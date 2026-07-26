@@ -2946,6 +2946,14 @@ export interface VideoPlacementRow {
   conversions: number;
   conversionsValue: number;
   videoViews: number;
+  /**
+   * Of kosten/klikken/conversies betekenisvol zijn. Bij Performance Max levert Google alleen
+   * vertoningen per placement — dan staat dit op false en mag er geen kosten- of CPA-oordeel
+   * op gebaseerd worden. Zonder deze vlag zou een PMax-placement er uitzien als "gratis".
+   */
+  metricsComplete: boolean;
+  /** Welke campagnesoort deze placement voedde; bepaalt ook hoe je 'm uitsluit. */
+  source: "video" | "pmax";
 }
 
 /**
@@ -3004,6 +3012,69 @@ export async function getVideoPlacementsByMonth(
         conversions: m.conversions || 0,
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
         videoViews: m.videoViews || m.video_views || 0,
+        metricsComplete: true,
+        source: "video" as const,
+      };
+    });
+  } catch { return []; }
+}
+
+/**
+ * Placements van Performance Max-campagnes. Ook PMax adverteert met video op YouTube, dus die
+ * plaatsingen horen in hetzelfde beeld — maar de data is wezenlijk beperkter.
+ *
+ * Google publiceert voor PMax uitsluitend het AANTAL VERTONINGEN per placement, geen kosten,
+ * klikken of conversies. Daarom komt metricsComplete op false: de uitsluit-logica mag hier geen
+ * "kost geld, levert niets"-conclusie op bouwen, want die kosten kent niemand. Wat wel kan is een
+ * plaatsing herkennen die er inhoudelijk niet hoort (spel- en kinder-apps) en materieel bereik krijgt.
+ *
+ * Uitsluiten werkt bij PMax bovendien anders: dat gaat via de uitsluitingslijst op accountniveau,
+ * niet per campagne.
+ */
+export async function getPmaxPlacementViewByMonth(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string
+): Promise<VideoPlacementRow[]> {
+  try {
+    const rows = await queryGoogleAds(credentials, customerId, `
+      SELECT
+        campaign.id,
+        campaign.name,
+        performance_max_placement_view.placement,
+        performance_max_placement_view.display_name,
+        performance_max_placement_view.placement_type,
+        performance_max_placement_view.target_url,
+        metrics.impressions
+      FROM performance_max_placement_view
+      WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+        AND metrics.impressions > 0
+      ORDER BY metrics.impressions DESC
+      LIMIT 1000
+    `);
+
+    return rows.map((row) => {
+      const c = row.campaign as Record<string, string>;
+      const pv = (row.performanceMaxPlacementView || row.performance_max_placement_view) as Record<string, string>;
+      const m = row.metrics as Record<string, number>;
+      return {
+        campaignId: c?.id || "",
+        campaignName: c?.name || "",
+        placement: pv?.placement || "",
+        displayName: pv?.displayName || pv?.display_name || "",
+        placementType: pv?.placementType || pv?.placement_type || "UNKNOWN",
+        targetUrl: pv?.targetUrl || pv?.target_url || "",
+        impressions: m?.impressions || 0,
+        // Google levert deze niet voor PMax; expliciet 0 houden en via metricsComplete markeren
+        // dat ze onbekend zijn in plaats van nul.
+        clicks: 0,
+        cost: 0,
+        conversions: 0,
+        conversionsValue: 0,
+        videoViews: 0,
+        metricsComplete: false,
+        source: "pmax" as const,
       };
     });
   } catch { return []; }

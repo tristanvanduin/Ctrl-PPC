@@ -24,6 +24,13 @@ export interface PlacementInput {
   cost: number;
   conversions: number;
   videoViews: number;
+  /**
+   * Of kosten/klikken/conversies bekend zijn. Bij Performance Max levert Google alleen
+   * vertoningen per placement. Ontbreekt deze vlag, dan gaan we uit van volledige cijfers
+   * (de video-campagnes leveren die wel).
+   */
+  metricsComplete?: boolean;
+  source?: "video" | "pmax";
 }
 
 export interface PlacementAgg {
@@ -41,6 +48,11 @@ export interface PlacementAgg {
   cpv: number | null;
   cpa: number | null;
   viewRate: number | null;
+  /** False zodra er PMax-bereik in zit: dan zijn kosten en conversies onvolledig. */
+  metricsComplete: boolean;
+  /** Vertoningen waarvoor geen kosten/conversies bekend zijn (de PMax-kant). */
+  impressionsWithoutMetrics: number;
+  sources: Array<"video" | "pmax">;
 }
 
 /** Minimale spend voordat een placement überhaupt de moeite van een oordeel waard is. */
@@ -50,6 +62,11 @@ export const MIN_VIEWS_TO_JUDGE = 500;
 export const MIN_CLICKS_TO_JUDGE = 25;
 /** Hoeveel duurder dan de mediaan-CPA een converterende placement mag zijn voordat hij opvalt. */
 export const CPA_MULTIPLE_FOR_REVIEW = 2.5;
+/**
+ * Bereikdrempel voor placements waarvan alleen vertoningen bekend zijn (Performance Max).
+ * Hoger dan de spend-drempel, want vertoningen zijn een zwakker signaal dan besteed budget.
+ */
+export const MIN_IMPRESSIONS_WITHOUT_METRICS = 5_000;
 
 export type PlacementVerdict = "uitsluiten" | "bekijken" | "houden" | "te_weinig_data";
 
@@ -84,24 +101,32 @@ export function placementTypeLabel(t: string): string {
 
 /** Sommeer per placement; ratio's uit de totalen. */
 export function aggregatePlacements(rows: PlacementInput[]): PlacementAgg[] {
-  const m = new Map<string, PlacementAgg & { campaignSet: Set<string> }>();
+  const m = new Map<string, PlacementAgg & { campaignSet: Set<string>; sourceSet: Set<"video" | "pmax"> }>();
   for (const r of rows) {
     const key = r.placement || r.displayName;
     if (!key) continue;
     const a = m.get(key) ?? {
       placement: r.placement, displayName: r.displayName || r.placement,
       placementType: r.placementType, targetUrl: r.targetUrl,
-      campaigns: [], campaignSet: new Set<string>(),
+      campaigns: [], campaignSet: new Set<string>(), sourceSet: new Set<"video" | "pmax">(),
       impressions: 0, clicks: 0, cost: 0, conversions: 0, videoViews: 0,
       cpm: null, cpv: null, cpa: null, viewRate: null,
+      metricsComplete: true, impressionsWithoutMetrics: 0, sources: [],
     };
     if (r.displayName) a.displayName = r.displayName;
     if (r.campaignName) a.campaignSet.add(r.campaignName);
+    a.sourceSet.add(r.source ?? "video");
     a.impressions += r.impressions;
     a.clicks += r.clicks;
     a.cost += r.cost;
     a.conversions += r.conversions;
     a.videoViews += r.videoViews;
+    // Eén rij zonder kosten/conversies maakt het totaal onvolledig: je mag dan geen CPA claimen
+    // over bereik waarvan je de kosten niet kent.
+    if (r.metricsComplete === false) {
+      a.metricsComplete = false;
+      a.impressionsWithoutMetrics += r.impressions;
+    }
     m.set(key, a);
   }
   return [...m.values()].map((a) => ({
@@ -115,10 +140,15 @@ export function aggregatePlacements(rows: PlacementInput[]): PlacementAgg[] {
     cost: a.cost,
     conversions: a.conversions,
     videoViews: a.videoViews,
-    cpm: a.impressions > 0 ? (a.cost / a.impressions) * 1000 : null,
-    cpv: a.videoViews > 0 ? a.cost / a.videoViews : null,
-    cpa: a.conversions > 0 ? a.cost / a.conversions : null,
-    viewRate: a.impressions > 0 ? a.videoViews / a.impressions : null,
+    // Ratio's alleen als de onderliggende cijfers compleet zijn; anders zouden ze een
+    // PMax-placement goedkoper laten lijken dan hij is (kosten onbekend, niet nul).
+    cpm: a.metricsComplete && a.impressions > 0 ? (a.cost / a.impressions) * 1000 : null,
+    cpv: a.metricsComplete && a.videoViews > 0 ? a.cost / a.videoViews : null,
+    cpa: a.metricsComplete && a.conversions > 0 ? a.cost / a.conversions : null,
+    viewRate: a.metricsComplete && a.impressions > 0 ? a.videoViews / a.impressions : null,
+    metricsComplete: a.metricsComplete,
+    impressionsWithoutMetrics: a.impressionsWithoutMetrics,
+    sources: [...a.sourceSet].sort(),
   }));
 }
 
@@ -138,6 +168,31 @@ export function judgePlacements(aggs: PlacementAgg[]): PlacementJudgement[] {
   const median = medianCpa(aggs);
 
   return aggs.map((agg) => {
+    // Performance Max: Google geeft alleen vertoningen per placement. Een kosten- of CPA-oordeel
+    // is hier onmogelijk — dat zou een claim zijn over cijfers die niemand heeft. Wat wél kan is
+    // een plaatsing herkennen die er inhoudelijk niet thuishoort en materieel bereik krijgt.
+    if (!agg.metricsComplete) {
+      if (agg.impressions < MIN_IMPRESSIONS_WITHOUT_METRICS) {
+        return {
+          agg,
+          verdict: "te_weinig_data" as const,
+          reason: `Alleen vertoningen bekend (Performance Max levert geen kosten of conversies per placement) en met ${int(agg.impressions)} vertoningen te weinig bereik om iets te vinden.`,
+        };
+      }
+      if (isAppPlacement(agg.placementType)) {
+        return {
+          agg,
+          verdict: "uitsluiten" as const,
+          reason: `App-plaatsing met ${int(agg.impressions)} vertoningen vanuit Performance Max. Kosten en conversies geeft Google hier niet, dus dit oordeel gaat op plaatsingssoort en bereik — apps leveren zelden zakelijke aanvragen. Uitsluiten kan alleen accountbreed.`,
+        };
+      }
+      return {
+        agg,
+        verdict: "bekijken" as const,
+        reason: `${int(agg.impressions)} vertoningen vanuit Performance Max, maar Google levert daar geen kosten of conversies per placement. Beoordeel zelf of deze plek bij je doelgroep past; harde cijfers zijn er niet.`,
+      };
+    }
+
     const enoughBase = agg.videoViews >= MIN_VIEWS_TO_JUDGE || agg.clicks >= MIN_CLICKS_TO_JUDGE;
     if (agg.cost < MIN_SPEND_TO_JUDGE || !enoughBase) {
       return {
