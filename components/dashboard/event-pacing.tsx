@@ -60,9 +60,9 @@ export function EventPacing({ clientId, geoClone }: { clientId: string; geoClone
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <CalendarClock className="w-4.5 h-4.5 text-rm-blue" />
         <h3 className="text-sm font-semibold text-rm-gray">Pacing richting de beurs</h3>
-        <span className="text-[11px] text-muted-foreground">event-relatief · vs vorige editie</span>
+        <span className="text-meta text-muted-foreground">event-relatief · vs vorige editie</span>
         {data.daysToFair != null && (
-          <span className="ml-auto text-[11px] font-medium text-rm-blue">
+          <span className="ml-auto text-meta font-medium text-rm-blue">
             nog {data.daysToFair} {data.daysToFair === 1 ? "dag" : "dagen"} tot {data.fairLabel}
           </span>
         )}
@@ -70,7 +70,7 @@ export function EventPacing({ clientId, geoClone }: { clientId: string; geoClone
 
       <div className="px-5 py-4">
         {!data.comparable ? (
-          <div className="text-[12px] text-muted-foreground flex items-start gap-2">
+          <div className="text-body text-muted-foreground flex items-start gap-2">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
               Nog niet vergelijkbaar met de vorige editie{data.previousEditionId ? ` (${data.previousEditionId})` : ""}:
@@ -81,27 +81,27 @@ export function EventPacing({ clientId, geoClone }: { clientId: string; geoClone
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <div className="text-[11px] text-muted-foreground">Opbouw tot nu (deze editie)</div>
+              <div className="text-meta text-muted-foreground">Opbouw tot nu (deze editie)</div>
               <div className="text-lg font-semibold text-rm-gray mt-0.5">{fmt(data.currentCumulative)}</div>
-              <div className="text-[10px] text-muted-foreground">conversies</div>
+              <div className="text-micro text-muted-foreground">conversies</div>
             </div>
             <div>
-              <div className="text-[11px] text-muted-foreground">Vorige editie op ditzelfde punt</div>
+              <div className="text-meta text-muted-foreground">Vorige editie op ditzelfde punt</div>
               <div className="text-lg font-semibold text-rm-gray mt-0.5">{fmt(data.previousCumulative)}</div>
-              <div className="text-[10px] text-muted-foreground">{data.previousEditionId ?? "vorige editie"}, gelijke afstand</div>
+              <div className="text-micro text-muted-foreground">{data.previousEditionId ?? "vorige editie"}, gelijke afstand</div>
             </div>
             <div>
-              <div className="text-[11px] text-muted-foreground">Pacing vs vorige editie</div>
+              <div className="text-meta text-muted-foreground">Pacing vs vorige editie</div>
               <div className={`text-lg font-semibold mt-0.5 flex items-center gap-1.5 ${toneClass}`}>
                 <TrendIcon className="w-4 h-4" /> {pct(data.deltaPct)}
               </div>
-              <div className="text-[10px] text-muted-foreground">{behind ? "loopt achter" : ahead ? "loopt voor" : "op koers"}</div>
+              <div className="text-micro text-muted-foreground">{behind ? "loopt achter" : ahead ? "loopt voor" : "op koers"}</div>
             </div>
           </div>
         )}
 
         {effectivenessNote && (
-          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-800">
             De aanloop ligt achter terwijl de spend gelijk of hoger is ({pct(data.costDeltaPct)}): dit is een
             effectiviteitsvraag, geen budgetkwestie — kijk naar conversieratio en targeting vóór je meer budget inzet.
           </div>

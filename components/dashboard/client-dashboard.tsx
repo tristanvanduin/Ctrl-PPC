@@ -140,7 +140,7 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
             <button key={s.id} onClick={() => onChange(s.tabs[0])}
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${active ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground hover:text-rm-gray"}`}>
               {s.icon}{s.label}
-              {showBadge && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-500 text-white">{sopErrorCount}</span>}
+              {showBadge && <span className="ml-1 px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-500 text-white">{sopErrorCount}</span>}
             </button>
           );
         })}
@@ -152,9 +152,9 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
             const active = activeTab === t;
             return (
               <button key={t} onClick={() => onChange(t)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${active ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-lead font-medium transition-colors ${active ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
                 {TAB_LABELS[t]}
-                {t === "files" && sopErrorCount > 0 && <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-500 text-white">{sopErrorCount}</span>}
+                {t === "files" && sopErrorCount > 0 && <span className="px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-500 text-white">{sopErrorCount}</span>}
               </button>
             );
           })}
@@ -237,7 +237,7 @@ export function ClientDashboard({ client }: { client: Client }) {
             {tab.icon}
             {tab.label}
             {tab.id === "files" && sopErrors.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-500 text-white">
+              <span className="ml-1 px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-500 text-white">
                 {sopErrors.length}
               </span>
             )}
@@ -297,7 +297,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                   <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                   <button
                     onClick={() => setCountryFilter(null)}
-                    className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                    className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
                       countryFilter === null ? "bg-rm-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-rm-gray"
                     }`}
                   >
@@ -307,7 +307,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                     <button
                       key={code}
                       onClick={() => setCountryFilter(countryFilter === code ? null : code)}
-                      className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                      className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
                         countryFilter === code ? "bg-rm-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-rm-gray"
                       }`}
                     >
@@ -376,7 +376,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                 // kanalen) is de juiste tool. De kalenderjaar-prognose vertekent bij een event —
                 // die staat op "Hele account".
                 <>
-                  <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-[11px] text-blue-800">
+                  <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-meta text-blue-800">
                     Je zit in de beurs <strong>{geoClone}</strong>. Hieronder de <strong>event-relatieve prognose</strong>
                     {" "}(dagen-tot-beurs, over alle kanalen) — de juiste projectie voor een beurs. De kalenderjaar-prognose
                     per kanaal staat op <strong>← Hele account</strong>.
@@ -453,7 +453,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                       event/edities zijn hierboven al beurs-specifiek geregeld; die niet
                       nog eens (en al helemaal niet voor álle beurzen) hieronder herhalen. */}
                   <details className="rounded-xl border border-border bg-gray-50/50">
-                    <summary className="cursor-pointer px-5 py-3 text-[12px] font-medium text-muted-foreground">
+                    <summary className="cursor-pointer px-5 py-3 text-body font-medium text-muted-foreground">
                       Account-instellingen (KPI-doelen, conversie-acties — waarvan deze beurs erft) tonen
                     </summary>
                     <div className="p-5 space-y-6">
@@ -508,7 +508,7 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
   // eronder, zodat je alle analyses ziet zonder dat een volledige SOP-uitwerking ze wegduwt.
   const Section = ({ children }: { children: React.ReactNode }) => (
     <div className="flex items-center gap-3 pt-1">
-      <span className="text-[10px] font-semibold text-rm-blue uppercase tracking-wide whitespace-nowrap">{children}</span>
+      <span className="text-micro font-semibold text-rm-blue uppercase tracking-wide whitespace-nowrap">{children}</span>
       <span className="h-px flex-1 bg-border" />
     </div>
   );
@@ -620,7 +620,7 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
         </>
       )}
 
-      <p className="text-[11px] text-muted-foreground pt-2">
+      <p className="text-meta text-muted-foreground pt-2">
         De uitkomsten (wachtrij, inzichten, aanbevelingen, hypotheses, taken) landen in het tabblad <strong>Bevindingen</strong>;
         van de maand-SOP komt automatisch een <strong>PDF bij Bestanden</strong>.
       </p>

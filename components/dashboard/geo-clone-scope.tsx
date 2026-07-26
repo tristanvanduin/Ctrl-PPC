@@ -20,7 +20,7 @@ export function GeoCloneScope({ value, onChange }: { value: string | null; onCha
   if (variants.length === 0) return null;
 
   const pill = (active: boolean) =>
-    `px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+    `px-2.5 py-1 text-meta font-medium rounded-md transition-colors ${
       active ? "bg-rm-blue text-white" : "bg-blue-50 text-muted-foreground hover:text-rm-gray"
     }`;
 
@@ -30,13 +30,13 @@ export function GeoCloneScope({ value, onChange }: { value: string | null; onCha
     const active = variants.find((v) => v.abbreviation === value);
     return (
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+        <span className="text-meta text-muted-foreground flex items-center gap-1">
           <MapPin className="w-3.5 h-3.5" /> Beurs:
         </span>
-        <span className="px-2.5 py-1 text-[11px] font-medium rounded-md bg-rm-blue text-white">
+        <span className="px-2.5 py-1 text-meta font-medium rounded-md bg-rm-blue text-white">
           {active ? `${active.brand} ${active.location} (${active.abbreviation})` : value}
         </span>
-        <button onClick={() => onChange(null)} className="text-[11px] text-muted-foreground hover:text-rm-blue underline underline-offset-2">
+        <button onClick={() => onChange(null)} className="text-meta text-muted-foreground hover:text-rm-blue underline underline-offset-2">
           ← Hele account
         </button>
       </div>
@@ -46,7 +46,7 @@ export function GeoCloneScope({ value, onChange }: { value: string | null; onCha
   // Op accountniveau: de volledige beurs-kiezer om in een beurs te stappen.
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+      <span className="text-meta text-muted-foreground flex items-center gap-1">
         <MapPin className="w-3.5 h-3.5" /> Beurs:
       </span>
       <button onClick={() => onChange(null)} className={pill(value === null)}>Hele account</button>

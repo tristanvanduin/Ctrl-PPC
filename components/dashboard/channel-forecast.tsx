@@ -92,10 +92,10 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
     return { spendF, convF, dayOfMonth, daysInMonth, curMtd: cur, monthsCount: fullSpend.length };
   }, [rows]);
 
-  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   if (rows === null) return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
   if (!model) {
-    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">Nog geen {cfg.label}-dagdata voor een prognose. Zodra de sync draait, verschijnt hier de run-rate-prognose.</div>;
+    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">Nog geen {cfg.label}-dagdata voor een prognose. Zodra de sync draait, verschijnt hier de run-rate-prognose.</div>;
   }
 
   const { spendF, convF, dayOfMonth, daysInMonth, curMtd, monthsCount } = model;
@@ -103,7 +103,7 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-[11px] text-blue-800 flex gap-2">
+      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-meta text-blue-800 flex gap-2">
         <Info className="w-4 h-4 shrink-0 mt-0.5" />
         <span>
           Run-rate-prognose: de lopende maand geprojecteerd op het tempo tot nu (dag {dayOfMonth} van {daysInMonth}),
@@ -116,24 +116,24 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Lopende maand */}
         <div className="bg-white rounded-xl border border-border shadow-sm p-4">
-          <div className="text-[11px] font-semibold text-rm-blue uppercase tracking-wide mb-2">Lopende maand (projectie)</div>
-          <div className="space-y-1.5 text-[13px]">
+          <div className="text-meta font-semibold text-rm-blue uppercase tracking-wide mb-2">Lopende maand (projectie)</div>
+          <div className="space-y-1.5 text-lead">
             <Row label="Spend tot nu" value={eur(curMtd.spend)} />
             <Row label="Spend geprojecteerd" value={eur(spendF.currentMonthProjected)} strong warn={!spendF.currentMonthReliable} />
             <Row label={`${cfg.convLabel} tot nu`} value={fmt(curMtd.conv)} />
             <Row label={`${cfg.convLabel} geprojecteerd`} value={fmt(convF.currentMonthProjected)} strong warn={!convF.currentMonthReliable} />
           </div>
-          {!spendF.currentMonthReliable && <p className="text-[10px] text-amber-600 mt-2">Nog weinig dagen deze maand — de projectie is grof.</p>}
+          {!spendF.currentMonthReliable && <p className="text-micro text-amber-600 mt-2">Nog weinig dagen deze maand — de projectie is grof.</p>}
         </div>
 
         {/* Volgende maand */}
         <div className="bg-white rounded-xl border border-border shadow-sm p-4">
-          <div className="text-[11px] font-semibold text-rm-blue uppercase tracking-wide mb-2">Volgende volle maand (trend)</div>
-          <div className="space-y-1.5 text-[13px]">
+          <div className="text-meta font-semibold text-rm-blue uppercase tracking-wide mb-2">Volgende volle maand (trend)</div>
+          <div className="space-y-1.5 text-lead">
             <Row label="Spend verwacht" value={eur(spendF.nextMonthProjected)} strong />
             <Row label={`${cfg.convLabel} verwacht`} value={fmt(convF.nextMonthProjected)} strong />
           </div>
-          <p className="text-[10px] text-muted-foreground mt-2">
+          <p className="text-micro text-muted-foreground mt-2">
             {spendF.nextMonthMethod === "trend" ? "Lineaire trend over de recente maanden, geklemd tegen wilde uitschieters." : spendF.nextMonthMethod === "laatste" ? "Te weinig maanden voor een trend — gelijk aan de laatste volle maand." : "Onvoldoende data."}
           </p>
         </div>

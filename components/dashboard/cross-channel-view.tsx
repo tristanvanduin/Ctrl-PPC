@@ -85,7 +85,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
         </div>
 
         <div className="px-5 py-4">
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-[11px] text-blue-800 flex gap-2 mb-4">
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-meta text-blue-800 flex gap-2 mb-4">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
               Blended cijfers zijn <strong>indicatief</strong>: elk kanaal meet zijn eigen attributie, dus de som is geen
@@ -94,21 +94,21 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
           </div>
 
           {rows === null && !error && (
-            <div className="flex items-center gap-2 text-[12px] text-muted-foreground py-8 justify-center">
+            <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Laden...
             </div>
           )}
           {error && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>
           )}
           {rows && rows.length === 0 && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
               Nog geen cross-channel data. Zodra minstens één kanaal (Google/Meta/LinkedIn) gesynct is, verschijnt hier de blended maandview.
             </div>
           )}
           {rows && rows.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-body">
                 <thead>
                   <tr className="text-left text-muted-foreground border-b border-border">
                     <th className="py-2 pr-4 font-medium">Maand</th>

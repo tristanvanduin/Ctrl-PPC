@@ -48,7 +48,7 @@ function QuartileBar({ p25, p50, p75, p100 }: { p25: number | null; p50: number 
               style={{ height: `${Math.max(2, Math.min(100, (s.v ?? 0) * 100))}%` }}
             />
           </div>
-          <span className="text-[8px] text-muted-foreground leading-none">{s.label}</span>
+          <span className="text-micro text-muted-foreground leading-none">{s.label}</span>
         </div>
       ))}
     </div>
@@ -109,13 +109,13 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <PlayCircle className="w-4.5 h-4.5 text-rm-blue" />
         <h3 className="text-sm font-semibold text-rm-gray">Video (YouTube)</h3>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           beoordeeld op bereik en kijkgedrag — niet op klikken of CPA
         </span>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-body">
           <thead>
             <tr className="text-left text-muted-foreground border-b border-border">
               <th className="px-5 py-2 font-medium">Campagne</th>
@@ -142,7 +142,7 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
                   <td className="px-3 py-2"><QuartileBar p25={a.p25} p50={a.p50} p75={a.p75} p100={a.p100} /></td>
                   <td className="px-5 py-2">
                     <span
-                      className={`inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${DIAGNOSIS_STYLE[d]}`}
+                      className={`inline-block rounded-md border px-1.5 py-0.5 text-micro font-medium ${DIAGNOSIS_STYLE[d]}`}
                       title={VIDEO_DIAGNOSIS_EXPLAIN[d]}
                     >
                       {VIDEO_DIAGNOSIS_LABEL[d]}
@@ -158,7 +158,7 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
       {/* De duiding uitgeschreven: een badge alleen laat de lezer raden wat te doen. */}
       <div className="px-5 py-3 border-t border-border space-y-1">
         {[...new Set(aggs.map((a) => diagnoseVideo(a)))].map((d) => (
-          <p key={d} className="text-[11px] text-muted-foreground">
+          <p key={d} className="text-meta text-muted-foreground">
             <strong className="text-rm-gray">{VIDEO_DIAGNOSIS_LABEL[d]}:</strong> {VIDEO_DIAGNOSIS_EXPLAIN[d]}
           </p>
         ))}

@@ -95,25 +95,25 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <Ban className="w-4.5 h-4.5 text-rm-blue" />
         <h3 className="text-sm font-semibold text-rm-gray">Waar je video&apos;s draaien</h3>
-        <span className="text-[11px] text-muted-foreground">voorstel welke placements uit te sluiten</span>
+        <span className="text-meta text-muted-foreground">voorstel welke placements uit te sluiten</span>
       </div>
 
       {excluding.length > 0 && (
         <div className="px-5 py-3 border-b border-border bg-red-50/50 space-y-1">
           {withCost.length > 0 && (
-            <p className="text-[12px] text-rm-gray">
+            <p className="text-body text-rm-gray">
               <strong>{withCost.length} placement{withCost.length === 1 ? "" : "s"}</strong> kostte{withCost.length === 1 ? "" : "n"} samen{" "}
               <strong>{eur(waste)}</strong> zonder één conversie. Uitsluiten geeft dat budget terug aan de plekken die wél werken.
             </p>
           )}
           {impressionsOnly.length > 0 && (
-            <p className="text-[12px] text-rm-gray">
+            <p className="text-body text-rm-gray">
               Daarnaast {impressionsOnly.length === 1 ? "staat er 1 plaatsing" : `staan er ${impressionsOnly.length} plaatsingen`} uit{" "}
               <strong>Performance Max</strong> met samen {int(impressionsOnly.reduce((s, j) => s + j.agg.impressions, 0))} vertoningen.
               Google geeft daar geen kosten of conversies bij, dus wat die precies kosten is niet te zeggen.
             </p>
           )}
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-meta text-muted-foreground">
             Uit te sluiten in Google Ads via de campagne → Content → Uitsluitingen; voor Performance Max
             alleen accountbreed. Dit dashboard doet het niet automatisch: eenmaal uitgesloten leer je
             niets meer over die plek.
@@ -122,7 +122,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-body">
           <thead>
             <tr className="text-left text-muted-foreground border-b border-border">
               <th className="px-5 py-2 font-medium">Placement</th>
@@ -148,11 +148,11 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
                       </a>
                     )}
                   </div>
-                  <div className="text-[10px] text-muted-foreground">{reason}</div>
+                  <div className="text-micro text-muted-foreground">{reason}</div>
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">
                   {placementTypeLabel(agg.placementType)}
-                  {agg.sources.includes("pmax") && <span className="block text-[9px] text-muted-foreground">via PMax</span>}
+                  {agg.sources.includes("pmax") && <span className="block text-micro text-muted-foreground">via PMax</span>}
                 </td>
                 <td className="px-3 py-2 text-right">{int(agg.impressions)}</td>
                 <td className="px-3 py-2 text-right">{agg.metricsComplete ? eur(agg.cost) : <span className="text-muted-foreground" title="Performance Max levert geen kosten per placement">onbekend</span>}</td>
@@ -161,7 +161,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
                 <td className="px-3 py-2 text-right">{!agg.metricsComplete ? "—" : agg.conversions === 0 ? "—" : int(agg.conversions)}</td>
                 <td className="px-3 py-2 text-right">{agg.cpa == null ? "—" : eur(agg.cpa)}</td>
                 <td className="px-5 py-2">
-                  <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap ${VERDICT_STYLE[verdict]}`}>
+                  <span className={`inline-block rounded-md border px-1.5 py-0.5 text-micro font-medium whitespace-nowrap ${VERDICT_STYLE[verdict]}`}>
                     {VERDICT_LABEL[verdict]}
                   </span>
                 </td>

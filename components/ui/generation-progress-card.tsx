@@ -20,13 +20,13 @@ export function GenerationProgressCard({ title, job, fallbackMessage = "Voortgan
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold text-rm-gray">{title}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 text-meta text-muted-foreground">
             {job ? describeGenerationOutcome(job) : fallbackMessage}
           </p>
         </div>
         <div className="shrink-0 text-right">
           <p className="text-xs font-semibold text-rm-gray">{progress}%</p>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-micro text-muted-foreground">
             {job?.step_index ?? 0}/{job?.total_steps ?? 0} fases
           </p>
         </div>
@@ -48,7 +48,7 @@ export function GenerationProgressCard({ title, job, fallbackMessage = "Voortgan
             const isFailed = phase.state === "failed";
             const isDone = phase.state === "completed";
             return (
-              <div key={phase.phase_key} className="flex items-start gap-2 text-[11px]">
+              <div key={phase.phase_key} className="flex items-start gap-2 text-meta">
                 <span className="mt-0.5 shrink-0">
                   {isCurrent && <Loader2 className="h-3.5 w-3.5 animate-spin text-rm-blue" />}
                   {isDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
@@ -62,7 +62,7 @@ export function GenerationProgressCard({ title, job, fallbackMessage = "Voortgan
                     {phase.phase_label}
                   </p>
                   {phase.details && (
-                    <p className="text-[10px] text-muted-foreground">{phase.details}</p>
+                    <p className="text-micro text-muted-foreground">{phase.details}</p>
                   )}
                 </div>
               </div>
@@ -72,14 +72,14 @@ export function GenerationProgressCard({ title, job, fallbackMessage = "Voortgan
       )}
 
       {job?.status === "failed" && job.error_message && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[11px] text-red-700">
+        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-meta text-red-700">
           {job.error_message}
           {job.partial_output_exists ? " Partiële output is beschikbaar." : ""}
         </div>
       )}
 
       {job?.status === "completed" && (
-        <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[11px] text-emerald-700">
+        <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-meta text-emerald-700">
           {job.message || "Resultaat gereed."}
         </div>
       )}

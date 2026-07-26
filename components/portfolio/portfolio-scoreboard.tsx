@@ -87,9 +87,9 @@ function MiniSparkline({ data }: { data: number[] }) {
 function SummaryCard({ label, value, color, subtitle }: { label: string; value: string; color?: string; subtitle?: string }) {
   return (
     <div className="bg-white rounded-xl border border-border p-4 shadow-sm">
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+      <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
       <p className={`text-lg font-bold mt-1 ${color ?? "text-rm-gray"}`}>{value}</p>
-      {subtitle && <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>}
+      {subtitle && <p className="text-micro text-muted-foreground mt-0.5">{subtitle}</p>}
     </div>
   );
 }
@@ -168,7 +168,7 @@ export function PortfolioScoreboard() {
   const SortHeader = ({ col, label, align }: { col: typeof sortBy; label: string; align?: string }) => (
     <th
       onClick={() => handleSort(col)}
-      className={`px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue transition-colors ${align === "right" ? "text-right" : "text-left"}`}
+      className={`px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue transition-colors ${align === "right" ? "text-right" : "text-left"}`}
     >
       {label}
       {sortBy === col && (
@@ -226,15 +226,15 @@ export function PortfolioScoreboard() {
           {activeCount > 0 && (
             <div className="hidden lg:grid grid-cols-3 gap-6 text-right">
               <div>
-                <p className="text-white/50 text-[10px] uppercase tracking-wider">Totaal conversies</p>
+                <p className="text-white/50 text-micro uppercase tracking-wider">Totaal conversies</p>
                 <p className="text-xl font-bold">{num(portfolioConv)}</p>
               </div>
               <div>
-                <p className="text-white/50 text-[10px] uppercase tracking-wider">Totaal omzet</p>
+                <p className="text-white/50 text-micro uppercase tracking-wider">Totaal omzet</p>
                 <p className="text-xl font-bold">{fmt(portfolioRev)}</p>
               </div>
               <div>
-                <p className="text-white/50 text-[10px] uppercase tracking-wider">Gem. ROAS</p>
+                <p className="text-white/50 text-micro uppercase tracking-wider">Gem. ROAS</p>
                 <p className="text-xl font-bold">{portfolioRoas.toFixed(1)}x</p>
               </div>
             </div>
@@ -262,8 +262,8 @@ export function PortfolioScoreboard() {
               <SortHeader col="revenue" label="Omzet YTD" align="right" />
               <SortHeader col="roas" label="ROAS" align="right" />
               <SortHeader col="cpa" label="CPA" align="right" />
-              <th className="px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider text-center">Spend YTD</th>
-              <th className="px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider text-center">Trend</th>
+              <th className="px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider text-center">Spend YTD</th>
+              <th className="px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider text-center">Trend</th>
               <th className="px-4 py-3 w-10"></th>
             </tr>
           </thead>
@@ -346,7 +346,7 @@ export function PortfolioScoreboard() {
           </tbody>
         </table>
         {emptyCount > 0 && (
-          <div className="flex items-center justify-between px-4 py-2.5 border-t border-border bg-gray-50/50 text-[11px] text-muted-foreground">
+          <div className="flex items-center justify-between px-4 py-2.5 border-t border-border bg-gray-50/50 text-meta text-muted-foreground">
             <span>
               {showEmpty
                 ? `${emptyCount} lege ${emptyCount === 1 ? "account" : "accounts"} zonder spend worden getoond.`

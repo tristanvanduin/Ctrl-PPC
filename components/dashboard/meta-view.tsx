@@ -42,7 +42,7 @@ export function MetaView({ clientId, geoClone }: { clientId: string; geoClone?: 
         delivers={SECTIONS}
         analysesHint={<>De Meta-analyses (maand-SOP, creative vision, briefing, signalen) draai je via het tabblad <strong>Analyses</strong> → Meta.</>}
         warning={connected === false ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
             Meta is nog niet gekoppeld. Configureer de Meta-credentials (env) en draai de sync; daarna vult dit tabblad met campagnes, ad sets, creatives en breakdowns.
           </div>
         ) : undefined}

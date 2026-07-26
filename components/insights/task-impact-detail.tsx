@@ -75,7 +75,7 @@ export function TaskImpactDetail({
 
         return (
           <div key={d.label} className="bg-gray-50 rounded-lg p-2 text-center">
-            <p className="text-[9px] text-muted-foreground font-medium uppercase">{d.label}</p>
+            <p className="text-micro text-muted-foreground font-medium uppercase">{d.label}</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               {isNeutral ? (
                 <Minus className="w-3 h-3 text-gray-400" />
@@ -84,13 +84,13 @@ export function TaskImpactDetail({
               ) : (
                 <TrendingDown className="w-3 h-3 text-red-500" />
               )}
-              <span className={`text-[11px] font-bold ${
+              <span className={`text-meta font-bold ${
                 isNeutral ? "text-gray-400" : isPositive ? "text-green-600" : "text-red-500"
               }`}>
                 {d.deltaPct > 0 ? "+" : ""}{d.deltaPct.toFixed(1)}%
               </span>
             </div>
-            <p className="text-[9px] text-muted-foreground mt-0.5">
+            <p className="text-micro text-muted-foreground mt-0.5">
               {d.before} → {d.after}
             </p>
           </div>

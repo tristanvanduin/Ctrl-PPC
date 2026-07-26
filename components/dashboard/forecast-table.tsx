@@ -70,7 +70,7 @@ export function ForecastTable({ clientId }: { clientId: string }) {
   return (
     <div className="space-y-4">
       {hasEvents && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
           <strong>Event-gedreven account.</strong> Deze kalender-jaarprognose vergelijkt elke maand met dezelfde
           kalendermaand vorig jaar. Voor een beurs met een andere cadans (bijv. 2-jaarlijks) vertekent dat de
           maandvorm — vorig jaar was er dan geen beurs. Gebruik de <strong>beursanalyse</strong> (kies een beurs
@@ -106,11 +106,11 @@ export function ForecastTable({ clientId }: { clientId: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-t border-b border-border bg-gray-50/50">
-              <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Maand</th>
-              <th className="text-right text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Verwacht</th>
-              <th className="text-right text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Gerealiseerd</th>
-              <th className="text-right text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Prognose</th>
-              <th className="text-right text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Ratio</th>
+              <th className="text-left text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Maand</th>
+              <th className="text-right text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Verwacht</th>
+              <th className="text-right text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Gerealiseerd</th>
+              <th className="text-right text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Prognose</th>
+              <th className="text-right text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Ratio</th>
             </tr>
           </thead>
           <tbody>
@@ -176,10 +176,10 @@ export function ForecastTable({ clientId }: { clientId: string }) {
                 </tr>
                 {result.kpi.forecastSpreadPct > 0 && (
                   <tr className="bg-rm-blue/5">
-                    <td className="px-5 pb-2.5 text-[11px] text-muted-foreground" colSpan={2}>
+                    <td className="px-5 pb-2.5 text-meta text-muted-foreground" colSpan={2}>
                       Bandbreedte (o.b.v. de spreiding in gerealiseerde maanden)
                     </td>
-                    <td className="px-5 pb-2.5 text-right text-[11px] text-muted-foreground" colSpan={3}>
+                    <td className="px-5 pb-2.5 text-right text-meta text-muted-foreground" colSpan={3}>
                       {fmt(result.kpi.forecastLow)} – {fmt(result.kpi.forecastHigh)}
                       <span className="ml-1 opacity-70">(±{result.kpi.forecastSpreadPct}%)</span>
                     </td>

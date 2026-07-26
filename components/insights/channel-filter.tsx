@@ -15,13 +15,13 @@ export function ChannelFilter({ value, onChange, counts }: {
   counts?: Partial<Record<InsightChannel, number>>;
 }) {
   const pill = (active: boolean) =>
-    `px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
+    `px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
       active ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
     }`;
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+      <span className="text-meta text-muted-foreground flex items-center gap-1">
         <Filter className="w-3.5 h-3.5" /> Kanaal:
       </span>
       <button onClick={() => onChange(null)} className={pill(value === null)}>Alle</button>
@@ -36,9 +36,9 @@ export function ChannelFilter({ value, onChange, counts }: {
 }
 
 export function ChannelBadge({ channel }: { channel: InsightChannel | null }) {
-  if (!channel) return <span className="text-[10px] text-muted-foreground">—</span>;
+  if (!channel) return <span className="text-micro text-muted-foreground">—</span>;
   return (
-    <span className={`inline-block px-1.5 py-0.5 text-[9px] font-semibold rounded border ${CHANNEL_BADGE_CLASS[channel]}`}>
+    <span className={`inline-block px-1.5 py-0.5 text-micro font-semibold rounded border ${CHANNEL_BADGE_CLASS[channel]}`}>
       {CHANNEL_LABEL[channel]}
     </span>
   );

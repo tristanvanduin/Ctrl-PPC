@@ -156,7 +156,7 @@ function SidebarInner() {
               <Link
                 key={v.abbreviation}
                 href={`/client/${client.id}?geo=${v.abbreviation}`}
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] transition-colors ${
+                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-body transition-colors ${
                   activeGeo === v.abbreviation
                     ? "bg-rm-orange text-white font-medium"
                     : "text-white/60 hover:bg-white/10 hover:text-white"
@@ -164,7 +164,7 @@ function SidebarInner() {
               >
                 <MapPin className="w-3 h-3 shrink-0" />
                 <span className="truncate">{v.brand} {v.location}</span>
-                <span className="ml-auto text-[9px] opacity-60">{v.abbreviation}</span>
+                <span className="ml-auto text-micro opacity-60">{v.abbreviation}</span>
               </Link>
             ))}
           </div>
@@ -221,7 +221,7 @@ function SidebarInner() {
 
       {/* Client list with groups */}
       <div className="flex-1 overflow-y-auto px-3 space-y-0.5">
-        <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-3 py-2">
+        <p className="text-white/40 text-meta font-semibold uppercase tracking-wider px-3 py-2">
           Klanten{mounted ? ` (${totalCount})` : ""}
         </p>
 
@@ -250,8 +250,8 @@ function SidebarInner() {
                 ) : (
                   <FolderOpen className="w-3.5 h-3.5 shrink-0" />
                 )}
-                <span className="truncate font-medium text-[12px]">{group.name}</span>
-                <span className="ml-auto text-[10px] text-white/30">{group.clients.length}</span>
+                <span className="truncate font-medium text-body">{group.name}</span>
+                <span className="ml-auto text-micro text-white/30">{group.clients.length}</span>
               </button>
 
               {!isCollapsed && (

@@ -222,7 +222,7 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
       {/* Result message */}
       {syncMessage && (
         <span
-          className={`text-[10px] ${
+          className={`text-micro ${
             syncResult === "success" ? "text-green-600" : "text-red-500"
           }`}
         >

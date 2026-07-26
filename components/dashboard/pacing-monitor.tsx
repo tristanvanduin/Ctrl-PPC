@@ -105,7 +105,7 @@ export function PacingMonitor({ clientId, countryFilter }: { clientId: string; c
       <div className="flex items-center gap-2 mb-4">
         <Zap className="w-4.5 h-4.5 text-rm-blue" />
         <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Pacing</h3>
-        <span className="text-[10px] text-muted-foreground ml-auto">
+        <span className="text-micro text-muted-foreground ml-auto">
           Dag {dayOfYear} van 365 · {Math.round(yearProgressPct)}% van het jaar
         </span>
       </div>
@@ -116,15 +116,15 @@ export function PacingMonitor({ clientId, countryFilter }: { clientId: string; c
           <div className="relative">
             <PacingRing pct={convPacingPct} color={convColor} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] font-bold" style={{ color: convColor }}>
+              <span className="text-micro font-bold" style={{ color: convColor }}>
                 {Math.round(convPacingPct)}%
               </span>
             </div>
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold text-rm-gray">Conversies</p>
-            <p className="text-[10px] text-muted-foreground">{num(conv.ytdRealized)} / {num(conv.annualTarget)}</p>
-            <p className="text-[10px] font-medium" style={{ color: convColor }}>{convStatus}</p>
+            <p className="text-micro text-muted-foreground">{num(conv.ytdRealized)} / {num(conv.annualTarget)}</p>
+            <p className="text-micro font-medium" style={{ color: convColor }}>{convStatus}</p>
           </div>
         </div>
 
@@ -133,15 +133,15 @@ export function PacingMonitor({ clientId, countryFilter }: { clientId: string; c
           <div className="relative">
             <PacingRing pct={spendPacingPct} color={spendColor} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] font-bold" style={{ color: spendColor }}>
+              <span className="text-micro font-bold" style={{ color: spendColor }}>
                 {Math.round(spendPacingPct)}%
               </span>
             </div>
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold text-rm-gray">Budget</p>
-            <p className="text-[10px] text-muted-foreground">{fmt(spend.ytdRealized)} / {fmt(spend.annualTarget)}</p>
-            <p className="text-[10px] font-medium" style={{ color: spendColor }}>{spendStatus}</p>
+            <p className="text-micro text-muted-foreground">{fmt(spend.ytdRealized)} / {fmt(spend.annualTarget)}</p>
+            <p className="text-micro font-medium" style={{ color: spendColor }}>{spendStatus}</p>
           </div>
         </div>
 
@@ -149,14 +149,14 @@ export function PacingMonitor({ clientId, countryFilter }: { clientId: string; c
         <div className="border-l border-border pl-4">
           <div className="flex items-center gap-1.5 mb-1">
             <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tempo conversies</p>
+            <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Tempo conversies</p>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-bold text-rm-gray">{num(dailyConvRate)}</span>
-            <span className="text-[10px] text-muted-foreground">/dag</span>
+            <span className="text-micro text-muted-foreground">/dag</span>
           </div>
           {convNeededPerDay > 0 && (
-            <p className={`text-[10px] mt-1 ${dailyConvRate >= convNeededPerDay ? "text-green-600" : "text-red-500"}`}>
+            <p className={`text-micro mt-1 ${dailyConvRate >= convNeededPerDay ? "text-green-600" : "text-red-500"}`}>
               {dailyConvRate >= convNeededPerDay ? "✓" : "✗"} Nodig: {num(convNeededPerDay)}/dag
             </p>
           )}
@@ -166,14 +166,14 @@ export function PacingMonitor({ clientId, countryFilter }: { clientId: string; c
         <div className="border-l border-border pl-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tempo spend</p>
+            <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Tempo spend</p>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-bold text-rm-gray">{fmt(dailySpendRate)}</span>
-            <span className="text-[10px] text-muted-foreground">/dag</span>
+            <span className="text-micro text-muted-foreground">/dag</span>
           </div>
           {spendNeededPerDay > 0 && (
-            <p className={`text-[10px] mt-1 ${dailySpendRate >= spendNeededPerDay * 0.9 ? "text-green-600" : "text-red-500"}`}>
+            <p className={`text-micro mt-1 ${dailySpendRate >= spendNeededPerDay * 0.9 ? "text-green-600" : "text-red-500"}`}>
               {dailySpendRate >= spendNeededPerDay * 0.9 ? "✓" : "✗"} Nodig: {fmt(spendNeededPerDay)}/dag
             </p>
           )}

@@ -353,15 +353,15 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           <div className="flex gap-2">
             <button
               onClick={selectAllConversions}
-              className="flex items-center gap-1.5 text-[11px] font-medium text-rm-blue hover:underline"
+              className="flex items-center gap-1.5 text-meta font-medium text-rm-blue hover:underline"
             >
               <CheckSquare className="w-3.5 h-3.5" />
               Alles aan
             </button>
-            <span className="text-muted-foreground text-[11px]">·</span>
+            <span className="text-muted-foreground text-meta">·</span>
             <button
               onClick={selectNoneConversions}
-              className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:underline"
+              className="flex items-center gap-1.5 text-meta font-medium text-muted-foreground hover:underline"
             >
               <Square className="w-3.5 h-3.5" />
               Alles uit
@@ -404,7 +404,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
               <button onClick={() => toggleConversion(action.id)} className="flex-1 min-w-0 text-left">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-rm-gray truncate">{action.name}</span>
-                  <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                  <span className={`text-micro font-semibold uppercase px-1.5 py-0.5 rounded ${
                     action.category === "primary" ? "bg-rm-blue/10 text-rm-blue" : "bg-gray-200 text-gray-600"
                   }`}>
                     {action.category}
@@ -415,7 +415,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
               {/* "Only" button */}
               <button
                 onClick={() => selectOnlyConversion(action.id)}
-                className="text-[10px] text-muted-foreground hover:text-rm-blue shrink-0 px-2 py-1 rounded hover:bg-rm-blue/5 transition-colors"
+                className="text-micro text-muted-foreground hover:text-rm-blue shrink-0 px-2 py-1 rounded hover:bg-rm-blue/5 transition-colors"
                 title="Selecteer alleen deze"
               >
                 <Filter className="w-3 h-3" />
@@ -489,7 +489,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
                 <option value="mid_ticket">Mid ticket (AOV €50-€250)</option>
                 <option value="high_ticket">Hoog ticket (AOV &gt; €250)</option>
               </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
+              <p className="text-meta text-muted-foreground mt-1">
                 Bepaalt de ROAS context: lager ticket = hogere ROAS nodig voor winstgevendheid.
               </p>
             </div>
@@ -561,7 +561,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
                     className="w-32 text-sm"
                   />
                   {hasOverride && (
-                    <span className="text-[10px] text-rm-orange font-medium">Override actief</span>
+                    <span className="text-micro text-rm-orange font-medium">Override actief</span>
                   )}
                 </div>
               );
@@ -569,7 +569,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           })()}
         </div>
         {Object.keys(convOverrides).length > 0 && (
-          <p className="text-[11px] text-muted-foreground mt-3">
+          <p className="text-meta text-muted-foreground mt-3">
             {Object.keys(convOverrides).length} override(s) actief. De forecast gebruikt deze waarden i.p.v. de echte tracking data.
           </p>
         )}
@@ -588,7 +588,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
         {/* Detected countries */}
         {detectedCountries.length > 0 && activeCountries.length === 0 && (
           <div className="mb-4">
-            <p className="text-[11px] text-muted-foreground mb-2">Gedetecteerd op basis van campagnenamen:</p>
+            <p className="text-meta text-muted-foreground mb-2">Gedetecteerd op basis van campagnenamen:</p>
             <div className="flex flex-wrap gap-1.5">
               {detectedCountries.map((code) => (
                 <button
@@ -656,7 +656,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
               placeholder="bijv. 123456789"
               className="text-sm"
             />
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-meta text-muted-foreground mt-1">
               Vereist voor Merchant API snapshots. Dit is het Merchant Center account waarvan processed products gelezen worden.
             </p>
           </div>
@@ -812,7 +812,7 @@ function KpiCard({
             <div className="flex gap-1 bg-white rounded-lg p-0.5 border border-border">
               <button
                 onClick={() => onChange({ ...config, inputMode: "absolute" })}
-                className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${
+                className={`flex-1 text-meta font-medium py-1.5 rounded-md transition-colors ${
                   config.inputMode === "absolute"
                     ? "bg-rm-blue text-white"
                     : "text-muted-foreground hover:text-rm-gray"
@@ -822,7 +822,7 @@ function KpiCard({
               </button>
               <button
                 onClick={() => onChange({ ...config, inputMode: "growth" })}
-                className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${
+                className={`flex-1 text-meta font-medium py-1.5 rounded-md transition-colors ${
                   config.inputMode === "growth"
                     ? "bg-rm-blue text-white"
                     : "text-muted-foreground hover:text-rm-gray"
@@ -860,7 +860,7 @@ function KpiCard({
                 <div className="flex gap-1 bg-white rounded-lg p-0.5 border border-border">
                   <button
                     onClick={() => onChange({ ...config, period: "year" })}
-                    className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${
+                    className={`flex-1 text-meta font-medium py-1.5 rounded-md transition-colors ${
                       config.period === "year"
                         ? "bg-rm-blue text-white"
                         : "text-muted-foreground hover:text-rm-gray"
@@ -870,7 +870,7 @@ function KpiCard({
                   </button>
                   <button
                     onClick={() => onChange({ ...config, period: "month" })}
-                    className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${
+                    className={`flex-1 text-meta font-medium py-1.5 rounded-md transition-colors ${
                       config.period === "month"
                         ? "bg-rm-blue text-white"
                         : "text-muted-foreground hover:text-rm-gray"
@@ -911,7 +911,7 @@ function KpiCard({
           )}
 
           {description && (
-            <p className="text-[11px] text-muted-foreground">{description}</p>
+            <p className="text-meta text-muted-foreground">{description}</p>
           )}
         </div>
       )}

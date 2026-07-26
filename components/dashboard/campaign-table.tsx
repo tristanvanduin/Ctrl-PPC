@@ -209,7 +209,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
   const SortTh = ({ col, label, align }: { col: SortKey; label: string; align?: string }) => (
     <th
       onClick={() => handleSort(col)}
-      className={`px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue transition-colors whitespace-nowrap ${align === "right" ? "text-right" : "text-left"}`}
+      className={`px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue transition-colors whitespace-nowrap ${align === "right" ? "text-right" : "text-left"}`}
     >
       <span className="inline-flex items-center gap-1">
         {label}
@@ -231,7 +231,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
             <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
               Campagnes
             </h3>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-meta text-muted-foreground mt-0.5">
               {filtered.length} campagnes · {num(totalConv)} conversies · {fmt(totalSpend)} spend · Gem. CPA {fmt(avgCpa)} (30 dagen)
             </p>
           </div>
@@ -242,7 +242,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                 <Globe className="w-3.5 h-3.5 text-muted-foreground mr-0.5" />
                 <button
                   onClick={() => setCountryFilter(null)}
-                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                  className={`px-2 py-1 text-micro font-medium rounded-md transition-colors ${
                     countryFilter === null ? "bg-rm-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-rm-gray"
                   }`}
                 >
@@ -252,7 +252,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                   <button
                     key={code}
                     onClick={() => setCountryFilter(countryFilter === code ? null : code)}
-                    className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                    className={`px-2 py-1 text-micro font-medium rounded-md transition-colors ${
                       countryFilter === code ? "bg-rm-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-rm-gray"
                     }`}
                   >
@@ -265,7 +265,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
             <div className="flex gap-1 flex-wrap">
               <button
                 onClick={() => setPurposeFilter(null)}
-                className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                className={`px-2 py-1 text-micro font-medium rounded-md transition-colors ${
                   purposeFilter === null ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
                 }`}
               >
@@ -275,7 +275,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                 <button
                   key={p}
                   onClick={() => setPurposeFilter(purposeFilter === p ? null : p)}
-                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                  className={`px-2 py-1 text-micro font-medium rounded-md transition-colors ${
                     purposeFilter === p ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
                   }`}
                 >
@@ -304,13 +304,13 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
           <thead className="bg-gray-50/50 border-b border-border">
             <tr>
               <SortTh col="name" label="Campagne" />
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Type</th>
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Bidding</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Type</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Bidding</th>
               <SortTh col="impressions" label="Impressies" align="right" />
               <SortTh col="spend" label="Spend" align="right" />
               <SortTh col="conversions" label="Conv." align="right" />
               <SortTh col="cpa" label="CPA" align="right" />
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Structuur</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Structuur</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -327,14 +327,14 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                         {campaign.name}
                       </span>
                       {campaign.bucketLabel && (
-                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">
+                        <span className="text-micro font-bold uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">
                           {campaign.bucketLabel}
                         </span>
                       )}
                     </div>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${purposeColor}`}>
+                    <span className={`text-micro font-semibold uppercase px-1.5 py-0.5 rounded ${purposeColor}`}>
                       {PURPOSE_LABELS[campaign.purpose] ?? campaign.purpose}
                     </span>
                   </td>
@@ -352,7 +352,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                   <td className="px-3 py-2.5 text-right">
                     <span className={`text-sm font-semibold ${isZeroConv ? "text-red-500" : "text-rm-gray"}`}>
                       {num(campaign.conversions)}
-                      {isZeroConv && <span className="text-[9px] text-red-400 ml-1">⚠</span>}
+                      {isZeroConv && <span className="text-micro text-red-400 ml-1">⚠</span>}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right">
@@ -366,7 +366,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-micro text-muted-foreground">
                       {campaign.adGroupCount > 0 && `${campaign.adGroupCount} AG`}
                       {campaign.assetGroupCount > 0 && `${campaign.assetGroupCount} ASG`}
                       {campaign.adGroupCount === 0 && campaign.assetGroupCount === 0 && "—"}

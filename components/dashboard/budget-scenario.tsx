@@ -113,7 +113,7 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
             />
           )}
         </div>
-        <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+        <div className="flex justify-between text-micro text-muted-foreground mt-1">
           <span>-50%</span>
           <span>0%</span>
           <span>+50%</span>
@@ -126,7 +126,7 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
             <button
               key={p}
               onClick={() => setBudgetChange(p)}
-              className={`px-3 py-1 text-[11px] font-medium rounded-md transition-colors ${
+              className={`px-3 py-1 text-meta font-medium rounded-md transition-colors ${
                 budgetChange === p
                   ? "bg-rm-blue text-white"
                   : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
@@ -217,7 +217,7 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
       )}
 
       {/* Methodology note */}
-      <div className="mt-4 flex items-start gap-2 text-[11px] text-muted-foreground">
+      <div className="mt-4 flex items-start gap-2 text-meta text-muted-foreground">
         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
         <span>
           Aanname: CPA blijft constant bij budgetwijziging (tCPA biedstrategie).
@@ -244,13 +244,13 @@ function ResultCard({
     <div className={`rounded-lg border p-3 ${
       highlight ? "border-green-300 bg-green-50" : "border-border"
     }`}>
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
+      <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
       <div className="flex items-center gap-1.5 mb-1">
         <span className="text-sm text-muted-foreground">{before}</span>
         <ArrowRight className="w-3 h-3 text-muted-foreground" />
         <span className={`text-sm font-bold ${highlight ? "text-green-700" : "text-rm-blue"}`}>{after}</span>
       </div>
-      <p className={`text-[10px] font-medium ${
+      <p className={`text-micro font-medium ${
         neutral ? "text-muted-foreground" :
         diff.startsWith("+") ? "text-green-600" :
         diff.startsWith("-") ? "text-red-500" :

@@ -128,13 +128,13 @@ function AnalysisNotifications({ jobs, onDismiss }: { jobs: AnalysisJob[]; onDis
               {job.label}
             </p>
             {job.status === "running" && (
-              <p className="text-[10px] text-muted-foreground">Draait op de achtergrond...</p>
+              <p className="text-micro text-muted-foreground">Draait op de achtergrond...</p>
             )}
             {job.status === "done" && (
-              <p className="text-[10px] text-emerald-600">Voltooid</p>
+              <p className="text-micro text-emerald-600">Voltooid</p>
             )}
             {job.status === "error" && (
-              <p className="text-[10px] text-red-500 truncate">{job.error}</p>
+              <p className="text-micro text-red-500 truncate">{job.error}</p>
             )}
           </div>
 

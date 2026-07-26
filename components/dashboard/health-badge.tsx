@@ -35,7 +35,7 @@ export function HealthBadge({ clientId }: { clientId: string }) {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className={`text-xl font-bold ${health.color}`}>{health.total}</span>
-            <span className="text-[9px] font-semibold text-muted-foreground">{health.grade}</span>
+            <span className="text-micro font-semibold text-muted-foreground">{health.grade}</span>
           </div>
         </div>
 
@@ -55,7 +55,7 @@ export function HealthBadge({ clientId }: { clientId: string }) {
                     style={{ width: `${(f.score / f.maxScore) * 100}%` }}
                   />
                 </div>
-                <div className="text-[9px] text-muted-foreground mt-1">{f.name}</div>
+                <div className="text-micro text-muted-foreground mt-1">{f.name}</div>
               </div>
             ))}
           </div>
@@ -64,7 +64,7 @@ export function HealthBadge({ clientId }: { clientId: string }) {
         {/* Anomalies */}
         {health.anomalies.length > 0 && (
           <div className="w-72 shrink-0">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider mb-2">
               Anomalieën ({health.anomalies.length})
             </p>
             <div className="space-y-1.5 max-h-[80px] overflow-y-auto">
@@ -77,11 +77,11 @@ export function HealthBadge({ clientId }: { clientId: string }) {
                   ) : (
                     <Info className="w-3 h-3 text-blue-500 shrink-0 mt-0.5" />
                   )}
-                  <span className="text-[11px] text-rm-gray leading-tight">{a.title}</span>
+                  <span className="text-meta text-rm-gray leading-tight">{a.title}</span>
                 </div>
               ))}
               {health.anomalies.length > 4 && (
-                <span className="text-[10px] text-muted-foreground">+{health.anomalies.length - 4} meer</span>
+                <span className="text-micro text-muted-foreground">+{health.anomalies.length - 4} meer</span>
               )}
             </div>
           </div>

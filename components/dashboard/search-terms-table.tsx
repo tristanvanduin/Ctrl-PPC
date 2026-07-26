@@ -89,7 +89,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
   const SortTh = ({ col, label, align }: { col: SortKey; label: string; align?: string }) => (
     <th
       onClick={() => handleSort(col)}
-      className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue ${align === "right" ? "text-right" : "text-left"}`}
+      className={`px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue ${align === "right" ? "text-right" : "text-left"}`}
     >
       <span className="inline-flex items-center gap-1">
         {label}
@@ -111,7 +111,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           >
             Verspilde zoektermen
             {terms.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-100 text-red-600">
+              <span className="ml-1.5 px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-100 text-red-600">
                 {terms.length}
               </span>
             )}
@@ -124,7 +124,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           >
             Ad group bleeders
             {bleeders.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-100 text-red-600">
+              <span className="ml-1.5 px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-100 text-red-600">
                 {bleeders.length}
               </span>
             )}
@@ -137,7 +137,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           >
             Product bleeders
             {productBleeders.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-100 text-red-600">
+              <span className="ml-1.5 px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-100 text-red-600">
                 {productBleeders.length}
               </span>
             )}
@@ -177,11 +177,11 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
               <thead className="bg-gray-50/50 border-b border-border">
                 <tr>
                   <SortTh col="term" label="Zoekterm" />
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Ad Group</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Ad Group</th>
                   <SortTh col="clicks" label="Clicks" align="right" />
                   <SortTh col="cost" label="Kosten" align="right" />
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -224,12 +224,12 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
             <table className="w-full">
               <thead className="bg-gray-50/50 border-b border-border">
                 <tr>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Ad Group</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Impressies</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Clicks</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Kosten</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Ad Group</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Impressies</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Clicks</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Kosten</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -272,12 +272,12 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
             <table className="w-full">
               <thead className="bg-gray-50/50 border-b border-border">
                 <tr>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Product</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Impressies</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Clicks</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Kosten</th>
-                  <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Product</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Impressies</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Clicks</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Kosten</th>
+                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -289,7 +289,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
                         <div className="min-w-0">
                           <span className="text-sm text-rm-gray font-medium truncate block max-w-[250px]">{p.productTitle}</span>
                           {p.productId && (
-                            <span className="text-[9px] text-muted-foreground">{p.productId}</span>
+                            <span className="text-micro text-muted-foreground">{p.productId}</span>
                           )}
                         </div>
                       </div>

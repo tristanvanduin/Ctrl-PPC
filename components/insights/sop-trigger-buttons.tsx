@@ -287,7 +287,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
     <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-rm-gray">SOP Analyse — {channelCfg.headerLabel}</h3>
-        <p className="text-[10px] text-muted-foreground mt-0.5">
+        <p className="text-micro text-muted-foreground mt-0.5">
           Klik op een analyse om deze handmatig uit te voeren. Output wordt opgeslagen bij Bestanden &gt; SOP&apos;s.
         </p>
       </div>
@@ -320,28 +320,28 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
                   {s.success && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                   {s.error && <AlertCircle className="w-4 h-4 text-red-500" />}
                 </div>
-                <p className="text-[10px] text-muted-foreground">{config.description}</p>
+                <p className="text-micro text-muted-foreground">{config.description}</p>
                 {s.lastDate && (
-                  <div className="flex items-center gap-1 mt-2 text-[9px] text-muted-foreground">
+                  <div className="flex items-center gap-1 mt-2 text-micro text-muted-foreground">
                     <Calendar className="w-3 h-3" />
                     Laatst: {s.lastDate}
                   </div>
                 )}
                 {s.error && (
-                  <p className="text-[10px] text-red-500 mt-1 truncate">{s.error}</p>
+                  <p className="text-micro text-red-500 mt-1 truncate">{s.error}</p>
                 )}
                 {s.running && type === "monthly" && (
-                  <p className="text-[10px] text-rm-blue mt-1">Dit duurt ca. 2-3 minuten...</p>
+                  <p className="text-micro text-rm-blue mt-1">Dit duurt ca. 2-3 minuten...</p>
                 )}
                 {s.running && type !== "monthly" && (
-                  <p className="text-[10px] text-rm-blue mt-1">Dit duurt ca. 30-60 seconden...</p>
+                  <p className="text-micro text-rm-blue mt-1">Dit duurt ca. 30-60 seconden...</p>
                 )}
               </button>
               {s.lastDate && (
                 <button
                   onClick={(e) => downloadPdf(type, e)}
                   disabled={pdfLoading[type] || anyRunning}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-[10px] text-muted-foreground hover:bg-gray-50 hover:text-rm-gray hover:border-rm-orange/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-micro text-muted-foreground hover:bg-gray-50 hover:text-rm-gray hover:border-rm-orange/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {pdfLoading[type] ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -359,7 +359,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
                 />
               )}
               {progressState.trackerUnavailable && !progressJob && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-700">
                   {progressState.trackerMessage || "Live voortgang niet beschikbaar. Analyse loopt mogelijk nog door."}
                 </div>
               )}
@@ -371,7 +371,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
                 />
               )}
               {pdfProgressState.trackerUnavailable && !pdfProgressJob && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-700">
                   {pdfProgressState.trackerMessage || "Live PDF-voortgang niet beschikbaar."}
                 </div>
               )}

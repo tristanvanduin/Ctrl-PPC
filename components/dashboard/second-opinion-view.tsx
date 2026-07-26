@@ -147,7 +147,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
             <Zap className="w-4 h-4 text-amber-500" />
             <span className="text-sm font-semibold text-gray-900">Snelle Audit</span>
           </div>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">10 Low Hanging Fruit checks</p>
+          <p className="text-meta text-muted-foreground leading-relaxed">10 Low Hanging Fruit checks</p>
           {runningMode === "quick" && <Loader2 className="w-4 h-4 animate-spin text-amber-500 mt-2" />}
         </button>
         <button onClick={() => startAudit("full")} disabled={runningMode !== null}
@@ -156,7 +156,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
             <Search className="w-4 h-4 text-orange-600" />
             <span className="text-sm font-semibold text-gray-900">Volledige Audit</span>
           </div>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">Alle checks over 9 categorieën</p>
+          <p className="text-meta text-muted-foreground leading-relaxed">Alle checks over 9 categorieën</p>
           {runningMode === "full" && <Loader2 className="w-4 h-4 animate-spin text-orange-500 mt-2" />}
         </button>
       </div>
@@ -169,7 +169,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
         />
       )}
       {progress.trackerUnavailable && !progress.job && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-700">
           {progress.trackerMessage || "Live voortgang niet beschikbaar. De audit loopt mogelijk nog door."}
         </div>
       )}
@@ -194,7 +194,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
                 </div>
                 <div className="text-right shrink-0">
                   <div className={`text-xs font-semibold ${confText[exec.auditConfidence] ?? ""}`}>Vertrouwen: {exec.auditConfidence}</div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{exec.scoredChecks}/{exec.totalChecks} beoordeeld</p>
+                  <p className="text-micro text-muted-foreground mt-0.5">{exec.scoredChecks}/{exec.totalChecks} beoordeeld</p>
                 </div>
               </div>
 
@@ -209,7 +209,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
                 ].map((s) => (
                   <div key={s.label} className="flex-1">
                     <div className={`text-lg font-bold ${s.color}`}>{s.n}</div>
-                    <div className="text-[10px] text-muted-foreground">{s.label}</div>
+                    <div className="text-micro text-muted-foreground">{s.label}</div>
                   </div>
                 ))}
               </div>
@@ -256,7 +256,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
               />
             )}
             {pdfProgress.trackerUnavailable && !pdfProgress.job && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-700">
                 {pdfProgress.trackerMessage || "Live PDF-voortgang niet beschikbaar."}
               </div>
             )}
@@ -267,7 +267,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
                 {activeRun.section_summaries.map((s) => {
                   const st = SCORE_STYLE[s.averageScore];
                   return (
-                    <div key={s.section} className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border ${st.badge}`}>
+                    <div key={s.section} className={`inline-flex items-center gap-1.5 text-meta font-medium px-2.5 py-1 rounded-md border ${st.badge}`}>
                       {SCORE_ICON[s.averageScore]}
                       <span>{s.section}</span>
                     </div>
@@ -287,21 +287,21 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
                   {/* Section header */}
                   <div className="px-4 py-2.5 border-b border-border/60 flex items-center justify-between bg-gray-50/40">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-[13px] font-semibold text-gray-900">{section}</h3>
-                      <span className="text-[10px] text-muted-foreground">{sectionRows.length}</span>
+                      <h3 className="text-lead font-semibold text-gray-900">{section}</h3>
+                      <span className="text-micro text-muted-foreground">{sectionRows.length}</span>
                       {overriddenCount > 0 && (
-                        <span className="text-[9px] bg-blue-50 text-blue-500 border border-blue-100 rounded px-1.5 py-px">{overriddenCount} bewerkt</span>
+                        <span className="text-micro bg-blue-50 text-blue-500 border border-blue-100 rounded px-1.5 py-px">{overriddenCount} bewerkt</span>
                       )}
                     </div>
                     {isEditing ? (
                       <div className="flex items-center gap-1.5">
-                        <Button onClick={() => { setEditingSection(null); setEditBuffer(new Map()); }} variant="ghost" size="sm" className="h-6 px-2 text-[11px]">Annuleren</Button>
-                        <Button onClick={saveEdits} disabled={saving} size="sm" className="h-6 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button onClick={() => { setEditingSection(null); setEditBuffer(new Map()); }} variant="ghost" size="sm" className="h-6 px-2 text-meta">Annuleren</Button>
+                        <Button onClick={saveEdits} disabled={saving} size="sm" className="h-6 px-2.5 text-meta bg-blue-600 hover:bg-blue-700 text-white">
                           {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}Opslaan
                         </Button>
                       </div>
                     ) : (
-                      <button onClick={() => startEditingSection(section)} className="text-[11px] text-muted-foreground hover:text-gray-700 flex items-center gap-1 transition-colors">
+                      <button onClick={() => startEditingSection(section)} className="text-meta text-muted-foreground hover:text-gray-700 flex items-center gap-1 transition-colors">
                         <Pencil className="w-3 h-3" /> Bewerken
                       </button>
                     )}
@@ -322,7 +322,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
                           <div className="min-w-0">
                             <div className="flex items-start gap-1.5">
                               <p className="text-sm text-gray-800 leading-snug">{row.controlPoint}</p>
-                              {row.isOverridden && <span className="text-[8px] bg-blue-100 text-blue-600 rounded px-1 py-px shrink-0 mt-0.5">BEWERKT</span>}
+                              {row.isOverridden && <span className="text-micro bg-blue-100 text-blue-600 rounded px-1 py-px shrink-0 mt-0.5">BEWERKT</span>}
                             </div>
                             {isRowEditing ? (
                               <textarea value={editData.comments} onChange={(e) => { const b = new Map(editBuffer); b.set(row.templateId, { ...editData, comments: e.target.value }); setEditBuffer(b); }}
@@ -368,7 +368,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
       {runs.length > 0 && !activeRun && (
         <div className="bg-white rounded-lg border border-border overflow-hidden">
           <div className="px-4 py-2.5 border-b border-border/60 bg-gray-50/40">
-            <h3 className="text-[13px] font-semibold text-gray-900">Eerdere audits</h3>
+            <h3 className="text-lead font-semibold text-gray-900">Eerdere audits</h3>
           </div>
           <div className="divide-y divide-border/40">
             {runs.map((run) => (
@@ -376,12 +376,12 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
                 className="w-full text-left flex items-center justify-between px-4 py-2.5 hover:bg-gray-50/50 transition-colors">
                 <div className="flex items-center gap-2.5">
                   {run.mode === "quick" ? <Zap className="w-3.5 h-3.5 text-amber-500" /> : <Search className="w-3.5 h-3.5 text-orange-500" />}
-                  <span className="text-[13px] font-medium text-gray-900">{run.mode === "quick" ? "Snelle Audit" : "Volledige Audit"}</span>
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-lead font-medium text-gray-900">{run.mode === "quick" ? "Snelle Audit" : "Volledige Audit"}</span>
+                  <span className="text-meta text-muted-foreground">
                     {new Date(run.created_at).toLocaleDateString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded ${run.status === "completed" ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
+                <span className={`text-micro px-2 py-0.5 rounded ${run.status === "completed" ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
                   {run.status === "completed" ? "Afgerond" : run.status}
                 </span>
               </button>
@@ -404,12 +404,12 @@ function PriorityList({ title, color, icon, items }: { title: string; color: str
   const c = colors[color] ?? colors.blue;
   return (
     <div>
-      <h4 className={`text-[11px] font-bold ${c.title} mb-1.5 flex items-center gap-1`}>{icon} {title}</h4>
+      <h4 className={`text-meta font-bold ${c.title} mb-1.5 flex items-center gap-1`}>{icon} {title}</h4>
       <ul className="space-y-1">
         {items.map((item, i) => (
-          <li key={i} className="text-[11px] text-gray-600 flex items-start gap-1.5 leading-relaxed">
+          <li key={i} className="text-meta text-gray-600 flex items-start gap-1.5 leading-relaxed">
             <span className={`w-1 h-1 rounded-full ${c.dot} mt-[6px] shrink-0`} />
-            <span>{item.controlPoint} <span className="text-[9px] text-gray-400">({item.section})</span></span>
+            <span>{item.controlPoint} <span className="text-micro text-gray-400">({item.section})</span></span>
           </li>
         ))}
       </ul>

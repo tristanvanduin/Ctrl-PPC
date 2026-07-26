@@ -818,14 +818,14 @@ export function InsightsBlock({
         {selectedInsightId && onSelectInsight && (
           <button
             onClick={() => onSelectInsight(null)}
-            className="flex items-center gap-1 text-[11px] text-rm-blue hover:underline"
+            className="flex items-center gap-1 text-meta text-rm-blue hover:underline"
           >
             <X className="w-3 h-3" />
             Filter wissen
           </button>
         )}
       </div>
-      <p className="text-[10px] text-muted-foreground mb-4">
+      <p className="text-micro text-muted-foreground mb-4">
         {hasDbInsights ? "AI analyse inzichten — klik om aanbevelingen en taken te filteren" : "Automatisch geanalyseerd op basis van API data en SOP-methodiek"}
       </p>
 
@@ -850,7 +850,7 @@ export function InsightsBlock({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`inline-block text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                    <span className={`inline-block text-micro font-bold uppercase px-1.5 py-0.5 rounded ${
                       ins.severity === "critical" ? "bg-red-100 text-red-700" :
                       ins.severity === "high" ? "bg-orange-100 text-orange-700" :
                       ins.severity === "positive" ? "bg-green-100 text-green-700" :
@@ -858,9 +858,9 @@ export function InsightsBlock({
                     }`}>
                       {ins.severity}
                     </span>
-                    <span className="text-[9px] text-muted-foreground">{ins.affected_entity}</span>
+                    <span className="text-micro text-muted-foreground">{ins.affected_entity}</span>
                     {ins.action_required && (
-                      <span className="text-[9px] font-semibold text-red-600">Actie vereist</span>
+                      <span className="text-micro font-semibold text-red-600">Actie vereist</span>
                     )}
                   </div>
                   <p className="text-sm font-medium text-rm-gray">{ins.title}</p>
@@ -872,7 +872,7 @@ export function InsightsBlock({
           {sortedDbInsights.length > 3 && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="flex items-center justify-center gap-1.5 w-full py-2 text-[11px] font-medium text-rm-blue hover:text-rm-blue/80 transition-colors"
+              className="flex items-center justify-center gap-1.5 w-full py-2 text-meta font-medium text-rm-blue hover:text-rm-blue/80 transition-colors"
             >
               {isExpanded ? (
                 <>Toon minder <ChevronUp className="w-3.5 h-3.5" /></>
@@ -895,7 +895,7 @@ export function InsightsBlock({
             >
               <div className="mt-0.5 shrink-0">{icons[insight.type]}</div>
               <div className="min-w-0">
-                <span className={`inline-block text-[9px] font-bold uppercase px-1.5 py-0.5 rounded mb-1.5 ${levelColors[insight.level] ?? "bg-gray-100 text-gray-600"}`}>
+                <span className={`inline-block text-micro font-bold uppercase px-1.5 py-0.5 rounded mb-1.5 ${levelColors[insight.level] ?? "bg-gray-100 text-gray-600"}`}>
                   {insight.level}
                 </span>
                 <p className="text-sm text-rm-gray leading-relaxed">{insight.text}</p>
@@ -906,7 +906,7 @@ export function InsightsBlock({
         {insights.length > 3 && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center justify-center gap-1.5 w-full py-2 mt-2 text-[11px] font-medium text-rm-blue hover:text-rm-blue/80 transition-colors"
+            className="flex items-center justify-center gap-1.5 w-full py-2 mt-2 text-meta font-medium text-rm-blue hover:text-rm-blue/80 transition-colors"
           >
             {isExpanded ? (
               <>Toon minder <ChevronUp className="w-3.5 h-3.5" /></>

@@ -122,7 +122,7 @@ export function TopBar() {
             >
               <Bell className="w-5 h-5 text-muted-foreground" />
               {totalCount > 0 && (
-                <span className={`absolute -top-0.5 -right-0.5 w-5 h-5 text-[10px] font-bold rounded-full flex items-center justify-center text-white ${
+                <span className={`absolute -top-0.5 -right-0.5 w-5 h-5 text-micro font-bold rounded-full flex items-center justify-center text-white ${
                   criticalCount > 0 ? "bg-red-500" : "bg-amber-500"
                 }`}>
                   {totalCount > 9 ? "9+" : totalCount}

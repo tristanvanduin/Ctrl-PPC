@@ -75,19 +75,19 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
         <Radar className="w-4.5 h-4.5 text-rm-blue" />
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-rm-gray">{title}</h3>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>
+          <p className="text-micro text-muted-foreground mt-0.5">{description}</p>
         </div>
         <button
           onClick={run}
           disabled={running}
-          className="px-3 py-1.5 rounded-md bg-rm-blue text-white text-[11px] font-medium hover:bg-rm-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
+          className="px-3 py-1.5 rounded-md bg-rm-blue text-white text-meta font-medium hover:bg-rm-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
         >
           {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
           {running ? "Bezig..." : runLabel ?? "Detecteer signalen"}
         </button>
       </div>
       <div className="px-5 py-3 space-y-2">
-        <div className="flex items-center gap-3 text-[11px]">
+        <div className="flex items-center gap-3 text-meta">
           {lastDate && (
             <span className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-3 h-3" /> Laatst: {lastDate}</span>
           )}
@@ -99,13 +99,13 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
           <>
             <button
               onClick={() => setExpanded((e) => !e)}
-              className="flex items-center gap-1 text-[11px] text-rm-blue hover:underline"
+              className="flex items-center gap-1 text-meta text-rm-blue hover:underline"
             >
               {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               {expanded ? "Verberg bevindingen" : "Bekijk bevindingen"}
             </button>
             {expanded && (
-              <div className="rounded-md border border-border bg-gray-50 px-3 py-2 text-[11px] text-rm-gray whitespace-pre-wrap max-h-72 overflow-y-auto">
+              <div className="rounded-md border border-border bg-gray-50 px-3 py-2 text-meta text-rm-gray whitespace-pre-wrap max-h-72 overflow-y-auto">
                 {output}
               </div>
             )}

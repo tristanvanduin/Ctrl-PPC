@@ -50,7 +50,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
           </div>
           <div>
             <h3 className="text-sm font-semibold text-rm-blue">{label}</h3>
-            {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
+            {subtitle && <p className="text-micro text-muted-foreground">{subtitle}</p>}
           </div>
         </div>
         <div className={`w-7 h-7 rounded-full ${statusBg} flex items-center justify-center`}>
@@ -60,7 +60,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
 
       {/* Big number: YTD realized */}
       <div className="mb-4">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+        <p className="text-micro text-muted-foreground uppercase tracking-wider mb-1">
           Gerealiseerd YTD
         </p>
         <p className="text-2xl font-bold text-rm-blue leading-none">
@@ -82,7 +82,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
 
       {/* Progress bar */}
       <div>
-        <div className="flex justify-between text-[10px] mb-1.5">
+        <div className="flex justify-between text-micro mb-1.5">
           <span className="text-muted-foreground">{Math.round(realizedPct)}% gerealiseerd</span>
           <span className={`font-bold ${statusColor}`}>
             {diffPct > 0 ? "+" : ""}{diffPct.toFixed(1)}%
@@ -101,7 +101,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
             style={{ width: `${Math.min(realizedPct, 100)}%` }}
           />
         </div>
-        <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+        <div className="flex justify-between text-micro text-muted-foreground mt-1">
           <span>0%</span>
           <span>Q1 verwacht ({yearProgress}%)</span>
           <span>100%</span>
