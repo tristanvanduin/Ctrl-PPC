@@ -31,3 +31,32 @@ export const USPS_TO_NAME: Record<string, string> = {
 export function stateLabel(usps: string): string {
   return USPS_TO_NAME[usps.toUpperCase()] ?? usps;
 }
+
+// Google Ads levert regio's als Engelse staatsnaam (region_name = "California", "New York").
+// Deze omgekeerde tabel koppelt de Engelse naam → USPS zodat de sync/read-laag de VS-staten
+// op de kaart kan leggen. Genormaliseerd op lowercase; onbekende namen vallen weg (blijven wél
+// in de onderliggende tabel, komen alleen niet op de staten-kaart).
+const ENGLISH_STATE_NAMES: Record<string, string> = {
+  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+  colorado: "CO", connecticut: "CT", delaware: "DE", "district of columbia": "DC",
+  florida: "FL", georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL",
+  indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY", louisiana: "LA",
+  maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI", minnesota: "MN",
+  mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV",
+  "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
+  "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK", oregon: "OR",
+  pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD",
+  tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT", virginia: "VA",
+  washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY", "puerto rico": "PR",
+};
+
+// Zet een Google region_name (of losse USPS-code) om naar een USPS-staatcode; null als het geen
+// herkenbare Amerikaanse staat is.
+export function regionNameToUsps(regionName: string | null | undefined): string | null {
+  if (!regionName) return null;
+  const raw = regionName.trim();
+  if (/^[A-Za-z]{2}$/.test(raw) && FIPS_TO_USPS && Object.values(FIPS_TO_USPS).includes(raw.toUpperCase())) {
+    return raw.toUpperCase();
+  }
+  return ENGLISH_STATE_NAMES[raw.toLowerCase()] ?? null;
+}

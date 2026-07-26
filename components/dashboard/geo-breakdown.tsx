@@ -8,6 +8,7 @@ import { countryLabel } from "@/lib/countries";
 import { stateLabel } from "@/lib/geo/us-fips";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { demoGeoCountries, demoGeoStates, type GeoAgg } from "@/lib/demo/geo-demo";
+import { MapErrorBoundary } from "./map-error-boundary";
 
 // De kaarten (SVG + geometrie + d3-geo) client-only en code-split laden: pas geladen als deze
 // weergave rendert, en nooit tijdens SSR.
@@ -131,10 +132,14 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
       <div className="px-3 py-3">
         {ranked.length === 0 ? (
           <p className="text-[12px] text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
-        ) : focus === "US" ? (
-          <UsStatesMap values={values} format={metric.fmt} metricLabel={metric.label} />
         ) : (
-          <WorldMap values={values} format={metric.fmt} metricLabel={metric.label} onCountryClick={canDrillUs ? (a) => a === "US" && setFocus("US") : undefined} />
+          <MapErrorBoundary>
+            {focus === "US" ? (
+              <UsStatesMap values={values} format={metric.fmt} metricLabel={metric.label} />
+            ) : (
+              <WorldMap values={values} format={metric.fmt} metricLabel={metric.label} onCountryClick={canDrillUs ? (a) => a === "US" && setFocus("US") : undefined} />
+            )}
+          </MapErrorBoundary>
         )}
         {focus == null && canDrillUs && (
           <p className="text-center text-[11px] text-muted-foreground pt-1">Klik op de <strong>Verenigde Staten</strong> om de staten te zien.</p>
