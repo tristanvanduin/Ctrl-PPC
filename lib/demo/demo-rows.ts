@@ -168,10 +168,17 @@ const metaDayAgg = (day: number) => META_ADS.reduce((s, a) => {
 const metaSaturationSpend = (daysAgo: number): number => 1 + 0.65 * (1 - daysAgo / 150);
 const metaSaturationClicks = (daysAgo: number): number => 1 - 0.35 * (1 - daysAgo / 150);
 
+// Bij dat verzadigingsverloop hoort een oplopende frequency: hetzelfde publiek ziet de advertentie
+// steeds vaker. Dat is de scherpste en vroegste indicatie dat een publiek opraakt — en de reden dat
+// de detector die apart behandelt. Reach volgt eruit (impressies / frequency), zodat de twee
+// consistent blijven in plaats van los van elkaar verzonnen.
+const metaFrequency = (daysAgo: number): number => 1.8 + 1.4 * (1 - daysAgo / 150);
+
 const metaAccountDaily: Row[] = Array.from({ length: 150 }, (_, d) => {
   const day = 149 - d; const a = metaDayAgg(day);
   const conv = a.conversions * weekdayConvPenalty(day);
-  return { client_id: CID, date: dayISO(day), impressions: a.impressions, link_clicks: Math.round(a.link_clicks * metaSaturationClicks(day)), spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: conv };
+  const frequency = metaFrequency(day);
+  return { client_id: CID, date: dayISO(day), impressions: a.impressions, reach: Math.round(a.impressions / frequency), frequency: Math.round(frequency * 100) / 100, link_clicks: Math.round(a.link_clicks * metaSaturationClicks(day)), spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: conv };
 });
 // meta_campaigns + meta_campaign_daily voeden de ChannelPerformance-view (KPI's, maand-/campagnetabel).
 const META_CAMPAIGNS = [
