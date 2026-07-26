@@ -22,6 +22,7 @@ import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
 import { fetchGa4Dataset, type Ga4SupabaseLike } from "@/lib/ga4/data-access";
 import { buildGa4CroSignals, buildGa4DeviceCroSignals, buildGa4LandingPageCroSignals } from "@/lib/ga4/signals";
 import { buildBlendedDataGapSignals, type ChannelValueAgg } from "@/lib/signals/blended-data-gap";
+import { buildBlendedCpmSignals } from "@/lib/signals/blended-cpm";
 import { mergeDetections } from "@/lib/signals/types";
 
 const SECTION = "cross_channel_v1";
@@ -275,9 +276,11 @@ export async function POST(request: NextRequest) {
   const detected = buildCrossChannelSignals({ channels, brand });
   // Funnel over de kanalen heen: blended totaal-funnel, fase-achterblijver en divergentie.
   const funnel = buildCrossChannelFunnelSignals(channels);
+  // Bereikkosten: stijgende CPM per kanaal, waarbij CTR verzadiging van veilingdruk scheidt.
+  const cpm = buildBlendedCpmSignals(channels);
   const merged = {
-    triggered: [...detected.triggered, ...funnel.triggered, ...kpiRelations.triggered, ...audienceStories, ...ga4Cro.triggered, ...dataGap.triggered],
-    checked: [...detected.checked, ...funnel.checked, ...kpiRelations.checked, "cross_audience_samenhang", ...ga4Cro.checked, ...dataGap.checked],
+    triggered: [...detected.triggered, ...funnel.triggered, ...kpiRelations.triggered, ...audienceStories, ...ga4Cro.triggered, ...dataGap.triggered, ...cpm.triggered],
+    checked: [...detected.checked, ...funnel.checked, ...kpiRelations.checked, "cross_audience_samenhang", ...ga4Cro.checked, ...dataGap.checked, ...cpm.checked],
   };
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, "Cross-channel");
 
@@ -291,6 +294,7 @@ export async function POST(request: NextRequest) {
     { key: "audience", title: "Doelgroep-samenhang", description: "Converterende LinkedIn-segmenten vs het gedeclareerde doelprofiel.", det: { triggered: audienceStories, checked: ["cross_audience_samenhang"] } },
     { key: "ga4_cro", title: "GA4 CRO (website)", description: "Kanaal-, device- en landingpage-conversiekloof op de site.", det: ga4Cro },
     { key: "data_gap", title: "Data-volledigheid", description: "Kanalen die wel converteren maar geen conversiewaarde meten — blended ROAS onberekenbaar.", det: dataGap },
+    { key: "cpm", title: "Bereikkosten & verzadiging", description: "Stijgende CPM per kanaal, waarbij de CTR verzadiging (creative/publiek) van veilingdruk (markt) scheidt.", det: cpm },
   ];
   const groups: CrossGroup[] = groupDefs.map((g) => {
     const r = renderSignalSection(g.det, g.title);
