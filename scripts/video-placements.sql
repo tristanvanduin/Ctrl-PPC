@@ -34,6 +34,13 @@ CREATE TABLE IF NOT EXISTS ads_video_placements (
   conversions numeric DEFAULT 0,
   conversions_value numeric DEFAULT 0,
   video_views integer DEFAULT 0,
+  -- Of kosten/klikken/conversies betekenisvol zijn. Bij Performance Max levert Google alleen
+  -- vertoningen per placement; dan staat dit op false en mag er geen kosten- of CPA-oordeel op.
+  -- Zonder deze vlag zou een PMax-placement er in de analyse uitzien als "gratis".
+  metrics_complete boolean DEFAULT true,
+  -- 'video' (VIDEO/DEMAND_GEN/DISCOVERY) of 'pmax'. Bepaalt ook hoe je uitsluit: bij PMax kan dat
+  -- alleen via de uitsluitingslijst op accountniveau, niet per campagne.
+  source text DEFAULT 'video',
   synced_at timestamptz DEFAULT now(),
   UNIQUE (client_id, campaign_id, placement, month)
 );
@@ -65,8 +72,14 @@ ON CONFLICT (client_id, dimension) DO UPDATE SET
 -- ============================================================================
 -- NOTES
 --
--- Google levert placementdata alleen voor het Display-/YouTube-netwerk; Search
--- heeft geen placements. De query filtert daarom op VIDEO/DEMAND_GEN/DISCOVERY.
+-- Twee bronnen, want alles wat met video adverteert hoort in hetzelfde beeld:
+--   detail_placement_view            -> VIDEO / DEMAND_GEN / DISCOVERY, volledige metrics
+--   performance_max_placement_view   -> Performance Max, UITSLUITEND vertoningen
+-- Search heeft geen placements en valt buiten beide.
+--
+-- Die tweede beperking is wezenlijk: Google publiceert voor PMax geen kosten,
+-- klikken of conversies per placement. De analyse markeert die rijen daarom met
+-- metrics_complete = false en velt er geen kosten- of CPA-oordeel over.
 --
 -- Uitsluiten gebeurt niet vanuit dit dashboard: het levert een VOORSTEL met de
 -- onderbouwing erbij. Een uitsluiting is in zijn effect moeilijk terug te draaien

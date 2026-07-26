@@ -7,7 +7,7 @@ export {};
 
 import {
   aggregatePlacements, judgePlacements, medianCpa, wastedSpend, isAppPlacement,
-  MIN_SPEND_TO_JUDGE, MIN_VIEWS_TO_JUDGE, CPA_MULTIPLE_FOR_REVIEW,
+  MIN_SPEND_TO_JUDGE, MIN_VIEWS_TO_JUDGE, CPA_MULTIPLE_FOR_REVIEW, MIN_IMPRESSIONS_WITHOUT_METRICS,
   type PlacementInput,
 } from "../video/placement-analysis";
 
@@ -131,6 +131,74 @@ console.log("\n10. Geen enkele converterende placement → geen mediaan, geen va
   const aggs = aggregatePlacements(rows);
   check("mediaan is null", medianCpa(aggs) === null);
   check("beide uitsluiten, geen crash", judgePlacements(aggs).every((j) => j.verdict === "uitsluiten"));
+}
+
+console.log("\n11. Performance Max: alleen vertoningen bekend, dus geen kosten- of CPA-oordeel");
+{
+  // Google publiceert voor PMax geen kosten/klikken/conversies per placement. Die nullen mogen
+  // nooit als "gratis" of "converteert niet" gelezen worden — dat zou een claim zijn over cijfers
+  // die niemand heeft.
+  const pmaxApp = p({
+    placement: "pmax-app", displayName: "Rekenspel Junior", placementType: "MOBILE_APPLICATION",
+    impressions: 40_000, clicks: 0, cost: 0, conversions: 0, videoViews: 0,
+    metricsComplete: false, source: "pmax",
+  });
+  const j = judgePlacements(aggregatePlacements([pmaxApp]))[0];
+  check("app via PMax → uitsluiten", j.verdict === "uitsluiten", j.verdict);
+  check("reden zegt expliciet dat kosten ontbreken", /kosten[^.]*niet|geen kosten/i.test(j.reason), j.reason);
+  check("reden noemt dat uitsluiten accountbreed moet", /accountbreed/i.test(j.reason), j.reason);
+  check("geen CPM/CPA berekend uit onbekende kosten", j.agg.cpm === null && j.agg.cpa === null);
+  check("gemarkeerd als onvolledig", j.agg.metricsComplete === false);
+  check("bron zichtbaar", j.agg.sources.includes("pmax"));
+}
+
+console.log("\n12. PMax, geen app → bekijken, niet uitsluiten (te weinig grond)");
+{
+  const rows = [p({
+    placement: "pmax-ch", displayName: "Nieuwskanaal", placementType: "YOUTUBE_CHANNEL",
+    impressions: 30_000, clicks: 0, cost: 0, conversions: 0, videoViews: 0,
+    metricsComplete: false, source: "pmax",
+  })];
+  const j = judgePlacements(aggregatePlacements(rows))[0];
+  check("bekijken", j.verdict === "bekijken", j.verdict);
+  check("reden benoemt dat harde cijfers ontbreken", /harde cijfers/i.test(j.reason), j.reason);
+}
+
+console.log("\n13. PMax met weinig bereik → geen oordeel");
+{
+  const rows = [p({
+    placement: "pmax-klein", placementType: "MOBILE_APPLICATION",
+    impressions: MIN_IMPRESSIONS_WITHOUT_METRICS - 1, clicks: 0, cost: 0, conversions: 0, videoViews: 0,
+    metricsComplete: false, source: "pmax",
+  })];
+  check("te_weinig_data", judgePlacements(aggregatePlacements(rows))[0].verdict === "te_weinig_data");
+}
+
+console.log("\n14. Dezelfde plek via video én PMax: kosten blijven onvolledig");
+{
+  // Een kanaal dat zowel via een videocampagne als via PMax bereikt wordt. De bekende kosten van
+  // de videokant mogen niet doen alsof het totaalbeeld compleet is.
+  const rows = [
+    p({ placement: "ch-mix", placementType: "YOUTUBE_CHANNEL", cost: 200, videoViews: 5_000, clicks: 80, conversions: 0, impressions: 30_000 }),
+    p({ placement: "ch-mix", placementType: "YOUTUBE_CHANNEL", impressions: 50_000, clicks: 0, cost: 0, conversions: 0, videoViews: 0, metricsComplete: false, source: "pmax" }),
+  ];
+  const a = aggregatePlacements(rows)[0];
+  check("vertoningen opgeteld over beide bronnen", a.impressions === 80_000, String(a.impressions));
+  check("totaal gemarkeerd als onvolledig", a.metricsComplete === false);
+  check("vertoningen zonder kosten apart bijgehouden", a.impressionsWithoutMetrics === 50_000, String(a.impressionsWithoutMetrics));
+  check("geen CPM over half-bekende kosten", a.cpm === null);
+  check("beide bronnen vermeld", a.sources.join(",") === "pmax,video", a.sources.join(","));
+}
+
+console.log("\n15. Verspilling telt alleen bekend budget, niet het onbekende");
+{
+  const rows = [
+    p({ placement: "video-bad", cost: 180, videoViews: 4_000, clicks: 60, conversions: 0, impressions: 20_000 }),
+    p({ placement: "pmax-app", placementType: "MOBILE_APPLICATION", impressions: 40_000, clicks: 0, cost: 0, conversions: 0, videoViews: 0, metricsComplete: false, source: "pmax" }),
+  ];
+  const js = judgePlacements(aggregatePlacements(rows));
+  check("beide zijn uitsluit-kandidaat", js.filter((j) => j.verdict === "uitsluiten").length === 2);
+  check("bedrag telt alleen de bekende 180", wastedSpend(js) === 180, String(wastedSpend(js)));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

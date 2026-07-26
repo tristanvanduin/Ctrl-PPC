@@ -42,7 +42,18 @@ function pl(
   cost: number, impressions: number, views: number, clicks: number, conversions: number,
   campaignName = "GRT | YouTube | Awareness NL",
 ): PlacementInput {
-  return { placement, displayName, placementType, targetUrl: "", campaignName, impressions, clicks, cost, conversions, videoViews: views };
+  return { placement, displayName, placementType, targetUrl: "", campaignName, impressions, clicks, cost, conversions, videoViews: views, metricsComplete: true, source: "video" };
+}
+
+// Performance Max adverteert ook met video op YouTube, maar Google geeft daar uitsluitend
+// vertoningen per placement — geen kosten, klikken of conversies. Deze rijen laten zien hoe de
+// analyse daarmee omgaat: wel signaleren, geen bedrag claimen dat niemand kent.
+function plPmax(placement: string, displayName: string, placementType: string, impressions: number): PlacementInput {
+  return {
+    placement, displayName, placementType, targetUrl: "", campaignName: "GreenTech | PMax",
+    impressions, clicks: 0, cost: 0, conversions: 0, videoViews: 0,
+    metricsComplete: false, source: "pmax",
+  };
 }
 
 export const DEMO_PLACEMENTS: PlacementInput[] = [
@@ -59,4 +70,9 @@ export const DEMO_PLACEMENTS: PlacementInput[] = [
   // Te klein om iets over te zeggen — bewust aanwezig om te tonen dat die met rust worden gelaten.
   pl("UC-kleinkanaal-a", "Kwekerij Vlog", "YOUTUBE_CHANNEL", 14, 1_900, 380, 9, 0),
   pl("UC-kleinkanaal-b", "Serre & Co", "YOUTUBE_CHANNEL", 8, 1_100, 210, 4, 0),
+  // Performance Max: alleen vertoningen bekend. De app hoort eruit, het nieuwskanaal is een
+  // afweging, en de kleine plaatsing krijgt bewust geen oordeel.
+  plPmax("pmax-app-rekenspel", "Rekenspel Junior", "MOBILE_APPLICATION", 63_000),
+  plPmax("pmax-ch-nieuws", "Dagelijks Nieuws NL", "YOUTUBE_CHANNEL", 41_000),
+  plPmax("pmax-ch-klein", "Kas & Techniek", "YOUTUBE_CHANNEL", 2_800),
 ];

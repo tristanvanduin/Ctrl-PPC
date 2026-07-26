@@ -45,7 +45,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
     if (!sb) { setRows([]); return; }
     const since = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
     sb.from("ads_video_placements")
-      .select("placement, display_name, placement_type, target_url, campaign_name, impressions, clicks, cost, conversions, video_views")
+      .select("placement, display_name, placement_type, target_url, campaign_name, impressions, clicks, cost, conversions, video_views, metrics_complete, source")
       .eq("client_id", clientId)
       .gte("month", since)
       .then(({ data }: { data: Record<string, unknown>[] | null }) => {
@@ -61,6 +61,8 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
           cost: Number(r.cost ?? 0),
           conversions: Number(r.conversions ?? 0),
           videoViews: Number(r.video_views ?? 0),
+          metricsComplete: r.metrics_complete !== false,
+          source: (r.source === "pmax" ? "pmax" : "video") as "video" | "pmax",
         })));
       }, () => { if (!cancelled) setRows([]); });
 
@@ -77,7 +79,11 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
   }, [rows]);
 
   const waste = useMemo(() => wastedSpend(judged), [judged]);
-  const excludeCount = judged.filter((j) => j.verdict === "uitsluiten").length;
+  const excluding = judged.filter((j) => j.verdict === "uitsluiten");
+  // Gescheiden tellen: van PMax-placements kent Google de kosten niet, dus die mogen niet
+  // meegeteld worden in een bedrag. Ze wel meetellen zou het bedrag te laag of te stellig maken.
+  const withCost = excluding.filter((j) => j.agg.metricsComplete);
+  const impressionsOnly = excluding.filter((j) => !j.agg.metricsComplete);
 
   if (rows === null) {
     return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
@@ -92,15 +98,25 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
         <span className="text-[11px] text-muted-foreground">voorstel welke placements uit te sluiten</span>
       </div>
 
-      {excludeCount > 0 && (
-        <div className="px-5 py-3 border-b border-border bg-red-50/50">
-          <p className="text-[12px] text-rm-gray">
-            <strong>{excludeCount} placement{excludeCount === 1 ? "" : "s"}</strong> kostte{excludeCount === 1 ? "" : "n"} samen{" "}
-            <strong>{eur(waste)}</strong> zonder één conversie. Uitsluiten geeft dat budget terug aan de plekken die wél werken.
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Uit te sluiten in Google Ads via de campagne → Content → Uitsluitingen. Dit dashboard doet het niet
-            automatisch: eenmaal uitgesloten leer je niets meer over die plek.
+      {excluding.length > 0 && (
+        <div className="px-5 py-3 border-b border-border bg-red-50/50 space-y-1">
+          {withCost.length > 0 && (
+            <p className="text-[12px] text-rm-gray">
+              <strong>{withCost.length} placement{withCost.length === 1 ? "" : "s"}</strong> kostte{withCost.length === 1 ? "" : "n"} samen{" "}
+              <strong>{eur(waste)}</strong> zonder één conversie. Uitsluiten geeft dat budget terug aan de plekken die wél werken.
+            </p>
+          )}
+          {impressionsOnly.length > 0 && (
+            <p className="text-[12px] text-rm-gray">
+              Daarnaast {impressionsOnly.length === 1 ? "staat er 1 plaatsing" : `staan er ${impressionsOnly.length} plaatsingen`} uit{" "}
+              <strong>Performance Max</strong> met samen {int(impressionsOnly.reduce((s, j) => s + j.agg.impressions, 0))} vertoningen.
+              Google geeft daar geen kosten of conversies bij, dus wat die precies kosten is niet te zeggen.
+            </p>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            Uit te sluiten in Google Ads via de campagne → Content → Uitsluitingen; voor Performance Max
+            alleen accountbreed. Dit dashboard doet het niet automatisch: eenmaal uitgesloten leer je
+            niets meer over die plek.
           </p>
         </div>
       )}
@@ -111,6 +127,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
             <tr className="text-left text-muted-foreground border-b border-border">
               <th className="px-5 py-2 font-medium">Placement</th>
               <th className="px-3 py-2 font-medium">Type</th>
+              <th className="px-3 py-2 font-medium text-right">Vertoningen</th>
               <th className="px-3 py-2 font-medium text-right">Kosten</th>
               <th className="px-3 py-2 font-medium text-right">Views</th>
               <th className="px-3 py-2 font-medium text-right">Klikken</th>
@@ -133,11 +150,15 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
                   </div>
                   <div className="text-[10px] text-muted-foreground">{reason}</div>
                 </td>
-                <td className="px-3 py-2 text-muted-foreground">{placementTypeLabel(agg.placementType)}</td>
-                <td className="px-3 py-2 text-right">{eur(agg.cost)}</td>
-                <td className="px-3 py-2 text-right">{int(agg.videoViews)}</td>
-                <td className="px-3 py-2 text-right">{int(agg.clicks)}</td>
-                <td className="px-3 py-2 text-right">{agg.conversions === 0 ? "—" : int(agg.conversions)}</td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {placementTypeLabel(agg.placementType)}
+                  {agg.sources.includes("pmax") && <span className="block text-[9px] text-muted-foreground">via PMax</span>}
+                </td>
+                <td className="px-3 py-2 text-right">{int(agg.impressions)}</td>
+                <td className="px-3 py-2 text-right">{agg.metricsComplete ? eur(agg.cost) : <span className="text-muted-foreground" title="Performance Max levert geen kosten per placement">onbekend</span>}</td>
+                <td className="px-3 py-2 text-right">{agg.metricsComplete ? int(agg.videoViews) : "—"}</td>
+                <td className="px-3 py-2 text-right">{agg.metricsComplete ? int(agg.clicks) : "—"}</td>
+                <td className="px-3 py-2 text-right">{!agg.metricsComplete ? "—" : agg.conversions === 0 ? "—" : int(agg.conversions)}</td>
                 <td className="px-3 py-2 text-right">{agg.cpa == null ? "—" : eur(agg.cpa)}</td>
                 <td className="px-5 py-2">
                   <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap ${VERDICT_STYLE[verdict]}`}>
