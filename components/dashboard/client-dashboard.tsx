@@ -50,6 +50,7 @@ import { GeoCloneScope } from "./geo-clone-scope";
 import { GeoCloneOverview } from "./geo-clone-overview";
 import { EventPacing } from "./event-pacing";
 import { GeoBreakdown } from "./geo-breakdown";
+import { VideoPerformance } from "./video-performance";
 import { TrackingAlert } from "./tracking-alert";
 import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
@@ -335,6 +336,9 @@ export function ClientDashboard({ client }: { client: Client }) {
               <PerformanceChart clientId={client.id} countryFilter={countryFilter} />
               {/* Geo-mapping: waar komt verkeer/conversies vandaan, per gekozen metric. */}
               <GeoBreakdown clientId={client.id} />
+              {/* YouTube/Demand Gen met de juiste maten (CPM, CPV, kijkdiepte). Rendert niets
+                  als er geen videocampagnes draaien. */}
+              <VideoPerformance clientId={client.id} />
               {/* Quick scan: hoe de advertenties eruitzien, hoe ze presteerden + korte samenvatting. */}
               <CreativePerformance clientId={client.id} channel="google" />
               <ClientNotes clientId={client.id} />
