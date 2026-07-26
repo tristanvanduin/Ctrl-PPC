@@ -43,6 +43,63 @@ export interface GoogleAdsCampaignMetrics extends GoogleAdsMetrics {
   campaignId: string;
   campaignName: string;
   campaignStatus: string;
+  /** advertising_channel_type (SEARCH, VIDEO, DEMAND_GEN, ...) — bepaalt welke lens past. */
+  campaignType: string;
+  /** Kosten per 1000 vertoningen. De awareness-maat: vergelijkbaar met Meta/LinkedIn. */
+  avgCpm: number;
+  /**
+   * Video-metrics. Alleen betekenisvol bij VIDEO/Demand Gen-campagnes; bij Search zijn ze 0.
+   * null zou hier misleiden (Google levert 0, niet "onbekend"), dus we bewaren 0 en laten de
+   * UI op campagnetype beslissen of ze getoond worden.
+   */
+  videoViews: number;
+  /** Kosten per view (TrueView). */
+  avgCpv: number;
+  /** Aandeel vertoningen dat tot een view leidde (0-1). */
+  videoViewRate: number;
+  /** Aandeel kijkers dat 25/50/75/100% van de video zag (0-1). Waar haken ze af. */
+  videoQuartileP25: number;
+  videoQuartileP50: number;
+  videoQuartileP75: number;
+  videoQuartileP100: number;
+}
+
+/** Campagnetypes waarbij video-metrics betekenis hebben (anders is het ruis). */
+export const VIDEO_CAMPAIGN_TYPES = ["VIDEO", "DEMAND_GEN", "DISCOVERY", "MULTI_CHANNEL"];
+
+export function isVideoCampaignType(type: string | null | undefined): boolean {
+  return VIDEO_CAMPAIGN_TYPES.includes((type ?? "").toUpperCase());
+}
+
+/** De video-velden die beide campagne-queries delen. */
+const VIDEO_METRIC_FIELDS = `
+      metrics.average_cpm,
+      metrics.video_views,
+      metrics.average_cpv,
+      metrics.video_view_rate,
+      metrics.video_quartile_p25_rate,
+      metrics.video_quartile_p50_rate,
+      metrics.video_quartile_p75_rate,
+      metrics.video_quartile_p100_rate`;
+
+/**
+ * Leest de video/CPM-velden uit een Google Ads-metrics-object. Google geeft ze in camelCase of
+ * snake_case afhankelijk van de transport-laag, en bedragen in micros — hier één keer genormaliseerd.
+ * Quartile-rates komen als percentage (0-100) binnen en worden naar een fractie (0-1) gebracht,
+ * zodat ze net als ctr/conversion_rate met een percent-formatter te tonen zijn.
+ */
+function readVideoMetrics(m: Record<string, number>) {
+  const pct = (v: number | undefined) => (v ? v / 100 : 0);
+  return {
+    avgCpm: (m.averageCpm || m.average_cpm || 0) / 1_000_000,
+    videoViews: m.videoViews || m.video_views || 0,
+    avgCpv: (m.averageCpv || m.average_cpv || 0) / 1_000_000,
+    videoViewRate: pct(m.videoViewRate || m.video_view_rate),
+    videoQuartileP25: pct(m.videoQuartileP25Rate || m.video_quartile_p25_rate),
+    videoQuartileP50: pct(m.videoQuartileP50Rate || m.video_quartile_p50_rate),
+    videoQuartileP75: pct(m.videoQuartileP75Rate || m.video_quartile_p75_rate),
+    videoQuartileP100: pct(m.videoQuartileP100Rate || m.video_quartile_p100_rate),
+  };
 }
 
 export interface CampaignImpressionShare {
@@ -499,6 +556,7 @@ export async function getCampaignMetricsByMonth(
       campaign.id,
       campaign.name,
       campaign.status,
+      campaign.advertising_channel_type,
       segments.month,
       metrics.impressions,
       metrics.clicks,
@@ -508,7 +566,7 @@ export async function getCampaignMetricsByMonth(
       metrics.ctr,
       metrics.average_cpc,
       metrics.cost_per_conversion,
-      metrics.conversions_from_interactions_rate
+      metrics.conversions_from_interactions_rate,${VIDEO_METRIC_FIELDS}
     FROM campaign
     WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
     ORDER BY metrics.cost_micros DESC
@@ -522,6 +580,7 @@ export async function getCampaignMetricsByMonth(
       campaignId: c.id,
       campaignName: c.name,
       campaignStatus: c.status,
+      campaignType: (c.advertisingChannelType || c.advertising_channel_type || "UNKNOWN") as string,
       date: s.month,
       impressions: m.impressions || 0,
       clicks: m.clicks || 0,
@@ -532,6 +591,7 @@ export async function getCampaignMetricsByMonth(
       avgCpc: (m.averageCpc || m.average_cpc || 0) / 1_000_000,
       costPerConversion: (m.costPerConversion || m.cost_per_conversion || 0) / 1_000_000,
       conversionRate: m.conversionsFromInteractionsRate || m.conversions_from_interactions_rate || 0,
+      ...readVideoMetrics(m),
     };
   });
 }
@@ -553,12 +613,13 @@ async function getFilteredCampaignMetricsByMonth(
       campaign.id,
       campaign.name,
       campaign.status,
+      campaign.advertising_channel_type,
       segments.month,
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
       metrics.ctr,
-      metrics.average_cpc
+      metrics.average_cpc,${VIDEO_METRIC_FIELDS}
     FROM campaign
     WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
     ORDER BY metrics.cost_micros DESC
@@ -608,6 +669,7 @@ async function getFilteredCampaignMetricsByMonth(
       campaignId: c.id,
       campaignName: c.name,
       campaignStatus: c.status,
+      campaignType: (c.advertisingChannelType || c.advertising_channel_type || "UNKNOWN") as string,
       date: s.month,
       impressions: m.impressions || 0,
       clicks,
@@ -618,6 +680,7 @@ async function getFilteredCampaignMetricsByMonth(
       avgCpc: (m.averageCpc || m.average_cpc || 0) / 1_000_000,
       costPerConversion: conv.conversions > 0 ? cost / conv.conversions : 0,
       conversionRate: clicks > 0 ? conv.conversions / clicks : 0,
+      ...readVideoMetrics(m),
     };
   });
 }
