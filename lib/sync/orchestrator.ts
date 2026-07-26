@@ -43,6 +43,7 @@ import {
   getPmaxAssetPerformanceByMonth,
   getPmaxNetworkBreakdownByMonth,
   getPmaxPlacementsByMonth,
+  getVideoPlacementsByMonth,
   getPmaxSearchCategoriesByMonth,
   type GoogleAdsCredentials,
 } from "../api/google-ads";
@@ -244,6 +245,8 @@ export async function syncClient(opts: SyncOptions): Promise<SyncResult> {
   let pmaxNetworkRaw: Awaited<ReturnType<typeof getPmaxNetworkBreakdownByMonth>> = [];
   let pmaxPlacementsRaw: Awaited<ReturnType<typeof getPmaxPlacementsByMonth>> = [];
   let pmaxSearchCatsRaw: Awaited<ReturnType<typeof getPmaxSearchCategoriesByMonth>> = [];
+  // YouTube-placements: waar de videoadvertenties daadwerkelijk landden (kanaal, video, app).
+  let videoPlacementsRaw: Awaited<ReturnType<typeof getVideoPlacementsByMonth>> = [];
   let rsaAssetsRaw: Awaited<ReturnType<typeof getRsaAssetMetricsByMonth>> = [];
   let adMetaRaw: Awaited<ReturnType<typeof getAdMeta>> = [];
   let adGroupNegRaw: Awaited<ReturnType<typeof getAdGroupNegatives>> = [];
@@ -259,6 +262,7 @@ export async function syncClient(opts: SyncOptions): Promise<SyncResult> {
       audienceRaw, scheduleRaw,
       checkoutRaw,
       pmaxAssetsRaw, pmaxNetworkRaw, pmaxPlacementsRaw, pmaxSearchCatsRaw,
+      videoPlacementsRaw,
       rsaAssetsRaw, adMetaRaw,
       adGroupNegRaw, campaignNegRaw, sharedNegRaw,
     ] = await Promise.all([
@@ -286,6 +290,8 @@ export async function syncClient(opts: SyncOptions): Promise<SyncResult> {
       getPmaxNetworkBreakdownByMonth(credentials, customerId, startDate, endDate),
       getPmaxPlacementsByMonth(credentials, customerId, startDate, endDate),
       getPmaxSearchCategoriesByMonth(credentials, customerId, startDate, endDate),
+      // YouTube-placements (video/Demand Gen) — de basis voor uitsluitingsvoorstellen.
+      getVideoPlacementsByMonth(credentials, customerId, startDate, endDate),
       // RSA-assets plus ad-meta (migratie 020, het RSA/W1-duo)
       getRsaAssetMetricsByMonth(credentials, customerId, startDate, endDate),
       getAdMeta(credentials, customerId),
@@ -476,6 +482,10 @@ export async function syncClient(opts: SyncOptions): Promise<SyncResult> {
       clientId)),
     syncDataset("ads_pmax_placements", () => replaceBatch(supabase, "ads_pmax_placements",
       pmaxPlacementsRaw.map((p) => ({ client_id: clientId, month: startDate, campaign_id: p.campaignId, campaign_name: p.campaignName, placement: p.placement, placement_type: p.placementType, impressions: p.impressions, clicks: p.clicks, cost: p.cost, conversions: p.conversions, conversions_value: p.conversionsValue, synced_at: now })),
+      clientId)),
+    // YouTube-placements: waar de videoadvertenties landden. Voedt de uitsluitingsvoorstellen.
+    syncDataset("ads_video_placements", () => replaceBatch(supabase, "ads_video_placements",
+      videoPlacementsRaw.map((p) => ({ client_id: clientId, month: startDate, campaign_id: p.campaignId, campaign_name: p.campaignName, placement: p.placement, display_name: p.displayName, placement_type: p.placementType, target_url: p.targetUrl, impressions: p.impressions, clicks: p.clicks, cost: p.cost, conversions: p.conversions, conversions_value: p.conversionsValue, video_views: p.videoViews, synced_at: now })),
       clientId)),
     syncDataset("ads_pmax_search_categories", () => replaceBatch(supabase, "ads_pmax_search_categories",
       pmaxSearchCatsRaw.map((sc) => ({ client_id: clientId, month: sc.date, campaign_id: sc.campaignId, campaign_name: sc.campaignName, category_label: sc.categoryLabel, impressions: sc.impressions, clicks: sc.clicks, cost: sc.cost, conversions: sc.conversions, conversions_value: sc.conversionsValue, synced_at: now })),

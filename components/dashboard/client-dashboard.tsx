@@ -51,6 +51,7 @@ import { GeoCloneOverview } from "./geo-clone-overview";
 import { EventPacing } from "./event-pacing";
 import { GeoBreakdown } from "./geo-breakdown";
 import { VideoPerformance } from "./video-performance";
+import { VideoPlacements } from "./video-placements";
 import { TrackingAlert } from "./tracking-alert";
 import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
@@ -339,6 +340,8 @@ export function ClientDashboard({ client }: { client: Client }) {
               {/* YouTube/Demand Gen met de juiste maten (CPM, CPV, kijkdiepte). Rendert niets
                   als er geen videocampagnes draaien. */}
               <VideoPerformance clientId={client.id} />
+              {/* Waar die video's landden + welke placements uit te sluiten. */}
+              <VideoPlacements clientId={client.id} />
               {/* Quick scan: hoe de advertenties eruitzien, hoe ze presteerden + korte samenvatting. */}
               <CreativePerformance clientId={client.id} channel="google" />
               <ClientNotes clientId={client.id} />

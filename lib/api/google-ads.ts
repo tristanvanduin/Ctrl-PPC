@@ -2930,6 +2930,85 @@ export async function getPmaxNetworkBreakdownByMonth(
   } catch { return []; }
 }
 
+export interface VideoPlacementRow {
+  campaignId: string;
+  campaignName: string;
+  /** De uitsluitbare identifier: kanaal-ID, video-ID, app-ID of domein. */
+  placement: string;
+  /** Leesbare naam (kanaalnaam, videotitel, appnaam) — leeg als Google die niet geeft. */
+  displayName: string;
+  /** YOUTUBE_CHANNEL | YOUTUBE_VIDEO | MOBILE_APPLICATION | WEBSITE | ... */
+  placementType: string;
+  targetUrl: string;
+  impressions: number;
+  clicks: number;
+  cost: number;
+  conversions: number;
+  conversionsValue: number;
+  videoViews: number;
+}
+
+/**
+ * Waar de video-advertenties daadwerkelijk zijn vertoond: YouTube-kanalen en -video's, apps en
+ * sites in het Display-netwerk. Dit is de basis voor uitsluitingen — bij YouTube lekt budget
+ * typisch weg naar kinder-apps, auto-play-kanalen en content die niets met de doelgroep te maken
+ * heeft, en dat zie je alleen op placementniveau.
+ *
+ * Bewust detail_placement_view en niet group_placement_view: die eerste onderscheidt kanaal van
+ * losse video en geeft de leesbare naam mee, wat nodig is om te kunnen besluiten wát je uitsluit.
+ * De bestaande getPmaxPlacementsByMonth is hard gefilterd op Performance Max en dekt video niet.
+ */
+export async function getVideoPlacementsByMonth(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string
+): Promise<VideoPlacementRow[]> {
+  try {
+    const rows = await queryGoogleAds(credentials, customerId, `
+      SELECT
+        campaign.id,
+        campaign.name,
+        detail_placement_view.placement,
+        detail_placement_view.display_name,
+        detail_placement_view.placement_type,
+        detail_placement_view.target_url,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions,
+        metrics.conversions_value,
+        metrics.video_views
+      FROM detail_placement_view
+      WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+        AND campaign.advertising_channel_type IN ('VIDEO', 'DEMAND_GEN', 'DISCOVERY')
+        AND metrics.cost_micros > 0
+      ORDER BY metrics.cost_micros DESC
+      LIMIT 1000
+    `);
+
+    return rows.map((row) => {
+      const c = row.campaign as Record<string, string>;
+      const dp = (row.detailPlacementView || row.detail_placement_view) as Record<string, string>;
+      const m = row.metrics as Record<string, number>;
+      return {
+        campaignId: c.id || "",
+        campaignName: c.name || "",
+        placement: dp?.placement || "",
+        displayName: dp?.displayName || dp?.display_name || "",
+        placementType: dp?.placementType || dp?.placement_type || "UNKNOWN",
+        targetUrl: dp?.targetUrl || dp?.target_url || "",
+        impressions: m.impressions || 0,
+        clicks: m.clicks || 0,
+        cost: (m.costMicros || m.cost_micros || 0) / 1_000_000,
+        conversions: m.conversions || 0,
+        conversionsValue: m.conversionsValue || m.conversions_value || 0,
+        videoViews: m.videoViews || m.video_views || 0,
+      };
+    });
+  } catch { return []; }
+}
+
 export interface PmaxPlacementRow {
   campaignId: string;
   campaignName: string;

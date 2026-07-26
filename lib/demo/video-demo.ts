@@ -4,6 +4,7 @@
 // presentatie — alleen actief in demo-modus.
 
 import type { VideoCampaignRow } from "@/lib/video/video-performance";
+import type { PlacementInput } from "@/lib/video/placement-analysis";
 
 function vrow(
   campaignId: string, campaignName: string, month: string,
@@ -29,4 +30,33 @@ export const DEMO_VIDEO_ROWS: VideoCampaignRow[] = [
   vrow("demo-v-brandfilm", "GRT | YouTube | Merkfilm beurs", "2026-05-01", 96_000, 1_480, 41_500, 0.88, 0.71, 0.52, 0.44),
   vrow("demo-v-brandfilm", "GRT | YouTube | Merkfilm beurs", "2026-06-01", 103_000, 1_610, 45_200, 0.90, 0.73, 0.55, 0.47),
   vrow("demo-v-brandfilm", "GRT | YouTube | Merkfilm beurs", "2026-07-01", 91_500, 1_420, 39_800, 0.87, 0.70, 0.51, 0.43),
+];
+
+// Demo-placements: waar het videobudget landde. Bewust een herkenbaar beeld — twee vakkanalen die
+// hun werk doen, en daarnaast het klassieke YouTube-lek: een kinder-/spelapp en een breed
+// entertainmentkanaal die samen honderden euro's kosten zonder één conversie. Plus een paar te
+// kleine placements, zodat zichtbaar is dat die géén advies krijgen in plaats van blind uitgesloten
+// te worden.
+function pl(
+  placement: string, displayName: string, placementType: string,
+  cost: number, impressions: number, views: number, clicks: number, conversions: number,
+  campaignName = "GRT | YouTube | Awareness NL",
+): PlacementInput {
+  return { placement, displayName, placementType, targetUrl: "", campaignName, impressions, clicks, cost, conversions, videoViews: views };
+}
+
+export const DEMO_PLACEMENTS: PlacementInput[] = [
+  // Werken: vakpubliek, converteren tegen een normale CPA.
+  pl("UC-tuinbouwtv", "TuinbouwTV", "YOUTUBE_CHANNEL", 620, 88_000, 26_400, 410, 18),
+  pl("UC-greentechtalks", "GreenTech Talks", "YOUTUBE_CHANNEL", 430, 61_000, 19_800, 295, 12),
+  pl("UC-agritech", "AgriTech Weekly", "YOUTUBE_CHANNEL", 260, 38_000, 11_500, 160, 6, "GRT | YouTube | Merkfilm beurs"),
+  // Het lek: veel vertoningen en klikken, nul resultaat.
+  pl("mobileapp-puzzelrijk", "Puzzelrijk (spel)", "MOBILE_APPLICATION", 340, 96_000, 8_200, 720, 0),
+  pl("UC-clipsdaily", "Clips Daily", "YOUTUBE_CHANNEL", 215, 74_000, 12_900, 180, 0),
+  pl("mobileapp-kidsgames", "Kids Games Wereld", "MOBILE_APPLICATION", 155, 52_000, 4_100, 430, 0),
+  // Duur maar converteert: hoort een 'bekijken' te worden, geen uitsluiting.
+  pl("UC-lifestylenl", "Lifestyle NL", "YOUTUBE_CHANNEL", 290, 41_000, 9_600, 140, 1),
+  // Te klein om iets over te zeggen — bewust aanwezig om te tonen dat die met rust worden gelaten.
+  pl("UC-kleinkanaal-a", "Kwekerij Vlog", "YOUTUBE_CHANNEL", 14, 1_900, 380, 9, 0),
+  pl("UC-kleinkanaal-b", "Serre & Co", "YOUTUBE_CHANNEL", 8, 1_100, 210, 4, 0),
 ];
