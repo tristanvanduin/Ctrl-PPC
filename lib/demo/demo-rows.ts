@@ -159,10 +159,19 @@ const metaDayAgg = (day: number) => META_ADS.reduce((s, a) => {
   s.spend += Math.round(a.spend * f); s.conversions += Math.max(0, Math.round(a.conv * f));
   return s;
 }, { impressions: 0, link_clicks: 0, spend: 0, conversions: 0 });
+// Meta raakt in de demo geleidelijk verzadigd: bereik wordt duurder (meer spend per vertoning)
+// terwijl de advertentie minder aanslaat (minder klikken per vertoning). Dat is precies de
+// signatuur waar de CPM/verzadigingsdetector op let — zonder zo'n verloop zou die kaart in de
+// demo nooit iets tonen. Bewust alleen op Meta: Google en LinkedIn blijven vlak, zodat het
+// contrast zichtbaar is en de detector laat zien dat hij per kanaal oordeelt.
+// daysAgo loopt van 149 (oudst) naar 0 (recentst), dus het effect neemt toe naarmate het recenter is.
+const metaSaturationSpend = (daysAgo: number): number => 1 + 0.65 * (1 - daysAgo / 150);
+const metaSaturationClicks = (daysAgo: number): number => 1 - 0.35 * (1 - daysAgo / 150);
+
 const metaAccountDaily: Row[] = Array.from({ length: 150 }, (_, d) => {
   const day = 149 - d; const a = metaDayAgg(day);
   const conv = a.conversions * weekdayConvPenalty(day);
-  return { client_id: CID, date: dayISO(day), impressions: a.impressions, link_clicks: a.link_clicks, spend: Math.round(a.spend * recentSpendBump(day)), conversions: conv, leads: conv };
+  return { client_id: CID, date: dayISO(day), impressions: a.impressions, link_clicks: Math.round(a.link_clicks * metaSaturationClicks(day)), spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: conv };
 });
 // meta_campaigns + meta_campaign_daily voeden de ChannelPerformance-view (KPI's, maand-/campagnetabel).
 const META_CAMPAIGNS = [
