@@ -104,22 +104,22 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
         <h3 className="text-sm font-semibold text-rm-gray">
           Waar komt het vandaan{focus === "US" ? " — Verenigde Staten" : ""}
         </h3>
-        <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
+        <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
         {focus === "US" && (
           <button
             onClick={() => setFocus(null)}
-            className="flex items-center gap-0.5 text-[11px] font-medium text-rm-blue hover:underline"
+            className="flex items-center gap-0.5 text-meta font-medium text-rm-blue hover:underline"
           >
             <ChevronLeft className="w-3.5 h-3.5" /> Wereld
           </button>
         )}
         {/* Slimme dropdown naast de kaart: kies de metric die de kaart inkleurt. */}
-        <label className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <label className="ml-auto flex items-center gap-1.5 text-meta text-muted-foreground">
           Toon
           <select
             value={metricKey}
             onChange={(e) => setMetricKey(e.target.value as MetricKey)}
-            className="rounded-md border border-border bg-white px-2 py-1 text-[12px] font-medium text-rm-gray focus:outline-none focus:ring-1 focus:ring-rm-blue"
+            className="rounded-md border border-border bg-white px-2 py-1 text-body font-medium text-rm-gray focus:outline-none focus:ring-1 focus:ring-rm-blue"
           >
             {METRICS.map((m) => (
               <option key={m.key} value={m.key}>{m.label}</option>
@@ -131,7 +131,7 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
 
       <div className="px-3 py-3">
         {ranked.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
+          <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
         ) : (
           <MapErrorBoundary>
             {focus === "US" ? (
@@ -142,13 +142,13 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
           </MapErrorBoundary>
         )}
         {focus == null && canDrillUs && (
-          <p className="text-center text-[11px] text-muted-foreground pt-1">Klik op de <strong>Verenigde Staten</strong> om de staten te zien.</p>
+          <p className="text-center text-meta text-muted-foreground pt-1">Klik op de <strong>Verenigde Staten</strong> om de staten te zien.</p>
         )}
       </div>
 
       {/* Volledige tabel: alle metrics per land/staat, zodat je naast de gekozen metric ook de rest ziet. */}
       <div className="overflow-x-auto border-t border-border">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-body">
           <thead>
             <tr className="text-left text-muted-foreground border-b border-border">
               <th className="px-5 py-2 font-medium">{focus === "US" ? "Staat" : "Land"}</th>

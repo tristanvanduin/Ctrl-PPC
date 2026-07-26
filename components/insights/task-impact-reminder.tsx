@@ -85,7 +85,7 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
         <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wide">
           Impact check ({pendingReminders.length})
         </h3>
-        <p className="text-[10px] text-amber-600 ml-auto">
+        <p className="text-micro text-amber-600 ml-auto">
           Taken die eerder afgevinkt zijn — tijd om de impact te meten
         </p>
       </div>
@@ -101,7 +101,7 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-rm-gray">{tc.task_text}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="text-micro text-muted-foreground mt-0.5">
                     Afgevinkt {days} dagen geleden · {tc.cadence}
                   </p>
                 </div>
@@ -109,7 +109,7 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
                   {!impact && (
                     <button
                       onClick={() => checkImpact(tc)}
-                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90"
+                      className="flex items-center gap-1 px-2.5 py-1 text-micro font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90"
                     >
                       <Eye className="w-3 h-3" /> Check impact
                     </button>
@@ -117,7 +117,7 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
                   {impact && (
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : tc.id)}
-                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-md bg-green-100 text-green-700"
+                      className="flex items-center gap-1 px-2.5 py-1 text-micro font-medium rounded-md bg-green-100 text-green-700"
                     >
                       {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                       Bekijk resultaat

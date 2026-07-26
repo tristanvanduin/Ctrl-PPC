@@ -64,10 +64,10 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
   }
 
   if (error && !config) {
-    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   }
   if (!config) {
-    return <div className="flex items-center gap-2 text-[12px] text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Laden...</div>;
+    return <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Laden...</div>;
   }
 
   return (
@@ -76,7 +76,7 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
         <Target className="w-5 h-5 text-rm-blue" />
         <h2 className="text-base font-semibold text-rm-blue">Conversie-selectie per kanaal</h2>
       </div>
-      <p className="text-[11px] text-muted-foreground mb-4">
+      <p className="text-meta text-muted-foreground mb-4">
         Kies welke conversies meetellen voor Meta en LinkedIn (zoals de conversie-acties bij Google).
         De selectie werkt door in de KPI&apos;s, pacing en forecasts. Laat je alles uit, dan valt het
         kanaal terug op de standaard (de conversie wordt nooit 0).
@@ -87,7 +87,7 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
           const selected = new Set(config[channel]);
           return (
             <div key={channel}>
-              <h3 className="text-[12px] font-semibold text-rm-gray mb-2">{label}</h3>
+              <h3 className="text-body font-semibold text-rm-gray mb-2">{label}</h3>
               <div className="space-y-1.5">
                 {conversionSourcesFor(channel).map((src) => (
                   <label key={src.field} className="flex items-start gap-2 cursor-pointer rounded-md px-2 py-1.5 hover:bg-gray-50">
@@ -98,13 +98,13 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
                       className="mt-0.5 accent-rm-blue"
                     />
                     <span className="min-w-0">
-                      <span className="text-[12px] text-rm-gray">{src.label}</span>
-                      {src.hint && <span className="block text-[10px] text-muted-foreground">{src.hint}</span>}
+                      <span className="text-body text-rm-gray">{src.label}</span>
+                      {src.hint && <span className="block text-micro text-muted-foreground">{src.hint}</span>}
                     </span>
                   </label>
                 ))}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-2">
+              <p className="text-micro text-muted-foreground mt-2">
                 Telt mee: <strong>{config[channel].length > 0 ? conversionSourcesFor(channel).filter((s) => selected.has(s.field)).map((s) => s.label).join(", ") : "standaard"}</strong>
               </p>
             </div>
@@ -112,11 +112,11 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
         })}
       </div>
 
-      {error && <p className="text-[11px] text-red-500 mt-3">{error}</p>}
+      {error && <p className="text-meta text-red-500 mt-3">{error}</p>}
       <button
         onClick={save}
         disabled={saving}
-        className="mt-5 flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-[12px] font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all"
+        className="mt-5 flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Conversie-selectie opslaan"}

@@ -388,7 +388,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
           {completed}/{tasks.length} afgerond
         </span>
       </div>
-      <p className="text-[10px] text-muted-foreground mb-3">
+      <p className="text-micro text-muted-foreground mb-3">
         {cadence === "actions"
           ? "Automatisch gegenereerd op basis van resultaten"
           : "Analysechecklist op basis van Ranking Masters SOP"}
@@ -400,7 +400,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
           <button
             key={c}
             onClick={() => setCadence(c)}
-            className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-1.5 text-[11px] font-medium rounded-md transition-colors relative ${
+            className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-1.5 text-meta font-medium rounded-md transition-colors relative ${
               cadence === c
                 ? "bg-white text-rm-blue shadow-sm"
                 : "text-muted-foreground hover:text-rm-gray"
@@ -409,12 +409,12 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
             {CADENCE_CONFIG[c].icon}
             {CADENCE_CONFIG[c].label}
             {c === "actions" && (dynamicCount + aiTasks.length) > 0 && cadence === "actions" && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-micro font-bold rounded-full flex items-center justify-center">
                 {dynamicCount + aiTasks.length}
               </span>
             )}
             {c !== "actions" && c === cadence && aiTasks.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rm-blue text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rm-blue text-white text-micro font-bold rounded-full flex items-center justify-center">
                 {aiTasks.length}
               </span>
             )}
@@ -449,7 +449,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
 
         return filteredAiTasks.length > 0 ? (
         <div className="mb-4">
-          <p className="text-[10px] font-semibold text-rm-blue uppercase tracking-wide mb-2">
+          <p className="text-micro font-semibold text-rm-blue uppercase tracking-wide mb-2">
             AI Analyse taken ({filteredAiTasks.length}{selectedInsightId ? " gefilterd" : ""})
           </p>
           <div className="space-y-1.5">
@@ -472,19 +472,19 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
                     <span className="text-xs text-muted-foreground block mt-1 ml-5">{at.description}</span>
                   )}
                   <div className="flex items-center gap-2 mt-1.5 ml-5">
-                    <span className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${PRIORITY_COLORS[at.priority] ?? ""}`}>
+                    <span className={`text-micro font-semibold uppercase px-1.5 py-0.5 rounded ${PRIORITY_COLORS[at.priority] ?? ""}`}>
                       {at.priority}
                     </span>
-                    <span className="text-[9px] text-muted-foreground">
+                    <span className="text-micro text-muted-foreground">
                       {ACTION_TYPE_LABELS[at.action_type] ?? at.action_type}
                     </span>
                     {at.affected_campaign && (
-                      <span className="text-[9px] text-muted-foreground truncate max-w-[150px]">
+                      <span className="text-micro text-muted-foreground truncate max-w-[150px]">
                         {at.affected_campaign}
                       </span>
                     )}
                     {at.due_date && (
-                      <span className="text-[9px] text-muted-foreground">
+                      <span className="text-micro text-muted-foreground">
                         Deadline: {at.due_date}
                       </span>
                     )}
@@ -500,7 +500,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
 
       {/* Fallback message when no AI tasks on Acties tab */}
       {cadence === "actions" && !aiTasksLoading && aiTasks.length === 0 && (
-        <p className="text-[10px] text-muted-foreground mb-3 px-2 py-1.5 bg-gray-50 rounded-lg">
+        <p className="text-micro text-muted-foreground mb-3 px-2 py-1.5 bg-gray-50 rounded-lg">
           Geen AI taken beschikbaar — draai eerst een analyse via /api/analysis/monthly
         </p>
       )}
@@ -523,7 +523,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
               <span className={`text-sm leading-relaxed ${task.done ? "line-through text-muted-foreground" : "text-rm-gray"}`}>
                 {task.text}
               </span>
-              <span className={`block text-[9px] mt-0.5 ${
+              <span className={`block text-micro mt-0.5 ${
                 task.dynamic && severityColors[task.step]
                   ? `font-semibold inline-block px-1.5 py-0.5 rounded w-fit ${severityColors[task.step]}`
                   : "text-muted-foreground"
@@ -540,7 +540,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
       {completed > 0 && (
         <button
           onClick={resetTasks}
-          className="mt-3 text-[11px] text-muted-foreground hover:text-rm-blue transition-colors"
+          className="mt-3 text-meta text-muted-foreground hover:text-rm-blue transition-colors"
         >
           {allDone ? "✓ Alle taken afgerond — reset voor nieuwe cyclus" : "Reset taken"}
         </button>

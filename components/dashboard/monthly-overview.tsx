@@ -99,7 +99,7 @@ function MonthCard({
           {statusIcons[variant]}
           <div>
             <span className="text-sm font-semibold text-rm-gray">{pt.monthLabel} 2026</span>
-            <span className="text-[10px] text-muted-foreground ml-1.5">{labels[variant]}</span>
+            <span className="text-micro text-muted-foreground ml-1.5">{labels[variant]}</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -118,7 +118,7 @@ function MonthCard({
         {/* Current month: Gerealiseerd (partial) at the top */}
         {hasPartial && (
           <div className="flex justify-between items-baseline">
-            <span className="text-[11px] text-muted-foreground">Gerealiseerd</span>
+            <span className="text-meta text-muted-foreground">Gerealiseerd</span>
             <span className="text-base font-bold text-rm-blue">
               {format(partialRealized!)}
             </span>
@@ -127,7 +127,7 @@ function MonthCard({
 
         {/* Main value: Gerealiseerd (previous) or Prognose (current/next) */}
         <div className="flex justify-between items-baseline">
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-meta text-muted-foreground">
             {isRealized ? "Gerealiseerd" : "Prognose"}
           </span>
           <span className={`${hasPartial ? "text-xs" : "text-base font-bold"} ${
@@ -139,14 +139,14 @@ function MonthCard({
 
         {/* Verwacht */}
         <div className="flex justify-between items-baseline">
-          <span className="text-[11px] text-muted-foreground">Verwacht</span>
+          <span className="text-meta text-muted-foreground">Verwacht</span>
           <span className="text-xs text-muted-foreground">{format(pt.expected)}</span>
         </div>
       </div>
 
       {/* Ratio bar */}
       <div className="mt-3">
-        <div className="flex justify-between text-[10px] mb-1">
+        <div className="flex justify-between text-micro mb-1">
           <span className="text-muted-foreground">Ratio</span>
           <span className={`font-semibold ${diffColor}`}>
             {(ratio * 100).toFixed(1)}%
@@ -163,7 +163,7 @@ function MonthCard({
         {/* Current month: mini progress within the month */}
         {hasPartial && monthProgressPct && (
           <div className="mt-1.5">
-            <div className="flex justify-between text-[10px] mb-0.5">
+            <div className="flex justify-between text-micro mb-0.5">
               <span className="text-muted-foreground">Maandvoortgang</span>
               <span className={`font-medium ${partialIsOnTrack ? "text-green-600" : "text-amber-500"}`}>
                 {Math.round(monthProgressPct)}% van maand
@@ -244,7 +244,7 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
           <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
             Maandprestaties
           </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-meta text-muted-foreground mt-0.5">
             Vorige, huidige en volgende maand · ratio geeft aan of je boven of onder verwachting zit
           </p>
         </div>
@@ -300,12 +300,12 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
                         : ""
                   }`}
                 >
-                  <p className={`text-[10px] font-medium mb-1 ${
+                  <p className={`text-micro font-medium mb-1 ${
                     isFocus ? "text-rm-blue font-semibold" : isRealized ? "text-rm-gray" : "text-muted-foreground"
                   }`}>
                     {pt.monthLabel}
                   </p>
-                  <p className={`text-[11px] font-semibold ${isFocus ? "text-rm-blue" : "text-rm-gray"}`}>
+                  <p className={`text-meta font-semibold ${isFocus ? "text-rm-blue" : "text-rm-gray"}`}>
                     {format(value)}
                   </p>
                   <div className="mt-1.5 mx-auto w-full max-w-[36px]">
@@ -316,7 +316,7 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
                       />
                     </div>
                   </div>
-                  <p className={`text-[9px] font-bold mt-0.5 ${ratioColor}`}>
+                  <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>
                     {(ratio * 100).toFixed(0)}%
                   </p>
                 </div>

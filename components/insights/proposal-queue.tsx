@@ -87,9 +87,9 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
       <div className="flex items-center gap-2 mb-1">
         <Inbox className="w-4 h-4 text-rm-blue" />
         <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Goedkeuringswachtrij</h3>
-        <span className="text-[10px] text-muted-foreground">{filtered.length} voorstel{filtered.length === 1 ? "" : "len"}</span>
+        <span className="text-micro text-muted-foreground">{filtered.length} voorstel{filtered.length === 1 ? "" : "len"}</span>
       </div>
-      <p className="text-[10px] text-muted-foreground mb-3">
+      <p className="text-micro text-muted-foreground mb-3">
         Voorstellen uit de losse analyses en signaal-detecties. Accepteren zet ze in de sprintplanning; afwijzen bewaart de reden.
       </p>
       <div className="space-y-2">
@@ -99,23 +99,23 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <ChannelBadge channel={channelOfSource(p.source)} />
-                  <span className="text-[10px] text-muted-foreground">{p.source ?? "onbekend"}</span>
-                  {p.ice_total != null && <span className="text-[10px] font-semibold text-rm-blue">ICE {p.ice_total.toFixed(1)}</span>}
+                  <span className="text-micro text-muted-foreground">{p.source ?? "onbekend"}</span>
+                  {p.ice_total != null && <span className="text-micro font-semibold text-rm-blue">ICE {p.ice_total.toFixed(1)}</span>}
                 </div>
-                <p className="text-[12px] text-rm-gray font-medium mt-1">{p.hypothesis}</p>
+                <p className="text-body text-rm-gray font-medium mt-1">{p.hypothesis}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={() => decide(p, "accept")}
                   disabled={busyId === p.id}
-                  className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  className="flex items-center gap-1 px-2.5 py-1 text-micro font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {busyId === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Accepteer
                 </button>
                 <button
                   onClick={() => decide(p, "reject")}
                   disabled={busyId === p.id}
-                  className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  className="flex items-center gap-1 px-2.5 py-1 text-micro font-medium rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
                 >
                   <X className="w-3 h-3" /> Wijs af
                 </button>
@@ -123,13 +123,13 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
             </div>
             <button
               onClick={() => setExpanded(expanded === p.id ? null : p.id)}
-              className="flex items-center gap-1 text-[10px] text-rm-blue hover:underline mt-1.5"
+              className="flex items-center gap-1 text-micro text-rm-blue hover:underline mt-1.5"
             >
               {expanded === p.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               {expanded === p.id ? "Verberg detail" : "Detail"}
             </button>
             {expanded === p.id && (
-              <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+              <div className="mt-2 space-y-1 text-meta text-muted-foreground">
                 {p.rationale && <p><span className="font-medium text-rm-gray">Onderbouwing:</span> {p.rationale}</p>}
                 {p.expected_result && <p><span className="font-medium text-rm-gray">Verwacht:</span> {p.expected_result}</p>}
                 {p.measurement_metric && <p><span className="font-medium text-rm-gray">Meting:</span> {p.measurement_metric}</p>}

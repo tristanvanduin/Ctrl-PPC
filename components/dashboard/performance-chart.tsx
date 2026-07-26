@@ -111,7 +111,7 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => setViewMode("weekly")}
-              className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+              className={`px-2.5 py-1 text-meta font-medium rounded-md transition-colors ${
                 viewMode === "weekly" ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
               }`}
             >
@@ -119,7 +119,7 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
             </button>
             <button
               onClick={() => setViewMode("monthly")}
-              className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+              className={`px-2.5 py-1 text-meta font-medium rounded-md transition-colors ${
                 viewMode === "monthly" ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
               }`}
             >
@@ -128,7 +128,7 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
           </div>
           <button
             onClick={() => setShowYoY(!showYoY)}
-            className={`px-2.5 py-1 text-[11px] font-medium rounded-md border transition-colors ${
+            className={`px-2.5 py-1 text-meta font-medium rounded-md border transition-colors ${
               showYoY
                 ? "bg-purple-50 border-purple-200 text-purple-700"
                 : "bg-gray-50 border-border text-muted-foreground hover:text-rm-gray"

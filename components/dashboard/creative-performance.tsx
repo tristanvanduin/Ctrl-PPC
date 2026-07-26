@@ -156,11 +156,11 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
 
   const summary = useMemo(() => (cards ? summarizeCreatives(cards) : null), [cards]);
 
-  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   if (cards === null) return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
   if (cards.length === 0) {
     return (
-      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
         Nog geen creative-data voor {CHANNEL_LABEL[channel]}. {channel === "google" ? "Zodra de creative-sync draait, verschijnen hier de advertenties met hun prestaties." : "Zodra de creatives gesynct zijn (afbeeldingen/teksten), verschijnen ze hier met hun prestaties."}
       </div>
     );
@@ -172,7 +172,7 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
           <Sparkles className="w-4.5 h-4.5 text-rm-blue" />
           <h3 className="text-sm font-semibold text-rm-gray">Creative Performance — {CHANNEL_LABEL[channel]}</h3>
-          <span className="text-[10px] text-muted-foreground">top {cards.length} op kosten, laatste 6 maanden</span>
+          <span className="text-micro text-muted-foreground">top {cards.length} op kosten, laatste 6 maanden</span>
         </div>
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           {cards.map((c) => (
@@ -185,27 +185,27 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
                 ) : c.headline ? (
                   // Google-zoekadvertentie: blauwe kop, Ad-badge + weergave-URL, grijze beschrijving.
                   <div className="w-full rounded-md bg-white border border-gray-200 px-4 py-3 shadow-sm">
-                    <div className="text-[15px] leading-tight text-[#1a0dab] hover:underline cursor-default">{c.headline}</div>
+                    <div className="text-title leading-tight text-[#1a0dab] hover:underline cursor-default">{c.headline}</div>
                     <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-[10px] font-semibold text-gray-700 border border-gray-400 rounded-[3px] px-1 leading-tight">Ad</span>
-                      {c.displayUrl && <span className="text-[12px] text-gray-700">{c.displayUrl}</span>}
+                      <span className="text-micro font-semibold text-gray-700 border border-gray-400 rounded-[3px] px-1 leading-tight">Ad</span>
+                      {c.displayUrl && <span className="text-body text-gray-700">{c.displayUrl}</span>}
                     </div>
-                    {c.description && <div className="text-[12px] text-gray-600 mt-1.5 leading-snug">{c.description}</div>}
+                    {c.description && <div className="text-body text-gray-600 mt-1.5 leading-snug">{c.description}</div>}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-meta text-muted-foreground">
                     <ImageOff className="w-4 h-4" /> Creative-tekst/visual niet gesynct — alleen prestaties beschikbaar.
                   </div>
                 )}
               </div>
               {/* Meta-regel */}
               <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-medium text-rm-gray truncate max-w-[60%]">{c.name}</span>
-                {c.format && <span className="text-[9px] text-muted-foreground uppercase tracking-wide">{c.format}</span>}
-                {c.cta && <span className="text-[9px] text-blue-700 flex items-center gap-0.5">{c.cta} <ArrowUpRight className="w-2.5 h-2.5" /></span>}
+                <span className="text-meta font-medium text-rm-gray truncate max-w-[60%]">{c.name}</span>
+                {c.format && <span className="text-micro text-muted-foreground uppercase tracking-wide">{c.format}</span>}
+                {c.cta && <span className="text-micro text-blue-700 flex items-center gap-0.5">{c.cta} <ArrowUpRight className="w-2.5 h-2.5" /></span>}
               </div>
               {/* Metrics */}
-              <div className="px-3 py-2 grid grid-cols-4 gap-2 text-[11px]">
+              <div className="px-3 py-2 grid grid-cols-4 gap-2 text-meta">
                 <div><div className="text-muted-foreground">Klikken</div><div className="font-semibold text-rm-gray">{fmt(c.clicks)}</div></div>
                 <div><div className="text-muted-foreground">CTR</div><div className="font-semibold text-rm-gray">{pctS(c.impressions, c.clicks)}</div></div>
                 <div><div className="text-muted-foreground">Kosten</div><div className="font-semibold text-rm-gray">{eur(c.cost)}</div></div>
@@ -223,20 +223,20 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
             <h3 className="text-sm font-semibold text-rm-gray">Samenvatting</h3>
           </div>
           <div className="px-5 py-4 space-y-3">
-            <p className="text-[12px] text-rm-gray leading-relaxed">{summary.summaryText}</p>
+            <p className="text-body text-rm-gray leading-relaxed">{summary.summaryText}</p>
             {summary.recommendations.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Aanbevelingen</p>
+                <p className="text-meta font-semibold text-muted-foreground uppercase tracking-wide mb-2">Aanbevelingen</p>
                 <ul className="space-y-1.5">
                   {summary.recommendations.map((r, i) => (
-                    <li key={i} className={`text-[12px] border rounded-md px-3 py-2 ${REC_STYLE[r.kind]}`}>
+                    <li key={i} className={`text-body border rounded-md px-3 py-2 ${REC_STYLE[r.kind]}`}>
                       <strong className="capitalize">{r.kind}:</strong> &ldquo;{r.creativeName}&rdquo; — {r.detail}
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-micro text-muted-foreground">
               Deterministisch afgeleid uit de creative-prestaties. Voor een geschreven diepteanalyse en briefing:
               draai de creative-analyses hierboven (Google RSA-copy, Meta creative vision/briefing).
             </p>

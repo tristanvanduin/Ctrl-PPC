@@ -709,8 +709,8 @@ function KpiCard({
         <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${barPct}%` }} />
       </div>
       <div className="flex items-center justify-between mt-2">
-        <span className="text-[10px] text-muted-foreground">Doel: {fmtVal(target)}</span>
-        <span className={`text-[10px] font-semibold ${statusColor}`}>
+        <span className="text-micro text-muted-foreground">Doel: {fmtVal(target)}</span>
+        <span className={`text-micro font-semibold ${statusColor}`}>
           Prognose: {fmtVal(forecastVal)} ({pct(diffPct)})
         </span>
       </div>
@@ -762,7 +762,7 @@ function ForecastBar({
           />
         )}
       </div>
-      <div className="flex justify-between text-[10px] text-muted-foreground">
+      <div className="flex justify-between text-micro text-muted-foreground">
         <span>Gerealiseerd: {num(realized)}</span>
         <span>Prognose: {num(forecastVal)}</span>
         <span>Doel: {num(target)}</span>
@@ -868,7 +868,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                 <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${sc.badge}`}>
                   {sc.label}
                 </span>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-micro text-muted-foreground">
                   Health score: {health.total}/100 ({health.grade})
                 </span>
               </div>
@@ -975,7 +975,7 @@ export function DgmView({ clientId }: { clientId: string }) {
             {causes.map((cause, i) => (
               <div key={i} className="bg-white rounded-xl border border-border p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${impactColors[cause.impact]}`}>
+                  <span className={`text-micro font-bold uppercase px-1.5 py-0.5 rounded ${impactColors[cause.impact]}`}>
                     Impact: {cause.impact}
                   </span>
                 </div>
@@ -1013,19 +1013,19 @@ export function DgmView({ clientId }: { clientId: string }) {
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">{action.why}</p>
                   <div className="flex flex-wrap gap-2 mt-1.5">
-                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${impactColors[action.impact]}`}>
+                    <span className={`text-micro font-bold uppercase px-1.5 py-0.5 rounded ${impactColors[action.impact]}`}>
                       Impact: {action.impact}
                     </span>
-                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                    <span className="text-micro font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
                       {action.status}
                     </span>
                     {action.deadline && (
-                      <span className="text-[9px] text-muted-foreground px-1.5 py-0.5 rounded bg-gray-100">
+                      <span className="text-micro text-muted-foreground px-1.5 py-0.5 rounded bg-gray-100">
                         {action.deadline}
                       </span>
                     )}
                     {action.metric && (
-                      <span className="text-[9px] text-muted-foreground px-1.5 py-0.5 rounded bg-gray-100">
+                      <span className="text-micro text-muted-foreground px-1.5 py-0.5 rounded bg-gray-100">
                         Metric: {action.metric}
                       </span>
                     )}
@@ -1091,11 +1091,11 @@ export function DgmView({ clientId }: { clientId: string }) {
               <h2 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
                 Sprintplanning Status
               </h2>
-              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${ss.badge}`}>
+              <span className={`text-micro font-bold uppercase px-2 py-0.5 rounded-full ${ss.badge}`}>
                 {ss.label}
               </span>
             </div>
-            <p className="text-[10px] text-muted-foreground mb-4">
+            <p className="text-micro text-muted-foreground mb-4">
               Week {currentWeek} · Gehele planning{minWeek && maxWeek ? ` (week ${minWeek} t/m ${maxWeek})` : ""} · {acceptedHyps} actieve hypotheses
             </p>
 
@@ -1103,7 +1103,7 @@ export function DgmView({ clientId }: { clientId: string }) {
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs text-rm-gray font-medium">{progressPct}% voltooid</span>
-                <span className="text-[10px] text-muted-foreground">{done} klaar · {active} actief · {expired} verlopen · {backlog} backlog</span>
+                <span className="text-micro text-muted-foreground">{done} klaar · {active} actief · {expired} verlopen · {backlog} backlog</span>
               </div>
               <div className="w-full h-3 bg-white rounded-full border border-gray-200 overflow-hidden flex">
                 {done > 0 && <div className="h-full bg-emerald-500" style={{ width: `${(done / total) * 100}%` }} />}
@@ -1113,7 +1113,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                 {expired > 0 && <div className="h-full bg-red-300" style={{ width: `${(expired / total) * 100}%` }} />}
                 {backlog > 0 && <div className="h-full bg-gray-300" style={{ width: `${(backlog / total) * 100}%` }} />}
               </div>
-              <div className="flex gap-3 mt-1.5 text-[9px] text-muted-foreground">
+              <div className="flex gap-3 mt-1.5 text-micro text-muted-foreground">
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Klaar ({done})</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Bezig ({ongoing})</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400" />Planning ({inPlanning})</span>
@@ -1127,23 +1127,23 @@ export function DgmView({ clientId }: { clientId: string }) {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
               <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
                 <p className="text-lg font-bold text-rm-blue">{active}</p>
-                <p className="text-[10px] text-muted-foreground">Actief</p>
+                <p className="text-micro text-muted-foreground">Actief</p>
               </div>
               <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
                 <p className={`text-lg font-bold ${clientOpen > 2 ? "text-amber-600" : "text-rm-gray"}`}>{clientOpen}</p>
-                <p className="text-[10px] text-muted-foreground">Open klant</p>
+                <p className="text-micro text-muted-foreground">Open klant</p>
               </div>
               <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
                 <p className="text-lg font-bold text-rm-gray">{rmOpen}</p>
-                <p className="text-[10px] text-muted-foreground">Open RM</p>
+                <p className="text-micro text-muted-foreground">Open RM</p>
               </div>
               <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
                 <p className={`text-lg font-bold ${overdue > 0 ? "text-red-600" : "text-emerald-600"}`}>{overdue}</p>
-                <p className="text-[10px] text-muted-foreground">Over deadline</p>
+                <p className="text-micro text-muted-foreground">Over deadline</p>
               </div>
               <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
                 <p className={`text-lg font-bold ${expired > 0 ? "text-red-400" : "text-emerald-600"}`}>{expired}</p>
-                <p className="text-[10px] text-muted-foreground">Verlopen</p>
+                <p className="text-micro text-muted-foreground">Verlopen</p>
               </div>
             </div>
 
@@ -1242,7 +1242,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
                       <p className="text-sm font-semibold text-rm-gray">{item.decision}</p>
-                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${impactColors[item.urgency]}`}>
+                      <span className={`text-micro font-bold uppercase px-1.5 py-0.5 rounded ${impactColors[item.urgency]}`}>
                         {item.urgency}
                       </span>
                     </div>
@@ -1284,8 +1284,8 @@ export function DgmView({ clientId }: { clientId: string }) {
                 {health.factors.map((f) => (
                   <div key={f.name} className="text-center">
                     <p className="text-lg font-bold text-rm-gray">{f.score}/{f.maxScore}</p>
-                    <p className="text-[10px] font-medium text-muted-foreground">{f.name}</p>
-                    <p className="text-[9px] text-muted-foreground">{f.description}</p>
+                    <p className="text-micro font-medium text-muted-foreground">{f.name}</p>
+                    <p className="text-micro text-muted-foreground">{f.description}</p>
                   </div>
                 ))}
               </div>
@@ -1298,7 +1298,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                 <div className="space-y-1.5">
                   {health.anomalies.map((a, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs">
-                      <span className={`shrink-0 text-[9px] font-bold uppercase px-1 py-0.5 rounded ${
+                      <span className={`shrink-0 text-micro font-bold uppercase px-1 py-0.5 rounded ${
                         a.severity === "critical" ? "bg-red-100 text-red-700" :
                         a.severity === "warning" ? "bg-amber-100 text-amber-700" :
                         "bg-blue-100 text-blue-700"

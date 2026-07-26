@@ -28,18 +28,18 @@ export function BrandHeaderBar({ geoClone, fallbackName }: { geoClone?: string |
         <img src={theme.logoUrl} alt={name} className="h-9 w-9 rounded-lg object-contain bg-white border border-border" />
       ) : (
         <div
-          className="h-9 w-9 rounded-lg flex items-center justify-center text-[13px] font-bold shrink-0"
+          className="h-9 w-9 rounded-lg flex items-center justify-center text-lead font-bold shrink-0"
           style={{ background: "var(--brand-primary)", color: "var(--brand-primary-contrast)" }}
         >
           {initials(name)}
         </div>
       )}
       <div className="min-w-0">
-        <div className="text-[15px] font-bold leading-tight text-rm-gray truncate" style={{ fontFamily: "var(--font-heading)" }}>
+        <div className="text-title font-bold leading-tight text-rm-gray truncate" style={{ fontFamily: "var(--font-heading)" }}>
           {name}
         </div>
         {beursLabel && (
-          <div className="text-[11px] text-muted-foreground truncate">
+          <div className="text-meta text-muted-foreground truncate">
             Beurs: <span className="font-medium text-rm-blue">{beursLabel}</span>
           </div>
         )}

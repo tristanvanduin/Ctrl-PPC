@@ -21,7 +21,7 @@ export class MapErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.failed) {
       return (
-        <p className="text-[12px] text-muted-foreground py-8 text-center">
+        <p className="text-body text-muted-foreground py-8 text-center">
           De kaart kon niet geladen worden. De uitsplitsing per land staat hieronder in de tabel.
         </p>
       );

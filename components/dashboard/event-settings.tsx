@@ -71,10 +71,10 @@ export function EventSettings({ clientId }: { clientId: string }) {
   }
 
   if (error && !events) {
-    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   }
   if (!events) {
-    return <div className="flex items-center gap-2 text-[12px] text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Laden...</div>;
+    return <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Laden...</div>;
   }
 
   return (
@@ -90,23 +90,23 @@ export function EventSettings({ clientId }: { clientId: string }) {
 
       <div className="space-y-4">
         {events.length === 0 && (
-          <p className="text-[12px] text-muted-foreground">Nog geen beurzen ingesteld. Voeg er een toe.</p>
+          <p className="text-body text-muted-foreground">Nog geen beurzen ingesteld. Voeg er een toe.</p>
         )}
         {events.map((ev) => (
           <div key={ev.id} className="rounded-lg border border-border p-4 space-y-3">
             <div className="flex items-start gap-3">
               <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <label className="block sm:col-span-2">
-                  <span className="text-[11px] font-medium text-rm-gray">Naam</span>
+                  <span className="text-meta font-medium text-rm-gray">Naam</span>
                   <input type="text" value={ev.name} placeholder="bijv. GreenTech Amsterdam"
                     onChange={(e) => patchEvent(ev.id, { name: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] focus:border-rm-blue/50 focus:outline-none" />
+                    className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none" />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] font-medium text-rm-gray">Afkorting (campagne)</span>
+                  <span className="text-meta font-medium text-rm-gray">Afkorting (campagne)</span>
                   <input type="text" value={ev.abbrev} placeholder="bijv. GTA"
                     onChange={(e) => patchEvent(ev.id, { abbrev: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] font-mono focus:border-rm-blue/50 focus:outline-none" />
+                    className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead font-mono focus:border-rm-blue/50 focus:outline-none" />
                 </label>
               </div>
               <button onClick={() => { setEvents((evs) => evs?.filter((e) => e.id !== ev.id) ?? evs); setSaved(false); }}
@@ -116,26 +116,26 @@ export function EventSettings({ clientId }: { clientId: string }) {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-rm-gray">Cadans:</span>
+              <span className="text-meta font-medium text-rm-gray">Cadans:</span>
               {(Object.keys(CADENCE_LABEL) as Cadence[]).map((c) => (
                 <button key={c} onClick={() => patchEvent(ev.id, { cadence: c })}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${ev.cadence === c ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
+                  className={`px-2.5 py-1 rounded-md text-meta font-medium transition-colors ${ev.cadence === c ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
                   {CADENCE_LABEL[c]}
                 </button>
               ))}
             </div>
 
             <div>
-              <span className="text-[11px] font-medium text-rm-gray">Afgelopen edities</span>
+              <span className="text-meta font-medium text-rm-gray">Afgelopen edities</span>
               <div className="space-y-2 mt-1">
                 {ev.editions.map((ed, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <input type="date" value={ed.date}
                       onChange={(e) => patchEdition(ev.id, idx, { date: e.target.value })}
-                      className="rounded-md border border-border px-3 py-1.5 text-[12px] focus:border-rm-blue/50 focus:outline-none" />
+                      className="rounded-md border border-border px-3 py-1.5 text-body focus:border-rm-blue/50 focus:outline-none" />
                     <input type="text" value={ed.label} placeholder="label (bijv. 2026)"
                       onChange={(e) => patchEdition(ev.id, idx, { label: e.target.value })}
-                      className="flex-1 rounded-md border border-border px-3 py-1.5 text-[12px] focus:border-rm-blue/50 focus:outline-none" />
+                      className="flex-1 rounded-md border border-border px-3 py-1.5 text-body focus:border-rm-blue/50 focus:outline-none" />
                     <button onClick={() => patchEvent(ev.id, { editions: ev.editions.filter((_, i) => i !== idx) })}
                       className="text-muted-foreground hover:text-red-500" title="Editie verwijderen">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -143,7 +143,7 @@ export function EventSettings({ clientId }: { clientId: string }) {
                   </div>
                 ))}
                 <button onClick={() => patchEvent(ev.id, { editions: [...ev.editions, { date: "", label: "" }] })}
-                  className="flex items-center gap-1 text-[11px] text-rm-blue hover:underline">
+                  className="flex items-center gap-1 text-meta text-rm-blue hover:underline">
                   <Plus className="w-3 h-3" /> Editie toevoegen
                 </button>
               </div>
@@ -152,14 +152,14 @@ export function EventSettings({ clientId }: { clientId: string }) {
         ))}
 
         <button onClick={() => { setEvents((evs) => [...(evs ?? []), emptyEvent()]); setSaved(false); }}
-          className="flex items-center gap-1.5 text-[12px] text-rm-blue hover:underline">
+          className="flex items-center gap-1.5 text-body text-rm-blue hover:underline">
           <Plus className="w-4 h-4" /> Beurs toevoegen
         </button>
       </div>
 
-      {error && <p className="text-[11px] text-red-500 mt-3">{error}</p>}
+      {error && <p className="text-meta text-red-500 mt-3">{error}</p>}
       <button onClick={save} disabled={saving}
-        className="mt-4 flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-[12px] font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all">
+        className="mt-4 flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all">
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Opslaan"}
       </button>

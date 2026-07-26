@@ -55,7 +55,7 @@ function MiniChart({ data, type, label, color = "#E87722", height = 180 }: { dat
   if (data.length === 0) return null;
   return (
     <div>
-      <p className="text-[10px] text-muted-foreground mb-1">{label}</p>
+      <p className="text-micro text-muted-foreground mb-1">{label}</p>
       <ResponsiveContainer width="100%" height={height}>
         {type === "bar" ? (
           <BarChart data={data}>
@@ -278,7 +278,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
         />
       )}
       {progress.trackerUnavailable && !progress.job && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-700">
           {progress.trackerMessage || "Live voortgang niet beschikbaar. Rapportgeneratie loopt mogelijk nog door."}
         </div>
       )}
@@ -291,7 +291,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
         />
       )}
       {pdfProgress.trackerUnavailable && !pdfProgress.job && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-700">
           {pdfProgress.trackerMessage || "Live PDF-voortgang niet beschikbaar."}
         </div>
       )}
@@ -305,9 +305,9 @@ export function ClientReporting({ clientId }: { clientId: string }) {
               <button key={r.id} onClick={() => loadReport(r.id)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors text-left">
                 <div>
                   <p className="text-sm font-medium text-rm-gray">{r.title}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{MONTH_NAMES[r.report_month - 1]} {r.report_year}</p>
+                  <p className="text-micro text-muted-foreground mt-0.5">{MONTH_NAMES[r.report_month - 1]} {r.report_year}</p>
                 </div>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[r.status]?.bg ?? ""} ${STATUS_STYLE[r.status]?.color ?? ""}`}>{STATUS_STYLE[r.status]?.label ?? r.status}</span>
+                <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[r.status]?.bg ?? ""} ${STATUS_STYLE[r.status]?.color ?? ""}`}>{STATUS_STYLE[r.status]?.label ?? r.status}</span>
               </button>
             ))}
           </div>
@@ -320,7 +320,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-rm-blue" />
           <p className="text-sm text-muted-foreground">Rapport wordt gegenereerd...</p>
-          <p className="text-[10px] text-muted-foreground">Data ophalen, metrics berekenen, tekst genereren — ca. 30-60 sec</p>
+          <p className="text-micro text-muted-foreground">Data ophalen, metrics berekenen, tekst genereren — ca. 30-60 sec</p>
         </div>
       )}
 
@@ -346,15 +346,15 @@ export function ClientReporting({ clientId }: { clientId: string }) {
           <div className="bg-white rounded-xl border border-border shadow-sm px-5 py-3 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-rm-gray">{report.title}</h2>
-              <p className="text-[10px] text-muted-foreground">{report.reportMonth} {report.reportYear}</p>
+              <p className="text-micro text-muted-foreground">{report.reportMonth} {report.reportYear}</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[reportStatus]?.bg ?? ""} ${STATUS_STYLE[reportStatus]?.color ?? ""}`}>{STATUS_STYLE[reportStatus]?.label ?? reportStatus}</span>
-              {reportStatus === "draft" && <button onClick={() => updateStatus("final")} className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md border border-green-200 bg-green-50 text-green-600 hover:bg-green-100"><Check className="w-3 h-3" /> Definitief</button>}
-              {reportStatus === "final" && <button onClick={() => updateStatus("sent")} className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100"><Send className="w-3 h-3" /> Verstuurd</button>}
-              {reportId && <button onClick={downloadPdf} disabled={pdfLoading} className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md border border-rm-orange/30 bg-orange-50 text-rm-orange hover:bg-orange-100 disabled:opacity-50">{pdfLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} PDF</button>}
-              <button onClick={copyText} className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-gray-50">{copied ? <Check className="w-3 h-3 text-green-500" /> : <Download className="w-3 h-3" />} {copied ? "Gekopieerd!" : "Tekst"}</button>
-              <button onClick={() => { setReport(null); setReportId(null); fetchReports().then(setReports); }} className="text-[10px] font-medium px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-gray-50">Terug</button>
+              <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[reportStatus]?.bg ?? ""} ${STATUS_STYLE[reportStatus]?.color ?? ""}`}>{STATUS_STYLE[reportStatus]?.label ?? reportStatus}</span>
+              {reportStatus === "draft" && <button onClick={() => updateStatus("final")} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-green-200 bg-green-50 text-green-600 hover:bg-green-100"><Check className="w-3 h-3" /> Definitief</button>}
+              {reportStatus === "final" && <button onClick={() => updateStatus("sent")} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100"><Send className="w-3 h-3" /> Verstuurd</button>}
+              {reportId && <button onClick={downloadPdf} disabled={pdfLoading} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-rm-orange/30 bg-orange-50 text-rm-orange hover:bg-orange-100 disabled:opacity-50">{pdfLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} PDF</button>}
+              <button onClick={copyText} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-gray-50">{copied ? <Check className="w-3 h-3 text-green-500" /> : <Download className="w-3 h-3" />} {copied ? "Gekopieerd!" : "Tekst"}</button>
+              <button onClick={() => { setReport(null); setReportId(null); fetchReports().then(setReports); }} className="text-micro font-medium px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-gray-50">Terug</button>
             </div>
           </div>
 
@@ -371,15 +371,15 @@ export function ClientReporting({ clientId }: { clientId: string }) {
               return (
                 <div key={kpi.label} className="bg-white rounded-xl border border-border shadow-sm p-4">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-medium text-muted-foreground">{kpi.label}</span>
-                    <span className={`text-[10px] font-bold ${changeColor}`}>
+                    <span className="text-micro font-medium text-muted-foreground">{kpi.label}</span>
+                    <span className={`text-micro font-bold ${changeColor}`}>
                       {kpi.changePct > 0 ? "+" : ""}{kpi.changePct}%
                     </span>
                   </div>
                   <p className="text-lg font-bold text-rm-gray">{fmtValue(kpi.current, kpi.format)}</p>
-                  <p className="text-[10px] text-muted-foreground">({fmtValue(kpi.previous, kpi.format)})</p>
+                  <p className="text-micro text-muted-foreground">({fmtValue(kpi.previous, kpi.format)})</p>
                   {kpi.yoyChangePct != null && (
-                    <p className="text-[9px] text-muted-foreground mt-1">YoY: {kpi.yoyChangePct > 0 ? "+" : ""}{kpi.yoyChangePct}%</p>
+                    <p className="text-micro text-muted-foreground mt-1">YoY: {kpi.yoyChangePct > 0 ? "+" : ""}{kpi.yoyChangePct}%</p>
                   )}
                 </div>
               );
@@ -394,7 +394,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
               <div key={section.id} className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
                 {/* Section label bar */}
                 <div className="px-5 py-2 border-b border-border flex items-center justify-between bg-gray-50/50">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{section.label}</span>
+                  <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">{section.label}</span>
                   {!isEditing && (
                     <button onClick={() => startEdit(section.id, section.heading, section.body)} className="p-1 rounded-md hover:bg-gray-100 text-muted-foreground"><Pencil className="w-3.5 h-3.5" /></button>
                   )}
@@ -446,7 +446,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
           {/* ── Actions section ── */}
           <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-2 border-b border-border flex items-center justify-between bg-gray-50/50">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Acties komende maand</span>
+              <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">Acties komende maand</span>
               {editingId !== "acties" && <button onClick={() => startEdit("acties", report.actionSection.heading, report.actionSection.body)} className="p-1 rounded-md hover:bg-gray-100 text-muted-foreground"><Pencil className="w-3.5 h-3.5" /></button>}
               {editingId === "acties" && (
                 <div className="flex items-center gap-1">
@@ -473,7 +473,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
           {/* ── Planning section ── */}
           <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-2 border-b border-border flex items-center justify-between bg-gray-50/50">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Planning & Vooruitblik</span>
+              <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">Planning & Vooruitblik</span>
               {editingId !== "planning" && <button onClick={() => startEdit("planning", report.planningSection.heading, report.planningSection.body)} className="p-1 rounded-md hover:bg-gray-100 text-muted-foreground"><Pencil className="w-3.5 h-3.5" /></button>}
               {editingId === "planning" && (
                 <div className="flex items-center gap-1">
@@ -518,11 +518,11 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                       return (
                         <div key={kpi.label} className="bg-white rounded-xl border border-border shadow-sm p-4">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-medium text-muted-foreground">{kpi.label}</span>
-                            <span className={`text-[10px] font-bold ${changeColor}`}>{kpi.changePct > 0 ? "+" : ""}{kpi.changePct}%</span>
+                            <span className="text-micro font-medium text-muted-foreground">{kpi.label}</span>
+                            <span className={`text-micro font-bold ${changeColor}`}>{kpi.changePct > 0 ? "+" : ""}{kpi.changePct}%</span>
                           </div>
                           <p className="text-lg font-bold text-rm-gray">{fmtValue(kpi.current, kpi.format)}</p>
-                          <p className="text-[10px] text-muted-foreground">({fmtValue(kpi.previous, kpi.format)})</p>
+                          <p className="text-micro text-muted-foreground">({fmtValue(kpi.previous, kpi.format)})</p>
                         </div>
                       );
                     })}
@@ -532,7 +532,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                   {cs.metricSections.map((section) => (
                     <div key={section.id} className="bg-white rounded-xl border border-border shadow-sm overflow-hidden mt-4">
                       <div className="px-5 py-2 border-b border-border bg-gray-50/50">
-                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{section.label}</span>
+                        <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">{section.label}</span>
                       </div>
                       <div className="px-5 py-4">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

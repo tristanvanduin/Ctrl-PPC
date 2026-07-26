@@ -36,7 +36,7 @@ export function LinkedInView({ clientId, geoClone }: { clientId: string; geoClon
         delivers={SECTIONS}
         analysesHint={<>De LinkedIn-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong> → LinkedIn.</>}
         warning={!demo ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
             Het LinkedIn-datamodel en de sync-laag staan klaar. Zodra de LinkedIn-koppeling live is en de
             sync draait, vult dit tabblad met onderstaande secties.
           </div>

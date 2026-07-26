@@ -99,7 +99,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
 
   const activeChannels = useMemo(() => (blocks ?? []).filter((b) => b.campaigns.length > 0), [blocks]);
 
-  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   if (blocks === null) return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
 
   return (
@@ -109,7 +109,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
           <Layers className="w-4.5 h-4.5 text-rm-blue" />
           <h3 className="text-sm font-semibold text-rm-gray">Actieve kanalen & campagnes{geoClone ? ` — beurs ${geoClone}` : ""}</h3>
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           {activeChannels.length === 0
             ? "Geen actieve campagnes gevonden voor deze scope."
             : `Actief op ${activeChannels.length} kanaal${activeChannels.length === 1 ? "" : "en"}: ${activeChannels.map((b) => `${b.label} (${b.campaigns.length})`).join(" · ")}.`}
@@ -121,10 +121,10 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             {CHANNEL_META[block.channel].icon}
             <h3 className="text-sm font-semibold text-rm-gray">{block.label}</h3>
-            <span className="text-[10px] text-muted-foreground">{block.campaigns.length} campagne{block.campaigns.length === 1 ? "" : "s"}</span>
+            <span className="text-micro text-muted-foreground">{block.campaigns.length} campagne{block.campaigns.length === 1 ? "" : "s"}</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="text-left text-muted-foreground border-b border-border">
                   <th className="px-5 py-2 font-medium">Campagne</th>

@@ -39,7 +39,7 @@ export function ScriptCard({
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-rm-gray truncate">{script.title}</h3>
           {script.description && (
-            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+            <p className="text-meta text-muted-foreground mt-0.5 line-clamp-2">
               {script.description}
             </p>
           )}
@@ -78,7 +78,7 @@ export function ScriptCard({
           {script.tags.map((tag) => (
             <span
               key={tag}
-              className="text-[9px] font-medium px-2 py-0.5 rounded-full bg-rm-blue/10 text-rm-blue"
+              className="text-micro font-medium px-2 py-0.5 rounded-full bg-rm-blue/10 text-rm-blue"
             >
               {tag}
             </span>
@@ -92,21 +92,21 @@ export function ScriptCard({
         className="w-full text-left"
       >
         <pre
-          className={`text-[11px] bg-gray-50 rounded-lg p-3 font-mono text-rm-gray overflow-x-auto ${
+          className={`text-meta bg-gray-50 rounded-lg p-3 font-mono text-rm-gray overflow-x-auto ${
             expanded ? "" : "max-h-[80px] overflow-hidden"
           }`}
         >
           {script.code}
         </pre>
         {!expanded && script.code.split("\n").length > 4 && (
-          <p className="text-[10px] text-rm-blue mt-1">
+          <p className="text-micro text-rm-blue mt-1">
             Klik om uit te klappen ({script.code.split("\n").length} regels)
           </p>
         )}
       </button>
 
       {/* Footer */}
-      <p className="text-[10px] text-muted-foreground mt-3">
+      <p className="text-micro text-muted-foreground mt-3">
         Bijgewerkt {timeAgo(script.updated_at)}
       </p>
     </div>

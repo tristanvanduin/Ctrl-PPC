@@ -406,7 +406,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                     <div key={err.id} className="flex items-center gap-2 text-xs">
                       <span className="font-medium text-red-600">{err.label}</span>
                       <span className="text-red-500 truncate max-w-[400px]">{err.error}</span>
-                      <span className="text-red-400 text-[10px]">
+                      <span className="text-red-400 text-micro">
                         {new Date(err.timestamp).toLocaleString("nl-NL", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}
                       </span>
                       {onDismissError && (
@@ -426,7 +426,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
             {errors.length > 1 && onDismissAllErrors && (
               <button
                 onClick={onDismissAllErrors}
-                className="text-[10px] font-medium text-red-500 hover:text-red-700 hover:underline shrink-0"
+                className="text-micro font-medium text-red-500 hover:text-red-700 hover:underline shrink-0"
               >
                 Alles afhandelen
               </button>
@@ -438,7 +438,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
       <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 pt-5 pb-4">
         <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Bestanden</h3>
-        <p className="text-[10px] text-muted-foreground mt-0.5">
+        <p className="text-micro text-muted-foreground mt-0.5">
           SOP's, rapportages en andere documenten per klant
         </p>
       </div>
@@ -462,7 +462,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                 <FolderOpen className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate flex-1 text-left">{folder.name}</span>
                 {count > 0 && (
-                  <span className={`text-[9px] ${isActive ? "text-white/70" : "text-muted-foreground"}`}>
+                  <span className={`text-micro ${isActive ? "text-white/70" : "text-muted-foreground"}`}>
                     {count}
                   </span>
                 )}
@@ -479,18 +479,18 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
                 placeholder="Mapnaam..."
-                className="w-full text-[11px] border border-border rounded px-2 py-1.5 focus:outline-none focus:border-rm-blue"
+                className="w-full text-meta border border-border rounded px-2 py-1.5 focus:outline-none focus:border-rm-blue"
                 autoFocus
               />
               <div className="flex gap-1 mt-1">
-                <button onClick={handleCreateFolder} className="text-[10px] text-rm-blue font-medium">Toevoegen</button>
-                <button onClick={() => setShowNewFolder(false)} className="text-[10px] text-muted-foreground">Annuleer</button>
+                <button onClick={handleCreateFolder} className="text-micro text-rm-blue font-medium">Toevoegen</button>
+                <button onClick={() => setShowNewFolder(false)} className="text-micro text-muted-foreground">Annuleer</button>
               </div>
             </div>
           ) : (
             <button
               onClick={() => setShowNewFolder(true)}
-              className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-lg text-[11px] text-muted-foreground hover:text-rm-blue hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-lg text-meta text-muted-foreground hover:text-rm-blue hover:bg-gray-100 transition-colors"
             >
               <FolderPlus className="w-3 h-3" /> Nieuwe map
             </button>
@@ -516,7 +516,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-50"
                 >
                   {uploading ? (
                     <><Loader2 className="w-3 h-3 animate-spin" /> Uploaden...</>
@@ -531,8 +531,8 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
           {/* Upload error */}
           {uploadError && (
             <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
-              <p className="text-[11px] text-red-700">Upload mislukt: {uploadError}</p>
-              <button onClick={() => setUploadError(null)} className="text-[11px] text-muted-foreground ml-2">
+              <p className="text-meta text-red-700">Upload mislukt: {uploadError}</p>
+              <button onClick={() => setUploadError(null)} className="text-meta text-muted-foreground ml-2">
                 <X className="w-3 h-3" />
               </button>
             </div>
@@ -541,10 +541,10 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
           {/* Delete confirmation */}
           {deleteConfirm && (
             <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
-              <p className="text-[11px] text-red-700">Bestand verwijderen?</p>
+              <p className="text-meta text-red-700">Bestand verwijderen?</p>
               <div className="flex gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="text-[11px] text-muted-foreground">Annuleren</button>
-                <button onClick={() => handleDeleteFile(deleteConfirm)} className="text-[11px] text-red-600 font-medium">Verwijder</button>
+                <button onClick={() => setDeleteConfirm(null)} className="text-meta text-muted-foreground">Annuleren</button>
+                <button onClick={() => handleDeleteFile(deleteConfirm)} className="text-meta text-red-600 font-medium">Verwijder</button>
               </div>
             </div>
           )}
@@ -559,7 +559,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
               {activeFolder && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-[11px] text-rm-blue hover:underline mt-2"
+                  className="text-meta text-rm-blue hover:underline mt-2"
                 >
                   Upload je eerste bestand
                 </button>
@@ -575,7 +575,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                   <FileIcon contentType={file.content_type} fileName={file.file_name} />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-rm-gray truncate">{file.file_name}</p>
-                    <p className="text-[9px] text-muted-foreground">
+                    <p className="text-micro text-muted-foreground">
                       {formatFileSize(file.file_size)} · {timeAgo(file.uploaded_at)}
                     </p>
                   </div>

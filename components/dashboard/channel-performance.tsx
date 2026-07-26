@@ -182,13 +182,13 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, campaign, convConfig, geoClone, matchedEntities]);
 
-  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   if (account === null) {
     return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
   }
   if (derived?.empty) {
     return (
-      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
         Geen {channel === "meta" ? "Meta" : "LinkedIn"}-campagnes die bij de gekozen beurs ({geoClone}) horen. De account-cijfers dragen geen campagnenaam en kunnen niet per beurs gesplitst worden.
       </div>
     );
@@ -212,7 +212,7 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
   return (
     <div className="space-y-6">
       {geoClone && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-[11px] text-blue-800">
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-meta text-blue-800">
           Beurs-scope <strong>{geoClone}</strong> actief: alle cijfers hieronder zijn her-geaggregeerd uit de
           campagnes die bij deze beurs horen (op basis van de campagnenaam).
         </div>
@@ -226,9 +226,9 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
         <div className="px-4 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {kpis.map((k) => (
             <div key={k.label} className="rounded-lg border border-border bg-white px-4 py-3">
-              <div className="text-[11px] text-muted-foreground">{k.label}</div>
+              <div className="text-meta text-muted-foreground">{k.label}</div>
               <div className="text-lg font-semibold text-rm-gray mt-0.5">{k.value}</div>
-              {k.delta && <div className={`text-[10px] mt-0.5 ${k.delta.startsWith("+") ? "text-emerald-600" : "text-red-500"}`}>{k.delta} vs vorige 28d</div>}
+              {k.delta && <div className={`text-micro mt-0.5 ${k.delta.startsWith("+") ? "text-emerald-600" : "text-red-500"}`}>{k.delta} vs vorige 28d</div>}
             </div>
           ))}
         </div>
@@ -240,17 +240,17 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
           <Gauge className="w-4.5 h-4.5 text-rm-blue" />
           <h3 className="text-sm font-semibold text-rm-gray">Pacing — maand tot nu (dag {dayOfMonth})</h3>
         </div>
-        <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 gap-4 text-[13px]">
+        <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 gap-4 text-lead">
           <div>
-            <div className="text-[11px] text-muted-foreground">Spend deze maand</div>
-            <div className="font-semibold text-rm-gray">{eur(mtd.spend)} <span className="text-[11px] text-muted-foreground font-normal">(vorige maand op dag {dayOfMonth}: {eur(prevMtd.spend)})</span></div>
+            <div className="text-meta text-muted-foreground">Spend deze maand</div>
+            <div className="font-semibold text-rm-gray">{eur(mtd.spend)} <span className="text-meta text-muted-foreground font-normal">(vorige maand op dag {dayOfMonth}: {eur(prevMtd.spend)})</span></div>
           </div>
           <div>
-            <div className="text-[11px] text-muted-foreground">{convLabel} deze maand</div>
-            <div className="font-semibold text-rm-gray">{fmt(mtd.conv, 1)} <span className="text-[11px] text-muted-foreground font-normal">(was {fmt(prevMtd.conv, 1)})</span></div>
+            <div className="text-meta text-muted-foreground">{convLabel} deze maand</div>
+            <div className="font-semibold text-rm-gray">{fmt(mtd.conv, 1)} <span className="text-meta text-muted-foreground font-normal">(was {fmt(prevMtd.conv, 1)})</span></div>
           </div>
           <div>
-            <div className="text-[11px] text-muted-foreground">Tempo vs vorige maand</div>
+            <div className="text-meta text-muted-foreground">Tempo vs vorige maand</div>
             <div className={`font-semibold ${pacePct != null && pacePct > 1.15 ? "text-amber-600" : "text-rm-gray"}`}>{pace ?? "—"}{pacePct != null && pacePct > 1.15 ? " (loopt voor)" : ""}</div>
           </div>
         </div>
@@ -287,7 +287,7 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
           <h3 className="text-sm font-semibold text-rm-gray">Maandprestaties</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-body">
             <thead>
               <tr className="text-left text-muted-foreground border-b border-border">
                 <th className="px-5 py-2 font-medium">Maand</th>
@@ -324,7 +324,7 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
             <h3 className="text-sm font-semibold text-rm-gray">Campagnes (laatste 28 dagen)</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="text-left text-muted-foreground border-b border-border">
                   <th className="px-5 py-2 font-medium">Campagne</th>

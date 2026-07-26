@@ -158,7 +158,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
   const SortTh = ({ col, label, align }: { col: SortKey; label: string; align?: string }) => (
     <th
       onClick={() => handleSort(col)}
-      className={`px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue ${align === "right" ? "text-right" : "text-left"}`}
+      className={`px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue ${align === "right" ? "text-right" : "text-left"}`}
     >
       <span className="inline-flex items-center gap-1">
         {label}
@@ -193,7 +193,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
         >
           Start Analyse
         </button>
-        <p className="text-[10px] text-muted-foreground mt-2">
+        <p className="text-micro text-muted-foreground mt-2">
           Duurt ca. 30-60 seconden
         </p>
       </div>
@@ -274,14 +274,14 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
           <thead className="bg-gray-50/50 border-b border-border">
             <tr>
               <SortTh col="term" label="Zoekterm" />
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
               <SortTh col="clicks" label="Clicks" align="right" />
               <SortTh col="cost" label="Kosten" align="right" />
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
               <SortTh col="score" label="Score" align="right" />
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Beoordeling</th>
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Actie</th>
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Reden</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Beoordeling</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Actie</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Reden</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -294,7 +294,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground" title={`${r.campaignName} > ${r.adGroupName}`}>
                     <div className="text-xs text-rm-gray">{r.campaignName}</div>
-                    <div className="text-[10px] text-muted-foreground">{r.adGroupName}</div>
+                    <div className="text-micro text-muted-foreground">{r.adGroupName}</div>
                   </td>
                   <td className="px-3 py-2.5 text-right text-sm text-rm-gray">{r.clicks}</td>
                   <td className="px-3 py-2.5 text-right text-sm text-rm-gray">{fmt(r.cost)}</td>
@@ -309,7 +309,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
                     </span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border ${verdictColors[r.verdict] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-micro font-medium rounded-full border ${verdictColors[r.verdict] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
                       <VerdictIcon className="w-3 h-3" />
                       {verdictLabels[r.verdict] || r.verdict}
                     </span>

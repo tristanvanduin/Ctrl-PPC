@@ -184,12 +184,12 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
         <h3 className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
           Hypotheses workflow — {WF_LABEL[workflowChannel]}
         </h3>
-        <span className="ml-auto px-2 py-0.5 text-[9px] font-bold rounded-full bg-purple-100 text-purple-600">
+        <span className="ml-auto px-2 py-0.5 text-micro font-bold rounded-full bg-purple-100 text-purple-600">
           {pendingCount} pending / {hypotheses.length} totaal
         </span>
       </div>
 
-      <p className="text-[10px] text-muted-foreground mb-4">
+      <p className="text-micro text-muted-foreground mb-4">
         Bron: laatste `structured_monthly_v2` output. Accepteren zet alle gekoppelde taken door naar sprintplanning.
       </p>
 
@@ -222,7 +222,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
                       </button>
                     </>
                   ) : (
-                    <div className={`px-2 py-1 rounded-md text-[10px] font-semibold ${statusTone(item.status)}`}>
+                    <div className={`px-2 py-1 rounded-md text-micro font-semibold ${statusTone(item.status)}`}>
                       {item.status}
                     </div>
                   )}
@@ -231,14 +231,14 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-xs font-semibold text-purple-700">{item.title}</p>
-                    <span className="px-1.5 py-0.5 rounded bg-white border border-purple-200 text-[10px] text-purple-600">
+                    <span className="px-1.5 py-0.5 rounded bg-white border border-purple-200 text-micro text-purple-600">
                       {item.label}
                     </span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusTone(item.status)}`}>
+                    <span className={`px-1.5 py-0.5 rounded text-micro font-medium ${statusTone(item.status)}`}>
                       {item.status}
                     </span>
                     {item.accepted_into_sprint && (
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-medium">
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-micro font-medium">
                         in sprint
                       </span>
                     )}
@@ -246,7 +246,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
 
                   <p className="text-sm text-rm-gray leading-snug mt-1">{item.hypothesis}</p>
 
-                  <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground flex-wrap">
+                  <div className="flex items-center gap-4 mt-2 text-micro text-muted-foreground flex-wrap">
                     <span>{item.linked_findings.length} bevindingen gekoppeld</span>
                     <span>{item.linked_tasks.length} taken gekoppeld</span>
                     <span>{item.sprint_items.length} sprint-items</span>
@@ -257,7 +257,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
 
                   <button
                     onClick={() => setExpanded(isExpanded ? null : item.id)}
-                    className="flex items-center gap-1 mt-1.5 text-[10px] text-purple-500 hover:text-purple-700"
+                    className="flex items-center gap-1 mt-1.5 text-micro text-purple-500 hover:text-purple-700"
                   >
                     {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     {isExpanded ? "Minder" : "Meer details"}
@@ -266,7 +266,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
               </div>
 
               {isExpanded && (
-                <div className="px-4 pb-4 pt-0 ml-12 space-y-3 text-[11px] text-muted-foreground border-t border-purple-100 mt-1 pt-3">
+                <div className="px-4 pb-4 pt-0 ml-12 space-y-3 text-meta text-muted-foreground border-t border-purple-100 mt-1 pt-3">
                   <div>
                     <p><span className="font-medium text-rm-gray">Waarom denken we dit:</span> {item.why_we_think_this}</p>
                     <p className="mt-1"><span className="font-medium text-rm-gray">Validatie / exploitatie:</span> {item.validation_or_exploitation_step}</p>

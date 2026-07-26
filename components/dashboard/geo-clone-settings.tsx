@@ -134,15 +134,15 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
   }
 
   if (error && !account) {
-    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   }
   if (!account || !resolved) {
-    return <div className="flex items-center gap-2 text-[12px] text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Laden...</div>;
+    return <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Laden...</div>;
   }
 
   const inheritHint = (inherited: boolean, val: string | number | null) =>
     inherited && val != null && val !== "" ? (
-      <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+      <span className="text-micro text-muted-foreground flex items-center gap-1 mt-1">
         <CornerDownRight className="w-3 h-3" /> Erft van account: <strong className="font-medium">{String(val)}</strong>
       </span>
     ) : null;
@@ -165,7 +165,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
 
   return (
     <div className="space-y-6">
-      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-[11px] text-blue-800">
+      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-meta text-blue-800">
         Instellingen voor <strong>{label}</strong> ({geoClone}). Laat je een veld leeg, dan <strong>erft</strong> deze
         beurs de waarde van het account. Alleen afwijkingen worden per beurs opgeslagen.
       </div>
@@ -183,7 +183,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
             const inh = resolved.branding.inherited[key];
             return (
               <label key={key} className="block">
-                <span className="text-[11px] font-medium text-rm-gray">{fl}</span>
+                <span className="text-meta font-medium text-rm-gray">{fl}</span>
                 <div className="mt-1 flex items-center gap-2">
                   {color && (
                     <input type="color" value={/^#([0-9a-fA-F]{6})$/.test(ovVal) ? ovVal : "#000000"}
@@ -192,7 +192,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
                   )}
                   <input type="text" value={ovVal} placeholder={accVal ? `${accVal} (account)` : "leeg = account"}
                     onChange={(e) => setBrand(key, e.target.value)}
-                    className={`flex-1 rounded-md border border-border px-3 py-2 text-[13px] focus:border-rm-blue/50 focus:outline-none ${color ? "font-mono" : ""}`} />
+                    className={`flex-1 rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none ${color ? "font-mono" : ""}`} />
                 </div>
                 {inheritHint(inh, accVal)}
               </label>
@@ -214,14 +214,14 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
             const inh = resolved.goals.inherited[key];
             return (
               <label key={key} className="block">
-                <span className="text-[11px] font-medium text-rm-gray">{fl}</span>
+                <span className="text-meta font-medium text-rm-gray">{fl}</span>
                 <div className="mt-1 flex items-center gap-2">
                   {prefix && <span className="text-sm text-muted-foreground">{prefix}</span>}
                   <input type="number" min={0} step={key === "roasTarget" ? 0.1 : 1}
                     value={ovVal != null && ovVal > 0 ? ovVal : ""}
                     placeholder={accVal != null ? `${accVal} (account)` : "leeg = account"}
                     onChange={(e) => setGoal(key, parseFloat(e.target.value) || 0)}
-                    className="flex-1 rounded-md border border-border px-3 py-2 text-[13px] focus:border-rm-blue/50 focus:outline-none" />
+                    className="flex-1 rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none" />
                   {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
                 </div>
                 {inheritHint(inh, accVal)}
@@ -239,24 +239,24 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
         </div>
 
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-[11px] font-medium text-rm-gray">Cadans:</span>
+          <span className="text-meta font-medium text-rm-gray">Cadans:</span>
           {(Object.keys(CADENCE_LABEL) as Cadence[]).map((c) => (
             <button key={c} onClick={() => setCadence(c)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${override.event?.cadence === c ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
+              className={`px-2.5 py-1 rounded-md text-meta font-medium transition-colors ${override.event?.cadence === c ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
               {CADENCE_LABEL[c]}
             </button>
           ))}
           {resolved.event.inherited.cadence && account.event.cadence && (
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <span className="text-micro text-muted-foreground flex items-center gap-1">
               <CornerDownRight className="w-3 h-3" /> account: {CADENCE_LABEL[account.event.cadence]}
             </span>
           )}
         </div>
 
         <div className="mt-3">
-          <span className="text-[11px] font-medium text-rm-gray">Afgelopen edities</span>
+          <span className="text-meta font-medium text-rm-gray">Afgelopen edities</span>
           {resolved.event.inherited.editions && (account.event.editions?.length ?? 0) > 0 && (
-            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+            <p className="text-micro text-muted-foreground flex items-center gap-1 mt-1">
               <CornerDownRight className="w-3 h-3" /> Erft van account: {(account.event.editions ?? []).map((e) => e.label || e.date).join(", ")}
             </p>
           )}
@@ -264,24 +264,24 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
             {(override.event?.editions ?? []).map((ed, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <input type="date" value={ed.date} onChange={(e) => patchEdition(idx, { date: e.target.value })}
-                  className="rounded-md border border-border px-3 py-1.5 text-[12px] focus:border-rm-blue/50 focus:outline-none" />
+                  className="rounded-md border border-border px-3 py-1.5 text-body focus:border-rm-blue/50 focus:outline-none" />
                 <input type="text" value={ed.label} placeholder="label (bijv. 2026)" onChange={(e) => patchEdition(idx, { label: e.target.value })}
-                  className="flex-1 rounded-md border border-border px-3 py-1.5 text-[12px] focus:border-rm-blue/50 focus:outline-none" />
+                  className="flex-1 rounded-md border border-border px-3 py-1.5 text-body focus:border-rm-blue/50 focus:outline-none" />
                 <button onClick={() => removeEdition(idx)} className="text-muted-foreground hover:text-red-500" title="Editie verwijderen">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
-            <button onClick={addEdition} className="flex items-center gap-1 text-[11px] text-rm-blue hover:underline">
+            <button onClick={addEdition} className="flex items-center gap-1 text-meta text-rm-blue hover:underline">
               <Plus className="w-3 h-3" /> Editie toevoegen
             </button>
           </div>
         </div>
       </div>
 
-      {error && <p className="text-[11px] text-red-500">{error}</p>}
+      {error && <p className="text-meta text-red-500">{error}</p>}
       <button onClick={save} disabled={saving}
-        className="flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-[12px] font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all">
+        className="flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all">
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? "Opslaan..." : saved ? "Opgeslagen" : `Instellingen ${geoClone} opslaan`}
       </button>

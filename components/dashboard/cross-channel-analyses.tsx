@@ -17,28 +17,28 @@ function GroupCard({ group }: { group: CrossGroup }) {
     <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <div className="flex-1">
-          <h4 className="text-[13px] font-semibold text-rm-gray">{group.title}</h4>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{group.description}</p>
+          <h4 className="text-lead font-semibold text-rm-gray">{group.title}</h4>
+          <p className="text-micro text-muted-foreground mt-0.5">{group.description}</p>
         </div>
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${has ? "bg-rm-orange/10 text-rm-orange" : "bg-gray-100 text-muted-foreground"}`}>
+        <span className={`text-micro font-medium px-2 py-0.5 rounded-full ${has ? "bg-rm-orange/10 text-rm-orange" : "bg-gray-100 text-muted-foreground"}`}>
           {has ? `${group.triggered} signa${group.triggered === 1 ? "al" : "len"}` : "geen"}
         </span>
       </div>
       <div className="px-5 py-2.5">
         {has ? (
           <>
-            <button onClick={() => setExpanded((e) => !e)} className="flex items-center gap-1 text-[11px] text-rm-blue hover:underline">
+            <button onClick={() => setExpanded((e) => !e)} className="flex items-center gap-1 text-meta text-rm-blue hover:underline">
               {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               {expanded ? "Verberg bevindingen" : "Bekijk bevindingen"}
             </button>
             {expanded && (
-              <div className="mt-2 rounded-md border border-border bg-gray-50 px-3 py-2 text-[11px] text-rm-gray whitespace-pre-wrap max-h-72 overflow-y-auto">
+              <div className="mt-2 rounded-md border border-border bg-gray-50 px-3 py-2 text-meta text-rm-gray whitespace-pre-wrap max-h-72 overflow-y-auto">
                 {group.section}
               </div>
             )}
           </>
         ) : (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-meta text-muted-foreground">
             Geen signalen getriggerd. Gecontroleerd: {group.checked.length > 0 ? group.checked.join(", ") : "—"}.
           </p>
         )}
@@ -99,20 +99,20 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
           <Radar className="w-4.5 h-4.5 text-rm-blue" />
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-rm-gray">Cross-channel-analyse</h3>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
+            <p className="text-micro text-muted-foreground mt-0.5">
               Eén deterministische run; de sub-analyses hieronder komen uit dezelfde detectie. Getriggerde signalen landen in de goedkeuringswachtrij.
             </p>
           </div>
           <button
             onClick={run}
             disabled={running}
-            className="px-3 py-1.5 rounded-md bg-rm-blue text-white text-[11px] font-medium hover:bg-rm-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
+            className="px-3 py-1.5 rounded-md bg-rm-blue text-white text-meta font-medium hover:bg-rm-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
           >
             {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             {running ? "Bezig..." : "Draai cross-channel-analyse"}
           </button>
         </div>
-        <div className="px-5 py-3 flex items-center gap-3 text-[11px]">
+        <div className="px-5 py-3 flex items-center gap-3 text-meta">
           {lastDate && <span className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-3 h-3" /> Laatst: {lastDate}</span>}
           {success && <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" /> {success}</span>}
           {error && <span className="flex items-center gap-1 text-red-500"><AlertCircle className="w-3.5 h-3.5" /> {error}</span>}
@@ -124,7 +124,7 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
       {groups === null ? (
         <div className="bg-white rounded-xl border border-border p-6 shadow-sm flex justify-center"><Loader2 className="w-4 h-4 animate-spin text-rm-blue" /></div>
       ) : groups.length === 0 ? (
-        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-[11px] text-blue-800 flex gap-2">
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-meta text-blue-800 flex gap-2">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
           <span>Nog geen sub-analyses. Draai de cross-channel-analyse om de blokken (funnel, arbitrage/mix, KPI-verhoudingen, doelgroep-samenhang, GA4-CRO) te vullen.</span>
         </div>
@@ -133,7 +133,7 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
       )}
 
       {degradations.length > 0 && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] text-amber-800">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-meta text-amber-800">
           <p className="font-medium mb-1">Expliciet gedegradeerd (geen stil gokken)</p>
           <ul className="list-disc pl-4 space-y-0.5">
             {degradations.map((d, i) => <li key={i}>{d}</li>)}

@@ -93,7 +93,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
     <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-rm-gray">Losse analyses (Google)</h3>
-        <p className="text-[10px] text-muted-foreground mt-0.5">
+        <p className="text-micro text-muted-foreground mt-0.5">
           Deterministisch voorgerekend, door het model verwoord. Draai los van de maandanalyse; de output wordt opgeslagen bij de analyse-uitvoer.
         </p>
       </div>
@@ -121,27 +121,27 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                   {s.success && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                   {s.error && <AlertCircle className="w-4 h-4 text-red-500" />}
                 </div>
-                <p className="text-[10px] text-muted-foreground">{a.description}</p>
+                <p className="text-micro text-muted-foreground">{a.description}</p>
                 {s.lastDate && (
-                  <div className="flex items-center gap-1 mt-2 text-[9px] text-muted-foreground">
+                  <div className="flex items-center gap-1 mt-2 text-micro text-muted-foreground">
                     <Calendar className="w-3 h-3" />
                     Laatst: {s.lastDate}
                   </div>
                 )}
-                {s.error && <p className="text-[10px] text-red-500 mt-1 truncate">{s.error}</p>}
-                {s.running && <p className="text-[10px] text-rm-blue mt-1">Bezig...</p>}
+                {s.error && <p className="text-micro text-red-500 mt-1 truncate">{s.error}</p>}
+                {s.running && <p className="text-micro text-rm-blue mt-1">Bezig...</p>}
               </button>
               {s.output && (
                 <>
                   <button
                     onClick={() => patch(a.key, { expanded: !s.expanded })}
-                    className="flex items-center justify-center gap-1 px-3 py-1 rounded-md border border-border text-[10px] text-muted-foreground hover:bg-gray-50 hover:text-rm-gray transition-all"
+                    className="flex items-center justify-center gap-1 px-3 py-1 rounded-md border border-border text-micro text-muted-foreground hover:bg-gray-50 hover:text-rm-gray transition-all"
                   >
                     {s.expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     {s.expanded ? "Verberg resultaat" : "Bekijk resultaat"}
                   </button>
                   {s.expanded && (
-                    <div className="rounded-md border border-border bg-gray-50 px-3 py-2 text-[11px] text-rm-gray whitespace-pre-wrap max-h-64 overflow-y-auto">
+                    <div className="rounded-md border border-border bg-gray-50 px-3 py-2 text-meta text-rm-gray whitespace-pre-wrap max-h-64 overflow-y-auto">
                       {s.output}
                     </div>
                   )}

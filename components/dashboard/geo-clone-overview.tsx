@@ -29,7 +29,7 @@ function fmtPct(ratio: number | null): string {
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-white px-4 py-3">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="text-meta text-muted-foreground">{label}</div>
       <div className="text-lg font-semibold text-rm-gray mt-0.5">{value}</div>
     </div>
   );
@@ -71,11 +71,11 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
       <div className="px-5 py-4 border-b border-border flex items-center gap-2">
         <MapPin className="w-5 h-5 text-rm-blue" />
         <h3 className="text-sm font-semibold text-rm-gray">{label} — beursoverzicht</h3>
-        <span className="text-[11px] text-muted-foreground">({geoClone})</span>
+        <span className="text-meta text-muted-foreground">({geoClone})</span>
       </div>
 
       <div className="px-5 py-4 space-y-4">
-        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-[11px] text-blue-800 flex gap-2">
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-meta text-blue-800 flex gap-2">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
             Deze cijfers zijn <strong>her-geaggregeerd per beurs</strong> uit de campagnedata (op basis van de
@@ -85,15 +85,15 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
         </div>
 
         {rows === null && !error && (
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground py-8 justify-center">
+          <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center">
             <Loader2 className="w-4 h-4 animate-spin" /> Laden...
           </div>
         )}
         {error && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>
         )}
         {summary && summary.months.length === 0 && !error && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
             Nog geen campagnedata voor <strong>{label}</strong> ({geoClone}). Zodra er campagnes met deze afkorting
             gesynct zijn, verschijnt hier het beursoverzicht.
           </div>
@@ -110,7 +110,7 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
               <Kpi label="CTR" value={fmtPct(summary.totals.ctr)} />
             </div>
 
-            <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <div className="text-meta text-muted-foreground flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" />
               {summary.campaignCount} campagne{summary.campaignCount === 1 ? "" : "s"} · laatste {recentMonths.length} maand
               {recentMonths.length === 1 ? "" : "en"} getoond (van {summary.months.length}).
@@ -123,7 +123,7 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
             />
 
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-body">
                 <thead>
                   <tr className="text-left text-muted-foreground border-b border-border">
                     <th className="py-2 pr-4 font-medium">Maand</th>

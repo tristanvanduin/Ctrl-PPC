@@ -19,6 +19,31 @@
 }
 
 @theme inline {
+  /* ── Typografische schaal ──────────────────────────────────────────────────
+     Vijf stappen, met een naam in plaats van een pixelwaarde. Dit dashboard is
+     informatiedicht, dus de stappen liggen dicht op elkaar; juist dan is een
+     vaste ladder nodig, anders sluipen er tussenmaten in en gaat niets meer
+     samen ogen.
+
+     Onder de 10px hoort niets: 8 en 9 pixels waren niet klein-maar-leesbaar,
+     ze waren onleesbaar. Die zijn opgegaan in `text-micro`.
+
+     Bewust géén line-height meegegeven: de bestaande regels rekenen op de
+     overgeërfde regelafstand, en die hier vastzetten zou honderden plekken
+     tegelijk anders laten uitlijnen.
+
+       micro  10px  badges, tellers, micro-labels
+       meta   11px  ondersteunende tekst, bijschriften
+       body   12px  tabel- en lopende tekst
+       lead   13px  nadruk binnen lopende tekst
+       title  15px  kleine kopjes
+     ───────────────────────────────────────────────────────────────────────── */
+  --text-micro: 0.625rem;
+  --text-meta: 0.6875rem;
+  --text-body: 0.75rem;
+  --text-lead: 0.8125rem;
+  --text-title: 0.9375rem;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: "Ubuntu", ui-sans-serif, system-ui, sans-serif;

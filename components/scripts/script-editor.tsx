@@ -64,7 +64,7 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
 
       <div className="space-y-3">
         <div>
-          <label className="text-[11px] font-medium text-rm-gray block mb-1">Titel *</label>
+          <label className="text-meta font-medium text-rm-gray block mb-1">Titel *</label>
           <input
             type="text"
             value={title}
@@ -75,7 +75,7 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
         </div>
 
         <div>
-          <label className="text-[11px] font-medium text-rm-gray block mb-1">Beschrijving</label>
+          <label className="text-meta font-medium text-rm-gray block mb-1">Beschrijving</label>
           <input
             type="text"
             value={description}
@@ -86,7 +86,7 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
         </div>
 
         <div>
-          <label className="text-[11px] font-medium text-rm-gray block mb-1">Tags</label>
+          <label className="text-meta font-medium text-rm-gray block mb-1">Tags</label>
           <input
             type="text"
             value={tagsInput}
@@ -97,7 +97,7 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
         </div>
 
         <div>
-          <label className="text-[11px] font-medium text-rm-gray block mb-1">Code *</label>
+          <label className="text-meta font-medium text-rm-gray block mb-1">Code *</label>
           <textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}

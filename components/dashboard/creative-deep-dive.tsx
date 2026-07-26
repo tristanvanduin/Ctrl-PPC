@@ -36,7 +36,7 @@ const VERDICT_STYLE: Record<AssetVerdict, string> = {
 // Mini-sparkline van CTR-punten; null-punten (geen volume) breken de lijn niet visueel af.
 function Spark({ points }: { points: (number | null)[] }) {
   const vals = points.filter((p): p is number => p != null);
-  if (vals.length < 2) return <span className="text-[10px] text-gray-300">—</span>;
+  if (vals.length < 2) return <span className="text-micro text-gray-300">—</span>;
   const max = Math.max(...vals), min = Math.min(...vals);
   const range = max - min || 1;
   const w = 72, h = 20;
@@ -122,7 +122,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
   const fatigue = useMemo(() => (periodRows ? analyzeCreativeFatigue(periodRows) : []), [periodRows]);
   const breakdown = useMemo(() => (channel === "google" ? analyzeAssetBreakdown(assetRows) : null), [assetRows, channel]);
 
-  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   if (periodRows === null) return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
 
   const flagged = fatigue.filter((f) => f.status === "vermoeid" || f.status === "afnemend");
@@ -134,13 +134,13 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
           <TrendingDown className="w-4 h-4 text-rm-blue" />
           <h3 className="text-sm font-semibold text-rm-gray">Creative-vermoeidheid</h3>
-          <span className="text-[10px] text-muted-foreground">CTR-traject per creative over de maanden</span>
+          <span className="text-micro text-muted-foreground">CTR-traject per creative over de maanden</span>
         </div>
         {fatigue.length === 0 ? (
-          <div className="px-5 py-4 text-[12px] text-muted-foreground">Nog geen maanddata per creative voor een vermoeidheidsoordeel.</div>
+          <div className="px-5 py-4 text-body text-muted-foreground">Nog geen maanddata per creative voor een vermoeidheidsoordeel.</div>
         ) : (
           <>
-            <div className="px-5 py-2.5 text-[11px] text-muted-foreground border-b border-border">
+            <div className="px-5 py-2.5 text-meta text-muted-foreground border-b border-border">
               {flagged.length > 0
                 ? `${flagged.length} van ${fatigue.length} creatives zakken onder hun CTR-piek — kandidaat om te verversen.`
                 : `Geen materiële vermoeidheid over ${fatigue.length} creatives; het CTR-traject blijft stabiel.`}
@@ -148,10 +148,10 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
             <div className="divide-y divide-border">
               {fatigue.slice(0, 15).map((f) => (
                 <div key={f.id} className="px-5 py-2.5 flex items-center gap-3">
-                  <span className={`text-[10px] font-semibold border rounded-full px-2 py-0.5 shrink-0 ${FATIGUE_STYLE[f.status]}`}>{FATIGUE_LABEL[f.status]}</span>
-                  <span className="text-[12px] text-rm-gray truncate flex-1 min-w-0" title={f.name}>{f.name}</span>
+                  <span className={`text-micro font-semibold border rounded-full px-2 py-0.5 shrink-0 ${FATIGUE_STYLE[f.status]}`}>{FATIGUE_LABEL[f.status]}</span>
+                  <span className="text-body text-rm-gray truncate flex-1 min-w-0" title={f.name}>{f.name}</span>
                   <Spark points={f.points.map((p) => p.ctr)} />
-                  <span className="text-[11px] text-muted-foreground w-28 text-right shrink-0">
+                  <span className="text-meta text-muted-foreground w-28 text-right shrink-0">
                     {f.peakCtr != null ? `piek ${pct(f.peakCtr)} → ${pct(f.latestCtr)}` : "—"}
                   </span>
                 </div>
@@ -167,15 +167,15 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             <Layers className="w-4 h-4 text-rm-blue" />
             <h3 className="text-sm font-semibold text-rm-gray">Asset-uitsplitsing (RSA)</h3>
-            <span className="text-[10px] text-muted-foreground">welke headlines/descriptions het gewicht trekken</span>
+            <span className="text-micro text-muted-foreground">welke headlines/descriptions het gewicht trekken</span>
           </div>
           <div className="px-5 py-3 space-y-3">
-            <p className="text-[12px] text-rm-gray leading-relaxed">{breakdown.summaryText}</p>
+            <p className="text-body text-rm-gray leading-relaxed">{breakdown.summaryText}</p>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <AssetColumn title="Headlines" stats={breakdown.headlines} />
               <AssetColumn title="Descriptions" stats={breakdown.descriptions} />
             </div>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-micro text-muted-foreground">
               Oordeel uit Google&apos;s eigen performance-label (BEST/LOW) gecombineerd met de CTR t.o.v. de mediaan binnen het veldtype.
             </p>
           </div>
@@ -189,11 +189,11 @@ function AssetColumn({ title, stats }: { title: string; stats: { assetText: stri
   if (stats.length === 0) return null;
   return (
     <div>
-      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">{title}</p>
+      <p className="text-meta font-semibold text-muted-foreground uppercase tracking-wide mb-2">{title}</p>
       <ul className="space-y-1.5">
         {stats.slice(0, 10).map((s, i) => (
-          <li key={i} className="flex items-center gap-2 text-[12px]">
-            <span className={`text-[9px] font-semibold border rounded px-1.5 py-0.5 shrink-0 capitalize ${VERDICT_STYLE[s.verdict]}`}>{s.verdict === "te_weinig_data" ? "weinig data" : s.verdict}</span>
+          <li key={i} className="flex items-center gap-2 text-body">
+            <span className={`text-micro font-semibold border rounded px-1.5 py-0.5 shrink-0 capitalize ${VERDICT_STYLE[s.verdict]}`}>{s.verdict === "te_weinig_data" ? "weinig data" : s.verdict}</span>
             <span className="text-rm-gray truncate flex-1 min-w-0" title={s.assetText}>{s.assetText}</span>
             <span className="text-muted-foreground shrink-0 w-24 text-right">{pct(s.ctr)} · {fmt(s.impressions)} imp</span>
           </li>

@@ -58,10 +58,10 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
   }
 
   if (error && !guide) {
-    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+    return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   }
   if (!guide) {
-    return <div className="flex items-center gap-2 text-[12px] text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Laden...</div>;
+    return <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Laden...</div>;
   }
 
   const theme = resolveEventTheme(guide.visual ?? {});
@@ -76,12 +76,12 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
         </div>
         <div className="px-5 py-4 space-y-4">
           <label className="block">
-            <span className="text-[11px] font-medium text-rm-gray">Merknaam</span>
+            <span className="text-meta font-medium text-rm-gray">Merknaam</span>
             <input
               type="text"
               value={guide.brandName ?? ""}
               onChange={(e) => { setGuide((g) => g ? { ...g, brandName: e.target.value } : g); setSaved(false); }}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] focus:border-rm-blue/50 focus:outline-none"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none"
             />
           </label>
 
@@ -89,7 +89,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
             const val = (guide.visual?.[key] as string) ?? "";
             return (
               <label key={key} className="block">
-                <span className="text-[11px] font-medium text-rm-gray">{label}</span>
+                <span className="text-meta font-medium text-rm-gray">{label}</span>
                 <div className="mt-1 flex items-center gap-2">
                   <input
                     type="color"
@@ -102,7 +102,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
                     value={val}
                     placeholder="#08288C"
                     onChange={(e) => setVisual(key, e.target.value)}
-                    className="flex-1 rounded-md border border-border px-3 py-2 text-[13px] font-mono focus:border-rm-blue/50 focus:outline-none"
+                    className="flex-1 rounded-md border border-border px-3 py-2 text-lead font-mono focus:border-rm-blue/50 focus:outline-none"
                   />
                 </div>
               </label>
@@ -110,37 +110,37 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
           })}
 
           <label className="block">
-            <span className="text-[11px] font-medium text-rm-gray">Logo-URL</span>
+            <span className="text-meta font-medium text-rm-gray">Logo-URL</span>
             <input
               type="text"
               value={(guide.visual?.logoUrl as string) ?? ""}
               placeholder="https://..."
               onChange={(e) => setVisual("logoUrl", e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] focus:border-rm-blue/50 focus:outline-none"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none"
             />
           </label>
 
           <label className="block">
-            <span className="text-[11px] font-medium text-rm-gray">Heading-font</span>
+            <span className="text-meta font-medium text-rm-gray">Heading-font</span>
             <input
               type="text"
               value={(guide.visual?.headingFont as string) ?? ""}
               placeholder="Gilroy, Ubuntu, sans-serif"
               onChange={(e) => setVisual("headingFont", e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] focus:border-rm-blue/50 focus:outline-none"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none"
             />
           </label>
 
-          {error && <p className="text-[11px] text-red-500">{error}</p>}
+          {error && <p className="text-meta text-red-500">{error}</p>}
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-[12px] font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Opslaan"}
           </button>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-micro text-muted-foreground">
             Alleen geldige hex-kleuren (#RRGGBB) worden toegepast; anders valt het thema terug op de standaardkleuren.
             Dit is de visuele identiteit; de creatieve regels (tone-of-voice, verboden woorden) volgen in een vervolgronde.
           </p>
@@ -161,12 +161,12 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
               <span className="text-base font-bold">{guide.brandName || clientName}</span>
             </div>
             <div className="p-5 space-y-3" style={{ background: theme.card }}>
-              <div className="text-[13px] font-semibold" style={{ color: theme.foreground }}>Voorbeeld-kaart</div>
-              <p className="text-[12px]" style={{ color: theme.foreground, opacity: 0.7 }}>Zo rendert het dashboard met deze merk-identiteit.</p>
+              <div className="text-lead font-semibold" style={{ color: theme.foreground }}>Voorbeeld-kaart</div>
+              <p className="text-body" style={{ color: theme.foreground, opacity: 0.7 }}>Zo rendert het dashboard met deze merk-identiteit.</p>
               <div className="flex gap-2">
-                <button className="px-3 py-1.5 rounded-md text-[12px] font-medium" style={{ background: theme.primary, color: theme.primaryForeground }}>Primaire actie</button>
-                <button className="px-3 py-1.5 rounded-md text-[12px] font-medium" style={{ background: theme.accent, color: theme.accentForeground }}>Accent</button>
-                <button className="px-3 py-1.5 rounded-md text-[12px] font-medium" style={{ background: theme.secondary, color: theme.foreground }}>Secundair</button>
+                <button className="px-3 py-1.5 rounded-md text-body font-medium" style={{ background: theme.primary, color: theme.primaryForeground }}>Primaire actie</button>
+                <button className="px-3 py-1.5 rounded-md text-body font-medium" style={{ background: theme.accent, color: theme.accentForeground }}>Accent</button>
+                <button className="px-3 py-1.5 rounded-md text-body font-medium" style={{ background: theme.secondary, color: theme.foreground }}>Secundair</button>
               </div>
             </div>
           </div>

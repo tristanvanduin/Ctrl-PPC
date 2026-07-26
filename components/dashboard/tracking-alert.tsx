@@ -88,13 +88,13 @@ export function TrackingAlert({ clientId, onNavigateToSettings }: {
             {" "}Dit wijst mogelijk op een probleem met de conversietracking.
           </p>
           <div className="flex items-center gap-3 mt-2">
-            <span className="text-[10px] text-red-500">
+            <span className="text-micro text-red-500">
               Controleer: Google Tag Assistant / GTM debug mode / conversieacties in Google Ads
             </span>
             {onNavigateToSettings && (
               <button
                 onClick={onNavigateToSettings}
-                className="inline-flex items-center gap-1 text-[10px] font-medium text-red-700 hover:underline"
+                className="inline-flex items-center gap-1 text-micro font-medium text-red-700 hover:underline"
               >
                 <ExternalLink className="w-3 h-3" />
                 Conversie override instellen

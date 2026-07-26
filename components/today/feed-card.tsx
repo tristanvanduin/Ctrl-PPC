@@ -50,22 +50,22 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
       {/* Kop: klant · kanaal · type · status · mock · leeftijd */}
       <div className="flex items-center gap-2 flex-wrap mb-1.5">
         <Link href={item.clientUrl} className="text-sm font-bold text-rm-gray hover:text-rm-blue truncate max-w-[40%]">{item.clientName}</Link>
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${CHANNEL_BADGE_CLASS[item.channel]}`}>{CHANNEL_LABEL[item.channel]}</span>
-        <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border border-border bg-gray-50 text-muted-foreground">{TYPE_LABEL[item.type]}</span>
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>
-        {item.isMock && <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">Demo</span>}
+        <span className={`text-micro font-semibold px-1.5 py-0.5 rounded-full border ${CHANNEL_BADGE_CLASS[item.channel]}`}>{CHANNEL_LABEL[item.channel]}</span>
+        <span className="text-micro font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border border-border bg-gray-50 text-muted-foreground">{TYPE_LABEL[item.type]}</span>
+        <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>
+        {item.isMock && <span className="text-micro font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">Demo</span>}
       </div>
 
       <p className="text-[13.5px] text-rm-gray leading-snug">{item.title}</p>
-      {item.explanation && <p className="text-[12px] text-muted-foreground leading-snug mt-0.5">{item.explanation}</p>}
+      {item.explanation && <p className="text-body text-muted-foreground leading-snug mt-0.5">{item.explanation}</p>}
 
       {/* Voetregel: impact · eigenaar · acties */}
       <div className="flex items-center gap-x-4 gap-y-2 flex-wrap mt-2.5">
         {item.impactLabel && (
-          <span className="inline-flex items-center gap-1.5 text-[12px]">
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Impact</span>
+          <span className="inline-flex items-center gap-1.5 text-body">
+            <span className="text-micro font-semibold uppercase tracking-wider text-gray-400">Impact</span>
             <span className={`font-semibold ${impactColor}`}>{item.impactLabel}</span>
-            <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-px rounded ${impactMeasured ? "text-emerald-700 bg-emerald-50" : "text-gray-500 bg-gray-100 border border-dashed border-gray-300"}`}>
+            <span className={`text-micro font-bold uppercase tracking-wide px-1.5 py-px rounded ${impactMeasured ? "text-emerald-700 bg-emerald-50" : "text-gray-500 bg-gray-100 border border-dashed border-gray-300"}`}>
               {impactMeasured ? "gemeten" : "geschat"}
             </span>
           </span>
@@ -73,27 +73,27 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
 
         {/* Eigenaar */}
         {item.ownerName ? (
-          <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-            <span className={`w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${avatarColor(item.ownerName)}`}>{item.ownerName.charAt(0)}</span>
-            {item.ownerName}{item.ownerIsMock && <span className="text-[9px] text-gray-400">· demo</span>}
+          <span className="inline-flex items-center gap-1.5 text-body text-muted-foreground">
+            <span className={`w-5 h-5 rounded-full text-white text-micro font-bold flex items-center justify-center ${avatarColor(item.ownerName)}`}>{item.ownerName.charAt(0)}</span>
+            {item.ownerName}{item.ownerIsMock && <span className="text-micro text-gray-400">· demo</span>}
             {item.dueAt && <span className={`ml-1 ${new Date(item.dueAt) <= new Date() ? "text-red-600 font-semibold" : ""}`}><Clock className="w-3 h-3 inline -mt-0.5" /> {item.dueAt.slice(0, 10)}</span>}
           </span>
         ) : (
-          <button onClick={() => setMode(mode === "assign" ? null : "assign")} className="inline-flex items-center gap-1 text-[12px] font-semibold text-red-600 hover:underline">
-            <span className="w-5 h-5 rounded-full border border-dashed border-red-400 text-red-500 text-[10px] flex items-center justify-center">?</span>
+          <button onClick={() => setMode(mode === "assign" ? null : "assign")} className="inline-flex items-center gap-1 text-body font-semibold text-red-600 hover:underline">
+            <span className="w-5 h-5 rounded-full border border-dashed border-red-400 text-red-500 text-micro flex items-center justify-center">?</span>
             Niet toegewezen
           </button>
         )}
 
         <span className="flex items-center gap-1.5 ml-auto">
-          <Link href={item.actionUrl} className="text-[12px] font-semibold text-white bg-rm-blue rounded-lg px-3 py-1.5 hover:brightness-110 inline-flex items-center gap-1">
+          <Link href={item.actionUrl} className="text-body font-semibold text-white bg-rm-blue rounded-lg px-3 py-1.5 hover:brightness-110 inline-flex items-center gap-1">
             {item.primaryAction.label}<ChevronRight className="w-3.5 h-3.5" />
           </Link>
           {item.secondaryActions.some((a) => a.kind === "assign") && item.ownerName && (
-            <button onClick={() => setMode(mode === "assign" ? null : "assign")} title="Opnieuw toewijzen" className="text-[12px] text-muted-foreground border border-border rounded-lg px-2 py-1.5 hover:text-rm-gray"><UserPlus className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setMode(mode === "assign" ? null : "assign")} title="Opnieuw toewijzen" className="text-body text-muted-foreground border border-border rounded-lg px-2 py-1.5 hover:text-rm-gray"><UserPlus className="w-3.5 h-3.5" /></button>
           )}
           {item.secondaryActions.some((a) => a.kind === "snooze") && (
-            <button onClick={() => setMode(mode === "snooze" ? null : "snooze")} className="text-[12px] text-muted-foreground border border-border rounded-lg px-3 py-1.5 hover:text-rm-gray">Snooze</button>
+            <button onClick={() => setMode(mode === "snooze" ? null : "snooze")} className="text-body text-muted-foreground border border-border rounded-lg px-3 py-1.5 hover:text-rm-gray">Snooze</button>
           )}
         </span>
       </div>
@@ -103,22 +103,22 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
         <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
           <div className="flex gap-1">
             {[{ d: 1, l: "morgen" }, { d: 3, l: "3 dagen" }, { d: 7, l: "volgende week" }].map((o) => (
-              <button key={o.d} onClick={() => setDays(o.d)} className={`text-[11px] px-2.5 py-1 rounded-md border ${days === o.d ? "bg-rm-blue text-white border-transparent" : "border-border text-muted-foreground"}`}>{o.l}</button>
+              <button key={o.d} onClick={() => setDays(o.d)} className={`text-meta px-2.5 py-1 rounded-md border ${days === o.d ? "bg-rm-blue text-white border-transparent" : "border-border text-muted-foreground"}`}>{o.l}</button>
             ))}
           </div>
-          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reden (verplicht)…" className="flex-1 min-w-[160px] text-[12px] border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:border-rm-blue" />
-          <button disabled={!reason.trim()} onClick={() => { onSnooze(item, reason.trim(), plusDays(days)); setMode(null); setReason(""); }} className="text-[12px] font-semibold text-white bg-rm-blue rounded-md px-3 py-1.5 disabled:opacity-40">Snooze</button>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reden (verplicht)…" className="flex-1 min-w-[160px] text-body border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:border-rm-blue" />
+          <button disabled={!reason.trim()} onClick={() => { onSnooze(item, reason.trim(), plusDays(days)); setMode(null); setReason(""); }} className="text-body font-semibold text-white bg-rm-blue rounded-md px-3 py-1.5 disabled:opacity-40">Snooze</button>
         </div>
       )}
 
       {/* Toewijzen */}
       {mode === "assign" && (
         <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">Wijs toe aan:</span>
+          <span className="text-meta text-muted-foreground">Wijs toe aan:</span>
           {MOCK_TEAM.map((name) => (
-            <button key={name} onClick={() => { onAssign(item, name); setMode(null); }} className="text-[12px] px-2.5 py-1 rounded-md border border-border hover:border-rm-blue hover:text-rm-blue">{name}</button>
+            <button key={name} onClick={() => { onAssign(item, name); setMode(null); }} className="text-body px-2.5 py-1 rounded-md border border-border hover:border-rm-blue hover:text-rm-blue">{name}</button>
           ))}
-          <span className="text-[10px] text-gray-400">· echte toewijzing (geen demo)</span>
+          <span className="text-micro text-gray-400">· echte toewijzing (geen demo)</span>
         </div>
       )}
     </div>

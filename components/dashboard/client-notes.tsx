@@ -55,16 +55,16 @@ function NoteCard({
             {note.title && (
               <span className="text-xs font-semibold text-rm-gray">{note.title}</span>
             )}
-            <span className="text-[9px] text-muted-foreground ml-auto shrink-0">{timeAgo(note.created_at)}</span>
+            <span className="text-micro text-muted-foreground ml-auto shrink-0">{timeAgo(note.created_at)}</span>
           </div>
 
           {/* Content */}
-          <p className="text-[11px] text-rm-gray/80 whitespace-pre-wrap leading-relaxed">{displayContent}</p>
+          <p className="text-meta text-rm-gray/80 whitespace-pre-wrap leading-relaxed">{displayContent}</p>
 
           {isLong && (
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-[10px] text-rm-blue hover:underline mt-1"
+              className="text-micro text-rm-blue hover:underline mt-1"
             >
               {expanded ? "Minder tonen" : "Meer tonen"}
             </button>
@@ -167,12 +167,12 @@ export function ClientNotes({ clientId }: { clientId: string }) {
         <div className="flex items-center gap-2">
           <StickyNote className="w-4 h-4 text-rm-blue" />
           <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Notities</h3>
-          <span className="text-[10px] text-muted-foreground">({notes.length})</span>
+          <span className="text-micro text-muted-foreground">({notes.length})</span>
         </div>
         {!showNew && !editingId && (
           <button
             onClick={startNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg bg-rm-blue/10 text-rm-blue hover:bg-rm-blue/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-rm-blue/10 text-rm-blue hover:bg-rm-blue/20 transition-colors"
           >
             <Plus className="w-3 h-3" /> Nieuwe notitie
           </button>
@@ -198,13 +198,13 @@ export function ClientNotes({ clientId }: { clientId: string }) {
             autoFocus
           />
           <div className="flex justify-end gap-2 mt-2">
-            <button onClick={cancelEdit} className="px-3 py-1.5 text-[11px] text-muted-foreground hover:text-rm-gray">
+            <button onClick={cancelEdit} className="px-3 py-1.5 text-meta text-muted-foreground hover:text-rm-gray">
               Annuleren
             </button>
             <button
               onClick={handleSave}
               disabled={saving || !content.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-50"
             >
               <Save className="w-3 h-3" /> {saving ? "Opslaan..." : "Opslaan"}
             </button>
@@ -215,24 +215,24 @@ export function ClientNotes({ clientId }: { clientId: string }) {
       {/* Delete confirmation */}
       {deleteConfirm && (
         <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
-          <p className="text-[11px] text-red-700">Notitie verwijderen?</p>
+          <p className="text-meta text-red-700">Notitie verwijderen?</p>
           <div className="flex gap-2">
-            <button onClick={() => setDeleteConfirm(null)} className="text-[11px] text-muted-foreground">Annuleren</button>
-            <button onClick={() => handleDelete(deleteConfirm)} className="text-[11px] text-red-600 font-medium">Verwijder</button>
+            <button onClick={() => setDeleteConfirm(null)} className="text-meta text-muted-foreground">Annuleren</button>
+            <button onClick={() => handleDelete(deleteConfirm)} className="text-meta text-red-600 font-medium">Verwijder</button>
           </div>
         </div>
       )}
 
       {/* Notes list */}
       {loading ? (
-        <p className="text-[11px] text-muted-foreground py-4 text-center">Laden...</p>
+        <p className="text-meta text-muted-foreground py-4 text-center">Laden...</p>
       ) : notes.length === 0 && !showNew ? (
         <div className="flex flex-col items-center py-8 text-center">
           <div className="w-10 h-10 rounded-full bg-rm-blue/5 flex items-center justify-center mb-3">
             <StickyNote className="w-5 h-5 text-rm-blue/30" />
           </div>
           <p className="text-xs text-muted-foreground">Nog geen notities</p>
-          <p className="text-[10px] text-muted-foreground/60 mt-0.5">Leg afspraken, strategie of gedachtes vast</p>
+          <p className="text-micro text-muted-foreground/60 mt-0.5">Leg afspraken, strategie of gedachtes vast</p>
         </div>
       ) : (
         <div className="space-y-2 max-h-[400px] overflow-y-auto">

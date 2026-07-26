@@ -159,57 +159,57 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
 
   const dimLabel = channel === "meta" ? "plaatsing, leeftijd en device" : "functie, seniority, industrie en bedrijfsgrootte";
 
-  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">{error}</div>;
+  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
 
   return (
     <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <Layers className="w-4.5 h-4.5 text-rm-blue" />
         <h3 className="text-sm font-semibold text-rm-gray">Structuur & segment-efficiëntie</h3>
-        <span className="text-[10px] text-muted-foreground">waar landt het budget binnen {dimLabel}</span>
+        <span className="text-micro text-muted-foreground">waar landt het budget binnen {dimLabel}</span>
       </div>
       <div className="px-5 py-4">
         {stories === null ? (
           <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>
         ) : stories.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             Geen materiële segment-signalen — het budget is redelijk verdeeld, of er is te weinig data per dimensie voor een eerlijk oordeel.
           </p>
         ) : (
           <div className="space-y-4">
             {tracking.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-red-700 uppercase tracking-wide mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Tracking-alarm</p>
+                <p className="text-meta font-semibold text-red-700 uppercase tracking-wide mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Tracking-alarm</p>
                 <div className="space-y-2">{tracking.map((s) => <StoryRow key={s.id} s={s} />)}</div>
               </div>
             )}
             {waste.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Verspilling</p>
+                <p className="text-meta font-semibold text-red-600 uppercase tracking-wide mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Verspilling</p>
                 <div className="space-y-2">{waste.map((s) => <StoryRow key={s.id} s={s} />)}</div>
               </div>
             )}
             {risk.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wide mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Concentratierisico</p>
+                <p className="text-meta font-semibold text-amber-600 uppercase tracking-wide mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Concentratierisico</p>
                 <div className="space-y-2">{risk.map((s) => <StoryRow key={s.id} s={s} />)}</div>
               </div>
             )}
             {scale.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wide mb-2 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> Schaalkansen</p>
+                <p className="text-meta font-semibold text-emerald-600 uppercase tracking-wide mb-2 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> Schaalkansen</p>
                 <div className="space-y-2">{scale.map((s) => <StoryRow key={s.id} s={s} />)}</div>
               </div>
             )}
             {drift.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> Mix-verschuiving over de tijd</p>
+                <p className="text-meta font-semibold text-blue-600 uppercase tracking-wide mb-2 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> Mix-verschuiving over de tijd</p>
                 <div className="space-y-2">{drift.map((s) => <StoryRow key={s.id} s={s} />)}</div>
               </div>
             )}
             {pacing.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wide mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Uitgeeftempo & dagpatroon</p>
+                <p className="text-meta font-semibold text-amber-600 uppercase tracking-wide mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Uitgeeftempo & dagpatroon</p>
                 <div className="space-y-2">{pacing.map((s) => <StoryRow key={s.id} s={s} />)}</div>
               </div>
             )}
@@ -224,15 +224,15 @@ function StoryRow({ s }: { s: SignalStory }) {
   return (
     <div className="rounded-lg border border-border px-3 py-2.5">
       <div className="flex items-center gap-2 flex-wrap mb-1">
-        <span className="text-[11px] font-medium text-rm-gray">{s.scope}</span>
-        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${CERTAINTY_STYLE[s.certainty]}`}>{CERTAINTY_LABEL[s.certainty]}</span>
+        <span className="text-meta font-medium text-rm-gray">{s.scope}</span>
+        <span className={`text-micro px-1.5 py-0.5 rounded border ${CERTAINTY_STYLE[s.certainty]}`}>{CERTAINTY_LABEL[s.certainty]}</span>
       </div>
-      <p className="text-[12px] text-rm-gray leading-snug">{s.story}</p>
-      <p className="text-[11px] text-muted-foreground mt-1">→ {s.actionDirection}</p>
+      <p className="text-body text-rm-gray leading-snug">{s.story}</p>
+      <p className="text-meta text-muted-foreground mt-1">→ {s.actionDirection}</p>
       {s.evidence.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {s.evidence.map((e, i) => (
-            <span key={i} className="text-[10px] bg-gray-100 rounded px-1.5 py-0.5 text-rm-gray">{e.metric}: <strong>{String(e.value)}</strong></span>
+            <span key={i} className="text-micro bg-gray-100 rounded px-1.5 py-0.5 text-rm-gray">{e.metric}: <strong>{String(e.value)}</strong></span>
           ))}
         </div>
       )}

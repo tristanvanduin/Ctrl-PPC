@@ -51,7 +51,7 @@ export function ScriptLibrary() {
       <div className="bg-white rounded-xl border border-border p-8 shadow-sm text-center">
         <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-3" />
         <p className="text-sm text-rm-gray font-medium mb-1">Supabase niet geconfigureerd</p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           Voeg NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY toe aan .env.local
         </p>
       </div>
@@ -64,7 +64,7 @@ export function ScriptLibrary() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-rm-blue">Scriptbibliotheek</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-meta text-muted-foreground mt-0.5">
             Bewaar en organiseer je Google Ads scripts
           </p>
         </div>
@@ -93,7 +93,7 @@ export function ScriptLibrary() {
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => setActiveTag(null)}
-              className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+              className={`text-micro font-medium px-2.5 py-1 rounded-full transition-colors ${
                 !activeTag
                   ? "bg-rm-blue text-white"
                   : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
@@ -105,7 +105,7 @@ export function ScriptLibrary() {
               <button
                 key={tag}
                 onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-                className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+                className={`text-micro font-medium px-2.5 py-1 rounded-full transition-colors ${
                   activeTag === tag
                     ? "bg-rm-blue text-white"
                     : "bg-gray-100 text-muted-foreground hover:bg-gray-200"

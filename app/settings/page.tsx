@@ -38,7 +38,7 @@ function EnvVar({ name }: { name: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="inline-flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded text-[11px] font-mono text-rm-gray cursor-pointer hover:bg-gray-200 transition-colors"
+      className="inline-flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded text-meta font-mono text-rm-gray cursor-pointer hover:bg-gray-200 transition-colors"
     >
       {name}
       {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
@@ -108,14 +108,14 @@ function ClientVisibilitySection() {
         <div className="flex gap-2">
           <button
             onClick={selectAll}
-            className="text-[11px] text-rm-blue hover:underline"
+            className="text-meta text-rm-blue hover:underline"
           >
             Alles aan
           </button>
-          <span className="text-muted-foreground text-[11px]">·</span>
+          <span className="text-muted-foreground text-meta">·</span>
           <button
             onClick={selectNone}
-            className="text-[11px] text-muted-foreground hover:underline"
+            className="text-meta text-muted-foreground hover:underline"
           >
             Alles uit
           </button>
@@ -277,14 +277,14 @@ function ClientGroupsSection() {
                       className="flex-1 text-sm border border-border rounded px-2 py-1 focus:outline-none focus:border-rm-blue"
                       autoFocus
                     />
-                    <button onClick={() => handleRename(group.id)} className="text-[11px] text-rm-blue font-medium">Opslaan</button>
-                    <button onClick={() => setEditingId(null)} className="text-[11px] text-muted-foreground">Annuleer</button>
+                    <button onClick={() => handleRename(group.id)} className="text-meta text-rm-blue font-medium">Opslaan</button>
+                    <button onClick={() => setEditingId(null)} className="text-meta text-muted-foreground">Annuleer</button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <FolderOpen className="w-4 h-4 text-rm-blue" />
                     <span className="text-sm font-semibold text-rm-gray">{group.name}</span>
-                    <span className="text-[10px] text-muted-foreground">({groupClients.length})</span>
+                    <span className="text-micro text-muted-foreground">({groupClients.length})</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1">
@@ -326,7 +326,7 @@ function ClientGroupsSection() {
                   </div>
                 ))}
                 {groupClients.length === 0 && (
-                  <p className="text-[11px] text-muted-foreground px-2 py-1">Nog geen klanten in deze groep</p>
+                  <p className="text-meta text-muted-foreground px-2 py-1">Nog geen klanten in deze groep</p>
                 )}
               </div>
 
@@ -357,14 +357,14 @@ function ClientGroupsSection() {
                           <Plus className="w-3 h-3 text-rm-blue shrink-0" />
                           <span className="truncate">{client.name}</span>
                           {assignedClientIds.has(client.id) && (
-                            <span className="ml-auto text-[9px] text-muted-foreground shrink-0">al in groep</span>
+                            <span className="ml-auto text-micro text-muted-foreground shrink-0">al in groep</span>
                           )}
                         </button>
                       ))}
                   </div>
                   <button
                     onClick={() => { setAddingToGroup(null); setClientSearch(""); }}
-                    className="text-[11px] text-muted-foreground mt-1"
+                    className="text-meta text-muted-foreground mt-1"
                   >
                     Sluiten
                   </button>
@@ -372,7 +372,7 @@ function ClientGroupsSection() {
               ) : (
                 <button
                   onClick={() => setAddingToGroup(group.id)}
-                  className="flex items-center gap-1 text-[11px] text-rm-blue hover:underline mt-1"
+                  className="flex items-center gap-1 text-meta text-rm-blue hover:underline mt-1"
                 >
                   <Plus className="w-3 h-3" /> Klant toevoegen
                 </button>
@@ -535,23 +535,23 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <EnvVar name="GOOGLE_ADS_DEVELOPER_TOKEN" />
-                  <span className="text-[10px] text-muted-foreground">Verplicht</span>
+                  <span className="text-micro text-muted-foreground">Verplicht</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <EnvVar name="GOOGLE_ADS_CLIENT_ID" />
-                  <span className="text-[10px] text-muted-foreground">Verplicht</span>
+                  <span className="text-micro text-muted-foreground">Verplicht</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <EnvVar name="GOOGLE_ADS_CLIENT_SECRET" />
-                  <span className="text-[10px] text-muted-foreground">Verplicht</span>
+                  <span className="text-micro text-muted-foreground">Verplicht</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <EnvVar name="GOOGLE_ADS_REFRESH_TOKEN" />
-                  <span className="text-[10px] text-muted-foreground">Verplicht</span>
+                  <span className="text-micro text-muted-foreground">Verplicht</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <EnvVar name="GOOGLE_ADS_MANAGER_CUSTOMER_ID" />
-                  <span className="text-[10px] text-muted-foreground">Optioneel (MCC)</span>
+                  <span className="text-micro text-muted-foreground">Optioneel (MCC)</span>
                 </div>
               </div>
 
@@ -577,7 +577,7 @@ export default function SettingsPage() {
                     <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener" className="text-rm-blue hover:underline inline-flex items-center gap-0.5">
                       OAuth Playground <ExternalLink className="w-3 h-3" />
                     </a>{" "}
-                    met scope <code className="font-mono text-[10px]">https://www.googleapis.com/auth/adwords</code>
+                    met scope <code className="font-mono text-micro">https://www.googleapis.com/auth/adwords</code>
                   </li>
                   <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
                 </ol>
@@ -633,15 +633,15 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <EnvVar name="META_ADS_ACCESS_TOKEN" />
-                  <span className="text-[10px] text-muted-foreground">Verplicht</span>
+                  <span className="text-micro text-muted-foreground">Verplicht</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <EnvVar name="META_ADS_APP_ID" />
-                  <span className="text-[10px] text-muted-foreground">Optioneel (token refresh)</span>
+                  <span className="text-micro text-muted-foreground">Optioneel (token refresh)</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <EnvVar name="META_ADS_APP_SECRET" />
-                  <span className="text-[10px] text-muted-foreground">Optioneel (token refresh)</span>
+                  <span className="text-micro text-muted-foreground">Optioneel (token refresh)</span>
                 </div>
               </div>
 
@@ -661,7 +661,7 @@ export default function SettingsPage() {
                     <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-rm-blue hover:underline inline-flex items-center gap-0.5">
                       Graph API Explorer <ExternalLink className="w-3 h-3" />
                     </a>{" "}
-                    met permissions: <code className="font-mono text-[10px]">ads_read, ads_management</code>
+                    met permissions: <code className="font-mono text-micro">ads_read, ads_management</code>
                   </li>
                   <li>Wissel het token om voor een long-lived token (geldig ~60 dagen)</li>
                   <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
@@ -675,7 +675,7 @@ export default function SettingsPage() {
         <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-rm-blue text-base">LinkedIn Ads API</h3>
-            <span className="text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-gray-100">Via .env.local</span>
+            <span className="text-meta text-muted-foreground px-2 py-0.5 rounded-full bg-gray-100">Via .env.local</span>
           </div>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -685,15 +685,15 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <EnvVar name="LINKEDIN_CLIENT_ID" />
-                <span className="text-[10px] text-muted-foreground">Verplicht</span>
+                <span className="text-micro text-muted-foreground">Verplicht</span>
               </div>
               <div className="flex items-center justify-between">
                 <EnvVar name="LINKEDIN_CLIENT_SECRET" />
-                <span className="text-[10px] text-muted-foreground">Verplicht</span>
+                <span className="text-micro text-muted-foreground">Verplicht</span>
               </div>
               <div className="flex items-center justify-between">
                 <EnvVar name="LINKEDIN_REFRESH_TOKEN" />
-                <span className="text-[10px] text-muted-foreground">Verplicht</span>
+                <span className="text-micro text-muted-foreground">Verplicht</span>
               </div>
             </div>
             <div className="border-t border-border pt-4 space-y-2">
@@ -706,7 +706,7 @@ export default function SettingsPage() {
                   </a>
                 </li>
                 <li>Vraag toegang aan tot de Advertising API (Marketing Developer Platform)</li>
-                <li>Genereer via OAuth2 een refresh token met scope <code className="font-mono text-[10px]">r_ads, r_ads_reporting</code></li>
+                <li>Genereer via OAuth2 een refresh token met scope <code className="font-mono text-micro">r_ads, r_ads_reporting</code></li>
                 <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
               </ol>
             </div>

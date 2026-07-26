@@ -81,7 +81,7 @@ export default function UsStatesMap({ values, format, metricLabel }: UsStatesMap
 
       {hover && hoveredValue != null && (
         <div
-          className="pointer-events-none absolute z-10 rounded-md border border-border bg-white px-2.5 py-1.5 shadow-md text-[11px]"
+          className="pointer-events-none absolute z-10 rounded-md border border-border bg-white px-2.5 py-1.5 shadow-md text-meta"
           style={{ left: Math.min(hover.x + 12, WIDTH - 120), top: hover.y + 12 }}
         >
           <div className="font-semibold text-rm-gray">{stateLabel(hover.usps)}</div>

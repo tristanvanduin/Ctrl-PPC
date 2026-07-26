@@ -355,7 +355,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Sprintplanning</h3>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
+          <p className="text-micro text-muted-foreground mt-0.5">
             {filteredItems.length} taken · Week {currentWeek} ({new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })})
           </p>
         </div>
@@ -365,7 +365,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
                   filter === f ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
                 }`}
               >
@@ -373,7 +373,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium rounded-md border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer">
+          <label className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer">
             {importing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
             {importing ? "Importeren..." : "CSV Import"}
             <input
@@ -385,19 +385,19 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           </label>
           <button
             onClick={() => setShowAddHypothesis(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90 transition-colors"
           >
             <Plus className="w-3 h-3" /> Hypothese + taak
           </button>
           <button
             onClick={() => setShowAddTask("standalone")}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium rounded-md border border-rm-blue/30 text-rm-blue hover:bg-rm-blue/5 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md border border-rm-blue/30 text-rm-blue hover:bg-rm-blue/5 transition-colors"
           >
             <Plus className="w-3 h-3" /> Losse taak
           </button>
           <button
             onClick={exportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium rounded-md border border-border hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md border border-border hover:bg-gray-50 transition-colors"
           >
             <Download className="w-3 h-3" /> CSV Export
           </button>
@@ -468,13 +468,13 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         <table className="w-full">
           <thead className="bg-gray-50/50 border-b border-border">
             <tr>
-              <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left w-16">Week</th>
-              <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left">Taak</th>
-              <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left w-24">Kanaal</th>
-              <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left w-28">Status</th>
-              <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left w-36">Verantwoordelijke</th>
-              <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left w-24">Looptijd</th>
-              <th className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-left w-32">Metrics</th>
+              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-16">Week</th>
+              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Taak</th>
+              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-24">Kanaal</th>
+              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-28">Status</th>
+              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-36">Verantwoordelijke</th>
+              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-24">Looptijd</th>
+              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-32">Metrics</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -497,11 +497,11 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                           ? <ChevronDown className="w-3.5 h-3.5 text-purple-400" />
                           : <ChevronUp className="w-3.5 h-3.5 text-purple-400" />
                         }
-                        <span className="text-[11px] font-medium text-purple-700 max-w-[50%]">
+                        <span className="text-meta font-medium text-purple-700 max-w-[50%]">
                           {hyp?.hypothesis || "Hypothese"}
                         </span>
                         <ChannelBadge channel={hyp ? channelOfSource(hyp.source) : null} />
-                        <span className="ml-auto flex items-center gap-2 text-[9px] text-purple-400">
+                        <span className="ml-auto flex items-center gap-2 text-micro text-purple-400">
                           {groupItems.length} taken · ICE {hyp?.ice_total?.toFixed(1) || "?"}
                           <button
                             onClick={(e) => { e.stopPropagation(); setShowAddTask(hypId); setNewTask(""); setNewOwner("Ranking Masters"); }}
@@ -529,7 +529,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                             <option value="Ranking Masters">RM</option>
                             <option value="Klant">Klant</option>
                           </select>
-                          <button onClick={() => addTaskToHypothesis(hypId)} disabled={!newTask.trim()} className="px-2 py-1 text-[10px] font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40">Voeg toe</button>
+                          <button onClick={() => addTaskToHypothesis(hypId)} disabled={!newTask.trim()} className="px-2 py-1 text-micro font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40">Voeg toe</button>
                           <button onClick={() => setShowAddTask(null)} className="p-1 hover:bg-purple-100 rounded"><X className="w-3 h-3 text-purple-400" /></button>
                         </div>
                       </td>
@@ -570,7 +570,7 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
             }`}
             placeholder="—"
           />
-          {isOverdue && <span className="text-[8px] text-red-500 font-bold">!</span>}
+          {isOverdue && <span className="text-micro text-red-500 font-bold">!</span>}
         </div>
       </td>
       <td className="px-4 py-2.5 text-sm text-rm-gray">{item.task}</td>
@@ -579,7 +579,7 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
         <select
           value={item.status}
           onChange={(e) => onUpdate(item.id, "status", e.target.value)}
-          className={`text-[10px] font-medium rounded-full px-2.5 py-1 border-0 cursor-pointer ${STATUS_COLOR(item.status)}`}
+          className={`text-micro font-medium rounded-full px-2.5 py-1 border-0 cursor-pointer ${STATUS_COLOR(item.status)}`}
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
