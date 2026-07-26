@@ -22,7 +22,7 @@ import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
 import { fetchGa4Dataset, type Ga4SupabaseLike } from "@/lib/ga4/data-access";
 import { buildGa4CroSignals, buildGa4DeviceCroSignals, buildGa4LandingPageCroSignals } from "@/lib/ga4/signals";
 import { buildBlendedDataGapSignals, type ChannelValueAgg } from "@/lib/signals/blended-data-gap";
-import { buildBlendedCpmSignals } from "@/lib/signals/blended-cpm";
+import { buildFastSaturationSignals, type SaturationPoint } from "@/lib/signals/fast-saturation";
 import { mergeDetections } from "@/lib/signals/types";
 
 const SECTION = "cross_channel_v1";
@@ -103,7 +103,13 @@ export async function POST(request: NextRequest) {
   // maand-op-maand-detector; alleen volle maanden gaan de vergelijking in.
   const currentMonthStart = new Date().toISOString().slice(0, 8) + "01";
 
-  const [blendedRes, campaignRes, demoRes, labelRes, settingsRes] = await Promise.all([
+  // Dag-/weekdata voor de snelle verzadigingsdetectie. Campagnes lopen hier hooguit een paar
+  // maanden, dus een maandvergelijking komt te laat om nog te kunnen bijsturen; deze bronnen geven
+  // een oordeel binnen weken. Meta levert ook frequency (hoe vaak dezelfde persoon de advertentie
+  // zag) — de vroegste waarschuwing dat een publiek opraakt.
+  const sinceFast = new Date(Date.now() - 140 * 86_400_000).toISOString().slice(0, 10);
+
+  const [blendedRes, campaignRes, demoRes, labelRes, settingsRes, metaDailyRes, liDailyRes, gWeeklyRes] = await Promise.all([
     supabase
       .from("blended_account_monthly")
       .select("month, channel, impressions, clicks, spend, conversions, conversion_value, leads")
@@ -123,6 +129,21 @@ export async function POST(request: NextRequest) {
       .gte("date", sinceDemo),
     supabase.from("linkedin_urn_labels").select("urn, label"),
     supabase.from("client_settings").select("audience_profile").eq("client_id", clientId).maybeSingle(),
+    supabase
+      .from("meta_account_daily")
+      .select("date, impressions, link_clicks, spend, frequency")
+      .eq("client_id", clientId)
+      .gte("date", sinceFast),
+    supabase
+      .from("linkedin_account_daily")
+      .select("date, impressions, clicks, spend")
+      .eq("client_id", clientId)
+      .gte("date", sinceFast),
+    supabase
+      .from("ads_account_weekly")
+      .select("week_start, impressions, clicks, cost")
+      .eq("client_id", clientId)
+      .gte("week_start", sinceFast),
   ]);
 
   const n = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
@@ -276,8 +297,24 @@ export async function POST(request: NextRequest) {
   const detected = buildCrossChannelSignals({ channels, brand });
   // Funnel over de kanalen heen: blended totaal-funnel, fase-achterblijver en divergentie.
   const funnel = buildCrossChannelFunnelSignals(channels);
-  // Bereikkosten: stijgende CPM per kanaal, waarbij CTR verzadiging van veilingdruk scheidt.
-  const cpm = buildBlendedCpmSignals(channels);
+  // Bereikkosten en verzadiging, zo vroeg als de data het toelaat: dag- (Meta/LinkedIn) en
+  // weekdata (Google), met een venster dat op volume wordt gekozen in plaats van op tijd.
+  const saturationPoints: SaturationPoint[] = [
+    ...(metaDailyRes.data ?? []).map((r) => ({
+      channel: "meta_ads", date: String(r.date),
+      impressions: n(r.impressions), clicks: n(r.link_clicks), spend: n(r.spend),
+      frequency: typeof r.frequency === "number" ? r.frequency : null,
+    })),
+    ...(liDailyRes.data ?? []).map((r) => ({
+      channel: "linkedin_ads", date: String(r.date),
+      impressions: n(r.impressions), clicks: n(r.clicks), spend: n(r.spend),
+    })),
+    ...(gWeeklyRes.data ?? []).map((r) => ({
+      channel: "google_ads", date: String(r.week_start),
+      impressions: n(r.impressions), clicks: n(r.clicks), spend: n(r.cost),
+    })),
+  ];
+  const cpm = buildFastSaturationSignals(saturationPoints);
   const merged = {
     triggered: [...detected.triggered, ...funnel.triggered, ...kpiRelations.triggered, ...audienceStories, ...ga4Cro.triggered, ...dataGap.triggered, ...cpm.triggered],
     checked: [...detected.checked, ...funnel.checked, ...kpiRelations.checked, "cross_audience_samenhang", ...ga4Cro.checked, ...dataGap.checked, ...cpm.checked],
@@ -294,7 +331,7 @@ export async function POST(request: NextRequest) {
     { key: "audience", title: "Doelgroep-samenhang", description: "Converterende LinkedIn-segmenten vs het gedeclareerde doelprofiel.", det: { triggered: audienceStories, checked: ["cross_audience_samenhang"] } },
     { key: "ga4_cro", title: "GA4 CRO (website)", description: "Kanaal-, device- en landingpage-conversiekloof op de site.", det: ga4Cro },
     { key: "data_gap", title: "Data-volledigheid", description: "Kanalen die wel converteren maar geen conversiewaarde meten — blended ROAS onberekenbaar.", det: dataGap },
-    { key: "cpm", title: "Bereikkosten & verzadiging", description: "Stijgende CPM per kanaal, waarbij de CTR verzadiging (creative/publiek) van veilingdruk (markt) scheidt.", det: cpm },
+    { key: "cpm", title: "Bereikkosten & verzadiging", description: "Vroegsignalering op dag-/weekdata: stijgende CPM of frequency, waarbij de CTR verzadiging (creative/publiek) van veilingdruk (markt) scheidt. Het venster wordt op volume gekozen, zodat een oordeel er binnen weken is in plaats van na maanden.", det: cpm },
   ];
   const groups: CrossGroup[] = groupDefs.map((g) => {
     const r = renderSignalSection(g.det, g.title);
