@@ -74,6 +74,33 @@ export function networkLabel(t: string): string {
   return NETWORK_LABEL[(t || "").toUpperCase()] ?? t;
 }
 
+// ── Intentie versus bereik ─────────────────────────────────────────────────
+// Meerdere analyses vragen "hoeveel van het PMax-budget gaat naar inventaris waar niemand actief
+// naar je zoekt". Die tweedeling stond op drie plekken uitgeschreven als CONTENT + YOUTUBE_WATCH,
+// en dat is sinds v23 stilletjes fout: YouTube heet nu YOUTUBE, en Maps, Discover en Gmail komen
+// er als eigen kanalen bij. Een account waar een derde van het budget naar Maps gaat zou zo op
+// nul procent bereikinventaris uitkomen. Daarom staat de tweedeling nu één keer hier.
+
+const INTENT_NETWORKS = new Set(["SEARCH", "SEARCH_PARTNERS"]);
+// Geen van beide: deze dragen geen kanaalinformatie, dus ze horen aan geen van beide kanten.
+const UNATTRIBUTED_NETWORKS = new Set(["MIXED", "UNSPECIFIED", "UNKNOWN", "GOOGLE_OWNED_CHANNELS"]);
+
+/** Zoekt de gebruiker actief? Zoeken en zoekpartners wel, de rest niet. */
+export function isIntentNetwork(t: string): boolean {
+  return INTENT_NETWORKS.has((t || "").toUpperCase());
+}
+
+/**
+ * Bereikinventaris: Display, YouTube, Maps, Discover, Gmail, Google TV. Maps zit hier bewust bij —
+ * iemand die een route zoekt heeft wel intentie, maar niet naar jouw aanbod, en in PMax gedraagt
+ * het zich als bereik. MIXED en de verzamelwaarden vallen buiten beide: die zeggen niet wáár het
+ * geld heen ging, en meetellen zou een uitspraak doen die de data niet draagt.
+ */
+export function isBrowseNetwork(t: string): boolean {
+  const u = (t || "").toUpperCase();
+  return !INTENT_NETWORKS.has(u) && !UNATTRIBUTED_NETWORKS.has(u) && u.length > 0;
+}
+
 /**
  * Een netwerk moet dit deel van de kosten dragen voordat de scheefheid iets betekent. Onder deze
  * grens is een verschil tussen twee aandelen vooral afrondingsruis.

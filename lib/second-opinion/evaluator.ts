@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isBrowseNetwork } from "../pmax/network-split";
 import {
   IS_LOSS_ALARM_PCT,
   HIGH_CPA_MULTIPLE,
@@ -864,8 +865,11 @@ const evaluators: Record<number, Evaluator> = {
     }
     const totalCost = ctx.pmaxNetworkBreakdown.reduce((s, n) => s + n.cost, 0);
     const totalConv = ctx.pmaxNetworkBreakdown.reduce((s, n) => s + n.conversions, 0);
-    const displayCost = ctx.pmaxNetworkBreakdown.filter((n) => n.network_type === "CONTENT" || n.network_type === "YOUTUBE_WATCH").reduce((s, n) => s + n.cost, 0);
-    const displayConv = ctx.pmaxNetworkBreakdown.filter((n) => n.network_type === "CONTENT" || n.network_type === "YOUTUBE_WATCH").reduce((s, n) => s + n.conversions, 0);
+    // Alle bereikinventaris, niet alleen Display en YouTube: sinds API v23 komen Maps, Discover
+    // en Gmail er als eigen kanalen bij, en die vielen hier buiten de telling.
+    const browse = ctx.pmaxNetworkBreakdown.filter((n) => isBrowseNetwork(n.network_type));
+    const displayCost = browse.reduce((s, n) => s + n.cost, 0);
+    const displayConv = browse.reduce((s, n) => s + n.conversions, 0);
     const displayCostPct = totalCost > 0 ? Math.round((displayCost / totalCost) * 100) : 0;
     const displayConvPct = totalConv > 0 ? Math.round((displayConv / totalConv) * 100) : 0;
     const searchCost = ctx.pmaxNetworkBreakdown.filter((n) => n.network_type === "SEARCH").reduce((s, n) => s + n.cost, 0);

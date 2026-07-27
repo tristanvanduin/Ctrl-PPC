@@ -141,7 +141,12 @@ export interface GeoPerformanceMonthly {
 
 // ── Network Performance ────────────────────────────────────────────────────
 
-export type NetworkType = "SEARCH" | "CONTENT" | "YOUTUBE_WATCH" | "MIXED" | "UNSPECIFIED";
+// De v23-enum: PMax splitst sinds januari 2026 uit naar Maps, Discover, Gmail en Google TV in
+// plaats van alles op MIXED te gooien. De oude YouTube-varianten blijven staan voor historie.
+export type NetworkType =
+  | "SEARCH" | "SEARCH_PARTNERS" | "CONTENT" | "YOUTUBE" | "MAPS" | "DISCOVER" | "GMAIL"
+  | "GOOGLE_TV" | "GOOGLE_OWNED_CHANNELS" | "MIXED"
+  | "YOUTUBE_WATCH" | "YOUTUBE_SEARCH" | "UNSPECIFIED" | "UNKNOWN";
 
 export interface NetworkPerformanceMonthly {
   client_id: string;

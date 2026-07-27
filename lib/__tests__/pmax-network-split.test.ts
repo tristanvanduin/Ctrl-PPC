@@ -5,7 +5,7 @@ export {};
 // Draaien: npx tsx lib/__tests__/pmax-network-split.test.ts
 
 import {
-  buildNetworkSplit, findImbalances, networkTotals, networkLabel,
+  buildNetworkSplit, findImbalances, networkTotals, networkLabel, isIntentNetwork, isBrowseNetwork,
   MIN_COST_SHARE_TO_FLAG, SHARE_GAP_THRESHOLD, type NetworkRow,
 } from "../pmax/network-split";
 
@@ -114,6 +114,23 @@ for (const t of ["SEARCH", "SEARCH_PARTNERS", "CONTENT", "MIXED", "YOUTUBE", "GO
   check(`${t} vertaald`, label !== t && label.length > 0, `kreeg "${label}"`);
 }
 check("onbekende toekomstige waarde valt terug op zichzelf", networkLabel("IETS_NIEUWS") === "IETS_NIEUWS");
+
+
+// De tweedeling intentie/bereik zat op drie plekken uitgeschreven als CONTENT + YOUTUBE_WATCH.
+// Sinds v23 is dat stil fout: een account waar een derde van het budget naar Maps gaat kwam zo
+// op nul procent bereikinventaris uit, en het signaal over lage-kwaliteitsinventaris zweeg.
+console.log("\nIntentie versus bereik");
+for (const t of ["SEARCH", "SEARCH_PARTNERS"]) {
+  check(`${t} is intentie`, isIntentNetwork(t) && !isBrowseNetwork(t));
+}
+for (const t of ["CONTENT", "YOUTUBE", "MAPS", "DISCOVER", "GMAIL", "GOOGLE_TV", "YOUTUBE_WATCH"]) {
+  check(`${t} is bereik`, isBrowseNetwork(t) && !isIntentNetwork(t));
+}
+for (const t of ["MIXED", "UNSPECIFIED", "UNKNOWN", "GOOGLE_OWNED_CHANNELS"]) {
+  check(`${t} telt aan geen van beide kanten`, !isBrowseNetwork(t) && !isIntentNetwork(t));
+}
+check("lege waarde valt buiten beide", !isBrowseNetwork("") && !isIntentNetwork(""));
+check("hoofdletterongevoelig", isIntentNetwork("search") && isBrowseNetwork("maps"));
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

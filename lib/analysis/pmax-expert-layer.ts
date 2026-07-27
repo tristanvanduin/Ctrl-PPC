@@ -14,6 +14,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isBrowseNetwork } from "@/lib/pmax/network-split";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -99,8 +100,14 @@ export async function computePmaxInsights(
     }
 
     // Check for Display/Video dominance with low conversion share
-    const displayCost = (byNetwork.get("CONTENT")?.cost ?? 0) + (byNetwork.get("YOUTUBE_WATCH")?.cost ?? 0);
-    const displayConv = (byNetwork.get("CONTENT")?.conv ?? 0) + (byNetwork.get("YOUTUBE_WATCH")?.conv ?? 0);
+    // Alle bereikinventaris, niet alleen Display en YouTube: sinds API v23 splitst PMax ook
+    // Maps, Discover en Gmail apart uit, en die stonden hier niet in. Een account waar een derde
+    // van het budget naar Maps gaat kwam zo op nul procent uit.
+    let displayCost = 0, displayConv = 0;
+    for (const [network, data] of byNetwork) {
+      if (!isBrowseNetwork(network)) continue;
+      displayCost += data.cost; displayConv += data.conv;
+    }
     const displayCostPct = totalCost > 0 ? displayCost / totalCost : 0;
     const displayConvPct = totalConv > 0 ? displayConv / totalConv : 0;
 
