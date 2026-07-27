@@ -17,6 +17,10 @@ import {
   campaignMetadataRows, devicePerformanceRows, networkPerformanceRows, adScheduleRows,
   keywordPerformanceRows, audiencePerformanceRows,
 } from "./google-sop-demo";
+import {
+  PMAX_CAMPAIGN, VIDEO_CAMPAIGN, videoMetricsFor, assetGroupRows, pmaxNetworkRows,
+  pmaxAssetRows, videoPlacementRows, pmaxPlacementRows, pmaxSearchCategoryRows,
+} from "./pmax-video-demo";
 
 type Row = Record<string, unknown>;
 
@@ -51,12 +55,19 @@ const recentSpendBump = (daysAgo: number): number => (daysAgo < 6 ? 1.7 : 1);
 const weekdayConvPenalty = (daysAgo: number): number => (new Date(Date.now() - daysAgo * 86_400_000).getUTCDay() === 0 ? 0.4 : 1);
 
 // ── ads_campaign_monthly: per campagne × 13 maanden (voedt o.a. het beurs/geo-clone-overzicht) ──
+// Het kanaalpalet van dit account: Search, Display, Video en Performance Max. Géén Shopping — een
+// vakbeurs verkoopt niets via een productfeed, dus PMax draait hier op asset groups met tekst,
+// beeld en video, gestuurd op standaanvragen.
 const CAMPAIGNS = [
-  { id: "demo-c-grt", name: "GRT | Search | NL", imp: 42000, clk: 2100, cost: 4200, conv: 60, aov: 130, seed: 0 },
-  { id: "demo-c-gra", name: "GRA | Search | US", imp: 30000, clk: 1400, cost: 3000, conv: 42, aov: 110, seed: 1 },
-  { id: "demo-c-grn", name: "GRN | Search | Canada", imp: 18000, clk: 900, cost: 1900, conv: 24, aov: 125, seed: 2 },
-  { id: "demo-c-grn2", name: "GRN | Display | Canada", imp: 52000, clk: 620, cost: 850, conv: 8, aov: 125, seed: 5 },
-  { id: "demo-c-brand", name: "GreenTech | Brand", imp: 15000, clk: 1000, cost: 500, conv: 55, aov: 90, seed: 3 },
+  { id: "demo-c-grt", name: "GRT | Search | NL", type: "SEARCH", imp: 42000, clk: 2100, cost: 4200, conv: 60, aov: 130, seed: 0 },
+  { id: "demo-c-gra", name: "GRA | Search | US", type: "SEARCH", imp: 30000, clk: 1400, cost: 3000, conv: 42, aov: 110, seed: 1 },
+  { id: "demo-c-grn", name: "GRN | Search | Canada", type: "SEARCH", imp: 18000, clk: 900, cost: 1900, conv: 24, aov: 125, seed: 2 },
+  { id: "demo-c-grn2", name: "GRN | Display | Canada", type: "DISPLAY", imp: 52000, clk: 620, cost: 850, conv: 8, aov: 125, seed: 5 },
+  { id: "demo-c-brand", name: "GreenTech | Brand", type: "SEARCH", imp: 15000, clk: 1000, cost: 500, conv: 55, aov: 90, seed: 3 },
+  // PMax: hoge waarde per conversie (een standaanvraag is meer waard dan een bezoekersregistratie).
+  { id: PMAX_CAMPAIGN.id, name: PMAX_CAMPAIGN.name, type: "PERFORMANCE_MAX", imp: 78000, clk: 1500, cost: 3200, conv: 34, aov: 180, seed: 7 },
+  // Video: awareness — veel vertoningen, weinig klikken, weinig directe conversies.
+  { id: VIDEO_CAMPAIGN.id, name: VIDEO_CAMPAIGN.name, type: "VIDEO", imp: 240000, clk: 900, cost: 1800, conv: 12, aov: 110, seed: 9 },
 ];
 const adsCampaignMonthly: Row[] = CAMPAIGNS.flatMap((c) =>
   Array.from({ length: N_MONTHS }, (_, i) => {
@@ -67,11 +78,13 @@ const adsCampaignMonthly: Row[] = CAMPAIGNS.flatMap((c) =>
     const conversions = Math.round(c.conv * f);
     const conversionsValue = Math.round(conversions * c.aov);
     return {
-      client_id: CID, campaign_id: c.id, campaign_name: c.name, month: monthISO(N_MONTHS - 1 - i),
+      client_id: CID, campaign_id: c.id, campaign_name: c.name, campaign_type: c.type,
+      campaign_status: "ENABLED", month: monthISO(N_MONTHS - 1 - i),
       impressions, clicks, cost, conversions, conversions_value: conversionsValue,
       ctr: impressions > 0 ? clicks / impressions : 0, avg_cpc: clicks > 0 ? cost / clicks : 0,
       conversion_rate: clicks > 0 ? conversions / clicks : 0, cost_per_conversion: conversions > 0 ? cost / conversions : 0,
       roas: cost > 0 ? conversionsValue / cost : 0,
+      ...videoMetricsFor(c.type, impressions, cost),
     };
   })
 );
@@ -407,6 +420,17 @@ const adsAdSchedulePerformance: Row[] = adScheduleRows(CID, adsAccountMonthly, d
 const adsKeywordPerformanceMonthly: Row[] = keywordPerformanceRows(CID, adsAdgroupMonthly, DIM_MONTHS, iso());
 const adsAudiencePerformanceMonthly: Row[] = audiencePerformanceRows(CID, adsAccountMonthly, DIM_MONTHS, iso());
 
+// ── PMax en Video ──────────────────────────────────────────────────────────
+// Asset groups, netwerkverdeling, assets, plaatsingen en zoekcategorieën. Deze tabellen voedden de
+// PMax-expertlaag, de video-diepteanalyse, de placement-uitsluitadviezen en vijf controlepunten in
+// de second opinion — die alle vijf leeg bleven zolang de demo geen PMax- of videocampagne had.
+const adsAssetGroupPerformanceMonthly: Row[] = assetGroupRows(CID, adsCampaignMonthly, DIM_MONTHS, iso());
+const adsPmaxNetworkBreakdown: Row[] = pmaxNetworkRows(CID, adsAssetGroupPerformanceMonthly, iso());
+const adsPmaxAssetPerformance: Row[] = pmaxAssetRows(CID, DIM_MONTHS, iso());
+const adsVideoPlacements: Row[] = videoPlacementRows(CID, DIM_MONTHS, iso());
+const adsPmaxPlacements: Row[] = pmaxPlacementRows(CID, DIM_MONTHS, iso());
+const adsPmaxSearchCategories: Row[] = pmaxSearchCategoryRows(CID, adsPmaxNetworkBreakdown, iso());
+
 // Bestanden: precies één set standaardmappen (geen dubbelen) + een paar voorbeeldbestanden,
 // zodat het tabblad Bestanden er in de demo netjes en volledig uitziet.
 const clientFolders: Row[] = ["SOP's", "Briefings", "Sprintplanning", "Rapportages", "Overig"].map((name, i) => ({
@@ -468,6 +492,12 @@ export function demoRows(): Record<string, Row[]> {
     ads_ad_schedule_performance: adsAdSchedulePerformance,
     ads_keyword_performance_monthly: adsKeywordPerformanceMonthly,
     ads_audience_performance_monthly: adsAudiencePerformanceMonthly,
+    ads_asset_group_performance_monthly: adsAssetGroupPerformanceMonthly,
+    ads_pmax_network_breakdown: adsPmaxNetworkBreakdown,
+    ads_pmax_asset_performance: adsPmaxAssetPerformance,
+    ads_pmax_placements: adsPmaxPlacements,
+    ads_pmax_search_categories: adsPmaxSearchCategories,
+    ads_video_placements: adsVideoPlacements,
     sop_insights: sopInsights,
     sop_recommendations: sopRecommendations,
     sprint_hypotheses: sprintHypotheses,

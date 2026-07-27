@@ -163,7 +163,17 @@ const AD_GROUPS: Record<string, AdGroupDef[]> = {
     { name: "Brand", costW: 0.72, convW: 0.78 },
     { name: "Brand Varianten", costW: 0.28, convW: 0.22 },
   ],
+  // Videocampagnes hebben wél ad-groepen. Performance Max NIET — die kent alleen asset groups, en
+  // die staan in ads_asset_group_performance_monthly. Daarom ontbreekt de PMax-campagne hier
+  // bewust: hem toch opnemen zou een tabel vullen die Google voor PMax niet levert.
+  "GRT | Video | YouTube awareness": [
+    { name: "Video Awareness NL", costW: 0.63, convW: 0.52 },
+    { name: "Video Retargeting bezoekers", costW: 0.37, convW: 0.48 },
+  ],
 };
+
+/** De campagnes die ad-groepen hébben — alles behalve Performance Max. */
+export const CAMPAIGNS_WITH_AD_GROUPS = Object.keys(AD_GROUPS);
 
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
@@ -296,6 +306,8 @@ const CAMPAIGN_META: Array<{ id: string; name: string; type: string; strategy: s
   { id: "demo-c-grn", name: "GRN | Search | Canada", type: "SEARCH", strategy: "TARGET_CPA", target: 80, budget: 90 },
   { id: "demo-c-grn2", name: "GRN | Display | Canada", type: "DISPLAY", strategy: "MAXIMIZE_CLICKS", target: null, budget: 30 },
   { id: "demo-c-brand", name: "GreenTech | Brand", type: "SEARCH", strategy: "TARGET_IMPRESSION_SHARE", target: 0.95, budget: 20 },
+  { id: "demo-c-pmax", name: "GreenTech | PMax | Standhouders", type: "PERFORMANCE_MAX", strategy: "MAXIMIZE_CONVERSIONS", target: null, budget: 105 },
+  { id: "demo-c-video", name: "GRT | Video | YouTube awareness", type: "VIDEO", strategy: "TARGET_CPM", target: 8, budget: 60 },
 ];
 
 export function campaignMetadataRows(clientId: string, updatedAt: string): Row[] {
@@ -339,14 +351,17 @@ export function devicePerformanceRows(clientId: string, accountMonthly: Row[], m
 }
 
 // ── ads_network_performance_monthly ────────────────────────────────────────
-// Zoekpartners kosten hier 9% van het budget voor 3% van de conversies. Dat is de klassieke
-// stille lekkage: het staat standaard aan, het valt in het campagnetotaal niet op, en het is met
-// één vinkje uit te zetten. Display draagt het meeste vertoningsvolume en het minste resultaat.
+// Zoekpartners kosten hier 6% van het budget voor 2% van de conversies. Dat is de klassieke stille
+// lekkage: het staat standaard aan, het valt in het campagnetotaal niet op, en het is met één
+// vinkje uit te zetten. YouTube en Display dragen samen het leeuwendeel van de vertoningen — met
+// een videocampagne en een PMax zonder feed in het account is dat precies wat je verwacht — maar
+// een klein deel van de conversies. Dat contrast is de reden dat deze uitsplitsing bestaat.
 
 const NETWORKS: Array<{ type: string; impW: number; clickW: number; costW: number; convW: number }> = [
-  { type: "SEARCH", impW: 0.35, clickW: 0.72, costW: 0.78, convW: 0.90 },
-  { type: "SEARCH_PARTNERS", impW: 0.08, clickW: 0.11, costW: 0.09, convW: 0.03 },
-  { type: "CONTENT", impW: 0.57, clickW: 0.17, costW: 0.13, convW: 0.07 },
+  { type: "SEARCH", impW: 0.14, clickW: 0.63, costW: 0.62, convW: 0.83 },
+  { type: "SEARCH_PARTNERS", impW: 0.04, clickW: 0.08, costW: 0.06, convW: 0.02 },
+  { type: "CONTENT", impW: 0.29, clickW: 0.16, costW: 0.16, convW: 0.09 },
+  { type: "YOUTUBE_WATCH", impW: 0.53, clickW: 0.13, costW: 0.16, convW: 0.06 },
 ];
 
 export function networkPerformanceRows(clientId: string, accountMonthly: Row[], months: string[], syncedAt: string): Row[] {

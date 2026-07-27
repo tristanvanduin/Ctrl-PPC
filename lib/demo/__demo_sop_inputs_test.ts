@@ -9,6 +9,7 @@
 import { demoRows } from "./demo-rows";
 import { splitInt, splitAlong } from "./split";
 import { demoGeoCountries, demoGeoStates, geoMonthlyRows } from "./geo-demo";
+import { CAMPAIGNS_WITH_AD_GROUPS } from "./google-sop-demo";
 
 let passed = 0, failed = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -39,7 +40,24 @@ const accCost = sum(account.filter((r) => r.month === month), "cost");
 const inMonth = (t: string) => get(t).filter((r) => r.month === month);
 check("apparaten = account", sum(inMonth("ads_device_performance_monthly"), "cost") === accCost, `${sum(inMonth("ads_device_performance_monthly"), "cost")} vs ${accCost}`);
 check("netwerken = account", sum(inMonth("ads_network_performance_monthly"), "cost") === accCost);
-check("ad-groepen = campagnes", sum(inMonth("ads_adgroup_monthly"), "cost") === sum(inMonth("ads_campaign_monthly"), "cost"));
+// Performance Max heeft geen ad-groepen maar asset groups, dus die campagne hoort hier NIET bij
+// op te tellen. Zou hij dat wel doen, dan stond er data in een tabel die Google voor PMax niet
+// levert — en dat is een ergere fout dan een ontbrekende rij.
+check("ad-groepen = campagnes mét ad-groepen", (() => {
+  const ag = sum(inMonth("ads_adgroup_monthly"), "cost");
+  const camp = sum(inMonth("ads_campaign_monthly").filter((r) => CAMPAIGNS_WITH_AD_GROUPS.includes(String(r.campaign_name))), "cost");
+  return ag === camp;
+})());
+check("PMax staat niet in de ad-groepen", !get("ads_adgroup_monthly").some((r) => String(r.campaign_name).includes("PMax")));
+check("asset groups = de PMax-campagne", (() => {
+  const agp = sum(inMonth("ads_asset_group_performance_monthly"), "cost");
+  const pmax = sum(inMonth("ads_campaign_monthly").filter((r) => r.campaign_type === "PERFORMANCE_MAX"), "cost");
+  return agp === pmax && agp > 0;
+})());
+check("PMax-netwerken = de asset groups", (() => {
+  const net = get("ads_pmax_network_breakdown").filter((r) => r.month === month);
+  return sum(net, "cost") === sum(inMonth("ads_asset_group_performance_monthly"), "cost");
+})());
 check("zoekwoorden = hun ad-groepen (alleen zoekcampagnes)", (() => {
   const kwGroups = new Set(inMonth("ads_keyword_performance_monthly").map((r) => r.ad_group_name));
   const kw = sum(inMonth("ads_keyword_performance_monthly"), "cost");
