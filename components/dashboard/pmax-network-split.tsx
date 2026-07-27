@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, PieChart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isDemoMode } from "@/lib/demo/demo-mode";
-import { DEMO_PMAX_NETWORKS } from "@/lib/demo/pmax-demo";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import {
@@ -35,8 +33,10 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    if (isDemoMode()) { setRows(DEMO_PMAX_NETWORKS); return; }
-
+    // Geen aparte demo-tak meer: in demo-modus IS `supabase` de mock-client, en die serveert
+    // ads_pmax_network_breakdown uit dezelfde bron als de analyse. Er stond hier een losse
+    // DEMO_PMAX_NETWORKS-constante met heel andere cijfers, waardoor deze ringen een ander
+    // verhaal vertelden dan de SOP-tekst ernaast over precies dezelfde campagne.
     const sb = supabase;
     if (!sb) { setRows([]); return; }
     const since = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);

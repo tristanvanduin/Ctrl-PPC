@@ -50,6 +50,7 @@ import { GeoCloneScope } from "./geo-clone-scope";
 import { GeoCloneOverview } from "./geo-clone-overview";
 import { EventPacing } from "./event-pacing";
 import { GeoBreakdown } from "./geo-breakdown";
+import { GeoChannelMatrix } from "./geo-channel-matrix";
 import { VideoPerformance } from "./video-performance";
 import { VideoPlacements } from "./video-placements";
 import { PmaxNetworkSplit } from "./pmax-network-split";
@@ -338,6 +339,12 @@ export function ClientDashboard({ client }: { client: Client }) {
               <PerformanceChart clientId={client.id} countryFilter={countryFilter} />
               {/* Geo-mapping: waar komt verkeer/conversies vandaan, per gekozen metric. */}
               <GeoBreakdown clientId={client.id} />
+              {/* En hóé die markten bediend worden: de kanaalmix per land. Staat bewust hier en
+                  niet op een eigen pagina — het is de volgende vraag na "welke landen", en een
+                  aparte pagina zou klant en periode opnieuw laten kiezen. */}
+              <div className="bg-card border border-border rounded-lg p-5">
+                <GeoChannelMatrix clientId={client.id} />
+              </div>
               {/* YouTube/Demand Gen met de juiste maten (CPM, CPV, kijkdiepte). Rendert niets
                   als er geen videocampagnes draaien. */}
               <VideoPerformance clientId={client.id} />

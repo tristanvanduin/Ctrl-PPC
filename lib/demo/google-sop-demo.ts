@@ -498,6 +498,75 @@ export function keywordPerformanceRows(clientId: string, adgroupRows: Row[], mon
   return rows.sort((a, b) => Number(b.cost) - Number(a.cost));
 }
 
+// ── ads_geo_performance_monthly ────────────────────────────────────────────
+// Land × campagne × maand — de tabel waar de land×kanaal-matrix op draait, want via het
+// campagnetype is de campagne de brug naar het kanaal.
+//
+// Afgeleid uit dezelfde landtotalen als de kaart (lib/demo/geo-demo), zodat de matrix per land
+// exact optelt tot wat de kaart toont. Elke markt heeft zijn eigen campagnemix, en die mix is het
+// interessante deel: Canada leunt op Display, Frankrijk krijgt alleen bereikverkeer uit Video en
+// Display — geen zoekcampagne, geen Franse landingspagina, en dus geen conversies. Dat is precies
+// waarom die markt in de analyse als dode markt naar boven komt.
+
+interface CountryCampaignMix { campaignId: string; costW: number; convW: number }
+
+const COUNTRY_CAMPAIGN_MIX: Record<string, CountryCampaignMix[]> = {
+  NL: [
+    { campaignId: "demo-c-grt", costW: 0.44, convW: 0.52 },
+    { campaignId: "demo-c-brand", costW: 0.10, convW: 0.18 },
+    { campaignId: "demo-c-pmax", costW: 0.28, convW: 0.22 },
+    { campaignId: "demo-c-video", costW: 0.18, convW: 0.08 },
+  ],
+  US: [
+    { campaignId: "demo-c-gra", costW: 0.52, convW: 0.63 },
+    { campaignId: "demo-c-pmax", costW: 0.30, convW: 0.28 },
+    { campaignId: "demo-c-video", costW: 0.18, convW: 0.09 },
+  ],
+  CA: [
+    { campaignId: "demo-c-grn", costW: 0.46, convW: 0.71 },
+    { campaignId: "demo-c-grn2", costW: 0.34, convW: 0.19 },
+    { campaignId: "demo-c-pmax", costW: 0.20, convW: 0.10 },
+  ],
+  // Frankrijk: alleen bereikkanalen, geen zoekcampagne. Verkeer zonder aanbod in de eigen taal.
+  FR: [
+    { campaignId: "demo-c-video", costW: 0.62, convW: 0.5 },
+    { campaignId: "demo-c-grn2", costW: 0.38, convW: 0.5 },
+  ],
+};
+
+const CAMPAIGN_NAME_BY_ID: Record<string, string> = Object.fromEntries(CAMPAIGN_META.map((c) => [c.id, c.name]));
+
+export function geoCampaignRows(
+  clientId: string,
+  countryMonthly: Array<{ code: string; month: string; impressions: number; clicks: number; cost: number; conversions: number; conversionsValue: number }>,
+  syncedAt: string
+): Row[] {
+  const rows: Row[] = [];
+  for (const g of countryMonthly) {
+    const mix = COUNTRY_CAMPAIGN_MIX[g.code];
+    if (!mix) continue;
+    const costW = mix.map((m) => m.costW);
+    const convW = mix.map((m) => m.convW);
+    const imp = splitInt(g.impressions, costW);
+    const clk = splitInt(g.clicks, costW);
+    const cost = splitInt(g.cost, costW);
+    const conv = splitInt(g.conversions, convW);
+    const val = splitAlong(g.conversionsValue, conv, convW);
+    mix.forEach((m, i) => {
+      const part = { impressions: imp[i], clicks: clk[i], cost: cost[i], conversions: conv[i], conversions_value: val[i] };
+      const der = derived(part);
+      rows.push({
+        client_id: clientId, month: g.month,
+        campaign_id: m.campaignId, campaign_name: CAMPAIGN_NAME_BY_ID[m.campaignId] ?? m.campaignId,
+        country_code: g.code, region_name: null, city_name: null,
+        geo_target_id: `demo-geo-${g.code}`,
+        ...part, ctr: der.ctr, conversion_rate: der.conversion_rate, synced_at: syncedAt,
+      });
+    });
+  }
+  return rows.sort((a, b) => Number(b.cost) - Number(a.cost));
+}
+
 // ── ads_audience_performance_monthly ───────────────────────────────────────
 // Observatie-doelgroepen overlappen elkaar: iemand kan tegelijk in-market én remarketing zijn.
 // Ze tellen daarom BEWUST niet op tot het accounttotaal — het zijn aandelen van hetzelfde verkeer,

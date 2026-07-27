@@ -15,7 +15,7 @@ import { demoGeoCountries, demoGeoStates, geoMonthlyRows, geoYoyMonthly } from "
 import {
   accountWeeklyRows, adgroupMonthlyRows, wastefulSearchTermRows, accountYoyRows, campaignYoyRows,
   campaignMetadataRows, devicePerformanceRows, networkPerformanceRows, adScheduleRows,
-  keywordPerformanceRows, audiencePerformanceRows,
+  keywordPerformanceRows, audiencePerformanceRows, geoCampaignRows,
 } from "./google-sop-demo";
 import {
   PMAX_CAMPAIGN, VIDEO_CAMPAIGN, videoMetricsFor, assetGroupRows, pmaxNetworkRows,
@@ -374,6 +374,10 @@ const adsCountryMonthly: Row[] = geoMonthlyRows(demoGeoCountries("google"), GEO_
   conversion_rate: r.conversionRate, roas: r.roas,
   campaign_count: 2, spend_share: 0, synced_at: iso(),
 }));
+// Land × campagne: de brug naar de land×kanaal-matrix, uit dezelfde landtotalen als hierboven.
+const adsGeoPerformanceMonthly: Row[] = geoCampaignRows(
+  CID, geoMonthlyRows(demoGeoCountries("google"), GEO_SOP_MONTHS).map((r) => ({ ...r, code: r.code })), iso()
+);
 // VS-staten voor de statenanalyse en de drilldown-kaart.
 const adsRegionMonthly: Row[] = geoMonthlyRows(demoGeoStates("google"), GEO_SOP_MONTHS).map((r) => ({
   client_id: CID, country_code: "US", region_name: r.code, region_code: r.code, month: r.month,
@@ -526,6 +530,7 @@ export function demoRows(): Record<string, Row[]> {
     client_folders: clientFolders,
     client_files: clientFiles,
     ads_country_monthly: adsCountryMonthly,
+    ads_geo_performance_monthly: adsGeoPerformanceMonthly,
     ads_country_yoy: adsCountryYoy,
     ads_region_monthly: adsRegionMonthly,
     blended_account_monthly: blendedAccountMonthly,
