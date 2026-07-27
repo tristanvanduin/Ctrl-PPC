@@ -2,13 +2,21 @@
 // in demo-mode. Voedt de tabs die direct uit Supabase lezen: Overzicht-aggregaties per beurs
 // (ads_campaign_monthly), Inzichten (sop_*), Creative Performance / diepteanalyse
 // (ads_creative_performance, RSA-assets), en de Meta/LinkedIn-views + forecasts (*_daily).
+// Sinds kort ook de dimensies die de maand-SOP leest maar die geen eigen scherm hebben — week,
+// ad-groep, zoekterm, YoY, apparaat, netwerk, schema, zoekwoord, doelgroep — zodat een demo-SOP
+// niet halverwege op "geen data" uitkomt. Die worden afgeleid in lib/demo/google-sop-demo.ts.
 //
 // Bewust REALISTISCH: maandreeksen dragen groei + seizoen + lichte ruis (deterministisch, dus
 // stabiel), échte conversiewaardes, en de dagseries variëren per dag (trend + weekdag + ruis).
 // Geen platte, identieke maanden meer. Alle rijen: client_id = demo-greentech. Puur presentatie.
 
 import { DEMO_GREENTECH_ID as CID } from "./greentech-mock";
-import { demoGeoCountries, demoGeoStates, geoMonthlyRows } from "./geo-demo";
+import { demoGeoCountries, demoGeoStates, geoMonthlyRows, geoYoyMonthly } from "./geo-demo";
+import {
+  accountWeeklyRows, adgroupMonthlyRows, wastefulSearchTermRows, accountYoyRows, campaignYoyRows,
+  campaignMetadataRows, devicePerformanceRows, networkPerformanceRows, adScheduleRows,
+  keywordPerformanceRows, audiencePerformanceRows,
+} from "./google-sop-demo";
 
 type Row = Record<string, unknown>;
 
@@ -363,6 +371,42 @@ const adsRegionMonthly: Row[] = geoMonthlyRows(demoGeoStates("google"), GEO_SOP_
   campaign_count: 2, spend_share: 0, synced_at: iso(),
 }));
 
+// Landen-YoY: percentages uit de vorig-jaar-verhoudingen in geo-demo, niet los verzonnen. Frankrijk
+// ontbreekt bewust — die markt is dit jaar geopend en heeft dus geen vergelijkingsjaar.
+const adsCountryYoy: Row[] = demoGeoCountries("google").flatMap((agg) => {
+  const series = geoYoyMonthly(agg, GEO_SOP_MONTHS);
+  if (!series) return [];
+  return series.map((y) => ({
+    client_id: CID, country_code: agg.code, month: y.month,
+    impressions_yoy_pct: y.impressions, clicks_yoy_pct: y.clicks, cost_yoy_pct: y.cost,
+    conversions_yoy_pct: y.conversions, conversions_value_yoy_pct: y.conversionsValue,
+    ctr_yoy_pct: y.ctr, avg_cpc_yoy_pct: y.avgCpc, conversion_rate_yoy_pct: y.conversionRate,
+    roas_yoy_pct: y.roas, cost_per_conversion_yoy_pct: y.costPerConversion, synced_at: iso(),
+  }));
+});
+
+// ── Google-dimensies voor de maand-SOP ─────────────────────────────────────
+// Week-, ad-groep-, zoekterm-, YoY-, apparaat-, netwerk-, schema-, zoekwoord- en doelgroeprijen.
+// Vrijwel alles is uit de reeksen hierboven gesplitst (zie lib/demo/google-sop-demo.ts), zodat de
+// dimensies exact optellen tot het account en de campagnes waar ze uit komen.
+const DIM_MONTHS = [monthISO(3), monthISO(2), monthISO(1), monthISO(0)];
+const ADGROUP_SINCE = monthISO(13); // de SOP kijkt 13 maanden terug
+
+const adsAccountWeekly: Row[] = accountWeeklyRows(CID, adsAccountMonthly, 26);
+const adsAdgroupMonthly: Row[] = adgroupMonthlyRows(CID, adsCampaignMonthly, ADGROUP_SINCE);
+// Zoektermen hangen aan dezelfde weken als de weekreeks, zodat de week-sleutels overeenkomen.
+const adsSearchTermsWasteful: Row[] = wastefulSearchTermRows(
+  CID, adsAccountWeekly.slice(-8).map((r) => String(r.week_start))
+);
+const adsAccountYoy: Row[] = accountYoyRows(CID, adsAccountMonthly);
+const adsCampaignYoy: Row[] = campaignYoyRows(CID, adsCampaignMonthly);
+const adsCampaignMetadata: Row[] = campaignMetadataRows(CID, iso());
+const adsDevicePerformanceMonthly: Row[] = devicePerformanceRows(CID, adsAccountMonthly, DIM_MONTHS, iso());
+const adsNetworkPerformanceMonthly: Row[] = networkPerformanceRows(CID, adsAccountMonthly, DIM_MONTHS, iso());
+const adsAdSchedulePerformance: Row[] = adScheduleRows(CID, adsAccountMonthly, dayISO(31), dayISO(1), iso());
+const adsKeywordPerformanceMonthly: Row[] = keywordPerformanceRows(CID, adsAdgroupMonthly, DIM_MONTHS, iso());
+const adsAudiencePerformanceMonthly: Row[] = audiencePerformanceRows(CID, adsAccountMonthly, DIM_MONTHS, iso());
+
 // Bestanden: precies één set standaardmappen (geen dubbelen) + een paar voorbeeldbestanden,
 // zodat het tabblad Bestanden er in de demo netjes en volledig uitziet.
 const clientFolders: Row[] = ["SOP's", "Briefings", "Sprintplanning", "Rapportages", "Overig"].map((name, i) => ({
@@ -389,6 +433,18 @@ const clientSettings: Row[] = [{
     ],
   },
   kpi_targets: { conversionsAbsolute: 700, revenueAbsolute: 90000, roasTarget: 4, cpaTarget: 60 },
+  // Conversie-acties ontbraken, en dat had een gevolg dat verder reikte dan dit veld: zonder
+  // primaire actie valt de accounttype-bepaling terug op "hybrid", wat de SOP labelt als
+  // "Hybrid (Shopping + Search)". Een vakbeurs verkoopt geen producten in een webshop — er is
+  // geen enkele Shopping-campagne in deze demo — dus dat label was gewoon onjuist. Met de
+  // standaanvraag als primaire actie klopt het weer: leadgen op CPA.
+  conversion_actions: [
+    { id: "demo-ca-stand", name: "Standaanvraag (formulier)", category: "primary", activeInAds: true, includedInDashboard: true },
+    { id: "demo-ca-bezoek", name: "Bezoekersregistratie", category: "secondary", activeInAds: true, includedInDashboard: true },
+    { id: "demo-ca-brochure", name: "Download exposantenbrochure", category: "secondary", activeInAds: true, includedInDashboard: true },
+    { id: "demo-ca-bel", name: "Telefoongesprek langer dan 60s", category: "secondary", activeInAds: true, includedInDashboard: false },
+    { id: "demo-ca-nieuwsbrief", name: "Aanmelding nieuwsbrief", category: "secondary", activeInAds: false, includedInDashboard: false },
+  ],
   channel_conversion_config: { meta_ads: ["conversions", "leads"], linkedin_ads: ["one_click_leads", "external_website_conversions"] },
   // GA4-insight-layer config (property + key events + funnelstappen). In demo levert data-access
   // de gemockte GA4-dataset; dit documenteert de vorm van client_settings.ga4_config.
@@ -400,7 +456,18 @@ export function demoRows(): Record<string, Row[]> {
   return {
     ads_campaign_monthly: adsCampaignMonthly,
     ads_account_monthly: adsAccountMonthly,
+    ads_account_weekly: adsAccountWeekly,
+    ads_adgroup_monthly: adsAdgroupMonthly,
     ads_campaign_impression_share: adsCampaignImpressionShare,
+    ads_search_terms_wasteful: adsSearchTermsWasteful,
+    ads_account_yoy: adsAccountYoy,
+    ads_campaign_yoy: adsCampaignYoy,
+    ads_campaign_metadata: adsCampaignMetadata,
+    ads_device_performance_monthly: adsDevicePerformanceMonthly,
+    ads_network_performance_monthly: adsNetworkPerformanceMonthly,
+    ads_ad_schedule_performance: adsAdSchedulePerformance,
+    ads_keyword_performance_monthly: adsKeywordPerformanceMonthly,
+    ads_audience_performance_monthly: adsAudiencePerformanceMonthly,
     sop_insights: sopInsights,
     sop_recommendations: sopRecommendations,
     sprint_hypotheses: sprintHypotheses,
@@ -429,6 +496,7 @@ export function demoRows(): Record<string, Row[]> {
     client_folders: clientFolders,
     client_files: clientFiles,
     ads_country_monthly: adsCountryMonthly,
+    ads_country_yoy: adsCountryYoy,
     ads_region_monthly: adsRegionMonthly,
     blended_account_monthly: blendedAccountMonthly,
     client_settings: clientSettings,

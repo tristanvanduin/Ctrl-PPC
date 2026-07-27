@@ -4,6 +4,8 @@
 // bij "Alle kanalen" zien, met plausibele verschillen per kanaal, zodat de metric-selector iets te
 // vertellen heeft. Puur presentatie — nooit vermengd met echte data; alleen actief in demo-modus.
 
+import { splitAlong, splitInt } from "./split";
+
 export interface GeoAgg {
   code: string; // alpha-2 land óf USPS-staat
   impressions: number;
@@ -136,14 +138,6 @@ export interface GeoMonthlyRow extends GeoAgg {
 // Lichte seizoensvorm zodat de reeks niet kaarsrecht is; genormaliseerd zodat de som klopt.
 const MONTH_WEIGHTS = [0.94, 1.0, 1.06];
 
-/** Verdeelt één geheel getal over de maanden volgens de gewichten, met de rest naar de laatste. */
-function splitInt(total: number, weights: number[]): number[] {
-  const sum = weights.reduce((s, w) => s + w, 0);
-  const out = weights.slice(0, -1).map((w) => Math.round((total * w) / sum));
-  out.push(total - out.reduce((s, v) => s + v, 0)); // rest, zodat de som exact klopt
-  return out;
-}
-
 /**
  * Zet de geaggregeerde markten om naar maandrijen over de opgegeven maanden (ISO, eerste van de
  * maand). De afgeleide ratio's komen uit de maandtotalen zelf, niet uit het jaartotaal.
@@ -156,7 +150,7 @@ export function geoMonthlyRows(aggs: GeoAgg[], months: string[]): GeoMonthlyRow[
     const clk = splitInt(a.clicks, weights);
     const cost = splitInt(Math.round(a.cost), weights);
     const conv = splitInt(Math.round(a.conversions), weights);
-    const val = splitInt(Math.round(a.conversionsValue), weights);
+    const val = splitAlong(Math.round(a.conversionsValue), conv, weights);
     months.forEach((month, i) => {
       out.push({
         code: a.code, month,
@@ -170,4 +164,69 @@ export function geoMonthlyRows(aggs: GeoAgg[], months: string[]): GeoMonthlyRow[
     });
   }
   return out;
+}
+
+// ── Vorig jaar ─────────────────────────────────────────────────────────────
+// De YoY-tabel draagt alleen percentages, en losse percentages zijn het makkelijkst te verzinnen
+// en het makkelijkst tegenstrijdig. Daarom leggen we hier het vórige jaar vast als verhouding tot
+// het huidige, en rekenen we élk percentage — ook de afgeleide zoals CPA en ROAS — daaruit uit.
+// Dan kan de YoY-uitkomst per definitie niet botsen met de markt-data ernaast.
+//
+// Het verhaal: Nederland groeit gestaag, de VS is dit jaar hard opgeschaald, Canada is juist
+// teruggeschroefd. Frankrijk staat er bewust NIET in — die markt is dit jaar geopend en heeft dus
+// geen vorig jaar. Dat sluit aan op het dode-markt-patroon: nieuw opengezet, maar zonder Franse
+// landingspagina.
+const COUNTRY_PRIOR_YEAR: Record<string, { impressions: number; clicks: number; cost: number; conversions: number }> = {
+  NL: { impressions: 0.86, clicks: 0.84, cost: 0.89, conversions: 0.82 },
+  US: { impressions: 0.71, clicks: 0.68, cost: 0.74, conversions: 0.63 },
+  CA: { impressions: 1.12, clicks: 1.15, cost: 1.08, conversions: 1.21 },
+};
+
+export interface GeoYoyPct {
+  month: string;
+  impressions: number; clicks: number; cost: number; conversions: number; conversionsValue: number;
+  ctr: number; avgCpc: number; conversionRate: number; roas: number; costPerConversion: number;
+}
+
+const yoyPct = (cur: number, prev: number): number =>
+  prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : 0;
+
+/**
+ * YoY-percentages per maand voor één markt, of null als die markt vorig jaar niet liep.
+ *
+ * Twee dingen zijn hier bewust: de percentages komen uit een échte vorig-jaar-reeks in plaats van
+ * uit losse getallen, zodat de afgeleide metrics (CPA, ROAS) volgen uit kosten en conversies en er
+ * niet naast kunnen liggen. En het vorige jaar krijgt een verschoven seizoensvorm, want een markt
+ * die twee jaar op rij exact hetzelfde maandprofiel heeft bestaat niet — zonder die verschuiving
+ * zou elke maand op de komma hetzelfde YoY-percentage tonen.
+ */
+export function geoYoyMonthly(agg: GeoAgg, months: string[]): GeoYoyPct[] | null {
+  const f = COUNTRY_PRIOR_YEAR[agg.code];
+  if (!f) return null;
+  const prevAgg: GeoAgg = {
+    code: agg.code,
+    impressions: Math.round(agg.impressions * f.impressions),
+    clicks: Math.round(agg.clicks * f.clicks),
+    cost: Math.round(agg.cost * f.cost),
+    conversions: Math.round(agg.conversions * f.conversions),
+    conversionsValue: Math.round(agg.conversionsValue * f.conversions), // waarde volgt de conversies (vaste AOV)
+  };
+  const cur = geoMonthlyRows([agg], months);
+  // Eén positie opgeschoven seizoensvorm: vorig jaar piekte de markt een maand eerder. We draaien
+  // de vorig-jaar-reeks door, dus de maandlabels doen er niet toe — alleen de vorm.
+  const prevSeries = geoMonthlyRows([prevAgg], months);
+  const prev = months.map((_, i) => prevSeries[(i + 1) % prevSeries.length]);
+  return months.map((month, i) => ({
+    month,
+    impressions: yoyPct(cur[i].impressions, prev[i].impressions),
+    clicks: yoyPct(cur[i].clicks, prev[i].clicks),
+    cost: yoyPct(cur[i].cost, prev[i].cost),
+    conversions: yoyPct(cur[i].conversions, prev[i].conversions),
+    conversionsValue: yoyPct(cur[i].conversionsValue, prev[i].conversionsValue),
+    ctr: yoyPct(cur[i].ctr, prev[i].ctr),
+    avgCpc: yoyPct(cur[i].avgCpc, prev[i].avgCpc),
+    conversionRate: yoyPct(cur[i].conversionRate, prev[i].conversionRate),
+    roas: yoyPct(cur[i].roas, prev[i].roas),
+    costPerConversion: yoyPct(cur[i].costPerConversion, prev[i].costPerConversion),
+  }));
 }
