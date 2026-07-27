@@ -1,4 +1,5 @@
 import { mapRsaAssetApiRow, mapAdMetaApiRow, applyAdText, buildAdTextMap, type RsaAssetApiResult, type AdMetaApiResult } from "./google-ads-rsa-transform";
+import { recordFetchFailure } from "./fetch-failures";
 import { logger } from "@/lib/logger";
 /**
  * Google Ads API client
@@ -1004,7 +1005,7 @@ export async function getAdGroupKeywords(
         matchType: keyword?.matchType || keyword?.match_type || "",
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getAdGroupKeywords", e); return []; }
 }
 
 // ── Campaign Location Targeting ────────────────────────────────────────
@@ -1046,7 +1047,7 @@ export async function getCampaignLocationTargets(
         locationType: geo?.targetType || geo?.target_type || "",
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getCampaignLocationTargets", e); return []; }
 }
 
 // ── Ad Copy & Final URLs ───────────────────────────────────────────────
@@ -1106,7 +1107,7 @@ export async function getAdGroupAdCopy(
           : [],
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getAdGroupAdCopy", e); return []; }
 }
 
 // ── Search Term Analysis ────────────────────────────────────────────────
@@ -1655,8 +1656,10 @@ export async function getChangeHistory(
         userEmail: ce.userEmail || ce.user_email || "",
       };
     });
-  } catch {
-    // Change history may not be available for all accounts
+  } catch (e) {
+    // Wijzigingsgeschiedenis is niet voor elk account beschikbaar. Dat is een geldige uitkomst,
+    // maar een quota-fout ziet er precies hetzelfde uit — dus noteren we hem hoe dan ook.
+    recordFetchFailure("getChangeHistory", e);
     return [];
   }
 }
@@ -1756,7 +1759,7 @@ export async function getKeywordPerformanceByMonth(
         qualityScore: qi?.qualityScore ?? qi?.quality_score ?? null,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getKeywordPerformanceByMonth", e); return []; }
 }
 
 // ── Search Terms (ALL, not just wasteful) by Month ────────────────────────
@@ -1826,7 +1829,7 @@ export async function getSearchTermsByMonth(
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getSearchTermsByMonth", e); return []; }
 }
 
 // ── Product Performance by Month (Shopping + PMax) ────────────────────────
@@ -2054,9 +2057,7 @@ export async function getCheckoutFunnelByMonth(
     }
 
     return Array.from(bucket.values());
-  } catch {
-    return [];
-  }
+  } catch (e) { recordFetchFailure("getCheckoutFunnelByMonth", e); return []; }
 }
 
 // ── Device Performance by Month ───────────────────────────────────────────
@@ -2321,7 +2322,7 @@ export async function getNetworkPerformanceByMonth(
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getNetworkPerformanceByMonth", e); return []; }
 }
 
 // ── Creative (Ad) Performance by Month ────────────────────────────────────
@@ -2431,7 +2432,7 @@ export async function getCreativePerformanceByMonth(
     } catch {
       return mapped; // tekstverrijking is best-effort; de metrics blijven hoe dan ook staan
     }
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getCreativePerformanceByMonth", e); return []; }
 }
 
 // ── Asset Group Performance by Month (PMax) ───────────────────────────────
@@ -2497,7 +2498,7 @@ export async function getAssetGroupPerformanceByMonth(
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getAssetGroupPerformanceByMonth", e); return []; }
 }
 
 // ── Audience Performance by Month ─────────────────────────────────────────
@@ -2567,7 +2568,7 @@ export async function getAudiencePerformanceByMonth(
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getAudiencePerformanceByMonth", e); return []; }
 }
 
 // ── Ad Schedule Performance (hour + day) ──────────────────────────────────
@@ -2615,7 +2616,7 @@ export async function getPMaxUrlExpansionSettings(
         finalUrlSuffix: (c.finalUrlSuffix ?? c.final_url_suffix ?? "") as string,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getPMaxUrlExpansionSettings", e); return []; }
 }
 
 /** Check Shopping campaign priority settings */
@@ -2645,7 +2646,7 @@ export async function getShoppingCampaignPriorities(
         priority: ss?.campaignPriority ?? ss?.campaign_priority ?? 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getShoppingCampaignPriorities", e); return []; }
 }
 
 /** Check ad group targeting settings (optimized targeting on/off) */
@@ -2687,7 +2688,7 @@ export async function getAdGroupTargetingSettings(
         optimizedTargetingEnabled: !hasOptOut,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getAdGroupTargetingSettings", e); return []; }
 }
 
 /** Check campaign frequency caps */
@@ -2728,7 +2729,7 @@ export async function getCampaignFrequencyCaps(
         capTimeUnit: (key?.timeUnit ?? key?.time_unit ?? "") as string,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getCampaignFrequencyCaps", e); return []; }
 }
 
 /** Check auto-apply recommendation settings */
@@ -2752,7 +2753,7 @@ export async function getAutoApplyRecommendations(
     // Note: actual AAR settings require the Recommendations API which is complex
     // This is a proxy check - we report what we can determine
     return { hasAutoApply: false, types: [] }; // Conservative default
-  } catch { return { hasAutoApply: false, types: [] }; }
+  } catch (e) { recordFetchFailure("getAutoApplyRecommendations", e); return { hasAutoApply: false, types: [] }; }
 }
 
 export async function getAdSchedulePerformance(
@@ -2796,7 +2797,7 @@ export async function getAdSchedulePerformance(
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getAdSchedulePerformance", e); return []; }
 }
 
 // ── PMAX Intelligence Queries ─────────────────────────────────────────────
@@ -2863,7 +2864,7 @@ export async function getPmaxAssetPerformanceByMonth(
         performanceLabel: aga?.performanceLabel || aga?.performance_label || "UNSPECIFIED",
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getPmaxAssetPerformanceByMonth", e); return []; }
 }
 
 export interface PmaxNetworkBreakdownRow {
@@ -2927,7 +2928,7 @@ export async function getPmaxNetworkBreakdownByMonth(
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getPmaxNetworkBreakdownByMonth", e); return []; }
 }
 
 export interface VideoPlacementRow {
@@ -3016,7 +3017,7 @@ export async function getVideoPlacementsByMonth(
         source: "video" as const,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getVideoPlacementsByMonth", e); return []; }
 }
 
 /**
@@ -3077,7 +3078,7 @@ export async function getPmaxPlacementViewByMonth(
         source: "pmax" as const,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getPmaxPlacementViewByMonth", e); return []; }
 }
 
 export interface PmaxPlacementRow {
@@ -3136,7 +3137,7 @@ export async function getPmaxPlacementsByMonth(
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getPmaxPlacementsByMonth", e); return []; }
 }
 
 export interface PmaxSearchCategoryRow {
@@ -3194,7 +3195,7 @@ export async function getPmaxSearchCategoriesByMonth(
         conversionsValue: m.conversionsValue || m.conversions_value || 0,
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getPmaxSearchCategoriesByMonth", e); return []; }
 }
 
 // ── RSA-assets en ad-metadata (migratie 020; het RSA/W1-duo) ────────────────────
@@ -3258,9 +3259,11 @@ export async function getAdMeta(credentials: GoogleAdsCredentials, customerId: s
 // geeft VALSE GERUSTSTELLING. Gedeelde lijsten zijn bij een agency juist de gebruikelijke
 // manier, dus die MOETEN erin.
 //
-// Elke fetch heeft zijn eigen `catch { return []; }`, het patroon dat in dit bestand al
-// achttien keer bewezen is. Daardoor kan een veld dat in deze API-versie niet bestaat
-// hooguit deze dataset leegmaken; de sync van het hele portfolio blijft draaien.
+// Elke fetch vangt zijn eigen fout af en geeft [] terug, zodat een veld dat in deze API-versie
+// niet bestaat hooguit deze dataset raakt en de sync van het hele portfolio blijft draaien.
+// Sinds kort noteert die catch de fout wél (recordFetchFailure): een lege uitkomst en een
+// mislukte call zagen er daarvoor identiek uit, en dan gaat de analyse "geen data" melden waar
+// "de sync faalt" het antwoord is.
 
 export interface NegativeKeywordRow {
   level: "campaign" | "ad_group" | "shared_set";
@@ -3302,7 +3305,7 @@ export async function getAdGroupNegatives(
         matchType: kw.matchType || kw.match_type || "",
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getAdGroupNegatives", e); return []; }
 }
 
 /** Negatives op campagne-niveau. */
@@ -3334,7 +3337,7 @@ export async function getCampaignNegatives(
         matchType: kw.matchType || kw.match_type || "",
       };
     });
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getCampaignNegatives", e); return []; }
 }
 
 /**
@@ -3396,5 +3399,5 @@ export async function getSharedSetNegatives(
       }
     }
     return out;
-  } catch { return []; }
+  } catch (e) { recordFetchFailure("getSharedSetNegatives", e); return []; }
 }

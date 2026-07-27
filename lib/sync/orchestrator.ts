@@ -56,6 +56,7 @@ import { aggregateSearchTermsByMonth } from "../api/google-ads-search-term-aggre
 import { negativesToDbRows } from "../api/google-ads-negatives-transform";
 import { syncMerchantProductSnapshots } from "../api/merchant-products";
 import { logger } from "@/lib/logger";
+import { withFetchFailures, hasFetchFailure } from "../api/fetch-failures";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -203,9 +204,65 @@ export async function replaceBatch(
   return written;
 }
 
+
+// Welke getter voedt welke dataset. Expliciet, want dit is de enige plek waar de koppeling
+// tussen "de API-call faalde" en "deze tabel is niet bijgewerkt" wordt gelegd — en die koppeling
+// moet je kunnen nalezen zonder de dertig-voudige Promise.all te ontrafelen.
+//
+// Zonder dit werd een mislukte ophaal een lege array, en een lege array een geslaagde dataset met
+// nul rijen. De statusregel zei dan "geslaagd" terwijl er niets was opgehaald, en de analyse
+// meldde vervolgens "geen data beschikbaar" in plaats van "de sync faalt".
+const FETCH_SOURCE_BY_DATASET: Record<string, string[]> = {
+  ads_account_monthly: ["getAccountMetricsByMonth"],
+  ads_account_weekly: ["getAccountMetricsByWeek"],
+  ads_campaign_monthly: ["getCampaignMetricsByMonth"],
+  ads_campaign_impression_share: ["getCampaignImpressionShareByMonth"],
+  ads_adgroup_monthly: ["getAdGroupPerformanceByMonth"],
+  ads_search_terms_wasteful: ["getWastefulSearchTermsByMonth"],
+  ads_change_history: ["getChangeHistory"],
+  ads_campaign_metadata: ["getCampaignMetadata"],
+  ads_keyword_performance_monthly: ["getKeywordPerformanceByMonth"],
+  ads_search_terms_monthly: ["getSearchTermsByMonth"],
+  ads_device_performance_monthly: ["getDevicePerformanceByMonth"],
+  ads_network_performance_monthly: ["getNetworkPerformanceByMonth"],
+  ads_creative_performance: ["getCreativePerformanceByMonth"],
+  ads_asset_group_performance_monthly: ["getAssetGroupPerformanceByMonth"],
+  ads_product_performance_monthly: ["getProductPerformanceByMonth"],
+  ads_geo_performance_monthly: ["getGeoPerformanceByMonth"],
+  ads_audience_performance_monthly: ["getAudiencePerformanceByMonth"],
+  ads_ad_schedule_performance: ["getAdSchedulePerformance"],
+  google_ads_product_performance: ["getProductPerformanceByMonth"],
+  google_ads_checkout_funnel: ["getCheckoutFunnelByMonth"],
+  ads_pmax_asset_performance: ["getPmaxAssetPerformanceByMonth"],
+  ads_pmax_network_breakdown: ["getPmaxNetworkBreakdownByMonth"],
+  ads_pmax_placements: ["getPmaxPlacementsByMonth"],
+  ads_video_placements: ["getVideoPlacementsByMonth", "getPmaxPlacementViewByMonth"],
+  ads_pmax_search_categories: ["getPmaxSearchCategoriesByMonth"],
+  // De landtabellen worden uit geoRaw afgeleid, dus ze delen die bron.
+  ads_campaign_country_monthly: ["getGeoPerformanceByMonth"],
+  ads_country_monthly: ["getGeoPerformanceByMonth"],
+  ads_country_yoy: ["getGeoPerformanceByMonth"],
+  ads_country_impression_share: ["getGeoPerformanceByMonth"],
+  google_ads_rsa_assets: ["getRsaAssetMetricsByMonth"],
+  google_ads_ad_meta: ["getAdMeta"],
+  ads_negative_keywords: ["getAdGroupNegatives", "getCampaignNegatives", "getSharedSetNegatives"],
+};
+
 // ── Main orchestrator ──────────────────────────────────────────────────────
 
+/**
+ * Synchroniseert één klant. De hele run draait binnen een ophaal-fout-verzamelaar: de getters in
+ * lib/api/google-ads.ts vangen hun eigen fouten af en geven [] terug (nodig, want dertig calls in
+ * één Promise.all mogen niet door één throw omvallen), maar ze noteren die fout nu wél. Daardoor
+ * kan syncDataset het verschil zien tussen "deze klant heeft geen zoekwoorden" en "de zoekwoord-
+ * call is mislukt" — twee dingen die tot vandaag identiek uit de sync kwamen.
+ */
 export async function syncClient(opts: SyncOptions): Promise<SyncResult> {
+  const { result } = await withFetchFailures(() => syncClientRun(opts));
+  return result;
+}
+
+async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
   const { supabase, credentials, clientId, customerId, syncType, triggeredBy } = opts;
   const { startDate, endDate } = opts.startDate && opts.endDate
     ? { startDate: opts.startDate, endDate: opts.endDate }
@@ -367,6 +424,15 @@ export async function syncClient(opts: SyncOptions): Promise<SyncResult> {
     name: string,
     fn: () => Promise<number>
   ): Promise<DatasetResult> {
+    // Faalde de ophaal? Dan is er niets om weg te schrijven en is "geslaagd met nul rijen" een
+    // leugen. Niet schrijven, wél als mislukt registreren.
+    const bronnen = FETCH_SOURCE_BY_DATASET[name] ?? [];
+    const gefaald = bronnen.filter((b) => hasFetchFailure(b));
+    if (gefaald.length > 0) {
+      const result = { name, rows: 0, success: false, error: `ophalen mislukt: ${gefaald.join(", ")}` };
+      datasetResults.push(result);
+      return result;
+    }
     try {
       const rows = await fn();
       const result = { name, rows, success: true };
