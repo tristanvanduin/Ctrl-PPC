@@ -2,9 +2,16 @@
 // ("demo-greentech") en geeft curated rijen terug; voor élke andere klant/tabel delegeert hij
 // naar de echte client (passthrough) zodat de 23 echte klanten volledig ongemoeid blijven.
 //
-// Bewust pragmatisch: bij het serveren van demo-rijen passen we het client_id-filter toe en
-// negeren we de overige filters (datum/status). De curated rijen dragen al zinnige statussen,
-// dus de weergave klopt; we hoeven de PostgREST-semantiek niet volledig na te bouwen.
+// Nagebootst: gelijkheidsfilters (.eq), sortering (.order) en afkapping (.limit/.range). Bewust
+// NIET nagebootst: bereikfilters als .gte/.lte en de tekstoperatoren — de curated rijen liggen al
+// binnen de vensters die de app opvraagt, dus dat zou werk zijn zonder verschil.
+//
+// Sorteren en afkappen stonden hier eerst ook bij de genegeerde: "we hoeven de PostgREST-semantiek
+// niet volledig na te bouwen". Dat hield geen stand. Het patroon .order(desc).limit(1) betekent
+// "pak de laatste rij", en zonder ordening gaf dat de eerste — de oudste. In de second opinion
+// bepaalde die ene waarde de maand waarop tien andere queries filteren, dus die kwamen leeg terug
+// en tien controlepunten meldden "geen data beschikbaar" over een account dat de data wél heeft.
+// Een mock mag minder kunnen dan de echte database; hij mag niet iets ANDERS antwoorden.
 //
 // Reads: thenable builder (await sb.from(t).select()…). Writes (insert/upsert/update/delete):
 // no-op succes voor de demo-klant; anders passthrough naar echt.
@@ -17,6 +24,16 @@ type Result = { data: unknown; error: unknown };
 
 interface DemoRowSource {
   [table: string]: Row[];
+}
+
+/** Vergelijkt twee celwaarden zoals Postgres dat zou doen: getallen numeriek, de rest als tekst. */
+function compareValues(a: unknown, b: unknown, asc: boolean, nullsFirst: boolean): number {
+  const aLeeg = a == null, bLeeg = b == null;
+  if (aLeeg && bLeeg) return 0;
+  if (aLeeg) return nullsFirst ? -1 : 1;
+  if (bLeeg) return nullsFirst ? 1 : -1;
+  const r = typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b));
+  return asc ? r : -r;
 }
 
 /**
@@ -83,8 +100,48 @@ class MockQuery implements PromiseLike<Result> {
       if (col === "client_id") { data = data.filter((r) => isDemoClientValue(r[col]) || r[col] === val); continue; }
       data = data.filter((r) => r[col] === val);
     }
+    data = this.applyOrder(data);
+    data = this.applyLimit(data);
     if (this.singleMode) return { data: data[0] ?? null, error: null };
     return { data, error: null };
+  }
+
+  /**
+   * Sorteren en afkappen wél nabootsen. Deze twee konden we niet blijven negeren: het patroon
+   * "pak de laatste maand" is .order(desc).limit(1), en zonder ordening leverde dat de EERSTE rij
+   * op — de oudste. In de second opinion bepaalde die ene waarde de maand waarop tien andere
+   * queries filteren, dus die kwamen allemaal leeg terug en tien controlepunten meldden "geen
+   * data beschikbaar" op een account dat de data gewoon heeft.
+   *
+   * In productie deed Postgres het correct; het was dus geen rekenfout maar een demo die iets
+   * anders liet zien dan het product doet. Dat is precies wat een demo niet mag.
+   */
+  private applyOrder(data: Row[]): Row[] {
+    const orders = this.calls.filter((c) => c.m === "order");
+    if (orders.length === 0) return data;
+    const out = [...data];
+    // PostgREST: de eerste .order() is de primaire sleutel. Array.sort is stabiel, dus we sorteren
+    // van achter naar voren om dezelfde volgorde te krijgen.
+    for (let i = orders.length - 1; i >= 0; i--) {
+      const col = orders[i].args[0];
+      if (typeof col !== "string") continue;
+      const opts = (orders[i].args[1] ?? {}) as { ascending?: boolean; nullsFirst?: boolean };
+      const asc = opts.ascending !== false;
+      // Postgres zet nulls standaard achteraan bij ASC en vooraan bij DESC.
+      const nullsFirst = opts.nullsFirst ?? !asc;
+      out.sort((a, b) => compareValues(a[col], b[col], asc, nullsFirst));
+    }
+    return out;
+  }
+
+  private applyLimit(data: Row[]): Row[] {
+    const range = [...this.calls].reverse().find((c) => c.m === "range");
+    if (range && typeof range.args[0] === "number" && typeof range.args[1] === "number") {
+      return data.slice(range.args[0], range.args[1] + 1); // range is inclusief
+    }
+    const limit = [...this.calls].reverse().find((c) => c.m === "limit");
+    if (limit && typeof limit.args[0] === "number") return data.slice(0, limit.args[0]);
+    return data;
   }
 
   private async delegate(): Promise<Result> {

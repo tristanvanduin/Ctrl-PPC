@@ -11,6 +11,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isBrowseNetwork } from "../pmax/network-split";
+import { spendWeightedQualityScore } from "../analysis/metric-cross-checks";
 import {
   IS_LOSS_ALARM_PCT,
   HIGH_CPA_MULTIPLE,
@@ -620,9 +621,21 @@ const evaluators: Record<number, Evaluator> = {
   19: (ctx) => {
     const withQs = ctx.keywords.filter((k) => k.quality_score !== null && k.quality_score !== undefined);
     if (withQs.length === 0) return { score: "Niet beoordeeld", comments: "Quality Score data niet beschikbaar.", confidence: "low" };
-    const avg = withQs.reduce((sum, k) => sum + (k.quality_score ?? 0), 0) / withQs.length;
+
+    // Kosten-gewogen, net als de losse QS-analyse. Hier stond een rekenkundig gemiddelde, en dat
+    // weegt veertig goedkope longtail-woorden zwaarder dan drie dure kopwoorden waar het budget
+    // in zit. Op een account met 97% van de spend in QS-3-termen gaf dat "Goed" (8,6) terwijl de
+    // QS-analyse "Onvoldoende" (3,2) meldde — twee oordelen over hetzelfde account, uit hetzelfde
+    // product. De redenering staat bij spendWeightedQualityScore: een dure lage-QS-term weegt
+    // zwaarder dan tien goedkope.
+    const gewogen = spendWeightedQualityScore(
+      withQs.map((k) => ({ quality_score: k.quality_score, cost: k.cost, clicks: k.clicks, impressions: k.impressions }))
+    );
+    // Zonder spend valt er niets te wegen (alles gepauzeerd); dan is het aantal het enige dat er is.
+    const avg = gewogen ?? withQs.reduce((sum, k) => sum + (k.quality_score ?? 0), 0) / withQs.length;
     const low = withQs.filter((k) => (k.quality_score ?? 0) < 5).length;
-    const comments = `Gemiddelde QS: ${avg.toFixed(1)}/10 over ${withQs.length} keywords. ${low} keywords met QS < 5.`;
+    const grondslag = gewogen == null ? "ongewogen, geen spend op de QS-woorden" : "kosten-gewogen";
+    const comments = `Gemiddelde QS: ${avg.toFixed(1)}/10 (${grondslag}) over ${withQs.length} keywords. ${low} keywords met QS < 5.`;
     if (avg >= 7) return { score: "Goed", comments, confidence: "high" };
     if (avg >= 5) return { score: "Voldoende", comments, confidence: "high" };
     return { score: "Onvoldoende", comments, confidence: "high" };
