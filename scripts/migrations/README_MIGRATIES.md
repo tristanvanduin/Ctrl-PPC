@@ -36,6 +36,23 @@ registreert elke toegepaste migratie met checksum in schema_migrations.
 - 016 backup_restore_log: bij fase Z2 (W1.5).
 - 017 rls_lockdown: GUARD, uitsluitend samen met de O1-deploy (WL.3). Nooit eerder,
   anders sluit de lockdown de huidige open app buiten.
+- 032 user_client_scope: samen met 001, bij de O1-deploy (WL.3). Verbreedt de rol-check
+  van 001 naar het rechtenmodel (admin, performance_marketeer, beurs_manager,
+  brand_strateeg, it, viewer) en voegt user_clients toe: welke beurs iemand mag zien.
+  Levert ook app_can_read_client(), de bouwsteen voor de scope-policies bij 017.
+
+## De volgorde bij de O1-deploy
+
+De autorisatie is pas een grens als alle vier de stappen staan; los van elkaar is elke
+stap cosmetisch of brekend.
+
+1. De client-side writes (35 stuks in 14 componenten, 13 tabellen) verhuizen naar
+   server-routes of een eigen smalle policy krijgen. Zonder deze stap breekt 017 ze.
+2. 001 en 032 draaien, eerste admin seeden (scripts/seed-first-admin.mjs), rollen en
+   beurzen toewijzen via /admin.
+3. O1_AUTH_ENFORCED=true. Inloggen en de API-guards worden actief.
+4. 017 draaien, plus per tabel `using (app_can_read_client(client_id))` waar een
+   client_id-kolom bestaat. Pas hier is de data daadwerkelijk gescheiden.
 
 ## Consolidatie-beslissingen (uit ANALYSE_VOOR_MASTERPLAN_V2, sectie 2a)
 

@@ -1,26 +1,147 @@
-// W1.2 (O1): het pure autorisatiebeleid. Rollen en padclassificatie op EEN plek, los
-// testbaar zonder omgeving. De middleware en de server-guards consumeren dit beleid;
-// de enforcement zelf staat achter de O1_AUTH_ENFORCED-flag tot de gecoordineerde
-// activatie in WL.3 (samen met migratie 017 en de eerste admin-seed).
+// Het pure autorisatiebeleid: rollen, rechten, scope en padclassificatie op EEN plek, los
+// testbaar zonder omgeving. De middleware en de server-guards consumeren dit beleid; de
+// enforcement zelf staat achter de O1_AUTH_ENFORCED-flag tot de gecoordineerde activatie
+// (samen met migratie 001, 032 en de eerste admin-seed).
 //
-// Rolmodel conform migratie 001_user_roles.sql en de O1-spec:
-// viewer = alles lezen, niets muteren en geen runs starten;
-// specialist = runs starten, settings en targets beheren, sprint muteren;
-// admin = alles plus gebruikersbeheer en kanaal-koppelingen.
+// WAAROM DIT GEEN RANGORDE MEER IS
+//
+// De oorspronkelijke opzet was een ladder: viewer < specialist < admin, met een
+// >=-vergelijking. Een ladder kan alleen "alles van de trede eronder" uitdrukken. De RAI-
+// situatie past daar niet in:
+//
+//   - IT moet bij koppelingen en syncs, maar hoeft geen omzet per beurs te zien. Op een
+//     ladder is de enige trede die koppelingen geeft admin, en die geeft ook alles.
+//   - Een brand-strateeg ziet merk- en creatie-inzichten, geen budget- of biedinstellingen.
+//     Er bestaat geen trede die "wel creatie, geen budget" betekent.
+//
+// Beide zijn ZIJWAARTSE rollen, geen hogere of lagere. Daarom rechten per rol als set.
+//
+// DE TWEEDE AS: SCOPE
+//
+// Rechten zeggen WAT je mag, scope zegt OVER WELKE BEURS. Iemand van Aquatech is geen
+// mindere gebruiker dan een performance marketeer, hij ziet alleen een kleinere verzameling
+// beurzen. Die twee assen zijn onafhankelijk: dezelfde rol met een andere scope, of dezelfde
+// scope met een andere rol, zijn allebei zinnige combinaties.
+//
+// GRENZEN VAN DIT BESTAND
+//
+// Dit is beleid, geen beveiliging. Zolang de RLS-policies `using (true)` zijn en de browser
+// met de anon key rechtstreeks Supabase bevraagt, is alles hieronder cosmetisch: het bepaalt
+// wat de UI toont en wat de route-handlers weigeren, niet waar de database bij laat. De
+// echte grens komt met migratie 017 (RLS-lockdown) plus 032 (scope-policies).
 
-export type Role = "admin" | "specialist" | "viewer";
+export const ROLES = [
+  "admin",
+  "performance_marketeer",
+  "beurs_manager",
+  "brand_strateeg",
+  "it",
+  "viewer",
+] as const;
 
-const ROLE_ORDER: Record<Role, number> = { viewer: 0, specialist: 1, admin: 2 };
+export type Role = (typeof ROLES)[number];
+
+// De oude waarden staan OPGESLAGEN in user_roles.role. Ze blijven geldig tot migratie 032
+// de rijen omzet; normalizeRole vertaalt bij het lezen. Zelfde patroon als OwnerEnum.
+const LEGACY_ROLE_MAP = {
+  specialist: "performance_marketeer",
+} as const satisfies Record<string, Role>;
+
+export type LegacyRole = keyof typeof LEGACY_ROLE_MAP;
+
+// ── Rechten ────────────────────────────────────────────────────────────────
+
+// Bewust grof: een recht per samenhangend stuk werk, niet per route. Te fijn en niemand
+// houdt de tabel bij; te grof en de zijwaartse rollen passen er weer niet in.
+export const CAPABILITIES = [
+  "client:read",         // dashboards en rapportages van beurzen binnen de scope
+  "insight:brand",       // creatie, merk, doelgroep, video
+  "insight:performance", // budget, biedingen, kosten, ROAS, second opinion
+  "analysis:run",        // SOP- en analyse-runs starten
+  "settings:write",      // client-settings, targets, events, conversie-config
+  "sprint:write",        // sprint, taken, hypotheses
+  "sync:run",            // handmatige syncs
+  "connection:manage",   // Google-, Meta- en LinkedIn-koppelingen
+  "system:ops",          // health, eval-harness, generation-jobs, scripts
+  "user:manage",         // gebruikersbeheer en scope-toewijzing
+] as const;
+
+export type Capability = (typeof CAPABILITIES)[number];
+
+export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
+  // Alles. Bewust als expliciete lijst en niet als "alle rechten": een nieuw recht hoort
+  // een bewuste toewijzing te zijn, ook aan admin. Een test bewaakt dat admin compleet is.
+  admin: CAPABILITIES,
+
+  // De uitvoerende rol: alle beurzen, alle inzichten, mag draaien en instellen. Erft de
+  // rechten van de oude "specialist" plus sync:run.
+  performance_marketeer: [
+    "client:read", "insight:brand", "insight:performance",
+    "analysis:run", "settings:write", "sprint:write", "sync:run",
+  ],
+
+  // De beursverantwoordelijke: alles zien en de sprint sturen binnen de eigen beurs, maar
+  // geen runs starten en geen instellingen wijzigen — dat blijft bij de marketeers.
+  beurs_manager: ["client:read", "insight:brand", "insight:performance", "sprint:write"],
+
+  // Merk en creatie, lezend. Geen budget, geen biedingen, geen instellingen.
+  brand_strateeg: ["client:read", "insight:brand"],
+
+  // Zijwaarts: de techniek eromheen. client:read zit erbij omdat je zonder te kijken of er
+  // rijen binnenkomen geen sync kunt debuggen; de duiding van die cijfers (insight:*) niet.
+  it: ["client:read", "sync:run", "connection:manage", "system:ops"],
+
+  // Meekijken, verder niets.
+  viewer: ["client:read"],
+};
 
 export function isRole(value: unknown): value is Role {
-  return value === "admin" || value === "specialist" || value === "viewer";
+  return typeof value === "string" && (ROLES as readonly string[]).includes(value);
 }
 
-// Hogere rollen omvatten de rechten van lagere rollen.
-export function hasRequiredRole(actual: Role | null | undefined, required: Role): boolean {
-  if (!actual) return false;
-  return ROLE_ORDER[actual] >= ROLE_ORDER[required];
+// Accepteert zowel de huidige als de opgeslagen oude waarden. Onbekend blijft null: een
+// onbekende rol mag nooit stilzwijgend als viewer doorgaan.
+export function normalizeRole(value: unknown): Role | null {
+  if (isRole(value)) return value;
+  if (typeof value === "string" && value in LEGACY_ROLE_MAP) {
+    return LEGACY_ROLE_MAP[value as LegacyRole];
+  }
+  return null;
 }
+
+export function can(role: Role | null | undefined, capability: Capability): boolean {
+  if (!role) return false;
+  return ROLE_CAPABILITIES[role].includes(capability);
+}
+
+export function capabilitiesOf(role: Role | null | undefined): readonly Capability[] {
+  return role ? ROLE_CAPABILITIES[role] : [];
+}
+
+// ── Scope: over welke beurzen ──────────────────────────────────────────────
+
+// "all" is geen lijst van alle beurs-ids maar een aparte waarde: een nieuwe beurs valt er
+// dan automatisch onder, zonder dat iemand alle rijen moet bijwerken.
+export const ALL_CLIENTS = "all" as const;
+export type ClientScope = typeof ALL_CLIENTS | readonly string[];
+
+export function canAccessClient(scope: ClientScope, clientId: string | null | undefined): boolean {
+  if (!clientId) return false;
+  if (scope === ALL_CLIENTS) return true;
+  return scope.includes(clientId);
+}
+
+// Rollen die per definitie over alle beurzen gaan. Voor de overige rollen komt de scope uit
+// user_clients; staat daar niets, dan is de scope leeg en niet stilzwijgend alles.
+const ORGANISATION_WIDE_ROLES: readonly Role[] = ["admin", "performance_marketeer", "it"];
+
+export function scopeFor(role: Role | null | undefined, assigned: readonly string[]): ClientScope {
+  if (!role) return [];
+  if (ORGANISATION_WIDE_ROLES.includes(role)) return ALL_CLIENTS;
+  return assigned;
+}
+
+// ── Padclassificatie ───────────────────────────────────────────────────────
 
 // Publieke paden: login, auth-callbacks, Next-internals en statische assets.
 export function isPublicPath(pathname: string): boolean {
@@ -36,15 +157,47 @@ export function isCronPath(pathname: string): boolean {
   return pathname === "/api/sync/cron" || pathname.startsWith("/api/sync/cron/");
 }
 
-// Gebruikersbeheer en kanaal-koppelingen zijn admin-only, ook voor lezen.
-const ADMIN_PREFIXES = ["/api/admin", "/api/users", "/api/invite", "/api/connections"];
+// Het benodigde recht per API-verzoek. Volgorde is significant: de eerste match wint, dus
+// de smalle prefixen staan boven de brede.
+const API_RULES: readonly { prefix: string; read?: Capability; write?: Capability }[] = [
+  { prefix: "/api/admin", read: "user:manage", write: "user:manage" },
+  { prefix: "/api/users", read: "user:manage", write: "user:manage" },
+  { prefix: "/api/invite", read: "user:manage", write: "user:manage" },
+  { prefix: "/api/connections", read: "connection:manage", write: "connection:manage" },
+  { prefix: "/api/health", read: "system:ops", write: "system:ops" },
+  { prefix: "/api/eval", read: "system:ops", write: "system:ops" },
+  { prefix: "/api/generation-jobs", read: "system:ops", write: "system:ops" },
+  { prefix: "/api/sync", read: "client:read", write: "sync:run" },
+  // De merk- en creatie-analyses: het enige stuk dat een brand-strateeg mag opvragen.
+  { prefix: "/api/analysis/meta-creatives", read: "insight:brand", write: "analysis:run" },
+  { prefix: "/api/analysis/meta-briefing", read: "insight:brand", write: "analysis:run" },
+  { prefix: "/api/analysis/rsa-insights", read: "insight:brand", write: "analysis:run" },
+  { prefix: "/api/analysis/google-video", read: "insight:brand", write: "analysis:run" },
+  { prefix: "/api/analysis/linkedin-icp-fit", read: "insight:brand", write: "analysis:run" },
+  // De rest van de analyses raakt budget, biedingen en kosten.
+  { prefix: "/api/analysis", read: "insight:performance", write: "analysis:run" },
+  { prefix: "/api/second-opinion", read: "insight:performance", write: "analysis:run" },
+];
 
-// De minimale rol per API-verzoek, conform de O1-spec: reads minimaal viewer; mutaties
-// en run-starts minimaal specialist; admin-prefixen altijd admin. De middleware dwingt
-// dit centraal af; requireRole blijft beschikbaar voor fijnmazige checks in routes.
-export function minRoleForApi(pathname: string, method: string): Role {
-  if (ADMIN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return "admin";
+export function capabilityForApi(pathname: string, method: string): Capability {
   const m = method.toUpperCase();
-  if (m === "GET" || m === "HEAD" || m === "OPTIONS") return "viewer";
-  return "specialist";
+  const isRead = m === "GET" || m === "HEAD" || m === "OPTIONS";
+  for (const rule of API_RULES) {
+    if (pathname === rule.prefix || pathname.startsWith(`${rule.prefix}/`)) {
+      const needed = isRead ? rule.read : rule.write;
+      if (needed) return needed;
+    }
+  }
+  // Alles wat geen eigen regel heeft: lezen is client:read, muteren vergt settings:write.
+  // Dat is de veilige kant — een nieuwe route valt niet per ongeluk in het laagste recht.
+  return isRead ? "client:read" : "settings:write";
+}
+
+// Het beurs-id uit een verzoek, voor de scope-check. De app gebruikt client_id in de
+// querystring (27 routes) en clientId in bodies; /client/<id> is het paginapad.
+export function clientIdFromPath(pathname: string, searchParams: URLSearchParams): string | null {
+  const q = searchParams.get("client_id") ?? searchParams.get("clientId");
+  if (q) return q;
+  const m = /^\/client\/([^/]+)/.exec(pathname);
+  return m ? decodeURIComponent(m[1]) : null;
 }

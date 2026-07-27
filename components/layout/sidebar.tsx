@@ -6,6 +6,7 @@ import { Settings, Building2, Search, FileCode2, FolderOpen, FolderClosed, Chevr
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { getVisibleClients, loadVisibleClientIds } from "@/lib/visible-clients";
 import { loadApiClients } from "@/lib/clients";
+import { useAccess } from "@/lib/auth/use-access";
 import { migrateLocalStorageToSupabase } from "@/lib/migrate-to-supabase";
 import { loadClientGroups, type GroupWithMembers } from "@/lib/client-groups";
 import { supabase } from "@/lib/supabase";
@@ -51,6 +52,7 @@ function SidebarInner() {
       });
     return () => { cancelled = true; };
   }, [activeClientId]);
+  const access = useAccess();
   const [search, setSearch] = useState("");
   const [visibleClients, setVisibleClients] = useState<VisibleClient[]>([]);
   const [groups, setGroups] = useState<GroupWithMembers[]>([]);
@@ -102,9 +104,11 @@ function SidebarInner() {
     });
   }
 
-  // Filter by search
-  const filtered = visibleClients.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+  // Filter op zoekterm en op de eigen beurs-scope. Zolang de auth-enforcement uit staat
+  // laat canAccessClient alles door (zie lib/auth/use-access.ts); daarna houdt iemand van
+  // Aquatech alleen Aquatech over in de lijst.
+  const filtered = visibleClients.filter(
+    (c) => c.name.toLowerCase().includes(search.toLowerCase()) && access.canAccessClient(c.id)
   );
   const filteredIds = new Set(filtered.map((c) => c.id));
 
