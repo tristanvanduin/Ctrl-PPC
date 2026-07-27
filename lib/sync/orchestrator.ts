@@ -127,7 +127,7 @@ function normalizeOfferId(value: string | null | undefined): string {
 }
 
 /** Deduplicate rows by composite key before upserting */
-function dedup(rows: Record<string, unknown>[], keyColumns: string[]): Record<string, unknown>[] {
+export function dedup(rows: Record<string, unknown>[], keyColumns: string[]): Record<string, unknown>[] {
   const seen = new Map<string, Record<string, unknown>>();
   for (const row of rows) {
     const key = keyColumns.map((c) => String(row[c] ?? "")).join("|||");
@@ -136,7 +136,7 @@ function dedup(rows: Record<string, unknown>[], keyColumns: string[]): Record<st
   return Array.from(seen.values());
 }
 
-async function upsertBatch(
+export async function upsertBatch(
   supabase: SupabaseClient,
   table: string,
   rows: Record<string, unknown>[],
@@ -145,34 +145,61 @@ async function upsertBatch(
   if (rows.length === 0) return 0;
   const CHUNK = 500;
   let written = 0;
+  const fouten: string[] = [];
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
     const { error } = await supabase.from(table).upsert(chunk, { onConflict: conflictColumns, ignoreDuplicates: false });
     if (error) {
       logger.error(`[sync] ${table} chunk error:`, error.message);
+      fouten.push(error.message);
     } else {
       written += chunk.length;
     }
   }
+  // Een mislukte chunk werd alleen gelogd, waarna de dataset alsnog als geslaagd werd geboekt.
+  // De logregel leest niemand; de statusregel in de UI wel. Die moet de waarheid vertellen.
+  if (fouten.length > 0) throw new Error(`${table}: ${fouten.length} van de ${Math.ceil(rows.length / CHUNK)} chunk(s) mislukt — ${fouten[0]}`);
   return written;
 }
 
-async function replaceBatch(
+/**
+ * Vervangt alle rijen van een klant in één tabel.
+ *
+ * DE VOLGORDE HIER IS HET HELE PUNT. Eerst werd er verwijderd en dáárna gekeken of er iets te
+ * schrijven viel. Dat maakte van elke tijdelijke API-storing een wisser: de 24 getters in
+ * lib/api/google-ads.ts eindigen allemaal op `catch { return []; }`, dus een netwerkfout, een
+ * quota-limiet of een verlopen token levert een lege array op. Die ging hier naar binnen, alles
+ * werd verwijderd, er kwam niets voor terug — en omdat syncDataset alleen op een throw let, werd
+ * de run als geslaagd geregistreerd. Stille, permanente historie-verlies op zeventien tabellen,
+ * waaronder ads_country_monthly.
+ *
+ * Niets binnengekregen betekent nu: niets aanraken. De prijs is dat een klant die écht naar nul
+ * gaat (laatste negatieve zoekwoord verwijderd) zijn oude rijen houdt tot de volgende sync met
+ * inhoud. Verouderde data is hinderlijk; gewiste historie is niet terug te halen.
+ */
+export async function replaceBatch(
   supabase: SupabaseClient,
   table: string,
   rows: Record<string, unknown>[],
   clientId: string
 ): Promise<number> {
+  if (rows.length === 0) {
+    logger.warn(`[sync] ${table}: geen rijen ontvangen, bestaande data blijft staan`);
+    return 0;
+  }
   await supabase.from(table).delete().eq("client_id", clientId);
-  if (rows.length === 0) return 0;
   const CHUNK = 500;
   let written = 0;
+  const fouten: string[] = [];
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
     const { error } = await supabase.from(table).insert(chunk);
-    if (error) logger.error(`[sync] ${table} chunk error:`, error.message);
+    if (error) { logger.error(`[sync] ${table} chunk error:`, error.message); fouten.push(error.message); }
     else written += chunk.length;
   }
+  // Hier is al verwijderd, dus een mislukte schrijfactie laat de tabel leeg achter. Dat mag niet
+  // als "geslaagd" de logs in: gooien zodat syncDataset het als mislukt registreert.
+  if (fouten.length > 0) throw new Error(`${table}: ${fouten.length} chunk(s) mislukt — ${fouten[0]}`);
   return written;
 }
 
