@@ -17,11 +17,12 @@ import { mapInsightsRow } from "./transform";
 import { metaDailyToDbRow, META_DAILY_CONFLICT } from "./rows";
 import { trailingWindow, backfillWindow, monthlyChunks } from "./sync-windows";
 import { logger } from "@/lib/logger";
+import { META_GRAPH_BASE } from "./api-version";
 
-// Per juni 2026 v25 (Graph en Marketing API). Pin hier; verifieer bij een upgrade de
-// changelog, met name de views-metric die reach vervangt en de Advantage+ read-only-shift.
-export const META_API_VERSION = "v25.0";
-const GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
+// De versie staat in lib/meta/api-version.ts, zodat hij niet opnieuw uit de pas kan lopen met
+// het koppelscherm. Blijft hier herge-exporteerd voor bestaande importeurs.
+export { META_API_VERSION } from "./api-version";
+const GRAPH = META_GRAPH_BASE;
 
 const log = logger.child("meta-sync");
 
@@ -43,6 +44,19 @@ const INSIGHTS_FIELDS = [
   "quality_ranking", "engagement_rate_ranking", "conversion_rate_ranking",
 ].join(",");
 
+// Bereik en frequentie zijn onbruikbaar zodra er per uur wordt uitgesplitst: Meta geeft ze dan
+// terug als 0, zonder foutmelding. Die nul is gevaarlijker dan een ontbrekende waarde — de
+// verzadigingsdetector leest hem als "niemand bereikt" en concludeert het tegenovergestelde van
+// wat er aan de hand is. We vragen ze in dat geval dus niet op; parseNum maakt er dan null van,
+// en null is eerlijk.
+const UNIQUE_FIELDS = ["reach", "frequency"];
+const isHourlyBreakdown = (b?: string): boolean => !!b && b.includes("hourly");
+
+export function fieldsFor(breakdowns?: string): string {
+  if (!isHourlyBreakdown(breakdowns)) return INSIGHTS_FIELDS;
+  return INSIGHTS_FIELDS.split(",").filter((f) => !UNIQUE_FIELDS.includes(f)).join(",");
+}
+
 export interface SyncContext {
   supabase: SupabaseClient;
   clientId: string;
@@ -62,7 +76,7 @@ export async function fetchInsightsAsync(
     level: opts.level,
     time_increment: "1",
     time_range: JSON.stringify({ since: opts.since, until: opts.until }),
-    fields: INSIGHTS_FIELDS,
+    fields: fieldsFor(opts.breakdowns),
     access_token: ctx.accessToken,
   });
   if (opts.breakdowns) params.set("breakdowns", opts.breakdowns);

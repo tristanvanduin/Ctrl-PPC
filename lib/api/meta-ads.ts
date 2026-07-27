@@ -1,11 +1,14 @@
 /**
  * Meta (Facebook) Ads API client
  *
- * Uses the Marketing API v21.0 with long-lived access tokens.
- * All calls go through our Next.js API routes to keep tokens server-side.
+ * Gebruikt de Marketing API met langlevende access tokens; de versie komt uit
+ * lib/meta/api-version.ts. All calls go through our Next.js API routes to keep tokens
+ * server-side.
  *
  * Docs: https://developers.facebook.com/docs/marketing-apis
  */
+
+import { META_GRAPH_BASE } from "@/lib/meta/api-version";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,8 +79,9 @@ export interface MetaParsedMetrics {
 
 // ── API Constants ────────────────────────────────────────────────────────────
 
-const API_VERSION = "v21.0";
-const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
+// Stond hier los op v21.0 terwijl de sync al op v25.0 zat. Meta zette per 9 juni 2026 alles
+// onder v24.0 uit, dus dit koppelpad praatte tegen een versie die niet meer bestaat. Eén bron.
+const BASE_URL = META_GRAPH_BASE;
 
 // Standard conversion action types to count
 const CONVERSION_ACTIONS = [
