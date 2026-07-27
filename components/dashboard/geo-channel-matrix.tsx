@@ -79,8 +79,19 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
     return devs.length ? Math.max(...devs) : 0;
   }, [cells, reference, metric]);
 
+  /**
+   * Kosten zonder enige conversie. Dit is GEEN ontbrekende waarde: er is gemeten, en de uitkomst
+   * is nul. Zonder dit onderscheid zou zo'n cel er identiek uitzien als een kanaal dat in die
+   * markt niet draait — en juist die cel is de scherpste bevinding in de hele matrix.
+   */
+  const isDeadSpend = (cell: ChannelCell): boolean =>
+    !isUnsplit(cell.channel) && cell.cost > 0 && cell.conversions === 0;
+
   function fillFor(cell: ChannelCell | undefined): { bg: string; fg: string } | null {
-    if (!cell || isUnsplit(cell.channel) || reference == null || reference === 0 || spread === 0) return null;
+    if (!cell || isUnsplit(cell.channel) || reference == null || reference === 0) return null;
+    // Betaald zonder resultaat is het slechtst mogelijke geval — het uiterste van de warme arm.
+    if (isDeadSpend(cell)) { const bg = divergingColor(1); return { bg, fg: inkOn(bg) }; }
+    if (spread === 0) return null;
     const v = metric.get(cell);
     if (v == null) return null;
     // t > 0 = slechter dan het account. Bij ROAS betekent hóger juist beter, dus draaien we om.
@@ -133,7 +144,8 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
 
       <p className="text-meta text-muted-foreground">
         Kleur toont {metric.label} ten opzichte van het account ({metric.fmt(reference)}).
-        Blauw is beter dan gemiddeld, rood slechter.
+        Blauw is beter dan gemiddeld, rood slechter. Een streepje betekent dat dat kanaal in die
+        markt niet draait; &ldquo;0 conv.&rdquo; betekent dat er wél budget in ging en er niets uitkwam.
         {hasUnsplit && " De PMax-kolom is bewust ongekleurd: daar is het budget per land bekend, maar de kanaalverdeling niet gemeten."}
       </p>
 
@@ -175,10 +187,14 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
                         onMouseLeave={() => setHover(null)}
                       >
                         {!cell ? (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground" title="Dit kanaal draait niet in deze markt">—</span>
                         ) : isUnsplit(ch) ? (
                           <span className="text-muted-foreground" title="Kanaalverdeling per land levert Google niet voor Performance Max">
                             {eur(cell.cost)} <span className="text-micro">niet gemeten</span>
+                          </span>
+                        ) : isDeadSpend(cell) ? (
+                          <span title={`${eur(cell.cost)} uitgegeven zonder één conversie`}>
+                            {eur(cell.cost)} <span className="text-micro">0 conv.</span>
                           </span>
                         ) : (
                           metric.fmt(metric.get(cell))
