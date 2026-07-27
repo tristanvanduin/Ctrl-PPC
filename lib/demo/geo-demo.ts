@@ -112,3 +112,62 @@ export function demoGeoStates(channel: Channel): GeoAgg[] {
   if (channel === "blended") return blend(Object.values(STATE_BASE));
   return STATE_BASE[channel];
 }
+
+// ── Maandrijen ─────────────────────────────────────────────────────────────
+// Dezelfde geo-wereld, maar in de tabelvorm die de maand-SOP en de client-data-API verwachten.
+//
+// Waarom hier en niet apart: er waren drie losse demo-definities van geo (de kaart, de analyse en
+// de client-data-API), en die spraken elkaar tegen — de een kende Frankrijk wel, de ander niet.
+// Eén definitie met afgeleide vormen kán niet uiteenlopen.
+//
+// De maandbedragen tellen exact op tot het totaal uit demoGeoCountries/demoGeoStates. Dat is de
+// eigenschap die het gelijktrekken waarmaakt: wie de maanden optelt krijgt precies wat de kaart
+// toont, tot op de eenheid.
+
+export interface GeoMonthlyRow extends GeoAgg {
+  month: string;
+  ctr: number;
+  avgCpc: number;
+  costPerConversion: number;
+  conversionRate: number;
+  roas: number;
+}
+
+// Lichte seizoensvorm zodat de reeks niet kaarsrecht is; genormaliseerd zodat de som klopt.
+const MONTH_WEIGHTS = [0.94, 1.0, 1.06];
+
+/** Verdeelt één geheel getal over de maanden volgens de gewichten, met de rest naar de laatste. */
+function splitInt(total: number, weights: number[]): number[] {
+  const sum = weights.reduce((s, w) => s + w, 0);
+  const out = weights.slice(0, -1).map((w) => Math.round((total * w) / sum));
+  out.push(total - out.reduce((s, v) => s + v, 0)); // rest, zodat de som exact klopt
+  return out;
+}
+
+/**
+ * Zet de geaggregeerde markten om naar maandrijen over de opgegeven maanden (ISO, eerste van de
+ * maand). De afgeleide ratio's komen uit de maandtotalen zelf, niet uit het jaartotaal.
+ */
+export function geoMonthlyRows(aggs: GeoAgg[], months: string[]): GeoMonthlyRow[] {
+  const weights = months.map((_, i) => MONTH_WEIGHTS[i % MONTH_WEIGHTS.length]);
+  const out: GeoMonthlyRow[] = [];
+  for (const a of aggs) {
+    const imp = splitInt(a.impressions, weights);
+    const clk = splitInt(a.clicks, weights);
+    const cost = splitInt(Math.round(a.cost), weights);
+    const conv = splitInt(Math.round(a.conversions), weights);
+    const val = splitInt(Math.round(a.conversionsValue), weights);
+    months.forEach((month, i) => {
+      out.push({
+        code: a.code, month,
+        impressions: imp[i], clicks: clk[i], cost: cost[i], conversions: conv[i], conversionsValue: val[i],
+        ctr: imp[i] > 0 ? clk[i] / imp[i] : 0,
+        avgCpc: clk[i] > 0 ? cost[i] / clk[i] : 0,
+        costPerConversion: conv[i] > 0 ? cost[i] / conv[i] : 0,
+        conversionRate: clk[i] > 0 ? conv[i] / clk[i] : 0,
+        roas: cost[i] > 0 ? val[i] / cost[i] : 0,
+      });
+    });
+  }
+  return out;
+}

@@ -8,6 +8,7 @@
 // Geen platte, identieke maanden meer. Alle rijen: client_id = demo-greentech. Puur presentatie.
 
 import { DEMO_GREENTECH_ID as CID } from "./greentech-mock";
+import { demoGeoCountries, demoGeoStates, geoMonthlyRows } from "./geo-demo";
 
 type Row = Record<string, unknown>;
 
@@ -339,6 +340,29 @@ const blendedAccountMonthly: Row[] = (() => {
   return out;
 })();
 
+// ── Geo: land- en staatrijen voor de maand-SOP ─────────────────────────────
+// Deze ontbraken, waardoor de SOP "geen landdata" concludeerde terwijl de kaart ernaast landen
+// toonde. Afgeleid uit dezelfde definitie als de kaart en de markt-analyse (lib/demo/geo-demo.ts),
+// zodat de drie het per definitie eens zijn.
+const GEO_SOP_MONTHS = [monthISO(3), monthISO(2), monthISO(1)];
+const adsCountryMonthly: Row[] = geoMonthlyRows(demoGeoCountries("google"), GEO_SOP_MONTHS).map((r) => ({
+  client_id: CID, country_code: r.code, month: r.month,
+  impressions: r.impressions, clicks: r.clicks, cost: r.cost,
+  conversions: r.conversions, conversions_value: r.conversionsValue,
+  ctr: r.ctr, avg_cpc: r.avgCpc, cost_per_conversion: r.costPerConversion,
+  conversion_rate: r.conversionRate, roas: r.roas,
+  campaign_count: 2, spend_share: 0, synced_at: iso(),
+}));
+// VS-staten voor de statenanalyse en de drilldown-kaart.
+const adsRegionMonthly: Row[] = geoMonthlyRows(demoGeoStates("google"), GEO_SOP_MONTHS).map((r) => ({
+  client_id: CID, country_code: "US", region_name: r.code, region_code: r.code, month: r.month,
+  impressions: r.impressions, clicks: r.clicks, cost: r.cost,
+  conversions: r.conversions, conversions_value: r.conversionsValue,
+  ctr: r.ctr, avg_cpc: r.avgCpc, cost_per_conversion: r.costPerConversion,
+  conversion_rate: r.conversionRate, roas: r.roas,
+  campaign_count: 2, spend_share: 0, synced_at: iso(),
+}));
+
 // Bestanden: precies één set standaardmappen (geen dubbelen) + een paar voorbeeldbestanden,
 // zodat het tabblad Bestanden er in de demo netjes en volledig uitziet.
 const clientFolders: Row[] = ["SOP's", "Briefings", "Sprintplanning", "Rapportages", "Overig"].map((name, i) => ({
@@ -404,6 +428,8 @@ export function demoRows(): Record<string, Row[]> {
     client_sync_status: clientSyncStatus,
     client_folders: clientFolders,
     client_files: clientFiles,
+    ads_country_monthly: adsCountryMonthly,
+    ads_region_monthly: adsRegionMonthly,
     blended_account_monthly: blendedAccountMonthly,
     client_settings: clientSettings,
   };
