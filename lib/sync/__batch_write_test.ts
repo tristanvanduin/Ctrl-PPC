@@ -12,7 +12,7 @@
 // Zeventien tabellen gebruiken replaceBatch, waaronder ads_country_monthly. De verwijdering is
 // niet op datum begrensd, dus het ging niet om het syncvenster maar om de hele historie.
 
-import { replaceBatch, upsertBatch, dedup } from "./orchestrator";
+import { replaceBatch, upsertBatch, dedup, getDateRange13Months } from "./orchestrator";
 
 let passed = 0, failed = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -97,6 +97,44 @@ async function main() {
     check("één rij per sleutel", r.length === 2, String(r.length));
     check("de laatste wint", r.find((x) => x.id === "a")?.v === 2);
     check("lege waarden botsen niet met elkaar", dedup([{ a: null, b: 1 }, { a: undefined, b: 2 }], ["a"]).length === 1);
+  }
+
+
+  console.log("\ngetDateRange13Months over de kalender");
+  {
+    // Deze berekening werkt met negatieve maandindices, Math.floor over negatieve getallen en een
+    // magische +120 om te normaliseren. Hij is CORRECT -- 17.532 gemeten combinaties over vier
+    // jaar en drie tijdzones, nul afwijkingen -- maar dat is niet af te lezen. Vandaar deze test:
+    // niet omdat er iets stuk is, maar omdat dit het soort code is dat iemand ooit "opschoont".
+    //
+    // Hij rekent bewust in lokale datumdelen (zie de comment bij fmt) en gaat nooit door
+    // toISOString. Dat is precies waarom hij standhoudt waar monthsAgo sneuvelde.
+    const Echt = Date;
+    const origineel = globalThis.Date;
+    let nu = "";
+    class Klok extends Echt {
+      constructor(...a: unknown[]) {
+        if (a.length === 0) super(nu); else super(...(a as ConstructorParameters<typeof Date>));
+      }
+      static now(): number { return new Echt(nu).getTime(); }
+    }
+    (globalThis as unknown as { Date: typeof Date }).Date = Klok as unknown as typeof Date;
+
+    const gevallen: Array<[string, string, string]> = [
+      // klok                    startDate     endDate
+      ["2026-01-01T12:00:00Z", "2024-11-01", "2026-01-01"], // jaargrens
+      ["2026-07-27T12:00:00Z", "2025-05-01", "2026-07-27"],
+      ["2026-03-31T12:00:00Z", "2025-01-01", "2026-03-31"], // maandeinde
+      ["2028-02-29T12:00:00Z", "2026-12-01", "2028-02-29"], // schrikkeldag
+      ["2028-12-31T12:00:00Z", "2027-10-01", "2028-12-31"],
+    ];
+    for (const [klok, vStart, vEind] of gevallen) {
+      nu = klok;
+      const r = getDateRange13Months();
+      check(`${klok.slice(0, 10)} start`, r.startDate === vStart, `${r.startDate} != ${vStart}`);
+      check(`${klok.slice(0, 10)} eind`, r.endDate === vEind, `${r.endDate} != ${vEind}`);
+    }
+    (globalThis as unknown as { Date: typeof Date }).Date = origineel;
   }
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);

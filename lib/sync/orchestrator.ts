@@ -105,7 +105,7 @@ function fmt(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function getDateRange13Months(): { startDate: string; endDate: string } {
+export function getDateRange13Months(): { startDate: string; endDate: string } {
   const now = new Date();
   const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   // Go 14 months back to ensure we have 13 complete months + current partial
