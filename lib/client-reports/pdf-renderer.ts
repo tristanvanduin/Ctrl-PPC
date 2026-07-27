@@ -14,7 +14,7 @@ import { Document, Page, Text, View, Image, Font, Svg, Path, Circle as SvgCircle
 
 Font.registerHyphenationCallback((word: string) => [word]);
 
-// Brand Guide: Ranking Masters kleurenpalet
+// Brand Guide: RAI Amsterdam kleurenpalet
 const c = {
   brand: "#E87722", brandLight: "#f4a460",
   blue: "#0F1D2F",          // Deep Navy (primair donker uit brand guide)

@@ -5,6 +5,8 @@ import type {
   NormalizedFinding,
   SopCoverage,
 } from "@/lib/analysis/canonicalize";
+import { OWNER_TEAM } from "@/lib/branding/brand";
+import type { Owner } from "@/lib/schema/analysis-schema";
 import {
   actionFamilyFromIssueCluster,
   causeFamilyFromIssueCluster,
@@ -114,7 +116,7 @@ export interface ThreadRecommendation extends Recommendation {
   cluster_id: string;
   thread_id: string | null;
   phase: ActionPhase;
-  owner: "Ranking Masters" | "Klant";
+  owner: Owner;
   dependencies: string[];
   action_intent_class: ActionIntentClass;
   action_unit_key: string;
@@ -1074,9 +1076,9 @@ function readinessFromCluster(cluster: IssueCluster): ActionReadiness {
   return "direct_action";
 }
 
-function ownerFromCluster(cluster: IssueCluster): "Ranking Masters" | "Klant" {
-  if (cluster.issue_cluster === "tracking_cvr_drop" || cluster.issue_cluster === "product_mix") return "Ranking Masters";
-  return "Ranking Masters";
+function ownerFromCluster(cluster: IssueCluster): Owner {
+  if (cluster.issue_cluster === "tracking_cvr_drop" || cluster.issue_cluster === "product_mix") return OWNER_TEAM;
+  return OWNER_TEAM;
 }
 
 function actionIntentFromCluster(cluster: IssueCluster): ActionIntentClass {
@@ -2925,7 +2927,7 @@ function buildRecommendationsFromStepActions(
       evidence_level: evidenceLevel,
       confidence,
       phase,
-      owner: cluster ? ownerFromCluster(cluster) : "Ranking Masters",
+      owner: cluster ? ownerFromCluster(cluster) : OWNER_TEAM,
       dependencies: unique([
         ...group.flatMap((item) => [`Afkomstig uit stap ${item.stepNumber}`]),
         ...(prerequisiteBlocker ? [`Valideer eerst ${prerequisiteBlocker.display_label}.`] : []),

@@ -144,7 +144,7 @@ async function main() {
       week_number: t["Week"] ? parseInt(t["Week"]) : null,
       task: t["Taak"] || "(geen taak)",
       status: STATUS_MAP[t["Status"]] || "todo",
-      owner: t["Verantwoordelijke"] || "Ranking Masters",
+      owner: t["Verantwoordelijke"] || "RAI Amsterdam",
       metrics: t["Metrics"] || null,
       review_timeframe: t["Looptijd tot Beoordeling"] || null,
     }));

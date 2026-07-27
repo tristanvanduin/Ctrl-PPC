@@ -8,6 +8,7 @@ import {
   AlertCircle, Info, ExternalLink,
 } from "lucide-react";
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
+import { isTeamOwner } from "@/lib/branding/brand";
 import { computeForecast, type ClientForecast, type ForecastKPI } from "@/lib/forecast";
 import { computeHealthScore, type HealthScore, type Anomaly } from "@/lib/health-score";
 import { getClientSettings } from "@/lib/client-settings";
@@ -1052,7 +1053,8 @@ export function DgmView({ clientId }: { clientId: string }) {
         const ongoing = sprintItems.filter((i) => i.status === "ongoing").length;
         const active = todo + inPlanning + ongoing;
 
-        const isRm = (owner: string) => owner === "Ranking Masters" || owner === "RM";
+        // Herkent ook de vóór de naamswijziging opgeslagen waarde; zie lib/branding/brand.
+        const isRm = isTeamOwner;
         const isClient = (owner: string) => !isRm(owner);
 
         const clientOpen = sprintItems.filter((i) => isClient(i.owner) && !["done", "expired"].includes(i.status)).length;

@@ -178,7 +178,7 @@ function SidebarInner() {
       {/* Logo */}
       <div className="p-6 pb-4">
         <h1 className="text-white text-xl font-bold tracking-tight">
-          Ranking Masters
+          RAI Amsterdam
         </h1>
         <p className="text-white/50 text-xs mt-1">SEA Dashboard</p>
       </div>

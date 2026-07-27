@@ -87,7 +87,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 
   /* Merk-tokens. Wijzen naar --brand-* variabelen die de BrandThemeProvider per beurs/klant
-     zet; zonder provider vallen ze terug op de Ranking Masters-huisstijl. Zo kleurt élk bestaand
+     zet; zonder provider vallen ze terug op de RAI Amsterdam-huisstijl. Zo kleurt élk bestaand
      gebruik van rm-blue/rm-orange automatisch mee met het actieve merk, zonder de componenten
      aan te raken. Neutralen (gray/border/light) blijven vast voor leesbaarheid. */
   --color-rm-blue: var(--brand-primary, #08288C);

@@ -195,7 +195,10 @@ console.log("7. parseRecommendations — happy path");
   if (result.success) {
     assert(result.data.recommendations.length === 1, "should have 1 rec");
     assert(result.data.tasks.length === 1, "should have 1 task");
-    assert(result.data.tasks[0].owner === "Ranking Masters", "task owner");
+    // Het schema normaliseert de opgeslagen eigenaar naar de huidige schrijfwijze. Rijen van
+    // vóór de naamswijziging dragen nog "Ranking Masters"; die worden geaccepteerd en omgezet,
+    // zodat ze niet ineens ongeldig zijn of als klant-taken gaan tellen.
+    assert(result.data.tasks[0].owner === "RAI Amsterdam", "task owner genormaliseerd");
     assert(result.data.recommendations[0].cluster_id === "cluster_unknown", "recommendation cluster_id defaults");
     assert(result.data.tasks[0].thread_id === null, "task thread_id defaults to null");
   }
@@ -213,7 +216,7 @@ console.log("8. parseRecommendations — invalid task owner with valid rec");
     tasks: [{
       recommendation_index: 0, title: "Do something",
       description: "...", action_type: "bid",
-      owner: "INVALID_OWNER", // not "Ranking Masters" or "Klant"
+      owner: "INVALID_OWNER", // noch RAI Amsterdam, noch de oude waarde, noch Klant
       affected_campaign: null, affected_adgroup: null, affected_keyword: null,
       current_value: null, target_value: null,
       priority: "high", frequency: "direct", due_date_days: 7,

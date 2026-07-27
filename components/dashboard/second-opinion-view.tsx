@@ -135,7 +135,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
         </div>
         <div>
           <h2 className="text-base font-bold text-gray-900 leading-tight">Second Opinion</h2>
-          <p className="text-xs text-muted-foreground">Account audit op basis van het Ranking Masters template</p>
+          <p className="text-xs text-muted-foreground">Account audit op basis van het RAI Amsterdam template</p>
         </div>
       </div>
 

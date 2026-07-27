@@ -391,7 +391,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
       <p className="text-micro text-muted-foreground mb-3">
         {cadence === "actions"
           ? "Automatisch gegenereerd op basis van resultaten"
-          : "Analysechecklist op basis van Ranking Masters SOP"}
+          : "Analysechecklist op basis van RAI Amsterdam SOP"}
       </p>
 
       {/* Cadence tabs */}

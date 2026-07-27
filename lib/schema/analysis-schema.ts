@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { OWNER_TEAM, OWNER_CLIENT, LEGACY_OWNER_TEAM } from "@/lib/branding/brand";
 
 // ── Shared enums ───────────────────────────────────────────────────────────
 
@@ -31,8 +32,22 @@ export type Priority = z.infer<typeof PriorityEnum>;
 export const FrequencyEnum = z.enum(["direct", "weekly", "biweekly", "monthly"]);
 export type Frequency = z.infer<typeof FrequencyEnum>;
 
-export const OwnerEnum = z.enum(["Ranking Masters", "Klant"]);
-export type Owner = z.infer<typeof OwnerEnum>;
+/**
+ * Wie pakt de taak op: het eigen team of de klant.
+ *
+ * Deze waarde wordt OPGESLAGEN (sprint_planning.owner, sop_tasks.owner) en is dus geen loutere
+ * weergavetekst. Bij de naamswijziging naar RAI Amsterdam accepteert het schema daarom ook nog de
+ * oude waarde: rijen van vóór de wijziging dragen "Ranking Masters", en die mogen niet ineens
+ * ongeldig worden of als klant-taken gaan tellen. De transform normaliseert alles naar de huidige
+ * schrijfwijze, zodat de rest van de code maar één waarde kent.
+ *
+ * Zodra scripts/rename-owner-to-rai.sql is gedraaid kan de oude waarde hier weg.
+ */
+export type Owner = typeof OWNER_TEAM | typeof OWNER_CLIENT;
+
+export const OwnerEnum = z
+  .enum([OWNER_TEAM, LEGACY_OWNER_TEAM, OWNER_CLIENT])
+  .transform((v): Owner => (v === OWNER_CLIENT ? OWNER_CLIENT : OWNER_TEAM));
 
 export const RecommendationSourceEnum = z.enum(["finding", "hypothesis"]);
 export type RecommendationSource = z.infer<typeof RecommendationSourceEnum>;

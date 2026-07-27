@@ -84,7 +84,7 @@ function findMonth(rows: Array<Record<string, unknown>>, monthStr: string): Reco
 // ── Prompt ─────────────────────────────────────────────────────────────────
 
 function buildReportPrompt(clientName: string): string {
-  return `Je bent een senior SEA account manager bij Ranking Masters die een professioneel klantrapport schrijft.
+  return `Je bent een senior SEA account manager bij RAI Amsterdam die een professioneel klantrapport schrijft.
 Het rapport is bedoeld voor de klant zelf.
 
 ## KRITIEKE STIJLREGELS

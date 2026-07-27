@@ -1,6 +1,6 @@
 // Brand-guide-theming: uit de visuele identiteit van een event (kleuren, logo, font uit de
 // brand guide) de complete thema-tokens maken, zodat het RAI-eventdashboard zich per event in
-// de eigen huisstijl toont in plaats van in het Ranking Masters-blauw. Puur en los getest; de
+// de eigen huisstijl toont in plaats van in het RAI Amsterdam-blauw. Puur en los getest; de
 // tool zet de tokens als CSS-variabelen (shadcn) per event. Ontbreekt of klopt een veld niet,
 // dan valt het terug op de RM-tokens, zodat er altijd een geldig, leesbaar thema is.
 
@@ -28,7 +28,7 @@ export interface EventTheme {
   headingFont: string;
 }
 
-// De Ranking Masters-tokens uit globals.css; de terugval als er geen of een onvolledige brand
+// De RAI Amsterdam-tokens uit globals.css; de terugval als er geen of een onvolledige brand
 // guide is.
 export const DEFAULT_THEME: EventTheme = {
   primary: "#08288C",

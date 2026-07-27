@@ -22,7 +22,8 @@ export const DEMO_CLIENTS: Client[] = [
   { id: "confidence-for-all", name: "Confidence for all", source: "demo" },
   { id: "fit-fysio", name: "FIT Fysio", source: "demo" },
   { id: "ocean-queens", name: "Ocean Queens", source: "demo" },
-  { id: "ranking-masters", name: "Ranking Masters", source: "demo" },
+  // Id blijft ongewijzigd: dat is een sleutel waar opgeslagen rijen naar verwijzen.
+  { id: "ranking-masters", name: "RAI Amsterdam", source: "demo" },
   { id: "wobblez", name: "Wobblez", source: "demo" },
   { id: "mobiliteitexpert", name: "Mobiliteitexpert", source: "demo" },
   { id: "mpc", name: "MPC", source: "demo" },

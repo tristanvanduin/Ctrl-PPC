@@ -209,13 +209,13 @@ Regels:
 - Sorteer hypotheses van hoog naar laag ICE score
 
 ## BELANGRIJK: Verantwoordelijkheid en afhankelijkheden
-Hypotheses en taken zijn NIET altijd voor het bureau (Ranking Masters). Wijs per taak een verantwoordelijke toe:
-- **Ranking Masters**: alles wat in Google Ads, Merchant Center, Tag Manager, Analytics etc. gebeurt
+Hypotheses en taken zijn NIET altijd voor het bureau (RAI Amsterdam). Wijs per taak een verantwoordelijke toe:
+- **RAI Amsterdam**: alles wat in Google Ads, Merchant Center, Tag Manager, Analytics etc. gebeurt
 - **Klant**: alles wat op de website, in het CMS, in de productfeed-bron, of buiten Google Ads moet gebeuren
 
 ### Afhankelijkheden herkennen
 Veel hypotheses vereisen actie van BEIDE partijen. Genereer dan ook BEIDE taken, in de juiste volgorde.
-Zonder de klant-taak kan Ranking Masters vaak niet verder. Maak dit expliciet.
+Zonder de klant-taak kan RAI Amsterdam vaak niet verder. Maak dit expliciet.
 
 Voorbeelden (niet limitatief — gebruik je eigen expertise):
 - Nieuwe campagnetypes (Display, Video, Awareness, Remarketing, Demand Gen) → klant levert content/creatives aan → RM bouwt campagne
@@ -274,7 +274,7 @@ Dit is geen uitputtende lijst — gebruik je expertise als senior SEA specialist
 // MONTHLY PER-STEP PROMPTS (moved from monthly/route.ts)
 // ============================================================
 
-const MONTHLY_BASE_ROLE = `Je bent een senior SEA strateeg bij Ranking Masters die een volledige maandelijkse analyse uitvoert.
+const MONTHLY_BASE_ROLE = `Je bent een senior SEA strateeg bij RAI Amsterdam die een volledige maandelijkse analyse uitvoert.
 Je denkt niet als een rapporteur maar als een adviseur. Elke observatie eindigt met een conclusie en actie.
 Schrijf altijd in het Nederlands. Gebruik altijd concrete cijfers. Nooit vage omschrijvingen.
 
@@ -970,7 +970,7 @@ Retourneer ALLEEN valid JSON, geen andere tekst, geen markdown codeblokken.
     "title": "string (max 60 tekens, imperatief)",
     "description": "string",
     "action_type": "budget"|"bid"|"targeting"|"creative"|"structure"|"tracking"|"audit"|"negative"|"website"|"content"|"feed",
-    "owner": "Ranking Masters"|"Klant",
+    "owner": "RAI Amsterdam"|"Klant",
     "affected_campaign": null|"string",
     "affected_adgroup": null|"string",
     "affected_keyword": null|"string",
@@ -1668,7 +1668,7 @@ Retourneer ALLEEN valid JSON, geen andere tekst, geen markdown codeblokken.
     "title": "string (max 60 tekens, imperatief)",
     "description": "string",
     "action_type": "budget"|"bid"|"targeting"|"creative"|"structure"|"tracking"|"audit"|"negative"|"website"|"content"|"feed",
-    "owner": "Ranking Masters"|"Klant",
+    "owner": "RAI Amsterdam"|"Klant",
     "affected_campaign": null|"string",
     "affected_adgroup": null|"string",
     "affected_keyword": null|"string",
@@ -1771,7 +1771,7 @@ Retourneer ALLEEN valid JSON, geen andere tekst, geen markdown codeblokken.
     "title": "string (max 60 tekens, imperatief)",
     "description": "string",
     "action_type": "budget"|"bid"|"targeting"|"creative"|"structure"|"tracking"|"audit"|"negative"|"website"|"content"|"feed",
-    "owner": "Ranking Masters"|"Klant",
+    "owner": "RAI Amsterdam"|"Klant",
     "affected_campaign": null|"string",
     "affected_adgroup": null|"string",
     "affected_keyword": null|"string",

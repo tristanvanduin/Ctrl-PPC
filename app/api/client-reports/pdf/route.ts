@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { BRAND_LOGO_FILE } from "@/lib/branding/brand";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { renderReportPdf, type ReportPdfProps } from "@/lib/client-reports/pdf-renderer";
 import {
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
     let clientLogoUrl: string | undefined;
 
     // RM logo from public directory
-    const rmLogoPath = process.cwd() + "/public/images/ranking-masters-logo.png";
+    const rmLogoPath = process.cwd() + `/public/images/${BRAND_LOGO_FILE}`;
     try {
       const fs = await import("fs");
       if (fs.existsSync(rmLogoPath)) {

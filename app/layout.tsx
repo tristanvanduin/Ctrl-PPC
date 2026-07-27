@@ -18,7 +18,7 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Ranking Masters — SEA Dashboard",
+  title: "RAI Amsterdam — SEA Dashboard",
   description: "Revenue & Conversie Forecasting Dashboard voor het SEA-team",
 };
 

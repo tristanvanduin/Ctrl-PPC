@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS sprint_items (
   week_number integer,
   task text NOT NULL,
   status text NOT NULL DEFAULT 'todo', -- todo, in_planning, ongoing, done, backlog, expired
-  owner text DEFAULT 'Ranking Masters',
+  owner text DEFAULT 'RAI Amsterdam',
   metrics text,
   review_timeframe text,
   created_at timestamptz DEFAULT now(),

@@ -15,6 +15,7 @@
  */
 
 import React from "react";
+import { BRAND_LOGO_FILE, BRAND_NAME } from "@/lib/branding/brand";
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import * as fs from "fs";
 import * as path from "path";
@@ -154,7 +155,7 @@ interface PdfProps {
 // Load RM logo as base64 data URI (cached at module level)
 let rmLogoDataUri: string | undefined;
 try {
-  const logoPath = path.join(process.cwd(), "public", "images", "ranking-masters-logo.png");
+  const logoPath = path.join(process.cwd(), "public", "images", BRAND_LOGO_FILE);
   if (fs.existsSync(logoPath)) {
     rmLogoDataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
   }
@@ -184,7 +185,7 @@ function SecondOpinionPdf({ clientName, mode, rows, summaries, generatedAt }: Pd
             ? React.createElement(Image, { src: rmLogoDataUri, style: { height: 32, width: 32, objectFit: "contain" as const } })
             : null,
           React.createElement(View, { style: { alignItems: "flex-end" as const } },
-            React.createElement(Text, { style: s.brand }, "Ranking Masters"),
+            React.createElement(Text, { style: s.brand }, BRAND_NAME),
             React.createElement(Text, { style: s.brandSub }, "De #1 SEM specialist in de Benelux"),
           ),
         ),
@@ -276,7 +277,7 @@ function SecondOpinionPdf({ clientName, mode, rows, summaries, generatedAt }: Pd
           rmLogoDataUri
             ? React.createElement(Image, { src: rmLogoDataUri, style: { height: 14, width: 14, objectFit: "contain" as const } })
             : null,
-          React.createElement(Text, { style: s.footerText }, "Ranking Masters  |  Second Opinion"),
+          React.createElement(Text, { style: s.footerText }, `${BRAND_NAME}  |  Second Opinion`),
         ),
       ),
     ),
@@ -338,7 +339,7 @@ function SecondOpinionPdf({ clientName, mode, rows, summaries, generatedAt }: Pd
           rmLogoDataUri
             ? React.createElement(Image, { src: rmLogoDataUri, style: { height: 14, width: 14, objectFit: "contain" as const } })
             : null,
-          React.createElement(Text, { style: s.footerText }, "Ranking Masters  |  Second Opinion"),
+          React.createElement(Text, { style: s.footerText }, `${BRAND_NAME}  |  Second Opinion`),
         ),
       ),
     ),

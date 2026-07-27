@@ -11,6 +11,7 @@
  */
 
 import React from "react";
+import { BRAND_LOGO_FILE } from "@/lib/branding/brand";
 import {
   Document,
   Page,
@@ -28,7 +29,7 @@ import { fixMojibake } from "@/lib/analysis/sanitize";
 // Load RM logo as base64 (cached at module level)
 let rmLogoDataUri: string | undefined;
 try {
-  const logoPath = path.join(process.cwd(), "public", "images", "ranking-masters-logo.png");
+  const logoPath = path.join(process.cwd(), "public", "images", BRAND_LOGO_FILE);
   if (fs.existsSync(logoPath)) {
     rmLogoDataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
   }
@@ -120,7 +121,7 @@ const redBorder = "#fecaca";
 const gray = "#6b7280";
 const grayLight = "#f9fafb";
 const grayBorder = "#e5e7eb";
-// Brand Guide: Ranking Masters kleurenpalet
+// Brand Guide: RAI Amsterdam kleurenpalet
 const dark = "#0A1628";        // Graphite (primair donker)
 const blueDark = "#0F1D2F";    // Deep Navy
 const blueLight = "#eff6ff";
@@ -515,7 +516,7 @@ function Header({
         React.createElement(
           View,
           { style: { alignItems: "flex-end" as const } },
-          React.createElement(Text, { style: s.brand }, "Ranking Masters"),
+          React.createElement(Text, { style: s.brand }, "RAI Amsterdam"),
           React.createElement(Text, { style: s.brandSub }, "De #1 SEM specialist in de Benelux"),
         )
       )

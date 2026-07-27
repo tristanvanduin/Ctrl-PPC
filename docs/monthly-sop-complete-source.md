@@ -1198,13 +1198,13 @@ Regels:
 - Sorteer hypotheses van hoog naar laag ICE score
 
 ## BELANGRIJK: Verantwoordelijkheid en afhankelijkheden
-Hypotheses en taken zijn NIET altijd voor het bureau (Ranking Masters). Wijs per taak een verantwoordelijke toe:
-- **Ranking Masters**: alles wat in Google Ads, Merchant Center, Tag Manager, Analytics etc. gebeurt
+Hypotheses en taken zijn NIET altijd voor het bureau (RAI Amsterdam). Wijs per taak een verantwoordelijke toe:
+- **RAI Amsterdam**: alles wat in Google Ads, Merchant Center, Tag Manager, Analytics etc. gebeurt
 - **Klant**: alles wat op de website, in het CMS, in de productfeed-bron, of buiten Google Ads moet gebeuren
 
 ### Afhankelijkheden herkennen
 Veel hypotheses vereisen actie van BEIDE partijen. Genereer dan ook BEIDE taken, in de juiste volgorde.
-Zonder de klant-taak kan Ranking Masters vaak niet verder. Maak dit expliciet.
+Zonder de klant-taak kan RAI Amsterdam vaak niet verder. Maak dit expliciet.
 
 Voorbeelden (niet limitatief — gebruik je eigen expertise):
 - Nieuwe campagnetypes (Display, Video, Awareness, Remarketing, Demand Gen) → klant levert content/creatives aan → RM bouwt campagne
@@ -1263,7 +1263,7 @@ Dit is geen uitputtende lijst — gebruik je expertise als senior SEA specialist
 // MONTHLY PER-STEP PROMPTS (moved from monthly/route.ts)
 // ============================================================
 
-const MONTHLY_BASE_ROLE = `Je bent een senior SEA strateeg bij Ranking Masters die een volledige maandelijkse analyse uitvoert.
+const MONTHLY_BASE_ROLE = `Je bent een senior SEA strateeg bij RAI Amsterdam die een volledige maandelijkse analyse uitvoert.
 Je denkt niet als een rapporteur maar als een adviseur. Elke observatie eindigt met een conclusie en actie.
 Schrijf altijd in het Nederlands. Gebruik altijd concrete cijfers. Nooit vage omschrijvingen.
 
@@ -1832,7 +1832,7 @@ Retourneer ALLEEN valid JSON, geen andere tekst, geen markdown codeblokken.
     "title": "string (max 60 tekens, imperatief)",
     "description": "string",
     "action_type": "budget"|"bid"|"targeting"|"creative"|"structure"|"tracking"|"audit"|"negative"|"website"|"content"|"feed",
-    "owner": "Ranking Masters"|"Klant",
+    "owner": "RAI Amsterdam"|"Klant",
     "affected_campaign": null|"string",
     "affected_adgroup": null|"string",
     "affected_keyword": null|"string",
@@ -2499,7 +2499,7 @@ Retourneer ALLEEN valid JSON, geen andere tekst, geen markdown codeblokken.
     "title": "string (max 60 tekens, imperatief)",
     "description": "string",
     "action_type": "budget"|"bid"|"targeting"|"creative"|"structure"|"tracking"|"audit"|"negative"|"website"|"content"|"feed",
-    "owner": "Ranking Masters"|"Klant",
+    "owner": "RAI Amsterdam"|"Klant",
     "affected_campaign": null|"string",
     "affected_adgroup": null|"string",
     "affected_keyword": null|"string",
@@ -2599,7 +2599,7 @@ Retourneer ALLEEN valid JSON, geen andere tekst, geen markdown codeblokken.
     "title": "string (max 60 tekens, imperatief)",
     "description": "string",
     "action_type": "budget"|"bid"|"targeting"|"creative"|"structure"|"tracking"|"audit"|"negative"|"website"|"content"|"feed",
-    "owner": "Ranking Masters"|"Klant",
+    "owner": "RAI Amsterdam"|"Klant",
     "affected_campaign": null|"string",
     "affected_adgroup": null|"string",
     "affected_keyword": null|"string",
@@ -3009,7 +3009,7 @@ export type Priority = z.infer<typeof PriorityEnum>;
 export const FrequencyEnum = z.enum(["direct", "weekly", "biweekly", "monthly"]);
 export type Frequency = z.infer<typeof FrequencyEnum>;
 
-export const OwnerEnum = z.enum(["Ranking Masters", "Klant"]);
+export const OwnerEnum = z.enum(["RAI Amsterdam", "Klant"]);
 export type Owner = z.infer<typeof OwnerEnum>;
 
 export const RecommendationSourceEnum = z.enum(["finding", "hypothesis"]);
@@ -3990,7 +3990,7 @@ export interface ThreadRecommendation extends Recommendation {
   cluster_id: string;
   thread_id: string | null;
   phase: ActionPhase;
-  owner: "Ranking Masters" | "Klant";
+  owner: "RAI Amsterdam" | "Klant";
   dependencies: string[];
   action_intent_class: ActionIntentClass;
   action_unit_key: string;
@@ -4283,9 +4283,9 @@ function evidenceFromCluster(cluster: IssueCluster): EvidenceLevel {
   return "deterministic";
 }
 
-function ownerFromCluster(cluster: IssueCluster): "Ranking Masters" | "Klant" {
-  if (cluster.issue_cluster === "tracking_cvr_drop" || cluster.issue_cluster === "product_mix") return "Ranking Masters";
-  return "Ranking Masters";
+function ownerFromCluster(cluster: IssueCluster): "RAI Amsterdam" | "Klant" {
+  if (cluster.issue_cluster === "tracking_cvr_drop" || cluster.issue_cluster === "product_mix") return "RAI Amsterdam";
+  return "RAI Amsterdam";
 }
 
 function actionIntentFromCluster(cluster: IssueCluster): ActionIntentClass {
@@ -7852,7 +7852,7 @@ const redBorder = "#fecaca";
 const gray = "#6b7280";
 const grayLight = "#f9fafb";
 const grayBorder = "#e5e7eb";
-// Brand Guide: Ranking Masters kleurenpalet
+// Brand Guide: RAI Amsterdam kleurenpalet
 const dark = "#0A1628";        // Graphite (primair donker)
 const blueDark = "#0F1D2F";    // Deep Navy
 const blueLight = "#eff6ff";
@@ -8166,7 +8166,7 @@ function Header({
         React.createElement(
           View,
           { style: { alignItems: "flex-end" as const } },
-          React.createElement(Text, { style: s.brand }, "Ranking Masters"),
+          React.createElement(Text, { style: s.brand }, "RAI Amsterdam"),
           React.createElement(Text, { style: s.brandSub }, "De #1 SEM specialist in de Benelux"),
         )
       )

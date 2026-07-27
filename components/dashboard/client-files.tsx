@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { OWNER_TEAM } from "@/lib/branding/brand";
 import {
   FolderPlus, Upload, Trash2, Download, FileText, FileSpreadsheet,
   Image as ImageIcon, File, FolderOpen, Plus, X, Loader2, AlertCircle, CheckCircle2,
@@ -147,7 +148,7 @@ async function parseSprintCSV(file: File, clientId: string, sb: SupabaseClient) 
       week_number: t["Week"] || t["week"] ? parseInt(t["Week"] || t["week"]) : null,
       task: t["Taak"] || t["taak"] || t["Task"] || "(geen taak)",
       status: statusMap[t["Status"] || t["status"]] || "todo",
-      owner: t["Verantwoordelijke"] || t["verantwoordelijke"] || "Ranking Masters",
+      owner: t["Verantwoordelijke"] || t["verantwoordelijke"] || OWNER_TEAM,
       metrics: t["Metrics"] || t["metrics"] || null,
       review_timeframe: t["Looptijd tot Beoordeling"] || t["looptijd"] || null,
     }));

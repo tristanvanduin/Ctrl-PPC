@@ -110,7 +110,7 @@ export function ReportExport({ clientId }: { clientId: string }) {
     lines.push("");
 
     lines.push("---");
-    lines.push(`*Gegenereerd door Ranking Masters SEA Dashboard op ${dateStr}*`);
+    lines.push(`*Gegenereerd door RAI Amsterdam SEA Dashboard op ${dateStr}*`);
 
     return lines.join("\n");
   }

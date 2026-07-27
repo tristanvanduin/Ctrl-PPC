@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Fragment } from "react";
+import { OWNER_TEAM, BRAND_SHORT } from "@/lib/branding/brand";
 import { Download, ChevronDown, ChevronUp, Loader2, Calendar, Plus, X, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { channelOfSource, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
@@ -58,7 +59,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   const [newTimeframe, setNewTimeframe] = useState("");
   const [showAddTask, setShowAddTask] = useState<string | null>(null); // hypothesis_id or "standalone"
   const [newTask, setNewTask] = useState("");
-  const [newOwner, setNewOwner] = useState("Ranking Masters");
+  const [newOwner, setNewOwner] = useState(OWNER_TEAM);
   const [importing, setImporting] = useState(false);
 
   const currentWeek = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
@@ -162,7 +163,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     });
 
     setNewTask("");
-    setNewOwner("Ranking Masters");
+    setNewOwner(OWNER_TEAM);
     setShowAddTask(null);
     await refresh();
   }
@@ -237,7 +238,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           week_number: t["Week"] || t["week"] ? parseInt(t["Week"] || t["week"]) : null,
           task: t["Taak"] || t["taak"] || t["Task"] || "(geen taak)",
           status: statusMap[t["Status"] || t["status"]] || "todo",
-          owner: t["Verantwoordelijke"] || t["verantwoordelijke"] || "Ranking Masters",
+          owner: t["Verantwoordelijke"] || t["verantwoordelijke"] || OWNER_TEAM,
           metrics: t["Metrics"] || t["metrics"] || null,
           review_timeframe: t["Looptijd tot Beoordeling"] || t["looptijd"] || null,
         }));
@@ -433,7 +434,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
             <input value={newMetrics} onChange={(e) => setNewMetrics(e.target.value)} placeholder="Metrics (bijv. ROAS, CR)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-purple-400" />
             <input value={newTimeframe} onChange={(e) => setNewTimeframe(e.target.value)} placeholder="Looptijd (bijv. 3 maanden)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-purple-400" />
             <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-white">
-              <option value="Ranking Masters">Ranking Masters</option>
+              <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
               <option value="Klant">Klant</option>
             </select>
           </div>
@@ -453,7 +454,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           <div className="flex gap-3">
             <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Taakomschrijving" className="flex-1 text-sm border border-blue-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-rm-blue" />
             <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-blue-200 rounded-lg px-3 py-1.5 bg-white">
-              <option value="Ranking Masters">Ranking Masters</option>
+              <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
               <option value="Klant">Klant</option>
             </select>
             <button onClick={() => addTaskToHypothesis(null)} disabled={!newTask.trim()} className="px-4 py-1.5 text-xs font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-40 transition-colors">
@@ -504,7 +505,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                         <span className="ml-auto flex items-center gap-2 text-micro text-purple-400">
                           {groupItems.length} taken · ICE {hyp?.ice_total?.toFixed(1) || "?"}
                           <button
-                            onClick={(e) => { e.stopPropagation(); setShowAddTask(hypId); setNewTask(""); setNewOwner("Ranking Masters"); }}
+                            onClick={(e) => { e.stopPropagation(); setShowAddTask(hypId); setNewTask(""); setNewOwner(OWNER_TEAM); }}
                             className="p-0.5 rounded hover:bg-purple-200 transition-colors"
                             title="Taak toevoegen"
                           >
@@ -526,7 +527,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                         <div className="flex items-center gap-2">
                           <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Nieuwe taak..." className="flex-1 text-xs border border-purple-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-purple-400" />
                           <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded px-2 py-1 bg-white">
-                            <option value="Ranking Masters">RM</option>
+                            <option value={OWNER_TEAM}>{BRAND_SHORT}</option>
                             <option value="Klant">Klant</option>
                           </select>
                           <button onClick={() => addTaskToHypothesis(hypId)} disabled={!newTask.trim()} className="px-2 py-1 text-micro font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40">Voeg toe</button>
@@ -592,7 +593,7 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
           onChange={(e) => onUpdate(item.id, "owner", e.target.value)}
           className="text-xs border border-transparent hover:border-border rounded px-1 py-0.5 bg-transparent focus:bg-white focus:border-rm-blue focus:outline-none cursor-pointer"
         >
-          <option value="Ranking Masters">Ranking Masters</option>
+          <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
           <option value="Klant">Klant</option>
         </select>
       </td>

@@ -5,6 +5,7 @@ import type {
   MonthlyStructuredOutput,
   OperatingHypothesisTrace,
 } from "@/lib/analysis/monthly-structured";
+import { OWNER_TEAM } from "@/lib/branding/brand";
 import type { NormalizedFinding } from "@/lib/analysis/canonicalize";
 
 const HYPOTHESIS_METADATA_PREFIX = "__RM_MONTHLY_HYPOTHESIS_WORKFLOW__:";
@@ -270,7 +271,7 @@ export function buildSprintItemDraftsForHypothesis(
     .map((task) => ({
       source_task_id: task.id,
       task: task.handeling,
-      owner: "Ranking Masters",
+      owner: OWNER_TEAM,
       metrics: task.meet_via || null,
       review_timeframe: "Deze sprint",
     }));
