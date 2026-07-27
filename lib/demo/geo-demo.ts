@@ -22,6 +22,14 @@ function row(code: string, impressions: number, ctr: number, convRate: number, c
   return { code, impressions, clicks, cost, conversions, conversionsValue: Math.round(conversions * AOV) };
 }
 
+// Een markt die wél verkeer trekt maar niets oplevert. Bewust apart van row(): daar volgen de
+// kosten uit de conversies, en juist hier zijn er geen conversies terwijl het geld wel op gaat.
+// Dit is het patroon waar de markt-analyse op let — meestal een landingspagina die niet in de
+// taal van die markt staat, of een aanbod dat er niet levert.
+function deadMarket(code: string, impressions: number, ctr: number, cost: number): GeoAgg {
+  return { code, impressions, clicks: Math.round(impressions * ctr), cost, conversions: 0, conversionsValue: 0 };
+}
+
 // Per kanaal een eigen geografisch profiel. Google = demand-capture (NL/US/CA, sterke conv). Meta =
 // awareness (breed bereik, veel impressies, lagere conv-ratio). LinkedIn = B2B (smal, duur, kwaliteit).
 type Channel = "google" | "meta" | "linkedin" | "blended";
@@ -31,6 +39,8 @@ const COUNTRY_BASE: Record<Exclude<Channel, "blended">, GeoAgg[]> = {
     row("NL", 132500, 0.047, 0.037, 50),
     row("US", 94000, 0.044, 0.029, 74),
     row("CA", 46700, 0.038, 0.023, 96),
+    // Frankrijk krijgt verkeer maar converteert niet: geen Franse landingspagina.
+    deadMarket("FR", 41000, 0.036, 1_240),
   ],
   meta: [
     row("NL", 410000, 0.021, 0.012, 62),
@@ -53,7 +63,8 @@ const STATE_BASE: Record<Exclude<Channel, "blended">, GeoAgg[]> = {
   google: [
     row("CA", 22800, 0.045, 0.031, 70),
     row("TX", 16400, 0.043, 0.028, 76),
-    row("NY", 14900, 0.046, 0.030, 72),
+    // New York is hier structureel duur: veel concurrentie op hetzelfde vakpubliek.
+    row("NY", 14900, 0.046, 0.030, 205),
     row("IL", 8600, 0.041, 0.026, 84),
     row("FL", 9800, 0.040, 0.024, 90),
     row("WA", 6100, 0.044, 0.029, 74),

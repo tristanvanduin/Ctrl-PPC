@@ -129,7 +129,8 @@ export type ProposalSource =
   | "google_kpi"
   | "meta_kpi"
   | "linkedin_kpi"
-  | "google_video";
+  | "google_video"
+  | "geo_markets";
 
 /**
  * Schrijft nieuwe pending voorstellen weg en vervangt de oude van dezelfde bron,

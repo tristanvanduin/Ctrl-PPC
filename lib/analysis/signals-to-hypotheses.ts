@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SignalStory, SignalCertainty } from "@/lib/signals/types";
 import { saveProposalsReplacingPending, type SprintHypothesisRow, type ProposalSource } from "../second-opinion/findings-to-hypotheses";
 
-export type SignalSource = Extract<ProposalSource, "meta_signals" | "linkedin_signals" | "cross_channel" | "google_kpi" | "meta_kpi" | "linkedin_kpi" | "google_video">;
+export type SignalSource = Extract<ProposalSource, "meta_signals" | "linkedin_signals" | "cross_channel" | "google_kpi" | "meta_kpi" | "linkedin_kpi" | "google_video" | "geo_markets">;
 
 // Zekerheid -> ICE-vertrouwen. Bewust conservatief: een verklaringskandidaat is een
 // onderzoeksrichting, geen bewezen actie.
@@ -30,6 +30,7 @@ const CHANNEL_LABEL: Record<SignalSource, string> = {
   meta_kpi: "Meta KPI-verhoudingen",
   linkedin_kpi: "LinkedIn KPI-verhoudingen",
   google_video: "Google video & PMax",
+  geo_markets: "Landen & staten",
 };
 
 function round1(n: number): number {

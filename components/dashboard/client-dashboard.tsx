@@ -548,6 +548,14 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
             description="Kijkdiepte van de videocampagnes, placements die budget kosten zonder conversie, en netwerken binnen PMax die naar verhouding meer kosten dan ze opleveren. Bevindingen landen in de wachtrij."
             runLabel="Analyseer video & PMax"
           />
+          <SignalAnalysisCard
+            clientId={clientId}
+            endpoint="/api/analysis/geo-markets"
+            extra={{ channel: "google" }}
+            title="Landen & staten"
+            description="Welke markten kosten zonder te converteren, zijn structureel duurder, of trekken wel verkeer maar haken ná de klik af. Binnen de VS ook per staat, tegen een eigen norm."
+            runLabel="Analyseer markten"
+          />
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} onAnalysisComplete={onComplete} onAnalysisError={onSopError} />
         </>
