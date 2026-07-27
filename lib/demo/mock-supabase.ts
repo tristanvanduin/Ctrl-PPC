@@ -19,7 +19,12 @@ interface DemoRowSource {
   [table: string]: Row[];
 }
 
-const isDemoClientValue = (v: unknown): boolean =>
+/**
+ * Is dit de demoklant? Geexporteerd omdat de geo-bron dezelfde vraag stelt: een demo-vlag die van
+ * de client komt mag bepalen of je de demo ziet, niet welke klant de demo is. Twee definities
+ * zouden op termijn uiteenlopen.
+ */
+export const isDemoClientValue = (v: unknown): boolean =>
   typeof v === "string" && (v === DEMO_GREENTECH_ID || v.replace(/^gads-/, "") === DEMO_GREENTECH_ID);
 
 class MockQuery implements PromiseLike<Result> {

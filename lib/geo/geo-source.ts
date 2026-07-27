@@ -12,6 +12,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { demoGeoCountries, demoGeoStates, type GeoAgg } from "@/lib/demo/geo-demo";
+import { isDemoClientValue } from "@/lib/demo/mock-supabase";
 import { regionNameToUsps } from "./us-fips";
 
 export type GeoChannel = "google" | "meta" | "linkedin" | "blended";
@@ -118,7 +119,12 @@ export interface ResolveGeoArgs {
 // Levert de geo-rijen voor de gevraagde (kanaal, niveau). Nooit een throw: bij ontbrekende config
 // of lege tabellen komt er gewoon [] terug, wat de kaart eerlijk laat verdwijnen.
 export async function resolveGeo({ clientId, channel, level, demo }: ResolveGeoArgs): Promise<GeoAgg[]> {
-  if (demo) {
+  // De demo-vlag komt van de client, dus hij mag alleen bepalen ÓF je de demo ziet — niet wélke
+  // klant de demo is. Hij werd hier eerder toegepast vóór de klantcontrole, waardoor
+  // ?clientId=<echte-klant>&demo=1 de verzonnen GreenTech-cijfers teruggaf onder de naam van die
+  // klant. Geen datalek, maar in een gedeelde rapportlink wel een verhaal dat nergens op slaat.
+  // De zusterroute /api/geo/channels deed het al goed, via de client_id-scoping van de mock.
+  if (demo && isDemoClientValue(clientId)) {
     return level === "region" ? demoGeoStates(channel) : demoGeoCountries(channel);
   }
   const sb = makeClient();

@@ -25,7 +25,13 @@ import {
 type Row = Record<string, unknown>;
 
 const dayISO = (back: number): string => new Date(Date.now() - back * 86_400_000).toISOString().slice(0, 10);
-const monthISO = (back: number): string => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - back); return d.toISOString().slice(0, 10); };
+// In UTC, net als de serialisatie eronder. Met lokale setters kwam er in Amsterdam vlak na
+// middernacht de laatste dag van de vórige maand uit ("2026-07-31" in plaats van "2026-08-01"),
+// en dan leest elke groepering op month.slice(0,7) een maand te vroeg.
+const monthISO = (back: number): string => {
+  const n = new Date();
+  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - back, 1)).toISOString().slice(0, 10);
+};
 const iso = () => new Date().toISOString();
 
 // Deterministische maand-factor: groei (2%/mnd) × voorjaarsseizoen × lichte, per-reeks-unieke ruis.

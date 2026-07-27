@@ -14,7 +14,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isBrowseNetwork } from "@/lib/pmax/network-split";
+import { buildNetworkSplit, isBrowseNetwork } from "@/lib/pmax/network-split";
 
 // ── Maandrijen samenvoegen per entiteit ────────────────────────────────────
 // De PMax-tabellen dragen één rij per entiteit PER MAAND. Wie daar direct overheen filtert telt
@@ -110,36 +110,35 @@ export async function computePmaxInsights(
   // ── Signal 1: Network Mix Quality ──
 
   const networkMix: PmaxInsights["networkMix"] = [];
-  if (networks.length > 0) {
-    const totalCost = networks.reduce((s, n) => s + (Number(n.cost) || 0), 0);
-    const totalConv = networks.reduce((s, n) => s + (Number(n.conversions) || 0), 0);
+  // Dezelfde aggregatie als de donut op het scherm, niet een eigen kopie ernaast. Er stond hier
+  // een losse optelling, en zodra buildNetworkSplit iets anders ging doen -- kanalen zonder enige
+  // activiteit weglaten -- vertelde de prompt een ander verhaal dan de kaart. Eén bron.
+  const slices = buildNetworkSplit(networks.map((n) => ({
+    networkType: String(n.network_type ?? "UNKNOWN"),
+    cost: Number(n.cost) || 0,
+    conversions: Number(n.conversions) || 0,
+    conversionsValue: Number(n.conversions_value) || 0,
+    impressions: Number(n.impressions) || 0,
+    clicks: Number(n.clicks) || 0,
+  })));
+  if (slices.length > 0) {
+    const totalCost = slices.reduce((s, n) => s + n.cost, 0);
+    const totalConv = slices.reduce((s, n) => s + n.conversions, 0);
 
-    const byNetwork = new Map<string, { cost: number; conv: number }>();
-    for (const n of networks) {
-      const nt = String(n.network_type || "OTHER");
-      const existing = byNetwork.get(nt) ?? { cost: 0, conv: 0 };
-      existing.cost += Number(n.cost) || 0;
-      existing.conv += Number(n.conversions) || 0;
-      byNetwork.set(nt, existing);
-    }
-
-    for (const [network, data] of byNetwork) {
+    for (const s of slices) {
       networkMix.push({
-        network,
-        costPct: totalCost > 0 ? Math.round((data.cost / totalCost) * 100) : 0,
-        convPct: totalConv > 0 ? Math.round((data.conv / totalConv) * 100) : 0,
+        network: s.networkType,
+        costPct: totalCost > 0 ? Math.round((s.cost / totalCost) * 100) : 0,
+        convPct: totalConv > 0 ? Math.round((s.conversions / totalConv) * 100) : 0,
       });
     }
 
-    // Check for Display/Video dominance with low conversion share
     // Alle bereikinventaris, niet alleen Display en YouTube: sinds API v23 splitst PMax ook
     // Maps, Discover en Gmail apart uit, en die stonden hier niet in. Een account waar een derde
     // van het budget naar Maps gaat kwam zo op nul procent uit.
-    let displayCost = 0, displayConv = 0;
-    for (const [network, data] of byNetwork) {
-      if (!isBrowseNetwork(network)) continue;
-      displayCost += data.cost; displayConv += data.conv;
-    }
+    const browse = slices.filter((s) => isBrowseNetwork(s.networkType));
+    const displayCost = browse.reduce((s, n) => s + n.cost, 0);
+    const displayConv = browse.reduce((s, n) => s + n.conversions, 0);
     const displayCostPct = totalCost > 0 ? displayCost / totalCost : 0;
     const displayConvPct = totalConv > 0 ? displayConv / totalConv : 0;
 
@@ -153,7 +152,7 @@ export async function computePmaxInsights(
       });
     }
 
-    const searchCost = byNetwork.get("SEARCH")?.cost ?? 0;
+    const searchCost = slices.find((s) => s.networkType === "SEARCH")?.cost ?? 0;
     const searchCostPct = totalCost > 0 ? searchCost / totalCost : 0;
     if (searchCostPct < 0.2 && totalCost > 100) {
       signals.push({
@@ -221,9 +220,20 @@ export async function computePmaxInsights(
 
   // ── Signal 3: Asset Weakness ──
 
-  if (assets.length > 0) {
-    const lowPerf = assets.filter((a) => String(a.performance_label) === "LOW");
-    const bestPerf = assets.filter((a) => String(a.performance_label) === "BEST");
+  // Ook deze tabel draagt een rij per asset PER MAAND. De telling ging daar overheen, en dat is
+  // hier gevaarlijker dan bij de categorieën: de drempel `>= 3` is niet schaal-invariant. Met vier
+  // maanden data werd één zwakke asset er vier, dus een klant met precies één zwakke asset en geen
+  // enkele sterke kreeg de melding "veel laag-presterende assets". Vals alarm, met een aanbeveling
+  // eraan vast.
+  //
+  // We nemen de laatste maand, niet een optelling: een performance-label is een momentopname die
+  // Google bijstelt, dus het meest recente label is het ware label. Zelfde aanpak als signaal 2.
+  const laatsteAssetMaand = [...new Set(assets.map((a) => String(a.month)))].sort().pop();
+  const huidigeAssets = assets.filter((a) => String(a.month) === laatsteAssetMaand);
+
+  if (huidigeAssets.length > 0) {
+    const lowPerf = huidigeAssets.filter((a) => String(a.performance_label) === "LOW");
+    const bestPerf = huidigeAssets.filter((a) => String(a.performance_label) === "BEST");
 
     if (lowPerf.length > bestPerf.length * 2 && lowPerf.length >= 3) {
       signals.push({
@@ -236,10 +246,10 @@ export async function computePmaxInsights(
     }
 
     // Check asset type coverage
-    const types = new Set(assets.map((a) => String(a.asset_type)));
+    const types = new Set(huidigeAssets.map((a) => String(a.asset_type)));
     const hasImages = types.has("IMAGE") || types.has("MEDIA_BUNDLE");
     const hasVideo = types.has("YOUTUBE_VIDEO");
-    if (!hasVideo && assets.length > 5) {
+    if (!hasVideo && huidigeAssets.length > 5) {
       signals.push({
         type: "asset_coverage",
         severity: "low",

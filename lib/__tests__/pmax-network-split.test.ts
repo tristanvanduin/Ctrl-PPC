@@ -132,5 +132,22 @@ for (const t of ["MIXED", "UNSPECIFIED", "UNKNOWN", "GOOGLE_OWNED_CHANNELS"]) {
 check("lege waarde valt buiten beide", !isBrowseNetwork("") && !isIntentNetwork(""));
 check("hoofdletterongevoelig", isIntentNetwork("search") && isBrowseNetwork("maps"));
 
+
+console.log("\nLege netwerken vallen af");
+{
+  // Sinds v23 rapporteert Google ook kanalen waar niets gebeurde; die horen niet in de ring.
+  const met = buildNetworkSplit([
+    { networkType: "SEARCH", cost: 100, conversions: 10, conversionsValue: 1000, impressions: 5000, clicks: 200 },
+    { networkType: "GMAIL", cost: 0, conversions: 0, conversionsValue: 0, impressions: 0, clicks: 0 },
+  ]);
+  check("een volledig leeg netwerk verdwijnt", met.length === 1 && met[0].networkType === "SEARCH", met.map((x) => x.networkType).join(","));
+  const gratis = buildNetworkSplit([
+    { networkType: "SEARCH", cost: 100, conversions: 10, conversionsValue: 1000, impressions: 5000, clicks: 200 },
+    { networkType: "DISCOVER", cost: 0, conversions: 0, conversionsValue: 0, impressions: 4000, clicks: 12 },
+  ]);
+  check("nul kosten maar wel bereik blijft staan", gratis.length === 2, gratis.map((x) => x.networkType).join(","));
+  check("aandelen tellen nog steeds op tot een", Math.abs(met.reduce((s, x) => s + x.costShare, 0) - 1) < 1e-9);
+}
+
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

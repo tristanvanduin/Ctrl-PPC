@@ -544,9 +544,11 @@ export async function calculateGeoContext(
   clientId: string
 ): Promise<string> {
   // Fetch last 3 months of country data
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-  const startDate = `${threeMonthsAgo.getFullYear()}-${String(threeMonthsAgo.getMonth() + 1).padStart(2, "0")}-01`;
+  // UTC, en dag 1 vóór de maandverschuiving: anders rolt "31 februari" door naar maart en wijkt
+  // de grens op maandeindes een hele maand af.
+  const nu = new Date();
+  const drieTerug = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth() - 3, 1));
+  const startDate = drieTerug.toISOString().slice(0, 10);
 
   const [{ data: countryData }, { data: yoyData }, { data: campaignCountryData }] = await Promise.all([
     supabase
@@ -587,8 +589,8 @@ export async function calculateGeoContext(
 
   // Previous month
   const prevMonth = new Date(latestMonth);
-  prevMonth.setMonth(prevMonth.getMonth() - 1);
-  const prevMonthStr = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}-01`;
+  const prevMonthStr = new Date(Date.UTC(prevMonth.getUTCFullYear(), prevMonth.getUTCMonth() - 1, 1))
+    .toISOString().slice(0, 10);
   const prevData = countryData.filter((r) => (r.month as string).startsWith(prevMonthStr.slice(0, 7)));
 
   const lines: string[] = [];

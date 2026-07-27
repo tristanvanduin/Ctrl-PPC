@@ -440,19 +440,34 @@ export async function runStep(opts: {
 
 // ── Date helpers ────────────────────────────────────────────────────────────
 
+// Alles hier rekent in UTC. Dat is geen voorkeur maar een noodzaak: fmt() serialiseert via
+// toISOString, en dat is UTC. Wie er met lokale setters aan rekent, mengt twee tijdlijnen en
+// verschuift de uitkomst met de tijdzone-offset. Op een UTC-server valt dat nooit op — ook niet
+// in de tests, want die draaien daar ook — en bij een klant in Amsterdam schuift elke grens een
+// dag op.
+
 export function fmt(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
+/**
+ * De eerste van de maand, n maanden terug.
+ *
+ * Date.UTC met dag 1 is hier het hele punt. De vorige versie deed setMonth() vóór setDate(1), en
+ * dan wordt "31 februari" doorgerold naar 1 maart: op de 29e tot en met de 31e van een maand gaf
+ * monthsAgo(1) de HUIDIGE maand terug in plaats van de vorige. Vijftien dagen per jaar, waarvan
+ * het gevolg was dat het analysevenster van dertien naar twaalf maanden kromp — precies genoeg om
+ * de jaar-op-jaar-tegenhanger van de geanalyseerde maand te laten verdwijnen.
+ *
+ * Date.UTC(jaar, maand - n, 1) rekent een negatieve maandindex netjes terug over de jaargrens en
+ * kan per definitie niet overlopen, omdat dag 1 in elke maand bestaat.
+ */
 export function monthsAgo(n: number): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - n);
-  d.setDate(1);
-  return fmt(d);
+  const now = new Date();
+  return fmt(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - n, 1)));
 }
 
+/** n dagen terug. Rekenen in milliseconden houdt het los van tijdzone en zomertijd. */
 export function daysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return fmt(d);
+  return fmt(new Date(Date.now() - n * 86_400_000));
 }

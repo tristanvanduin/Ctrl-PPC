@@ -2,9 +2,10 @@
 // conversies vandaan.
 //
 // PMax is voor de adverteerder een black box — Google verdeelt het budget zelf over Zoeken,
-// Display, YouTube, Discover en Gmail. Die verdeling wordt wél gesynct maar bereikte tot nu toe
-// alleen de AI-lagen, nooit het scherm. Terwijl juist híer de scheefheid zichtbaar wordt: als 40%
-// van je budget naar Display gaat en daar 5% van de conversies vandaan komt, is dat het gesprek.
+// Zoekpartners, Display, YouTube, Maps, Discover en Gmail. Die verdeling wordt wél gesynct maar
+// bereikte tot nu toe alleen de AI-lagen, nooit het scherm. Terwijl juist híer de scheefheid
+// zichtbaar wordt: als een derde van je budget naar Maps gaat en daar een tiende van de
+// conversies vandaan komt, is dat het gesprek.
 //
 // Vandaar dat kosten en conversies naast elkaar staan en niet los: het aandeel op zichzelf zegt
 // weinig, het verschil tussen de twee aandelen is het signaal.
@@ -39,10 +40,9 @@ export interface NetworkSlice {
   shareGap: number | null;
 }
 
-// Google's ad_network_type-waarden, in het Nederlands. Onbekende waarden houden hun eigen naam,
-// zodat een nieuw netwerk zichtbaar blijft in plaats van stilletjes onder "overig" te verdwijnen.
-// De kanalen die Google Ads onderscheidt, in de termen van het "Where your conversions come
-// from"-rapport in de interface.
+// Google's ad_network_type-waarden in het Nederlands, in de termen van het "Where your conversions
+// come from"-rapport in de interface. Onbekende waarden houden hun eigen naam, zodat een nieuw
+// netwerk zichtbaar blijft in plaats van stilletjes onder "overig" te verdwijnen.
 //
 // SINDS API v23 (januari 2026) is deze lijst langer geworden, en dat is geen detail: waar PMax
 // eerder alles buiten Zoeken op MIXED gooide, komen Maps, Discover en Gmail er nu apart uit. In
@@ -123,7 +123,13 @@ export function buildNetworkSplit(rows: NetworkRow[]): NetworkSlice[] {
     m.set(key, a);
   }
 
-  const all = [...m.values()];
+  // Netwerken zonder enige activiteit vallen af. Sinds v23 rapporteert Google elk kanaal apart,
+  // ook de kanalen waar niets gebeurde: in veel accounts staat Gmail op precies nul kosten, nul
+  // vertoningen en nul conversies. Zo'n segment is onzichtbaar in de ring maar kost wel een
+  // legenda-regel en een kleur uit het palet, waardoor de kanalen die er wél toe doen opschuiven
+  // naar minder onderscheidbare kleuren. Een netwerk met nul kosten maar wél vertoningen blijft
+  // staan — dat is gratis bereik, en dat is informatie.
+  const all = [...m.values()].filter((r) => r.cost > 0 || r.impressions > 0 || r.conversions > 0);
   const totalCost = all.reduce((s, r) => s + r.cost, 0);
   const totalConv = all.reduce((s, r) => s + r.conversions, 0);
 

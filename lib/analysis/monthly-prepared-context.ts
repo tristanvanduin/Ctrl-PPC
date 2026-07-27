@@ -93,12 +93,18 @@ type AdGroupComparisonRow = {
   roas?: number;
 };
 
+// Volledig in UTC, net als fmt() waarmee het resultaat wordt geserialiseerd. De vorige versie
+// bouwde de einddatum met new Date(jaar, maand, 0) — een LOKALE middernacht — en serialiseerde
+// die als UTC. In elke tijdzone vóór UTC lag periodEnd daardoor altijd een dag te vroeg, elke dag
+// van het jaar. Voor maandtabellen viel dat weg omdat die op de 1e staan, maar elke
+// .lte("date", periodEnd) op een dagtabel sneed de laatste dag van de geanalyseerde maand eraf.
 function computeAnalysisWindow() {
   const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const analysisYear = currentMonth === 1 ? now.getFullYear() - 1 : now.getFullYear();
+  const currentMonth = now.getUTCMonth() + 1;
+  const analysisYear = currentMonth === 1 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
   const lastCompleteMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-  const periodEndDate = new Date(analysisYear, lastCompleteMonth, 0);
+  // Dag 0 van de volgende maand = de laatste dag van deze.
+  const periodEndDate = new Date(Date.UTC(analysisYear, lastCompleteMonth, 0));
   return {
     analysisYear,
     lastCompleteMonth,
