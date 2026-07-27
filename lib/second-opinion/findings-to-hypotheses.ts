@@ -128,7 +128,8 @@ export type ProposalSource =
   | "quality_score"
   | "google_kpi"
   | "meta_kpi"
-  | "linkedin_kpi";
+  | "linkedin_kpi"
+  | "google_video";
 
 /**
  * Schrijft nieuwe pending voorstellen weg en vervangt de oude van dezelfde bron,

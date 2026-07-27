@@ -541,6 +541,13 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
             description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
             runLabel="Analyseer verhoudingen"
           />
+          <SignalAnalysisCard
+            clientId={clientId}
+            endpoint="/api/analysis/google-video"
+            title="Video & Performance Max"
+            description="Kijkdiepte van de videocampagnes, placements die budget kosten zonder conversie, en netwerken binnen PMax die naar verhouding meer kosten dan ze opleveren. Bevindingen landen in de wachtrij."
+            runLabel="Analyseer video & PMax"
+          />
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} onAnalysisComplete={onComplete} onAnalysisError={onSopError} />
         </>
