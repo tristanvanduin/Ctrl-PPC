@@ -16,6 +16,38 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isBrowseNetwork } from "@/lib/pmax/network-split";
 
+// ── Maandrijen samenvoegen per entiteit ────────────────────────────────────
+// De PMax-tabellen dragen één rij per entiteit PER MAAND. Wie daar direct overheen filtert telt
+// bij vier maanden data alles vier keer: "16 zoekcategorieën zonder conversies" waar het er vier
+// zijn. En dat is nog de onschuldige helft — een categorie die in één maand niets opleverde maar
+// in de andere drie wél, kwam er als verspilling uit, terwijl hij gewoon werkt.
+//
+// Drempels horen daarom op het totaal over het venster te liggen, niet op een losse maand. Dat is
+// ook hoe de omliggende sommen (totale kosten, aandeel) al werkten; alleen de filters en de
+// tellingen keken naar rijen.
+
+interface EntityTotals {
+  label: string;
+  cost: number;
+  conversions: number;
+  impressions: number;
+}
+
+/** Voegt maandrijen samen tot één rij per entiteit, op de opgegeven sleutelkolom. */
+export function aggregateByEntity(rows: Array<Record<string, unknown>>, keyColumn: string): EntityTotals[] {
+  const byKey = new Map<string, EntityTotals>();
+  for (const r of rows) {
+    const label = String(r[keyColumn] ?? "").trim();
+    if (!label) continue;
+    const acc = byKey.get(label) ?? { label, cost: 0, conversions: 0, impressions: 0 };
+    acc.cost += Number(r.cost) || 0;
+    acc.conversions += Number(r.conversions) || 0;
+    acc.impressions += Number(r.impressions) || 0;
+    byKey.set(label, acc);
+  }
+  return [...byKey.values()].sort((a, b) => b.cost - a.cost);
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface PmaxSignal {
@@ -221,16 +253,17 @@ export async function computePmaxInsights(
   // ── Signal 4: Placement Waste ──
 
   if (placements.length > 0) {
-    const wasteThreshold = 20; // €20+
-    const wastePlacements = placements.filter((p) => (Number(p.cost) || 0) > wasteThreshold && (Number(p.conversions) || 0) === 0);
-    const totalWaste = wastePlacements.reduce((s, p) => s + (Number(p.cost) || 0), 0);
+    const wasteThreshold = 20; // €20+ over het hele venster
+    const byPlacement = aggregateByEntity(placements, "placement");
+    const wastePlacements = byPlacement.filter((p) => p.cost > wasteThreshold && p.conversions === 0);
+    const totalWaste = wastePlacements.reduce((s, p) => s + p.cost, 0);
 
     if (wastePlacements.length > 0 && totalWaste > 50) {
       signals.push({
         type: "placement_waste",
         severity: "high",
         title: `€${Math.round(totalWaste)} verspild op plaatsingen zonder conversies`,
-        description: `${wastePlacements.length} plaatsing(en) met >€${wasteThreshold} spend en 0 conversies. Top: ${wastePlacements.slice(0, 3).map((p) => String(p.placement)).join(", ")}.`,
+        description: `${wastePlacements.length} plaatsing(en) met >€${wasteThreshold} spend en 0 conversies. Top: ${wastePlacements.slice(0, 3).map((p) => p.label).join(", ")}.`,
         confidence: "high",
       });
     }
@@ -239,9 +272,10 @@ export async function computePmaxInsights(
   // ── Signal 5: Search Category Dilution ──
 
   if (searchCats.length > 0) {
-    const totalCost = searchCats.reduce((s, c) => s + (Number(c.cost) || 0), 0);
-    const zeroConvCats = searchCats.filter((c) => (Number(c.conversions) || 0) === 0 && (Number(c.cost) || 0) > 10);
-    const wasteCost = zeroConvCats.reduce((s, c) => s + (Number(c.cost) || 0), 0);
+    const byCategory = aggregateByEntity(searchCats, "category_label");
+    const totalCost = byCategory.reduce((s, c) => s + c.cost, 0);
+    const zeroConvCats = byCategory.filter((c) => c.conversions === 0 && c.cost > 10);
+    const wasteCost = zeroConvCats.reduce((s, c) => s + c.cost, 0);
 
     if (zeroConvCats.length > 3 && wasteCost > totalCost * 0.2) {
       signals.push({
@@ -260,32 +294,33 @@ export async function computePmaxInsights(
     // Detect foreign language search terms (PMAX expanding to non-targeted markets)
     const foreignPatterns = /[\u0600-\u06FF]|[\u0400-\u04FF]|[\u4E00-\u9FFF]|[\u3040-\u309F]|[\u30A0-\u30FF]/; // Arabic, Cyrillic, Chinese, Japanese
     const nonTargetLanguages = ["civciv", "makinesi", "kuluçka", "yumurta", "csirke", "keltetö", "wylegarnia", "chocadeira", "couveuse"]; // Common non-NL/DE/FR terms
-    const foreignTerms = searchCats.filter((c) => {
-      const label = String(c.category_label || "").toLowerCase();
+    const categories = aggregateByEntity(searchCats, "category_label");
+    const foreignTerms = categories.filter((c) => {
+      const label = c.label.toLowerCase();
       return foreignPatterns.test(label) || nonTargetLanguages.some((t) => label.includes(t));
     });
-    const foreignCost = foreignTerms.reduce((s, c) => s + (Number(c.cost) || 0), 0);
-    const foreignImpr = foreignTerms.reduce((s, c) => s + (Number(c.impressions) || 0), 0);
+    const foreignCost = foreignTerms.reduce((s, c) => s + c.cost, 0);
+    const foreignImpr = foreignTerms.reduce((s, c) => s + c.impressions, 0);
 
     if (foreignTerms.length > 0 && (foreignCost > 10 || foreignImpr > 500)) {
       signals.push({
         type: "search_language_leakage",
         severity: foreignCost > 50 ? "high" : "medium",
         title: `PMAX taal-lekkage: ${foreignTerms.length} zoekcategorieën in niet-getargete talen`,
-        description: `€${Math.round(foreignCost)} spend en ${foreignImpr} impressies op termen in buitenlandse talen (o.a. ${foreignTerms.slice(0, 3).map((c) => `"${String(c.category_label)}"`).join(", ")}). PMAX breidt uit naar markten die niet getarget worden. Controleer taalinstellingen en voeg negatieve zoekwoorden toe.`,
+        description: `€${Math.round(foreignCost)} spend en ${foreignImpr} impressies op termen in buitenlandse talen (o.a. ${foreignTerms.slice(0, 3).map((c) => `"${c.label}"`).join(", ")}). PMAX breidt uit naar markten die niet getarget worden. Controleer taalinstellingen en voeg negatieve zoekwoorden toe.`,
         confidence: "high",
       });
     }
 
     // Analyze search category quality: high-impr zero-conv categories
-    const highImprZeroConv = searchCats.filter((c) => (Number(c.impressions) || 0) > 5000 && (Number(c.conversions) || 0) === 0);
+    const highImprZeroConv = categories.filter((c) => c.impressions > 5000 && c.conversions === 0);
     if (highImprZeroConv.length > 0) {
-      const wastedImpr = highImprZeroConv.reduce((s, c) => s + (Number(c.impressions) || 0), 0);
+      const wastedImpr = highImprZeroConv.reduce((s, c) => s + c.impressions, 0);
       signals.push({
         type: "search_category_waste",
         severity: "medium",
         title: `${highImprZeroConv.length} zoekcategorieën met >5K impressies maar 0 conversies`,
-        description: `Categorieën zoals ${highImprZeroConv.slice(0, 3).map((c) => `"${String(c.category_label)}"`).join(", ")} genereren samen ${wastedImpr.toLocaleString()} impressies zonder conversies. PMAX verspilt bereik op irrelevante zoekthema's.`,
+        description: `Categorieën zoals ${highImprZeroConv.slice(0, 3).map((c) => `"${c.label}"`).join(", ")} genereren samen ${wastedImpr.toLocaleString()} impressies zonder conversies. PMAX verspilt bereik op irrelevante zoekthema's.`,
         confidence: "high",
       });
     }
