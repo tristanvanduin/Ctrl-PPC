@@ -41,14 +41,31 @@ export interface NetworkSlice {
 
 // Google's ad_network_type-waarden, in het Nederlands. Onbekende waarden houden hun eigen naam,
 // zodat een nieuw netwerk zichtbaar blijft in plaats van stilletjes onder "overig" te verdwijnen.
+// De kanalen die Google Ads onderscheidt, in de termen van het "Where your conversions come
+// from"-rapport in de interface.
+//
+// SINDS API v23 (januari 2026) is deze lijst langer geworden, en dat is geen detail: waar PMax
+// eerder alles buiten Zoeken op MIXED gooide, komen Maps, Discover en Gmail er nu apart uit. In
+// echte accounts is Maps regelmatig de grootste kostenpost van de campagne. Stond die hier niet,
+// dan verscheen de grootste taartpunt als de kale enum-naam "MAPS".
+//
+// Let op de historie in de data: kanaaldata bestaat pas vanaf 1 juni 2025, en oudere maanden
+// blijven MIXED. GOOGLE_OWNED_CHANNELS is de verzamelnaam van vóór de opsplitsing en komt alleen
+// nog in historische rijen voor.
 const NETWORK_LABEL: Record<string, string> = {
   SEARCH: "Zoeken",
   SEARCH_PARTNERS: "Zoekpartners",
   CONTENT: "Display",
+  YOUTUBE: "YouTube",
+  MAPS: "Maps",
+  DISCOVER: "Discover",
+  GMAIL: "Gmail",
+  GOOGLE_TV: "Google TV",
+  GOOGLE_OWNED_CHANNELS: "Google-eigen kanalen",
+  MIXED: "Cross-network",
+  // Oudere waarden uit de tijd vóór v23; blijven staan voor historische rijen.
   YOUTUBE_WATCH: "YouTube",
   YOUTUBE_SEARCH: "YouTube (zoeken)",
-  YOUTUBE: "YouTube",
-  MIXED: "Gemengd",
   UNSPECIFIED: "Onbekend",
   UNKNOWN: "Onbekend",
 };

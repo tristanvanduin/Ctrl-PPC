@@ -206,3 +206,19 @@ export function findMixDeviations(cells: ChannelCell[]): MixDeviation[] {
   }
   return out.sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
 }
+
+/**
+ * Per markt alleen de sterkste afwijking. Een markt die structureel anders in elkaar zit wijkt op
+ * álle kanalen tegelijk af — Frankrijk zonder zoekcampagne scoort automatisch ook hoog op video en
+ * display, want die aandelen moeten samen op honderd uitkomen. Zonder deze stap vult één markt de
+ * hele lijst en komt de tweede markt nooit in beeld, terwijl de derde regel over Frankrijk niets
+ * toevoegt aan de eerste.
+ */
+export function strongestPerCountry(deviations: MixDeviation[]): MixDeviation[] {
+  const best = new Map<string, MixDeviation>();
+  for (const d of deviations) {
+    const cur = best.get(d.country);
+    if (!cur || Math.abs(d.gap) > Math.abs(cur.gap)) best.set(d.country, d);
+  }
+  return [...best.values()].sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+}

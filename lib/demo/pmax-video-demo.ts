@@ -123,10 +123,21 @@ export function assetGroupRows(clientId: string, campaignMonthly: Row[], months:
 // sturen op één doel zonder feed: het algoritme koopt goedkoop bereik in waar dat te krijgen is.
 // De analyse hoort dat te zien en er een budgetgesprek van te maken, niet een alarm.
 
+// De zeven kanalen die het "Where your conversions come from"-rapport toont, in de verhouding
+// die je in echte feedloze PMax-accounts terugziet: Maps als grootste kostenpost, YouTube daar
+// vlak achter, en Zoeken dat met een kwart van het budget de meeste conversies levert.
+//
+// Maps zo groot is geen verzinsel maar het patroon dat deze uitsplitsing juist zo waardevol
+// maakt — vóór v23 verdween dat volledig in de verzamelbak MIXED, en zag je alleen dat "de rest"
+// duur was zonder te weten wát.
 const PMAX_NETWORKS: Array<{ type: string; costW: number; convW: number; impW: number }> = [
-  { type: "SEARCH", costW: 0.34, convW: 0.62, impW: 0.12 },
-  { type: "CONTENT", costW: 0.28, convW: 0.19, impW: 0.46 },
-  { type: "YOUTUBE_WATCH", costW: 0.38, convW: 0.19, impW: 0.42 },
+  { type: "MAPS", costW: 0.34, convW: 0.11, impW: 0.22 },
+  { type: "YOUTUBE", costW: 0.27, convW: 0.09, impW: 0.38 },
+  { type: "SEARCH", costW: 0.23, convW: 0.57, impW: 0.09 },
+  { type: "SEARCH_PARTNERS", costW: 0.12, convW: 0.15, impW: 0.07 },
+  { type: "DISCOVER", costW: 0.035, convW: 0.06, impW: 0.16 },
+  { type: "CONTENT", costW: 0.005, convW: 0.02, impW: 0.08 },
+  { type: "GMAIL", costW: 0, convW: 0, impW: 0 },
 ];
 
 export function pmaxNetworkRows(clientId: string, assetGroupRowsIn: Row[], syncedAt: string): Row[] {

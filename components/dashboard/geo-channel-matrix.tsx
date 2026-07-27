@@ -6,7 +6,7 @@ import { isDemoMode } from "@/lib/demo/demo-mode";
 import { divergingColor, inkOn } from "@/lib/branding/chart-colors";
 import { stateLabel } from "@/lib/geo/us-fips";
 import {
-  matrixTotals, cellIndex, findMixDeviations, isUnsplit, cpa, roas,
+  matrixTotals, cellIndex, findMixDeviations, strongestPerCountry, isUnsplit, cpa, roas,
   CHANNEL_LABEL, type ChannelCell, type ChannelKey,
 } from "@/lib/geo/channel-matrix";
 
@@ -56,7 +56,7 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
 
   const totals = useMemo(() => (cells ? matrixTotals(cells) : null), [cells]);
   const index = useMemo(() => (cells ? cellIndex(cells) : new Map<string, ChannelCell>()), [cells]);
-  const deviations = useMemo(() => (cells ? findMixDeviations(cells) : []), [cells]);
+  const deviations = useMemo(() => (cells ? strongestPerCountry(findMixDeviations(cells)) : []), [cells]);
 
   const metric = METRICS[metricKey];
 

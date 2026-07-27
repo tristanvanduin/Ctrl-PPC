@@ -3,7 +3,7 @@
 
 import {
   buildChannelMatrix, matrixTotals, cellIndex, findMixDeviations, channelFromCampaignType,
-  isUnsplit, cpa, roas, CHANNEL_ORDER, MIN_COUNTRY_COST,
+  isUnsplit, cpa, roas, CHANNEL_ORDER, MIN_COUNTRY_COST, strongestPerCountry,
   type GeoCampaignRow,
 } from "./channel-matrix";
 import { demoRows } from "../demo/demo-rows";
@@ -100,6 +100,23 @@ check("landtotalen == ads_country_monthly", mismatches.length === 0, mismatches.
 
 check("Frankrijk draait geen zoekcampagne", !cellIndex(demoCells).has("FR|search"));
 check("Frankrijk converteert niet", (dt.byCountry.get("FR")?.conversions ?? -1) === 0);
+
+
+console.log("\nSterkste afwijking per markt");
+{
+  const many = [
+    { country: "FR", channel: "search" as const, countryShare: 0, accountShare: 0.5, gap: -0.5 },
+    { country: "FR", channel: "video" as const, countryShare: 0.62, accountShare: 0.17, gap: 0.45 },
+    { country: "FR", channel: "display" as const, countryShare: 0.38, accountShare: 0.07, gap: 0.31 },
+    { country: "CA", channel: "display" as const, countryShare: 0.34, accountShare: 0.07, gap: 0.27 },
+  ];
+  const top = strongestPerCountry(many);
+  check("één regel per markt", top.length === 2, String(top.length));
+  check("de sterkste wint", top[0].country === "FR" && top[0].channel === "search");
+  check("tweede markt komt in beeld", top[1].country === "CA");
+  check("nog steeds op grootte gesorteerd", Math.abs(top[0].gap) >= Math.abs(top[1].gap));
+  check("leeg blijft leeg", strongestPerCountry([]).length === 0);
+}
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

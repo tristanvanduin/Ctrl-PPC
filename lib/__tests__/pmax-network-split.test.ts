@@ -103,5 +103,17 @@ console.log("\n8. Leeg en nul-kosten: geen deling door nul");
   check("totalen kloppen", t.cost === 0 && t.conversions === 0);
 }
 
+
+// ── v23-kanalen ────────────────────────────────────────────────────────────
+// Sinds API v23 splitst PMax uit naar Maps, Discover, Gmail en Google TV in plaats van alles op
+// MIXED te gooien. Zonder label verschijnt de grootste taartpunt als kale enum-naam, en Maps is
+// in echte accounts regelmatig juist de grootste kostenpost.
+console.log("\nAlle v23-netwerktypes hebben een label");
+for (const t of ["SEARCH", "SEARCH_PARTNERS", "CONTENT", "MIXED", "YOUTUBE", "GOOGLE_TV", "DISCOVER", "GMAIL", "MAPS", "GOOGLE_OWNED_CHANNELS"]) {
+  const label = networkLabel(t);
+  check(`${t} vertaald`, label !== t && label.length > 0, `kreeg "${label}"`);
+}
+check("onbekende toekomstige waarde valt terug op zichzelf", networkLabel("IETS_NIEUWS") === "IETS_NIEUWS");
+
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);
