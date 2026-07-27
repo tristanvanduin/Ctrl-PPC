@@ -34,24 +34,40 @@ function check(name: string, cond: boolean, detail = "") {
   else { failed++; fouten.push(`${name}  ${detail}`); }
 }
 
-/** Elke dag van 2026, plus een paar tijdstippen die de UTC-grens overschrijden. */
+// 2027 is een gewoon jaar, 2028 een schrikkeljaar. Beide erin, want 29 februari is precies het
+// soort dag waarop datum-rekenwerk omvalt: hij bestaat niet in het vorige jaar, en een maand die
+// erop uitkomt heeft geen 30e of 31e.
+const JAREN = [2027, 2028];
+
+/** Elke dag van de gekozen jaren, plus een tijdstip dat de UTC-grens overschrijdt. */
 function* dagen(): Generator<string> {
-  for (let m = 0; m < 12; m++) {
-    const laatste = new RealDate(RealDate.UTC(2026, m + 1, 0)).getUTCDate();
-    for (let d = 1; d <= laatste; d++) {
-      const dag = `2026-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      yield `${dag}T12:00:00Z`;
-      yield `${dag}T23:30:00Z`; // in UTC+1/+2 is het dan al morgen
+  for (const jaar of JAREN) {
+    for (let m = 0; m < 12; m++) {
+      const laatste = new RealDate(RealDate.UTC(jaar, m + 1, 0)).getUTCDate();
+      for (let d = 1; d <= laatste; d++) {
+        const dag = `${jaar}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        yield `${dag}T12:00:00Z`;
+        yield `${dag}T23:30:00Z`; // in UTC+1/+2 is het dan al morgen
+      }
     }
   }
 }
+
+// Eeuwjaren volgen de uitzonderingsregel: deelbaar door 100 is géén schrikkeljaar, tenzij ook
+// door 400. Die twee zitten er los bij, want een volledig jaar aflopen is er te duur voor.
+const EEUWGEVALLEN = [
+  "2100-03-31T12:00:00Z", // 2100 is GEEN schrikkeljaar -> februari heeft 28 dagen
+  "2400-03-31T12:00:00Z", // 2400 wél -> 29
+  "2028-02-29T12:00:00Z", // de schrikkeldag zelf
+  "2028-02-29T23:30:00Z",
+];
 
 async function main() {
   const { monthsAgo, daysAgo } = await import("./helpers");
 
   for (const tz of ["UTC", "Europe/Amsterdam", "America/New_York"]) {
     process.env.TZ = tz;
-    for (const moment of dagen()) {
+    for (const moment of [...dagen(), ...EEUWGEVALLEN]) {
       NU = moment;
       const now = new RealDate(moment);
 
@@ -84,8 +100,9 @@ async function main() {
 
   for (const tz of ["UTC", "Europe/Amsterdam"]) {
     process.env.TZ = tz;
-    for (const dag of ["2026-01-01", "2026-01-31", "2026-02-28", "2026-03-29", "2026-03-30",
-                       "2026-03-31", "2026-05-31", "2026-07-15", "2026-07-31", "2026-12-31"]) {
+    for (const dag of ["2028-01-01", "2028-01-31", "2028-02-29", "2028-03-29", "2028-03-30",
+                       "2028-03-31", "2028-05-31", "2028-07-15", "2028-07-31", "2028-12-31",
+                       "2027-02-28", "2027-03-01", "2027-03-31"]) {
       for (const uur of ["12:00:00", "23:30:00"]) {
         NU = `${dag}T${uur}Z`;
         const i = await fetchMonthlyPreparedInputs(sb, "demo-greentech");
