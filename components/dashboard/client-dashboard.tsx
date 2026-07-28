@@ -38,6 +38,7 @@ import { HealthBadge } from "./health-badge";
 import { PacingMonitor } from "./pacing-monitor";
 import { ClientNotes } from "./client-notes";
 import { ForecastTable } from "./forecast-table";
+import { BudgetScenario } from "./budget-scenario";
 import { ClientFiles } from "./client-files";
 import { DgmView } from "./dgm-view";
 import { MetaView } from "./meta-view";
@@ -431,7 +432,12 @@ export function ClientDashboard({ client }: { client: Client }) {
               ) : (
                 <>
                   <ChannelTabs channel={channel} onChange={setChannel} />
-                  {channel === "google" && <ForecastTable clientId={client.id} />}
+                  {channel === "google" && (
+                    <>
+                      <ForecastTable clientId={client.id} />
+                      <BudgetScenario clientId={client.id} />
+                    </>
+                  )}
                   {channel === "blended" && (
                     <>
                       <ChannelForecast clientId={client.id} channel="blended" />

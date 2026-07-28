@@ -47,6 +47,15 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
   // Headroom: if we lose 30% IS to budget, we can grow ~30% at same efficiency
   const headroomPct = Math.round(avgBudgetLostIS * 100);
 
+  // Zonder conversies bestaat er geen CPA, en zonder CPA is dit scenario niet te rekenen.
+  //
+  // Eerder viel dat stil terug op nul: `currentCpa > 0 ? spend / cpa : 0` gaf bij nul conversies
+  // nul extra conversies, en de kaarten toonden dan bij +100% budget doodleuk "0 extra
+  // conversies, CPA € 0, constant". Dat leest als "meer budget levert niets op" terwijl het
+  // betekent "hier valt niets over te zeggen" — en dat is precies het verschil waar een
+  // budgetbeslissing op hangt.
+  const scenarioTeRekenen = currentCpa > 0 && currentMonthlySpend > 0;
+
   // Scenario: budget verandert, CPA blijft gelijk
   // Dit is de correcte aanname bij tCPA bidding of stabiele efficiency
   const factor = 1 + budgetChange / 100;
@@ -138,8 +147,21 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
         </div>
       </div>
 
+      {/* Geen CPA, geen scenario */}
+      {budgetChange !== 0 && !scenarioTeRekenen && (
+        <div className="px-4 py-3 rounded-lg border bg-amber-50 border-amber-200">
+          <p className="text-sm text-amber-800">
+            <span className="font-medium">Nog niet te berekenen.</span> Dit scenario rekent met de
+            huidige kosten per conversie, en die is er nog niet: er zijn dit jaar
+            {currentAnnualConv > 0 ? " nog geen kosten geregistreerd" : " nog geen conversies gemeten"}.
+            Een budgetwijziging levert dus geen voorspelling op — dat is iets anders dan een
+            voorspelling van nul.
+          </p>
+        </div>
+      )}
+
       {/* Results */}
-      {budgetChange !== 0 && (
+      {budgetChange !== 0 && scenarioTeRekenen && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <ResultCard
@@ -221,7 +243,7 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
         <span>
           Aanname: CPA blijft constant bij budgetwijziging (tCPA biedstrategie).
-          Extra conversies = extra spend ÷ huidige CPA ({fmt(currentCpa)}).
+          Extra conversies = extra spend ÷ huidige CPA ({scenarioTeRekenen ? fmt(currentCpa) : "nog niet bekend"}).
           ROAS = omzet ÷ spend, verschuift minimaal bij constante AOV ({aov > 0 ? fmt(aov) : "n.v.t."}).
           {headroomPct > 0 && ` IS headroom: ${headroomPct}% van impressies wordt nu gemist door budget.`}
         </span>
