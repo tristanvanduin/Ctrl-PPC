@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ClientHistoricalData, MonthlyRecord, WeeklyRecord } from "../types";
 import { computeForecast, type ClientForecast } from "../forecast";
+import { today } from "../reporting-date";
 
 interface AccountRow {
   month: string;         // YYYY-MM-DD
@@ -23,7 +24,7 @@ interface AccountRow {
   conversion_rate: number;
 }
 
-interface WeeklyRow {
+export interface WeeklyRow {
   week_start: string;
   cost: number;
   conversions: number;
@@ -48,9 +49,21 @@ function rowToMonthlyRecord(row: AccountRow): MonthlyRecord {
   };
 }
 
-function buildWeeks(weeklyRows: WeeklyRow[], month: number): WeeklyRecord[] {
+/**
+ * De weken van een specifieke maand in een specifiek JAAR.
+ *
+ * Het jaar stond hier niet in. Dat had twee gevolgen tegelijk, en allebei zijn ze stil:
+ *
+ *   1. De weekdata werd alleen voor het huidige jaar opgehaald, dus juni 2024 kreeg de weken
+ *      van juni 2026 aangehangen. De forecast gebruikt die weken voor de verdeling binnen een
+ *      maand en voor het aantal weken per maand, dus historische seizoenspatronen werden met
+ *      cijfers van dit jaar gevuld.
+ *   2. Maanden die dit jaar nog niet geweest zijn kregen NUL weken in alle historische jaren.
+ *      Bij een analyse in juli betekent dat: augustus tot en met december leeg, elk jaar.
+ */
+export function buildWeeks(weeklyRows: WeeklyRow[], year: number, month: number): WeeklyRecord[] {
   const monthWeeks = weeklyRows
-    .filter((w) => parseMonth(w.week_start) === month)
+    .filter((w) => parseYear(w.week_start) === year && parseMonth(w.week_start) === month)
     .sort((a, b) => a.week_start.localeCompare(b.week_start));
 
   return monthWeeks.map((w, i) => ({
@@ -77,9 +90,8 @@ export async function computeAnalysisTargets(
   currentYear: number;
   monthlyExpected: { month: number; conversions: number; revenue: number; adSpend: number }[];
 } | null> {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // 1-12
+  // Amsterdamse kalenderdag, niet de UTC-datum van het serverproces: zie lib/reporting-date.ts.
+  const [currentYear, currentMonth] = today().split("-").slice(0, 2).map(Number);
   const lastCompleteMonth = currentMonth - 1 || 12;
   const lastCompleteYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
@@ -95,12 +107,13 @@ export async function computeAnalysisTargets(
 
   if (!accountRows || accountRows.length === 0) return null;
 
-  // Fetch weekly data for current year
+  // Weekdata over hetzelfde venster als de maanddata. Stond op alleen het huidige jaar,
+  // waardoor historische jaren de weken van dit jaar kregen aangehangen.
   const { data: weeklyRows } = await supabase
     .from("ads_account_weekly")
     .select("*")
     .eq("client_id", clientId)
-    .gte("week_start", `${currentYear}-01-01`)
+    .gte("week_start", `${startYear}-01-01`)
     .order("week_start");
 
   const weekly = (weeklyRows ?? []) as WeeklyRow[];
@@ -131,7 +144,7 @@ export async function computeAnalysisTargets(
       const row = rows.find((r) => parseMonth(r.month) === m);
       if (row) {
         const rec = rowToMonthlyRecord(row);
-        rec.weeks = buildWeeks(weekly, m);
+        rec.weeks = buildWeeks(weekly, year, m);
         records.push(rec);
       } else {
         records.push({ month: m, conversions: 0, revenue: 0, adSpend: 0, weeks: [] });
@@ -151,7 +164,7 @@ export async function computeAnalysisTargets(
     const row = currentYearRows.find((r) => parseMonth(r.month) === m);
     if (row) {
       const rec = rowToMonthlyRecord(row);
-      rec.weeks = buildWeeks(weekly, m);
+      rec.weeks = buildWeeks(weekly, currentYear, m);
       currentYearData.push(rec);
     } else {
       currentYearData.push(null);
