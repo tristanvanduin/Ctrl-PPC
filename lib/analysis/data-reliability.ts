@@ -76,6 +76,9 @@ interface ReliabilityInput {
 
 // ── Core computation ───────────────────────────────────────────────────────
 
+// Van laag naar hoog, zodat een plafond alleen omlaag kan bijstellen en nooit omhoog.
+const RANG: Record<OverallConfidence, number> = { critical: 0, low: 1, medium: 2, high: 3 };
+
 export function computeDataReliability(input: ReliabilityInput): DataReliabilityAssessment {
   const flags: ReliabilityFlag[] = [];
   const metricReliability: MetricReliability[] = [];
@@ -259,6 +262,36 @@ export function computeDataReliability(input: ReliabilityInput): DataReliability
   } else {
     overallConfidence = "high";
     overallExplanation = `Data is consistent en betrouwbaar. Alle metrics kunnen met vertrouwen worden geanalyseerd.`;
+  }
+
+  // ── Hoeveel maanden konden we uberhaupt beoordelen? ─────────────────────
+  //
+  // Zonder deze begrenzing stond de maatstaf aan de onderkant op zijn kop: elke controle
+  // hierboven heeft minstens twee maanden nodig (een efficientie-crash vergelijkt met de
+  // vorige maand, een regime-shift met de vier daarvoor). Met een maand data vuurt er dus
+  // niets, en LEIDDE DAT TOT "hoog vertrouwen — alle metrics kunnen met vertrouwen worden
+  // geanalyseerd". Minder data gaf meer vertrouwen.
+  //
+  // Dat is geen cosmetisch probleem: overallConfidence bepaalt de analysemodus en gaat via
+  // promptContext rechtstreeks de LLM in. Een maand-SOP kreeg te horen dat alles klopte.
+  const maanden = sorted.length;
+  const plafond: OverallConfidence | null =
+    maanden < 2 ? "critical" :
+    maanden < 4 ? "low" :
+    maanden < 6 ? "medium" : null;
+
+  if (plafond !== null && RANG[plafond] < RANG[overallConfidence]) {
+    overallConfidence = plafond;
+    overallExplanation =
+      maanden < 2
+        ? `Slechts ${maanden} maand data: er is niets om mee te vergelijken, dus de betrouwbaarheid is niet vast te stellen. Dat is geen oordeel over de data maar over wat we ervan kunnen zien.`
+        : `Slechts ${maanden} maanden data. De consistentiecontroles hebben minstens ${maanden < 4 ? "vier" : "zes"} maanden nodig om iets te kunnen zeggen; wat hierboven niet is opgemerkt kan dus ook gewoon buiten beeld liggen.`;
+    flags.push({
+      type: "data_gap",
+      severity: maanden < 2 ? "critical" : "medium",
+      description: `${maanden} ${maanden === 1 ? "maand" : "maanden"} accountdata beschikbaar; de consistentiecontroles vergen er meer.`,
+      affectedMetrics: ["all"],
+    });
   }
 
   // ── Analysis mode ──
