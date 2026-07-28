@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Loader2, Layers, Info } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
+import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
+import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
 
 // Cross-channel (blended) tab. Leest de blended_account_monthly-view over Google, Meta en
 // LinkedIn heen. De view levert de bouwstenen; de attributie-voetnoot is verplicht, want elk
@@ -61,6 +63,31 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
   // de mix ook eerlijker zien.
   const RECENT_MONTHS = 6;
   const chartMonths = [...months].sort().slice(-RECENT_MONTHS);
+
+  // Lens 5: de optelsom-illusie.
+  //
+  // Elk kanaal claimt zijn eigen conversies met zijn eigen attributievenster, dus de som telt
+  // dubbel: dezelfde aankoop wordt door Google en Meta allebei opgeeist. De blokjes hierboven
+  // waarschuwen daar in algemene bewoordingen voor; deze lens maakt er een getal van.
+  //
+  // Zonder anker — het werkelijke aantal orders of leads uit een primaire bron — is de som een
+  // BOVENGRENS en zegt de lens dat expliciet. Dat is de eerlijke uitkomst en niet een tekort:
+  // een verzonnen verdeling zou hier erger zijn dan geen verdeling.
+  // chartMonths wordt elke render opnieuw opgebouwd; als afhankelijkheid zou de memo dus nooit
+  // aanslaan. Het venster wordt daarom hierbinnen bepaald, uit rows.
+  const betrouwbaarheid = useMemo(() => {
+    if (!rows || rows.length === 0) return null;
+    const venster = [...new Set(rows.map((r) => r.month))].sort().slice(-RECENT_MONTHS);
+    const perKanaal = new Map<string, number>();
+    for (const r of rows.filter((x) => venster.includes(x.month))) {
+      perKanaal.set(r.channel, (perKanaal.get(r.channel) ?? 0) + (r.conversions ?? 0));
+    }
+    if (perKanaal.size < 2) return null; // met één kanaal valt er niets op te tellen
+    return blendedReliability(
+      [...perKanaal].map(([channel, conversions]) => ({ channel: channel as ChannelKey, conversions })),
+      null // geen anker beschikbaar in deze weergave
+    );
+  }, [rows]);
   const chartSeries = [...new Set((rows ?? []).map((r) => CHANNEL_LABEL[r.channel] ?? r.channel))];
   const chartData = chartMonths.map((m) => {
     const row: Record<string, number | string> = { maand: m.slice(0, 7) };
@@ -92,6 +119,17 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
               exacte verdeling. Bedragen alleen optellen over kanalen met gelijke valuta.
             </span>
           </div>
+
+          {/* Lens 5 met cijfers erbij, in plaats van alleen de algemene waarschuwing hierboven. */}
+          {betrouwbaarheid && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-meta text-amber-900 flex gap-2 mb-4">
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                Over de laatste {chartMonths.length} maanden claimen de kanalen samen{" "}
+                <strong>{fmt(betrouwbaarheid.blendedSum)} conversies</strong>. {betrouwbaarheid.detail}
+              </span>
+            </div>
+          )}
 
           {rows === null && !error && (
             <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center">
