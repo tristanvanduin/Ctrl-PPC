@@ -25,7 +25,13 @@ export interface AnalysisPreparedContextRow {
   analysis_date: string;
   prepared_at?: string;
   decision_rules: DecisionRulesOutput;
-  kpi_chain_account: KpiChain;
+  /**
+   * Null als de maandrij van de geanalyseerde of de voorgaande maand ontbreekt. Eerder werd een
+   * ontbrekende maand als `{}` doorgegeven, waarna elk veld via `Number(x || 0)` nul werd en de
+   * keten een daling van 100% op alle metrieken meldde. Die tekst gaat onder het kopje "reken
+   * NIET zelf" de prompt in, dus een sync die nog niet binnen is werd zo een ineenstorting.
+   */
+  kpi_chain_account: KpiChain | null;
   kpi_chains_campaigns: KpiChain[];
   comparison_facts_campaigns: ReturnType<typeof computeCampaignComparisonFacts>;
   comparison_facts_adgroups: ReturnType<typeof computeAdGroupComparisonFacts>;
@@ -156,7 +162,11 @@ export async function fetchMonthlyPreparedInputs(
     supabase.from("ads_campaign_monthly").select("*").eq("client_id", clientId).gte("month", periodStart).lte("month", periodEnd).order("month"),
     supabase.from("ads_adgroup_monthly").select("*").eq("client_id", clientId).gte("month", periodStart).lte("month", periodEnd).order("month"),
     supabase.from("ads_campaign_impression_share").select("*").eq("client_id", clientId).gte("month", monthsAgo(6)).lte("month", periodEnd).order("month"),
-    supabase.from("ads_search_terms_wasteful").select("*").eq("client_id", clientId).order("cost", { ascending: false }).limit(500),
+    // Met een venster. Deze twee stonden als enige zonder datumfilter: ze pakten de duurste
+    // rijen uit de hele historie en die kwamen in de prompt terecht onder een kop die de
+    // geanalyseerde periode noemt. Een zoekterm die twee jaar geleden geld kostte en allang is
+    // uitgesloten verdrong zo de termen van deze maand.
+    supabase.from("ads_search_terms_wasteful").select("*").eq("client_id", clientId).gte("week_start", monthsAgo(3)).lte("week_start", periodEnd).order("cost", { ascending: false }).limit(500),
     supabase.from("ads_account_yoy").select("*").eq("client_id", clientId).lte("month", periodEnd).order("month"),
     supabase.from("ads_campaign_yoy").select("*").eq("client_id", clientId).lte("month", periodEnd).order("month"),
     supabase.from("ads_campaign_metadata").select("*").eq("client_id", clientId),
@@ -333,8 +343,12 @@ export async function buildPreparedContextRow(
   const adgroupComparisonRows = toAdGroupComparisonRows(inputs);
   const latestMonth = latestMonthLabel(inputs.analysisYear, inputs.lastCompleteMonth);
   const previousMonth = previousMonthLabel(inputs.analysisYear, inputs.lastCompleteMonth);
-  const currentAccount = inputs.accountData.find((row) => String(row.month || "").slice(0, 7) === latestMonth) ?? {};
-  const previousAccount = inputs.accountData.find((row) => String(row.month || "").slice(0, 7) === previousMonth) ?? {};
+  // Ontbrekende maanden blijven hier undefined; ze worden pas verderop tot {} gemaakt waar dat
+  // onschadelijk is. De KPI-keten mag er niet op gebouwd worden — zie kpiChainAccount hieronder.
+  const currentAccountRow = inputs.accountData.find((row) => String(row.month || "").slice(0, 7) === latestMonth);
+  const previousAccountRow = inputs.accountData.find((row) => String(row.month || "").slice(0, 7) === previousMonth);
+  const currentAccount = currentAccountRow ?? {};
+  const previousAccount = previousAccountRow ?? {};
   const targetMonth = inputs.targetResult?.monthlyExpected?.[inputs.lastCompleteMonth - 1];
   const benchmarks = await fetchSectorBenchmarks(supabase, clientId, inputs.accountType);
   const { data: clientSettingsData } = await supabase
@@ -366,7 +380,15 @@ export async function buildPreparedContextRow(
       conversionsTarget: Number(targetMonth?.conversions || 0),
     },
   });
-  const kpiChainAccount = computeKpiChain({
+  // De uitkomstmetriek volgt het accounttype en niet de vraag of er toevallig data is.
+  // Eerder werd hij afgeleid uit `conversions_value > 0` van de huidige maand: ontbrak die
+  // maand, dan sloeg de keten stilzwijgend om van waarde naar conversies. En de campagneketens
+  // stonden hardgecodeerd op conversiewaarde, ook voor leadgen-accounts die die niet hebben —
+  // die kregen acht ketens die openden met "Conversiewaarde +0%" terwijl de conversies stegen.
+  const resultMetric: "conversion_value" | "conversions" =
+    inputs.accountType.startsWith("ecommerce") ? "conversion_value" : "conversions";
+
+  const kpiChainAccount = (currentAccountRow && previousAccountRow) ? computeKpiChain({
     currentMonth: {
       conversion_value: Number((currentAccount as Record<string, unknown>).conversions_value || 0),
       conversions: Number((currentAccount as Record<string, unknown>).conversions || 0),
@@ -387,13 +409,13 @@ export async function buildPreparedContextRow(
       avg_cpc: Number((previousAccount as Record<string, unknown>).avg_cpc || 0),
       cost: Number((previousAccount as Record<string, unknown>).cost || 0),
     },
-    resultMetric: Number((currentAccount as Record<string, unknown>).conversions_value || 0) > 0 ? "conversion_value" : "conversions",
-  });
+    resultMetric,
+  }) : null;
   const kpiChainsCampaigns = computeCampaignKpiChains({
     campaignData: campaignKpiRows,
     lastMonth: latestMonth,
     monthBeforeLast: previousMonth,
-    resultMetric: "conversion_value",
+    resultMetric,
   }).slice(0, 12);
   const campaignComparisonFacts = computeCampaignComparisonFacts({
     campaignData: campaignComparisonRows,
@@ -421,9 +443,21 @@ export async function buildPreparedContextRow(
     networkData: inputs.networkData,
     scheduleData: inputs.scheduleData,
   });
+  // Ontbreekt een van beide maanden, dan staat hier waarom er geen keten is. Dat is iets anders
+  // dan een keten vol nullen, en de lezer moet het verschil kunnen zien: onder deze kop staat
+  // "reken NIET zelf", dus wat hier staat wordt als vaststaand overgenomen.
+  const ontbrekendeMaanden = [
+    currentAccountRow ? null : latestMonth,
+    previousAccountRow ? null : previousMonth,
+  ].filter(Boolean);
+
   const kpiChainText = [
     "## PRE-COMPUTED KPI-KETEN (gebruik als basis, reken NIET zelf)",
-    kpiChainAccount.formattedChain,
+    kpiChainAccount
+      ? kpiChainAccount.formattedChain
+      : `Geen account-KPI-keten: de maandrij ontbreekt voor ${ontbrekendeMaanden.join(" en ")}. ` +
+        "Dat betekent niet dat de cijfers nul waren, maar dat ze er niet zijn. Doe geen uitspraak " +
+        "over de ontwikkeling van deze maand en benoem het ontbreken expliciet.",
     "",
     ...kpiChainsCampaigns.slice(0, 8).map((chain) => `- ${chain.formattedChain}`),
     "",
