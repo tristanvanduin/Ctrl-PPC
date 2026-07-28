@@ -5,19 +5,7 @@ import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("nl-NL", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("nl-NL").format(value);
-}
+import { formatCurrency, formatNumber } from "@/lib/forecast-format";
 
 interface KpiCardProps {
   label: string;

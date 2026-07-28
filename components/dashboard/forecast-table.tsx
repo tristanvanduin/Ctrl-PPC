@@ -4,28 +4,11 @@ import { useState, useEffect } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, MONTH_LABELS, type ForecastMetric } from "@/lib/forecast";
 import { supabase } from "@/lib/supabase";
+import { METRIC_LABELS, formatterFor } from "@/lib/forecast-format";
 
-function formatNumber(v: number): string {
-  return new Intl.NumberFormat("nl-NL").format(Math.round(v));
-}
-
-function formatCurrency(v: number): string {
-  return new Intl.NumberFormat("nl-NL", {
-    style: "currency", currency: "EUR",
-    minimumFractionDigits: 0, maximumFractionDigits: 0,
-  }).format(v);
-}
-
-function formatRoas(v: number): string {
-  return `${v.toFixed(2)}x`;
-}
-
-const METRICS: { id: ForecastMetric; label: string; format: (v: number) => string }[] = [
-  { id: "conversions", label: "Conversies", format: formatNumber },
-  { id: "revenue", label: "Omzet", format: formatCurrency },
-  { id: "roas", label: "ROAS", format: formatRoas },
-  { id: "cpa", label: "CPA", format: formatCurrency },
-];
+const METRICS: { id: ForecastMetric; label: string; format: (v: number) => string }[] =
+  (["conversions", "revenue", "roas", "cpa"] as ForecastMetric[])
+    .map((id) => ({ id, label: METRIC_LABELS[id], format: formatterFor(id) }));
 
 export function ForecastTable({ clientId }: { clientId: string }) {
   const [selectedMetric, setSelectedMetric] = useState<ForecastMetric>("conversions");

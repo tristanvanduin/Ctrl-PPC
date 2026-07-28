@@ -9,6 +9,8 @@ import { getClientSettings } from "@/lib/client-settings";
 import { SecondOpinionView } from "./second-opinion-view";
 import { MetricCards } from "./metric-cards";
 import { MonthlyOverview } from "./monthly-overview";
+import { FairWeeksOverview } from "./fair-weeks-overview";
+import { useUpcomingEdition } from "@/lib/rai/use-upcoming-edition";
 import { PerformanceChart } from "./performance-chart";
 import { ClientSettingsPanel } from "./client-settings";
 import { InsightsBlock } from "../insights/insights-block";
@@ -74,7 +76,7 @@ interface Client {
 
 type Tab = "dashboard" | "campaigns" | "forecast" | "insights" | "outcomes" | "sprint" | "reporting" | "dgm" | "second-opinion" | "files" | "settings";
 
-function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
+function SectionHeader({ icon, title, subtitle, action }: { icon: React.ReactNode; title: string; subtitle: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
       <div className="w-9 h-9 rounded-lg bg-rm-blue/10 flex items-center justify-center shrink-0">
@@ -84,6 +86,31 @@ function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title
         <h2 className="text-base font-bold text-rm-blue">{title}</h2>
         <p className="text-xs text-muted-foreground">{subtitle}</p>
       </div>
+      {action && <div className="ml-auto shrink-0">{action}</div>}
+    </div>
+  );
+}
+
+// De as-keuze bij de prestatiekaart. Alleen zichtbaar als er een beurs is om naartoe te tellen;
+// zonder beurs is er niets te kiezen en zou de knop alleen ruis zijn.
+function TijdasKeuze({ value, onChange }: { value: "beurs" | "maand"; onChange: (v: "beurs" | "maand") => void }) {
+  const opties: { id: "beurs" | "maand"; label: string }[] = [
+    { id: "beurs", label: "Weken tot beurs" },
+    { id: "maand", label: "Maanden" },
+  ];
+  return (
+    <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+      {opties.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => onChange(o.id)}
+          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+            value === o.id ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -199,6 +226,12 @@ export function ClientDashboard({ client }: { client: Client }) {
   const [lagDays, setLagDays] = useState<number>(3);
   const [refreshKey, setRefreshKey] = useState(0);
   const [countryFilter, setCountryFilter] = useState<string | null>(null);
+  // Stuurt deze klant op een beurs, dan is de kalendermaand niet de as die telt. De
+  // prestatiekaart schakelt dan naar weken-tot-beurs; de maandweergave blijft een klik ver weg
+  // voor wie toch per maand wil kijken.
+  const upcomingEdition = useUpcomingEdition(client.id);
+  const [tijdas, setTijdas] = useState<"beurs" | "maand">("beurs");
+  const beursAs = upcomingEdition !== null && tijdas === "beurs";
 
   useEffect(() => {
     const settings = getClientSettings(client.id);
@@ -350,11 +383,21 @@ export function ClientDashboard({ client }: { client: Client }) {
 
               <SectionHeader
                 icon={<Calendar className="w-4.5 h-4.5 text-rm-blue" />}
-                title={countryFilter ? `Maandprestaties — ${countryLabel(countryFilter)}` : "Maandprestaties"}
-                subtitle="Per maand: waar staan we en wat is de trend?"
+                title={
+                  (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
+                  + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
+                }
+                subtitle={beursAs
+                  ? `Per week: hoeveel weken zijn we van ${upcomingEdition!.eventName} en lopen we op schema?`
+                  : "Per maand: waar staan we en wat is de trend?"}
+                action={upcomingEdition && (
+                  <TijdasKeuze value={tijdas} onChange={setTijdas} />
+                )}
               />
-              <MonthlyOverview clientId={client.id} countryFilter={countryFilter} />
-              <PacingMonitor clientId={client.id} countryFilter={countryFilter} />
+              {beursAs
+                ? <FairWeeksOverview clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition!} />
+                : <MonthlyOverview clientId={client.id} countryFilter={countryFilter} />}
+              <PacingMonitor clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition} />
 
               <div className="pt-2">
                 <SectionHeader

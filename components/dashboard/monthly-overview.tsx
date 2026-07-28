@@ -5,41 +5,12 @@ import { TrendingUp, TrendingDown, CheckCircle2, Clock, ArrowRight } from "lucid
 import { REALIZED_THROUGH_MONTH } from "@/lib/types";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast, ForecastMetric, ForecastPoint, MONTH_LABELS } from "@/lib/forecast";
-
-function formatCurrency(v: number) {
-  return new Intl.NumberFormat("nl-NL", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(v);
-}
-
-function formatNumber(v: number) {
-  return new Intl.NumberFormat("nl-NL").format(Math.round(v));
-}
-
-const METRIC_LABELS: Record<ForecastMetric, string> = {
-  conversions: "Conversies",
-  revenue: "Omzet",
-  roas: "ROAS",
-  cpa: "CPA",
-};
-
-/** CPA is inverted: lower is better */
-function isLowerBetter(metric: ForecastMetric): boolean {
-  return metric === "cpa";
-}
-
-function getFormatter(metric: ForecastMetric) {
-  if (metric === "revenue" || metric === "cpa") return formatCurrency;
-  if (metric === "roas") return (v: number) => `${v.toFixed(2)}x`;
-  return formatNumber;
-}
+import { computeForecast, ForecastMetric, ForecastPoint } from "@/lib/forecast";
+import { METRIC_LABELS, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 
 function MonthCard({
   pt,
+  year,
   format,
   variant,
   inverted,
@@ -47,6 +18,8 @@ function MonthCard({
   monthProgressPct,
 }: {
   pt: ForecastPoint;
+  /** Het jaar waar de data over gaat; stond hier als vaste "2026" in de opmaak. */
+  year: number;
   format: (v: number) => string;
   variant: "previous" | "current" | "next";
   /** If true, lower values are better (CPA) */
@@ -98,7 +71,7 @@ function MonthCard({
         <div className="flex items-center gap-2">
           {statusIcons[variant]}
           <div>
-            <span className="text-sm font-semibold text-rm-gray">{pt.monthLabel} 2026</span>
+            <span className="text-sm font-semibold text-rm-gray">{pt.monthLabel} {year}</span>
             <span className="text-micro text-muted-foreground ml-1.5">{labels[variant]}</span>
           </div>
         </div>
@@ -192,7 +165,7 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
   const gedeeld = useForecast();
   const forecast = gedeeld ?? computeForecast(data);
   const result = forecast[metric];
-  const format = getFormatter(metric);
+  const format = formatterFor(metric);
 
   // Previous = last realized month, Current = first forecast, Next = second forecast
   const prevMonth = result.points[REALIZED_THROUGH_MONTH - 1]; // Mar (index 2)
@@ -271,9 +244,9 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
       {/* 3 main month cards */}
       <div className="px-5 pb-2">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {prevMonth && <MonthCard pt={prevMonth} format={format} variant="previous" inverted={isLowerBetter(metric)} />}
-          {currMonth && <MonthCard pt={currMonth} format={format} variant="current" inverted={isLowerBetter(metric)} partialRealized={partialRealized} monthProgressPct={monthProgressPct} />}
-          {nextMonth && <MonthCard pt={nextMonth} format={format} variant="next" inverted={isLowerBetter(metric)} />}
+          {prevMonth && <MonthCard pt={prevMonth} year={data.currentYear} format={format} variant="previous" inverted={isLowerBetter(metric)} />}
+          {currMonth && <MonthCard pt={currMonth} year={data.currentYear} format={format} variant="current" inverted={isLowerBetter(metric)} partialRealized={partialRealized} monthProgressPct={monthProgressPct} />}
+          {nextMonth && <MonthCard pt={nextMonth} year={data.currentYear} format={format} variant="next" inverted={isLowerBetter(metric)} />}
         </div>
       </div>
 

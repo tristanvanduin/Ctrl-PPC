@@ -17,6 +17,7 @@ import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, ForecastMetric, MONTH_LABELS } from "@/lib/forecast";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
+import { METRIC_LABELS } from "@/lib/forecast-format";
 
 function formatYAxis(metric: ForecastMetric) {
   if (metric === "revenue") {
@@ -35,12 +36,6 @@ function formatYAxis(metric: ForecastMetric) {
   return (v: number) => new Intl.NumberFormat("nl-NL", { notation: "compact" }).format(v);
 }
 
-const METRIC_LABELS: Record<ForecastMetric, string> = {
-  conversions: "Conversies",
-  revenue: "Omzet",
-  roas: "ROAS",
-  cpa: "CPA",
-};
 
 type ViewMode = "weekly" | "monthly";
 type CoreMetric = "conversions" | "revenue" | "adSpend";

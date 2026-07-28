@@ -5,6 +5,8 @@ import { Clock, Target, Zap, AlertTriangle, TrendingUp, Calendar } from "lucide-
 import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
+import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
+import { today } from "@/lib/reporting-date";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -36,7 +38,7 @@ function PacingRing({ pct, color, size = 44 }: { pct: number; color: string; siz
   );
 }
 
-export function PacingMonitor({ clientId, countryFilter }: { clientId: string; countryFilter?: string | null }) {
+export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: string; countryFilter?: string | null; edition?: UpcomingEdition | null }) {
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
   const forecast = useMemo(() => computeForecast(data), [data]);
@@ -46,18 +48,15 @@ export function PacingMonitor({ clientId, countryFilter }: { clientId: string; c
   const rev = forecast.revenue.kpi;
 
   const now = new Date();
-  const currentMonth = now.getMonth(); // 0-indexed
-  const dayOfMonth = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), currentMonth + 1, 0).getDate();
-  const monthProgressPct = (dayOfMonth / daysInMonth) * 100;
 
   // Year progress
   const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
   const yearProgressPct = (dayOfYear / 365) * 100;
 
-  // Realized months
-  const realizedMonths = forecast.conversions.points.filter((p) => p.realized !== null);
-  const realizedCount = realizedMonths.length;
+  // Stuurt de klant op een beurs, dan is "dag 209 van 365" geen ijkpunt maar ruis: het jaar
+  // loopt door, de beurs is een deadline. De doelen blijven jaardoelen — daarom blijft het
+  // jaarverloop erbij staan; alleen de kop leidt met de afstand die er wél toe doet.
+  const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, today()) : null;
 
   // Year pacing: compare realized vs EXPECTED for this period (not linear annual %)
   // This accounts for seasonality — Q1 might only be 15% of the annual target, not 25%
@@ -106,6 +105,11 @@ export function PacingMonitor({ clientId, countryFilter }: { clientId: string; c
         <Zap className="w-4.5 h-4.5 text-rm-blue" />
         <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Pacing</h3>
         <span className="text-micro text-muted-foreground ml-auto">
+          {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
+            <span className="font-semibold text-rm-blue mr-1.5">
+              Nog {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"} tot {edition!.label} ·
+            </span>
+          )}
           Dag {dayOfYear} van 365 · {Math.round(yearProgressPct)}% van het jaar
         </span>
       </div>
