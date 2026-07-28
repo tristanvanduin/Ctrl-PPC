@@ -46,13 +46,18 @@ registreert elke toegepaste migratie met checksum in schema_migrations.
 De autorisatie is pas een grens als alle vier de stappen staan; los van elkaar is elke
 stap cosmetisch of brekend.
 
-1. De client-side writes (35 stuks in 14 componenten, 13 tabellen) verhuizen naar
-   server-routes of een eigen smalle policy krijgen. Zonder deze stap breekt 017 ze.
+1. ~~De client-side writes verhuizen naar server-routes.~~ GEDAAN. Alle schrijfacties uit
+   de browser lopen nu via `/api/data/[table]` met de service role; het beleid staat in
+   `lib/data-access/write-policy.ts`. Zolang O1_AUTH_ENFORCED uit staat gedraagt die route
+   zich als voorheen (geen rechtencheck), zodat er vandaag niets verandert.
 2. 001 en 032 draaien, eerste admin seeden (scripts/seed-first-admin.mjs), rollen en
    beurzen toewijzen via /admin.
-3. O1_AUTH_ENFORCED=true. Inloggen en de API-guards worden actief.
+3. O1_AUTH_ENFORCED=true. Inloggen, de API-guards en de beurs-scope worden actief.
 4. 017 draaien, plus per tabel `using (app_can_read_client(client_id))` waar een
    client_id-kolom bestaat. Pas hier is de data daadwerkelijk gescheiden.
+
+Stap 1 was de blokkade: 017 geeft bewust geen write-policies, dus elke schrijfactie die nog
+vanuit de browser liep zou op dat moment stil zijn gaan falen. Dat kan nu niet meer gebeuren.
 
 ## Consolidatie-beslissingen (uit ANALYSE_VOOR_MASTERPLAN_V2, sectie 2a)
 

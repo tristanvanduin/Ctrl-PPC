@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2, CalendarClock, Save, CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbUpsert } from "@/lib/data-access/client-write";
 
 // RAI event-instellingen per klant: beurzen/geo-clones met cadans (jaarlijks/2-jaarlijks/anders)
 // en de datums van de afgelopen edities. Slaat op in client_settings.rai_events (migratie 024).
@@ -61,10 +62,7 @@ export function EventSettings({ clientId }: { clientId: string }) {
     const clean = events
       .filter((e) => e.name.trim())
       .map((e) => ({ ...e, editions: e.editions.filter((ed) => ed.date) }));
-    const { error } = await sb.from("client_settings").upsert(
-      { client_id: clientId, rai_events: { events: clean } },
-      { onConflict: "client_id" }
-    );
+    const { error } = await dbUpsert("client_settings", clientId, { rai_events: { events: clean } });
     setSaving(false);
     if (error) setError(error.message.includes("rai_events") ? "Kolom ontbreekt — draai eerst migratie 024_rai_events.sql." : error.message);
     else { setSaved(true); setTimeout(() => setSaved(false), 4000); }

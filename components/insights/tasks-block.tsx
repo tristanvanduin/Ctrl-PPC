@@ -7,6 +7,7 @@ import { computeForecast, type ClientForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { supabase, type KpiSnapshot } from "@/lib/supabase";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
+import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
 
 type Cadence = "actions" | "weekly" | "biweekly" | "monthly";
 
@@ -321,7 +322,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
 
   const markAiTaskDone = (taskId: string) => {
     if (!supabase) return;
-    supabase.from("sop_tasks").update({ status: "completed" }).eq("id", taskId).then(() => {
+    void dbUpdate("sop_tasks", clientId, { status: "completed" }, { id: taskId }).then(() => {
       setAiTasks((prev) => prev.filter((t) => t.id !== taskId));
     });
   };
@@ -344,24 +345,18 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
           roas: roasPts[roasPts.length - 1]?.realized ?? 0,
         };
 
-        supabase.from("task_completions").insert({
-          client_id: clientId,
+        void dbInsert("task_completions", clientId, {
           task_id: id,
           cadence,
           task_text: task.text,
           kpi_snapshot: snapshot,
           reminder_days: 14,
-        }).then(() => {});
+        });
       }
 
       // Remove Supabase record when unchecking
       if (task && task.done && supabase) {
-        supabase.from("task_completions")
-          .delete()
-          .eq("client_id", clientId)
-          .eq("task_id", id)
-          .eq("cadence", cadence)
-          .then(() => {});
+        void dbDelete("task_completions", clientId, { task_id: id, cadence });
       }
 
       return updated;

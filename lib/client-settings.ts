@@ -6,6 +6,7 @@
 
 import { supabase } from "./supabase";
 import type { GoogleAdsConversionAction } from "./api/google-ads";
+import { dbUpsert } from "./data-access/client-write";
 
 // --- Conversion actions ---
 
@@ -184,8 +185,7 @@ export async function saveClientSettings(settings: ClientSettings): Promise<void
 
   // Persist to Supabase
   if (supabase) {
-    await supabase.from("client_settings").upsert({
-      client_id: settings.clientId,
+    await dbUpsert("client_settings", settings.clientId, {
       conversion_actions: settings.conversionActions,
       kpi_targets: settings.kpiTargets,
       sector: settings.sector ?? null,

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Inbox, Check, X, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { channelOfSource, type InsightChannel } from "@/lib/insights/channel-of";
+import { dbUpdate } from "@/lib/data-access/client-write";
 import { ChannelBadge } from "./channel-filter";
 
 // De goedkeuringswachtrij: ALLE pending voorstellen uit sprint_hypotheses, ongeacht bron
@@ -63,7 +64,7 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
     const patch = action === "accept"
       ? { status: "accepted", accepted_at: now, decided_at: now }
       : { status: "rejected", decision_reason: reason, decided_at: now };
-    const { error } = await supabase.from("sprint_hypotheses").update(patch).eq("id", p.id).eq("status", "pending");
+    const { error } = await dbUpdate("sprint_hypotheses", clientId, patch, { id: p.id, status: "pending" });
     setBusyId(null);
     if (!error) {
       setProposals((prev) => prev?.filter((x) => x.id !== p.id) ?? prev);

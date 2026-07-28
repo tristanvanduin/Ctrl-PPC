@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Search, Plus, FileCode2, AlertCircle } from "lucide-react";
 import { supabase, type Script } from "@/lib/supabase";
+import { dbDelete } from "@/lib/data-access/client-write";
 import { ScriptCard } from "./script-card";
 import { ScriptEditor } from "./script-editor";
 
@@ -41,7 +42,7 @@ export function ScriptLibrary() {
 
   async function handleDelete(id: string) {
     if (!supabase) return;
-    await supabase.from("scripts").delete().eq("id", id);
+    await dbDelete("scripts", null, { id });
     setDeleteConfirm(null);
     fetchScripts();
   }

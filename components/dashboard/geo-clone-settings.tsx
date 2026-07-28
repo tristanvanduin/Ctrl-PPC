@@ -5,6 +5,7 @@ import { Loader2, Save, CheckCircle2, Palette, Target, CalendarClock, Plus, Tras
 import { supabase } from "@/lib/supabase";
 import { getClientSettings } from "@/lib/client-settings";
 import { RAI_GEO_CLONES } from "@/lib/rai/geo-clone-catalog";
+import { dbUpsert } from "@/lib/data-access/client-write";
 import {
   resolveGeoCloneSettings,
   type AccountSettings,
@@ -127,7 +128,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
       event: override.event ? { ...override.event, editions: cleanEditions } : null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from("geo_clone_settings").upsert(payload, { onConflict: "client_id,geo_clone" });
+    const { error } = await dbUpsert("geo_clone_settings", clientId, payload);
     setSaving(false);
     if (error) setError(error.message.toLowerCase().includes("geo_clone_settings") ? "Tabel ontbreekt — draai eerst migratie 025_geo_clone_settings.sql." : error.message);
     else { setSaved(true); setTimeout(() => setSaved(false), 4000); }

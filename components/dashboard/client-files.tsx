@@ -7,6 +7,7 @@ import {
   Image as ImageIcon, File, FolderOpen, Plus, X, Loader2, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbDelete, dbInsert } from "@/lib/data-access/client-write";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SopError } from "../insights/sop-trigger-buttons";
 
@@ -92,17 +93,15 @@ async function parseSprintCSV(file: File, clientId: string, sb: SupabaseClient) 
       // Losse hypotheses zijn voorstellen: ze horen eerst in de goedkeuringswachtrij bij
       // Bevindingen (status pending), en gaan pas naar de sprintplanning zodra ze zijn
       // geaccepteerd. Daarom hier géén accepted-status en géén placeholder-sprinttaak.
-      const { data: hyp } = await sb
-        .from("sprint_hypotheses")
-        .insert({
-          client_id: clientId,
-          hypothesis: hypText,
-          measurement_metric: metrics,
-          timeframe: timeframe,
-          status: "pending",
-          source: "sprint_import",
-        })
-        .select("id").single();
+      // De route geeft de ingevoegde rijen terug, dus [0] vervangt .single().
+      const { data: hypRows } = await dbInsert("sprint_hypotheses", clientId, {
+        hypothesis: hypText,
+        measurement_metric: metrics,
+        timeframe: timeframe,
+        status: "pending",
+        source: "sprint_import",
+      });
+      const hyp = hypRows?.[0] as { id: string } | undefined;
 
       if (!hyp) continue;
       void weekNum; // week is pas relevant zodra het voorstel geaccepteerd is
@@ -129,16 +128,13 @@ async function parseSprintCSV(file: File, clientId: string, sb: SupabaseClient) 
     const metrics = tasks[0]["Metrics"] || tasks[0]["metrics"] || null;
     const timeframe = tasks[0]["Looptijd tot Beoordeling"] || tasks[0]["looptijd"] || null;
 
-    const { data: hyp } = await sb
-      .from("sprint_hypotheses")
-      .insert({
-        client_id: clientId,
-        hypothesis: hypothesis === "(geen hypothese)" ? "Import: geen hypothese" : hypothesis,
-        measurement_metric: metrics, timeframe,
-        status: allDone ? "completed" : "accepted",
-        accepted_at: new Date().toISOString(),
-      })
-      .select("id").single();
+    const { data: hypRows } = await dbInsert("sprint_hypotheses", clientId, {
+      hypothesis: hypothesis === "(geen hypothese)" ? "Import: geen hypothese" : hypothesis,
+      measurement_metric: metrics, timeframe,
+      status: allDone ? "completed" : "accepted",
+      accepted_at: new Date().toISOString(),
+    });
+    const hyp = hypRows?.[0] as { id: string } | undefined;
 
     if (!hyp) continue;
 
@@ -153,7 +149,7 @@ async function parseSprintCSV(file: File, clientId: string, sb: SupabaseClient) 
       review_timeframe: t["Looptijd tot Beoordeling"] || t["looptijd"] || null,
     }));
 
-    await sb.from("sprint_items").insert(sprintItems);
+    await dbInsert("sprint_items", clientId, sprintItems);
   }
 
   console.log(`[parseSprintCSV] Imported ${rows.length} items from ${groups.size} hypotheses`);
@@ -244,8 +240,8 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
     const missing = DEFAULT_FOLDERS.filter((name) => !existingNames.has(name));
     if (missing.length > 0 && seededClientRef.current !== clientId) {
       seededClientRef.current = clientId;
-      const inserts = missing.map((name) => ({ client_id: clientId, name }));
-      await supabase.from("client_folders").insert(inserts);
+      const inserts = missing.map((name) => ({ name }));
+      await dbInsert("client_folders", clientId, inserts);
       const { data: newFolders } = await supabase
         .from("client_folders").select("*").eq("client_id", clientId).order("name");
       loadedFolders = newFolders ?? [];
@@ -278,7 +274,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
 
   async function handleCreateFolder() {
     if (!supabase || !newFolderName.trim()) return;
-    await supabase.from("client_folders").insert({ client_id: clientId, name: newFolderName.trim() });
+    await dbInsert("client_folders", clientId, { name: newFolderName.trim() });
     setNewFolderName("");
     setShowNewFolder(false);
     await refresh();
@@ -308,8 +304,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
         continue;
       }
 
-      const { error: dbErr } = await supabase.from("client_files").insert({
-        client_id: clientId,
+      const { error: dbErr } = await dbInsert("client_files", clientId, {
         folder: activeFolder,
         file_name: file.name,
         file_size: file.size,
@@ -358,7 +353,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
     const file = files.find((f) => f.id === fileId);
     if (file) {
       await supabase.storage.from("client-files").remove([file.storage_path]);
-      await supabase.from("client_files").delete().eq("id", fileId);
+      await dbDelete("client_files", clientId, { id: fileId });
     }
     setDeleteConfirm(null);
     await refresh();
@@ -370,9 +365,9 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
     const folderFiles = files.filter((f) => f.folder === folderName);
     if (folderFiles.length > 0) {
       await supabase.storage.from("client-files").remove(folderFiles.map((f) => f.storage_path));
-      await supabase.from("client_files").delete().eq("client_id", clientId).eq("folder", folderName);
+      await dbDelete("client_files", clientId, { folder: folderName });
     }
-    await supabase.from("client_folders").delete().eq("client_id", clientId).eq("name", folderName);
+    await dbDelete("client_folders", clientId, { name: folderName });
 
     if (activeFolder === folderName) setActiveFolder("");
     await refresh();

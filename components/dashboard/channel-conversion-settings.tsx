@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2, Save, CheckCircle2, Target } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbUpsert } from "@/lib/data-access/client-write";
 import {
   conversionSourcesFor,
   resolveChannelConversionConfig,
@@ -54,10 +55,7 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
     setSaving(true); setError(null);
     // Normaliseer (lege selectie → default) vóór opslaan, zodat de conversie nooit 0 wordt.
     const clean = resolveChannelConversionConfig(config);
-    const { error } = await sb.from("client_settings").upsert(
-      { client_id: clientId, channel_conversion_config: clean },
-      { onConflict: "client_id" }
-    );
+    const { error } = await dbUpsert("client_settings", clientId, { channel_conversion_config: clean });
     setSaving(false);
     if (error) setError(error.message);
     else { setConfig(clean); setSaved(true); setTimeout(() => setSaved(false), 4000); }

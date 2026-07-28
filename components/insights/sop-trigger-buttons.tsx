@@ -6,7 +6,9 @@ import { supabase } from "@/lib/supabase";
 import { useAnalysis } from "@/lib/analysis-context";
 import { getAllClients } from "@/lib/clients";
 import { useGenerationProgress } from "@/lib/use-generation-progress";
+import { dbInsert } from "@/lib/data-access/client-write";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
+import { today } from "@/lib/reporting-date";
 
 type SopType = "weekly" | "biweekly" | "monthly";
 export type SopChannel = "google_ads" | "meta_ads" | "linkedin_ads";
@@ -152,8 +154,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
       return;
     }
 
-    await sb.from("client_files").insert({
-      client_id: clientId,
+    await dbInsert("client_files", clientId, {
       folder: "SOP's",
       file_name: fileName,
       file_size: blob.size,
@@ -186,7 +187,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
 
         // Build markdown from response
         let markdown: string;
-        const analysisDate = data.analysisDate || new Date().toISOString().split("T")[0];
+        const analysisDate = data.analysisDate || today();
 
         if (type === "monthly" && data.steps) {
           const header = `# Maandelijkse ${channelCfg.headerLabel} Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${data.period?.start} t/m ${data.period?.end}\n**Model:** ${data.model}\n\n---\n\n`;

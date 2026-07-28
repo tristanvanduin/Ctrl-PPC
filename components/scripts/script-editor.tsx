@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Save, Check } from "lucide-react";
 import { supabase, type Script } from "@/lib/supabase";
+import { dbInsert, dbUpdate } from "@/lib/data-access/client-write";
 
 interface ScriptEditorProps {
   script?: Script | null;
@@ -38,9 +39,9 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
     };
 
     if (isEdit) {
-      await supabase.from("scripts").update(record).eq("id", script.id);
+      await dbUpdate("scripts", null, record, { id: script.id });
     } else {
-      await supabase.from("scripts").insert(record);
+      await dbInsert("scripts", null, record);
     }
 
     setSaving(false);

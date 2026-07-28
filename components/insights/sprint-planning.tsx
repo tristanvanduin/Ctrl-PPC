@@ -5,7 +5,9 @@ import { OWNER_TEAM, BRAND_SHORT } from "@/lib/branding/brand";
 import { Download, ChevronDown, ChevronUp, Loader2, Calendar, Plus, X, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { channelOfSource, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
+import { dbInsert, dbUpdate, dbUpdateIn } from "@/lib/data-access/client-write";
 import { ChannelFilter, ChannelBadge } from "./channel-filter";
+import { today } from "@/lib/reporting-date";
 
 interface SprintItem {
   id: string;
@@ -88,10 +90,8 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     }
     // Batch update expired items in Supabase
     if (expiredIds.length > 0) {
-      await supabase
-        .from("sprint_items")
-        .update({ status: "expired", updated_at: new Date().toISOString() })
-        .in("id", expiredIds);
+      await dbUpdateIn("sprint_items", clientId,
+        { status: "expired", updated_at: new Date().toISOString() }, "id", expiredIds);
     }
 
     setItems(allItems);
@@ -107,7 +107,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
 
   async function updateItem(id: string, field: string, value: string) {
     if (!supabase) return;
-    await supabase.from("sprint_items").update({ [field]: value, updated_at: new Date().toISOString() }).eq("id", id);
+    await dbUpdate("sprint_items", clientId, { [field]: value, updated_at: new Date().toISOString() }, { id });
     setItems((prev) => prev.map((item) => item.id === id ? { ...item, [field]: value } : item));
   }
 
@@ -115,22 +115,17 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     if (!supabase || !newHypothesis.trim()) return;
     const currentWeek = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
 
-    const { data: hyp } = await supabase
-      .from("sprint_hypotheses")
-      .insert({
-        client_id: clientId,
-        hypothesis: newHypothesis.trim(),
-        measurement_metric: newMetrics.trim() || null,
-        timeframe: newTimeframe.trim() || null,
-        status: "accepted",
-        accepted_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
+    const { data: hypRows } = await dbInsert("sprint_hypotheses", clientId, {
+      hypothesis: newHypothesis.trim(),
+      measurement_metric: newMetrics.trim() || null,
+      timeframe: newTimeframe.trim() || null,
+      status: "accepted",
+      accepted_at: new Date().toISOString(),
+    });
+    const hyp = hypRows?.[0] as { id: string } | undefined;
 
     if (hyp && newTask.trim()) {
-      await supabase.from("sprint_items").insert({
-        client_id: clientId,
+      await dbInsert("sprint_items", clientId, {
         hypothesis_id: hyp.id,
         week_number: currentWeek,
         task: newTask.trim(),
@@ -153,8 +148,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     if (!supabase || !newTask.trim()) return;
     const currentWeek = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
 
-    await supabase.from("sprint_items").insert({
-      client_id: clientId,
+    await dbInsert("sprint_items", clientId, {
       hypothesis_id: hypothesisId,
       week_number: currentWeek,
       task: newTask.trim(),
@@ -219,21 +213,17 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         const metrics = tasks[0]["Metrics"] || tasks[0]["metrics"] || null;
         const timeframe = tasks[0]["Looptijd tot Beoordeling"] || tasks[0]["looptijd"] || null;
 
-        const { data: hyp } = await supabase
-          .from("sprint_hypotheses")
-          .insert({
-            client_id: clientId,
-            hypothesis: hypothesis === "(geen hypothese)" ? "Import: geen hypothese" : hypothesis,
-            measurement_metric: metrics, timeframe,
-            status: allDone ? "completed" : "accepted",
-            accepted_at: new Date().toISOString(),
-          })
-          .select("id").single();
+        const { data: hypRows } = await dbInsert("sprint_hypotheses", clientId, {
+          hypothesis: hypothesis === "(geen hypothese)" ? "Import: geen hypothese" : hypothesis,
+          measurement_metric: metrics, timeframe,
+          status: allDone ? "completed" : "accepted",
+          accepted_at: new Date().toISOString(),
+        });
+        const hyp = hypRows?.[0] as { id: string } | undefined;
 
         if (!hyp) continue;
 
         const sprintItems = tasks.map((t) => ({
-          client_id: clientId,
           hypothesis_id: hyp.id,
           week_number: t["Week"] || t["week"] ? parseInt(t["Week"] || t["week"]) : null,
           task: t["Taak"] || t["taak"] || t["Task"] || "(geen taak)",
@@ -243,7 +233,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           review_timeframe: t["Looptijd tot Beoordeling"] || t["looptijd"] || null,
         }));
 
-        await supabase.from("sprint_items").insert(sprintItems);
+        await dbInsert("sprint_items", clientId, sprintItems);
       }
 
       await refresh();
@@ -286,7 +276,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sprintplanning-${clientId}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `sprintplanning-${clientId}-${today()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

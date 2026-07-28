@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { StickyNote, Plus, Pencil, Trash2, X, Save, Check } from "lucide-react";
 import { supabase, type ClientNote } from "@/lib/supabase";
+import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -134,14 +135,14 @@ export function ClientNotes({ clientId }: { clientId: string }) {
     setSaving(true);
 
     if (editingId) {
-      await supabase.from("client_notes").update({
+      await dbUpdate("client_notes", clientId, {
         title: title.trim() || null,
         content: content.trim(),
         updated_at: new Date().toISOString(),
-      }).eq("id", editingId);
+      }, { id: editingId });
     } else {
-      await supabase.from("client_notes").insert({
-        client_id: clientId,
+      // client_id gaat niet meer mee in de rij: de server vult hem in vanuit de scope.
+      await dbInsert("client_notes", clientId, {
         title: title.trim() || null,
         content: content.trim(),
       });
@@ -154,7 +155,7 @@ export function ClientNotes({ clientId }: { clientId: string }) {
 
   async function handleDelete(id: string) {
     if (!supabase) return;
-    await supabase.from("client_notes").delete().eq("id", id);
+    await dbDelete("client_notes", clientId, { id });
     setDeleteConfirm(null);
     fetchNotes();
   }

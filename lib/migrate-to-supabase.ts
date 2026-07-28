@@ -5,6 +5,7 @@
  */
 
 import { supabase } from "./supabase";
+import { dbUpsert } from "./data-access/client-write";
 
 export async function migrateLocalStorageToSupabase(): Promise<{ migrated: string[]; skipped: string[] }> {
   if (!supabase) return { migrated: [], skipped: ["Supabase not configured"] };
@@ -25,7 +26,7 @@ export async function migrateLocalStorageToSupabase(): Promise<{ migrated: strin
     if (apiClientsRaw) {
       const clients = JSON.parse(apiClientsRaw);
       if (Array.isArray(clients) && clients.length > 0) {
-        await supabase.from("app_settings").upsert({
+        await dbUpsert("app_settings", null, {
           key: "api_clients",
           value: clients,
           updated_at: new Date().toISOString(),
@@ -41,7 +42,7 @@ export async function migrateLocalStorageToSupabase(): Promise<{ migrated: strin
     if (visibleRaw) {
       const ids = JSON.parse(visibleRaw);
       if (Array.isArray(ids)) {
-        await supabase.from("app_settings").upsert({
+        await dbUpsert("app_settings", null, {
           key: "visible_client_ids",
           value: ids,
           updated_at: new Date().toISOString(),
@@ -74,7 +75,12 @@ export async function migrateLocalStorageToSupabase(): Promise<{ migrated: strin
     }
 
     if (settingsToMigrate.length > 0) {
-      await supabase.from("client_settings").upsert(settingsToMigrate);
+      // Per beurs, niet in een keer: de route vult client_id server-side in vanuit de
+      // gecontroleerde scope, dus een gemengde batch zou alle rijen naar een beurs trekken.
+      for (const rij of settingsToMigrate) {
+        const { client_id: beurs, ...rest } = rij as Record<string, unknown>;
+        await dbUpsert("client_settings", String(beurs), rest);
+      }
       migrated.push(`client_settings (${settingsToMigrate.length} klanten)`);
     }
   } catch (e) { skipped.push("client_settings: " + String(e)); }

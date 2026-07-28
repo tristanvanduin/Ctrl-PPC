@@ -5,6 +5,7 @@ import { Bell, Eye, X, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase, type TaskCompletion, type KpiSnapshot } from "@/lib/supabase";
 import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
+import { dbUpdate } from "@/lib/data-access/client-write";
 import { TaskImpactDetail } from "./task-impact-detail";
 
 function daysAgo(dateStr: string): number {
@@ -60,19 +61,17 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
     if (!supabase) return;
     const currentKpi = getCurrentKpiSnapshot(clientId, clientData);
 
-    await supabase.from("task_completions").update({
+    await dbUpdate("task_completions", clientId, {
       followup_kpi: currentKpi,
       followup_checked_at: new Date().toISOString(),
-    }).eq("id", tc.id);
+    }, { id: tc.id });
 
     setCheckedImpact((prev) => ({ ...prev, [tc.id]: currentKpi }));
   }
 
   async function dismiss(id: string) {
     if (!supabase) return;
-    await supabase.from("task_completions").update({
-      reminder_dismissed: true,
-    }).eq("id", id);
+    await dbUpdate("task_completions", clientId, { reminder_dismissed: true }, { id });
     setPendingReminders((prev) => prev.filter((r) => r.id !== id));
   }
 

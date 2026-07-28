@@ -6,6 +6,7 @@
 
 import { getAllClients } from "./clients";
 import { supabase } from "./supabase";
+import { dbUpsert } from "./data-access/client-write";
 
 const STORAGE_KEY = "rm-dashboard-visible-clients";
 const SUPABASE_KEY = "visible_client_ids";
@@ -44,7 +45,7 @@ export async function setVisibleClientIds(ids: string[]): Promise<void> {
 
   // Persist to Supabase
   if (supabase) {
-    await supabase.from("app_settings").upsert({
+    await dbUpsert("app_settings", null, {
       key: SUPABASE_KEY,
       value: ids,
       updated_at: new Date().toISOString(),

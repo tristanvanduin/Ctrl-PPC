@@ -34,6 +34,7 @@ export const DEMO_CLIENTS: Client[] = [
 import { supabase } from "./supabase";
 import { isDemoMode } from "./demo/demo-mode";
 import { DEMO_GREENTECH_ID, DEMO_GREENTECH_NAME } from "./demo/greentech-mock";
+import { dbDelete, dbUpsert } from "./data-access/client-write";
 
 const API_CLIENTS_KEY = "rm-dashboard-api-clients";
 const SUPABASE_CLIENTS_KEY = "api_clients";
@@ -46,11 +47,11 @@ export function saveApiClients(apiClients: Client[]): void {
 
   // Persist to Supabase
   if (supabase) {
-    supabase.from("app_settings").upsert({
+    void dbUpsert("app_settings", null, {
       key: SUPABASE_CLIENTS_KEY,
       value: apiClients,
       updated_at: new Date().toISOString(),
-    }).then(() => {});
+    });
   }
 }
 
@@ -88,7 +89,7 @@ export function clearApiClients(): void {
   window.dispatchEvent(new Event("clients-changed"));
 
   if (supabase) {
-    supabase.from("app_settings").delete().eq("key", SUPABASE_CLIENTS_KEY).then(() => {});
+    void dbDelete("app_settings", null, { key: SUPABASE_CLIENTS_KEY });
   }
 }
 
