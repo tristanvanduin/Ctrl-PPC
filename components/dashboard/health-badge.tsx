@@ -27,15 +27,21 @@ export function HealthBadge({ clientId }: { clientId: string }) {
             <circle cx="40" cy="40" r="34" fill="none" stroke="#E1E5F2" strokeWidth="6" />
             <circle
               cx="40" cy="40" r="34" fill="none"
-              stroke={health.total >= 70 ? "#22c55e" : health.total >= 50 ? "#f59e0b" : "#ef4444"}
+              stroke={health.grade === "?" ? "#d1d5db" : health.total >= 70 ? "#22c55e" : health.total >= 50 ? "#f59e0b" : "#ef4444"}
               strokeWidth="6"
               strokeLinecap="round"
-              strokeDasharray={`${health.total * 2.136} 213.6`}
+              strokeDasharray={health.grade === "?" ? "0 213.6" : `${health.total * 2.136} 213.6`}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={`text-xl font-bold ${health.color}`}>{health.total}</span>
-            <span className="text-micro font-semibold text-muted-foreground">{health.grade}</span>
+            {/* Een getal tonen naast een "?" suggereert precisie die er niet is: bij te
+                weinig beoordeelde factoren is de score geen lage score maar een onbekende. */}
+            <span className={`text-xl font-bold ${health.color}`}>
+              {health.grade === "?" ? "—" : health.total}
+            </span>
+            <span className="text-micro font-semibold text-muted-foreground">
+              {health.grade === "?" ? `${health.assessedCount}/5` : health.grade}
+            </span>
           </div>
         </div>
 

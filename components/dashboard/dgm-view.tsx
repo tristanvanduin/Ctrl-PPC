@@ -870,7 +870,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                   {sc.label}
                 </span>
                 <span className="text-micro text-muted-foreground">
-                  Health score: {health.total}/100 ({health.grade})
+                  Health score: {health.grade === "?" ? `niet te bepalen (${health.assessedCount}/5 factoren beoordeeld)` : `${health.total}/100 (${health.grade})`}
                 </span>
               </div>
               <p className={`text-base font-medium ${sc.text}`}>{traject.summary}</p>

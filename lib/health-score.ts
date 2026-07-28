@@ -35,11 +35,15 @@ import type { ClientForecast } from "./forecast";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "./use-client-data";
 
 export interface HealthScore {
-  total: number;               // 0–100
-  grade: "A" | "B" | "C" | "D" | "F";
+  /** 0–100, geschaald over de factoren die beoordeeld konden worden. */
+  total: number;
+  /** "?" wanneer er te weinig factoren beoordeeld zijn om een cijfer te geven. */
+  grade: "A" | "B" | "C" | "D" | "F" | "?";
   color: string;               // tailwind color class
   factors: HealthFactor[];
   anomalies: Anomaly[];
+  /** Hoeveel van de vijf factoren daadwerkelijk beoordeeld zijn. */
+  assessedCount: number;
 }
 
 export interface HealthFactor {
@@ -47,6 +51,15 @@ export interface HealthFactor {
   score: number;               // 0–20
   maxScore: number;            // always 20
   description: string;
+  /**
+   * False als er te weinig data is om deze factor te beoordelen. Zo'n factor telt NIET mee in
+   * het totaal, ook niet als nul: ontbrekende kennis is geen slechte score en al helemaal geen
+   * goede. Eerder kreeg een account zonder jaardoel de volle 20 punten op "Doelstelling",
+   * waardoor een account dat WEL een doel had en er 90 procent van haalde (18 punten) lager
+   * uitkwam dan een account waar niemand een doel had ingesteld. Het instellen van een doel
+   * werd zo bestraft.
+   */
+  assessed: boolean;
 }
 
 export interface Anomaly {
@@ -81,17 +94,17 @@ export function computeHealthScore(
 
   // ── 1. TARGET TRACKING (20pt) ──
   // How close is the adjusted annual to the target?
-  const targetRatio = conv.annualTarget > 0
-    ? conv.adjustedAnnual / conv.annualTarget
-    : 1;
-  const targetScore = clamp(Math.round(targetRatio * 20), 0, 20);
+  const heeftDoel = conv.annualTarget > 0;
+  const targetRatio = heeftDoel ? conv.adjustedAnnual / conv.annualTarget : 0;
+  const targetScore = heeftDoel ? clamp(Math.round(targetRatio * 20), 0, 20) : 0;
   factors.push({
     name: "Doelstelling",
     score: targetScore,
     maxScore: 20,
-    description: conv.annualTarget > 0
+    description: heeftDoel
       ? `Prognose ${Math.round(targetRatio * 100)}% van jaardoel`
-      : "Geen jaardoel ingesteld",
+      : "Geen jaardoel ingesteld — niet beoordeeld",
+    assessed: heeftDoel,
   });
 
   if (targetRatio < 0.5 && conv.annualTarget > 0) {
@@ -104,7 +117,10 @@ export function computeHealthScore(
 
   // ── 2. SPEND EFFICIENCY (20pt) ──
   const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
-  let efficiencyScore = 14; // default: decent
+  // Zonder twee gerealiseerde maanden valt er geen trend te zien. Hier stond 14 als
+  // "standaard: redelijk", en dat is een oordeel over een account waarover niets bekend is.
+  const efficiencyBeoordeeld = cpaPoints.length >= 2;
+  let efficiencyScore = 0;
 
   if (cpaPoints.length >= 2) {
     const firstCpa = cpaPoints[0].realized!;
@@ -136,7 +152,10 @@ export function computeHealthScore(
     name: "Efficiency",
     score: efficiencyScore,
     maxScore: 20,
-    description: efficiencyScore >= 16 ? "CPA stabiel of dalend" : efficiencyScore >= 10 ? "CPA licht stijgend" : "CPA stijgt significant",
+    description: !efficiencyBeoordeeld
+      ? "Te weinig maanden voor een CPA-trend — niet beoordeeld"
+      : efficiencyScore >= 16 ? "CPA stabiel of dalend" : efficiencyScore >= 10 ? "CPA licht stijgend" : "CPA stijgt significant",
+    assessed: efficiencyBeoordeeld,
   });
 
   // ── 3. TREND (20pt) ──
@@ -147,6 +166,8 @@ export function computeHealthScore(
   //      because raw conversion growth just reflects spend scaling, not account health.
   //
   // The forecast engine's dataMaturity tells us which mode to use.
+  // Zonder twee gerealiseerde maanden is er geen trend om te zien.
+  const trendBeoordeeld = realizedMonths.length >= 2;
   let trendScore = 10;
   {
     const dm = forecast.dataMaturity;
@@ -231,14 +252,21 @@ export function computeHealthScore(
 
   factors.push({
     name: "Trend",
-    score: trendScore,
+    score: trendBeoordeeld ? trendScore : 0,
     maxScore: 20,
-    description: trendScore >= 16 ? "Opwaartse trend" : trendScore >= 10 ? "Stabiel" : "Neerwaartse trend",
+    description: !trendBeoordeeld
+      ? "Te weinig maanden voor een trend — niet beoordeeld"
+      : trendScore >= 16 ? "Opwaartse trend" : trendScore >= 10 ? "Stabiel" : "Neerwaartse trend",
+    assessed: trendBeoordeeld,
   });
 
   // ── 4. BUDGET UTILIZATION (20pt) ──
-  let budgetScore = 14;
-  const spendRatio = spend.annualTarget > 0 ? spend.ytdRealized / spend.ytdExpected : 1;
+  // Zonder budgetdoel valt er niets te benutten. Hier stond een terugval op ratio 1, wat de
+  // volle 20 punten en de tekst "Budget wordt goed benut" opleverde voor een account waar
+  // niemand een budget had ingesteld.
+  const budgetBeoordeeld = spend.annualTarget > 0 && spend.ytdExpected > 0;
+  let budgetScore = 0;
+  const spendRatio = budgetBeoordeeld ? spend.ytdRealized / spend.ytdExpected : 0;
 
   if (spendRatio > 0.90) budgetScore = 20;
   else if (spendRatio > 0.75) budgetScore = 16;
@@ -260,12 +288,18 @@ export function computeHealthScore(
 
   factors.push({
     name: "Budget",
-    score: budgetScore,
+    score: budgetBeoordeeld ? budgetScore : 0,
     maxScore: 20,
-    description: spendRatio > 0.85 ? "Budget wordt goed benut" : `${Math.round(spendRatio * 100)}% van budget besteed`,
+    description: !budgetBeoordeeld
+      ? "Geen budgetdoel ingesteld — niet beoordeeld"
+      : spendRatio > 0.85 ? "Budget wordt goed benut" : `${Math.round(spendRatio * 100)}% van budget besteed`,
+    assessed: budgetBeoordeeld,
   });
 
   // ── 5. ACCOUNT HYGIENE (20pt) ──
+  // Zonder besteding is er niets om te verspillen. Een leeg account kreeg hier de volle 20
+  // punten met de tekst "Weinig verspilling" — een uitspraak over een account waar niets in
+  // omgaat.
   let hygieneScore = 20;
 
   const wasteAmount = wastefulTerms?.reduce((s, t) => s + t.cost, 0) ?? 0;
@@ -294,23 +328,42 @@ export function computeHealthScore(
     });
   }
 
+  const hygieneBeoordeeld = totalSpend > 0;
   factors.push({
     name: "Hygiëne",
-    score: hygieneScore,
+    score: hygieneBeoordeeld ? hygieneScore : 0,
     maxScore: 20,
-    description: hygieneScore >= 17 ? "Weinig verspilling" : `${Math.round(wasteRatio * 100)}% spend naar 0-conversie items`,
+    description: !hygieneBeoordeeld
+      ? "Geen besteding in de periode — niet beoordeeld"
+      : hygieneScore >= 17 ? "Weinig verspilling" : `${Math.round(wasteRatio * 100)}% spend naar 0-conversie items`,
+    assessed: hygieneBeoordeeld,
   });
 
-  // ── Total ──
-  const total = factors.reduce((s, f) => s + f.score, 0);
+  // ── Totaal ──
+  //
+  // Alleen beoordeelde factoren tellen mee, en het totaal wordt geschaald naar 100 zodat de
+  // grenzen voor A tot en met F blijven kloppen. Zou een niet-beoordeelde factor als nul
+  // meetellen, dan zakt een account met weinig data naar een F terwijl er niets mis is; telde
+  // hij als vol mee, dan kreeg een leeg account een B. Geen van beide is waar: het antwoord
+  // is dat we het niet weten.
+  const beoordeeld = factors.filter((f) => f.assessed);
+  const behaald = beoordeeld.reduce((s, f) => s + f.score, 0);
+  const haalbaar = beoordeeld.reduce((s, f) => s + f.maxScore, 0);
+  const total = haalbaar > 0 ? Math.round((behaald / haalbaar) * 100) : 0;
+
+  // Onder de helft van de factoren is een cijfer niet vol te houden. Dat is geen slechte score
+  // maar een onbekende, en die hoort als zodanig in beeld te komen.
+  const genoegBasis = beoordeeld.length >= 3;
 
   const grade: HealthScore["grade"] =
+    !genoegBasis ? "?" :
     total >= 85 ? "A" :
     total >= 70 ? "B" :
     total >= 55 ? "C" :
     total >= 40 ? "D" : "F";
 
   const color =
+    !genoegBasis ? "text-muted-foreground" :
     total >= 85 ? "text-green-600" :
     total >= 70 ? "text-green-500" :
     total >= 55 ? "text-amber-500" :
@@ -320,5 +373,5 @@ export function computeHealthScore(
   const severityOrder = { critical: 0, warning: 1, info: 2 };
   anomalies.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
-  return { total, grade, color, factors, anomalies };
+  return { total, grade, color, factors, anomalies, assessedCount: beoordeeld.length };
 }
