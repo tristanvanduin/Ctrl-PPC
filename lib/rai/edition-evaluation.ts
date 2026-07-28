@@ -107,7 +107,7 @@ export function buildEditionEvaluation(input: {
           target: volumeTargetFor(input.targetRows, input.geoClone, input.currentEditionId, stream),
           asOfDate: input.asOfDate,
         })
-      : ({ method: "geen_basis", daysToFairNow: null, currentCumulative: 0, projectedFinal: null, target: null, projectedVsTargetPct: null, willHitTarget: null, confidence: "geen_basis", note: "editie niet gevonden" } as StreamForecast);
+      : ({ method: "geen_basis", daysToFairNow: null, currentCumulative: 0, projectedFinal: null, target: null, projectedVsTargetPct: null, willHitTarget: null, confidence: "geen_basis", note: "editie niet gevonden", basedOnEditions: 0, editionSpread: null } as StreamForecast);
 
     const { verdict, detail } = verdictFor(forecast, afgelopen);
     return { stream, verdict, detail, forecast, comparison };

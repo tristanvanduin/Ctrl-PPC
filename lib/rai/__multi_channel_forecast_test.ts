@@ -42,7 +42,12 @@ assert(res.blended.currentCumulative === 3600, "de huidige stand telt over de ka
 assert(res.blended.projectedFinal === 9000, "de beursprojectie is de som van de kanaal-projecties (6000+2000+1000)");
 assert(res.blended.target === 8500, "het totaal-doel telt op als élk kanaal een doel heeft (5500+2000+1000)");
 assert(res.blended.projectedVsTargetPct !== null && Math.abs(res.blended.projectedVsTargetPct - 1.059) < 0.01 && res.blended.willHitTarget === true, "totaal versus totaal-doel gehaald");
-assert(res.blended.confidence === "gemiddeld", "de zekerheid is de zwakste schakel (D-15 = gemiddeld voor elk)");
+// Het vertrouwen is de zwakste schakel over de kanalen. Elk kanaal rust hier op EEN eerdere
+// editie en staat op D-15, dus noch dichtbij genoeg, noch bevestigd door een tweede editie.
+// Dat is sinds de overgang naar meerdere edities "laag": een enkele vergelijking is geen
+// bevestiging, en dat hoort in het vertrouwen te staan in plaats van in een voetnoot.
+assert(res.blended.confidence === "laag", "de zekerheid is de zwakste schakel (een editie op D-15 = laag)");
+assert(res.perChannel.every((c) => c.forecast.basedOnEditions === 1), "elk kanaal rust op een eerdere editie");
 
 // ── Eén kanaal zonder basis: degradeert expliciet, telt niet mee, totaal draait door ──
 const resDeg = forecastAllChannels([

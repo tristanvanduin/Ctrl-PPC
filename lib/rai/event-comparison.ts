@@ -91,6 +91,7 @@ export function previousEditionFor(editions: RaiEdition[], currentEditionId: str
   const prev = priorSameFair[0] ?? null;
   if (!prev) return { edition: null, gapDays: null, cadenceMatches: false };
 
+
   const gapDays = daysToFair(current.fairStartDate, prev.fairStartDate);
   const expected = expectedGapDays(current.cadence);
   // Redelijk als binnen 90 dagen van de verwachte gap (beursdata schuiven per jaar wat op).
@@ -192,4 +193,28 @@ export function buildEventComparison(input: {
     cadenceMatches: prev.cadenceMatches,
     weekOverWeek,
   };
+}
+
+/**
+ * ALLE eerdere edities van dezelfde beurs en geo-kloon, meest recente eerst.
+ *
+ * previousEditionFor levert er een. Dat maakte de prognose fragiel op twee manieren tegelijk:
+ * een enkele afwijkende editie — een verschoven datum, een ander seizoen, een jaar dat om
+ * externe redenen niet representatief was — werd in zijn eentje de norm. En als juist die ene
+ * editie een materieel ander campagnevenster had, viel de hele sjabloon-projectie weg en bleef
+ * er lineaire extrapolatie over, terwijl de editie daarvoor prima vergelijkbaar was.
+ *
+ * Met de volledige lijst kan de aanroeper de onvergelijkbare edities overslaan in plaats van
+ * op te geven, en over de rest een mediaan nemen.
+ */
+export function priorEditionsFor(editions: RaiEdition[], currentEditionId: string): RaiEdition[] {
+  const current = editions.find((e) => e.editionId === currentEditionId);
+  if (!current) return [];
+
+  return editions
+    .filter((e) => e.fairId === current.fairId && e.geoClone === current.geoClone && e.editionId !== current.editionId)
+    .map((e) => ({ e, gap: daysToFair(current.fairStartDate, e.fairStartDate) }))
+    .filter((x): x is { e: RaiEdition; gap: number } => x.gap != null && x.gap > 0)
+    .sort((a, b) => a.gap - b.gap) // kleinste positieve gap eerst = meest recent
+    .map((x) => x.e);
 }

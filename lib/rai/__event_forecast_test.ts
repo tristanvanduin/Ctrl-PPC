@@ -37,12 +37,19 @@ assert(f.projectedFinal === 6000, "projecteert met de groei van de vorige editie
 assert(f.projectedFinal! > f.currentCumulative * (45 / 30), "de sjabloon-projectie ligt hoger dan een lineaire, want hij vangt de eindpiek");
 assert(f.projectedVsTargetPct !== null && Math.abs(f.projectedVsTargetPct - 1.091) < 0.01 && f.willHitTarget === true, "projectie versus target 5500 gehaald");
 
-// ── Vertrouwen stijgt dichter bij de beurs ──
-// Op D-6 (fracLeft 6/45 = 0.13 < 0.3) hoort hoog vertrouwen.
+// ── Vertrouwen: afstand tot de beurs EN het aantal edities ──
+//
+// De regel is hier veranderd. Eerder haalde een projectie dicht bij de beurs "hoog", ook als
+// hij op EEN eerdere editie rustte. Dat overschat wat je weet: de vorm van de curve is dan
+// misschien goed geschat, maar of die ene editie representatief was weet je niet — daar is
+// geen tweede vergelijking voor. Dicht bij de beurs met een editie is dus "gemiddeld"; "hoog"
+// vergt minstens twee edities die het onderling eens zijn.
 const curBijBeurs: DailyPoint[] = [...curPoints, { date: "2026-04-05", value: 1200 }]; // D-10
 const fDichtbij = forecastStream({ current: { edition: cur, points: curBijBeurs }, previous: { edition: prev, points: prevPoints }, target: 5500, asOfDate: "2026-04-09" });
-assert(fDichtbij.daysToFairNow === 6 && fDichtbij.confidence === "hoog", "dicht bij de beurs is het vertrouwen hoog");
-assert(f.confidence === "gemiddeld", "ver van de beurs (D-15) is het vertrouwen gemiddeld");
+assert(fDichtbij.daysToFairNow === 6 && fDichtbij.confidence === "gemiddeld", "dicht bij de beurs met EEN editie: gemiddeld, niet hoog");
+assert(fDichtbij.basedOnEditions === 1, "en dat aantal is zichtbaar in het resultaat");
+assert(fDichtbij.editionSpread === null, "met een editie is er geen spreiding");
+assert(f.confidence === "laag", "ver van de beurs met EEN editie: laag — noch dichtbij, noch bevestigd door een tweede editie");
 
 // ── Eerste editie: tempo-extrapolatie met onzekerheid ──
 const eerste = forecastStream({ current: { edition: cur, points: curPoints }, previous: null, target: 5500, asOfDate: "2026-03-31" });

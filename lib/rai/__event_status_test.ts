@@ -11,7 +11,7 @@ function assert(condition: boolean, label: string): void {
 }
 
 function fc(pct: number | null, confidence: StreamForecast["confidence"] = "gemiddeld"): StreamForecast {
-  return { method: "vorige_editie_sjabloon", daysToFairNow: 15, currentCumulative: 100, projectedFinal: pct == null ? null : 100, target: 100, projectedVsTargetPct: pct, willHitTarget: pct == null ? null : pct >= 1, confidence, note: "" };
+  return { method: "vorige_editie_sjabloon", daysToFairNow: 15, currentCumulative: 100, projectedFinal: pct == null ? null : 100, target: 100, projectedVsTargetPct: pct, willHitTarget: pct == null ? null : pct >= 1, confidence, note: "", basedOnEditions: 1, editionSpread: null };
 }
 
 // ── Stream-stoplicht uit de forecast ──

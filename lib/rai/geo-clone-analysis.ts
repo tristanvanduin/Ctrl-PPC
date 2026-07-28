@@ -13,7 +13,7 @@
 //   met de beursdag); dat is een benadering en staat als aanname in de output.
 
 import { aggregateCampaignMonthlyByGeoClone, type CampaignMonthlyRow } from "./geo-clone-aggregate";
-import { previousEditionFor, type RaiEdition, type FairCadence } from "./event-comparison";
+import { previousEditionFor, priorEditionsFor, type RaiEdition, type FairCadence } from "./event-comparison";
 import { alignEditionsAtEqualDaysOut, isWithinWindow, type DailyPoint, type Edition as AxisEdition, type EditionComparison } from "./event-time-axis";
 import { forecastStream, type StreamForecast } from "./event-forecast";
 import { forecastAllChannels, type ChannelForecastInput, type ChannelForecastResult, type BlendedForecast } from "./multi-channel-forecast";
@@ -123,6 +123,10 @@ export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisR
   if (!current) return emptyResult(input, [...degradations, "geen bruikbare editie gevonden"]);
 
   const prev = previousEditionFor(editions, current.editionId);
+  // Alle eerdere edities, niet alleen de meest recente: de projectie neemt hier de mediaan
+  // over, zodat een enkele afwijkende editie de norm niet in zijn eentje zet en een editie met
+  // een ander campagnevenster niet de hele sjabloon-projectie laat wegvallen.
+  const alleEerdere = priorEditionsFor(editions, current.editionId);
 
   // Maandpunten -> dagpunten op de maand-datum, per metriek.
   const convPoints: DailyPoint[] = summary.months.map((m) => ({ date: m.month.slice(0, 10), value: m.conversions }));
@@ -152,6 +156,7 @@ export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisR
       channel: "google_ads",
       current: { edition: current, points: curConv },
       previous: prev.edition ? { edition: prev.edition, points: prevConv } : null,
+      previousEditions: alleEerdere.map((e) => ({ edition: e, points: pointsWithin(convPoints, e) })),
       target: input.conversionsTarget,
     },
   ];
@@ -160,6 +165,7 @@ export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisR
       channel: cs.channel,
       current: { edition: current, points: pointsWithin(cs.points, current) },
       previous: prev.edition ? { edition: prev.edition, points: pointsWithin(cs.points, prev.edition) } : null,
+      previousEditions: alleEerdere.map((e) => ({ edition: e, points: pointsWithin(cs.points, e) })),
       target: cs.target ?? null,
     });
   }
