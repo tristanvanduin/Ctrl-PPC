@@ -5,7 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountType } from "../prompts/sop-prompts";
-import { addDays } from "./helpers";
+import { addDays, today } from "./helpers";
 
 // ── LAAG 1: Strategische context ────────────────────────────────────────────
 
@@ -84,8 +84,17 @@ export async function calculatePortfolioAnalysis(
   let totalCost = 0;
   let totalConv = 0;
 
+  // Kosten waarvoor GEEN campagnetype bekend is, apart bijgehouden. Zonder dit onderscheid
+  // belandde alles zonder metadata in "OTHER", en bij een lege of half gesynchroniseerde
+  // ads_campaign_metadata las de uitkomst als "Budget verdeling: PMAX 0%, Search 0%,
+  // Shopping 0%, Overig 100%". Dat is een alarmerende, actiegerichte uitspraak — en hij is
+  // onwaar: het budget zit niet in onbekende campagnetypes, wij weten alleen het type niet.
+  // De regel ging zo als feit de LLM in en de tabel ads_portfolio_analysis in.
+  let onbekendeKosten = 0;
   for (const c of lastMonthData) {
-    const type = classifyType(metaMap.get(c.campaign_id) || "");
+    const ruwType = metaMap.get(c.campaign_id);
+    if (!ruwType) onbekendeKosten += c.cost;
+    const type = classifyType(ruwType || "");
     byType[type].cost += c.cost;
     byType[type].conv += c.conversions;
     byType[type].value += c.conversions_value;
@@ -144,6 +153,13 @@ export async function calculatePortfolioAnalysis(
   }, { onConflict: "client_id,month" });
 
   // Format for AI
+  const onbekendPct = pct(onbekendeKosten, totalCost);
+  // Boven een tiende van het budget is de verdeling geen beschrijving van het account meer
+  // maar van een gat in de synchronisatie. Dat hoort erbij te staan, niet weggemoffeld in
+  // een categorie die "overige campagnetypes" heet.
+  const metadataWaarschuwing = onbekendPct > 10
+    ? `\n- LET OP: voor ${onbekendPct}% van de kosten is geen campagnetype bekend (ads_campaign_metadata ontbreekt of is niet volledig gesynchroniseerd). Die kosten staan hierboven onder "Overig"; de verdeling zegt dus meer over de synchronisatie dan over het account.`
+    : "";
   const momStr = momPct !== null ? ` (${momPct > 0 ? "+" : ""}${momPct}% MoM)` : "";
   const concRisk = concentrationRisk
     ? `Ja — ${topCampaign?.name} neemt ${topCampaignPct}% van het budget`
@@ -154,7 +170,7 @@ export async function calculatePortfolioAnalysis(
 - Conversie verdeling: PMAX ${pct(byType.PMAX.conv, totalConv)}%, Search ${pct(byType.SEARCH.conv, totalConv)}%, Shopping ${pct(byType.SHOPPING.conv, totalConv)}%, Overig ${pct(byType.OTHER.conv, totalConv)}%
 - Concentratierisico: ${concRisk}
 - PMAX/Search overlap: ${overlap ? "Ja — beide actief" : "Nee"}
-- Portfolio efficiëntie score: ${portfolioRoas} ROAS${momStr}`;
+- Portfolio efficiëntie score: ${portfolioRoas} ROAS${momStr}${metadataWaarschuwing}`;
 }
 
 // ── LAAG 3: Hypothese tracking ──────────────────────────────────────────────
@@ -196,11 +212,19 @@ export async function calculateLeadingIndicators(
     .maybeSingle();
   const lagDays = (settingsRow?.conversion_lag_days as number) ?? 3;
 
-  // A week is "immature" if its end date falls within the lag window
-  const today = new Date();
-  const safeDate = new Date(today);
-  safeDate.setDate(safeDate.getDate() - lagDays);
-  const safeDateStr = safeDate.toISOString().split("T")[0];
+  // Een week is onvolgroeid als zijn EINDDATUM binnen het lag-venster valt: de conversies van
+  // die dagen druppelen nog binnen.
+  //
+  // Dit was een vergelijking tussen twee ongelijksoortige dingen. safeDate kwam uit new Date()
+  // en droeg dus de KLOKTIJD van nu, terwijl het weekeinde op middernacht staat. Een week die
+  // precies op de grens eindigde viel daardoor aan de verkeerde kant: bij een lag van drie
+  // dagen gold een week die op 25 juli eindigde op 28 juli als volgroeid, terwijl de conversies
+  // van 25 juli nog niet binnen zijn. Precies de weken waarvoor de onderdrukking bedoeld is
+  // kregen hun conversie-vlaggen dus wel.
+  //
+  // Nu allebei kalenderdatums, in Amsterdamse tijd zoals de rest van de app. De oude regel
+  // berekende ook nog een safeDateStr die nergens werd gebruikt; die is meeverdwenen.
+  const veiligeDatum = addDays(today(), -lagDays);
 
   // Fetch last 6 weeks of weekly data to compute WoW for last 4
   const { data: weeklyData } = await supabase
@@ -224,8 +248,10 @@ export async function calculateLeadingIndicators(
     // setDate() telt er lokaal bij op. Dat verschuift het weekeinde met de tijdzone-offset,
     // en die vergelijking bepaalt of een week als onvolgroeid wordt gemarkeerd.
     const weekStart = String(cur.week_start || "");
-    const weekEnd = new Date(`${addDays(weekStart, 6)}T00:00:00Z`);
-    const isImmature = weekEnd >= safeDate;
+    // Datumstrings vergelijken: YYYY-MM-DD sorteert lexicografisch gelijk aan chronologisch,
+    // dus hier is geen Date-object voor nodig — en daarmee ook geen tijdzone.
+    const weekEinde = addDays(weekStart, 6);
+    const isImmature = weekEinde >= veiligeDatum;
 
     const wow = (curVal: unknown, prevVal: unknown): number | null => {
       const c = Number(curVal) || 0;
