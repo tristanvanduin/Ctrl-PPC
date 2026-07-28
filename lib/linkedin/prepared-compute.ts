@@ -1,4 +1,5 @@
-// L2 rekenkern: de deterministische pre-compute voor de LinkedIn SOP. Herberekent afgeleide
+
+import { safeDiv } from "@/lib/util/math";// L2 rekenkern: de deterministische pre-compute voor de LinkedIn SOP. Herberekent afgeleide
 // metrieken uit SOMMEN (nooit ratio's van ratio's middelen), aggregeert per maand, en levert de
 // MoM-keten, trendrichting en versus-gemiddelde die de stappen als voorgerekende feiten krijgen.
 // Gespiegeld op de M2-rekenkern (lib/meta/prepared-compute.ts), met de LinkedIn-metrieken en de
@@ -30,9 +31,7 @@ function pct(ratio: number | null): number | null {
 }
 
 // Deelt veilig: deler 0 geeft null, zodat een metriek nooit Infinity of NaN wordt.
-export function safeDiv(num: number, den: number): number | null {
-  return den === 0 ? null : num / den;
-}
+export { safeDiv } from "@/lib/util/math";
 
 export function groupBy<T>(rows: T[], keyOf: (row: T) => string): Map<string, T[]> {
   const map = new Map<string, T[]>();

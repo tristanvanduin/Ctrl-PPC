@@ -6,6 +6,7 @@
 // naar beschrijvend (geen fit-score), zonder dat de run faalt.
 
 import type { LinkedInDemographicRow, LinkedInPivotType } from "./types";
+import { safeDiv } from "@/lib/util/math";
 
 export interface LinkedInIcp {
   job_functions: string[];
@@ -38,9 +39,6 @@ export interface IcpPivotFit {
 
 function round(v: number | null): number | null {
   return v == null ? null : Math.round(v * 10000) / 10000;
-}
-function safeDiv(numerator: number, denominator: number): number | null {
-  return denominator === 0 ? null : numerator / denominator;
 }
 
 // Berekent de ICP-fit voor een enkele pivot. De TOTAL-rij levert coverage_pct en wordt niet

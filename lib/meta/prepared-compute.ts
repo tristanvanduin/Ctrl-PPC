@@ -1,4 +1,5 @@
-// M2 data-laag (pre-compute): pure, deterministische functies die Meta daily-rijen omzetten
+
+import { safeDiv } from "@/lib/util/math";// M2 data-laag (pre-compute): pure, deterministische functies die Meta daily-rijen omzetten
 // in de voorgerekende feiten die de SOP-stappen nodig hebben. Het model rekent zo met
 // aangeleverde getallen in plaats van zelf te rekenen. Geen Supabase, geen IO: dit is de
 // rekenkern en is volledig op fixtures te testen.
@@ -28,9 +29,7 @@ export interface MetaComputeRow {
   initiate_checkout?: number | null;
 }
 
-export function safeDiv(num: number, den: number): number | null {
-  return den > 0 && Number.isFinite(num) && Number.isFinite(den) ? num / den : null;
-}
+export { safeDiv } from "@/lib/util/math";
 
 function round(value: number | null, decimals = 2): number | null {
   if (value === null || !Number.isFinite(value)) return null;

@@ -1,4 +1,5 @@
-// Pure transform van een LinkedIn adAnalytics-element naar een getypeerde dagrij. Geen
+
+import { safeDiv } from "@/lib/util/math";// Pure transform van een LinkedIn adAnalytics-element naar een getypeerde dagrij. Geen
 // I/O, dus los testbaar. Drie aandachtspunten uit de API: datums komen als object
 // (year/month/day), bedragen kunnen als string komen, en door de circa 20-velden-limiet
 // per request worden twee veldensets in aparte calls opgehaald die per dag plus entiteit
@@ -23,10 +24,6 @@ export function parseNum(value: unknown): number | null {
 }
 
 // Deelt veilig: deler null of 0 geeft null, zodat een metriek nooit Infinity of NaN wordt.
-function safeDiv(numerator: number | null, denominator: number | null): number | null {
-  if (numerator == null || denominator == null || denominator === 0) return null;
-  return numerator / denominator;
-}
 
 // Telling: ontbrekend of niet-numeriek wordt 0 (geen data betekent nul voorvallen).
 function count(value: unknown): number {

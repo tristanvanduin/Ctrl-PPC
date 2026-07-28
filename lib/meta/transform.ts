@@ -4,6 +4,7 @@
 // omni_purchase, de pixel-variant) wat tot dubbeltelling leidt als je niet oppast.
 
 import type { MetaActionEntry, MetaInsightsRow, MetaDailyRow } from "./types";
+import { safeDiv } from "@/lib/util/math";
 
 // Parseert een Meta-waarde (meestal string) naar een getal. Leeg of niet-numeriek geeft null.
 export function parseNum(value: unknown): number | null {
@@ -16,10 +17,6 @@ export function parseNum(value: unknown): number | null {
 }
 
 // Deelt veilig: deler null of 0 geeft null, zodat een metriek nooit Infinity of NaN wordt.
-function safeDiv(numerator: number | null, denominator: number | null): number | null {
-  if (numerator == null || denominator == null || denominator === 0) return null;
-  return numerator / denominator;
-}
 
 // Expliciete mapping van action_type naar een doelveld. Onbekende types worden
 // genegeerd (blijven alleen in raw). Meerdere types kunnen naar hetzelfde veld
