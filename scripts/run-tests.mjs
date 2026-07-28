@@ -60,7 +60,11 @@ function vindTsx() {
   return naOphalen ? { cmd: naOphalen, args: [] } : { cmd: "npx", args: ["tsx"] };
 }
 
-const tests = walk("lib").sort();
+// Ook buiten lib/ zoeken. De runner keek alleen in lib, waardoor een test onder components/ of
+// app/ wel bestond maar nooit draaide — en een test die niet draait geeft alleen maar het
+// gevoel van dekking. Mappen die er niet zijn worden overgeslagen.
+const WORTELS = ["lib", "components", "app"];
+const tests = WORTELS.filter((d) => existsSync(d)).flatMap((d) => walk(d)).sort();
 const { cmd, args } = vindTsx();
 // Zoveel processen naast elkaar als er kernen zijn. Meer levert niets op: elk testproces is
 // kortstondig rekengebonden, en de tests raken geen gedeelde bestanden of poorten.
