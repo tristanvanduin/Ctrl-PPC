@@ -1,4 +1,5 @@
-// Deterministische creative-samenvatting en -aanbevelingen voor de Creative Performance-view.
+
+import { median } from "@/lib/util/stats";// Deterministische creative-samenvatting en -aanbevelingen voor de Creative Performance-view.
 // Puur: geen LLM, geen IO. Vat de creatives van een kanaal samen (totalen, beste/zwakste op
 // CTR en CPA) en leidt concrete aanbevelingen af (pauzeer dure niet-converterende creatives,
 // schaal bewezen winners). Ratio's UIT TOTALEN; drempels relatief t.o.v. de account-mediaan
@@ -21,12 +22,6 @@ export const HIGH_COST_ZERO_CONV = 50; // dure creative zonder conversies (in va
 const ctrOf = (c: CreativeRow): number | null => (c.impressions > 0 ? c.clicks / c.impressions : null);
 const cpaOf = (c: CreativeRow): number | null => (c.conversions > 0 ? c.cost / c.conversions : null);
 
-function median(nums: number[]): number | null {
-  const xs = nums.filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
-  if (xs.length === 0) return null;
-  const mid = Math.floor(xs.length / 2);
-  return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
-}
 
 export interface CreativeRecommendation {
   kind: "pauzeer" | "schaal" | "vervang";

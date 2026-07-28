@@ -12,6 +12,7 @@
 #
 # Gebruik:
 #   scripts/gates.sh            alles
+#   scripts/gates.sh hygiene    alleen de hygienecontrole
 #   scripts/gates.sh tsc        alleen typecheck
 #   scripts/gates.sh test       alleen tests
 #   scripts/gates.sh build      alleen build
@@ -20,6 +21,7 @@
 
 set -uo pipefail
 
+HYGIENE_TIMEOUT=${HYGIENE_TIMEOUT:-60}
 TSC_TIMEOUT=${TSC_TIMEOUT:-300}
 # De suite doet er ~32s over sinds de runner het tsx-binary rechtstreeks aanroept en
 # parallelliseert (was ~460s). 300s laat ruimte voor een tragere machine en vangt een
@@ -51,6 +53,14 @@ stap() {
 
 doel=${1:-alles}
 falen=0
+
+# Eerst, want hij is klaar in een seconde en vangt wat de andere drie poorten per definitie
+# niet zien: dubbele definities van gedeelde hulpjes, modules die door niets worden
+# geimporteerd, en stuurtekens die een bestand onvindbaar maken voor code-search. Dat zijn
+# precies de dingen die stilzwijgend teruggroeien omdat niets ze tegenhoudt.
+if [ "$doel" = "alles" ] || [ "$doel" = "hygiene" ]; then
+  stap hygiene "$HYGIENE_TIMEOUT" node scripts/check-hygiene.mjs || falen=$?
+fi
 
 if [ "$doel" = "alles" ] || [ "$doel" = "tsc" ]; then
   stap tsc "$TSC_TIMEOUT" npx tsc --noEmit || falen=$?

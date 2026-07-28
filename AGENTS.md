@@ -43,3 +43,29 @@ Dezelfde regel geldt overal: `npx <iets>` in een lus is bijna altijd een fout.
 houdt het oude manifest vast en gaat 500's geven op chunks die niet meer bestaan — wat er
 uitziet als een kapotte app terwijl er niets mis is. Stop de server eerst, op **PID**: `pkill -f`
 matcht zijn eigen commandoregel en sloopt zijn eigen shell (exitcode 144).
+
+## De hygienepoort
+
+`scripts/gates.sh` begint met `check-hygiene.mjs`, en die vangt drie dingen die tsc, de tests
+en de build per definitie niet zien:
+
+1. **Een tweede definitie van een gedeeld hulpje.** `median` stond acht keer in de codebase, in
+   drie smaken; `safeDiv` vijf keer, in drie gedragingen. Dat is geen stijlkwestie — het
+   samenvoegen bracht twee echte fouten aan het licht. De MAD in `forecast.ts` was twee keer te
+   groot omdat de lokale mediaan de nul-afwijkingen wegfilterde, waardoor uitschieters niet
+   werden gerepareerd. En vier van de vijf `safeDiv`-varianten gaven `0` terug bij een oneindige
+   noemer, wat als een gemeten nul leest.
+
+2. **Modules die door niets worden geimporteerd.** Er lagen er elf. De uitzonderingen staan in
+   `TOEGESTANE_WEZEN` met een reden per stuk; die lijst hoort te krimpen. Groeit hij, dan is er
+   iets gebouwd dat nergens op aangesloten is, en dat is het moment om te beslissen of het af
+   moet of weg.
+
+3. **Stuurtekens in de bron.** Een letterlijke NUL-byte in `asset-breakdown.ts` maakte dat
+   bestand binair voor elk tekstgereedschap. `grep` sloeg het stilzwijgend over — inclusief de
+   zoekopdracht waarmee ik de median-kopieen inventariseerde. De achtste vond ik pas toen deze
+   controle er was.
+
+De poort draait in een seconde. Voeg je bewust een uitzondering toe, zet er dan de reden bij:
+een uitzondering zonder reden is over drie maanden niet meer van een vergissing te
+onderscheiden.
