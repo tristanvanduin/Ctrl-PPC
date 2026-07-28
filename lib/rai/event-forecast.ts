@@ -12,6 +12,7 @@ import {
   type DailyPoint,
 } from "./event-time-axis";
 import { MATERIAL_WINDOW_DIFF } from "./event-time-axis";
+import { median } from "@/lib/util/stats";
 
 export type ForecastMethod = "vorige_editie_sjabloon" | "vorige_editie_restvolume" | "tempo_extrapolatie" | "beurs_bereikt" | "geen_basis";
 export type ForecastConfidence = "hoog" | "gemiddeld" | "laag" | "geen_basis";
@@ -52,11 +53,6 @@ function round(v: number): number {
   return Math.round(v);
 }
 
-function median(xs: number[]): number {
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
 
 function withTarget(
   projectedFinal: number | null,
@@ -157,7 +153,9 @@ export function forecastStream(input: {
 
   if (signalen.length > 0) {
     const ratios = signalen.map((s) => s.ratio);
-    const ratio = median(ratios);
+    // De lijst is hierboven al op lengte gecontroleerd, dus null kan hier niet optreden;
+    // 1 als terugval betekent "geen groei aangenomen" in plaats van een projectie van nul.
+    const ratio = median(ratios) ?? 1;
     const projectedFinal = round(currentCumulative * ratio);
     const spread = ratios.length > 1 && ratio > 0
       ? Math.round(((Math.max(...ratios) - Math.min(...ratios)) / ratio) * 1000) / 1000
@@ -186,7 +184,7 @@ export function forecastStream(input: {
       confidence,
       basedOnEditions: signalen.length,
       editionSpread: spread,
-      note: `geprojecteerd met ${welk} op gelijke dagen-uit (mediaan ${pct(median(signalen.map((s) => s.materializedFrac)))}% van de curve stond op D-${x})${spreidingTekst}`,
+      note: `geprojecteerd met ${welk} op gelijke dagen-uit (mediaan ${pct(median(signalen.map((s) => s.materializedFrac)) ?? 0)}% van de curve stond op D-${x})${spreidingTekst}`,
     });
   }
 
@@ -195,7 +193,7 @@ export function forecastStream(input: {
   // reden. Expliciet laag-zeker.
   const bruikbaar = restVolumes.filter((r) => r.rest > 0);
   if (bruikbaar.length > 0) {
-    const rest = median(bruikbaar.map((r) => r.rest));
+    const rest = median(bruikbaar.map((r) => r.rest)) ?? 0;
     const projectedFinal = round(currentCumulative + rest);
     return withTarget(projectedFinal, target, {
       method: "vorige_editie_restvolume",
@@ -204,7 +202,7 @@ export function forecastStream(input: {
       confidence: "laag",
       basedOnEditions: bruikbaar.length,
       editionSpread: null,
-      note: `vroeg op de ramp: mediaan ${pct(median(bruikbaar.map((r) => r.frac)))}% van de curve stond op D-${x} bij ${bruikbaar.length === 1 ? `editie ${bruikbaar[0].id}` : `${bruikbaar.length} eerdere edities`}, dus geankerd op het restvolume (${round(rest)}) dat na D-${x} nog werd opgebouwd; wordt betrouwbaarder richting de beurs`,
+      note: `vroeg op de ramp: mediaan ${pct(median(bruikbaar.map((r) => r.frac)) ?? 0)}% van de curve stond op D-${x} bij ${bruikbaar.length === 1 ? `editie ${bruikbaar[0].id}` : `${bruikbaar.length} eerdere edities`}, dus geankerd op het restvolume (${round(rest)}) dat na D-${x} nog werd opgebouwd; wordt betrouwbaarder richting de beurs`,
     });
   }
 

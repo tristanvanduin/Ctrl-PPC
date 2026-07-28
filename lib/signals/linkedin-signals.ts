@@ -11,6 +11,7 @@
 
 import { type DetectionResult, type SignalStory } from "./types";
 import { renderSignalSection, type SignalSectionResult } from "./render-section";
+import { median } from "@/lib/util/stats";
 
 export const FORM_COMPLETION_WEAK = 0.15; // onder 15% completion op geopende forms is zwak (heuristiek)
 export const MIN_FORM_OPENS = 20;         // onder dit aantal opens is de rate ruis
@@ -38,12 +39,6 @@ export interface LinkedInSignalTargets {
   cplTarget?: number | null;
 }
 
-function median(nums: number[]): number | null {
-  const xs = nums.filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
-  if (xs.length === 0) return null;
-  const mid = Math.floor(xs.length / 2);
-  return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
-}
 
 // ── 1. Lead-form drop-off ───────────────────────────────────────────────────────────
 export function detectLinkedInFormDropOff(entities: LinkedInEntitySignalInput[]): DetectionResult {

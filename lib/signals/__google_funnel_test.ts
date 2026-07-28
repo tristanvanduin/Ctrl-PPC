@@ -1,7 +1,8 @@
 // Test voor de belofte-versus-levering-detector. Deterministisch, geen IO.
 // Draaien: npx tsx lib/signals/__google_funnel_test.ts
 
-import { detectBelofteVersusLevering, median, MIN_CLICKS_FOR_FUNNEL_STORY, MAX_FUNNEL_STORIES, type FunnelCampaignInput } from "./google-funnel";
+import { median } from "@/lib/util/stats";
+import { detectBelofteVersusLevering, MIN_CLICKS_FOR_FUNNEL_STORY, MAX_FUNNEL_STORIES, type FunnelCampaignInput } from "./google-funnel";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {

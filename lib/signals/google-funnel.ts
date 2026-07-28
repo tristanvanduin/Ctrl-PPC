@@ -11,6 +11,7 @@
 //     is de bevestigingsbron; die kijkt echt naar de pagina. Deze detector wijst hem aan.
 
 import { type DetectionResult, pct } from "./types";
+import { median } from "@/lib/util/stats";
 
 export const MIN_CLICKS_FOR_FUNNEL_STORY = 100; // onder dit volume is een conversieratio ruis
 export const FUNNEL_GAP_MATERIAL = 0.2; // twintig procent relatief van de mediaan, beide kanten
@@ -23,12 +24,6 @@ export interface FunnelCampaignInput {
   conversions: number;
 }
 
-export function median(values: number[]): number | null {
-  const sorted = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
-  if (sorted.length === 0) return null;
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-}
 
 interface CampaignRates {
   campaignName: string;

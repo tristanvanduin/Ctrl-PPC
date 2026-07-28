@@ -10,7 +10,7 @@
 // ongeacht de budgetstructuur, en de zekerheid blijft indicatie.
 
 import { type DetectionResult, pct } from "./types";
-import { median } from "./google-funnel";
+import { median } from "@/lib/util/stats";
 
 export const STARVED_BUDGET_LOST = 0.1; // vanaf tien procent budget-verlies telt een campagne als geknepen
 export const SPEND_SHIFT_MATERIAL = 0.15; // vijftien procent spend-beweging is materieel

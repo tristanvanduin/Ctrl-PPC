@@ -34,6 +34,7 @@ import {
   WeeklyRecord,
   REALIZED_THROUGH_MONTH,
 } from "./types";
+import { median, medianAbsoluteDeviation } from "@/lib/util/stats";
 
 export const MONTH_LABELS = [
   "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
@@ -233,15 +234,6 @@ function sanitizeCurrentYear(records: (MonthlyRecord | null)[]): (MonthlyRecord 
 
 // ── Outlier & tracking break detection ─────────────────────────────────────
 
-/** Compute median of an array of positive numbers */
-function median(values: number[]): number {
-  const sorted = values.filter((v) => v > 0).sort((a, b) => a - b);
-  if (sorted.length === 0) return 0;
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
 
 /**
  * Detect and repair outliers / tracking breaks in a year of data for one metric.
@@ -255,8 +247,14 @@ function repairOutliers(records: MonthlyRecord[], metric: CoreMetric): MonthlyRe
   const positiveValues = values.filter((v) => v > 0);
   if (positiveValues.length < 3) return records; // not enough data to judge
 
-  const med = median(positiveValues);
-  const mad = median(positiveValues.map((v) => Math.abs(v - med))) || med * 0.5;
+  // De MAD moet de nul-afwijkingen MEEtellen. De vorige mediaan filterde intern op `v > 0` en
+  // gooide ze weg, terwijl een absolute afwijking juist nul is zodra een waarde gelijk is aan de
+  // mediaan — precies bij een stabiele reeks. Gemeten op [100, 100, 100, 100, 300] werd de MAD
+  // daardoor 200 in plaats van 0, kwam de uitschieterdrempel op 700 te liggen in plaats van 250,
+  // en werd de 300 niet meer gerepareerd. Een stabiele reeks met één uitschieter is nu juist het
+  // geval waar deze functie voor bestaat.
+  const med = median(positiveValues) ?? 0;
+  const mad = medianAbsoluteDeviation(positiveValues) || med * 0.5;
 
   // For conversions: also detect efficiency anomalies (conv crashes but spend stable)
   // This catches tracking breaks where conversions don't drop to exactly 0
@@ -266,7 +264,9 @@ function repairOutliers(records: MonthlyRecord[], metric: CoreMetric): MonthlyRe
       .filter((r) => r.conversions > 0 && r.adSpend > 0)
       .map((r) => r.conversions / r.adSpend);
     if (efficiencies.length >= 3) {
-      convPerSpendMedian = median(efficiencies);
+      // De lijst is hierboven op minstens drie elementen gecontroleerd; 0 is de
+      // oorspronkelijke waarde en betekent "geen efficiency-controle".
+      convPerSpendMedian = median(efficiencies) ?? 0;
     }
   }
 
@@ -577,8 +577,12 @@ function computePerformanceFactor(
   const healthyRatios: { ratio: number; weight: number }[] = [];
 
   if (allRatios.length >= 2) {
-    const ratioValues = allRatios.map((r) => r.ratio);
-    const medianRatio = median(ratioValues);
+    // Alleen positieve ratio's bepalen wat "normaal" is. Een maand met ratio 0 is meestal een
+    // trackingbreuk, en die mag de norm niet omlaag trekken — anders lijkt de volgende breuk
+    // niet meer afwijkend. Dit filter stond eerder in de gedeelde mediaan verstopt; het is een
+    // keuze van deze aanroepplek en hoort hier zichtbaar te zijn.
+    const ratioValues = allRatios.map((r) => r.ratio).filter((v) => v > 0);
+    const medianRatio = median(ratioValues) ?? 0;
 
     for (const { m, ratio } of allRatios) {
       // Flag: ratio is suspiciously low (tracking break) or high (data spike)

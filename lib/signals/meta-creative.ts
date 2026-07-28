@@ -11,6 +11,7 @@
 
 import { type DetectionResult, type SignalStory } from "./types";
 import { renderSignalSection, type SignalSectionResult } from "./render-section";
+import { median } from "@/lib/util/stats";
 
 export const FREQUENCY_FATIGUE = 3.0;       // vanaf hier is herhaling een fatigue-risico
 export const FREQUENCY_SATURATION = 4.0;    // hierboven is de doelgroep aantoonbaar te vaak bereikt
@@ -44,12 +45,6 @@ export interface MetaLevelSignalInput {
   impressions: number;
 }
 
-function median(nums: number[]): number | null {
-  const xs = nums.filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
-  if (xs.length === 0) return null;
-  const mid = Math.floor(xs.length / 2);
-  return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
-}
 
 function isBelowAverage(rank: string | null | undefined): boolean {
   return typeof rank === "string" && rank.trim().toUpperCase().startsWith("BELOW_AVERAGE");

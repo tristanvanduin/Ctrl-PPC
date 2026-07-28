@@ -18,6 +18,7 @@ import { type DetectionResult, type SignalStory, type SignalEvidence } from "./t
 import { countryLabel } from "@/lib/countries";
 import { stateLabel } from "@/lib/geo/us-fips";
 import type { GeoAgg } from "@/lib/demo/geo-demo";
+import { median } from "@/lib/util/stats";
 
 export type GeoLevel = "country" | "region";
 
@@ -68,12 +69,6 @@ function toMarkets(rows: GeoAgg[], level: GeoLevel): Market[] {
   }));
 }
 
-function median(values: number[]): number | null {
-  const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
-  if (v.length === 0) return null;
-  const mid = Math.floor(v.length / 2);
-  return v.length % 2 === 0 ? (v[mid - 1] + v[mid]) / 2 : v[mid];
-}
 
 /** Draagt deze markt genoeg volume om er iets over te zeggen? */
 function isMaterial(m: Market): boolean {
