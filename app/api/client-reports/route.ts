@@ -11,6 +11,7 @@ import {
   updateProgressPhase,
 } from "@/lib/progress/server";
 import { logger } from "@/lib/logger";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 export const maxDuration = 120;
 
@@ -852,11 +853,12 @@ Retourneer ALLEEN valid JSON:
 // ── GET: List reports ─────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
-
+  // Zie second-opinion: de klant-id bepaalt welke client we nodig hebben, dus die komt eerst.
   const clientId = request.nextUrl.searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id parameter vereist" }, { status: 400 });
+
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
 
   const { data, error } = await supabase
     .from("client_reports")

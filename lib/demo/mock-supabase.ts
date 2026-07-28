@@ -174,6 +174,30 @@ class MockQuery implements PromiseLike<Result> {
 
 // Bouwt een mock-client die .from() onderschept en de rest (auth, storage, rpc…) doorlaat
 // naar de echte client indien aanwezig.
+// Bestandsopslag zonder backend. Geeft overal een nette fout terug in plaats van undefined.
+//
+// Zonder dit stuk crashte de demo hard. De consumers schrijven `if (!supabase) return`, en die
+// controle laat de mock door omdat hij bestaat — maar `supabase.storage` was undefined, dus
+// `supabase.storage.from(...)` gaf "Cannot read properties of undefined (reading 'from')" en
+// nam het hele instellingen-tabblad mee. Vijftien plekken gebruiken .storage; het is dus een
+// klasse, geen geval, en hij hoort hier gedicht te worden en niet vijftien keer los.
+//
+// De vorm volgt supabase-js: { data, error }. Zo hoeft de aanroepende code niets te weten.
+const DEMO_STORAGE_ERROR = { message: "Bestandsopslag is niet beschikbaar in de demo", name: "DemoStorageError" };
+
+function demoStorageBucket() {
+  return {
+    upload: async () => ({ data: null, error: DEMO_STORAGE_ERROR }),
+    download: async () => ({ data: null, error: DEMO_STORAGE_ERROR }),
+    remove: async () => ({ data: null, error: DEMO_STORAGE_ERROR }),
+    list: async () => ({ data: [], error: null }),
+    // Geen ondertekende URL: de aanroepers controleren op data?.signedUrl en tonen dan niets.
+    createSignedUrl: async () => ({ data: null, error: DEMO_STORAGE_ERROR }),
+    createSignedUrls: async () => ({ data: [], error: null }),
+    getPublicUrl: () => ({ data: { publicUrl: "" } }),
+  };
+}
+
 export function createDemoSupabase(real: SupabaseClient | null, rows: DemoRowSource): SupabaseClient {
   const handler: ProxyHandler<object> = {
     get(_t, prop) {
@@ -185,6 +209,7 @@ export function createDemoSupabase(real: SupabaseClient | null, rows: DemoRowSou
         const v = (real as unknown as Record<string | symbol, unknown>)[prop];
         return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(real) : v;
       }
+      if (prop === "storage") return { from: demoStorageBucket };
       return undefined;
     },
   };

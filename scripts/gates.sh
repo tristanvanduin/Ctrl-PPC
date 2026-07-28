@@ -21,7 +21,10 @@
 set -uo pipefail
 
 TSC_TIMEOUT=${TSC_TIMEOUT:-300}
-TEST_TIMEOUT=${TEST_TIMEOUT:-900}
+# De suite doet er ~32s over sinds de runner het tsx-binary rechtstreeks aanroept en
+# parallelliseert (was ~460s). 300s laat ruimte voor een tragere machine en vangt een
+# vastloper drie keer zo snel als de oude 900s.
+TEST_TIMEOUT=${TEST_TIMEOUT:-300}
 BUILD_TIMEOUT=${BUILD_TIMEOUT:-900}
 
 LOCK=/tmp/dashboard-gates.lock

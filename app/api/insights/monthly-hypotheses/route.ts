@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { decideTransition } from "@/lib/learning/hypothesis-status";
 import type { MonthlyStructuredOutput, OperatingHypothesisTrace } from "@/lib/analysis/monthly-structured";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 import {
   buildMonthlyHypothesesInsightsPayload,
   buildSprintItemDraftsForHypothesis,
@@ -38,7 +39,7 @@ function resolveSopType(channel: string | null | undefined): string {
 }
 
 async function loadLatestMonthlyContext(clientId: string, sopType: string) {
-  const supabase = getSupabase();
+  const supabase = supabaseForClient(clientId);
   if (!supabase) {
     return { supabase: null, error: Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 }) };
   }

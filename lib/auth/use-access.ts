@@ -30,6 +30,8 @@ export interface Access {
 }
 
 interface MeResponse {
+  /** False zolang O1_AUTH_ENFORCED uit staat: dan wordt er niet gefilterd. */
+  enforced?: boolean;
   role?: Role | null;
   capabilities?: Capability[];
   scope?: ClientScope;
@@ -47,7 +49,10 @@ export function useAccess(): Access {
     fetch("/api/me")
       .then(async (res) => (res.ok ? ((await res.json()) as MeResponse) : null))
       .then((data) => {
-        if (!live || !data) return; // 401: enforcement uit, alles blijft zichtbaar
+        if (!live || !data) return;
+        // De server zegt nu expliciet of er gehandhaafd wordt, in plaats van dat we het uit een
+        // 401 moeten afleiden. Staat de handhaving uit, dan blijft alles zichtbaar.
+        if (data.enforced === false) return;
         setUnrestricted(false);
         setRole(data.role ?? null);
         setCapabilities(data.capabilities ?? []);

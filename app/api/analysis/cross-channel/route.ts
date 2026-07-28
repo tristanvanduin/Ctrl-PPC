@@ -25,6 +25,7 @@ import { buildBlendedDataGapSignals, type ChannelValueAgg } from "@/lib/signals/
 import { buildFastSaturationSignals, type SaturationPoint } from "@/lib/signals/fast-saturation";
 import { mergeDetections } from "@/lib/signals/types";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 const SECTION = "cross_channel_v1";
 // Additieve sectie: de sub-analyses als losse blokken (JSON), zodat de UI de cross-channel-
@@ -50,7 +51,9 @@ const PIVOT_TO_DIMENSION: Record<string, AudienceDimension> = {
 export async function GET(request: NextRequest) {
   const clientId = new URL(request.url).searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest. Zonder dit gaf deze route in
+  // demo-modus een 500 en bleef het tabblad Analyse leeg.
+  const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const [{ data }, { data: groupsRow }] = await Promise.all([

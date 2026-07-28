@@ -13,6 +13,7 @@ import {
 } from "@/lib/progress/server";
 import { logger } from "@/lib/logger";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 /**
  * POST /api/second-opinion — trigger a second opinion audit.
@@ -195,11 +196,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
-
+  // De klant-id eerst: de demo-klant krijgt demo-rijen, de rest de echte client. Stond dit
+  // andersom, dan viel de route in demo-modus al om op een 500 voordat hij wist over wie het ging.
   const clientId = request.nextUrl.searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id parameter vereist" }, { status: 400 });
+
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
 
   const { data, error } = await supabase
     .from("second_opinion_runs")
