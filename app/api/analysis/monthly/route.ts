@@ -81,6 +81,7 @@ import { getClientMemory, buildClientMemoryGrounding } from "@/lib/memory/client
 import { buildGoogleSignalsSection, type CampaignIsRow, type CampaignMonthlyRow, type KeywordMonthlyRow, type ChangeHistoryRow, type ScheduleRow, type NetworkMonthlyRow, type DeviceMonthlyRow, type SearchTermMonthlyLite, type NegativeKeywordRow } from "@/lib/analysis/signal-section";
 import { today } from "@/lib/reporting-date";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
+import { callLogMark, logCacheSummary } from "@/lib/analysis/openrouter-client";
 
 function getCredentials(): GoogleAdsCredentials | null {
   const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
@@ -1160,6 +1161,9 @@ export async function POST(request: NextRequest) {
     if (adapter.channel === "linkedin_ads") {
       return await runLinkedinMonthlyAnalysis(supabase, adapter, clientId, jobId, evalCapture);
     }
+    // Vanaf hier tellen de LLM-calls van deze run, zodat de cachesamenvatting aan het eind
+    // niet die van een eerdere analyse in hetzelfde proces meepakt.
+    const callMark = callLogMark();
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const analysisYear = currentMonth === 1 ? now.getFullYear() - 1 : now.getFullYear();
@@ -2798,6 +2802,8 @@ ${conclusions.join("\n\n---\n\n")}`,
       },
       partialOutputExists,
     });
+
+    logCacheSummary(callMark, `monthly ${clientId}`);
 
     return Response.json({
       jobId,

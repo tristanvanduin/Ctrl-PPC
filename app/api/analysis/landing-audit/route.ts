@@ -195,6 +195,7 @@ export async function POST(request: NextRequest) {
         stepLabel: "Landing audit",
         model: response.model,
         promptTokens: response.promptTokens ?? 0,
+            cachedPromptTokens: response.cachedPromptTokens ?? 0,
         completionTokens: response.completionTokens ?? 0,
       });
       try {

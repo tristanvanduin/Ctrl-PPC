@@ -46,6 +46,14 @@ export interface OpenRouterResponse {
   completionTokens: number;
   latencyMs: number;
   retries: number;
+  /**
+   * Het deel van promptTokens dat de provider uit zijn cache haalde. Gemini cachet impliciet
+   * op een gedeeld promptbegin en rekent die tokens goedkoper af. Zonder dit getal is niet te
+   * zien of dat werkt: de prompt lijkt dan even duur als zonder cache, en een wijziging die het
+   * gedeelde begin breekt kost stilzwijgend geld zonder dat er iets kapot gaat.
+   * 0 als de provider het niet meldt.
+   */
+  cachedPromptTokens: number;
   /** Whether the response was valid JSON (if jsonMode requested) */
   parseStatus: "ok" | "recovered" | "failed" | "not_json_mode";
 }
@@ -58,6 +66,8 @@ interface RawApiResponse {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    /** OpenAI-compatibel veld; Gemini vult hier zijn impliciete cachetreffers in. */
+    prompt_tokens_details?: { cached_tokens?: number };
   };
 }
 
@@ -68,6 +78,10 @@ export interface CallLog {
   label: string;
   model: string;
   tokensUsed: number;
+  /** Alleen bij een geslaagde call ingevuld. */
+  promptTokens?: number;
+  /** Zie OpenRouterResponse.cachedPromptTokens. */
+  cachedPromptTokens?: number;
   latencyMs: number;
   retries: number;
   parseStatus: string;
@@ -77,6 +91,24 @@ export interface CallLog {
 
 const callLogs: CallLog[] = [];
 
+/**
+ * Hoeveel van de prompttokens over een reeks calls uit de cache kwamen.
+ *
+ * Dit is de enige manier om te zien of het gedeelde promptbegin zijn werk doet. Zakt dit naar
+ * nul terwijl er meerdere stappen op dezelfde systeemprompt draaien, dan is er iets veranderds
+ * aan het BEGIN van de prompt — een datum, een stapnummer, een teller — en wordt elke stap weer
+ * vol afgerekend zonder dat er iets zichtbaar kapot is.
+ */
+export function cacheHitRate(logs: readonly CallLog[]): { promptTokens: number; cached: number; pct: number | null } {
+  let promptTokens = 0, cached = 0;
+  for (const l of logs) {
+    if (!l.success) continue;
+    promptTokens += l.promptTokens ?? 0;
+    cached += l.cachedPromptTokens ?? 0;
+  }
+  return { promptTokens, cached, pct: promptTokens > 0 ? Math.round((cached / promptTokens) * 100) : null };
+}
+
 /** Get all logs from this process lifetime (useful for debugging/observability). */
 export function getCallLogs(): readonly CallLog[] {
   return callLogs;
@@ -85,6 +117,30 @@ export function getCallLogs(): readonly CallLog[] {
 /** Get logs for the current analysis run (by label prefix). */
 export function getRunLogs(prefix: string): CallLog[] {
   return callLogs.filter((l) => l.label.startsWith(prefix));
+}
+
+/**
+ * Het aantal calls tot nu toe. Neem dit aan het begin van een run en geef het mee aan
+ * `logCacheSummary`, dan telt alleen deze run mee. Op label filteren zou niet volstaan: labels
+ * zijn niet run-specifiek, dus een tweede analyse in hetzelfde proces zou de eerste meetellen.
+ */
+export function callLogMark(): number {
+  return callLogs.length;
+}
+
+/**
+ * Schrijft één regel met de cachetreffers van een run. Bewust een logregel en geen exception:
+ * dit is een waarneming over kosten, geen fout.
+ */
+export function logCacheSummary(vanaf: number, label: string): void {
+  const run = callLogs.slice(vanaf);
+  if (run.length === 0) return;
+  const { promptTokens, cached, pct } = cacheHitRate(run);
+  if (pct === null) return;
+  logger.info(
+    `[cache] ${label}: ${run.length} calls, ${promptTokens} prompttokens waarvan ${cached} uit cache (${pct}%).` +
+    (pct === 0 ? " Nul treffers — controleer of er iets variabels boven in de prompt is gekomen." : "")
+  );
 }
 
 // ── Core client ────────────────────────────────────────────────────────────
@@ -177,14 +233,18 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
         }
       }
 
+      const promptTokens = data.usage?.prompt_tokens ?? 0;
+      const cachedPromptTokens = data.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+
       const response: OpenRouterResponse = {
         output,
         model: data.model ?? DEFAULT_MODEL,
         tokensUsed: data.usage?.total_tokens ?? 0,
-        promptTokens: data.usage?.prompt_tokens ?? 0,
+        promptTokens,
         completionTokens: data.usage?.completion_tokens ?? 0,
         latencyMs,
         retries,
+        cachedPromptTokens,
         parseStatus,
       };
 
@@ -194,6 +254,8 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
         label,
         model: response.model,
         tokensUsed: response.tokensUsed,
+        promptTokens,
+        cachedPromptTokens,
         latencyMs,
         retries,
         parseStatus,

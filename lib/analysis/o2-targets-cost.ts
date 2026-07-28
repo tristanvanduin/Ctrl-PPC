@@ -118,18 +118,38 @@ export const MODEL_PRICES: Record<string, { inputPer1M: number; outputPer1M: num
 };
 
 /**
+ * Deel van de normale invoerprijs dat een gecachte prompttoken kost. Gemini rekent impliciet
+ * gecachte invoer af tegen een kwart van het normale tarief. Staat hier als aparte constante
+ * zodat hij met de prijstabel mee bijgewerkt kan worden.
+ */
+export const CACHED_INPUT_FACTOR = 0.25;
+
+/**
  * Berekent de kosten van een call in euro. Null als het model geen bekende prijs
  * heeft; dat is eerlijker dan een schatting. Afgerond op vier decimalen (numeric(10,4)).
+ *
+ * `cachedPromptTokens` is het deel van `promptTokens` dat de provider uit zijn cache haalde en
+ * goedkoper afrekent. Zonder dat onderscheid wordt een run met een goed werkende cache even
+ * duur gerapporteerd als een run zonder, en is aan de cijfers niet te zien of het gedeelde
+ * promptbegin nog intact is.
  */
 export function computeCallCost(
   model: string,
   promptTokens: number,
   completionTokens: number,
-  prices: Record<string, { inputPer1M: number; outputPer1M: number }> = MODEL_PRICES
+  prices: Record<string, { inputPer1M: number; outputPer1M: number }> = MODEL_PRICES,
+  cachedPromptTokens = 0
 ): number | null {
   const p = prices[model];
   if (!p) return null;
-  const cost = (promptTokens / 1_000_000) * p.inputPer1M + (completionTokens / 1_000_000) * p.outputPer1M;
+  // Meer gecacht dan verstuurd kan niet; bij een rare melding van de provider liever de
+  // veilige kant op dan een negatief aantal volle tokens.
+  const gecacht = Math.max(0, Math.min(cachedPromptTokens, promptTokens));
+  const vol = promptTokens - gecacht;
+  const cost =
+    (vol / 1_000_000) * p.inputPer1M +
+    (gecacht / 1_000_000) * p.inputPer1M * CACHED_INPUT_FACTOR +
+    (completionTokens / 1_000_000) * p.outputPer1M;
   return Math.round(cost * 10000) / 10000;
 }
 
@@ -228,6 +248,8 @@ export function buildUsageRow(input: {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  /** Deel van promptTokens dat uit de providercache kwam; telt mee in de prijs, niet als kolom. */
+  cachedPromptTokens?: number;
 }): Record<string, unknown> {
   return {
     run_key: input.runKey,
@@ -239,7 +261,13 @@ export function buildUsageRow(input: {
     model: input.model,
     prompt_tokens: input.promptTokens,
     completion_tokens: input.completionTokens,
-    cost_eur: computeCallCost(input.model, input.promptTokens, input.completionTokens),
+    // Bewust GEEN kolom voor de gecachte tokens: llm_usage heeft die niet en de insert is
+    // fire-and-forget met een stille catch, dus een onbekende kolom zou alle kostenregistratie
+    // geruisloos uitzetten. De korting zit wel in cost_eur verwerkt. De migratie die de kolom
+    // toevoegt staat klaar in scripts/pending-migration-cached-tokens.sql.
+    cost_eur: computeCallCost(
+      input.model, input.promptTokens, input.completionTokens, MODEL_PRICES, input.cachedPromptTokens ?? 0
+    ),
   };
 }
 

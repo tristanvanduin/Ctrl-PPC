@@ -10,7 +10,7 @@ function check(name: string, cond: boolean, detail = "") {
   else { failed++; console.log("  FAIL  " + name + "  " + detail); }
 }
 function fakeResp(model: string): OpenRouterResponse {
-  return { output: "ok", model, tokensUsed: 1, promptTokens: 1, completionTokens: 0, latencyMs: 1, retries: 0, parseStatus: "not_json_mode" };
+  return { output: "ok", model, tokensUsed: 1, promptTokens: 1, completionTokens: 0, latencyMs: 1, retries: 0, cachedPromptTokens: 0, parseStatus: "not_json_mode" };
 }
 
 console.log("\n1. Tier-resolutie uit het label");

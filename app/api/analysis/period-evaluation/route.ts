@@ -159,6 +159,7 @@ Kort: (1) het oordeel over de periode in twee zinnen, (2) wat het plan was en wa
     stepLabel: "Periode-evaluatie",
     model: response.model,
     promptTokens: response.promptTokens ?? 0,
+            cachedPromptTokens: response.cachedPromptTokens ?? 0,
     completionTokens: response.completionTokens ?? 0,
   });
 
