@@ -28,6 +28,9 @@ import { ChannelForecast } from "./channel-forecast";
 import { CreativeDeepDive } from "./creative-deep-dive";
 import { DEMO_GREENTECH_ID } from "@/lib/demo/greentech-mock";
 import type { InsightChannel } from "@/lib/insights/channel-of";
+import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
+import { PeriodSelector } from "./period-selector";
+import { PeriodSummary } from "./period-summary";
 import { SprintPlanning } from "../insights/sprint-planning";
 import { CampaignTable } from "./campaign-table";
 import { SearchTermsTable } from "./search-terms-table";
@@ -166,6 +169,21 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
   );
 }
 
+// Apart component omdat usePeriod alleen binnen de PeriodProvider werkt, en de provider zit
+// om de return van ClientDashboard heen.
+function DashboardPeriodPicker() {
+  const periode = usePeriod();
+  return (
+    <PeriodSelector
+      value={{
+        preset: periode.preset, custom: periode.custom, comparison: periode.comparison,
+        range: periode.range, compareRange: periode.compareRange,
+      }}
+      onChange={(v) => periode.set(v.preset, v.custom, v.comparison)}
+    />
+  );
+}
+
 export function ClientDashboard({ client }: { client: Client }) {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [channel, setChannel] = useState<Channel>("blended");
@@ -187,10 +205,17 @@ export function ClientDashboard({ client }: { client: Client }) {
   }, [client.id]);
 
   return (
+    <PeriodProvider scope={`client-${client.id}`}>
     <BrandThemeProvider clientId={client.id} geoClone={geoClone}>
     <div className="space-y-6">
       {/* Merk-header: logo + merk-/beursnaam, in de huisstijl van de actieve klant/beurs. */}
-      <BrandHeaderBar geoClone={geoClone} fallbackName={client.name} />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 grow"><BrandHeaderBar geoClone={geoClone} fallbackName={client.name} /></div>
+        {/* De periodekiezer staat in de kop en niet per tabblad: hij geldt voor de hele
+            klantweergave, en per tabblad een eigen periode zou betekenen dat twee getallen
+            op hetzelfde scherm over verschillende maanden gaan. */}
+        <DashboardPeriodPicker />
+      </div>
       {/* Data source indicator + sync status */}
       {clientData.source === "api" && !clientData.loading && !clientData.error && (
         <div className="flex items-center gap-2 flex-wrap">
@@ -275,6 +300,9 @@ export function ClientDashboard({ client }: { client: Client }) {
 
           {activeTab === "dashboard" && (
             <div className="space-y-6">
+              {/* De cijfers van de gekozen periode. Werkt op data die de pagina al heeft, dus
+                  ook in demo-modus. */}
+              <PeriodSummary data={clientData.data} />
               <ChannelTabs channel={channel} onChange={setChannel} />
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} />}
               {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} />}
@@ -419,13 +447,21 @@ export function ClientDashboard({ client }: { client: Client }) {
           )}
 
           {activeTab === "insights" && (
-            <InsightsTab
-              clientId={client.id}
-              onSopError={(error) => setSopErrors((prev) => [...prev, error])}
-            />
+            <div className="space-y-6">
+              <PeriodSummary data={clientData.data} />
+              <InsightsTab
+                clientId={client.id}
+                onSopError={(error) => setSopErrors((prev) => [...prev, error])}
+              />
+            </div>
           )}
 
-          {activeTab === "outcomes" && <OutcomesTab clientId={client.id} />}
+          {activeTab === "outcomes" && (
+            <div className="space-y-6">
+              <PeriodSummary data={clientData.data} />
+              <OutcomesTab clientId={client.id} />
+            </div>
+          )}
 
           {activeTab === "sprint" && (
             <SprintPlanning clientId={client.id} />
@@ -503,6 +539,7 @@ export function ClientDashboard({ client }: { client: Client }) {
       )}
     </div>
     </BrandThemeProvider>
+    </PeriodProvider>
   );
 }
 

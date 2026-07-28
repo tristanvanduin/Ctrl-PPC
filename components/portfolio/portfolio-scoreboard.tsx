@@ -5,6 +5,54 @@ import { Loader2, TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { getVisibleClients } from "@/lib/visible-clients";
 import { type Client } from "@/lib/clients";
+import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
+import { PeriodSelector } from "@/components/dashboard/period-selector";
+import { formatRange } from "@/lib/period/period-range";
+import { DEMO_GREENTECH_ID, buildGreentechClientData } from "@/lib/demo/greentech-mock";
+import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "@/lib/api/adapter";
+import { comparePeriods } from "@/lib/period/apply-period";
+import type { PeriodRange } from "@/lib/period/period-range";
+
+// De demo-klant komt niet uit de Google Ads MCC en heeft dus geen gads-id; zonder deze
+// omweg blijft het scorebord in demo-modus leeg terwijl de periodekiezer er wel boven staat.
+// De cijfers lopen door dezelfde adapter en dezelfde periodesnede als het klantdashboard, dus
+// wat je hier ziet is consistent met wat je daar ziet.
+function demoOverview(range: PeriodRange, compareRange: PeriodRange | null): AccountOverview {
+  const api = buildGreentechClientData(DEMO_GREENTECH_ID);
+  const data = buildClientDataFromApi(
+    DEMO_GREENTECH_ID,
+    api.historicalYears as YearDataInput[],
+    api.currentYearMonthly as ApiMonthlyData[],
+    api.currentYearWeekly as ApiWeeklyData[],
+    api.targetCurrentYear,
+    api.currentYear,
+    api.realizedThroughMonth,
+  );
+  const { current, previous, deltas } = comparePeriods(data, range, compareRange);
+  const laatste = current.months[current.months.length - 1];
+  const vorigJaarZelfdeMaand = previous?.months.find((m) => m.month === laatste?.month);
+  return {
+    customerId: DEMO_GREENTECH_ID,
+    ytd: {
+      conversions: current.totals.conversions,
+      revenue: current.totals.revenue,
+      adSpend: current.totals.adSpend,
+      roas: current.totals.adSpend > 0 ? current.totals.revenue / current.totals.adSpend : 0,
+      cpa: current.totals.conversions > 0 ? current.totals.adSpend / current.totals.conversions : 0,
+    },
+    yoy: {
+      convChange: deltas?.conversions.pct ?? null,
+      revChange: deltas?.revenue.pct ?? null,
+      spendChange: deltas?.adSpend.pct ?? null,
+    },
+    lastMonth: laatste ? {
+      month: laatste.month, conversions: laatste.conversions,
+      revenue: laatste.revenue, adSpend: laatste.adSpend,
+      prevYearConv: vorigJaarZelfdeMaand?.conversions ?? 0,
+    } : null,
+    monthlyConversions: current.months.map((m) => m.conversions),
+  };
+}
 
 // Het klassieke portfolio-scorebord (YTD-prestaties per klant). Ongewijzigd verplaatst van de
 // oude homepage (/) naar /portfolio bij de introductie van de "Vandaag"-cockpit. Geen wijziging
@@ -94,7 +142,17 @@ function SummaryCard({ label, value, color, subtitle }: { label: string; value: 
   );
 }
 
+// De provider zit om het scorebord heen; het bord zelf leest de periode via usePeriod.
 export function PortfolioScoreboard() {
+  return (
+    <PeriodProvider scope="portfolio">
+      <PortfolioScoreboardBody />
+    </PeriodProvider>
+  );
+}
+
+function PortfolioScoreboardBody() {
+  const periode = usePeriod();
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<Client[]>([]);
   const [overviews, setOverviews] = useState<Map<string, AccountOverview>>(new Map());
@@ -107,17 +165,31 @@ export function PortfolioScoreboard() {
     setClients(visible);
 
     // Only fetch for Google Ads clients
+    // De demo-klant krijgt zijn cijfers lokaal; de rest komt van de API.
+    const demoMap = new Map<string, AccountOverview>();
+    if (visible.some((c) => c.id === DEMO_GREENTECH_ID)) {
+      demoMap.set(DEMO_GREENTECH_ID, demoOverview(periode.range, periode.compareRange));
+    }
+
     const gadsClients = visible.filter((c) => c.id.startsWith("gads-"));
     if (gadsClients.length === 0) {
+      setOverviews(demoMap);
       setLoading(false);
       return;
     }
 
     const customerIds = gadsClients.map((c) => c.id.replace("gads-", "")).join(",");
-    fetch(`/api/google-ads/overview?customerIds=${customerIds}`)
+    // De periode gaat mee de query in: het scorebord haalt zijn cijfers server-side op, dus
+    // client-side snijden zoals op het klantdashboard kan hier niet.
+    const q = new URLSearchParams({ customerIds, start: periode.range.start, end: periode.range.end });
+    if (periode.compareRange) {
+      q.set("compareStart", periode.compareRange.start);
+      q.set("compareEnd", periode.compareRange.end);
+    }
+    fetch(`/api/google-ads/overview?${q}`)
       .then((r) => r.json())
       .then((data) => {
-        const map = new Map<string, AccountOverview>();
+        const map = new Map<string, AccountOverview>(demoMap);
         for (const account of data.accounts || []) {
           map.set(`gads-${account.customerId}`, account);
         }
@@ -125,7 +197,7 @@ export function PortfolioScoreboard() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [periode.range.start, periode.range.end, periode.compareRange?.start, periode.compareRange?.end]);
 
   function handleSort(col: typeof sortBy) {
     if (sortBy === col) {
@@ -157,7 +229,7 @@ export function PortfolioScoreboard() {
   // Alleen verbergen als we het echt konden vaststellen — faalt de fetch (geen overview),
   // dan verbergen we niets. Puur weergave: de data blijft ongemoeid, de toggle zet het terug.
   function isEmptyAccount(client: Client): boolean {
-    if (!client.id.startsWith("gads-")) return false;
+    if (!client.id.startsWith("gads-")) return false; // demo en handmatige klanten nooit verbergen
     const o = overviews.get(client.id);
     if (!o) return false;
     return !(o.ytd && o.ytd.adSpend > 0);
@@ -210,6 +282,21 @@ export function PortfolioScoreboard() {
 
   return (
     <div className="space-y-6">
+      {/* De periodekiezer boven het bord: alle kolommen hieronder gaan over deze periode. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-body text-muted-foreground">
+          Cijfers over <span className="font-medium text-rm-gray">{formatRange(periode.range)}</span>
+          {periode.compareRange && <> tegenover {formatRange(periode.compareRange)}</>}
+        </p>
+        <PeriodSelector
+          value={{
+            preset: periode.preset, custom: periode.custom, comparison: periode.comparison,
+            range: periode.range, compareRange: periode.compareRange,
+          }}
+          onChange={(v) => periode.set(v.preset, v.custom, v.comparison)}
+        />
+      </div>
+
       {/* Hero */}
       <div className="bg-gradient-to-r from-rm-blue to-rm-blue/80 rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
@@ -257,12 +344,12 @@ export function PortfolioScoreboard() {
           <thead className="border-b border-border bg-gray-50/50">
             <tr>
               <SortHeader col="name" label="Klant" />
-              <SortHeader col="conversions" label="Conversies YTD" align="right" />
+              <SortHeader col="conversions" label="Conversies" align="right" />
               <SortHeader col="yoy" label="YoY" align="right" />
-              <SortHeader col="revenue" label="Omzet YTD" align="right" />
+              <SortHeader col="revenue" label="Omzet" align="right" />
               <SortHeader col="roas" label="ROAS" align="right" />
               <SortHeader col="cpa" label="CPA" align="right" />
-              <th className="px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider text-center">Spend YTD</th>
+              <th className="px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider text-center">Spend</th>
               <th className="px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider text-center">Trend</th>
               <th className="px-4 py-3 w-10"></th>
             </tr>
