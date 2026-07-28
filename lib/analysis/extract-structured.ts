@@ -25,6 +25,7 @@ import { applyActionGating } from "./action-gating";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
 import { extractGroundedNumbers, gateItemFields } from "./weekly-number-gate";
 import type { DataReliabilityAssessment } from "./data-reliability";
+import type { DroppedItems } from "@/lib/schema/analysis-schema";
 import { logger } from "@/lib/logger";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -35,6 +36,12 @@ export interface ExtractionResult {
   tasks: Task[];
   findingsParseOk: boolean;
   recsParseOk: boolean;
+  /**
+   * Wat het herstelpad heeft weggegooid omdat het niet valideerde, of null als er niets
+   * wegviel. Stond hier niet, waardoor "geparsed" en "volledig geparsed" niet te
+   * onderscheiden waren: recsParseOk was true terwijl er taken ontbraken.
+   */
+  recsDropped: DroppedItems | null;
   saved: boolean;
   steps: StepResult[];
 }
@@ -133,6 +140,13 @@ ${analysisOutput}`,
   let tasks: Task[] = recsResult.success ? recsResult.data.tasks : [];
   if (!recsResult.success) {
     logger.error(`[${sopType}] Recommendations parse failed:`, recsResult.error);
+  } else if (recsResult.dropped) {
+    // Het herstelpad heeft items weggegooid. Dat is beter dan alles verliezen, maar het hoort
+    // niet stil te gebeuren: een LLM die systematisch een veld verkeerd invult raakt zo het
+    // gros van zijn voorstellen kwijt zonder dat iemand het merkt.
+    const { counts, reasons } = recsResult.dropped;
+    const wat = Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(" en ");
+    logger.error(`[${sopType}] ${wat} weggevallen bij het parsen omdat ze niet valideerden: ${reasons.join(" | ")}`);
   }
 
   // ── Apply deterministic action gating ────────────────────────────
@@ -208,12 +222,19 @@ ${analysisOutput}`,
       const insightIds = (insertedInsights ?? []).map((r: { id: string }) => r.id);
 
       // 2. Insert recommendations → sop_recommendations
+      // finding_index komt uit de LLM en het schema legt er geen bereik op (z.number().int()).
+      // Een index van 5 bij 2 bevindingen werd daardoor stil insight_id: null, en dan staat er
+      // een aanbeveling in de database zonder de bevinding waar hij uit voortkomt. Juist die
+      // koppeling is waar de rest van de tool op steunt om een advies te kunnen verantwoorden.
+      let verbrokenKoppelingen = 0;
       const recRows = recs.map((rec) => {
         const findingIdx = rec.finding_index;
+        const buitenBereik = findingIdx !== null && (findingIdx < 0 || findingIdx >= insightIds.length);
+        if (buitenBereik) verbrokenKoppelingen += 1;
         return {
           client_id: clientId,
           analysis_id: analysisId,
-          insight_id: findingIdx !== null ? (insightIds[findingIdx] ?? null) : null,
+          insight_id: findingIdx !== null && !buitenBereik ? insightIds[findingIdx] : null,
           sop_type: sopType,
           analysis_date: analysisDate,
           hypothesis: rec.hypothesis,
@@ -229,6 +250,10 @@ ${analysisOutput}`,
         };
       });
 
+      if (verbrokenKoppelingen > 0) {
+        logger.error(`[${sopType}] ${verbrokenKoppelingen} van de ${recs.length} aanbevelingen verwees naar een bevinding die niet bestaat (finding_index buiten bereik); die staan nu zonder koppeling in de database`);
+      }
+
       const { data: insertedRecs } = await supabase
         .from("sop_recommendations")
         .insert(recRows)
@@ -237,8 +262,11 @@ ${analysisOutput}`,
       const recIds = (insertedRecs ?? []).map((r: { id: string }) => r.id);
 
       // 3. Insert tasks → sop_tasks
+      // Zelfde verhaal voor de koppeling taak -> aanbeveling.
+      let verbrokenTaakKoppelingen = 0;
       const taskRows = tasks.map((task) => {
         const recIdx = task.recommendation_index;
+        if (recIdx < 0 || recIdx >= recIds.length) verbrokenTaakKoppelingen += 1;
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + task.due_date_days);
 
@@ -260,6 +288,10 @@ ${analysisOutput}`,
           due_date: dueDate.toISOString().split("T")[0],
         };
       });
+
+      if (verbrokenTaakKoppelingen > 0) {
+        logger.error(`[${sopType}] ${verbrokenTaakKoppelingen} van de ${tasks.length} taken verwees naar een aanbeveling die niet bestaat (recommendation_index buiten bereik)`);
+      }
 
       await supabase.from("sop_tasks").insert(taskRows);
 
@@ -299,6 +331,7 @@ ${analysisOutput}`,
     tasks,
     findingsParseOk: findingsResult.success,
     recsParseOk: recsResult.success,
+    recsDropped: recsResult.success ? (recsResult.dropped ?? null) : null,
     saved,
     steps,
   };

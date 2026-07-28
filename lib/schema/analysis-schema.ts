@@ -296,9 +296,25 @@ export function extractJson(raw: string): string | null {
   return null;
 }
 
+/**
+ * Het resultaat van het parsen van LLM-uitvoer.
+ *
+ * `dropped` telt de items die het herstelpad heeft weggegooid omdat ze niet valideerden. Dat
+ * veld stond er niet, en daardoor was het verlies onzichtbaar: bij drie voorgestelde taken
+ * waarvan er een ongeldig was kwam er `success: true` met twee taken uit, zonder enig spoor
+ * van de derde. De foutlogging verderop kijkt naar `success` en sloeg dus ook niet aan. Wie
+ * de analyse las zag twee taken en had geen manier om te weten dat er een derde was bedacht
+ * en stilletjes verdwenen.
+ */
 export type ParseResult<T> =
-  | { success: true; data: T }
+  | { success: true; data: T; dropped?: DroppedItems }
   | { success: false; error: string; raw: string };
+
+export interface DroppedItems {
+  /** Aantal weggevallen items per soort, met de reden van de eerste. */
+  counts: Record<string, number>;
+  reasons: string[];
+}
 
 function inferIssueCluster(raw: Record<string, unknown>): IssueCluster {
   const provided = typeof raw.issue_cluster === "string" ? raw.issue_cluster.trim().toLowerCase() : "";
@@ -410,7 +426,27 @@ export function parseRecommendations(raw: string): ParseResult<RecommendationsOu
     }
 
     if (validRecs.length > 0 || validTasks.length > 0) {
-      return { success: true, data: { recommendations: validRecs, tasks: validTasks } };
+      // Wat er is weggevallen gaat mee naar buiten. Stil laten vallen is hier het gevaarlijkst:
+      // een LLM die systematisch een veld verkeerd invult verliest zo het gros van zijn taken
+      // zonder dat iemand het merkt.
+      const recsIn = (parsed.recommendations ?? []).length;
+      const tasksIn = (parsed.tasks ?? []).length;
+      const counts: Record<string, number> = {};
+      const reasons: string[] = [];
+      if (recsIn > validRecs.length) {
+        counts.recommendations = recsIn - validRecs.length;
+        const eerste = (parsed.recommendations ?? []).find((r: unknown) => !RecommendationSchema.safeParse(r).success);
+        const fout = eerste ? RecommendationSchema.safeParse(eerste) : null;
+        if (fout && !fout.success) reasons.push(`aanbeveling: ${fout.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+      }
+      if (tasksIn > validTasks.length) {
+        counts.tasks = tasksIn - validTasks.length;
+        const eerste = (parsed.tasks ?? []).find((t: unknown) => !TaskSchema.safeParse(t).success);
+        const fout = eerste ? TaskSchema.safeParse(eerste) : null;
+        if (fout && !fout.success) reasons.push(`taak: ${fout.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+      }
+      const dropped = Object.keys(counts).length > 0 ? { counts, reasons } : undefined;
+      return { success: true, data: { recommendations: validRecs, tasks: validTasks }, dropped };
     }
 
     return {
