@@ -79,6 +79,7 @@ import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { logger } from "@/lib/logger";
 import { getClientMemory, buildClientMemoryGrounding } from "@/lib/memory/client-memory";
 import { buildGoogleSignalsSection, type CampaignIsRow, type CampaignMonthlyRow, type KeywordMonthlyRow, type ChangeHistoryRow, type ScheduleRow, type NetworkMonthlyRow, type DeviceMonthlyRow, type SearchTermMonthlyLite, type NegativeKeywordRow } from "@/lib/analysis/signal-section";
+import { today } from "@/lib/reporting-date";
 
 function getCredentials(): GoogleAdsCredentials | null {
   const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
@@ -915,7 +916,7 @@ async function runMetaMonthlyAnalysis(
   const parsedSteps: ParsedStepOutput[] = [];
   const allSteps: StepResult[] = [];
   const conclusions: string[] = [];
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
 
   for (let stepNumber = 1; stepNumber <= adapter.stepCount; stepNumber++) {
     const stepName = metaStepName(stepNumber);
@@ -1047,7 +1048,7 @@ async function runLinkedinMonthlyAnalysis(
   const parsedSteps: ParsedStepOutput[] = [];
   const allSteps: StepResult[] = [];
   const conclusions: string[] = [];
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
 
   for (let stepNumber = 1; stepNumber <= adapter.stepCount; stepNumber++) {
     const stepName = linkedinStepName(stepNumber);
@@ -1530,7 +1531,7 @@ ${runningContext}`,
             row: {
               client_id: clientId,
               sop_type: "monthly",
-              analysis_date: new Date().toISOString().split("T")[0],
+              analysis_date: today(),
               period_start: periodStart,
               period_end: periodEnd,
               section: name,
@@ -1831,7 +1832,7 @@ ${runningContext}`,
           row: {
             client_id: clientId,
             sop_type: "monthly",
-            analysis_date: new Date().toISOString().split("T")[0],
+            analysis_date: today(),
             period_start: periodStart,
             period_end: periodEnd,
             section: stepName,
@@ -2044,7 +2045,7 @@ ${runningContext}`,
         row: {
           client_id: clientId,
           sop_type: adapter.sopTypeKey,
-          analysis_date: new Date().toISOString().split("T")[0],
+          analysis_date: today(),
           period_start: periodStart,
           period_end: periodEnd,
           section: "Search Term Performance",
@@ -2180,7 +2181,7 @@ ${JSON.stringify(keywordData, null, 2)}
         row: {
           client_id: clientId,
           sop_type: adapter.sopTypeKey,
-          analysis_date: new Date().toISOString().split("T")[0],
+          analysis_date: today(),
           period_start: periodStart,
           period_end: periodEnd,
           section: "Product Performance",
@@ -2293,7 +2294,7 @@ ${JSON.stringify(creativeData, null, 2)}
         row: {
           client_id: clientId,
           sop_type: adapter.sopTypeKey,
-          analysis_date: new Date().toISOString().split("T")[0],
+          analysis_date: today(),
           period_start: periodStart,
           period_end: periodEnd,
           section: "Audience Performance",
@@ -2389,7 +2390,7 @@ ${conclusions.join("\n\n---\n\n")}`,
       logger.warn("[monthly] Step 13 validation", conclusionValidation);
     }
 
-    const analysisDate = new Date().toISOString().split("T")[0];
+    const analysisDate = today();
     const dimensionAvailability = buildCoverageDimensionAvailability({
       campaignData: campaignData as Record<string, unknown>[],
       campaignMetaData: campaignMetaData as Record<string, unknown>[],

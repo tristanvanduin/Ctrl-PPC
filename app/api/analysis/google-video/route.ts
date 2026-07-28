@@ -18,6 +18,7 @@ import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
 import { aggregateVideoCampaigns, type VideoCampaignRow } from "@/lib/video/video-performance";
 import { aggregatePlacements, judgePlacements, type PlacementInput } from "@/lib/video/placement-analysis";
 import { buildNetworkSplit, type NetworkRow } from "@/lib/pmax/network-split";
+import { today } from "@/lib/reporting-date";
 import {
   buildVideoDepthSignals, buildPlacementWasteSignals, buildPmaxNetworkSignals,
 } from "@/lib/signals/google-video";
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, LABEL);
   const output = section || `## ${LABEL}\n\nGeen opvallende bevindingen in de laatste ${WINDOW_DAYS} dagen. Gecontroleerd: ${checkedIds.join(", ")}.`;
 
-  const analysisDate = new Date().toISOString().slice(0, 10);
+  const analysisDate = today();
   const { error: saveError } = await saveAnalysisOutputSection({
     supabase,
     row: {

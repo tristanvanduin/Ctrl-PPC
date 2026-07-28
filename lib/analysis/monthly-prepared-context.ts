@@ -17,7 +17,7 @@ import {
   type DecisionRuleGeoRow,
 } from "@/lib/analysis/decision-rules";
 import { computeCampaignKpiChains, computeKpiChain, type KpiChain } from "@/lib/analysis/kpi-chain";
-import { fetchClientContext, fmt, monthsAgo } from "@/lib/analysis/helpers";
+import { fetchClientContext, fmt, monthsAgo, today } from "@/lib/analysis/helpers";
 
 export interface AnalysisPreparedContextRow {
   id?: string;
@@ -93,15 +93,22 @@ type AdGroupComparisonRow = {
   roas?: number;
 };
 
-// Volledig in UTC, net als fmt() waarmee het resultaat wordt geserialiseerd. De vorige versie
-// bouwde de einddatum met new Date(jaar, maand, 0) — een LOKALE middernacht — en serialiseerde
-// die als UTC. In elke tijdzone vóór UTC lag periodEnd daardoor altijd een dag te vroeg, elke dag
-// van het jaar. Voor maandtabellen viel dat weg omdat die op de 1e staan, maar elke
+// De huidige maand komt uit today() — de Amsterdamse kalenderdag — en niet uit getUTCMonth().
+// Dat is geen detail: periodStart komt van monthsAgo(), dat al op Amsterdam ankert. Zou dit
+// bij UTC blijven, dan rekenen twee plekken "vandaag" verschillend uit, en op de laatste dag
+// van een maand na 23:00 Amsterdamse tijd leveren ze een ander maandnummer. Het venster kromp
+// dan van dertien naar twaalf maanden — precies genoeg om de jaar-op-jaar-tegenhanger van de
+// geanalyseerde maand te laten verdwijnen.
+//
+// De einddatum blijft via Date.UTC gebouwd, net als fmt() waarmee hij wordt geserialiseerd. Een
+// eerdere versie gebruikte new Date(jaar, maand, 0) — een LOKALE middernacht — en serialiseerde
+// die als UTC. In elke tijdzone vóór UTC lag periodEnd daardoor een dag te vroeg, elke dag van
+// het jaar. Voor maandtabellen viel dat weg omdat die op de 1e staan, maar elke
 // .lte("date", periodEnd) op een dagtabel sneed de laatste dag van de geanalyseerde maand eraf.
 function computeAnalysisWindow() {
-  const now = new Date();
-  const currentMonth = now.getUTCMonth() + 1;
-  const analysisYear = currentMonth === 1 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  const [jaar, maand] = today().split("-").map(Number);
+  const currentMonth = maand;
+  const analysisYear = currentMonth === 1 ? jaar - 1 : jaar;
   const lastCompleteMonth = currentMonth === 1 ? 12 : currentMonth - 1;
   // Dag 0 van de volgende maand = de laatste dag van deze.
   const periodEndDate = new Date(Date.UTC(analysisYear, lastCompleteMonth, 0));

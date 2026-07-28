@@ -12,6 +12,7 @@ import {
   updateProgressPhase,
 } from "@/lib/progress/server";
 import { logger } from "@/lib/logger";
+import { today } from "@/lib/reporting-date";
 
 /**
  * POST /api/second-opinion — trigger a second opinion audit.
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
         message: "Second opinion PDF opbouwen...",
       });
       const modeLabel = mode === "quick" ? "Snelle-Audit" : "Volledige-Audit";
-      const dateStr = new Date().toISOString().split("T")[0];
+      const dateStr = today();
       const filename = `Second-Opinion-${modeLabel}-${dateStr}.pdf`;
       const storagePath = `${clientId}/Second Opinion/${Date.now()}-${filename}`;
 

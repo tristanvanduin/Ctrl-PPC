@@ -20,6 +20,7 @@ import { renderSignalSection } from "@/lib/signals/render-section";
 import { mergeDetections } from "@/lib/signals/types";
 import { shapeMetaAdInputs, shapeMetaLevelInputs, type MetaDailyRow } from "@/lib/analysis/channel-signal-data";
 import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "meta_signals_v1";
 const SOP_TYPE = "meta_signals";
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
   const budgetEntities: BudgetEntityRow[] = [...campTotals.entries()].map(([eid, t]) => ({ name: campName.get(eid) ?? eid, spend: t.spend, conversions: t.conversions }));
 
   // Meta demografie-/segment-drift over de tijd + spend-velocity op accountniveau.
-  const asOfDate = new Date().toISOString().slice(0, 10);
+  const asOfDate = today();
   const metaDriftRows: DemographicDriftRow[] = breakdownRows.length > 0
     ? (breakdownRes.data ?? [])
         .filter((r) => r.breakdown_type && r.breakdown_value && r.date)
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, "Meta");
 
   const output = section || `## Meta-signalen\n\nGeen signalen getriggerd. Gecontroleerd: ${checkedIds.join(", ")}.`;
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const dates = adRows.map((r) => r.date).sort();
 
   const { error: saveError } = await saveAnalysisOutputSection({

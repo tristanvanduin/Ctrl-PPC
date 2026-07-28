@@ -8,6 +8,7 @@ import { NextRequest } from "next/server";
 import { getSupabase, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { analyzeGoogleFunnel, renderGoogleFunnelMarkdown, type GoogleFunnelWeeklyRow } from "@/lib/analysis/google-funnel-facts";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "google_funnel_v1";
 const SOP_TYPE = "google_funnel";
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
   const output = renderGoogleFunnelMarkdown(facts);
   const actionNeeded = facts.worst !== null;
 
-  const analysisDate = new Date().toISOString().slice(0, 10);
+  const analysisDate = today();
   const { error: saveError } = await saveAnalysisOutputSection({
     supabase,
     row: {

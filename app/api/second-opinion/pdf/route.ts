@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { renderSecondOpinionPdf } from "@/lib/second-opinion/pdf-renderer";
+import { today } from "@/lib/reporting-date";
 import {
   createProgressJob,
   markProgressCompleted,
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
     const clientId = run.client_id;
     const timestamp = Date.now();
     const modeLabel = run.mode === "quick" ? "Snelle-Audit" : "Volledige-Audit";
-    const filename = `Second-Opinion-${modeLabel}-${new Date().toISOString().split("T")[0]}.pdf`;
+    const filename = `Second-Opinion-${modeLabel}-${today()}.pdf`;
     const storagePath = `${clientId}/Second Opinion/${timestamp}-${filename}`;
 
     await updateProgressPhase(supabase, {

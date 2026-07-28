@@ -16,6 +16,7 @@
 // Puur presentatie: alleen actief in demo-modus, nooit vermengd met echte data.
 
 import { splitAlong, splitInt } from "./split";
+import { today } from "../reporting-date";
 
 type Row = Record<string, unknown>;
 
@@ -113,7 +114,7 @@ function dailyFromMonthly(monthly: Row[]): Map<string, MonthTotals> {
 /** Volle weken (maandag t/m zondag) tot en met de laatst afgeronde week. */
 export function accountWeeklyRows(clientId: string, accountMonthly: Row[], weeks: number): Row[] {
   const daily = dailyFromMonthly(accountMonthly);
-  const lastComplete = new Date(`${mondayOf(new Date().toISOString().slice(0, 10))}T00:00:00Z`);
+  const lastComplete = new Date(`${mondayOf(today())}T00:00:00Z`);
   lastComplete.setUTCDate(lastComplete.getUTCDate() - 7); // de lopende week is nog niet af
   const rows: Row[] = [];
   for (let w = weeks - 1; w >= 0; w--) {

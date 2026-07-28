@@ -9,6 +9,7 @@ import { NextRequest } from "next/server";
 import { getSupabase, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { analyzeMetaFunnel, renderMetaFunnelMarkdown, type MetaFunnelDailyRow } from "@/lib/analysis/meta-funnel-facts";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "meta_funnel_v1";
 const SOP_TYPE = "meta_funnel";
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
   const output = renderMetaFunnelMarkdown(facts);
   const actionNeeded = facts.worst !== null;
 
-  const analysisDate = new Date().toISOString().slice(0, 10);
+  const analysisDate = today();
   const { error: saveError } = await saveAnalysisOutputSection({
     supabase,
     row: {

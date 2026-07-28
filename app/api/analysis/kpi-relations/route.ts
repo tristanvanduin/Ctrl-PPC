@@ -13,6 +13,7 @@ import { buildKpiRelations, type KpiWindow } from "@/lib/analysis/kpi-relations"
 import { renderSignalSection } from "@/lib/signals/render-section";
 import { splitWindows } from "@/lib/analysis/channel-signal-data";
 import { saveSignalHypotheses, type SignalSource } from "@/lib/analysis/signals-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 type Kanaal = "google" | "meta" | "linkedin";
 const SOURCES: Record<Kanaal, SignalSource> = { google: "google_kpi", meta: "meta_kpi", linkedin: "linkedin_kpi" };
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, `KPI-verhoudingen ${LABELS[kanaal]}`);
   const output = section || `## KPI-verhoudingen ${LABELS[kanaal]}\n\nGeen opvallende verhoudingen (${windows.prior.label} → ${windows.recent.label}). Gecontroleerd: ${checkedIds.join(", ")}.`;
 
-  const analysisDate = new Date().toISOString().slice(0, 10);
+  const analysisDate = today();
   const { error: saveError } = await saveAnalysisOutputSection({
     supabase,
     row: {

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isGreentechDemo, buildGreentechClientData } from "@/lib/demo/greentech-mock";
+import { today } from "@/lib/reporting-date";
 import {
   getAccountMetricsByMonth,
   getAccountMetricsByWeek,
@@ -72,7 +73,10 @@ export async function GET(request: NextRequest) {
 
   try {
     // ── Determine year range dynamically ──────────────────────────────
-    const currentYear = new Date().getFullYear();
+    // Het Amsterdamse jaar: new Date().getFullYear() is het lokale jaar van het serverproces,
+    // en dat draait in UTC. Op oudejaarsavond na 23:00 Amsterdamse tijd zou dat het vorige jaar
+    // opleveren en het historievenster een jaar mis laten lopen.
+    const currentYear = Number(today().slice(0, 4));
     const MAX_HISTORY_YEARS = 5;
     const firstHistoricalYear = currentYear - MAX_HISTORY_YEARS;
 
@@ -101,7 +105,7 @@ export async function GET(request: NextRequest) {
       getCampaignMetricsByMonth(credentials, customerId, `${currentYear}-01-01`, `${currentYear}-12-31`),
       getCampaignImpressionShare(credentials, customerId,
         new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        new Date().toISOString().split("T")[0]
+        today()
       ),
       getConversionActions(credentials, customerId),
       getAccountStructure(credentials, customerId),

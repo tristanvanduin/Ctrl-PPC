@@ -14,6 +14,9 @@ import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { computeDataReliability } from "@/lib/analysis/data-reliability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
+import { today } from "@/lib/reporting-date";
+
+const amsterdamseMaand = () => Number(today().slice(5, 7));
 import {
   createProgressJob,
   markProgressCompleted,
@@ -115,7 +118,10 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
       accountMonthly: accountMonthlyData as Array<{ month: string; impressions: number; clicks: number; cost: number; conversions: number; conversions_value: number }>,
       campaignMonthly: (campaignResult.data ?? []) as Array<{ campaign_name: string; month: string; cost: number; conversions: number; conversions_value: number }>,
       conversionLagDays: (lagSettings?.conversion_lag_days as number) ?? 3,
-      lastCompleteMonth: new Date().getMonth() === 0 ? 12 : new Date().getMonth(),
+      // De Amsterdamse maand, niet new Date().getMonth(): dat is de LOKALE maand van het
+      // serverproces, en dat draait in UTC. Op de laatste dag van een maand na 23:00
+      // Amsterdamse tijd zou hier een andere maand uitkomen dan in computeAnalysisWindow.
+      lastCompleteMonth: amsterdamseMaand() === 1 ? 12 : amsterdamseMaand() - 1,
       hasKpiTargets: !!goalsSection,
     });
     const reliabilityText = `\n\n${weeklyReliability.promptContext}`;

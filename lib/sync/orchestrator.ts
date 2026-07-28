@@ -48,6 +48,7 @@ import {
   getPmaxSearchCategoriesByMonth,
   type GoogleAdsCredentials,
 } from "../api/google-ads";
+import { addYears } from "../analysis/helpers";
 import { rsaAssetToDbRow, adMetaToDbRow } from "../api/google-ads-rsa-transform";
 // De zoekterm-query splitst rijen per match-type (segments.search_term_match_type); de
 // dedup verderop kent dat segment niet en zou een van de rijen weggooien MET zijn metrics.
@@ -705,9 +706,11 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
 
   const countryYoyRows: Record<string, unknown>[] = [];
   for (const r of countryMonthlyRows) {
-    const prevMonth = new Date(r.month);
-    prevMonth.setFullYear(prevMonth.getFullYear() - 1);
-    const prevKey = `${r.country_code}|||${fmt(prevMonth)}`;
+    // UTC, niet new Date(...).setFullYear(): dat parst als UTC en telt lokaal op. Op een
+    // UTC-server klopt het, maar in een tijdzone met negatieve offset landt de sleutel een dag
+    // te vroeg (59 van de 60 maanden in New York) en vindt de lookup niets — waarna de rij
+    // stilzwijgend wordt overgeslagen in plaats van als YoY-vergelijking te verschijnen.
+    const prevKey = `${r.country_code}|||${addYears(String(r.month), -1)}`;
     const prev = countryMonthLookup.get(prevKey);
     if (!prev) continue;
     countryYoyRows.push({

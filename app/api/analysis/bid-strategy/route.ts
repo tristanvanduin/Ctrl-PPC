@@ -13,6 +13,7 @@ import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { analyzeBidStrategy, type CampaignBidInput, type BidGoal } from "@/lib/analysis/bid-strategy-facts";
 import { buildBidStrategyPrompt } from "@/lib/prompts/bid-strategy-prompt";
 import { saveBidStrategyHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "bid_strategy_v1";
 const SOP_TYPE = "bid_strategy";
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
     label: "bid-strategy",
   });
 
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const months = isRows.map((r) => r.month).filter(Boolean).sort();
 
   void recordUsage(supabase, {

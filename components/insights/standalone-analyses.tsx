@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Calendar, CheckCircle2, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { today } from "@/lib/reporting-date";
 
 // De losse (standalone) Google-analyses. Elk endpoint deelt hetzelfde contract:
 // GET ?client_id= levert de laatst opgeslagen analyse, POST { client_id } draait hem opnieuw
@@ -77,7 +78,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
       patch(a.key, {
         running: false,
         success: true,
-        lastDate: data.analysisDate ?? new Date().toISOString().split("T")[0],
+        lastDate: data.analysisDate ?? today(),
       });
       // Verse output ophalen zodat "Bekijk resultaat" meteen klopt.
       await fetchLatest(a);

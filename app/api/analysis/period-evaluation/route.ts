@@ -14,6 +14,7 @@ import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSe
 import { callRouted } from "@/lib/analysis/llm-router";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { buildPeriodEvaluation, renderPeriodEvaluationSection, type PeriodHypothesis, type PeriodMonthRow } from "@/lib/analysis/period-evaluation";
+import { today as vandaag } from "@/lib/reporting-date";
 
 const SECTION = "period_evaluation_v1";
 const SOP_TYPE = "period_evaluation";
@@ -146,7 +147,7 @@ Kort: (1) het oordeel over de periode in twee zinnen, (2) wat het plan was en wa
     label: "period-evaluation",
   });
 
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = vandaag();
   void recordUsage(supabase, {
     runKey: `period-evaluation-${clientId}-${analysisDate}`,
     clientId,

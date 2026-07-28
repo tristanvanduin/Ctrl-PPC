@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { forecastChannelMetric, type MonthValue } from "@/lib/analysis/channel-forecast";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { resolveChannelConversionConfig, sumSelectedConversions, conversionSourcesFor, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
+import { today as vandaag } from "@/lib/reporting-date";
 
 // Run-rate-prognose voor Meta/LinkedIn: lopende maand op tempo + volgende maand via een lichte
 // trend. Eerlijk over de beperking (geen meerjarige historie, dus geen seizoenscorrectie). De
@@ -71,7 +72,7 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
 
   const model = useMemo(() => {
     if (!rows || rows.length === 0) return null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = vandaag();
     const curMonth = today.slice(0, 7);
     const dayOfMonth = Number(today.slice(8, 10));
     const daysInMonth = new Date(Number(curMonth.slice(0, 4)), Number(curMonth.slice(5, 7)), 0).getDate();

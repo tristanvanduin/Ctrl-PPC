@@ -8,6 +8,7 @@ import { NextRequest } from "next/server";
 import { getSupabase, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { analyzeLinkedInFunnel, renderLinkedInFunnelMarkdown, type LinkedInFunnelDailyRow } from "@/lib/analysis/linkedin-funnel-facts";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "linkedin_funnel_v1";
 const SOP_TYPE = "linkedin_funnel";
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
   const output = renderLinkedInFunnelMarkdown(facts);
   const actionNeeded = facts.worst !== null;
 
-  const analysisDate = new Date().toISOString().slice(0, 10);
+  const analysisDate = today();
   const { error: saveError } = await saveAnalysisOutputSection({
     supabase,
     row: {

@@ -50,6 +50,7 @@ import {
   type FrequencyCapInfo,
 } from "../api/google-ads";
 import { mergeConversionActionsWithLiveStatus } from "../client-settings";
+import { today } from "../reporting-date";
 
 // ── Account data context (loaded once per audit) ───────────────────────────
 
@@ -351,7 +352,7 @@ async function loadFromGoogleAds(
   kpiTargets: Record<string, unknown> | null,
 ): Promise<AccountContext> {
   // Date range for impression share (last 90 days)
-  const endDate = new Date().toISOString().split("T")[0];
+  const endDate = today();
   const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   // Fetch live data from Google Ads API in parallel

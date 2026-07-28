@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountType } from "../prompts/sop-prompts";
+import { addDays } from "./helpers";
 
 // ── LAAG 1: Strategische context ────────────────────────────────────────────
 
@@ -219,9 +220,11 @@ export async function calculateLeadingIndicators(
     const prev = weeks[i - 1];
 
     // Determine if this week's data is immature (conversion data may be incomplete)
+    // Ook hier UTC: week_start is een datumstring, dus new Date() geeft UTC-middernacht en
+    // setDate() telt er lokaal bij op. Dat verschuift het weekeinde met de tijdzone-offset,
+    // en die vergelijking bepaalt of een week als onvolgroeid wordt gemarkeerd.
     const weekStart = String(cur.week_start || "");
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
+    const weekEnd = new Date(`${addDays(weekStart, 6)}T00:00:00Z`);
     const isImmature = weekEnd >= safeDate;
 
     const wow = (curVal: unknown, prevVal: unknown): number | null => {

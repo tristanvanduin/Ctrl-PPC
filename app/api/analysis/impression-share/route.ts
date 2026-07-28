@@ -18,6 +18,7 @@ import {
 } from "@/lib/analysis/impression-share-facts";
 import { buildImpressionSharePrompt } from "@/lib/prompts/impression-share-prompt";
 import { saveImpressionShareHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "impression_share_v1";
 const SOP_TYPE = "impression_share";
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     label: "impression-share",
   });
 
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const months = campaignRows.map((r) => r.month).filter(Boolean).sort();
   const periodStart = `${months[0]}-01`;
   const periodEnd = `${months[months.length - 1]}-01`;

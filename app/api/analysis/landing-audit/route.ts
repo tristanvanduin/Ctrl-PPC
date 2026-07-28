@@ -14,6 +14,7 @@ import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { buildMessageMatchFacts, buildMessageMatchPrompt, MessageMatchSchema, type MessageMatchFacts, type MessageMatchJudgement } from "@/lib/analysis/landing-message-match";
 import { extractPageText } from "@/lib/analysis/page-extract";
 import { saveLandingAuditHypotheses, type LandingAuditItem } from "@/lib/analysis/standalone-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "landing_audit_v1";
 const SOP_TYPE = "landing_audit";
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
   };
 
   // ── 3. Per unieke URL: fetch, extract, facts, en het pad. ──
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const results: UrlAuditResult[] = [];
   for (const [url, { adGroupName, adIds }] of [...urlToAds.entries()].slice(0, maxPages)) {
     const { headlines, descriptions } = copyForAds(adIds);

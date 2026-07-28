@@ -8,6 +8,7 @@ import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_GRID, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
+import { today as vandaag } from "@/lib/reporting-date";
 
 // Volwaardige prestatie-view voor Meta en LinkedIn: dezelfde bouwstenen als Google
 // (KPI-kaarten, pacing, maandtabel, grafiek, campagnetabel), gevoed uit de dag-tabellen van
@@ -130,7 +131,7 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
       : account;
     if (geoClone && matchedEntities && matchedEntities.size === 0) return { empty: true } as const;
     if (source.length === 0) return null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = vandaag();
     const curMonth = today.slice(0, 7);
 
     // Maand-aggregatie (volle maanden, laatste 6).

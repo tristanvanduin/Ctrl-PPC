@@ -24,6 +24,7 @@ import { buildGa4CroSignals, buildGa4DeviceCroSignals, buildGa4LandingPageCroSig
 import { buildBlendedDataGapSignals, type ChannelValueAgg } from "@/lib/signals/blended-data-gap";
 import { buildFastSaturationSignals, type SaturationPoint } from "@/lib/signals/fast-saturation";
 import { mergeDetections } from "@/lib/signals/types";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "cross_channel_v1";
 // Additieve sectie: de sub-analyses als losse blokken (JSON), zodat de UI de cross-channel-
@@ -345,7 +346,7 @@ export async function POST(request: NextRequest) {
   }
   const output = lines.join("\n");
 
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const months = channels.map((c) => c.month).sort();
 
   const { error: saveError } = await saveAnalysisOutputSection({

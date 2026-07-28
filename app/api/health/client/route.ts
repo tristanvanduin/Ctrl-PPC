@@ -9,6 +9,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { evaluateChannelHealth, evaluateConversionTrackingQuality, assembleClientHealth, type ChannelHealth, type ChannelHealthInput, type HealthStatus } from "@/lib/health";
+import { today } from "@/lib/reporting-date";
 
 function getClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
       hasPrimaryAction: actions.some((a) => a.category === "primary"),
       conversionLagConfigured: settings?.conversion_lag_days != null,
       conversionLagDays: settings?.conversion_lag_days ?? null,
-      asOfDate: new Date().toISOString().slice(0, 10),
+      asOfDate: today(),
     });
 
     const allChecks = [...googleHealth.checks, ...convChecks];

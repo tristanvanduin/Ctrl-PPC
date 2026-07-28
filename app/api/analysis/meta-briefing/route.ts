@@ -21,6 +21,7 @@ import { aggregateAdWindow, buildFatigueInputs, type AdDailyRow } from "@/lib/me
 import { flagFatiguedWinners, type PatternAggregate } from "@/lib/meta/vision/patterns";
 import { emptyBrandGuide, brandContextForBriefing, type BrandGuide } from "@/lib/branding/brand-guide";
 import { FEATURES_VERSION } from "@/app/api/analysis/meta-creatives/route";
+import { today as vandaag } from "@/lib/reporting-date";
 
 const SECTION = "meta_briefing_v1";
 const SOP_TYPE = "meta_briefing";
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
   // ── 3. De selectie beslist het pad. ──
   const selection = selectBriefingPatterns({ patterns, replacements });
   const kop = { klant: clientId, periodeBasis: `${newestPeriod} tot ${periodEnd}`, doelstelling: `uitvoering van de aangenomen hypothese: ${String(gateRow.hypothesis).slice(0, 120)}`, funnelfocus: typeof body.funnelfocus === "string" && body.funnelfocus ? body.funnelfocus : "prospecting en retargeting" };
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = vandaag();
 
   if (selection.status === "onvoldoende_bewijs") {
     const markdown = renderInsufficientMarkdown(selection, kop);

@@ -13,6 +13,7 @@ import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { analyzeRsaInsights, type RsaAssetRow } from "@/lib/analysis/rsa-insights-facts";
 import { saveRsaInsightsHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
 import { buildRsaInsightsPrompt } from "@/lib/prompts/rsa-insights-prompt";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "rsa_insights_v1";
 const SOP_TYPE = "rsa_insights";
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     label: "rsa-insights",
   });
 
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const months = assetRows.map((r) => r.month).filter(Boolean).sort();
   const periodStart = `${String(months[0]).slice(0, 7)}-01`;
   const periodEnd = `${String(months[months.length - 1]).slice(0, 7)}-01`;

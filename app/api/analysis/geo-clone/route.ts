@@ -16,6 +16,7 @@ import { resolveChannelConversionConfig, sumSelectedConversions, type ChannelCon
 import { resolveEvent, resolveGoals, type Edition, type Cadence } from "@/lib/rai/geo-clone-settings";
 import type { CampaignMonthlyRow } from "@/lib/rai/geo-clone-aggregate";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SOP_TYPE = "geo_clone";
 const sectionFor = (geoClone: string) => `geo_clone_${geoClone.toLowerCase()}_v1`;
@@ -103,7 +104,7 @@ async function runGeoCloneAnalysis(
   if (metaPoints.length > 0) channelConvPoints.push({ channel: "meta_ads", points: metaPoints, target: null });
   if (liPoints.length > 0) channelConvPoints.push({ channel: "linkedin_ads", points: liPoints, target: null });
 
-  const asOfDate = new Date().toISOString().slice(0, 10);
+  const asOfDate = today();
   const result = analyzeGeoClone({
     geoClone,
     fairLabel,
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
   const run = await runGeoCloneAnalysis(supabase, clientId, geoClone);
   if ("error" in run) return Response.json({ error: run.error }, { status: run.status });
   const { result, rows, fairLabel } = run;
-  const asOfDate = new Date().toISOString().slice(0, 10);
+  const asOfDate = today();
 
   const months = rows.map((r) => r.month).sort();
   const { error: saveError } = await saveAnalysisOutputSection({

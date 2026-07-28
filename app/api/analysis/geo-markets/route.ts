@@ -18,6 +18,7 @@ import { mergeDetections } from "@/lib/signals/types";
 import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
 import { buildGeoSignals } from "@/lib/signals/geo-analysis";
 import { resolveGeo, type GeoChannel } from "@/lib/geo/geo-source";
+import { today } from "@/lib/reporting-date";
 
 const SOURCE = "geo_markets" as const;
 const SECTION = "geo_markets_v1";
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, title);
   const output = section || `## ${title}\n\nGeen opvallende markten. Gecontroleerd: ${checkedIds.join(", ")}.`;
 
-  const analysisDate = new Date().toISOString().slice(0, 10);
+  const analysisDate = today();
   const { error: saveError } = await saveAnalysisOutputSection({
     supabase,
     row: {

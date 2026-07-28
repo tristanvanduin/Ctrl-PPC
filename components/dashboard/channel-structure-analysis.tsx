@@ -12,6 +12,7 @@ import { buildWeekdayEfficiencySignals, type WeekdayRow } from "@/lib/signals/we
 import { buildTrackingGapSignals, type TrackingGapRow } from "@/lib/signals/tracking-gap";
 import { buildHourlyDaypartingSignals, type HourlyRow } from "@/lib/signals/hourly-dayparting";
 import { mergeDetections, type SignalStory, type SignalCertainty } from "@/lib/signals/types";
+import { today } from "@/lib/reporting-date";
 
 // Deterministische structuur-analyse per kanaal, client-side (leest de dag-tabellen direct en
 // draait de pure detector) — zodat de segment-efficiëntie zichtbaar is zonder API-key of
@@ -65,7 +66,7 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
     };
 
     async function load() {
-      const asOfDate = new Date().toISOString().slice(0, 10);
+      const asOfDate = today();
       if (channel === "meta") {
         const [{ data, error }, { data: campDaily }, { data: campNames }, { data: acctDaily }, { data: hourly }] = await Promise.all([
           sb!.from("meta_breakdown_daily").select("breakdown_type, breakdown_value, date, impressions, link_clicks, spend, conversions").eq("client_id", clientId).gte("date", since),

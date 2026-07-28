@@ -13,6 +13,7 @@ import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { saveQualityScoreHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
 import { analyzeQualityScore, type KeywordQsPerformanceRow } from "@/lib/analysis/quality-score-facts";
 import { buildQualityScorePrompt } from "@/lib/prompts/quality-score-prompt";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "quality_score_v1";
 const SOP_TYPE = "quality_score";
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
     label: "quality-score",
   });
 
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const months = keywordRows.map((r) => r.month).filter(Boolean).sort();
   const periodStart = `${String(months[0]).slice(0, 7)}-01`;
   const periodEnd = `${String(months[months.length - 1]).slice(0, 7)}-01`;

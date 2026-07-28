@@ -18,6 +18,7 @@ import { alignEditionsAtEqualDaysOut, isWithinWindow, type DailyPoint, type Edit
 import { forecastStream, type StreamForecast } from "./event-forecast";
 import { forecastAllChannels, type ChannelForecastInput, type ChannelForecastResult, type BlendedForecast } from "./multi-channel-forecast";
 import type { Edition as SettingsEdition } from "./geo-clone-settings";
+import { addDays } from "../analysis/helpers";
 
 export const FAIR_DURATION_DAYS = 3; // aanname: een beurs duurt enkele dagen; alleen de startdag is geconfigureerd
 const WINDOW_FALLBACK_DAYS: Record<FairCadence, number> = { annual: 365, biennial: 730, custom: 365 };
@@ -56,11 +57,12 @@ export interface GeoCloneAnalysisResult {
 
 const ACTION_BEHIND_PCT = -0.15; // 15% achter op de vorige editie bij gelijke afstand is materieel
 
-function addDays(iso: string, days: number): string {
-  const d = new Date(iso);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+// Beursvensters rekenen in UTC. De vorige versie parste met new Date(iso) — UTC-middernacht —
+// en telde er met setDate() LOKAAL bij op. Op een UTC-server valt dat niet op, maar zodra TZ
+// iets anders is (een ontwikkelmachine in Amsterdam, een container met TZ gezet) landt elk
+// venster dat een zomertijdgrens kruist een dag te vroeg: 587 van de 7.056 gecontroleerde
+// combinaties over drie jaar. Dat verschuift campaignStartDate en fairEndDate, waardoor een
+// dag data bij de verkeerde editie terechtkomt.
 
 /** Bouwt RaiEditions uit de geconfigureerde editie-datums: venster loopt van net na de vorige
  * editie tot en met de beursdag (of een cadans-lengte terug voor de eerste editie). */

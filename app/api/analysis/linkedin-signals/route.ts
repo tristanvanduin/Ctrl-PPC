@@ -18,6 +18,7 @@ import { renderSignalSection } from "@/lib/signals/render-section";
 import { shapeLinkedInInputs, type LinkedInDailyRow } from "@/lib/analysis/channel-signal-data";
 import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
 import { mergeDetections } from "@/lib/signals/types";
+import { today } from "@/lib/reporting-date";
 
 // LinkedIn-pivot → leesbare demografische dimensie voor de segment-efficiëntie-detector.
 const PIVOT_TO_DIM: Record<string, string> = {
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
       return { dimension, value: urnLabel.get(urn) ?? urn, date: String(r.date), leads: num(r.leads) };
     })
     .filter((r): r is DemographicDriftRow => r !== null);
-  const asOfDate = new Date().toISOString().slice(0, 10);
+  const asOfDate = today();
 
   const liSpendDaily: SpendDailyRow[] = (accountRes.data ?? []).map((r) => ({ date: String(r.date), spend: num(r.spend) }));
   const liWeekdayRows: WeekdayRow[] = (accountRes.data ?? []).map((r) => ({ date: String(r.date), spend: num(r.spend), conversions: num(r.one_click_leads) }));
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, "LinkedIn");
 
   const output = section || `## LinkedIn-signalen\n\nGeen signalen getriggerd. Gecontroleerd: ${checkedIds.join(", ")}.`;
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const dates = rows.map((r) => r.date).sort();
 
   const { error: saveError } = await saveAnalysisOutputSection({

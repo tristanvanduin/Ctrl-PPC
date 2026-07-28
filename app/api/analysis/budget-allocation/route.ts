@@ -13,6 +13,7 @@ import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { analyzeBudgetAllocation, type CampaignBudgetInput, type BudgetTarget } from "@/lib/analysis/budget-allocation-facts";
 import { buildBudgetAllocationPrompt } from "@/lib/prompts/budget-allocation-prompt";
 import { saveBudgetAllocationHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
+import { today } from "@/lib/reporting-date";
 
 const SECTION = "budget_allocation_v1";
 const SOP_TYPE = "budget_allocation";
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
     label: "budget-allocation",
   });
 
-  const analysisDate = new Date().toISOString().split("T")[0];
+  const analysisDate = today();
   const months = isRows.map((r) => r.month).filter(Boolean).sort();
 
   void recordUsage(supabase, {

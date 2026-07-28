@@ -65,19 +65,27 @@ const EEUWGEVALLEN = [
 async function main() {
   const { monthsAgo, daysAgo } = await import("./helpers");
 
-  for (const tz of ["UTC", "Europe/Amsterdam", "America/New_York"]) {
+  // De verwachting is AMSTERDAM, niet UTC. Dit is de kern van wat er veranderd is: de
+  // serverprocessen draaien in UTC, en tot 02:00 Amsterdamse tijd staat de UTC-kalender nog op
+  // de vorige dag — aan het begin van een maand dus op de vorige MAAND. De momenten hieronder
+  // op 23:30Z vallen precies in dat venster, en horen de VOLGENDE Amsterdamse dag te geven.
+  const amsterdamseDag = (m: string) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam" }).format(new RealDate(m));
+
+  // De twee tijdzones waarin deze code feitelijk draait: server op UTC, ontwikkelmachines op
+  // Amsterdam. De uitkomst hoort in allebei identiek te zijn.
+  for (const tz of ["UTC", "Europe/Amsterdam"]) {
     process.env.TZ = tz;
     for (const moment of [...dagen(), ...EEUWGEVALLEN]) {
       NU = moment;
-      const now = new RealDate(moment);
+      const [jaar, maand, dag] = amsterdamseDag(moment).split("-").map(Number);
 
       for (const n of [0, 1, 2, 3, 6, 13]) {
-        const verwacht = new RealDate(RealDate.UTC(now.getUTCFullYear(), now.getUTCMonth() - n, 1))
-          .toISOString().slice(0, 10);
+        const verwacht = new RealDate(RealDate.UTC(jaar, maand - 1 - n, 1)).toISOString().slice(0, 10);
         check(`${tz} ${moment} monthsAgo(${n})`, monthsAgo(n) === verwacht, `kreeg ${monthsAgo(n)}, verwacht ${verwacht}`);
       }
 
-      const dVerwacht = new RealDate(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+      const dVerwacht = new RealDate(RealDate.UTC(jaar, maand - 1, dag - 30)).toISOString().slice(0, 10);
       check(`${tz} ${moment} daysAgo(30)`, daysAgo(30) === dVerwacht, `kreeg ${daysAgo(30)}, verwacht ${dVerwacht}`);
     }
   }
@@ -88,8 +96,9 @@ async function main() {
 
   // ── Het analysevenster ───────────────────────────────────────────────────
   // Het venster hoort altijd dertien hele maanden te zijn en te eindigen op de laatste dag van de
-  // laatste volledige maand. Beide eigenschappen sneuvelden: de eerste op maandeindes, de tweede
-  // in elke tijdzone vóór UTC.
+  // laatste volledige maand, gerekend in Amsterdamse tijd. Alle drie de eigenschappen sneuvelden
+  // ooit: de lengte op maandeindes, de einddatum in elke tijdzone vóór UTC, en de maand zelf toen
+  // monthsAgo() al op Amsterdam ankerde en computeAnalysisWindow nog op UTC.
   const { fetchMonthlyPreparedInputs } = await import("./monthly-prepared-context");
   const { createDemoSupabase } = await import("../demo/mock-supabase");
   const { demoRows } = await import("../demo/demo-rows");
@@ -110,9 +119,12 @@ async function main() {
         const e = new RealDate(`${i.periodEnd}T00:00:00Z`);
         const maanden = (e.getUTCFullYear() - s.getUTCFullYear()) * 12 + (e.getUTCMonth() - s.getUTCMonth()) + 1;
 
-        const now = new RealDate(NU);
-        const maandNu = now.getUTCMonth() + 1;
-        const jaar = maandNu === 1 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+        // De verwachting volgt de AMSTERDAMSE kalendermaand, niet de UTC-maand. Op 23:30Z van
+        // de laatste dag van een maand is het in Amsterdam al de volgende maand, en dan hoort
+        // de laatste volledige maand ook mee te schuiven. Deed alleen monthsAgo() dat en
+        // computeAnalysisWindow niet, dan kromp het venster stil naar twaalf maanden.
+        const [jaarNu, maandNu] = amsterdamseDag(NU).split("-").map(Number);
+        const jaar = maandNu === 1 ? jaarNu - 1 : jaarNu;
         const laatsteVolle = maandNu === 1 ? 12 : maandNu - 1;
         const eindVerwacht = new RealDate(RealDate.UTC(jaar, laatsteVolle, 0)).toISOString().slice(0, 10);
 
