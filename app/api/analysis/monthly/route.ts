@@ -2139,7 +2139,12 @@ ${JSON.stringify(adgroupAggregation.campaign_summaries, null, 2)}
 ## Ad Group Details (pre-geaggregeerd)
 \`\`\`json
 ${JSON.stringify(adgroupAggregation.ad_group_details, null, 2)}
-\`\`\`${enrichment.changeHistory}`
+\`\`\`
+
+Lees \`null\` als "niet te meten", niet als nul. Een CPA is \`null\` wanneer er geen conversies
+waren — dat is geen goedkope CPA. Een trend is \`null\` wanneer er geen vergelijkbare vorige
+periode is. Advertentiegroepen met \`active_last_3m: false\` lagen stil: die zijn geen
+underperformer, daar valt niets over te zeggen. Baseer geen aanbeveling op een \`null\`.${enrichment.changeHistory}`
       : `Er is geen ad group data beschikbaar voor client "${clientId}". Benoem expliciet dat deze stap data-arm is en welke verklaring hierdoor open blijft.`);
     await runCheckpoint("Checkpoint A", [1, 2, 3]);
 

@@ -8,6 +8,13 @@
  *   3. Negative keyword safety (phrase vs exact, risk flagging)
  *   4. Cluster consistency (same theme = same action)
  *   5. Review readiness (derive actionReadiness, evidenceLevel, safer alternatives)
+ *
+ * Let op de betekenis van `saferAlternativeAction`. Op de meeste plekken hieronder bewaart dat
+ * veld juist de AGRESSIEVERE actie die is overschreven (met de toelichting "Origineel: ..."),
+ * niet een veiliger alternatief. Alleen regel 7 zet er werkelijk een zachter alternatief in. Het
+ * veld wordt nergens weggeschreven of getoond — het is nu puur spoor — maar wie het ooit als
+ * "dit mag je in plaats daarvan toepassen" gaat lezen, zet een phrase-uitsluiting op een term
+ * die converteert. Lees de bijbehorende `saferAlternativeReason` voordat je erop bouwt.
  */
 
 import type { SearchTermVerdict } from "../schema/search-term-schema";
@@ -36,6 +43,22 @@ function normalizeIntent(v: TermWithData): void {
   }
 }
 
+// ── Branded campagnes herkennen ────────────────────────────────────────────
+
+/**
+ * Op hele woorden, niet op deelstrings. "brand" zat als deelstring in Brandbeveiliging,
+ * Brandstof en Brandweer — allemaal gewone Nederlandse woorden en stuk voor stuk onderwerpen
+ * waar RAI beurzen over heeft. Elke zoekterm in zo'n campagne werd daardoor op "keep" gezet en
+ * kon nooit meer worden uitgesloten. Andersom miste de oude controle "merk" zelf: alleen
+ * "merknaam" telde mee.
+ */
+const BRAND_TOKENS = ["brand", "branded", "brandname", "merk", "merknaam"];
+const BRAND_PATROON = new RegExp(`(^|[^a-z0-9])(${BRAND_TOKENS.join("|")})([^a-z0-9]|$)`, "i");
+
+function isBrandCampaign(campaignName: string): boolean {
+  return BRAND_PATROON.test(campaignName.toLowerCase());
+}
+
 // ── Core guardrails ────────────────────────────────────────────────────────
 
 export function applySearchTermGuardrails(verdicts: TermWithData[]): TermWithData[] {
@@ -58,9 +81,7 @@ export function applySearchTermGuardrails(verdicts: TermWithData[]): TermWithDat
     }
 
     // ── Rule 2: Brand campaign terms ──
-    const lowerCampaign = v.campaignName.toLowerCase();
-    const isBrandCampaign = lowerCampaign.includes("brand") || lowerCampaign.includes("merknaam");
-    if (isBrandCampaign && v.recommendedAction !== "keep") {
+    if (isBrandCampaign(v.campaignName) && v.recommendedAction !== "keep") {
       v.saferAlternativeAction = v.recommendedAction;
       v.saferAlternativeReason = `Origineel: ${v.recommendedAction}. Overschreven: term zit in branded campagne.`;
       v.recommendedAction = "keep";
@@ -161,19 +182,6 @@ export function applySearchTermGuardrails(verdicts: TermWithData[]): TermWithDat
       else v.exclusionRisk = "low";
     }
 
-    // ── Rule 12: Derive actionReadiness ──
-    if (v.recommendedAction === "keep" || v.recommendedAction === "monitor") {
-      v.actionReadiness = "monitor";
-    } else if (v.confidence === "high" && v.recommendedAction === "negative_exact" && v.intentType === "out_of_scope") {
-      v.actionReadiness = "direct_action";
-    } else if (v.recommendedAction === "investigate" || v.requiresHumanReview) {
-      v.actionReadiness = "investigate_first";
-    } else if (v.confidence === "high" && !v.riskFlag) {
-      v.actionReadiness = "direct_action";
-    } else {
-      v.actionReadiness = "investigate_first";
-    }
-
     // ── Rule 13: Derive evidenceLevel ──
     if (!v.evidenceLevel) {
       if (v.conversions > 0) v.evidenceLevel = "deterministic";
@@ -185,33 +193,92 @@ export function applySearchTermGuardrails(verdicts: TermWithData[]): TermWithDat
   // Phase 2: Cluster consistency — same n-gram pattern = consistent action
   applyClusterConsistency(verdicts);
 
+  // Phase 3: Rule 12 — actionReadiness afleiden.
+  //
+  // Dit hoort NA fase 2. Toen het nog in de lus hierboven stond, werd de readiness bepaald op de
+  // aanbeveling zoals die er op dat moment lag, waarna de clustercontrole de actie alsnog
+  // terugzette naar investigate. Er kwamen dan rijen uit met recommendedAction "investigate" en
+  // requiresHumanReview true, maar actionReadiness "direct_action" — en dat laatste veld is nu
+  // juist het veld dat in action-gating.ts bepaalt of iets zonder mens toegepast mag worden.
+  for (const v of verdicts) deriveActionReadiness(v);
+
   return verdicts;
+}
+
+function deriveActionReadiness(v: TermWithData): void {
+  if (v.recommendedAction === "keep" || v.recommendedAction === "monitor") {
+    v.actionReadiness = "monitor";
+  } else if (v.confidence === "high" && v.recommendedAction === "negative_exact" && v.intentType === "out_of_scope" && !v.requiresHumanReview && !v.riskFlag) {
+    v.actionReadiness = "direct_action";
+  } else if (v.recommendedAction === "investigate" || v.requiresHumanReview) {
+    v.actionReadiness = "investigate_first";
+  } else if (v.confidence === "high" && !v.riskFlag) {
+    v.actionReadiness = "direct_action";
+  } else {
+    v.actionReadiness = "investigate_first";
+  }
 }
 
 // ── Cluster consistency ────────────────────────────────────────────────────
 
+function isNegative(v: TermWithData): boolean {
+  return v.recommendedAction === "negative_exact" || v.recommendedAction === "negative_phrase";
+}
+
 function applyClusterConsistency(verdicts: TermWithData[]): void {
-  // Group by 2-gram overlap for simple clustering
-  const clusters = new Map<string, TermWithData[]>();
+  // Group by 2-gram overlap for simple clustering.
+  // Een Set en geen array: een zoekterm waarin hetzelfde 2-gram twee keer voorkomt
+  // ("zonnepaneel installatie zonnepaneel installatie") werd anders twee keer in dezelfde groep
+  // gezet. Twee van zulke termen haalden samen de drempel van drie, terwijl het er twee waren.
+  const clusters = new Map<string, Set<TermWithData>>();
+  const voegToe = (key: string, v: TermWithData) => {
+    if (!clusters.has(key)) clusters.set(key, new Set());
+    clusters.get(key)!.add(v);
+  };
 
   for (const v of verdicts) {
     const words = v.searchTerm.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
     // Generate 2-grams as cluster keys
     for (let i = 0; i < words.length - 1; i++) {
-      const key = `${words[i]} ${words[i + 1]}`;
-      if (!clusters.has(key)) clusters.set(key, []);
-      clusters.get(key)!.push(v);
+      voegToe(`${words[i]} ${words[i + 1]}`, v);
     }
     // Also use single significant words for short terms
     if (words.length === 1 && words[0].length > 4) {
-      if (!clusters.has(words[0])) clusters.set(words[0], []);
-      clusters.get(words[0])!.push(v);
+      voegToe(words[0], v);
     }
   }
 
-  // For clusters with 3+ terms: ensure consistency
-  for (const [key, group] of clusters) {
-    if (group.length < 3) continue;
+  // Dezelfde zoekterm kan in meerdere advertentiegroepen voorkomen en daar een ander oordeel
+  // hebben gekregen. Dat is een tegenspraak op zichzelf en hoort niet af te hangen van de vraag
+  // of er toevallig 2-grammen overlappen. Eerst dus die controle, los van de clusters.
+  const perTerm = new Map<string, TermWithData[]>();
+  for (const v of verdicts) {
+    const sleutel = v.searchTerm.trim().toLowerCase();
+    if (!perTerm.has(sleutel)) perTerm.set(sleutel, []);
+    perTerm.get(sleutel)!.push(v);
+  }
+  for (const [term, rijen] of perTerm) {
+    if (rijen.length < 2) continue;
+    const houden = rijen.some((v) => v.recommendedAction === "keep");
+    const uitsluiten = rijen.some((v) => isNegative(v));
+    if (!houden || !uitsluiten) continue;
+    for (const v of rijen) {
+      if (!isNegative(v)) continue;
+      v.saferAlternativeAction = v.recommendedAction;
+      v.saferAlternativeReason = `Zoekterm "${term}" wordt in een andere advertentiegroep juist behouden — uitsluiting is inconsistent.`;
+      v.recommendedAction = "investigate";
+      v.requiresHumanReview = true;
+      v.riskFlag = true;
+    }
+  }
+
+  // For clusters with 3+ terms: ensure consistency.
+  // Drie verschillende zoektermen, niet drie rijen: dezelfde term in drie advertentiegroepen is
+  // geen thema.
+  for (const [key, groepSet] of clusters) {
+    const group = [...groepSet];
+    const losseTermen = new Set(group.map((v) => v.searchTerm.trim().toLowerCase()));
+    if (losseTermen.size < 3) continue;
 
     // Check for mixed actions on same cluster
     const actions = new Set(group.map((v) => v.recommendedAction));
@@ -223,12 +290,12 @@ function applyClusterConsistency(verdicts: TermWithData[]): void {
 
     // Mixed actions — check if some are aggressive while others are not
     const hasKeep = group.some((v) => v.recommendedAction === "keep");
-    const hasNegative = group.some((v) => v.recommendedAction === "negative_exact" || v.recommendedAction === "negative_phrase");
+    const hasNegative = group.some((v) => isNegative(v));
 
     if (hasKeep && hasNegative) {
       // Contradiction: same theme has both keep and negative — downgrade negatives to investigate
       for (const v of group) {
-        if (v.recommendedAction === "negative_exact" || v.recommendedAction === "negative_phrase") {
+        if (isNegative(v)) {
           v.saferAlternativeAction = v.recommendedAction;
           v.saferAlternativeReason = `Cluster "${key}" bevat ook relevante termen — uitsluiting is inconsistent.`;
           v.recommendedAction = "investigate";

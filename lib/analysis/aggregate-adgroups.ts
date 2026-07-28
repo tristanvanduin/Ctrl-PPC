@@ -4,6 +4,13 @@
  *
  * Input:  raw rows from ads_adgroup_monthly (13 months)
  * Output: per-adgroup summary + per-campaign summary
+ *
+ * De uitvoer gaat als JSON rechtstreeks de analyseprompt in. Wat hier een getal is, leest het
+ * model als een gemeten feit — dus staat er `null` waar niets gemeten is. Nul conversies is geen
+ * goedkope CPA en geen dure; het is geen CPA. Een advertentiegroep die stilligt is geen
+ * underperformer; er is niets van te zeggen. Dat onderscheid was hier weg en dat draaide
+ * adviezen om: een groep die 6 euro uitgaf zonder één conversie kwam eruit als de goedkoopste
+ * van de campagne.
  */
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -26,22 +33,25 @@ export interface AdGroupSummary {
   ad_group_name: string;
   campaign_name: string;
   months_with_data: number;
-  avg_conversions_last_3m: number;
-  avg_conversions_prev_3m: number;
+  /** False als er in de laatste 3 maanden geen enkele rij is: de groep ligt stil. */
+  active_last_3m: boolean;
+  avg_conversions_last_3m: number | null;
+  avg_conversions_prev_3m: number | null;
   conversions_trend_pct: number | null;
-  avg_cpa_last_3m: number;
-  avg_cpa_prev_3m: number;
+  /** null bij 0 conversies — dan bestaat er geen kosten-per-conversie. */
+  avg_cpa_last_3m: number | null;
+  avg_cpa_prev_3m: number | null;
   cpa_trend_pct: number | null;
-  avg_roas_last_3m: number;
-  avg_roas_prev_3m: number;
+  avg_roas_last_3m: number | null;
+  avg_roas_prev_3m: number | null;
   roas_trend_pct: number | null;
-  avg_cost_last_3m: number;
-  vs_campaign_avg_conversions_pct: number;
-  vs_campaign_avg_roas_pct: number;
-  vs_campaign_avg_cpa_pct: number;
+  avg_cost_last_3m: number | null;
+  vs_campaign_avg_conversions_pct: number | null;
+  vs_campaign_avg_roas_pct: number | null;
+  vs_campaign_avg_cpa_pct: number | null;
   has_breakpoint: boolean;
   breakpoint_month: string | null;
-  performance_label: "overperformer" | "underperformer" | "gemiddeld";
+  performance_label: "overperformer" | "underperformer" | "gemiddeld" | "geen_data";
 }
 
 export interface CampaignAdGroupSummary {
@@ -50,10 +60,12 @@ export interface CampaignAdGroupSummary {
   overperformers: number;
   underperformers: number;
   gemiddeld: number;
-  best_ad_group: string;
-  best_ad_group_avg_conv: number;
-  worst_ad_group: string;
-  worst_ad_group_avg_conv: number;
+  /** Advertentiegroepen zonder data in de laatste 3 maanden — niet meegewogen in het oordeel. */
+  zonder_data: number;
+  best_ad_group: string | null;
+  best_ad_group_avg_conv: number | null;
+  worst_ad_group: string | null;
+  worst_ad_group_avg_conv: number | null;
 }
 
 export interface AggregatedAdGroupData {
@@ -63,23 +75,66 @@ export interface AggregatedAdGroupData {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function avg(values: number[]): number {
-  if (values.length === 0) return 0;
+/** Gemiddelde, of null als er niets te middelen valt. Een lege reeks is geen nul. */
+function avgOrNull(values: number[]): number | null {
+  if (values.length === 0) return null;
   return values.reduce((s, v) => s + v, 0) / values.length;
 }
 
-function pctChange(current: number, previous: number): number | null {
-  if (previous === 0) return current > 0 ? 100 : null;
+function sum(values: number[]): number {
+  return values.reduce((s, v) => s + v, 0);
+}
+
+/**
+ * Kosten per conversie over een verzameling rijen: totale kosten gedeeld door totale conversies.
+ * Zonder conversies is er geen CPA — niet "gelijk aan de kosten", want dan gaat een groep die
+ * niets oplevert er goedkoop uitzien zodra hij weinig uitgeeft.
+ */
+function cpaOf(rows: RawAdGroupRow[]): number | null {
+  if (rows.length === 0) return null;
+  const conv = sum(rows.map((r) => r.conversions));
+  if (conv <= 0) return null;
+  return sum(rows.map((r) => r.cost)) / conv;
+}
+
+/** ROAS gewogen op kosten: totale waarde gedeeld door totale kosten. */
+function roasOf(rows: RawAdGroupRow[]): number | null {
+  if (rows.length === 0) return null;
+  const cost = sum(rows.map((r) => r.cost));
+  if (cost <= 0) return null;
+  return sum(rows.map((r) => r.conversions_value)) / cost;
+}
+
+/**
+ * Procentuele verandering. Ontbreekt een van beide kanten, of was de vorige periode nul, dan is
+ * er geen percentage — ook geen +100%. Groei vanaf niets is niet te meten en het getal 100 zou
+ * even echt ogen als een gemeten stijging.
+ */
+function pctChange(current: number | null, previous: number | null): number | null {
+  if (current === null || previous === null || previous === 0) return null;
   return parseFloat((((current - previous) / previous) * 100).toFixed(1));
 }
 
-function r2(n: number): number {
-  return parseFloat(n.toFixed(2));
+function r2(n: number | null): number | null {
+  return n === null ? null : parseFloat(n.toFixed(2));
+}
+
+function relatief(waarde: number | null, referentie: number | null): number | null {
+  if (waarde === null || referentie === null || referentie === 0) return null;
+  return ((waarde - referentie) / referentie) * 100;
 }
 
 function sortMonths(months: string[]): string[] {
   return [...months].sort();
 }
+
+/**
+ * Onder deze grens is een maand-op-maand-sprong ruis, geen breekpunt. Bij 1 -> 2 conversies is
+ * de relatieve verandering 100%, en met de conversieaantallen die hier langskomen zou vrijwel
+ * elke advertentiegroep dan een breekpunt hebben.
+ */
+const BREAKPOINT_MIN_CONVERSIES = 3;
+const BREAKPOINT_MIN_VERANDERING = 0.3;
 
 // ── Main aggregation ────────────────────────────────────────────────────────
 
@@ -116,28 +171,26 @@ export function aggregateAdGroups(
     byCampaign.get(row.campaign_name)!.push(row);
   }
 
-  const campaignAvgs = new Map<string, { avgConv: number; avgRoas: number; avgCpa: number }>();
+  const campaignAvgs = new Map<string, { avgConv: number | null; avgRoas: number | null; avgCpa: number | null }>();
   for (const [campName, rows] of byCampaign) {
     const last3 = rows.filter((r) => last3Months.includes(r.month));
     const adGroupIds = [...new Set(last3.map((r) => r.ad_group_id))];
-    // Per-adgroup averages, then average of those
+
+    // Conversies zijn een telling: het gemiddelde per advertentiegroep is hier zinvol.
     const adGroupConvAvgs: number[] = [];
-    const adGroupRoasAvgs: number[] = [];
-    const adGroupCpaAvgs: number[] = [];
     for (const agId of adGroupIds) {
       const agRows = last3.filter((r) => r.ad_group_id === agId);
-      adGroupConvAvgs.push(avg(agRows.map((r) => r.conversions)));
-      adGroupRoasAvgs.push(avg(agRows.map((r) => r.roas)));
-      const costs = agRows.map((r) => r.cost);
-      const convs = agRows.map((r) => r.conversions);
-      const totalCost = costs.reduce((s, v) => s + v, 0);
-      const totalConv = convs.reduce((s, v) => s + v, 0);
-      adGroupCpaAvgs.push(totalConv > 0 ? totalCost / totalConv : totalCost);
+      const a = avgOrNull(agRows.map((r) => r.conversions));
+      if (a !== null) adGroupConvAvgs.push(a);
     }
+
+    // CPA en ROAS zijn verhoudingen. Het gemiddelde van verhoudingen is geen verhouding: een
+    // advertentiegroep van 3 euro telde net zo zwaar mee als een van 1000, waardoor de
+    // campagnenorm wegzakte en de groep die het werk doet er duur uit kwam te zien.
     campaignAvgs.set(campName, {
-      avgConv: avg(adGroupConvAvgs),
-      avgRoas: avg(adGroupRoasAvgs),
-      avgCpa: avg(adGroupCpaAvgs),
+      avgConv: avgOrNull(adGroupConvAvgs),
+      avgRoas: roasOf(last3),
+      avgCpa: cpaOf(last3),
     });
   }
 
@@ -150,66 +203,60 @@ export function aggregateAdGroups(
 
     const last3 = rows.filter((r) => last3Months.includes(r.month));
     const prev3 = rows.filter((r) => prev3Months.includes(r.month));
+    const actiefLast3 = last3.length > 0;
 
-    const avgConvLast = avg(last3.map((r) => r.conversions));
-    const avgConvPrev = avg(prev3.map((r) => r.conversions));
+    const avgConvLast = avgOrNull(last3.map((r) => r.conversions));
+    const avgConvPrev = avgOrNull(prev3.map((r) => r.conversions));
 
-    const totalCostLast = last3.reduce((s, r) => s + r.cost, 0);
-    const totalConvLast = last3.reduce((s, r) => s + r.conversions, 0);
-    const avgCpaLast = totalConvLast > 0 ? totalCostLast / totalConvLast : totalCostLast;
+    const avgCpaLast = cpaOf(last3);
+    const avgCpaPrev = cpaOf(prev3);
 
-    const totalCostPrev = prev3.reduce((s, r) => s + r.cost, 0);
-    const totalConvPrev = prev3.reduce((s, r) => s + r.conversions, 0);
-    const avgCpaPrev = totalConvPrev > 0 ? totalCostPrev / totalConvPrev : totalCostPrev;
+    const avgRoasLast = roasOf(last3);
+    const avgRoasPrev = roasOf(prev3);
 
-    const avgRoasLast = avg(last3.map((r) => r.roas));
-    const avgRoasPrev = avg(prev3.map((r) => r.roas));
+    const avgCostLast = avgOrNull(last3.map((r) => r.cost));
 
-    const avgCostLast = avg(last3.map((r) => r.cost));
-
-    // Breakpoint detection: any single month >30% deviation from its neighbours
+    // Breekpunt: de grootste maand-op-maand-sprong die boven de ruisgrens uitkomt.
     const sortedRows = [...rows].sort((a, b) => a.month.localeCompare(b.month));
     let hasBreakpoint = false;
     let breakpointMonth: string | null = null;
+    let grootsteVerandering = 0;
 
     for (let i = 1; i < sortedRows.length; i++) {
       const prevConv = sortedRows[i - 1].conversions;
       const currConv = sortedRows[i].conversions;
-      if (prevConv > 0) {
-        const change = Math.abs((currConv - prevConv) / prevConv);
-        if (change > 0.3) {
-          hasBreakpoint = true;
-          breakpointMonth = sortedRows[i].month;
-          break;
-        }
-      } else if (currConv > 2) {
-        // From 0 to something significant
+      // Zonder voldoende volume aan minstens één kant is de sprong ruis.
+      if (Math.max(prevConv, currConv) < BREAKPOINT_MIN_CONVERSIES) continue;
+
+      const change = prevConv > 0
+        ? Math.abs((currConv - prevConv) / prevConv)
+        : Infinity; // van nul naar iets van betekenis
+      if (change > BREAKPOINT_MIN_VERANDERING && change > grootsteVerandering) {
+        grootsteVerandering = change;
         hasBreakpoint = true;
         breakpointMonth = sortedRows[i].month;
-        break;
       }
     }
 
-    // Performance label based on conversions vs campaign average
-    const vsConvPct = campAvg.avgConv > 0
-      ? ((avgConvLast - campAvg.avgConv) / campAvg.avgConv) * 100
-      : 0;
+    // Performance label based on conversions vs campaign average.
+    // Ligt de groep stil, dan is er geen oordeel — niet "onder het gemiddelde".
+    const vsConvPct = relatief(avgConvLast, campAvg.avgConv);
     const label: AdGroupSummary["performance_label"] =
+      !actiefLast3 ? "geen_data" :
+      vsConvPct === null ? "gemiddeld" :
       vsConvPct > 15 ? "overperformer" :
       vsConvPct < -15 ? "underperformer" :
       "gemiddeld";
 
-    const vsRoasPct = campAvg.avgRoas > 0
-      ? ((avgRoasLast - campAvg.avgRoas) / campAvg.avgRoas) * 100
-      : 0;
-    const vsCpaPct = campAvg.avgCpa > 0
-      ? ((avgCpaLast - campAvg.avgCpa) / campAvg.avgCpa) * 100
-      : 0;
+    const vsRoasPct = relatief(avgRoasLast, campAvg.avgRoas);
+    const vsCpaPct = relatief(avgCpaLast, campAvg.avgCpa);
 
     adGroupDetails.push({
       ad_group_name: first.ad_group_name,
       campaign_name: first.campaign_name,
-      months_with_data: rows.length,
+      // Maanden, geen rijen: dubbele rijen voor dezelfde maand mogen dit niet opblazen.
+      months_with_data: new Set(rows.map((r) => r.month)).size,
+      active_last_3m: actiefLast3,
       avg_conversions_last_3m: r2(avgConvLast),
       avg_conversions_prev_3m: r2(avgConvPrev),
       conversions_trend_pct: pctChange(avgConvLast, avgConvPrev),
@@ -229,8 +276,8 @@ export function aggregateAdGroups(
     });
   }
 
-  // Sort: underperformers first, then overperformers, then gemiddeld
-  const labelOrder = { underperformer: 0, overperformer: 1, gemiddeld: 2 };
+  // Sort: underperformers first, then overperformers, then gemiddeld, dan wat stilligt.
+  const labelOrder = { underperformer: 0, overperformer: 1, gemiddeld: 2, geen_data: 3 };
   adGroupDetails.sort((a, b) => labelOrder[a.performance_label] - labelOrder[b.performance_label]);
 
   // Build campaign summaries
@@ -242,10 +289,15 @@ export function aggregateAdGroups(
     const over = campAgs.filter((a) => a.performance_label === "overperformer").length;
     const under = campAgs.filter((a) => a.performance_label === "underperformer").length;
     const mid = campAgs.filter((a) => a.performance_label === "gemiddeld").length;
+    const leeg = campAgs.filter((a) => a.performance_label === "geen_data").length;
 
-    const sorted = [...campAgs].sort((a, b) => b.avg_conversions_last_3m - a.avg_conversions_last_3m);
-    const best = sorted[0];
-    const worst = sorted[sorted.length - 1];
+    // Beste en slechtste alleen over groepen die daadwerkelijk gedraaid hebben, en alleen als er
+    // iets te vergelijken valt: bij één advertentiegroep is dezelfde groep niet de beste én de
+    // slechtste.
+    const metData = campAgs.filter((a) => a.avg_conversions_last_3m !== null);
+    const sorted = [...metData].sort((a, b) => (b.avg_conversions_last_3m ?? 0) - (a.avg_conversions_last_3m ?? 0));
+    const best = sorted.length > 0 ? sorted[0] : null;
+    const worst = sorted.length > 1 ? sorted[sorted.length - 1] : null;
 
     campaignSummaries.push({
       campaign_name: campName,
@@ -253,10 +305,11 @@ export function aggregateAdGroups(
       overperformers: over,
       underperformers: under,
       gemiddeld: mid,
-      best_ad_group: best.ad_group_name,
-      best_ad_group_avg_conv: best.avg_conversions_last_3m,
-      worst_ad_group: worst.ad_group_name,
-      worst_ad_group_avg_conv: worst.avg_conversions_last_3m,
+      zonder_data: leeg,
+      best_ad_group: best?.ad_group_name ?? null,
+      best_ad_group_avg_conv: best?.avg_conversions_last_3m ?? null,
+      worst_ad_group: worst?.ad_group_name ?? null,
+      worst_ad_group_avg_conv: worst?.avg_conversions_last_3m ?? null,
     });
   }
 
