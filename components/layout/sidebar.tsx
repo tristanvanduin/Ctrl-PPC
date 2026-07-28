@@ -40,10 +40,16 @@ function SidebarInner() {
   useEffect(() => {
     if (!activeClientId || !supabase) { setGeoClones([]); return; }
     let cancelled = false;
+    // Nieuwste maanden eerst, en dat is geen kosmetiek. Zonder .order() mag Postgres elke
+    // volgorde teruggeven, dus welke 2000 van de dertien maanden aan campagnerijen je krijgt
+    // is willekeurig: bij meer dan ~150 campagnes kan een geo-kloon tussen twee page loads uit
+    // de sidebar verdwijnen. Aflopend op maand maakt het bovendien inhoudelijk juister — een
+    // kloon die een jaar geleden stopte hoort er niet meer te staan.
     supabase
       .from("ads_campaign_monthly")
       .select("campaign_name")
       .eq("client_id", activeClientId)
+      .order("month", { ascending: false })
       .limit(2000)
       .then(({ data }) => {
         if (cancelled) return;

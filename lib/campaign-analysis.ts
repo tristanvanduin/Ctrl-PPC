@@ -94,12 +94,15 @@ export interface CampaignSummary {
   totalImpressions: number;
   totalClicks: number;
   roas: number;
-  cpa: number;
+  /** null als er geen conversies waren: dan bestaat er geen CPA. */
+  cpa: number | null;
   avgCtr: number;
   avgConvRate: number;
   avgCpc: number;
   cpm: number;
   momChange: number;
+  /** De maanden die de trendvelden vergelijken, voor in de tekst. */
+  trendPeriode: string;
   /** MoM change in CTR */
   ctrTrend: number;
   /** MoM change in CPC */
@@ -138,20 +141,63 @@ function pct1(v: number): string {
   return `${(v * 100).toFixed(1)}%`;
 }
 
-function trend(first: number, last: number): number {
-  return first > 0 ? ((last - first) / first) * 100 : 0;
+// Het aantal maanden aan elke kant van de vergelijking. Drie is genoeg om een losse
+// uitschieter te dempen en kort genoeg om een echte kentering nog te zien.
+const TREND_WINDOW = 3;
+
+/**
+ * De verandering tussen de laatste periode en de periode daarvoor, in procenten.
+ *
+ * De vorige versie vergeleek de EERSTE maand met de LAATSTE en negeerde alles ertussen. Op een
+ * reeks van dertien maanden gaf dat twee soorten onzin, allebei met een aanbeveling eraan:
+ *
+ *   100 95 88 80 72 65 58 52 48 44 40 38 101  ->  +1%, dus geen waarschuwing, terwijl de
+ *                                                 campagne twaalf maanden lang wegzakte
+ *     3 80 84 79 88 91 85 90 87 92 88 90  86  ->  +2767% "groei", terwijl die eerste maand
+ *                                                 gewoon een halve maand was na de lancering
+ *
+ * Periode tegen periode heeft dat probleem niet: een enkele maand kan de uitkomst niet meer
+ * bepalen. De drempels (-10, -15, -30 procent) blijven ongewijzigd en worden hierdoor
+ * betekenisvoller, niet losser — ze meten nu wat ze beweren te meten.
+ */
+export function trendOver(values: number[]): number {
+  if (values.length < 2) return 0;
+  const venster = Math.min(TREND_WINDOW, Math.floor(values.length / 2));
+  const recent = values.slice(-venster);
+  const eerder = values.slice(-2 * venster, -venster);
+  if (eerder.length === 0) return 0;
+  const gem = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const basis = gem(eerder);
+  return basis > 0 ? ((gem(recent) - basis) / basis) * 100 : 0;
 }
 
-function summarize(campaign: CampaignData, totalSpend: number): CampaignSummary {
+const MAAND_KORT = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+
+/**
+ * De maanden die trendOver daadwerkelijk vergelijkt, voor in de tekst naar de gebruiker.
+ *
+ * De vorige tekst zei letterlijk "Jan→Mrt", hardgecodeerd uit de tijd dat de dataset drie
+ * maanden besloeg. Op dertien maanden data stond daar dus gewoon een onwaarheid in een
+ * aanbeveling. Nu volgt het label de maanden die echt vergeleken zijn.
+ */
+function trendPeriode(months: CampaignMonthlyMetrics[]): string {
+  if (months.length < 2) return "";
+  const venster = Math.min(TREND_WINDOW, Math.floor(months.length / 2));
+  const eerste = months[months.length - 2 * venster]?.month;
+  const laatste = months[months.length - 1]?.month;
+  const naam = (m: number | undefined) =>
+    typeof m === "number" && m >= 1 && m <= 12 ? MAAND_KORT[m - 1] : null;
+  const a = naam(eerste), b = naam(laatste);
+  return a && b ? ` (${a} t/m ${b})` : "";
+}
+
+export function summarize(campaign: CampaignData, totalSpend: number): CampaignSummary {
   const months = campaign.monthly;
   const spend = months.reduce((s, m) => s + m.adSpend, 0);
   const conv = months.reduce((s, m) => s + m.conversions, 0);
   const rev = months.reduce((s, m) => s + m.revenue, 0);
   const impr = months.reduce((s, m) => s + m.impressions, 0);
   const clicks = months.reduce((s, m) => s + m.clicks, 0);
-
-  const first = months[0];
-  const last = months[months.length - 1];
 
   return {
     name: campaign.campaignName,
@@ -164,16 +210,22 @@ function summarize(campaign: CampaignData, totalSpend: number): CampaignSummary 
     totalImpressions: impr,
     totalClicks: clicks,
     roas: spend > 0 ? rev / spend : 0,
-    cpa: conv > 0 ? spend / conv : spend,
+    // null bij nul conversies, niet de totale besteding. Die terugval loog twee kanten op: een
+    // campagne van 30 euro zonder enige conversie kreeg "CPA 30" en bleef daarmee onder het
+    // accountgemiddelde van 50, dus onopgemerkt; een campagne van 12.000 euro zonder conversies
+    // werd gemeld als "CPA 12.000", een getal dat geen CPA is. Nul conversies is geen dure CPA
+    // maar een afwezige — zie de aparte bevinding verderop.
+    cpa: conv > 0 ? spend / conv : null,
     avgCtr: impr > 0 ? clicks / impr : 0,
     avgConvRate: clicks > 0 ? conv / clicks : 0,
     avgCpc: clicks > 0 ? spend / clicks : 0,
     cpm: impr > 0 ? (spend / impr) * 1000 : 0,
-    momChange: months.length >= 2 ? trend(first.conversions, last.conversions) : 0,
-    ctrTrend: months.length >= 2 ? trend(first.ctr, last.ctr) : 0,
-    cpcTrend: months.length >= 2 ? trend(first.avgCpc, last.avgCpc) : 0,
-    convRateTrend: months.length >= 2 ? trend(first.conversionRate, last.conversionRate) : 0,
-    impressionTrend: months.length >= 2 ? trend(first.impressions, last.impressions) : 0,
+    momChange: trendOver(months.map((m) => m.conversions)),
+    ctrTrend: trendOver(months.map((m) => m.ctr)),
+    cpcTrend: trendOver(months.map((m) => m.avgCpc)),
+    convRateTrend: trendOver(months.map((m) => m.conversionRate)),
+    impressionTrend: trendOver(months.map((m) => m.impressions)),
+    trendPeriode: trendPeriode(months),
     spendShare: totalSpend > 0 ? (spend / totalSpend) * 100 : 0,
   };
 }
@@ -546,8 +598,15 @@ export function analyzeClientCampaigns(clientId: string, clientData?: ClientHist
     // ── Category comparison (compare similar-purpose campaigns) ──
     if (purpose === "category") {
       const otherCategories = summaries.filter((o) => o.purpose === "category" && o.name !== s.name);
-      if (otherCategories.length > 0) {
-        const avgCatRoas = otherCategories.reduce((sum, o) => sum + o.roas, 0) / otherCategories.length;
+      // Op besteding gewogen, niet het gemiddelde van de losse ROAS-waarden. Het gemiddelde van
+      // een verhouding is de verhouding niet: een campagne van 400 euro met toevallig ROAS 24
+      // tilt het "categoriegemiddelde" van 3,7 naar 10,2, waarna een campagne die er 33% onder
+      // zit wordt gemeld als 75% slechter — en een waarschuwing krijgt die bij een correcte
+      // weging niet afgaat. Zelfde fout als eerder bij de kwaliteitsscore in de second opinion.
+      const catSpend = otherCategories.reduce((sum, o) => sum + o.totalSpend, 0);
+      const catRevenue = otherCategories.reduce((sum, o) => sum + o.totalRevenue, 0);
+      if (otherCategories.length > 0 && catSpend > 0) {
+        const avgCatRoas = catRevenue / catSpend;
         if (s.roas < avgCatRoas * 0.6 && s.totalSpend > totalSpend * 0.05) {
           findings.push({
             severity: "warning",
@@ -598,15 +657,33 @@ export function analyzeClientCampaigns(clientId: string, clientData?: ClientHist
           severity: s.momChange < -30 && s.spendShare > 10 ? "critical" : "warning",
           category: "declining",
           campaignName: s.name, campaignType: s.type, purpose, purposeLabel: s.purposeLabel,
-          description: `Conversies ${pct(s.momChange)} Jan→Mrt. ${s.spendShare > 10 ? `Significant: ${Math.round(s.spendShare)}% van budget.` : `${Math.round(s.spendShare)}% budget.`}`,
+          description: `Conversies ${pct(s.momChange)}${s.trendPeriode}. ${s.spendShare > 10 ? `Significant: ${Math.round(s.spendShare)}% van budget.` : `${Math.round(s.spendShare)}% budget.`}`,
           action: `Analyseer: ${getPurposeFocus(purpose)}. Check change history.`,
           impactScore: Math.abs(s.momChange) * s.spendShare,
         });
       }
     }
 
+    // ── Besteding zonder enige conversie ──
+    // Dit stond hiervoor verstopt in de CPA-check, die bij nul conversies terugviel op de
+    // totale besteding als "CPA". Een kleine campagne kwam daarmee onder het gemiddelde uit en
+    // bleef onopgemerkt. Het is een eigen bevinding: niet een dure prijs per conversie, maar
+    // geen enkele conversie. De drempel is bewust lager dan bij de CPA-check, want hier is er
+    // geen opbrengst om tegen af te wegen.
+    if (!hasNaturallyHighRoas(purpose) && purpose !== "awareness" && isRoasRelevant(purpose) &&
+      s.totalConversions === 0 && s.totalSpend > totalSpend * 0.02 && s.totalSpend > 0) {
+      findings.push({
+        severity: s.spendShare > 5 ? "critical" : "warning",
+        category: "bleeder",
+        campaignName: s.name, campaignType: s.type, purpose, purposeLabel: s.purposeLabel,
+        description: `${fmt(s.totalSpend)} uitgegeven zonder een enkele conversie (${Math.round(s.spendShare)}% van het budget, ${s.totalClicks.toLocaleString("nl-NL")} klikken).`,
+        action: `Controleer eerst of de conversiemeting werkt voor deze campagne; klikken zonder conversies wijst net zo vaak op een meetgat als op een slechte campagne. Daarna: ${getPurposeFocus(purpose)}.`,
+        impactScore: s.totalSpend,
+      });
+    }
+
     // ── CPA issues (non-brand, non-awareness) ──
-    if (!hasNaturallyHighRoas(purpose) && purpose !== "awareness" &&
+    if (!hasNaturallyHighRoas(purpose) && purpose !== "awareness" && s.cpa !== null &&
       s.cpa > accountTotals.avgCpaNonBrand * 1.5 && s.totalSpend > totalSpend * 0.08 &&
       !bleeders.some((b) => b.name === s.name)) {
       findings.push({
