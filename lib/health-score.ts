@@ -33,6 +33,7 @@
 
 import type { ClientForecast } from "./forecast";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "./use-client-data";
+import { cpaTrendFrom } from "./analysis/trend";
 
 export interface HealthScore {
   /** 0–100, geschaald over de factoren die beoordeeld konden worden. */
@@ -123,9 +124,13 @@ export function computeHealthScore(
   let efficiencyScore = 0;
 
   if (cpaPoints.length >= 2) {
-    const firstCpa = cpaPoints[0].realized!;
-    const lastCpa = cpaPoints[cpaPoints.length - 1].realized!;
-    const cpaTrend = firstCpa > 0 ? ((lastCpa - firstCpa) / firstCpa) * 100 : 0;
+    // Gedeelde berekening en drempels (lib/analysis/trend.ts). Hier stond een eigen kopie die
+    // de eerste maand met de laatste vergeleek; zes plekken deden dat, met vier verschillende
+    // drempels, waardoor twee blokken op hetzelfde scherm elkaar konden tegenspreken.
+    const t = cpaTrendFrom(cpaPoints);
+    const firstCpa = t.vorig;
+    const lastCpa = t.huidig;
+    const cpaTrend = t.pct ?? 0;
 
     if (cpaTrend < -10) efficiencyScore = 20;       // CPA dalend = excellent
     else if (cpaTrend < 5) efficiencyScore = 16;     // Stabiel

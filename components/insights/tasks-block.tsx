@@ -8,6 +8,7 @@ import { getClientSettings } from "@/lib/client-settings";
 import { supabase, type KpiSnapshot } from "@/lib/supabase";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
 import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
+import { cpaTrendFrom } from "@/lib/analysis/trend";
 
 type Cadence = "actions" | "weekly" | "biweekly" | "monthly";
 
@@ -143,10 +144,11 @@ function generateDynamicTasks(forecast: ClientForecast): Task[] {
   // ── CPA taken ──
 
   if (lastCpa > 0 && cpaPoints.length >= 2) {
-    const firstCpa = cpaPoints[0]?.realized ?? 0;
-    const cpaTrend = firstCpa > 0 ? ((lastCpa - firstCpa) / firstCpa) * 100 : 0;
+    // Gedeelde berekening en drempels; zie lib/analysis/trend.ts.
+    const t = cpaTrendFrom(cpaPoints);
+    const cpaTrend = t.pct ?? 0;
 
-    if (cpaTrend > 15) {
+    if (t.stijgt) {
       idx++;
       tasks.push({
         id: `dyn-${idx}`, step: "CPA", dynamic: true, done: false,

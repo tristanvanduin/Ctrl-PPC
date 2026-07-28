@@ -12,7 +12,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { useState } from "react";
-import { useClientHistoricalData } from "@/lib/client-data-provider";
+import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, ForecastMetric, MONTH_LABELS } from "@/lib/forecast";
 import { useBrandTheme } from "../branding/brand-theme-provider";
@@ -53,7 +53,10 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
 
   const fullData = useClientHistoricalData(clientId);
   const clientData = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
-  const forecast = computeForecast(clientData);
+  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
+  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const gedeeld = useForecast();
+  const forecast = gedeeld ?? computeForecast(clientData);
   const result = forecast[metric];
 
   // Previous year data for YoY overlay

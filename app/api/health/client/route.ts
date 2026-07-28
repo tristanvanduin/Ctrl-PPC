@@ -10,6 +10,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { evaluateChannelHealth, evaluateConversionTrackingQuality, assembleClientHealth, type ChannelHealth, type ChannelHealthInput, type HealthStatus } from "@/lib/health";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 function getClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -22,7 +23,8 @@ export async function GET(request: Request) {
   const clientId = new URL(request.url).searchParams.get("clientId");
   if (!clientId) return Response.json({ error: "clientId is verplicht" }, { status: 400 });
 
-  const supabase = getClient();
+  // Demo-rijen voor de demo-klant; anders had de gezondheidsbadge in demo een 500 gegeven.
+  const supabase = supabaseForClient(clientId) ?? getClient();
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const channels: ChannelHealth[] = [];

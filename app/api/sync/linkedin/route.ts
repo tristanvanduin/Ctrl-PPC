@@ -13,6 +13,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { refreshAccessToken, type LinkedInOAuthConfig } from "@/lib/linkedin/auth";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 import {
   syncLinkedinBackfill, syncLinkedinDaily, type LinkedInLevel, type SyncContext,
 } from "@/lib/linkedin/sync";
@@ -155,11 +156,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
-
+  // De invoer eerst, dan de omgeving. Andersom kreeg een verzoek zonder client_id een 500
+  // ("de server is stuk") terwijl het antwoord een 400 hoort te zijn ("je verzoek klopt niet"),
+  // en kon de demo-check niet werken omdat de route al had afgehaakt.
   const clientId = request.nextUrl.searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id parameter vereist" }, { status: 400 });
+
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
 
   const { data: runs } = await supabase
     .from("linkedin_sync_runs")

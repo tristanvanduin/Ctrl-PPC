@@ -35,6 +35,7 @@ import {
 import { fetchStrategicContext } from "@/lib/analysis/expert-layers";
 import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
 import { logger } from "@/lib/logger";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 export const maxDuration = 300; // 5 minutes for full analysis with many batches
 
@@ -80,11 +81,14 @@ type VerdictWithData = SearchTermVerdict & {
 // ── GET: Fetch cached analysis results ─────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
-
+  // De invoer eerst, dan de omgeving. Andersom kreeg een verzoek zonder client_id een 500
+  // ("server stuk") terwijl het antwoord een 400 hoort te zijn ("je verzoek klopt niet"), en
+  // kon de demo-check niet werken omdat de route al was afgehaakt.
   const clientId = request.nextUrl.searchParams.get("client_id");
-  if (!clientId) return Response.json({ error: "client_id is required" }, { status: 400 });
+  if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
+
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
 
   // Find the most recent analysis date for this client
   const { data: latest } = await supabase

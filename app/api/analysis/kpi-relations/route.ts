@@ -14,6 +14,7 @@ import { renderSignalSection } from "@/lib/signals/render-section";
 import { splitWindows } from "@/lib/analysis/channel-signal-data";
 import { saveSignalHypotheses, type SignalSource } from "@/lib/analysis/signals-to-hypotheses";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 type Kanaal = "google" | "meta" | "linkedin";
 const SOURCES: Record<Kanaal, SignalSource> = { google: "google_kpi", meta: "meta_kpi", linkedin: "linkedin_kpi" };
@@ -30,7 +31,8 @@ export async function GET(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get("client_id");
   const kanaal = parseKanaal(request.nextUrl.searchParams.get("channel"));
   if (!clientId || !kanaal) return Response.json({ error: "client_id en channel (google|meta|linkedin) zijn verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest.
+  const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const { data } = await supabase

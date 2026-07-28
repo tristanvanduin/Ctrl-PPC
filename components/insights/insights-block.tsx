@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { AlertTriangle, TrendingUp, TrendingDown, Info, DollarSign, Filter, X, ChevronDown, ChevronUp } from "lucide-react";
-import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
+import { useClientHistoricalData, useClientDataState, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { supabase } from "@/lib/supabase";
 import type { ImpressionShareData, AccountStructureData, WastefulSearchTermData, AdGroupBleederData, ChangeHistoryData } from "@/lib/use-client-data";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
+import { cpaTrendFrom } from "@/lib/analysis/trend";
 
 type InsightType = "critical" | "warning" | "positive" | "info";
 
@@ -234,17 +235,19 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
   if (realizedMonths.length >= 2) {
     const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
     if (cpaPoints.length >= 2) {
-      const firstCpa = cpaPoints[0].realized!;
-      const lastCpa = cpaPoints[cpaPoints.length - 1].realized!;
-      const cpaTrend = firstCpa > 0 ? ((lastCpa - firstCpa) / firstCpa) * 100 : 0;
+      // Gedeelde berekening en drempels (lib/analysis/trend.ts).
+      const t = cpaTrendFrom(cpaPoints);
+      const firstCpa = t.vorig;
+      const lastCpa = t.huidig;
+      const cpaTrend = t.pct ?? 0;
 
-      if (cpaTrend > 15) {
+      if (t.stijgt) {
         insights.push({
           type: "warning",
           level: "Efficiency",
-          text: `CPA stijgt: van ${fmt(firstCpa)} (${cpaPoints[0].monthLabel}) naar ${fmt(lastCpa)} (${cpaPoints[cpaPoints.length - 1].monthLabel}), een stijging van ${Math.round(cpaTrend)}%. Elke conversie wordt duurder. Analyseer: hogere CPC (meer concurrentie?) of lagere conversieratio (landingspagina/aanbod)?`,
+          text: `CPA stijgt: van ${fmt(firstCpa)} naar ${fmt(lastCpa)}${t.periode}, een stijging van ${Math.round(cpaTrend)}%. Elke conversie wordt duurder. Analyseer: hogere CPC (meer concurrentie?) of lagere conversieratio (landingspagina/aanbod)?`,
         });
-      } else if (cpaTrend < -15) {
+      } else if (t.daalt) {
         insights.push({
           type: "positive",
           level: "Efficiency",
@@ -773,7 +776,10 @@ export function InsightsBlock({
 }) {
   const data = useClientHistoricalData(clientId);
   const dataState = useClientDataState();
-  const forecast = computeForecast(data);
+  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
+  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const gedeeld = useForecast();
+  const forecast = gedeeld ?? computeForecast(data);
   const insights = generateInsights(forecast, clientId, {
     impressionShare: dataState?.impressionShare,
     accountStructure: dataState?.accountStructure,

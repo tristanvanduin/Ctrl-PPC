@@ -53,14 +53,16 @@ function getCredentials(): GoogleAdsCredentials | null {
  * Returns a lightweight summary per account for the overview table.
  */
 export async function GET(request: NextRequest) {
-  const credentials = getCredentials();
-  if (!credentials) {
-    return Response.json({ error: "Not configured" }, { status: 500 });
-  }
-
+  // De parameter eerst: een verzoek zonder customerIds is een fout van de aanroeper (400) en
+  // niet van de server (500), ongeacht of de koppeling geconfigureerd is.
   const idsParam = request.nextUrl.searchParams.get("customerIds");
   if (!idsParam) {
     return Response.json({ error: "customerIds required" }, { status: 400 });
+  }
+
+  const credentials = getCredentials();
+  if (!credentials) {
+    return Response.json({ error: "Not configured" }, { status: 500 });
   }
 
   const customerIds = idsParam.split(",").filter(Boolean);

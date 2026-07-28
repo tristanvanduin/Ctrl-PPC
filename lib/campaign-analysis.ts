@@ -25,6 +25,10 @@ import {
 import { computeForecast } from "./forecast";
 import type { ClientHistoricalData } from "./types";
 import { getClientSettings } from "./client-settings";
+// Gedeeld met health-score, dgm-view, insights-block, tasks-block en recommendations-block.
+// Die hadden allemaal een eigen kopie met een eigen drempel, waardoor twee blokken op hetzelfde
+// scherm elkaar konden tegenspreken.
+import { trendOver, TREND_WINDOW } from "./analysis/trend";
 
 // ── Finding types ───────────────────────────────────────────────────────────
 
@@ -139,36 +143,6 @@ function pct(v: number): string {
 
 function pct1(v: number): string {
   return `${(v * 100).toFixed(1)}%`;
-}
-
-// Het aantal maanden aan elke kant van de vergelijking. Drie is genoeg om een losse
-// uitschieter te dempen en kort genoeg om een echte kentering nog te zien.
-const TREND_WINDOW = 3;
-
-/**
- * De verandering tussen de laatste periode en de periode daarvoor, in procenten.
- *
- * De vorige versie vergeleek de EERSTE maand met de LAATSTE en negeerde alles ertussen. Op een
- * reeks van dertien maanden gaf dat twee soorten onzin, allebei met een aanbeveling eraan:
- *
- *   100 95 88 80 72 65 58 52 48 44 40 38 101  ->  +1%, dus geen waarschuwing, terwijl de
- *                                                 campagne twaalf maanden lang wegzakte
- *     3 80 84 79 88 91 85 90 87 92 88 90  86  ->  +2767% "groei", terwijl die eerste maand
- *                                                 gewoon een halve maand was na de lancering
- *
- * Periode tegen periode heeft dat probleem niet: een enkele maand kan de uitkomst niet meer
- * bepalen. De drempels (-10, -15, -30 procent) blijven ongewijzigd en worden hierdoor
- * betekenisvoller, niet losser — ze meten nu wat ze beweren te meten.
- */
-export function trendOver(values: number[]): number {
-  if (values.length < 2) return 0;
-  const venster = Math.min(TREND_WINDOW, Math.floor(values.length / 2));
-  const recent = values.slice(-venster);
-  const eerder = values.slice(-2 * venster, -venster);
-  if (eerder.length === 0) return 0;
-  const gem = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
-  const basis = gem(eerder);
-  return basis > 0 ? ((gem(recent) - basis) / basis) * 100 : 0;
 }
 
 const MAAND_KORT = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];

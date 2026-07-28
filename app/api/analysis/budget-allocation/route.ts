@@ -14,6 +14,7 @@ import { analyzeBudgetAllocation, type CampaignBudgetInput, type BudgetTarget } 
 import { buildBudgetAllocationPrompt } from "@/lib/prompts/budget-allocation-prompt";
 import { saveBudgetAllocationHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 const SECTION = "budget_allocation_v1";
 const SOP_TYPE = "budget_allocation";
@@ -21,7 +22,9 @@ const SOP_TYPE = "budget_allocation";
 export async function GET(request: NextRequest) {
   const clientId = new URL(request.url).searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest. Zonder dit gaf deze route in
+  // demo-modus een 500 en bleef het bijbehorende tabblad leeg.
+  const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const { data } = await supabase

@@ -53,8 +53,12 @@ export async function GET(request: NextRequest) {
   // Demo-klant (GreenTech + geo-clones): serveer de curated mock zonder Google Ads te bellen —
   // geen keys of accountrechten nodig. Scoped op de demo-klant; echte klanten lopen ongewijzigd door.
   const demoCid = request.nextUrl.searchParams.get("customerId");
+  // Ontbreekt de parameter, dan is dat een fout van de aanroeper. Zonder deze regel viel de
+  // route door naar de credentials-controle en kwam er een 500 uit: "de server is stuk",
+  // terwijl het verzoek zelf niet klopte.
+  if (!demoCid) return Response.json({ error: "customerId is verplicht" }, { status: 400 });
   if (isGreentechDemo(demoCid)) {
-    return Response.json(buildGreentechClientData(demoCid!));
+    return Response.json(buildGreentechClientData(demoCid));
   }
 
   const credentials = getCredentials();

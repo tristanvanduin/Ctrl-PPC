@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
-import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
+import { useClientHistoricalData, useClientDataState, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { supabase } from "@/lib/supabase";
 import type { ImpressionShareData } from "@/lib/use-client-data";
 import { channelOfSopType, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
+import { cpaTrendFrom } from "@/lib/analysis/trend";
 
 type Priority = "high" | "medium" | "low";
 
@@ -48,9 +49,11 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
 
   // CPA trend
   const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
-  const firstCpa = cpaPoints[0]?.realized ?? 0;
-  const lastCpa = cpaPoints[cpaPoints.length - 1]?.realized ?? 0;
-  const cpaTrend = firstCpa > 0 ? ((lastCpa - firstCpa) / firstCpa) * 100 : 0;
+  // Gedeelde berekening en drempels; zie lib/analysis/trend.ts.
+  const cpaT = cpaTrendFrom(cpaPoints);
+  const firstCpa = cpaT.vorig;
+  const lastCpa = cpaT.huidig;
+  const cpaTrend = cpaT.pct ?? 0;
 
   // ── Budget actions ──
 
@@ -92,13 +95,13 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
 
   // ── CPA optimization ──
 
-  if (cpaTrend > 15 && lastCpa > 0) {
+  if (cpaT.stijgt && lastCpa > 0) {
     recs.push({
       priority: "high",
       source: "CPA Optimalisatie",
       text: `CPA stijgt ${Math.round(cpaTrend)}% (van ${fmt(firstCpa)} naar ${fmt(lastCpa)}). Acties: (1) Check zoektermen — filter irrelevant verkeer met negatieve zoekwoorden, (2) Evalueer biedstrategie — overweeg max CPA bid cap, (3) Test landingspagina varianten — elke 1% conversieratio verbetering verlaagt CPA significant.`,
     });
-  } else if (cpaTrend < -15 && convDiff < 0) {
+  } else if (cpaT.daalt && convDiff < 0) {
     recs.push({
       priority: "medium",
       source: "CPA Kans",
@@ -301,7 +304,10 @@ export function RecommendationsBlock({
 }) {
   const data = useClientHistoricalData(clientId);
   const dataState = useClientDataState();
-  const forecast = computeForecast(data);
+  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
+  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const gedeeld = useForecast();
+  const forecast = gedeeld ?? computeForecast(data);
   const legacyRecs = generateRecommendations(forecast, clientId, dataState?.impressionShare);
 
   const [dbRecs, setDbRecs] = useState<DbRecommendation[]>([]);

@@ -14,6 +14,7 @@ import { computeHealthScore, type HealthScore, type Anomaly } from "@/lib/health
 import { getClientSettings } from "@/lib/client-settings";
 import { supabase } from "@/lib/supabase";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "@/lib/use-client-data";
+import { cpaTrendFrom } from "@/lib/analysis/trend";
 
 // ─── Account type vocabulary ─────────────────────────────────────────
 
@@ -233,10 +234,12 @@ function computeBusinessCauses(
   // CPA trend
   const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
   if (cpaPoints.length >= 2 && causes.length < 3) {
-    const firstCpa = cpaPoints[0].realized!;
-    const lastCpa = cpaPoints[cpaPoints.length - 1].realized!;
-    const cpaTrend = firstCpa > 0 ? ((lastCpa - firstCpa) / firstCpa) * 100 : 0;
-    if (cpaTrend > 15) {
+    // Gedeelde berekening en drempels; zie lib/analysis/trend.ts.
+    const t = cpaTrendFrom(cpaPoints);
+    const firstCpa = t.vorig;
+    const lastCpa = t.huidig;
+    const cpaTrend = t.pct ?? 0;
+    if (t.stijgt) {
       causes.push({
         title: "Kosten per conversie stijgen",
         explanation: `De kosten per conversie zijn ${Math.round(cpaTrend)}% gestegen (van ${fmt(firstCpa)} naar ${fmt(lastCpa)}). Elke conversie kost meer budget.`,
@@ -613,9 +616,12 @@ function computeActions(
     }
     if (forecast.cpa.points.filter((p) => p.realized !== null).length >= 2) {
       const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
-      const lastCpa = cpaPoints[cpaPoints.length - 1].realized!;
-      const firstCpa = cpaPoints[0].realized!;
-      if (firstCpa > 0 && ((lastCpa - firstCpa) / firstCpa) * 100 > 10) {
+      // Stond op 10 procent terwijl de rest van de app 15 aanhoudt: op een stijging van 12
+      // procent gaf dit blok een waarschuwing die nergens anders verscheen.
+      const tweede = cpaTrendFrom(cpaPoints);
+      const lastCpa = tweede.huidig;
+      const firstCpa = tweede.vorig;
+      if (tweede.stijgt) {
         actions.push({
           title: "Kosten per conversie optimaliseren",
           why: "De kosten per conversie stijgen. Zoektermen opschonen en biedingen evalueren.",

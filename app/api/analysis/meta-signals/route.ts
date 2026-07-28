@@ -21,6 +21,7 @@ import { mergeDetections } from "@/lib/signals/types";
 import { shapeMetaAdInputs, shapeMetaLevelInputs, type MetaDailyRow } from "@/lib/analysis/channel-signal-data";
 import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 const SECTION = "meta_signals_v1";
 const SOP_TYPE = "meta_signals";
@@ -29,7 +30,9 @@ const FETCH_DAYS = 70; // twee vensters van 28 plus marge voor sync-lag
 export async function GET(request: NextRequest) {
   const clientId = new URL(request.url).searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest. Zonder dit gaf deze route in
+  // demo-modus een 500 en bleef het bijbehorende tabblad leeg.
+  const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const { data } = await supabase

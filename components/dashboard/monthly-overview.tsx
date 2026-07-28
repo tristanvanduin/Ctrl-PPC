@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { TrendingUp, TrendingDown, CheckCircle2, Clock, ArrowRight } from "lucide-react";
 import { REALIZED_THROUGH_MONTH } from "@/lib/types";
-import { useClientHistoricalData } from "@/lib/client-data-provider";
+import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, ForecastMetric, ForecastPoint, MONTH_LABELS } from "@/lib/forecast";
 
@@ -187,7 +187,10 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
 
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
-  const forecast = computeForecast(data);
+  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
+  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const gedeeld = useForecast();
+  const forecast = gedeeld ?? computeForecast(data);
   const result = forecast[metric];
   const format = getFormatter(metric);
 

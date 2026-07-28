@@ -14,6 +14,7 @@ import { analyzeBidStrategy, type CampaignBidInput, type BidGoal } from "@/lib/a
 import { buildBidStrategyPrompt } from "@/lib/prompts/bid-strategy-prompt";
 import { saveBidStrategyHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 const SECTION = "bid_strategy_v1";
 const SOP_TYPE = "bid_strategy";
@@ -21,7 +22,9 @@ const SOP_TYPE = "bid_strategy";
 export async function GET(request: NextRequest) {
   const clientId = new URL(request.url).searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest. Zonder dit gaf deze route in
+  // demo-modus een 500 en bleef het bijbehorende tabblad leeg.
+  const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const { data } = await supabase

@@ -7,7 +7,8 @@
 //
 // De tests hieronder leggen precies die vier vast.
 
-import { trendOver, summarize } from "./campaign-analysis";
+import { summarize } from "./campaign-analysis";
+import { trendOver } from "./analysis/trend";
 import type { CampaignData, CampaignMonthlyMetrics } from "./campaign-types";
 
 let passed = 0, failed = 0;

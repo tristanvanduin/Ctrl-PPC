@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useClientHistoricalData } from "@/lib/client-data-provider";
+import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, MONTH_LABELS, type ForecastMetric } from "@/lib/forecast";
 import { supabase } from "@/lib/supabase";
 
@@ -30,7 +30,10 @@ const METRICS: { id: ForecastMetric; label: string; format: (v: number) => strin
 export function ForecastTable({ clientId }: { clientId: string }) {
   const [selectedMetric, setSelectedMetric] = useState<ForecastMetric>("conversions");
   const data = useClientHistoricalData(clientId);
-  const forecast = computeForecast(data);
+  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
+  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const gedeeld = useForecast();
+  const forecast = gedeeld ?? computeForecast(data);
 
   // Event-besef: heeft deze klant beurzen geconfigureerd, dan is de kalender-YoY-prognose
   // hieronder misleidend voor de maandvorm (een 2-jaarlijkse beurs vergelijkt met een

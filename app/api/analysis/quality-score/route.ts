@@ -14,6 +14,7 @@ import { saveQualityScoreHypotheses } from "@/lib/analysis/standalone-to-hypothe
 import { analyzeQualityScore, type KeywordQsPerformanceRow } from "@/lib/analysis/quality-score-facts";
 import { buildQualityScorePrompt } from "@/lib/prompts/quality-score-prompt";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 const SECTION = "quality_score_v1";
 const SOP_TYPE = "quality_score";
@@ -22,7 +23,9 @@ const SOP_TYPE = "quality_score";
 export async function GET(request: NextRequest) {
   const clientId = new URL(request.url).searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest. Zonder dit gaf deze route in
+  // demo-modus een 500 en bleef het bijbehorende tabblad leeg.
+  const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const { data } = await supabase

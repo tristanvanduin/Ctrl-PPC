@@ -17,6 +17,7 @@ import { resolveEvent, resolveGoals, type Edition, type Cadence } from "@/lib/ra
 import type { CampaignMonthlyRow } from "@/lib/rai/geo-clone-aggregate";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 const SOP_TYPE = "geo_clone";
 const sectionFor = (geoClone: string) => `geo_clone_${geoClone.toLowerCase()}_v1`;
@@ -143,7 +144,8 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const params = parseParams(url.searchParams.get("client_id"), url.searchParams.get("geo_clone"));
   if (!params) return Response.json({ error: "client_id en geo_clone zijn verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest.
+  const supabase = supabaseForClient(params.clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   // Live pacing-uitlezing: draai de deterministische analyse en geef alleen de pacing terug.

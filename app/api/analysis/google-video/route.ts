@@ -19,6 +19,7 @@ import { aggregateVideoCampaigns, type VideoCampaignRow } from "@/lib/video/vide
 import { aggregatePlacements, judgePlacements, type PlacementInput } from "@/lib/video/placement-analysis";
 import { buildNetworkSplit, type NetworkRow } from "@/lib/pmax/network-split";
 import { today } from "@/lib/reporting-date";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
 import {
   buildVideoDepthSignals, buildPlacementWasteSignals, buildPmaxNetworkSignals,
 } from "@/lib/signals/google-video";
@@ -31,7 +32,8 @@ const WINDOW_DAYS = 180;
 export async function GET(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest.
+  const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const { data } = await supabase
@@ -53,7 +55,8 @@ const s = (v: unknown): string => (v == null ? "" : String(v));
 export async function POST(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  const supabase = getSupabase();
+  // Demo-rijen voor de demo-klant, de echte client voor de rest.
+  const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);

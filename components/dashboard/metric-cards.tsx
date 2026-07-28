@@ -1,7 +1,7 @@
 "use client";
 
 import { TrendingUp, TrendingDown, Target, DollarSign, BarChart3, Wallet } from "lucide-react";
-import { useClientHistoricalData } from "@/lib/client-data-provider";
+import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
@@ -114,7 +114,10 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
 export function MetricCards({ clientId, countryFilter }: { clientId: string; countryFilter?: string | null }) {
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
-  const forecast = computeForecast(data);
+  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
+  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const gedeeld = useForecast();
+  const forecast = gedeeld ?? computeForecast(data);
   const settings = getClientSettings(clientId);
   const kpi = settings.kpiTargets;
 
