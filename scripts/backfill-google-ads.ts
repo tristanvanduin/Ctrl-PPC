@@ -38,6 +38,7 @@ import {
   getAdSchedulePerformance,
   type GoogleAdsCredentials,
 } from "../lib/api/google-ads";
+import { getDateRange13Months } from "../lib/sync/orchestrator";
 
 // ── Load .env.local ─────────────────────────────────────────────────────────
 
@@ -126,22 +127,18 @@ function dedup(rows: Record<string, unknown>[], keyColumns: string[]): Record<st
 
 // ── Date helpers ────────────────────────────────────────────────────────────
 
-function getDateRange13Months(): { startDate: string; endDate: string } {
-  const now = new Date();
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const start = new Date(end);
-  start.setMonth(start.getMonth() - 13);
-  start.setDate(1); // first day of that month
-
-  return {
-    startDate: fmt(start),
-    endDate: fmt(end),
-  };
-}
-
-function fmt(d: Date): string {
-  return d.toISOString().split("T")[0];
-}
+// getDateRange13Months komt uit de synclaag en staat hier bewust NIET meer als eigen kopie.
+//
+// De kopie die hier stond week op twee manieren af. `start.setMonth(m - 13)` rolt om zodra de
+// dag van de maand niet in de doelmaand bestaat: op 31 maart werd 31 februari, wat 3 maart
+// wordt, en de setDate(1) daarna herstelde alleen de dag en niet de maand. Op 27 van de 1461
+// dagen in vier jaar begon de backfill daardoor een hele maand te laat — precies de maand die
+// de analyse via monthsAgo(13) wel opvraagt, dus die bleef leeg zonder dat er iets misging.
+// Daarnaast serialiseerde de lokale fmt() met toISOString(), en dat maakt van een lokale
+// middernacht de vorige dag in elke tijdzone voor UTC.
+//
+// De versie in de orchestrator rekent volledig in lokale datumdelen en is doorgemeten; hij
+// haalt bovendien 14 maanden op in plaats van 13, wat de marge geeft die de analyse nodig heeft.
 
 // ── Upsert helpers ──────────────────────────────────────────────────────────
 

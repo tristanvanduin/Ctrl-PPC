@@ -45,6 +45,14 @@ export interface EnrichmentContext {
   pmaxInsights: PmaxInsights | null;
   /** Geographic/country performance context */
   geoContext: string;
+  /**
+   * Lagen die niet opgehaald konden worden. Elke laag vangt zijn eigen fout af en laat zijn veld
+   * dan op een lege string staan, en een lege string wordt in de prompt niets — waardoor een
+   * mislukte laag niet te onderscheiden was van een laag die niets te melden had. Een
+   * wijzigingshistorie die niet opgehaald kon worden las zo als "er is niets gewijzigd", en dat
+   * is een andere conclusie dan "we hebben het niet kunnen nakijken".
+   */
+  failedLayers: string[];
 }
 
 /**
@@ -123,6 +131,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     pmaxContext: "",
     pmaxInsights: null,
     geoContext: "",
+    failedLayers: [],
   };
 
   // Build array of parallel fetches based on matrix
@@ -132,7 +141,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     tasks.push(
       fetchStrategicContext(supabase, clientId, analysisDate)
         .then((v) => { result.strategicContext = v; })
-        .catch((e) => { logger.error("[enrichment] strategicContext failed:", e); })
+        .catch((e) => { logger.error("[enrichment] strategicContext failed:", e); result.failedLayers.push("strategicContext"); })
     );
   }
 
@@ -140,7 +149,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     tasks.push(
       calculatePortfolioAnalysis(supabase, clientId, campaignData, campaignMetaData)
         .then((v) => { result.portfolioAnalysis = v; })
-        .catch((e) => { logger.error("[enrichment] portfolioAnalysis failed:", e); })
+        .catch((e) => { logger.error("[enrichment] portfolioAnalysis failed:", e); result.failedLayers.push("portfolioAnalysis"); })
     );
   }
 
@@ -148,7 +157,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     tasks.push(
       fetchHypothesisTracking(supabase, clientId)
         .then((v) => { result.hypothesisTracking = v; })
-        .catch((e) => { logger.error("[enrichment] hypothesisTracking failed:", e); })
+        .catch((e) => { logger.error("[enrichment] hypothesisTracking failed:", e); result.failedLayers.push("hypothesisTracking"); })
     );
   }
 
@@ -156,7 +165,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     tasks.push(
       calculateLeadingIndicators(supabase, clientId)
         .then((v) => { result.leadingIndicators = v; })
-        .catch((e) => { logger.error("[enrichment] leadingIndicators failed:", e); })
+        .catch((e) => { logger.error("[enrichment] leadingIndicators failed:", e); result.failedLayers.push("leadingIndicators"); })
     );
   }
 
@@ -164,7 +173,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     tasks.push(
       fetchSectorBenchmarks(supabase, accountType, clientId)
         .then((v) => { result.sectorBenchmarks = v; })
-        .catch((e) => { logger.error("[enrichment] sectorBenchmarks failed:", e); })
+        .catch((e) => { logger.error("[enrichment] sectorBenchmarks failed:", e); result.failedLayers.push("sectorBenchmarks"); })
     );
   }
 
@@ -172,7 +181,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     tasks.push(
       fetchEnhancedChangeHistory(supabase, clientId)
         .then((v) => { result.changeHistory = v; })
-        .catch((e) => { logger.error("[enrichment] changeHistory failed:", e); })
+        .catch((e) => { logger.error("[enrichment] changeHistory failed:", e); result.failedLayers.push("changeHistory"); })
     );
   }
 
@@ -183,14 +192,14 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
         result.pmaxInsights = insights;
         result.pmaxContext = insights.promptContext;
       })
-      .catch((e) => { logger.error("[enrichment] pmaxInsights failed:", e); })
+      .catch((e) => { logger.error("[enrichment] pmaxInsights failed:", e); result.failedLayers.push("pmaxInsights"); })
   );
 
   // Always compute geo context (only produces output if multi-country)
   tasks.push(
     calculateGeoContext(supabase, clientId)
       .then((v) => { result.geoContext = v; })
-      .catch((e) => { logger.error("[enrichment] geoContext failed:", e); })
+      .catch((e) => { logger.error("[enrichment] geoContext failed:", e); result.failedLayers.push("geoContext"); })
   );
 
   // Always fetch dimension availability (lightweight query)
@@ -200,9 +209,32 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
         result.dimensionProfile = profile;
         result.dimensionAvailability = buildAvailabilitySummary(profile, sopType);
       })
-      .catch((e) => { logger.error("[enrichment] dimensionAvailability failed:", e); })
+      .catch((e) => { logger.error("[enrichment] dimensionAvailability failed:", e); result.failedLayers.push("dimensionAvailability"); })
   );
 
   await Promise.all(tasks);
+
+  // Mislukte lagen horen in de prompt te staan, niet alleen in de logs.
+  //
+  // De fout werd wel gelogd, maar de logregel leest niemand terwijl de analyse wel wordt gelezen.
+  // Zonder deze melding kwam de uitvoer met gezag tot een conclusie die op een ontbrekende laag
+  // rustte: geen wijzigingshistorie las als "er is niets gewijzigd", geen sectorbenchmarks als
+  // "er valt niet te vergelijken".
+  //
+  // Het wordt aan dimensionAvailability geplakt omdat dat blok in stap 1 van alle drie de SOP's
+  // al wordt meegestuurd. Ook als die laag zelf faalde: dan is de melding het hele blok, en juist
+  // dan moet hij zichtbaar zijn.
+  if (result.failedLayers.length > 0) {
+    const melding = [
+      "## Niet opgehaalde context",
+      `De volgende lagen konden niet worden opgehaald: ${result.failedLayers.join(", ")}.`,
+      "Dat betekent NIET dat daar niets te melden was, maar dat het niet gecontroleerd kon worden.",
+      "Doe geen uitspraak die op deze lagen rust en benoem expliciet dat ze ontbraken.",
+    ].join("\n");
+    result.dimensionAvailability = result.dimensionAvailability
+      ? `${result.dimensionAvailability}\n\n${melding}`
+      : melding;
+  }
+
   return result;
 }
