@@ -205,6 +205,65 @@ export async function replaceBatch(
   return written;
 }
 
+/**
+ * Postgres meldt met deze code dat er geen unieke sleutel is die bij de ON CONFLICT past.
+ * Zie https://www.postgresql.org/docs/current/errcodes-appendix.html
+ */
+const GEEN_UNIEKE_SLEUTEL = "42P10";
+
+/**
+ * Schrijft weg zonder de bestaande historie te wissen.
+ *
+ * Het verschil met replaceBatch is wat er met oudere rijen gebeurt. replaceBatch verwijdert
+ * eerst alles van de klant, waardoor de tabel nooit meer kan bevatten dan wat de laatste sync
+ * ophaalde — veertien maanden. Deze functie werkt bij en laat staan wat er al was, zodat de
+ * tabel elke maand een maand langer wordt. Dat is precies wat je wilt voor tijdreeksen: Google
+ * bewaart zoektermdata niet onbeperkt, en wat daar uit het venster loopt is definitief weg
+ * tenzij wij het zelf hebben bewaard.
+ *
+ * Alleen voor tabellen waar dat KLOPT. Een tabel die de huidige toestand beschrijft — de
+ * uitsluitingenlijst bijvoorbeeld — hoort wel gewist te worden, anders blijft een verwijderde
+ * uitsluiting eeuwig staan. Zie de opmerking onderaan
+ * scripts/pending-migration-history-accumulation.sql.
+ *
+ * Valt terug op replaceBatch zolang de unieke sleutel er nog niet is. Zonder die terugval zou
+ * deze wijziging de sync breken op elke omgeving waar de migratie nog niet is gedraaid; met de
+ * terugval verandert er daar niets en begint het aangroeien vanzelf zodra de sleutels er zijn.
+ */
+export async function appendBatch(
+  supabase: SupabaseClient,
+  table: string,
+  rows: Record<string, unknown>[],
+  conflictColumns: string,
+  clientId: string
+): Promise<number> {
+  if (rows.length === 0) {
+    logger.warn(`[sync] ${table}: geen rijen ontvangen, bestaande data blijft staan`);
+    return 0;
+  }
+  const CHUNK = 500;
+  let written = 0;
+  const fouten: string[] = [];
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const { error } = await supabase.from(table).upsert(chunk, { onConflict: conflictColumns, ignoreDuplicates: false });
+    if (error) {
+      if ((error as { code?: string }).code === GEEN_UNIEKE_SLEUTEL) {
+        logger.warn(
+          `[sync] ${table}: nog geen unieke sleutel op (${conflictColumns}), dus terug naar vervangen. ` +
+          "Historie ouder dan het syncvenster gaat hierbij verloren; draai " +
+          "scripts/pending-migration-history-accumulation.sql om dat te stoppen."
+        );
+        return replaceBatch(supabase, table, rows, clientId);
+      }
+      logger.error(`[sync] ${table} chunk error:`, error.message);
+      fouten.push(error.message);
+    } else written += chunk.length;
+  }
+  if (fouten.length > 0) throw new Error(`${table}: ${fouten.length} chunk(s) mislukt — ${fouten[0]}`);
+  return written;
+}
+
 
 // Welke getter voedt welke dataset. Expliciet, want dit is de enige plek waar de koppeling
 // tussen "de API-call faalde" en "deze tabel is niet bijgewerkt" wordt gelegd — en die koppeling
@@ -463,12 +522,12 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     syncDataset("ads_adgroup_monthly", () => upsertBatch(supabase, "ads_adgroup_monthly",
       agRaw.map((ag) => ({ client_id: clientId, campaign_name: ag.campaignName, ad_group_id: ag.adGroupId, ad_group_name: ag.adGroupName, month: ag.date, impressions: ag.impressions, clicks: ag.clicks, cost: ag.cost, conversions: ag.conversions, conversions_value: ag.conversionsValue, cpa: ag.cpa, roas: ag.roas })),
       "client_id,ad_group_id,month")),
-    syncDataset("ads_search_terms_wasteful", () => replaceBatch(supabase, "ads_search_terms_wasteful",
+    syncDataset("ads_search_terms_wasteful", () => appendBatch(supabase, "ads_search_terms_wasteful",
       dedup(stRaw.map((st) => ({ client_id: clientId, week_start: st.date, search_term: st.searchTerm, campaign_name: st.campaignName, ad_group_name: st.adGroupName, impressions: st.impressions, clicks: st.clicks, cost: st.cost, term_status: st.status })), ["client_id", "week_start", "search_term"]),
-      clientId)),
-    syncDataset("ads_change_history", () => replaceBatch(supabase, "ads_change_history",
+      "client_id,week_start,search_term", clientId)),
+    syncDataset("ads_change_history", () => appendBatch(supabase, "ads_change_history",
       chRaw.map((ch) => ({ client_id: clientId, change_datetime: ch.changeDateTime, resource_type: ch.resourceType, change_resource_name: ch.changeResourceName, campaign_name: ch.campaignName, change_type: ch.changeType, old_value: ch.oldValue, new_value: ch.newValue, user_email: ch.userEmail })),
-      clientId)),
+      "client_id,change_datetime,change_resource_name,change_type", clientId)),
     syncDataset("ads_campaign_metadata", () => upsertBatch(supabase, "ads_campaign_metadata",
       metaRaw.map((cm) => ({ client_id: clientId, campaign_id: cm.campaignId, campaign_name: cm.campaignName, campaign_type: cm.campaignType, bidding_strategy: cm.biddingStrategy, bidding_strategy_target: cm.biddingStrategyTarget, budget_amount: cm.budgetAmount, budget_type: cm.budgetType, serving_status: cm.servingStatus, updated_at: new Date().toISOString() })),
       "client_id,campaign_id")),
@@ -482,12 +541,12 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     syncDataset("ads_search_terms_monthly", () => upsertBatch(supabase, "ads_search_terms_monthly",
       dedup(aggregateSearchTermsByMonth(stFullRaw).map((st) => ({ client_id: clientId, month: st.date, campaign_id: st.campaignId, campaign_name: st.campaignName, ad_group_id: st.adGroupId, ad_group_name: st.adGroupName, search_term: st.searchTerm, match_type: st.matchType, impressions: st.impressions, clicks: st.clicks, cost: st.cost, conversions: st.conversions, conversions_value: st.conversionsValue, ctr: st.clicks > 0 && st.impressions > 0 ? st.clicks / st.impressions : 0, conversion_rate: st.clicks > 0 ? st.conversions / st.clicks : 0, synced_at: now })), ["client_id", "search_term", "campaign_name", "ad_group_name", "month"]),
       "client_id,search_term,campaign_name,ad_group_name,month")),
-    syncDataset("ads_device_performance_monthly", () => replaceBatch(supabase, "ads_device_performance_monthly",
+    syncDataset("ads_device_performance_monthly", () => appendBatch(supabase, "ads_device_performance_monthly",
       deviceRaw.map((d) => ({ client_id: clientId, month: d.date, device: d.device, level: d.campaignId ? "campaign" : "account", campaign_id: d.campaignId, campaign_name: d.campaignName, impressions: d.impressions, clicks: d.clicks, cost: d.cost, conversions: d.conversions, conversions_value: d.conversionsValue, ctr: d.impressions > 0 ? d.clicks / d.impressions : 0, avg_cpc: d.clicks > 0 ? d.cost / d.clicks : 0, conversion_rate: d.clicks > 0 ? d.conversions / d.clicks : 0, cost_per_conversion: d.conversions > 0 ? d.cost / d.conversions : 0, synced_at: now })),
-      clientId)),
-    syncDataset("ads_network_performance_monthly", () => replaceBatch(supabase, "ads_network_performance_monthly",
+      "client_id,month,device,level,campaign_id", clientId)),
+    syncDataset("ads_network_performance_monthly", () => appendBatch(supabase, "ads_network_performance_monthly",
       networkRaw.map((n) => ({ client_id: clientId, month: n.date, network_type: n.networkType, campaign_id: n.campaignId, campaign_name: n.campaignName, impressions: n.impressions, clicks: n.clicks, cost: n.cost, conversions: n.conversions, conversions_value: n.conversionsValue, ctr: n.impressions > 0 ? n.clicks / n.impressions : 0, conversion_rate: n.clicks > 0 ? n.conversions / n.clicks : 0, synced_at: now })),
-      clientId)),
+      "client_id,month,network_type,campaign_id", clientId)),
     syncDataset("ads_creative_performance", () => upsertBatch(supabase, "ads_creative_performance",
       dedup(creativeRaw.map((cr) => ({ client_id: clientId, month: cr.date, campaign_id: cr.campaignId, campaign_name: cr.campaignName, ad_group_id: cr.adGroupId, ad_group_name: cr.adGroupName, ad_id: cr.adId, ad_type: cr.adType, headlines: JSON.stringify(cr.headlines), descriptions: JSON.stringify(cr.descriptions), final_urls: JSON.stringify(cr.finalUrls), impressions: cr.impressions, clicks: cr.clicks, cost: cr.cost, conversions: cr.conversions, conversions_value: cr.conversionsValue, ctr: cr.impressions > 0 ? cr.clicks / cr.impressions : 0, conversion_rate: cr.clicks > 0 ? cr.conversions / cr.clicks : 0, synced_at: now })), ["client_id", "ad_id", "month"]),
       "client_id,ad_id,month")),
@@ -497,12 +556,12 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     syncDataset("ads_product_performance_monthly", () => upsertBatch(supabase, "ads_product_performance_monthly",
       dedup(prodRaw.map((p) => ({ client_id: clientId, month: p.date, campaign_name: p.campaignName, campaign_type: p.campaignType, product_title: p.productTitle, product_id: p.productId || null, impressions: p.impressions, clicks: p.clicks, cost: p.cost, conversions: p.conversions, conversions_value: p.conversionsValue, ctr: p.impressions > 0 ? p.clicks / p.impressions : 0, roas: roas(p.conversionsValue, p.cost), cost_per_conversion: p.conversions > 0 ? p.cost / p.conversions : 0, synced_at: now })), ["client_id", "product_title", "campaign_name", "month"]),
       "client_id,product_title,campaign_name,month")),
-    syncDataset("ads_geo_performance_monthly", () => replaceBatch(supabase, "ads_geo_performance_monthly",
+    syncDataset("ads_geo_performance_monthly", () => appendBatch(supabase, "ads_geo_performance_monthly",
       dedup(geoRaw.map((g) => ({ client_id: clientId, month: g.date, campaign_id: g.campaignId, campaign_name: g.campaignName, country_code: g.countryCode || null, region_name: g.regionName || null, city_name: null, geo_target_id: g.geoTargetId || null, impressions: Number(g.impressions), clicks: Number(g.clicks), cost: g.cost, conversions: g.conversions, conversions_value: g.conversionsValue, ctr: g.impressions > 0 ? g.clicks / g.impressions : 0, conversion_rate: g.clicks > 0 ? g.conversions / g.clicks : 0, synced_at: now })), ["client_id", "geo_target_id", "campaign_id", "month"]),
-      clientId)),
-    syncDataset("ads_audience_performance_monthly", () => replaceBatch(supabase, "ads_audience_performance_monthly",
+      "client_id,month,campaign_id,geo_target_id,country_code", clientId)),
+    syncDataset("ads_audience_performance_monthly", () => appendBatch(supabase, "ads_audience_performance_monthly",
       audienceRaw.map((a) => ({ client_id: clientId, month: a.date, campaign_id: a.campaignId, campaign_name: a.campaignName, ad_group_id: a.adGroupId, ad_group_name: a.adGroupName, audience_id: a.audienceId, audience_name: a.audienceName, audience_type: null, impressions: a.impressions, clicks: a.clicks, cost: a.cost, conversions: a.conversions, conversions_value: a.conversionsValue, ctr: a.impressions > 0 ? a.clicks / a.impressions : 0, conversion_rate: a.clicks > 0 ? a.conversions / a.clicks : 0, synced_at: now })),
-      clientId)),
+      "client_id,month,campaign_id,ad_group_id,audience_id", clientId)),
     syncDataset("ads_ad_schedule_performance", () => replaceBatch(supabase, "ads_ad_schedule_performance",
       scheduleRaw.map((s) => ({ client_id: clientId, period_start: startDate, period_end: endDate, campaign_id: s.campaignId, campaign_name: s.campaignName, day_of_week: s.dayOfWeek, hour_of_day: s.hourOfDay, impressions: s.impressions, clicks: s.clicks, cost: s.cost, conversions: s.conversions, conversions_value: s.conversionsValue, synced_at: now })),
       clientId)),
@@ -782,8 +841,8 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
   await Promise.all([
     syncDataset("ads_campaign_country_monthly", () => replaceBatch(supabase, "ads_campaign_country_monthly",
       campaignCountryRows, clientId)),
-    syncDataset("ads_country_monthly", () => replaceBatch(supabase, "ads_country_monthly",
-      countryMonthlyRows, clientId)),
+    syncDataset("ads_country_monthly", () => appendBatch(supabase, "ads_country_monthly",
+      countryMonthlyRows, "client_id,month,country_code", clientId)),
     syncDataset("ads_country_yoy", () => replaceBatch(supabase, "ads_country_yoy",
       countryYoyRows, clientId)),
     syncDataset("ads_country_impression_share", () => replaceBatch(supabase, "ads_country_impression_share",
