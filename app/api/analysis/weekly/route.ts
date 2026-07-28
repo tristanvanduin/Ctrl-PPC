@@ -15,6 +15,7 @@ import { computeDataReliability } from "@/lib/analysis/data-reliability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
 import { today } from "@/lib/reporting-date";
+import { toPromptTable } from "@/lib/analysis/prompt-table";
 
 const amsterdamseMaand = () => Number(today().slice(5, 7));
 import {
@@ -134,18 +135,18 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
 Periode: ${periodStart} t/m ${periodEnd}.${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
 
 ## Account Performance (wekelijks, laatste 14 dagen)
-\`\`\`json
-${JSON.stringify(weeklyData, null, 2)}
+\`\`\`
+${toPromptTable(weeklyData)}
 \`\`\`
 
 ## Wasteful Search Terms (laatste 30 dagen, top 30 op cost)
-\`\`\`json
-${JSON.stringify(searchResult.data ?? [], null, 2)}
+\`\`\`
+${toPromptTable(searchResult.data ?? [])}
 \`\`\`
 
 ## Campaign Performance (laatste 2 maanden, voor budget/spend check)
-\`\`\`json
-${JSON.stringify(campaignResult.data ?? [], null, 2)}
+\`\`\`
+${toPromptTable(campaignResult.data ?? [])}
 \`\`\`${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}
 
 Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders die directe actie vereisen.`;

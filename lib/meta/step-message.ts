@@ -1,3 +1,4 @@
+import { toPromptTable } from "@/lib/analysis/prompt-table";
 // M2 route-wiring: bouwt de per-stap data-prompt (de userMessage voor runNarrativeStep) uit de
 // voorgerekende Meta-facts. Dezelfde rol als de inline Google-messages, maar gevoed door
 // buildMetaStepFacts. Het model krijgt de exacte getallen aangeleverd en hoeft niet zelf te rekenen.
@@ -23,7 +24,7 @@ export function metaStepName(stepNumber: number): string {
 
 export function buildMetaStepMessage(stepNumber: number, facts: unknown, clientId: string): string {
   const name = metaStepName(stepNumber);
-  const factsBlock = JSON.stringify(facts ?? {}, null, 2);
+  const factsBlock = toPromptTable(facts ?? {});
   return [
     `Analyseer ${name} (stap ${stepNumber}) voor client "${clientId}".`,
     "",

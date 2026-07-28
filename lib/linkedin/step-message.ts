@@ -1,3 +1,4 @@
+import { toPromptTable } from "@/lib/analysis/prompt-table";
 // L2 route-wiring: bouwt de per-stap data-prompt (de userMessage voor de stap-runner) uit de
 // voorgerekende LinkedIn-facts. Dezelfde rol als de Meta-versie: het model krijgt de exacte
 // getallen aangeleverd en rekent niet zelf. Pure functie, op fixtures te testen.
@@ -20,7 +21,7 @@ export function linkedinStepName(stepNumber: number): string {
 
 export function buildLinkedinStepMessage(stepNumber: number, facts: unknown, clientId: string): string {
   const name = linkedinStepName(stepNumber);
-  const factsBlock = JSON.stringify(facts ?? {}, null, 2);
+  const factsBlock = toPromptTable(facts ?? {});
   return [
     `Analyseer ${name} (stap ${stepNumber}) voor client "${clientId}".`,
     "",

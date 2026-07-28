@@ -15,6 +15,7 @@ import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { computeComparisonFacts, formatComparisonFacts } from "@/lib/analysis/comparison-facts";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
+import { toPromptTable } from "@/lib/analysis/prompt-table";
 import {
   createProgressJob,
   markProgressCompleted,
@@ -155,23 +156,23 @@ Periode: ${periodStart} t/m ${periodEnd}.${enrichment.strategicContext}${targetT
 ${bwComparisonText}
 
 ## Account Performance (maandelijks, laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(accountData, null, 2)}
+\`\`\`
+${toPromptTable(accountData)}
 \`\`\`
 
 ## Account Performance (wekelijks, laatste 30 dagen)
-\`\`\`json
-${JSON.stringify(weeklyResult.data ?? [], null, 2)}
+\`\`\`
+${toPromptTable(weeklyResult.data ?? [])}
 \`\`\`
 
 ## Campaign Performance (maandelijks, laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(campaignResult.data ?? [], null, 2)}
+\`\`\`
+${toPromptTable(campaignResult.data ?? [])}
 \`\`\`
 
 ## Ad Group Performance (laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(adgroupResult.data ?? [], null, 2)}
+\`\`\`
+${toPromptTable(adgroupResult.data ?? [])}
 \`\`\`${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}
 
 Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug aan de maandanalyse.

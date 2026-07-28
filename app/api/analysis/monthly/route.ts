@@ -80,6 +80,7 @@ import { logger } from "@/lib/logger";
 import { getClientMemory, buildClientMemoryGrounding } from "@/lib/memory/client-memory";
 import { buildGoogleSignalsSection, type CampaignIsRow, type CampaignMonthlyRow, type KeywordMonthlyRow, type ChangeHistoryRow, type ScheduleRow, type NetworkMonthlyRow, type DeviceMonthlyRow, type SearchTermMonthlyLite, type NegativeKeywordRow } from "@/lib/analysis/signal-section";
 import { today } from "@/lib/reporting-date";
+import { toPromptTable } from "@/lib/analysis/prompt-table";
 
 function getCredentials(): GoogleAdsCredentials | null {
   const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
@@ -1558,7 +1559,7 @@ ${runningContext}`,
     }
 
     const accountYoySection = accountYoyData.length > 0
-      ? `\n\n## Account YoY Vergelijking (% verschil t.o.v. dezelfde maand vorig jaar)\n\`\`\`json\n${JSON.stringify(accountYoyData, null, 2)}\n\`\`\``
+      ? `\n\n## Account YoY Vergelijking (% verschil t.o.v. dezelfde maand vorig jaar)\n\`\`\`\n${toPromptTable(accountYoyData)}\n\`\`\``
       : "\n\n## Account YoY Vergelijking\nGeen YoY data beschikbaar (minder dan 12 maanden historie).";
     const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
     const kpiTargetsRaw = clientCtx.goalsSection ? {
@@ -1916,8 +1917,8 @@ ${runningContext}`,
           .sort((a, b) => b.cost - a.cost)
       ).slice(0, 12);
 
-      const classificationTermsJson = `\`\`\`json\n${JSON.stringify(serializeTermRows(classificationRows), null, 2)}\n\`\`\``;
-      const actionTermsJson = `\`\`\`json\n${JSON.stringify(serializeTermRows(actionRows), null, 2)}\n\`\`\``;
+      const classificationTermsTabel = `\`\`\`\n${toPromptTable(serializeTermRows(classificationRows))}\n\`\`\``;
+      const actionTermsTabel = `\`\`\`\n${toPromptTable(serializeTermRows(actionRows))}\n\`\`\``;
       const classificationSummary = [
         "## Deel A dataset-samenvatting",
         `- Protected relevant: ${protectedRows.length}`,
@@ -1954,7 +1955,7 @@ ${classificationSummary}
 Classificeer alleen de belangrijkste zoektermen en hun bewijsniveau. Houd het compact en zoekterm-specifiek.
 
 ## Search Term classificatie-set
-${classificationTermsJson}
+${classificationTermsTabel}
 
 ## Data beschikbaarheid voor deze stap
 ${stepAvailabilityByStep.get(7)?.promptNote || "Geen extra data-opmerking."}
@@ -1996,17 +1997,17 @@ ${actionSummary}
 Gebruik de classificatie uit deel A als uitgangspunt en vertaal dit naar maximaal 2 concrete acties en de definitieve stapconclusie.
 
 ## Geclassificeerde signalen uit deel A
-\`\`\`json
-${JSON.stringify({
+\`\`\`
+${toPromptTable({
   narrative: parsed7a.narrative,
   findings: parsed7a.findings,
   actions: parsed7a.actions,
   step_conclusion: parsed7a.step_conclusion,
-}, null, 2)}
+})}
 \`\`\`
 
 ## Search Term actie-set
-${actionTermsJson}
+${actionTermsTabel}
 
 ## Data beschikbaarheid voor deze stap
 ${stepAvailabilityByStep.get(7)?.promptNote || "Geen extra data-opmerking."}
@@ -2079,7 +2080,7 @@ ${runningContext}`,
     };
 
     const campaignYoySection = campaignYoyData.length > 0
-      ? `\n\n## Campaign YoY Vergelijking (% verschil t.o.v. dezelfde maand vorig jaar, per campagne)\n\`\`\`json\n${JSON.stringify(campaignYoyData, null, 2)}\n\`\`\``
+      ? `\n\n## Campaign YoY Vergelijking (% verschil t.o.v. dezelfde maand vorig jaar, per campagne)\n\`\`\`\n${toPromptTable(campaignYoyData)}\n\`\`\``
       : "";
     const campaignMomText = computeCampaignMomFacts(
       campaignData as Array<{ campaign_name: string; month: string; impressions: number; clicks: number; cost: number; conversions: number; conversions_value: number }>,
@@ -2132,13 +2133,13 @@ ${preparedContext?.campaign_table_text || ""}
 ${adgroupMomText}
 
 ## Campaign Overzicht
-\`\`\`json
-${JSON.stringify(adgroupAggregation.campaign_summaries, null, 2)}
+\`\`\`
+${toPromptTable(adgroupAggregation.campaign_summaries)}
 \`\`\`
 
 ## Ad Group Details (pre-geaggregeerd)
-\`\`\`json
-${JSON.stringify(adgroupAggregation.ad_group_details, null, 2)}
+\`\`\`
+${toPromptTable(adgroupAggregation.ad_group_details)}
 \`\`\`
 
 Lees \`null\` als "niet te meten", niet als nul. Een CPA is \`null\` wanneer er geen conversies
@@ -2156,8 +2157,8 @@ ${preparedContext?.binding_facts_text || ""}
 ${preparedContext?.campaign_table_text || ""}
 
 ## Campaign Impression Share (laatste 6 maanden)
-\`\`\`json
-${JSON.stringify(isData, null, 2)}
+\`\`\`
+${toPromptTable(isData)}
 \`\`\`${enrichment.changeHistory}`
       : `Er is geen impression share data beschikbaar voor client "${clientId}". Noteer welke hypothese hierdoor onbewezen blijft.`);
 
@@ -2165,8 +2166,8 @@ ${JSON.stringify(isData, null, 2)}
       ? `Analyseer de keyword performance voor client "${clientId}".
 
 ## Keyword Performance (laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(keywordData, null, 2)}
+\`\`\`
+${toPromptTable(keywordData)}
 \`\`\`${enrichment.changeHistory}`
       : `Er is geen keyword performance data beschikbaar voor client "${clientId}". Benoem expliciet dat werkwijze A/B/C hierdoor beperkt is.`);
 
@@ -2217,8 +2218,8 @@ ${JSON.stringify(keywordData, null, 2)}
 ${merchantSync.message}
 
 ## Product Performance (verrijkt, laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(enrichedProductData, null, 2)}
+\`\`\`
+${toPromptTable(enrichedProductData)}
 \`\`\``
         : `Analyseer de product performance voor client "${clientId}" op basis van ruwe productdata. Merchant Center verrijking ontbreekt, dus benoem EXPLICIET dat Werkwijze A (Custom Labels/Categories) data niet beschikbaar is door ontbrekende Merchant Center koppeling, maar voer Werkwijze B (SKU-niveau) wel uit op de beschikbare productdata.
 
@@ -2226,8 +2227,8 @@ ${JSON.stringify(enrichedProductData, null, 2)}
 ${merchantSync.message}
 
 ## Product Performance (ruw, laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(productData, null, 2)}
+\`\`\`
+${toPromptTable(productData)}
 \`\`\``);
     }
 
@@ -2235,8 +2236,8 @@ ${JSON.stringify(productData, null, 2)}
       await runSplitSearchTermStep(`Analyseer de wasteful search terms voor client "${clientId}".
 
 ## Wasteful Search Terms (top 30 op cost, 0 conversies)
-\`\`\`json
-${JSON.stringify(searchData, null, 2)}
+\`\`\`
+${toPromptTable(searchData)}
 \`\`\`${enrichment.changeHistory}`);
     } else {
       await runNarrativeStep(7, "Search Term Performance", `Er zijn geen wasteful search terms gevonden voor client "${clientId}". Noteer dit als potentieel positief signaal, maar benoem ook dat de afwezigheid van wasteful termen geen bewijs is dat routing goed staat.`);
@@ -2247,8 +2248,8 @@ ${JSON.stringify(searchData, null, 2)}
       ? `Analyseer de creative performance voor client "${clientId}".
 
 ## Creative Performance (laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(creativeData, null, 2)}
+\`\`\`
+${toPromptTable(creativeData)}
 \`\`\``
       : `Er is geen creative performance data beschikbaar voor client "${clientId}". Benoem dat creative-signalen niet gevalideerd kunnen worden.`);
 
@@ -2326,8 +2327,8 @@ ${JSON.stringify(creativeData, null, 2)}
       await runNarrativeStep(9, "Audience Performance", `Analyseer de audience performance voor client "${clientId}".
 
 ## Audience Performance (laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(audienceData, null, 2)}
+\`\`\`
+${toPromptTable(audienceData)}
 \`\`\``);
     }
 
@@ -2335,31 +2336,31 @@ ${JSON.stringify(audienceData, null, 2)}
       ? `Analyseer de device performance voor client "${clientId}".
 
 ## Device Performance (laatste 3 maanden)
-\`\`\`json
-${JSON.stringify(deviceData, null, 2)}
+\`\`\`
+${toPromptTable(deviceData)}
 \`\`\``
       : `Er is geen device performance data beschikbaar voor client "${clientId}". Benoem dat device-hypothesen hierdoor onbewezen blijven.`);
 
     const countryYoySection = countryYoyData.length > 0
-      ? `\n\n## Land YoY Vergelijking\n\`\`\`json\n${JSON.stringify(countryYoyData, null, 2)}\n\`\`\``
+      ? `\n\n## Land YoY Vergelijking\n\`\`\`\n${toPromptTable(countryYoyData)}\n\`\`\``
       : "";
     await runNarrativeStep(11, "Geografische Performance", countryData.length > 0
       ? `Analyseer de geografische performance voor client "${clientId}".
 
 ## Land Performance (maandelijks, tot 6 maanden)
-\`\`\`json
-${JSON.stringify(countryData, null, 2)}
+\`\`\`
+${toPromptTable(countryData)}
 \`\`\`${countryYoySection}`
       : `Er is geen geografische performance data beschikbaar voor client "${clientId}". Benoem dat geo-allocatie hierdoor niet hard kan worden getoetst.`);
 
     const networkSection = networkData.length > 0
-      ? `\n\n## Network Performance (laatste 3 maanden)\n\`\`\`json\n${JSON.stringify(networkData, null, 2)}\n\`\`\``
+      ? `\n\n## Network Performance (laatste 3 maanden)\n\`\`\`\n${toPromptTable(networkData)}\n\`\`\``
       : "\n\nGeen network data beschikbaar.";
     const scheduleSection = scheduleData.length > 0
-      ? `\n\n## Ad Schedule Performance (dag/uur verdeling)\n\`\`\`json\n${JSON.stringify(scheduleData, null, 2)}\n\`\`\``
+      ? `\n\n## Ad Schedule Performance (dag/uur verdeling)\n\`\`\`\n${toPromptTable(scheduleData)}\n\`\`\``
       : "\n\nGeen schedule data beschikbaar.";
     const checkoutSection = checkoutData.length > 0
-      ? `\n\n## Checkout Funnel (laatste 3 maanden)\n\`\`\`json\n${JSON.stringify(checkoutData, null, 2)}\n\`\`\``
+      ? `\n\n## Checkout Funnel (laatste 3 maanden)\n\`\`\`\n${toPromptTable(checkoutData)}\n\`\`\``
       : "\n\nGeen checkout funnel data beschikbaar.";
     await runNarrativeStep(12, "Checkout, Schedule & Network Performance", `Analyseer checkout funnel, schedule en network performance voor client "${clientId}".${checkoutSection}${scheduleSection}${networkSection}
 
@@ -2379,8 +2380,8 @@ ${buildStep12AvailabilityInstruction(stepAvailabilityByStep.get(12))}`);
       userMessage: `Bouw de synthese voor client "${clientId}" op basis van checkpoint C en alle voorgaande analyse-stappen.
 
 ## Checkpoints
-\`\`\`json
-${JSON.stringify(checkpointOutputs, null, 2)}
+\`\`\`
+${toPromptTable(checkpointOutputs)}
 \`\`\`
 
 ## Stapconclusies

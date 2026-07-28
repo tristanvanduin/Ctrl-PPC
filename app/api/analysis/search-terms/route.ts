@@ -9,6 +9,7 @@ import {
   type GoogleAdsCredentials,
 } from "@/lib/api/google-ads";
 import { buildSearchTermAnalysisPrompt } from "@/lib/prompts/search-term-prompts";
+import { toPromptTable } from "@/lib/analysis/prompt-table";
 import { callRouted } from "@/lib/analysis/llm-router";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import {
@@ -332,7 +333,7 @@ ${productList || "Geen productdata beschikbaar"}`;
       const userMessage = `${contextBlock}
 
 ## Zoektermen om te beoordelen (batch ${batchNum})
-${JSON.stringify(termsJson, null, 2)}`;
+${toPromptTable(termsJson)}`;
 
       try {
         const response = await callRouted({
