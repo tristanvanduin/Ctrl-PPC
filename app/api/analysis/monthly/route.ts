@@ -82,6 +82,8 @@ import { buildGoogleSignalsSection, type CampaignIsRow, type CampaignMonthlyRow,
 import { today } from "@/lib/reporting-date";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
 import { callLogMark, logCacheSummary } from "@/lib/analysis/openrouter-client";
+import { buildTaskStatusGrounding } from "@/lib/tasks/task-tracking";
+import { priorTasksVoorGrounding } from "@/lib/tasks/prior-tasks";
 
 function getCredentials(): GoogleAdsCredentials | null {
   const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
@@ -1242,6 +1244,26 @@ export async function POST(request: NextRequest) {
     const clientMemory = await getClientMemory(supabase, clientId);
     const clientMemorySection = buildClientMemoryGrounding(clientMemory);
 
+    // Taakstatus van de vorige cyclus.
+    //
+    // Zonder dit blok begint elke maandanalyse met een schone lei en beveelt hij opnieuw aan wat
+    // vorige maand al is uitgevoerd — het model heeft geen enkele manier om te weten wat ermee
+    // gebeurd is. buildTaskStatusGrounding zet de openstaande en afgeronde taken in de prompt,
+    // met de instructie afgeronde taken niet te herhalen tenzij de cijfers aantoonbaar terugvielen.
+    //
+    // De bron is sop_tasks. De pure kern is geschreven op analysis_tasks (migratie 006), maar die
+    // tabel wordt nergens geschreven of gelezen; sop_tasks is de tabel die daadwerkelijk gevuld
+    // wordt. Twee velden bestaan daar niet: execution_status en deadline_hint blijven dus
+    // onbekend, en de functie laat de bijbehorende regels dan gewoon weg in plaats van iets aan
+    // te nemen.
+    const taakStatusSection = buildTaskStatusGrounding(await priorTasksVoorGrounding(supabase, clientId, periodEnd));
+
+    // Bij het geheugenblok gevoegd in plaats van als los argument: beide beschrijven wat we van
+    // deze klant weten uit eerdere runs, en buildMonthlyStepPrompt laat een leeg blok al
+    // byte-identiek weg. Een klant zonder taakhistorie krijgt dus precies dezelfde prompt als
+    // voorheen — dat is de eigenschap die de cachetest bewaakt.
+    const geheugenMetTaken = [clientMemorySection, taakStatusSection].filter(Boolean).join("\n\n");
+
     // A-track: de deterministisch gedetecteerde signalen en cross-checks, eenmalig voor de
     // lus. Zelfde principe als het geheugenblok: een lege sectie geeft byte-identieke
     // prompts, dus een account zonder signalen merkt niets.
@@ -1771,7 +1793,7 @@ ${runningContext}`,
           adapter.stepInstructions[stepNumber],
           `${runningContext}\n\n${conclusions.slice(-2).join("\n\n")}`,
           adapter,
-          clientMemorySection,
+          geheugenMetTaken,
           signalsSection
         ),
         userMessage: `${message}\n\n## Data beschikbaarheid voor deze stap\n${stepAvailabilityByStep.get(stepNumber)?.promptNote || "Geen extra data-opmerking."}\n\n## Running context uit laatste checkpoint\n${runningContext}`,
@@ -1800,7 +1822,7 @@ ${runningContext}`,
             adapter.stepInstructions[stepNumber],
             `${runningContext}\n\n${conclusions.slice(-2).join("\n\n")}`,
             adapter,
-            clientMemorySection,
+            geheugenMetTaken,
             signalsSection
           ),
           userMessage: repairMessage,
@@ -1948,7 +1970,7 @@ ${runningContext}`,
           `${adapter.stepInstructions[7]}\n\n${MONTHLY_STEP7_CLASSIFICATION_INSTRUCTION}`,
           `${runningContext}\n\n${conclusions.slice(-2).join("\n\n")}`,
           adapter,
-          clientMemorySection,
+          geheugenMetTaken,
           signalsSection
         ),
         userMessage: `${baseInstruction}
@@ -1990,7 +2012,7 @@ ${runningContext}`,
           `${adapter.stepInstructions[7]}\n\n${MONTHLY_STEP7_ACTIONS_INSTRUCTION}`,
           `${runningContext}\n\n${conclusions.slice(-2).join("\n\n")}\n\n## Uitkomst deel A\n${parsed7a.step_conclusion}`,
           adapter,
-          clientMemorySection,
+          geheugenMetTaken,
           signalsSection
         ),
         userMessage: `${baseInstruction}
@@ -2380,7 +2402,7 @@ ${buildStep12AvailabilityInstruction(stepAvailabilityByStep.get(12))}`);
       ...shared,
       stepNumber: 13,
       stepName: "Hypotheses & Sprintplanning",
-      systemPrompt: buildMonthlyStepPrompt(goalsSection, accountType, adapter.stepInstructions[13], runningContext, adapter, clientMemorySection, signalsSection),
+      systemPrompt: buildMonthlyStepPrompt(goalsSection, accountType, adapter.stepInstructions[13], runningContext, adapter, geheugenMetTaken, signalsSection),
       userMessage: `Bouw de synthese voor client "${clientId}" op basis van checkpoint C en alle voorgaande analyse-stappen.
 
 ## Checkpoints
