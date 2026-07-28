@@ -23,7 +23,19 @@ export interface CampaignFunnelInput {
   // Kanaal-eigen signalen; wat niet van toepassing is blijft weg.
   campaignType?: string | null; // Google: SEARCH, SHOPPING, PERFORMANCE_MAX, DISPLAY, VIDEO, DEMAND_GEN
   isBranded?: boolean | null; // Google: de campagne draait (vrijwel) alleen op eigen merktermen
-  objective?: string | null; // Meta: OUTCOME_*; LinkedIn: LEAD_GENERATION enz.
+  /**
+   * Meta: OUTCOME_*; LinkedIn: LEAD_GENERATION enz.
+   *
+   * WORDT NOG NIET GEBRUIKT door classifyFunnelRole. Het veld staat hier omdat het de bedoeling
+   * was, maar er is geen tak die het leest — en dat is een bewuste stand van zaken, geen
+   * omissie die je even wegwerkt. Een objective zegt wat je wilt bereiken, niet wie je
+   * aanspreekt: OUTCOME_SALES kan net zo goed prospecting als retargeting zijn. De funnelrol
+   * volgt eerlijker uit de doelgroep (audienceKind), en die zit voor LinkedIn in
+   * targeting_summary en voor Meta in de adsets. Zolang die afleiding er niet is, komen
+   * Meta- en LinkedIn-campagnes als "onbekend" uit de classificatie — zichtbaar in
+   * unknownCount, niet stilzwijgend.
+   */
+  objective?: string | null;
   audienceKind?: AudienceKind | null; // Meta en LinkedIn: het doelgroeptype
 }
 
@@ -67,7 +79,17 @@ export function classifyFunnelRole(campaign: CampaignFunnelInput): ClassifiedCam
     }
   }
 
-  return { ...base, role: "onbekend", basis: "geen herkend objective, doelgroeptype of campagnetype" };
+  // De reden noemt alleen wat er werkelijk is bekeken. Hier stond "geen herkend objective,
+  // doelgroeptype of campagnetype", en dat suggereerde dat het objective was gewogen en
+  // afgewezen. Bij een Meta-campagne met OUTCOME_LEADS stond dat er dus, terwijl er nooit naar
+  // is gekeken — een uitspraak die klinkt als een bevinding maar een gat is.
+  return campaign.objective
+    ? {
+        ...base,
+        role: "onbekend",
+        basis: `alleen een objective bekend (${campaign.objective}); de funnelrol volgt uit de doelgroep en die is hier niet beschikbaar`,
+      }
+    : { ...base, role: "onbekend", basis: "geen doelgroeptype of campagnetype bekend" };
 }
 
 export interface FunnelGapFlag {

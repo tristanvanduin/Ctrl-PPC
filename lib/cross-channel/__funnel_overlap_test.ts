@@ -21,7 +21,12 @@ assert(classifyFunnelRole(camp({ channel: "meta_ads", campaignId: "p2", audience
 assert(classifyFunnelRole(camp({ channel: "google_ads", campaignId: "d", campaignType: "DEMAND_GEN" })).role === "prospecting", "DEMAND_GEN is vraag-genererend");
 assert(classifyFunnelRole(camp({ channel: "google_ads", campaignId: "s", campaignType: "SEARCH" })).role === "prospecting", "SEARCH zonder branded-vlag vangt actieve vraag");
 const onbekend = classifyFunnelRole(camp({ channel: "linkedin_ads", campaignId: "x", objective: "IETS_NIEUWS" }));
-assert(onbekend.role === "onbekend" && onbekend.basis.includes("geen herkend"), "een niet-herkende waarde degradeert naar onbekend met uitleg");
+// De assertie luidde eerder basis.includes("geen herkend"). Die formulering suggereerde dat het
+// objective was gewogen en afgewezen, terwijl classifyFunnelRole er nooit naar kijkt. De
+// bedoeling van deze test — onbekend, mét uitleg — blijft; alleen de misleidende bewoording gaat
+// eruit. Zie de sectie onderaan voor het volledige gedrag.
+assert(onbekend.role === "onbekend" && onbekend.basis.length > 0, "een niet-herkende waarde degradeert naar onbekend met uitleg");
+assert(onbekend.basis.includes("IETS_NIEUWS"), "en de uitleg noemt wat er wel bekend was");
 
 // ── Dubbele warme pool: twee kanalen retargeten ──
 const dubbel = analyzeFunnelOverlap([
@@ -67,6 +72,40 @@ const veelOnbekend = analyzeFunnelOverlap([
 ]);
 assert(veelOnbekend.unknownCount === 2, "onbekende campagnes worden geteld");
 assert(veelOnbekend.flags.length === 0, "alleen onbekenden geven geen flags (geen plafond-oordeel zonder geclassificeerd bewijs)");
+
+// ── Het objective wordt niet gewogen, en de reden zegt dat ────────────────
+//
+// classifyFunnelRole leest campaign.objective nergens. Dat is een bewuste stand van zaken: een
+// objective zegt wat je wilt bereiken, niet wie je aanspreekt, dus OUTCOME_SALES kan net zo goed
+// prospecting als retargeting zijn. De rol volgt uit de doelgroep.
+//
+// De terugvalreden zei echter "geen herkend objective", en dat suggereerde dat het objective was
+// gewogen en afgewezen. Bij een Meta-campagne met OUTCOME_LEADS stond dat er dus, terwijl er
+// nooit naar gekeken is. Deze tests leggen het werkelijke gedrag vast, inclusief de beperking.
+
+console.log("\nde reden bij een onbekende rol");
+{
+  const meta = classifyFunnelRole({
+    channel: "meta_ads", campaignId: "m1", campaignName: "Leads NL", objective: "OUTCOME_LEADS",
+  });
+  assert(meta.role === "onbekend", "een Meta-campagne met alleen een objective blijft onbekend");
+  assert(!/geen herkend objective/.test(meta.basis),
+    "de reden claimt niet dat het objective is gewogen");
+  assert(meta.basis.includes("OUTCOME_LEADS"),
+    "de reden noemt wat er wel bekend was, zodat de lezer ziet waar het op vastloopt");
+  assert(/doelgroep/.test(meta.basis), "en waarom dat niet genoeg is");
+
+  const leeg = classifyFunnelRole({ channel: "google_ads", campaignId: "g9", campaignName: "Naamloos" });
+  assert(leeg.role === "onbekend", "zonder enig signaal ook onbekend");
+  assert(!/objective/.test(leeg.basis), "en dan wordt er geen objective genoemd dat er niet was");
+
+  // De doelgroep wint wel, ook als er een objective naast staat: dat is de volgorde die klopt.
+  const metDoelgroep = classifyFunnelRole({
+    channel: "meta_ads", campaignId: "m2", campaignName: "Retargeting",
+    objective: "OUTCOME_AWARENESS", audienceKind: "custom_warm",
+  });
+  assert(metDoelgroep.role === "retargeting", "de doelgroep bepaalt de rol, niet het objective");
+}
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);
