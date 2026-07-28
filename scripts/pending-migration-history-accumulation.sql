@@ -15,6 +15,11 @@
 -- het venster loopt is definitief weg. Elke sync die ads_search_terms_wasteful leeggooit, gooit
 -- historie weg die niet meer op te halen is.
 --
+-- Niet alles hoeft echter eeuwig te blijven. Zoekwoorden, campagnes, advertentiegroepen en
+-- advertenties zijn begrensde verzamelingen en groeien onbeperkt door; zoektermen zijn open-eind
+-- en hebben een bewaarbeleid nodig. Dat staat in scripts/search-term-retention.sql en raakt
+-- uitsluitend de twee zoektermtabellen.
+--
 -- NULLS NOT DISTINCT is nodig omdat campaign_id, geo_target_id en soortgelijke kolommen leeg
 -- mogen zijn. Standaard beschouwt Postgres twee NULL's als verschillend, waardoor er alsnog
 -- dubbele rijen zouden ontstaan en de upsert niets zou ontdubbelen. Vereist Postgres 15+.
