@@ -706,9 +706,35 @@ export function applyProductContextDecisioning<T extends VerdictWithData>(
     }
 
     if (assessment.exclusionSafety === "safe_to_exclude") {
+      // Conversies winnen van het catalogusoordeel.
+      //
+      // Deze module draait NA applySearchTermGuardrails, en die zet een converterende term
+      // onvoorwaardelijk op "keep" — de meest fundamentele bescherming die er is. Deze tak
+      // overschreef dat: een zoekterm met 6 conversies en 1200 euro conversiewaarde kwam er als
+      // negative_exact met direct_action uit, verdict "irrelevant", zonder dat er ergens stond
+      // dat hij converteerde. De beoordeling hierboven kent conversies niet eens; het aantal
+      // wordt wel meegegeven maar nergens gelezen.
+      //
+      // Dat een converterende term buiten de catalogus valt is op zichzelf interessant — het kan
+      // wijzen op verkeerde conversietoekenning of op een product dat wel degelijk verkocht
+      // wordt. Maar dat is iets om uit te zoeken, niet om automatisch uit te sluiten.
+      if (verdict.conversions > 0) {
+        verdict.actionReadiness = "investigate_first";
+        verdict.requiresHumanReview = true;
+        verdict.reason = `${assessment.reasoningLabel} Term valt buiten de catalogus maar leverde ${verdict.conversions} conversie(s) op — eerst uitzoeken hoe dat kan, niet uitsluiten.`;
+        continue;
+      }
+
       if (verdict.recommendedAction === "keep") verdict.recommendedAction = "negative_exact";
       verdict.verdict = "irrelevant";
-      verdict.actionReadiness = verdict.recommendedAction === "negative_exact" ? "direct_action" : "investigate_first";
+      // Een uitsluiting die om een mens vraagt is niet direct uitvoerbaar. Zonder deze twee
+      // voorwaarden kwam een concurrentterm die de vangrails expliciet hadden gemarkeerd er als
+      // direct_action uit, met requiresHumanReview true ernaast: twee velden in dezelfde rij die
+      // elkaar tegenspreken, waarbij de automatisering naar het gevaarlijke veld kijkt.
+      verdict.actionReadiness =
+        verdict.recommendedAction === "negative_exact" && !verdict.requiresHumanReview && !verdict.riskFlag
+          ? "direct_action"
+          : "investigate_first";
       verdict.reason = `${assessment.reasoningLabel} Uitsluiting is veilig op ${assessment.recommendedScope}-niveau.`;
     }
   }

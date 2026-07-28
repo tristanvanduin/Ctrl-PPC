@@ -10,47 +10,102 @@
 
 import type { Finding, Recommendation } from "../schema/analysis-schema";
 
+/** Leest de huidige readiness. Elke regel leest opnieuw; zie de opmerking in applyActionGating. */
+function readinessOf(rec: Recommendation): string | undefined {
+  return (rec as Record<string, unknown>).action_readiness as string | undefined;
+}
+
+function setReadiness(rec: Recommendation, waarde: string): void {
+  (rec as Record<string, unknown>).action_readiness = waarde;
+}
+
+/**
+ * Metrieken waarvan de waarde een bedrag in euro's is.
+ *
+ * De kleine-signalen-drempel hieronder is bedoeld als "er staat te weinig geld op het spel om
+ * dit automatisch te doen". Die vraag heeft alleen betekenis bij een bedrag. Zonder deze
+ * controle werd `current_value` van elke metriek als euro's gelezen, en dan is een ROAS van 4,2
+ * of een CTR van 0,05 altijd "minder dan 50 euro".
+ */
+const BEDRAG_METRIEKEN = /^(cost|spend|kosten|budget|uitgaven|revenue|omzet|conversions?_value|conversiewaarde|waarde)$/i;
+
+/**
+ * Ontbreekt de metriek, dan is niet vast te stellen of het om een bedrag gaat en grijpt de
+ * drempel niet in. Het schema vereist het veld wel, maar deze objecten komen uit LLM-uitvoer via
+ * een herstelpad, dus hier niet op vertrouwen.
+ */
+function isBedrag(metric: string | null | undefined): boolean {
+  return typeof metric === "string" && BEDRAG_METRIEKEN.test(metric.trim());
+}
+
+/** Onder dit bedrag is de inzet te klein om zonder mens op te handelen. */
+const KLEIN_BEDRAG_EUR = 50;
+
 /**
  * Apply action gating rules to recommendations based on their linked findings.
  * Mutates the recommendations in-place and returns them.
+ *
+ * Let op: elke regel leest `action_readiness` opnieuw. Eerder werd hij één keer bovenaan
+ * uitgelezen, waarna de regels daaronder hun beslissing namen op een waarde die inmiddels
+ * achterhaald was — regel 1 waardeerde af naar investigate_first en regel 2 en 3 dachten nog
+ * steeds met een direct_action te maken te hebben.
  */
 export function applyActionGating(
   findings: Finding[],
   recommendations: Recommendation[]
 ): Recommendation[] {
   for (const rec of recommendations) {
-    const readiness = (rec as Record<string, unknown>).action_readiness as string | undefined;
     const evidenceLevel = (rec as Record<string, unknown>).evidence_level as string | undefined;
     const confidence = (rec as Record<string, unknown>).confidence as string | undefined;
 
     // Rule 1: direct_action requires deterministic + high confidence
-    if (readiness === "direct_action") {
+    if (readinessOf(rec) === "direct_action") {
       if (evidenceLevel !== "deterministic" || confidence !== "high") {
-        (rec as Record<string, unknown>).action_readiness = "investigate_first";
+        setReadiness(rec, "investigate_first");
       }
     }
 
     // Rule 2: Check linked finding for small signals
-    if (rec.finding_index !== null && rec.finding_index !== undefined) {
-      const finding = findings[rec.finding_index];
-      if (finding) {
-        // Small waste: if change involves <€50, downgrade from direct_action
-        const absValue = Math.abs(finding.current_value ?? 0);
-        if (absValue < 50 && readiness === "direct_action" && finding.insight_type !== "anomaly") {
-          (rec as Record<string, unknown>).action_readiness = "monitor";
+    const index = rec.finding_index;
+    if (index !== null && index !== undefined) {
+      const finding = findings[index];
+      if (!finding) {
+        // De aanbeveling wijst naar een bevinding die niet bestaat. Dat is geen reden om de
+        // controles hieronder over te slaan — juist andersom: het bewijs waar deze aanbeveling
+        // op zegt te rusten is niet te vinden, dus hij mag niet zonder mens uitgevoerd worden.
+        // Eerder viel zo'n aanbeveling stil buiten regel 2 en behield hij direct_action.
+        if (readinessOf(rec) === "direct_action") setReadiness(rec, "investigate_first");
+      } else {
+        // Small waste: te weinig geld op het spel om automatisch op te handelen.
+        const bedrag = Math.abs(finding.current_value ?? 0);
+        if (
+          isBedrag(finding.metric) && bedrag < KLEIN_BEDRAG_EUR &&
+          readinessOf(rec) === "direct_action" && finding.insight_type !== "anomaly"
+        ) {
+          setReadiness(rec, "monitor");
         }
 
         // Low confidence finding → max investigate_first
         const findingConfidence = (finding as Record<string, unknown>).confidence as string | undefined;
-        if (findingConfidence === "low" && readiness === "direct_action") {
-          (rec as Record<string, unknown>).action_readiness = "investigate_first";
+        if (findingConfidence === "low" && readinessOf(rec) === "direct_action") {
+          setReadiness(rec, "investigate_first");
         }
       }
     }
 
-    // Rule 3: hypothesis source → always strategic_hypothesis
-    if (rec.source === "hypothesis" && readiness === "direct_action") {
-      (rec as Record<string, unknown>).action_readiness = "strategic_hypothesis";
+    // Rule 3: hypothesis source → always strategic_hypothesis.
+    //
+    // Onvoorwaardelijk, en dat is een wijziging. Eerder stond hier een controle op
+    // direct_action, die per ongeluk werkte omdat de readiness bovenaan was uitgelezen en dus
+    // nog de oorspronkelijke waarde had — ook nadat regel 1 al had afgewaardeerd. Zodra de
+    // regels de actuele stand lezen, viel een hypothese met zwak bewijs op investigate_first
+    // in plaats van in de hypothesebak.
+    //
+    // strategic_hypothesis is een categorie, geen sterktegraad: een aanbeveling uit een
+    // hypothese hoort in het sprint- en experimentenspoor, ongeacht hoe stevig het bewijs is.
+    // Zwak bewijs is juist de normale toestand van een hypothese.
+    if (rec.source === "hypothesis") {
+      setReadiness(rec, "strategic_hypothesis");
     }
   }
 
@@ -59,9 +114,14 @@ export function applyActionGating(
   for (let i = 0; i < recommendations.length; i++) {
     const rec = recommendations[i];
     // Group by affected entity (from hypothesis text or finding entity)
-    const entityKey = rec.finding_index !== null && findings[rec.finding_index]
+    // Zonder bevinding is de hele hypothesetekst de sleutel, niet de eerste 30 tekens.
+    // "Verhoog het budget van campagne Brand NL" en "Verhoog het budget van campagne Generic BE"
+    // kappen allebei af op "Verhoog het budget van campagn" en werden zo als dezelfde entiteit
+    // behandeld. Twee losse campagnes konden elkaars aanbeveling dan afwaarderen op een
+    // tegenstrijdigheid die er niet was.
+    const entityKey = rec.finding_index !== null && rec.finding_index !== undefined && findings[rec.finding_index]
       ? findings[rec.finding_index].entity_name
-      : rec.hypothesis.slice(0, 30);
+      : rec.hypothesis;
 
     if (!entityActions.has(entityKey)) entityActions.set(entityKey, []);
     entityActions.get(entityKey)!.push({ rec, index: i });

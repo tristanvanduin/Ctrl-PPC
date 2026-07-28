@@ -27,6 +27,7 @@ import { extractGroundedNumbers, gateItemFields } from "./weekly-number-gate";
 import type { DataReliabilityAssessment } from "./data-reliability";
 import type { DroppedItems } from "@/lib/schema/analysis-schema";
 import { logger } from "@/lib/logger";
+import { toPromptTable } from "./prompt-table";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -126,8 +127,15 @@ ${analysisOutput}`;
     stepNumber: stepOffset + 2,
     stepName: "Aanbevelingen & Taken",
     systemPrompt: recsSystemPrompt,
-    userMessage: `## Bevindingen (findings JSON)
-${JSON.stringify(findings, null, 2)}
+    // De index staat als eigen kolom in de tabel. In de JSON-versie moest het model de positie
+    // in de array tellen om `finding_index` in te vullen, terwijl de prompt nergens uitlegt dat
+    // die twee met elkaar te maken hebben. Een index buiten bereik leverde stil `insight_id:
+    // null` op — de aanbeveling belandde dan zonder de bevinding waar hij uit voortkomt in de
+    // database. Aflezen is minder foutgevoelig dan tellen.
+    userMessage: `## Bevindingen
+Gebruik de kolom finding_index als waarde voor "finding_index" in je uitvoer.
+
+${toPromptTable(findings.map((f, i) => ({ finding_index: i, ...f })))}
 
 ## Volledige analyse tekst
 ${analysisOutput}`,
