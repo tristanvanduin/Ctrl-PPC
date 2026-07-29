@@ -9,6 +9,7 @@ import { SignalAnalysisCard } from "./signal-analysis-card";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { maandLabel } from "./chart-chrome";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
+import { formatRoas } from "@/lib/forecast-format";
 
 // Fase 1c: account-brede kaarten kunnen niet per geo-clone gesplitst worden (de account-tabel
 // draagt geen campagnenaam). Daarom her-aggregeren we de KPI's PER geo-clone uit
@@ -108,7 +109,7 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
               <Kpi label="Conversies" value={fmt(summary.totals.conversions, { maximumFractionDigits: 1 })} />
               <Kpi label="Conv.waarde" value={fmtEur(summary.totals.conversionsValue)} />
               <Kpi label="CPA" value={fmtEur(summary.totals.cpa)} />
-              <Kpi label="ROAS" value={summary.totals.roas === null ? "—" : `${summary.totals.roas.toFixed(2)}×`} />
+              <Kpi label="ROAS" value={summary.totals.roas === null ? "—" : formatRoas(summary.totals.roas)} />
               <Kpi label="CTR" value={fmtPct(summary.totals.ctr)} />
             </div>
 
@@ -162,7 +163,7 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
                         <GetalCel>{fmt(m.conversions, { maximumFractionDigits: 1 })}</GetalCel>
                         <GetalCel>{fmtEur(m.conversionsValue)}</GetalCel>
                         <GetalCel zacht>{fmtEur(m.cpa)}</GetalCel>
-                        <GetalCel zacht>{m.roas === null ? "—" : `${m.roas.toFixed(2)}×`}</GetalCel>
+                        <GetalCel zacht>{m.roas === null ? "—" : formatRoas(m.roas)}</GetalCel>
                         <GetalCel zacht>{fmtPct(m.ctr)}</GetalCel>
                       </Rij>
                     ))}
@@ -177,7 +178,7 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
                     <TotaalCel getal>{fmt(zichtbaar.conversions, { maximumFractionDigits: 1 })}</TotaalCel>
                     <TotaalCel getal>{fmtEur(zichtbaar.conversionsValue)}</TotaalCel>
                     <TotaalCel getal>{fmtEur(zichtbaar.conversions > 0 ? zichtbaar.cost / zichtbaar.conversions : null)}</TotaalCel>
-                    <TotaalCel getal>{zichtbaar.cost > 0 ? `${(zichtbaar.conversionsValue / zichtbaar.cost).toFixed(2)}×` : "—"}</TotaalCel>
+                    <TotaalCel getal>{zichtbaar.cost > 0 ? formatRoas(zichtbaar.conversionsValue / zichtbaar.cost) : "—"}</TotaalCel>
                     <TotaalCel getal>{fmtPct(zichtbaar.impressions > 0 ? zichtbaar.clicks / zichtbaar.impressions : null)}</TotaalCel>
                   </TotaalRij>
                 </Tabel>

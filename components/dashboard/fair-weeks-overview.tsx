@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, CheckCircle2, Clock, ArrowRight, CalendarCloc
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, type ForecastMetric } from "@/lib/forecast";
-import { METRIC_LABELS, formatterFor, isLowerBetter } from "@/lib/forecast-format";
+import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 import { toFairWeeks, currentWeekIndex, type FairWeek, type UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { today } from "@/lib/reporting-date";
 
@@ -75,7 +75,7 @@ function WeekCard({
             ? <TrendingUp className="w-3.5 h-3.5 text-green-600" />
             : <TrendingDown className="w-3.5 h-3.5 text-red-500" />}
           <span className={`text-xs font-bold ${diffColor}`}>
-            {diff > 0 ? "+" : ""}{diff.toFixed(1)}%
+            {formatDeltaPercent(diff)}
           </span>
         </div>
       </div>
@@ -96,7 +96,7 @@ function WeekCard({
       <div className="mt-3">
         <div className="flex justify-between text-micro mb-1">
           <span className="text-muted-foreground">Ratio</span>
-          <span className={`font-semibold ${diffColor}`}>{(ratio * 100).toFixed(1)}%</span>
+          <span className={`font-semibold ${diffColor}`}>{formatPercent(ratio, 1)}</span>
         </div>
         <div className="h-1.5 bg-white/80 rounded-full overflow-hidden">
           <div
@@ -231,7 +231,7 @@ export function FairWeeksOverview({
                       <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(ratio * 100, 120)}%` }} />
                     </div>
                   </div>
-                  <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>{(ratio * 100).toFixed(0)}%</p>
+                  <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>{formatPercent(ratio, 0)}</p>
                 </div>
               );
             })}

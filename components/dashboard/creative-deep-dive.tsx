@@ -14,6 +14,22 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 
 type ChannelKind = "google" | "meta" | "linkedin";
 
+/**
+ * Onder het kanaalfilter "Alle" staan drie exemplaren van dit blok onder elkaar — Google, Meta,
+ * LinkedIn. Ze droegen alle drie dezelfde kop en dezelfde ondertitel, dus stonden er drie
+ * identiek ogende kaarten met verschillende cijfers en niets dat zei welke welke was. Het
+ * component weet zijn kanaal; het hoorde het alleen niet te verzwijgen.
+ */
+const KANAAL_LABEL: Record<ChannelKind, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn" };
+
+function KanaalMerk({ channel }: { channel: ChannelKind }) {
+  return (
+    <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+      {KANAAL_LABEL[channel]}
+    </span>
+  );
+}
+
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : 0));
 const pct = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 2 }).format(v));
 const fmt = (v: number): string => new Intl.NumberFormat("nl-NL").format(v);
@@ -141,6 +157,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
           <TrendingDown className="w-4 h-4 text-rm-blue" />
           <h3 className="text-sm font-semibold text-rm-gray">Creative-vermoeidheid</h3>
+          <KanaalMerk channel={channel} />
           <span className="text-micro text-muted-foreground">CTR-traject per creative over de maanden</span>
         </div>
         {fatigue.length === 0 ? (
@@ -174,6 +191,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             <Layers className="w-4 h-4 text-rm-blue" />
             <h3 className="text-sm font-semibold text-rm-gray">Asset-uitsplitsing (RSA)</h3>
+            <KanaalMerk channel={channel} />
             <span className="text-micro text-muted-foreground">welke headlines/descriptions het gewicht trekken</span>
           </div>
           <div className="px-5 py-3 space-y-3">

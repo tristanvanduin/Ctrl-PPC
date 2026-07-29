@@ -27,6 +27,11 @@ const GEDEELD = {
   median: "lib/util/stats.ts",
   medianAbsoluteDeviation: "lib/util/stats.ts",
   safeDiv: "lib/util/math.ts",
+  // ROAS werd op acht plekken los opgemaakt, in drie schrijfwijzen: "1.56", "1.56x" en "1,52×".
+  // De eerste twee zijn in het Nederlands fout — de punt is hier het duizendtalteken — en in de
+  // kaartenrij bovenaan stond "ROAS 1.56" naast "€ 91.890", waar diezelfde punt het andere
+  // betekende. Eén huis, zodat de volgende plek hem niet opnieuw verzint.
+  formatRoas: "lib/forecast-format.ts",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import type { ClientHistoricalData } from "@/lib/types";
 import { usePeriod } from "@/lib/period/period-context";
 import { comparePeriods, type PeriodDelta } from "@/lib/period/apply-period";
 import { formatRange, formatMonth } from "@/lib/period/period-range";
+import { formatDeltaPercent, formatRoas } from "@/lib/forecast-format";
 
 function euro(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -40,7 +41,7 @@ function Delta({ d, hogerIsBeter = true }: { d: PeriodDelta; hogerIsBeter?: bool
   return (
     <span className={`flex items-center gap-1 text-micro ${kleur}`}>
       <Icoon className="h-3 w-3" />
-      {d.pct > 0 ? "+" : ""}{d.pct.toFixed(1)}%
+      {formatDeltaPercent(d.pct)}
     </span>
   );
 }
@@ -91,7 +92,7 @@ export function PeriodSummary({ data, compact }: Props) {
         ))}
         <div>
           <p className="text-micro text-muted-foreground">ROAS</p>
-          <p className="text-lg font-semibold text-rm-gray">{roas === null ? "—" : roas.toFixed(2)}</p>
+          <p className="text-lg font-semibold text-rm-gray">{roas === null ? "—" : formatRoas(roas)}</p>
         </div>
         <div>
           <p className="text-micro text-muted-foreground">CPA</p>

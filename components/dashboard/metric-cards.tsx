@@ -5,7 +5,7 @@ import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
-import { formatCurrency, formatNumber } from "@/lib/forecast-format";
+import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas } from "@/lib/forecast-format";
 
 interface KpiCardProps {
   label: string;
@@ -73,7 +73,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
         <div className="flex justify-between text-micro mb-1.5">
           <span className="text-muted-foreground">{Math.round(realizedPct)}% gerealiseerd</span>
           <span className={`font-bold ${statusColor}`}>
-            {diffPct > 0 ? "+" : ""}{diffPct.toFixed(1)}%
+            {formatDeltaPercent(diffPct)}
           </span>
         </div>
         <div className="h-2 bg-gray-100 rounded-full overflow-hidden relative">
@@ -151,7 +151,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
         adjusted={forecast.roas.kpi.adjustedAnnual}
         realized={forecast.roas.kpi.ytdRealized}
         diffPct={forecast.roas.kpi.diffPct}
-        format={(v: number) => `${v.toFixed(2)}x`}
+        format={formatRoas}
         subtitle="Return on ad spend"
       />
       <KpiCard
@@ -161,8 +161,10 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
         adjusted={forecastedCpa}
         realized={ytdCpa}
         diffPct={cpaDiffPct}
-        format={(v: number) => `€${v.toFixed(2)}`}
-        subtitle="Cost per acquisition"
+        // Was `€${v.toFixed(2)}`: "€76.00", zonder spatie en met een punt, terwijl de kaart
+        // ernaast "€ 143.520" schrijft. Dezelfde grootheid hoort er hetzelfde uit te zien.
+        format={formatCurrency}
+        subtitle="Kosten per conversie"
       />
     </div>
   );

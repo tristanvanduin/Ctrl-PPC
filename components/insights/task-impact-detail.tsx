@@ -2,6 +2,7 @@
 
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { KpiSnapshot } from "@/lib/supabase";
+import { formatDeltaPercent, formatRoas } from "@/lib/forecast-format";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -32,8 +33,8 @@ function computeDeltas(before: KpiSnapshot, after: KpiSnapshot): MetricDelta[] {
     },
     {
       label: "ROAS",
-      before: `${before.roas.toFixed(2)}x`,
-      after: `${after.roas.toFixed(2)}x`,
+      before: formatRoas(before.roas),
+      after: formatRoas(after.roas),
       deltaPct: delta(before.roas, after.roas),
     },
     {
@@ -87,7 +88,7 @@ export function TaskImpactDetail({
               <span className={`text-meta font-bold ${
                 isNeutral ? "text-gray-400" : isPositive ? "text-green-600" : "text-red-500"
               }`}>
-                {d.deltaPct > 0 ? "+" : ""}{d.deltaPct.toFixed(1)}%
+                {formatDeltaPercent(d.deltaPct)}
               </span>
             </div>
             <p className="text-micro text-muted-foreground mt-0.5">

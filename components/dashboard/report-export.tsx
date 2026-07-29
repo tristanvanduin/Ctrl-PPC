@@ -8,6 +8,7 @@ import { computeForecast, MONTH_LABELS } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { getAllClients } from "@/lib/clients";
 import { fixMojibake } from "@/lib/analysis/sanitize";
+import { formatRoas } from "@/lib/forecast-format";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -60,7 +61,7 @@ export function ReportExport({ clientId }: { clientId: string }) {
     lines.push("|-----|-----------------|----------|-------------|----------|");
     lines.push(`| Conversies | ${num(conv.ytdRealized)} | ${num(conv.annualTarget)} | ${num(conv.adjustedAnnual)} | ${pct(conv.diffPct)} |`);
     lines.push(`| Omzet | ${fmt(rev.ytdRealized)} | ${fmt(rev.annualTarget)} | ${fmt(rev.adjustedAnnual)} | ${pct(rev.diffPct)} |`);
-    lines.push(`| ROAS | ${roas.ytdRealized.toFixed(2)}x | ${roas.annualTarget.toFixed(2)}x | ${roas.adjustedAnnual.toFixed(2)}x | ${pct(roas.diffPct)} |`);
+    lines.push(`| ROAS | ${formatRoas(roas.ytdRealized)} | ${formatRoas(roas.annualTarget)} | ${formatRoas(roas.adjustedAnnual)} | ${pct(roas.diffPct)} |`);
     lines.push(`| CPA | ${fmt(cpa.ytdRealized)} | ${fmt(cpa.annualTarget)} | ${fmt(cpa.adjustedAnnual)} | ${pct(cpa.diffPct)} |`);
     lines.push("");
 

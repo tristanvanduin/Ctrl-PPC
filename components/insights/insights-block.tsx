@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import type { ImpressionShareData, AccountStructureData, WastefulSearchTermData, AdGroupBleederData, ChangeHistoryData } from "@/lib/use-client-data";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
+import { formatRoas } from "@/lib/forecast-format";
 
 type InsightType = "critical" | "warning" | "positive" | "info";
 
@@ -263,7 +264,7 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
     insights.push({
       type: "critical",
       level: "KPI",
-      text: `ROAS prognose (${roasKpi.adjustedAnnual.toFixed(2)}x) ligt ${Math.round(Math.abs(roasDiff))}% onder target (${roasKpi.annualTarget.toFixed(2)}x). Check of dit door lagere conversiewaarde (AOV daling?) of hogere spend per conversie komt. Evalueer welke campagnes de meeste spend verbruiken met laagste ROAS.`,
+      text: `ROAS prognose (${formatRoas(roasKpi.adjustedAnnual)}) ligt ${Math.round(Math.abs(roasDiff))}% onder target (${formatRoas(roasKpi.annualTarget)}). Check of dit door lagere conversiewaarde (AOV daling?) of hogere spend per conversie komt. Evalueer welke campagnes de meeste spend verbruiken met laagste ROAS.`,
     });
   }
 

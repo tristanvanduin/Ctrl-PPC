@@ -6,7 +6,7 @@ import { REALIZED_THROUGH_MONTH } from "@/lib/types";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, ForecastMetric, ForecastPoint } from "@/lib/forecast";
-import { METRIC_LABELS, formatterFor, isLowerBetter } from "@/lib/forecast-format";
+import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 
 function MonthCard({
   pt,
@@ -81,7 +81,7 @@ function MonthCard({
             : <TrendingDown className="w-3.5 h-3.5 text-red-500" />
           }
           <span className={`text-xs font-bold ${diffColor}`}>
-            {diff > 0 ? "+" : ""}{diff.toFixed(1)}%
+            {formatDeltaPercent(diff)}
           </span>
         </div>
       </div>
@@ -122,7 +122,7 @@ function MonthCard({
         <div className="flex justify-between text-micro mb-1">
           <span className="text-muted-foreground">Ratio</span>
           <span className={`font-semibold ${diffColor}`}>
-            {(ratio * 100).toFixed(1)}%
+            {formatPercent(ratio, 1)}
           </span>
         </div>
         <div className="h-1.5 bg-white/80 rounded-full overflow-hidden">
@@ -293,7 +293,7 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
                     </div>
                   </div>
                   <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>
-                    {(ratio * 100).toFixed(0)}%
+                    {formatPercent(ratio, 0)}
                   </p>
                 </div>
               );

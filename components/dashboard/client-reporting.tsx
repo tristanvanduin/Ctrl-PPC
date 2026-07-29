@@ -12,6 +12,7 @@ import { getAllClients } from "@/lib/clients";
 import { useGenerationProgress } from "@/lib/use-generation-progress";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
 import { Raster, AsX, AsY, Tip, BALK_RADIUS } from "./chart-chrome";
+import { formatPercent } from "@/lib/forecast-format";
 
 // ── Types (matching API output) ────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }>
 
 function fmtValue(v: number, format: string): string {
   if (format === "currency") return `€${new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v)}`;
-  if (format === "percent") return `${v.toFixed(1)}%`;
+  if (format === "percent") return formatPercent(v / 100, 1);
   if (format === "decimal") return v.toFixed(2);
   return new Intl.NumberFormat("nl-NL").format(Math.round(v));
 }

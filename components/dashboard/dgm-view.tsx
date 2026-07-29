@@ -15,6 +15,7 @@ import { getClientSettings } from "@/lib/client-settings";
 import { supabase } from "@/lib/supabase";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "@/lib/use-client-data";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
+import { formatRoas } from "@/lib/forecast-format";
 
 // ─── Account type vocabulary ─────────────────────────────────────────
 
@@ -97,15 +98,6 @@ function num(v: number, decimals = 0): string {
 
 function pct(v: number): string {
   return `${v > 0 ? "+" : ""}${Math.round(v)}%`;
-}
-
-/**
- * ROAS met zijn teken erbij. Zonder dat stond er kaal "2" met "Doel: 4" tussen "€ 77.160" en
- * "€ 76" in — en dan is niet te zien of dat twee euro, twee procent of twee keer is. Het maal-teken
- * kost één karakter en haalt de vraag weg; de rest van het dashboard schrijft ROAS ook zo.
- */
-function ratio(v: number): string {
-  return `${num(v, 2)}×`;
 }
 
 function dateLabel(): string {
@@ -718,7 +710,7 @@ function KpiCard({
    */
   lagerIsBeter?: boolean;
 }) {
-  const fmtVal = format === "currency" ? fmt : format === "ratio" ? ratio : num;
+  const fmtVal = format === "currency" ? fmt : format === "ratio" ? formatRoas : num;
   // Draai het teken om als lager beter is; daarna gelden dezelfde drempels voor alle metrics.
   const scoreDiff = lagerIsBeter ? -diffPct : diffPct;
   const isGood = scoreDiff >= -3;

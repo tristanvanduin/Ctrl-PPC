@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, MONTH_LABELS, type ForecastMetric } from "@/lib/forecast";
 import { supabase } from "@/lib/supabase";
-import { METRIC_LABELS, formatterFor } from "@/lib/forecast-format";
+import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor } from "@/lib/forecast-format";
 
 const METRICS: { id: ForecastMetric; label: string; format: (v: number) => string }[] =
   (["conversions", "revenue", "roas", "cpa"] as ForecastMetric[])
@@ -120,7 +120,7 @@ export function ForecastTable({ clientId }: { clientId: string }) {
                     {pt.forecast !== null ? fmt(pt.forecast) : "—"}
                   </td>
                   <td className={`px-5 py-2.5 text-right font-bold ${isPositive ? "text-green-600" : "text-red-500"}`}>
-                    {(ratio * 100).toFixed(0)}%
+                    {formatPercent(ratio, 0)}
                   </td>
                 </tr>
               );
@@ -141,7 +141,7 @@ export function ForecastTable({ clientId }: { clientId: string }) {
               <td className={`px-5 py-3 text-right font-bold ${
                 (isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"
               }`}>
-                {totalDiffPct > 0 ? "+" : ""}{totalDiffPct.toFixed(0)}%
+                {formatDeltaPercent(totalDiffPct, 0)}
               </td>
             </tr>
             {/* Annual forecast summary row + onzekerheidsband */}

@@ -310,7 +310,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <BarChart3 className="w-5 h-5 text-rm-blue" />
-          <h2 className="text-base font-semibold text-rm-blue">KPI Doelstellingen</h2>
+          <h2 className="text-base font-semibold text-rm-blue">KPI-doelstellingen</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-5">
           Activeer de KPIs waar deze klant op stuurt. Vul alleen in wat relevant is.
@@ -343,11 +343,13 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
             icon={<TrendingUp className="w-4 h-4" />}
             config={kpiRoas}
             onChange={(c) => { setKpiRoas(c); setSaved(false); }}
-            suffix="x"
+            suffix="×"
             step={0.1}
-            format={(v) => `${v.toFixed(1)}x`}
-            placeholder="bijv. 5.0"
-            description="Minimale return on ad spend"
+            // Nederlandse notatie en het maal-teken, zoals de KPI-kaart op Doelen & voortgang en de
+            // beursoverzichten het ook schrijven. Er stond "4.0x" met een punt en een letter x.
+            format={(v) => `${new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)}×`}
+            placeholder="bijv. 5,0"
+            description="Minimaal rendement op advertentiebudget"
           />
           <KpiCard
             label="CPA"
@@ -356,9 +358,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
             onChange={(c) => { setKpiCpa(c); setSaved(false); }}
             prefix="€"
             step={0.5}
-            format={(v) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", minimumFractionDigits: 2 }).format(v)}
-            placeholder="bijv. 18.50"
-            description="Maximale cost per conversie"
+            format={(v) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v)}
+            placeholder="bijv. 18,50"
+            description="Maximale kosten per conversie"
           />
         </div>
       </div>
@@ -561,10 +563,12 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <AlertTriangle className="w-5 h-5 text-rm-orange" />
-          <h2 className="text-base font-semibold text-rm-orange">Conversie Overrides</h2>
+          <h2 className="text-base font-semibold text-rm-orange">Handmatige conversiecijfers</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-5">
-          Vul hier handmatig conversies in voor maanden met kapotte tracking. De forecast engine gebruikt deze waarden in plaats van de echte (0) data.
+          Voor maanden waarin de tracking stuk was. De prognose rekent dan met het getal dat je hier
+          invult in plaats van met de gemeten nul — een nul door kapotte meting is geen nul in de markt,
+          en zonder deze correctie trekt hij de hele jaarlijn omlaag.
         </p>
 
         <div className="space-y-2">

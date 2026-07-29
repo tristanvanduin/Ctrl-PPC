@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Calculator, ArrowRight, DollarSign, Target, AlertTriangle, Info } from "lucide-react";
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
+import { formatDeltaPercent, formatRoas } from "@/lib/forecast-format";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -186,9 +187,9 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
             />
             <ResultCard
               label="ROAS"
-              before={`${currentRoas.toFixed(2)}x`}
-              after={`${newRoas.toFixed(2)}x`}
-              diff={currentRoas > 0 ? `${((newRoas / currentRoas - 1) * 100).toFixed(1)}%` : "—"}
+              before={formatRoas(currentRoas)}
+              after={formatRoas(newRoas)}
+              diff={currentRoas > 0 ? formatDeltaPercent((newRoas / currentRoas - 1) * 100) : "—"}
               neutral={Math.abs(newRoas - currentRoas) < 0.05}
             />
           </div>
