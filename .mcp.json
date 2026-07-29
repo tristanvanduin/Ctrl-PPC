@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "nano-banana": {
+      "command": "node",
+      "args": ["scripts/nano-banana-mcp.mjs"],
+      "env": {}
+    }
+  }
+}

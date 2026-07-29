@@ -69,3 +69,24 @@ en de build per definitie niet zien:
 De poort draait in een seconde. Voeg je bewust een uitzondering toe, zet er dan de reden bij:
 een uitzondering zonder reden is over drie maanden niet meer van een vergissing te
 onderscheiden.
+
+# Afbeeldingen maken
+
+Vraagt iemand om een afbeelding, illustratie, mockup of visual, gebruik dan de MCP-tool
+`generate_image` (Nano Banana Pro, `gemini-3-pro-image`). Niet vragen welk model; dit is het model.
+
+De server staat in `scripts/nano-banana-mcp.mjs` en is via `.mcp.json` aan deze repo gekoppeld.
+Hij heeft geen afhankelijkheden en gebruikt de `GEMINI_API_KEY` die hier toch al ligt voor de
+analyses — dezelfde sleutel, geen tweede rekening.
+
+Waarvoor dit project het nodig heeft: de demo-creatives staan nu op `picsum.photos`-placeholders
+(`lib/demo/demo-rows.ts`), en de creative-briefings vragen om voorbeeldvisuals. Een placeholder
+laat niet zien wat het product doet.
+
+Twee dingen om te weten voordat je hem gebruikt:
+
+- **Beeldgeneratie kost geld per aanroep** en staat los van de tekstmodellen. Genereer niet
+  ongevraagd een reeks varianten; vraag het eerst.
+- **De sleutel van dit project had bij het bouwen geen quota voor de beeldmodellen** (429 op
+  `gemini-3-pro-image`, `gemini-3.1-flash-image` en `gemini-2.5-flash-image`). Krijg je die fout,
+  dan is er niets stuk aan de server: er moet facturering aan staan op het Google-project.
