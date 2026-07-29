@@ -17,9 +17,35 @@ import {
 import { useClientDataState } from "@/lib/client-data-provider";
 import { invalidateClientCache } from "@/lib/use-client-data";
 
+/**
+ * De acht kaarten in dit paneel, los aan te vragen.
+ *
+ * Dit paneel was één blok van acht kaarten achter elkaar, en de instellingenpagina zette daar
+ * nog drie losse panelen omheen. Zaken die bij elkaar horen stonden ver uit elkaar: de
+ * Google-conversie-acties in kaart twee, de Meta/LinkedIn-conversies in een apart component
+ * ná het hele paneel; het logo in kaart acht, de rest van de huisstijl in een eigen paneel
+ * daarna. Door de kaarten los opvraagbaar te maken kan de pagina ze op onderwerp groeperen,
+ * zonder dat dit component in achten geknipt hoeft te worden.
+ */
+export type SettingsKaart =
+  | "kpi"
+  | "conversies"
+  | "sector"
+  | "lag"
+  | "overrides"
+  | "landen"
+  | "merchant"
+  | "logo";
+
+export const ALLE_SETTINGS_KAARTEN: SettingsKaart[] = [
+  "kpi", "conversies", "sector", "lag", "overrides", "landen", "merchant", "logo",
+];
+
 interface Props {
   clientId: string;
   clientName: string;
+  /** Welke kaarten te tonen. Weglaten toont ze allemaal — het gedrag van vóór deze splitsing. */
+  kaarten?: SettingsKaart[];
 }
 
 type KpiPeriod = "year" | "month";
@@ -33,7 +59,10 @@ interface KpiConfig {
   growthPct: number;
 }
 
-export function ClientSettingsPanel({ clientId, clientName }: Props) {
+export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
+  const zichtbaar = kaarten ?? ALLE_SETTINGS_KAARTEN;
+  const toon = (k: SettingsKaart) => zichtbaar.includes(k);
+
   const [settings, setSettings] = useState<ClientSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [convSearch, setConvSearch] = useState("");
@@ -277,6 +306,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
   return (
     <div className="space-y-6">
       {/* ── KPI Doelstellingen (bovenaan: waar stuurt de klant op) ── */}
+      {toon("kpi") && (
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <BarChart3 className="w-5 h-5 text-rm-blue" />
@@ -332,8 +362,10 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           />
         </div>
       </div>
+      )}
 
       {/* ── Conversion Actions ── */}
+      {toon("conversies") && (
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
@@ -424,8 +456,10 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           ))}
         </div>
       </div>
+      )}
 
       {/* ── Sector & AOV ── */}
+      {toon("sector") && (
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Building2 className="w-5 h-5 text-rm-blue" />
@@ -496,8 +530,10 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           )}
         </div>
       </div>
+      )}
 
       {/* ── Conversielag ── */}
+      {toon("lag") && (
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Clock className="w-5 h-5 text-amber-500" />
@@ -518,8 +554,10 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           <span className="text-sm text-muted-foreground">dagen (standaard: 3)</span>
         </div>
       </div>
+      )}
 
       {/* ── Conversion Overrides ── */}
+      {toon("overrides") && (
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <AlertTriangle className="w-5 h-5 text-rm-orange" />
@@ -574,8 +612,10 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           </p>
         )}
       </div>
+      )}
 
       {/* ── Landen configuratie ── */}
+      {toon("landen") && (
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Globe className="w-5 h-5 text-rm-orange" />
@@ -636,8 +676,10 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           }
         </select>
       </div>
+      )}
 
       {/* ── Merchant Center ── */}
+      {toon("merchant") && (
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Globe className="w-5 h-5 text-rm-blue" />
@@ -695,8 +737,10 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── Client Logo ── */}
+      {toon("logo") && (
       <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <ImageIcon className="w-5 h-5 text-rm-blue" />
@@ -732,6 +776,7 @@ export function ClientSettingsPanel({ clientId, clientName }: Props) {
           )}
         </div>
       </div>
+      )}
 
       {/* Save / Reset */}
       <div className="flex items-center gap-3">

@@ -556,29 +556,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                   </details>
                 </>
               ) : (
-                <>
-                  {/* Beurzen & edities bovenaan: de cadans (jaarlijks/2-jaarlijks) en de
-                      editie-datums voeden de dagen-tot-beurs-inzichten en de beursanalyse. */}
-                  <EventSettings clientId={client.id} />
-                  <details open className="rounded-xl border border-border bg-white shadow-sm">
-                    <summary className="cursor-pointer px-6 py-4 text-sm font-semibold text-rm-blue">
-                      Klantinstellingen (KPI-doelen, conversie-acties, landen, Merchant, logo)
-                    </summary>
-                    <div className="px-2 pb-2">
-                      <ClientSettingsPanel clientId={client.id} clientName={client.name} />
-                    </div>
-                  </details>
-                  {/* Conversie-selectie voor Meta/LinkedIn: het equivalent van de Google-conversie-acties. */}
-                  <ChannelConversionSettings clientId={client.id} />
-                  <details className="rounded-xl border border-border bg-white shadow-sm">
-                    <summary className="cursor-pointer px-6 py-4 text-sm font-semibold text-rm-blue">
-                      Branding (merk-identiteit en live preview)
-                    </summary>
-                    <div className="px-2 pb-2">
-                      <BrandingView clientId={client.id} clientName={client.name} />
-                    </div>
-                  </details>
-                </>
+                <SettingsSections client={client} />
               )}
             </div>
           )}
@@ -588,6 +566,69 @@ export function ClientDashboard({ client }: { client: Client }) {
     </div>
     </BrandThemeProvider>
     </PeriodProvider>
+  );
+}
+
+// De instellingenpagina was een vlakke stapel van elf panelen in drie verschillende omhulsels:
+// twee kale componenten en twee <details>, met dingen die bij elkaar horen ver uit elkaar. De
+// Google-conversie-acties zaten in het klantpaneel, de Meta/LinkedIn-conversies in een los
+// component daarna; het logo in het klantpaneel, de rest van de huisstijl in een eigen paneel
+// daarna. Wie iets zocht moest weten waar het ooit was neergezet.
+//
+// Nu vier groepen op onderwerp, met één navigatie erboven. Elke groep past op één scherm, en
+// wat bij elkaar hoort staat bij elkaar — de conversie-instellingen van alle drie de kanalen
+// onder elkaar, merk en logo samen.
+const SETTINGS_GROEPEN = [
+  { id: "meten", label: "Doelen & meten", uitleg: "Waar stuurt deze klant op, en wat telt als conversie — per kanaal." },
+  { id: "merk", label: "Merk & uiterlijk", uitleg: "Huisstijl, kleuren en logo; wat je terugziet in het dashboard en de rapporten." },
+  { id: "beurzen", label: "Beurzen", uitleg: "Cadans en editie-datums. Voeden de weken-tot-beurs-weergave en de beursanalyse." },
+  { id: "account", label: "Account & markt", uitleg: "Sector en benchmarks, actieve landen, Merchant Center." },
+] as const;
+
+type SettingsGroep = (typeof SETTINGS_GROEPEN)[number]["id"];
+
+function SettingsSections({ client }: { client: Client }) {
+  const [groep, setGroep] = useState<SettingsGroep>("meten");
+  const actief = SETTINGS_GROEPEN.find((g) => g.id === groep)!;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
+        {SETTINGS_GROEPEN.map((g) => (
+          <button
+            key={g.id}
+            onClick={() => setGroep(g.id)}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              g.id === groep ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+            }`}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-meta text-muted-foreground">{actief.uitleg}</p>
+
+      {groep === "meten" && (
+        <div className="space-y-6">
+          <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["kpi", "conversies", "overrides", "lag"]} />
+          {/* Meta/LinkedIn direct onder de Google-conversie-acties: dezelfde vraag, ander kanaal. */}
+          <ChannelConversionSettings clientId={client.id} />
+        </div>
+      )}
+
+      {groep === "merk" && (
+        <div className="space-y-6">
+          <BrandingView clientId={client.id} clientName={client.name} />
+          <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["logo"]} />
+        </div>
+      )}
+
+      {groep === "beurzen" && <EventSettings clientId={client.id} />}
+
+      {groep === "account" && (
+        <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["sector", "landen", "merchant"]} />
+      )}
+    </div>
   );
 }
 
