@@ -1,7 +1,10 @@
 // Test voor de grafiek-chrome. Deterministisch, geen IO.
 // Draaien: npx tsx components/dashboard/__chart_chrome_test.ts
 
-import { asSchaal, asSchaalLijn, balkBreedte, kortGetal, kortEuro, maandLabel } from "./chart-chrome";
+import {
+  asSchaal, asSchaalLijn, balkBreedte, kortGetal, kortEuro, kortEuroLabel, maandLabel,
+  verloopId, plotBreedte, VAK_MAX,
+} from "./chart-chrome";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {
@@ -18,6 +21,17 @@ assert(kortEuro(20000) === "€ 20k", "de euro staat ervoor met een spatie");
 assert(kortGetal(5000) === "5k", "een ronde vijfduizend is 5k en niet 5,0k");
 assert(kortGetal(2_000_000) === "2M", "twee miljoen is 2M en niet 2,0M");
 assert(kortGetal(1500) === "1,5k", "een halve duizend blijft wél staan");
+// Een label boven een balk krijgt de breedte van die balk mee. Op een gewone spatie brak "€ 10k"
+// over twee regels — het teken bovenaan, het getal eronder, en bij de laatste balk viel het teken
+// weg. Een harde spatie geeft geen breekpunt.
+assert(kortEuroLabel(10000) === "€ 10k", "het balklabel houdt het bedrag op één regel");
+assert(!kortEuroLabel(10000).includes(" "), "in het balklabel staat geen gewone spatie");
+
+// ── Verloop-ids ──
+// Een SVG-id komt in een url()-verwijzing terecht; een spatie of accent breekt die stil.
+assert(verloopId("Google Ads", 0) === "balk-verloop-0-GoogleAds", "spaties vallen uit de id");
+assert(verloopId("Meta", 1) !== verloopId("Meta", 2), "dezelfde naam op een andere plek geeft een andere id");
+assert(/^[A-Za-z][\w-]*$/.test(verloopId("LinkedIn (b2b)", 3)), "de id blijft een geldige SVG-id");
 
 // ── Balkbreedte ──
 // De breedte volgt het aantal categorieën, maar altijd onder het plafond.
@@ -29,6 +43,19 @@ for (const n of [1, 2, 4, 6, 12, 40]) {
   const b = balkBreedte(n);
   assert(b <= 24, `${n} categorieën blijft onder het plafond van 24 (${b})`);
   assert(b >= 10, `${n} categorieën blijft dik genoeg om te zien (${b})`);
+}
+
+// ── De breedte van het vlak ──
+// Het vlak groeit met het aantal categorieën, zodat de balken niet als losse luciferhoutjes in een
+// leeg veld staan. Boven de kaartbreedte doet de begrenzing niets meer: dan wint de kaart.
+assert(plotBreedte(4) < plotBreedte(6), "meer categorieën geeft een breder vlak");
+assert(plotBreedte(12) > 1200, "bij twaalf categorieën is de grens hoger dan een kaart breed is");
+for (const n of [1, 4, 6, 12]) {
+  const perVak = (plotBreedte(n) - plotBreedte(0)) / n;
+  assert(perVak <= VAK_MAX, `${n} categorieën: hoogstens ${VAK_MAX} pixels per vak (${perVak})`);
+  // Een balk van 24 pixels in een vak van 130 is achttien procent inkt; onder dat vak zou de
+  // begrenzing zelf de leegte veroorzaken die hij moet oplossen.
+  assert(perVak >= balkBreedte(n) * 4, `${n} categorieën: het vak is ruimer dan de balk erin`);
 }
 
 // ── Maandlabels ──

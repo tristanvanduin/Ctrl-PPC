@@ -49,7 +49,9 @@ function kort(v: number, heel: boolean): string {
  * dat is wat een grafiek uit een spreadsheet laat lijken. Dezelfde kleur op een dunne mark leest
  * als data.
  *
- * De lucht die overblijft is dus het ontwerp, niet het probleem.
+ * De lucht die overblijft is dus het ontwerp, niet het probleem — maar wel begrensd. Vier balken
+ * van vierentwintig in een vlak van duizend pixels is negen procent inkt, en dat leest als leegte.
+ * Het antwoord daarop is niet een dikkere balk maar een smaller vlak: zie `plotBreedte`.
  */
 export function balkBreedte(aantalCategorieen: number): number {
   if (aantalCategorieen <= 4) return BALK_MAX;
@@ -59,6 +61,18 @@ export function balkBreedte(aantalCategorieen: number): number {
 
 export function kortEuro(v: number): string {
   return `€ ${kortGetal(v)}`;
+}
+
+/**
+ * Hetzelfde als kortEuro, maar met een harde spatie tussen het teken en het getal.
+ *
+ * Een label boven een balk krijgt van recharts de breedte van die balk mee, en bij een balk van
+ * vierentwintig pixels brak "€ 10k" op de spatie: het euroteken op de ene regel, "10k" op de
+ * volgende — en bij de laatste balk verdween het teken zelfs helemaal. Een harde spatie geeft geen
+ * breekpunt, dus blijft het bedrag één woord.
+ */
+export function kortEuroLabel(v: number): string {
+  return `€\u00A0${kortGetal(v)}`;
 }
 
 export function volledigEuro(v: number): string {
@@ -224,6 +238,16 @@ export const PLOT_MARGE = { top: 8, right: 16, left: 0, bottom: 4 } as const;
  */
 export const PLOT_MARGE_LABELS = { top: 20, right: 56, left: 0, bottom: 4 } as const;
 
+/**
+ * Dezelfde marge, met alleen boven ruimte: voor een plot waarin elke balk zijn waarde draagt.
+ *
+ * De y-as sluit strak op het maximum aan (zie `asSchaal`), dus de hoogste balk raakt de bovenrand
+ * van het vlak en zijn label zou er acht pixels bóven vallen — buiten de plot, tegen het kopje
+ * "Spend" aan. Rechts is de gewone lucht genoeg: een waardelabel staat gecentreerd op een balk van
+ * vierentwintig pixels en is korter dan een kanaalnaam.
+ */
+export const PLOT_MARGE_WAARDEN = { top: 22, right: 16, left: 0, bottom: 4 } as const;
+
 // ── Tooltip ────────────────────────────────────────────────────────────────
 
 /**
@@ -299,6 +323,40 @@ export function Legenda({ items, className = "" }: { items: LegendaItem[]; class
 // een rand eromheen. Randen om marks zijn een anti-pattern: de scheiding hoort een gat in het
 // vlak te zijn.
 
+/**
+ * Een verticaal verloop per serie, als SVG-definitie.
+ *
+ * Waarom dit mag en 3D niet. Een balk codeert zijn waarde in HOOGTE — dat is de hele afspraak. Een
+ * 3D-balk zet er een bovenvlak op: oppervlak dat geen data is, en waardoor de bovenrand niet meer
+ * op één hoogte tegen de as ligt. Je kunt de waarde dan niet meer aflezen, en dat is het enige wat
+ * een grafiek moet kunnen. Een verloop raakt de hoogte niet aan: de bovenrand blijft één scherpe
+ * lijn op precies de waarde, alleen de vulling eronder ademt.
+ *
+ * Van boven naar beneden en niet andersom: de bovenkant is waar je afleest, dus die krijgt de volle
+ * kleur. Naar de basislijn toe zakt hij weg, wat de balk optisch op de as laat staan in plaats van
+ * erop te plakken. Ruim een kwart minder dekking onderaan is genoeg om te zien en te weinig om als
+ * een tweede waarde te lezen — het verloop blijft binnen één hue, dus de balk houdt één identiteit.
+ */
+export function BalkVerloop({ id, kleur }: { id: string; kleur: string }) {
+  return (
+    <defs>
+      {/* De kleur gaat via `style` en niet via het `stop-color`-attribuut. De seriekleuren zijn
+          `var(--serie-n, …)` zodat ze in donkere modus meebewegen, en een var() wordt alleen
+          vervangen in een echte CSS-declaratie — in een presentatie-attribuut blijft het letterlijk
+          staan en valt de stop terug op zwart. */}
+      <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" style={{ stopColor: kleur, stopOpacity: 1 }} />
+        <stop offset="100%" style={{ stopColor: kleur, stopOpacity: 0.72 }} />
+      </linearGradient>
+    </defs>
+  );
+}
+
+/** Een geldige, stabiele SVG-id voor het verloop van een serie. */
+export function verloopId(sleutel: string, index: number): string {
+  return `balk-verloop-${index}-${sleutel.replace(/[^a-zA-Z0-9]/g, "")}`;
+}
+
 export const BALK_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
 /**
  * Maximale balkbreedte: vierentwintig pixels, het plafond uit de mark-specificatie. Zonder
@@ -309,3 +367,26 @@ export const BALK_MAX = 24;
 /** Ruimte tussen de balken binnen één groep, en tussen de groepen onderling. */
 export const BALK_GAP = 2;
 export const GROEP_GAP = "22%";
+
+/**
+ * De breedte die een plot hoogstens krijgt, gegeven het aantal categorieën.
+ *
+ * Het plafond op de balkbreedte heeft een keerzijde die pas in een schermafdruk te zien is. Een
+ * kaart is hier ruim elfhonderd pixels breed; vier balken van vierentwintig is zesennegentig
+ * pixels inkt in duizend pixels vlak — negen procent. Dat leest niet als lucht maar als leegte: de
+ * balken staan als losse luciferhoutjes in een wit veld, en dat is precies waar "het lijkt wel een
+ * spreadsheet" vandaan komt. De balken breder maken mag niet (dan wordt het een verfvlak), dus
+ * moet het vlak smaller.
+ *
+ * Honderddertig pixels per categorie is de bovengrens: genoeg dat een groep van drie balken lucht
+ * om zich heen houdt, weinig genoeg dat de reeks één figuur blijft in plaats van uiteen te vallen.
+ * Zijn er veel categorieën, dan komt de rekensom boven de kaartbreedte uit en verandert er niets —
+ * dit knijpt alleen de gevallen af waar de data de breedte niet vult.
+ */
+export const VAK_MAX = 130;
+/** Wat er naast de balken nog aan vlak nodig is: de aslabels links en wat lucht rechts. */
+const AS_KOLOM = 72;
+
+export function plotBreedte(aantalCategorieen: number): number {
+  return AS_KOLOM + aantalCategorieen * VAK_MAX;
+}

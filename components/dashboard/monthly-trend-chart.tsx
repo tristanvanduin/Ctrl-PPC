@@ -7,7 +7,9 @@ import { CHART_CATEGORICAL, CHART_LINE_SECONDARY } from "@/lib/branding/chart-co
 import {
   Raster, AsX, AsY, Tip, Legenda, PLOT_MARGE,
   BALK_RADIUS, BALK_GAP, GROEP_GAP,
-  kortEuro, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte, PLOT_MARGE_LABELS, type LegendaItem,
+  kortEuro, kortEuroLabel, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte,
+  PLOT_MARGE_LABELS, PLOT_MARGE_WAARDEN, plotBreedte,
+  BalkVerloop, verloopId, type LegendaItem,
 } from "./chart-chrome";
 
 // Maand-trendgrafieken: spend per maand, en dezelfde maanden per kanaal.
@@ -45,6 +47,13 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
   const schaalLijn = asSchaalLijn(Math.max(0, ...rows.map((r) => r.lijn)));
   const hoogBoven = Math.round(height * 0.56);
   const hoogOnder = height - hoogBoven;
+  // Beide panelen krijgen dezelfde maximumbreedte, anders staan de balken en de lijn niet meer
+  // boven elkaar — en dat is het enige wat de twee panelen tot één figuur maakt.
+  //
+  // Links uitgelijnd en niet gecentreerd. Gecentreerd geprobeerd en teruggedraaid: de kaarttitel en
+  // het kopje van het paneel staan links, dus een gecentreerde plot zweeft weg van zijn eigen kop
+  // en er valt een gat linksonder. Zichtbaar in de schermafdruk, niet in de code.
+  const vlak = { maxWidth: plotBreedte(rows.length) } as const;
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -54,23 +63,40 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
         <span className="text-meta text-muted-foreground">spend en {lineLabel.toLowerCase()}, zelfde maanden</span>
       </div>
 
-      <div className="px-3 pt-4 pb-1">
+      <div className="px-3 pt-4 pb-1" style={vlak}>
         <p className="px-2 text-micro font-medium text-muted-foreground uppercase tracking-wider mb-1">Spend</p>
         <div style={{ height: hoogBoven }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={rows} margin={PLOT_MARGE} barCategoryGap={GROEP_GAP}>
+            <ComposedChart data={rows} margin={rows.length <= 8 ? PLOT_MARGE_WAARDEN : PLOT_MARGE} barCategoryGap={GROEP_GAP}>
               <Raster />
               {/* Alleen de onderste plot draagt de maandlabels: twee keer dezelfde as is ruis. */}
               <AsX dataKey="maand" formatter={() => ""} />
               <AsY formatter={kortEuro} {...schaalSpend} />
               <Tip formatter={volledigEuro} />
-              <Bar dataKey="spend" name="Spend" fill={theme.primary} radius={BALK_RADIUS} barSize={balkBreedte(rows.length)} />
+              <BalkVerloop id="balk-verloop-spend" kleur={theme.primary} />
+              <Bar dataKey="spend" name="Spend" fill="url(#balk-verloop-spend)" radius={BALK_RADIUS} barSize={balkBreedte(rows.length)}>
+                {/* Bij weinig balken draagt elke balk zijn eigen bedrag. "Nooit een getal op elk
+                    punt" gaat over dichte grafieken waar het chaos wordt; bij een handvol balken is
+                    het juist het tegenovergestelde — dan hoeft de lezer niet te mikken op een
+                    hoogte tussen twee rasterlijnen. Vanaf negen balken vervalt het en doet de as
+                    het werk. */}
+                {rows.length <= 8 && (
+                  <LabelList
+                    dataKey="spend"
+                    position="top"
+                    offset={8}
+                    className="fill-muted-foreground"
+                    style={{ fontSize: 10, fontWeight: 500 }}
+                    formatter={(v: unknown) => kortEuroLabel(Number(v))}
+                  />
+                )}
+              </Bar>
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="px-3 pb-4">
+      <div className="px-3 pb-4" style={vlak}>
         <p className="px-2 text-micro font-medium text-muted-foreground uppercase tracking-wider mb-1">{lineLabel}</p>
         <div style={{ height: hoogOnder }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -167,15 +193,16 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
         {/* De legenda staat boven de plot: je leest hem vóór de grafiek, niet erna. */}
         <Legenda items={legenda} className="ml-auto" />
       </div>
-      <div className="px-3 py-4" style={{ height }}>
+      <div className="px-3 py-4" style={{ height, maxWidth: plotBreedte(data.length) }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={PLOT_MARGE_LABELS} barCategoryGap={GROEP_GAP} barGap={BALK_GAP}>
             <Raster />
             <AsX dataKey="maand" formatter={maandLabel} />
             <AsY formatter={kortEuro} {...schaal} />
             <Tip formatter={volledigEuro} />
+            {series.map((s, i) => <BalkVerloop key={`v-${s}`} id={verloopId(s, i)} kleur={kleurVan(i)} />)}
             {series.map((s, i) => (
-              <Bar key={s} dataKey={s} name={s} fill={kleurVan(i)} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)}>
+              <Bar key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)}>
                 {/* Alleen de grootste serie draagt een naam, boven zijn laatste balk. Zie
                     `grootsteSerie` hierboven voor waarom het er één is en niet drie. */}
                 {s === grootsteSerie && (
