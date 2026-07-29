@@ -5,6 +5,7 @@ import { Loader2, PieChart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
+import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import {
   buildNetworkSplit, findImbalances, networkTotals,
   type NetworkRow, type NetworkSlice,
@@ -30,6 +31,7 @@ function colorFor(networkType: string, order: string[]): string {
 
 export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
+  const [tabelOpen, toggleTabel] = useRememberedOpen("pmax-tabel", false);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,8 +140,15 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
       </div>
 
       {/* De exacte cijfers. Een ring is voor de verhouding op het oog; hier staan de waarden die
-          je nodig hebt om twee netwerken die dicht bij elkaar liggen echt te vergelijken. */}
-      <div className="overflow-x-auto border-t border-border">
+          je nodig hebt om twee netwerken die dicht bij elkaar liggen echt te vergelijken. Dicht
+          bij binnenkomst: de donut is het antwoord, de tabel de controle erop. */}
+      <RegioToggle
+        open={tabelOpen}
+        onToggle={toggleTabel}
+        controls="pmax-tabel"
+        label={`de cijfers per netwerk (${slices.length})`}
+      />
+      <div id="pmax-tabel" hidden={!tabelOpen} className="overflow-x-auto border-t border-border">
         <table className="w-full text-body">
           <thead>
             <tr className="text-left text-muted-foreground border-b border-border">

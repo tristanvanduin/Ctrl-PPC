@@ -414,9 +414,7 @@ export function ClientDashboard({ client }: { client: Client }) {
               {/* En hóé die markten bediend worden: de kanaalmix per land. Staat bewust hier en
                   niet op een eigen pagina — het is de volgende vraag na "welke landen", en een
                   aparte pagina zou klant en periode opnieuw laten kiezen. */}
-              <div className="bg-card border border-border rounded-lg p-5">
-                <GeoChannelMatrix clientId={client.id} />
-              </div>
+              <GeoChannelMatrix clientId={client.id} />
               {/* YouTube/Demand Gen met de juiste maten (CPM, CPV, kijkdiepte). Rendert niets
                   als er geen videocampagnes draaien. */}
               <VideoPerformance clientId={client.id} />

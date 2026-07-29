@@ -9,6 +9,7 @@ import {
   aggregatePlacements, judgePlacements, wastedSpend, placementTypeLabel,
   type PlacementInput, type PlacementVerdict,
 } from "@/lib/video/placement-analysis";
+import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
 
 // Waar het videobudget landde, met een voorstel welke placements uit te sluiten. Bij YouTube kiest
 // Google de plek; dit maakt zichtbaar wat dat oplevert. Bewust een voorstel met onderbouwing en
@@ -78,6 +79,11 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
       });
   }, [rows]);
 
+  // De sortering zet de uit te sluiten placements bovenaan, dus de eerste drie regels zijn
+  // precies waar actie op zit. De rest is naslag en hoeft de pagina niet te verlengen —
+  // een account met tweehonderd placements duwde alles eronder buiten beeld.
+  const lijst = useTruncatedList(judged, 3);
+
   const waste = useMemo(() => wastedSpend(judged), [judged]);
   const excluding = judged.filter((j) => j.verdict === "uitsluiten");
   // Gescheiden tellen: van PMax-placements kent Google de kosten niet, dus die mogen niet
@@ -137,7 +143,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
             </tr>
           </thead>
           <tbody>
-            {judged.map(({ agg, verdict, reason }) => (
+            {lijst.zichtbaar.map(({ agg, verdict, reason }) => (
               <tr key={agg.placement} className="border-b border-border/50 align-top">
                 <td className="px-5 py-2">
                   <div className="text-rm-gray font-medium flex items-center gap-1">
@@ -170,6 +176,12 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
           </tbody>
         </table>
       </div>
+      <MeerKnop
+        verborgen={lijst.verborgen}
+        uitgeklapt={lijst.uitgeklapt}
+        onToggle={lijst.toggle}
+        eenheid="placements"
+      />
     </div>
   );
 }

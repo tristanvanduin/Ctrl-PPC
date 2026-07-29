@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Loader2, Sparkles, ImageOff, ArrowUpRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { summarizeCreatives, type CreativeRow } from "@/lib/analysis/creative-summary";
+import { CollapsiblePanel } from "@/components/ui/disclosure";
 
 // Creative Performance per kanaal: hoe de creatives eruit zien (preview), hoe ze presteerden
 // (metrics per creative) en een deterministische samenvatting + aanbevelingen eronder — zodat
@@ -168,12 +169,16 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Sparkles className="w-4.5 h-4.5 text-rm-blue" />
-          <h3 className="text-sm font-semibold text-rm-gray">Creative Performance — {CHANNEL_LABEL[channel]}</h3>
-          <span className="text-micro text-muted-foreground">top {cards.length} op kosten, laatste 6 maanden</span>
-        </div>
+      {/* De advertentievoorbeelden zijn twee kolommen hoog per paar; bij tien creatives is dat
+          het langste blok van de pagina. Blijft open bij binnenkomst — de visuals zijn de reden
+          dat dit blok bestaat — maar wie het dichtklapt houdt het dicht. */}
+      <CollapsiblePanel
+        id={`creatives-${channel}`}
+        icon={<Sparkles className="w-4.5 h-4.5 text-rm-blue" />}
+        title={`Creative Performance — ${CHANNEL_LABEL[channel]}`}
+        subtitle="top op kosten, laatste 6 maanden"
+        meta={<span className="text-micro text-muted-foreground">{cards.length} advertenties</span>}
+      >
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           {cards.map((c) => (
             <div key={c.id} className="rounded-lg border border-border overflow-hidden flex flex-col">
@@ -214,7 +219,7 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
             </div>
           ))}
         </div>
-      </div>
+      </CollapsiblePanel>
 
       {/* Samenvatting + aanbevelingen */}
       {summary && (

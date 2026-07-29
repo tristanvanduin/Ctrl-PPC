@@ -5,6 +5,7 @@ import { Loader2, PlayCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_VIDEO_ROWS } from "@/lib/demo/video-demo";
+import { CollapsiblePanel } from "@/components/ui/disclosure";
 import {
   aggregateVideoCampaigns, diagnoseVideo, VIDEO_DIAGNOSIS_LABEL, VIDEO_DIAGNOSIS_EXPLAIN,
   type VideoCampaignRow, type VideoDiagnosis,
@@ -105,15 +106,13 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
   if (aggs.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-        <PlayCircle className="w-4.5 h-4.5 text-rm-blue" />
-        <h3 className="text-sm font-semibold text-rm-gray">Video (YouTube)</h3>
-        <span className="text-meta text-muted-foreground">
-          beoordeeld op bereik en kijkgedrag — niet op klikken of CPA
-        </span>
-      </div>
-
+    <CollapsiblePanel
+      id="video-prestaties"
+      icon={<PlayCircle className="w-4.5 h-4.5 text-rm-blue" />}
+      title="Video (YouTube)"
+      subtitle="beoordeeld op bereik en kijkgedrag — niet op klikken of CPA"
+      meta={<span className="text-micro text-muted-foreground">{aggs.length} campagne{aggs.length === 1 ? "" : "s"}</span>}
+    >
       <div className="overflow-x-auto">
         <table className="w-full text-body">
           <thead>
@@ -163,6 +162,6 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
           </p>
         ))}
       </div>
-    </div>
+    </CollapsiblePanel>
   );
 }

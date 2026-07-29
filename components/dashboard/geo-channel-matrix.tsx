@@ -5,6 +5,7 @@ import { Loader2, Grid3x3 } from "lucide-react";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { divergingColor, inkOn } from "@/lib/branding/chart-colors";
 import { stateLabel } from "@/lib/geo/us-fips";
+import { CollapsiblePanel } from "@/components/ui/disclosure";
 import {
   matrixTotals, cellIndex, findMixDeviations, strongestPerCountry, isUnsplit, cpa, roas,
   CHANNEL_LABEL, type ChannelCell, type ChannelKey,
@@ -101,31 +102,42 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
     return { bg, fg: inkOn(bg) };
   }
 
+  // De matrix is de vervolgvraag na "welke landen", niet het eerste antwoord. Hij staat daarom
+  // dicht bij binnenkomst; wie hem opent houdt hem open (de keuze wordt onthouden).
+  const panelProps = {
+    id: "geo-kanaal-matrix",
+    title: "Land × kanaal",
+    subtitle: "hoe elke markt bediend wordt",
+    icon: <Grid3x3 className="w-4.5 h-4.5 text-rm-blue" aria-hidden />,
+    defaultOpen: false,
+  };
+
   if (cells === null) {
     return (
-      <div className="flex items-center justify-center py-10 text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin mr-2" aria-hidden /> <span className="text-body">Land × kanaal laden…</span>
-      </div>
+      <CollapsiblePanel {...panelProps}>
+        <div className="flex items-center justify-center py-10 text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin mr-2" aria-hidden /> <span className="text-body">Land × kanaal laden…</span>
+        </div>
+      </CollapsiblePanel>
     );
   }
   if (!totals || totals.countries.length === 0) {
     return (
-      <p className="text-body text-muted-foreground py-6">
-        Nog geen land×kanaal-data. Dit komt uit <code>ads_geo_performance_monthly</code> gecombineerd
-        met het campagnetype; zodra de geo-sync gedraaid heeft verschijnt de matrix hier.
-      </p>
+      <CollapsiblePanel {...panelProps}>
+        <p className="text-body text-muted-foreground px-5 py-6">
+          Nog geen land×kanaal-data. Dit komt uit <code>ads_geo_performance_monthly</code> gecombineerd
+          met het campagnetype; zodra de geo-sync gedraaid heeft verschijnt de matrix hier.
+        </p>
+      </CollapsiblePanel>
     );
   }
 
   const hasUnsplit = totals.channels.some(isUnsplit);
 
   return (
-    <section className="space-y-3">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Grid3x3 className="w-4 h-4 text-muted-foreground" aria-hidden />
-          <h3 className="text-title font-semibold">Land × kanaal</h3>
-        </div>
+    <CollapsiblePanel {...panelProps}>
+    <section className="space-y-3 px-5 py-4">
+      <header className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex gap-1" role="group" aria-label="Metriek">
           {(Object.keys(METRICS) as MetricKey[]).map((k) => (
             <button
@@ -256,5 +268,6 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
         </div>
       )}
     </section>
+    </CollapsiblePanel>
   );
 }

@@ -9,6 +9,7 @@ import { stateLabel } from "@/lib/geo/us-fips";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { demoGeoCountries, demoGeoStates, type GeoAgg } from "@/lib/demo/geo-demo";
 import { MapErrorBoundary } from "./map-error-boundary";
+import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 
 // De kaarten (SVG + geometrie + d3-geo) client-only en code-split laden: pas geladen als deze
 // weergave rendert, en nooit tijdens SSR.
@@ -52,6 +53,9 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
   const state = useClientDataState();
   const [metricKey, setMetricKey] = useState<MetricKey>("conversions");
   const [focus, setFocus] = useState<"US" | null>(null); // null = wereld, "US" = staten-drilldown
+  // De tabel begint dicht: de kaart is het antwoord op "waar komt het vandaan", de tabel is de
+  // naslag erachter. Vijftig landregels tussen twee kaarten in maakt de pagina onleesbaar.
+  const [tabelOpen, toggleTabel] = useRememberedOpen("geo-tabel", false);
   const metric = METRICS.find((m) => m.key === metricKey)!;
   const demo = isDemoMode();
 
@@ -129,7 +133,10 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
         </label>
       </div>
 
-      <div className="px-3 py-3">
+      {/* De kaart schaalde mee met de kolombreedte, en werd op een breed scherm bijna 400px hoog
+          voordat er ook maar een cijfer in beeld kwam. Een wereldkaart wordt niet beter van meer
+          pixels; hij wordt alleen duurder in verticale ruimte. */}
+      <div className="px-3 py-3 max-w-[680px] mx-auto w-full">
         {ranked.length === 0 ? (
           <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
         ) : (
@@ -147,7 +154,13 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
       </div>
 
       {/* Volledige tabel: alle metrics per land/staat, zodat je naast de gekozen metric ook de rest ziet. */}
-      <div className="overflow-x-auto border-t border-border">
+      <RegioToggle
+        open={tabelOpen}
+        onToggle={toggleTabel}
+        controls="geo-tabel"
+        label={`de tabel per ${geoWord} (${ranked.length})`}
+      />
+      <div id="geo-tabel" hidden={!tabelOpen} className="overflow-x-auto border-t border-border">
         <table className="w-full text-body">
           <thead>
             <tr className="text-left text-muted-foreground border-b border-border">
