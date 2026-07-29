@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ArrowUpDown, Search, Globe } from "lucide-react";
+import { Search, Globe } from "lucide-react";
 import { useClientDataState } from "@/lib/client-data-provider";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import type { AccountStructureData } from "@/lib/use-client-data";
 import { detectCountryFromName, countryLabel } from "@/lib/countries";
+import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
+import {
+  Tabel, Kop, KolomKop, SorteerKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel,
+} from "./data-table";
 
 interface CampaignRow {
   name: string;
@@ -71,6 +75,16 @@ const BIDDING_LABELS: Record<string, string> = {
   TARGET_SPEND: "Max Clicks",
   UNKNOWN: "—",
 };
+
+/**
+ * Een enumwaarde waar geen vertaling voor is, leesbaar maken. Zonder dit stond er letterlijk
+ * "DEMAND_CAPTURE" in een badge en "demand_capture" op een filterknop: rauwe database-inhoud in
+ * de interface. Een onbekend doel hoort er niet anders uit te zien dan een bekend doel.
+ */
+function leesbaar(sleutel: string): string {
+  const woorden = sleutel.replace(/_/g, " ").trim().toLowerCase();
+  return woorden ? woorden.charAt(0).toUpperCase() + woorden.slice(1) : sleutel;
+}
 
 type SortKey = "name" | "spend" | "conversions" | "cpa" | "roas" | "impressions";
 
@@ -166,7 +180,9 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
       result = result.filter((c) => matchGeoCloneByCampaignName(c.name)?.abbreviation === geoClone);
     }
 
-    result.sort((a, b) => {
+    // Een kopie: zonder filters is `result` nog de array uit de campaigns-memo, en `sort` sorteert
+    // in plaats. Dan schrijft deze memo in de uitvoer van een andere.
+    result = [...result].sort((a, b) => {
       let va: number | string, vb: number | string;
       switch (sortBy) {
         case "name": va = a.name; vb = b.name;
@@ -206,21 +222,22 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
     );
   }
 
-  const SortTh = ({ col, label, align }: { col: SortKey; label: string; align?: string }) => (
-    <th
-      onClick={() => handleSort(col)}
-      className={`px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue transition-colors whitespace-nowrap ${align === "right" ? "text-right" : "text-left"}`}
+  const SortTh = ({ col, label, align, breed }: { col: SortKey; label: string; align?: string; breed?: boolean }) => (
+    <SorteerKop
+      getal={align === "right"}
+      breed={breed}
+      actief={sortBy === col}
+      richting={sortDir}
+      onSorteer={() => handleSort(col)}
     >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {sortBy === col ? (
-          <span>{sortDir === "asc" ? "↑" : "↓"}</span>
-        ) : (
-          <ArrowUpDown className="w-3 h-3 opacity-30" />
-        )}
-      </span>
-    </th>
+      {label}
+    </SorteerKop>
   );
+
+  // De strepen staan tegen de koploper en niet tegen de som: bij dertig campagnes is elk
+  // aandeel-van-het-totaal klein, en dan zijn alle streepjes even kort.
+  const grootsteSpend = Math.max(0, ...filtered.map((c) => c.spend));
+  const grootsteConv = Math.max(0, ...filtered.map((c) => c.conversions));
 
   return (
     <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
@@ -232,7 +249,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
               Campagnes
             </h3>
             <p className="text-meta text-muted-foreground mt-0.5">
-              {filtered.length} campagnes · {num(totalConv)} conversies · {fmt(totalSpend)} spend · Gem. CPA {fmt(avgCpa)} (30 dagen)
+              {filtered.length} campagnes · {num(totalConv)} conversies · {fmt(totalSpend)} spend · CPA {fmt(avgCpa)} (30 dagen)
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -279,7 +296,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                     purposeFilter === p ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
                   }`}
                 >
-                  {PURPOSE_LABELS[p] ?? p}
+                  {PURPOSE_LABELS[p] ?? leesbaar(p)}
                 </button>
               ))}
             </div>
@@ -299,85 +316,93 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50/50 border-b border-border">
-            <tr>
-              <SortTh col="name" label="Campagne" />
-              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Type</th>
-              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Bidding</th>
-              <SortTh col="impressions" label="Impressies" align="right" />
-              <SortTh col="spend" label="Spend" align="right" />
-              <SortTh col="conversions" label="Conv." align="right" />
-              <SortTh col="cpa" label="CPA" align="right" />
-              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Structuur</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {filtered.map((campaign, i) => {
-              const purposeColor = PURPOSE_COLORS[campaign.purpose] ?? "bg-gray-100 text-gray-600";
-              const isZeroConv = campaign.conversions === 0 && campaign.spend > 0;
-              const highCpa = campaign.cpa > avgCpa * 2 && campaign.cpa !== Infinity;
+      <Tabel>
+        <Kop>
+          <SortTh col="name" label="Campagne" breed />
+          <KolomKop>Type</KolomKop>
+          <KolomKop>Bidding</KolomKop>
+          <SortTh col="impressions" label="Impressies" align="right" />
+          <SortTh col="spend" label="Spend" align="right" />
+          <SortTh col="conversions" label="Conv." align="right" />
+          <SortTh col="cpa" label="CPA" align="right" />
+          <KolomKop getal>Structuur</KolomKop>
+        </Kop>
+        <Body>
+          {filtered.map((campaign, i) => {
+            const purposeColor = PURPOSE_COLORS[campaign.purpose] ?? "bg-gray-100 text-gray-600";
+            const isZeroConv = campaign.conversions === 0 && campaign.spend > 0;
+            const highCpa = campaign.cpa > avgCpa * 2 && campaign.cpa !== Infinity;
 
-              return (
-                <tr key={i} className={`hover:bg-gray-50/50 transition-colors ${isZeroConv ? "bg-red-50/30" : ""}`}>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm text-rm-gray truncate max-w-[250px]" title={campaign.name}>
-                        {campaign.name}
+            return (
+              <Rij key={i} className={isZeroConv ? "bg-red-50/30" : ""}>
+                <NaamCel>
+                  <span className="inline-flex items-center gap-2 min-w-0" title={campaign.name}>
+                    <span className="truncate">{campaign.name}</span>
+                    {campaign.bucketLabel && (
+                      <span className="text-micro font-bold uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">
+                        {campaign.bucketLabel}
                       </span>
-                      {campaign.bucketLabel && (
-                        <span className="text-micro font-bold uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">
-                          {campaign.bucketLabel}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className={`text-micro font-semibold uppercase px-1.5 py-0.5 rounded ${purposeColor}`}>
-                      {PURPOSE_LABELS[campaign.purpose] ?? campaign.purpose}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className="text-xs text-muted-foreground">
-                      {BIDDING_LABELS[campaign.biddingStrategy] ?? campaign.biddingStrategy}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <span className="text-xs text-muted-foreground">{num(campaign.impressions)}</span>
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <span className="text-sm font-medium text-rm-gray">{fmt(campaign.spend)}</span>
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <span className={`text-sm font-semibold ${isZeroConv ? "text-red-500" : "text-rm-gray"}`}>
+                    )}
+                  </span>
+                </NaamCel>
+                <Cel nowrap>
+                  <span className={`text-micro font-semibold uppercase px-1.5 py-0.5 rounded ${purposeColor}`}>
+                    {PURPOSE_LABELS[campaign.purpose] ?? leesbaar(campaign.purpose)}
+                  </span>
+                </Cel>
+                <Cel zacht nowrap>{BIDDING_LABELS[campaign.biddingStrategy] ?? leesbaar(campaign.biddingStrategy)}</Cel>
+                <GetalCel zacht>{num(campaign.impressions)}</GetalCel>
+                {/* Strepen op spend en conversies — de twee optelbare kolommen. Ze staan naast
+                    elkaar zodat je in één blik ziet welke campagne meer budget krijgt dan ze
+                    oplevert; dat is de vraag die deze tabel beantwoordt. Op CPA staat er geen:
+                    een verhouding heeft geen geheel, en laag is daar juist beter. */}
+                <AandeelCel
+                  waarde={fmt(campaign.spend)}
+                  aandeel={grootsteSpend > 0 ? campaign.spend / grootsteSpend : 0}
+                />
+                <AandeelCel
+                  waarde={
+                    <span className={isZeroConv ? "text-red-500" : ""}>
                       {num(campaign.conversions)}
                       {isZeroConv && <span className="text-micro text-red-400 ml-1">⚠</span>}
                     </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <span className={`text-sm ${
-                      campaign.cpa === 0 ? "text-gray-300" :
-                      campaign.cpa === Infinity ? "text-red-500 font-semibold" :
-                      highCpa ? "text-red-500" :
-                      "text-rm-gray"
-                    }`}>
-                      {campaign.cpa === 0 ? "—" : campaign.cpa === Infinity ? "∞" : fmt(campaign.cpa)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <span className="text-micro text-muted-foreground">
-                      {campaign.adGroupCount > 0 && `${campaign.adGroupCount} AG`}
-                      {campaign.assetGroupCount > 0 && `${campaign.assetGroupCount} ASG`}
-                      {campaign.adGroupCount === 0 && campaign.assetGroupCount === 0 && "—"}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  }
+                  aandeel={grootsteConv > 0 ? campaign.conversions / grootsteConv : 0}
+                  kleur={CHART_CATEGORICAL[2]}
+                />
+                <GetalCel
+                  className={
+                    campaign.cpa === 0 ? "text-gray-300" :
+                    campaign.cpa === Infinity ? "text-red-500 font-semibold" :
+                    highCpa ? "text-red-500" : ""
+                  }
+                >
+                  {campaign.cpa === 0 ? "—" : campaign.cpa === Infinity ? "∞" : fmt(campaign.cpa)}
+                </GetalCel>
+                <GetalCel zacht className="text-micro">
+                  {campaign.adGroupCount > 0 && `${campaign.adGroupCount} AG`}
+                  {campaign.assetGroupCount > 0 && `${campaign.assetGroupCount} ASG`}
+                  {campaign.adGroupCount === 0 && campaign.assetGroupCount === 0 && "—"}
+                </GetalCel>
+              </Rij>
+            );
+          })}
+        </Body>
+        {/* De totaalrij volgt de filters. De regel in de kaartkop doet dat ook, maar staat ver van
+            de kolommen af; hier sluit de som aan op de cijfers waar hij bij hoort. De CPA komt uit
+            de totalen — een gemiddelde van campagne-CPA's weegt een campagne met één conversie
+            even zwaar als een met tweehonderd. */}
+        <TotaalRij>
+          <TotaalCel>Totaal ({filtered.length})</TotaalCel>
+          <TotaalCel>{""}</TotaalCel>
+          <TotaalCel>{""}</TotaalCel>
+          <TotaalCel getal>{num(filtered.reduce((s, c) => s + c.impressions, 0))}</TotaalCel>
+          <TotaalCel getal>{fmt(totalSpend)}</TotaalCel>
+          <TotaalCel getal>{num(totalConv)}</TotaalCel>
+          <TotaalCel getal>{totalConv > 0 ? fmt(avgCpa) : "—"}</TotaalCel>
+          <TotaalCel getal>{""}</TotaalCel>
+        </TotaalRij>
+      </Tabel>
     </div>
   );
 }

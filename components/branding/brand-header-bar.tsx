@@ -66,7 +66,13 @@ export function BrandHeaderBar({
   return (
     <div
       className="relative overflow-hidden rounded-xl border border-border"
-      style={{ background: "linear-gradient(120deg, var(--brand-primary), var(--brand-accent))" }}
+      // Uit `theme` en niet uit de CSS-variabelen. Die variabelen worden pas op de root gezet
+      // zódra de merkgegevens geladen zijn; tot dat moment is de gradient een ongeldige waarde en
+      // valt de balk terug op grijs — een grijze blokkop boven een gekleurd dashboard. Op de
+      // beurs-gescopete pagina bleef hij in demo-modus zelfs grijs staan. `theme` draagt
+      // ondertussen gewoon DEFAULT_THEME, en het is bovendien dezelfde bron als waaruit de inkt
+      // en de sluier hierboven berekend worden — die twee moeten wel over dezelfde kleur gaan.
+      style={{ background: `linear-gradient(120deg, ${theme.primary}, ${theme.accent})` }}
     >
       <div className={`absolute inset-0 ${sluier}`} aria-hidden />
 
@@ -78,7 +84,7 @@ export function BrandHeaderBar({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={theme.logoUrl} alt={name} className="h-12 w-12 rounded-lg object-contain bg-white p-1 shadow-sm shrink-0" />
         ) : (
-          <div className="h-12 w-12 rounded-lg bg-white/95 flex items-center justify-center text-lead font-bold shrink-0" style={{ color: "var(--brand-primary)" }}>
+          <div className="h-12 w-12 rounded-lg bg-white/95 flex items-center justify-center text-lead font-bold shrink-0" style={{ color: theme.primary }}>
             {initials(name)}
           </div>
         )}

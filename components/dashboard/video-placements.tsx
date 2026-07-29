@@ -10,6 +10,7 @@ import {
   type PlacementInput, type PlacementVerdict,
 } from "@/lib/video/placement-analysis";
 import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel } from "./data-table";
 
 // Waar het videobudget landde, met een voorstel welke placements uit te sluiten. Bij YouTube kiest
 // Google de plek; dit maakt zichtbaar wat dat oplevert. Bewust een voorstel met onderbouwing en
@@ -85,6 +86,12 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
   const lijst = useTruncatedList(judged, 3);
 
   const waste = useMemo(() => wastedSpend(judged), [judged]);
+  // De schaal van de aandeelstreep komt uit de volledige lijst en niet uit de zichtbare drie: een
+  // schaal die verspringt zodra je uitklapt maakt de streep onvergelijkbaar met wat je net zag.
+  const duursteKosten = useMemo(
+    () => Math.max(0, ...judged.filter((j) => j.agg.metricsComplete).map((j) => j.agg.cost)),
+    [judged],
+  );
   const excluding = judged.filter((j) => j.verdict === "uitsluiten");
   // Gescheiden tellen: van PMax-placements kent Google de kosten niet, dus die mogen niet
   // meegeteld worden in een bedrag. Ze wel meetellen zou het bedrag te laag of te stellig maken.
@@ -127,55 +134,63 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-body">
-          <thead>
-            <tr className="text-left text-muted-foreground border-b border-border">
-              <th className="px-5 py-2 font-medium">Placement</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium text-right">Vertoningen</th>
-              <th className="px-3 py-2 font-medium text-right">Kosten</th>
-              <th className="px-3 py-2 font-medium text-right">Views</th>
-              <th className="px-3 py-2 font-medium text-right">Klikken</th>
-              <th className="px-3 py-2 font-medium text-right">Conv.</th>
-              <th className="px-3 py-2 font-medium text-right">CPA</th>
-              <th className="px-5 py-2 font-medium">Advies</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lijst.zichtbaar.map(({ agg, verdict, reason }) => (
-              <tr key={agg.placement} className="border-b border-border/50 align-top">
-                <td className="px-5 py-2">
-                  <div className="text-rm-gray font-medium flex items-center gap-1">
-                    {agg.displayName || agg.placement}
-                    {agg.targetUrl && (
-                      <a href={agg.targetUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-rm-blue">
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                  <div className="text-micro text-muted-foreground">{reason}</div>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  {placementTypeLabel(agg.placementType)}
-                  {agg.sources.includes("pmax") && <span className="block text-micro text-muted-foreground">via PMax</span>}
-                </td>
-                <td className="px-3 py-2 text-right">{int(agg.impressions)}</td>
-                <td className="px-3 py-2 text-right">{agg.metricsComplete ? eur(agg.cost) : <span className="text-muted-foreground" title="Performance Max levert geen kosten per placement">onbekend</span>}</td>
-                <td className="px-3 py-2 text-right">{agg.metricsComplete ? int(agg.videoViews) : "—"}</td>
-                <td className="px-3 py-2 text-right">{agg.metricsComplete ? int(agg.clicks) : "—"}</td>
-                <td className="px-3 py-2 text-right">{!agg.metricsComplete ? "—" : agg.conversions === 0 ? "—" : int(agg.conversions)}</td>
-                <td className="px-3 py-2 text-right">{agg.cpa == null ? "—" : eur(agg.cpa)}</td>
-                <td className="px-5 py-2">
-                  <span className={`inline-block rounded-md border px-1.5 py-0.5 text-micro font-medium whitespace-nowrap ${VERDICT_STYLE[verdict]}`}>
-                    {VERDICT_LABEL[verdict]}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Tabel>
+        <Kop>
+          <KolomKop breed>Placement</KolomKop>
+          <KolomKop>Type</KolomKop>
+          <KolomKop getal>Vertoningen</KolomKop>
+          <KolomKop getal bijschrift="aandeel">Kosten</KolomKop>
+          <KolomKop getal>Views</KolomKop>
+          <KolomKop getal>Klikken</KolomKop>
+          <KolomKop getal>Conv.</KolomKop>
+          <KolomKop getal>CPA</KolomKop>
+          <KolomKop>Advies</KolomKop>
+        </Kop>
+        <Body>
+          {lijst.zichtbaar.map(({ agg, verdict, reason }) => (
+            <Rij key={agg.placement}>
+              <NaamCel sub={reason}>
+                <span className="flex items-center gap-1">
+                  {agg.displayName || agg.placement}
+                  {agg.targetUrl && (
+                    <a href={agg.targetUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-rm-blue shrink-0">
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </span>
+              </NaamCel>
+              <Cel zacht nowrap>
+                {placementTypeLabel(agg.placementType)}
+                {agg.sources.includes("pmax") && <span className="block text-micro text-muted-foreground">via PMax</span>}
+              </Cel>
+              <GetalCel>{int(agg.impressions)}</GetalCel>
+              {/* De streep staat op kosten en niet op vertoningen: de vraag hier is waar het geld
+                  heen ging, niet waar het bereik zat. Placements uit Performance Max krijgen geen
+                  streep — Google geeft daar geen kosten bij, en een streep van nul zou als
+                  "kostte niets" lezen terwijl het "onbekend" is. */}
+              {agg.metricsComplete ? (
+                <AandeelCel waarde={eur(agg.cost)} aandeel={duursteKosten > 0 ? agg.cost / duursteKosten : 0} />
+              ) : (
+                <GetalCel zacht>
+                  <span title="Performance Max levert geen kosten per placement">onbekend</span>
+                </GetalCel>
+              )}
+              <GetalCel>{agg.metricsComplete ? int(agg.videoViews) : "—"}</GetalCel>
+              <GetalCel>{agg.metricsComplete ? int(agg.clicks) : "—"}</GetalCel>
+              <GetalCel>{!agg.metricsComplete ? "—" : agg.conversions === 0 ? "—" : int(agg.conversions)}</GetalCel>
+              <GetalCel zacht>{agg.cpa == null ? "—" : eur(agg.cpa)}</GetalCel>
+              <Cel>
+                <span className={`inline-block rounded-md border px-1.5 py-0.5 text-micro font-medium whitespace-nowrap ${VERDICT_STYLE[verdict]}`}>
+                  {VERDICT_LABEL[verdict]}
+                </span>
+              </Cel>
+            </Rij>
+          ))}
+        </Body>
+        {/* Geen totaalrij: de lijst staat standaard ingeklapt op drie regels, en een som onder een
+            afgekapte lijst telt iets anders op dan wat je ziet. Het bedrag dat er wél toe doet —
+            de verspilling — staat hierboven, en dat is over álle placements gerekend. */}
+      </Tabel>
       <MeerKnop
         verborgen={lijst.verborgen}
         uitgeklapt={lijst.uitgeklapt}

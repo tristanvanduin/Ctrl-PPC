@@ -7,6 +7,7 @@ import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Legenda, type LegendaItem } from "./chart-chrome";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import {
   buildNetworkSplit, findImbalances, networkTotals,
   type NetworkRow, type NetworkSlice,
@@ -157,36 +158,49 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
         controls="pmax-tabel"
         label={`de cijfers per netwerk (${slices.length})`}
       />
-      <div id="pmax-tabel" hidden={!tabelOpen} className="overflow-x-auto border-t border-border">
-        <table className="w-full text-body">
-          <thead>
-            <tr className="text-left text-muted-foreground border-b border-border">
-              <th className="px-5 py-2 font-medium">Netwerk</th>
-              <th className="px-3 py-2 font-medium text-right">Kosten</th>
-              <th className="px-3 py-2 font-medium text-right">Aandeel</th>
-              <th className="px-3 py-2 font-medium text-right">Conversies</th>
-              <th className="px-3 py-2 font-medium text-right">Aandeel</th>
-              <th className="px-5 py-2 font-medium text-right">CPA</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div id="pmax-tabel" hidden={!tabelOpen} className="border-t border-border">
+        <Tabel>
+          <Kop>
+            <KolomKop>Netwerk</KolomKop>
+            <KolomKop getal>Kosten</KolomKop>
+            <KolomKop getal>Aandeel</KolomKop>
+            <KolomKop getal>Conversies</KolomKop>
+            <KolomKop getal>Aandeel</KolomKop>
+            <KolomKop getal>CPA</KolomKop>
+          </Kop>
+          <Body>
             {slices.map((s: NetworkSlice) => (
-              <tr key={s.networkType} className="border-b border-border/50">
-                <td className="px-5 py-1.5">
-                  <span className="inline-flex items-center gap-1.5 text-rm-gray font-medium">
+              <Rij key={s.networkType}>
+                {/* Het kleurblokje herhaalt de kleur uit de ring, zodat een regel hier zonder
+                    zoeken bij zijn segment daarboven hoort. */}
+                <NaamCel>
+                  <span className="inline-flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: colorFor(s.networkType, order) }} aria-hidden />
                     {s.label}
                   </span>
-                </td>
-                <td className="px-3 py-1.5 text-right">{eur(s.cost)}</td>
-                <td className="px-3 py-1.5 text-right">{pct(s.costShare)}</td>
-                <td className="px-3 py-1.5 text-right">{s.conversions > 0 ? num(s.conversions, 1) : "—"}</td>
-                <td className="px-3 py-1.5 text-right">{pct(s.conversionShare)}</td>
-                <td className="px-5 py-1.5 text-right">{s.cpa == null ? "—" : eur(s.cpa)}</td>
-              </tr>
+                </NaamCel>
+                {/* Geen aandeelstrepen in deze tabel: de ringen erboven tonen exact dezelfde
+                    verhouding. Hier zijn de exacte cijfers het doel — dat is waarom de tabel er is. */}
+                <GetalCel>{eur(s.cost)}</GetalCel>
+                <GetalCel zacht>{pct(s.costShare)}</GetalCel>
+                <GetalCel>{s.conversions > 0 ? num(s.conversions, 1) : "—"}</GetalCel>
+                <GetalCel zacht>{pct(s.conversionShare)}</GetalCel>
+                <GetalCel zacht>{s.cpa == null ? "—" : eur(s.cpa)}</GetalCel>
+              </Rij>
             ))}
-          </tbody>
-        </table>
+          </Body>
+          {/* De CPA in de totaalrij komt uit de totalen en niet uit een gemiddelde van de
+              netwerk-CPA's: dat laatste weegt een netwerk met drie conversies even zwaar als een
+              met driehonderd. */}
+          <TotaalRij>
+            <TotaalCel>Alle netwerken</TotaalCel>
+            <TotaalCel getal>{eur(totals.cost)}</TotaalCel>
+            <TotaalCel getal>100%</TotaalCel>
+            <TotaalCel getal>{totals.hasConversions ? num(totals.conversions, 1) : "—"}</TotaalCel>
+            <TotaalCel getal>{totals.hasConversions ? "100%" : "—"}</TotaalCel>
+            <TotaalCel getal>{totals.conversions > 0 ? eur(totals.cost / totals.conversions) : "—"}</TotaalCel>
+          </TotaalRij>
+        </Tabel>
       </div>
     </div>
   );

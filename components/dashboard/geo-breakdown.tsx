@@ -9,6 +9,7 @@ import { isDemoMode } from "@/lib/demo/demo-mode";
 import { type GeoAgg } from "@/lib/demo/geo-demo";
 import { MapErrorBoundary } from "./map-error-boundary";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 
 // De kaarten (SVG + geometrie + d3-geo) client-only en code-split laden: pas geladen als deze
 // weergave rendert, en nooit tijdens SSR.
@@ -108,6 +109,33 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
     return m;
   }, [ranked]);
 
+  const totaal = useMemo(() => {
+    const t = { impressions: 0, clicks: 0, cost: 0, conversions: 0 };
+    for (const { c } of ranked) {
+      t.impressions += c.impressions; t.clicks += c.clicks;
+      t.cost += c.cost; t.conversions += c.conversions;
+    }
+    return t;
+  }, [ranked]);
+
+  // De aandeelstreep staat in de kolom die je zelf hebt gekozen — dezelfde metric die de kaart
+  // inkleurt. Zo lezen kaart en tabel hetzelfde verhaal in plaats van elk een eigen.
+  //
+  // Alleen bij optelbare grootheden. CTR, conversieratio en CPA zijn verhoudingen: daar bestaat
+  // "aandeel van het geheel" niet, en bij CPA zou een lange streep "veel" zeggen waar het "duur"
+  // betekent. Kies je zo'n metric, dan staat er nergens een streep.
+  const balkKolom = (["impressions", "clicks", "conversions"] as const).find((k) => k === metricKey) ?? null;
+  // Tegen de koploper en niet tegen de som: bij vijftig landen is elk aandeel-van-het-totaal klein
+  // en zijn alle streepjes even kort.
+  const grootste = useMemo(
+    () => (balkKolom ? Math.max(0, ...ranked.map(({ c }) => c[balkKolom])) : 0),
+    [ranked, balkKolom],
+  );
+  const balk = (c: GeoAgg, kolom: "impressions" | "clicks" | "conversions", waarde: string) =>
+    balkKolom === kolom
+      ? <AandeelCel waarde={waarde} aandeel={grootste > 0 ? c[kolom] / grootste : 0} />
+      : <GetalCel>{waarde}</GetalCel>;
+
   // Tijdens het laden nog niets concluderen: "één of geen land" was anders even waar voor elke
   // klant, en dan knippert de kaart weg en weer terug.
   if (laden) {
@@ -185,33 +213,43 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
         controls="geo-tabel"
         label={`de tabel per ${geoWord} (${ranked.length})`}
       />
-      <div id="geo-tabel" hidden={!tabelOpen} className="overflow-x-auto border-t border-border">
-        <table className="w-full text-body">
-          <thead>
-            <tr className="text-left text-muted-foreground border-b border-border">
-              <th className="px-5 py-2 font-medium">{focus === "US" ? "Staat" : "Land"}</th>
-              <th className="px-3 py-2 font-medium text-right">Vertoningen</th>
-              <th className="px-3 py-2 font-medium text-right">Klikken</th>
-              <th className="px-3 py-2 font-medium text-right">CTR</th>
-              <th className="px-3 py-2 font-medium text-right">Conversies</th>
-              <th className="px-3 py-2 font-medium text-right">Conv.ratio</th>
-              <th className="px-5 py-2 font-medium text-right">CPA</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div id="geo-tabel" hidden={!tabelOpen} className="border-t border-border">
+        <Tabel>
+          <Kop>
+            <KolomKop>{focus === "US" ? "Staat" : "Land"}</KolomKop>
+            <KolomKop getal bijschrift={balkKolom === "impressions" ? "aandeel" : undefined}>Vertoningen</KolomKop>
+            <KolomKop getal bijschrift={balkKolom === "clicks" ? "aandeel" : undefined}>Klikken</KolomKop>
+            <KolomKop getal>CTR</KolomKop>
+            <KolomKop getal bijschrift={balkKolom === "conversions" ? "aandeel" : undefined}>Conversies</KolomKop>
+            <KolomKop getal>Conv.ratio</KolomKop>
+            <KolomKop getal>CPA</KolomKop>
+          </Kop>
+          <Body>
             {ranked.map(({ c }) => (
-              <tr key={c.code} className="border-b border-border/50">
-                <td className="px-5 py-1.5 text-rm-gray font-medium">{labelOf(c.code)}</td>
-                <td className="px-3 py-1.5 text-right">{int(c.impressions)}</td>
-                <td className="px-3 py-1.5 text-right">{int(c.clicks)}</td>
-                <td className="px-3 py-1.5 text-right">{pct(c.impressions > 0 ? c.clicks / c.impressions : null)}</td>
-                <td className="px-3 py-1.5 text-right">{c.conversions == null ? "—" : nf(1).format(c.conversions)}</td>
-                <td className="px-3 py-1.5 text-right">{pct(c.clicks > 0 ? c.conversions / c.clicks : null)}</td>
-                <td className="px-5 py-1.5 text-right">{eur(c.conversions > 0 ? c.cost / c.conversions : null)}</td>
-              </tr>
+              <Rij key={c.code}>
+                <NaamCel>{labelOf(c.code)}</NaamCel>
+                {balk(c, "impressions", int(c.impressions))}
+                {balk(c, "clicks", int(c.clicks))}
+                <GetalCel zacht>{pct(c.impressions > 0 ? c.clicks / c.impressions : null)}</GetalCel>
+                {balk(c, "conversions", c.conversions == null ? "—" : nf(1).format(c.conversions))}
+                <GetalCel zacht>{pct(c.clicks > 0 ? c.conversions / c.clicks : null)}</GetalCel>
+                <GetalCel zacht>{eur(c.conversions > 0 ? c.cost / c.conversions : null)}</GetalCel>
+              </Rij>
             ))}
-          </tbody>
-        </table>
+          </Body>
+          {/* Vijftig landregels zonder som laten de lezer optellen om te weten of "de VS" nu groot
+              of klein is. De ratio's staan uit de totalen berekend en niet als gemiddelde van de
+              landwaarden: een gemiddelde CTR over landen weegt Nederland even zwaar als Malta. */}
+          <TotaalRij>
+            <TotaalCel>Totaal ({ranked.length})</TotaalCel>
+            <TotaalCel getal>{int(totaal.impressions)}</TotaalCel>
+            <TotaalCel getal>{int(totaal.clicks)}</TotaalCel>
+            <TotaalCel getal>{pct(totaal.impressions > 0 ? totaal.clicks / totaal.impressions : null)}</TotaalCel>
+            <TotaalCel getal>{nf(1).format(totaal.conversions)}</TotaalCel>
+            <TotaalCel getal>{pct(totaal.clicks > 0 ? totaal.conversions / totaal.clicks : null)}</TotaalCel>
+            <TotaalCel getal>{eur(totaal.conversions > 0 ? totaal.cost / totaal.conversions : null)}</TotaalCel>
+          </TotaalRij>
+        </Tabel>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_VIDEO_ROWS } from "@/lib/demo/video-demo";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import {
   aggregateVideoCampaigns, diagnoseVideo, VIDEO_DIAGNOSIS_LABEL, VIDEO_DIAGNOSIS_EXPLAIN,
   type VideoCampaignRow, type VideoDiagnosis,
@@ -113,46 +114,68 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
       subtitle="beoordeeld op bereik en kijkgedrag — niet op klikken of CPA"
       meta={<span className="text-micro text-muted-foreground">{aggs.length} campagne{aggs.length === 1 ? "" : "s"}</span>}
     >
-      <div className="overflow-x-auto">
-        <table className="w-full text-body">
-          <thead>
-            <tr className="text-left text-muted-foreground border-b border-border">
-              <th className="px-5 py-2 font-medium">Campagne</th>
-              <th className="px-3 py-2 font-medium text-right">Vertoningen</th>
-              <th className="px-3 py-2 font-medium text-right">Views</th>
-              <th className="px-3 py-2 font-medium text-right">View rate</th>
-              <th className="px-3 py-2 font-medium text-right">CPM</th>
-              <th className="px-3 py-2 font-medium text-right">CPV</th>
-              <th className="px-3 py-2 font-medium">Kijkdiepte</th>
-              <th className="px-5 py-2 font-medium">Duiding</th>
-            </tr>
-          </thead>
-          <tbody>
-            {aggs.map((a) => {
-              const d = diagnoseVideo(a);
-              return (
-                <tr key={a.campaignId} className="border-b border-border/50 align-middle">
-                  <td className="px-5 py-2 text-rm-gray font-medium">{a.campaignName}</td>
-                  <td className="px-3 py-2 text-right">{int(a.impressions)}</td>
-                  <td className="px-3 py-2 text-right">{int(a.videoViews)}</td>
-                  <td className="px-3 py-2 text-right">{pct(a.viewRate)}</td>
-                  <td className="px-3 py-2 text-right">{eur2(a.cpm)}</td>
-                  <td className="px-3 py-2 text-right">{eurCpv(a.cpv)}</td>
-                  <td className="px-3 py-2"><QuartileBar p25={a.p25} p50={a.p50} p75={a.p75} p100={a.p100} /></td>
-                  <td className="px-5 py-2">
-                    <span
-                      className={`inline-block rounded-md border px-1.5 py-0.5 text-micro font-medium ${DIAGNOSIS_STYLE[d]}`}
-                      title={VIDEO_DIAGNOSIS_EXPLAIN[d]}
-                    >
-                      {VIDEO_DIAGNOSIS_LABEL[d]}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {(() => {
+        const totaal = aggs.reduce(
+          (t, a) => ({ impressions: t.impressions + a.impressions, videoViews: t.videoViews + a.videoViews, cost: t.cost + a.cost }),
+          { impressions: 0, videoViews: 0, cost: 0 },
+        );
+        const grootsteBereik = Math.max(0, ...aggs.map((a) => a.impressions));
+        return (
+          <Tabel>
+            <Kop>
+              <KolomKop breed>Campagne</KolomKop>
+              <KolomKop getal bijschrift="aandeel">Vertoningen</KolomKop>
+              <KolomKop getal>Views</KolomKop>
+              <KolomKop getal>View rate</KolomKop>
+              <KolomKop getal>CPM</KolomKop>
+              <KolomKop getal>CPV</KolomKop>
+              <KolomKop>Kijkdiepte</KolomKop>
+              <KolomKop>Duiding</KolomKop>
+            </Kop>
+            <Body>
+              {aggs.map((a) => {
+                const d = diagnoseVideo(a);
+                return (
+                  <Rij key={a.campaignId}>
+                    <NaamCel>{a.campaignName}</NaamCel>
+                    {/* De streep op vertoningen: dit paneel beoordeelt op bereik, en dan is de
+                        eerste vraag welke campagne het bereik draagt. Op view rate, CPM en CPV
+                        staat er geen — dat zijn verhoudingen. */}
+                    <AandeelCel waarde={int(a.impressions)} aandeel={grootsteBereik > 0 ? a.impressions / grootsteBereik : 0} />
+                    <GetalCel>{int(a.videoViews)}</GetalCel>
+                    <GetalCel zacht>{pct(a.viewRate)}</GetalCel>
+                    <GetalCel zacht>{eur2(a.cpm)}</GetalCel>
+                    <GetalCel zacht>{eurCpv(a.cpv)}</GetalCel>
+                    <Cel><QuartileBar p25={a.p25} p50={a.p50} p75={a.p75} p100={a.p100} /></Cel>
+                    <Cel>
+                      <span
+                        className={`inline-block rounded-md border px-1.5 py-0.5 text-micro font-medium whitespace-nowrap ${DIAGNOSIS_STYLE[d]}`}
+                        title={VIDEO_DIAGNOSIS_EXPLAIN[d]}
+                      >
+                        {VIDEO_DIAGNOSIS_LABEL[d]}
+                      </span>
+                    </Cel>
+                  </Rij>
+                );
+              })}
+            </Body>
+            {/* View rate, CPM en CPV uit de totalen en niet als gemiddelde van de campagnewaarden:
+                anders weegt een campagne met duizend vertoningen even zwaar als een met een miljoen.
+                De kijkdiepte krijgt geen totaal — die is per campagne al naar vertoningen gewogen,
+                en een balk over alle campagnes samen zou een gemiddelde tonen dat niemand bekijkt. */}
+            <TotaalRij>
+              <TotaalCel>Alle campagnes ({aggs.length})</TotaalCel>
+              <TotaalCel getal>{int(totaal.impressions)}</TotaalCel>
+              <TotaalCel getal>{int(totaal.videoViews)}</TotaalCel>
+              <TotaalCel getal>{pct(totaal.impressions > 0 ? totaal.videoViews / totaal.impressions : null)}</TotaalCel>
+              <TotaalCel getal>{eur2(totaal.impressions > 0 ? (totaal.cost / totaal.impressions) * 1000 : null)}</TotaalCel>
+              <TotaalCel getal>{eurCpv(totaal.videoViews > 0 ? totaal.cost / totaal.videoViews : null)}</TotaalCel>
+              <TotaalCel>{""}</TotaalCel>
+              <TotaalCel>{""}</TotaalCel>
+            </TotaalRij>
+          </Tabel>
+        );
+      })()}
 
       {/* De duiding uitgeschreven: een badge alleen laat de lezer raden wat te doen. */}
       <div className="px-5 py-3 border-t border-border space-y-1">

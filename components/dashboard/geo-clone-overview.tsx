@@ -7,6 +7,8 @@ import { aggregateCampaignMonthlyByGeoClone, type CampaignMonthlyRow } from "@/l
 import { RAI_GEO_CLONES } from "@/lib/rai/geo-clone-catalog";
 import { SignalAnalysisCard } from "./signal-analysis-card";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
+import { maandLabel } from "./chart-chrome";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 
 // Fase 1c: account-brede kaarten kunnen niet per geo-clone gesplitst worden (de account-tabel
 // draagt geen campagnenaam). Daarom her-aggregeren we de KPI's PER geo-clone uit
@@ -122,36 +124,65 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
               data={recentMonths.map((m) => ({ maand: m.month.slice(0, 7), spend: m.cost, lijn: m.conversions }))}
             />
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-body">
-                <thead>
-                  <tr className="text-left text-muted-foreground border-b border-border">
-                    <th className="py-2 pr-4 font-medium">Maand</th>
-                    <th className="py-2 pr-4 font-medium text-right">Spend</th>
-                    <th className="py-2 pr-4 font-medium text-right">Klikken</th>
-                    <th className="py-2 pr-4 font-medium text-right">Conversies</th>
-                    <th className="py-2 pr-4 font-medium text-right">Conv.waarde</th>
-                    <th className="py-2 pr-4 font-medium text-right">CPA</th>
-                    <th className="py-2 pr-4 font-medium text-right">ROAS</th>
-                    <th className="py-2 font-medium text-right">CTR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthsDesc.map((m) => (
-                    <tr key={m.month} className="border-b border-border/50">
-                      <td className="py-1.5 pr-4 text-muted-foreground">{m.month.slice(0, 7)}</td>
-                      <td className="py-1.5 pr-4 text-right">{fmtEur(m.cost)}</td>
-                      <td className="py-1.5 pr-4 text-right">{fmt(m.clicks)}</td>
-                      <td className="py-1.5 pr-4 text-right">{fmt(m.conversions, { maximumFractionDigits: 1 })}</td>
-                      <td className="py-1.5 pr-4 text-right">{fmtEur(m.conversionsValue)}</td>
-                      <td className="py-1.5 pr-4 text-right">{fmtEur(m.cpa)}</td>
-                      <td className="py-1.5 pr-4 text-right">{m.roas === null ? "—" : `${m.roas.toFixed(2)}×`}</td>
-                      <td className="py-1.5 text-right">{fmtPct(m.ctr)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              // Tegen de duurste maand en niet tegen de som: bij twaalf maanden is elk
+              // aandeel-van-het-totaal klein en zijn alle streepjes even kort.
+              const duursteMaand = Math.max(0, ...monthsDesc.map((m) => m.cost));
+              // De som gaat over de zichtbare maanden en niet over `summary.totals`. Die laatste
+              // telt alle 25 maanden op, en dan staat er € 190.021 onder zes regels van elk zo'n
+              // € 8.000 — een totaal dat niet klopt met wat je ziet is erger dan geen totaal.
+              const zichtbaar = monthsDesc.reduce(
+                (t, m) => ({
+                  impressions: t.impressions + m.impressions,
+                  clicks: t.clicks + m.clicks,
+                  cost: t.cost + m.cost,
+                  conversions: t.conversions + m.conversions,
+                  conversionsValue: t.conversionsValue + m.conversionsValue,
+                }),
+                { impressions: 0, clicks: 0, cost: 0, conversions: 0, conversionsValue: 0 },
+              );
+              return (
+                <Tabel>
+                  <Kop>
+                    <KolomKop>Maand</KolomKop>
+                    <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+                    <KolomKop getal>Klikken</KolomKop>
+                    <KolomKop getal>Conversies</KolomKop>
+                    <KolomKop getal>Conv.waarde</KolomKop>
+                    <KolomKop getal>CPA</KolomKop>
+                    <KolomKop getal>ROAS</KolomKop>
+                    <KolomKop getal>CTR</KolomKop>
+                  </Kop>
+                  <Body>
+                    {monthsDesc.map((m) => (
+                      <Rij key={m.month}>
+                        <NaamCel>{maandLabel(m.month)}</NaamCel>
+                        <AandeelCel waarde={fmtEur(m.cost)} aandeel={duursteMaand > 0 ? m.cost / duursteMaand : 0} />
+                        <GetalCel>{fmt(m.clicks)}</GetalCel>
+                        <GetalCel>{fmt(m.conversions, { maximumFractionDigits: 1 })}</GetalCel>
+                        <GetalCel>{fmtEur(m.conversionsValue)}</GetalCel>
+                        <GetalCel zacht>{fmtEur(m.cpa)}</GetalCel>
+                        <GetalCel zacht>{m.roas === null ? "—" : `${m.roas.toFixed(2)}×`}</GetalCel>
+                        <GetalCel zacht>{fmtPct(m.ctr)}</GetalCel>
+                      </Rij>
+                    ))}
+                  </Body>
+                  {/* De ratio's uit de opgetelde maanden en niet als gemiddelde van de
+                      maandwaarden: een maand met tien conversies mag niet even zwaar wegen als een
+                      met honderd. */}
+                  <TotaalRij>
+                    <TotaalCel>Getoonde maanden ({monthsDesc.length} van {summary.months.length})</TotaalCel>
+                    <TotaalCel getal>{fmtEur(zichtbaar.cost)}</TotaalCel>
+                    <TotaalCel getal>{fmt(zichtbaar.clicks)}</TotaalCel>
+                    <TotaalCel getal>{fmt(zichtbaar.conversions, { maximumFractionDigits: 1 })}</TotaalCel>
+                    <TotaalCel getal>{fmtEur(zichtbaar.conversionsValue)}</TotaalCel>
+                    <TotaalCel getal>{fmtEur(zichtbaar.conversions > 0 ? zichtbaar.cost / zichtbaar.conversions : null)}</TotaalCel>
+                    <TotaalCel getal>{zichtbaar.cost > 0 ? `${(zichtbaar.conversionsValue / zichtbaar.cost).toFixed(2)}×` : "—"}</TotaalCel>
+                    <TotaalCel getal>{fmtPct(zichtbaar.impressions > 0 ? zichtbaar.clicks / zichtbaar.impressions : null)}</TotaalCel>
+                  </TotaalRij>
+                </Tabel>
+              );
+            })()}
           </>
         )}
       </div>

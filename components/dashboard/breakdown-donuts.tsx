@@ -9,6 +9,7 @@ import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { buildNetworkSplit, findImbalances, networkTotals, type NetworkRow } from "@/lib/pmax/network-split";
 import { BREAKDOWN_DIMENSIES, metaWaardeLabel, type BreakdownKanaal } from "@/lib/analysis/breakdown-dimensions";
 import { Legenda, type LegendaItem } from "./chart-chrome";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 
 // Waar het budget van Meta en LinkedIn landt, per uitsplitsing.
 //
@@ -205,36 +206,42 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
         controls={`breakdown-tabel-${channel}`}
         label={`de cijfers per segment (${slices.length})`}
       />
-      <div id={`breakdown-tabel-${channel}`} hidden={!tabelOpen} className="overflow-x-auto border-t border-border">
-        <table className="w-full text-body">
-          <thead>
-            <tr className="text-left text-muted-foreground border-b border-border">
-              <th className="px-5 py-2 font-medium">Segment</th>
-              <th className="px-3 py-2 font-medium text-right">Spend</th>
-              <th className="px-3 py-2 font-medium text-right">Aandeel</th>
-              <th className="px-3 py-2 font-medium text-right">{conversieWoord === "leads" ? "Leads" : "Conversies"}</th>
-              <th className="px-3 py-2 font-medium text-right">Aandeel</th>
-              <th className="px-5 py-2 font-medium text-right">{conversieWoord === "leads" ? "CPL" : "CPA"}</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div id={`breakdown-tabel-${channel}`} hidden={!tabelOpen} className="border-t border-border">
+        <Tabel>
+          <Kop>
+            <KolomKop>Segment</KolomKop>
+            <KolomKop getal>Spend</KolomKop>
+            <KolomKop getal>Aandeel</KolomKop>
+            <KolomKop getal>{conversieWoord === "leads" ? "Leads" : "Conversies"}</KolomKop>
+            <KolomKop getal>Aandeel</KolomKop>
+            <KolomKop getal>{conversieWoord === "leads" ? "CPL" : "CPA"}</KolomKop>
+          </Kop>
+          <Body>
             {slices.map((s) => (
-              <tr key={s.networkType} className="border-b border-border/50">
-                <td className="px-5 py-1.5">
-                  <span className="inline-flex items-center gap-1.5 text-rm-gray font-medium">
+              <Rij key={s.networkType}>
+                <NaamCel>
+                  <span className="inline-flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: kleur(s.networkType) }} aria-hidden />
                     {s.label}
                   </span>
-                </td>
-                <td className="px-3 py-1.5 text-right">{eur(s.cost)}</td>
-                <td className="px-3 py-1.5 text-right">{pct(s.costShare)}</td>
-                <td className="px-3 py-1.5 text-right">{s.conversions > 0 ? num(s.conversions, 1) : "—"}</td>
-                <td className="px-3 py-1.5 text-right">{pct(s.conversionShare)}</td>
-                <td className="px-5 py-1.5 text-right">{s.cpa == null ? "—" : eur(s.cpa)}</td>
-              </tr>
+                </NaamCel>
+                <GetalCel>{eur(s.cost)}</GetalCel>
+                <GetalCel zacht>{pct(s.costShare)}</GetalCel>
+                <GetalCel>{s.conversions > 0 ? num(s.conversions, 1) : "—"}</GetalCel>
+                <GetalCel zacht>{pct(s.conversionShare)}</GetalCel>
+                <GetalCel zacht>{s.cpa == null ? "—" : eur(s.cpa)}</GetalCel>
+              </Rij>
             ))}
-          </tbody>
-        </table>
+          </Body>
+          <TotaalRij>
+            <TotaalCel>Alle segmenten</TotaalCel>
+            <TotaalCel getal>{eur(totalen.cost)}</TotaalCel>
+            <TotaalCel getal>100%</TotaalCel>
+            <TotaalCel getal>{totalen.hasConversions ? num(totalen.conversions, 1) : "—"}</TotaalCel>
+            <TotaalCel getal>{totalen.hasConversions ? "100%" : "—"}</TotaalCel>
+            <TotaalCel getal>{totalen.conversions > 0 ? eur(totalen.cost / totalen.conversions) : "—"}</TotaalCel>
+          </TotaalRij>
+        </Tabel>
       </div>
     </div>
   );

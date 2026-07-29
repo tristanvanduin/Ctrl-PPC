@@ -1,16 +1,28 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { AlertTriangle, ArrowUpDown, Sparkles } from "lucide-react";
+import { AlertTriangle, Sparkles } from "lucide-react";
 import { useClientDataState } from "@/lib/client-data-provider";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { detectSearchTermCountries } from "@/lib/countries";
 import { SearchTermAnalysisTab } from "./search-term-analysis-tab";
+import {
+  Tabel, Kop, KolomKop, SorteerKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel,
+} from "./data-table";
 
+/**
+ * De kleur van de aandeelstreep in deze drie tabellen. Rood en niet de merkkleur: alles wat hier
+ * staat is geld dat niets opleverde, en een streep in de huiskleur zou dat als prestatie lezen.
+ */
+const VERSPIL_KLEUR = "#ef4444";
+
+// Hele euro's, zoals overal elders in het dashboard. Met centen erbij las "€ 119,00" naast
+// "€ 9.321" als een ander soort getal, terwijl het dezelfde grootheid is — en bij verspilling
+// voegen twee decimalen niets toe aan de beslissing.
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
     style: "currency", currency: "EUR",
-    minimumFractionDigits: 2, maximumFractionDigits: 2,
+    minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(v);
 }
 
@@ -86,17 +98,24 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
   const totalBleederCost = bleeders.reduce((s, b) => s + b.cost, 0);
   const totalProductBleederCost = productBleeders.reduce((s, p) => s + p.cost, 0);
 
-  const SortTh = ({ col, label, align }: { col: SortKey; label: string; align?: string }) => (
-    <th
-      onClick={() => handleSort(col)}
-      className={`px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue ${align === "right" ? "text-right" : "text-left"}`}
+  const SortTh = ({ col, label, align, breed, bijschrift }: { col: SortKey; label: string; align?: string; breed?: boolean; bijschrift?: string }) => (
+    <SorteerKop
+      getal={align === "right"}
+      breed={breed}
+      bijschrift={bijschrift}
+      actief={sortBy === col}
+      richting={sortDir}
+      onSorteer={() => handleSort(col)}
     >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {sortBy === col ? <span>{sortDir === "asc" ? "↑" : "↓"}</span> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
-      </span>
-    </th>
+      {label}
+    </SorteerKop>
   );
+
+  // Elke streep staat tegen de duurste regel in zijn eigen tabel: de vraag is welke term, ad group
+  // of product het meeste weglekt, niet welk aandeel van de verspilling het is.
+  const duursteTerm = Math.max(0, ...sortedTerms.map((t) => t.cost));
+  const duursteBleeder = Math.max(0, ...bleeders.map((b) => b.cost));
+  const duursteProduct = Math.max(0, ...productBleeders.map((p) => p.cost));
 
   return (
     <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
@@ -172,44 +191,48 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
             Geen verspilde zoektermen gevonden. Goed bezig!
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/50 border-b border-border">
-                <tr>
-                  <SortTh col="term" label="Zoekterm" />
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Ad Group</th>
-                  <SortTh col="clicks" label="Clicks" align="right" />
-                  <SortTh col="cost" label="Kosten" align="right" />
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {sortedTerms.map((term, i) => (
-                  <tr key={i} className="hover:bg-red-50/30 transition-colors">
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <span className="text-sm text-rm-gray font-medium">{term.searchTerm}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground truncate max-w-[200px]">{term.campaignName}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground truncate max-w-[150px]">{term.adGroupName}</td>
-                    <td className="px-4 py-2.5 text-right text-sm text-rm-gray">{term.clicks}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-semibold text-red-500">{fmt(term.cost)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm text-red-500 font-semibold">0</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="border-t-2 border-border bg-gray-50/50">
-                <tr>
-                  <td colSpan={4} className="px-4 py-2.5 text-xs font-semibold text-rm-gray">Totaal verspild</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold text-red-600">{fmt(totalWaste)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <Tabel>
+            <Kop>
+              <SortTh col="term" label="Zoekterm" breed />
+              <KolomKop>Campagne</KolomKop>
+              <KolomKop>Ad Group</KolomKop>
+              <SortTh col="clicks" label="Clicks" align="right" />
+              <SortTh col="cost" label="Kosten" align="right" bijschrift="aandeel" />
+              <KolomKop getal>Conv.</KolomKop>
+            </Kop>
+            <Body>
+              {sortedTerms.map((term, i) => (
+                <Rij key={i}>
+                  <NaamCel>
+                    <span className="inline-flex items-center gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      <span className="truncate">{term.searchTerm}</span>
+                    </span>
+                  </NaamCel>
+                  <Cel zacht nowrap className="text-micro">{term.campaignName}</Cel>
+                  <Cel zacht nowrap className="text-micro">{term.adGroupName}</Cel>
+                  <GetalCel>{term.clicks}</GetalCel>
+                  {/* De streep op kosten: deze tabel bestaat om te zien wáár het weglekt, en dan
+                      is de vraag welke termen het meeste kosten — niet of ze samen honderd
+                      procent zijn. Vandaar tegen de duurste term en niet tegen de som. */}
+                  <AandeelCel
+                    waarde={<span className="text-red-500">{fmt(term.cost)}</span>}
+                    aandeel={duursteTerm > 0 ? term.cost / duursteTerm : 0}
+                    kleur={VERSPIL_KLEUR}
+                  />
+                  <GetalCel className="text-red-500 font-semibold">0</GetalCel>
+                </Rij>
+              ))}
+            </Body>
+            <TotaalRij>
+              <TotaalCel>Totaal verspild ({sortedTerms.length})</TotaalCel>
+              <TotaalCel>{""}</TotaalCel>
+              <TotaalCel>{""}</TotaalCel>
+              <TotaalCel getal>{sortedTerms.reduce((s, t) => s + t.clicks, 0)}</TotaalCel>
+              <TotaalCel getal><span className="text-red-600">{fmt(totalWaste)}</span></TotaalCel>
+              <TotaalCel getal>0</TotaalCel>
+            </TotaalRij>
+          </Tabel>
         )
       )}
 
@@ -220,44 +243,45 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
             Geen ad group bleeders gevonden.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/50 border-b border-border">
-                <tr>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Ad Group</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Impressies</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Clicks</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Kosten</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {bleeders.map((ag, i) => (
-                  <tr key={i} className="hover:bg-red-50/30 transition-colors">
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <span className="text-sm text-rm-gray font-medium truncate max-w-[200px]">{ag.adGroupName}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground truncate max-w-[200px]">{ag.campaignName}</td>
-                    <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">{ag.impressions.toLocaleString("nl-NL")}</td>
-                    <td className="px-4 py-2.5 text-right text-sm text-rm-gray">{ag.clicks}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-semibold text-red-500">{fmt(ag.cost)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm text-red-500 font-semibold">0</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="border-t-2 border-border bg-gray-50/50">
-                <tr>
-                  <td colSpan={4} className="px-4 py-2.5 text-xs font-semibold text-rm-gray">Totaal verspild</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold text-red-600">{fmt(totalBleederCost)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <Tabel>
+            <Kop>
+              <KolomKop breed>Ad Group</KolomKop>
+              <KolomKop>Campagne</KolomKop>
+              <KolomKop getal>Impressies</KolomKop>
+              <KolomKop getal>Clicks</KolomKop>
+              <KolomKop getal bijschrift="aandeel">Kosten</KolomKop>
+              <KolomKop getal>Conv.</KolomKop>
+            </Kop>
+            <Body>
+              {bleeders.map((ag, i) => (
+                <Rij key={i}>
+                  <NaamCel>
+                    <span className="inline-flex items-center gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      <span className="truncate">{ag.adGroupName}</span>
+                    </span>
+                  </NaamCel>
+                  <Cel zacht nowrap className="text-micro">{ag.campaignName}</Cel>
+                  <GetalCel zacht>{ag.impressions.toLocaleString("nl-NL")}</GetalCel>
+                  <GetalCel>{ag.clicks}</GetalCel>
+                  <AandeelCel
+                    waarde={<span className="text-red-500">{fmt(ag.cost)}</span>}
+                    aandeel={duursteBleeder > 0 ? ag.cost / duursteBleeder : 0}
+                    kleur={VERSPIL_KLEUR}
+                  />
+                  <GetalCel className="text-red-500 font-semibold">0</GetalCel>
+                </Rij>
+              ))}
+            </Body>
+            <TotaalRij>
+              <TotaalCel>Totaal verspild ({bleeders.length})</TotaalCel>
+              <TotaalCel>{""}</TotaalCel>
+              <TotaalCel getal>{bleeders.reduce((s, b) => s + b.impressions, 0).toLocaleString("nl-NL")}</TotaalCel>
+              <TotaalCel getal>{bleeders.reduce((s, b) => s + b.clicks, 0)}</TotaalCel>
+              <TotaalCel getal><span className="text-red-600">{fmt(totalBleederCost)}</span></TotaalCel>
+              <TotaalCel getal>0</TotaalCel>
+            </TotaalRij>
+          </Tabel>
         )
       )}
 
@@ -268,49 +292,45 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
             Geen product bleeders gevonden.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/50 border-b border-border">
-                <tr>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Product</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Impressies</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Clicks</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Kosten</th>
-                  <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {productBleeders.map((p, i) => (
-                  <tr key={i} className="hover:bg-red-50/30 transition-colors">
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <div className="min-w-0">
-                          <span className="text-sm text-rm-gray font-medium truncate block max-w-[250px]">{p.productTitle}</span>
-                          {p.productId && (
-                            <span className="text-micro text-muted-foreground">{p.productId}</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground truncate max-w-[200px]">{p.campaignName}</td>
-                    <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">{p.impressions.toLocaleString("nl-NL")}</td>
-                    <td className="px-4 py-2.5 text-right text-sm text-rm-gray">{p.clicks}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-semibold text-red-500">{fmt(p.cost)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm text-red-500 font-semibold">0</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="border-t-2 border-border bg-gray-50/50">
-                <tr>
-                  <td colSpan={4} className="px-4 py-2.5 text-xs font-semibold text-rm-gray">Totaal verspild</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold text-red-600">{fmt(totalProductBleederCost)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <Tabel>
+            <Kop>
+              <KolomKop breed>Product</KolomKop>
+              <KolomKop>Campagne</KolomKop>
+              <KolomKop getal>Impressies</KolomKop>
+              <KolomKop getal>Clicks</KolomKop>
+              <KolomKop getal bijschrift="aandeel">Kosten</KolomKop>
+              <KolomKop getal>Conv.</KolomKop>
+            </Kop>
+            <Body>
+              {productBleeders.map((p, i) => (
+                <Rij key={i}>
+                  <NaamCel sub={p.productId || undefined}>
+                    <span className="inline-flex items-center gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      <span className="truncate">{p.productTitle}</span>
+                    </span>
+                  </NaamCel>
+                  <Cel zacht nowrap className="text-micro">{p.campaignName}</Cel>
+                  <GetalCel zacht>{p.impressions.toLocaleString("nl-NL")}</GetalCel>
+                  <GetalCel>{p.clicks}</GetalCel>
+                  <AandeelCel
+                    waarde={<span className="text-red-500">{fmt(p.cost)}</span>}
+                    aandeel={duursteProduct > 0 ? p.cost / duursteProduct : 0}
+                    kleur={VERSPIL_KLEUR}
+                  />
+                  <GetalCel className="text-red-500 font-semibold">0</GetalCel>
+                </Rij>
+              ))}
+            </Body>
+            <TotaalRij>
+              <TotaalCel>Totaal verspild ({productBleeders.length})</TotaalCel>
+              <TotaalCel>{""}</TotaalCel>
+              <TotaalCel getal>{productBleeders.reduce((s, p) => s + p.impressions, 0).toLocaleString("nl-NL")}</TotaalCel>
+              <TotaalCel getal>{productBleeders.reduce((s, p) => s + p.clicks, 0)}</TotaalCel>
+              <TotaalCel getal><span className="text-red-600">{fmt(totalProductBleederCost)}</span></TotaalCel>
+              <TotaalCel getal>0</TotaalCel>
+            </TotaalRij>
+          </Tabel>
         )
       )}
       {/* AI Analysis tab */}

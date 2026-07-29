@@ -27,6 +27,7 @@
 // visueel "veel" zeggen waar het "duur" betekent. Die kolommen krijgen daarom GetalCel.
 
 import type { ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 /** De tabel plus zijn horizontale scroll. Tabellen mogen nooit de pagina laten scrollen. */
 export function Tabel({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -58,7 +59,16 @@ export function KolomKop({
 }: {
   children: ReactNode;
   getal?: boolean;
-  /** De identiteitskolom: krijgt de ruimte, de rest zo smal mogelijk. */
+  /**
+   * De identiteitskolom slokt alle overgebleven breedte op, zodat de getallen zo compact mogelijk
+   * naast elkaar staan.
+   *
+   * Alleen zetten als die kolom lange vrije tekst draagt — een campagnenaam, een placement, een
+   * zoekterm. Bij korte labels (een netwerk, een segment, een land) levert het een gat van meer
+   * dan duizend pixels tussen de naam en het eerste getal op, en moet je oog de hele breedte over
+   * om een regel te volgen. Zonder `breed` verdeelt de browser de overruimte over alle kolommen
+   * en staan ze rustig gespreid.
+   */
   breed?: boolean;
   /** Kleine tweede regel onder de kop, bijv. om te zeggen waar een aandeelstreep over gaat. */
   bijschrift?: ReactNode;
@@ -82,6 +92,65 @@ export function KolomKop({
   );
 }
 
+/**
+ * Een kolomkop waarop je kunt sorteren.
+ *
+ * Drie dingen die de losse varianten in dit dashboard misten en die geen smaak zijn:
+ *
+ * - Het is een `button`. Een `onClick` op een `th` is voor een muis een knop en voor een toetsenbord
+ *   niets: geen focus, geen Enter, geen aankondiging dat er iets te kiezen valt.
+ * - `aria-sort` op de cel. Zonder dat weet een schermlezer niet waarop de tabel gesorteerd staat —
+ *   het pijltje is dan de enige drager van die informatie, en dat is puur visueel.
+ * - Bij een getalkolom staat de pijl links van het label, zodat het label tegen de rechterrand
+ *   blijft staan waar de cijfers eronder ook staan. Anders schuift de kop een pijlbreedte op zodra
+ *   je hem aanklikt.
+ */
+export function SorteerKop({
+  children,
+  getal = false,
+  breed = false,
+  bijschrift,
+  actief = false,
+  richting = "desc",
+  onSorteer,
+}: {
+  children: ReactNode;
+  getal?: boolean;
+  breed?: boolean;
+  bijschrift?: ReactNode;
+  actief?: boolean;
+  richting?: "asc" | "desc";
+  onSorteer: () => void;
+}) {
+  const Pijl = !actief ? ArrowUpDown : richting === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th
+      scope="col"
+      aria-sort={actief ? (richting === "asc" ? "ascending" : "descending") : "none"}
+      className={`px-3 py-2.5 text-micro font-semibold uppercase tracking-wider whitespace-nowrap ${
+        getal ? "text-right" : "text-left"
+      } ${breed ? "w-full" : ""}`}
+    >
+      {/* De typografie staat ook op de knop en niet alleen op de cel: de browserreset zet
+          `text-transform: none` en een eigen lettergrootte op button, en dan staat de ene kolomkop
+          in kapitalen en de sorteerbare ernaast niet. */}
+      <button
+        type="button"
+        onClick={onSorteer}
+        className={`inline-flex items-center gap-1 rounded-sm text-micro font-semibold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue ${
+          getal ? "flex-row-reverse" : ""
+        } ${actief ? "text-rm-blue" : "text-muted-foreground hover:text-rm-blue"}`}
+      >
+        {children}
+        <Pijl className={`w-3 h-3 shrink-0 ${actief ? "" : "opacity-30"}`} aria-hidden />
+      </button>
+      {bijschrift && (
+        <span className="block font-normal normal-case tracking-normal text-muted-foreground/70">{bijschrift}</span>
+      )}
+    </th>
+  );
+}
+
 export function Body({ children }: { children: ReactNode }) {
   return <tbody className="divide-y divide-border/60">{children}</tbody>;
 }
@@ -95,8 +164,33 @@ export function Rij({ children, className = "" }: { children: ReactNode; classNa
 export function NaamCel({ children, sub, className = "" }: { children: ReactNode; sub?: ReactNode; className?: string }) {
   return (
     <td className={`px-3 py-2 align-middle ${className}`}>
+      {/* De naam wordt afgekapt: hij is een aanduiding, en een campagnenaam van honderd tekens
+          duwt alle getallen uit beeld. */}
       <div className="text-rm-gray font-medium truncate max-w-[28rem]">{children}</div>
-      {sub && <div className="text-micro text-muted-foreground truncate max-w-[28rem]">{sub}</div>}
+      {/* De tweede regel niet. Daar staat de reden — "kostte € 340 over 720 klikken zonder één
+          conversie" — en die werd afgekapt tot "Klikken in apps zijn vaak onbe…". Een afgekapte
+          naam kun je nog herkennen; een afgekapte verklaring is weg. */}
+      {sub && <div className="text-micro text-muted-foreground max-w-[28rem]">{sub}</div>}
+    </td>
+  );
+}
+
+/** Een gewone cel voor tekst die geen getal en geen identiteit is: een type, een label, een advies. */
+export function Cel({
+  children,
+  zacht = false,
+  nowrap = false,
+  className = "",
+}: {
+  children: ReactNode;
+  zacht?: boolean;
+  /** Korte labels ("Mobiele app", "YouTube-kanaal") mogen niet over twee regels breken. */
+  nowrap?: boolean;
+  className?: string;
+}) {
+  return (
+    <td className={`px-3 py-2 align-middle ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${nowrap ? "whitespace-nowrap" : ""} ${className}`}>
+      {children}
     </td>
   );
 }
@@ -132,7 +226,12 @@ export function GetalCel({
 export function AandeelCel({
   waarde,
   aandeel,
-  kleur = "var(--brand-primary)",
+  // Mét terugvalwaarde, zoals overal elders in deze codebase (zie globals.css). Zonder de
+  // terugval is `background: var(--brand-primary)` een ongeldige waarde zolang de merkkleur nog
+  // niet geladen is, en valt de achtergrond terug op transparant: dan staat er een lege grijze
+  // baan naast het getal. Dat is niet zichtbaar in de code en niet in de types — alleen in de
+  // schermafdruk. Op de beurs-gescopete pagina bleef die kleur in demo-modus zelfs helemaal uit.
+  kleur = "var(--brand-primary, #08288C)",
   className = "",
 }: {
   waarde: ReactNode;
