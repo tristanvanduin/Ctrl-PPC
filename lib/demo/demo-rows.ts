@@ -131,6 +131,23 @@ const sprintHypotheses: Row[] = [
   { id: "demo-h3", client_id: CID, source: "linkedin_signals", hypothesis: "Door het lead-gen-formulier van GRT | Leadgen NL van 7 naar 4 velden te verkorten verwachten we de form-open → lead-ratio te herstellen (18% → 24%) binnen 3 weken.", expected_result: "Lead-rate 18% → ~24%; CPL −20%", measurement_metric: "one_click_leads", timeframe: "3 weken", rationale: "Form-open → lead daalde −24% over de recente 4 weken; formulierlengte is de vermoedelijke oorzaak.", ice_impact: 7, ice_confidence: 5, ice_ease: 6, ice_total: 58, status: "pending", created_at: iso() },
   { id: "demo-h4", client_id: CID, source: "sprint_import", hypothesis: "Door het dagbudget van GreenTech | Brand met 25% te verhogen verwachten we +18 conversies/maand te winnen, omdat de campagne 1% impressieaandeel op budget verliest bij een ruim gehaald target.", expected_result: "+18 conversies/mnd; IS-verlies op budget → 0%", measurement_metric: "conversions", timeframe: "1 maand", rationale: "Geïmporteerd uit de sprintplanning-CSV; Brand haalt het target ruim en verliest volume op budgetcap.", ice_impact: 7, ice_confidence: 8, ice_ease: 9, ice_total: 78, status: "pending", created_at: iso() },
 ];
+// sprint_items ontbrak volledig, en daardoor liep de sprintpagina in de demo vast: de mock valt
+// bij een onbekende tabel terug op de echte Supabase, en die is in een demo-omgeving niet
+// bereikbaar. De pagina bleef dus op zijn spinner staan.
+//
+// De weeknummers staan relatief aan de huidige week, niet vast: het component markeert items
+// ouder dan twee weken als verlopen, dus met vaste nummers zou de demo na verloop van tijd
+// alleen nog verlopen taken tonen. Zo blijft er altijd een lopende, een geplande en een
+// afgeronde week zichtbaar.
+const HUIDIGE_WEEK = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+const sprintItems: Row[] = [
+  { id: "demo-si1", client_id: CID, hypothesis_id: "demo-h1", week_number: HUIDIGE_WEEK, task: "Negatieve zoektermen toevoegen op GRA | Search | US (brede-match-vervuilers)", status: "in_progress", owner: "RAI Amsterdam", metrics: "conversion_rate", review_timeframe: "2 weken", created_at: iso(), updated_at: iso() },
+  { id: "demo-si2", client_id: CID, hypothesis_id: "demo-h2", week_number: HUIDIGE_WEEK, task: "Twee nieuwe hooks produceren voor GRT | Awareness EU", status: "todo", owner: "RAI Amsterdam", metrics: "ctr", review_timeframe: "2 weken", created_at: iso(), updated_at: iso() },
+  { id: "demo-si3", client_id: CID, hypothesis_id: "demo-h4", week_number: HUIDIGE_WEEK + 1, task: "Dagbudget GreenTech | Brand met 25% verhogen", status: "todo", owner: "RAI Amsterdam", metrics: "conversions", review_timeframe: "1 maand", created_at: iso(), updated_at: iso() },
+  { id: "demo-si4", client_id: CID, hypothesis_id: "demo-h3", week_number: HUIDIGE_WEEK - 1, task: "Lead-gen-formulier GRT | Leadgen NL inkorten naar 4 velden", status: "done", owner: "RAI Amsterdam", metrics: "one_click_leads", review_timeframe: "3 weken", created_at: iso(), updated_at: iso() },
+  { id: "demo-si5", client_id: CID, hypothesis_id: null, task: "Placement-uitsluitingen doorvoeren uit de video-analyse", week_number: HUIDIGE_WEEK - 1, status: "done", owner: "RAI Amsterdam", metrics: "cost", review_timeframe: "1 week", created_at: iso(), updated_at: iso() },
+];
+
 const sopTasks: Row[] = [
   { id: "demo-t1", client_id: CID, title: "Negatieve zoektermen toevoegen GRA | US", description: "Voeg brede-match-vervuilers toe als negative.", action_type: "negative_keywords", priority: "high", due_date: dayISO(-1), status: "open", frequency: "direct", affected_campaign: "GRA | Search | US" },
   { id: "demo-t2", client_id: CID, title: "Dagbudget Brand +25%", description: "Verhoog het budget en monitor IS.", action_type: "budget", priority: "medium", due_date: dayISO(-3), status: "open", frequency: "direct", affected_campaign: "GreenTech | Brand" },
@@ -557,6 +574,7 @@ export function demoRows(): Record<string, Row[]> {
     sop_insights: sopInsights,
     sop_recommendations: sopRecommendations,
     sprint_hypotheses: sprintHypotheses,
+    sprint_items: sprintItems,
     sop_tasks: sopTasks,
     task_completions: [],
     ads_creative_performance: adsCreativePerformance,

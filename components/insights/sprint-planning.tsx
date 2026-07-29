@@ -52,6 +52,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   const [items, setItems] = useState<SprintItem[]>([]);
   const [hypotheses, setHypotheses] = useState<Map<string, HypothesisRef>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [fout, setFout] = useState<string | null>(null);
   const [filter, setFilter] = useState<"active" | "done" | "all">("all");
   const [channelFilter, setChannelFilter] = useState<InsightChannel | null>(null);
   const [collapsedHypotheses, setCollapsedHypotheses] = useState<Set<string>>(new Set());
@@ -68,7 +69,11 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
 
   const refresh = useCallback(async () => {
     if (!supabase) { setLoading(false); return; }
-
+    // try/finally om de spinner: zonder dit bleef de pagina bij élke fout onbeperkt laden, en dan
+    // is niet te zien of het traag is, leeg, of stuk. Dat gebeurde ook echt — sprint_items
+    // ontbrak in de demo-data, de mock viel terug op de onbereikbare echte database, en de
+    // afwijzing sloeg setLoading(false) over. Een laadtoestand hoort altijd te eindigen.
+    try {
     const [{ data: itemsData }, { data: hypData }] = await Promise.all([
       supabase.from("sprint_items").select("*").eq("client_id", clientId).order("week_number", { ascending: true }),
       supabase.from("sprint_hypotheses").select("id, hypothesis, status, ice_total, source").eq("client_id", clientId).in("status", ["accepted", "completed"]),
@@ -100,7 +105,12 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
       map.set(h.id, h);
     }
     setHypotheses(map);
-    setLoading(false);
+    setFout(null);
+    } catch (e) {
+      setFout(e instanceof Error ? e.message : "Sprintitems konden niet geladen worden.");
+    } finally {
+      setLoading(false);
+    }
   }, [clientId, currentWeek]);
 
   useEffect(() => { refresh(); }, [refresh, refreshKey]);
@@ -317,6 +327,13 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     }
   }
 
+  if (fout) {
+    return (
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
+        {fout}
+      </div>
+    );
+  }
   if (loading) {
     return (
       <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex items-center justify-center">
