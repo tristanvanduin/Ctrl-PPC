@@ -33,7 +33,7 @@ export function ScriptCard({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="min-w-0">
@@ -78,7 +78,7 @@ export function ScriptCard({
           {script.tags.map((tag) => (
             <span
               key={tag}
-              className="text-micro font-medium px-2 py-0.5 rounded-full bg-rm-blue/10 text-rm-blue"
+              className="text-micro font-medium px-2 py-0.5 rounded-full bg-rm-blue/10 text-rm-blue-ink"
             >
               {tag}
             </span>
@@ -99,7 +99,7 @@ export function ScriptCard({
           {script.code}
         </pre>
         {!expanded && script.code.split("\n").length > 4 && (
-          <p className="text-micro text-rm-blue mt-1">
+          <p className="text-micro text-rm-blue-ink mt-1">
             Klik om uit te klappen ({script.code.split("\n").length} regels)
           </p>
         )}

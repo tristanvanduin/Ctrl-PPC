@@ -16,7 +16,7 @@ const STATUS_LABEL: Record<FeedStatus, string> = { new: "Nieuw", in_progress: "I
 const STATUS_CLASS: Record<FeedStatus, string> = {
   new: "text-blue-700 bg-blue-50 border-blue-200",
   in_progress: "text-amber-700 bg-amber-50 border-amber-200",
-  awaiting_approval: "text-rm-blue bg-rm-blue/10 border-rm-blue/20",
+  awaiting_approval: "text-rm-blue-ink bg-rm-blue/10 border-rm-blue/20",
   snoozed: "text-gray-500 bg-gray-100 border-gray-200",
   resolved: "text-emerald-700 bg-emerald-50 border-emerald-200",
 };
@@ -46,10 +46,10 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
   const impactColor = item.impactDirection === "risk" ? "text-red-600" : item.impactDirection === "gain" ? "text-emerald-600" : "text-rm-gray";
 
   return (
-    <div className={`bg-white rounded-xl border border-border border-l-[3px] ${BORDER[item.severity]} shadow-sm p-3.5`}>
+    <div className={`bg-card rounded-xl border border-border border-l-[3px] ${BORDER[item.severity]} shadow-sm p-3.5`}>
       {/* Kop: klant · kanaal · type · status · mock · leeftijd */}
       <div className="flex items-center gap-2 flex-wrap mb-1.5">
-        <Link href={item.clientUrl} className="text-sm font-bold text-rm-gray hover:text-rm-blue truncate max-w-[40%]">{item.clientName}</Link>
+        <Link href={item.clientUrl} className="text-sm font-bold text-rm-gray hover:text-rm-blue-ink truncate max-w-[40%]">{item.clientName}</Link>
         <span className={`text-micro font-semibold px-1.5 py-0.5 rounded-full border ${CHANNEL_BADGE_CLASS[item.channel]}`}>{CHANNEL_LABEL[item.channel]}</span>
         <span className="text-micro font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border border-border bg-gray-50 text-muted-foreground">{TYPE_LABEL[item.type]}</span>
         <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>
@@ -116,7 +116,7 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
         <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
           <span className="text-meta text-muted-foreground">Wijs toe aan:</span>
           {MOCK_TEAM.map((name) => (
-            <button key={name} onClick={() => { onAssign(item, name); setMode(null); }} className="text-body px-2.5 py-1 rounded-md border border-border hover:border-rm-blue hover:text-rm-blue">{name}</button>
+            <button key={name} onClick={() => { onAssign(item, name); setMode(null); }} className="text-body px-2.5 py-1 rounded-md border border-border hover:border-rm-blue hover:text-rm-blue-ink">{name}</button>
           ))}
           <span className="text-micro text-gray-400">· echte toewijzing (geen demo)</span>
         </div>

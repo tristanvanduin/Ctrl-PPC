@@ -20,8 +20,8 @@ interface Recommendation {
 
 const priorityConfig: Record<Priority, { label: string; color: string; bg: string }> = {
   high: { label: "Hoog", color: "text-red-600", bg: "bg-red-100" },
-  medium: { label: "Midden", color: "text-rm-orange", bg: "bg-orange-100" },
-  low: { label: "Laag", color: "text-rm-blue", bg: "bg-blue-100" },
+  medium: { label: "Midden", color: "text-rm-orange-ink", bg: "bg-orange-100" },
+  low: { label: "Laag", color: "text-rm-blue-ink", bg: "bg-blue-100" },
 };
 
 function fmt(v: number): string {
@@ -337,8 +337,8 @@ export function RecommendationsBlock({
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide mb-1">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-1">
         Aanbevelingen
       </h3>
       <p className="text-micro text-muted-foreground mb-4">
@@ -366,8 +366,8 @@ export function RecommendationsBlock({
               className="p-3 rounded-lg bg-rm-blue/5 border border-rm-blue/10"
             >
               <div className="flex items-center gap-2 mb-2">
-                <Lightbulb className="w-4 h-4 text-rm-orange shrink-0" />
-                <span className="text-micro font-bold uppercase px-1.5 py-0.5 rounded bg-rm-blue/10 text-rm-blue">
+                <Lightbulb className="w-4 h-4 text-rm-orange-ink shrink-0" />
+                <span className="text-micro font-bold uppercase px-1.5 py-0.5 rounded bg-rm-blue/10 text-rm-blue-ink">
                   ICE {rec.ice_total}
                 </span>
                 <span className="text-micro text-muted-foreground">
@@ -385,7 +385,7 @@ export function RecommendationsBlock({
           {findingRecs.length > 3 && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="flex items-center justify-center gap-1.5 w-full py-2 text-meta font-medium text-rm-blue hover:text-rm-blue/80 transition-colors"
+              className="flex items-center justify-center gap-1.5 w-full py-2 text-meta font-medium text-rm-blue-ink hover:text-rm-blue-ink/80 transition-colors"
             >
               {isExpanded ? (
                 <>Toon minder <ChevronUp className="w-3.5 h-3.5" /></>
@@ -417,7 +417,7 @@ export function RecommendationsBlock({
                 key={i}
                 className="flex gap-3 p-3 rounded-lg bg-rm-blue/5 border border-rm-blue/10"
               >
-                <Lightbulb className="w-4 h-4 text-rm-orange mt-0.5 shrink-0" />
+                <Lightbulb className="w-4 h-4 text-rm-orange-ink mt-0.5 shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className={`text-micro font-bold uppercase px-1.5 py-0.5 rounded ${config.bg} ${config.color}`}>
@@ -436,7 +436,7 @@ export function RecommendationsBlock({
         {legacyRecs.length > 3 && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center justify-center gap-1.5 w-full py-2 mt-2 text-meta font-medium text-rm-blue hover:text-rm-blue/80 transition-colors"
+            className="flex items-center justify-center gap-1.5 w-full py-2 mt-2 text-meta font-medium text-rm-blue-ink hover:text-rm-blue-ink/80 transition-colors"
           >
             {isExpanded ? (
               <>Toon minder <ChevronUp className="w-3.5 h-3.5" /></>

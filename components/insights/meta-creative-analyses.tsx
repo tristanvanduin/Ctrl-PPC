@@ -36,7 +36,7 @@ export function MetaCreativeAnalyses({ clientId }: { clientId: string }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-rm-gray">Creative-analyses (Meta)</h3>
         <p className="text-micro text-muted-foreground mt-0.5">Losse creative-analyses; vereisen gesyncte Meta-data.</p>
@@ -55,7 +55,7 @@ export function MetaCreativeAnalyses({ clientId }: { clientId: string }) {
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-semibold text-rm-gray">{a.label}</span>
-                {running[a.key] && <Loader2 className="w-4 h-4 text-rm-blue animate-spin" />}
+                {running[a.key] && <Loader2 className="w-4 h-4 text-rm-blue-ink animate-spin" />}
                 {r?.ok && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                 {r && !r.ok && <AlertCircle className="w-4 h-4 text-red-500" />}
               </div>

@@ -19,7 +19,7 @@ export function HealthBadge({ clientId }: { clientId: string }) {
   ), [forecast, dataState]);
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-start gap-5">
         {/* Score circle */}
         <div className="relative w-20 h-20 shrink-0">
@@ -48,8 +48,8 @@ export function HealthBadge({ clientId }: { clientId: string }) {
         {/* Factors */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-3">
-            <Activity className="w-4 h-4 text-rm-blue" />
-            <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Account Health</h3>
+            <Activity className="w-4 h-4 text-rm-blue-ink" />
+            <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Account Health</h3>
           </div>
           <div className="grid grid-cols-5 gap-2">
             {health.factors.map((f) => (

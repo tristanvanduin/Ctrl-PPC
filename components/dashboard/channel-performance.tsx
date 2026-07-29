@@ -219,14 +219,14 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
         </div>
       )}
       {/* KPI-kaarten — in een getitelde kaart, zodat de opbouw rijmt met het Google-beursoverzicht. */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <BarChart3 className="w-4.5 h-4.5 text-rm-blue" />
+          <BarChart3 className="w-4.5 h-4.5 text-rm-blue-ink" />
           <h3 className="text-sm font-semibold text-rm-gray">Kerncijfers (laatste 28 dagen)</h3>
         </div>
         <div className="px-4 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {kpis.map((k) => (
-            <div key={k.label} className="rounded-lg border border-border bg-white px-4 py-3">
+            <div key={k.label} className="rounded-lg border border-border bg-card px-4 py-3">
               <div className="text-meta text-muted-foreground">{k.label}</div>
               <div className="text-lg font-semibold text-rm-gray mt-0.5">{k.value}</div>
               {k.delta && <div className={`text-micro mt-0.5 ${k.delta.startsWith("+") ? "text-emerald-600" : "text-red-500"}`}>{k.delta} vs vorige 28d</div>}
@@ -236,16 +236,16 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
       </div>
 
       {/* Pacing */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Gauge className="w-4.5 h-4.5 text-rm-blue" />
+          <Gauge className="w-4.5 h-4.5 text-rm-blue-ink" />
           <h3 className="text-sm font-semibold text-rm-gray">Pacing — maand tot nu (dag {dayOfMonth})</h3>
           {/* Google telt inmiddels naar de beursdag; hier stond nog alleen de kalendermaand, en
               dan vertellen twee kanaaltabbladen naast elkaar een ander verhaal over dezelfde
               week. De maandvergelijking blijft staan — die voedt de cijfers hieronder — maar de
               afstand die er echt toe doet staat er nu bij. */}
           {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
-            <span className="ml-auto text-meta font-medium text-rm-blue">
+            <span className="ml-auto text-meta font-medium text-rm-blue-ink">
               nog {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"} tot {edition!.label}
             </span>
           )}
@@ -276,9 +276,9 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
       />
 
       {/* Maandtabel */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Calendar className="w-4.5 h-4.5 text-rm-blue" />
+          <Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />
           <h3 className="text-sm font-semibold text-rm-gray">Maandprestaties</h3>
         </div>
         <div className="overflow-x-auto">
@@ -313,9 +313,9 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
 
       {/* Campagnetabel */}
       {campaigns.length > 0 && (
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-            <BarChart3 className="w-4.5 h-4.5 text-rm-blue" />
+            <BarChart3 className="w-4.5 h-4.5 text-rm-blue-ink" />
             <h3 className="text-sm font-semibold text-rm-gray">Campagnes (laatste 28 dagen)</h3>
           </div>
           <div className="overflow-x-auto">

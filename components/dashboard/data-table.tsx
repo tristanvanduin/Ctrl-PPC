@@ -86,7 +86,7 @@ export function KolomKop({
           raden. Dat gebeurde: de eerste vraag over deze tabel was "is die streep op kosten,
           conversies of CPA?". Het bijschrift beantwoordt hem voordat hij opkomt. */}
       {bijschrift && (
-        <span className="block font-normal normal-case tracking-normal text-muted-foreground/70">{bijschrift}</span>
+        <span className="block font-normal normal-case tracking-normal text-muted-foreground">{bijschrift}</span>
       )}
     </th>
   );
@@ -139,13 +139,13 @@ export function SorteerKop({
         onClick={onSorteer}
         className={`inline-flex items-center gap-1 rounded-sm text-micro font-semibold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue ${
           getal ? "flex-row-reverse" : ""
-        } ${actief ? "text-rm-blue" : "text-muted-foreground hover:text-rm-blue"}`}
+        } ${actief ? "text-rm-blue-ink" : "text-muted-foreground hover:text-rm-blue-ink"}`}
       >
         {children}
         <Pijl className={`w-3 h-3 shrink-0 ${actief ? "" : "opacity-30"}`} aria-hidden />
       </button>
       {bijschrift && (
-        <span className="block font-normal normal-case tracking-normal text-muted-foreground/70">{bijschrift}</span>
+        <span className="block font-normal normal-case tracking-normal text-muted-foreground">{bijschrift}</span>
       )}
     </th>
   );
@@ -249,7 +249,7 @@ export function AandeelCel({
           koploper kreeg een balk over de volle celbreedte en zag eruit als "geselecteerd",
           terwijl de kleinste een sliver naast zijn cijfers kreeg. Een baan met een vaste
           breedte leest ondubbelzinnig als schaal, en raakt de cijfers niet. */}
-      <span className="mt-1 block ml-auto h-[3px] rounded-full overflow-hidden" style={{ width: 72, background: "rgba(15,23,42,0.07)" }} aria-hidden>
+      <span className="mt-1 block ml-auto h-[3px] rounded-full overflow-hidden" style={{ width: 72, background: "var(--spoor, rgba(15,23,42,0.07))" }} aria-hidden>
         <span className="block h-full rounded-full" style={{ width: `${veilig * 100}%`, background: kleur, opacity: 0.75 }} />
       </span>
     </td>

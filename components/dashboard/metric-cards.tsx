@@ -29,7 +29,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
   const statusBg = isPositive ? "bg-green-50" : "bg-red-50";
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
@@ -37,7 +37,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
             {icon}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-rm-blue">{label}</h3>
+            <h3 className="text-sm font-semibold text-rm-blue-ink">{label}</h3>
             {subtitle && <p className="text-micro text-muted-foreground">{subtitle}</p>}
           </div>
         </div>
@@ -51,7 +51,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
         <p className="text-micro text-muted-foreground uppercase tracking-wider mb-1">
           Gerealiseerd YTD
         </p>
-        <p className="text-2xl font-bold text-rm-blue leading-none">
+        <p className="text-2xl font-bold text-rm-blue-ink leading-none">
           {format(realized)}
         </p>
       </div>
@@ -64,7 +64,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground">Jaarprognose</span>
-          <span className="text-xs font-semibold text-rm-blue">{format(adjusted)}</span>
+          <span className="text-xs font-semibold text-rm-blue-ink">{format(adjusted)}</span>
         </div>
       </div>
 
@@ -126,7 +126,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       <KpiCard
         label="Conversies"
-        icon={<Target className="w-4 h-4 text-rm-blue" />}
+        icon={<Target className="w-4 h-4 text-rm-blue-ink" />}
         annualTarget={forecast.conversions.kpi.annualTarget}
         adjusted={forecast.conversions.kpi.adjustedAnnual}
         realized={forecast.conversions.kpi.ytdRealized}
@@ -136,7 +136,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
       />
       <KpiCard
         label="Omzet"
-        icon={<DollarSign className="w-4 h-4 text-rm-blue" />}
+        icon={<DollarSign className="w-4 h-4 text-rm-blue-ink" />}
         annualTarget={forecast.revenue.kpi.annualTarget}
         adjusted={forecast.revenue.kpi.adjustedAnnual}
         realized={forecast.revenue.kpi.ytdRealized}
@@ -146,7 +146,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
       />
       <KpiCard
         label="ROAS"
-        icon={<BarChart3 className="w-4 h-4 text-rm-blue" />}
+        icon={<BarChart3 className="w-4 h-4 text-rm-blue-ink" />}
         annualTarget={forecast.roas.kpi.annualTarget}
         adjusted={forecast.roas.kpi.adjustedAnnual}
         realized={forecast.roas.kpi.ytdRealized}
@@ -156,7 +156,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
       />
       <KpiCard
         label="CPA"
-        icon={<Wallet className="w-4 h-4 text-rm-blue" />}
+        icon={<Wallet className="w-4 h-4 text-rm-blue-ink" />}
         annualTarget={kpi.cpaTarget}
         adjusted={forecastedCpa}
         realized={ytdCpa}

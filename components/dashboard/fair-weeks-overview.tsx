@@ -45,7 +45,7 @@ function WeekCard({
   const labels = { previous: "Vorige week", current: "Deze week", next: "Volgende week" };
   const statusIcons = {
     previous: <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />,
-    current: <Clock className="w-3.5 h-3.5 text-rm-blue" />,
+    current: <Clock className="w-3.5 h-3.5 text-rm-blue-ink" />,
     next: <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />,
   };
 
@@ -83,7 +83,7 @@ function WeekCard({
       <div className="space-y-1.5">
         <div className="flex justify-between items-baseline">
           <span className="text-meta text-muted-foreground">{isRealized ? "Gerealiseerd" : "Prognose"}</span>
-          <span className={`text-base font-bold ${variant === "current" ? "text-rm-blue" : "text-rm-gray"}`}>
+          <span className={`text-base font-bold ${variant === "current" ? "text-rm-blue-ink" : "text-rm-gray"}`}>
             {format(value)}
           </span>
         </div>
@@ -144,10 +144,10 @@ export function FairWeeksOverview({
   const wekenTotBeurs = huidige?.weeksOut ?? null;
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide flex items-center gap-2">
             <CalendarClock className="w-4 h-4" />
             Weken tot {edition.eventName}
           </h3>
@@ -164,7 +164,7 @@ export function FairWeeksOverview({
               key={m}
               onClick={() => setMetric(m)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                metric === m ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue"
+                metric === m ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue-ink"
               }`}
             >
               {METRIC_LABELS[m]}
@@ -219,11 +219,11 @@ export function FairWeeksOverview({
                   }`}
                 >
                   <p className={`text-micro font-medium mb-1 ${
-                    isBeursweek ? "text-rm-orange font-semibold" : isFocus ? "text-rm-blue font-semibold" : isRealized ? "text-rm-gray" : "text-muted-foreground"
+                    isBeursweek ? "text-rm-orange-ink font-semibold" : isFocus ? "text-rm-blue-ink font-semibold" : isRealized ? "text-rm-gray" : "text-muted-foreground"
                   }`}>
                     {w.label}
                   </p>
-                  <p className={`text-meta font-semibold ${isFocus ? "text-rm-blue" : "text-rm-gray"}`}>
+                  <p className={`text-meta font-semibold ${isFocus ? "text-rm-blue-ink" : "text-rm-gray"}`}>
                     {format(value)}
                   </p>
                   <div className="mt-1.5 mx-auto w-full max-w-[36px]">

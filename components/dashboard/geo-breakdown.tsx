@@ -16,11 +16,11 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 // weergave rendert, en nooit tijdens SSR.
 const WorldMap = dynamic(() => import("./world-map"), {
   ssr: false,
-  loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>,
+  loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" /></div>,
 });
 const UsStatesMap = dynamic(() => import("./us-states-map"), {
   ssr: false,
-  loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>,
+  loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" /></div>,
 });
 
 // Geo-mapping: waar komt het verkeer / de conversies vandaan, per gekozen metric. Interactief —
@@ -145,9 +145,9 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
   if (countries.length <= 1) return null; // één (of geen) land: geen geo-verhaal
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <Globe2 className="w-4.5 h-4.5 text-rm-blue" />
+        <Globe2 className="w-4.5 h-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">
           Waar komt het vandaan{focus === "US" ? " — Verenigde Staten" : ""}
         </h3>
@@ -155,7 +155,7 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
         {focus === "US" && (
           <button
             onClick={() => setFocus(null)}
-            className="flex items-center gap-0.5 text-meta font-medium text-rm-blue hover:underline"
+            className="flex items-center gap-0.5 text-meta font-medium text-rm-blue-ink hover:underline"
           >
             <ChevronLeft className="w-3.5 h-3.5" /> Wereld
           </button>
@@ -166,7 +166,7 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
           <select
             value={metricKey}
             onChange={(e) => setMetricKey(e.target.value as MetricKey)}
-            className="rounded-md border border-border bg-white px-2 py-1 text-body font-medium text-rm-gray focus:outline-none focus:ring-1 focus:ring-rm-blue"
+            className="rounded-md border border-border bg-card px-2 py-1 text-body font-medium text-rm-gray focus:outline-none focus:ring-1 focus:ring-rm-blue"
           >
             {METRICS.map((m) => (
               <option key={m.key} value={m.key}>{m.label}</option>

@@ -20,21 +20,21 @@ const STATUS_CONFIG: Record<
 > = {
   fresh: {
     label: "Data actueel",
-    color: "text-green-600",
+    color: "text-green-700",
     bg: "bg-green-50",
     border: "border-green-200",
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
   },
   stale: {
     label: "Data verouderd",
-    color: "text-amber-600",
+    color: "text-amber-700",
     bg: "bg-amber-50",
     border: "border-amber-200",
     icon: <Clock className="w-3.5 h-3.5" />,
   },
   partial: {
     label: "Data onvolledig",
-    color: "text-amber-600",
+    color: "text-amber-700",
     bg: "bg-amber-50",
     border: "border-amber-200",
     icon: <AlertTriangle className="w-3.5 h-3.5" />,
@@ -198,14 +198,14 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
         disabled={syncing}
         className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border transition-all ${
           syncing
-            ? "bg-rm-blue/5 border-rm-blue/20 text-rm-blue cursor-wait"
+            ? "bg-rm-blue/5 border-rm-blue/20 text-rm-blue-ink cursor-wait"
             : syncResult === "success"
             ? "bg-green-50 border-green-200 text-green-600"
             : syncResult === "error"
             ? "bg-red-50 border-red-200 text-red-600"
             : needsSync
-            ? "bg-rm-orange/10 border-rm-orange/40 text-rm-orange font-semibold hover:bg-rm-orange/20 cursor-pointer"
-            : "bg-white border-border text-muted-foreground hover:text-rm-gray hover:border-rm-blue/40 cursor-pointer"
+            ? "bg-rm-orange/10 border-rm-orange/40 text-rm-orange-ink font-semibold hover:bg-rm-orange/20 cursor-pointer"
+            : "bg-card border-border text-muted-foreground hover:text-rm-gray hover:border-rm-blue/40 cursor-pointer"
         }`}
         title={syncing ? "Synchroniseren..." : "Data synchroniseren met Google Ads"}
       >

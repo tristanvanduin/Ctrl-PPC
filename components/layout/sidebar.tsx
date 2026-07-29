@@ -169,7 +169,7 @@ function SidebarInner() {
                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-body transition-colors ${
                   activeGeo === v.abbreviation
                     ? "bg-rm-orange text-white font-medium"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <MapPin className="w-3 h-3 shrink-0" />
@@ -190,19 +190,19 @@ function SidebarInner() {
         <h1 className="text-white text-xl font-bold tracking-tight">
           RAI Amsterdam
         </h1>
-        <p className="text-white/50 text-xs mt-1">SEA Dashboard</p>
+        <p className="text-white/90 text-xs mt-1">SEA Dashboard</p>
       </div>
 
       {/* Search */}
       <div className="px-4 pb-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
           <input
             type="text"
             placeholder="Zoek klant..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-white/10 text-white text-sm rounded-lg pl-9 pr-3 py-2 placeholder:text-white/40 border border-white/10 focus:outline-none focus:border-rm-orange"
+            className="w-full bg-white/10 text-white text-sm rounded-lg pl-9 pr-3 py-2 placeholder:text-white/65 border border-white/10 focus:outline-none focus:border-rm-orange"
           />
         </div>
       </div>
@@ -231,7 +231,7 @@ function SidebarInner() {
 
       {/* Client list with groups */}
       <div className="flex-1 overflow-y-auto px-3 space-y-0.5">
-        <p className="text-white/40 text-meta font-semibold uppercase tracking-wider px-3 py-2">
+        <p className="text-white/90 text-meta font-semibold uppercase tracking-wider px-3 py-2">
           Klanten{mounted ? ` (${totalCount})` : ""}
         </p>
 
@@ -247,7 +247,7 @@ function SidebarInner() {
                 className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors ${
                   hasActiveClient && isCollapsed
                     ? "bg-rm-orange/20 text-white"
-                    : "text-white/50 hover:bg-white/5 hover:text-white/70"
+                    : "text-white/75 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {isCollapsed ? (

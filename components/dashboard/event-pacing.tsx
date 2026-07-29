@@ -57,13 +57,13 @@ export function EventPacing({ clientId, geoClone }: { clientId: string; geoClone
   const effectivenessNote = behind && data.costDeltaPct != null && data.deltaPct != null && data.costDeltaPct >= data.deltaPct;
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-        <CalendarClock className="w-4.5 h-4.5 text-rm-blue" />
+        <CalendarClock className="w-4.5 h-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">Pacing richting de beurs</h3>
         <span className="text-meta text-muted-foreground">event-relatief · vs vorige editie</span>
         {data.daysToFair != null && (
-          <span className="ml-auto text-meta font-medium text-rm-blue">
+          <span className="ml-auto text-meta font-medium text-rm-blue-ink">
             nog {data.daysToFair} {data.daysToFair === 1 ? "dag" : "dagen"} tot {data.fairLabel}
           </span>
         )}

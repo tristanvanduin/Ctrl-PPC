@@ -110,7 +110,7 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
   return (
     <CollapsiblePanel
       id="video-prestaties"
-      icon={<PlayCircle className="w-4.5 h-4.5 text-rm-blue" />}
+      icon={<PlayCircle className="w-4.5 h-4.5 text-rm-blue-ink" />}
       title="Video (YouTube)"
       subtitle="beoordeeld op bereik en kijkgedrag — niet op klikken of CPA"
       meta={<span className="text-micro text-muted-foreground">{aggs.length} campagne{aggs.length === 1 ? "" : "s"}</span>}

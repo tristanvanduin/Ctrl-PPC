@@ -66,7 +66,7 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-md border border-border bg-white px-3 py-1.5 text-body text-rm-gray hover:border-gray-400"
+        className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-body text-rm-gray hover:border-gray-400"
       >
         <Calendar className="h-4 w-4 text-muted-foreground" />
         <span className="font-medium">{formatRange(value.range)}</span>
@@ -79,7 +79,7 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-1 w-80 rounded-lg border border-border bg-white p-3 shadow-lg">
+        <div className="absolute right-0 z-20 mt-1 w-80 rounded-lg border border-border bg-card p-3 shadow-lg">
           <p className="mb-1.5 text-micro font-medium uppercase tracking-wide text-muted-foreground">Periode</p>
           <div className="mb-3 grid grid-cols-2 gap-1.5">
             {PERIOD_PRESETS.filter((p) => p !== "custom").map((p) => (
@@ -89,7 +89,7 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
                 onClick={() => zet(p, null, value.comparison)}
                 className={`rounded-md border px-2 py-1.5 text-left text-body ${
                   value.preset === p
-                    ? "border-rm-blue bg-rm-blue/5 font-medium text-rm-blue"
+                    ? "border-rm-blue bg-rm-blue/5 font-medium text-rm-blue-ink"
                     : "border-border text-rm-gray hover:border-gray-400"
                 }`}
               >
@@ -132,7 +132,7 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
                 onClick={() => zet(value.preset, value.custom, m)}
                 className={`flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-left text-body ${
                   value.comparison === m
-                    ? "border-rm-blue bg-rm-blue/5 font-medium text-rm-blue"
+                    ? "border-rm-blue bg-rm-blue/5 font-medium text-rm-blue-ink"
                     : "border-border text-rm-gray hover:border-gray-400"
                 }`}
               >

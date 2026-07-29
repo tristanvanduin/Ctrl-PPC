@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Bell, AlertTriangle, Info, X } from "lucide-react";
 import { getAllClients } from "@/lib/clients";
+import { ThemaSchakelaar } from "@/components/ui/thema-schakelaar";
 
 interface Notification {
   clientName: string;
@@ -109,10 +110,14 @@ export function TopBar() {
   const totalCount = notifications.length;
 
   return (
-    <header className="h-16 border-b border-border bg-white flex items-center justify-between px-6 sticky top-0 z-40">
-      <h2 className="text-lg font-bold text-rm-blue">{getTitle()}</h2>
+    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6 sticky top-0 z-40">
+      <h2 className="text-lg font-bold text-rm-blue-ink">{getTitle()}</h2>
 
       <div className="flex items-center gap-4">
+        {/* De thema-keuze staat in de bovenbalk en niet weggestopt in de instellingen: het is een
+            weergavevoorkeur van dit scherm, geen accountinstelling. */}
+        <ThemaSchakelaar />
+
         {/* Notification bell */}
         {mounted && (
           <div className="relative" ref={panelRef}>
@@ -132,9 +137,9 @@ export function TopBar() {
 
             {/* Dropdown */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 bg-white rounded-xl border border-border shadow-lg overflow-hidden z-50">
+              <div className="absolute right-0 top-12 w-80 bg-card rounded-xl border border-border shadow-lg overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <span className="text-sm font-semibold text-rm-blue">Meldingen</span>
+                  <span className="text-sm font-semibold text-rm-blue-ink">Meldingen</span>
                   <button onClick={() => setShowNotifications(false)}>
                     <X className="w-4 h-4 text-muted-foreground" />
                   </button>

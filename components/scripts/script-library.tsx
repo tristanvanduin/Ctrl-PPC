@@ -53,7 +53,7 @@ export function ScriptLibrary() {
 
   if (!supabase) {
     return (
-      <div className="bg-white rounded-xl border border-border p-8 shadow-sm text-center">
+      <div className="bg-card rounded-xl border border-border p-8 shadow-sm text-center">
         <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-3" />
         <p className="text-sm text-rm-gray font-medium mb-1">Supabase niet geconfigureerd</p>
         <p className="text-meta text-muted-foreground">
@@ -68,7 +68,7 @@ export function ScriptLibrary() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-rm-blue">Scriptbibliotheek</h2>
+          <h2 className="text-lg font-bold text-rm-blue-ink">Scriptbibliotheek</h2>
           <p className="text-meta text-muted-foreground mt-0.5">
             Bewaar en organiseer je Google Ads scripts
           </p>

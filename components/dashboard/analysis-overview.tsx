@@ -89,9 +89,9 @@ export function AnalysisOverview({
   const { uitgevoerd, open } = groepeerOpStatus(runs);
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-        <Radar className="w-4.5 h-4.5 text-rm-blue" />
+        <Radar className="w-4.5 h-4.5 text-rm-blue-ink" />
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-rm-gray">Alle analyses</h3>
           <p className="text-micro text-muted-foreground mt-0.5">
@@ -103,7 +103,7 @@ export function AnalysisOverview({
       {uitgevoerd.length > 0 && (
         <>
           <div className="px-5 py-1.5 bg-gray-50/70 border-b border-border">
-            <span className="text-micro font-semibold text-rm-blue uppercase tracking-wide">Uitgevoerd</span>
+            <span className="text-micro font-semibold text-rm-blue-ink uppercase tracking-wide">Uitgevoerd</span>
           </div>
           <div className="divide-y divide-border/50">
             {uitgevoerd.map((a) => <Regel key={a.section} a={a} onKies={onKiesKanaal} />)}

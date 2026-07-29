@@ -244,7 +244,7 @@ export function Tip({ formatter }: { formatter?: (v: number) => string }) {
     <Tooltip
       // Een vulling over de hele balkgroep als hover-doel: mikken op een dunne balk is geen
       // interactie maar een test.
-      cursor={{ fill: "rgba(15, 23, 42, 0.04)" }}
+      cursor={{ fill: "var(--hover-vlak, rgba(15, 23, 42, 0.04))" }}
       content={(props: unknown) => <TipInhoud {...(props as TipProps)} formatter={formatter} />}
     />
   );

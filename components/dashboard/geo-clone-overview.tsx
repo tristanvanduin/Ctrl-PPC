@@ -31,7 +31,7 @@ function fmtPct(ratio: number | null): string {
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border bg-white px-4 py-3">
+    <div className="rounded-lg border border-border bg-card px-4 py-3">
       <div className="text-meta text-muted-foreground">{label}</div>
       <div className="text-lg font-semibold text-rm-gray mt-0.5">{value}</div>
     </div>
@@ -70,9 +70,9 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
 
   return (
     <div className="space-y-6">
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-        <MapPin className="w-5 h-5 text-rm-blue" />
+        <MapPin className="w-5 h-5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">{label} — beursoverzicht</h3>
         <span className="text-meta text-muted-foreground">({geoClone})</span>
       </div>

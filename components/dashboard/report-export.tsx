@@ -138,11 +138,11 @@ export function ReportExport({ clientId }: { clientId: string }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-rm-blue" />
-          <h3 className="text-base font-semibold text-rm-blue">Klantrapport</h3>
+          <FileText className="w-5 h-5 text-rm-blue-ink" />
+          <h3 className="text-base font-semibold text-rm-blue-ink">Klantrapport</h3>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5 text-xs">

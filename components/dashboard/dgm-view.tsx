@@ -722,7 +722,7 @@ function KpiCard({
   const barColor = isGood ? "bg-green-500" : isWarning ? "bg-amber-500" : "bg-red-500";
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
       <p className="text-xs text-muted-foreground font-medium mb-2">{label}</p>
       <p className="text-2xl font-bold text-rm-gray">{fmtVal(realized)}</p>
       <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -903,7 +903,7 @@ export function DgmView({ clientId }: { clientId: string }) {
 
       {/* ─── 2. KPI Cards ─── */}
       <div>
-        <h2 className="text-sm font-semibold text-rm-blue uppercase tracking-wide mb-3">
+        <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
           Voortgang trajectdoelen
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -963,8 +963,8 @@ export function DgmView({ clientId }: { clientId: string }) {
 
       {/* ─── 3. Wat betekent dit? ─── */}
       {businessImpact.length > 0 && (
-        <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-rm-blue uppercase tracking-wide mb-3">
+        <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
             Wat betekent dit voor het traject?
           </h2>
           <div className="space-y-2.5">
@@ -989,12 +989,12 @@ export function DgmView({ clientId }: { clientId: string }) {
       {/* ─── 4. Waarom gebeurt dit? ─── */}
       {causes.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-rm-blue uppercase tracking-wide mb-3">
+          <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
             Belangrijkste oorzaken
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {causes.map((cause, i) => (
-              <div key={i} className="bg-white rounded-xl border border-border p-4 shadow-sm">
+              <div key={i} className="bg-card rounded-xl border border-border p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-micro font-bold uppercase px-1.5 py-0.5 rounded ${impactColors[cause.impact]}`}>
                     Impact: {cause.impact}
@@ -1010,8 +1010,8 @@ export function DgmView({ clientId }: { clientId: string }) {
 
       {/* ─── 5. Lopende acties ─── */}
       {actions.length > 0 && (
-        <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-rm-blue uppercase tracking-wide mb-3">
+        <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
             Lopende acties en aanbevelingen
           </h2>
           <div className="space-y-3">
@@ -1025,7 +1025,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                   ) : action.status === "Afgerond" ? (
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                   ) : (
-                    <CircleDot className="w-4 h-4 text-rm-blue" />
+                    <CircleDot className="w-4 h-4 text-rm-blue-ink" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -1110,7 +1110,7 @@ export function DgmView({ clientId }: { clientId: string }) {
         return (
           <div className={`rounded-xl border ${ss.border} ${ss.bg} p-5 shadow-sm`}>
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
+              <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
                 Sprintplanning Status
               </h2>
               <span className={`text-micro font-bold uppercase px-2 py-0.5 rounded-full ${ss.badge}`}>
@@ -1127,7 +1127,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                 <span className="text-xs text-rm-gray font-medium">{progressPct}% voltooid</span>
                 <span className="text-micro text-muted-foreground">{done} klaar · {active} actief · {expired} verlopen · {backlog} backlog</span>
               </div>
-              <div className="w-full h-3 bg-white rounded-full border border-gray-200 overflow-hidden flex">
+              <div className="w-full h-3 bg-card rounded-full border border-gray-200 overflow-hidden flex">
                 {done > 0 && <div className="h-full bg-emerald-500" style={{ width: `${(done / total) * 100}%` }} />}
                 {ongoing > 0 && <div className="h-full bg-blue-500" style={{ width: `${(ongoing / total) * 100}%` }} />}
                 {inPlanning > 0 && <div className="h-full bg-yellow-400" style={{ width: `${(inPlanning / total) * 100}%` }} />}
@@ -1147,23 +1147,23 @@ export function DgmView({ clientId }: { clientId: string }) {
 
             {/* Stats grid */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-              <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
-                <p className="text-lg font-bold text-rm-blue">{active}</p>
+              <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
+                <p className="text-lg font-bold text-rm-blue-ink">{active}</p>
                 <p className="text-micro text-muted-foreground">Actief</p>
               </div>
-              <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
+              <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
                 <p className={`text-lg font-bold ${clientOpen > 2 ? "text-amber-600" : "text-rm-gray"}`}>{clientOpen}</p>
                 <p className="text-micro text-muted-foreground">Open klant</p>
               </div>
-              <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
+              <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
                 <p className="text-lg font-bold text-rm-gray">{rmOpen}</p>
                 <p className="text-micro text-muted-foreground">Open RM</p>
               </div>
-              <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
+              <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
                 <p className={`text-lg font-bold ${overdue > 0 ? "text-red-600" : "text-emerald-600"}`}>{overdue}</p>
                 <p className="text-micro text-muted-foreground">Over deadline</p>
               </div>
-              <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
+              <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
                 <p className={`text-lg font-bold ${expired > 0 ? "text-red-400" : "text-emerald-600"}`}>{expired}</p>
                 <p className="text-micro text-muted-foreground">Verlopen</p>
               </div>
@@ -1203,8 +1203,8 @@ export function DgmView({ clientId }: { clientId: string }) {
       })()}
 
       {/* ─── 6. Forecast vs Doel ─── */}
-      <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-rm-blue uppercase tracking-wide mb-4">
+      <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-4">
           Prognose vs jaardoel
         </h2>
         <div className="space-y-5">
@@ -1249,7 +1249,7 @@ export function DgmView({ clientId }: { clientId: string }) {
 
       {/* ─── 7. Beslissingen nodig ─── */}
       {decisions.length > 0 && (
-        <div className="bg-white rounded-xl border-2 border-amber-200 p-5 shadow-sm">
+        <div className="bg-card rounded-xl border-2 border-amber-200 p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <h2 className="text-sm font-semibold text-amber-800 uppercase tracking-wide">
@@ -1279,7 +1279,7 @@ export function DgmView({ clientId }: { clientId: string }) {
       )}
 
       {/* ─── 8. Specialistische verdieping (collapsed) ─── */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <button
           onClick={() => setDetailsExpanded(!detailsExpanded)}
           className="flex items-center justify-between w-full p-5 text-left hover:bg-gray-50 transition-colors"

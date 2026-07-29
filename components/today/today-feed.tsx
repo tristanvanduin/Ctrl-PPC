@@ -22,7 +22,7 @@ const BANDS: { key: FeedSeverity; label: string; lede: string; icon: React.React
 
 function Pulse({ label, value, tone }: { label: string; value: string; tone?: "warn" | "ok" }) {
   return (
-    <div className="bg-white rounded-xl border border-border px-3.5 py-2 shadow-sm min-w-[104px]">
+    <div className="bg-card rounded-xl border border-border px-3.5 py-2 shadow-sm min-w-[104px]">
       <p className="text-meta font-semibold text-muted-foreground">{label}</p>
       <p className={`text-xl font-bold tabular-nums mt-0.5 ${tone === "warn" ? "text-red-600" : tone === "ok" ? "text-emerald-600" : "text-rm-gray"}`}>{value}</p>
     </div>
@@ -33,7 +33,7 @@ function Seg<T extends string>({ value, onChange, options }: { value: T; onChang
   return (
     <div className="inline-flex bg-gray-100 border border-border rounded-lg p-0.5 gap-0.5">
       {options.map((o) => (
-        <button key={o.v} onClick={() => onChange(o.v)} className={`text-[12.5px] font-medium px-3 py-1.5 rounded-md transition-colors ${value === o.v ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground hover:text-rm-gray"}`}>{o.l}</button>
+        <button key={o.v} onClick={() => onChange(o.v)} className={`text-[12.5px] font-medium px-3 py-1.5 rounded-md transition-colors ${value === o.v ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"}`}>{o.l}</button>
       ))}
     </div>
   );
@@ -68,7 +68,7 @@ export function TodayFeed() {
   const dateStr = now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   if (feed.loading) {
-    return <div className="flex items-center justify-center py-20 gap-3"><Loader2 className="w-6 h-6 animate-spin text-rm-blue" /><p className="text-sm text-muted-foreground">Vandaag samenstellen…</p></div>;
+    return <div className="flex items-center justify-center py-20 gap-3"><Loader2 className="w-6 h-6 animate-spin text-rm-blue-ink" /><p className="text-sm text-muted-foreground">Vandaag samenstellen…</p></div>;
   }
 
   // Geen live data én geen demo-mode: heldere data-unavailable state i.p.v. stilletjes demo tonen.
@@ -80,13 +80,13 @@ export function TodayFeed() {
           <p className="text-lead text-muted-foreground capitalize">{dateStr}</p>
         </div>
         {feed.error && <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-body text-amber-800">{feed.error}</div>}
-        <div className="rounded-xl border border-border bg-white shadow-sm p-10 text-center max-w-xl mx-auto">
-          <div className="w-12 h-12 rounded-full bg-rm-blue/10 flex items-center justify-center mx-auto mb-4"><DatabaseZap className="w-6 h-6 text-rm-blue" /></div>
+        <div className="rounded-xl border border-border bg-card shadow-sm p-10 text-center max-w-xl mx-auto">
+          <div className="w-12 h-12 rounded-full bg-rm-blue/10 flex items-center justify-center mx-auto mb-4"><DatabaseZap className="w-6 h-6 text-rm-blue-ink" /></div>
           <p className="text-title font-semibold text-rm-gray">Geen live data beschikbaar voor de Vandaag-feed.</p>
           <p className="text-lead text-muted-foreground mt-1.5">Koppel databronnen of bekijk een demo van de triagecockpit.</p>
           <div className="flex gap-2.5 justify-center mt-5">
             <Link href="/?demo=1" className="text-lead font-semibold text-white bg-rm-blue rounded-lg px-4 py-2 hover:brightness-110">Bekijk demo</Link>
-            <Link href="/portfolio" className="text-lead font-semibold text-rm-gray border border-border rounded-lg px-4 py-2 hover:border-rm-blue hover:text-rm-blue">Ga naar portfolio</Link>
+            <Link href="/portfolio" className="text-lead font-semibold text-rm-gray border border-border rounded-lg px-4 py-2 hover:border-rm-blue hover:text-rm-blue-ink">Ga naar portfolio</Link>
           </div>
         </div>
       </div>
@@ -124,7 +124,7 @@ export function TodayFeed() {
       <div className="flex items-center gap-2 flex-wrap">
         <Seg value={owner} onChange={setOwner} options={[{ v: "team", l: "Team" }, { v: "mine", l: "Mijn" }, { v: "unassigned", l: "Niet toegewezen" }]} />
         <Seg value={channel} onChange={setChannel} options={[{ v: "all", l: "Alle kanalen" }, { v: "google", l: "Google" }, { v: "meta", l: "Meta" }, { v: "linkedin", l: "LinkedIn" }]} />
-        <span className="ml-auto text-meta font-mono text-muted-foreground bg-white border border-border rounded-full px-3 py-1">Nieuw sinds gisteren · {feed.pulse.newSince}</span>
+        <span className="ml-auto text-meta font-mono text-muted-foreground bg-card border border-border rounded-full px-3 py-1">Nieuw sinds gisteren · {feed.pulse.newSince}</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
@@ -139,7 +139,7 @@ export function TodayFeed() {
                 <span className="text-meta text-muted-foreground ml-auto text-right">{b.lede}</span>
               </div>
               {bands[b.key].length === 0 ? (
-                <p className="text-body text-muted-foreground bg-white border border-border rounded-lg px-4 py-3">Niets in deze band{owner !== "team" || channel !== "all" ? " binnen dit filter" : ""}.</p>
+                <p className="text-body text-muted-foreground bg-card border border-border rounded-lg px-4 py-3">Niets in deze band{owner !== "team" || channel !== "all" ? " binnen dit filter" : ""}.</p>
               ) : (
                 <div className="space-y-2">
                   {bands[b.key].map((item) => (
@@ -168,7 +168,7 @@ export function TodayFeed() {
               </div>
               <div className="space-y-2">
                 {snoozedVisible.map((item) => (
-                  <div key={item.id} className="bg-white rounded-xl border border-border border-l-[3px] border-l-gray-300 shadow-sm p-3 flex items-center gap-3 opacity-80">
+                  <div key={item.id} className="bg-card rounded-xl border border-border border-l-[3px] border-l-gray-300 shadow-sm p-3 flex items-center gap-3 opacity-80">
                     <span className="text-lead font-semibold text-rm-gray truncate max-w-[32%]">{item.clientName}</span>
                     <span className="text-body text-muted-foreground truncate flex-1 min-w-0">{item.title}</span>
                     {item.snoozeReason && <span className="text-meta text-gray-400 italic truncate hidden sm:inline">&ldquo;{item.snoozeReason}&rdquo;</span>}
@@ -183,10 +183,10 @@ export function TodayFeed() {
 
         {/* Rechterkolom */}
         <aside className="space-y-4 lg:sticky lg:top-4">
-          <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-4">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-meta font-mono uppercase tracking-wider text-muted-foreground">Mijn acties vandaag</h3>
-              <span className="text-body font-bold text-rm-blue tabular-nums">{myActions.length}</span>
+              <span className="text-body font-bold text-rm-blue-ink tabular-nums">{myActions.length}</span>
             </div>
             <p className="text-[10.5px] text-gray-400 mb-2.5">= dezelfde feed, gefilterd op deadline vandaag/verlopen{feed.currentUser ? " of jouw naam" : ""}</p>
             {myActions.length === 0 ? (
@@ -203,7 +203,7 @@ export function TodayFeed() {
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-4">
             <h3 className="text-meta font-mono uppercase tracking-wider text-muted-foreground mb-3">Nieuw sinds gisteren</h3>
             {(["critical", "decision", "watch"] as FeedSeverity[]).map((k, idx) => (
               <div key={k} className={`flex justify-between text-[12.5px] py-1.5 ${idx > 0 ? "border-t border-border" : ""}`}>
@@ -217,7 +217,7 @@ export function TodayFeed() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-4">
             <h3 className="text-meta font-mono uppercase tracking-wider text-muted-foreground mb-3">Wanneer kleurt het?</h3>
             <ul className="space-y-2.5">
               <li className="flex gap-2.5 text-body text-muted-foreground"><span className="w-2.5 h-2.5 rounded-sm bg-red-500 mt-1 shrink-0" /><span><strong className="text-rm-gray">Rood</strong> — tracking/sync kapot, budget acuut fout, grote spend-anomalie, conversies vallen weg, deadline vandaag/verlopen. Schaars &amp; vandaag actioneerbaar.</span></li>

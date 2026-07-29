@@ -96,7 +96,7 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
           const impact = checkedImpact[tc.id] ?? tc.followup_kpi;
 
           return (
-            <div key={tc.id} className="bg-white rounded-lg border border-amber-100 p-3">
+            <div key={tc.id} className="bg-card rounded-lg border border-amber-100 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-rm-gray">{tc.task_text}</p>

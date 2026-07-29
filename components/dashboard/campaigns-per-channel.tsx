@@ -23,9 +23,9 @@ const eur = (v: number): string => new Intl.NumberFormat("nl-NL", { style: "curr
 const fmt = (v: number, d = 0): string => new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d }).format(v);
 
 const CHANNEL_META: Record<ChannelKey, { label: string; convLabel: string; icon: React.ReactNode }> = {
-  google_ads: { label: "Google Ads", convLabel: "Conversies", icon: <BarChart3 className="w-4 h-4 text-rm-blue" /> },
-  meta_ads: { label: "Meta", convLabel: "Conversies", icon: <Megaphone className="w-4 h-4 text-rm-blue" /> },
-  linkedin_ads: { label: "LinkedIn", convLabel: "Leads", icon: <Briefcase className="w-4 h-4 text-rm-blue" /> },
+  google_ads: { label: "Google Ads", convLabel: "Conversies", icon: <BarChart3 className="w-4 h-4 text-rm-blue-ink" /> },
+  meta_ads: { label: "Meta", convLabel: "Conversies", icon: <Megaphone className="w-4 h-4 text-rm-blue-ink" /> },
+  linkedin_ads: { label: "LinkedIn", convLabel: "Leads", icon: <Briefcase className="w-4 h-4 text-rm-blue-ink" /> },
 };
 
 export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
@@ -107,9 +107,9 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-border shadow-sm px-5 py-4">
+      <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-4">
         <div className="flex items-center gap-2 mb-1">
-          <Layers className="w-4.5 h-4.5 text-rm-blue" />
+          <Layers className="w-4.5 h-4.5 text-rm-blue-ink" />
           <h3 className="text-sm font-semibold text-rm-gray">Actieve kanalen & campagnes{geoClone ? ` — beurs ${geoClone}` : ""}</h3>
         </div>
         <p className="text-meta text-muted-foreground">
@@ -120,7 +120,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
       </div>
 
       {activeChannels.map((block) => (
-        <div key={block.channel} className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+        <div key={block.channel} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             {CHANNEL_META[block.channel].icon}
             <h3 className="text-sm font-semibold text-rm-gray">{block.label}</h3>

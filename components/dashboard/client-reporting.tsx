@@ -259,7 +259,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-rm-blue/10 flex items-center justify-center shrink-0">
-            <FileText className="w-4.5 h-4.5 text-rm-blue" />
+            <FileText className="w-4.5 h-4.5 text-rm-blue-ink" />
           </div>
           <div>
             <h2 className="text-base font-bold text-gray-900 leading-tight">Rapportage</h2>
@@ -300,7 +300,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
 
       {/* Report list (when no active report) */}
       {!report && !generating && !loading && reports.length > 0 && (
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border"><h3 className="text-sm font-semibold text-rm-gray">Eerdere rapportages</h3></div>
           <div className="divide-y divide-border">
             {reports.map((r) => (
@@ -317,10 +317,10 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       )}
 
       {/* Loading / Generating */}
-      {loading && <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-rm-blue" /></div>}
+      {loading && <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-rm-blue-ink" /></div>}
       {generating && (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-rm-blue" />
+          <Loader2 className="w-8 h-8 animate-spin text-rm-blue-ink" />
           <p className="text-sm text-muted-foreground">Rapport wordt gegenereerd...</p>
           <p className="text-micro text-muted-foreground">Data ophalen, metrics berekenen, tekst genereren — ca. 30-60 sec</p>
         </div>
@@ -328,7 +328,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
 
       {/* Empty state */}
       {!report && !generating && !loading && reports.length === 0 && (
-        <div className="bg-white rounded-xl border border-border shadow-sm p-12 text-center">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-12 text-center">
           <FileText className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <h3 className="text-sm font-semibold text-rm-gray mb-1">Nog geen rapportages</h3>
           <p className="text-xs text-muted-foreground mb-4">Genereer een rapport met grafieken, KPI&apos;s en analyse per metric.</p>
@@ -345,7 +345,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
         <div className="space-y-5">
 
           {/* Actions bar */}
-          <div className="bg-white rounded-xl border border-border shadow-sm px-5 py-3 flex items-center justify-between">
+          <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-3 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-rm-gray">{report.title}</h2>
               <p className="text-micro text-muted-foreground">{report.reportMonth} {report.reportYear}</p>
@@ -354,7 +354,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
               <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[reportStatus]?.bg ?? ""} ${STATUS_STYLE[reportStatus]?.color ?? ""}`}>{STATUS_STYLE[reportStatus]?.label ?? reportStatus}</span>
               {reportStatus === "draft" && <button onClick={() => updateStatus("final")} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-green-200 bg-green-50 text-green-600 hover:bg-green-100"><Check className="w-3 h-3" /> Definitief</button>}
               {reportStatus === "final" && <button onClick={() => updateStatus("sent")} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100"><Send className="w-3 h-3" /> Verstuurd</button>}
-              {reportId && <button onClick={downloadPdf} disabled={pdfLoading} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-rm-orange/30 bg-orange-50 text-rm-orange hover:bg-orange-100 disabled:opacity-50">{pdfLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} PDF</button>}
+              {reportId && <button onClick={downloadPdf} disabled={pdfLoading} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-rm-orange/30 bg-orange-50 text-rm-orange-ink hover:bg-orange-100 disabled:opacity-50">{pdfLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} PDF</button>}
               <button onClick={copyText} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-gray-50">{copied ? <Check className="w-3 h-3 text-green-500" /> : <Download className="w-3 h-3" />} {copied ? "Gekopieerd!" : "Tekst"}</button>
               <button onClick={() => { setReport(null); setReportId(null); fetchReports().then(setReports); }} className="text-micro font-medium px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-gray-50">Terug</button>
             </div>
@@ -371,7 +371,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                 : (isPositive ? "text-green-600" : "text-red-600");
 
               return (
-                <div key={kpi.label} className="bg-white rounded-xl border border-border shadow-sm p-4">
+                <div key={kpi.label} className="bg-card rounded-xl border border-border shadow-sm p-4">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-micro font-medium text-muted-foreground">{kpi.label}</span>
                     <span className={`text-micro font-bold ${changeColor}`}>
@@ -393,7 +393,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
             const isEditing = editingId === section.id;
 
             return (
-              <div key={section.id} className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+              <div key={section.id} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
                 {/* Section label bar */}
                 <div className="px-5 py-2 border-b border-border flex items-center justify-between bg-gray-50/50">
                   <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">{section.label}</span>
@@ -423,7 +423,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                         </>
                       ) : (
                         <>
-                          <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{section.heading}<span className="text-rm-orange">.</span></h3>
+                          <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{section.heading}<span className="text-rm-orange-ink">.</span></h3>
                           <div className="space-y-0.5 mb-3">
                             {section.bullets.map((b, i) => <p key={i} className="text-sm text-rm-gray"><span className="font-semibold">•</span> {b}</p>)}
                           </div>
@@ -446,7 +446,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
           })}
 
           {/* ── Actions section ── */}
-          <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-2 border-b border-border flex items-center justify-between bg-gray-50/50">
               <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">Acties komende maand</span>
               {editingId !== "acties" && <button onClick={() => startEdit("acties", report.actionSection.heading, report.actionSection.body)} className="p-1 rounded-md hover:bg-gray-100 text-muted-foreground"><Pencil className="w-3.5 h-3.5" /></button>}
@@ -465,7 +465,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                 </>
               ) : (
                 <>
-                  <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{report.actionSection.heading}<span className="text-rm-orange">.</span></h3>
+                  <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{report.actionSection.heading}<span className="text-rm-orange-ink">.</span></h3>
                   <div className="text-sm text-rm-gray leading-relaxed whitespace-pre-line">{report.actionSection.body}</div>
                 </>
               )}
@@ -473,7 +473,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
           </div>
 
           {/* ── Planning section ── */}
-          <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-2 border-b border-border flex items-center justify-between bg-gray-50/50">
               <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">Planning & Vooruitblik</span>
               {editingId !== "planning" && <button onClick={() => startEdit("planning", report.planningSection.heading, report.planningSection.body)} className="p-1 rounded-md hover:bg-gray-100 text-muted-foreground"><Pencil className="w-3.5 h-3.5" /></button>}
@@ -492,7 +492,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                 </>
               ) : (
                 <>
-                  <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{report.planningSection.heading}<span className="text-rm-orange">.</span></h3>
+                  <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{report.planningSection.heading}<span className="text-rm-orange-ink">.</span></h3>
                   <div className="text-sm text-rm-gray leading-relaxed whitespace-pre-line">{report.planningSection.body}</div>
                 </>
               )}
@@ -518,7 +518,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                         ? (isPositive ? "text-red-600" : "text-green-600")
                         : (isPositive ? "text-green-600" : "text-red-600");
                       return (
-                        <div key={kpi.label} className="bg-white rounded-xl border border-border shadow-sm p-4">
+                        <div key={kpi.label} className="bg-card rounded-xl border border-border shadow-sm p-4">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-micro font-medium text-muted-foreground">{kpi.label}</span>
                             <span className={`text-micro font-bold ${changeColor}`}>{kpi.changePct > 0 ? "+" : ""}{kpi.changePct}%</span>
@@ -532,14 +532,14 @@ export function ClientReporting({ clientId }: { clientId: string }) {
 
                   {/* Country metric sections */}
                   {cs.metricSections.map((section) => (
-                    <div key={section.id} className="bg-white rounded-xl border border-border shadow-sm overflow-hidden mt-4">
+                    <div key={section.id} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden mt-4">
                       <div className="px-5 py-2 border-b border-border bg-gray-50/50">
                         <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">{section.label}</span>
                       </div>
                       <div className="px-5 py-4">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <div>
-                            <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{section.heading}<span className="text-rm-orange">.</span></h3>
+                            <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{section.heading}<span className="text-rm-orange-ink">.</span></h3>
                             <div className="space-y-0.5 mb-3">
                               {section.bullets.map((b, i) => <p key={i} className="text-sm text-rm-gray"><span className="font-semibold">•</span> {b}</p>)}
                             </div>

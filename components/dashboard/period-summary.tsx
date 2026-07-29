@@ -68,10 +68,10 @@ export function PeriodSummary({ data, compact }: Props) {
   const cpa = current.totals.conversions > 0 ? current.totals.adSpend / current.totals.conversions : null;
 
   return (
-    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
       {!compact && (
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-rm-blue">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-rm-blue-ink">
             {formatRange(periode.range)}
           </h3>
           {periode.compareRange && (

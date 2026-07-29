@@ -137,7 +137,7 @@ function MiniSparkline({ data }: { data: number[] }) {
 
 function SummaryCard({ label, value, color, subtitle }: { label: string; value: string; color?: string; subtitle?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-border p-4 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
       <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
       <p className={`text-lg font-bold mt-1 ${color ?? "text-rm-gray"}`}>{value}</p>
       {subtitle && <p className="text-micro text-muted-foreground mt-0.5">{subtitle}</p>}
@@ -261,7 +261,7 @@ function PortfolioScoreboardBody() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-rm-blue" />
+        <Loader2 className="w-6 h-6 animate-spin text-rm-blue-ink" />
         <p className="text-sm text-muted-foreground">Klantoverzicht laden...</p>
       </div>
     );
@@ -352,7 +352,7 @@ function PortfolioScoreboardBody() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <Tabel>
           <Kop>
             {sorteerKop("name", "Klant", { breed: true })}
@@ -376,7 +376,7 @@ function PortfolioScoreboardBody() {
               return (
                 <Rij key={client.id} className="group">
                   <NaamCel>
-                    <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-rm-blue transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue">
+                    <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-rm-blue-ink transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue">
                       {/* Health dot */}
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                         !hasData ? "bg-gray-200" :
@@ -448,7 +448,7 @@ function PortfolioScoreboardBody() {
             </span>
             <button
               onClick={() => setShowEmpty((v) => !v)}
-              className="font-semibold text-rm-blue hover:underline"
+              className="font-semibold text-rm-blue-ink hover:underline"
             >
               {showEmpty ? "Verberg lege accounts" : "Toon alles"}
             </button>

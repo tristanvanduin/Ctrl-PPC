@@ -77,7 +77,7 @@ function AuditKeuze({ icoon, titel, telling, randKleur, bezig, uitgeschakeld, on
       type="button"
       onClick={onStart}
       disabled={uitgeschakeld}
-      className={`group text-left bg-white rounded-lg border border-border p-4 hover:shadow-sm transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue ${randKleur}`}
+      className={`group text-left bg-card rounded-lg border border-border p-4 hover:shadow-sm transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue ${randKleur}`}
     >
       <div className="flex items-center gap-2 mb-1">
         {icoon}
@@ -222,7 +222,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
           het duurt of waar de uitkomst landt. Zodra er een run is, is de uitkomst zelf het
           antwoord en verdwijnt dit blok. */}
       {!activeRun && runs.length === 0 && !loading && (
-        <div className="bg-white rounded-lg border border-border px-5 py-4 space-y-3">
+        <div className="bg-card rounded-lg border border-border px-5 py-4 space-y-3">
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-muted-foreground" aria-hidden />
             <h3 className="text-lead font-semibold text-gray-900">Nog geen audit voor deze klant</h3>
@@ -371,7 +371,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
               const overriddenCount = sectionRows.filter((r) => r.isOverridden).length;
 
               return (
-                <div key={section} className="bg-white rounded-lg border border-border overflow-hidden">
+                <div key={section} className="bg-card rounded-lg border border-border overflow-hidden">
                   {/* Section header */}
                   <div className="px-4 py-2.5 border-b border-border/60 flex items-center justify-between bg-gray-50/40">
                     <div className="flex items-center gap-2">
@@ -414,7 +414,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
                             </div>
                             {isRowEditing ? (
                               <textarea value={editData.comments} onChange={(e) => { const b = new Map(editBuffer); b.set(row.templateId, { ...editData, comments: e.target.value }); setEditBuffer(b); }}
-                                className="mt-1.5 w-full text-xs border border-border rounded px-2.5 py-1.5 bg-white focus:outline-none focus:border-blue-400 resize-none" rows={2} placeholder="Toelichting..." />
+                                className="mt-1.5 w-full text-xs border border-border rounded px-2.5 py-1.5 bg-card focus:outline-none focus:border-blue-400 resize-none" rows={2} placeholder="Toelichting..." />
                             ) : (
                               comments && <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{comments}</p>
                             )}
@@ -429,7 +429,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
                           <div className="pt-0.5">
                             {isRowEditing ? (
                               <select value={editData.score} onChange={(e) => { const b = new Map(editBuffer); b.set(row.templateId, { ...editData, score: e.target.value as AuditScore }); setEditBuffer(b); }}
-                                className="text-xs border border-border rounded px-2.5 py-1.5 bg-white focus:outline-none focus:border-blue-400 w-full">
+                                className="text-xs border border-border rounded px-2.5 py-1.5 bg-card focus:outline-none focus:border-blue-400 w-full">
                                 {SCORE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                               </select>
                             ) : (
@@ -454,7 +454,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
 
       {/* ── Previous runs ── */}
       {runs.length > 0 && !activeRun && (
-        <div className="bg-white rounded-lg border border-border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="px-4 py-2.5 border-b border-border/60 bg-gray-50/40">
             <h3 className="text-lead font-semibold text-gray-900">Eerdere audits</h3>
           </div>

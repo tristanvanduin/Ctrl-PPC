@@ -37,7 +37,7 @@ function Balk({ breedte, hoogte = 12, className = "" }: { breedte: string; hoogt
   return (
     <span
       className={`block rounded-md animate-pulse ${className}`}
-      style={{ width: breedte, height: hoogte, background: "rgba(15,23,42,0.06)" }}
+      style={{ width: breedte, height: hoogte, background: "var(--spoor-zacht, rgba(15,23,42,0.06))" }}
       aria-hidden
     />
   );
@@ -77,7 +77,7 @@ export function Laadvlak({
 
   return (
     <div
-      className={`bg-white rounded-xl border border-border shadow-sm overflow-hidden ${className}`}
+      className={`bg-card rounded-xl border border-border shadow-sm overflow-hidden ${className}`}
       // De hele kaart is één statusgebied: een schermlezer hoort "laden" en niet acht losse balkjes.
       role="status"
       aria-busy="true"
@@ -121,7 +121,7 @@ function GrafiekSkelet({ hoogte }: { hoogte: number }) {
         <span
           key={i}
           className="flex-1 rounded-t-md animate-pulse"
-          style={{ height: `${h * 100}%`, background: "rgba(15,23,42,0.06)" }}
+          style={{ height: `${h * 100}%`, background: "var(--spoor-zacht, rgba(15,23,42,0.06))" }}
         />
       ))}
     </div>

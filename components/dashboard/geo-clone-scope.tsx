@@ -36,7 +36,7 @@ export function GeoCloneScope({ value, onChange }: { value: string | null; onCha
         <span className="px-2.5 py-1 text-meta font-medium rounded-md bg-rm-blue text-white">
           {active ? `${active.brand} ${active.location} (${active.abbreviation})` : value}
         </span>
-        <button onClick={() => onChange(null)} className="text-meta text-muted-foreground hover:text-rm-blue underline underline-offset-2">
+        <button onClick={() => onChange(null)} className="text-meta text-muted-foreground hover:text-rm-blue-ink underline underline-offset-2">
           ← Hele account
         </button>
       </div>

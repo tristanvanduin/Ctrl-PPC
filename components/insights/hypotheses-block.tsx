@@ -167,8 +167,8 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
-        <Loader2 className="w-4 h-4 animate-spin text-rm-blue" />
+      <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+        <Loader2 className="w-4 h-4 animate-spin text-rm-blue-ink" />
       </div>
     );
   }
@@ -178,7 +178,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
   const pendingCount = hypotheses.filter((item) => item.status === "pending").length;
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <Beaker className="w-4 h-4 text-purple-500" />
         <h3 className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
@@ -231,7 +231,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-xs font-semibold text-purple-700">{item.title}</p>
-                    <span className="px-1.5 py-0.5 rounded bg-white border border-purple-200 text-micro text-purple-600">
+                    <span className="px-1.5 py-0.5 rounded bg-card border border-purple-200 text-micro text-purple-600">
                       {item.label}
                     </span>
                     <span className={`px-1.5 py-0.5 rounded text-micro font-medium ${statusTone(item.status)}`}>

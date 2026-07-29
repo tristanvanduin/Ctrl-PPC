@@ -84,7 +84,7 @@ function SectionHeader({ icon, title, subtitle, action }: { icon: React.ReactNod
         {icon}
       </div>
       <div>
-        <h2 className="text-base font-bold text-rm-blue">{title}</h2>
+        <h2 className="text-base font-bold text-rm-blue-ink">{title}</h2>
         <p className="text-xs text-muted-foreground">{subtitle}</p>
       </div>
       {action && <div className="ml-auto shrink-0">{action}</div>}
@@ -106,7 +106,7 @@ function TijdasKeuze({ value, onChange }: { value: "beurs" | "maand"; onChange: 
           key={o.id}
           onClick={() => onChange(o.id)}
           className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-            value === o.id ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue"
+            value === o.id ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue-ink"
           }`}
         >
           {o.label}
@@ -133,7 +133,7 @@ function ChannelTabs({ channel, onChange }: { channel: Channel; onChange: (c: Ch
           key={c.id}
           onClick={() => onChange(c.id)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            channel === c.id ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+            channel === c.id ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"
           }`}
         >
           {c.icon}
@@ -172,7 +172,7 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
           const showBadge = s.tabs.includes("files") && sopErrorCount > 0;
           return (
             <button key={s.id} onClick={() => onChange(s.tabs[0])}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${active ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground hover:text-rm-gray"}`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${active ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"}`}>
               {s.icon}{s.label}
               {showBadge && <span className="ml-1 px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-500 text-white">{sopErrorCount}</span>}
             </button>
@@ -293,7 +293,7 @@ export function ClientDashboard({ client }: { client: Client }) {
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? "bg-white text-rm-blue shadow-sm"
+                ? "bg-card text-rm-blue-ink shadow-sm"
                 : "text-muted-foreground hover:text-rm-gray"
             }`}
           >
@@ -312,7 +312,7 @@ export function ClientDashboard({ client }: { client: Client }) {
       {/* Loading state */}
       {clientData.loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-rm-blue" />
+          <Loader2 className="w-8 h-8 animate-spin text-rm-blue-ink" />
           <p className="text-sm text-muted-foreground">Data ophalen uit Google Ads...</p>
         </div>
       )}
@@ -384,7 +384,7 @@ export function ClientDashboard({ client }: { client: Client }) {
               )}
 
               <SectionHeader
-                icon={<Calendar className="w-4.5 h-4.5 text-rm-blue" />}
+                icon={<Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />}
                 title={
                   (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
                   + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
@@ -403,7 +403,7 @@ export function ClientDashboard({ client }: { client: Client }) {
 
               <div className="pt-2">
                 <SectionHeader
-                  icon={<Target className="w-4.5 h-4.5 text-rm-blue" />}
+                  icon={<Target className="w-4.5 h-4.5 text-rm-blue-ink" />}
                   title={countryFilter ? `Jaaroverzicht 2026 — ${countryLabel(countryFilter)}` : "Jaaroverzicht 2026"}
                   subtitle="Jaardoelen vs bijgestelde prognose op basis van weektrend"
                 />
@@ -600,7 +600,7 @@ function SettingsSections({ client }: { client: Client }) {
             key={g.id}
             onClick={() => setGroep(g.id)}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              g.id === groep ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+              g.id === groep ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"
             }`}
           >
             {g.label}
@@ -645,7 +645,7 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
   // eronder, zodat je alle analyses ziet zonder dat een volledige SOP-uitwerking ze wegduwt.
   const Section = ({ children }: { children: React.ReactNode }) => (
     <div className="flex items-center gap-3 pt-1">
-      <span className="text-micro font-semibold text-rm-blue uppercase tracking-wide whitespace-nowrap">{children}</span>
+      <span className="text-micro font-semibold text-rm-blue-ink uppercase tracking-wide whitespace-nowrap">{children}</span>
       <span className="h-px flex-1 bg-border" />
     </div>
   );

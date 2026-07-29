@@ -53,7 +53,7 @@ function MonthCard({
 
   const statusIcons = {
     previous: <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />,
-    current: <Clock className="w-3.5 h-3.5 text-rm-blue" />,
+    current: <Clock className="w-3.5 h-3.5 text-rm-blue-ink" />,
     next: <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />,
   };
 
@@ -92,7 +92,7 @@ function MonthCard({
         {hasPartial && (
           <div className="flex justify-between items-baseline">
             <span className="text-meta text-muted-foreground">Gerealiseerd</span>
-            <span className="text-base font-bold text-rm-blue">
+            <span className="text-base font-bold text-rm-blue-ink">
               {format(partialRealized!)}
             </span>
           </div>
@@ -104,7 +104,7 @@ function MonthCard({
             {isRealized ? "Gerealiseerd" : "Prognose"}
           </span>
           <span className={`${hasPartial ? "text-xs" : "text-base font-bold"} ${
-            hasPartial ? "text-muted-foreground" : variant === "current" ? "text-rm-blue" : "text-rm-gray"
+            hasPartial ? "text-muted-foreground" : variant === "current" ? "text-rm-blue-ink" : "text-rm-gray"
           }`}>
             {format(value)}
           </span>
@@ -213,11 +213,11 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
   const focusIndices = new Set([REALIZED_THROUGH_MONTH - 1, REALIZED_THROUGH_MONTH, REALIZED_THROUGH_MONTH + 1]);
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header with metric tabs */}
       <div className="px-5 pt-5 pb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
             Maandprestaties
           </h3>
           <p className="text-meta text-muted-foreground mt-0.5">
@@ -232,7 +232,7 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                 metric === m
                   ? "bg-rm-blue text-white"
-                  : "text-muted-foreground hover:text-rm-blue"
+                  : "text-muted-foreground hover:text-rm-blue-ink"
               }`}
             >
               {METRIC_LABELS[m]}
@@ -277,11 +277,11 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
                   }`}
                 >
                   <p className={`text-micro font-medium mb-1 ${
-                    isFocus ? "text-rm-blue font-semibold" : isRealized ? "text-rm-gray" : "text-muted-foreground"
+                    isFocus ? "text-rm-blue-ink font-semibold" : isRealized ? "text-rm-gray" : "text-muted-foreground"
                   }`}>
                     {pt.monthLabel}
                   </p>
-                  <p className={`text-meta font-semibold ${isFocus ? "text-rm-blue" : "text-rm-gray"}`}>
+                  <p className={`text-meta font-semibold ${isFocus ? "text-rm-blue-ink" : "text-rm-gray"}`}>
                     {format(value)}
                   </p>
                   <div className="mt-1.5 mx-auto w-full max-w-[36px]">

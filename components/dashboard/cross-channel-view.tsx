@@ -118,9 +118,9 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
         <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} />
       )}
       {/* Data-weergave; de cross-channel-signaalanalyse draait via Analyses → Cross-channel. */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-          <Layers className="w-5 h-5 text-rm-blue" />
+          <Layers className="w-5 h-5 text-rm-blue-ink" />
           <h3 className="text-sm font-semibold text-rm-gray">Cross-channel (blended)</h3>
         </div>
 

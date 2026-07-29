@@ -336,15 +336,15 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   }
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-rm-blue" />
+      <div className="bg-card rounded-xl border border-border p-8 shadow-sm flex items-center justify-center">
+        <Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" />
       </div>
     );
   }
 
   if (items.length === 0 && !showAddHypothesis && !showAddTask) {
     return (
-      <div className="bg-white rounded-xl border border-border p-8 shadow-sm text-center">
+      <div className="bg-card rounded-xl border border-border p-8 shadow-sm text-center">
         <Calendar className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
         <p className="text-sm text-muted-foreground mb-3">Nog geen sprintplanning.</p>
         <button
@@ -358,11 +358,11 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Sprintplanning</h3>
+          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Sprintplanning</h3>
           <p className="text-micro text-muted-foreground mt-0.5">
             {filteredItems.length} taken · Week {currentWeek} ({new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })})
           </p>
@@ -374,7 +374,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
-                  filter === f ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
+                  filter === f ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
                 }`}
               >
                 {f === "active" ? "Actief" : f === "done" ? "Klaar" : "Alles"}
@@ -399,7 +399,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           </button>
           <button
             onClick={() => setShowAddTask("standalone")}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md border border-rm-blue/30 text-rm-blue hover:bg-rm-blue/5 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md border border-rm-blue/30 text-rm-blue-ink hover:bg-rm-blue/5 transition-colors"
           >
             <Plus className="w-3 h-3" /> Losse taak
           </button>
@@ -428,19 +428,19 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
             value={newHypothesis}
             onChange={(e) => setNewHypothesis(e.target.value)}
             placeholder="Hypothese: Met het [actie] verwachten we [verwachting]..."
-            className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-purple-400 resize-none"
+            className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-purple-400 resize-none"
             rows={2}
           />
           <input
             value={newTask}
             onChange={(e) => setNewTask(e.target.value)}
             placeholder="Eerste taak (optioneel)"
-            className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-purple-400"
+            className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-purple-400"
           />
           <div className="flex gap-3">
-            <input value={newMetrics} onChange={(e) => setNewMetrics(e.target.value)} placeholder="Metrics (bijv. ROAS, CR)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-purple-400" />
-            <input value={newTimeframe} onChange={(e) => setNewTimeframe(e.target.value)} placeholder="Looptijd (bijv. 3 maanden)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-purple-400" />
-            <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-white">
+            <input value={newMetrics} onChange={(e) => setNewMetrics(e.target.value)} placeholder="Metrics (bijv. ROAS, CR)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:border-purple-400" />
+            <input value={newTimeframe} onChange={(e) => setNewTimeframe(e.target.value)} placeholder="Looptijd (bijv. 3 maanden)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:border-purple-400" />
+            <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card">
               <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
               <option value="Klant">Klant</option>
             </select>
@@ -455,12 +455,12 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
       {showAddTask === "standalone" && (
         <div className="px-5 py-4 border-b border-border bg-blue-50/30 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-rm-blue">Losse taak toevoegen (zonder hypothese)</p>
+            <p className="text-xs font-semibold text-rm-blue-ink">Losse taak toevoegen (zonder hypothese)</p>
             <button onClick={() => setShowAddTask(null)} className="p-1 hover:bg-blue-100 rounded"><X className="w-3.5 h-3.5 text-blue-400" /></button>
           </div>
           <div className="flex gap-3">
-            <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Taakomschrijving" className="flex-1 text-sm border border-blue-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-rm-blue" />
-            <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-blue-200 rounded-lg px-3 py-1.5 bg-white">
+            <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Taakomschrijving" className="flex-1 text-sm border border-blue-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-rm-blue" />
+            <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-blue-200 rounded-lg px-3 py-1.5 bg-card">
               <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
               <option value="Klant">Klant</option>
             </select>
@@ -532,8 +532,8 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                       <td className="px-4 py-2" />
                       <td className="px-4 py-2" colSpan={4}>
                         <div className="flex items-center gap-2">
-                          <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Nieuwe taak..." className="flex-1 text-xs border border-purple-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-purple-400" />
-                          <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded px-2 py-1 bg-white">
+                          <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Nieuwe taak..." className="flex-1 text-xs border border-purple-200 rounded px-2 py-1 bg-card focus:outline-none focus:border-purple-400" />
+                          <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded px-2 py-1 bg-card">
                             <option value={OWNER_TEAM}>{BRAND_SHORT}</option>
                             <option value="Klant">Klant</option>
                           </select>
@@ -571,7 +571,7 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
             type="number"
             value={item.week_number || ""}
             onChange={(e) => onUpdate(item.id, "week_number", e.target.value)}
-            className={`w-12 text-xs text-center border rounded px-1 py-0.5 focus:bg-white focus:border-rm-blue focus:outline-none ${
+            className={`w-12 text-xs text-center border rounded px-1 py-0.5 focus:bg-card focus:border-rm-blue focus:outline-none ${
               isOverdue ? "border-red-300 bg-red-50 text-red-600 font-bold" :
               isCurrent ? "border-emerald-300 bg-emerald-50 text-emerald-600 font-bold" :
               "border-transparent hover:border-border bg-transparent"
@@ -598,7 +598,7 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
         <select
           value={item.owner}
           onChange={(e) => onUpdate(item.id, "owner", e.target.value)}
-          className="text-xs border border-transparent hover:border-border rounded px-1 py-0.5 bg-transparent focus:bg-white focus:border-rm-blue focus:outline-none cursor-pointer"
+          className="text-xs border border-transparent hover:border-border rounded px-1 py-0.5 bg-transparent focus:bg-card focus:border-rm-blue focus:outline-none cursor-pointer"
         >
           <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
           <option value="Klant">Klant</option>

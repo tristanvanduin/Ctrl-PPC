@@ -15,20 +15,20 @@ function GroupCard({ group }: { group: CrossGroup }) {
   const [expanded, setExpanded] = useState(false);
   const has = group.triggered > 0;
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <div className="flex-1">
           <h4 className="text-lead font-semibold text-rm-gray">{group.title}</h4>
           <p className="text-micro text-muted-foreground mt-0.5">{group.description}</p>
         </div>
-        <span className={`text-micro font-medium px-2 py-0.5 rounded-full ${has ? "bg-rm-orange/10 text-rm-orange" : "bg-gray-100 text-muted-foreground"}`}>
+        <span className={`text-micro font-medium px-2 py-0.5 rounded-full ${has ? "bg-rm-orange/10 text-rm-orange-ink" : "bg-gray-100 text-muted-foreground"}`}>
           {has ? `${group.triggered} signa${group.triggered === 1 ? "al" : "len"}` : "geen"}
         </span>
       </div>
       <div className="px-5 py-2.5">
         {has ? (
           <>
-            <button onClick={() => setExpanded((e) => !e)} className="flex items-center gap-1 text-meta text-rm-blue hover:underline">
+            <button onClick={() => setExpanded((e) => !e)} className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline">
               {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               {expanded ? "Verberg bevindingen" : "Bekijk bevindingen"}
             </button>
@@ -104,9 +104,9 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
   return (
     <div className="space-y-3">
       {/* Kop met de gedeelde run-knop: één run voedt alle sub-analyses. */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Radar className="w-4.5 h-4.5 text-rm-blue" />
+          <Radar className="w-4.5 h-4.5 text-rm-blue-ink" />
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-rm-gray">Cross-channel-analyse</h3>
             <p className="text-micro text-muted-foreground mt-0.5">

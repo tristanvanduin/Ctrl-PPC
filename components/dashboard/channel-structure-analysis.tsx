@@ -163,15 +163,15 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-        <Layers className="w-4.5 h-4.5 text-rm-blue" />
+        <Layers className="w-4.5 h-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">Structuur & segment-efficiëntie</h3>
         <span className="text-micro text-muted-foreground">waar landt het budget binnen {dimLabel}</span>
       </div>
       <div className="px-5 py-4">
         {stories === null ? (
-          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" /></div>
         ) : stories.length === 0 ? (
           <p className="text-body text-muted-foreground">
             Geen materiële segment-signalen — het budget is redelijk verdeeld, of er is te weinig data per dimensie voor een eerlijk oordeel.

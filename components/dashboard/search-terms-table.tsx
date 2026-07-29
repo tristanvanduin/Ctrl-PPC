@@ -120,14 +120,14 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
   const duursteProduct = Math.max(0, ...productBleeders.map((p) => p.cost));
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header with subtabs */}
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
           <button
             onClick={() => setSubtab("terms")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              subtab === "terms" ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
+              subtab === "terms" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
             }`}
           >
             Verspilde zoektermen
@@ -140,7 +140,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           <button
             onClick={() => setSubtab("adgroups")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              subtab === "adgroups" ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
+              subtab === "adgroups" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
             }`}
           >
             Ad group bleeders
@@ -153,7 +153,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           <button
             onClick={() => setSubtab("products")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              subtab === "products" ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
+              subtab === "products" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
             }`}
           >
             Product bleeders
@@ -166,7 +166,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           <button
             onClick={() => setSubtab("ai")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              subtab === "ai" ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
+              subtab === "ai" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
             }`}
           >
             <span className="inline-flex items-center gap-1">

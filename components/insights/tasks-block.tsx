@@ -232,12 +232,12 @@ const STORAGE_KEY_PREFIX = "rm-dashboard-tasks-";
 
 const severityColors: Record<string, string> = {
   "Budget": "text-red-600 bg-red-50",
-  "Analyse": "text-rm-orange bg-orange-50",
+  "Analyse": "text-rm-orange-ink bg-orange-50",
   "Zoektermen": "text-purple-600 bg-purple-50",
   "Efficiency": "text-amber-600 bg-amber-50",
   "CPA": "text-amber-700 bg-amber-50",
   "Concurrentie": "text-slate-600 bg-slate-50",
-  "Klant": "text-rm-blue bg-blue-50",
+  "Klant": "text-rm-blue-ink bg-blue-50",
   "Onderhoud": "text-gray-600 bg-gray-100",
   "Kans": "text-green-600 bg-green-50",
 };
@@ -376,9 +376,9 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
   const allDone = completed === tasks.length;
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
           Taken
         </h3>
         <span className="text-xs text-muted-foreground">
@@ -399,7 +399,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
             onClick={() => setCadence(c)}
             className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-1.5 text-meta font-medium rounded-md transition-colors relative ${
               cadence === c
-                ? "bg-white text-rm-blue shadow-sm"
+                ? "bg-card text-rm-blue-ink shadow-sm"
                 : "text-muted-foreground hover:text-rm-gray"
             }`}
           >
@@ -446,7 +446,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
 
         return filteredAiTasks.length > 0 ? (
         <div className="mb-4">
-          <p className="text-micro font-semibold text-rm-blue uppercase tracking-wide mb-2">
+          <p className="text-micro font-semibold text-rm-blue-ink uppercase tracking-wide mb-2">
             AI Analyse taken ({filteredAiTasks.length}{selectedInsightId ? " gefilterd" : ""})
           </p>
           <div className="space-y-1.5">
@@ -463,7 +463,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
                 <div className="min-w-0 flex-1">
                   <button onClick={() => toggleExpanded(at.id)} className="flex items-start gap-1.5 w-full text-left group">
                     {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />}
-                    <span className={`text-sm font-medium text-rm-gray flex-1 group-hover:text-rm-blue ${isOpen ? "" : "truncate"}`}>{at.title}</span>
+                    <span className={`text-sm font-medium text-rm-gray flex-1 group-hover:text-rm-blue-ink ${isOpen ? "" : "truncate"}`}>{at.title}</span>
                   </button>
                   {isOpen && (
                     <span className="text-xs text-muted-foreground block mt-1 ml-5">{at.description}</span>
@@ -537,7 +537,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
       {completed > 0 && (
         <button
           onClick={resetTasks}
-          className="mt-3 text-meta text-muted-foreground hover:text-rm-blue transition-colors"
+          className="mt-3 text-meta text-muted-foreground hover:text-rm-blue-ink transition-colors"
         >
           {allDone ? "✓ Alle taken afgerond — reset voor nieuwe cyclus" : "Reset taken"}
         </button>

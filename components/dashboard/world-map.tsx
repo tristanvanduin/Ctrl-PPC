@@ -29,13 +29,16 @@ const SHAPES: Shape[] = features.map((f, i) => {
   return { key: `${numeric}-${i}`, alpha2: NUMERIC_TO_ALPHA2[numeric] ?? null, d: pathGen(f as GeoPermissibleObjects) ?? "" };
 });
 
-// Sequentiële blauw-ramp (licht → donker) op waarde-intensiteit; merk-onafhankelijk en leesbaar.
-const LIGHT = [230, 238, 248];
-const DARK = [8, 40, 140];
+// Sequentiële ramp op waarde-intensiteit; merk-onafhankelijk en leesbaar.
+//
+// De twee uiteinden staan als CSS-variabele en niet als vaste rgb, want een kaart die van
+// bijna-wit naar donkerblauw loopt is op een donker canvas een lichtbak: in de eerste donkere
+// schermafdruk was de wereldkaart een wit blok midden op de pagina. In het donker loopt de ramp
+// juist andersom — van iets boven het vlak naar een heldere tint — en `color-mix` doet de
+// interpolatie in de browser, zodat het omschakelen geen JavaScript kost.
 function ramp(frac: number): string {
   const f = Math.max(0, Math.min(1, frac));
-  const c = LIGHT.map((x, i) => Math.round(x + (DARK[i] - x) * f));
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+  return `color-mix(in srgb, var(--kaart-hoog, #08288C) ${Math.round(f * 100)}%, var(--kaart-laag, #e6eef8))`;
 }
 
 export interface WorldMapProps {
@@ -68,8 +71,8 @@ export default function WorldMap({ values, format, metricLabel, onCountryClick }
             <path
               key={s.key}
               d={s.d}
-              fill={has ? ramp(Math.abs(v as number) / max) : "#eef1f6"}
-              stroke={isHover ? "#08288C" : "#ffffff"}
+              fill={has ? ramp(Math.abs(v as number) / max) : "var(--kaart-leeg, #eef1f6)"}
+              stroke={isHover ? "var(--kaart-hover, #08288C)" : "var(--kaart-rand, #ffffff)"}
               strokeWidth={isHover ? 1.4 : 0.4}
               style={{ cursor: clickable ? "pointer" : "default", opacity: hover && !isHover ? 0.9 : 1, transition: "opacity 120ms" }}
               onClick={() => { if (clickable && s.alpha2) onCountryClick!(s.alpha2); }}
@@ -108,14 +111,14 @@ export default function WorldMap({ values, format, metricLabel, onCountryClick }
 
       {hover && (
         <div
-          className="pointer-events-none absolute z-10 rounded-md border border-border bg-white px-2.5 py-1.5 shadow-md text-meta"
+          className="pointer-events-none absolute z-10 rounded-md border border-border bg-card px-2.5 py-1.5 shadow-md text-meta"
           style={{ left: Math.min(hover.x + 12, WIDTH - 120), top: hover.y + 12 }}
         >
           <div className="font-semibold text-rm-gray">{countryLabel(hover.alpha2)}</div>
           <div className="text-muted-foreground">
             {metricLabel}:{" "}
             {hoveredValue != null && Number.isFinite(hoveredValue)
-              ? <span className="font-medium text-rm-blue tabular-nums">{format(hoveredValue)}</span>
+              ? <span className="font-medium text-rm-blue-ink tabular-nums">{format(hoveredValue)}</span>
               : <span className="italic">geen data voor dit land</span>}
           </div>
         </div>

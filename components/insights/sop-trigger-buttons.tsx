@@ -285,7 +285,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
     channelCfg.types.some((t) => isJobRunning(`sop-${channelCfg.sopTypeKey[t]}-${clientId}`));
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-rm-gray">SOP Analyse — {channelCfg.headerLabel}</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
@@ -317,7 +317,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-rm-gray">{config.label}</span>
-                  {s.running && <Loader2 className="w-4 h-4 text-rm-blue animate-spin" />}
+                  {s.running && <Loader2 className="w-4 h-4 text-rm-blue-ink animate-spin" />}
                   {s.success && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                   {s.error && <AlertCircle className="w-4 h-4 text-red-500" />}
                 </div>
@@ -332,10 +332,10 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
                   <p className="text-micro text-red-500 mt-1 truncate">{s.error}</p>
                 )}
                 {s.running && type === "monthly" && (
-                  <p className="text-micro text-rm-blue mt-1">Dit duurt ca. 2-3 minuten...</p>
+                  <p className="text-micro text-rm-blue-ink mt-1">Dit duurt ca. 2-3 minuten...</p>
                 )}
                 {s.running && type !== "monthly" && (
-                  <p className="text-micro text-rm-blue mt-1">Dit duurt ca. 30-60 seconden...</p>
+                  <p className="text-micro text-rm-blue-ink mt-1">Dit duurt ca. 30-60 seconden...</p>
                 )}
               </button>
               {s.lastDate && (

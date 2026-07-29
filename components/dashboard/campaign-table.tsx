@@ -223,7 +223,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
 
   if (campaigns.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-border p-8 shadow-sm text-center">
+      <div className="bg-card rounded-xl border border-border p-8 shadow-sm text-center">
         <p className="text-muted-foreground">Campagne data wordt geladen...</p>
       </div>
     );
@@ -250,12 +250,12 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
   const grootsteConv = Math.max(0, ...filtered.map((c) => c.conversions));
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-border">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
               Campagnes
             </h3>
             <p className="text-meta text-muted-foreground mt-0.5">

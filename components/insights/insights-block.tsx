@@ -21,9 +21,9 @@ interface Insight {
 
 const icons: Record<InsightType, React.ReactNode> = {
   critical: <AlertTriangle className="w-4 h-4 text-red-500" />,
-  warning: <AlertTriangle className="w-4 h-4 text-rm-orange" />,
+  warning: <AlertTriangle className="w-4 h-4 text-rm-orange-ink" />,
   positive: <TrendingUp className="w-4 h-4 text-green-500" />,
-  info: <Info className="w-4 h-4 text-rm-blue" />,
+  info: <Info className="w-4 h-4 text-rm-blue-ink" />,
 };
 
 const bgColors: Record<InsightType, string> = {
@@ -34,7 +34,7 @@ const bgColors: Record<InsightType, string> = {
 };
 
 const levelColors: Record<string, string> = {
-  "Account": "bg-rm-blue/10 text-rm-blue",
+  "Account": "bg-rm-blue/10 text-rm-blue-ink",
   "Budget": "bg-amber-100 text-amber-700",
   "Campagne": "bg-purple-100 text-purple-700",
   "Trend": "bg-slate-100 text-slate-700",
@@ -817,15 +817,15 @@ export function InsightsBlock({
   );
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
           Inzichten
         </h3>
         {selectedInsightId && onSelectInsight && (
           <button
             onClick={() => onSelectInsight(null)}
-            className="flex items-center gap-1 text-meta text-rm-blue hover:underline"
+            className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline"
           >
             <X className="w-3 h-3" />
             Filter wissen
@@ -853,7 +853,7 @@ export function InsightsBlock({
                 } hover:shadow-sm`}
               >
                 <div className="mt-0.5 shrink-0">
-                  {isSelected ? <Filter className="w-4 h-4 text-rm-blue" /> : icons[insType]}
+                  {isSelected ? <Filter className="w-4 h-4 text-rm-blue-ink" /> : icons[insType]}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -879,7 +879,7 @@ export function InsightsBlock({
           {sortedDbInsights.length > 3 && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="flex items-center justify-center gap-1.5 w-full py-2 text-meta font-medium text-rm-blue hover:text-rm-blue/80 transition-colors"
+              className="flex items-center justify-center gap-1.5 w-full py-2 text-meta font-medium text-rm-blue-ink hover:text-rm-blue-ink/80 transition-colors"
             >
               {isExpanded ? (
                 <>Toon minder <ChevronUp className="w-3.5 h-3.5" /></>
@@ -913,7 +913,7 @@ export function InsightsBlock({
         {insights.length > 3 && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center justify-center gap-1.5 w-full py-2 mt-2 text-meta font-medium text-rm-blue hover:text-rm-blue/80 transition-colors"
+            className="flex items-center justify-center gap-1.5 w-full py-2 mt-2 text-meta font-medium text-rm-blue-ink hover:text-rm-blue-ink/80 transition-colors"
           >
             {isExpanded ? (
               <>Toon minder <ChevronUp className="w-3.5 h-3.5" /></>

@@ -106,17 +106,17 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
             Performance {new Date().getFullYear()}
           </h3>
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => setViewMode("weekly")}
               className={`px-2.5 py-1 text-meta font-medium rounded-md transition-colors ${
-                viewMode === "weekly" ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
+                viewMode === "weekly" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
               }`}
             >
               Per week
@@ -124,7 +124,7 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
             <button
               onClick={() => setViewMode("monthly")}
               className={`px-2.5 py-1 text-meta font-medium rounded-md transition-colors ${
-                viewMode === "monthly" ? "bg-white text-rm-blue shadow-sm" : "text-muted-foreground"
+                viewMode === "monthly" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
               }`}
             >
               Per maand
@@ -149,7 +149,7 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                 metric === m
                   ? "bg-rm-blue text-white"
-                  : "text-muted-foreground hover:text-rm-blue"
+                  : "text-muted-foreground hover:text-rm-blue-ink"
               }`}
             >
               {METRIC_LABELS[m]}

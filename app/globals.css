@@ -89,14 +89,27 @@
   /* Merk-tokens. Wijzen naar --brand-* variabelen die de BrandThemeProvider per beurs/klant
      zet; zonder provider vallen ze terug op de RAI Amsterdam-huisstijl. Zo kleurt élk bestaand
      gebruik van rm-blue/rm-orange automatisch mee met het actieve merk, zonder de componenten
-     aan te raken. Neutralen (gray/border/light) blijven vast voor leesbaarheid. */
+     aan te raken.
+
+     De neutralen stonden hier als vaste hex, en dat is precies waarom `text-rm-gray` — de
+     standaard tekstkleur van dit hele dashboard, 280 keer gebruikt — als `color:#32373c` werd
+     uitgeschreven in plaats van als variabele. Nu wijzen ze naar runtime-variabelen met exact
+     dezelfde waarde, zodat de donkere modus ze kan verzetten zonder één component aan te raken. */
   --color-rm-blue: var(--brand-primary, #08288C);
   --color-rm-orange: var(--brand-accent, #F16B37);
-  --color-rm-light: #f9fafc;
+  --color-rm-light: var(--rm-light, #f9fafc);
   --color-rm-blue-light: var(--brand-primary-light, #0a35b0);
   --color-rm-orange-light: var(--brand-accent-light, #f4885e);
-  --color-rm-gray: #32373c;
-  --color-rm-border: #E1E5F2;
+  /* De merkkleur als inkt, los van de merkkleur als vlak.
+     Eén kleur kan die twee rollen niet allebei doen. De huisstijlkleur is gekozen om op wit te
+     lezen — RAI-blauw is bijna zwart, GreenTech-groen is een diepe tint — en verdwijnt daardoor
+     als tekst op een donkere kaart. Licht je hem op, dan wordt de zijbalk een lichtbak met witte
+     letters erop; dat was letterlijk het beeld in de eerste donkere schermafdruk. In de lichte
+     modus zijn beide tokens exact dezelfde kleur, dus daar verandert er niets. */
+  --color-rm-blue-ink: var(--rm-blue-ink, var(--brand-primary, #08288C));
+  --color-rm-orange-ink: var(--rm-orange-ink, var(--brand-accent, #F16B37));
+  --color-rm-gray: var(--rm-gray, #32373c);
+  --color-rm-border: var(--rm-border, #E1E5F2);
 }
 
 :root {
@@ -111,7 +124,10 @@
   --secondary: #f0f2f8;
   --secondary-foreground: #08288C;
   --muted: #f0f2f8;
-  --muted-foreground: #64748b;
+  /* Was #64748b: 4,25:1 op de lichtgrijze vlakken waar deze kleur het vaakst op staat —
+     net onder de 4,5 die klein tekstwerk nodig heeft. Eén tint dieper haalt acht plekken tegelijk
+     over de drempel zonder dat het "gedempt" ophoudt gedempt te zijn. */
+  --muted-foreground: #55637a;
   --accent: #F16B37;
   --accent-foreground: #ffffff;
   --destructive: #ef4444;
@@ -132,6 +148,222 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.12);
   --sidebar-ring: #F16B37;
+
+  /* De grafiek-chrome als variabele in plaats van als hex in TypeScript, zodat het raster en de
+     aslabels met het thema meebewegen. Dezelfde waarden als voorheen. */
+  --rm-gray: #32373c;
+  --rm-light: #f9fafc;
+  --rm-border: #E1E5F2;
+
+  --chart-grid: #eef1f6;
+  --chart-axis: #64748b;
+  /* De baan waarop een aandeelstreep loopt, en de vulling van een hover-cursor in een grafiek. */
+  --spoor: rgba(15, 23, 42, 0.07);
+  --spoor-zacht: rgba(15, 23, 42, 0.06);
+  --hover-vlak: rgba(15, 23, 42, 0.04);
+  --rij-hover: rgb(249 250 251 / 0.8);
+
+  /* De kaart. `--kaart-laag` is de kleur bij nul en `--kaart-hoog` die bij het maximum; de
+     landen ertussenin worden in de browser gemengd. `--kaart-leeg` is een land zonder data. */
+  --kaart-laag: #e6eef8;
+  --kaart-hoog: #08288C;
+  --kaart-leeg: #eef1f6;
+  --kaart-rand: #ffffff;
+  --kaart-hover: #08288C;
+
+  /* Het vlak achter een advertentie-preview. */
+  --preview-vlak: rgb(243 244 246 / 0.7);
+}
+
+/* ── De donkere modus ──────────────────────────────────────────────────────
+ *
+ * Bijna alles staat hier en niet in de componenten, en dat kan omdat Tailwind v4 elke
+ * paletklasse als variabele uitschrijft: `.bg-red-50` wordt letterlijk
+ * `background-color: var(--color-red-50)`. Wie die variabele omdefinieert, verzet in één keer
+ * alle honderddertig plekken waar een gekleurd vlakje staat — zonder één classNaam aan te raken.
+ *
+ * De truc bij de kleurtrappen is dat ze omgekeerd worden. In het licht is 50 een bijna-wit vlak
+ * en 700 de leesbare tekst erop; in het donker moet 50 een diep getint vlak zijn en 700 juist een
+ * heldere letter. Door de trap om te klappen blijft élk bestaand paar `bg-x-50 text-x-700`
+ * kloppen, ook de paren die ik nooit gezien heb.
+ *
+ * Wat hier NIET in kan:
+ *   - `bg-white`. Dat is in de componenten `bg-card` geworden, want `--color-white` omdefiniëren
+ *     zou ook de honderdnegen `text-white` meenemen — en die staan op de merkgradient en de
+ *     blauwe zijbalk, waar wit wit hoort te blijven.
+ *   - Het categorische grafiekpalet. Dat is gevalideerd op kleurenblindheid tegen een wit vlak;
+ *     opnieuw kiezen voor een donker vlak is een eigen ronde met de validator, geen kleurtabel.
+ */
+.dark {
+  --background: #0f1115;
+  --foreground: #e7e9ee;
+  --card: #171a21;
+  --card-foreground: #e7e9ee;
+  --popover: #1b1f27;
+  --popover-foreground: #e7e9ee;
+  --primary: var(--brand-primary, #5b7cff);
+  --primary-foreground: #ffffff;
+  --secondary: #1f242d;
+  --secondary-foreground: #e7e9ee;
+  --muted: #1f242d;
+  --muted-foreground: #9aa3b2;
+  --accent: var(--brand-accent, #F16B37);
+  --accent-foreground: #ffffff;
+  --destructive: #f87171;
+  --border: #262b35;
+  --input: #262b35;
+  --ring: #5b7cff;
+
+  /* De huisgrijzen. `text-rm-gray` is de standaard tekstkleur van dit dashboard en stond als
+     vaste hex in de theme-laag; hij leest nu uit een variabele zodat hij hier mee kan. */
+  --rm-gray: #e7e9ee;
+  --rm-light: #0f1115;
+  --rm-border: #262b35;
+
+  /* De merkkleur als TÉKST op een donker vlak.
+     `text-rm-blue` draagt in dit dashboard de kopjes, de actieve tab en de nadruk — honderden
+     plekken. De merkkleur zelf is gekozen om op wit te lezen: het RAI-blauw is bijna zwart, en
+     het GreenTech-groen is een diepe tint. Op een vlak van #171a21 verdwijnt zo'n kleur; in de
+     eerste donkere schermafdruk was "Prestaties" merkbaar donkerder dan het inactieve label
+     ernaast. Vandaar hier dezelfde tint, maar opgelicht — de identiteit blijft, de leesbaarheid
+     komt terug. De vlakken (zijbalk, gradient, balken) houden de volle merkkleur. */
+  --rm-blue-ink: color-mix(in srgb, var(--brand-primary, #08288C) 38%, #ffffff);
+  --rm-orange-ink: color-mix(in srgb, var(--brand-accent, #F16B37) 70%, #ffffff);
+
+  /* De zijbalk draagt de volle merkkleur, en dat is naast een bijna-zwart canvas een lichtbak.
+     Dezelfde kleur, teruggebracht naar de helderheid die bij de rest van het scherm hoort. */
+  --sidebar: color-mix(in srgb, var(--brand-primary, #08288C) 38%, #0f1115);
+  --sidebar-accent: color-mix(in srgb, var(--brand-primary, #08288C) 52%, #0f1115);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  --chart-grid: #262b35;
+  --chart-axis: #8b93a1;
+  --spoor: rgba(255, 255, 255, 0.10);
+  --spoor-zacht: rgba(255, 255, 255, 0.07);
+  --hover-vlak: rgba(255, 255, 255, 0.05);
+  --rij-hover: rgb(255 255 255 / 0.04);
+
+  /* De ramp draait om: bij nul net boven het kaartvlak, bij het maximum een heldere tint. De
+     landgrenzen krijgen de canvaskleur in plaats van wit — witte lijnen op een donkere kaart
+     lezen als een net, niet als grenzen. */
+  --kaart-laag: #1d2430;
+  --kaart-hoog: #7ba6ff;
+  --kaart-leeg: #191d25;
+  --kaart-rand: #0f1115;
+  --kaart-hover: #ffffff;
+  --preview-vlak: #e9ecf1;
+
+  /* Neutralen: de trap omgeklapt. 50 wordt het diepste vlak, 900 de helderste letter. */
+  --color-gray-50: #171a21;
+  --color-gray-100: #1f242d;
+  --color-gray-200: #262b35;
+  --color-gray-300: #3a414e;
+  --color-gray-400: #6b7482;
+  --color-gray-500: #9aa3b2;
+  --color-gray-600: #b6bdc9;
+  --color-gray-700: #ced3dc;
+  --color-gray-800: #dde1e8;
+  --color-gray-900: #e7e9ee;
+
+  --color-slate-50: #171a21;
+  --color-slate-100: #1f242d;
+  --color-slate-200: #262b35;
+  --color-slate-600: #b6bdc9;
+  --color-slate-700: #ced3dc;
+
+  /* Getinte trappen. Dezelfde omklap: de lage trappen worden gedempte, donkere vlakken met een
+     spoor van hun kleur erin, de hoge trappen worden helder genoeg om op dat vlak te lezen. */
+  --color-red-50: #2a1618;
+  --color-red-100: #3a1c1f;
+  --color-red-200: #522427;
+  --color-red-300: #7a3339;
+  --color-red-400: #d9757c;
+  --color-red-500: #ef7c84;
+  --color-red-600: #f28f95;
+  --color-red-700: #f5a6ab;
+  --color-red-800: #f8bcc0;
+
+  --color-amber-50: #2a2010;
+  --color-amber-100: #3a2b14;
+  --color-amber-200: #52391a;
+  --color-amber-300: #7a5526;
+  --color-amber-400: #d9a24e;
+  --color-amber-500: #efb45c;
+  --color-amber-600: #f2c179;
+  --color-amber-700: #f5cf96;
+  --color-amber-800: #f8dcb4;
+  --color-amber-900: #fbe9d1;
+
+  --color-yellow-100: #3a3414;
+  --color-yellow-400: #d9c74e;
+  --color-yellow-700: #f5ef96;
+
+  --color-emerald-50: #12261d;
+  --color-emerald-100: #163326;
+  --color-emerald-200: #1c4733;
+  --color-emerald-300: #2a6a4b;
+  --color-emerald-500: #4dc48c;
+  --color-emerald-600: #6ed0a1;
+  --color-emerald-700: #8edcb6;
+  --color-emerald-800: #ade7cb;
+
+  --color-green-50: #13261a;
+  --color-green-100: #183322;
+  --color-green-200: #1e472e;
+  --color-green-300: #2c6a43;
+  --color-green-400: #4fbe73;
+  --color-green-500: #63c884;
+  --color-green-600: #7fd39a;
+  --color-green-700: #9bdeb0;
+  --color-green-800: #b7e9c6;
+
+  --color-blue-50: #141d2e;
+  --color-blue-100: #17263f;
+  --color-blue-200: #1d3457;
+  --color-blue-400: #6b96e8;
+  --color-blue-500: #7fa4ec;
+  --color-blue-600: #97b5f0;
+  --color-blue-700: #afc6f4;
+  --color-blue-800: #c7d7f8;
+
+  --color-sky-100: #17263f;
+  --color-sky-700: #afc6f4;
+
+  --color-indigo-100: #1c1e3f;
+  --color-indigo-700: #b6bcf4;
+
+  --color-orange-50: #2b1c12;
+  --color-orange-100: #3b2517;
+  --color-orange-200: #53321d;
+  --color-orange-300: #7b4a2a;
+  --color-orange-500: #ef9a63;
+  --color-orange-600: #f2ad80;
+  --color-orange-700: #f5c09d;
+
+  --color-violet-100: #241c3f;
+  --color-violet-700: #c3b6f4;
+
+  --color-purple-50: #201630;
+  --color-purple-100: #2b1c40;
+  --color-purple-200: #3b2558;
+  --color-purple-300: #56377f;
+  --color-purple-400: #a17ce0;
+  --color-purple-500: #ac8ce6;
+  --color-purple-600: #bb9fea;
+  --color-purple-700: #cab2ee;
+  --color-purple-900: #e8dcf8;
+
+  --color-teal-100: #14302e;
+  --color-teal-700: #9adcd6;
+
+  --color-cyan-100: #133034;
+  --color-cyan-700: #96d9e2;
+
+  --color-pink-100: #351826;
+  --color-pink-700: #efaec9;
+
+  --color-rose-100: #351822;
+  --color-rose-700: #efaebd;
 }
 
 @layer base {
@@ -179,6 +411,6 @@
     transition: background-color 120ms ease;
   }
   table tbody tr:hover {
-    background-color: rgb(249 250 251 / 0.8);
+    background-color: var(--rij-hover, rgb(249 250 251 / 0.8));
   }
 }

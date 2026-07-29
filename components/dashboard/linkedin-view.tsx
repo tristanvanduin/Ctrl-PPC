@@ -26,7 +26,7 @@ export function LinkedInView({ clientId, geoClone, edition }: { clientId: string
   return (
     <div className="space-y-6">
       <ChannelViewHeader
-        icon={<Briefcase className="w-5 h-5 text-rm-blue" />}
+        icon={<Briefcase className="w-5 h-5 text-rm-blue-ink" />}
         title="LinkedIn Ads"
         geoClone={geoClone}
         status={demo ? { kind: "connected", label: "Gekoppeld (demo)" } : { kind: "warning", label: "Nog geen data" }}

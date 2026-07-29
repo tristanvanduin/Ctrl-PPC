@@ -47,7 +47,7 @@ export function ChannelViewHeader({
   warning?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center gap-2">
         {icon}
         <h3 className="text-sm font-semibold text-rm-gray">{title}</h3>

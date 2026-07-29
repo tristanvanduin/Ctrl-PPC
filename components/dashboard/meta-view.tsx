@@ -32,7 +32,7 @@ export function MetaView({ clientId, geoClone, edition }: { clientId: string; ge
   return (
     <div className="space-y-6">
       <ChannelViewHeader
-        icon={<Megaphone className="w-5 h-5 text-rm-blue" />}
+        icon={<Megaphone className="w-5 h-5 text-rm-blue-ink" />}
         title="Meta Ads"
         geoClone={geoClone}
         status={connected === null ? { kind: "loading" } : connected ? { kind: "connected" } : { kind: "warning", label: "Niet gekoppeld" }}

@@ -91,7 +91,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
   const anyRunning = Object.values(state).some((s) => s.running);
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-rm-gray">Losse analyses (Google)</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
@@ -118,7 +118,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-rm-gray">{a.label}</span>
-                  {s.running && <Loader2 className="w-4 h-4 text-rm-blue animate-spin" />}
+                  {s.running && <Loader2 className="w-4 h-4 text-rm-blue-ink animate-spin" />}
                   {s.success && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                   {s.error && <AlertCircle className="w-4 h-4 text-red-500" />}
                 </div>
@@ -130,7 +130,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                   </div>
                 )}
                 {s.error && <p className="text-micro text-red-500 mt-1 truncate">{s.error}</p>}
-                {s.running && <p className="text-micro text-rm-blue mt-1">Bezig...</p>}
+                {s.running && <p className="text-micro text-rm-blue-ink mt-1">Bezig...</p>}
               </button>
               {s.output && (
                 <>

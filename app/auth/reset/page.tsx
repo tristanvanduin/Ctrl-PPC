@@ -42,7 +42,7 @@ export default function ResetPage() {
   if (klaar) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-card p-6 shadow-sm">
           <h1 className="mb-2 text-lg font-semibold text-gray-900">Wachtwoord ingesteld</h1>
           <p className="mb-4 text-sm text-gray-600">Je kunt nu inloggen met je nieuwe wachtwoord.</p>
           <a href="/login" className="text-sm font-medium text-gray-900 underline">Naar inloggen</a>
@@ -53,7 +53,7 @@ export default function ResetPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-card p-6 shadow-sm">
         <h1 className="mb-1 text-lg font-semibold text-gray-900">Nieuw wachtwoord</h1>
         <p className="mb-5 text-sm text-gray-500">Ingesteld via de link uit je mail.</p>
         <form onSubmit={opslaan} className="space-y-4">

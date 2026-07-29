@@ -48,7 +48,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-card p-6 shadow-sm">
         <h1 className="mb-1 text-lg font-semibold text-gray-900">Inloggen</h1>
         <p className="mb-5 text-sm text-gray-500">Toegang is op uitnodiging.</p>
         <form onSubmit={login} className="space-y-4">

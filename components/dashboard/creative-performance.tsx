@@ -175,7 +175,7 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
           dat dit blok bestaat — maar wie het dichtklapt houdt het dicht. */}
       <CollapsiblePanel
         id={`creatives-${channel}`}
-        icon={<Sparkles className="w-4.5 h-4.5 text-rm-blue" />}
+        icon={<Sparkles className="w-4.5 h-4.5 text-rm-blue-ink" />}
         title={`Creative Performance — ${CHANNEL_LABEL[channel]}`}
         subtitle="top op kosten, laatste 6 maanden"
         meta={<span className="text-micro text-muted-foreground">{cards.length} advertenties</span>}
@@ -184,19 +184,24 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
           {cards.map((c) => (
             <div key={c.id} className="rounded-lg border border-border overflow-hidden flex flex-col">
               {/* Preview — beeld voor Meta/LinkedIn, een echte zoekadvertentie-look voor Google-tekst. */}
-              <div className="bg-gray-100/70 p-3 border-b border-border min-h-[92px] flex items-center">
+              <div className="p-3 border-b border-border min-h-[92px] flex items-center" style={{ background: "var(--preview-vlak, rgb(243 244 246 / 0.7))" }}>
                 {c.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={c.imageUrl} alt={c.name} className="w-full h-36 object-cover rounded-md" />
                 ) : c.headline ? (
                   // Google-zoekadvertentie: blauwe kop, Ad-badge + weergave-URL, grijze beschrijving.
-                  <div className="w-full rounded-md bg-white border border-gray-200 px-4 py-3 shadow-sm">
-                    <div className="text-title leading-tight text-[#1a0dab] hover:underline cursor-default">{c.headline}</div>
+                  // Deze preview blijft licht, ook in de donkere modus. Het is geen kaart van dit
+                  // dashboard maar een weergave van hoe de advertentie er in Google uitziet, en die
+                  // staat op een witte zoekpagina. Meekleuren zou het product verkeerd voorstellen —
+                  // en de kleuren hieronder (het #1a0dab van een Google-link) zijn juist zo gekozen
+                  // dat ze op wit kloppen.
+                  <div className="w-full rounded-md border px-4 py-3 shadow-sm" style={{ background: "#ffffff", borderColor: "#e5e7eb" }}>
+                    <div className="text-title leading-tight hover:underline cursor-default" style={{ color: "#1a0dab" }}>{c.headline}</div>
                     <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-micro font-semibold text-gray-700 border border-gray-400 rounded-[3px] px-1 leading-tight">Ad</span>
-                      {c.displayUrl && <span className="text-body text-gray-700">{c.displayUrl}</span>}
+                      <span className="text-micro font-semibold rounded-[3px] px-1 leading-tight border" style={{ color: "#374151", borderColor: "#9ca3af" }}>Ad</span>
+                      {c.displayUrl && <span className="text-body" style={{ color: "#374151" }}>{c.displayUrl}</span>}
                     </div>
-                    {c.description && <div className="text-body text-gray-600 mt-1.5 leading-snug">{c.description}</div>}
+                    {c.description && <div className="text-body mt-1.5 leading-snug" style={{ color: "#4b5563" }}>{c.description}</div>}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-meta text-muted-foreground">
@@ -224,7 +229,7 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
 
       {/* Samenvatting + aanbevelingen */}
       {summary && (
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border">
             <h3 className="text-sm font-semibold text-rm-gray">Samenvatting</h3>
           </div>

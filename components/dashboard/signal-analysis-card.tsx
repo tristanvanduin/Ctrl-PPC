@@ -70,9 +70,9 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-        <Radar className="w-4.5 h-4.5 text-rm-blue" />
+        <Radar className="w-4.5 h-4.5 text-rm-blue-ink" />
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-rm-gray">{title}</h3>
           <p className="text-micro text-muted-foreground mt-0.5">{description}</p>
@@ -99,7 +99,7 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
           <>
             <button
               onClick={() => setExpanded((e) => !e)}
-              className="flex items-center gap-1 text-meta text-rm-blue hover:underline"
+              className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline"
             >
               {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               {expanded ? "Verberg bevindingen" : "Bekijk bevindingen"}

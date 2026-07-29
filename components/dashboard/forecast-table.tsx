@@ -65,10 +65,10 @@ export function ForecastTable({ clientId }: { clientId: string }) {
           beursdag vergelijkt.
         </div>
       )}
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header with metric tabs */}
       <div className="px-5 pt-5 pb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
           Maandelijkse uitsplitsing — {metric.label}
         </h3>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
@@ -79,7 +79,7 @@ export function ForecastTable({ clientId }: { clientId: string }) {
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                 selectedMetric === m.id
                   ? "bg-rm-blue text-white"
-                  : "text-muted-foreground hover:text-rm-blue"
+                  : "text-muted-foreground hover:text-rm-blue-ink"
               }`}
             >
               {m.label}
@@ -110,7 +110,7 @@ export function ForecastTable({ clientId }: { clientId: string }) {
                 <NaamCel>{pt.monthLabel}</NaamCel>
                 <GetalCel zacht>{fmt(pt.expected)}</GetalCel>
                 <GetalCel className="font-semibold">{pt.realized !== null ? fmt(pt.realized) : "—"}</GetalCel>
-                <GetalCel className="text-rm-blue font-medium">{pt.forecast !== null ? fmt(pt.forecast) : "—"}</GetalCel>
+                <GetalCel className="text-rm-blue-ink font-medium">{pt.forecast !== null ? fmt(pt.forecast) : "—"}</GetalCel>
                 <GetalCel className={`font-bold ${isPositive ? "text-green-600" : "text-red-500"}`}>
                   {formatPercent(ratio, 0)}
                 </GetalCel>
@@ -125,7 +125,7 @@ export function ForecastTable({ clientId }: { clientId: string }) {
             <TotaalCel>Totaal</TotaalCel>
             <TotaalCel getal className="text-muted-foreground">{isRatio ? fmt(kpiTarget) : fmt(totalExpected)}</TotaalCel>
             <TotaalCel getal>{isRatio ? "—" : fmt(totalRealized)}</TotaalCel>
-            <TotaalCel getal className="text-rm-blue">{isRatio ? fmt(kpiAdjusted) : fmt(totalForecast)}</TotaalCel>
+            <TotaalCel getal className="text-rm-blue-ink">{isRatio ? fmt(kpiAdjusted) : fmt(totalForecast)}</TotaalCel>
             <TotaalCel getal className={(isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"}>
               {formatDeltaPercent(totalDiffPct, 0)}
             </TotaalCel>
@@ -133,10 +133,10 @@ export function ForecastTable({ clientId }: { clientId: string }) {
 
           {!isRatio && (
             <VoetRij className="bg-rm-blue/5">
-              <TotaalCel colSpan={2} className="text-xs font-semibold text-rm-blue">
+              <TotaalCel colSpan={2} className="text-xs font-semibold text-rm-blue-ink">
                 Jaarprognose (gerealiseerd + prognose)
               </TotaalCel>
-              <TotaalCel getal colSpan={2} className="text-xs font-bold text-rm-blue">{fmt(kpiAdjusted)}</TotaalCel>
+              <TotaalCel getal colSpan={2} className="text-xs font-bold text-rm-blue-ink">{fmt(kpiAdjusted)}</TotaalCel>
               <TotaalCel getal className={`text-xs font-bold ${(isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"}`}>
                 vs doel {fmt(totalExpected)}
               </TotaalCel>

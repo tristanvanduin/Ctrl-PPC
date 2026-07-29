@@ -100,13 +100,13 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
     : spendPaceRatio >= 0.9 ? "Op schema" : spendPaceRatio >= 0.7 ? "Achterlopend" : "Sterk achter";
 
   return (
-    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
-        <Zap className="w-4.5 h-4.5 text-rm-blue" />
-        <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Pacing</h3>
+        <Zap className="w-4.5 h-4.5 text-rm-blue-ink" />
+        <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Pacing</h3>
         <span className="text-micro text-muted-foreground ml-auto">
           {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
-            <span className="font-semibold text-rm-blue mr-1.5">
+            <span className="font-semibold text-rm-blue-ink mr-1.5">
               Nog {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"} tot {edition!.label} ·
             </span>
           )}

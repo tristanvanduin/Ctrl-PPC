@@ -105,9 +105,9 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
   if (judged.length === 0) return null; // geen videoplacements: niets te tonen
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <Ban className="w-4.5 h-4.5 text-rm-blue" />
+        <Ban className="w-4.5 h-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">Waar je video&apos;s draaien</h3>
         <span className="text-meta text-muted-foreground">voorstel welke placements uit te sluiten</span>
       </div>
@@ -154,7 +154,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
                 <span className="flex items-center gap-1">
                   {agg.displayName || agg.placement}
                   {agg.targetUrl && (
-                    <a href={agg.targetUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-rm-blue shrink-0">
+                    <a href={agg.targetUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-rm-blue-ink shrink-0">
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}

@@ -155,7 +155,7 @@ export default function AdminPage() {
         De rol bepaalt wat iemand mag, de beurzen bepalen waarover. Alleen voor admins.
       </p>
 
-      <form onSubmit={invite} className="mb-8 rounded-lg border border-gray-200 bg-white p-4">
+      <form onSubmit={invite} className="mb-8 rounded-lg border border-gray-200 bg-card p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="grow">
             <label htmlFor="invite-email" className="mb-1 block text-sm font-medium text-gray-700">
@@ -239,7 +239,7 @@ export default function AdminPage() {
       {laden ? (
         <p className="text-sm text-gray-500">Laden...</p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-card">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>

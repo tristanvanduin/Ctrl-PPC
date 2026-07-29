@@ -158,7 +158,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
   const SortTh = ({ col, label, align }: { col: SortKey; label: string; align?: string }) => (
     <th
       onClick={() => handleSort(col)}
-      className={`px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue ${align === "right" ? "text-right" : "text-left"}`}
+      className={`px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue-ink ${align === "right" ? "text-right" : "text-left"}`}
     >
       <span className="inline-flex items-center gap-1">
         {label}
@@ -181,7 +181,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
   if (results.length === 0 && !analyzing) {
     return (
       <div className="px-5 py-10 text-center">
-        <Sparkles className="w-8 h-8 text-rm-blue mx-auto mb-3 opacity-60" />
+        <Sparkles className="w-8 h-8 text-rm-blue-ink mx-auto mb-3 opacity-60" />
         <p className="text-sm text-muted-foreground mb-4">
           {error
             ? error
@@ -204,7 +204,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
   if (analyzing) {
     return (
       <div className="px-5 py-10 text-center">
-        <Loader2 className="w-8 h-8 text-rm-blue mx-auto mb-3 animate-spin" />
+        <Loader2 className="w-8 h-8 text-rm-blue-ink mx-auto mb-3 animate-spin" />
         <p className="text-sm font-medium text-rm-gray mb-1">Zoektermen analyseren...</p>
         <p className="text-xs text-muted-foreground">
           AI beoordeelt alle zoektermen met clicks op relevantie. Dit duurt ca. 30-120 seconden afhankelijk van het aantal termen.
@@ -244,7 +244,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
           <select
             value={verdictFilter}
             onChange={(e) => setVerdictFilter(e.target.value as VerdictFilter)}
-            className="text-xs border border-border rounded-md px-2 py-1 bg-white"
+            className="text-xs border border-border rounded-md px-2 py-1 bg-card"
           >
             <option value="all">Alle beoordelingen</option>
             <option value="irrelevant">Irrelevant</option>
@@ -255,7 +255,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
           <button
             onClick={runAnalysis}
             disabled={analyzing}
-            className="px-3 py-1 text-xs font-medium text-rm-blue border border-rm-blue/30 rounded-md hover:bg-rm-blue/5 transition-colors"
+            className="px-3 py-1 text-xs font-medium text-rm-blue-ink border border-rm-blue/30 rounded-md hover:bg-rm-blue/5 transition-colors"
           >
             Opnieuw analyseren
           </button>

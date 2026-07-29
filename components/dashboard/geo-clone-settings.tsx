@@ -172,10 +172,10 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
       </div>
 
       {/* Branding */}
-      <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+      <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <Palette className="w-5 h-5 text-rm-blue" />
-          <h2 className="text-base font-semibold text-rm-blue">Branding — {label}</h2>
+          <Palette className="w-5 h-5 text-rm-blue-ink" />
+          <h2 className="text-base font-semibold text-rm-blue-ink">Branding — {label}</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {brandFields.map(({ key, label: fl, color }) => {
@@ -203,10 +203,10 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
       </div>
 
       {/* Doelstellingen */}
-      <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+      <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <Target className="w-5 h-5 text-rm-blue" />
-          <h2 className="text-base font-semibold text-rm-blue">Doelstellingen — {label}</h2>
+          <Target className="w-5 h-5 text-rm-blue-ink" />
+          <h2 className="text-base font-semibold text-rm-blue-ink">Doelstellingen — {label}</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {goalFields.map(({ key, label: fl, prefix, suffix }) => {
@@ -233,10 +233,10 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
       </div>
 
       {/* Event / datums */}
-      <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+      <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <CalendarClock className="w-5 h-5 text-rm-blue" />
-          <h2 className="text-base font-semibold text-rm-blue">Event & edities — {label}</h2>
+          <CalendarClock className="w-5 h-5 text-rm-blue-ink" />
+          <h2 className="text-base font-semibold text-rm-blue-ink">Event & edities — {label}</h2>
         </div>
 
         <div className="flex items-center gap-2 mb-2">
@@ -273,7 +273,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
                 </button>
               </div>
             ))}
-            <button onClick={addEdition} className="flex items-center gap-1 text-meta text-rm-blue hover:underline">
+            <button onClick={addEdition} className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline">
               <Plus className="w-3 h-3" /> Editie toevoegen
             </button>
           </div>

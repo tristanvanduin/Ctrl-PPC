@@ -50,7 +50,7 @@ export function GenerationProgressCard({ title, job, fallbackMessage = "Voortgan
             return (
               <div key={phase.phase_key} className="flex items-start gap-2 text-meta">
                 <span className="mt-0.5 shrink-0">
-                  {isCurrent && <Loader2 className="h-3.5 w-3.5 animate-spin text-rm-blue" />}
+                  {isCurrent && <Loader2 className="h-3.5 w-3.5 animate-spin text-rm-blue-ink" />}
                   {isDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
                   {isFailed && <AlertCircle className="h-3.5 w-3.5 text-red-500" />}
                   {!isCurrent && !isDone && !isFailed && <span className="block h-3.5 w-3.5 rounded-full border border-gray-300" />}

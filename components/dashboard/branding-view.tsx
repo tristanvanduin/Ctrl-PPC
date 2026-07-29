@@ -67,9 +67,9 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Editor */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-          <Palette className="w-5 h-5 text-rm-blue" />
+          <Palette className="w-5 h-5 text-rm-blue-ink" />
           <h3 className="text-sm font-semibold text-rm-gray">Merk-identiteit</h3>
         </div>
         <div className="px-5 py-4 space-y-4">
@@ -146,7 +146,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
       </div>
 
       {/* Live preview */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-rm-gray">Live preview</h3>
         </div>

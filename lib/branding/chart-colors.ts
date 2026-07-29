@@ -21,8 +21,14 @@ export const CHART_CATEGORICAL = [
 ] as const;
 
 // Recessieve chrome voor grafieken (raster + as-tekst), consistent over alle charts.
-export const CHART_GRID = "#eef1f6";
-export const CHART_AXIS = "#64748b";
+/**
+ * Raster en aslabels lezen uit een CSS-variabele in plaats van een vaste hex, zodat ze met het
+ * thema meebewegen. Een raster van #eef1f6 op een donkere kaart is onzichtbaar; een raster dat
+ * niet meebeweegt is erger dan geen raster, want dan staat de grafiek zonder maatverdeling.
+ * De lichte waarde staat als terugval in de var() en is dezelfde als voorheen.
+ */
+export const CHART_GRID = "var(--chart-grid, #eef1f6)";
+export const CHART_AXIS = "var(--chart-axis, #64748b)";
 
 // De secondaire (lijn-)kleur naast een merk-gekleurde balk: altijd oranje, dat contrasteert met
 // zowel een blauw als een groen merk-primary. De vorm (lijn vs balk) draagt het onderscheid mee.

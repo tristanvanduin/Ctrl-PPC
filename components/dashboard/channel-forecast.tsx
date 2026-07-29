@@ -117,8 +117,8 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Lopende maand */}
-        <div className="bg-white rounded-xl border border-border shadow-sm p-4">
-          <div className="text-meta font-semibold text-rm-blue uppercase tracking-wide mb-2">Lopende maand (projectie)</div>
+        <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+          <div className="text-meta font-semibold text-rm-blue-ink uppercase tracking-wide mb-2">Lopende maand (projectie)</div>
           <div className="space-y-1.5 text-lead">
             <Row label="Spend tot nu" value={eur(curMtd.spend)} />
             <Row label="Spend geprojecteerd" value={eur(spendF.currentMonthProjected)} strong warn={!spendF.currentMonthReliable} />
@@ -129,8 +129,8 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
         </div>
 
         {/* Volgende maand */}
-        <div className="bg-white rounded-xl border border-border shadow-sm p-4">
-          <div className="text-meta font-semibold text-rm-blue uppercase tracking-wide mb-2">Volgende volle maand (trend)</div>
+        <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+          <div className="text-meta font-semibold text-rm-blue-ink uppercase tracking-wide mb-2">Volgende volle maand (trend)</div>
           <div className="space-y-1.5 text-lead">
             <Row label="Spend verwacht" value={eur(spendF.nextMonthProjected)} strong />
             <Row label={`${cfg.convLabel} verwacht`} value={fmt(convF.nextMonthProjected)} strong />

@@ -69,10 +69,10 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <Target className="w-5 h-5 text-rm-blue" />
-        <h2 className="text-base font-semibold text-rm-blue">Conversie-selectie per kanaal</h2>
+        <Target className="w-5 h-5 text-rm-blue-ink" />
+        <h2 className="text-base font-semibold text-rm-blue-ink">Conversie-selectie per kanaal</h2>
       </div>
       <p className="text-meta text-muted-foreground mb-4">
         Kies welke conversies meetellen voor Meta en LinkedIn (zoals de conversie-acties bij Google).

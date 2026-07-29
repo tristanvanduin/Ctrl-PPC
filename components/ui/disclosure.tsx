@@ -78,7 +78,7 @@ export function CollapsiblePanel({
   const paneelId = `paneel-${id}`;
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={toggle}
@@ -137,7 +137,7 @@ export function RegioToggle({
       onClick={onToggle}
       aria-expanded={open}
       aria-controls={controls}
-      className="w-full px-5 py-2.5 text-meta font-medium text-rm-blue hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
+      className="w-full px-5 py-2.5 text-meta font-medium text-rm-blue-ink hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
     >
       <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       {open ? `Verberg ${label}` : `Toon ${label}`}
@@ -185,7 +185,7 @@ export function MeerKnop({
     <button
       type="button"
       onClick={onToggle}
-      className="w-full px-5 py-2.5 text-meta font-medium text-rm-blue hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
+      className="w-full px-5 py-2.5 text-meta font-medium text-rm-blue-ink hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
     >
       <ChevronDown className={`w-3.5 h-3.5 transition-transform ${uitgeklapt ? "rotate-180" : ""}`} />
       {uitgeklapt ? "Toon minder" : `Toon ${verborgen} ${eenheid} meer`}

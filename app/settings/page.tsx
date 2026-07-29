@@ -94,10 +94,10 @@ function ClientVisibilitySection() {
   const visibleCount = allClients.filter((c) => visibleIds.includes(c.id)).length;
 
   return (
-    <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-rm-blue text-base">Klanten in sidebar</h3>
+          <h3 className="font-semibold text-rm-blue-ink text-base">Klanten in sidebar</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Selecteer welke klanten zichtbaar zijn in het menu. {visibleCount} van {allClients.length} zichtbaar.
             {allClients.length > 0 && allClients[0].source === "google-ads" && (
@@ -108,7 +108,7 @@ function ClientVisibilitySection() {
         <div className="flex gap-2">
           <button
             onClick={selectAll}
-            className="text-meta text-rm-blue hover:underline"
+            className="text-meta text-rm-blue-ink hover:underline"
           >
             Alles aan
           </button>
@@ -149,7 +149,7 @@ function ClientVisibilitySection() {
               }`}
             >
               {isVisible
-                ? <Eye className="w-4 h-4 text-rm-blue shrink-0" />
+                ? <Eye className="w-4 h-4 text-rm-blue-ink shrink-0" />
                 : <EyeOff className="w-4 h-4 text-gray-300 shrink-0" />
               }
               <Building2 className="w-3.5 h-3.5 shrink-0" />
@@ -227,10 +227,10 @@ function ClientGroupsSection() {
   if (loading) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-rm-blue text-base">Klantgroepen</h3>
+          <h3 className="font-semibold text-rm-blue-ink text-base">Klantgroepen</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Organiseer klanten in mapjes in de sidebar. {groups.length} groep{groups.length !== 1 ? "en" : ""} aangemaakt.
           </p>
@@ -277,12 +277,12 @@ function ClientGroupsSection() {
                       className="flex-1 text-sm border border-border rounded px-2 py-1 focus:outline-none focus:border-rm-blue"
                       autoFocus
                     />
-                    <button onClick={() => handleRename(group.id)} className="text-meta text-rm-blue font-medium">Opslaan</button>
+                    <button onClick={() => handleRename(group.id)} className="text-meta text-rm-blue-ink font-medium">Opslaan</button>
                     <button onClick={() => setEditingId(null)} className="text-meta text-muted-foreground">Annuleer</button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4 text-rm-blue" />
+                    <FolderOpen className="w-4 h-4 text-rm-blue-ink" />
                     <span className="text-sm font-semibold text-rm-gray">{group.name}</span>
                     <span className="text-micro text-muted-foreground">({groupClients.length})</span>
                   </div>
@@ -354,7 +354,7 @@ function ClientGroupsSection() {
                           onClick={() => handleAddClient(client.id, group.id)}
                           className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs text-rm-gray hover:bg-rm-blue/5 text-left"
                         >
-                          <Plus className="w-3 h-3 text-rm-blue shrink-0" />
+                          <Plus className="w-3 h-3 text-rm-blue-ink shrink-0" />
                           <span className="truncate">{client.name}</span>
                           {assignedClientIds.has(client.id) && (
                             <span className="ml-auto text-micro text-muted-foreground shrink-0">al in groep</span>
@@ -372,7 +372,7 @@ function ClientGroupsSection() {
               ) : (
                 <button
                   onClick={() => setAddingToGroup(group.id)}
-                  className="flex items-center gap-1 text-meta text-rm-blue hover:underline mt-1"
+                  className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline mt-1"
                 >
                   <Plus className="w-3 h-3" /> Klant toevoegen
                 </button>
@@ -452,7 +452,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-rm-blue" />
+        <Loader2 className="w-6 h-6 animate-spin text-rm-blue-ink" />
       </div>
     );
   }
@@ -463,7 +463,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-rm-blue">Instellingen</h1>
+        <h1 className="text-2xl font-bold text-rm-blue-ink">Instellingen</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           API koppelingen en dashboard configuratie. Credentials worden ingesteld via{" "}
           <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">.env.local</code>
@@ -473,7 +473,7 @@ export default function SettingsPage() {
       {/* Overall status */}
       {!status?.anyConnected && (
         <div className="px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-rm-blue font-medium mb-1">Dashboard draait op demo data</p>
+          <p className="text-sm text-rm-blue-ink font-medium mb-1">Dashboard draait op demo data</p>
           <p className="text-xs text-muted-foreground">
             Configureer de API keys in <code className="font-mono">.env.local</code> om live data te gebruiken.
             Kopieer <code className="font-mono">.env.example</code> als startpunt.
@@ -489,9 +489,9 @@ export default function SettingsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ── Google Ads ──────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue text-base">Google Ads API</h3>
+            <h3 className="font-semibold text-rm-blue-ink text-base">Google Ads API</h3>
             <StatusBadge connected={googleConnected} />
           </div>
 
@@ -560,21 +560,21 @@ export default function SettingsPage() {
                 <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
                   <li>
                     Ga naar{" "}
-                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-rm-blue hover:underline inline-flex items-center gap-0.5">
+                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
                       Google Cloud Console <ExternalLink className="w-3 h-3" />
                     </a>{" "}
                     en maak een OAuth2 Client ID aan (type: Web application)
                   </li>
                   <li>
                     Ga naar{" "}
-                    <a href="https://ads.google.com/aw/apicenter" target="_blank" rel="noopener" className="text-rm-blue hover:underline inline-flex items-center gap-0.5">
+                    <a href="https://ads.google.com/aw/apicenter" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
                       Google Ads API Center <ExternalLink className="w-3 h-3" />
                     </a>{" "}
                     voor je Developer Token
                   </li>
                   <li>
                     Genereer een Refresh Token via de{" "}
-                    <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener" className="text-rm-blue hover:underline inline-flex items-center gap-0.5">
+                    <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
                       OAuth Playground <ExternalLink className="w-3 h-3" />
                     </a>{" "}
                     met scope <code className="font-mono text-micro">https://www.googleapis.com/auth/adwords</code>
@@ -587,9 +587,9 @@ export default function SettingsPage() {
         </div>
 
         {/* ── Meta Ads ────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue text-base">Meta Ads API</h3>
+            <h3 className="font-semibold text-rm-blue-ink text-base">Meta Ads API</h3>
             <StatusBadge connected={metaConnected} />
           </div>
 
@@ -650,7 +650,7 @@ export default function SettingsPage() {
                 <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
                   <li>
                     Ga naar{" "}
-                    <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" className="text-rm-blue hover:underline inline-flex items-center gap-0.5">
+                    <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
                       Meta for Developers <ExternalLink className="w-3 h-3" />
                     </a>{" "}
                     en maak een app aan (type: Business)
@@ -658,7 +658,7 @@ export default function SettingsPage() {
                   <li>Voeg de Marketing API product toe aan je app</li>
                   <li>
                     Genereer een User Access Token via de{" "}
-                    <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-rm-blue hover:underline inline-flex items-center gap-0.5">
+                    <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
                       Graph API Explorer <ExternalLink className="w-3 h-3" />
                     </a>{" "}
                     met permissions: <code className="font-mono text-micro">ads_read, ads_management</code>
@@ -672,9 +672,9 @@ export default function SettingsPage() {
         </div>
 
         {/* ── LinkedIn Ads ────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue text-base">LinkedIn Ads API</h3>
+            <h3 className="font-semibold text-rm-blue-ink text-base">LinkedIn Ads API</h3>
             <span className="text-meta text-muted-foreground px-2 py-0.5 rounded-full bg-gray-100">Via .env.local</span>
           </div>
           <div className="space-y-4">
@@ -701,7 +701,7 @@ export default function SettingsPage() {
               <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
                 <li>
                   Maak een app aan in het{" "}
-                  <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noopener" className="text-rm-blue hover:underline inline-flex items-center gap-0.5">
+                  <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
                     LinkedIn Developer Portal <ExternalLink className="w-3 h-3" />
                   </a>
                 </li>
@@ -715,8 +715,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Architecture info */}
-      <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
-        <h3 className="font-semibold text-rm-blue text-base mb-3">Architectuur</h3>
+      <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+        <h3 className="font-semibold text-rm-blue-ink text-base mb-3">Architectuur</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-muted-foreground">
           <div className="space-y-1">
             <p className="font-semibold text-rm-gray">API Calls</p>

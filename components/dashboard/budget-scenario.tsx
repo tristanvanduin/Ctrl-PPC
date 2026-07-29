@@ -87,10 +87,10 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
   const presets = [-25, 0, 25, 50, 75, 100];
 
   return (
-    <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <Calculator className="w-5 h-5 text-rm-blue" />
-        <h3 className="text-base font-semibold text-rm-blue">Budget Scenario Builder</h3>
+        <Calculator className="w-5 h-5 text-rm-blue-ink" />
+        <h3 className="text-base font-semibold text-rm-blue-ink">Budget Scenario Builder</h3>
       </div>
       <p className="text-sm text-muted-foreground mb-5">
         Wat levert een budgetwijziging op? Berekend met constante CPA ({fmt(currentCpa)}) — de prijs per conversie verandert niet.
@@ -271,7 +271,7 @@ function ResultCard({
       <div className="flex items-center gap-1.5 mb-1">
         <span className="text-sm text-muted-foreground">{before}</span>
         <ArrowRight className="w-3 h-3 text-muted-foreground" />
-        <span className={`text-sm font-bold ${highlight ? "text-green-700" : "text-rm-blue"}`}>{after}</span>
+        <span className={`text-sm font-bold ${highlight ? "text-green-700" : "text-rm-blue-ink"}`}>{after}</span>
       </div>
       <p className={`text-micro font-medium ${
         neutral ? "text-muted-foreground" :

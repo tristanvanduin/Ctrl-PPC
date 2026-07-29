@@ -122,9 +122,9 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
   const convSlices: DonutSlice[] = slices.map((s) => ({ key: s.networkType, label: s.label, value: s.conversions, color: kleur(s.networkType) }));
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <PieChart className="w-4.5 h-4.5 text-rm-blue" />
+        <PieChart className="w-4.5 h-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">Waar gaat het budget heen</h3>
         <span className="text-meta text-muted-foreground">laatste 60 dagen</span>
         <div className="ml-auto flex gap-1 bg-gray-100 rounded-lg p-0.5 flex-wrap">
@@ -133,7 +133,7 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
               key={d.key}
               onClick={() => setDimensie(d.key)}
               className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
-                actief === d.key ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue"
+                actief === d.key ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue-ink"
               }`}
             >
               {d.label}

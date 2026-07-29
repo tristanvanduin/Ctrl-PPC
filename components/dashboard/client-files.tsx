@@ -197,7 +197,7 @@ function FileIcon({ contentType, fileName }: { contentType: string | null; fileN
   if (["xls", "xlsx", "csv"].includes(ext ?? ""))
     return <FileSpreadsheet className="w-4 h-4 text-green-600" />;
   if (["doc", "docx"].includes(ext ?? ""))
-    return <FileText className="w-4 h-4 text-rm-blue" />;
+    return <FileText className="w-4 h-4 text-rm-blue-ink" />;
   return <File className="w-4 h-4 text-muted-foreground" />;
 }
 
@@ -377,8 +377,8 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-rm-blue" />
+      <div className="bg-card rounded-xl border border-border p-8 shadow-sm flex items-center justify-center">
+        <Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" />
       </div>
     );
   }
@@ -431,9 +431,9 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 pt-5 pb-4">
-        <h3 className="text-sm font-semibold text-rm-blue uppercase tracking-wide">Bestanden</h3>
+        <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Bestanden</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
           SOP's, rapportages en andere documenten per klant
         </p>
@@ -479,14 +479,14 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                 autoFocus
               />
               <div className="flex gap-1 mt-1">
-                <button onClick={handleCreateFolder} className="text-micro text-rm-blue font-medium">Toevoegen</button>
+                <button onClick={handleCreateFolder} className="text-micro text-rm-blue-ink font-medium">Toevoegen</button>
                 <button onClick={() => setShowNewFolder(false)} className="text-micro text-muted-foreground">Annuleer</button>
               </div>
             </div>
           ) : (
             <button
               onClick={() => setShowNewFolder(true)}
-              className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-lg text-meta text-muted-foreground hover:text-rm-blue hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-lg text-meta text-muted-foreground hover:text-rm-blue-ink hover:bg-gray-100 transition-colors"
             >
               <FolderPlus className="w-3 h-3" /> Nieuwe map
             </button>
@@ -555,7 +555,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
               {activeFolder && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-meta text-rm-blue hover:underline mt-2"
+                  className="text-meta text-rm-blue-ink hover:underline mt-2"
                 >
                   Upload je eerste bestand
                 </button>
@@ -578,10 +578,10 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                   <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => handleDownload(file)}
-                      className="p-1.5 rounded-md hover:bg-white hover:shadow-sm"
+                      className="p-1.5 rounded-md hover:bg-card hover:shadow-sm"
                       title="Download"
                     >
-                      <Download className="w-3 h-3 text-rm-blue" />
+                      <Download className="w-3 h-3 text-rm-blue-ink" />
                     </button>
                     <button
                       onClick={() => setDeleteConfirm(file.id)}
