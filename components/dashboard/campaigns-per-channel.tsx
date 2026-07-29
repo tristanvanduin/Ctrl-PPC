@@ -5,6 +5,7 @@ import { Loader2, BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { GeoBreakdown } from "./geo-breakdown";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 
 // Campagne-overzicht over alle kanalen: op welke kanalen zijn we actief en welke campagnes
 // draaien er per kanaal (beurs-gescoped op de afkorting in de campagnenaam). Leest de campagne-
@@ -123,28 +124,40 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
             <h3 className="text-sm font-semibold text-rm-gray">{block.label}</h3>
             <span className="text-micro text-muted-foreground">{block.campaigns.length} campagne{block.campaigns.length === 1 ? "" : "s"}</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-body">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b border-border">
-                  <th className="px-5 py-2 font-medium">Campagne</th>
-                  <th className="px-3 py-2 font-medium text-right">Spend</th>
-                  <th className="px-3 py-2 font-medium text-right">{block.convLabel}</th>
-                  <th className="px-5 py-2 font-medium text-right">CPA</th>
-                </tr>
-              </thead>
-              <tbody>
-                {block.campaigns.map((c) => (
-                  <tr key={c.name} className="border-b border-border/50">
-                    <td className="px-5 py-1.5 text-rm-gray font-medium">{c.name}</td>
-                    <td className="px-3 py-1.5 text-right">{eur(c.spend)}</td>
-                    <td className="px-3 py-1.5 text-right">{fmt(c.conversions, 1)}</td>
-                    <td className="px-5 py-1.5 text-right">{c.conversions > 0 ? eur(c.spend / c.conversions) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            // Het aandeel wordt tegen de grootste campagne gezet en niet tegen de som: bij zeven
+            // campagnes is elk aandeel-van-het-totaal klein, en dan zijn alle balkjes even kort.
+            // Tegen de koploper afzetten laat de verhoudingen zien waar het om gaat.
+            const grootste = Math.max(0, ...block.campaigns.map((c) => c.spend));
+            const totaalSpend = block.campaigns.reduce((s, c) => s + c.spend, 0);
+            const totaalConv = block.campaigns.reduce((s, c) => s + c.conversions, 0);
+            return (
+              <Tabel>
+                <Kop>
+                  <KolomKop breed>Campagne</KolomKop>
+                  <KolomKop getal>Spend</KolomKop>
+                  <KolomKop getal>{block.convLabel}</KolomKop>
+                  <KolomKop getal>CPA</KolomKop>
+                </Kop>
+                <Body>
+                  {block.campaigns.map((c) => (
+                    <Rij key={c.name}>
+                      <NaamCel>{c.name}</NaamCel>
+                      <AandeelCel waarde={eur(c.spend)} aandeel={grootste > 0 ? c.spend / grootste : 0} />
+                      <GetalCel>{fmt(c.conversions, 1)}</GetalCel>
+                      <GetalCel zacht>{c.conversions > 0 ? eur(c.spend / c.conversions) : "—"}</GetalCel>
+                    </Rij>
+                  ))}
+                </Body>
+                <TotaalRij>
+                  <TotaalCel>Totaal</TotaalCel>
+                  <TotaalCel getal>{eur(totaalSpend)}</TotaalCel>
+                  <TotaalCel getal>{fmt(totaalConv, 1)}</TotaalCel>
+                  <TotaalCel getal>{totaalConv > 0 ? eur(totaalSpend / totaalConv) : "—"}</TotaalCel>
+                </TotaalRij>
+              </Tabel>
+            );
+          })()}
         </div>
       ))}
 
