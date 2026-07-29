@@ -244,11 +244,12 @@ export function ClientDashboard({ client }: { client: Client }) {
     <BrandThemeProvider clientId={client.id} geoClone={geoClone}>
     <div className="space-y-6">
       {/* Merk-header: logo + merk-/beursnaam, in de huisstijl van de actieve klant/beurs. */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 grow"><BrandHeaderBar geoClone={geoClone} fallbackName={client.name} /></div>
-        {/* De periodekiezer staat in de kop en niet per tabblad: hij geldt voor de hele
-            klantweergave, en per tabblad een eigen periode zou betekenen dat twee getallen
-            op hetzelfde scherm over verschillende maanden gaan. */}
+      <BrandHeaderBar geoClone={geoClone} fallbackName={client.name} edition={upcomingEdition} />
+      {/* De periodekiezer staat in de kop en niet per tabblad: hij geldt voor de hele
+          klantweergave, en per tabblad een eigen periode zou betekenen dat twee getallen
+          op hetzelfde scherm over verschillende maanden gaan. Onder de hero i.p.v. ernaast:
+          de hero loopt nu over de volle breedte, en de kiezer ertegenaan geklemd maakte hem smal. */}
+      <div className="flex justify-end -mt-3">
         <DashboardPeriodPicker />
       </div>
       {/* Data source indicator + sync status */}
