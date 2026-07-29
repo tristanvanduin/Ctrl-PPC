@@ -237,6 +237,19 @@ const META_BD_SEGMENTS = [
   { type: "age", value: "45-54", spend: 8, conv: 0.1, drift: 0.8 },
   { type: "device_platform", value: "mobile", spend: 26, conv: 0.9, drift: 0 },
   { type: "device_platform", value: "desktop", spend: 8, conv: 0.05, drift: 0 },
+  // Plaatsing binnen het platform. Dit is de uitsplitsing waar een Meta-adverteerder als eerste
+  // naar kijkt — het publisher_platform zegt op wélk netwerk je zat, de positie zegt wáár. Reels
+  // krijgt hier het klassieke patroon: veel budget, weinig conversie, want de kijker zit in een
+  // scroll-modus. Stories doet het omgekeerde.
+  { type: "platform_position", value: "feed", spend: 18, conv: 0.75, drift: 0 },
+  { type: "platform_position", value: "reels", spend: 13, conv: 0.14, drift: 0.5 },
+  { type: "platform_position", value: "story", spend: 6, conv: 0.32, drift: 0 },
+  { type: "platform_position", value: "right_hand_column", spend: 3, conv: 0.04, drift: -0.4 },
+  // Gender: bewust vlak gehouden op efficiëntie. Niet elke uitsplitsing hoeft een probleem te
+  // bevatten — een demo waarin élke dimensie scheef staat leert je niet meer te kijken.
+  { type: "gender", value: "female", spend: 15, conv: 0.5, drift: 0 },
+  { type: "gender", value: "male", spend: 16, conv: 0.52, drift: 0 },
+  { type: "gender", value: "unknown", spend: 3, conv: 0.08, drift: 0 },
 ];
 const META_BD_DAYS = 60;
 const metaBreakdownDaily: Row[] = META_BD_SEGMENTS.flatMap((s) =>
@@ -278,11 +291,25 @@ const LI_CAMPAIGNS = [
   { urn: "urn:li:demo:5", name: "GRA | Thought Leadership US" },
 ];
 const linkedinCampaigns: Row[] = LI_CAMPAIGNS.map((c) => ({ client_id: CID, campaign_urn: c.urn, name: c.name, status: "ACTIVE", objective_type: "LEAD_GENERATION" }));
+// Twee creatives, allebei single_image, was te dun om de creative-weergave iets te laten zeggen:
+// er viel niets te vergelijken en het formaat-onderscheid was onzichtbaar. Vijf stuks over de
+// formaten die LinkedIn daadwerkelijk kent, met uiteenlopende prestaties — de video trekt
+// vertoningen maar weinig leads, het document (whitepaper) is de leadmotor. Dat is het patroon
+// dat een B2B-beursaccount in het echt laat zien.
 const linkedinCreatives: Row[] = [
   { client_id: CID, creative_urn: "urn:li:demo:cr1", headline: "Ontmoet de tuinbouwsector op GreenTech", post_text: "Registreer uw team voor de vakbeurs.", image_storage_path: "https://picsum.photos/seed/li-greentech-1/320/200", cta_label: "Registreren", landing_url: "https://demo.greentech-fictief.example/li", format: "single_image" },
-  { client_id: CID, creative_urn: "urn:li:demo:cr2", headline: "Whitepaper: kas-innovatie 2026", post_text: "Download de trendgids.", image_storage_path: "https://picsum.photos/seed/li-greentech-2/320/200", cta_label: "Download", landing_url: "https://demo.greentech-fictief.example/li-wp", format: "single_image" },
+  { client_id: CID, creative_urn: "urn:li:demo:cr2", headline: "Whitepaper: kas-innovatie 2026", post_text: "Download de trendgids met 12 casussen uit de sector.", image_storage_path: "https://picsum.photos/seed/li-greentech-2/320/200", cta_label: "Download", landing_url: "https://demo.greentech-fictief.example/li-wp", format: "document" },
+  { client_id: CID, creative_urn: "urn:li:demo:cr3", headline: "In 90 seconden over de beursvloer", post_text: "Een rondleiding langs de innovaties van vorig jaar.", image_storage_path: "https://picsum.photos/seed/li-greentech-3/320/200", cta_label: "Meer info", landing_url: "https://demo.greentech-fictief.example/li-video", format: "video" },
+  { client_id: CID, creative_urn: "urn:li:demo:cr4", headline: "Vier redenen om te exposeren", post_text: "Van leadvolume tot leveranciersnetwerk — swipe door de cijfers.", image_storage_path: "https://picsum.photos/seed/li-greentech-4/320/200", cta_label: "Stand boeken", landing_url: "https://demo.greentech-fictief.example/li-stand", format: "carousel" },
+  { client_id: CID, creative_urn: "urn:li:demo:cr5", headline: "Persoonlijke uitnodiging voor uw team", post_text: "Ontvang twee vrijkaarten voor de vakbeurs.", image_storage_path: "https://picsum.photos/seed/li-greentech-5/320/200", cta_label: "Uitnodiging", landing_url: "https://demo.greentech-fictief.example/li-invite", format: "message" },
 ];
-const LI_META = [{ urn: "urn:li:demo:cr1", imp: 620, clk: 11, spend: 34, leads: 3, seed: 1 }, { urn: "urn:li:demo:cr2", imp: 780, clk: 14, spend: 40, leads: 4, seed: 3 }];
+const LI_META = [
+  { urn: "urn:li:demo:cr1", imp: 620, clk: 11, spend: 34, leads: 3, seed: 1 },
+  { urn: "urn:li:demo:cr2", imp: 780, clk: 14, spend: 40, leads: 6, seed: 3 },
+  { urn: "urn:li:demo:cr3", imp: 2100, clk: 19, spend: 58, leads: 2, seed: 5 },
+  { urn: "urn:li:demo:cr4", imp: 940, clk: 16, spend: 37, leads: 4, seed: 7 },
+  { urn: "urn:li:demo:cr5", imp: 310, clk: 9, spend: 22, leads: 3, seed: 9 },
+];
 const linkedinCreativeDaily: Row[] = LI_META.flatMap((c) =>
   Array.from({ length: 150 }, (_, d) => {
     const f = dayFactor(149 - d, c.seed);
@@ -319,7 +346,20 @@ const LI_DEMO_SEGMENTS = [
   { pivot: "MEMBER_JOB_FUNCTION", urn: "urn:li:function:25", label: "Sales", spend: 14, leads: 0.12, drift: -0.7 },
   { pivot: "MEMBER_JOB_FUNCTION", urn: "urn:li:function:15", label: "Marketing", spend: 4, leads: 0.28, drift: 0.7 },
   { pivot: "MEMBER_SENIORITY", urn: "urn:li:seniority:5", label: "Senior", spend: 22, leads: 0.9, drift: 0 },
+  { pivot: "MEMBER_SENIORITY", urn: "urn:li:seniority:4", label: "Manager", spend: 11, leads: 0.34, drift: 0 },
   { pivot: "MEMBER_SENIORITY", urn: "urn:li:seniority:1", label: "Entry", spend: 8, leads: 0.06, drift: 0 },
+  // Industrie en bedrijfsgrootte stonden wél in de vertaaltabel van de structuur-analyse maar
+  // hadden geen demo-rijen, waardoor die twee dimensies in de demo altijd leeg bleven. Voor een
+  // beurs is dit juist de scherpste snede: exposanten zitten in een handvol sectoren en het zijn
+  // zelden de kleinste bedrijven die een stand boeken.
+  { pivot: "MEMBER_INDUSTRY", urn: "urn:li:industry:2", label: "Tuinbouw & agrifood", spend: 18, leads: 0.85, drift: 0.3 },
+  { pivot: "MEMBER_INDUSTRY", urn: "urn:li:industry:47", label: "Machinebouw", spend: 10, leads: 0.4, drift: 0 },
+  { pivot: "MEMBER_INDUSTRY", urn: "urn:li:industry:135", label: "Zakelijke dienstverlening", spend: 9, leads: 0.08, drift: -0.5 },
+  { pivot: "MEMBER_INDUSTRY", urn: "urn:li:industry:96", label: "IT & software", spend: 5, leads: 0.12, drift: 0 },
+  { pivot: "MEMBER_COMPANY_SIZE", urn: "urn:li:companySize:D", label: "51-200", spend: 16, leads: 0.62, drift: 0 },
+  { pivot: "MEMBER_COMPANY_SIZE", urn: "urn:li:companySize:E", label: "201-500", spend: 12, leads: 0.55, drift: 0.4 },
+  { pivot: "MEMBER_COMPANY_SIZE", urn: "urn:li:companySize:B", label: "2-10", spend: 7, leads: 0.05, drift: 0 },
+  { pivot: "MEMBER_COMPANY_SIZE", urn: "urn:li:companySize:G", label: "1001-5000", spend: 6, leads: 0.3, drift: 0 },
 ];
 const LI_DEMO_DAYS = 60;
 const linkedinDemographicDaily: Row[] = LI_DEMO_SEGMENTS.flatMap((s) =>

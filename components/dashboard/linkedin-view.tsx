@@ -5,6 +5,7 @@ import { ChannelPerformance } from "./channel-performance";
 import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
 import { GeoBreakdown } from "./geo-breakdown";
+import { BreakdownDonuts } from "./breakdown-donuts";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 
 // LinkedIn Ads-tab. Zelfde opbouw als de Google- en Meta-weergave via de gedeelde
@@ -47,6 +48,8 @@ export function LinkedInView({ clientId, geoClone }: { clientId: string; geoClon
       <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} />
       {/* Geo-mapping: waar komt verkeer/conversies vandaan (per gekozen metric). */}
       <GeoBreakdown clientId={clientId} channel="linkedin" />
+      {/* Waar het budget landt per uitsplitsing — het equivalent van de PMax-ringen bij Google. */}
+      <BreakdownDonuts clientId={clientId} channel="linkedin" />
       {/* Quick scan: creatives + prestaties + samenvatting. */}
       <CreativePerformance clientId={clientId} channel="linkedin" />
     </div>

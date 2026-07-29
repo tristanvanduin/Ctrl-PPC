@@ -110,10 +110,28 @@ export const MIN_COST_SHARE_TO_FLAG = 0.10;
 export const SHARE_GAP_THRESHOLD = 0.15;
 
 /** Sommeer per netwerk en leid de aandelen af uit de totalen. */
-export function buildNetworkSplit(rows: NetworkRow[]): NetworkSlice[] {
+/**
+ * De verdeling van kosten en conversies over een dimensie, met per segment het aandeel, de CPA
+ * en het verschil tussen beide aandelen.
+ *
+ * De rekenkern is niet Google-specifiek — "welk segment kost naar verhouding meer dan het
+ * oplevert" is dezelfde vraag voor een PMax-netwerk, een Meta-plaatsing of een LinkedIn-functie.
+ * Alleen het benoemen en normaliseren van de sleutel verschilt, en dat gaat via de opties. Zonder
+ * die opening zou de kanaalweergave deze dertig regels moeten overschrijven, inclusief de
+ * subtiliteiten (nul-segmenten eruit, conversie-aandeel null zolang er nergens conversies zijn).
+ *
+ * @param opties labelOf vertaalt de sleutel naar een leesbare naam; normalizeKey bepaalt wanneer
+ *               twee rijen hetzelfde segment zijn. Standaard: Google's netwerknamen en hoofdletters.
+ */
+export function buildNetworkSplit(
+  rows: NetworkRow[],
+  opties?: { labelOf?: (key: string) => string; normalizeKey?: (key: string) => string }
+): NetworkSlice[] {
+  const labelOf = opties?.labelOf ?? networkLabel;
+  const normalizeKey = opties?.normalizeKey ?? ((k: string) => (k || "UNKNOWN").toUpperCase());
   const m = new Map<string, NetworkRow>();
   for (const r of rows) {
-    const key = (r.networkType || "UNKNOWN").toUpperCase();
+    const key = normalizeKey(r.networkType);
     const a = m.get(key) ?? { networkType: key, cost: 0, conversions: 0, conversionsValue: 0, impressions: 0, clicks: 0 };
     a.cost += r.cost;
     a.conversions += r.conversions;
@@ -139,7 +157,7 @@ export function buildNetworkSplit(rows: NetworkRow[]): NetworkSlice[] {
       const conversionShare = totalConv > 0 ? r.conversions / totalConv : null;
       return {
         networkType: r.networkType,
-        label: networkLabel(r.networkType),
+        label: labelOf(r.networkType),
         cost: r.cost,
         conversions: r.conversions,
         conversionsValue: r.conversionsValue,

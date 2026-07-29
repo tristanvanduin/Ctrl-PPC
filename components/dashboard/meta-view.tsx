@@ -6,6 +6,7 @@ import { ChannelPerformance } from "./channel-performance";
 import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
 import { GeoBreakdown } from "./geo-breakdown";
+import { BreakdownDonuts } from "./breakdown-donuts";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 
 // Meta Ads-tab: DATA-weergave (connectiestatus + wat het kanaal levert). Zelfde opbouw als de
@@ -52,6 +53,8 @@ export function MetaView({ clientId, geoClone }: { clientId: string; geoClone?: 
       <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} />
       {/* Geo-mapping: waar komt verkeer/conversies vandaan (per gekozen metric). */}
       <GeoBreakdown clientId={clientId} channel="meta" />
+      {/* Waar het budget landt per uitsplitsing — het equivalent van de PMax-ringen bij Google. */}
+      <BreakdownDonuts clientId={clientId} channel="meta" />
       {/* Quick scan: creatives + prestaties + samenvatting. */}
       <CreativePerformance clientId={clientId} channel="meta" />
     </div>
