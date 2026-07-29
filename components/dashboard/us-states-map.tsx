@@ -79,13 +79,31 @@ export default function UsStatesMap({ values, format, metricLabel }: UsStatesMap
         })}
       </svg>
 
-      {hover && hoveredValue != null && (
+      {/* Zelfde schaallegenda als de wereldkaart, om dezelfde reden: een sequentiële ramp zonder
+          schaal laat je zien dát een staat donkerder is, niet hoeveel. */}
+      <div className="flex items-center justify-center gap-2 pt-1">
+        <span className="text-micro text-muted-foreground tabular-nums">0</span>
+        <span
+          className="h-2 w-40 rounded-full"
+          style={{ background: `linear-gradient(90deg, ${ramp(0)}, ${ramp(0.5)}, ${ramp(1)})` }}
+          aria-hidden
+        />
+        <span className="text-micro text-muted-foreground tabular-nums">{format(max)}</span>
+        <span className="text-micro text-muted-foreground ml-1">{metricLabel.toLowerCase()} per staat</span>
+      </div>
+
+      {hover && (
         <div
           className="pointer-events-none absolute z-10 rounded-md border border-border bg-white px-2.5 py-1.5 shadow-md text-meta"
           style={{ left: Math.min(hover.x + 12, WIDTH - 120), top: hover.y + 12 }}
         >
           <div className="font-semibold text-rm-gray">{stateLabel(hover.usps)}</div>
-          <div className="text-muted-foreground">{metricLabel}: <span className="font-medium text-rm-blue">{format(hoveredValue)}</span></div>
+          <div className="text-muted-foreground">
+            {metricLabel}:{" "}
+            {hoveredValue != null && Number.isFinite(hoveredValue)
+              ? <span className="font-medium text-rm-blue tabular-nums">{format(hoveredValue)}</span>
+              : <span className="italic">geen data voor deze staat</span>}
+          </div>
         </div>
       )}
     </div>

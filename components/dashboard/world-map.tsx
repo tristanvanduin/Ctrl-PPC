@@ -74,7 +74,10 @@ export default function WorldMap({ values, format, metricLabel, onCountryClick }
               style={{ cursor: clickable ? "pointer" : "default", opacity: hover && !isHover ? 0.9 : 1, transition: "opacity 120ms" }}
               onClick={() => { if (clickable && s.alpha2) onCountryClick!(s.alpha2); }}
               onMouseMove={(e) => {
-                if (!has || !s.alpha2) { setHover(null); return; }
+                // Ook zonder data een tooltip. Hoverde je een land waar niets voor gemeten is, dan
+                // gebeurde er niets — en stilte is niet te onderscheiden van een kapotte kaart.
+                // Nu zegt hij "geen data", wat een antwoord is in plaats van een raadsel.
+                if (!s.alpha2) { setHover(null); return; }
                 const box = (e.currentTarget.ownerSVGElement?.parentElement as HTMLElement)?.getBoundingClientRect();
                 if (!box) return;
                 setHover({ alpha2: s.alpha2, x: e.clientX - box.left, y: e.clientY - box.top });
@@ -85,13 +88,36 @@ export default function WorldMap({ values, format, metricLabel, onCountryClick }
         })}
       </svg>
 
-      {hover && hoveredValue != null && (
+      {/* De schaallegenda. Zonder deze codeert de kaart grootte met alleen kleur: je ziet dat het
+          ene land donkerder is dan het andere, maar niet wat donker betekent — 100 conversies of
+          10.000. De tabel eronder zou dat kunnen dragen, maar die staat dicht, en dan is kleur de
+          enige drager van een continue schaal. Dat is precies wat een choropleth niet mag doen.
+
+          Vandaar de ramp zelf als balk, met de twee uiteinden benoemd: nul links, het gemeten
+          maximum rechts, in dezelfde eenheid als de kaart. */}
+      <div className="flex items-center justify-center gap-2 pt-1">
+        <span className="text-micro text-muted-foreground tabular-nums">0</span>
+        <span
+          className="h-2 w-40 rounded-full"
+          style={{ background: `linear-gradient(90deg, ${ramp(0)}, ${ramp(0.5)}, ${ramp(1)})` }}
+          aria-hidden
+        />
+        <span className="text-micro text-muted-foreground tabular-nums">{format(max)}</span>
+        <span className="text-micro text-muted-foreground ml-1">{metricLabel.toLowerCase()} per land</span>
+      </div>
+
+      {hover && (
         <div
           className="pointer-events-none absolute z-10 rounded-md border border-border bg-white px-2.5 py-1.5 shadow-md text-meta"
           style={{ left: Math.min(hover.x + 12, WIDTH - 120), top: hover.y + 12 }}
         >
           <div className="font-semibold text-rm-gray">{countryLabel(hover.alpha2)}</div>
-          <div className="text-muted-foreground">{metricLabel}: <span className="font-medium text-rm-blue">{format(hoveredValue)}</span></div>
+          <div className="text-muted-foreground">
+            {metricLabel}:{" "}
+            {hoveredValue != null && Number.isFinite(hoveredValue)
+              ? <span className="font-medium text-rm-blue tabular-nums">{format(hoveredValue)}</span>
+              : <span className="italic">geen data voor dit land</span>}
+          </div>
         </div>
       )}
     </div>
