@@ -143,6 +143,18 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
     for (const rij of data) if (Number(rij[serie] ?? 0) > 0) n += 1;
     return n;
   };
+
+  // Eén directe label, op de grootste serie.
+  //
+  // Eerst kregen alle drie de series er een. Dat botste: Meta en LinkedIn liggen hier dicht bij
+  // elkaar in waarde én staan naast elkaar, dus hun namen schoven over elkaar heen. De richtlijn
+  // is daar duidelijk over — botsende eindlabels niet uit elkaar duwen, want dan raken ze los van
+  // hun mark en worden ze ruis; terugvallen op de legenda, of alleen labelen wat het verhaal
+  // draagt. Google is hier drie keer de rest; dat is het verhaal. De legenda dekt de andere twee.
+  const grootsteSerie = series.reduce((beste, s) => {
+    const som = (reeks: string) => data.reduce((t, r) => t + Number(r[reeks] ?? 0), 0);
+    return som(s) > som(beste) ? s : beste;
+  }, series[0]);
   const hoogste = Math.max(0, ...data.flatMap((r) => series.map((s) => Number(r[s] ?? 0))));
   const schaal = asSchaal(hoogste);
   const legenda: LegendaItem[] = series.map((s, i) => ({ label: s, kleur: kleurVan(i) }));
@@ -164,19 +176,16 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
             <Tip formatter={volledigEuro} />
             {series.map((s, i) => (
               <Bar key={s} dataKey={s} name={s} fill={kleurVan(i)} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)}>
-                {/* Eén label per serie, boven de laatste maand.
-                    Bij drie of meer series mag kleur niet de enige drager van identiteit zijn — en
-                    dit palet haalt op drie tinten geen 3:1 tegen het vlak, wat zichtbare labels
-                    verplicht maakt in plaats van optioneel. Een getal boven élke balk zou het
-                    tegenovergestelde zijn: achttien labels is geen kaart meer maar een tabel met
-                    staafjes. Alleen de laatste groep dus: daar staat de naam waar je oog toch al
-                    eindigt, en de legenda blijft voor de rest. */}
-                <LabelList
-                  dataKey={s}
-                  position="top"
-                  offset={8}
-                  content={(props: unknown) => <SerieNaam {...(props as LabelProps)} naam={s} laatste={laatsteMetWaarde(s)} />}
-                />
+                {/* Alleen de grootste serie draagt een naam, boven zijn laatste balk. Zie
+                    `grootsteSerie` hierboven voor waarom het er één is en niet drie. */}
+                {s === grootsteSerie && (
+                  <LabelList
+                    dataKey={s}
+                    position="top"
+                    offset={8}
+                    content={(props: unknown) => <SerieNaam {...(props as LabelProps)} naam={s} laatste={laatsteMetWaarde(s)} />}
+                  />
+                )}
               </Bar>
             ))}
           </ComposedChart>

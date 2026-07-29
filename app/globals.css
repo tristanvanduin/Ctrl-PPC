@@ -57,10 +57,10 @@
      waar een pagina om draait.
 
        figure  30px  een KPI in een rij van vier of vijf
-       hero    40px  het getal waar de pagina om draait
+       hero    48px  het getal waar de pagina om draait
      ────────────────────────────────────────────────────────────────────────── */
   --text-figure: 1.875rem;
-  --text-hero: 2.5rem;
+  --text-hero: 3rem;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

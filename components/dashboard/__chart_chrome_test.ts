@@ -20,13 +20,15 @@ assert(kortGetal(2_000_000) === "2M", "twee miljoen is 2M en niet 2,0M");
 assert(kortGetal(1500) === "1,5k", "een halve duizend blijft wél staan");
 
 // ── Balkbreedte ──
-// Vier balken van 26 pixels over een brede plot lezen als een grafiek waar data uit is gevallen;
-// twaalf brede blokken lezen als schreeuwen. De breedte volgt dus het aantal.
+// De breedte volgt het aantal categorieën, maar altijd onder het plafond.
 assert(balkBreedte(4) > balkBreedte(12), "minder categorieën geeft bredere balken");
 assert(balkBreedte(4) >= balkBreedte(6) && balkBreedte(6) >= balkBreedte(12), "de reeks loopt aflopend");
+// Het plafond is geen richtlijn maar een grens: boven de 24 pixels leest een verzadigde vulling
+// als een verfvlak in plaats van als een meetwaarde. Dat is de reden dat het palet mag zoals het is.
 for (const n of [1, 2, 4, 6, 12, 40]) {
   const b = balkBreedte(n);
-  assert(b >= 20 && b <= 56, `${n} categorieën geeft een breedte (${b}) binnen de grenzen`);
+  assert(b <= 24, `${n} categorieën blijft onder het plafond van 24 (${b})`);
+  assert(b >= 10, `${n} categorieën blijft dik genoeg om te zien (${b})`);
 }
 
 // ── Maandlabels ──

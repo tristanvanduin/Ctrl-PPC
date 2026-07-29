@@ -37,17 +37,24 @@ function kort(v: number, heel: boolean): string {
 }
 
 /**
- * Balkbreedte naar het aantal categorieën.
+ * Balkbreedte naar het aantal categorieën — altijd onder het plafond.
  *
- * Een vaste breedte van 26 pixels werkt bij twaalf maanden en valt uit elkaar bij vier: dan staan
- * er vier dunne staafjes met vierhonderd pixels lucht ertussen, en dat leest als een grafiek waar
- * data uit is weggevallen. Breder mag daar dus — maar met een plafond, want een breed verzadigd
- * blok is precies het beeld dat een dashboard goedkoop maakt.
+ * Hier stond 48 / 36 / 26 pixels, met als redenering dat vier dunne staafjes op een brede plot
+ * "leeg" ogen. Dat was mijn eigen redenering en hij is fout. De mark-specificatie zegt: een balk
+ * is HOOGSTENS 24 pixels dik, vul het vak nooit, en wat overblijft is lucht — geen gebrek.
+ *
+ * Dat is ook precies de reden dat het verzadigde palet werkt. Datzelfde document zegt: verzadigde
+ * vullingen horen bij kleine marks en accenten, nooit bij grote blokken. Een balk van 48 pixels in
+ * vol blauw is zo'n blok — dan lees je het als een verfvlak in plaats van als een meetwaarde, en
+ * dat is wat een grafiek uit een spreadsheet laat lijken. Dezelfde kleur op een dunne mark leest
+ * als data.
+ *
+ * De lucht die overblijft is dus het ontwerp, niet het probleem.
  */
 export function balkBreedte(aantalCategorieen: number): number {
-  if (aantalCategorieen <= 4) return 48;
-  if (aantalCategorieen <= 8) return 36;
-  return BALK_MAX;
+  if (aantalCategorieen <= 4) return BALK_MAX;
+  if (aantalCategorieen <= 8) return 18;
+  return 12;
 }
 
 export function kortEuro(v: number): string {
@@ -294,11 +301,11 @@ export function Legenda({ items, className = "" }: { items: LegendaItem[]; class
 
 export const BALK_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
 /**
- * Maximale balkbreedte. Zonder begrenzing rekt recharts de balken uit tot de groep vol is, en dan
- * krijg je brede verzadigde blokken — dat leest luid, bijna kinderlijk. Verzadigde vulling hoort
- * bij kleine marks; een brede vlakverdeling hoort lichter.
+ * Maximale balkbreedte: vierentwintig pixels, het plafond uit de mark-specificatie. Zonder
+ * begrenzing rekt recharts de balken uit tot de groep vol is, en dan krijg je brede verzadigde
+ * blokken — dat leest luid, bijna kinderlijk. Verzadigde vulling hoort bij kleine marks.
  */
-export const BALK_MAX = 26;
+export const BALK_MAX = 24;
 /** Ruimte tussen de balken binnen één groep, en tussen de groepen onderling. */
 export const BALK_GAP = 2;
 export const GROEP_GAP = "22%";
