@@ -6,6 +6,7 @@
 // getallen veranderen mee. Alles komt uit data die de pagina al geladen heeft — er gaat geen
 // query overheen — dus het werkt in demo-modus precies zoals met echte data.
 
+import type { ReactNode } from "react";
 import { TrendingDown, TrendingUp, Minus, TriangleAlert } from "lucide-react";
 import type { ClientHistoricalData } from "@/lib/types";
 import { usePeriod } from "@/lib/period/period-context";
@@ -46,6 +47,23 @@ function Delta({ d, hogerIsBeter = true }: { d: PeriodDelta; hogerIsBeter?: bool
   );
 }
 
+/**
+ * Eén cijfer uit de band: label, getal, en eronder de verandering.
+ *
+ * `tabular-nums` en een strakke letterafstand horen bij deze maat. Cijfers op 30 pixels vallen
+ * zonder die twee uit elkaar — de spatie tussen een 1 en een 4 wordt dan een gat — en juist bij
+ * een getal dat de kop van de pagina draagt valt dat op.
+ */
+function Cijfer({ label, waarde, children }: { label: string; waarde: string; children?: ReactNode }) {
+  return (
+    <div>
+      <p className="text-micro font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-1.5 text-figure font-semibold leading-none tracking-tight text-rm-gray tabular-nums">{waarde}</p>
+      {children && <div className="mt-2">{children}</div>}
+    </div>
+  );
+}
+
 interface Props {
   data: ClientHistoricalData | null;
   /** Toon een compactere variant zonder kop, voor binnen een bestaand kaartje. */
@@ -68,7 +86,7 @@ export function PeriodSummary({ data, compact }: Props) {
   const cpa = current.totals.conversions > 0 ? current.totals.adSpend / current.totals.conversions : null;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <div className="rounded-xl border border-border bg-card px-6 py-5 shadow-sm">
       {!compact && (
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-rm-blue-ink">
@@ -82,24 +100,24 @@ export function PeriodSummary({ data, compact }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      {/* De cijferband. Dit is de kop van elke pagina, en hij stond in dezelfde maat als de rest:
+          18 pixels tussen honderden regels van 10 tot 13. Dan is er geen kop — dan is er alleen
+          tekst, en moet de lezer zelf uitzoeken waar hij moet kijken.
+
+          De verhoudingen die het doen: het cijfer groot en met strakke letterafstand (grote cijfers
+          vallen anders uit elkaar), het label klein en in kapitalen erbóven zodat je het leest
+          vóór het getal, en de verandering eronder als aparte regel in plaats van ernaast — een
+          percentage naast een bedrag concurreert met dat bedrag. */}
+      <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 lg:grid-cols-5">
         {kaarten.map((k) => (
-          <div key={k.label}>
-            <p className="text-micro text-muted-foreground">{k.label}</p>
-            <p className="text-lg font-semibold text-rm-gray">{k.waarde}</p>
+          <Cijfer key={k.label} label={k.label} waarde={k.waarde}>
             {k.d && <Delta d={k.d} hogerIsBeter={k.hogerIsBeter} />}
-          </div>
+          </Cijfer>
         ))}
-        <div>
-          <p className="text-micro text-muted-foreground">ROAS</p>
-          <p className="text-lg font-semibold text-rm-gray">{roas === null ? "—" : formatRoas(roas)}</p>
-        </div>
-        <div>
-          <p className="text-micro text-muted-foreground">CPA</p>
-          {/* Geen conversies betekent geen CPA; een bedrag tonen zou een prijs per conversie
-              suggereren die niet bestaat. */}
-          <p className="text-lg font-semibold text-rm-gray">{cpa === null ? "—" : euro(cpa)}</p>
-        </div>
+        <Cijfer label="ROAS" waarde={roas === null ? "—" : formatRoas(roas)} />
+        {/* Geen conversies betekent geen CPA; een bedrag tonen zou een prijs per conversie
+            suggereren die niet bestaat. */}
+        <Cijfer label="CPA" waarde={cpa === null ? "—" : euro(cpa)} />
       </div>
 
       {current.missing.length > 0 && (

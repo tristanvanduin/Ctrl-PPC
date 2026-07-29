@@ -44,6 +44,24 @@
   --text-lead: 0.8125rem;
   --text-title: 0.9375rem;
 
+  /* ── En twee stappen die er niet waren ────────────────────────────────────
+     De hele typografische omvang van dit dashboard liep van 10 tot 24 pixels, en
+     24 kwam zeven keer voor. Alles leefde tussen 10 en 13. Dat is niet "dicht op
+     elkaar", dat is géén schaalcontrast: het belangrijkste getal op een pagina
+     was nauwelijks groter dan het bijschrift eronder, en dan moet de lezer zelf
+     uitzoeken waar hij moet kijken. Precies wat een spreadsheet je laat doen.
+
+     Een cijfer dat de kop van een pagina draagt hoort de kop te zíjn. Deze twee
+     stappen zijn daarvoor, en voor niets anders — niet voor kopjes, niet voor
+     lopende tekst. `figure` voor een KPI in een rij, `hero` voor het ene getal
+     waar een pagina om draait.
+
+       figure  30px  een KPI in een rij van vier of vijf
+       hero    40px  het getal waar de pagina om draait
+     ────────────────────────────────────────────────────────────────────────── */
+  --text-figure: 1.875rem;
+  --text-hero: 2.5rem;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
@@ -173,6 +191,9 @@
 
   /* Het vlak achter een advertentie-preview. */
   --preview-vlak: rgb(243 244 246 / 0.7);
+
+  --kaart-lijn: #e8ebf3;
+  --kaart-schaduw: 0 1px 2px rgb(15 23 42 / 0.03), 0 8px 24px -12px rgb(15 23 42 / 0.10);
 }
 
 /* ── De donkere modus ──────────────────────────────────────────────────────
@@ -252,6 +273,8 @@
   --kaart-rand: #0f1115;
   --kaart-hover: #ffffff;
   --preview-vlak: #e9ecf1;
+  --kaart-lijn: #252a34;
+  --kaart-schaduw: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.6);
 
   /* Neutralen: de trap omgeklapt. 50 wordt het diepste vlak, 900 de helderste letter. */
   --color-gray-50: #171a21;
@@ -378,6 +401,31 @@
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
+  }
+}
+
+/* ── Het materiaal van een kaart ───────────────────────────────────────────
+ *
+ * Vierenvijftig kaarten droegen exact hetzelfde: `rounded-xl border border-border
+ * shadow-sm`. Rand én schaduw, allebei op vol vermogen. Dat is één materiaal te
+ * veel — een rand zegt "hier houdt het op" en een schaduw zegt "dit ligt erop",
+ * en samen zeggen ze allebei half. Het resultaat is dat elke kaart even hard
+ * roept en er dus geen enkele opvalt.
+ *
+ * Eén materiaal, en dan goed: een haarlijn die de kaart begrenst, en een schaduw
+ * die groot en zacht genoeg is om als licht te lezen in plaats van als rand.
+ * De verhouding — grote straal, lage dekking, een fractie omlaag verschoven — is
+ * wat het verschil maakt tussen "er zit een schaduwtje op" en diepte.
+ *
+ * In het donker werkt een schaduw niet: daar is niets om op te vallen. Daar doet
+ * een fijne lichtrand langs de bovenkant hetzelfde werk.
+ */
+@layer base {
+  .rounded-xl.border.border-border.shadow-sm,
+  .rounded-lg.border.border-border.shadow-sm {
+    --tw-shadow: 0 0 #0000;
+    box-shadow: var(--kaart-schaduw);
+    border-color: var(--kaart-lijn);
   }
 }
 
