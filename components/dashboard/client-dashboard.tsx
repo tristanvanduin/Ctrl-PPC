@@ -68,6 +68,7 @@ import { BrandHeaderBar } from "../branding/brand-header-bar";
 import { useClientData } from "@/lib/use-client-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
+import { Sectie } from "@/components/ui/sectie";
 
 interface Client {
   id: string;
@@ -77,20 +78,6 @@ interface Client {
 
 type Tab = "dashboard" | "campaigns" | "forecast" | "insights" | "outcomes" | "sprint" | "reporting" | "dgm" | "second-opinion" | "files" | "settings";
 
-function SectionHeader({ icon, title, subtitle, action }: { icon: React.ReactNode; title: string; subtitle: string; action?: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-9 h-9 rounded-lg bg-rm-blue/10 flex items-center justify-center shrink-0">
-        {icon}
-      </div>
-      <div>
-        <h2 className="text-base font-bold text-rm-blue-ink">{title}</h2>
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
-      </div>
-      {action && <div className="ml-auto shrink-0">{action}</div>}
-    </div>
-  );
-}
 
 // De as-keuze bij de prestatiekaart. Alleen zichtbaar als er een beurs is om naartoe te tellen;
 // zonder beurs is er niets te kiezen en zou de knop alleen ruis zijn.
@@ -383,50 +370,66 @@ export function ClientDashboard({ client }: { client: Client }) {
                 </div>
               )}
 
-              <SectionHeader
-                icon={<Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />}
-                title={
+              {/* De pagina is in secties gegroepeerd in plaats van dertien losse kaarten onder
+                  elkaar. Elke sectie beantwoordt één vraag; binnen een sectie staan de kaarten
+                  dicht op elkaar, ertussen zit ruim het dubbele. Zonder dat verschil groepeert er
+                  niets en moet de lezer zelf uitzoeken wat bij wat hoort. */}
+              <Sectie
+                eerste
+                icoon={<Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                titel={
                   (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
                   + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
                 }
-                subtitle={beursAs
+                bijschrift={beursAs
                   ? `Per week: hoeveel weken zijn we van ${upcomingEdition!.eventName} en lopen we op schema?`
                   : "Per maand: waar staan we en wat is de trend?"}
-                action={upcomingEdition && (
-                  <TijdasKeuze value={tijdas} onChange={setTijdas} />
-                )}
-              />
-              {beursAs
-                ? <FairWeeksOverview clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition!} />
-                : <MonthlyOverview clientId={client.id} countryFilter={countryFilter} />}
-              <PacingMonitor clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition} />
+                actie={upcomingEdition && <TijdasKeuze value={tijdas} onChange={setTijdas} />}
+              >
+                {beursAs
+                  ? <FairWeeksOverview clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition!} />
+                  : <MonthlyOverview clientId={client.id} countryFilter={countryFilter} />}
+                <PacingMonitor clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition} />
+              </Sectie>
 
-              <div className="pt-2">
-                <SectionHeader
-                  icon={<Target className="w-4.5 h-4.5 text-rm-blue-ink" />}
-                  title={countryFilter ? `Jaaroverzicht 2026 — ${countryLabel(countryFilter)}` : "Jaaroverzicht 2026"}
-                  subtitle="Jaardoelen vs bijgestelde prognose op basis van weektrend"
-                />
+              <Sectie
+                icoon={<Target className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                titel={countryFilter ? `Jaaroverzicht 2026 — ${countryLabel(countryFilter)}` : "Jaaroverzicht 2026"}
+                bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+              >
+                <MetricCards clientId={client.id} countryFilter={countryFilter} />
+                <PerformanceChart clientId={client.id} countryFilter={countryFilter} />
+              </Sectie>
+
+              {/* Waar het vandaan komt, en hóé die markten bediend worden. De kanaalmix per land
+                  staat bewust naast de kaart en niet op een eigen pagina: het is de volgende vraag
+                  na "welke landen", en een aparte pagina zou klant en periode opnieuw laten kiezen. */}
+              <Sectie
+                icoon={<Globe className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                titel="Markten"
+                bijschrift="Waar het verkeer en de conversies vandaan komen, en met welke kanaalmix"
+              >
+                <GeoBreakdown clientId={client.id} />
+                <GeoChannelMatrix clientId={client.id} />
+              </Sectie>
+
+              {/* Video, PMax-netwerken, placements en creatives horen bij elkaar: het is allemaal
+                  "waar landt het budget en hoe ziet het eruit". Elk van deze kaarten rendert niets
+                  als er geen data voor is, dus de sectie kan ook helemaal leeg blijven. */}
+              <Sectie
+                icoon={<LayoutGrid className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                titel="Waar het budget landt"
+                bijschrift="Video, netwerken, placements en de advertenties zelf"
+              >
+                <VideoPerformance clientId={client.id} />
+                <PmaxNetworkSplit clientId={client.id} />
+                <VideoPlacements clientId={client.id} />
+                <CreativePerformance clientId={client.id} channel="google" />
+              </Sectie>
+
+              <div className="mt-10">
+                <ClientNotes clientId={client.id} />
               </div>
-              <MetricCards clientId={client.id} countryFilter={countryFilter} />
-
-              <PerformanceChart clientId={client.id} countryFilter={countryFilter} />
-              {/* Geo-mapping: waar komt verkeer/conversies vandaan, per gekozen metric. */}
-              <GeoBreakdown clientId={client.id} />
-              {/* En hóé die markten bediend worden: de kanaalmix per land. Staat bewust hier en
-                  niet op een eigen pagina — het is de volgende vraag na "welke landen", en een
-                  aparte pagina zou klant en periode opnieuw laten kiezen. */}
-              <GeoChannelMatrix clientId={client.id} />
-              {/* YouTube/Demand Gen met de juiste maten (CPM, CPV, kijkdiepte). Rendert niets
-                  als er geen videocampagnes draaien. */}
-              <VideoPerformance clientId={client.id} />
-              {/* PMax verdeelt zelf over de netwerken; dit maakt die verdeling zichtbaar. */}
-              <PmaxNetworkSplit clientId={client.id} />
-              {/* Waar die video's landden + welke placements uit te sluiten. */}
-              <VideoPlacements clientId={client.id} />
-              {/* Quick scan: hoe de advertenties eruitzien, hoe ze presteerden + korte samenvatting. */}
-              <CreativePerformance clientId={client.id} channel="google" />
-              <ClientNotes clientId={client.id} />
               </>
               )}
               </>
