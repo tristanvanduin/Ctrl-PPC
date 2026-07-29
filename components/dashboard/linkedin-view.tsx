@@ -2,6 +2,7 @@
 
 import { Briefcase } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
+import type { UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
 import { GeoBreakdown } from "./geo-breakdown";
@@ -20,7 +21,7 @@ const SECTIONS = [
   "Lead-forms",
 ];
 
-export function LinkedInView({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
+export function LinkedInView({ clientId, geoClone, edition }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null }) {
   const demo = isDemoMode();
   return (
     <div className="space-y-6">
@@ -45,7 +46,7 @@ export function LinkedInView({ clientId, geoClone }: { clientId: string; geoClon
       />
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
-      <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} />
+      <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} edition={edition} />
       {/* Geo-mapping: waar komt verkeer/conversies vandaan (per gekozen metric). */}
       <GeoBreakdown clientId={clientId} channel="linkedin" />
       {/* Waar het budget landt per uitsplitsing — het equivalent van de PMax-ringen bij Google. */}

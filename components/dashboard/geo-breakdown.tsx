@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Globe2, Loader2, ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useClientDataState } from "@/lib/client-data-provider";
 import { countryLabel } from "@/lib/countries";
 import { stateLabel } from "@/lib/geo/us-fips";
 import { isDemoMode } from "@/lib/demo/demo-mode";
-import { demoGeoCountries, demoGeoStates, type GeoAgg } from "@/lib/demo/geo-demo";
+import { type GeoAgg } from "@/lib/demo/geo-demo";
 import { MapErrorBoundary } from "./map-error-boundary";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 
@@ -50,34 +49,44 @@ const METRICS: MetricDef[] = [
 const CHANNEL_LABEL: Record<Channel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", blended: "Alle kanalen" };
 
 export function GeoBreakdown({ clientId, channel = "google" }: { clientId: string; channel?: Channel }) {
-  const state = useClientDataState();
   const [metricKey, setMetricKey] = useState<MetricKey>("conversions");
   const [focus, setFocus] = useState<"US" | null>(null); // null = wereld, "US" = staten-drilldown
   // De tabel begint dicht: de kaart is het antwoord op "waar komt het vandaan", de tabel is de
   // naslag erachter. Vijftig landregels tussen twee kaarten in maakt de pagina onleesbaar.
   const [tabelOpen, toggleTabel] = useRememberedOpen("geo-tabel", false);
   const metric = METRICS.find((m) => m.key === metricKey)!;
-  const demo = isDemoMode();
 
-  // Land-databron per kanaal. Google = echte per-land data (ads_country_monthly, in demo de
-  // curated set). Meta/LinkedIn/blended hebben nog geen gesyncte geo → demo-mock, of niets buiten demo.
-  const countries = useMemo<GeoAgg[]>(() => {
-    if (channel === "google") {
-      const map = new Map<string, GeoAgg>();
-      for (const r of state?.countryMonthlyData ?? []) {
-        const code = String(r.countryCode || "").toUpperCase();
-        if (!code) continue;
-        const a = map.get(code) ?? { code, impressions: 0, clicks: 0, cost: 0, conversions: 0, conversionsValue: 0 };
-        a.impressions += r.impressions; a.clicks += r.clicks; a.cost += r.cost; a.conversions += r.conversions; a.conversionsValue += r.conversionsValue;
-        map.set(code, a);
-      }
-      return [...map.values()];
-    }
-    return demo ? demoGeoCountries(channel) : [];
-  }, [channel, state, demo]);
+  // Beide niveaus via /api/geo, dat per (kanaal, niveau) de juiste tabel kiest — zie
+  // lib/geo/geo-source.ts. Dat lag er al, maar dit component las het niet: landen kwamen uit de
+  // client-data-provider en staten kwamen ALLEEN uit de demo-mock. Buiten demo was `states` dus
+  // altijd leeg, waardoor de klik op de VS niets deed — geen kapotte kaart, maar een dood
+  // eindpunt dat er wél uitzag als een knop.
+  //
+  // De staten worden meteen meegehaald en niet pas bij de klik: alleen zo weet de kaart óf de
+  // drilldown iets oplevert, en pas dan mag de uitnodiging "klik op de VS" er staan.
+  const [countries, setCountries] = useState<GeoAgg[]>([]);
+  const [states, setStates] = useState<GeoAgg[]>([]);
+  const [laden, setLaden] = useState(true);
 
-  // VS-staten (drilldown). Laag 1: alleen demo-data — echte staten-sync komt in Laag 2.
-  const states = useMemo<GeoAgg[]>(() => (demo ? demoGeoStates(channel) : []), [channel, demo]);
+  useEffect(() => {
+    let cancelled = false;
+    setLaden(true);
+    const demoParam = isDemoMode() ? "&demo=1" : "";
+    const haal = (level: "country" | "region") =>
+      fetch(`/api/geo?clientId=${encodeURIComponent(clientId)}&channel=${channel}&level=${level}${demoParam}`)
+        .then((r) => (r.ok ? r.json() : { rows: [] }))
+        .then((d) => (Array.isArray(d?.rows) ? (d.rows as GeoAgg[]) : []))
+        .catch(() => [] as GeoAgg[]);
+
+    Promise.all([haal("country"), haal("region")]).then(([land, staat]) => {
+      if (cancelled) return;
+      setCountries(land);
+      setStates(staat);
+      setLaden(false);
+    });
+    return () => { cancelled = true; };
+  }, [clientId, channel]);
+
   const canDrillUs = states.length > 0 && countries.some((c) => c.code === "US");
 
   const active = focus === "US" ? states : countries;
@@ -99,6 +108,11 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
     return m;
   }, [ranked]);
 
+  // Tijdens het laden nog niets concluderen: "één of geen land" was anders even waar voor elke
+  // klant, en dan knippert de kaart weg en weer terug.
+  if (laden) {
+    return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+  }
   if (countries.length <= 1) return null; // één (of geen) land: geen geo-verhaal
 
   return (
@@ -150,6 +164,17 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
         )}
         {focus == null && canDrillUs && (
           <p className="text-center text-meta text-muted-foreground pt-1">Klik op de <strong>Verenigde Staten</strong> om de staten te zien.</p>
+        )}
+        {/* De VS staat op de kaart maar er zijn geen staten om naar door te klikken. Dat was
+            eerder stilte: een groot land dat op een klik niet reageert leest als kapot. Zeg dan
+            wát er ontbreekt.
+            De rijen die er wél zijn dragen "LOCATION_OF_PRESENCE" in de regiokolom — het
+            geo-doeltype van Google, niet de naam van een staat — dus er valt niets uit te lezen. */}
+        {focus == null && !canDrillUs && countries.some((c) => c.code === "US") && (
+          <p className="text-center text-meta text-muted-foreground pt-1">
+            Voor de <strong>Verenigde Staten</strong> is geen staten-uitsplitsing beschikbaar: die data is
+            voor dit account nog niet gesynct.
+          </p>
         )}
       </div>
 

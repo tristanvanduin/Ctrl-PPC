@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Megaphone } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
+import type { UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
 import { GeoBreakdown } from "./geo-breakdown";
@@ -15,7 +16,7 @@ import { isDemoMode } from "@/lib/demo/demo-mode";
 
 const SECTIONS = ["Campagnes", "Ad sets", "Advertenties & creatives", "Breakdowns (leeftijd, plaatsing, device)"];
 
-export function MetaView({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
+export function MetaView({ clientId, geoClone, edition }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null }) {
   const [connected, setConnected] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export function MetaView({ clientId, geoClone }: { clientId: string; geoClone?: 
       />
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
-      <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} />
+      <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} edition={edition} />
       {/* Geo-mapping: waar komt verkeer/conversies vandaan (per gekozen metric). */}
       <GeoBreakdown clientId={clientId} channel="meta" />
       {/* Waar het budget landt per uitsplitsing — het equivalent van de PMax-ringen bij Google. */}

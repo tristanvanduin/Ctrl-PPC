@@ -340,8 +340,8 @@ export function ClientDashboard({ client }: { client: Client }) {
                   ook in demo-modus. */}
               <PeriodSummary data={clientData.data} />
               <ChannelTabs channel={channel} onChange={setChannel} />
-              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} />}
-              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} />}
+              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
+              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
               {channel === "blended" && <CrossChannelView clientId={client.id} />}
               {channel === "google" && (
               <>
@@ -443,8 +443,8 @@ export function ClientDashboard({ client }: { client: Client }) {
                   <SearchTermsTable clientId={client.id} geoClone={geoClone} countryFilter={countryFilter} />
                 </div>
               )}
-              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} />}
-              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} />}
+              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
+              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
               {/* Alle kanalen op de Campagnes-tab: welke campagnes draaien per kanaal (niet de
                   blended maandgrafiek — die hoort bij Prognose/Overzicht). */}
               {channel === "blended" && <CampaignsPerChannel clientId={client.id} geoClone={geoClone} />}
