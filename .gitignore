@@ -40,6 +40,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# Beelden uit de nano-banana MCP-server; uitvoer, geen bron.
-generated-images/
