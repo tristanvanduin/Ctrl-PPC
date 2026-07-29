@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { GeoBreakdown } from "./geo-breakdown";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
+import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 
 // Campagne-overzicht over alle kanalen: op welke kanalen zijn we actief en welke campagnes
 // draaien er per kanaal (beurs-gescoped op de afkorting in de campagnenaam). Leest de campagne-
@@ -128,23 +129,33 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
             // Het aandeel wordt tegen de grootste campagne gezet en niet tegen de som: bij zeven
             // campagnes is elk aandeel-van-het-totaal klein, en dan zijn alle balkjes even kort.
             // Tegen de koploper afzetten laat de verhoudingen zien waar het om gaat.
-            const grootste = Math.max(0, ...block.campaigns.map((c) => c.spend));
+            const grootsteSpend = Math.max(0, ...block.campaigns.map((c) => c.spend));
+            const grootsteConv = Math.max(0, ...block.campaigns.map((c) => c.conversions));
             const totaalSpend = block.campaigns.reduce((s, c) => s + c.spend, 0);
             const totaalConv = block.campaigns.reduce((s, c) => s + c.conversions, 0);
             return (
               <Tabel>
                 <Kop>
                   <KolomKop breed>Campagne</KolomKop>
-                  <KolomKop getal>Spend</KolomKop>
-                  <KolomKop getal>{block.convLabel}</KolomKop>
+                  <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+                  <KolomKop getal bijschrift="aandeel">{block.convLabel}</KolomKop>
                   <KolomKop getal>CPA</KolomKop>
                 </Kop>
                 <Body>
                   {block.campaigns.map((c) => (
                     <Rij key={c.name}>
                       <NaamCel>{c.name}</NaamCel>
-                      <AandeelCel waarde={eur(c.spend)} aandeel={grootste > 0 ? c.spend / grootste : 0} />
-                      <GetalCel>{fmt(c.conversions, 1)}</GetalCel>
+                      {/* Twee strepen naast elkaar: kosten en opbrengst. Dát is de vraag die deze
+                          tabel beantwoordt, en die vergelijking lieten we eerst aan het hoofd van
+                          de lezer over. Nu zie je in één blik welke campagne meer budget krijgt
+                          dan ze oplevert — dezelfde redenering waarom de PMax-ringen met twee
+                          zijn en niet met één. */}
+                      <AandeelCel waarde={eur(c.spend)} aandeel={grootsteSpend > 0 ? c.spend / grootsteSpend : 0} />
+                      <AandeelCel
+                        waarde={fmt(c.conversions, 1)}
+                        aandeel={grootsteConv > 0 ? c.conversions / grootsteConv : 0}
+                        kleur={CHART_CATEGORICAL[2]}
+                      />
                       <GetalCel zacht>{c.conversions > 0 ? eur(c.spend / c.conversions) : "—"}</GetalCel>
                     </Rij>
                   ))}

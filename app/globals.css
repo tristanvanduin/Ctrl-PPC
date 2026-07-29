@@ -148,3 +148,37 @@
     font-family: var(--font-heading);
   }
 }
+
+/* ── Tabellen ──────────────────────────────────────────────────────────────
+ *
+ * Zeventien tabellen, en vier ervan zetten `tabular-nums`. Zonder dat zijn
+ * cijfers proportioneel: een 1 is smaller dan een 8, dus € 133.159 en € 15.795
+ * beginnen op verschillende posities en een kolom is niet te scannen maar
+ * alleen te lezen. Dat is in een datatool het duidelijkste teken van haastwerk.
+ *
+ * Deze regel pakt het bij de bron: elke rechts uitgelijnde cel in een tabel is
+ * per definitie een getalkolom, en die krijgt gelijke cijferbreedtes. Eén regel
+ * in plaats van zeventien bestanden langs, en een nieuwe tabel erft het vanzelf.
+ *
+ * `text-right` is hier de juiste haak en niet een eigen klasse: het staat er al
+ * overal, en het is precies de plek waar uitlijnen betekenis heeft. Links
+ * uitgelijnde tekst wordt bewust niet geraakt — tabulaire cijfers in lopende
+ * tekst zetten de spatiëring juist los.
+ */
+@layer base {
+  table td.text-right,
+  table th.text-right,
+  table td[align="right"],
+  table th[align="right"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Een rustige hover over de hele rij: zo volg je een regel met je oog over
+   * de volle breedte, in plaats van per cel te moeten mikken. */
+  table tbody tr {
+    transition: background-color 120ms ease;
+  }
+  table tbody tr:hover {
+    background-color: rgb(249 250 251 / 0.8);
+  }
+}

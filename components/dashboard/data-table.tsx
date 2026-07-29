@@ -16,8 +16,15 @@
 //
 // 3. GEEN TOTAAL. Een kolom bedragen zonder som laat de lezer optellen, en dat doet niemand.
 //
-// De cijfers blijven leidend: de balk is een hulp bij het scannen, niet de drager van de
-// waarde. Daarom staat hij áchter het getal, laag in dekking, en nooit als enige encoding.
+// De cijfers blijven leidend: de streep is een hulp bij het scannen, niet de drager van de
+// waarde. Hij staat ónder het getal op een baan met vaste breedte, en nooit als enige encoding.
+//
+// WAAR EEN AANDEELSTREEP WEL EN NIET MAG
+//
+// Alleen bij grootheden die optellen: kosten, conversies, klikken, vertoningen. Een streep leest
+// als "aandeel van een geheel", en bij een verhouding — CPA, ROAS, CTR, conversieratio — bestaat
+// dat geheel niet. Bij CPA komt er nog bij dat laag juist beter is, dus een lange streep zou
+// visueel "veel" zeggen waar het "duur" betekent. Die kolommen krijgen daarom GetalCel.
 
 import type { ReactNode } from "react";
 
@@ -46,12 +53,15 @@ export function KolomKop({
   children,
   getal = false,
   breed = false,
+  bijschrift,
   className = "",
 }: {
   children: ReactNode;
   getal?: boolean;
   /** De identiteitskolom: krijgt de ruimte, de rest zo smal mogelijk. */
   breed?: boolean;
+  /** Kleine tweede regel onder de kop, bijv. om te zeggen waar een aandeelstreep over gaat. */
+  bijschrift?: ReactNode;
   className?: string;
 }) {
   return (
@@ -62,6 +72,12 @@ export function KolomKop({
       } ${breed ? "w-full" : ""} ${className}`}
     >
       {children}
+      {/* Een streep onder een getal die niet zegt waarvan hij het aandeel is, laat de lezer
+          raden. Dat gebeurde: de eerste vraag over deze tabel was "is die streep op kosten,
+          conversies of CPA?". Het bijschrift beantwoordt hem voordat hij opkomt. */}
+      {bijschrift && (
+        <span className="block font-normal normal-case tracking-normal text-muted-foreground/70">{bijschrift}</span>
+      )}
     </th>
   );
 }
