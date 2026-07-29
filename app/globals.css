@@ -395,6 +395,24 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* De zijbalkkolom over de volle documenthoogte.
+     *
+     * De zijbalk zelf staat op `position: fixed` en dekt dus altijd precies één schermhoogte.
+     * Daaronder — bij een volledige schermafdruk, bij afdrukken naar PDF, en bij het doorveren
+     * van een trackpad voorbij het einde van de pagina — komt de pagina-achtergrond tevoorschijn
+     * en houdt de groene balk halverwege op. Op een pagina van vijfduizend pixels is dat een
+     * witte strook van vierduizend.
+     *
+     * Deze verloop legt dezelfde merkkleur over de eerste 18rem van het hele document, achter de
+     * zijbalk langs. De balk loopt daarmee altijd door tot onderaan, ongeacht hoe lang de pagina
+     * is of hoe je hem vastlegt. */
+    background-image: linear-gradient(
+      to right,
+      var(--brand-primary, #08288C) 0,
+      var(--brand-primary, #08288C) 18rem,
+      transparent 18rem
+    );
+    background-repeat: no-repeat;
   }
   html {
     @apply font-sans;

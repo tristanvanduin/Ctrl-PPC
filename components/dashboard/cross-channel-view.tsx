@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, Layers, Info } from "lucide-react";
+import { Loader2, Layers, Info, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
@@ -10,6 +10,7 @@ import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalR
 import { RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
 import { maandLabel } from "./chart-chrome";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
+import { Sectie } from "@/components/ui/sectie";
 
 // Cross-channel (blended) tab. Leest de blended_account_monthly-view over Google, Meta en
 // LinkedIn heen. De view levert de bouwstenen; de attributie-voetnoot is verplicht, want elk
@@ -113,16 +114,30 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
   });
 
   return (
-    <div className="space-y-6">
+    <div>
+      {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
+          vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
+          binnen zichzelf, terwijl het twee antwoorden op twee vragen zijn — "hoe verhouden de
+          kanalen zich over de maanden" en "wat leverde elk kanaal op". */}
       {rows && rows.length > 0 && (
-        <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} />
+        <Sectie
+          eerste
+          icoon={<TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />}
+          titel="Verdeling over de kanalen"
+          bijschrift="Spend per kanaal per maand — welk kanaal draagt welk deel van het budget"
+        >
+          <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} />
+        </Sectie>
       )}
+
       {/* Data-weergave; de cross-channel-signaalanalyse draait via Analyses → Cross-channel. */}
+      <Sectie
+        icoon={<Layers className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Cross-channel (blended)"
+        bijschrift="Wat elk kanaal opleverde, en de maanden erachter"
+        eerste={!(rows && rows.length > 0)}
+      >
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-          <Layers className="w-5 h-5 text-rm-blue-ink" />
-          <h3 className="text-sm font-semibold text-rm-gray">Cross-channel (blended)</h3>
-        </div>
 
         <div className="px-5 py-4">
           <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-meta text-blue-800 flex gap-2 mb-4">
@@ -269,6 +284,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
           })()}
         </div>
       </div>
+      </Sectie>
     </div>
   );
 }
