@@ -256,6 +256,20 @@ export function AandeelCel({
   );
 }
 
+/**
+ * De voet van de tabel. Eén rij is het gewone geval; wie er meer nodig heeft — een totaal, en
+ * daaronder een jaarprognose met een bandbreedte — geeft `rijen` mee en levert de `<tr>`'s zelf.
+ * De prognosetabel deed dat al met de hand en paste daardoor niet op deze laag.
+ */
+export function TotaalVoet({ children }: { children: ReactNode }) {
+  return <tfoot>{children}</tfoot>;
+}
+
+/** Een extra regel onder de totaalrij: rustiger, voor een afgeleide of een toelichting. */
+export function VoetRij({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <tr className={className}>{children}</tr>;
+}
+
 /** De totaalrij: bovenrand dikker, vet, en altijd op dezelfde uitlijning als de kolom erboven. */
 export function TotaalRij({ children }: { children: ReactNode }) {
   return (
@@ -265,8 +279,20 @@ export function TotaalRij({ children }: { children: ReactNode }) {
   );
 }
 
-export function TotaalCel({ children, getal = false }: { children: ReactNode; getal?: boolean }) {
+export function TotaalCel({
+  children,
+  getal = false,
+  colSpan,
+  className = "",
+}: {
+  children: ReactNode;
+  getal?: boolean;
+  colSpan?: number;
+  className?: string;
+}) {
   return (
-    <td className={`px-3 py-2.5 ${getal ? "text-right tabular-nums" : "text-left"} whitespace-nowrap`}>{children}</td>
+    <td colSpan={colSpan} className={`px-3 py-2.5 ${getal ? "text-right tabular-nums" : "text-left"} whitespace-nowrap ${className}`}>
+      {children}
+    </td>
   );
 }

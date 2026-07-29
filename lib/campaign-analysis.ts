@@ -29,6 +29,7 @@ import { getClientSettings } from "./client-settings";
 // Die hadden allemaal een eigen kopie met een eigen drempel, waardoor twee blokken op hetzelfde
 // scherm elkaar konden tegenspreken.
 import { trendOver, TREND_WINDOW } from "./analysis/trend";
+import { formatPercent } from "@/lib/forecast-format";
 
 // ── Finding types ───────────────────────────────────────────────────────────
 
@@ -141,9 +142,9 @@ function pct(v: number): string {
   return `${v > 0 ? "+" : ""}${Math.round(v)}%`;
 }
 
-function pct1(v: number): string {
-  return `${(v * 100).toFixed(1)}%`;
-}
+// Via de gedeelde formatter: deze teksten komen op de inzichtkaarten terecht, naast bedragen
+// die al Nederlands gezet zijn.
+const pct1 = (v: number): string => formatPercent(v, 1);
 
 const MAAND_KORT = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
 

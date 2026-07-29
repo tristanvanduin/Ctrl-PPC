@@ -15,7 +15,8 @@ import { getClientSettings } from "@/lib/client-settings";
 import { supabase } from "@/lib/supabase";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "@/lib/use-client-data";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
-import { formatRoas } from "@/lib/forecast-format";
+import { formatRoas, formatPercent } from "@/lib/forecast-format";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 
 // ─── Account type vocabulary ─────────────────────────────────────────
 
@@ -1338,78 +1339,99 @@ export function DgmView({ clientId }: { clientId: string }) {
             {/* Monthly forecast detail */}
             <div>
               <p className="text-xs font-semibold text-rm-gray mb-2">Maandoverzicht {vocab.conversions.charAt(0).toUpperCase() + vocab.conversions.slice(1)}</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-1.5 text-muted-foreground font-medium">Maand</th>
-                      <th className="text-right py-1.5 text-muted-foreground font-medium">Verwacht</th>
-                      <th className="text-right py-1.5 text-muted-foreground font-medium">Gerealiseerd</th>
-                      <th className="text-right py-1.5 text-muted-foreground font-medium">Prognose</th>
-                      <th className="text-right py-1.5 text-muted-foreground font-medium">Ratio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {forecast.conversions.points.map((p) => (
-                      <tr key={p.month} className="border-b border-border/50">
-                        <td className="py-1.5 font-medium text-rm-gray">{p.monthLabel}</td>
-                        <td className="text-right text-muted-foreground">{num(p.expected)}</td>
-                        <td className="text-right text-rm-gray">
-                          {p.realized !== null ? num(p.realized) : "—"}
-                        </td>
-                        <td className="text-right text-muted-foreground">
-                          {p.forecast !== null ? num(p.forecast) : "—"}
-                        </td>
-                        <td className={`text-right font-medium ${
-                          p.monthRatio >= 1 ? "text-green-600" :
-                          p.monthRatio >= 0.85 ? "text-amber-600" :
-                          p.realized !== null ? "text-red-600" : "text-muted-foreground"
-                        }`}>
-                          {p.realized !== null ? `${Math.round(p.monthRatio * 100)}%` : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Tabel>
+                <Kop>
+                  <KolomKop breed>Maand</KolomKop>
+                  <KolomKop getal>Verwacht</KolomKop>
+                  <KolomKop getal>Gerealiseerd</KolomKop>
+                  <KolomKop getal>Prognose</KolomKop>
+                  <KolomKop getal>Ratio</KolomKop>
+                </Kop>
+                <Body>
+                  {forecast.conversions.points.map((p) => (
+                    <Rij key={p.month}>
+                      <NaamCel>{p.monthLabel}</NaamCel>
+                      <GetalCel zacht>{num(p.expected)}</GetalCel>
+                      <GetalCel>{p.realized !== null ? num(p.realized) : "—"}</GetalCel>
+                      <GetalCel zacht>{p.forecast !== null ? num(p.forecast) : "—"}</GetalCel>
+                      <GetalCel
+                        className={
+                          p.realized === null ? "text-muted-foreground" :
+                          p.monthRatio >= 1 ? "text-green-600 font-medium" :
+                          p.monthRatio >= 0.85 ? "text-amber-600 font-medium" : "text-red-600 font-medium"
+                        }
+                      >
+                        {p.realized !== null ? formatPercent(p.monthRatio, 0) : "—"}
+                      </GetalCel>
+                    </Rij>
+                  ))}
+                </Body>
+                {/* De ratio in de totaalrij komt uit de opgetelde maanden en niet uit een gemiddelde
+                    van de maandratio's: een maand met tien conversies mag niet even zwaar wegen als
+                    een met tweehonderd. */}
+                {(() => {
+                  const t = forecast.conversions.points.reduce(
+                    (a, p) => ({
+                      verwacht: a.verwacht + p.expected,
+                      gerealiseerd: a.gerealiseerd + (p.realized ?? 0),
+                      prognose: a.prognose + (p.forecast ?? 0),
+                      verwachtTotNu: a.verwachtTotNu + (p.realized !== null ? p.expected : 0),
+                    }),
+                    { verwacht: 0, gerealiseerd: 0, prognose: 0, verwachtTotNu: 0 },
+                  );
+                  return (
+                    <TotaalRij>
+                      <TotaalCel>Heel jaar</TotaalCel>
+                      <TotaalCel getal>{num(t.verwacht)}</TotaalCel>
+                      <TotaalCel getal>{num(t.gerealiseerd)}</TotaalCel>
+                      <TotaalCel getal>{num(t.prognose)}</TotaalCel>
+                      <TotaalCel getal>{t.verwachtTotNu > 0 ? formatPercent(t.gerealiseerd / t.verwachtTotNu, 0) : "—"}</TotaalCel>
+                    </TotaalRij>
+                  );
+                })()}
+              </Tabel>
             </div>
 
             {/* Impression Share summary */}
             {dataState?.impressionShare && dataState.impressionShare.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-rm-gray mb-2">Impression Share per Campagne</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-1.5 text-muted-foreground font-medium">Campagne</th>
-                        <th className="text-right py-1.5 text-muted-foreground font-medium">IS</th>
-                        <th className="text-right py-1.5 text-muted-foreground font-medium">Lost (Budget)</th>
-                        <th className="text-right py-1.5 text-muted-foreground font-medium">Lost (Rank)</th>
-                        <th className="text-right py-1.5 text-muted-foreground font-medium">Kosten</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dataState.impressionShare
-                        .filter((is) => is.cost > 0)
-                        .sort((a, b) => b.cost - a.cost)
-                        .slice(0, 10)
-                        .map((is) => (
-                          <tr key={is.campaignId} className="border-b border-border/50">
-                            <td className="py-1.5 font-medium text-rm-gray truncate max-w-[200px]">{is.campaignName}</td>
-                            <td className="text-right text-muted-foreground">{Math.round(is.searchImpressionShare * 100)}%</td>
-                            <td className={`text-right ${is.searchBudgetLostIS > 0.15 ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
-                              {Math.round(is.searchBudgetLostIS * 100)}%
-                            </td>
-                            <td className={`text-right ${is.searchRankLostIS > 0.20 ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
-                              {Math.round(is.searchRankLostIS * 100)}%
-                            </td>
-                            <td className="text-right text-muted-foreground">{fmt(is.cost)}</td>
-                          </tr>
+                {(() => {
+                  const rijen = dataState.impressionShare
+                    .filter((is) => is.cost > 0)
+                    .sort((a, b) => b.cost - a.cost)
+                    .slice(0, 10);
+                  const duurste = Math.max(0, ...rijen.map((is) => is.cost));
+                  return (
+                    <Tabel>
+                      <Kop>
+                        <KolomKop breed>Campagne</KolomKop>
+                        <KolomKop getal>IS</KolomKop>
+                        <KolomKop getal>Verloren (budget)</KolomKop>
+                        <KolomKop getal>Verloren (positie)</KolomKop>
+                        <KolomKop getal bijschrift="aandeel">Kosten</KolomKop>
+                      </Kop>
+                      <Body>
+                        {rijen.map((is) => (
+                          <Rij key={is.campaignId}>
+                            <NaamCel>{is.campaignName}</NaamCel>
+                            <GetalCel zacht>{formatPercent(is.searchImpressionShare, 0)}</GetalCel>
+                            {/* Verloren impressieaandeel is geen optelbare grootheid maar een
+                                verhouding, dus geen streep — alleen een kleur zodra de drempel
+                                gehaald wordt. Op kosten wél: dat is waar het geld heen ging. */}
+                            <GetalCel className={is.searchBudgetLostIS > 0.15 ? "text-red-600 font-medium" : "text-muted-foreground"}>
+                              {formatPercent(is.searchBudgetLostIS, 0)}
+                            </GetalCel>
+                            <GetalCel className={is.searchRankLostIS > 0.20 ? "text-amber-600 font-medium" : "text-muted-foreground"}>
+                              {formatPercent(is.searchRankLostIS, 0)}
+                            </GetalCel>
+                            <AandeelCel waarde={fmt(is.cost)} aandeel={duurste > 0 ? is.cost / duurste : 0} />
+                          </Rij>
                         ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </Body>
+                    </Tabel>
+                  );
+                })()}
               </div>
             )}
 

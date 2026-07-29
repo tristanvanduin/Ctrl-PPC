@@ -34,6 +34,7 @@
 import type { ClientForecast } from "./forecast";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "./use-client-data";
 import { cpaTrendFrom } from "./analysis/trend";
+import { formatPercent } from "@/lib/forecast-format";
 
 export interface HealthScore {
   /** 0–100, geschaald over de factoren die beoordeeld konden worden. */
@@ -225,13 +226,13 @@ export function computeHealthScore(
         anomalies.push({
           severity: "critical",
           title: "Sterke neerwaartse trend",
-          description: `Gewogen prestatiefactor ${(pf * 100).toFixed(0)}%, laatste maand ${(lastRatio * 100).toFixed(0)}% van verwachting.`,
+          description: `Gewogen prestatiefactor ${formatPercent(pf, 0)}, laatste maand ${formatPercent(lastRatio, 0)} van verwachting.`,
         });
       } else if (pf < 0.90 && lastRatio < 0.90) {
         anomalies.push({
           severity: "warning",
           title: "Dalende trend",
-          description: `Gewogen prestatiefactor ${(pf * 100).toFixed(0)}%, laatste maand ${(lastRatio * 100).toFixed(0)}% van verwachting.`,
+          description: `Gewogen prestatiefactor ${formatPercent(pf, 0)}, laatste maand ${formatPercent(lastRatio, 0)} van verwachting.`,
         });
       }
     }

@@ -12,6 +12,9 @@ import { DEMO_GREENTECH_ID, buildGreentechClientData } from "@/lib/demo/greentec
 import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "@/lib/api/adapter";
 import { comparePeriods } from "@/lib/period/apply-period";
 import type { PeriodRange } from "@/lib/period/period-range";
+import { formatRoas } from "@/lib/forecast-format";
+import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
+import { Tabel, Kop, KolomKop, SorteerKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "@/components/dashboard/data-table";
 
 // De demo-klant komt niet uit de Google Ads MCC en heeft dus geen gads-id; zonder deze
 // omweg blijft het scorebord in demo-modus leeg terwijl de periodekiezer er wel boven staat.
@@ -237,16 +240,22 @@ function PortfolioScoreboardBody() {
   const emptyCount = clients.filter(isEmptyAccount).length;
   const displayClients = showEmpty ? sortedClients : sortedClients.filter((c) => !isEmptyAccount(c));
 
-  const SortHeader = ({ col, label, align }: { col: typeof sortBy; label: string; align?: string }) => (
-    <th
-      onClick={() => handleSort(col)}
-      className={`px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue transition-colors ${align === "right" ? "text-right" : "text-left"}`}
+  // Een functie die JSX oplevert, geen component: een component dat tijdens de render ontstaat is
+  // elke render een nieuw type en laat React de hele kop opnieuw ophangen. En de sorteerknop komt
+  // uit de gedeelde tabellaag, zodat hij een echte knop is met aria-sort in plaats van een th met
+  // een klik erop — dat laatste is voor een muis een knop en voor een toetsenbord niets.
+  const sorteerKop = (col: typeof sortBy, label: string, opties: { getal?: boolean; breed?: boolean; bijschrift?: string } = {}) => (
+    <SorteerKop
+      key={col}
+      getal={opties.getal}
+      breed={opties.breed}
+      bijschrift={opties.bijschrift}
+      actief={sortBy === col}
+      richting={sortDir}
+      onSorteer={() => handleSort(col)}
     >
       {label}
-      {sortBy === col && (
-        <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>
-      )}
-    </th>
+    </SorteerKop>
   );
 
   if (loading) {
@@ -272,6 +281,10 @@ function PortfolioScoreboardBody() {
   const portfolioRev = allOverviews.reduce((s, o) => s + (o.ytd?.revenue ?? 0), 0);
   const portfolioSpend = allOverviews.reduce((s, o) => s + (o.ytd?.adSpend ?? 0), 0);
   const portfolioRoas = portfolioSpend > 0 ? portfolioRev / portfolioSpend : 0;
+  // Tegen de grootste klant en niet tegen de som: bij twintig klanten is elk aandeel-van-het-
+  // totaal klein, en dan zijn alle streepjes even kort.
+  const grootsteConv = Math.max(0, ...allOverviews.map((o) => o.ytd?.conversions ?? 0));
+  const grootsteSpend = Math.max(0, ...allOverviews.map((o) => o.ytd?.adSpend ?? 0));
   const activeCount = allOverviews.length;
   const growingCount = allOverviews.filter((o) => (o.yoy?.convChange ?? 0) > 0).length;
   const decliningCount = allOverviews.filter((o) => (o.yoy?.convChange ?? 0) < -10).length;
@@ -322,7 +335,7 @@ function PortfolioScoreboardBody() {
               </div>
               <div>
                 <p className="text-white/50 text-micro uppercase tracking-wider">Gem. ROAS</p>
-                <p className="text-xl font-bold">{portfolioRoas.toFixed(1)}x</p>
+                <p className="text-xl font-bold">{formatRoas(portfolioRoas)}</p>
               </div>
             </div>
           )}
@@ -335,36 +348,35 @@ function PortfolioScoreboardBody() {
           <SummaryCard label="Conversies" value={num(portfolioConv)} />
           <SummaryCard label="Omzet" value={fmt(portfolioRev)} />
           <SummaryCard label="Spend" value={fmt(portfolioSpend)} />
-          <SummaryCard label="ROAS" value={`${portfolioRoas.toFixed(1)}x`} color={portfolioRoas >= 3 ? "text-green-600" : portfolioRoas >= 1 ? "text-rm-gray" : "text-red-500"} />
+          <SummaryCard label="ROAS" value={formatRoas(portfolioRoas)} color={portfolioRoas >= 3 ? "text-green-600" : portfolioRoas >= 1 ? "text-rm-gray" : "text-red-500"} />
         </div>
       )}
 
       <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="border-b border-border bg-gray-50/50">
-            <tr>
-              <SortHeader col="name" label="Klant" />
-              <SortHeader col="conversions" label="Conversies" align="right" />
-              <SortHeader col="yoy" label="YoY" align="right" />
-              <SortHeader col="revenue" label="Omzet" align="right" />
-              <SortHeader col="roas" label="ROAS" align="right" />
-              <SortHeader col="cpa" label="CPA" align="right" />
-              <th className="px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider text-center">Spend</th>
-              <th className="px-4 py-3 text-meta font-semibold text-muted-foreground uppercase tracking-wider text-center">Trend</th>
-              <th className="px-4 py-3 w-10"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
+        <Tabel>
+          <Kop>
+            {sorteerKop("name", "Klant", { breed: true })}
+            {sorteerKop("conversions", "Conversies", { getal: true, bijschrift: "aandeel" })}
+            {sorteerKop("yoy", "YoY", { getal: true })}
+            {sorteerKop("revenue", "Omzet", { getal: true })}
+            {sorteerKop("roas", "ROAS", { getal: true })}
+            {sorteerKop("cpa", "CPA", { getal: true })}
+            <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+            <KolomKop>Trend</KolomKop>
+            <KolomKop><span className="sr-only">Openen</span></KolomKop>
+          </Kop>
+          <Body>
             {displayClients.map((client) => {
               const overview = overviews.get(client.id);
               const ytd = overview?.ytd;
               const yoy = overview?.yoy;
               const hasData = ytd && ytd.adSpend > 0;
+              const leeg = <span className="text-gray-300">—</span>;
 
               return (
-                <tr key={client.id} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className="px-4 py-3">
-                    <Link href={`/client/${client.id}`} className="flex items-center gap-2.5 text-sm font-medium text-rm-gray hover:text-rm-blue transition-colors">
+                <Rij key={client.id} className="group">
+                  <NaamCel>
+                    <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-rm-blue transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue">
                       {/* Health dot */}
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                         !hasData ? "bg-gray-200" :
@@ -374,64 +386,59 @@ function PortfolioScoreboardBody() {
                       }`} />
                       {client.name}
                     </Link>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {hasData ? (
-                      <span className="text-sm font-semibold text-rm-gray">{num(ytd.conversions)}</span>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <TrendBadge value={yoy?.convChange ?? null} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {hasData ? (
-                      <span className="text-sm text-rm-gray">{fmt(ytd.revenue)}</span>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {hasData ? (
-                      <span className={`text-sm font-medium ${ytd.roas >= 3 ? "text-green-600" : ytd.roas >= 1 ? "text-rm-gray" : "text-red-500"}`}>
-                        {ytd.roas.toFixed(1)}x
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {hasData ? (
-                      <span className="text-sm text-rm-gray">{fmt(ytd.cpa)}</span>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {hasData ? (
-                      <span className="text-sm text-muted-foreground">{fmt(ytd.adSpend)}</span>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {overview?.monthlyConversions && overview.monthlyConversions.length > 1 ? (
-                      <MiniSparkline data={overview.monthlyConversions} />
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link href={`/client/${client.id}`} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  </NaamCel>
+                  {/* Twee strepen: conversies en spend. Dát is de vraag van een portfolio-overzicht
+                      — welke klant trekt het volume en welke trekt het budget — en die vergelijking
+                      lieten we eerst aan het hoofd van de lezer over. Op ROAS en CPA staat er geen:
+                      dat zijn verhoudingen, en bij CPA is laag juist beter. */}
+                  {hasData ? (
+                    <AandeelCel waarde={num(ytd.conversions)} aandeel={grootsteConv > 0 ? ytd.conversions / grootsteConv : 0} />
+                  ) : <GetalCel>{leeg}</GetalCel>}
+                  <GetalCel><TrendBadge value={yoy?.convChange ?? null} /></GetalCel>
+                  <GetalCel>{hasData ? fmt(ytd.revenue) : leeg}</GetalCel>
+                  <GetalCel className={!hasData ? "" : ytd.roas >= 3 ? "text-green-600 font-medium" : ytd.roas >= 1 ? "" : "text-red-500 font-medium"}>
+                    {hasData ? formatRoas(ytd.roas) : leeg}
+                  </GetalCel>
+                  <GetalCel zacht>{hasData ? fmt(ytd.cpa) : leeg}</GetalCel>
+                  {hasData ? (
+                    <AandeelCel waarde={fmt(ytd.adSpend)} aandeel={grootsteSpend > 0 ? ytd.adSpend / grootsteSpend : 0} kleur={CHART_CATEGORICAL[2]} />
+                  ) : <GetalCel>{leeg}</GetalCel>}
+                  <Cel>
+                    {overview?.monthlyConversions && overview.monthlyConversions.length > 1
+                      ? <MiniSparkline data={overview.monthlyConversions} />
+                      : leeg}
+                  </Cel>
+                  <Cel>
+                    {/* Alleen zichtbaar op hover was het probleem: met het toetsenbord kun je niet
+                        hoveren, dus de pijl was er wel maar onvindbaar. Focus laat hem nu ook zien. */}
+                    <Link
+                      href={`/client/${client.id}`}
+                      aria-label={`Open ${client.name}`}
+                      className="inline-flex opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue"
+                    >
                       <ArrowRight className="w-4 h-4 text-muted-foreground" />
                     </Link>
-                  </td>
-                </tr>
+                  </Cel>
+                </Rij>
               );
             })}
-          </tbody>
-        </table>
+          </Body>
+          {/* De som van de zichtbare klanten. Stond alleen in de blauwe kop bovenaan, ver van de
+              kolommen af; hier sluit hij aan op de cijfers waar hij bij hoort. De ROAS komt uit de
+              totalen — een gemiddelde van klant-ROAS'en weegt een klant met € 2.000 spend even
+              zwaar als een met € 400.000. */}
+          <TotaalRij>
+            <TotaalCel>Alle klanten met spend ({activeCount})</TotaalCel>
+            <TotaalCel getal>{num(portfolioConv)}</TotaalCel>
+            <TotaalCel getal>{""}</TotaalCel>
+            <TotaalCel getal>{fmt(portfolioRev)}</TotaalCel>
+            <TotaalCel getal>{formatRoas(portfolioRoas)}</TotaalCel>
+            <TotaalCel getal>{portfolioConv > 0 ? fmt(portfolioSpend / portfolioConv) : "—"}</TotaalCel>
+            <TotaalCel getal>{fmt(portfolioSpend)}</TotaalCel>
+            <TotaalCel>{""}</TotaalCel>
+            <TotaalCel>{""}</TotaalCel>
+          </TotaalRij>
+        </Tabel>
         {emptyCount > 0 && (
           <div className="flex items-center justify-between px-4 py-2.5 border-t border-border bg-gray-50/50 text-meta text-muted-foreground">
             <span>

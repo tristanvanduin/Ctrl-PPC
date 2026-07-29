@@ -12,6 +12,8 @@
  * This is purely deterministic — no LLM involved.
  */
 
+import { formatRoas } from "@/lib/forecast-format";
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type OverallConfidence = "high" | "medium" | "low" | "critical";
@@ -188,7 +190,7 @@ export function computeDataReliability(input: ReliabilityInput): DataReliability
     }
     const roas = row.cost > 0 ? row.conversions_value / row.cost : 0;
     if (roas > 50 && row.cost > 100) {
-      flags.push({ type: "impossible_value", severity: "medium", description: `${row.month}: ROAS ${roas.toFixed(1)}x is ongebruikelijk hoog. Controleer conversie-attributie.`, affectedMetrics: ["roas", "conversion_value"] });
+      flags.push({ type: "impossible_value", severity: "medium", description: `${row.month}: ROAS ${formatRoas(roas)} is ongebruikelijk hoog. Controleer conversie-attributie.`, affectedMetrics: ["roas", "conversion_value"] });
     }
     if (row.cost_per_conversion && row.cost_per_conversion < 0) {
       flags.push({ type: "impossible_value", severity: "critical", description: `${row.month}: Negatieve CPA.`, affectedMetrics: ["cpa"] });

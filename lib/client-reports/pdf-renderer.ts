@@ -11,6 +11,7 @@
 
 import React from "react";
 import { Document, Page, Text, View, Image, Font, Svg, Path, Circle as SvgCircle, Line as SvgLine, renderToBuffer } from "@react-pdf/renderer";
+import { formatPercent } from "@/lib/forecast-format";
 
 Font.registerHyphenationCallback((word: string) => [word]);
 
@@ -52,7 +53,9 @@ export interface ReportPdfProps {
 
 function fmt(v: number, f: string): string {
   if (f === "currency") return `\u20AC${new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(v))}`;
-  if (f === "percent") return `${v.toFixed(1)}%`;
+  // De rapportage-PDF gaat naar de klant; daar hoort dezelfde notatie in te staan als op het
+  // scherm waar hij vandaan komt.
+  if (f === "percent") return formatPercent(v / 100, 1);
   if (f === "decimal") return v.toFixed(2);
   return new Intl.NumberFormat("nl-NL").format(Math.round(v));
 }

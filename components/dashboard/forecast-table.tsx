@@ -5,6 +5,7 @@ import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider
 import { computeForecast, MONTH_LABELS, type ForecastMetric } from "@/lib/forecast";
 import { supabase } from "@/lib/supabase";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor } from "@/lib/forecast-format";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalVoet, VoetRij, TotaalCel } from "./data-table";
 
 const METRICS: { id: ForecastMetric; label: string; format: (v: number) => string }[] =
   (["conversions", "revenue", "roas", "cpa"] as ForecastMetric[])
@@ -88,94 +89,73 @@ export function ForecastTable({ clientId }: { clientId: string }) {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-t border-b border-border bg-gray-50/50">
-              <th className="text-left text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Maand</th>
-              <th className="text-right text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Verwacht</th>
-              <th className="text-right text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Gerealiseerd</th>
-              <th className="text-right text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Prognose</th>
-              <th className="text-right text-micro font-semibold text-muted-foreground uppercase tracking-wider px-5 py-2.5">Ratio</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.points.map((pt) => {
-              const value = pt.realized ?? pt.forecast ?? 0;
-              const ratio = pt.monthRatio;
-              const isPositive = isInverted ? ratio <= 1 : ratio >= 1;
-              const isRealized = pt.realized !== null;
+      <Tabel>
+        <Kop>
+          <KolomKop breed>Maand</KolomKop>
+          <KolomKop getal>Verwacht</KolomKop>
+          <KolomKop getal>Gerealiseerd</KolomKop>
+          <KolomKop getal>Prognose</KolomKop>
+          <KolomKop getal>Ratio</KolomKop>
+        </Kop>
+        <Body>
+          {result.points.map((pt) => {
+            const ratio = pt.monthRatio;
+            const isPositive = isInverted ? ratio <= 1 : ratio >= 1;
+            const isRealized = pt.realized !== null;
 
-              return (
-                <tr
-                  key={pt.month}
-                  className={`border-b border-border/50 ${isRealized ? "bg-white" : "bg-gray-50/30"}`}
-                >
-                  <td className="px-5 py-2.5 font-medium text-rm-gray">{pt.monthLabel}</td>
-                  <td className="px-5 py-2.5 text-right text-muted-foreground">{fmt(pt.expected)}</td>
-                  <td className="px-5 py-2.5 text-right font-semibold text-rm-gray">
-                    {pt.realized !== null ? fmt(pt.realized) : "—"}
-                  </td>
-                  <td className="px-5 py-2.5 text-right text-rm-blue font-medium">
-                    {pt.forecast !== null ? fmt(pt.forecast) : "—"}
-                  </td>
-                  <td className={`px-5 py-2.5 text-right font-bold ${isPositive ? "text-green-600" : "text-red-500"}`}>
-                    {formatPercent(ratio, 0)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-border bg-gray-50">
-              <td className="px-5 py-3 font-bold text-rm-gray">Totaal</td>
-              <td className="px-5 py-3 text-right font-semibold text-muted-foreground">
-                {isRatio ? fmt(kpiTarget) : fmt(totalExpected)}
-              </td>
-              <td className="px-5 py-3 text-right font-bold text-rm-gray">
-                {isRatio ? "—" : fmt(totalRealized)}
-              </td>
-              <td className="px-5 py-3 text-right font-bold text-rm-blue">
-                {isRatio ? fmt(kpiAdjusted) : fmt(totalForecast)}
-              </td>
-              <td className={`px-5 py-3 text-right font-bold ${
-                (isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"
-              }`}>
-                {formatDeltaPercent(totalDiffPct, 0)}
-              </td>
-            </tr>
-            {/* Annual forecast summary row + onzekerheidsband */}
-            {!isRatio && (
-              <>
-                <tr className="bg-rm-blue/5">
-                  <td className="px-5 py-2.5 text-xs font-semibold text-rm-blue" colSpan={2}>
-                    Jaarprognose (gerealiseerd + prognose)
-                  </td>
-                  <td className="px-5 py-2.5 text-right text-xs font-bold text-rm-blue" colSpan={2}>
-                    {fmt(kpiAdjusted)}
-                  </td>
-                  <td className={`px-5 py-2.5 text-right text-xs font-bold ${
-                    (isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"
-                  }`}>
-                    vs doel {fmt(totalExpected)}
-                  </td>
-                </tr>
-                {result.kpi.forecastSpreadPct > 0 && (
-                  <tr className="bg-rm-blue/5">
-                    <td className="px-5 pb-2.5 text-meta text-muted-foreground" colSpan={2}>
-                      Bandbreedte (o.b.v. de spreiding in gerealiseerde maanden)
-                    </td>
-                    <td className="px-5 pb-2.5 text-right text-meta text-muted-foreground" colSpan={3}>
-                      {fmt(result.kpi.forecastLow)} – {fmt(result.kpi.forecastHigh)}
-                      <span className="ml-1 opacity-70">(±{result.kpi.forecastSpreadPct}%)</span>
-                    </td>
-                  </tr>
-                )}
-              </>
-            )}
-          </tfoot>
-        </table>
-      </div>
+            return (
+              // Maanden die nog moeten komen krijgen een lichter vlak: dat onderscheid tussen
+              // gemeten en geprojecteerd is de belangrijkste informatie in deze tabel.
+              <Rij key={pt.month} className={isRealized ? "" : "bg-gray-50/40"}>
+                <NaamCel>{pt.monthLabel}</NaamCel>
+                <GetalCel zacht>{fmt(pt.expected)}</GetalCel>
+                <GetalCel className="font-semibold">{pt.realized !== null ? fmt(pt.realized) : "—"}</GetalCel>
+                <GetalCel className="text-rm-blue font-medium">{pt.forecast !== null ? fmt(pt.forecast) : "—"}</GetalCel>
+                <GetalCel className={`font-bold ${isPositive ? "text-green-600" : "text-red-500"}`}>
+                  {formatPercent(ratio, 0)}
+                </GetalCel>
+              </Rij>
+            );
+          })}
+        </Body>
+        {/* Drie voetregels in plaats van één: het totaal, de jaarprognose en de bandbreedte
+            eronder. Daarom TotaalVoet met eigen rijen — een vaste totaalrij past hier niet. */}
+        <TotaalVoet>
+          <VoetRij className="border-t-2 border-border bg-gray-50 font-semibold text-rm-gray">
+            <TotaalCel>Totaal</TotaalCel>
+            <TotaalCel getal className="text-muted-foreground">{isRatio ? fmt(kpiTarget) : fmt(totalExpected)}</TotaalCel>
+            <TotaalCel getal>{isRatio ? "—" : fmt(totalRealized)}</TotaalCel>
+            <TotaalCel getal className="text-rm-blue">{isRatio ? fmt(kpiAdjusted) : fmt(totalForecast)}</TotaalCel>
+            <TotaalCel getal className={(isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"}>
+              {formatDeltaPercent(totalDiffPct, 0)}
+            </TotaalCel>
+          </VoetRij>
+
+          {!isRatio && (
+            <VoetRij className="bg-rm-blue/5">
+              <TotaalCel colSpan={2} className="text-xs font-semibold text-rm-blue">
+                Jaarprognose (gerealiseerd + prognose)
+              </TotaalCel>
+              <TotaalCel getal colSpan={2} className="text-xs font-bold text-rm-blue">{fmt(kpiAdjusted)}</TotaalCel>
+              <TotaalCel getal className={`text-xs font-bold ${(isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"}`}>
+                vs doel {fmt(totalExpected)}
+              </TotaalCel>
+            </VoetRij>
+          )}
+
+          {!isRatio && result.kpi.forecastSpreadPct > 0 && (
+            <VoetRij className="bg-rm-blue/5">
+              <TotaalCel colSpan={2} className="text-meta text-muted-foreground">
+                Bandbreedte (o.b.v. de spreiding in gerealiseerde maanden)
+              </TotaalCel>
+              <TotaalCel getal colSpan={3} className="text-meta text-muted-foreground">
+                {fmt(result.kpi.forecastLow)} – {fmt(result.kpi.forecastHigh)}
+                <span className="ml-1 opacity-70">(±{result.kpi.forecastSpreadPct}%)</span>
+              </TotaalCel>
+            </VoetRij>
+          )}
+        </TotaalVoet>
+      </Tabel>
     </div>
     </div>
   );

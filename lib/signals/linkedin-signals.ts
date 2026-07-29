@@ -12,6 +12,7 @@
 import { type DetectionResult, type SignalStory } from "./types";
 import { renderSignalSection, type SignalSectionResult } from "./render-section";
 import { median } from "@/lib/util/stats";
+import { formatPercent } from "@/lib/forecast-format";
 
 export const FORM_COMPLETION_WEAK = 0.15; // onder 15% completion op geopende forms is zwak (heuristiek)
 export const MIN_FORM_OPENS = 20;         // onder dit aantal opens is de rate ruis
@@ -116,7 +117,7 @@ export function detectLinkedInEngagementWeakness(entities: LinkedInEntitySignalI
       category: "creative" as const,
       scope: e.name,
       story:
-        `De CTR van "${e.name}" (${((e.ctr ?? 0) * 100).toFixed(2)}%) ligt ver onder de accountmediaan (${(medCtr * 100).toFixed(2)}%). ` +
+        `De CTR van "${e.name}" (${formatPercent(e.ctr ?? 0, 2)}) ligt ver onder de accountmediaan (${formatPercent(medCtr, 2)}). ` +
         `De boodschap resoneert niet met deze doelgroep.`,
       actionDirection: "herzie de hook en het aanbod; op LinkedIn werkt een scherpe, functie-specifieke boodschap beter dan een generieke",
       certainty: "bewezen_binnen_platform" as const,
@@ -144,7 +145,7 @@ export function detectLinkedInVideoDropOff(entities: LinkedInEntitySignalInput[]
       category: "creative" as const,
       scope: e.name,
       story:
-        `De video van "${e.name}" wordt door weinig kijkers afgemaakt (completion-rate ${((e.videoCompletionRate ?? 0) * 100).toFixed(0)}%, ver onder de accountmediaan). ` +
+        `De video van "${e.name}" wordt door weinig kijkers afgemaakt (completion-rate ${formatPercent(e.videoCompletionRate ?? 0, 0)}, ver onder de accountmediaan). ` +
         `De kern van de boodschap bereikt bijna niemand.`,
       actionDirection: "kort de video in of zet de kernboodschap vooraan; op LinkedIn kijkt men zelden een lange video uit",
       certainty: "bewezen_binnen_platform" as const,
