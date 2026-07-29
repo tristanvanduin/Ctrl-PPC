@@ -127,6 +127,12 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
 
   const flagged = fatigue.filter((f) => f.status === "vermoeid" || f.status === "afnemend");
 
+  // Niets te zeggen: dan ook niets tonen. Dit blok staat nu tussen de bevindingen, waar het
+  // per kanaal naast elkaar kan staan; een kaart die alleen meldt dat er geen data is, is daar
+  // ruis. Zelfde regel die de videokaart al volgde.
+  const heeftBreakdown = Boolean(breakdown && (breakdown.headlines.length > 0 || breakdown.descriptions.length > 0));
+  if (fatigue.length === 0 && !heeftBreakdown) return null;
+
   return (
     <div className="space-y-4">
       {/* Creative-vermoeidheid */}
@@ -162,7 +168,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
       </div>
 
       {/* Asset-uitsplitsing (alleen Google RSA) */}
-      {breakdown && (breakdown.headlines.length > 0 || breakdown.descriptions.length > 0) && (
+      {heeftBreakdown && breakdown && (
         <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             <Layers className="w-4 h-4 text-rm-blue" />

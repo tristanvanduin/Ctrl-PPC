@@ -10,6 +10,7 @@ import { SecondOpinionView } from "./second-opinion-view";
 import { MetricCards } from "./metric-cards";
 import { MonthlyOverview } from "./monthly-overview";
 import { FairWeeksOverview } from "./fair-weeks-overview";
+import { AnalysisOverview } from "./analysis-overview";
 import { useUpcomingEdition } from "@/lib/rai/use-upcoming-edition";
 import { PerformanceChart } from "./performance-chart";
 import { ClientSettingsPanel } from "./client-settings";
@@ -616,7 +617,6 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
         <>
           <Section>Losse analyses</Section>
           <StandaloneAnalyses clientId={clientId} />
-          <CreativeDeepDive clientId={clientId} channel="google" />
           <SignalAnalysisCard
             clientId={clientId}
             endpoint="/api/analysis/google-funnel"
@@ -657,7 +657,6 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
           <MetaCreativeAnalyses clientId={clientId} />
           {/* Deterministische structuur-analyse (plaatsing/leeftijd/device), direct uit de data. */}
           <ChannelStructureAnalysis clientId={clientId} channel="meta" />
-          <CreativeDeepDive clientId={clientId} channel="meta" />
           <SignalAnalysisCard
             clientId={clientId}
             endpoint="/api/analysis/meta-funnel"
@@ -688,7 +687,6 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
           <Section>Losse analyses</Section>
           {/* Deterministische structuur-analyse (functie/seniority/industrie/bedrijfsgrootte), direct uit de data. */}
           <ChannelStructureAnalysis clientId={clientId} channel="linkedin" />
-          <CreativeDeepDive clientId={clientId} channel="linkedin" />
           <SignalAnalysisCard
             clientId={clientId}
             endpoint="/api/analysis/linkedin-icp-fit"
@@ -729,6 +727,11 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
         </>
       )}
 
+      {/* Het overzicht staat onder elk kanaal, want de vraag "wat heb ik al gedraaid" is niet
+          kanaalgebonden. Op "Alle kanalen" is het het hoofdgerecht: daar stond eerst één kaart. */}
+      <Section>Wat er klaarstaat</Section>
+      <AnalysisOverview clientId={clientId} onKiesKanaal={setAnalysisChannel} />
+
       <p className="text-meta text-muted-foreground pt-2">
         De uitkomsten (wachtrij, inzichten, aanbevelingen, hypotheses, taken) landen in het tabblad <strong>Bevindingen</strong>;
         van de maand-SOP komt automatisch een <strong>PDF bij Bestanden</strong>.
@@ -751,6 +754,13 @@ function OutcomesTab({ clientId }: { clientId: string }) {
       {/* Kanaal-filter over inzichten, aanbevelingen, hypotheses, wachtrij en taken. */}
       <ChannelFilter value={channelFilter} onChange={setChannelFilter} />
       <ProposalQueue clientId={clientId} refreshKey={refreshKey} channel={channelFilter} onWorkflowChange={() => setRefreshKey((k) => k + 1)} />
+      {/* Creative-vermoeidheid stond bij de analyses, maar er valt niets te draaien: het is een
+          aflezing van data die er al is, dus een bevinding. Hij volgt het kanaalfilter; op
+          "Alle" staan de kanalen naast elkaar en tonen alleen de kanalen die iets te zeggen
+          hebben zichzelf. */}
+      {(channelFilter === null ? (["google", "meta", "linkedin"] as const) : channelFilter === "cross" ? [] : [channelFilter]).map((c) => (
+        <CreativeDeepDive key={c} clientId={clientId} channel={c} />
+      ))}
       <InsightsBlock
         clientId={clientId}
         selectedInsightId={selectedInsightId}
