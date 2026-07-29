@@ -10,6 +10,7 @@ import { computeExecutiveSummary, type AuditScore, type AuditRowResult, type Sec
 import { getShortlistTemplate, getLonglistTemplate, type TemplateRow } from "@/lib/second-opinion/template";
 import { useGenerationProgress } from "@/lib/use-generation-progress";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
+import { Sectie } from "@/components/ui/sectie";
 
 interface Props { clientId: string; clientName: string; }
 
@@ -178,18 +179,16 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5">
-
-      {/* ── Header ── */}
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
-          <ClipboardCheck className="w-4.5 h-4.5 text-orange-600" />
-        </div>
-        <div>
-          <h2 className="text-base font-bold text-gray-900 leading-tight">Second Opinion</h2>
-          <p className="text-xs text-muted-foreground">Account audit op basis van het RAI Amsterdam template</p>
-        </div>
-      </div>
+    <div>
+      {/* Twee onderwerpen op deze pagina: een audit starten, en wat eruit kwam. De losse kop die
+          hier stond deed hetzelfde werk als een sectiekop, maar met een eigen opmaak — nu dezelfde
+          als op de rest van het dashboard. */}
+      <Sectie
+        eerste
+        icoon={<ClipboardCheck className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Second opinion"
+        bijschrift="Account-audit op het RAI Amsterdam-template"
+      >
 
       {/* ── Audit trigger cards ──
           De aantallen komen uit het template zelf en staan niet in de tekst. Er stond "10 Low
@@ -249,6 +248,17 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
         </div>
       )}
 
+      </Sectie>
+
+      {/* Alleen als er iets te tonen is. Een sectiekop met niets eronder is erger dan geen kop:
+          hij belooft inhoud die er niet is. Zolang er geen audit gedraaid is, doet de lege staat
+          in de sectie hierboven het werk. */}
+      {(runningMode !== null || progress.job || activeRun || runs.length > 0 || loading) && (
+      <Sectie
+        icoon={<Eye className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="De uitkomst"
+        bijschrift="Per controlepunt een oordeel met de reden erbij — met de hand aan te passen en te downloaden als PDF"
+      >
       {(runningMode !== null || progress.job) && (
         <GenerationProgressCard
           title="Second opinion voortgang"
@@ -476,6 +486,8 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
             ))}
           </div>
         </div>
+      )}
+      </Sectie>
       )}
     </div>
   );
