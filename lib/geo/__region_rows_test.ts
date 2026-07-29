@@ -2,6 +2,8 @@
 // Draaien: npx tsx lib/geo/__region_rows_test.ts
 
 import { buildRegionRows, overslaanSamenvatting, type RuweRegioRij, type GeoDoelLabel } from "./region-rows";
+import { uspsToEnglishName, regionNameToUsps, FIPS_TO_USPS } from "./us-fips";
+import { demoRows } from "@/lib/demo/demo-rows";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {
@@ -88,6 +90,26 @@ assert(oudeFout.onbekendeNamen.includes("LOCATION_OF_PRESENCE"), "en wordt zicht
 // ── Lege invoer ──
 const leeg = buildRegionRows([], labels);
 assert(leeg.rijen.length === 0 && Object.keys(leeg.overgeslagen).length === 0, "lege invoer geeft een leeg, stil resultaat");
+
+// ── Heen en terug ──
+// De sync leest de Engelse naam van Google en vertaalt naar USPS; de demo doet het omgekeerd.
+// Lopen die twee uiteen, dan ziet de demo er anders uit dan productie en test hij de vertaalstap
+// niet meer — precies de blinde vlek waardoor dit ooit misging.
+for (const usps of Object.values(FIPS_TO_USPS)) {
+  const naam = uspsToEnglishName(usps);
+  assert(regionNameToUsps(naam) === usps, `${usps} → "${naam}" → ${usps}`);
+}
+
+// ── De demo-rijen volgen diezelfde regel ──
+const regioDemo = (demoRows() as unknown as Record<string, Record<string, unknown>[]>).ads_region_monthly ?? [];
+assert(regioDemo.length > 0, "er zijn demo-rijen voor ads_region_monthly");
+const scheef = regioDemo.filter((r) => regionNameToUsps(String(r.region_name)) !== r.region_code);
+assert(scheef.length === 0, `elke demo-region_name vertaalt terug naar zijn region_code (${scheef.length} scheef)`);
+assert(regioDemo.every((r) => r.country_code === "US"), "de demo-staten staan allemaal op US");
+
+// De statenkaart tekent op USPS-codes uit us-atlas; een code die daar niet in staat is onzichtbaar.
+const tekenbaar = new Set(Object.values(FIPS_TO_USPS));
+assert(regioDemo.every((r) => tekenbaar.has(String(r.region_code))), "elke demo-staat is op de kaart te tekenen");
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

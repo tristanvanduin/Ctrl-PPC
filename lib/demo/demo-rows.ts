@@ -12,6 +12,7 @@
 
 import { DEMO_GREENTECH_ID as CID } from "./greentech-mock";
 import { demoGeoCountries, demoGeoStates, geoMonthlyRows, geoYoyMonthly } from "./geo-demo";
+import { uspsToEnglishName } from "@/lib/geo/us-fips";
 import {
   accountWeeklyRows, adgroupMonthlyRows, wastefulSearchTermRows, accountYoyRows, campaignYoyRows,
   campaignMetadataRows, devicePerformanceRows, networkPerformanceRows, adScheduleRows,
@@ -425,8 +426,13 @@ const adsGeoPerformanceMonthly: Row[] = geoCampaignRows(
   CID, geoMonthlyRows(demoGeoCountries("google"), GEO_SOP_MONTHS).map((r) => ({ ...r, code: r.code })), iso()
 );
 // VS-staten voor de statenanalyse en de drilldown-kaart.
+//
+// region_name draagt de Engelse staatsnaam en niet de USPS-code. Dat lijkt een detail, maar het
+// is precies de kolom waar dit ooit misging: de sync schreef er het geo-doeltype in en niemand
+// merkte het, omdat de demo een code neerzette die toevallig óók te vertalen was. Een demo die
+// er anders uitziet dan productie test de vertaalstap niet.
 const adsRegionMonthly: Row[] = geoMonthlyRows(demoGeoStates("google"), GEO_SOP_MONTHS).map((r) => ({
-  client_id: CID, country_code: "US", region_name: r.code, region_code: r.code, month: r.month,
+  client_id: CID, country_code: "US", region_name: uspsToEnglishName(r.code), region_code: r.code, month: r.month,
   impressions: r.impressions, clicks: r.clicks, cost: r.cost,
   conversions: r.conversions, conversions_value: r.conversionsValue,
   ctr: r.ctr, avg_cpc: r.avgCpc, cost_per_conversion: r.costPerConversion,

@@ -59,18 +59,51 @@ const COUNTRY_BASE: Record<Exclude<Channel, "blended">, GeoAgg[]> = {
   ],
 };
 
-// VS-staten per kanaal. Google sterk in CA/TX/NY; Meta breder; LinkedIn geconcentreerd in de
-// B2B-hubs (NY/CA/MA). Alleen de VS — dit voedt de drilldown-kaart onder de wereldkaart.
+// VS-staten per kanaal.
+//
+// Zes tot acht staten was te weinig: een statenkaart met zeven gekleurde vormen en
+// drieënveertig lege leest als een kapotte kaart, niet als een account dat in zeven staten
+// draait. Een echt account met landelijk bereik raakt vrijwel elke staat — veel met weinig
+// volume. Daarom nu een brede spreiding met een lange staart, zodat de choropleth doet waar hij
+// voor bedoeld is: een verloop tonen in plaats van een handvol losse vlekken.
+//
+// De volgorde volgt grofweg marktomvang, met een paar bewuste afwijkingen die de analyse iets te
+// zeggen geven (zie de opmerkingen per staat).
 const STATE_BASE: Record<Exclude<Channel, "blended">, GeoAgg[]> = {
   google: [
     row("CA", 22800, 0.045, 0.031, 70),
     row("TX", 16400, 0.043, 0.028, 76),
     // New York is hier structureel duur: veel concurrentie op hetzelfde vakpubliek.
     row("NY", 14900, 0.046, 0.030, 205),
-    row("IL", 8600, 0.041, 0.026, 84),
     row("FL", 9800, 0.040, 0.024, 90),
+    row("IL", 8600, 0.041, 0.026, 84),
+    row("PA", 7400, 0.039, 0.025, 88),
+    row("OH", 6800, 0.040, 0.026, 82),
     row("WA", 6100, 0.044, 0.029, 74),
+    row("MI", 5900, 0.038, 0.024, 92),
+    row("GA", 5700, 0.039, 0.023, 94),
+    row("NC", 5600, 0.038, 0.024, 90),
     row("MA", 5400, 0.047, 0.032, 68),
+    row("NJ", 5100, 0.043, 0.028, 86),
+    row("VA", 4700, 0.041, 0.027, 84),
+    row("AZ", 4400, 0.040, 0.025, 88),
+    row("WI", 4100, 0.042, 0.028, 78),
+    row("MN", 3900, 0.043, 0.029, 76),
+    row("IN", 3600, 0.039, 0.025, 86),
+    row("CO", 3400, 0.042, 0.027, 80),
+    row("TN", 3200, 0.038, 0.024, 92),
+    row("MO", 3000, 0.039, 0.025, 88),
+    row("MD", 2800, 0.041, 0.027, 84),
+    row("OR", 2600, 0.043, 0.028, 78),
+    row("SC", 2300, 0.037, 0.023, 96),
+    row("IA", 2100, 0.041, 0.028, 74),
+    row("KS", 1800, 0.040, 0.027, 76),
+    row("UT", 1700, 0.042, 0.028, 78),
+    row("NE", 1400, 0.041, 0.028, 74),
+    row("CT", 1300, 0.042, 0.027, 88),
+    // Nevada trekt verkeer maar levert niets op — de verspiller in de staart, zodat de
+    // markt-analyse ook binnen de VS iets te vinden heeft.
+    deadMarket("NV", 2400, 0.036, 310),
   ],
   meta: [
     row("CA", 68000, 0.020, 0.010, 80),
@@ -78,16 +111,46 @@ const STATE_BASE: Record<Exclude<Channel, "blended">, GeoAgg[]> = {
     row("NY", 47000, 0.021, 0.011, 78),
     row("FL", 41000, 0.018, 0.008, 94),
     row("IL", 29000, 0.019, 0.009, 88),
+    row("PA", 26000, 0.018, 0.009, 90),
+    row("OH", 24000, 0.019, 0.009, 86),
     row("GA", 22000, 0.017, 0.008, 96),
+    row("NC", 20000, 0.018, 0.008, 92),
+    row("MI", 19000, 0.018, 0.009, 88),
     row("WA", 18000, 0.020, 0.010, 82),
+    row("NJ", 17000, 0.019, 0.009, 88),
+    row("VA", 15000, 0.018, 0.009, 90),
+    row("AZ", 14000, 0.017, 0.008, 94),
+    row("MA", 13000, 0.021, 0.011, 76),
+    row("TN", 12000, 0.017, 0.008, 96),
+    row("IN", 11000, 0.018, 0.008, 92),
+    row("MO", 10000, 0.018, 0.008, 92),
+    row("WI", 9500, 0.019, 0.009, 86),
+    row("MN", 9000, 0.019, 0.010, 84),
+    row("CO", 8500, 0.019, 0.009, 86),
+    row("MD", 8000, 0.018, 0.009, 90),
+    row("SC", 7000, 0.017, 0.008, 98),
+    row("OR", 6500, 0.020, 0.010, 82),
+    row("UT", 5000, 0.019, 0.009, 86),
   ],
   linkedin: [
     row("NY", 16800, 0.011, 0.019, 150),
     row("CA", 15200, 0.010, 0.018, 158),
     row("MA", 9400, 0.012, 0.022, 138),
-    row("IL", 6100, 0.009, 0.016, 166),
     row("TX", 7300, 0.009, 0.015, 172),
+    row("IL", 6100, 0.009, 0.016, 166),
     row("WA", 5200, 0.010, 0.017, 160),
+    row("NJ", 4600, 0.010, 0.017, 156),
+    row("VA", 4200, 0.010, 0.016, 164),
+    row("PA", 3900, 0.009, 0.015, 170),
+    row("GA", 3600, 0.009, 0.015, 174),
+    row("NC", 3300, 0.009, 0.016, 168),
+    row("CO", 3000, 0.010, 0.017, 158),
+    row("MD", 2800, 0.010, 0.016, 162),
+    row("MN", 2500, 0.010, 0.017, 154),
+    row("OH", 2400, 0.009, 0.015, 172),
+    row("MI", 2200, 0.009, 0.015, 176),
+    row("FL", 2100, 0.008, 0.013, 188),
+    row("CT", 1900, 0.011, 0.019, 146),
   ],
 };
 

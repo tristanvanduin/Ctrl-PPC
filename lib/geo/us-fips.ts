@@ -50,6 +50,26 @@ const ENGLISH_STATE_NAMES: Record<string, string> = {
   washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY", "puerto rico": "PR",
 };
 
+/**
+ * De omgekeerde weg: USPS-code → de Engelse staatsnaam zoals Google Ads hem levert.
+ *
+ * Uitdrukkelijk NIET USPS_TO_NAME: die is Nederlandstalig ("Californië") en bedoeld voor het
+ * scherm. Wie die naam terugvoert in regionNameToUsps krijgt null, want daar staan alleen de
+ * Engelse namen. Afgeleid uit dezelfde tabel, zodat de twee richtingen niet uit elkaar kunnen
+ * lopen.
+ */
+const USPS_TO_ENGLISH: Record<string, string> = Object.fromEntries(
+  Object.entries(ENGLISH_STATE_NAMES).map(([engels, usps]) => [
+    usps,
+    // De tabel is lowercase; Google levert hoofdletters per woord.
+    engels.replace(/(^|\s)\S/g, (c) => c.toUpperCase()),
+  ])
+);
+
+export function uspsToEnglishName(usps: string): string {
+  return USPS_TO_ENGLISH[usps.toUpperCase()] ?? usps;
+}
+
 // Zet een Google region_name (of losse USPS-code) om naar een USPS-staatcode; null als het geen
 // herkenbare Amerikaanse staat is.
 export function regionNameToUsps(regionName: string | null | undefined): string | null {
