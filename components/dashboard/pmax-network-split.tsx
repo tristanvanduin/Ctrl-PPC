@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
+import { Legenda, type LegendaItem } from "./chart-chrome";
 import {
   buildNetworkSplit, findImbalances, networkTotals,
   type NetworkRow, type NetworkSlice,
@@ -131,6 +132,14 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
             </figure>
           )}
         </div>
+
+        {/* De legenda hoort bij de ringen en niet in de tabel eronder: die staat dicht, en dan is
+            kleur de enige drager van identiteit. Bij dit palet mag dat niet — drie tinten halen
+            geen 3:1 tegen wit, en die uitkomst verplicht zichtbare labels. */}
+        <Legenda
+          items={slices.map((s) => ({ label: s.label, kleur: colorFor(s.networkType, order) })) as LegendaItem[]}
+          className="justify-center mt-4"
+        />
 
         {!totals.hasConversions && (
           <p className="text-meta text-muted-foreground text-center mt-3">

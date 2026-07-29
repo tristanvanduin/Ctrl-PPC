@@ -5,10 +5,8 @@ import {
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
   ReferenceLine,
 } from "recharts";
 import { useState } from "react";
@@ -17,6 +15,7 @@ import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, ForecastMetric, MONTH_LABELS } from "@/lib/forecast";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
+import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
 import { METRIC_LABELS } from "@/lib/forecast-format";
 
 function formatYAxis(metric: ForecastMetric) {
@@ -99,6 +98,13 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
   const yFormatter = formatYAxis(metric);
   const lastRealizedIdx = data.findLastIndex((d) => d.gerealiseerd !== null);
 
+  const legendaItems: LegendaItem[] = [
+    { label: "Gerealiseerd", kleur: theme.primary },
+    { label: "Prognose", kleur: theme.primary },
+    { label: "Verwacht", kleur: CHART_AXIS },
+    ...(showYoY ? [{ label: "Vorig jaar", kleur: CHART_CATEGORICAL[6] }] : []),
+  ];
+
   return (
     <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
@@ -165,27 +171,31 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
         </div>
       )}
 
+      {/* De legenda boven de plot; recharts zette hem onderaan als rij blokjes. Hier is hij ook
+          verplicht: het palet haalt de kleurenblind-checks maar niet overal 3:1 tegen wit, en dan
+          mag kleur niet de enige drager van identiteit zijn. */}
+      <Legenda items={legendaItems} className="mb-3" />
+
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E1E5F2" />
+          <Raster />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: viewMode === "weekly" ? 9 : 12, fill: "#64748b" }}
-            axisLine={{ stroke: "#E1E5F2" }}
+            tick={{ fontSize: viewMode === "weekly" ? 9 : 11, fill: CHART_AXIS }}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
             interval={viewMode === "weekly" ? 3 : 0}
           />
           <YAxis
             tickFormatter={yFormatter}
-            tick={{ fontSize: 11, fill: "#64748b" }}
-            axisLine={{ stroke: "#E1E5F2" }}
+            tick={{ fontSize: 11, fill: CHART_AXIS }}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
             width={65}
           />
-          <Tooltip
-            contentStyle={{ borderRadius: "8px", border: "1px solid #E1E5F2", fontSize: "13px" }}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter={(value: any) => [yFormatter(value as number)]}
-          />
-          <Legend />
+          <Tip formatter={yFormatter} />
 
           {lastRealizedIdx >= 0 && lastRealizedIdx < data.length - 1 && (
             <ReferenceLine

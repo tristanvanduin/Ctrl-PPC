@@ -6,11 +6,12 @@ import {
   Send, ChevronDown, ChevronUp,
 } from "lucide-react";
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, LineChart, Line, ResponsiveContainer,
 } from "recharts";
 import { getAllClients } from "@/lib/clients";
 import { useGenerationProgress } from "@/lib/use-generation-progress";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
+import { Raster, AsX, AsY, Tip, BALK_RADIUS } from "./chart-chrome";
 
 // ── Types (matching API output) ────────────────────────────────────────────
 
@@ -59,19 +60,19 @@ function MiniChart({ data, type, label, color = "#E87722", height = 180 }: { dat
       <ResponsiveContainer width="100%" height={height}>
         {type === "bar" ? (
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="month" tick={{ fontSize: 9 }} />
-            <YAxis tick={{ fontSize: 9 }} width={45} />
-            <Tooltip contentStyle={{ fontSize: 11 }} />
-            <Bar dataKey="value" fill={color} radius={[2, 2, 0, 0]} name={label} />
+            <Raster />
+            <AsX dataKey="month" />
+            <AsY width={48} />
+            <Tip />
+            <Bar dataKey="value" fill={color} radius={BALK_RADIUS} name={label} />
           </BarChart>
         ) : (
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="month" tick={{ fontSize: 9 }} />
-            <YAxis tick={{ fontSize: 9 }} width={45} />
-            <Tooltip contentStyle={{ fontSize: 11 }} />
-            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ r: 3 }} name={label} />
+            <Raster />
+            <AsX dataKey="month" />
+            <AsY width={48} />
+            <Tip />
+            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }} name={label} />
           </LineChart>
         )}
       </ResponsiveContainer>

@@ -2,15 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Loader2, Calendar, TrendingUp, Gauge, BarChart3 } from "lucide-react";
-import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { supabase } from "@/lib/supabase";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
-import { useBrandTheme } from "../branding/brand-theme-provider";
-import { CHART_GRID, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
 import { today as vandaag } from "@/lib/reporting-date";
+import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
-import { today } from "@/lib/reporting-date";
 
 // Volwaardige prestatie-view voor Meta en LinkedIn: dezelfde bouwstenen als Google
 // (KPI-kaarten, pacing, maandtabel, grafiek, campagnetabel), gevoed uit de dag-tabellen van
@@ -77,7 +74,6 @@ const emptyAgg = (): Agg => ({ impressions: 0, clicks: 0, spend: 0, conv: 0 });
 
 export function ChannelPerformance({ clientId, channel, geoClone, edition }: { clientId: string; channel: ChannelKind; geoClone?: string | null; edition?: UpcomingEdition | null }) {
   const cfg = CONFIG[channel];
-  const { theme } = useBrandTheme();
   const [account, setAccount] = useState<DailyRow[] | null>(null);
   const [campaign, setCampaign] = useState<DailyRow[]>([]);
   const [names, setNames] = useState<Map<string, string>>(new Map());
@@ -199,10 +195,10 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
   if (!derived) return null; // geen data: de kanaaltab toont al de eerlijke lege staat
 
   const { fullMonths, recent, prior, mtd, prevMtd, campaigns, dayOfMonth } = derived;
-  const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, today()) : null;
+  const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, vandaag()) : null;
   const cpa = (a: Agg): number | null => (a.conv > 0 ? a.spend / a.conv : null);
   const ctr = (a: Agg): number | null => (a.impressions > 0 ? a.clicks / a.impressions : null);
-  const chartData = fullMonths.map(([m, a]) => ({ maand: m, Spend: Math.round(a.spend), [convLabel]: Math.round(a.conv) }));
+  const chartData = fullMonths.map(([m, a]) => ({ maand: m, spend: Math.round(a.spend), lijn: Math.round(a.conv) }));
   const pace = deltaS(mtd.spend, prevMtd.spend);
   const pacePct = mtd.spend > 0 && prevMtd.spend > 0 ? mtd.spend / prevMtd.spend : null;
 
@@ -269,29 +265,14 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
         </div>
       </div>
 
-      {/* Grafiek */}
-      {chartData.length >= 2 && (
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-            <TrendingUp className="w-4.5 h-4.5 text-rm-blue" />
-            <h3 className="text-sm font-semibold text-rm-gray">Maandverloop</h3>
-          </div>
-          <div className="px-3 py-4" style={{ height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
-                <XAxis dataKey="maand" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="spend" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="conv" orientation="right" tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="spend" dataKey="Spend" fill={theme.primary} radius={[3, 3, 0, 0]} opacity={0.9} />
-                <Line yAxisId="conv" dataKey={convLabel} stroke={CHART_LINE_SECONDARY} strokeWidth={2} dot={{ r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+      {/* Maandverloop. Stond hier als eigen ComposedChart met spend links en conversies rechts —
+          dezelfde dubbele as en dezelfde opbouw als MonthlyTrendChart, dus twee kopieën van
+          hetzelfde probleem. Nu één component, dat de twee metrieken onder elkaar zet. */}
+      <MonthlyTrendChart
+        title="Maandverloop"
+        lineLabel={convLabel}
+        data={chartData.map((d) => ({ maand: d.maand, spend: d.spend, lijn: d.lijn }))}
+      />
 
       {/* Maandtabel */}
       <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">

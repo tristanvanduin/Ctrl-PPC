@@ -8,6 +8,7 @@ import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { buildNetworkSplit, findImbalances, networkTotals, type NetworkRow } from "@/lib/pmax/network-split";
 import { BREAKDOWN_DIMENSIES, metaWaardeLabel, type BreakdownKanaal } from "@/lib/analysis/breakdown-dimensions";
+import { Legenda, type LegendaItem } from "./chart-chrome";
 
 // Waar het budget van Meta en LinkedIn landt, per uitsplitsing.
 //
@@ -185,6 +186,11 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
             </figure>
           )}
         </div>
+
+        <Legenda
+          items={slices.map((s) => ({ label: s.label, kleur: kleur(s.networkType) })) as LegendaItem[]}
+          className="justify-center mt-4"
+        />
 
         {!totalen.hasConversions && (
           <p className="text-meta text-muted-foreground text-center mt-3">
