@@ -1,6 +1,7 @@
 import { mapRsaAssetApiRow, mapAdMetaApiRow, applyAdText, buildAdTextMap, type RsaAssetApiResult, type AdMetaApiResult } from "./google-ads-rsa-transform";
 import { recordFetchFailure } from "./fetch-failures";
 import { logger } from "@/lib/logger";
+import type { RuweRegioRij, GeoDoelLabel } from "@/lib/geo/region-rows";
 /**
  * Google Ads API client
  *
@@ -2247,7 +2248,12 @@ export async function getGeoPerformanceByMonth(
         campaignId: c.id || "",
         campaignName: c.name || "",
         countryCode,
-        regionName: String(gv.locationType || gv.location_type || ""),
+        // BEWUST LEEG. Hier stond `gv.locationType`, en dat is geographic_view.location_type:
+        // het geo-doeltype van Google, dat door de WHERE hierboven altijd "LOCATION_OF_PRESENCE"
+        // is. Die waarde belandde in de regiokolom van ads_region_monthly, waardoor 118 rijen een
+        // constante string als staatsnaam droegen en de VS-drilldown op de kaart nooit iets vond.
+        // geographic_view geeft alleen het LAND; de staat komt uit getRegionPerformanceByMonth.
+        regionName: "",
         geoTargetId: String(parsedCriterionId || rawCriterionId || ""),
         impressions: Number(m.impressions || 0),
         clicks: Number(m.clicks || 0),
@@ -2265,6 +2271,99 @@ export async function getGeoPerformanceByMonth(
     logger.error("[getGeoPerformanceByMonth] ERROR:", err instanceof Error ? err.message : err);
     return [];
   }
+}
+
+// ── Region (VS-staten) Performance by Month ───────────────────────────────
+//
+// geographic_view geeft per rij alleen het land. De staat zit in `segments.geo_target_state`, en
+// dat levert een resource-naam op (geoTargetConstants/21137) — geen leesbare naam. Die moet in
+// een tweede query opgelost worden tegen geo_target_constant. Vandaar twee stappen; de vertaling
+// zelf staat in lib/geo/region-rows.ts en is daar los getest.
+
+export interface RegionPerformanceResult {
+  rows: RuweRegioRij[];
+  labels: Map<string, GeoDoelLabel>;
+}
+
+/** Batchgrootte voor de tweede query. GAQL-IN-lijsten worden onhandelbaar lang bij honderden ids. */
+const GEO_LABEL_BATCH = 200;
+
+export async function getRegionPerformanceByMonth(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string
+): Promise<RegionPerformanceResult> {
+  try {
+    const rows = await queryGoogleAds(credentials, customerId, `
+      SELECT
+        campaign.id,
+        campaign.name,
+        segments.geo_target_state,
+        segments.month,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions,
+        metrics.conversions_value
+      FROM geographic_view
+      WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+        AND campaign.status IN ('ENABLED', 'PAUSED')
+        AND geographic_view.location_type = 'LOCATION_OF_PRESENCE'
+        AND metrics.impressions > 0
+    `);
+
+    const ruw: RuweRegioRij[] = rows.map((row) => {
+      const c = (row.campaign ?? {}) as Record<string, string>;
+      const s = (row.segments ?? {}) as Record<string, string>;
+      const m = (row.metrics ?? {}) as Record<string, number>;
+      return {
+        month: s.month ?? "",
+        campaignId: c.id ?? "",
+        campaignName: c.name ?? "",
+        geoTargetState: String(s.geoTargetState ?? s.geo_target_state ?? ""),
+        impressions: Number(m.impressions || 0),
+        clicks: Number(m.clicks || 0),
+        cost: Number(m.costMicros || m.cost_micros || 0) / 1_000_000,
+        conversions: Number(m.conversions || 0),
+        conversionsValue: Number(m.conversionsValue || m.conversions_value || 0),
+      };
+    });
+
+    const labels = await resolveGeoTargets(credentials, customerId, [...new Set(ruw.map((r) => r.geoTargetState).filter(Boolean))]);
+    return { rows: ruw, labels };
+  } catch (err) {
+    logger.error("[getRegionPerformanceByMonth] ERROR:", err instanceof Error ? err.message : err);
+    return { rows: [], labels: new Map() };
+  }
+}
+
+/** Resource-namen van geo-doelen oplossen naar naam + landcode. */
+async function resolveGeoTargets(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  resourceNames: string[]
+): Promise<Map<string, GeoDoelLabel>> {
+  const uit = new Map<string, GeoDoelLabel>();
+  for (let i = 0; i < resourceNames.length; i += GEO_LABEL_BATCH) {
+    const batch = resourceNames.slice(i, i + GEO_LABEL_BATCH);
+    const lijst = batch.map((r) => `'${r}'`).join(", ");
+    const rows = await queryGoogleAds(credentials, customerId, `
+      SELECT
+        geo_target_constant.resource_name,
+        geo_target_constant.name,
+        geo_target_constant.country_code
+      FROM geo_target_constant
+      WHERE geo_target_constant.resource_name IN (${lijst})
+    `);
+    for (const row of rows) {
+      const g = (row.geoTargetConstant ?? row.geo_target_constant ?? {}) as Record<string, string>;
+      const naam = g.resourceName ?? g.resource_name;
+      if (!naam) continue;
+      uit.set(naam, { name: g.name ?? "", countryCode: (g.countryCode ?? g.country_code ?? "").toUpperCase() });
+    }
+  }
+  return uit;
 }
 
 // ── Network Performance by Month ──────────────────────────────────────────

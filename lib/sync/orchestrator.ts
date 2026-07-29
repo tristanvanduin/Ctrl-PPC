@@ -29,6 +29,7 @@ import {
   getProductPerformanceByMonth,
   getDevicePerformanceByMonth,
   getGeoPerformanceByMonth,
+  getRegionPerformanceByMonth,
   getNetworkPerformanceByMonth,
   getCreativePerformanceByMonth,
   getAssetGroupPerformanceByMonth,
@@ -58,6 +59,7 @@ import { negativesToDbRows } from "../api/google-ads-negatives-transform";
 import { syncMerchantProductSnapshots } from "../api/merchant-products";
 import { logger } from "@/lib/logger";
 import { withFetchFailures, hasFetchFailure } from "../api/fetch-failures";
+import { buildRegionRows, overslaanSamenvatting } from "@/lib/geo/region-rows";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -289,6 +291,7 @@ const FETCH_SOURCE_BY_DATASET: Record<string, string[]> = {
   ads_asset_group_performance_monthly: ["getAssetGroupPerformanceByMonth"],
   ads_product_performance_monthly: ["getProductPerformanceByMonth"],
   ads_geo_performance_monthly: ["getGeoPerformanceByMonth"],
+  ads_region_monthly: ["getRegionPerformanceByMonth"],
   ads_audience_performance_monthly: ["getAudiencePerformanceByMonth"],
   ads_ad_schedule_performance: ["getAdSchedulePerformance"],
   google_ads_product_performance: ["getProductPerformanceByMonth"],
@@ -379,6 +382,7 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
   let prodRaw: Awaited<ReturnType<typeof getProductPerformanceByMonth>> = [];
   let deviceRaw: Awaited<ReturnType<typeof getDevicePerformanceByMonth>> = [];
   let geoRaw: Awaited<ReturnType<typeof getGeoPerformanceByMonth>> = [];
+  let regioRaw: Awaited<ReturnType<typeof getRegionPerformanceByMonth>> = { rows: [], labels: new Map() };
   let networkRaw: Awaited<ReturnType<typeof getNetworkPerformanceByMonth>> = [];
   let creativeRaw: Awaited<ReturnType<typeof getCreativePerformanceByMonth>> = [];
   let assetRaw: Awaited<ReturnType<typeof getAssetGroupPerformanceByMonth>> = [];
@@ -405,7 +409,7 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
       monthlyRaw, weeklyRaw, campaignsRaw, isRaw,
       agRaw, stRaw, chRaw, metaRaw,
       kwRaw, stFullRaw, prodRaw, deviceRaw,
-      geoRaw, networkRaw, creativeRaw, assetRaw,
+      geoRaw, regioRaw, networkRaw, creativeRaw, assetRaw,
       audienceRaw, scheduleRaw,
       checkoutRaw,
       pmaxAssetsRaw, pmaxNetworkRaw, pmaxPlacementsRaw, pmaxSearchCatsRaw,
@@ -426,6 +430,7 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
       getProductPerformanceByMonth(credentials, customerId, startDate, endDate),
       getDevicePerformanceByMonth(credentials, customerId, startDate, endDate),
       getGeoPerformanceByMonth(credentials, customerId, startDate, endDate),
+      getRegionPerformanceByMonth(credentials, customerId, startDate, endDate),
       getNetworkPerformanceByMonth(credentials, customerId, startDate, endDate),
       getCreativePerformanceByMonth(credentials, customerId, startDate, endDate),
       getAssetGroupPerformanceByMonth(credentials, customerId, startDate, endDate),
@@ -559,6 +564,31 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     syncDataset("ads_geo_performance_monthly", () => appendBatch(supabase, "ads_geo_performance_monthly",
       dedup(geoRaw.map((g) => ({ client_id: clientId, month: g.date, campaign_id: g.campaignId, campaign_name: g.campaignName, country_code: g.countryCode || null, region_name: g.regionName || null, city_name: null, geo_target_id: g.geoTargetId || null, impressions: Number(g.impressions), clicks: Number(g.clicks), cost: g.cost, conversions: g.conversions, conversions_value: g.conversionsValue, ctr: g.impressions > 0 ? g.clicks / g.impressions : 0, conversion_rate: g.clicks > 0 ? g.conversions / g.clicks : 0, synced_at: now })), ["client_id", "geo_target_id", "campaign_id", "month"]),
       "client_id,month,campaign_id,geo_target_id,country_code", clientId)),
+    // VS-staten. Deze tabel bestond al maar werd door niets gevuld; de rijen die erin stonden
+    // kwamen uit een oude sync die geographic_view.location_type in de regiokolom schreef. De
+    // vertaling en de telling van wat afvalt staan in lib/geo/region-rows.ts.
+    syncDataset("ads_region_monthly", () => {
+      const res = buildRegionRows(regioRaw.rows, regioRaw.labels);
+      const uitleg = overslaanSamenvatting(res);
+      // Een sync die rijen ophaalt en er nul wegschrijft hoort dat te zeggen: anders is "geen
+      // staten" niet te onderscheiden van "de vertaling faalde".
+      if (uitleg) logger.info(`[sync] ads_region_monthly: ${res.rijen.length} rijen, overgeslagen: ${uitleg}`);
+      return replaceBatch(supabase, "ads_region_monthly",
+        res.rijen.map((r) => ({
+          client_id: clientId, month: r.month,
+          country_code: r.country_code, region_name: r.region_name, region_code: r.region_code,
+          campaign_count: r.campaign_count,
+          impressions: r.impressions, clicks: r.clicks, cost: r.cost,
+          conversions: r.conversions, conversions_value: r.conversions_value,
+          ctr: r.impressions > 0 ? r.clicks / r.impressions : 0,
+          avg_cpc: r.clicks > 0 ? r.cost / r.clicks : 0,
+          conversion_rate: r.clicks > 0 ? r.conversions / r.clicks : 0,
+          cost_per_conversion: r.conversions > 0 ? r.cost / r.conversions : 0,
+          roas: roas(r.conversions_value, r.cost),
+          synced_at: now,
+        })),
+        clientId);
+    }),
     syncDataset("ads_audience_performance_monthly", () => appendBatch(supabase, "ads_audience_performance_monthly",
       audienceRaw.map((a) => ({ client_id: clientId, month: a.date, campaign_id: a.campaignId, campaign_name: a.campaignName, ad_group_id: a.adGroupId, ad_group_name: a.adGroupName, audience_id: a.audienceId, audience_name: a.audienceName, audience_type: null, impressions: a.impressions, clicks: a.clicks, cost: a.cost, conversions: a.conversions, conversions_value: a.conversionsValue, ctr: a.impressions > 0 ? a.clicks / a.impressions : 0, conversion_rate: a.clicks > 0 ? a.conversions / a.clicks : 0, synced_at: now })),
       "client_id,month,campaign_id,ad_group_id,audience_id", clientId)),
