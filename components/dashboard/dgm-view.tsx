@@ -875,8 +875,12 @@ export function DgmView({ clientId }: { clientId: string }) {
 
   const [detailsExpanded, setDetailsExpanded] = useState(false);
 
+  // Elk blok op deze pagina is een eigen sectie — snapshot, trajectdoelen, oorzaken, acties,
+  // sprintstatus, prognose, beslissingen, verdieping — maar ze stonden allemaal op dezelfde
+  // `space-y-6` als de inhoud binnen zo'n blok. Zonder verschil tussen "tussen onderwerpen" en
+  // "binnen een onderwerp" groepeert er niets. De inhoud houdt zijn eigen krappere afstanden.
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-10 max-w-5xl">
 
       {/* ─── 1. Executive Snapshot ─── */}
       <div className={`rounded-xl border-2 ${sc.border} ${sc.bg} p-5`}>

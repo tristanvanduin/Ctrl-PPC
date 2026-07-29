@@ -46,8 +46,12 @@ export function Sectie({
         </div>
         {actie && <div className="ml-auto shrink-0">{actie}</div>}
       </div>
-      {/* Binnen een sectie staan de kaarten dichter op elkaar dan de secties onderling. */}
-      <div className="space-y-4">{children}</div>
+      {/* Binnen een sectie staan de kaarten dichter op elkaar dan de secties onderling — én ze
+          wegen niet allemaal even zwaar. De eerste kaart is het antwoord op de vraag die de
+          sectiekop stelt; wat erna komt is de onderbouwing. `sectie-kaarten` zet daarom vanaf de
+          tweede kaart een rustiger schaduw (zie globals.css). Dat werkt via een variabele, dus het
+          erft ook door naar kaarten die dieper in een kind zitten. */}
+      <div className="space-y-4 sectie-kaarten">{children}</div>
     </section>
   );
 }

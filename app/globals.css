@@ -447,6 +447,27 @@
   }
 }
 
+/* ── Rangorde binnen een sectie ────────────────────────────────────────────
+ *
+ * Binnen een sectie wogen alle kaarten even zwaar: dezelfde rand, dezelfde
+ * schaduw, dezelfde maat. Maar de eerste kaart ís het antwoord op de vraag die
+ * de sectiekop stelt, en wat erna komt is onderbouwing. Als die twee er identiek
+ * uitzien moet de lezer zelf uitzoeken waar hij begint.
+ *
+ * Vanaf de tweede kaart dus een rustiger schaduw. Via de variabele en niet via
+ * een klasse op de kaart zelf, zodat het ook doorwerkt op kaarten die dieper in
+ * een kind zitten — en zodat een kaart die buiten een sectie staat er niets van
+ * merkt.
+ */
+@layer base {
+  .sectie-kaarten > * + * {
+    --kaart-schaduw: 0 1px 2px rgb(15 23 42 / 0.02);
+  }
+  .dark .sectie-kaarten > * + * {
+    --kaart-schaduw: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  }
+}
+
 /* ── Tabellen ──────────────────────────────────────────────────────────────
  *
  * Zeventien tabellen, en vier ervan zetten `tabular-nums`. Zonder dat zijn

@@ -255,10 +255,9 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
       <div className="px-5 py-4 border-b border-border">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
-              Campagnes
-            </h3>
-            <p className="text-meta text-muted-foreground mt-0.5">
+            {/* De kaarttitel "Campagnes" is vervallen: die stond twee regels onder de sectiekop
+                die hetzelfde zegt. De samenvattingsregel blijft — die draagt cijfers. */}
+            <p className="text-meta text-muted-foreground">
               {filtered.length} campagnes · {num(totalConv)} conversies · {fmt(totalSpend)} spend · CPA {fmt(avgCpa)} (30 dagen)
             </p>
           </div>

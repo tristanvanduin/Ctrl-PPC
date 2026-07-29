@@ -441,9 +441,24 @@ export function ClientDashboard({ client }: { client: Client }) {
             <div className="space-y-6">
               <ChannelTabs channel={channel} onChange={setChannel} />
               {channel === "google" && (
-                <div className="space-y-6">
-                  <CampaignTable clientId={client.id} geoClone={geoClone} countryFilter={countryFilter} onCountryFilterChange={setCountryFilter} />
-                  <SearchTermsTable clientId={client.id} geoClone={geoClone} countryFilter={countryFilter} />
+                <div>
+                  {/* Twee vragen, twee secties. Wat draait er, en waar lekt het weg — dat laatste
+                      is geen detail van het eerste maar een eigen onderwerp met een eigen actie. */}
+                  <Sectie
+                    eerste
+                    icoon={<LayoutGrid className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                    titel="Wat er draait"
+                    bijschrift="Alle campagnes van dit account over de laatste 30 dagen"
+                  >
+                    <CampaignTable clientId={client.id} geoClone={geoClone} countryFilter={countryFilter} onCountryFilterChange={setCountryFilter} />
+                  </Sectie>
+                  <Sectie
+                    icoon={<AlertTriangle className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                    titel="Waar het weglekt"
+                    bijschrift="Zoektermen, ad groups en producten die kosten maken zonder conversie"
+                  >
+                    <SearchTermsTable clientId={client.id} geoClone={geoClone} countryFilter={countryFilter} />
+                  </Sectie>
                 </div>
               )}
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
@@ -480,13 +495,35 @@ export function ClientDashboard({ client }: { client: Client }) {
                   <ChannelTabs channel={channel} onChange={setChannel} />
                   {channel === "google" && (
                     <>
-                      <ForecastTable clientId={client.id} />
-                      <BudgetScenario clientId={client.id} />
+                      {/* De prognose is het antwoord; het budgetscenario is wat je ermee doet.
+                          Twee onderwerpen, dus twee secties. */}
+                      <Sectie
+                        eerste
+                        icoon={<TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                        titel="Waar dit jaar op uitkomt"
+                        bijschrift="Gerealiseerd plus prognose per maand, tegen het jaardoel"
+                      >
+                        <ForecastTable clientId={client.id} />
+                      </Sectie>
+                      <Sectie
+                        icoon={<Target className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                        titel="Wat een budgetwijziging zou doen"
+                        bijschrift="Doorrekening van een hoger of lager mediabudget op dezelfde efficiëntie"
+                      >
+                        <BudgetScenario clientId={client.id} />
+                      </Sectie>
                     </>
                   )}
                   {channel === "blended" && (
                     <>
-                      <ChannelForecast clientId={client.id} channel="blended" />
+                      <Sectie
+                        eerste
+                        icoon={<TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                        titel="Prognose over alle kanalen"
+                        bijschrift="De blended projectie richting het einde van de periode"
+                      >
+                        <ChannelForecast clientId={client.id} channel="blended" />
+                      </Sectie>
                       <CrossChannelView clientId={client.id} />
                     </>
                   )}
@@ -794,32 +831,57 @@ function OutcomesTab({ clientId }: { clientId: string }) {
   const [channelFilter, setChannelFilter] = useState<InsightChannel | null>(null);
 
   return (
-    <div className="space-y-6">
-      <TaskImpactReminder clientId={clientId} />
-      {/* Kanaal-filter over inzichten, aanbevelingen, hypotheses, wachtrij en taken. */}
-      <ChannelFilter value={channelFilter} onChange={setChannelFilter} />
-      <ProposalQueue clientId={clientId} refreshKey={refreshKey} channel={channelFilter} onWorkflowChange={() => setRefreshKey((k) => k + 1)} />
+    <div>
+      <div className="space-y-4">
+        <TaskImpactReminder clientId={clientId} />
+        {/* Kanaal-filter over inzichten, aanbevelingen, hypotheses, wachtrij en taken. */}
+        <ChannelFilter value={channelFilter} onChange={setChannelFilter} />
+      </div>
+
+      {/* Wat op goedkeuring wacht staat vooraan: dat is het enige op deze pagina waar direct een
+          handeling van jou op zit. De rest is lezen. */}
+      <Sectie
+        icoon={<ClipboardCheck className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Wacht op je oordeel"
+        bijschrift="Voorstellen uit de analyses; accepteren zet ze in de sprintplanning"
+      >
+        <ProposalQueue clientId={clientId} refreshKey={refreshKey} channel={channelFilter} onWorkflowChange={() => setRefreshKey((k) => k + 1)} />
+      </Sectie>
+
       {/* Creative-vermoeidheid stond bij de analyses, maar er valt niets te draaien: het is een
           aflezing van data die er al is, dus een bevinding. Hij volgt het kanaalfilter; op
           "Alle" staan de kanalen naast elkaar en tonen alleen de kanalen die iets te zeggen
           hebben zichzelf. */}
-      {(channelFilter === null ? (["google", "meta", "linkedin"] as const) : channelFilter === "cross" ? [] : [channelFilter]).map((c) => (
-        <CreativeDeepDive key={c} clientId={clientId} channel={c} />
-      ))}
-      <InsightsBlock
-        clientId={clientId}
-        selectedInsightId={selectedInsightId}
-        onSelectInsight={setSelectedInsightId}
-        refreshKey={refreshKey}
-        channel={channelFilter}
-      />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="space-y-6">
-          <RecommendationsBlock clientId={clientId} selectedInsightId={selectedInsightId} refreshKey={refreshKey} channel={channelFilter} />
-          <HypothesesBlock clientId={clientId} refreshKey={refreshKey} onWorkflowChange={() => setRefreshKey((k) => k + 1)} channel={channelFilter} />
+      <Sectie
+        icoon={<Lightbulb className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Wat de analyses zien"
+        bijschrift="Creative-vermoeidheid per kanaal, en de inzichten die eruit volgen"
+      >
+        {(channelFilter === null ? (["google", "meta", "linkedin"] as const) : channelFilter === "cross" ? [] : [channelFilter]).map((c) => (
+          <CreativeDeepDive key={c} clientId={clientId} channel={c} />
+        ))}
+        <InsightsBlock
+          clientId={clientId}
+          selectedInsightId={selectedInsightId}
+          onSelectInsight={setSelectedInsightId}
+          refreshKey={refreshKey}
+          channel={channelFilter}
+        />
+      </Sectie>
+
+      <Sectie
+        icoon={<Kanban className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Wat eruit volgt"
+        bijschrift="Aanbevelingen, hypotheses en de taken die eruit voortkomen"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <RecommendationsBlock clientId={clientId} selectedInsightId={selectedInsightId} refreshKey={refreshKey} channel={channelFilter} />
+            <HypothesesBlock clientId={clientId} refreshKey={refreshKey} onWorkflowChange={() => setRefreshKey((k) => k + 1)} channel={channelFilter} />
+          </div>
+          <TasksBlock clientId={clientId} selectedInsightId={selectedInsightId} refreshKey={refreshKey} channel={channelFilter} />
         </div>
-        <TasksBlock clientId={clientId} selectedInsightId={selectedInsightId} refreshKey={refreshKey} channel={channelFilter} />
-      </div>
+      </Sectie>
     </div>
   );
 }
