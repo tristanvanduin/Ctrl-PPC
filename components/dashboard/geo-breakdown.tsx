@@ -10,6 +10,7 @@ import { type GeoAgg } from "@/lib/demo/geo-demo";
 import { MapErrorBoundary } from "./map-error-boundary";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // De kaarten (SVG + geometrie + d3-geo) client-only en code-split laden: pas geladen als deze
 // weergave rendert, en nooit tijdens SSR.
@@ -139,7 +140,7 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
   // Tijdens het laden nog niets concluderen: "één of geen land" was anders even waar voor elke
   // klant, en dan knippert de kaart weg en weer terug.
   if (laden) {
-    return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+    return <Laadvlak vorm="grafiek" hoogte={220} titel="Waar komt het vandaan" />;
   }
   if (countries.length <= 1) return null; // één (of geen) land: geen geo-verhaal
 

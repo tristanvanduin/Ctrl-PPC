@@ -99,6 +99,15 @@ function pct(v: number): string {
   return `${v > 0 ? "+" : ""}${Math.round(v)}%`;
 }
 
+/**
+ * ROAS met zijn teken erbij. Zonder dat stond er kaal "2" met "Doel: 4" tussen "€ 77.160" en
+ * "€ 76" in — en dan is niet te zien of dat twee euro, twee procent of twee keer is. Het maal-teken
+ * kost één karakter en haalt de vraag weg; de rest van het dashboard schrijft ROAS ook zo.
+ */
+function ratio(v: number): string {
+  return `${num(v, 2)}×`;
+}
+
 function dateLabel(): string {
   return new Date().toLocaleDateString("nl-NL", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -690,21 +699,32 @@ function KpiCard({
   forecast: forecastVal,
   diffPct,
   format,
+  lagerIsBeter = false,
 }: {
   label: string;
   realized: number;
   target: number;
   forecast: number;
   diffPct: number;
-  format: "currency" | "number" | "currency2";
+  format: "currency" | "number" | "ratio";
+  /**
+   * Bij kosten per conversie is een afwijking naar boven slecht en niet goed.
+   *
+   * `diffPct` is overal `(prognose − doel) / doel` en draagt geen richting: de forecast-laag weet
+   * niet of hoger beter is. Deze kaart trok daar één conclusie uit voor alle metrics, en dus stond
+   * er "€ 76 (+25%)" in groen met een volle groene balk terwijl het doel € 60 was en de banner
+   * erboven meldde dat het traject significant achterloopt. Groen voor een kostenoverschrijding
+   * van een kwart is niet een verkeerd kleurtje maar een verkeerde conclusie.
+   */
+  lagerIsBeter?: boolean;
 }) {
-  const fmtVal = format === "number" ? num : fmt;
-  const isGood = diffPct >= -3;
-  const isWarning = diffPct < -3 && diffPct >= -15;
-  const isBad = diffPct < -15;
+  const fmtVal = format === "currency" ? fmt : format === "ratio" ? ratio : num;
+  // Draai het teken om als lager beter is; daarna gelden dezelfde drempels voor alle metrics.
+  const scoreDiff = lagerIsBeter ? -diffPct : diffPct;
+  const isGood = scoreDiff >= -3;
+  const isWarning = scoreDiff < -3 && scoreDiff >= -15;
 
   const statusColor = isGood ? "text-green-600" : isWarning ? "text-amber-600" : "text-red-600";
-  const statusBg = isGood ? "bg-green-50" : isWarning ? "bg-amber-50" : "bg-red-50";
   const barPct = target > 0 ? Math.min((realized / target) * 100, 100) : 0;
   const barColor = isGood ? "bg-green-500" : isWarning ? "bg-amber-500" : "bg-red-500";
 
@@ -922,6 +942,7 @@ export function DgmView({ clientId }: { clientId: string }) {
               forecast={conv.adjustedAnnual > 0 ? spend.adjustedAnnual / conv.adjustedAnnual : 0}
               diffPct={cpa.diffPct}
               format="currency"
+              lagerIsBeter
             />
           )}
           {spend.annualTarget > 0 && (
@@ -941,7 +962,7 @@ export function DgmView({ clientId }: { clientId: string }) {
               target={settings.kpiTargets.roasTarget}
               forecast={spend.adjustedAnnual > 0 ? rev.adjustedAnnual / spend.adjustedAnnual : 0}
               diffPct={roas.diffPct}
-              format="number"
+              format="ratio"
             />
           )}
         </div>

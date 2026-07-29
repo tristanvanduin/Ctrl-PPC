@@ -7,7 +7,7 @@ import { CHART_CATEGORICAL, CHART_LINE_SECONDARY } from "@/lib/branding/chart-co
 import {
   Raster, AsX, AsY, Tip, Legenda, PLOT_MARGE,
   BALK_RADIUS, BALK_GAP, GROEP_GAP,
-  kortEuro, volledigEuro, volledigGetal, maandLabel, asSchaal, BALK_MAX, type LegendaItem,
+  kortEuro, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte, type LegendaItem,
 } from "./chart-chrome";
 
 // Maand-trendgrafieken: spend per maand, en dezelfde maanden per kanaal.
@@ -41,7 +41,8 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
   const rows = data.map((d) => ({ maand: d.maand, spend: Math.round(d.spend), lijn: Math.round(d.lijn) }));
   // Twee panelen delen de hoogte; de bovenste krijgt iets meer omdat de spend het anker is.
   const schaalSpend = asSchaal(Math.max(0, ...rows.map((r) => r.spend)));
-  const schaalLijn = asSchaal(Math.max(0, ...rows.map((r) => r.lijn)));
+  // De lijn krijgt lucht boven zijn hoogste punt; de balken niet. Zie asSchaalLijn.
+  const schaalLijn = asSchaalLijn(Math.max(0, ...rows.map((r) => r.lijn)));
   const hoogBoven = Math.round(height * 0.56);
   const hoogOnder = height - hoogBoven;
 
@@ -63,7 +64,7 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
               <AsX dataKey="maand" formatter={() => ""} />
               <AsY formatter={kortEuro} {...schaalSpend} />
               <Tip formatter={volledigEuro} />
-              <Bar dataKey="spend" name="Spend" fill={theme.primary} radius={BALK_RADIUS} barSize={BALK_MAX} />
+              <Bar dataKey="spend" name="Spend" fill={theme.primary} radius={BALK_RADIUS} barSize={balkBreedte(rows.length)} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -129,7 +130,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
             <AsY formatter={kortEuro} {...schaal} />
             <Tip formatter={volledigEuro} />
             {series.map((s, i) => (
-              <Bar key={s} dataKey={s} name={s} fill={kleurVan(i)} radius={BALK_RADIUS} barSize={BALK_MAX} />
+              <Bar key={s} dataKey={s} name={s} fill={kleurVan(i)} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)} />
             ))}
           </ComposedChart>
         </ResponsiveContainer>

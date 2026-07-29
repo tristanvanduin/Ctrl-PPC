@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, Calendar, TrendingUp, Gauge, BarChart3 } from "lucide-react";
+import { Calendar, TrendingUp, Gauge, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { today as vandaag } from "@/lib/reporting-date";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Volwaardige prestatie-view voor Meta en LinkedIn: dezelfde bouwstenen als Google
 // (KPI-kaarten, pacing, maandtabel, grafiek, campagnetabel), gevoed uit de dag-tabellen van
@@ -183,7 +184,7 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
 
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   if (account === null) {
-    return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+    return <Laadvlak vorm="grafiek" hoogte={220} />;
   }
   if (derived?.empty) {
     return (

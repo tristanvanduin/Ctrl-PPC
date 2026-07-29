@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, PieChart } from "lucide-react";
+import { PieChart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
@@ -12,6 +12,7 @@ import {
   buildNetworkSplit, findImbalances, networkTotals,
   type NetworkRow, type NetworkSlice,
 } from "@/lib/pmax/network-split";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Waar Performance Max je budget laat landen. PMax verdeelt zelf over Zoeken, Display, YouTube,
 // Discover en Gmail; die verdeling werd wel gesynct maar bereikte alleen de analyse-lagen.
@@ -73,7 +74,7 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
   const convSlices: DonutSlice[] = slices.map((s) => ({ key: s.networkType, label: s.label, value: s.conversions, color: colorFor(s.networkType, order) }));
 
   if (rows === null) {
-    return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+    return <Laadvlak vorm="grafiek" hoogte={200} titel="Performance Max — waar gaat het budget heen" />;
   }
   if (slices.length === 0 || totals.cost <= 0) return null; // geen PMax: niets te tonen
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Ban, ExternalLink } from "lucide-react";
+import { Ban, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_PLACEMENTS } from "@/lib/demo/video-demo";
@@ -11,6 +11,7 @@ import {
 } from "@/lib/video/placement-analysis";
 import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel } from "./data-table";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Waar het videobudget landde, met een voorstel welke placements uit te sluiten. Bij YouTube kiest
 // Google de plek; dit maakt zichtbaar wat dat oplevert. Bewust een voorstel met onderbouwing en
@@ -99,7 +100,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
   const impressionsOnly = excluding.filter((j) => !j.agg.metricsComplete);
 
   if (rows === null) {
-    return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+    return <Laadvlak vorm="tabel" regels={3} titel="Waar je video&apos;s draaien" />;
   }
   if (judged.length === 0) return null; // geen videoplacements: niets te tonen
 

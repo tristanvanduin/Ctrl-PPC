@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, PlayCircle } from "lucide-react";
+import { PlayCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_VIDEO_ROWS } from "@/lib/demo/video-demo";
@@ -11,6 +11,7 @@ import {
   aggregateVideoCampaigns, diagnoseVideo, VIDEO_DIAGNOSIS_LABEL, VIDEO_DIAGNOSIS_EXPLAIN,
   type VideoCampaignRow, type VideoDiagnosis,
 } from "@/lib/video/video-performance";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // YouTube/Demand Gen-prestaties met de maten die bij video horen: CPM (wat kost bereik), CPV (wat
 // kost een view), view rate en kijkdiepte. Verschijnt alléén als er echt videocampagnes draaien —
@@ -101,7 +102,7 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
   }, [rows]);
 
   if (rows === null) {
-    return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+    return <Laadvlak vorm="tabel" regels={2} titel="Video (YouTube)" />;
   }
   // Geen videocampagnes: niets tonen. Een lege videokaart onder een Search-account is ruis.
   if (aggs.length === 0) return null;

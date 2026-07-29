@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, Sparkles, ImageOff, ArrowUpRight } from "lucide-react";
+import { Sparkles, ImageOff, ArrowUpRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { summarizeCreatives, type CreativeRow } from "@/lib/analysis/creative-summary";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Creative Performance per kanaal: hoe de creatives eruit zien (preview), hoe ze presteerden
 // (metrics per creative) en een deterministische samenvatting + aanbevelingen eronder — zodat
@@ -158,7 +159,7 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
   const summary = useMemo(() => (cards ? summarizeCreatives(cards) : null), [cards]);
 
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
-  if (cards === null) return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+  if (cards === null) return <Laadvlak vorm="kaartjes" regels={4} />;
   if (cards.length === 0) {
     return (
       <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">

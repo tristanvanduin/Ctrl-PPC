@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Radar, CheckCircle2, Circle } from "lucide-react";
+import { Radar, CheckCircle2, Circle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   ANALYSE_CATALOGUS,
@@ -10,6 +10,7 @@ import {
   type AnalyseKanaal,
   type AnalyseStatus,
 } from "@/lib/analysis/analysis-catalog";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Wat kan ik hier draaien, en wat heb ik al gedraaid?
 //
@@ -82,7 +83,7 @@ export function AnalysisOverview({
   }, [clientId]);
 
   if (runs === null) {
-    return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+    return <Laadvlak vorm="kaartjes" regels={6} />;
   }
 
   const { uitgevoerd, open } = groepeerOpStatus(runs);

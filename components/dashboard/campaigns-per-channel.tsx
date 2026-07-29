@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
+import { BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { GeoBreakdown } from "./geo-breakdown";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Campagne-overzicht over alle kanalen: op welke kanalen zijn we actief en welke campagnes
 // draaien er per kanaal (beurs-gescoped op de afkorting in de campagnenaam). Leest de campagne-
@@ -102,7 +103,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
   const activeChannels = useMemo(() => (blocks ?? []).filter((b) => b.campaigns.length > 0), [blocks]);
 
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
-  if (blocks === null) return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+  if (blocks === null) return <Laadvlak vorm="tabel" regels={4} titel="Actieve kanalen &amp; campagnes" />;
 
   return (
     <div className="space-y-4">

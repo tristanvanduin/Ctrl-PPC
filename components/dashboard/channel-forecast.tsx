@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, TrendingUp, Info } from "lucide-react";
+import { TrendingUp, Info } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { forecastChannelMetric, type MonthValue } from "@/lib/analysis/channel-forecast";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { resolveChannelConversionConfig, sumSelectedConversions, conversionSourcesFor, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { today as vandaag } from "@/lib/reporting-date";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Run-rate-prognose voor Meta/LinkedIn: lopende maand op tempo + volgende maand via een lichte
 // trend. Eerlijk over de beperking (geen meerjarige historie, dus geen seizoenscorrectie). De
@@ -94,7 +95,7 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
   }, [rows]);
 
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
-  if (rows === null) return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+  if (rows === null) return <Laadvlak vorm="grafiek" hoogte={200} />;
   if (!model) {
     return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">Nog geen {cfg.label}-dagdata voor een prognose. Zodra de sync draait, verschijnt hier de run-rate-prognose.</div>;
   }

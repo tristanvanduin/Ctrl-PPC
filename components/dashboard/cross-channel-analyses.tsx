@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Radar, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Cross-channel-analyse als losse sub-analyse-kaarten — net als de kanalen, maar uit ÉÉN
 // deterministische run. De route (/api/analysis/cross-channel) levert de groepen (funnel,
@@ -55,14 +56,23 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
   const [groups, setGroups] = useState<CrossGroup[] | null>(null);
   const [degradations, setDegradations] = useState<string[]>([]);
 
+  // `groups === null` betekende hier drie dingen tegelijk: aan het laden, niets gevonden, en
+  // opgehaald-maar-mislukt. De weergave koos er één van — de spinner — en dus bleef een klant die
+  // de analyse nooit gedraaid had eindeloos naar een draaiend rondje kijken, terwijl de lege
+  // staat ("Nog geen sub-analyses. Draai de cross-channel-analyse…") er twee regels lager gewoon
+  // stond en alleen niet bereikbaar was. Elke uitgang zet nu een lijst — desnoods een lege.
   const fetchLatest = useCallback(async () => {
     try {
       const res = await fetch(`/api/analysis/cross-channel?client_id=${encodeURIComponent(clientId)}`);
-      if (!res.ok) return;
+      if (!res.ok) { setGroups([]); return; }
       const data = await res.json();
-      if (Array.isArray(data?.groups)) setGroups(data.groups);
+      setGroups(Array.isArray(data?.groups) ? data.groups : []);
       if (data?.groupsDate) setLastDate(data.groupsDate);
-    } catch { /* geen laatste run is geen fout */ }
+    } catch {
+      // Geen laatste run is geen fout — maar het is wél een uitkomst, en die hoort zichtbaar
+      // te worden in plaats van als "nog bezig" te blijven staan.
+      setGroups([]);
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -122,7 +132,7 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
 
       {/* De sub-analyses als losse kaarten. */}
       {groups === null ? (
-        <div className="bg-white rounded-xl border border-border p-6 shadow-sm flex justify-center"><Loader2 className="w-4 h-4 animate-spin text-rm-blue" /></div>
+        <Laadvlak vorm="tekst" regels={3} />
       ) : groups.length === 0 ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-meta text-blue-800 flex gap-2">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />

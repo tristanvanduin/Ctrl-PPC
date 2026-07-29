@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, TrendingDown, Layers } from "lucide-react";
+import { TrendingDown, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { analyzeCreativeFatigue, type CreativePeriodRow, type FatigueStatus } from "@/lib/analysis/creative-fatigue";
 import { analyzeAssetBreakdown, type AssetRow, type AssetVerdict } from "@/lib/analysis/asset-breakdown";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // De grondige creative-uitwerking op het Analyses-tabblad (de quick-scan staat op Overzicht):
 // het CTR-traject per creative over de maanden (vermoeidheid) en — voor Google RSA — welke
@@ -123,7 +124,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
   const breakdown = useMemo(() => (channel === "google" ? analyzeAssetBreakdown(assetRows) : null), [assetRows, channel]);
 
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
-  if (periodRows === null) return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+  if (periodRows === null) return <Laadvlak vorm="grafiek" hoogte={200} />;
 
   const flagged = fatigue.filter((f) => f.status === "vermoeid" || f.status === "afnemend");
 

@@ -98,11 +98,13 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
   const totalBleederCost = bleeders.reduce((s, b) => s + b.cost, 0);
   const totalProductBleederCost = productBleeders.reduce((s, p) => s + p.cost, 0);
 
-  const SortTh = ({ col, label, align, breed, bijschrift }: { col: SortKey; label: string; align?: string; breed?: boolean; bijschrift?: string }) => (
+  // Zie campaign-table: een functie die JSX oplevert, geen component dat tijdens de render ontstaat.
+  const sorteerKop = (col: SortKey, label: string, opties: { getal?: boolean; breed?: boolean; bijschrift?: string } = {}) => (
     <SorteerKop
-      getal={align === "right"}
-      breed={breed}
-      bijschrift={bijschrift}
+      key={col}
+      getal={opties.getal}
+      breed={opties.breed}
+      bijschrift={opties.bijschrift}
       actief={sortBy === col}
       richting={sortDir}
       onSorteer={() => handleSort(col)}
@@ -193,11 +195,11 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
         ) : (
           <Tabel>
             <Kop>
-              <SortTh col="term" label="Zoekterm" breed />
+              {sorteerKop("term", "Zoekterm", { breed: true })}
               <KolomKop>Campagne</KolomKop>
               <KolomKop>Ad Group</KolomKop>
-              <SortTh col="clicks" label="Clicks" align="right" />
-              <SortTh col="cost" label="Kosten" align="right" bijschrift="aandeel" />
+              {sorteerKop("clicks", "Clicks", { getal: true })}
+              {sorteerKop("cost", "Kosten", { getal: true, bijschrift: "aandeel" })}
               <KolomKop getal>Conv.</KolomKop>
             </Kop>
             <Body>

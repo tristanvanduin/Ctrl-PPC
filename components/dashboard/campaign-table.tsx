@@ -141,10 +141,17 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
   }, [campaigns]);
 
   // Get unique countries for filter — prefer API-detected countries (from geo data), fallback to campaign-derived
+  //
+  // De waarde staat bewust buiten de memo. Binnenin stond `dataState?.detectedCountries` terwijl de
+  // dependency-lijst dat pad ook noemde; de React-compiler leidde daaruit `dataState` af — breder
+  // dan wat er stond — en sloeg het optimaliseren van dit hele component daarom over. Dat is de
+  // grootste tabel van de pagina. Eén const ervoor en de afgeleide en de opgegeven afhankelijkheid
+  // zijn weer dezelfde.
+  const gedetecteerdeLanden = dataState?.detectedCountries;
   const countries = useMemo(() => {
     // If API provides detected countries from geo data, use those
-    if (dataState?.detectedCountries && dataState.detectedCountries.length > 0) {
-      return dataState.detectedCountries;
+    if (gedetecteerdeLanden && gedetecteerdeLanden.length > 0) {
+      return gedetecteerdeLanden;
     }
     // Fallback: extract from campaign data
     const counts = new Map<string, number>();
@@ -154,7 +161,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([code]) => code);
-  }, [campaigns, dataState?.detectedCountries]);
+  }, [campaigns, gedetecteerdeLanden]);
 
   const showCountryFilter = countries.length > 1;
 
@@ -222,10 +229,13 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
     );
   }
 
-  const SortTh = ({ col, label, align, breed }: { col: SortKey; label: string; align?: string; breed?: boolean }) => (
+  // Bewust een functie die JSX oplevert en geen component: een component dat tijdens de render
+  // wordt gedefinieerd, is elke render een nieuw type, en dan hangt React de hele kop opnieuw op.
+  const sorteerKop = (col: SortKey, label: string, opties: { getal?: boolean; breed?: boolean } = {}) => (
     <SorteerKop
-      getal={align === "right"}
-      breed={breed}
+      key={col}
+      getal={opties.getal}
+      breed={opties.breed}
       actief={sortBy === col}
       richting={sortDir}
       onSorteer={() => handleSort(col)}
@@ -318,13 +328,13 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
       {/* Table */}
       <Tabel>
         <Kop>
-          <SortTh col="name" label="Campagne" breed />
+          {sorteerKop("name", "Campagne", { breed: true })}
           <KolomKop>Type</KolomKop>
           <KolomKop>Bidding</KolomKop>
-          <SortTh col="impressions" label="Impressies" align="right" />
-          <SortTh col="spend" label="Spend" align="right" />
-          <SortTh col="conversions" label="Conv." align="right" />
-          <SortTh col="cpa" label="CPA" align="right" />
+          {sorteerKop("impressions", "Impressies", { getal: true })}
+          {sorteerKop("spend", "Spend", { getal: true })}
+          {sorteerKop("conversions", "Conv.", { getal: true })}
+          {sorteerKop("cpa", "CPA", { getal: true })}
           <KolomKop getal>Structuur</KolomKop>
         </Kop>
         <Body>

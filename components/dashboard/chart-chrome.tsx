@@ -21,9 +21,33 @@ import { CHART_GRID, CHART_AXIS } from "@/lib/branding/chart-colors";
 
 export function kortGetal(v: number): string {
   const a = Math.abs(v);
-  if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1).replace(".", ",")}M`;
-  if (a >= 1_000) return `${(v / 1_000).toFixed(a >= 10_000 ? 0 : 1).replace(".", ",")}k`;
+  if (a >= 1_000_000) return `${kort(v / 1_000_000, a >= 10_000_000)}M`;
+  if (a >= 1_000) return `${kort(v / 1_000, a >= 10_000)}k`;
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(v);
+}
+
+/**
+ * Eén decimaal, maar niet als die nul is. Op een as met de stappen 0 / 5k / 10k / 15k stond
+ * "€ 5,0k" tussen "€ 10k" en "€ 15k": dezelfde grootheid, drie keer anders geschreven. De komma-nul
+ * draagt geen informatie — hij is er alleen omdat 5000 onder de tienduizend valt.
+ */
+function kort(v: number, heel: boolean): string {
+  const s = v.toFixed(heel ? 0 : 1);
+  return (s.endsWith(".0") ? s.slice(0, -2) : s).replace(".", ",");
+}
+
+/**
+ * Balkbreedte naar het aantal categorieën.
+ *
+ * Een vaste breedte van 26 pixels werkt bij twaalf maanden en valt uit elkaar bij vier: dan staan
+ * er vier dunne staafjes met vierhonderd pixels lucht ertussen, en dat leest als een grafiek waar
+ * data uit is weggevallen. Breder mag daar dus — maar met een plafond, want een breed verzadigd
+ * blok is precies het beeld dat een dashboard goedkoop maakt.
+ */
+export function balkBreedte(aantalCategorieen: number): number {
+  if (aantalCategorieen <= 4) return 48;
+  if (aantalCategorieen <= 8) return 36;
+  return BALK_MAX;
 }
 
 export function kortEuro(v: number): string {
@@ -62,11 +86,26 @@ export function Raster() {
 
 const AS_TICK = { fontSize: 11, fill: CHART_AXIS } as const;
 
-/** De x-as, recessief: geen aslijn, geen tickstreepjes, alleen de tekst. */
+/**
+ * De x-as, recessief: geen aslijn, geen tickstreepjes, alleen de tekst.
+ *
+ * `scale="band"` staat er expliciet en niet op automatisch. Recharts kiest anders per grafiek:
+ * een grafiek mét balken krijgt een band-schaal (categorie = een vak, de balk staat in het
+ * midden), een grafiek met alleen een lijn krijgt een punt-schaal (categorie = een streep, het
+ * eerste punt plakt tegen de linkerrand). Twee panelen onder elkaar — balken boven, lijn onder —
+ * staan dan een halve categoriebreedte uit elkaar.
+ *
+ * Dat was hier niet theoretisch: de balken stonden op 510, 778, 1045 en 1313 pixels en de
+ * lijnpunten op 52, 409, 765 en 1122. Een lezer die de piek in de spend naast het aantal acties
+ * van diezelfde maand legt, las een punt dat tussen twee maanden in hing. Precies het verband dat
+ * het splitsen van de dubbele as moest bewaren, was daarmee weg.
+ */
 export function AsX({ dataKey, formatter }: { dataKey: string; formatter?: (v: string) => string }) {
   return (
     <XAxis
       dataKey={dataKey}
+      type="category"
+      scale="band"
       tick={AS_TICK}
       tickLine={false}
       axisLine={false}
@@ -113,6 +152,27 @@ export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5 }
  */
 export function asSchaal(max: number, gewensteStappen = 4): { domain: [number, number]; tickCount: number } {
   if (!Number.isFinite(max) || max <= 0) return { domain: [0, 1], tickCount: 2 };
+  return kiesSchaal(max, gewensteStappen);
+}
+
+/**
+ * Dezelfde schaal, maar met wat lucht boven de hoogste waarde.
+ *
+ * Voor balken is een strak plafond juist goed: de balk eindigt op zijn waarde en die mag de
+ * bovenrand raken. Voor een lijn niet. Die heeft dikte, en een ronde punt op het hoogste punt is
+ * nog eens vier pixels extra — raakt de waarde het plafond, dan wordt de bovenste helft van de
+ * lijn door de rand van het vlak afgesneden. In de prognosegrafiek lag de lijn op tien pixels van
+ * de bovenkant van een vlak van honderd, en dat las als een lijn die uit beeld liep in plaats van
+ * als een reeks die vlak loopt.
+ *
+ * Acht procent is genoeg om de lijn vrij te laten en weinig genoeg om de vorm niet plat te drukken.
+ */
+export function asSchaalLijn(max: number, gewensteStappen = 4): { domain: [number, number]; tickCount: number } {
+  if (!Number.isFinite(max) || max <= 0) return { domain: [0, 1], tickCount: 2 };
+  return kiesSchaal(max * 1.08, gewensteStappen);
+}
+
+function kiesSchaal(max: number, gewensteStappen: number): { domain: [number, number]; tickCount: number } {
 
   // Alle ronde stappen rond de grootteorde van max/stappen, niet één berekende. Eén stap kiezen
   // uit een formule gaf soms te grof: bij max 47 werd het stap 20 en dus plafond 60, ruim een

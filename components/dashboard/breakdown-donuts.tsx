@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, PieChart } from "lucide-react";
+import { PieChart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
@@ -10,6 +10,7 @@ import { buildNetworkSplit, findImbalances, networkTotals, type NetworkRow } fro
 import { BREAKDOWN_DIMENSIES, metaWaardeLabel, type BreakdownKanaal } from "@/lib/analysis/breakdown-dimensions";
 import { Legenda, type LegendaItem } from "./chart-chrome";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Waar het budget van Meta en LinkedIn landt, per uitsplitsing.
 //
@@ -111,7 +112,7 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
   }, [segmenten, actief]);
 
   if (segmenten === null) {
-    return <div className="bg-white rounded-xl border border-border p-8 shadow-sm flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-rm-blue" /></div>;
+    return <Laadvlak vorm="grafiek" hoogte={200} titel="Waar gaat het budget heen" />;
   }
   // Geen uitsplitsingen gesynct: niets tonen in plaats van een lege ring.
   if (beschikbaar.length === 0 || slices.length === 0) return null;

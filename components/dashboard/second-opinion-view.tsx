@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { computeExecutiveSummary, type AuditScore, type AuditRowResult, type SectionSummary } from "@/lib/second-opinion/types";
+import { getShortlistTemplate, getLonglistTemplate, type TemplateRow } from "@/lib/second-opinion/template";
 import { useGenerationProgress } from "@/lib/use-generation-progress";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
 
@@ -43,6 +44,53 @@ const SCORE_OPTIONS: AuditScore[] = ["Goed", "Voldoende", "Onvoldoende", "Niet b
 
 function getFinalScore(row: AuditRowResult): AuditScore { return row.overrideScore ?? row.score; }
 function getFinalComments(row: AuditRowResult): string { return row.overrideComments ?? row.comments; }
+
+// ── Wat de twee audits inhouden ────────────────────────────────────────────
+// Uit het template geteld en niet uit het hoofd opgeschreven: zo kan het cijfer op de knop niet
+// uit de pas gaan lopen met wat de audit werkelijk doet.
+
+interface Telling { totaal: number; secties: number; uitData: number; niet: number }
+
+function tel(rijen: TemplateRow[]): Telling {
+  return {
+    totaal: rijen.length,
+    secties: new Set(rijen.map((r) => r.section)).size,
+    // "partial" telt mee als uit data af te leiden: er komt een oordeel uit, alleen met minder
+    // zekerheid. "unsupported" niet — daar komt per definitie "niet beoordeeld" uit.
+    uitData: rijen.filter((r) => r.supportStatus !== "unsupported").length,
+    niet: rijen.filter((r) => r.supportStatus === "unsupported").length,
+  };
+}
+
+/** Eén van de twee startknoppen. Zegt hoeveel punten hij nakijkt en over hoeveel categorieën. */
+function AuditKeuze({ icoon, titel, telling, randKleur, bezig, uitgeschakeld, onStart }: {
+  icoon: React.ReactNode;
+  titel: string;
+  telling: Telling;
+  randKleur: string;
+  bezig: boolean;
+  uitgeschakeld: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onStart}
+      disabled={uitgeschakeld}
+      className={`group text-left bg-white rounded-lg border border-border p-4 hover:shadow-sm transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue ${randKleur}`}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        {icoon}
+        <span className="text-sm font-semibold text-gray-900">{titel}</span>
+        {bezig && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground ml-auto" aria-hidden />}
+      </div>
+      <p className="text-meta text-muted-foreground leading-relaxed">
+        {telling.totaal} controlepunten over {telling.secties} categorie{telling.secties === 1 ? "" : "ën"}
+        {telling.niet > 0 && <>, waarvan {telling.uitData} uit accountdata</>}
+      </p>
+    </button>
+  );
+}
 
 export function SecondOpinionView({ clientId, clientName }: Props) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -123,6 +171,10 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
 
   const sections = activeRun?.results ? [...new Set(activeRun.results.map((r) => r.section))] : [];
 
+  // Het template is een constante; één keer tellen per render is verwaarloosbaar en houdt de
+  // knoptekst per definitie gelijk aan wat er daadwerkelijk nagekeken wordt.
+  const dekking = { snel: tel(getShortlistTemplate()), volledig: tel(getLonglistTemplate()) };
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -139,27 +191,63 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
         </div>
       </div>
 
-      {/* ── Audit trigger cards ── */}
+      {/* ── Audit trigger cards ──
+          De aantallen komen uit het template zelf en staan niet in de tekst. Er stond "10 Low
+          Hanging Fruit checks" en "Alle checks over 9 categorieën"; zulke getallen lopen achter
+          zodra iemand een controlepunt toevoegt, en dan staat er een cijfer dat niet klopt op de
+          plek waar de gebruiker een keuze maakt. */}
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => startAudit("quick")} disabled={runningMode !== null}
-          className="group text-left bg-white rounded-lg border border-border p-4 hover:border-amber-300 hover:shadow-sm transition-all disabled:opacity-50">
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className="w-4 h-4 text-amber-500" />
-            <span className="text-sm font-semibold text-gray-900">Snelle Audit</span>
-          </div>
-          <p className="text-meta text-muted-foreground leading-relaxed">10 Low Hanging Fruit checks</p>
-          {runningMode === "quick" && <Loader2 className="w-4 h-4 animate-spin text-amber-500 mt-2" />}
-        </button>
-        <button onClick={() => startAudit("full")} disabled={runningMode !== null}
-          className="group text-left bg-white rounded-lg border border-border p-4 hover:border-orange-300 hover:shadow-sm transition-all disabled:opacity-50">
-          <div className="flex items-center gap-2 mb-1">
-            <Search className="w-4 h-4 text-orange-600" />
-            <span className="text-sm font-semibold text-gray-900">Volledige Audit</span>
-          </div>
-          <p className="text-meta text-muted-foreground leading-relaxed">Alle checks over 9 categorieën</p>
-          {runningMode === "full" && <Loader2 className="w-4 h-4 animate-spin text-orange-500 mt-2" />}
-        </button>
+        <AuditKeuze
+          icoon={<Zap className="w-4 h-4 text-amber-500" />}
+          titel="Snelle audit"
+          telling={dekking.snel}
+          randKleur="hover:border-amber-300"
+          bezig={runningMode === "quick"}
+          uitgeschakeld={runningMode !== null}
+          onStart={() => startAudit("quick")}
+        />
+        <AuditKeuze
+          icoon={<Search className="w-4 h-4 text-orange-600" />}
+          titel="Volledige audit"
+          telling={dekking.volledig}
+          randKleur="hover:border-orange-300"
+          bezig={runningMode === "full"}
+          uitgeschakeld={runningMode !== null}
+          onStart={() => startAudit("full")}
+        />
       </div>
+
+      {/* Wat een audit oplevert, vóórdat je hem draait. Deze pagina eindigde hiervoor onder de twee
+          knoppen: zevenhonderd pixels wit, geen woord over wat er gebeurt als je klikt, hoe lang
+          het duurt of waar de uitkomst landt. Zodra er een run is, is de uitkomst zelf het
+          antwoord en verdwijnt dit blok. */}
+      {!activeRun && runs.length === 0 && !loading && (
+        <div className="bg-white rounded-lg border border-border px-5 py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-muted-foreground" aria-hidden />
+            <h3 className="text-lead font-semibold text-gray-900">Nog geen audit voor deze klant</h3>
+          </div>
+          <p className="text-body text-muted-foreground leading-relaxed max-w-3xl">
+            Een audit loopt de controlepunten van het RAI-template langs en geeft er per punt een
+            oordeel bij — <strong className="text-rm-gray">Goed</strong>,{" "}
+            <strong className="text-rm-gray">Voldoende</strong> of{" "}
+            <strong className="text-rm-gray">Onvoldoende</strong> — met de reden erbij en de impact
+            ernaast. Elk oordeel is met de hand aan te passen; de uitkomst is te downloaden als PDF.
+          </p>
+          <p className="text-body text-muted-foreground leading-relaxed max-w-3xl">
+            {dekking.volledig.niet > 0 ? (
+              <>
+                Van de {dekking.volledig.totaal} controlepunten zijn er{" "}
+                <strong className="text-rm-gray">{dekking.volledig.niet}</strong> niet uit accountdata
+                af te leiden — denk aan wat er op de website staat. Die komen terug als{" "}
+                <em>niet beoordeeld</em> en wachten op jouw oordeel; ze worden niet geraden.
+              </>
+            ) : (
+              <>Alle controlepunten zijn uit accountdata af te leiden.</>
+            )}
+          </p>
+        </div>
+      )}
 
       {(runningMode !== null || progress.job) && (
         <GenerationProgressCard

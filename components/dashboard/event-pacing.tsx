@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, CalendarClock, TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
+import { CalendarClock, TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
+import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Event-relatieve pacing: voor een beurs is "dag X van 365" zinloos. Wat telt is de opbouw tot NU
 // afgezet tegen HETZELFDE punt vóór de vorige editie (op gelijke afstand tot de beursdag,
@@ -45,7 +46,7 @@ export function EventPacing({ clientId, geoClone }: { clientId: string; geoClone
   // en laat het beursoverzicht eronder het werk doen — geen storende foutmelding bovenaan.
   if (error) return null;
   if (!data) {
-    return <div className="bg-white rounded-xl border border-border p-6 shadow-sm flex justify-center"><Loader2 className="w-4 h-4 animate-spin text-rm-blue" /></div>;
+    return <Laadvlak vorm="kaartjes" regels={4} />;
   }
 
   const behind = data.comparable && data.deltaPct != null && data.deltaPct < -0.02;
