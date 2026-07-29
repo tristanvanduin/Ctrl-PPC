@@ -1,13 +1,13 @@
 "use client";
 
-import { ResponsiveContainer, ComposedChart, Bar, Line, LineChart } from "recharts";
+import { ResponsiveContainer, ComposedChart, Bar, Line, LineChart, LabelList } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
 import {
   Raster, AsX, AsY, Tip, Legenda, PLOT_MARGE,
   BALK_RADIUS, BALK_GAP, GROEP_GAP,
-  kortEuro, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte, type LegendaItem,
+  kortEuro, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte, PLOT_MARGE_LABELS, type LegendaItem,
 } from "./chart-chrome";
 
 // Maand-trendgrafieken: spend per maand, en dezelfde maanden per kanaal.
@@ -95,6 +95,29 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
   );
 }
 
+/**
+ * De naam van een serie, één keer, boven zijn balk in de laatste groep.
+ *
+ * De labelprops van recharts zijn per versie anders getypeerd; dit is wat we er werkelijk uit
+ * lezen. `index` is de positie in de reeks, dus alleen de laatste krijgt tekst.
+ */
+interface LabelProps { x?: number; y?: number; width?: number; index?: number }
+
+function SerieNaam({ x, y, width, index, naam, laatste }: LabelProps & { naam: string; laatste: number }) {
+  if (index !== laatste || x == null || y == null || width == null) return null;
+  return (
+    <text
+      x={x + width / 2}
+      y={y - 6}
+      textAnchor="middle"
+      className="fill-muted-foreground"
+      style={{ fontSize: 10, fontWeight: 500 }}
+    >
+      {naam}
+    </text>
+  );
+}
+
 // Gegroepeerde maandbalken per serie (bijv. spend per kanaal): categorische vergelijking, dus het
 // gevalideerde categorische palet (kleurenblind-veilig, merk-onafhankelijk).
 
@@ -110,6 +133,16 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
   // Kleur volgt de serie op zijn vaste plek in het palet, niet zijn rang in deze grafiek: valt er
   // een kanaal weg, dan houden de overige hun kleur.
   const kleurVan = (i: number) => CHART_CATEGORICAL[i % CHART_CATEGORICAL.length];
+  // De laatste maand waarin déze serie iets heeft, en niet simpelweg de laatste maand van de
+  // grafiek. Meta en LinkedIn beginnen hier pas in maart, dus recharts geeft hun labels een index
+  // van 0 tot 4 terwijl Google er zes heeft: vergelijken met `data.length - 1` liet twee van de
+  // drie namen weg. Dat was in de code niet te zien en in de types ook niet — alleen in de DOM,
+  // waar drie labellijsten stonden en er één tekst in zat.
+  const laatsteMetWaarde = (serie: string): number => {
+    let n = -1;
+    for (const rij of data) if (Number(rij[serie] ?? 0) > 0) n += 1;
+    return n;
+  };
   const hoogste = Math.max(0, ...data.flatMap((r) => series.map((s) => Number(r[s] ?? 0))));
   const schaal = asSchaal(hoogste);
   const legenda: LegendaItem[] = series.map((s, i) => ({ label: s, kleur: kleurVan(i) }));
@@ -124,13 +157,27 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
       </div>
       <div className="px-3 py-4" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={PLOT_MARGE} barCategoryGap={GROEP_GAP} barGap={BALK_GAP}>
+          <ComposedChart data={data} margin={PLOT_MARGE_LABELS} barCategoryGap={GROEP_GAP} barGap={BALK_GAP}>
             <Raster />
             <AsX dataKey="maand" formatter={maandLabel} />
             <AsY formatter={kortEuro} {...schaal} />
             <Tip formatter={volledigEuro} />
             {series.map((s, i) => (
-              <Bar key={s} dataKey={s} name={s} fill={kleurVan(i)} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)} />
+              <Bar key={s} dataKey={s} name={s} fill={kleurVan(i)} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)}>
+                {/* Eén label per serie, boven de laatste maand.
+                    Bij drie of meer series mag kleur niet de enige drager van identiteit zijn — en
+                    dit palet haalt op drie tinten geen 3:1 tegen het vlak, wat zichtbare labels
+                    verplicht maakt in plaats van optioneel. Een getal boven élke balk zou het
+                    tegenovergestelde zijn: achttien labels is geen kaart meer maar een tabel met
+                    staafjes. Alleen de laatste groep dus: daar staat de naam waar je oog toch al
+                    eindigt, en de legenda blijft voor de rest. */}
+                <LabelList
+                  dataKey={s}
+                  position="top"
+                  offset={8}
+                  content={(props: unknown) => <SerieNaam {...(props as LabelProps)} naam={s} laatste={laatsteMetWaarde(s)} />}
+                />
+              </Bar>
             ))}
           </ComposedChart>
         </ResponsiveContainer>

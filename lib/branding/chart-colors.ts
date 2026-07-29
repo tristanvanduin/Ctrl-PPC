@@ -9,15 +9,27 @@
 // (validate_palette.js: alle harde checks PASS in light-mode; CVD-veilig op de aangrenzende
 // paren). Volgorde is de veiligheidsmechanisme — niet cosmetisch — dus niet herschikken.
 
+//
+// BEIDE MODI ZIJN GEKOZEN, NIET GESPIEGELD
+//
+// Toen de donkere modus erbij kwam, bleef dit palet staan zoals het was. De validator zegt
+// waarom dat fout is: tegen een donker vlak vallen vier van de acht buiten de lichtheidsband
+// (`FAIL Lightness band: #eb6834, #eda100, #e87ba4, #4a3aa7`). Een palet dat op wit is gekozen
+// is niet automatisch goed op zwart — het is dezelfde acht tinten, opnieuw getrapt voor het
+// andere vlak. De donkere kolom hieronder komt uit de richtlijn en haalt in donker álle checks,
+// inclusief de contrastcheck die in de lichte modus nog een WARN geeft.
+//
+// De waarden staan als CSS-variabele zodat het omschakelen geen JavaScript kost en een SVG-fill
+// hem net zo goed leest als een HTML-blokje. De lichte waarde staat als terugval in de var().
 export const CHART_CATEGORICAL = [
-  "#2a78d6", // blauw
-  "#eb6834", // oranje
-  "#1baf7a", // aqua
-  "#eda100", // geel
-  "#e87ba4", // magenta
-  "#008300", // groen
-  "#4a3aa7", // violet
-  "#e34948", // rood
+  "var(--serie-1, #2a78d6)", // blauw
+  "var(--serie-2, #eb6834)", // oranje
+  "var(--serie-3, #1baf7a)", // aqua
+  "var(--serie-4, #eda100)", // geel
+  "var(--serie-5, #e87ba4)", // magenta
+  "var(--serie-6, #008300)", // groen
+  "var(--serie-7, #4a3aa7)", // violet
+  "var(--serie-8, #e34948)", // rood
 ] as const;
 
 // Recessieve chrome voor grafieken (raster + as-tekst), consistent over alle charts.

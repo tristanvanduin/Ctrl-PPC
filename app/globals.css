@@ -181,6 +181,18 @@
   --hover-vlak: rgba(15, 23, 42, 0.04);
   --rij-hover: rgb(249 250 251 / 0.8);
 
+  /* Het categorische grafiekpalet — de gevalideerde referentievolgorde. De volgorde is het
+     veiligheidsmechanisme (aangrenzende paren zijn getoetst op kleurenblindheid), dus niet
+     herschikken. Zie lib/branding/chart-colors.ts. */
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
+  --serie-3: #1baf7a;
+  --serie-4: #eda100;
+  --serie-5: #e87ba4;
+  --serie-6: #008300;
+  --serie-7: #4a3aa7;
+  --serie-8: #e34948;
+
   /* De kaart. `--kaart-laag` is de kleur bij nul en `--kaart-hoog` die bij het maximum; de
      landen ertussenin worden in de browser gemengd. `--kaart-leeg` is een land zonder data. */
   --kaart-laag: #e6eef8;
@@ -273,6 +285,18 @@
   --kaart-rand: #0f1115;
   --kaart-hover: #ffffff;
   --preview-vlak: #e9ecf1;
+
+  /* Dezelfde acht tinten, opnieuw getrapt voor een donker vlak. Niet een gespiegeld palet maar
+     een gekozen palet: de lichte waarden vallen hier buiten de lichtheidsband. Deze haalt in
+     donker alle checks van de validator, inclusief contrast. */
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
+  --serie-3: #199e70;
+  --serie-4: #c98500;
+  --serie-5: #d55181;
+  --serie-6: #008300;
+  --serie-7: #9085e9;
+  --serie-8: #e66767;
   --kaart-lijn: #252a34;
   --kaart-schaduw: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.6);
 
@@ -412,7 +436,18 @@
       var(--brand-primary, #08288C) 18rem,
       transparent 18rem
     );
-    background-repeat: no-repeat;
+    /* `repeat-y` en niet `no-repeat`.
+     *
+     * Het `body`-element is hier 3454 pixels hoog, maar zijn achtergrond wordt door de browser
+     * doorgegeven aan het canvas — en het positioneringsvlak dáárvan is dat van het wortelelement,
+     * en `html` staat op `h-full`: precies één schermhoogte. Met `no-repeat` werd het verloop dus
+     * één keer over 1200 pixels getekend en hield de groene kolom daar op, ongeacht hoe lang de
+     * pagina was. Dat is wat er nog stond nadat ik dacht het opgelost te hebben.
+     *
+     * Verticaal herhalen lost dat op zonder naad: het verloop loopt alleen naar rechts, dus elke
+     * herhaling ziet er identiek uit. Horizontaal herhalen zou wél fout zijn — dan tegelt de
+     * groene kolom over de hele breedte. */
+    background-repeat: repeat-y;
   }
   html {
     @apply font-sans;

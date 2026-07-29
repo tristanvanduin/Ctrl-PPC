@@ -206,6 +206,17 @@ function kiesSchaal(max: number, gewensteStappen: number): { domain: [number, nu
 /** Ruimte rond de plot. Rechts wat lucht zodat het laatste punt niet tegen de rand plakt. */
 export const PLOT_MARGE = { top: 8, right: 16, left: 0, bottom: 4 } as const;
 
+/**
+ * Dezelfde marge, maar met ruimte rechts en boven voor directe labels.
+ *
+ * Een serienaam boven de laatste balk staat gecentreerd op die balk, en de laatste balk staat
+ * tegen de rechterrand. Met de gewone marge van zestien pixels liep "LinkedIn" het vlak uit — te
+ * zien in de schermafdruk, niet in de code en niet in de types. Zesenvijftig is genoeg voor de
+ * halve breedte van het langste kanaallabel; boven twintig zodat het label van de hoogste balk
+ * niet tegen de bovenrand plakt.
+ */
+export const PLOT_MARGE_LABELS = { top: 20, right: 56, left: 0, bottom: 4 } as const;
+
 // ── Tooltip ────────────────────────────────────────────────────────────────
 
 /**
