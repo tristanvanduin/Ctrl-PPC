@@ -17,12 +17,16 @@ export function ScriptLibrary() {
 
   const fetchScripts = useCallback(async () => {
     if (!supabase) { setLoading(false); return; }
-    const { data } = await supabase
-      .from("scripts")
-      .select("*")
-      .order("updated_at", { ascending: false });
-    setScripts(data ?? []);
-    setLoading(false);
+    // Zie client-notes: een laadtoestand zonder finally eindigt bij een fout nooit.
+    try {
+      const { data } = await supabase
+        .from("scripts")
+        .select("*")
+        .order("updated_at", { ascending: false });
+      setScripts(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchScripts(); }, [fetchScripts]);

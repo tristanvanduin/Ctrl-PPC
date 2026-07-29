@@ -98,13 +98,19 @@ export function ClientNotes({ clientId }: { clientId: string }) {
 
   const fetchNotes = useCallback(async () => {
     if (!supabase) { setLoading(false); return; }
-    const { data } = await supabase
-      .from("client_notes")
-      .select("*")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-    setNotes(data ?? []);
-    setLoading(false);
+    // try/finally om de laadtoestand: zonder dit blijft de spinner bij een afwijzing voor altijd
+    // staan, en dan is niet te zien of het traag is, leeg, of stuk. Ditzelfde patroon liet de
+    // sprintpagina oneindig laden.
+    try {
+      const { data } = await supabase
+        .from("client_notes")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+      setNotes(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => { fetchNotes(); }, [fetchNotes]);

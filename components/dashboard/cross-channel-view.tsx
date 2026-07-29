@@ -6,6 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
 import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
+import { RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
+import { maandLabel } from "./chart-chrome";
+import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 
 // Cross-channel (blended) tab. Leest de blended_account_monthly-view over Google, Meta en
 // LinkedIn heen. De view levert de bouwstenen; de attributie-voetnoot is verplicht, want elk
@@ -29,12 +33,21 @@ const CHANNEL_LABEL: Record<string, string> = {
   linkedin_ads: "LinkedIn",
 };
 
+// Bedragen dragen hun valutateken. Zonder dat staat er "489.160" naast "266.532" en moet je uit
+// de kolomkop afleiden wat geld is en wat een aantal — precies het soort werk dat een tabel je
+// hoort te besparen.
+function eur(n: number | null): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+}
+
 function fmt(n: number | null): string {
   if (n === null || n === undefined) return "—";
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(n);
 }
 
 export function CrossChannelView({ clientId }: { clientId: string }) {
+  const [maandenOpen, toggleMaanden] = useRememberedOpen("cross-maanden", false);
   const [rows, setRows] = useState<BlendedRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,38 +157,116 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
               Nog geen cross-channel data. Zodra minstens één kanaal (Google/Meta/LinkedIn) gesynct is, verschijnt hier de blended maandview.
             </div>
           )}
-          {rows && rows.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-body">
-                <thead>
-                  <tr className="text-left text-muted-foreground border-b border-border">
-                    <th className="py-2 pr-4 font-medium">Maand</th>
-                    <th className="py-2 pr-4 font-medium">Kanaal</th>
-                    <th className="py-2 pr-4 font-medium text-right">Spend</th>
-                    <th className="py-2 pr-4 font-medium text-right">Klikken</th>
-                    <th className="py-2 pr-4 font-medium text-right">Conversies</th>
-                    <th className="py-2 pr-4 font-medium text-right">Conv.waarde</th>
-                    <th className="py-2 font-medium">Valuta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {months.map((m) =>
-                    rows.filter((r) => r.month === m).map((r, i) => (
-                      <tr key={`${m}-${r.channel}`} className="border-b border-border/50">
-                        <td className="py-1.5 pr-4 text-muted-foreground">{i === 0 ? m : ""}</td>
-                        <td className="py-1.5 pr-4 text-rm-gray font-medium">{CHANNEL_LABEL[r.channel] ?? r.channel}</td>
-                        <td className="py-1.5 pr-4 text-right">{fmt(r.spend)}</td>
-                        <td className="py-1.5 pr-4 text-right">{fmt(r.clicks)}</td>
-                        <td className="py-1.5 pr-4 text-right">{fmt(r.conversions)}</td>
-                        <td className="py-1.5 pr-4 text-right">{fmt(r.conversion_value)}</td>
-                        <td className="py-1.5 text-muted-foreground">{r.currency ?? "—"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {rows && rows.length > 0 && (() => {
+            // WAAROM DIT GEEN PLATTE LIJST MEER IS
+            //
+            // Hier stonden alle (maand × kanaal)-rijen onder elkaar: veertig regels ruwe data,
+            // met de maand alleen op de eerste regel van elke groep en lege cellen daaronder.
+            // Dat beantwoordt de vraag niet die je stelt als je hier komt — hoe verdeelt mijn
+            // budget zich over de kanalen, en wat levert elk kanaal op. Die stond nergens; je
+            // moest hem zelf optellen uit veertig regels.
+            //
+            // Nu eerst de kanaaltotalen (drie regels, met de verhouding zichtbaar), en de
+            // maanddetails eronder achter een klik. De ruwe cijfers zijn niet weg; ze zijn alleen
+            // niet meer het eerste wat je ziet.
+            const perKanaal = new Map<string, { spend: number; clicks: number; conversions: number; waarde: number }>();
+            for (const r of rows) {
+              const k = CHANNEL_LABEL[r.channel] ?? r.channel;
+              const a = perKanaal.get(k) ?? { spend: 0, clicks: 0, conversions: 0, waarde: 0 };
+              a.spend += r.spend ?? 0;
+              a.clicks += r.clicks ?? 0;
+              a.conversions += r.conversions ?? 0;
+              a.waarde += r.conversion_value ?? 0;
+              perKanaal.set(k, a);
+            }
+            const kanalen = [...perKanaal.entries()].sort((a, b) => b[1].spend - a[1].spend);
+            const grootsteSpend = Math.max(0, ...kanalen.map(([, a]) => a.spend));
+            const grootsteConv = Math.max(0, ...kanalen.map(([, a]) => a.conversions));
+            const tot = kanalen.reduce((s, [, a]) => ({
+              spend: s.spend + a.spend, clicks: s.clicks + a.clicks,
+              conversions: s.conversions + a.conversions, waarde: s.waarde + a.waarde,
+            }), { spend: 0, clicks: 0, conversions: 0, waarde: 0 });
+
+            return (
+              <>
+                <Tabel>
+                  <Kop>
+                    <KolomKop breed>Kanaal</KolomKop>
+                    <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+                    <KolomKop getal>Klikken</KolomKop>
+                    <KolomKop getal bijschrift="aandeel">Conversies</KolomKop>
+                    <KolomKop getal>Conv.waarde</KolomKop>
+                    <KolomKop getal>CPA</KolomKop>
+                  </Kop>
+                  <Body>
+                    {kanalen.map(([naam, a]) => (
+                      <Rij key={naam}>
+                        <NaamCel>{naam}</NaamCel>
+                        <AandeelCel waarde={eur(a.spend)} aandeel={grootsteSpend > 0 ? a.spend / grootsteSpend : 0} />
+                        <GetalCel zacht>{fmt(a.clicks)}</GetalCel>
+                        <AandeelCel
+                          waarde={fmt(a.conversions)}
+                          aandeel={grootsteConv > 0 ? a.conversions / grootsteConv : 0}
+                          kleur={CHART_CATEGORICAL[2]}
+                        />
+                        <GetalCel zacht>{a.waarde > 0 ? eur(a.waarde) : "—"}</GetalCel>
+                        <GetalCel zacht>{a.conversions > 0 ? eur(a.spend / a.conversions) : "—"}</GetalCel>
+                      </Rij>
+                    ))}
+                  </Body>
+                  <TotaalRij>
+                    <TotaalCel>Totaal ({chartMonths.length} maanden)</TotaalCel>
+                    <TotaalCel getal>{eur(tot.spend)}</TotaalCel>
+                    <TotaalCel getal>{fmt(tot.clicks)}</TotaalCel>
+                    <TotaalCel getal>{fmt(tot.conversions)}</TotaalCel>
+                    <TotaalCel getal>{tot.waarde > 0 ? eur(tot.waarde) : "—"}</TotaalCel>
+                    {/* De CPA uit de totalen, niet als gemiddelde van de kanaal-CPA's: dat zou
+                        LinkedIn even zwaar laten wegen als Google. */}
+                    <TotaalCel getal>{tot.conversions > 0 ? eur(tot.spend / tot.conversions) : "—"}</TotaalCel>
+                  </TotaalRij>
+                </Tabel>
+
+                <div className="-mx-5 mt-4">
+                  <RegioToggle
+                    open={maandenOpen}
+                    onToggle={toggleMaanden}
+                    controls="cross-maanden"
+                    label={`de maanden per kanaal (${rows.length} regels)`}
+                  />
+                </div>
+                <div id="cross-maanden" hidden={!maandenOpen} className="-mx-5">
+                  <Tabel>
+                    <Kop>
+                      <KolomKop>Maand</KolomKop>
+                      <KolomKop breed>Kanaal</KolomKop>
+                      <KolomKop getal>Spend</KolomKop>
+                      <KolomKop getal>Klikken</KolomKop>
+                      <KolomKop getal>Conversies</KolomKop>
+                      <KolomKop getal>Conv.waarde</KolomKop>
+                      <KolomKop>Valuta</KolomKop>
+                    </Kop>
+                    <Body>
+                      {months.map((m) =>
+                        rows.filter((r) => r.month === m).map((r, i) => (
+                          <Rij key={`${m}-${r.channel}`}>
+                            {/* De maand alleen op de eerste regel van zijn groep; herhaling maakt
+                                de kolom een muur van dezelfde datum. */}
+                            <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{i === 0 ? maandLabel(m) : ""}</td>
+                            <NaamCel>{CHANNEL_LABEL[r.channel] ?? r.channel}</NaamCel>
+                            <GetalCel>{eur(r.spend)}</GetalCel>
+                            <GetalCel zacht>{fmt(r.clicks)}</GetalCel>
+                            <GetalCel>{fmt(r.conversions)}</GetalCel>
+                            <GetalCel zacht>{eur(r.conversion_value)}</GetalCel>
+                            <td className="px-3 py-2 text-muted-foreground">{r.currency ?? "—"}</td>
+                          </Rij>
+                        ))
+                      )}
+                    </Body>
+                  </Tabel>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>
