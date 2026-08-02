@@ -1,6 +1,6 @@
 "use client";
 
-import { ResponsiveContainer, ComposedChart, Bar, Line, LineChart, LabelList } from "recharts";
+import { ResponsiveContainer, ComposedChart, Bar, Area, AreaChart, LabelList } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
@@ -8,8 +8,8 @@ import {
   Raster, AsX, AsY, Tip, Legenda, PLOT_MARGE,
   BALK_RADIUS, BALK_GAP, GROEP_GAP,
   kortEuro, kortEuroLabel, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte,
-  PLOT_MARGE_LABELS, PLOT_MARGE_WAARDEN, plotBreedte,
-  BalkVerloop, verloopId, type LegendaItem,
+  PLOT_MARGE_LABELS, PLOT_MARGE_WAARDEN, PLOT_MARGE_EIND, plotBreedte,
+  BalkVerloop, VlakWas, verloopId, type LegendaItem,
 } from "./chart-chrome";
 
 // Maand-trendgrafieken: spend per maand, en dezelfde maanden per kanaal.
@@ -54,6 +54,31 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
   // het kopje van het paneel staan links, dus een gecentreerde plot zweeft weg van zijn eigen kop
   // en er valt een gat linksonder. Zichtbaar in de schermafdruk, niet in de code.
   const vlak = { maxWidth: plotBreedte(rows.length) } as const;
+  // Bij een handvol balken draagt elke balk zijn eigen bedrag, en vervalt het raster eronder.
+  const elkBedragErbij = rows.length <= 8;
+
+  // Wat er in de overgebleven breedte staat.
+  //
+  // De plot is zo breed als de data (zie `plotBreedte`), en bij vier maanden blijft er een halve
+  // kaart over. Die leeg laten was eerlijk maar niet af: een kaart die voor de helft niets doet
+  // leest als een kaart die niet af is. Wat er nu staat is geen opvulling maar de drie vragen die
+  // je bij een reeks stelt en die je uit balkjes moet optellen — hoeveel bij elkaar, hoeveel per
+  // maand, en hoeveel is het opgelopen.
+  //
+  // Bewust de maanden van déze grafiek en niet die van de periodekeuze erboven: dat zijn andere
+  // maanden (alleen de volle), en daarom staat het aantal er expliciet bij.
+  const totaal = rows.reduce((t, r) => t + r.spend, 0);
+  const eerste = rows[0].spend;
+  const laatste = rows[rows.length - 1].spend;
+  const verloop = eerste > 0 ? ((laatste - eerste) / eerste) * 100 : null;
+  const kerncijfers = [
+    { label: `Totaal over ${rows.length} maanden`, waarde: volledigEuro(totaal) },
+    { label: "Gemiddeld per maand", waarde: volledigEuro(Math.round(totaal / rows.length)) },
+    {
+      label: `Van ${maandLabel(rows[0].maand)} naar ${maandLabel(rows[rows.length - 1].maand)}`,
+      waarde: verloop === null ? "—" : `${verloop > 0 ? "+" : ""}${verloop.toFixed(0)}%`,
+    },
+  ];
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -63,24 +88,30 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
         <span className="text-meta text-muted-foreground">spend en {lineLabel.toLowerCase()}, zelfde maanden</span>
       </div>
 
+      {/* De plot links, de kerncijfers in de breedte die overblijft. Onder de brede breekpunten
+          vallen de cijfers weg: dan vult de plot de kaart al en zou een tweede kolom hem knijpen. */}
+      <div className="flex items-stretch">
+      <div className="min-w-0 flex-1">
       <div className="px-3 pt-4 pb-1" style={vlak}>
         <p className="px-2 text-micro font-medium text-muted-foreground uppercase tracking-wider mb-1">Spend</p>
         <div style={{ height: hoogBoven }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={rows} margin={rows.length <= 8 ? PLOT_MARGE_WAARDEN : PLOT_MARGE} barCategoryGap={GROEP_GAP}>
-              <Raster />
+            <ComposedChart data={rows} margin={elkBedragErbij ? PLOT_MARGE_WAARDEN : PLOT_MARGE} barCategoryGap={GROEP_GAP}>
+              {/* Of het raster, of de bedragen — niet allebei.
+                  Eerst stond hier allebei: vier balken met "€ 10k" tot "€ 13k" op de kop, en
+                  daarnaast een as met 0 / 5k / 10k / 15k. Acht getallen voor vier waarden. De
+                  mark-specificatie zegt het in één zin: de asgetallen dragen wat je niet direct
+                  gelabeld hebt, dus houd ze — tenzij élke waarde gelabeld is. Bij een handvol
+                  balken is dat laatste het geval, en dan is het raster de tweede kopie. Wat
+                  overblijft is de nullijn, want zonder die ene lijn staan de balken nergens op. */}
+              {!elkBedragErbij && <Raster />}
               {/* Alleen de onderste plot draagt de maandlabels: twee keer dezelfde as is ruis. */}
-              <AsX dataKey="maand" formatter={() => ""} />
-              <AsY formatter={kortEuro} {...schaalSpend} />
+              <AsX dataKey="maand" formatter={() => ""} basislijn={elkBedragErbij} />
+              <AsY formatter={kortEuro} {...schaalSpend} stil={elkBedragErbij} />
               <Tip formatter={volledigEuro} />
               <BalkVerloop id="balk-verloop-spend" kleur={theme.primary} />
               <Bar dataKey="spend" name="Spend" fill="url(#balk-verloop-spend)" radius={BALK_RADIUS} barSize={balkBreedte(rows.length)}>
-                {/* Bij weinig balken draagt elke balk zijn eigen bedrag. "Nooit een getal op elk
-                    punt" gaat over dichte grafieken waar het chaos wordt; bij een handvol balken is
-                    het juist het tegenovergestelde — dan hoeft de lezer niet te mikken op een
-                    hoogte tussen twee rasterlijnen. Vanaf negen balken vervalt het en doet de as
-                    het werk. */}
-                {rows.length <= 8 && (
+                {elkBedragErbij && (
                   <LabelList
                     dataKey="spend"
                     position="top"
@@ -100,22 +131,54 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
         <p className="px-2 text-micro font-medium text-muted-foreground uppercase tracking-wider mb-1">{lineLabel}</p>
         <div style={{ height: hoogOnder }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={rows} margin={PLOT_MARGE}>
+            <AreaChart data={rows} margin={PLOT_MARGE_EIND}>
               <Raster />
               <AsX dataKey="maand" formatter={maandLabel} />
               <AsY {...schaalLijn} />
               <Tip formatter={volledigGetal} />
-              <Line
+              <VlakWas id="lijn-was" kleur={CHART_LINE_SECONDARY} />
+              {/* Drie dingen die dit paneel eerder niet had, en waardoor het las als een vlek in
+                  plaats van als een reeks:
+                  - Punten. Vier maanden zijn vier metingen; zonder punten is niet te zien dát het
+                    er vier zijn, en lijkt het een doorlopende streep. De ring in vlakkleur is geen
+                    versiering maar de scheiding — een randje óm een mark is een anti-pattern, een
+                    gat eromheen is de manier.
+                  - Een wassing van tien procent eronder. Geeft de reeks gewicht zonder een tweede
+                    waarde te suggereren; een verzadigd vlak zou dat wel doen.
+                  - Het laatste getal erbij. Een lijn draagt zijn waarde aan het eind — anders is
+                    het enige wat je kunt aflezen "ongeveer tussen 1k en 2k". */}
+              <Area
                 dataKey="lijn"
                 name={lineLabel}
                 stroke={CHART_LINE_SECONDARY}
                 strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }}
-              />
-            </LineChart>
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="url(#lijn-was)"
+                dot={rows.length <= 12 ? { r: 3.5, strokeWidth: 2, stroke: "var(--card, #fff)", fill: CHART_LINE_SECONDARY } : false}
+                activeDot={{ r: 4.5, strokeWidth: 2, stroke: "var(--card, #fff)" }}
+              >
+                <LabelList
+                  dataKey="lijn"
+                  content={(props: unknown) => (
+                    <EindWaarde {...(props as LabelProps)} laatste={rows.length - 1} tekst={volledigGetal(rows[rows.length - 1].lijn)} />
+                  )}
+                />
+              </Area>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
+      </div>
+      </div>
+
+      <div className="hidden shrink-0 flex-col justify-center gap-6 px-6 py-4 lg:flex" style={{ width: 220 }}>
+        {kerncijfers.map((k) => (
+          <div key={k.label}>
+            <p className="text-micro text-muted-foreground">{k.label}</p>
+            <p className="mt-0.5 text-lg font-semibold leading-none tracking-tight text-rm-gray tabular-nums">{k.waarde}</p>
+          </div>
+        ))}
+      </div>
       </div>
     </div>
   );
@@ -128,6 +191,21 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
  * lezen. `index` is de positie in de reeks, dus alleen de laatste krijgt tekst.
  */
 interface LabelProps { x?: number; y?: number; width?: number; index?: number }
+
+/**
+ * De waarde van een lijn, rechts van zijn laatste punt.
+ *
+ * Naast en niet erboven: boven het punt botst het met de lijn zelf zodra die stijgt. Zes pixels
+ * lucht is genoeg om los te lezen en weinig genoeg om bij het punt te horen.
+ */
+function EindWaarde({ x, y, index, laatste, tekst }: LabelProps & { laatste: number; tekst: string }) {
+  if (index !== laatste || x == null || y == null) return null;
+  return (
+    <text x={x + 8} y={y + 4} className="fill-muted-foreground" style={{ fontSize: 10, fontWeight: 500 }}>
+      {tekst}
+    </text>
+  );
+}
 
 function SerieNaam({ x, y, width, index, naam, laatste }: LabelProps & { naam: string; laatste: number }) {
   if (index !== laatste || x == null || y == null || width == null) return null;
@@ -185,6 +263,18 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
   const schaal = asSchaal(hoogste);
   const legenda: LegendaItem[] = series.map((s, i) => ({ label: s, kleur: kleurVan(i) }));
 
+  // Welke series pas later beginnen, en vanaf wanneer.
+  //
+  // In februari staat hier alleen Google. Een leeg vak leest als nul, en nul leest als "dat kanaal
+  // heeft niets uitgegeven" — terwijl het kanaal er toen gewoon nog niet was. De grafiek kan dat
+  // verschil niet tekenen (een ontbrekende balk en een balk van nul zien er hetzelfde uit), dus
+  // moet hij het zeggen. Eén regel eronder is genoeg; het alternatief — de as afkappen tot de
+  // maanden waarin álles meet — gooit echte Google-data weg om een misverstand te vermijden.
+  const laatstarters = series
+    .map((s) => ({ naam: s, vanaf: data.findIndex((r) => r[s] !== undefined && Number(r[s]) > 0) }))
+    .filter((x) => x.vanaf > 0)
+    .map((x) => ({ ...x, maand: maandLabel(String(data[x.vanaf].maand ?? "")) }));
+
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
@@ -218,6 +308,11 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      {laatstarters.length > 0 && (
+        <p className="px-5 pb-4 -mt-1 text-micro text-muted-foreground">
+          {laatstarters.map((x) => `${x.naam} vanaf ${x.maand}`).join(", ")} — daarvóór is er geen meting, geen nul.
+        </p>
+      )}
     </div>
   );
 }

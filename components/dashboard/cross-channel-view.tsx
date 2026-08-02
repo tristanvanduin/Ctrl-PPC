@@ -103,9 +103,13 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
     );
   }, [rows]);
   const chartSeries = [...new Set((rows ?? []).map((r) => CHANNEL_LABEL[r.channel] ?? r.channel))];
+  // Een maand waarin een kanaal niet gemeten is, krijgt géén nul. Hier stond `row[s] = 0` voor elke
+  // serie, en daardoor las februari als "Meta heeft nul euro uitgegeven" terwijl Meta toen simpelweg
+  // niet liep — de tooltip zei er "€ 0" bij. Een ontbrekende meting als meetwaarde tonen is dezelfde
+  // fout als een lege grafiek als een resultaat tonen. Zonder sleutel tekent recharts niets en zwijgt
+  // de tooltip; wélke series later beginnen, zegt de grafiek er in een voetnoot bij.
   const chartData = chartMonths.map((m) => {
     const row: Record<string, number | string> = { maand: m.slice(0, 7) };
-    for (const s of chartSeries) row[s] = 0;
     for (const r of (rows ?? []).filter((x) => x.month === m)) {
       const label = CHANNEL_LABEL[r.channel] ?? r.channel;
       row[label] = (Number(row[label]) || 0) + (r.spend ?? 0);

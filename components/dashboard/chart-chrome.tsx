@@ -121,7 +121,15 @@ const AS_TICK = { fontSize: 11, fill: CHART_AXIS } as const;
  * van diezelfde maand legt, las een punt dat tussen twee maanden in hing. Precies het verband dat
  * het splitsen van de dubbele as moest bewaren, was daarmee weg.
  */
-export function AsX({ dataKey, formatter }: { dataKey: string; formatter?: (v: string) => string }) {
+export function AsX({ dataKey, formatter, basislijn = false }: {
+  dataKey: string;
+  formatter?: (v: string) => string;
+  /**
+   * Trek de nullijn wél. Nodig in een vlak zonder raster: zonder één horizontale lijn zweven de
+   * balken en is er niets wat "nul" aanwijst.
+   */
+  basislijn?: boolean;
+}) {
   return (
     <XAxis
       dataKey={dataKey}
@@ -129,7 +137,7 @@ export function AsX({ dataKey, formatter }: { dataKey: string; formatter?: (v: s
       scale="band"
       tick={AS_TICK}
       tickLine={false}
-      axisLine={false}
+      axisLine={basislijn ? { stroke: CHART_GRID, strokeWidth: 1 } : false}
       tickMargin={10}
       tickFormatter={formatter}
       minTickGap={16}
@@ -137,13 +145,22 @@ export function AsX({ dataKey, formatter }: { dataKey: string; formatter?: (v: s
   );
 }
 
-/** De y-as, idem, met compacte getallen. `width` houdt de plot links uitgelijnd tussen grafieken. */
-export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5 }: {
+/**
+ * De y-as, idem, met compacte getallen. `width` houdt de plot links uitgelijnd tussen grafieken.
+ *
+ * `stil` houdt die breedte vast maar tekent geen getallen. Dat is voor het geval waarin elke balk
+ * zijn eigen bedrag draagt: dan zijn de asgetallen dezelfde informatie voor de tweede keer. Zonder
+ * de as helemaal weg te laten, want twee panelen boven elkaar moeten links op dezelfde pixel
+ * beginnen — anders staan de balken en de lijn eronder niet meer boven elkaar.
+ */
+export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5, stil = false }: {
   formatter?: (v: number) => string;
   width?: number;
   domain?: [number | string, number | string];
   tickCount?: number;
+  stil?: boolean;
 }) {
+  if (stil) return <YAxis tick={false} tickLine={false} axisLine={false} width={width} domain={domain} tickCount={tickCount} />;
   return (
     <YAxis
       tick={AS_TICK}
@@ -248,6 +265,9 @@ export const PLOT_MARGE_LABELS = { top: 20, right: 56, left: 0, bottom: 4 } as c
  */
 export const PLOT_MARGE_WAARDEN = { top: 22, right: 16, left: 0, bottom: 4 } as const;
 
+/** Marge voor een lijn die zijn laatste waarde náást het eindpunt draagt. */
+export const PLOT_MARGE_EIND = { top: 12, right: 52, left: 0, bottom: 4 } as const;
+
 // ── Tooltip ────────────────────────────────────────────────────────────────
 
 /**
@@ -340,13 +360,32 @@ export function Legenda({ items, className = "" }: { items: LegendaItem[]; class
 export function BalkVerloop({ id, kleur }: { id: string; kleur: string }) {
   return (
     <defs>
-      {/* De kleur gaat via `style` en niet via het `stop-color`-attribuut. De seriekleuren zijn
-          `var(--serie-n, …)` zodat ze in donkere modus meebewegen, en een var() wordt alleen
-          vervangen in een echte CSS-declaratie — in een presentatie-attribuut blijft het letterlijk
-          staan en valt de stop terug op zwart. */}
+      {/* De seriekleuren zijn `var(--serie-n, …)` zodat donkere modus meebeweegt. Ik heb eerst
+          `style` gebruikt in de veronderstelling dat een var() in een presentatie-attribuut niet
+          vervangen wordt. Dat is niet zo — nagemeten met twee identieke gradiënten naast elkaar,
+          één met `stop-color` als attribuut en één via style: allebei rgb(42,120,214), geen zwarte
+          terugval. Dus gewoon het attribuut, net als de `stroke` elders in dit bestand. */}
       <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" style={{ stopColor: kleur, stopOpacity: 1 }} />
-        <stop offset="100%" style={{ stopColor: kleur, stopOpacity: 0.72 }} />
+        <stop offset="0%" stopColor={kleur} stopOpacity={1} />
+        <stop offset="100%" stopColor={kleur} stopOpacity={0.72} />
+      </linearGradient>
+    </defs>
+  );
+}
+
+/**
+ * De wassing onder een lijn: dezelfde tint op tien procent, uitlopend naar niets.
+ *
+ * Tien procent is het cijfer uit de mark-specificatie, en de reden staat erbij: een wassing geeft
+ * een reeks gewicht, een verzadigd vlak zou een tweede grootheid suggereren die er niet is. Naar
+ * beneden toe naar nul, zodat de vulling nergens met de nullijn concurreert.
+ */
+export function VlakWas({ id, kleur }: { id: string; kleur: string }) {
+  return (
+    <defs>
+      <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={kleur} stopOpacity={0.1} />
+        <stop offset="100%" stopColor={kleur} stopOpacity={0} />
       </linearGradient>
     </defs>
   );
