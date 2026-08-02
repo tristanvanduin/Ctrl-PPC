@@ -6,6 +6,7 @@ import { Loader2, AlertTriangle, Scale, Eye, CheckCircle2, DatabaseZap, MoonStar
 import { useTodayFeed } from "@/lib/feed/use-today-feed";
 import type { FeedItem, FeedSeverity, FeedChannel } from "@/lib/feed/feed-item";
 import { FeedCard } from "./feed-card";
+import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 // De "Vandaag"-cockpit: cross-client triage. Beantwoordt in één blik — is er iets kapot,
 // welke beslissingen wachten, wat moet vandaag, wat is nieuw, en wie is veilig buiten beeld.
@@ -21,10 +22,16 @@ const BANDS: { key: FeedSeverity; label: string; lede: string; icon: React.React
 ];
 
 function Pulse({ label, value, tone }: { label: string; value: string; tone?: "warn" | "ok" }) {
+  // De pols van de dag. Het kaartje blijft van deze pagina; het cijfer erin komt uit de gedeelde
+  // tegel, zodat het dezelfde maat heeft als hetzelfde soort cijfer op een klantpagina.
   return (
     <div className="bg-card rounded-xl border border-border px-3.5 py-2 shadow-sm min-w-[104px]">
-      <p className="text-meta font-semibold text-muted-foreground">{label}</p>
-      <p className={`text-xl font-bold tabular-nums mt-0.5 ${tone === "warn" ? "text-red-600" : tone === "ok" ? "text-emerald-600" : "text-rm-gray"}`}>{value}</p>
+      <Kerncijfer
+        label={label}
+        waarde={value}
+        formaat="compact"
+        toon={tone === "warn" ? "waarschuwing" : tone === "ok" ? "goed" : undefined}
+      />
     </div>
   );
 }

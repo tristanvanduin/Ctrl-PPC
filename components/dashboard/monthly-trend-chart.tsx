@@ -11,6 +11,7 @@ import {
   PLOT_MARGE_LABELS, PLOT_MARGE_WAARDEN, PLOT_MARGE_EIND, plotBreedte,
   BalkVerloop, VlakWas, verloopId, type LegendaItem,
 } from "./chart-chrome";
+import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 // Maand-trendgrafieken: spend per maand, en dezelfde maanden per kanaal.
 //
@@ -185,10 +186,7 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
 
       <div className="hidden shrink-0 flex-col justify-center gap-6 px-6 py-4 lg:flex" style={{ width: 220 }}>
         {kerncijfers.map((k) => (
-          <div key={k.label}>
-            <p className="text-micro text-muted-foreground">{k.label}</p>
-            <p className="mt-0.5 text-lg font-semibold leading-none tracking-tight text-rm-gray tabular-nums">{k.waarde}</p>
-          </div>
+          <Kerncijfer key={k.label} label={k.label} waarde={k.waarde} formaat="compact" />
         ))}
       </div>
       </div>

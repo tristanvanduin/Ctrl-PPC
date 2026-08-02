@@ -6,6 +6,7 @@ import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas } from "@/lib/forecast-format";
+import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 interface KpiCardProps {
   label: string;
@@ -46,14 +47,11 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
         </div>
       </div>
 
-      {/* Big number: YTD realized */}
+      {/* Het cijfer waar deze kaart om draait, in de gedeelde maat. Stond op text-2xl terwijl
+          hetzelfde soort getal in de periodeband op text-figure staat; dat verschil had geen
+          reden. De rest van de kaart (doel, prognose, voortgang) blijft eigen opbouw. */}
       <div className="mb-4">
-        <p className="text-micro text-muted-foreground uppercase tracking-wider mb-1">
-          Gerealiseerd YTD
-        </p>
-        <p className="text-2xl font-bold text-rm-blue-ink leading-none">
-          {format(realized)}
-        </p>
+        <Kerncijfer label="Gerealiseerd YTD" waarde={format(realized)} />
       </div>
 
       {/* Target + Forecast */}

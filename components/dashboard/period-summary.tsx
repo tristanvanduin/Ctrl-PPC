@@ -6,14 +6,13 @@
 // getallen veranderen mee. Alles komt uit data die de pagina al geladen heeft — er gaat geen
 // query overheen — dus het werkt in demo-modus precies zoals met echte data.
 
-import type { ReactNode } from "react";
-import { TrendingDown, TrendingUp, Minus, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import type { ClientHistoricalData } from "@/lib/types";
 import { usePeriod } from "@/lib/period/period-context";
-import { comparePeriods, type PeriodDelta } from "@/lib/period/apply-period";
+import { comparePeriods } from "@/lib/period/apply-period";
 import { formatRange, formatMonth } from "@/lib/period/period-range";
-import { formatDeltaPercent, formatRoas } from "@/lib/forecast-format";
-import { Sparkline, type SparkBasis } from "@/components/ui/sparkline";
+import { formatRoas } from "@/lib/forecast-format";
+import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 function euro(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -23,64 +22,6 @@ function euro(v: number): string {
 
 function aantal(v: number): string {
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(v);
-}
-
-// Voor kosten is een stijging niet automatisch goed; daarom bepaalt de aanroeper de richting.
-function Delta({ d, hogerIsBeter = true }: { d: PeriodDelta; hogerIsBeter?: boolean }) {
-  if (d.pct === null) {
-    // Van niets naar iets is geen percentage. Een "+100%" of "+∞" tonen zou een precisie
-    // suggereren die er niet is.
-    return (
-      <span className="text-micro text-muted-foreground">
-        {d.vorig === 0 && d.huidig > 0 ? "nieuw in deze periode" : "geen vergelijking mogelijk"}
-      </span>
-    );
-  }
-  const vlak = Math.abs(d.pct) < 0.5;
-  const goed = hogerIsBeter ? d.pct > 0 : d.pct < 0;
-  const kleur = vlak ? "text-muted-foreground" : goed ? "text-green-600" : "text-red-600";
-  const Icoon = vlak ? Minus : d.pct > 0 ? TrendingUp : TrendingDown;
-  return (
-    <span className={`flex items-center gap-1 text-micro ${kleur}`}>
-      <Icoon className="h-3 w-3" />
-      {formatDeltaPercent(d.pct)}
-    </span>
-  );
-}
-
-/**
- * Eén cijfer uit de band: label, getal, en eronder de verandering.
- *
- * `tabular-nums` en een strakke letterafstand horen bij deze maat. Cijfers op 30 pixels vallen
- * zonder die twee uit elkaar — de spatie tussen een 1 en een 4 wordt dan een gat — en juist bij
- * een getal dat de kop van de pagina draagt valt dat op.
- */
-function Cijfer({ label, waarde, reeks, reeksLabel, basis = "nul", children }: {
-  label: string;
-  waarde: string;
-  /** Het verloop over de maanden in deze periode, oud naar nieuw. */
-  reeks?: (number | null)[];
-  reeksLabel?: string;
-  /** Een volume hoort vanaf nul, een verhouding op zijn eigen bereik. Zie `Sparkline`. */
-  basis?: SparkBasis;
-  children?: ReactNode;
-}) {
-  return (
-    <div>
-      <p className="text-micro font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-1.5 text-figure font-semibold leading-none tracking-tight text-rm-gray tabular-nums">{waarde}</p>
-      {/* Het cijfer is een optelsom en verzwijgt daarmee hoe hij tot stand kwam: twaalf gelijke
-          maanden en een half jaar niets gevolgd door een piek geven hetzelfde totaal. De lijn
-          eronder kost twee regels en beantwoordt precies dat verschil. Alleen de vorm, geen as en
-          geen getallen — wie de cijfers wil, vindt ze in de maandtabel. */}
-      {reeks && reeks.length > 1 && (
-        <div className="mt-2">
-          <Sparkline punten={reeks} basis={basis} breedte={72} hoogte={18} titel={reeksLabel} />
-        </div>
-      )}
-      {children && <div className="mt-2">{children}</div>}
-    </div>
-  );
 }
 
 interface Props {
@@ -147,36 +88,41 @@ export function PeriodSummary({ data, compact }: Props) {
           percentage naast een bedrag concurreert met dat bedrag. */}
       <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 lg:grid-cols-5">
         {kaarten.map((k) => (
-          <Cijfer
+          <Kerncijfer
             key={k.label}
             label={k.label}
             waarde={k.waarde}
             reeks={k.reeks}
             reeksLabel={`${k.label} per maand binnen ${formatRange(periode.range)}`}
-          >
-            {k.d && <Delta d={k.d} hogerIsBeter={k.hogerIsBeter} />}
-          </Cijfer>
+            delta={k.d ? {
+              pct: k.d.pct,
+              hogerIsBeter: k.hogerIsBeter,
+              // Van niets naar iets is geen percentage; "+100%" zou een precisie suggereren die
+              // er niet is.
+              leegTekst: k.d.vorig === 0 && k.d.huidig > 0 ? "nieuw in deze periode" : undefined,
+            } : undefined}
+          />
         ))}
         {/* ROAS en CPA zijn verhoudingen en geen volumes, dus hun lijn loopt op het eigen bereik:
             vanaf nul zou een ROAS die tussen 1,4 en 1,7 beweegt een kaarsrechte streep worden en
             precies de beweging verbergen waarvoor je naar een ROAS kijkt. Een maand zonder spend of
             zonder conversies levert geen verhouding op — dat wordt een gat in de lijn en geen nul,
             want nul zou "verdiende niets" betekenen in plaats van "niet te berekenen". */}
-        <Cijfer
+        <Kerncijfer
           label="ROAS"
           waarde={roas === null ? "—" : formatRoas(roas)}
           reeks={reeksVerhouding((m) => (m.adSpend > 0 ? m.revenue / m.adSpend : null))}
           reeksLabel={`ROAS per maand binnen ${formatRange(periode.range)}`}
-          basis="bereik"
+          reeksBasis="bereik"
         />
         {/* Geen conversies betekent geen CPA; een bedrag tonen zou een prijs per conversie
             suggereren die niet bestaat. */}
-        <Cijfer
+        <Kerncijfer
           label="CPA"
           waarde={cpa === null ? "—" : euro(cpa)}
           reeks={reeksVerhouding((m) => (m.conversions > 0 ? m.adSpend / m.conversions : null))}
           reeksLabel={`CPA per maand binnen ${formatRange(periode.range)}`}
-          basis="bereik"
+          reeksBasis="bereik"
         />
       </div>
 

@@ -10,6 +10,7 @@ import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { maandLabel } from "./chart-chrome";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { formatRoas } from "@/lib/forecast-format";
+import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 // Fase 1c: account-brede kaarten kunnen niet per geo-clone gesplitst worden (de account-tabel
 // draagt geen campagnenaam). Daarom her-aggregeren we de KPI's PER geo-clone uit
@@ -30,10 +31,12 @@ function fmtPct(ratio: number | null): string {
 }
 
 function Kpi({ label, value }: { label: string; value: string }) {
+  // Het omhulsel blijft lokaal (deze cijfers staan in eigen kaartjes naast elkaar), het cijfer
+  // zelf komt uit de gedeelde tegel — anders staat hetzelfde soort getal hier weer een maat
+  // kleiner dan in de band bovenaan de pagina.
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3">
-      <div className="text-meta text-muted-foreground">{label}</div>
-      <div className="text-lg font-semibold text-rm-gray mt-0.5">{value}</div>
+    <div className="rounded-lg border border-border bg-card px-4 py-3 h-full">
+      <Kerncijfer label={label} waarde={value} formaat="compact" />
     </div>
   );
 }

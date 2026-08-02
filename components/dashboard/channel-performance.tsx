@@ -9,6 +9,7 @@ import { today as vandaag } from "@/lib/reporting-date";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 // Volwaardige prestatie-view voor Meta en LinkedIn: dezelfde bouwstenen als Google
 // (KPI-kaarten, pacing, maandtabel, grafiek, campagnetabel), gevoed uit de dag-tabellen van
@@ -67,8 +68,11 @@ const CONFIG: Record<ChannelKind, ChannelConfig> = {
 const eur = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v));
 const fmt = (v: number | null, d = 0): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d }).format(v));
 const pctS = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 2 }).format(v));
-const deltaS = (cur: number | null, prev: number | null): string | null =>
-  cur != null && prev != null && prev > 0 ? `${cur >= prev ? "+" : ""}${Math.round(((cur - prev) / prev) * 100)}%` : null;
+// Het percentage als getal en niet als tekst. Als tekst moest de weergave de richting uit het
+// plusteken afleiden (`startsWith("+") ? groen : rood`), en dat is fout zodra lager beter is: een
+// CPL die met twaalf procent stijgt kleurde groen. Wie hoort te stijgen zegt de aanroeper.
+const deltaPct = (cur: number | null, prev: number | null): number | null =>
+  cur != null && prev != null && prev > 0 ? ((cur - prev) / prev) * 100 : null;
 
 interface Agg { impressions: number; clicks: number; spend: number; conv: number }
 const emptyAgg = (): Agg => ({ impressions: 0, clicks: 0, spend: 0, conv: 0 });
@@ -200,14 +204,15 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
   const cpa = (a: Agg): number | null => (a.conv > 0 ? a.spend / a.conv : null);
   const ctr = (a: Agg): number | null => (a.impressions > 0 ? a.clicks / a.impressions : null);
   const chartData = fullMonths.map(([m, a]) => ({ maand: m, spend: Math.round(a.spend), lijn: Math.round(a.conv) }));
-  const pace = deltaS(mtd.spend, prevMtd.spend);
+  const paceP = deltaPct(mtd.spend, prevMtd.spend);
+  const pace = paceP == null ? null : `${paceP >= 0 ? "+" : ""}${Math.round(paceP)}%`;
   const pacePct = mtd.spend > 0 && prevMtd.spend > 0 ? mtd.spend / prevMtd.spend : null;
 
-  const kpis: { label: string; value: string; delta: string | null }[] = [
-    { label: "Spend (28d)", value: eur(recent.spend), delta: deltaS(recent.spend, prior.spend) },
-    { label: `${convLabel} (28d)`, value: fmt(recent.conv, 1), delta: deltaS(recent.conv, prior.conv) },
-    { label: useLeadsLabel ? "CPL (28d)" : "CPA (28d)", value: eur(cpa(recent)), delta: deltaS(cpa(recent), cpa(prior)) },
-    { label: "CTR (28d)", value: pctS(ctr(recent)), delta: deltaS(ctr(recent), ctr(prior)) },
+  const kpis: { label: string; value: string; delta: number | null; hogerIsBeter: boolean }[] = [
+    { label: "Spend (28d)", value: eur(recent.spend), delta: deltaPct(recent.spend, prior.spend), hogerIsBeter: false },
+    { label: `${convLabel} (28d)`, value: fmt(recent.conv, 1), delta: deltaPct(recent.conv, prior.conv), hogerIsBeter: true },
+    { label: useLeadsLabel ? "CPL (28d)" : "CPA (28d)", value: eur(cpa(recent)), delta: deltaPct(cpa(recent), cpa(prior)), hogerIsBeter: false },
+    { label: "CTR (28d)", value: pctS(ctr(recent)), delta: deltaPct(ctr(recent), ctr(prior)), hogerIsBeter: true },
   ];
 
   return (
@@ -226,10 +231,13 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
         </div>
         <div className="px-4 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {kpis.map((k) => (
-            <div key={k.label} className="rounded-lg border border-border bg-card px-4 py-3">
-              <div className="text-meta text-muted-foreground">{k.label}</div>
-              <div className="text-lg font-semibold text-rm-gray mt-0.5">{k.value}</div>
-              {k.delta && <div className={`text-micro mt-0.5 ${k.delta.startsWith("+") ? "text-emerald-600" : "text-red-500"}`}>{k.delta} vs vorige 28d</div>}
+            <div key={k.label} className="rounded-lg border border-border bg-card px-4 py-3 h-full">
+              <Kerncijfer
+                label={k.label}
+                waarde={k.value}
+                formaat="compact"
+                delta={k.delta != null ? { pct: k.delta, hogerIsBeter: k.hogerIsBeter, waartegen: "vs vorige 28d" } : undefined}
+              />
             </div>
           ))}
         </div>

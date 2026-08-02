@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CalendarClock, TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
+import { CalendarClock, Info } from "lucide-react";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 // Event-relatieve pacing: voor een beurs is "dag X van 365" zinloos. Wat telt is de opbouw tot NU
 // afgezet tegen HETZELFDE punt vóór de vorige editie (op gelijke afstand tot de beursdag,
@@ -51,8 +52,6 @@ export function EventPacing({ clientId, geoClone }: { clientId: string; geoClone
 
   const behind = data.comparable && data.deltaPct != null && data.deltaPct < -0.02;
   const ahead = data.comparable && data.deltaPct != null && data.deltaPct > 0.02;
-  const toneClass = behind ? "text-red-600" : ahead ? "text-emerald-600" : "text-rm-gray";
-  const TrendIcon = behind ? TrendingDown : ahead ? TrendingUp : Minus;
   // Spend gelijk of hoger terwijl de opbouw achterloopt = effectiviteitsvraag, geen budgetkwestie.
   const effectivenessNote = behind && data.costDeltaPct != null && data.deltaPct != null && data.costDeltaPct >= data.deltaPct;
 
@@ -81,22 +80,28 @@ export function EventPacing({ clientId, geoClone }: { clientId: string; geoClone
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Kerncijfer
+              label="Opbouw tot nu (deze editie)"
+              waarde={fmt(data.currentCumulative)}
+              formaat="compact"
+              onderschrift="conversies"
+            />
+            <Kerncijfer
+              label="Vorige editie op ditzelfde punt"
+              waarde={fmt(data.previousCumulative)}
+              formaat="compact"
+              onderschrift={`${data.previousEditionId ?? "vorige editie"}, gelijke afstand`}
+            />
             <div>
-              <div className="text-meta text-muted-foreground">Opbouw tot nu (deze editie)</div>
-              <div className="text-lg font-semibold text-rm-gray mt-0.5">{fmt(data.currentCumulative)}</div>
-              <div className="text-micro text-muted-foreground">conversies</div>
-            </div>
-            <div>
-              <div className="text-meta text-muted-foreground">Vorige editie op ditzelfde punt</div>
-              <div className="text-lg font-semibold text-rm-gray mt-0.5">{fmt(data.previousCumulative)}</div>
-              <div className="text-micro text-muted-foreground">{data.previousEditionId ?? "vorige editie"}, gelijke afstand</div>
-            </div>
-            <div>
-              <div className="text-meta text-muted-foreground">Pacing vs vorige editie</div>
-              <div className={`text-lg font-semibold mt-0.5 flex items-center gap-1.5 ${toneClass}`}>
-                <TrendIcon className="w-4 h-4" /> {pct(data.deltaPct)}
-              </div>
-              <div className="text-micro text-muted-foreground">{behind ? "loopt achter" : ahead ? "loopt voor" : "op koers"}</div>
+              {/* Dit cijfer ís de status — het pacing-verschil zelf — dus hier kleurt het getal,
+                  en niet een delta eronder. */}
+              <Kerncijfer
+                label="Pacing vs vorige editie"
+                waarde={pct(data.deltaPct)}
+                formaat="compact"
+                toon={behind ? "waarschuwing" : ahead ? "goed" : undefined}
+                onderschrift={behind ? "loopt achter" : ahead ? "loopt voor" : "op koers"}
+              />
             </div>
           </div>
         )}

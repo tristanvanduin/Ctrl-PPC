@@ -17,6 +17,7 @@ import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } 
 import { cpaTrendFrom } from "@/lib/analysis/trend";
 import { formatRoas, formatPercent } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
+import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 // ─── Account type vocabulary ─────────────────────────────────────────
 
@@ -723,8 +724,9 @@ function KpiCard({
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-      <p className="text-xs text-muted-foreground font-medium mb-2">{label}</p>
-      <p className="text-2xl font-bold text-rm-gray">{fmtVal(realized)}</p>
+      {/* Zelfde cijfer, zelfde maat als elders. De voortgangsbalk en de prognoseregel eronder
+          horen bij deze kaart en blijven van deze kaart. */}
+      <Kerncijfer label={label} waarde={fmtVal(realized)} />
       <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${barPct}%` }} />
       </div>

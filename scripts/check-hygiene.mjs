@@ -38,6 +38,10 @@ const GEDEELD = {
   // basislijn benoemt, zodat de vraag "vanaf nul of niet" per grootheid beantwoord wordt en niet
   // per toevallig gekozen kopie.
   Sparkline: "components/ui/sparkline.tsx",
+  // Hetzelfde cijfer stond op zes plekken in vijf maten: text-figure, text-2xl, text-xl en twee
+  // keer text-lg. Wie doorklikte van het overzicht naar een kanaal zag dezelfde soort getallen
+  // ineens kleiner, zonder dat er iets aan hun belang veranderd was.
+  Kerncijfer: "components/ui/kerncijfer.tsx",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────
