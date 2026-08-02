@@ -32,6 +32,12 @@ const GEDEELD = {
   // kaartenrij bovenaan stond "ROAS 1.56" naast "€ 91.890", waar diezelfde punt het andere
   // betekende. Eén huis, zodat de volgende plek hem niet opnieuw verzint.
   formatRoas: "lib/forecast-format.ts",
+  // Er stonden twee sparklines, en ze verschilden op het enige punt dat telt: de basislijn. De ene
+  // schaalde vanaf nul, de andere vanaf het laagste punt — dezelfde reeks is in de eerste een
+  // rechte streep en in de tweede een steile klim. Nu één component waarin de aanroeper de
+  // basislijn benoemt, zodat de vraag "vanaf nul of niet" per grootheid beantwoord wordt en niet
+  // per toevallig gekozen kopie.
+  Sparkline: "components/ui/sparkline.tsx",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────

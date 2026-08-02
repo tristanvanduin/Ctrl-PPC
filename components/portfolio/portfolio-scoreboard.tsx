@@ -15,6 +15,7 @@ import type { PeriodRange } from "@/lib/period/period-range";
 import { formatRoas } from "@/lib/forecast-format";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Tabel, Kop, KolomKop, SorteerKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "@/components/dashboard/data-table";
+import { Sparkline } from "@/components/ui/sparkline";
 
 // De demo-klant komt niet uit de Google Ads MCC en heeft dus geen gads-id; zonder deze
 // omweg blijft het scorebord in demo-modus leeg terwijl de periodekiezer er wel boven staat.
@@ -107,31 +108,6 @@ function TrendBadge({ value, suffix = "%" }: { value: number | null; suffix?: st
       <Icon className="w-3 h-3" />
       {value > 0 ? "+" : ""}{Math.round(value)}{suffix}
     </span>
-  );
-}
-
-function MiniSparkline({ data }: { data: number[] }) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data, 1);
-  const w = 80;
-  const h = 24;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - (v / max) * (h - 4) - 2;
-    return `${x},${y}`;
-  }).join(" ");
-
-  return (
-    <svg width={w} height={h} className="inline-block">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="#08288C"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 
@@ -405,7 +381,8 @@ function PortfolioScoreboardBody() {
                   ) : <GetalCel>{leeg}</GetalCel>}
                   <Cel>
                     {overview?.monthlyConversions && overview.monthlyConversions.length > 1
-                      ? <MiniSparkline data={overview.monthlyConversions} />
+                      // Conversies zijn een volume, dus vanaf nul: de hoogte ís hier de betekenis.
+                      ? <Sparkline punten={overview.monthlyConversions} basis="nul" titel={`Conversies per maand voor ${client.name}`} />
                       : leeg}
                   </Cel>
                   <Cel>

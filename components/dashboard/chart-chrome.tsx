@@ -379,12 +379,16 @@ export function BalkVerloop({ id, kleur }: { id: string; kleur: string }) {
  * Tien procent is het cijfer uit de mark-specificatie, en de reden staat erbij: een wassing geeft
  * een reeks gewicht, een verzadigd vlak zou een tweede grootheid suggereren die er niet is. Naar
  * beneden toe naar nul, zodat de vulling nergens met de nullijn concurreert.
+ *
+ * De dekking komt uit `--was-dekking` en niet uit dit bestand: op een bijna zwart vlak is tien
+ * procent een veel grotere sprong dan op wit, en las de wassing als een grijze plaat. Nagemeten in
+ * de donkere schermafdruk, niet beredeneerd.
  */
 export function VlakWas({ id, kleur }: { id: string; kleur: string }) {
   return (
     <defs>
       <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor={kleur} stopOpacity={0.1} />
+        <stop offset="0%" stopColor={kleur} stopOpacity="var(--was-dekking, 0.1)" />
         <stop offset="100%" stopColor={kleur} stopOpacity={0} />
       </linearGradient>
     </defs>

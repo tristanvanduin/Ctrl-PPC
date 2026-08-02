@@ -8,7 +8,6 @@ import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { buildNetworkSplit, findImbalances, networkTotals, type NetworkRow } from "@/lib/pmax/network-split";
 import { BREAKDOWN_DIMENSIES, metaWaardeLabel, type BreakdownKanaal } from "@/lib/analysis/breakdown-dimensions";
-import { Legenda, type LegendaItem } from "./chart-chrome";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
 
@@ -19,10 +18,13 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 // alleen de signaal-detectors op het analysetabblad. Wie op het Meta-tabblad keek zag campagnes
 // en verder niets — geen antwoord op "waar zit mijn geld".
 //
-// Twee ringen naast elkaar, net als bij PMax: het kostenaandeel op zichzelf zegt weinig. Pas
-// naast het conversie-aandeel wordt zichtbaar of een segment zijn plek verdient. De rekenkern is
-// dezelfde als die van de PMax-ringen — dat is geen toeval maar dezelfde vraag over een andere
-// dimensie, en dus dezelfde functie.
+// Het kostenaandeel op zichzelf zegt weinig; pas naast het conversie-aandeel wordt zichtbaar of
+// een segment zijn plek verdient. De rekenkern is dezelfde als die van de PMax-ringen — dat is
+// geen toeval maar dezelfde vraag over een andere dimensie, en dus dezelfde functie.
+//
+// De vorm is wél anders geworden. Zie de opmerking bij het strepenraster verderop: twee ringen
+// dwongen de lezer een partje op kleur terug te vinden in de andere ring; twee strepen op één
+// nullijn laten hetzelfde verschil in één blik zien.
 
 const eur = (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 const num = (v: number, d = 0) => new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d }).format(v);
@@ -31,6 +33,70 @@ const pct = (v: number | null) => (v == null ? "—" : new Intl.NumberFormat("nl
 type Kanaal = BreakdownKanaal;
 
 interface Segment { dimensie: string; waarde: string; label: string; spend: number; conversies: number; impressies: number; klikken: number }
+
+/**
+ * Eén streep: een aandeel van nul tot honderd procent, op een gedeelde nullijn.
+ *
+ * De breedte is `aandeel × 100`, geklemd tussen nul en honderd — een aandeel kán niet buiten dat
+ * bereik vallen, maar een deling door nul of een rij die later een andere noemer krijgt wel, en een
+ * streep die buiten zijn spoor loopt liegt over de verhouding.
+ *
+ * Een segment met een aandeel van nul krijgt géén streep van nul pixels maar een zichtbaar
+ * streepje van twee, in een gedempte tint. Anders verdwijnt de rij en lijkt het segment er niet te
+ * zijn, terwijl "dit segment kreeg niets" juist het antwoord is.
+ */
+function Streep({ aandeel, kleur, label }: { aandeel: number | null; kleur: string; label: string }) {
+  const veilig = aandeel == null || !Number.isFinite(aandeel) ? 0 : Math.min(100, Math.max(0, aandeel * 100));
+  const leeg = veilig <= 0;
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--spoor,#eef1f6)]" role="img" aria-label={label}>
+      <div
+        className="h-full rounded-full"
+        style={{ width: leeg ? "2px" : `${veilig}%`, backgroundColor: kleur, opacity: leeg ? 0.35 : 1 }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Per segment twee strepen naast elkaar: welk deel van het budget het kreeg, en welk deel van de
+ * opbrengst het leverde. Dezelfde kleur in beide kolommen, want het is hetzelfde segment; de
+ * vergelijking zit in de lengte en niet in de tint.
+ */
+function AandeelRaster({ slices, kleur, toonConversies, conversieWoord }: {
+  slices: { networkType: string; label: string; costShare: number; conversionShare: number | null }[];
+  kleur: (k: string) => string;
+  toonConversies: boolean;
+  conversieWoord: string;
+}) {
+  const kolommen = toonConversies ? "1fr 1fr" : "1fr";
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-x-6 text-micro font-medium uppercase tracking-wider text-muted-foreground"
+           style={{ gridTemplateColumns: `minmax(0,10rem) ${kolommen}` }}>
+        <span>Segment</span>
+        <span>Aandeel spend</span>
+        {toonConversies && <span>Aandeel {conversieWoord}</span>}
+      </div>
+      {slices.map((s) => (
+        <div key={s.networkType} className="grid items-center gap-x-6 gap-y-1"
+             style={{ gridTemplateColumns: `minmax(0,10rem) ${kolommen}` }}>
+          <span className="truncate text-body text-rm-gray" title={s.label}>{s.label}</span>
+          <div className="flex items-center gap-2">
+            <Streep aandeel={s.costShare} kleur={kleur(s.networkType)} label={`${s.label}: ${pct(s.costShare)} van de spend`} />
+            <span className="w-10 shrink-0 text-right text-micro tabular-nums text-muted-foreground">{pct(s.costShare)}</span>
+          </div>
+          {toonConversies && (
+            <div className="flex items-center gap-2">
+              <Streep aandeel={s.conversionShare} kleur={kleur(s.networkType)} label={`${s.label}: ${pct(s.conversionShare)} van de ${conversieWoord}`} />
+              <span className="w-10 shrink-0 text-right text-micro tabular-nums text-muted-foreground">{pct(s.conversionShare)}</span>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function BreakdownDonuts({ clientId, channel }: { clientId: string; channel: Kanaal }) {
   const [segmenten, setSegmenten] = useState<Segment[] | null>(null);
@@ -119,7 +185,6 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
 
   const conversieWoord = channel === "linkedin" ? "leads" : "conversies";
   const kostenSlices: DonutSlice[] = slices.map((s) => ({ key: s.networkType, label: s.label, value: s.cost, color: kleur(s.networkType) }));
-  const convSlices: DonutSlice[] = slices.map((s) => ({ key: s.networkType, label: s.label, value: s.conversions, color: kleur(s.networkType) }));
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -162,9 +227,17 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
         </div>
       )}
 
+      {/* Eén ring en een strepenraster, en niet twee ringen.
+          Hier stonden twee ringen naast elkaar: kostenaandeel links, conversieaandeel rechts. De
+          vraag van deze kaart is of een segment zijn plek verdient, en dat is een vergelijking
+          tussen twee aandelen van hetzelfde segment — maar om die te maken moest je een partje in
+          de ene ring op kleur terugvinden in de andere en twee hoeken tegen elkaar afwegen. Voor
+          het vergelijken van waarden die dicht bij elkaar liggen is een ring de verkeerde vorm;
+          strepen op één gedeelde nullijn zijn de goede. De ring die blijft doet wat een ring wél
+          kan: in één oogopslag het geheel en het totaalbedrag in het midden. */}
       <div className="px-5 py-5">
-        <div className="flex flex-wrap items-start justify-center gap-10">
-          <figure className="flex flex-col items-center gap-2">
+        <div className="flex flex-wrap items-center gap-8">
+          <figure className="flex shrink-0 flex-col items-center gap-2">
             <DonutChart
               slices={kostenSlices}
               centerValue={eur(totalen.cost)}
@@ -175,27 +248,18 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
             <figcaption className="text-meta font-medium text-rm-gray">Spend</figcaption>
           </figure>
 
-          {totalen.hasConversions && (
-            <figure className="flex flex-col items-center gap-2">
-              <DonutChart
-                slices={convSlices}
-                centerValue={num(totalen.conversions, 1)}
-                centerLabel={conversieWoord}
-                format={(v) => num(v, 1)}
-                ariaLabel={`Verdeling van de ${conversieWoord}: ${slices.map((s) => `${s.label} ${pct(s.conversionShare)}`).join(", ")}`}
-              />
-              <figcaption className="text-meta font-medium text-rm-gray">{conversieWoord === "leads" ? "Leads" : "Conversies"}</figcaption>
-            </figure>
-          )}
+          <div className="min-w-0 flex-1">
+            <AandeelRaster
+              slices={slices}
+              kleur={kleur}
+              toonConversies={totalen.hasConversions}
+              conversieWoord={conversieWoord}
+            />
+          </div>
         </div>
 
-        <Legenda
-          items={slices.map((s) => ({ label: s.label, kleur: kleur(s.networkType) })) as LegendaItem[]}
-          className="justify-center mt-4"
-        />
-
         {!totalen.hasConversions && (
-          <p className="text-meta text-muted-foreground text-center mt-3">
+          <p className="text-meta text-muted-foreground mt-3">
             Er zijn in dit venster geen {conversieWoord} per segment geregistreerd, dus alleen de kostenverdeling is te tonen.
           </p>
         )}

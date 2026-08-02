@@ -71,11 +71,14 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
   const eerste = rows[0].spend;
   const laatste = rows[rows.length - 1].spend;
   const verloop = eerste > 0 ? ((laatste - eerste) / eerste) * 100 : null;
+  // "Totaal over 5 maanden" stond er eerst zonder grootheid, in een kaart die twee grootheden
+  // toont. Dan moet de lezer raden of het over spend of over acties gaat, en die twee staan hier
+  // juist naast elkaar omdat ze niet hetzelfde zijn.
   const kerncijfers = [
-    { label: `Totaal over ${rows.length} maanden`, waarde: volledigEuro(totaal) },
-    { label: "Gemiddeld per maand", waarde: volledigEuro(Math.round(totaal / rows.length)) },
+    { label: `Spend over ${rows.length} maanden`, waarde: volledigEuro(totaal) },
+    { label: "Spend per maand", waarde: volledigEuro(Math.round(totaal / rows.length)) },
     {
-      label: `Van ${maandLabel(rows[0].maand)} naar ${maandLabel(rows[rows.length - 1].maand)}`,
+      label: `Spend ${maandLabel(rows[0].maand)} → ${maandLabel(rows[rows.length - 1].maand)}`,
       waarde: verloop === null ? "—" : `${verloop > 0 ? "+" : ""}${verloop.toFixed(0)}%`,
     },
   ];
@@ -88,10 +91,19 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
         <span className="text-meta text-muted-foreground">spend en {lineLabel.toLowerCase()}, zelfde maanden</span>
       </div>
 
-      {/* De plot links, de kerncijfers in de breedte die overblijft. Onder de brede breekpunten
-          vallen de cijfers weg: dan vult de plot de kaart al en zou een tweede kolom hem knijpen. */}
+      {/* De plot en de cijfers als één blok links, niet elk tegen een rand geduwd.
+          Met `flex-1` op de plot slokte die alle ruimte op en werden de cijfers naar de rechterrand
+          gedrukt: twee blokken met een gat ertussen, wat leest als een kaart die uit elkaar valt.
+          Nu volgen de cijfers direct op de plot en valt de overgebleven breedte in één stuk rechts —
+          witruimte aan de buitenkant leest als marge, witruimte in het midden als een fout.
+          Onder de brede breekpunten vallen de cijfers weg: dan vult de plot de kaart al.
+
+          `flex-1` mét het plafond op deze kolom, en niet `shrink`: zonder groeirichting zakt een
+          flex-kind terug op zijn inhoud, en de ResponsiveContainer erin meet dan nul. Dat leverde
+          een plot van honderddertig pixels op met over elkaar heen liggende labels — zichtbaar in
+          de schermafdruk, en tsc zag er niets van. */}
       <div className="flex items-stretch">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1" style={vlak}>
       <div className="px-3 pt-4 pb-1" style={vlak}>
         <p className="px-2 text-micro font-medium text-muted-foreground uppercase tracking-wider mb-1">Spend</p>
         <div style={{ height: hoogBoven }}>

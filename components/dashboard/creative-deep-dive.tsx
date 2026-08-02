@@ -3,9 +3,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { TrendingDown, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { analyzeCreativeFatigue, type CreativePeriodRow, type FatigueStatus } from "@/lib/analysis/creative-fatigue";
+// De drempels komen uit de rekenkern en worden hier niet opnieuw gekozen: de kleur van het cijfer
+// moet omslaan op exact hetzelfde punt waarop het oordeel omslaat.
+import { analyzeCreativeFatigue, FATIGUE_DROP, SOFT_DROP, type CreativePeriodRow, type FatigueStatus } from "@/lib/analysis/creative-fatigue";
 import { analyzeAssetBreakdown, type AssetRow, type AssetVerdict } from "@/lib/analysis/asset-breakdown";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Sparkline } from "@/components/ui/sparkline";
 
 // De grondige creative-uitwerking op het Analyses-tabblad (de quick-scan staat op Overzicht):
 // het CTR-traject per creative over de maanden (vermoeidheid) en — voor Google RSA — welke
@@ -49,22 +52,6 @@ const VERDICT_STYLE: Record<AssetVerdict, string> = {
   neutraal: "text-gray-600 bg-gray-50 border-gray-200",
   te_weinig_data: "text-gray-400 bg-gray-50 border-gray-200",
 };
-
-// Mini-sparkline van CTR-punten; null-punten (geen volume) breken de lijn niet visueel af.
-function Spark({ points }: { points: (number | null)[] }) {
-  const vals = points.filter((p): p is number => p != null);
-  if (vals.length < 2) return <span className="text-micro text-gray-300">—</span>;
-  const max = Math.max(...vals), min = Math.min(...vals);
-  const range = max - min || 1;
-  const w = 72, h = 20;
-  const step = w / (points.length - 1);
-  const coords = points.map((p, i) => (p == null ? null : `${i * step},${h - ((p - min) / range) * (h - 3) - 1.5}`)).filter(Boolean).join(" ");
-  return (
-    <svg width={w} height={h} className="inline-block align-middle">
-      <polyline points={coords} fill="none" style={{ stroke: "var(--brand-primary, #08288C)" }} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 export function CreativeDeepDive({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
   const [periodRows, setPeriodRows] = useState<CreativePeriodRow[] | null>(null);
@@ -174,9 +161,23 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
                 <div key={f.id} className="px-5 py-2.5 flex items-center gap-3">
                   <span className={`text-micro font-semibold border rounded-full px-2 py-0.5 shrink-0 ${FATIGUE_STYLE[f.status]}`}>{FATIGUE_LABEL[f.status]}</span>
                   <span className="text-body text-rm-gray truncate flex-1 min-w-0" title={f.name}>{f.name}</span>
-                  <Spark points={f.points.map((p) => p.ctr)} />
-                  <span className="text-meta text-muted-foreground w-28 text-right shrink-0">
+                  <Sparkline punten={f.points.map((p) => p.ctr)} basis="bereik" breedte={72} hoogte={20} titel={`CTR-verloop van ${f.name}`} />
+                  <span className="text-meta text-muted-foreground w-28 text-right shrink-0 tabular-nums">
                     {f.peakCtr != null ? `piek ${pct(f.peakCtr)} → ${pct(f.latestCtr)}` : "—"}
+                  </span>
+                  {/* Het cijfer waar het oordeel op rust, náást het oordeel.
+                      De rij droeg alleen de conclusie ("vermoeid") en het traject; hoe vér een
+                      creative onder zijn piek zit — de grootheid waar de drempels van 15 en 30
+                      procent op slaan — stond er niet. Dan moet je de lezer vragen ons op ons woord
+                      te geloven. Nul procent is hier geen leegte maar een uitkomst: precies op de
+                      piek. */}
+                  <span className={`w-20 text-right text-meta font-semibold tabular-nums shrink-0 ${
+                    f.declineFromPeak == null ? "text-muted-foreground"
+                      : f.declineFromPeak <= -FATIGUE_DROP ? "text-red-600"
+                      : f.declineFromPeak <= -SOFT_DROP ? "text-amber-600"
+                      : "text-muted-foreground"
+                  }`}>
+                    {f.declineFromPeak == null ? "—" : `${Math.round(f.declineFromPeak * 100)}% vs piek`}
                   </span>
                 </div>
               ))}

@@ -13,6 +13,7 @@ import { usePeriod } from "@/lib/period/period-context";
 import { comparePeriods, type PeriodDelta } from "@/lib/period/apply-period";
 import { formatRange, formatMonth } from "@/lib/period/period-range";
 import { formatDeltaPercent, formatRoas } from "@/lib/forecast-format";
+import { Sparkline, type SparkBasis } from "@/components/ui/sparkline";
 
 function euro(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -54,11 +55,29 @@ function Delta({ d, hogerIsBeter = true }: { d: PeriodDelta; hogerIsBeter?: bool
  * zonder die twee uit elkaar — de spatie tussen een 1 en een 4 wordt dan een gat — en juist bij
  * een getal dat de kop van de pagina draagt valt dat op.
  */
-function Cijfer({ label, waarde, children }: { label: string; waarde: string; children?: ReactNode }) {
+function Cijfer({ label, waarde, reeks, reeksLabel, basis = "nul", children }: {
+  label: string;
+  waarde: string;
+  /** Het verloop over de maanden in deze periode, oud naar nieuw. */
+  reeks?: (number | null)[];
+  reeksLabel?: string;
+  /** Een volume hoort vanaf nul, een verhouding op zijn eigen bereik. Zie `Sparkline`. */
+  basis?: SparkBasis;
+  children?: ReactNode;
+}) {
   return (
     <div>
       <p className="text-micro font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="mt-1.5 text-figure font-semibold leading-none tracking-tight text-rm-gray tabular-nums">{waarde}</p>
+      {/* Het cijfer is een optelsom en verzwijgt daarmee hoe hij tot stand kwam: twaalf gelijke
+          maanden en een half jaar niets gevolgd door een piek geven hetzelfde totaal. De lijn
+          eronder kost twee regels en beantwoordt precies dat verschil. Alleen de vorm, geen as en
+          geen getallen — wie de cijfers wil, vindt ze in de maandtabel. */}
+      {reeks && reeks.length > 1 && (
+        <div className="mt-2">
+          <Sparkline punten={reeks} basis={basis} breedte={72} hoogte={18} titel={reeksLabel} />
+        </div>
+      )}
       {children && <div className="mt-2">{children}</div>}
     </div>
   );
@@ -76,10 +95,28 @@ export function PeriodSummary({ data, compact }: Props) {
 
   const { current, previous, deltas } = comparePeriods(data, periode.range, periode.compareRange);
 
+  // De maanden van deze periode, oud naar nieuw. `current.months` bevat alleen de maanden die er
+  // werkelijk zijn (ontbrekende staan in `current.missing`), dus de lijn loopt niet dwars over een
+  // gat heen alsof daar gemeten is.
+  const reeks = (kies: (m: (typeof current.months)[number]) => number): (number | null)[] =>
+    current.months.map((m) => {
+      const v = kies(m);
+      return Number.isFinite(v) ? v : null;
+    });
+  /** Idem, maar de keuze mag `null` teruggeven als de verhouding voor die maand niet bestaat. */
+  const reeksVerhouding = (kies: (m: (typeof current.months)[number]) => number | null): (number | null)[] =>
+    current.months.map((m) => {
+      const v = kies(m);
+      return v != null && Number.isFinite(v) ? v : null;
+    });
+
   const kaarten = [
-    { label: "Conversies", waarde: aantal(current.totals.conversions), d: deltas?.conversions, hogerIsBeter: true },
-    { label: "Omzet", waarde: euro(current.totals.revenue), d: deltas?.revenue, hogerIsBeter: true },
-    { label: "Advertentiekosten", waarde: euro(current.totals.adSpend), d: deltas?.adSpend, hogerIsBeter: false },
+    { label: "Conversies", waarde: aantal(current.totals.conversions), d: deltas?.conversions, hogerIsBeter: true,
+      reeks: reeks((m) => m.conversions || 0) },
+    { label: "Omzet", waarde: euro(current.totals.revenue), d: deltas?.revenue, hogerIsBeter: true,
+      reeks: reeks((m) => m.revenue || 0) },
+    { label: "Advertentiekosten", waarde: euro(current.totals.adSpend), d: deltas?.adSpend, hogerIsBeter: false,
+      reeks: reeks((m) => m.adSpend || 0) },
   ];
 
   const roas = current.totals.adSpend > 0 ? current.totals.revenue / current.totals.adSpend : null;
@@ -110,14 +147,37 @@ export function PeriodSummary({ data, compact }: Props) {
           percentage naast een bedrag concurreert met dat bedrag. */}
       <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 lg:grid-cols-5">
         {kaarten.map((k) => (
-          <Cijfer key={k.label} label={k.label} waarde={k.waarde}>
+          <Cijfer
+            key={k.label}
+            label={k.label}
+            waarde={k.waarde}
+            reeks={k.reeks}
+            reeksLabel={`${k.label} per maand binnen ${formatRange(periode.range)}`}
+          >
             {k.d && <Delta d={k.d} hogerIsBeter={k.hogerIsBeter} />}
           </Cijfer>
         ))}
-        <Cijfer label="ROAS" waarde={roas === null ? "—" : formatRoas(roas)} />
+        {/* ROAS en CPA zijn verhoudingen en geen volumes, dus hun lijn loopt op het eigen bereik:
+            vanaf nul zou een ROAS die tussen 1,4 en 1,7 beweegt een kaarsrechte streep worden en
+            precies de beweging verbergen waarvoor je naar een ROAS kijkt. Een maand zonder spend of
+            zonder conversies levert geen verhouding op — dat wordt een gat in de lijn en geen nul,
+            want nul zou "verdiende niets" betekenen in plaats van "niet te berekenen". */}
+        <Cijfer
+          label="ROAS"
+          waarde={roas === null ? "—" : formatRoas(roas)}
+          reeks={reeksVerhouding((m) => (m.adSpend > 0 ? m.revenue / m.adSpend : null))}
+          reeksLabel={`ROAS per maand binnen ${formatRange(periode.range)}`}
+          basis="bereik"
+        />
         {/* Geen conversies betekent geen CPA; een bedrag tonen zou een prijs per conversie
             suggereren die niet bestaat. */}
-        <Cijfer label="CPA" waarde={cpa === null ? "—" : euro(cpa)} />
+        <Cijfer
+          label="CPA"
+          waarde={cpa === null ? "—" : euro(cpa)}
+          reeks={reeksVerhouding((m) => (m.conversions > 0 ? m.adSpend / m.conversions : null))}
+          reeksLabel={`CPA per maand binnen ${formatRange(periode.range)}`}
+          basis="bereik"
+        />
       </div>
 
       {current.missing.length > 0 && (

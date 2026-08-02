@@ -175,6 +175,11 @@
 
   --chart-grid: #eef1f6;
   --chart-axis: #64748b;
+  /* De dekking van de wassing onder een lijn. Tien procent is het cijfer uit de mark-specificatie
+     en dat klopt op een licht vlak; op een bijna zwart vlak is diezelfde tien procent een veel
+     grotere sprong en leest de wassing als een grijze plaat in plaats van als een schaduw van de
+     lijn. Vandaar een variabele en geen constante in het component. */
+  --was-dekking: 0.10;
   /* De baan waarop een aandeelstreep loopt, en de vulling van een hover-cursor in een grafiek. */
   --spoor: rgba(15, 23, 42, 0.07);
   --spoor-zacht: rgba(15, 23, 42, 0.06);
@@ -271,6 +276,7 @@
 
   --chart-grid: #262b35;
   --chart-axis: #8b93a1;
+  --was-dekking: 0.055;
   --spoor: rgba(255, 255, 255, 0.10);
   --spoor-zacht: rgba(255, 255, 255, 0.07);
   --hover-vlak: rgba(255, 255, 255, 0.05);
