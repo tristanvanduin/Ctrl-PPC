@@ -123,7 +123,7 @@ De eerste versie van §2 stelde één `fact_daily` voor met vijf kanonieke metri
 hier omdat ze het ontwerp bepalen — en omdat een ontwerp dat zijn eigen fouten verzwijgt
 onbruikbaar is.
 
-**Aanname 1: alles staat per dag. Onjuist.**
+**Aanname 1: alles staat per dag. Onjuist — maar niet om de reden die ik eerst opschreef.**
 
 | korrel | tabellen |
 |---|---:|
@@ -131,10 +131,42 @@ onbruikbaar is.
 | `date` | 13 |
 | `week` / `week_start` | 4 |
 
-De Google-data — de grootste en oudste bak — staat per **maand**. De dagelijkse detail bestaat
-niet in de database. Een `fact_daily` vullen voor Google kan dus alleen door dagen te verzinnen
-uit een maandtotaal, en dat is precies het soort verzonnen precisie waar de rest van deze
-codebase op let. Het schema moet de korrel dragen in plaats van er één te veronderstellen.
+De Google-data staat per **maand**. Mijn eerste conclusie daaruit was dat dagdetail "niet
+bestaat". Dat is fout, en het is een belangrijke fout: de Google Ads API levert wél dagniveau.
+Geteld in `lib/api/google-ads.ts`:
+
+| | |
+|---|---|
+| `segments.date` | 37× — maar in de **WHERE**, als datumfilter |
+| `segments.month` | 25× — in de **SELECT**, als groepering |
+| `segments.week` | 1× |
+
+We vragen de API dus om maandtotalen terwijl de dagen beschikbaar zijn. De korrel wordt
+weggegooid bij het ophalen, niet door het platform. Dat is te herstellen door anders te syncen,
+en het is bovendien de goede kant op: **je kunt altijd optellen naar boven, nooit uitsplitsen
+naar beneden.** Wie maanden opslaat kan nooit meer een weektrend tonen; wie dagen opslaat kan
+alles.
+
+Wat het wél kost, doorgerekend op de huidige data en geëxtrapoleerd naar 400 accounts:
+
+| niveau | rijen per jaar bij 400 accounts, dagkorrel |
+|---|---:|
+| account / campagne | 448.000 |
+| creatives | 2,9 mln |
+| keywords | 9,5 mln |
+| **zoektermen** | **39 mln** |
+
+Tot en met creatives is dag een non-discussie. Bij zoektermen wordt het een echte afweging: 39
+miljoen rijen per jaar vraagt partitionering per maand, en de vraag is wat het oplevert. Een
+zoekterm met twee klikken in een maand heeft geen zinvolle dagcurve; de zoektermanalyse kijkt
+naar periodes, niet naar dagen.
+
+De conclusie is dus niet "alles per dag" en ook niet "alles per maand", maar: **sla op in de
+fijnste korrel die een analyse daadwerkelijk gebruikt.** Account, campagne en creative op dag —
+daar draaien pacing, trends en fatigue op. Keywords en zoektermen op week of maand.
+
+Precies daarom is `grain` als kolom de goede keuze, en niet een tabelnaam die de korrel vastlegt:
+per niveau kan een andere korrel gelden, en dat kan later veranderen zonder schemawijziging.
 
 **Aanname 2: vijf kanonieke metrieken dekken het meeste. Onjuist — het is een kwart.**
 
@@ -149,7 +181,9 @@ lead-varianten, video op `thruplay` en `video_3s_views`. Al die analyses zouden 
 jsonb moeten, en trager worden dan ze nu zijn.
 
 De les zit niet in de twee fouten maar in de vorm ervan: beide waren generalisaties over data
-die ik niet had geteld. §2 hieronder is herschreven op de gemeten werkelijkheid.
+die ik niet had geteld. De eerste is bovendien pas rechtgezet doordat er iemand tegenin ging —
+ik had de maandopslag als een gegeven aangenomen in plaats van te kijken waar hij vandaan kwam.
+§2 hieronder is herschreven op de gemeten werkelijkheid.
 
 ### 1.8 Wat goed is en moet blijven
 
@@ -231,6 +265,16 @@ create table fact_core (
 `grain` als kolom lost aanname 1 op: een maandrij is een maandrij en doet niet alsof hij een dag
 is. Een query die maanden wil vraagt `grain = 'month'`; een query die over kanalen heen optelt
 moet expliciet kiezen welke korrel hij wil, en kan niet per ongeluk dagen bij maanden optellen.
+
+Het maakt bovendien mogelijk wat §1.7 voorstelt: per niveau een andere korrel. Account,
+campagne en creative op `day`, keywords en zoektermen op `week` of `month`, zonder dat daar een
+aparte tabel voor nodig is. En als een niveau later fijner moet, is dat een sync-wijziging plus
+nieuwe rijen — geen migratie.
+
+Bij dagkorrel over 400 accounts komt `fact_dimension` in de tientallen miljoenen rijen per jaar.
+Dan hoort er partitionering per maand op `period_start` bij. Dat is geen bezwaar tegen deze
+opzet — het is een gewone maatregel bij dit volume — maar het hoort in de planning en niet als
+verrassing.
 
 **Laag 2 — `<kanaal>_metrics`: de kanaaleigen metrieken, getypeerd.**
 
