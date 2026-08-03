@@ -577,7 +577,30 @@ tegenhanger in `fact_core`. Rijaantallen klopten, sommen klopten, en toch gaf de
 creative fatigue straks doet nul rijen terug. Rechtgezet in 042, en `verify-fact-core.mjs` heeft
 er nu een wezencontrole bij — getest dat die rood wordt.
 
-**Nog te doen in 2b:** `fact_dimension` (zoektermen, keywords, geo, device, netwerk, doelgroep).
+**`fact_dimension` — GEDAAN (migratie 043).** Negen tabellen werden er één: **330.601 rijen, nul
+verlies**, elke bron komt exact terug.
+
+De sleutel kostte drie rondes meten, en dat is de les van deze migratie:
+
+| opzet | rijen die stil zouden verdwijnen |
+|---|---:|
+| `key` = tekst, ouder = campagne | **13.784** |
+| + `variant` (match_type, type, land) | 3.696 |
+| + advertentiegroep, en id in plaats van naam | **0** |
+
+De echte korrel is de advertentiegroep en niet de campagne, en de stabiele sleutel is het id waar
+het platform er een geeft — niet de naam, want twee doelgroepen kunnen dezelfde naam dragen. Met
+`on conflict do nothing` was die eerste opzet 13.784 rijen kwijtgeraakt zonder één foutmelding.
+
+Het niveau staat er niet als aparte kolom in: een lege `campaign_id` betekent accountbreed.
+Gecontroleerd op de enige bron met een eigen level-kolom — alle 2.735 account-rijen hebben geen
+campagne, alle 12.668 campagne-rijen wel. Een aparte kolom zou hetzelfde twee keer zeggen, en dat
+is precies hoe twee waarheden uit de pas gaan lopen.
+
+`linkedin_demographic_daily` had deze vorm al (`pivot_type` als dimensie, `pivot_value_urn` als
+sleutel). Dat iemand er onafhankelijk op uitkwam, is de beste bevestiging dat de opzet klopt.
+
+Daarmee is fase 2b klaar. `verify-fact-core.mjs` dekt nu 108 sommen, 0 afwijkingen.
 
 **2c — nog te doen:** de sync dubbel laten schrijven. Dit is de eerste stap die draaiende code
 raakt.

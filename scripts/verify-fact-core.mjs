@@ -161,6 +161,42 @@ if (Number(rollup.afwijkend) > 0) {
   console.log(`  OK    rollups (${rollup.vergeleken} maandrijen tellen op tot hun dagen)`);
 }
 
+// fact_dimension tegen zijn negen bronnen.
+//
+// Per dimensie de som van de vier grootheden. Aantallen alleen zijn niet genoeg: bij het
+// samenvoegen botsten in de eerste opzet 13.784 rijen op de sleutel, en die zouden met
+// `on conflict do nothing` zijn verdwenen zonder één foutmelding. Zie migratie 043.
+const DIMENSIES = [
+  ["search_term", "google", "", "select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v from ads_search_terms_monthly s join accounts a on a.client_id = s.client_id where s.search_term is not null"],
+  ["keyword", "google", "", "select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v from ads_keyword_performance_monthly s join accounts a on a.client_id = s.client_id where coalesce(s.keyword_id, s.keyword_text) is not null"],
+  ["device", "google", "", "select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v from ads_device_performance_monthly s join accounts a on a.client_id = s.client_id where s.device is not null"],
+  ["network", "google", "", "select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v from ads_network_performance_monthly s join accounts a on a.client_id = s.client_id where s.network_type is not null"],
+  ["audience", "google", "", "select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v from ads_audience_performance_monthly s join accounts a on a.client_id = s.client_id where coalesce(s.audience_id, s.audience_name) is not null"],
+  // country en region-accountbreed hebben campaign_id = '', de campagne-regio's niet. Die
+  // scheiding is het hele punt van die kolom, dus hij wordt hier ook zo getoetst.
+  ["country", "google", "and campaign_id = ''", "select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v from ads_country_monthly s join accounts a on a.client_id = s.client_id where s.country_code is not null"],
+  ["region", "google", "and campaign_id <> ''", "select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v from ads_geo_performance_monthly s join accounts a on a.client_id = s.client_id where coalesce(s.geo_target_id, s.region_name) is not null"],
+  ["region", "google", "and campaign_id = ''", "select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v from ads_region_monthly s join accounts a on a.client_id = s.client_id where coalesce(s.region_code, s.region_name) is not null"],
+  ["member_job_function", "linkedin", "", "select sum(impressions) i, sum(clicks) c, sum(spend) k, sum(conversions) v from linkedin_demographic_daily s join accounts a on a.client_id = s.client_id where s.pivot_type is not null and s.pivot_value_urn is not null"],
+];
+
+for (const [dim, kanaal, extra, bronQuery] of DIMENSIES) {
+  const [bron] = await sql(bronQuery);
+  const [nieuw] = await sql(
+    `select sum(impressions) i, sum(clicks) c, sum(cost) k, sum(conversions) v
+     from fact_dimension where channel = '${kanaal}' and dimension = '${dim}' ${extra}`);
+  const afw = [];
+  for (const [sleutel, label] of VELDEN.slice(0, 4)) {
+    gecontroleerd++;
+    if (Math.abs(getal(bron[sleutel]) - getal(nieuw[sleutel])) > MARGE) {
+      afw.push(`${label}: bron ${getal(bron[sleutel])} vs ${getal(nieuw[sleutel])}`);
+    }
+  }
+  const naam = `${kanaal} / ${dim}${extra ? (extra.includes("<>") ? " (per campagne)" : " (accountbreed)") : ""}`;
+  if (afw.length === 0) { console.log(`  OK    ${naam}`); }
+  else { gefaald += afw.length; console.log(`  FOUT  ${naam}`); for (const a of afw) console.log(`          ${a}`); }
+}
+
 // Wezen: een kanaalmetriek zonder rij in fact_core.
 //
 // Dit is de controle die ontbrak toen het misging. De metriektabellen dragen geen impressies,
