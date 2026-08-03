@@ -110,11 +110,20 @@ hypothesetekst in `sprint_items.owner` konden er precies daarom in.
 **Volume.** Bij 400 accounts groeit de grootste tabel van 244.000 naar circa 1,6 miljoen rijen.
 Daar draait Postgres zijn hand niet voor om.
 
-Wel: van de 24 tabellen met meer dan 500 rijen hebben er **8 geen index op `client_id`** —
-`sop_insights`, `search_term_analysis`, `sop_tasks`, `ads_product_performance_monthly`,
-`ads_campaign_country_monthly`, `ads_pmax_network_breakdown`,
-`ads_asset_group_performance_monthly`, `generation_job_events`. Nu onzichtbaar bij 60 klanten,
-merkbaar bij 400. Dat is losstaand van dit hele ontwerp op te lossen en kost een middag.
+Wel misten van de 24 tabellen met meer dan 500 rijen er **zeven een index op `client_id`**.
+(Mijn eerste telling zei acht en noemde `generation_job_events` erbij; die tabel heeft helemaal
+geen `client_id`-kolom en kan er dus per definitie geen index op hebben.)
+
+**Opgelost in migratie 034**, als fase 0. Samengestelde indexen `(client_id, tijdkolom)`, want
+geen enkele query vraagt een klant zonder periode. Gemeten voor en na:
+
+| tabel | voor | na |
+|---|---:|---:|
+| `sop_insights` | 183,8 ms | **2,9 ms** |
+| `search_term_analysis` | 36,5 ms | **1,9 ms** |
+| `ads_campaign_country_monthly` | 37,3 ms | **1,9 ms** |
+
+Sequentiële scans werden index-scans. Dat is puur additief en met `drop index` terug te draaien.
 
 ### 1.7 Waar de eerste versie van dit ontwerp op faalde
 
@@ -476,9 +485,10 @@ hoe wij het opslaan.
 De harde eis: **op geen enkel moment mag een bestaande analyse of grafiek breken.** Daarom loopt
 alles via views, en wordt er pas iets weggegooid als alle lezers om zijn.
 
-### Fase 0 — losstaand, nu al veilig
-De 8 ontbrekende indexen op `client_id`. Raakt geen enkel schema en geen enkele query, maakt
-alleen bestaande queries sneller. Volledig terug te draaien.
+### Fase 0 — losstaand, nu al veilig — GEDAAN (migratie 034)
+De zeven ontbrekende indexen op `client_id`, samengesteld met de tijdkolom erbij. Raakt geen
+enkel schema en geen enkele query, maakt alleen bestaande queries sneller. Zie §1.6 voor de
+meting: 183,8 ms naar 2,9 ms op de grootste. Volledig terug te draaien met `drop index`.
 
 ### Fase 1 — de nieuwe niveaus, leeg naast het oude
 `agencies`, `accounts`, `user_agencies` aanmaken en vullen: één bureau met de bestaande accounts
