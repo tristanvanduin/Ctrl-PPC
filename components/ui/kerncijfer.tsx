@@ -60,6 +60,7 @@ export function Kerncijfer({
   label,
   waarde,
   formaat = "groot",
+  labelRegels = 1,
   delta,
   reeks,
   reeksBasis = "nul",
@@ -71,6 +72,12 @@ export function Kerncijfer({
   label: string;
   waarde: string;
   formaat?: CijferFormaat;
+  /**
+   * Hoeveel regels het label hoogstens kost. Staat er in een rij één label dat over twee regels
+   * breekt, geef dan 2 mee: dan reserveren álle tegels die ruimte en liggen de getallen op één
+   * lijn. Standaard 1, want de meeste labels zijn één woord en dan is reserveren loze ruimte.
+   */
+  labelRegels?: number;
   delta?: KerncijferDelta;
   /** Het verloop achter dit cijfer, oud naar nieuw. `null` is een gat, geen nul. */
   reeks?: (number | null)[];
@@ -91,17 +98,29 @@ export function Kerncijfer({
     : "text-xl font-semibold leading-none tracking-tight";
   const kleur = toon === "waarschuwing" ? "text-red-600" : toon === "goed" ? "text-emerald-600" : "text-rm-gray";
 
-  // De hele tegel is een kolom en het getal zit in een blok dat naar beneden wordt geduwd.
+  // Uitlijnen doet het LABEL, niet het getal.
   //
-  // Zonder dat ligt een rij tegels scheef zodra één label langer is dan de rest: in de
-  // kanaalkerncijfers brak "Lead-formulieren + website-conversies (28d)" over twee regels en zakte
-  // alleen dát cijfer een regel omlaag, terwijl de drie andere op hun plek bleven. Vier getallen
-  // die je naast elkaar moet lezen horen op één lijn te liggen. In een grid zijn de tegels even
-  // hoog, dus `mt-auto` legt de onderranden gelijk — ongeacht hoeveel regels het label kost.
+  // Eerste poging was `mt-auto` op de waarde: in een grid zijn de tegels even hoog, dus dat legt de
+  // onderranden gelijk. Dat repareerde het geval waarvoor het bedoeld was — een label dat over twee
+  // regels breekt — en brak meteen een ander: een tegel zónder delta eronder heeft minder te dragen,
+  // dus zakte zijn getal precies de hoogte van die delta omlaag. In de periodeband stonden ROAS en
+  // CPA daardoor drieëntwintig pixels lager dan de drie ernaast. Gemeten, niet vermoed.
+  //
+  // De juiste plek om te compenseren is bóven het getal: reserveer regels voor het label en alle
+  // getallen beginnen op dezelfde hoogte, ongeacht wat eronder hangt. Hoeveel regels weet alleen de
+  // aanroeper — hij kent zijn eigen labels — dus dat is een keuze en geen gok.
   return (
     <div className="flex h-full flex-col">
-      <p className="text-micro font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`mt-auto pt-1.5 ${maat} ${kleur}`}>{waarde}</p>
+      <p
+        // De regelhoogte staat hier expliciet, want de reservering rekent ermee. Op de
+        // overgeërfde 1,5 kwam een label van twee regels drie pixels boven zijn eigen reservering
+        // uit en stond de rij alsnog scheef — drie pixels, maar wel zichtbaar in de meting.
+        className="text-micro font-medium uppercase tracking-wider text-muted-foreground leading-[1.35]"
+        style={labelRegels > 1 ? { minHeight: `${labelRegels * 1.35}em` } : undefined}
+      >
+        {label}
+      </p>
+      <p className={`mt-1.5 ${maat} ${kleur}`}>{waarde}</p>
       {onderschrift && <p className="mt-1 text-micro text-muted-foreground">{onderschrift}</p>}
       {/* Het verloop onder het getal. Een totaal verzwijgt hoe het tot stand kwam: twaalf gelijke
           maanden en een half jaar niets gevolgd door een piek geven hetzelfde getal. */}

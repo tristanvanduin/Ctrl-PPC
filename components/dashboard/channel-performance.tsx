@@ -241,6 +241,9 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
                 label={k.label}
                 waarde={k.value}
                 formaat="compact"
+                // "Lead-formulieren + website-conversies (28d)" breekt over twee regels; met de
+                // reservering blijven de vier getallen op één lijn.
+                labelRegels={2}
                 delta={k.delta != null ? { pct: k.delta, hogerIsBeter: k.hogerIsBeter, waartegen: "vs vorige 28d" } : undefined}
               />
             </div>
