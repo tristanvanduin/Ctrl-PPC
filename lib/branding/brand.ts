@@ -22,6 +22,20 @@ export const BRAND_LOGO_FILE = "ctrl-ppc-logo.png";
 /** Korte vorm voor krappe plekken (tabelkoppen, selectievelden). */
 export const BRAND_SHORT = "Ctrl";
 
+/**
+ * De regel onder de merknaam in klantdocumenten. Leeg betekent: geen regel.
+ *
+ * Hier stond letterlijk "De #1 SEM specialist in de Benelux", hardgecodeerd in de
+ * Second-Opinion-PDF. Twee dingen mis daarmee. Het is een superlatief zonder onderbouwing in een
+ * document dat naar een klant gaat — en het stond náást de merknaam, dus na de hernoeming was het
+ * ineens een claim van Ctrl PPC over zichzelf, zonder dat iemand die claim had gedaan.
+ *
+ * En het tweede: als dit als SaaS draait, is de regel onder de naam per bureau anders. Dezelfde
+ * fout als bij de eigenaar, op een andere plek. Dus hier, leeg, en de PDF laat hem weg als er
+ * niets staat. Wie een regel wil, zet hem er bewust in.
+ */
+export const BRAND_TAGLINE = "";
+
 // ── Eigenaarschap van taken ────────────────────────────────────────────────
 //
 // LOSGEKOPPELD VAN DE MERKNAAM, EN DAT IS GEEN OPRUIMING MAAR EEN CORRECTIE.

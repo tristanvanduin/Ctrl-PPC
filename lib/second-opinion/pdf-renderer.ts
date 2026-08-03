@@ -15,7 +15,7 @@
  */
 
 import React from "react";
-import { BRAND_LOGO_FILE, BRAND_NAME } from "@/lib/branding/brand";
+import { BRAND_LOGO_FILE, BRAND_NAME, BRAND_TAGLINE } from "@/lib/branding/brand";
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import * as fs from "fs";
 import * as path from "path";
@@ -186,7 +186,9 @@ function SecondOpinionPdf({ clientName, mode, rows, summaries, generatedAt }: Pd
             : null,
           React.createElement(View, { style: { alignItems: "flex-end" as const } },
             React.createElement(Text, { style: s.brand }, BRAND_NAME),
-            React.createElement(Text, { style: s.brandSub }, "De #1 SEM specialist in de Benelux"),
+            // Alleen als er een regel ís. Zie BRAND_TAGLINE: hier stond een superlatief zonder
+            // onderbouwing in een document dat naar de klant gaat.
+            BRAND_TAGLINE ? React.createElement(Text, { style: s.brandSub }, BRAND_TAGLINE) : null,
           ),
         ),
       ),

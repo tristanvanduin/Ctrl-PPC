@@ -9,7 +9,7 @@
 // sop_tasks.owner. Rijen van vóór de wijziging dragen de oude naam en mogen niet ineens ongeldig
 // worden of als klant-taken gaan tellen.
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   BRAND_NAME, BRAND_SHORT, BRAND_LOGO_FILE,
@@ -31,6 +31,41 @@ console.log("De constanten");
 // naamswijziging uit de pas gaat lopen.
 check("merknaam is gezet", BRAND_NAME.trim().length > 0);
 check("logobestand is een png", BRAND_LOGO_FILE.endsWith(".png"));
+// Het logobestand bestaat niet.
+//
+// Deze controle keek of de bestandsnaam bij de merknaam past, en dat deed hij — maar niemand keek
+// of het bestand er ook was. In public/images/ staat alleen `ranking-masters-logo.png`, van twee
+// naamswijzigingen geleden. Sinds de vorige rebranding verwijzen de PDF-renderers dus naar een
+// bestand dat er niet is, en omdat ze dat afvangen met `fs.existsSync` gebeurt er niets zichtbaars:
+// de klant krijgt een PDF met alleen het woordbeeld en niemand merkt het.
+//
+// Dat is precies het patroon waar deze codebase op let — een ontbrekende zaak die zich voordoet
+// als een geldige uitkomst. De controle staat er daarom bij, en hij hoort te falen tot het echte
+// bestand er staat. Zie ook de opmerking bij BRAND_LOGO_FILE: een logo op de zijbalk moet
+// eenkleurig en doorzichtig zijn, want die balk draagt de kleur van de actieve klant.
+//
+// Zolang het bestand er niet is staat de controle als BEKEND GAT genoteerd, met een reden — hetzelfde
+// idioom als `TOEGESTANE_WEZEN` in de hygiënepoort. Een rode poort die niemand kan oplossen
+// blokkeert alles en wordt daarna genegeerd; een genoteerd gat blijft zichtbaar en verdwijnt met
+// één regel zodra het logo er is. Deze lijst hoort te krimpen.
+const BEKENDE_GATEN = new Map([
+  ["logobestand", "wacht op een eenkleurig, doorzichtig logo; tot die tijd dragen de PDF's alleen het woordbeeld"],
+]);
+
+{
+  const bestaat = existsSync(join("public", "images", BRAND_LOGO_FILE));
+  const reden = BEKENDE_GATEN.get("logobestand");
+  if (bestaat) {
+    check("het logobestand bestaat ook echt", true);
+    check("het gat is gedicht — haal hem uit BEKENDE_GATEN", reden === undefined,
+      "het bestand staat er nu; de uitzondering hoort weg");
+  } else {
+    check("het ontbrekende logo is genoteerd als bekend gat", reden !== undefined,
+      `public/images/${BRAND_LOGO_FILE} ontbreekt en staat niet in BEKENDE_GATEN`);
+    console.log(`  GAT   logobestand: ${reden}`);
+  }
+}
+
 check("logobestand volgt de merknaam", (() => {
   const slug = BRAND_NAME.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return BRAND_LOGO_FILE.startsWith(slug);
