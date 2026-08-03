@@ -45,8 +45,13 @@ export type Frequency = z.infer<typeof FrequencyEnum>;
  */
 export type Owner = typeof OWNER_TEAM | typeof OWNER_CLIENT;
 
+/**
+ * Elke schrijfwijze die ooit is weggeschreven blijft geldig bij het lezen; alles wat geen klant is
+ * normaliseert naar de rol. Zo hoeft er geen migratie over bestaande rijen heen voordat het
+ * product een andere naam kan dragen — zie de toelichting in lib/branding/brand.ts.
+ */
 export const OwnerEnum = z
-  .enum([OWNER_TEAM, LEGACY_OWNER_TEAM, OWNER_CLIENT])
+  .enum([OWNER_TEAM, OWNER_CLIENT, ...LEGACY_OWNER_TEAM])
   .transform((v): Owner => (v === OWNER_CLIENT ? OWNER_CLIENT : OWNER_TEAM));
 
 export const RecommendationSourceEnum = z.enum(["finding", "hypothesis"]);

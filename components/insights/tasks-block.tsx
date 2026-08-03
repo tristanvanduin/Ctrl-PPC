@@ -9,6 +9,7 @@ import { supabase, type KpiSnapshot } from "@/lib/supabase";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
 import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
+import { BRAND_NAME } from "@/lib/branding/brand";
 
 type Cadence = "actions" | "weekly" | "biweekly" | "monthly";
 
@@ -388,7 +389,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
       <p className="text-micro text-muted-foreground mb-3">
         {cadence === "actions"
           ? "Automatisch gegenereerd op basis van resultaten"
-          : "Analysechecklist op basis van RAI Amsterdam SOP"}
+          : `Analysechecklist op basis van de ${BRAND_NAME}-SOP`}
       </p>
 
       {/* Cadence tabs */}

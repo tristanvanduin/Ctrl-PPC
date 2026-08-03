@@ -27,7 +27,11 @@ CREATE TABLE IF NOT EXISTS sprint_items (
   week_number integer,
   task text NOT NULL,
   status text NOT NULL DEFAULT 'todo', -- todo, in_planning, ongoing, done, backlog, expired
-  owner text DEFAULT 'RAI Amsterdam',
+  -- Een ROL, geen naam. Hier stond de merknaam zelf, waardoor elke rij die zonder eigenaar
+  -- werd weggeschreven de merknaam van dat moment kreeg — en bij een rebranding dus als
+  -- klant-taak zou gaan tellen. LET OP: dit bestand aanpassen verandert een BESTAANDE database
+  -- niet; daar staat de oude standaard nog tot er een ALTER overheen gaat.
+  owner text DEFAULT 'Bureau',
   metrics text,
   review_timeframe text,
   created_at timestamptz DEFAULT now(),

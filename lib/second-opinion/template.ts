@@ -1,7 +1,7 @@
 /**
  * Second Opinion audit template — source of truth for all checklist rows.
  *
- * Derived from the RAI Amsterdam Second Opinion Template spreadsheet.
+ * Derived from the Second Opinion Template spreadsheet.
  * Two modes:
  *   - "quick" = shortlist (10 Low Hanging Fruit items)
  *   - "full"  = longlist  (all 45 items across 9 categories)

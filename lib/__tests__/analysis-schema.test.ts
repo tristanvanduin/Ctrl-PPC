@@ -11,6 +11,7 @@ import {
   RecommendationSchema,
   TaskSchema,
 } from "../schema/analysis-schema";
+import { OWNER_TEAM } from "../branding/brand";
 
 let passed = 0;
 let failed = 0;
@@ -195,10 +196,10 @@ console.log("7. parseRecommendations — happy path");
   if (result.success) {
     assert(result.data.recommendations.length === 1, "should have 1 rec");
     assert(result.data.tasks.length === 1, "should have 1 task");
-    // Het schema normaliseert de opgeslagen eigenaar naar de huidige schrijfwijze. Rijen van
-    // vóór de naamswijziging dragen nog "Ranking Masters"; die worden geaccepteerd en omgezet,
-    // zodat ze niet ineens ongeldig zijn of als klant-taken gaan tellen.
-    assert(result.data.tasks[0].owner === "RAI Amsterdam", "task owner genormaliseerd");
+    // Het schema normaliseert de opgeslagen eigenaar naar de ROL. Rijen van vóór een
+    // naamswijziging dragen nog een bureaunaam ("Ranking Masters", "RAI Amsterdam"); die worden
+    // geaccepteerd en omgezet, zodat ze niet ineens ongeldig zijn of als klant-taken gaan tellen.
+    assert(result.data.tasks[0].owner === OWNER_TEAM, "task owner genormaliseerd naar de rol");
     assert(result.data.recommendations[0].cluster_id === "cluster_unknown", "recommendation cluster_id defaults");
     assert(result.data.tasks[0].thread_id === null, "task thread_id defaults to null");
   }

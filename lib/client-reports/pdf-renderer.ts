@@ -15,7 +15,7 @@ import { formatPercent } from "@/lib/forecast-format";
 
 Font.registerHyphenationCallback((word: string) => [word]);
 
-// Brand Guide: RAI Amsterdam kleurenpalet
+// Brand Guide: het merkpalet
 const c = {
   brand: "#E87722", brandLight: "#f4a460",
   blue: "#0F1D2F",          // Deep Navy (primair donker uit brand guide)

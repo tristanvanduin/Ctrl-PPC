@@ -14,7 +14,7 @@ import { join } from "node:path";
 import {
   BRAND_NAME, BRAND_SHORT, BRAND_LOGO_FILE,
   OWNER_TEAM, OWNER_CLIENT, LEGACY_OWNER_TEAM,
-  isTeamOwner, normalizeOwner,
+  isTeamOwner, normalizeOwner, ownerLabel,
 } from "./brand";
 import { OwnerEnum } from "../schema/analysis-schema";
 
@@ -37,25 +37,42 @@ check("logobestand volgt de merknaam", (() => {
 })(), `${BRAND_LOGO_FILE} hoort met de slug van "${BRAND_NAME}" te beginnen`);
 check("korte vorm past bij de naam", BRAND_NAME.toUpperCase().includes(BRAND_SHORT.toUpperCase()));
 
-console.log("\nOude opgeslagen waarden blijven herkend");
-check("de oude naam telt als eigen team", isTeamOwner(LEGACY_OWNER_TEAM));
-check("de nieuwe naam ook", isTeamOwner(OWNER_TEAM));
-check("de korte vorm ook", isTeamOwner(BRAND_SHORT) && isTeamOwner("RM"));
+console.log("\nElke ooit opgeslagen schrijfwijze blijft herkend");
+// Dit is de kern van het loskoppelen van naam en rol: een rebranding mag geen enkele bestaande
+// rij van eigenaar laten wisselen. Zou "RAI Amsterdam" hier niet meer als team gelden, dan telde
+// elke taak van vóór de naamswijziging ineens als klant-taak.
+for (const oud of LEGACY_OWNER_TEAM) {
+  check(`"${oud}" telt als bureau`, isTeamOwner(oud));
+  check(`"${oud}" normaliseert naar de rol`, normalizeOwner(oud) === OWNER_TEAM);
+}
+check("de rol zelf ook", isTeamOwner(OWNER_TEAM));
+check("de huidige merknaam ook", isTeamOwner(BRAND_NAME));
+check("de korte vorm ook", isTeamOwner(BRAND_SHORT));
 check("de klant niet", !isTeamOwner(OWNER_CLIENT));
 check("leeg niet", !isTeamOwner("") && !isTeamOwner(null) && !isTeamOwner(undefined));
-check("spaties eromheen storen niet", isTeamOwner(`  ${LEGACY_OWNER_TEAM}  `));
+check("spaties eromheen storen niet", isTeamOwner(`  ${LEGACY_OWNER_TEAM[0]}  `));
 
-console.log("\nNormaliseren naar de huidige schrijfwijze");
-check("oud wordt nieuw", normalizeOwner(LEGACY_OWNER_TEAM) === OWNER_TEAM);
-check("nieuw blijft nieuw", normalizeOwner(OWNER_TEAM) === OWNER_TEAM);
+console.log("\nNormaliseren naar de rol");
+check("rol blijft rol", normalizeOwner(OWNER_TEAM) === OWNER_TEAM);
 check("klant blijft klant", normalizeOwner(OWNER_CLIENT) === OWNER_CLIENT);
 check("onbekend wordt klant", normalizeOwner("iemand anders") === OWNER_CLIENT);
+// Dat de opgeslagen waarde een rol is en geen merknaam, bewijst tsc al op typeniveau: de
+// vergelijking `OWNER_TEAM !== BRAND_NAME` is statisch altijd waar en wordt afgekeurd als
+// vergissing. Precies wat je wilt — een runtime-check zou hier niets meer toevoegen.
+
+console.log("\nDe weergavenaam is los van de opgeslagen rol");
+check("zonder tenant valt hij terug op de productnaam", ownerLabel(OWNER_TEAM) === BRAND_NAME);
+check("met een tenant wint die", ownerLabel(OWNER_TEAM, "Bureau Zuid") === "Bureau Zuid");
+check("een klant-taak blijft de klant", ownerLabel(OWNER_CLIENT, "Bureau Zuid") === OWNER_CLIENT);
+check("een oude naam krijgt de huidige weergave", ownerLabel("Ranking Masters", "Bureau Zuid") === "Bureau Zuid");
 
 console.log("\nHet schema accepteert beide en levert één waarde");
 {
-  const oud = OwnerEnum.safeParse(LEGACY_OWNER_TEAM);
-  check("de oude waarde wordt geaccepteerd", oud.success, JSON.stringify(oud));
-  check("en komt er als de nieuwe uit", oud.success && oud.data === OWNER_TEAM, oud.success ? oud.data : "");
+  for (const oudeNaam of LEGACY_OWNER_TEAM) {
+    const oud = OwnerEnum.safeParse(oudeNaam);
+    check(`"${oudeNaam}" wordt geaccepteerd`, oud.success, JSON.stringify(oud));
+    check(`"${oudeNaam}" komt er als de rol uit`, oud.success && oud.data === OWNER_TEAM, oud.success ? oud.data : "");
+  }
   const nieuw = OwnerEnum.safeParse(OWNER_TEAM);
   check("de nieuwe waarde ook", nieuw.success && nieuw.data === OWNER_TEAM);
   const klant = OwnerEnum.safeParse(OWNER_CLIENT);
@@ -80,13 +97,21 @@ console.log("\nDe oude naam staat nergens meer als weergavetekst");
     "lib/branding/brand.ts", "lib/branding/__brand_test.ts",
     "lib/schema/analysis-schema.ts", "scripts/rename-owner-to-rai.sql",
     "lib/__tests__/", "__tests__/",
+    // RAI Amsterdam is hier geen productnaam maar een KLANT in de demolijst. Na de rebranding is
+    // dat juist correct: het bureau heet Ctrl PPC, RAI Amsterdam is een van zijn klanten.
+    "lib/clients.ts",
   ];
   const overtreders: string[] = [];
   for (const f of [...walk("lib"), ...walk("app"), ...walk("components"), ...walk("scripts")]) {
     if (toegestaan.some((t) => f.includes(t))) continue;
     const src = readFileSync(f, "utf8");
     src.split("\n").forEach((r, i) => {
-      if (r.includes(LEGACY_OWNER_TEAM)) overtreders.push(`${f}:${i + 1}`);
+      // Alleen de volledige namen, niet de korte vormen. "RM" en "RAI" zijn twee tot drie letters
+      // en zitten in gewone woorden: LOG_FORMAT_SKELETONS bevat "RM", en die meldde deze controle
+      // als een losse merkvermelding. Waar het om gaat is de naam als weergavetekst, en die is
+      // altijd meerdelig.
+      const volledigeNamen = LEGACY_OWNER_TEAM.filter((n) => n.includes(" "));
+      if (volledigeNamen.some((oud) => r.includes(oud))) overtreders.push(`${f}:${i + 1}`);
     });
   }
   check("geen losse vermelding meer", overtreders.length === 0, overtreders.slice(0, 5).join(", "));

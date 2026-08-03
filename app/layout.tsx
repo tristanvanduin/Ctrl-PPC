@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { THEMA_INIT_SCRIPT } from "@/components/ui/thema-schakelaar";
+import { BRAND_NAME } from "@/lib/branding/brand";
 import "./globals.css";
 
 const ubuntu = Ubuntu({
@@ -19,7 +20,7 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "RAI Amsterdam — SEA Dashboard",
+  title: `${BRAND_NAME} — SEA Dashboard`,
   description: "Revenue & Conversie Forecasting Dashboard voor het SEA-team",
 };
 

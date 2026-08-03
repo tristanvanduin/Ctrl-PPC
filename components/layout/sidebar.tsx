@@ -11,6 +11,7 @@ import { migrateLocalStorageToSupabase } from "@/lib/migrate-to-supabase";
 import { loadClientGroups, type GroupWithMembers } from "@/lib/client-groups";
 import { supabase } from "@/lib/supabase";
 import { visibleGeoClones, type GeoCloneVariant } from "@/lib/rai/geo-clone-catalog";
+import { BRAND_NAME } from "@/lib/branding/brand";
 
 interface VisibleClient {
   id: string;
@@ -188,7 +189,7 @@ function SidebarInner() {
       {/* Logo */}
       <div className="p-6 pb-4">
         <h1 className="text-white text-xl font-bold tracking-tight">
-          RAI Amsterdam
+          {BRAND_NAME}
         </h1>
         <p className="text-white/90 text-xs mt-1">SEA Dashboard</p>
       </div>

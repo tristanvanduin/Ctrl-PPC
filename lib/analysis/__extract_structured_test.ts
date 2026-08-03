@@ -12,6 +12,7 @@
 // was bedacht en verdwenen.
 
 import { parseRecommendations, TaskSchema, RecommendationSchema } from "../schema/analysis-schema";
+import { OWNER_TEAM } from "../branding/brand";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -20,7 +21,7 @@ function check(label: string, cond: boolean, detail = ""): void {
 }
 
 const taak = (titel: string, o: Record<string, unknown> = {}) => ({
-  title: titel, description: "d", action_type: "budget", owner: "RAI Amsterdam",
+  title: titel, description: "d", action_type: "budget", owner: OWNER_TEAM,
   affected_campaign: null, affected_adgroup: null, affected_keyword: null,
   current_value: null, target_value: null, priority: "high", frequency: "weekly",
   due_date_days: 7, recommendation_index: 0, ...o,

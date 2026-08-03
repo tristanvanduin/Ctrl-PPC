@@ -11,7 +11,7 @@
  */
 
 import React from "react";
-import { BRAND_LOGO_FILE } from "@/lib/branding/brand";
+import { BRAND_LOGO_FILE, BRAND_NAME } from "@/lib/branding/brand";
 import {
   Document,
   Page,
@@ -121,7 +121,7 @@ const redBorder = "#fecaca";
 const gray = "#6b7280";
 const grayLight = "#f9fafb";
 const grayBorder = "#e5e7eb";
-// Brand Guide: RAI Amsterdam kleurenpalet
+// Brand Guide: het merkpalet
 const dark = "#0A1628";        // Graphite (primair donker)
 const blueDark = "#0F1D2F";    // Deep Navy
 const blueLight = "#eff6ff";
@@ -516,7 +516,7 @@ function Header({
         React.createElement(
           View,
           { style: { alignItems: "flex-end" as const } },
-          React.createElement(Text, { style: s.brand }, "RAI Amsterdam"),
+          React.createElement(Text, { style: s.brand }, BRAND_NAME),
           React.createElement(Text, { style: s.brandSub }, "De #1 SEM specialist in de Benelux"),
         )
       )

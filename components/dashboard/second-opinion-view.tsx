@@ -11,6 +11,7 @@ import { getShortlistTemplate, getLonglistTemplate, type TemplateRow } from "@/l
 import { useGenerationProgress } from "@/lib/use-generation-progress";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
 import { Sectie } from "@/components/ui/sectie";
+import { BRAND_NAME } from "@/lib/branding/brand";
 
 interface Props { clientId: string; clientName: string; }
 
@@ -187,7 +188,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
         eerste
         icoon={<ClipboardCheck className="w-4.5 h-4.5 text-rm-blue-ink" />}
         titel="Second opinion"
-        bijschrift="Account-audit op het RAI Amsterdam-template"
+        bijschrift={`Account-audit op het ${BRAND_NAME}-template`}
       >
 
       {/* ── Audit trigger cards ──

@@ -9,6 +9,7 @@ import { getClientSettings } from "@/lib/client-settings";
 import { getAllClients } from "@/lib/clients";
 import { fixMojibake } from "@/lib/analysis/sanitize";
 import { formatRoas } from "@/lib/forecast-format";
+import { BRAND_NAME } from "@/lib/branding/brand";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -114,7 +115,7 @@ export function ReportExport({ clientId }: { clientId: string }) {
     lines.push("");
 
     lines.push("---");
-    lines.push(`*Gegenereerd door RAI Amsterdam SEA Dashboard op ${dateStr}*`);
+    lines.push(`*Gegenereerd door ${BRAND_NAME} op ${dateStr}*`);
 
     return lines.join("\n");
   }

@@ -105,7 +105,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 
   /* Merk-tokens. Wijzen naar --brand-* variabelen die de BrandThemeProvider per beurs/klant
-     zet; zonder provider vallen ze terug op de RAI Amsterdam-huisstijl. Zo kleurt élk bestaand
+     zet; zonder provider vallen ze terug op de huisstijl van het product. Zo kleurt élk bestaand
      gebruik van rm-blue/rm-orange automatisch mee met het actieve merk, zonder de componenten
      aan te raken.
 
@@ -567,5 +567,50 @@
   }
   table tbody tr:hover {
     background-color: var(--rij-hover, rgb(249 250 251 / 0.8));
+  }
+}
+
+/* ── Wie geen beweging verdraagt ───────────────────────────────────────────
+ *
+ * Gemeten voordat dit er stond: 139 transition-klassen, 49 draaiende spinners en drie
+ * pulserende skeletons, en geen enkele regel die daar iets aan deed. Voor wie
+ * bewegingsgevoelig is (vestibulaire klachten, migraine) is dat geen smaakkwestie maar
+ * misselijkheid; het besturingssysteem heeft er een schakelaar voor en die stond hier
+ * simpelweg niet aangesloten.
+ *
+ * Drie soorten beweging, drie antwoorden — en niet één blinde `animation: none`:
+ *
+ *   1. Overgangen en decoratieve animaties gaan uit. Een kleur die verspringt in plaats
+ *      van vloeit is prima; niemand mist een fade.
+ *
+ *   2. De spinner blijft draaien, maar rustiger. Een spinner die stilstaat leest als een
+ *      vastgelopen scherm — dan is de "reparatie" schadelijker dan de kwaal. Twee en een
+ *      halve seconde per omwenteling is traag genoeg om niet te prikkelen en snel genoeg
+ *      om te zien dat er iets gebeurt.
+ *
+ *   3. Het pulserende skelet wordt stil. Dat is puur versiering: het vlak zegt al waar
+ *      straks inhoud komt, ook zonder te ademen.
+ *
+ * `scroll-behavior: auto` hoort er ook bij: een pagina die zelf wegglijdt is precies het
+ * soort beweging dat deze voorkeur bedoelt.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 2.5s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .animate-pulse {
+    animation: none !important;
   }
 }

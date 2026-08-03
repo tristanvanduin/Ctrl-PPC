@@ -7,6 +7,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
+import { OWNER_TEAM } from "../lib/branding/brand";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -144,7 +145,7 @@ async function main() {
       week_number: t["Week"] ? parseInt(t["Week"]) : null,
       task: t["Taak"] || "(geen taak)",
       status: STATUS_MAP[t["Status"]] || "todo",
-      owner: t["Verantwoordelijke"] || "RAI Amsterdam",
+      owner: t["Verantwoordelijke"] || OWNER_TEAM,
       metrics: t["Metrics"] || null,
       review_timeframe: t["Looptijd tot Beoordeling"] || null,
     }));
