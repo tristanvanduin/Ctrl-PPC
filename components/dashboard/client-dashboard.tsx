@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, Settings, Calendar, Target, Loader2, AlertTriangle, Wifi, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Globe, Megaphone, Briefcase, Layers } from "lucide-react";
+import { BarChart3, Settings, Calendar, Target, Loader2, AlertTriangle, Wifi, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Globe, Megaphone, Briefcase, Layers, Sparkles } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import { SyncStatusBadge } from "./sync-status-badge";
 import { getClientSettings } from "@/lib/client-settings";
@@ -419,12 +419,11 @@ export function ClientDashboard({ client }: { client: Client }) {
               <Sectie
                 icoon={<LayoutGrid className="w-4.5 h-4.5 text-rm-blue-ink" />}
                 titel="Waar het budget landt"
-                bijschrift="Video, netwerken, placements en de advertenties zelf"
+                bijschrift="Video, netwerken en placements"
               >
                 <VideoPerformance clientId={client.id} />
                 <PmaxNetworkSplit clientId={client.id} />
                 <VideoPlacements clientId={client.id} />
-                <CreativePerformance clientId={client.id} channel="google" />
               </Sectie>
 
               <div className="mt-10">
@@ -451,6 +450,20 @@ export function ClientDashboard({ client }: { client: Client }) {
                     bijschrift="Alle campagnes van dit account over de laatste 30 dagen"
                   >
                     <CampaignTable clientId={client.id} geoClone={geoClone} countryFilter={countryFilter} onCountryFilterChange={setCountryFilter} />
+                  </Sectie>
+                  {/* De advertenties zelf horen hier en niet op Overzicht.
+                      Ze stonden in de sectie "Waar het budget landt", samen met video, netwerken
+                      en placements: vier onderwerpen onder één kop, samen 1.872 pixels — ruim
+                      anderhalf scherm en zesendertig procent van de hele pagina. Dit blok was het
+                      grootste (616px) én het enige dat inhoudelijk ergens anders thuishoort: een
+                      advertentie is waar een campagne uit bestaat, niet waar een budget landt.
+                      Overzicht wordt hier een derde korter zonder dat er iets verdwijnt. */}
+                  <Sectie
+                    icoon={<Sparkles className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                    titel="De advertenties zelf"
+                    bijschrift="Hoe de creatives eruitzien en wat ze opleverden"
+                  >
+                    <CreativePerformance clientId={client.id} channel="google" />
                   </Sectie>
                   <Sectie
                     icoon={<AlertTriangle className="w-4.5 h-4.5 text-rm-blue-ink" />}
