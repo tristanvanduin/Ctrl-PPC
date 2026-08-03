@@ -35,10 +35,18 @@ export function ChannelFilter({ value, onChange, counts }: {
   );
 }
 
-export function ChannelBadge({ channel }: { channel: InsightChannel | null }) {
+/**
+ * `className` landt bewust alleen op de badge en niet op het streepje.
+ *
+ * In een tabelkolom wil je dat de tékst onder de kolomkop begint, niet de rand van de pil. De
+ * badge draagt zelf `px-1.5` plus een rand, dus zijn letters staan 7px naar rechts; het streepje
+ * heeft geen opvulling en staat al goed. Kreeg het streepje dezelfde correctie mee, dan liep de
+ * kolom alsnog uit elkaar — alleen de andere kant op.
+ */
+export function ChannelBadge({ channel, className = "" }: { channel: InsightChannel | null; className?: string }) {
   if (!channel) return <span className="text-micro text-muted-foreground">—</span>;
   return (
-    <span className={`inline-block px-1.5 py-0.5 text-micro font-semibold rounded border ${CHANNEL_BADGE_CLASS[channel]}`}>
+    <span className={`inline-block px-1.5 py-0.5 text-micro font-semibold rounded border ${CHANNEL_BADGE_CLASS[channel]} ${className}`}>
       {CHANNEL_LABEL[channel]}
     </span>
   );

@@ -499,27 +499,42 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                     className="bg-purple-50/40 cursor-pointer hover:bg-purple-50/60"
                     onClick={() => toggleCollapse(hypId)}
                   >
-                    <td colSpan={7} className="px-4 py-2.5">
+                    {/*
+                      Dit was één cel met colSpan={7} en een flexrij erin. Daardoor zweefde de
+                      kanaalbadge direct achter de hypothesetekst, en die tekst is per rij een
+                      andere lengte — de badge landde zo op vier verschillende posities, terwijl
+                      de badges van de taken eronder allemaal in de kanaalkolom staan. Een
+                      overspannende cel kan zich per definitie niet aan het kolomraster houden.
+
+                      Nu draagt de rij echte cellen: tekst over Week+Taak, de badge in Kanaal, en
+                      de groepsgegevens over de rest. De band ziet er hetzelfde uit, maar alles
+                      staat in de kolom waar het bij hoort.
+                    */}
+                    <td colSpan={2} className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         {isCollapsed
-                          ? <ChevronDown className="w-3.5 h-3.5 text-purple-400" />
-                          : <ChevronUp className="w-3.5 h-3.5 text-purple-400" />
+                          ? <ChevronDown className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          : <ChevronUp className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                         }
-                        <span className="text-meta font-medium text-purple-700 max-w-[50%]">
+                        <span className="text-meta font-medium text-purple-700">
                           {hyp?.hypothesis || "Hypothese"}
                         </span>
-                        <ChannelBadge channel={hyp ? channelOfSource(hyp.source) : null} />
-                        <span className="ml-auto flex items-center gap-2 text-micro text-purple-400">
-                          {groupItems.length} taken · ICE {hyp?.ice_total?.toFixed(1) || "?"}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setShowAddTask(hypId); setNewTask(""); setNewOwner(OWNER_TEAM); }}
-                            className="p-0.5 rounded hover:bg-purple-200 transition-colors"
-                            title="Taak toevoegen"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </span>
                       </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <ChannelBadge channel={hyp ? channelOfSource(hyp.source) : null} className={OP_KOP_BADGE} />
+                    </td>
+                    <td colSpan={4} className="px-4 py-2.5">
+                      <span className="flex items-center justify-end gap-2 text-micro text-purple-400">
+                        {groupItems.length} taken · ICE {hyp?.ice_total?.toFixed(1) || "?"}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowAddTask(hypId); setNewTask(""); setNewOwner(OWNER_TEAM); }}
+                          className="p-0.5 rounded hover:bg-purple-200 transition-colors"
+                          title="Taak toevoegen"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </span>
                     </td>
                   </tr>
 
@@ -559,6 +574,22 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   );
 }
 
+// Elke cel met een bedieningselement stond op een andere inspringing dan zijn kolomkop.
+//
+// De cel geeft `px-4`, en daar bovenop draagt het element zijn eigen opvulling: de pil `px-2.5`,
+// de badge `px-1.5` plus een rand, de keuzelijst `px-1` plus een rand, en het weekveld stond
+// bovendien gecentreerd in een vak van 48px. Gemeten afwijking ten opzichte van de kop, per
+// kolom: 17, 0, 7, 10, 5, 0, 0 — vijf verschillende waarden over zeven kolommen. De koprij is
+// een liniaal, en het lichaam hield zich er niet aan.
+//
+// Vier van de zeven kolommen lijnen hun tékst uit op de kop, dus dat is hier de maat: het
+// element wordt met een negatieve marge exact zijn eigen inspringing naar links getrokken,
+// zodat de letters op de kop staan en de pil zijn vorm houdt. De marge blijft binnen de 16px
+// celopvulling, dus niets raakt de buurkolom.
+const OP_KOP_PIL = "-ml-[10px]";   // px-2.5, geen rand
+const OP_KOP_BADGE = "-ml-[7px]";  // px-1.5 + 1px rand
+const OP_KOP_VELD = "-ml-[5px]";   // px-1 + 1px rand
+
 function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem; onUpdate: (id: string, field: string, value: string) => void; currentWeek: number; channel: InsightChannel | null }) {
   const isOverdue = item.week_number != null && item.week_number < currentWeek && !["done", "expired"].includes(item.status);
   const isCurrent = item.week_number != null && item.week_number === currentWeek;
@@ -571,7 +602,7 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
             type="number"
             value={item.week_number || ""}
             onChange={(e) => onUpdate(item.id, "week_number", e.target.value)}
-            className={`w-12 text-xs text-center border rounded px-1 py-0.5 focus:bg-card focus:border-rm-blue focus:outline-none ${
+            className={`w-12 text-xs text-left border rounded px-1 py-0.5 ${OP_KOP_VELD} focus:bg-card focus:border-rm-blue focus:outline-none ${
               isOverdue ? "border-red-300 bg-red-50 text-red-600 font-bold" :
               isCurrent ? "border-emerald-300 bg-emerald-50 text-emerald-600 font-bold" :
               "border-transparent hover:border-border bg-transparent"
@@ -582,12 +613,12 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
         </div>
       </td>
       <td className="px-4 py-2.5 text-sm text-rm-gray">{item.task}</td>
-      <td className="px-4 py-2.5"><ChannelBadge channel={channel} /></td>
+      <td className="px-4 py-2.5"><ChannelBadge channel={channel} className={OP_KOP_BADGE} /></td>
       <td className="px-4 py-2.5">
         <select
           value={item.status}
           onChange={(e) => onUpdate(item.id, "status", e.target.value)}
-          className={`text-micro font-medium rounded-full px-2.5 py-1 border-0 cursor-pointer ${STATUS_COLOR(item.status)}`}
+          className={`text-micro font-medium rounded-full px-2.5 py-1 border-0 cursor-pointer ${OP_KOP_PIL} ${STATUS_COLOR(item.status)}`}
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
@@ -604,7 +635,7 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
           // klopten. `normalizeOwner` levert altijd een van de twee rollen, dus altijd een match.
           value={normalizeOwner(item.owner)}
           onChange={(e) => onUpdate(item.id, "owner", e.target.value)}
-          className="text-xs border border-transparent hover:border-border rounded px-1 py-0.5 bg-transparent focus:bg-card focus:border-rm-blue focus:outline-none cursor-pointer"
+          className={`text-xs border border-transparent hover:border-border rounded px-1 py-0.5 ${OP_KOP_VELD} bg-transparent focus:bg-card focus:border-rm-blue focus:outline-none cursor-pointer`}
         >
           {/* De waarde is de rol, het label is de naam. Zie ownerLabel in brand.ts. */}
           <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>

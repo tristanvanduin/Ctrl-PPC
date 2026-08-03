@@ -418,10 +418,22 @@
   --color-blue-700: #afc6f4;
   --color-blue-800: #c7d7f8;
 
+  /* De -50 en -200 stonden hier niet, en dat was zichtbaar.
+     De kanaalbadges dragen `bg-sky-50 text-sky-700 border-sky-200` (LinkedIn) en dezelfde
+     opbouw met indigo (Meta). Alleen de 700 had een donkere tegenhanger, dus in het donker
+     werd de tékst licht terwijl het vlak en de rand op Tailwinds bijna-witte standaard bleven
+     staan: lichtblauwe letters op een wit pilletje. Gemeten 1,61:1 voor LinkedIn en 1,63:1
+     voor Meta — onleesbaar. Google en Cross deden het goed omdat blue-50 en amber-50 hier wél
+     stonden; zo werd het gemist.
+     Met deze stappen komen ze op 9,6:1 en 9,8:1, gelijk aan de 9,8:1 van Google. */
+  --color-sky-50: #102132;
   --color-sky-100: #17263f;
+  --color-sky-200: #1c4058;
   --color-sky-700: #afc6f4;
 
+  --color-indigo-50: #17162f;
   --color-indigo-100: #1c1e3f;
+  --color-indigo-200: #2b2a63;
   --color-indigo-700: #b6bcf4;
 
   --color-orange-50: #2b1c12;
