@@ -1,17 +1,21 @@
 "use client";
 
-import { Briefcase } from "lucide-react";
+import { Briefcase, Calendar, Globe, LayoutGrid, Sparkles } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import type { UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
 import { GeoBreakdown } from "./geo-breakdown";
 import { BreakdownDonuts } from "./breakdown-donuts";
+import { Sectie } from "@/components/ui/sectie";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 
 // LinkedIn Ads-tab. Zelfde opbouw als de Google- en Meta-weergave via de gedeelde
 // ChannelViewHeader. Buiten demo is er nog geen gesyncte data; dan toont de header een eerlijke
 // lege staat en de prestatie-view eronder blijft leeg tot de sync draait.
+//
+// Gesplitst om dezelfde reden als meta-view: deze view stond in zijn geheel op Overzicht én op
+// Campagnes met dezelfde props, en toonde daar elf identieke koppen. Zie de toelichting daar.
 
 const SECTIONS = [
   "Campagnegroepen & campagnes",
@@ -46,13 +50,53 @@ export function LinkedInView({ clientId, geoClone, edition }: { clientId: string
       />
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
-      <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} edition={edition} />
+      <Sectie
+        icoon={<Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Maandprestaties"
+        bijschrift="Kerncijfers, pacing en het maandverloop"
+      >
+        <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} edition={edition} />
+      </Sectie>
+
       {/* Geo-mapping: waar komt verkeer/conversies vandaan (per gekozen metric). */}
-      <GeoBreakdown clientId={clientId} channel="linkedin" />
+      <Sectie
+        icoon={<Globe className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Markten"
+        bijschrift="Waar het verkeer en de conversies vandaan komen"
+      >
+        <GeoBreakdown clientId={clientId} channel="linkedin" />
+      </Sectie>
+
       {/* Waar het budget landt per uitsplitsing — het equivalent van de PMax-ringen bij Google. */}
-      <BreakdownDonuts clientId={clientId} channel="linkedin" />
+      <Sectie
+        icoon={<LayoutGrid className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Wie het te zien krijgt"
+        bijschrift="Functie, senioriteit, sector en bedrijfsgrootte"
+      >
+        <BreakdownDonuts clientId={clientId} channel="linkedin" />
+      </Sectie>
+    </div>
+  );
+}
+
+/**
+ * Het campagne-deel van LinkedIn: de advertenties zelf.
+ *
+ * Geen ChannelViewHeader, net als bij Meta en Google: de koppelingsstatus is een overzichtsvraag
+ * en hoort niet op elk tabblad herhaald te worden.
+ */
+export function LinkedInCampagnes({ clientId }: { clientId: string }) {
+  return (
+    <div className="space-y-6">
       {/* Quick scan: creatives + prestaties + samenvatting. */}
-      <CreativePerformance clientId={clientId} channel="linkedin" />
+      <Sectie
+        eerste
+        icoon={<Sparkles className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="De advertenties zelf"
+        bijschrift="Creatives, hun prestaties en vermoeidheid"
+      >
+        <CreativePerformance clientId={clientId} channel="linkedin" />
+      </Sectie>
     </div>
   );
 }

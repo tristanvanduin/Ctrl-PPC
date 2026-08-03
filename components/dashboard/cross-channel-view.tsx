@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, Layers, Info, TrendingUp } from "lucide-react";
+import { Globe, Info, Layers, Loader2, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
@@ -11,6 +11,7 @@ import { RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
 import { maandLabel } from "./chart-chrome";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Sectie } from "@/components/ui/sectie";
+import { GeoBreakdown } from "./geo-breakdown";
 
 // Cross-channel (blended) tab. Leest de blended_account_monthly-view over Google, Meta en
 // LinkedIn heen. De view levert de bouwstenen; de attributie-voetnoot is verplicht, want elk
@@ -288,6 +289,17 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
           })()}
         </div>
       </div>
+      </Sectie>
+
+      {/* De wereldkaart stond op het Campagnes-tabblad, en alleen bij Alle kanalen. Op Google,
+          Meta en LinkedIn stond hij op Overzicht — dezelfde vraag, drie tabbladen verderop.
+          "Waar komt het vandaan" is een overzichtsvraag, dus hier hoort hij. */}
+      <Sectie
+        icoon={<Globe className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Markten"
+        bijschrift="Waar het verkeer en de conversies vandaan komen, over alle kanalen samen"
+      >
+        <GeoBreakdown clientId={clientId} channel="blended" />
       </Sectie>
     </div>
   );

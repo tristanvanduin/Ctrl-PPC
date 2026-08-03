@@ -44,8 +44,8 @@ import { ForecastTable } from "./forecast-table";
 import { BudgetScenario } from "./budget-scenario";
 import { ClientFiles } from "./client-files";
 import { DgmView } from "./dgm-view";
-import { MetaView } from "./meta-view";
-import { LinkedInView } from "./linkedin-view";
+import { MetaView, MetaCampagnes } from "./meta-view";
+import { LinkedInView, LinkedInCampagnes } from "./linkedin-view";
 import { CrossChannelView } from "./cross-channel-view";
 import { CampaignsPerChannel } from "./campaigns-per-channel";
 import { BrandingView } from "./branding-view";
@@ -474,8 +474,8 @@ export function ClientDashboard({ client }: { client: Client }) {
                   </Sectie>
                 </div>
               )}
-              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
-              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
+              {channel === "meta" && <MetaCampagnes clientId={client.id} />}
+              {channel === "linkedin" && <LinkedInCampagnes clientId={client.id} />}
               {/* Alle kanalen op de Campagnes-tab: welke campagnes draaien per kanaal (niet de
                   blended maandgrafiek — die hoort bij Prognose/Overzicht). */}
               {channel === "blended" && <CampaignsPerChannel clientId={client.id} geoClone={geoClone} />}

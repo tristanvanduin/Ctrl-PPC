@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import { BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
-import { GeoBreakdown } from "./geo-breakdown";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Laadvlak } from "@/components/ui/laadvlak";
@@ -173,8 +172,9 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
         </div>
       ))}
 
-      {/* Geo-mapping over alle kanalen samen: waar komt verkeer/conversies vandaan (per metric). */}
-      <GeoBreakdown clientId={clientId} channel="blended" />
+      {/* De wereldkaart stond hier en is naar Overzicht verhuisd. "Waar komt het vandaan" is een
+          overzichtsvraag, geen campagnevraag — en op de drie andere kanalen stond hij al op
+          Overzicht. Zie cross-channel-view. */}
     </div>
   );
 }
