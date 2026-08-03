@@ -46,11 +46,13 @@ export const BRAND_TAGLINE = "";
 // Ten eerste: als dit als SaaS verkocht wordt, is de eigenaar per tenant een ander bureau. Een
 // taak van bureau A zou dan letterlijk de naam van bureau B dragen zodra die de rij inleest.
 //
-// Ten tweede, en dat is de acute: deze waarde wordt OPGESLAGEN in sprint_planning.owner en
-// sop_tasks.owner. Was de merknaam blijven meeliften, dan had het hernoemen naar Ctrl PPC elke
-// bestaande rij met "RAI Amsterdam" stilzwijgend als KLANT-taak laten tellen — want die naam zou
-// dan niet meer overeenkomen met de teamwaarde. Een naamswijziging in de zijbalk had zo de
-// verdeling van het werk in de sprintplanning omgegooid.
+// Ten tweede, en dat is de acute: deze waarde wordt OPGESLAGEN in sprint_items.owner. (Niet in
+// sprint_planning en niet in sop_tasks — dat stond hier eerder en klopte allebei niet; nagekeken
+// tegen het live schema, sop_tasks heeft helemaal geen owner-kolom.) Was de merknaam blijven
+// meeliften, dan had het hernoemen naar Ctrl PPC elke bestaande rij met "RAI Amsterdam"
+// stilzwijgend als KLANT-taak laten tellen — want die naam zou dan niet meer overeenkomen met de
+// teamwaarde. Een naamswijziging in de zijbalk had zo de verdeling van het werk in de
+// sprintplanning omgegooid.
 //
 // Wat er wordt opgeslagen is daarom geen naam meer maar een ROL. De naam is weergave en komt van
 // de tenant; de rol is data en verandert nooit mee met een rebranding.
@@ -59,6 +61,14 @@ export const BRAND_TAGLINE = "";
 // nodig: bestaande rijen worden bij het lezen genormaliseerd, en pas wat daarna wordt weggeschreven
 // draagt de rol. Die lijst hoort te krimpen, niet te groeien — hij is een geheugen van elke naam
 // die dit product ooit heeft gedragen.
+//
+// Wat er werkelijk in die kolom staat, geteld op 3 augustus 2026: 38 rijen "RAI Amsterdam", 7 rijen
+// "Minismus" (een klant van het bureau — die valt terecht door naar de klant-rol), en 4 rijen met
+// een hele hypothesetekst erin, uit een import die het verkeerde veld raakte. Dat laatste is
+// rommel, maar hij normaliseert netjes naar "Klant" en is daardoor onzichtbaar geworden.
+//
+// De kolomstandaard stond nog op "Ranking Masters" — twee namen achter. Die is inmiddels op de
+// rol gezet.
 
 /** De opgeslagen waarde voor "het bureau doet dit". Een rol, geen naam. */
 export const OWNER_TEAM = "Bureau";

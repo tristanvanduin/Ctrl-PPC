@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Fragment } from "react";
-import { OWNER_TEAM, BRAND_SHORT } from "@/lib/branding/brand";
+import { OWNER_TEAM, OWNER_CLIENT, BRAND_SHORT, ownerLabel, normalizeOwner } from "@/lib/branding/brand";
 import { Download, ChevronDown, ChevronUp, Loader2, Calendar, Plus, X, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { channelOfSource, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
@@ -274,7 +274,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         `"${(item.task || "").replace(/"/g, '""')}"`,
         ch ? CHANNEL_LABEL[ch] : "",
         statusLabel,
-        item.owner || "",
+        ownerLabel(item.owner),
         `"${(hyp?.hypothesis || "").replace(/"/g, '""')}"`,
         item.review_timeframe || "",
         item.metrics || "",
@@ -441,8 +441,8 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
             <input value={newMetrics} onChange={(e) => setNewMetrics(e.target.value)} placeholder="Metrics (bijv. ROAS, CR)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:border-purple-400" />
             <input value={newTimeframe} onChange={(e) => setNewTimeframe(e.target.value)} placeholder="Looptijd (bijv. 3 maanden)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:border-purple-400" />
             <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card">
-              <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
-              <option value="Klant">Klant</option>
+              <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>
+              <option value={OWNER_CLIENT}>{OWNER_CLIENT}</option>
             </select>
           </div>
           <button onClick={addHypothesisWithTask} disabled={!newHypothesis.trim()} className="px-4 py-1.5 text-xs font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40 transition-colors">
@@ -461,8 +461,8 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           <div className="flex gap-3">
             <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Taakomschrijving" className="flex-1 text-sm border border-blue-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-rm-blue" />
             <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-blue-200 rounded-lg px-3 py-1.5 bg-card">
-              <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
-              <option value="Klant">Klant</option>
+              <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>
+              <option value={OWNER_CLIENT}>{OWNER_CLIENT}</option>
             </select>
             <button onClick={() => addTaskToHypothesis(null)} disabled={!newTask.trim()} className="px-4 py-1.5 text-xs font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-40 transition-colors">
               Toevoegen
@@ -535,7 +535,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                           <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Nieuwe taak..." className="flex-1 text-xs border border-purple-200 rounded px-2 py-1 bg-card focus:outline-none focus:border-purple-400" />
                           <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded px-2 py-1 bg-card">
                             <option value={OWNER_TEAM}>{BRAND_SHORT}</option>
-                            <option value="Klant">Klant</option>
+                            <option value={OWNER_CLIENT}>{OWNER_CLIENT}</option>
                           </select>
                           <button onClick={() => addTaskToHypothesis(hypId)} disabled={!newTask.trim()} className="px-2 py-1 text-micro font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40">Voeg toe</button>
                           <button onClick={() => setShowAddTask(null)} className="p-1 hover:bg-purple-100 rounded"><X className="w-3 h-3 text-purple-400" /></button>
@@ -596,12 +596,19 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
       </td>
       <td className="px-4 py-2.5">
         <select
-          value={item.owner}
+          // De genormaliseerde ROL en niet de ruwe waarde. In de database staat van alles: de
+          // merknaam van twee rebrandings geleden, een klantnaam, en in vier rijen zelfs een hele
+          // hypothese die bij een import in het verkeerde veld belandde. Geen van die waarden komt
+          // overeen met een <option>, dus de keuzelijst stond bij 45 van de 49 rijen leeg — en na
+          // het hernoemen van de teamwaarde gold dat ook voor de 38 rijen die vóórdien nog wel
+          // klopten. `normalizeOwner` levert altijd een van de twee rollen, dus altijd een match.
+          value={normalizeOwner(item.owner)}
           onChange={(e) => onUpdate(item.id, "owner", e.target.value)}
           className="text-xs border border-transparent hover:border-border rounded px-1 py-0.5 bg-transparent focus:bg-card focus:border-rm-blue focus:outline-none cursor-pointer"
         >
-          <option value={OWNER_TEAM}>{OWNER_TEAM}</option>
-          <option value="Klant">Klant</option>
+          {/* De waarde is de rol, het label is de naam. Zie ownerLabel in brand.ts. */}
+          <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>
+          <option value={OWNER_CLIENT}>{OWNER_CLIENT}</option>
         </select>
       </td>
       <td className="px-4 py-2.5 text-xs text-muted-foreground">{item.review_timeframe || "—"}</td>
