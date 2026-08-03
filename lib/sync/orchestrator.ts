@@ -956,6 +956,27 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     updated_at: finishedAt,
   }, { onConflict: "client_id" });
 
+  // De nieuwe feitentabellen bijwerken vanuit wat er zojuist is weggeschreven.
+  //
+  // Bewust GEEN dubbel schrijven in de sync zelf. De sync blijft precies doen wat hij deed — naar
+  // de oude tabellen — en één databasefunctie projecteert die daarna naar fact_core,
+  // fact_dimension en de kanaalmetrieken. Zie scripts/migrations/044_projectie.sql.
+  //
+  // Twee redenen. Ten eerste kon dubbelschrijf-code hier niet één keer getest worden: er zijn nu
+  // geen werkende API-sleutels, dus die code zou wekenlang ongedraaid in de sync zitten. De
+  // projectie is wél te testen, en dat is gebeurd: een waarde in ads_account_monthly gewijzigd,
+  // de functie gedraaid, en fact_core volgde.
+  //
+  // Ten tweede blijft het risico nul voor wat nu werkt. Faalt de projectie, dan is de sync zelf
+  // gewoon geslaagd en lopen alleen de nieuwe tabellen achter — en die worden nog nergens gelezen.
+  // Vandaar dat een fout hier de sync niet laat mislukken maar wel wordt gemeld.
+  const { error: projectieFout } = await supabase.rpc("refresh_fact_from_legacy", {
+    p_client_id: clientId,
+  });
+  if (projectieFout) {
+    console.error(`[sync] projectie naar fact_core mislukt voor ${clientId}: ${projectieFout.message}`);
+  }
+
   return {
     runId, clientId, status,
     startedAt: now, finishedAt,

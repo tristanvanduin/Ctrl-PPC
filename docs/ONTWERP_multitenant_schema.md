@@ -602,8 +602,27 @@ sleutel). Dat iemand er onafhankelijk op uitkwam, is de beste bevestiging dat de
 
 Daarmee is fase 2b klaar. `verify-fact-core.mjs` dekt nu 108 sommen, 0 afwijkingen.
 
-**2c — nog te doen:** de sync dubbel laten schrijven. Dit is de eerste stap die draaiende code
-raakt.
+**2c — projectie in plaats van dubbel schrijven — GEDAAN (migratie 044)**
+
+Het plan was de sync naar beide plekken te laten schrijven. Dat is de verkeerde vorm gebleken, om
+een praktische reden: er zijn nu geen werkende API-sleutels voor Google, Meta en LinkedIn.
+Dubbelschrijf-code zou dus een flinke wijziging aan draaiende code zijn die pas over weken voor
+het eerst uitgevoerd wordt, en tot die tijd niet één keer bewezen.
+
+De gekozen vorm doet hetzelfde en is nu wél te testen: **de sync blijft ongemoeid** en schrijft
+naar de oude tabellen zoals altijd; `refresh_fact_from_legacy()` projecteert die daarna naar
+`fact_core`, de kanaalmetrieken en de rollups. De sync roept hem aan het eind aan — één toevoeging,
+en een fout daarin laat de sync niet mislukken maar wordt wel gemeld, want de nieuwe tabellen
+worden nog nergens gelezen.
+
+Getest wat het moet doen: een waarde in `ads_account_monthly` gewijzigd (kosten +1.234,56, klikken
++99), gecontroleerd dat `fact_core` achterliep, de functie gedraaid, en `fact_core` volgde exact.
+Daarna teruggedraaid; 108 sommen, 0 afwijkingen.
+
+Onderweg viel de functie meteen om op een `not null`-schending: de demodata heeft Meta-rijen met
+impressies maar zonder `clicks_all`. Migratie 036 ving dat per kolom af met `coalesce`; bij het
+herschrijven naar een union raakte dat kwijt. Nu staat het op de buitenste select, waar het voor
+alle takken tegelijk geldt.
 
 ### Fase 3 — views onder de oude namen
 Elke oude tabel wordt hernoemd naar `<naam>_legacy` en er komt een view met de oude naam die uit
