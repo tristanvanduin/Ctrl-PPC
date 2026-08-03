@@ -123,7 +123,7 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
               <AsY formatter={kortEuro} {...schaalSpend} stil={elkBedragErbij} />
               <Tip formatter={volledigEuro} />
               <BalkVerloop id="balk-verloop-spend" kleur={theme.primary} />
-              <Bar dataKey="spend" name="Spend" fill="url(#balk-verloop-spend)" radius={BALK_RADIUS} barSize={balkBreedte(rows.length)}>
+              <Bar dataKey="spend" name="Spend" fill="url(#balk-verloop-spend)" filter="url(#balk-verloop-spend-gloed)" radius={BALK_RADIUS} barSize={balkBreedte(rows.length)}>
                 {elkBedragErbij && (
                   <LabelList
                     dataKey="spend"
@@ -302,7 +302,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
             <Tip formatter={volledigEuro} />
             {series.map((s, i) => <BalkVerloop key={`v-${s}`} id={verloopId(s, i)} kleur={kleurVan(i)} />)}
             {series.map((s, i) => (
-              <Bar key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)}>
+              <Bar key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} filter={`url(#${verloopId(s, i)}-gloed)`} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)}>
                 {/* Alleen de grootste serie draagt een naam, boven zijn laatste balk. Zie
                     `grootsteSerie` hierboven voor waarom het er één is en niet drie. */}
                 {s === grootsteSerie && (

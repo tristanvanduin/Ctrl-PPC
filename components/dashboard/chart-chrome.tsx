@@ -284,8 +284,18 @@ function TipInhoud({ active, payload, label, formatter }: TipProps) {
   if (!active || !payload?.length) return null;
   const fmt = formatter ?? volledigGetal;
   return (
-    <div className="rounded-lg border border-border bg-white/95 backdrop-blur-sm shadow-lg px-3 py-2 text-meta">
-      {label != null && <div className="font-semibold text-rm-gray mb-1">{String(label)}</div>}
+    // `bg-card` en niet `bg-white`. Dat laatste is letterlijk wit en weet niets van het thema, dus
+    // in donkere modus stond hier een witte doos met de lichte donkere-modus-inkt erop: grijs op
+    // wit, praktisch onleesbaar. Precies de reden waarom `bg-white` elders in deze codebase al was
+    // vervangen — deze plek was overgeslagen, en alleen zichtbaar als je hovert.
+    //
+    // En dit is de tweede plek waar glas écht glas is: een tooltip zweeft over de plot, dus er is
+    // een achtergrond om te vervagen. Vandaar meer doorzicht en meer blur dan de 95% die er stond;
+    // op vijfennegentig procent zag je er niets doorheen en was het effect alleen kosten.
+    <div className="rounded-lg border border-border bg-[var(--tip-vlak)] backdrop-blur-md shadow-lg px-3 py-2 text-meta">
+      {/* Door dezelfde opmaker als de as. De as zei "mei '26" en de tooltip eronder "2026-05":
+          twee schrijfwijzen voor dezelfde maand, tien pixels uit elkaar. */}
+      {label != null && <div className="font-semibold text-rm-gray mb-1">{maandLabel(String(label))}</div>}
       <div className="space-y-0.5">
         {payload.map((p: TipDeel, i: number) => (
           <div key={`${p.name}-${i}`} className="flex items-center gap-2">
@@ -360,6 +370,21 @@ export function Legenda({ items, className = "" }: { items: LegendaItem[]; class
 export function BalkVerloop({ id, kleur }: { id: string; kleur: string }) {
   return (
     <defs>
+      {/* De gloed onder de balk, als SVG-filter zodat hij de kleur van déze serie krijgt.
+          Via CSS lukt dat niet: één plot draagt meerdere series en een klasse kan geen kleur
+          meenemen. `feDropShadow` kan dat wel, want hij staat naast het verloop in dezelfde defs.
+
+          Onder de balk en niet eromheen. In de referentie omgeeft de gloed de hele balk, dus ook
+          de BOVENrand — en dat is precies de rand waar je de waarde afleest. Een halo daar maakt
+          het aflezen onnauwkeurig; dezelfde fout als een 3D-balk, alleen milder. Een verticale
+          verschuiving van drie pixels legt het schijnsel op het vlak eronder, waar geen waarde
+          staat: je krijgt de diepte en de bovenrand blijft één scherpe lijn.
+
+          Alleen in donkere modus zichtbaar: `--gloed-sterkte` staat op nul in het licht, want op
+          een licht vlak wordt een gekleurde gloed geen schijnsel maar vuil. */}
+      <filter id={`${id}-gloed`} x="-50%" y="-20%" width="200%" height="160%">
+        <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor={kleur} floodOpacity="var(--gloed-sterkte, 0)" />
+      </filter>
       {/* De seriekleuren zijn `var(--serie-n, …)` zodat donkere modus meebeweegt. Ik heb eerst
           `style` gebruikt in de veronderstelling dat een var() in een presentatie-attribuut niet
           vervangen wordt. Dat is niet zo — nagemeten met twee identieke gradiënten naast elkaar,
