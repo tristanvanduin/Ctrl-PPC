@@ -503,13 +503,42 @@ bestaan er vanaf het eerste moment twee tenants, en valt een scoping-fout op zod
 wordt — in plaats van pas bij de eerste echte tweede klant, wanneer er data van iemand anders in
 het geding is. Een multi-tenant model met één tenant test namelijk niets.
 
-### Fase 2 — de feitentabellen ernaast, dubbel geschreven
-`fact_core`, `fact_dimension` en de kanaaltabellen aanmaken. De sync schrijft vanaf dat moment naar **beide**
-plekken. De oude tabellen blijven de waarheid; de nieuwe worden gevuld en gecontroleerd.
+### Fase 2 — de feitentabellen ernaast
 
-Controle voordat er iets omgaat: per tabel en per maand de sommen van impressies, klikken,
-kosten en conversies vergelijken tussen oud en nieuw. Wijkt er iets af, dan gaat de fase niet
-door. Dat is een script, geen inschatting.
+Opgesplitst, want er zitten twee heel verschillende risico's in: tabellen aanmaken en vullen uit
+bestaande data raakt geen code, de sync aanpassen wel.
+
+**2a — fact_core aangemaakt en gevuld — GEDAAN (migratie 036)**
+
+Gevuld uit de bestaande tabellen, met exact overeenkomende rijaantallen:
+
+| kanaal | niveau | korrel | rijen | periode |
+|---|---|---|---:|---|
+| google | account | month | 775 | 2024-08 t/m 2026-07 |
+| google | campaign | month | 4.707 | 2024-08 t/m 2026-07 |
+| meta | account | day | 160 | 2026-02-10 t/m 2026-07-19 |
+| meta | campaign | day | 128 | 2026-05-17 t/m 2026-07-19 |
+| linkedin | account | day | 160 | 2026-02-10 t/m 2026-07-19 |
+| linkedin | campaign | day | 128 | 2026-05-17 t/m 2026-07-19 |
+
+**Geverifieerd met `scripts/verify-fact-core.mjs`: 30 sommen vergeleken, 0 afwijkingen.** Dat
+script is de poort naar fase 3 en blijft herhaalbaar, want de sync draait ondertussen door.
+
+Twee dingen die daarbij besloten zijn en die niet vanzelf spreken:
+
+- Meta's `clicks_all` wordt de kanonieke `clicks`, niet `link_clicks`. Dat komt overeen met wat
+  Google `clicks` noemt. Zou `link_clicks` hier staan, dan zette elke cross-channel vergelijking
+  Meta stelselmatig te laag.
+- `conversions` is voor Meta en LinkedIn een **afgeleide van een instelling**, niet een ruw feit:
+  wat meetelt staat in `client_settings.channel_conversion_config`. Geen enkele klant wijkt nu af
+  van de standaard, dus de backfill past die toe — en `verify-fact-core.mjs` faalt expliciet zodra
+  er wél iemand afwijkt, in plaats van stil verkeerd te blijven staan.
+
+**2b — nog te doen:** de kanaaltabellen (`meta_metrics`, `linkedin_metrics`, `google_metrics`) en
+`fact_dimension`.
+
+**2c — nog te doen:** de sync dubbel laten schrijven. Dit is de eerste stap die draaiende code
+raakt.
 
 ### Fase 3 — views onder de oude namen
 Elke oude tabel wordt hernoemd naar `<naam>_legacy` en er komt een view met de oude naam die uit
