@@ -41,6 +41,22 @@ export const ROLES = [
 
 export type Role = (typeof ROLES)[number];
 
+/**
+ * De rolnamen zoals ze in de database staan zijn technisch; dit is wat een mens leest.
+ *
+ * Stond als lokale const in app/admin/page.tsx. Zodra de sprintplanning dezelfde namen als
+ * functiesuggestie aanbiedt zijn het er twee, en dan drift de ene versie van de andere weg —
+ * precies waar de hygiënepoort op let. Hier hoort hij, naast de rollen zelf.
+ */
+export const ROL_LABEL: Record<Role, string> = {
+  admin: "Admin",
+  performance_marketeer: "Performance marketeer",
+  beurs_manager: "Beursverantwoordelijke",
+  brand_strateeg: "Brand strateeg",
+  it: "IT",
+  viewer: "Meekijker",
+};
+
 // De oude waarden staan OPGESLAGEN in user_roles.role. Ze blijven geldig tot migratie 032
 // de rijen omzet; normalizeRole vertaalt bij het lezen. Zelfde patroon als OwnerEnum.
 const LEGACY_ROLE_MAP = {
@@ -163,6 +179,11 @@ const API_RULES: readonly { prefix: string; read?: Capability; write?: Capabilit
   { prefix: "/api/admin", read: "user:manage", write: "user:manage" },
   { prefix: "/api/users", read: "user:manage", write: "user:manage" },
   { prefix: "/api/invite", read: "user:manage", write: "user:manage" },
+  // De lijst met toewijsbare collega's. Lezen vergt hier het recht om te MOGEN toewijzen, niet
+  // het recht om te lezen: wie geen sprinttaak kan wijzigen, heeft geen reden de namen van het
+  // team op te vragen. Zonder deze regel zou de standaard `client:read` gelden en zou een
+  // meekijker de lijst kunnen ophalen — de route weigert dat zelf ook, maar dan pas erna.
+  { prefix: "/api/team", read: "sprint:write", write: "sprint:write" },
   { prefix: "/api/connections", read: "connection:manage", write: "connection:manage" },
   { prefix: "/api/health", read: "system:ops", write: "system:ops" },
   { prefix: "/api/eval", read: "system:ops", write: "system:ops" },

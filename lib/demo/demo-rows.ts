@@ -22,7 +22,7 @@ import {
   PMAX_CAMPAIGN, VIDEO_CAMPAIGN, videoMetricsFor, assetGroupRows, pmaxNetworkRows,
   pmaxAssetRows, videoPlacementRows, pmaxPlacementRows, pmaxSearchCategoryRows,
 } from "./pmax-video-demo";
-import { OWNER_TEAM } from "../branding/brand";
+import { OWNER_TEAM, OWNER_CLIENT } from "../branding/brand";
 
 type Row = Record<string, unknown>;
 
@@ -142,11 +142,11 @@ const sprintHypotheses: Row[] = [
 // afgeronde week zichtbaar.
 const HUIDIGE_WEEK = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
 const sprintItems: Row[] = [
-  { id: "demo-si1", client_id: CID, hypothesis_id: "demo-h1", week_number: HUIDIGE_WEEK, task: "Negatieve zoektermen toevoegen op GRA | Search | US (brede-match-vervuilers)", status: "in_progress", owner: OWNER_TEAM, metrics: "conversion_rate", review_timeframe: "2 weken", created_at: iso(), updated_at: iso() },
-  { id: "demo-si2", client_id: CID, hypothesis_id: "demo-h2", week_number: HUIDIGE_WEEK, task: "Twee nieuwe hooks produceren voor GRT | Awareness EU", status: "todo", owner: OWNER_TEAM, metrics: "ctr", review_timeframe: "2 weken", created_at: iso(), updated_at: iso() },
-  { id: "demo-si3", client_id: CID, hypothesis_id: "demo-h4", week_number: HUIDIGE_WEEK + 1, task: "Dagbudget GreenTech | Brand met 25% verhogen", status: "todo", owner: OWNER_TEAM, metrics: "conversions", review_timeframe: "1 maand", created_at: iso(), updated_at: iso() },
-  { id: "demo-si4", client_id: CID, hypothesis_id: "demo-h3", week_number: HUIDIGE_WEEK - 1, task: "Lead-gen-formulier GRT | Leadgen NL inkorten naar 4 velden", status: "done", owner: OWNER_TEAM, metrics: "one_click_leads", review_timeframe: "3 weken", created_at: iso(), updated_at: iso() },
-  { id: "demo-si5", client_id: CID, hypothesis_id: null, task: "Placement-uitsluitingen doorvoeren uit de video-analyse", week_number: HUIDIGE_WEEK - 1, status: "done", owner: OWNER_TEAM, metrics: "cost", review_timeframe: "1 week", created_at: iso(), updated_at: iso() },
+  { id: "demo-si1", client_id: CID, hypothesis_id: "demo-h1", week_number: HUIDIGE_WEEK, task: "Negatieve zoektermen toevoegen op GRA | Search | US (brede-match-vervuilers)", status: "in_progress", owner: OWNER_TEAM, owner_soort: "functie", owner_naam: "Performance marketeer", owner_user_id: null, metrics: "conversion_rate", review_timeframe: "2 weken", created_at: iso(), updated_at: iso() },
+  { id: "demo-si2", client_id: CID, hypothesis_id: "demo-h2", week_number: HUIDIGE_WEEK, task: "Twee nieuwe hooks produceren voor GRT | Awareness EU", status: "todo", owner: OWNER_TEAM, owner_soort: "bedrijf", owner_naam: "Studio Noord", owner_user_id: null, metrics: "ctr", review_timeframe: "2 weken", created_at: iso(), updated_at: iso() },
+  { id: "demo-si3", client_id: CID, hypothesis_id: "demo-h4", week_number: HUIDIGE_WEEK + 1, task: "Dagbudget GreenTech | Brand met 25% verhogen", status: "todo", owner: OWNER_TEAM, owner_soort: null, owner_naam: null, owner_user_id: null, metrics: "conversions", review_timeframe: "1 maand", created_at: iso(), updated_at: iso() },
+  { id: "demo-si4", client_id: CID, hypothesis_id: "demo-h3", week_number: HUIDIGE_WEEK - 1, task: "Lead-gen-formulier GRT | Leadgen NL inkorten naar 4 velden", status: "done", owner: OWNER_CLIENT, owner_soort: "functie", owner_naam: "Webdeveloper", owner_user_id: null, metrics: "one_click_leads", review_timeframe: "3 weken", created_at: iso(), updated_at: iso() },
+  { id: "demo-si5", client_id: CID, hypothesis_id: null, task: "Placement-uitsluitingen doorvoeren uit de video-analyse", week_number: HUIDIGE_WEEK - 1, status: "done", owner: OWNER_CLIENT, owner_soort: null, owner_naam: null, owner_user_id: null, metrics: "cost", review_timeframe: "1 week", created_at: iso(), updated_at: iso() },
 ];
 
 const sopTasks: Row[] = [

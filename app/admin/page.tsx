@@ -8,7 +8,7 @@
 // zodat zichtbaar blijft dat die as bestaat. LIVE-ONGETEST tot WL.3.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ALL_CLIENTS, ROLES, scopeFor, type Role } from "@/lib/auth/roles";
+import { ALL_CLIENTS, ROLES, ROL_LABEL, scopeFor, type Role } from "@/lib/auth/roles";
 import { getAllClients, type Client } from "@/lib/clients";
 
 interface AdminUser {
@@ -20,16 +20,6 @@ interface AdminUser {
   deactivated: boolean;
   lastSignIn: string | null;
 }
-
-// De rolnamen zoals ze in de database staan zijn technisch; dit is wat de beheerder leest.
-const ROL_LABEL: Record<Role, string> = {
-  admin: "Admin",
-  performance_marketeer: "Performance marketeer",
-  beurs_manager: "Beursverantwoordelijke",
-  brand_strateeg: "Brand strateeg",
-  it: "IT",
-  viewer: "Meekijker",
-};
 
 const ROL_UITLEG: Record<Role, string> = {
   admin: "Alles, plus gebruikersbeheer en koppelingen.",

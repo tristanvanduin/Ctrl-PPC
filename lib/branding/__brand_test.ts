@@ -5,9 +5,10 @@
 // zoek-en-vervang met kans op een vergeten hoekje — en een vergeten hoekje staat vervolgens in een
 // PDF die naar een klant gaat.
 //
-// De eigenaar-waarde is het lastige deel: die wordt OPGESLAGEN in sprint_planning.owner en
-// sop_tasks.owner. Rijen van vóór de wijziging dragen de oude naam en mogen niet ineens ongeldig
-// worden of als klant-taken gaan tellen.
+// De eigenaar-waarde is het lastige deel: die wordt OPGESLAGEN in sprint_items.owner. (Hier stond
+// sprint_planning.owner en sop_tasks.owner; nagekeken tegen het live schema bestaat geen van beide
+// — dezelfde fout die scripts/rename-owner-to-rai.sql bijna liet afbreken.) Rijen van vóór de
+// wijziging dragen de oude naam en mogen niet ineens ongeldig worden of als klant-taken tellen.
 
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -15,6 +16,7 @@ import {
   BRAND_NAME, BRAND_SHORT, BRAND_LOGO_FILE,
   OWNER_TEAM, OWNER_CLIENT, LEGACY_OWNER_TEAM,
   isTeamOwner, normalizeOwner, ownerLabel,
+  EIGENAAR_SOORTEN, normalizeSoort, toewijzingLabel, toewijzingCompleet,
 } from "./brand";
 import { OwnerEnum } from "../schema/analysis-schema";
 
@@ -103,6 +105,58 @@ check("en dus nooit op de productnaam", ownerLabel(OWNER_TEAM) !== BRAND_NAME);
 check("met een tenant wint die", ownerLabel(OWNER_TEAM, "Bureau Zuid") === "Bureau Zuid");
 check("een klant-taak blijft de klant", ownerLabel(OWNER_CLIENT, "Bureau Zuid") === OWNER_CLIENT);
 check("een oude naam krijgt de huidige weergave", ownerLabel("Ranking Masters", "Bureau Zuid") === "Bureau Zuid");
+
+console.log("\nDe toewijzing: wie binnen de kant");
+{
+  const personen = new Map([["u1", "Sanne"]]);
+  const leeg = { kant: OWNER_TEAM, soort: null, naam: null, userId: null };
+
+  // De kern van het ontwerp: hoe specifiek de toewijzing ook wordt, de KANT blijft afleesbaar.
+  // Zou dit breken, dan is "hoeveel werk ligt er bij de klant" niet meer te beantwoorden — de
+  // vraag waarvoor deze hele splitsing bestaat.
+  for (const soort of EIGENAAR_SOORTEN) {
+    const bureau = { kant: OWNER_TEAM, soort, naam: "X", userId: "u1" };
+    const klant = { kant: OWNER_CLIENT, soort, naam: "X", userId: "u1" };
+    check(`kant blijft bureau bij soort ${soort}`, isTeamOwner(bureau.kant));
+    check(`kant blijft klant bij soort ${soort}`, !isTeamOwner(klant.kant));
+  }
+
+  check("leeg toont de kant", toewijzingLabel(leeg) === OWNER_TEAM);
+  check("een persoon toont zijn naam",
+    toewijzingLabel({ kant: OWNER_TEAM, soort: "persoon", naam: null, userId: "u1" }, { personen }) === "Sanne");
+  check("een functie toont de functie",
+    toewijzingLabel({ kant: OWNER_CLIENT, soort: "functie", naam: "Webdeveloper", userId: null }) === "Webdeveloper");
+  check("een bedrijf toont het bedrijf",
+    toewijzingLabel({ kant: OWNER_TEAM, soort: "bedrijf", naam: "Studio Noord", userId: null }) === "Studio Noord");
+
+  // De terugval is geen randgeval maar de normale toestand zolang auth.users leeg is, en hij
+  // treedt ook op zodra een gebruiker wordt verwijderd (on delete set null in migratie 033).
+  check("een onbekende gebruiker valt terug op de kant",
+    toewijzingLabel({ kant: OWNER_TEAM, soort: "persoon", naam: null, userId: "weg" }, { personen }) === OWNER_TEAM);
+  check("een persoon zonder gebruiker valt terug op de kant",
+    toewijzingLabel({ kant: OWNER_CLIENT, soort: "persoon", naam: null, userId: null }) === OWNER_CLIENT);
+  check("lege functietekst valt terug op de kant",
+    toewijzingLabel({ kant: OWNER_CLIENT, soort: "functie", naam: "   ", userId: null }) === OWNER_CLIENT);
+  check("de bureaunaam van de tenant wint ook hier",
+    toewijzingLabel(leeg, { bureauNaam: "Bureau Zuid" }) === "Bureau Zuid");
+
+  // Een historische rij: ruwe naam in de kant, geen toewijzing. Zo staan alle 49 bestaande rijen
+  // erbij, en die moeten zonder migratie meteen goed lezen.
+  check("een oude bureaunaam leest nog als bureau",
+    toewijzingLabel({ kant: "RAI Amsterdam", soort: null, naam: null, userId: null }, { bureauNaam: "Bureau Zuid" }) === "Bureau Zuid");
+
+  check("onbekende soort wordt leeg", normalizeSoort("verzonnen") === null);
+  check("lege soort blijft leeg", normalizeSoort(null) === null && normalizeSoort("") === null);
+  for (const s of EIGENAAR_SOORTEN) check(`soort ${s} blijft overeind`, normalizeSoort(s) === s);
+
+  check("leeg is compleet", toewijzingCompleet(leeg));
+  check("persoon zonder gebruiker is onaf",
+    !toewijzingCompleet({ kant: OWNER_TEAM, soort: "persoon", naam: null, userId: null }));
+  check("functie zonder tekst is onaf",
+    !toewijzingCompleet({ kant: OWNER_TEAM, soort: "functie", naam: " ", userId: null }));
+  check("ingevulde functie is compleet",
+    toewijzingCompleet({ kant: OWNER_TEAM, soort: "functie", naam: "Webdeveloper", userId: null }));
+}
 
 console.log("\nHet schema accepteert beide en levert één waarde");
 {

@@ -122,3 +122,88 @@ export function normalizeOwner(owner: string | null | undefined): string {
 export function ownerLabel(owner: string | null | undefined, bureauNaam: string = OWNER_TEAM): string {
   return isTeamOwner(owner) ? bureauNaam : OWNER_CLIENT;
 }
+
+// ── De toewijzing: wie precies ─────────────────────────────────────────────
+//
+// Hierboven staat de KANT (bureau of klant). Dit is de tweede as: wie binnen die kant. De twee
+// staan bewust los, en dat is de hele reden dat dit werkt.
+//
+// Zou "Sanne" of "hun webbouwer" rechtstreeks in `owner` zijn beland, dan was elke specifiekere
+// toewijzing meteen het antwoord kwijt op de vraag hoeveel werk er bij de klant ligt — want
+// zo'n waarde lijkt op niets en valt door naar de klant-rol. Dat is hier al een keer gebeurd:
+// zeven klantnamen en vier hypotheseteksten in de kolom tellen nu allemaal als klant-taak.
+//
+// Leeg is een geldige en gewone toestand: de taak ligt bij de kant als geheel. Daarom hoefde
+// er bij migratie 033 geen enkele rij te worden aangepast.
+//
+// Voor de drie soorten geldt een andere bron, en dat is geen inconsistentie maar het verschil
+// tussen intern en extern:
+//
+//   persoon  — een verwijzing naar auth.users. Alleen aan bureaukant bruikbaar: mensen aan
+//              klantzijde loggen niet in en bestaan dus niet als gebruiker.
+//   functie  — vrije tekst. De app-rollen zijn suggesties aan bureaukant, geen keuzelijst:
+//              die rollen gaan over rechten in het dashboard, niet over wie werk uitvoert, en
+//              aan klantzijde bestaan functies als "webdeveloper" die daar nooit in staan.
+//   bedrijf  — vrije tekst. De naam van een externe partner, of van het bureau zelf.
+
+export const EIGENAAR_SOORTEN = ["bedrijf", "functie", "persoon"] as const;
+export type EigenaarSoort = (typeof EIGENAAR_SOORTEN)[number];
+
+export interface Toewijzing {
+  /** De opgeslagen kant. Wordt genormaliseerd; ruwe historische waarden mogen erin. */
+  kant: string | null | undefined;
+  soort: EigenaarSoort | null;
+  /** De vrije tekst bij 'bedrijf' en 'functie'. Bij 'persoon' ongebruikt. */
+  naam: string | null;
+  /** De gebruiker bij 'persoon'. Bij de andere soorten ongebruikt. */
+  userId: string | null;
+}
+
+/** Herkent een opgeslagen soort. Alles wat niet klopt wordt leeg — dus: de kant als geheel. */
+export function normalizeSoort(soort: string | null | undefined): EigenaarSoort | null {
+  const v = (soort ?? "").trim();
+  return (EIGENAAR_SOORTEN as readonly string[]).includes(v) ? (v as EigenaarSoort) : null;
+}
+
+/**
+ * Hoe de toewijzing op het scherm heet.
+ *
+ * Valt terug op de kant zodra de specifieke toewijzing ontbreekt of niet op te lossen is. Een
+ * taak toont dus nooit een leeg vakje: in het slechtste geval staat er "Bureau" of "Klant", en
+ * dat is nog steeds waar.
+ *
+ * Die terugval is niet theoretisch. `owner_user_id` heeft `on delete set null`, dus zodra
+ * iemand uit dienst gaat verliezen zijn taken de persoon en houden ze de kant. En omdat
+ * auth.users vandaag leeg is, is "wel een soort, geen oplosbare naam" nu de normale toestand
+ * en niet de uitzondering.
+ */
+export function toewijzingLabel(
+  t: Toewijzing,
+  opties: { bureauNaam?: string; personen?: ReadonlyMap<string, string> } = {},
+): string {
+  const kant = ownerLabel(t.kant, opties.bureauNaam ?? OWNER_TEAM);
+  const soort = normalizeSoort(t.soort);
+  if (soort === "persoon") {
+    const naam = t.userId ? opties.personen?.get(t.userId) : undefined;
+    return naam ?? kant;
+  }
+  if (soort === "bedrijf" || soort === "functie") {
+    const naam = (t.naam ?? "").trim();
+    return naam === "" ? kant : naam;
+  }
+  return kant;
+}
+
+/**
+ * Is deze toewijzing houdbaar zoals hij is opgeslagen?
+ *
+ * 'persoon' zonder gebruiker, of 'functie'/'bedrijf' zonder tekst, is een half ingevuld veld.
+ * Het label valt dan netjes terug op de kant, maar het scherm hoort te laten zien dat er iets
+ * onaf is in plaats van te doen alsof de taak globaal is toegewezen.
+ */
+export function toewijzingCompleet(t: Toewijzing): boolean {
+  const soort = normalizeSoort(t.soort);
+  if (soort === null) return true;
+  if (soort === "persoon") return t.userId != null && t.userId !== "";
+  return (t.naam ?? "").trim() !== "";
+}

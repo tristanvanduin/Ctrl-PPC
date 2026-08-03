@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, Fragment } from "react";
-import { OWNER_TEAM, OWNER_CLIENT, ownerLabel, normalizeOwner } from "@/lib/branding/brand";
+import { OWNER_TEAM, OWNER_CLIENT, ownerLabel, toewijzingLabel, normalizeOwner, normalizeSoort } from "@/lib/branding/brand";
+import { EigenaarKiezer, haalTeam, type Teamlid } from "./eigenaar-kiezer";
 import { Download, ChevronDown, ChevronUp, Loader2, Calendar, Plus, X, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { channelOfSource, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
@@ -16,7 +17,14 @@ interface SprintItem {
   week_number: number | null;
   task: string;
   status: string;
+  // De KANT: 'Bureau' of 'Klant'. Historische rijen dragen nog namen; normalizeOwner vertaalt
+  // die bij het lezen. Zie lib/branding/brand.ts.
   owner: string;
+  // De toewijzing binnen die kant, uit migratie 033. Alle drie mogen leeg zijn en zijn dat bij
+  // elke bestaande rij — leeg betekent: de kant als geheel.
+  owner_soort: string | null;
+  owner_naam: string | null;
+  owner_user_id: string | null;
   metrics: string | null;
   review_timeframe: string | null;
   created_at: string;
@@ -64,6 +72,15 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   const [newTask, setNewTask] = useState("");
   const [newOwner, setNewOwner] = useState(OWNER_TEAM);
   const [importing, setImporting] = useState(false);
+  // Eén keer voor de hele tabel, niet per rij — zie haalTeam.
+  const [team, setTeam] = useState<Teamlid[]>([]);
+  // ok=false betekent "niet opgehaald", niet "leeg". De kiezer zegt daardoor iets anders.
+  const [teamOk, setTeamOk] = useState(true);
+  useEffect(() => {
+    let levend = true;
+    haalTeam().then((r) => { if (levend) { setTeam(r.leden); setTeamOk(r.ok); } });
+    return () => { levend = false; };
+  }, []);
 
   const currentWeek = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
 
@@ -116,9 +133,50 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   useEffect(() => { refresh(); }, [refresh, refreshKey]);
 
   async function updateItem(id: string, field: string, value: string) {
+    await updateItemFields(id, { [field]: value });
+  }
+
+  /**
+   * Meerdere velden in één schrijfactie.
+   *
+   * De toewijzing verandert nooit één veld tegelijk: van 'persoon' naar 'functie' schakelen zet
+   * `owner_soort`, wist `owner_user_id` en vult `owner_naam`. Via drie losse updateItem-aanroepen
+   * zijn dat drie verzoeken en drie tussentoestanden, en de middelste daarvan — soort 'functie'
+   * met nog een gebruiker eraan — breekt de aanname dat de velden bij elkaar horen. Eén schrijf
+   * dus, en één keer de lokale staat bijwerken.
+   */
+  async function updateItemFields(id: string, velden: Record<string, string | null>) {
     if (!supabase) return;
-    await dbUpdate("sprint_items", clientId, { [field]: value, updated_at: new Date().toISOString() }, { id });
-    setItems((prev) => prev.map((item) => item.id === id ? { ...item, [field]: value } : item));
+
+    // EERST het scherm, DAN de database — en niet andersom.
+    //
+    // Hier stond `await dbUpdate(...)` vóór `setItems`. Gemeten: bij het wisselen van soort in de
+    // eigenaarkiezer bleef dat verzoek na vier seconden nog onbeantwoord, dus werd setItems nooit
+    // bereikt en verdween de klik zonder spoor — geen wijziging, geen melding. Wie klikt, ziet
+    // dan niets gebeuren en klikt nog eens.
+    //
+    // Een celeditor hoort niet op een netwerkronde te wachten om je eigen keuze te tonen. De
+    // wijziging gaat daarom meteen in de lijst, en pas als de schrijfactie faalt wordt hij
+    // teruggedraaid — met de reden erbij, want een stille terugdraai is net zo verwarrend als
+    // een stille mislukking.
+    //
+    // De oude velden worden in de updater zelf gelezen en niet uit `items`: die closure is bij
+    // twee wijzigingen kort na elkaar al verouderd, en dan draait de terugrol de verkeerde
+    // waarde terug.
+    const terug: Record<string, unknown> = {};
+    setItems((prev) => prev.map((item) => {
+      if (item.id !== id) return item;
+      for (const sleutel of Object.keys(velden)) {
+        terug[sleutel] = (item as unknown as Record<string, unknown>)[sleutel];
+      }
+      return { ...item, ...velden } as SprintItem;
+    }));
+
+    const { error } = await dbUpdate("sprint_items", clientId, { ...velden, updated_at: new Date().toISOString() }, { id });
+    if (error) {
+      setItems((prev) => prev.map((item) => item.id === id ? ({ ...item, ...terug } as SprintItem) : item));
+      setFout(`De wijziging kon niet worden opgeslagen: ${error.message}`);
+    }
   }
 
   async function addHypothesisWithTask() {
@@ -238,7 +296,19 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           week_number: t["Week"] || t["week"] ? parseInt(t["Week"] || t["week"]) : null,
           task: t["Taak"] || t["taak"] || t["Task"] || "(geen taak)",
           status: statusMap[t["Status"] || t["status"]] || "todo",
-          owner: t["Verantwoordelijke"] || t["verantwoordelijke"] || OWNER_TEAM,
+          // De KANT komt uit "Kant" en niet uit "Verantwoordelijke". Dat onderscheid is de reden
+          // dat de rommel in deze kolom ooit is ontstaan: die kolom bevat sinds de toewijzing een
+          // persoons-, functie- of bedrijfsnaam, en die als kant terugschrijven maakt van elke
+          // bureaupersoon stilzwijgend een klant-taak — `normalizeOwner` kent de naam immers niet.
+          //
+          // Oudere bestanden hebben geen Kant-kolom; daar stond wel een rol of een bureaunaam in
+          // Verantwoordelijke, en die wordt genormaliseerd. Vandaar de terugval.
+          //
+          // De verbijzondering zelf wordt BEWUST niet teruggelezen: uit "Sanne" valt niet af te
+          // leiden of dat een persoon, een functie of een bedrijf is, en een gok zou hier een
+          // verwijzing naar de verkeerde gebruiker kunnen opleveren. Een geïmporteerde taak komt
+          // dus op de kant binnen en wordt daarna in de planning verbijzonderd.
+          owner: normalizeOwner(t["Kant"] || t["kant"] || t["Verantwoordelijke"] || t["verantwoordelijke"] || OWNER_TEAM),
           metrics: t["Metrics"] || t["metrics"] || null,
           review_timeframe: t["Looptijd tot Beoordeling"] || t["looptijd"] || null,
         }));
@@ -264,7 +334,11 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   }
 
   function exportCSV() {
-    const headers = ["Week", "Taak", "Kanaal", "Status", "Verantwoordelijke", "Hypothese", "Looptijd tot Beoordeling", "Metrics"];
+    // "Kant" staat er los naast, en dat is geen dubbeling. Verantwoordelijke draagt sinds de
+    // toewijzing een persoons- of functienaam, en uit "Sanne" is niet meer af te lezen of dat
+    // werk bij het bureau of bij de klant ligt. Die verdeling is juist waar deze export op
+    // gelezen wordt, en hij is de enige kolom die de import terugleest.
+    const headers = ["Week", "Taak", "Kanaal", "Status", "Kant", "Verantwoordelijke", "Hypothese", "Looptijd tot Beoordeling", "Metrics"];
     const rows = filteredItems.map((item) => {
       const hyp = item.hypothesis_id ? hypotheses.get(item.hypothesis_id) : null;
       const statusLabel = STATUS_OPTIONS.find((s) => s.value === item.status)?.label || item.status;
@@ -275,6 +349,10 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         ch ? CHANNEL_LABEL[ch] : "",
         statusLabel,
         ownerLabel(item.owner),
+        `"${toewijzingLabel(
+          { kant: item.owner, soort: normalizeSoort(item.owner_soort), naam: item.owner_naam, userId: item.owner_user_id },
+          { personen: new Map(team.map((l) => [l.id, l.naam])) },
+        ).replace(/"/g, '""')}"`,
         `"${(hyp?.hypothesis || "").replace(/"/g, '""')}"`,
         item.review_timeframe || "",
         item.metrics || "",
@@ -540,7 +618,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
 
                   {/* Task rows */}
                   {!isCollapsed && groupItems.map((item) => (
-                    <SprintRow key={item.id} item={item} onUpdate={updateItem} currentWeek={currentWeek} channel={channelOfItem(item)} />
+                    <SprintRow key={item.id} item={item} onUpdate={updateItem} onUpdateFields={updateItemFields} team={team} teamOk={teamOk} currentWeek={currentWeek} channel={channelOfItem(item)} />
                   ))}
                   {!isCollapsed && showAddTask === hypId && (
                     <tr className="bg-purple-50/20">
@@ -565,7 +643,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
 
             {/* Items without hypothesis */}
             {noHypothesis.map((item) => (
-              <SprintRow key={item.id} item={item} onUpdate={updateItem} currentWeek={currentWeek} channel={channelOfItem(item)} />
+              <SprintRow key={item.id} item={item} onUpdate={updateItem} onUpdateFields={updateItemFields} team={team} teamOk={teamOk} currentWeek={currentWeek} channel={channelOfItem(item)} />
             ))}
           </tbody>
         </table>
@@ -590,7 +668,7 @@ const OP_KOP_PIL = "-ml-[10px]";   // px-2.5, geen rand
 const OP_KOP_BADGE = "-ml-[7px]";  // px-1.5 + 1px rand
 const OP_KOP_VELD = "-ml-[5px]";   // px-1 + 1px rand
 
-function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem; onUpdate: (id: string, field: string, value: string) => void; currentWeek: number; channel: InsightChannel | null }) {
+function SprintRow({ item, onUpdate, onUpdateFields, team, teamOk, currentWeek, channel }: { item: SprintItem; onUpdate: (id: string, field: string, value: string) => void; onUpdateFields: (id: string, velden: Record<string, string | null>) => void; team: readonly Teamlid[]; teamOk: boolean; currentWeek: number; channel: InsightChannel | null }) {
   const isOverdue = item.week_number != null && item.week_number < currentWeek && !["done", "expired"].includes(item.status);
   const isCurrent = item.week_number != null && item.week_number === currentWeek;
 
@@ -626,21 +704,27 @@ function SprintRow({ item, onUpdate, currentWeek, channel }: { item: SprintItem;
         </select>
       </td>
       <td className="px-4 py-2.5">
-        <select
-          // De genormaliseerde ROL en niet de ruwe waarde. In de database staat van alles: de
-          // merknaam van twee rebrandings geleden, een klantnaam, en in vier rijen zelfs een hele
-          // hypothese die bij een import in het verkeerde veld belandde. Geen van die waarden komt
-          // overeen met een <option>, dus de keuzelijst stond bij 45 van de 49 rijen leeg — en na
-          // het hernoemen van de teamwaarde gold dat ook voor de 38 rijen die vóórdien nog wel
-          // klopten. `normalizeOwner` levert altijd een van de twee rollen, dus altijd een match.
-          value={normalizeOwner(item.owner)}
-          onChange={(e) => onUpdate(item.id, "owner", e.target.value)}
-          className={`text-xs border border-transparent hover:border-border rounded px-1 py-0.5 ${OP_KOP_VELD} bg-transparent focus:bg-card focus:border-rm-blue focus:outline-none cursor-pointer`}
-        >
-          {/* De waarde is de rol, het label is de naam. Zie ownerLabel in brand.ts. */}
-          <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>
-          <option value={OWNER_CLIENT}>{OWNER_CLIENT}</option>
-        </select>
+        {/*
+          Was een <select> met twee opties. Wat er in de database staat is van alles: de merknaam
+          van twee rebrandings geleden, klantnamen, en in vier rijen een hele hypothese die bij een
+          import in het verkeerde veld belandde. Geen van die waarden kwam met een <option>
+          overeen, dus de lijst stond bij 45 van de 49 rijen leeg.
+
+          De kiezer leest die ruwe waarde nog steeds als KANT — daar verandert niets aan — en zet
+          de verbijzondering ernaast. Zie migratie 033 en het toewijzingsmodel in brand.ts.
+        */}
+        <EigenaarKiezer
+          waarde={{ kant: item.owner, soort: normalizeSoort(item.owner_soort), naam: item.owner_naam, userId: item.owner_user_id }}
+          team={team}
+          teamOk={teamOk}
+          onChange={(t) => onUpdateFields(item.id, {
+            owner: t.kant ?? OWNER_TEAM,
+            owner_soort: t.soort,
+            owner_naam: t.naam,
+            owner_user_id: t.userId,
+          })}
+          className={OP_KOP_VELD}
+        />
       </td>
       <td className="px-4 py-2.5 text-xs text-muted-foreground">{item.review_timeframe || "—"}</td>
       <td className="px-4 py-2.5 text-xs text-muted-foreground">{item.metrics || "—"}</td>
