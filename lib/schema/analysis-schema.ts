@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { OWNER_TEAM, OWNER_CLIENT, LEGACY_OWNER_TEAM } from "@/lib/branding/brand";
+import { OWNER_TEAM, OWNER_CLIENT, LEGACY_OWNER_TEAM, KANT_LABEL_INTERN, KANT_LABEL_EXTERN, normalizeOwner } from "@/lib/branding/brand";
 
 // ── Shared enums ───────────────────────────────────────────────────────────
 
@@ -51,8 +51,12 @@ export type Owner = typeof OWNER_TEAM | typeof OWNER_CLIENT;
  * product een andere naam kan dragen — zie de toelichting in lib/branding/brand.ts.
  */
 export const OwnerEnum = z
-  .enum([OWNER_TEAM, OWNER_CLIENT, ...LEGACY_OWNER_TEAM])
-  .transform((v): Owner => (v === OWNER_CLIENT ? OWNER_CLIENT : OWNER_TEAM));
+  .enum([OWNER_TEAM, OWNER_CLIENT, KANT_LABEL_INTERN, KANT_LABEL_EXTERN, ...LEGACY_OWNER_TEAM])
+  // normalizeOwner en niet `v === OWNER_CLIENT ? ... : OWNER_TEAM`. Die regel stond hier als eigen
+  // kopie, en dat werkte alleen zolang "Klant" de enige niet-interne waarde was: alles wat daar
+  // niet exact aan gelijk was, werd intern. Met de schermteksten erbij zou "Extern" dus stilzwijgend
+  // als intern binnenkomen — precies andersom. Er is één plek waar staat wat intern is.
+  .transform((v): Owner => (normalizeOwner(v) === OWNER_CLIENT ? OWNER_CLIENT : OWNER_TEAM));
 
 export const RecommendationSourceEnum = z.enum(["finding", "hypothesis"]);
 export type RecommendationSource = z.infer<typeof RecommendationSourceEnum>;

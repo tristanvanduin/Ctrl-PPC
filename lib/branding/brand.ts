@@ -75,10 +75,30 @@ export const BRAND_TAGLINE = "";
 // De kolomstandaard stond nog op "Ranking Masters" — twee namen achter. Die is inmiddels op de
 // rol gezet.
 
-/** De opgeslagen waarde voor "het bureau doet dit". Een rol, geen naam. */
+/**
+ * De opgeslagen waarde voor "onze kant doet dit". Een SLEUTEL, geen schermtekst.
+ *
+ * Hij staat zo in de database en verandert niet mee als de weergave verandert — wat hij inmiddels
+ * ook heeft gedaan: het scherm zegt nu "Intern". Zie KANT_LABEL_INTERN.
+ */
 export const OWNER_TEAM = "Bureau";
-/** De opgeslagen waarde voor "de klant doet dit". */
+/** De opgeslagen waarde voor "de andere kant doet dit". Ook een sleutel. */
 export const OWNER_CLIENT = "Klant";
+
+// ── Hoe de twee kanten op het scherm heten ─────────────────────────────────
+//
+// Los van de sleutels hierboven, en dat is precies waarom dit zonder migratie kon: de 49 rijen
+// dragen nog steeds "Bureau" en "Klant", en er is geen enkele reden om daaraan te komen.
+//
+// "Intern" en "extern" beschrijven bovendien wat er werkelijk wordt bedoeld. "Bureau" en "klant"
+// zijn twee partijen, maar de vraag die deze as beantwoordt is of het werk aan onze kant ligt of
+// daarbuiten — en daarbuiten is niet altijd de klant zelf, het kan net zo goed hun webbouwer of
+// een andere partner zijn. Met "Klant" als kop stond die partner onder een naam die niet klopte.
+
+/** De weergave van de eigen kant, als de tenant geen eigen bureaunaam meegeeft. */
+export const KANT_LABEL_INTERN = "Intern";
+/** De weergave van de andere kant. */
+export const KANT_LABEL_EXTERN = "Extern";
 
 /** Elke schrijfwijze die ooit als teamwaarde is weggeschreven. Bij het lezen allemaal geldig. */
 export const LEGACY_OWNER_TEAM = ["RAI Amsterdam", "RAI", "Ranking Masters", "RM"] as const;
@@ -95,7 +115,11 @@ export const LEGACY_OWNER_TEAM = ["RAI Amsterdam", "RAI", "Ranking Masters", "RM
 export function isTeamOwner(owner: string | null | undefined): boolean {
   const v = (owner ?? "").trim();
   if (v === "") return false;
-  if (v === OWNER_TEAM) return true;
+  // De schermtekst telt mee, niet uit slordigheid maar omdat hij terugkomt: de CSV-export schrijft
+  // de kolom Kant als "Intern" of "Extern", en de import leest diezelfde kolom. Zonder deze regel
+  // zou elke geëxporteerde interne taak bij het terugzetten extern worden — de labels staan
+  // immers niet in de sleutels of in de historische namen.
+  if (v === OWNER_TEAM || v === KANT_LABEL_INTERN) return true;
   return (LEGACY_OWNER_TEAM as readonly string[]).includes(v);
 }
 
@@ -115,12 +139,12 @@ export function normalizeOwner(owner: string | null | undefined): string {
  * verantwoordelijk voor iets. In de sprintplanning stond daardoor letterlijk "Ctrl PPC" in de
  * kolom Verantwoordelijke, alsof de software zelf het werk deed.
  *
- * "Bureau" is als terugval bovendien eerlijker: het zegt wie het doet zonder een naam te
- * verzinnen die niemand heeft opgegeven. Zodra er een tenantveld met een bureaunaam is, gaat die
- * hier naar binnen en verandert er verder niets.
+ * De terugval is bovendien eerlijker dan een naam: hij zegt aan welke kant het werk ligt zonder
+ * een bureaunaam te verzinnen die niemand heeft opgegeven. Zodra er een tenantveld met een echte
+ * bureaunaam is, gaat die hier naar binnen en verandert er verder niets.
  */
-export function ownerLabel(owner: string | null | undefined, bureauNaam: string = OWNER_TEAM): string {
-  return isTeamOwner(owner) ? bureauNaam : OWNER_CLIENT;
+export function ownerLabel(owner: string | null | undefined, bureauNaam: string = KANT_LABEL_INTERN): string {
+  return isTeamOwner(owner) ? bureauNaam : KANT_LABEL_EXTERN;
 }
 
 // ── De toewijzing: wie precies ─────────────────────────────────────────────
@@ -181,7 +205,11 @@ export function toewijzingLabel(
   t: Toewijzing,
   opties: { bureauNaam?: string; personen?: ReadonlyMap<string, string> } = {},
 ): string {
-  const kant = ownerLabel(t.kant, opties.bureauNaam ?? OWNER_TEAM);
+  // Geen eigen terugval hier: `undefined` doorgeven laat de standaard van ownerLabel gelden.
+  // Er stond `?? OWNER_TEAM`, een tweede kopie van dezelfde beslissing — en die liep meteen uit
+  // de pas toen het label van de kant "Intern" werd: ownerLabel gaf "Intern", deze regel gaf
+  // nog "Bureau". De test viel erover, wat precies de bedoeling was.
+  const kant = ownerLabel(t.kant, opties.bureauNaam);
   const soort = normalizeSoort(t.soort);
   if (soort === "persoon") {
     const naam = t.userId ? opties.personen?.get(t.userId) : undefined;

@@ -15,7 +15,7 @@ import { join } from "node:path";
 import {
   BRAND_NAME, BRAND_SHORT, BRAND_LOGO_FILE,
   OWNER_TEAM, OWNER_CLIENT, LEGACY_OWNER_TEAM,
-  isTeamOwner, normalizeOwner, ownerLabel,
+  isTeamOwner, normalizeOwner, ownerLabel, KANT_LABEL_INTERN, KANT_LABEL_EXTERN,
   EIGENAAR_SOORTEN, normalizeSoort, toewijzingLabel, toewijzingCompleet,
 } from "./brand";
 import { OwnerEnum } from "../schema/analysis-schema";
@@ -91,6 +91,19 @@ check("de klant niet", !isTeamOwner(OWNER_CLIENT));
 check("leeg niet", !isTeamOwner("") && !isTeamOwner(null) && !isTeamOwner(undefined));
 check("spaties eromheen storen niet", isTeamOwner(`  ${LEGACY_OWNER_TEAM[0]}  `));
 
+// De schermtekst moet ook terug naar binnen kunnen, en dat is geen theoretisch nettigheidje.
+// De CSV-export schrijft de kolom Kant als "Intern" of "Extern" en de import leest diezelfde
+// kolom. Zou "Intern" hier niet als intern gelden, dan werd elke geëxporteerde interne taak bij
+// het terugzetten extern — een stille verschuiving over de hele planning, precies het soort
+// fout dat deze kolom al eerder heeft opgelopen.
+check("het interne label komt er ook weer in", isTeamOwner(KANT_LABEL_INTERN));
+check("het externe label telt niet als intern", !isTeamOwner(KANT_LABEL_EXTERN));
+check("intern label normaliseert naar de sleutel", normalizeOwner(KANT_LABEL_INTERN) === OWNER_TEAM);
+check("extern label normaliseert naar de sleutel", normalizeOwner(KANT_LABEL_EXTERN) === OWNER_CLIENT);
+// En de heenweg: wat de export schrijft, is exact wat de import herkent.
+check("export en import sluiten op elkaar aan",
+  normalizeOwner(ownerLabel(OWNER_TEAM)) === OWNER_TEAM && normalizeOwner(ownerLabel(OWNER_CLIENT)) === OWNER_CLIENT);
+
 console.log("\nNormaliseren naar de rol");
 check("rol blijft rol", normalizeOwner(OWNER_TEAM) === OWNER_TEAM);
 check("klant blijft klant", normalizeOwner(OWNER_CLIENT) === OWNER_CLIENT);
@@ -100,10 +113,10 @@ check("onbekend wordt klant", normalizeOwner("iemand anders") === OWNER_CLIENT);
 // vergissing. Precies wat je wilt — een runtime-check zou hier niets meer toevoegen.
 
 console.log("\nDe weergavenaam is los van de opgeslagen rol");
-check("zonder tenant valt hij terug op de rol", ownerLabel(OWNER_TEAM) === OWNER_TEAM);
+check("zonder tenant valt hij terug op het kantlabel", ownerLabel(OWNER_TEAM) === KANT_LABEL_INTERN);
 check("en dus nooit op de productnaam", ownerLabel(OWNER_TEAM) !== BRAND_NAME);
 check("met een tenant wint die", ownerLabel(OWNER_TEAM, "Bureau Zuid") === "Bureau Zuid");
-check("een klant-taak blijft de klant", ownerLabel(OWNER_CLIENT, "Bureau Zuid") === OWNER_CLIENT);
+check("de andere kant blijft extern", ownerLabel(OWNER_CLIENT, "Bureau Zuid") === KANT_LABEL_EXTERN);
 check("een oude naam krijgt de huidige weergave", ownerLabel("Ranking Masters", "Bureau Zuid") === "Bureau Zuid");
 
 console.log("\nDe toewijzing: wie binnen de kant");
@@ -121,7 +134,7 @@ console.log("\nDe toewijzing: wie binnen de kant");
     check(`kant blijft klant bij soort ${soort}`, !isTeamOwner(klant.kant));
   }
 
-  check("leeg toont de kant", toewijzingLabel(leeg) === OWNER_TEAM);
+  check("leeg toont de kant", toewijzingLabel(leeg) === KANT_LABEL_INTERN);
   check("een persoon toont zijn naam",
     toewijzingLabel({ kant: OWNER_TEAM, soort: "persoon", naam: null, userId: "u1" }, { personen }) === "Sanne");
   check("een functie toont de functie",
@@ -132,11 +145,11 @@ console.log("\nDe toewijzing: wie binnen de kant");
   // De terugval is geen randgeval maar de normale toestand zolang auth.users leeg is, en hij
   // treedt ook op zodra een gebruiker wordt verwijderd (on delete set null in migratie 033).
   check("een onbekende gebruiker valt terug op de kant",
-    toewijzingLabel({ kant: OWNER_TEAM, soort: "persoon", naam: null, userId: "weg" }, { personen }) === OWNER_TEAM);
+    toewijzingLabel({ kant: OWNER_TEAM, soort: "persoon", naam: null, userId: "weg" }, { personen }) === KANT_LABEL_INTERN);
   check("een persoon zonder gebruiker valt terug op de kant",
-    toewijzingLabel({ kant: OWNER_CLIENT, soort: "persoon", naam: null, userId: null }) === OWNER_CLIENT);
+    toewijzingLabel({ kant: OWNER_CLIENT, soort: "persoon", naam: null, userId: null }) === KANT_LABEL_EXTERN);
   check("lege functietekst valt terug op de kant",
-    toewijzingLabel({ kant: OWNER_CLIENT, soort: "functie", naam: "   ", userId: null }) === OWNER_CLIENT);
+    toewijzingLabel({ kant: OWNER_CLIENT, soort: "functie", naam: "   ", userId: null }) === KANT_LABEL_EXTERN);
   check("de bureaunaam van de tenant wint ook hier",
     toewijzingLabel(leeg, { bureauNaam: "Bureau Zuid" }) === "Bureau Zuid");
 
