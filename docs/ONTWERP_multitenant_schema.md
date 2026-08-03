@@ -490,10 +490,18 @@ De zeven ontbrekende indexen op `client_id`, samengesteld met de tijdkolom erbij
 enkel schema en geen enkele query, maakt alleen bestaande queries sneller. Zie §1.6 voor de
 meting: 183,8 ms naar 2,9 ms op de grootste. Volledig terug te draaien met `drop index`.
 
-### Fase 1 — de nieuwe niveaus, leeg naast het oude
-`agencies`, `accounts`, `user_agencies` aanmaken en vullen: één bureau met de bestaande accounts
-eronder. Er verandert niets aan bestaande tabellen. Niets leest deze tabellen nog, dus er kan
-niets breken.
+### Fase 1 — de nieuwe niveaus, leeg naast het oude — GEDAAN (migratie 035)
+`agencies`, `accounts` en `user_agencies` aangemaakt en gevuld. Er is niets aan bestaande
+tabellen veranderd en niets leest de nieuwe tabellen nog.
+
+Uitkomst: 2 bureaus, 71 accounts, en **0 client_id's met data die geen account kregen** — er is
+niets over het hoofd gezien. Ranking Masters heeft 70 accounts (allemaal met een Google Ads-id),
+Demo heeft er 1.
+
+**Twee bureaus en niet één, met opzet.** De demo-klant staat onder een eigen bureau. Daardoor
+bestaan er vanaf het eerste moment twee tenants, en valt een scoping-fout op zodra hij gemaakt
+wordt — in plaats van pas bij de eerste echte tweede klant, wanneer er data van iemand anders in
+het geding is. Een multi-tenant model met één tenant test namelijk niets.
 
 ### Fase 2 — de feitentabellen ernaast, dubbel geschreven
 `fact_core`, `fact_dimension` en de kanaaltabellen aanmaken. De sync schrijft vanaf dat moment naar **beide**

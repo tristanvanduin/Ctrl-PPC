@@ -202,9 +202,16 @@ console.log("\nDe oude naam staat nergens meer als weergavetekst");
     "lib/branding/brand.ts", "lib/branding/__brand_test.ts",
     "lib/schema/analysis-schema.ts", "scripts/rename-owner-to-rai.sql",
     "lib/__tests__/", "__tests__/",
-    // RAI Amsterdam is hier geen productnaam maar een KLANT in de demolijst. Na de rebranding is
-    // dat juist correct: het bureau heet Ctrl PPC, RAI Amsterdam is een van zijn klanten.
+    // RAI Amsterdam is hier geen productnaam maar een KLANT in de demolijst. Dat is juist
+    // correct: Ctrl PPC is de naam van het gereedschap, RAI Amsterdam is een klant die erin
+    // staat. (Hier stond "het bureau heet Ctrl PPC"; dat klopte niet — Ctrl PPC is het product,
+    // het bureau is Ranking Masters. Zie de toelichting bij ownerLabel in brand.ts.)
     "lib/clients.ts",
+    // Migratie 035 zet "Ranking Masters" in de agencies-tabel. Dat is precies waar deze hele
+    // splitsing voor bestaat: het is de naam van een TENANT, opgeslagen als data, en niet een
+    // achtergebleven merkverwijzing in de weergave. Zou deze controle daarop blijven vallen, dan
+    // kan er nooit een bureau met een eigen naam in de database staan — en dat is het doel.
+    "scripts/migrations/035_bureaus_en_accounts.sql",
   ];
   const overtreders: string[] = [];
   for (const f of [...walk("lib"), ...walk("app"), ...walk("components"), ...walk("scripts")]) {
