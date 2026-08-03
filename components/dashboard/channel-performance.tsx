@@ -9,6 +9,7 @@ import { today as vandaag } from "@/lib/reporting-date";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { useVorige } from "@/lib/use-vorige";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 
 // Volwaardige prestatie-view voor Meta en LinkedIn: dezelfde bouwstenen als Google
@@ -79,7 +80,11 @@ const emptyAgg = (): Agg => ({ impressions: 0, clicks: 0, spend: 0, conv: 0 });
 
 export function ChannelPerformance({ clientId, channel, geoClone, edition }: { clientId: string; channel: ChannelKind; geoClone?: string | null; edition?: UpcomingEdition | null }) {
   const cfg = CONFIG[channel];
-  const [account, setAccount] = useState<DailyRow[] | null>(null);
+  const [accountRuw, setAccount] = useState<DailyRow[] | null>(null);
+  // De vorige inhoud blijft staan terwijl de nieuwe binnenkomt: bij een kanaalwissel klapte deze
+  // kaart eerst terug naar een skelet en daarna weer vol. Zie lib/use-vorige.ts.
+  const account = useVorige(accountRuw);
+  const ververst = accountRuw === null && account !== null;
   const [campaign, setCampaign] = useState<DailyRow[]>([]);
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [convConfig, setConvConfig] = useState<ChannelConversionConfig>(() => resolveChannelConversionConfig(null));
@@ -216,7 +221,7 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-opacity duration-200" style={{ opacity: ververst ? 0.55 : 1 }} aria-busy={ververst}>
       {geoClone && (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-meta text-blue-800">
           Beurs-scope <strong>{geoClone}</strong> actief: alle cijfers hieronder zijn her-geaggregeerd uit de

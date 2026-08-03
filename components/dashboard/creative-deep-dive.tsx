@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { analyzeCreativeFatigue, FATIGUE_DROP, SOFT_DROP, type CreativePeriodRow, type FatigueStatus } from "@/lib/analysis/creative-fatigue";
 import { analyzeAssetBreakdown, type AssetRow, type AssetVerdict } from "@/lib/analysis/asset-breakdown";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { useVorige } from "@/lib/use-vorige";
 import { Sparkline } from "@/components/ui/sparkline";
 
 // De grondige creative-uitwerking op het Analyses-tabblad (de quick-scan staat op Overzicht):
@@ -54,7 +55,11 @@ const VERDICT_STYLE: Record<AssetVerdict, string> = {
 };
 
 export function CreativeDeepDive({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
-  const [periodRows, setPeriodRows] = useState<CreativePeriodRow[] | null>(null);
+  const [periodRowsRuw, setPeriodRows] = useState<CreativePeriodRow[] | null>(null);
+  // De vorige inhoud blijft staan terwijl de nieuwe binnenkomt: bij een kanaalwissel klapte deze
+  // kaart eerst terug naar een skelet en daarna weer vol. Zie lib/use-vorige.ts.
+  const periodRows = useVorige(periodRowsRuw);
+  const ververst = periodRowsRuw === null && periodRows !== null;
   const [assetRows, setAssetRows] = useState<AssetRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,7 +143,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
   if (fatigue.length === 0 && !heeftBreakdown) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 transition-opacity duration-200" style={{ opacity: ververst ? 0.55 : 1 }} aria-busy={ververst}>
       {/* Creative-vermoeidheid */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
