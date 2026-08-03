@@ -13,6 +13,7 @@
 # Gebruik:
 #   scripts/gates.sh            alles
 #   scripts/gates.sh hygiene    alleen de hygienecontrole
+#   scripts/gates.sh rpc        alleen de rechten op databasefuncties
 #   scripts/gates.sh tsc        alleen typecheck
 #   scripts/gates.sh test       alleen tests
 #   scripts/gates.sh build      alleen build
@@ -22,6 +23,7 @@
 set -uo pipefail
 
 HYGIENE_TIMEOUT=${HYGIENE_TIMEOUT:-60}
+RPC_TIMEOUT=${RPC_TIMEOUT:-30}
 TSC_TIMEOUT=${TSC_TIMEOUT:-300}
 # De suite doet er ~32s over sinds de runner het tsx-binary rechtstreeks aanroept en
 # parallelliseert (was ~460s). 300s laat ruimte voor een tragere machine en vangt een
@@ -60,6 +62,15 @@ falen=0
 # precies de dingen die stilzwijgend teruggroeien omdat niets ze tegenhoudt.
 if [ "$doel" = "alles" ] || [ "$doel" = "hygiene" ]; then
   stap hygiene "$HYGIENE_TIMEOUT" node scripts/check-hygiene.mjs || falen=$?
+fi
+
+# Vlak na de hygiene, want hij is net zo snel en vangt iets dat de andere poorten per definitie
+# niet zien: rechten staan in de DATABASE en niet in de code. PostgREST publiceert elke functie in
+# public als endpoint en Postgres geeft nieuwe functies standaard EXECUTE aan PUBLIC — twee
+# defaults die samen betekenen dat wie een functie aanmaakt, hem op internet zet. Dat is hier
+# gebeurd met verwijder_klant_data; zie migratie 040. Slaat zichzelf over zonder databasegegevens.
+if [ "$doel" = "alles" ] || [ "$doel" = "rpc" ]; then
+  stap rpc-rechten "$RPC_TIMEOUT" node scripts/check-rpc-rechten.mjs || falen=$?
 fi
 
 if [ "$doel" = "alles" ] || [ "$doel" = "tsc" ]; then
