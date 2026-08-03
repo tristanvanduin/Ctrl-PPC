@@ -19,7 +19,12 @@ export const BRAND_NAME = "Ctrl PPC";
  */
 export const BRAND_LOGO_FILE = "ctrl-ppc-logo.png";
 
-/** Korte vorm voor krappe plekken (tabelkoppen, selectievelden). */
+/**
+ * Korte vorm van de PRODUCTNAAM, voor krappe plekken waar het product zichzelf benoemt.
+ *
+ * Niet te gebruiken als aanduiding van een partij. Hij stond in de sprintplanning als optie in
+ * het eigenaarsveld — daar las "Ctrl" als de naam van degene die de taak oppakt.
+ */
 export const BRAND_SHORT = "Ctrl";
 
 /**
@@ -78,11 +83,19 @@ export const OWNER_CLIENT = "Klant";
 /** Elke schrijfwijze die ooit als teamwaarde is weggeschreven. Bij het lezen allemaal geldig. */
 export const LEGACY_OWNER_TEAM = ["RAI Amsterdam", "RAI", "Ranking Masters", "RM"] as const;
 
-/** Hoort deze taak bij het bureau? Herkent de rol én elke naam die ooit is opgeslagen. */
+/**
+ * Hoort deze taak bij het bureau? Herkent de rol én elke naam die ooit is opgeslagen.
+ *
+ * De productnaam staat hier bewust NIET tussen. Ctrl PPC is het gereedschap, niet een partij die
+ * werk uitvoert — het kan dus nooit de eigenaar van een taak zijn. Eerder stonden BRAND_NAME en
+ * BRAND_SHORT hier wel, en dat was mijn denkfout: ik had de merknaam als bureaunaam gelezen.
+ * Nagekeken in de database voordat ze eruit gingen: geen enkele rij draagt "Ctrl PPC" of "Ctrl",
+ * dus er wordt niets stilzwijgend geherclassificeerd.
+ */
 export function isTeamOwner(owner: string | null | undefined): boolean {
   const v = (owner ?? "").trim();
   if (v === "") return false;
-  if (v === OWNER_TEAM || v === BRAND_NAME || v === BRAND_SHORT) return true;
+  if (v === OWNER_TEAM) return true;
   return (LEGACY_OWNER_TEAM as readonly string[]).includes(v);
 }
 
@@ -94,9 +107,18 @@ export function normalizeOwner(owner: string | null | undefined): string {
 /**
  * Hoe de eigenaar op het scherm heet.
  *
- * De rol is data, dit is weergave. Geef de bureaunaam van de tenant mee en die wint; zonder valt
- * hij terug op de productnaam, wat klopt zolang er één bureau is.
+ * De rol is data, dit is weergave. Geef de bureaunaam van de tenant mee en die wint.
+ *
+ * Zonder tenantnaam valt hij terug op de ROL, niet op de productnaam. Dat stond hier eerst wel
+ * zo, met als redenering "dat klopt zolang er één bureau is" — maar die redenering was fout,
+ * niet onvolledig. Ctrl PPC is de naam van het gereedschap; het voert geen taken uit en is nooit
+ * verantwoordelijk voor iets. In de sprintplanning stond daardoor letterlijk "Ctrl PPC" in de
+ * kolom Verantwoordelijke, alsof de software zelf het werk deed.
+ *
+ * "Bureau" is als terugval bovendien eerlijker: het zegt wie het doet zonder een naam te
+ * verzinnen die niemand heeft opgegeven. Zodra er een tenantveld met een bureaunaam is, gaat die
+ * hier naar binnen en verandert er verder niets.
  */
-export function ownerLabel(owner: string | null | undefined, bureauNaam: string = BRAND_NAME): string {
+export function ownerLabel(owner: string | null | undefined, bureauNaam: string = OWNER_TEAM): string {
   return isTeamOwner(owner) ? bureauNaam : OWNER_CLIENT;
 }

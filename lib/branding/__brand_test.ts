@@ -81,8 +81,10 @@ for (const oud of LEGACY_OWNER_TEAM) {
   check(`"${oud}" normaliseert naar de rol`, normalizeOwner(oud) === OWNER_TEAM);
 }
 check("de rol zelf ook", isTeamOwner(OWNER_TEAM));
-check("de huidige merknaam ook", isTeamOwner(BRAND_NAME));
-check("de korte vorm ook", isTeamOwner(BRAND_SHORT));
+// De productnaam telt NIET als eigenaar, en dat is de hele reden dat deze regels er staan.
+// Ctrl PPC is het gereedschap; het voert geen taken uit. Hier stond eerder het omgekeerde.
+check("de productnaam niet", !isTeamOwner(BRAND_NAME));
+check("de korte vorm evenmin", !isTeamOwner(BRAND_SHORT));
 check("de klant niet", !isTeamOwner(OWNER_CLIENT));
 check("leeg niet", !isTeamOwner("") && !isTeamOwner(null) && !isTeamOwner(undefined));
 check("spaties eromheen storen niet", isTeamOwner(`  ${LEGACY_OWNER_TEAM[0]}  `));
@@ -96,7 +98,8 @@ check("onbekend wordt klant", normalizeOwner("iemand anders") === OWNER_CLIENT);
 // vergissing. Precies wat je wilt — een runtime-check zou hier niets meer toevoegen.
 
 console.log("\nDe weergavenaam is los van de opgeslagen rol");
-check("zonder tenant valt hij terug op de productnaam", ownerLabel(OWNER_TEAM) === BRAND_NAME);
+check("zonder tenant valt hij terug op de rol", ownerLabel(OWNER_TEAM) === OWNER_TEAM);
+check("en dus nooit op de productnaam", ownerLabel(OWNER_TEAM) !== BRAND_NAME);
 check("met een tenant wint die", ownerLabel(OWNER_TEAM, "Bureau Zuid") === "Bureau Zuid");
 check("een klant-taak blijft de klant", ownerLabel(OWNER_CLIENT, "Bureau Zuid") === OWNER_CLIENT);
 check("een oude naam krijgt de huidige weergave", ownerLabel("Ranking Masters", "Bureau Zuid") === "Bureau Zuid");

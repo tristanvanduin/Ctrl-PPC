@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Fragment } from "react";
-import { OWNER_TEAM, OWNER_CLIENT, BRAND_SHORT, ownerLabel, normalizeOwner } from "@/lib/branding/brand";
+import { OWNER_TEAM, OWNER_CLIENT, ownerLabel, normalizeOwner } from "@/lib/branding/brand";
 import { Download, ChevronDown, ChevronUp, Loader2, Calendar, Plus, X, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { channelOfSource, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
@@ -549,7 +549,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                         <div className="flex items-center gap-2">
                           <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Nieuwe taak..." className="flex-1 text-xs border border-purple-200 rounded px-2 py-1 bg-card focus:outline-none focus:border-purple-400" />
                           <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded px-2 py-1 bg-card">
-                            <option value={OWNER_TEAM}>{BRAND_SHORT}</option>
+                            <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>
                             <option value={OWNER_CLIENT}>{OWNER_CLIENT}</option>
                           </select>
                           <button onClick={() => addTaskToHypothesis(hypId)} disabled={!newTask.trim()} className="px-2 py-1 text-micro font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40">Voeg toe</button>
