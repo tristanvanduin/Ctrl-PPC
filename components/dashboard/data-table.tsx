@@ -5,10 +5,19 @@
 // De tabellen in dit dashboard misten drie dingen die een tabel bruikbaar maken, en alle drie
 // zijn ze functioneel — geen smaak.
 //
-// 1. CIJFERS DIE NIET UITLIJNEN. Van alle tabellen gebruikten er vier `tabular-nums`. Zonder
-//    dat zijn cijfers proportioneel gezet: een 1 is smaller dan een 8, dus € 133.159 en
-//    € 15.795 beginnen op verschillende posities en je kunt kolommen niet met je oog scannen.
-//    In een tabel vol getallen is dat de grootste enkele verbetering die er is.
+// 1. CIJFERS DIE NIET UITLIJNEN. Rechts uitlijnen plus `whitespace-nowrap`: zo staan de eenheden
+//    onder de eenheden en breekt € 133.159 niet af.
+//
+//    Hier stond dat cijfers proportioneel gezet zijn en een 1 smaller is dan een 8. Nagemeten in
+//    de browser met het echte, geladen lettertype: Ubuntu zet alle tien de cijfers op 6,77px bij
+//    12px — spreiding 0. Voor dít lettertype voegt `tabular-nums` dus niets toe, en die regel was
+//    een aanname die ik nooit had gecontroleerd.
+//
+//    De klasse blijft staan, maar om een andere en kleinere reden: hij dekt de fallback af. Vóórdat
+//    het webfont binnen is (en als het niet binnenkomt) rendert de tabel in een systeemlettertype,
+//    en die hebben lang niet allemaal cijfers van gelijke breedte. Goedkope verzekering, geen
+//    hoofdzaak — en dat scheelde het klakkeloos toevoegen van de klasse in tientallen kolommen
+//    elders, want daar zou het niets hebben opgelost.
 //
 // 2. GEEN GEVOEL VOOR VERHOUDING. Zeven campagnes met bedragen van € 15.795 tot € 133.159: om
 //    te zien wie het budget trekt moest je elk getal lezen en onthouden. Een fijne balk achter
@@ -196,8 +205,11 @@ export function Cel({
 }
 
 /**
- * Een getalcel. `tabular-nums` is hier het hele punt: gelijke cijferbreedtes laten de kolom
- * uitlijnen, zodat je hem kunt scannen in plaats van lezen.
+ * Een getalcel: rechts uitgelijnd en niet afbrekend, zodat de eenheden onder elkaar staan en de
+ * kolom te scannen is in plaats van te lezen.
+ *
+ * `tabular-nums` staat erbij voor de fallback, niet voor het huislettertype — Ubuntu zet zijn
+ * cijfers al even breed. Zie de toelichting bovenaan dit bestand.
  */
 export function GetalCel({
   children,

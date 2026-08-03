@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Ubuntu, Open_Sans } from "next/font/google";
+import { Ubuntu } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
@@ -13,11 +13,10 @@ const ubuntu = Ubuntu({
   weight: ["300", "400", "500", "700"],
 });
 
-const openSans = Open_Sans({
-  variable: "--font-open-sans",
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-});
+// Open Sans stond hier in drie gewichten, en --font-open-sans werd nergens gebruikt. Het kwam
+// alleen binnen via --font-mono, waar het niet hoorde omdat het geen monospace-lettertype is
+// (zie de toelichting in globals.css). Dat waren dus drie lettertypebestanden per paginabezoek
+// voor een verwijzing die nergens naartoe leidde.
 
 export const metadata: Metadata = {
   title: `${BRAND_NAME} — SEA Dashboard`,
@@ -32,7 +31,7 @@ export default function RootLayout({
   return (
     <html
       lang="nl"
-      className={`${ubuntu.variable} ${openSans.variable} h-full antialiased`}
+      className={`${ubuntu.variable} h-full antialiased`}
     >
       <head>
         {/* Vóór React en vóór de eerste verf: anders laadt de pagina in het licht en klapt hij een
