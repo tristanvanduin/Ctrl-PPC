@@ -566,3 +566,77 @@ gelezen.
   weggepoetst.
 - **Geen hernoeming van `client_id`.** Die tekstsleutel blijft, ook in `accounts`. Hij staat op
   te veel plekken en werkt prima als natuurlijke sleutel.
+
+---
+
+## 8. Toetsing van het ontwerp zelf
+
+De drie risico's uit §5 zijn gemeten voordat er iets gebouwd is. Alles read-only tegen de live
+database; er is geen enkel object aangemaakt of gewijzigd.
+
+### 8.1 Passen de kanaalkolommen in één tabel per kanaal? — Ja, ruimer dan verwacht
+
+| tabel | metrieken | korrel |
+|---|---:|---|
+| `linkedin_account_daily` | 23 | date |
+| `linkedin_campaign_daily` | 23 | date |
+| `linkedin_creative_daily` | 23 | date |
+| `meta_account_daily` | 28 | date |
+| `meta_campaign_daily` | 28 | date |
+| `meta_ad_daily` | 28 | date |
+
+Binnen een kanaal draagt **elk niveau dezelfde metriekenset op dezelfde korrel**. Eén
+`<kanaal>_metrics` met `level` in de sleutel dekt account, campagne en creative in één keer — en
+vervangt daarmee drie tabellen per kanaal in plaats van er één bij te zetten.
+`linkedin_demographic_daily` heeft er 6 en is een dimensie; die hoort bij `fact_dimension`.
+
+### 8.2 Zijn aggregerende views snel genoeg? — Ja, mits begrensd
+
+Gemeten op `ads_search_terms_monthly` (243.666 rijen):
+
+| query | tijd |
+|---|---:|
+| aggregeren over álle klanten | 1.882 ms |
+| aggregeren voor één klant (de grootste) | **137 ms** |
+| voorgeaggregeerde maandtabel lezen, één klant | 30 ms |
+
+Een view is dus ongeveer 4,5× duurder dan een voorgeaggregeerde tabel, en 137 ms is ruim
+voldoende voor een scherm.
+
+**De voorwaarde staat in de tweede regel van die tabel.** Die 137 ms scande de héle historie van
+die klant. Op dagkorrel bij 400 accounts is dat een veelvoud. Views zijn daarom houdbaar op
+precies één voorwaarde: **elke query is begrensd op klant én periode**, met een index
+`(account_id, grain, period_start desc)` die dat ondersteunt. Een ongefilterde query door een
+aggregerende view is een volledige scan van een klanthistorie.
+
+### 8.3 Zijn de bestaande lezers begrensd? — Grotendeels, en het restant is telbaar
+
+| | |
+|---|---:|
+| `select("*")`-aanroepen | **100** |
+| waarvan met een `client_id`-filter | 97 |
+| waarvan óók met een periode- of maandfilter | **64** |
+
+De 36 zonder periodefilter zijn het werk dat vóór fase 3 af moet, en ze raken precies de tabellen
+die view worden: `ads_account_weekly`, `ads_account_monthly`, `ads_campaign_monthly`,
+`ads_keyword_performance_monthly`, `ads_creative_performance` en verwanten.
+
+Dat is geen ontdekking meer maar een lijst: 36 plekken een periodefilter geven, vóór de omzetting
+en los ervan te testen.
+
+### 8.4 Wat nog steeds niet getoetst is
+
+PostgREST geeft bij `select("*")` op een view terug wat de view heeft. Ontbreekt er een kolom die
+de code verwacht, dan is dat in JavaScript `undefined` en geen foutmelding — dus stil verkeerd.
+Dat is geen risico dat een test wegneemt maar een eigenschap van de opzet.
+
+De maatregel hoort daarom in fase 3 zelf: per view een kolom-diff tegen de `_legacy`-tabel, en
+die diff moet leeg zijn voordat de rename doorgaat. Geen inschatting, een script.
+
+### 8.5 Conclusie
+
+Geen van de drie toetsen heeft het ontwerp gekraakt. Eén kwam er beter uit dan verwacht, twee
+leverden een voorwaarde op die telbaar en vooraf af te vinken is in plaats van een onbekende.
+
+Dat is genoeg om te beginnen — met de fases die aantoonbaar omkeerbaar zijn, en met een expliciet
+go/no-go vóór de eerste onomkeerbare stap.
