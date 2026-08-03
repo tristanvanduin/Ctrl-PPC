@@ -534,6 +534,32 @@ Twee dingen die daarbij besloten zijn en die niet vanzelf spreken:
   van de standaard, dus de backfill past die toe — en `verify-fact-core.mjs` faalt expliciet zodra
   er wél iemand afwijkt, in plaats van stil verkeerd te blijven staan.
 
+**Rollups (migratie 037, gecorrigeerd in 038).** Week en maand worden AFGELEID uit de dagen, niet
+apart bij de API opgehaald: dat kost vier keer zoveel calls voor data die je al hebt, en levert
+reeksen op die uit de pas kunnen lopen — zie §1.4. Berekende rijen kunnen dat niet.
+
+Het is een functie met een startdatum en geen eenmalige insert, omdat Google een conversie
+terugschrijft naar de KLIKDATUM. Een rij van 1 juli verandert nog weken daarna, de sync haalt
+daarom elke nacht veertien maanden opnieuw op, en een rollup die blijft staan drift weg van zijn
+eigen bron.
+
+**De historie mag daar nooit onder lijden.** 037 verwijderde een afgeleide rij zodra het account
+érgens dagrijen had, in plaats van dagrijen in díé periode. Zolang alle dagen bewaard blijven is
+dat onzichtbaar. Maar dagdetail is precies wat je op termijn opruimt, en dan gebeurt dit —
+gesimuleerd op de echte data, met de dagen vóór 2026-06 als opgeruimd verondersteld:
+
+| | rijen die de delete weghaalt |
+|---|---:|
+| versie 037 | 110 (alles) |
+| versie 038 | 54 (alleen wat herberekend kan worden) |
+
+037 zou er 110 weghalen en 54 terugbouwen: 56 samengevatte periodes definitief weg, zonder
+melding. 038 verwijdert precies wat hij kan terugbouwen.
+
+Dezelfde afweging die de sync al maakt met `upsertBatch` tegenover `replaceBatch`: bijwerken wat
+in het venster valt, laten staan wat erbuiten ligt. De waarde van dit product zit in de
+opgebouwde reeks, en die hoort langer te worden.
+
 **2b — nog te doen:** de kanaaltabellen (`meta_metrics`, `linkedin_metrics`, `google_metrics`) en
 `fact_dimension`.
 
