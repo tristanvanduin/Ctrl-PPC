@@ -110,10 +110,13 @@ export function TopBar() {
   const totalCount = notifications.length;
 
   return (
-    // De enige plek in het dashboard waar glas ook echt glas is: deze balk staat op
-    // `sticky top-0`, dus de hele pagina schuift er letterlijk onderdoor. Er is dus een
-    // achtergrond om te vervagen en je ziet de inhoud bewegen. Op een kaart zou hetzelfde effect
-    // niets doen — daar ligt alleen een egaal paginavlak onder.
+    // Glas met reden: deze balk staat op `sticky top-0`, dus de hele pagina schuift er letterlijk
+    // onderdoor. Er is dus een achtergrond om te vervagen en je ziet de inhoud bewegen. Op een
+    // kaart zou hetzelfde effect niets doen — daar ligt alleen een egaal paginavlak onder.
+    //
+    // Dezelfde toets geldt voor de andere plekken waar het staat: de grafiektooltip, het
+    // meldingenpaneel hieronder, de periodekiezer en de chip op de merkbalk. Vier plekken, alle
+    // vier met inhoud eronder. Waar die inhoud er niet is, staat het er niet.
     //
     // `supports-[backdrop-filter]` houdt de balk dicht op browsers die het niet kunnen; zonder
     // die terugval wordt hij daar half doorzichtig zónder vervaging, en loopt de tekst van de
@@ -145,7 +148,7 @@ export function TopBar() {
 
             {/* Dropdown */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 bg-card rounded-xl border border-border shadow-lg overflow-hidden z-50">
+              <div className="absolute right-0 top-12 w-80 bg-card supports-[backdrop-filter]:bg-[var(--zweef-vlak)] supports-[backdrop-filter]:backdrop-blur-md rounded-xl border border-border shadow-lg overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <span className="text-sm font-semibold text-rm-blue-ink">Meldingen</span>
                   <button onClick={() => setShowNotifications(false)}>

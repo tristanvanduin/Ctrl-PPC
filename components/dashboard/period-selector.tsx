@@ -79,7 +79,7 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-1 w-80 rounded-lg border border-border bg-card p-3 shadow-lg">
+        <div className="absolute right-0 z-20 mt-1 w-80 rounded-lg border border-border bg-card supports-[backdrop-filter]:bg-[var(--zweef-vlak)] supports-[backdrop-filter]:backdrop-blur-md p-3 shadow-lg">
           <p className="mb-1.5 text-micro font-medium uppercase tracking-wide text-muted-foreground">Periode</p>
           <div className="mb-3 grid grid-cols-2 gap-1.5">
             {PERIOD_PRESETS.filter((p) => p !== "custom").map((p) => (

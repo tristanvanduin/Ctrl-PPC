@@ -236,6 +236,11 @@
      is een achtergrond om te vervagen. Stond op letterlijk `bg-white/95` — wit dus, ook in het
      donker, met de lichte donkere-modus-inkt erop. */
   --tip-vlak: rgb(255 255 255 / 0.86);
+  /* Hetzelfde materiaal voor een paneel dat over de pagina zweeft: de periodekiezer, de
+     meldingenlijst. Dezelfde toets als bij de bovenbalk en de tooltip — er ligt inhoud onder, dus
+     glas doet hier wat glas hoort te doen. Iets dichter dan de tooltip, want in deze panelen staat
+     meer tekst en die moet onvoorwaardelijk leesbaar zijn. */
+  --zweef-vlak: rgb(255 255 255 / 0.9);
   /* Geen gloed op een licht vlak: daar zou hij als vuil onder de balk lezen. Zie BalkVerloop. */
   --gloed-sterkte: 0;
 }
@@ -337,6 +342,7 @@
   --kaart-hoogtelicht: inset 0 1px 0 rgb(255 255 255 / 0.07);
   --balk-vlak: rgb(20 24 31 / 0.72);
   --tip-vlak: rgb(24 28 36 / 0.88);
+  --zweef-vlak: rgb(24 28 36 / 0.92);
   --gloed-sterkte: 0.4;
 
   /* Neutralen: de trap omgeklapt. 50 wordt het diepste vlak, 900 de helderste letter. */
