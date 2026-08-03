@@ -116,7 +116,42 @@ Wel: van de 24 tabellen met meer dan 500 rijen hebben er **8 geen index op `clie
 `ads_asset_group_performance_monthly`, `generation_job_events`. Nu onzichtbaar bij 60 klanten,
 merkbaar bij 400. Dat is losstaand van dit hele ontwerp op te lossen en kost een middag.
 
-### 1.7 Wat goed is en moet blijven
+### 1.7 Waar de eerste versie van dit ontwerp op faalde
+
+De eerste versie van §2 stelde één `fact_daily` voor met vijf kanonieke metriekkolommen en een
+`jsonb` voor de rest. Twee aannames daarin zijn getoetst en allebei onjuist gebleken. Ze staan
+hier omdat ze het ontwerp bepalen — en omdat een ontwerp dat zijn eigen fouten verzwijgt
+onbruikbaar is.
+
+**Aanname 1: alles staat per dag. Onjuist.**
+
+| korrel | tabellen |
+|---|---:|
+| `month` | **29** |
+| `date` | 13 |
+| `week` / `week_start` | 4 |
+
+De Google-data — de grootste en oudste bak — staat per **maand**. De dagelijkse detail bestaat
+niet in de database. Een `fact_daily` vullen voor Google kan dus alleen door dagen te verzinnen
+uit een maandtotaal, en dat is precies het soort verzonnen precisie waar de rest van deze
+codebase op let. Het schema moet de korrel dragen in plaats van er één te veronderstellen.
+
+**Aanname 2: vijf kanonieke metrieken dekken het meeste. Onjuist — het is een kwart.**
+
+Geteld over de 14 grootste tabellen: 235 numerieke kolommen, waarvan **60 (25%)** binnen
+impressies/klikken/kosten/conversies/waarde vallen. De overige **175** zouden in `jsonb`
+belanden. Voor `meta_campaign_daily` is dat 24 van de 28 kolommen, voor
+`linkedin_campaign_daily` 19 van de 23.
+
+Daarmee vervalt het hele argument voor die opzet. `extra` zou niet de staart zijn maar de romp:
+creative fatigue draait op `frequency`, `hook_rate` en `hold_rate`, LinkedIn op zijn
+lead-varianten, video op `thruplay` en `video_3s_views`. Al die analyses zouden ongetypeerd door
+jsonb moeten, en trager worden dan ze nu zijn.
+
+De les zit niet in de twee fouten maar in de vorm ervan: beide waren generalisaties over data
+die ik niet had geteld. §2 hieronder is herschreven op de gemeten werkelijkheid.
+
+### 1.8 Wat goed is en moet blijven
 
 Dit document is kritisch omdat dat de opdracht is, maar er staat veel dat deugt:
 
@@ -159,109 +194,159 @@ bestaande rij te veranderen: de koppeling naar een bureau is een join, geen migr
 `on delete restrict` en niet `cascade`: een bureau verwijderen mag nooit stilzwijgend de
 historie van twintig accounts meenemen.
 
-### 2.2 Feiten worden kanaalneutraal, per korrel
+### 2.2 Twee lagen feiten, niet één
 
-In plaats van tabellen per kanaal komen er tabellen per **korrel** — het niveau waarop een feit
-geldt. De kanaalnaam wordt een kolom in plaats van een tabelnaam.
+De gemeten werkelijkheid (§1.7) dwingt een andere opzet dan één tabel voor alles. Er komen er
+twee, met een duidelijke taakverdeling.
+
+**Laag 1 — `fact_core`: de vijf grootheden die élk platform levert.**
+
+Dit is de laag waar vergelijken op draait: portfolio-overzichten, cross-channel, bureau-totalen,
+"waar gaat het budget heen". Precies de vragen die over kanalen heen gaan, en dus precies de
+vragen die alleen de universele metrieken gebruiken — dat is waarom ze universeel zijn.
 
 ```sql
-create table fact_daily (
-  account_id    uuid not null references accounts(id) on delete cascade,
-  channel       text not null,          -- 'google' | 'meta' | 'linkedin' | 'tiktok' | ...
-  level         text not null,          -- 'account' | 'campaign' | 'adgroup' | 'creative'
-  entity_id     text not null,          -- '' op accountniveau
-  entity_name   text,
-  date          date not null,
+create table fact_core (
+  account_id   uuid not null references accounts(id) on delete cascade,
+  channel      text not null,          -- 'google' | 'meta' | 'linkedin' | 'tiktok' | ...
+  level        text not null,          -- 'account' | 'campaign' | 'adgroup' | 'creative'
+  entity_id    text not null default '',
+  entity_name  text,
 
-  -- Kanonieke metrieken: wat élk advertentieplatform levert.
-  impressions   bigint  not null default 0,
-  clicks        bigint  not null default 0,
-  cost          numeric not null default 0,   -- altijd in de valuta van het account
-  conversions   numeric not null default 0,
-  conv_value    numeric not null default 0,
+  -- De korrel staat in de data, niet in de tabelnaam. Google levert maand, Meta en LinkedIn dag.
+  grain        text not null check (grain in ('day','week','month')),
+  period_start date not null,
 
-  -- Alles wat echt kanaalspecifiek is: hook_rate, one_click_leads, video_thruplay, ...
-  extra         jsonb   not null default '{}',
+  impressions  bigint  not null default 0,
+  clicks       bigint  not null default 0,
+  cost         numeric not null default 0,
+  conversions  numeric not null default 0,
+  conv_value   numeric not null default 0,
 
-  synced_at     timestamptz not null default now(),
-  primary key (account_id, channel, level, entity_id, date)
+  synced_at    timestamptz not null default now(),
+  primary key (account_id, channel, level, entity_id, grain, period_start)
 );
 ```
 
-**Waarom kanonieke kolommen én een jsonb, en niet één van beide.**
+`grain` als kolom lost aanname 1 op: een maandrij is een maandrij en doet niet alsof hij een dag
+is. Een query die maanden wil vraagt `grain = 'month'`; een query die over kanalen heen optelt
+moet expliciet kiezen welke korrel hij wil, en kan niet per ongeluk dagen bij maanden optellen.
 
-Volledig EAV — een rij per metriek met een `metric`/`value`-paar — is verleidelijk omdat elk
-kanaal er dan in past zonder schemawijziging. Maar dan verliest elke som zijn type, wordt elke
-aggregatie een pivot, en is er geen enkele constraint meer die zegt dat kosten een getal zijn.
-Bij 1,6 miljoen rijen wordt dat traag én stil fout.
+**Laag 2 — `<kanaal>_metrics`: de kanaaleigen metrieken, getypeerd.**
 
-Alles als kolom werkt ook niet: dan groeit de tabel bij elk kanaal en staat hij vol met
-kolommen die voor 80% van de rijen leeg zijn.
-
-De middenweg: de vijf grootheden die élk platform levert krijgen een echte, getypeerde kolom —
-daar draaien alle sommen, grafieken en vergelijkingen op. De rest gaat in `extra`, met een
-GIN-index, en wordt alleen uitgepakt door het scherm dat er specifiek om vraagt.
-
-**Afgeleide waarden staan er bewust niet in.** Geen `ctr`, geen `roas`, geen `conversion_rate`.
-Die worden berekend waar ze getoond worden, uit de vijf kolommen hierboven. Dat maakt §1.4
-structureel onmogelijk: er kunnen geen twee antwoorden meer zijn omdat er maar één bron is.
-
-Waar een platform een eigen ratio levert die *afwijkt* van de eigen componenten — zoals de
-PMax-conversieratio — hoort die in `extra` onder zijn eigen naam (`google_conversion_rate`), met
-de expliciete betekenis "dit is wat Google zegt", naast de berekening die zegt "dit is wat de
-componenten zeggen". Dan is het verschil zichtbaar in plaats van een raadsel.
-
-### 2.3 De dimensietabellen blijven apart
-
-Zoektermen, keywords, geo, device, netwerk, doelgroep, product: die hebben elk hun eigen
-dimensiekolom en horen niet in `fact_daily`. Ze krijgen dezelfde vorm:
+De 175 kolommen uit §1.7 gaan niet in jsonb maar blijven echte kolommen, in een tabel per
+kanaal, met dezelfde sleutel als `fact_core`:
 
 ```sql
-create table fact_dimension_daily (
+create table meta_metrics (
+  account_id  uuid not null references accounts(id) on delete cascade,
+  level       text not null,
+  entity_id   text not null default '',
+  grain       text not null,
+  period_start date not null,
+
+  frequency        numeric,
+  hook_rate        numeric,
+  hold_rate        numeric,
+  link_clicks      bigint,
+  landing_page_views bigint,
+  video_thruplay   bigint,
+  add_to_cart      numeric,
+  initiate_checkout numeric,
+  -- ... de rest van de Meta-specifieke kolommen zoals ze nu al bestaan
+
+  primary key (account_id, level, entity_id, grain, period_start)
+);
+```
+
+De sleutel is dezelfde als in `fact_core` op één veld na: `channel` ontbreekt, want die staat al
+in de tabelnaam. Een echte foreign key naar `fact_core` kan niet omdat de kanaalkolom daar deel
+van de sleutel is en hier een constante zou zijn; de samenhang wordt daarom bewaakt door de sync,
+die beide tabellen in dezelfde transactie schrijft, plus een controlequery die wees-rijen
+opspoort. Dat is zwakker dan een FK en dat hoort hier te staan.
+
+Zo blijft alles getypeerd en snel, blijft creative fatigue een gewone kolomquery, en hoeft geen
+enkele bestaande analyse door jsonb.
+
+**Wat dit wél oplevert ten opzichte van nu**, ook al blijven er kanaaltabellen bestaan:
+
+- de universele metrieken staan één keer, onder één naam — geen `cost` naast `spend` meer
+- cross-channel en portfolio lezen één tabel in plaats van drie met vertaalregels
+- de korrel is expliciet in plaats van verstopt in een tabelnaam
+- afgeleide waarden verdwijnen (zie §2.4), dus §1.4 kan niet terugkomen
+- een nieuw kanaal is: rijen in `fact_core` plus één eigen metriektabel — geen aanpassing aan
+  bestaande tabellen, geen aanpassing aan cross-channel schermen
+
+**Wat het níét oplevert, eerlijk gezegd:** het aantal tabellen daalt niet dramatisch. Google 39,
+Meta 15, LinkedIn 12 wordt niet 3. Het wordt wel: één gedeelde kern plus een voorspelbare
+kanaaltabel per platform, in plaats van elk kanaal een eigen wildgroei. Dat is minder
+spectaculair dan mijn eerste voorstel en het is wat er daadwerkelijk kan.
+
+### 2.3 De dimensietabellen
+
+Zoektermen, keywords, geo, device, netwerk, doelgroep, product: elk met een eigen dimensiekolom.
+Die krijgen dezelfde behandeling — één gedeelde vorm, want hier zijn de metrieken wél universeel
+(het zijn overal impressies, klikken, kosten, conversies):
+
+```sql
+create table fact_dimension (
   account_id  uuid not null references accounts(id) on delete cascade,
   channel     text not null,
   dimension   text not null,   -- 'search_term' | 'keyword' | 'country' | 'device' | ...
-  key         text not null,   -- de waarde binnen die dimensie
-  parent_id   text,            -- campagne of adgroup waar hij onder valt, mag leeg
-  date        date not null,
+  key         text not null,
+  parent_id   text not null default '',
+  grain       text not null,
+  period_start date not null,
   impressions bigint  not null default 0,
   clicks      bigint  not null default 0,
   cost        numeric not null default 0,
   conversions numeric not null default 0,
   conv_value  numeric not null default 0,
-  extra       jsonb   not null default '{}',
-  primary key (account_id, channel, dimension, key, parent_id, date)
+  primary key (account_id, channel, dimension, key, parent_id, grain, period_start)
 );
 ```
 
-Dit vervangt in één klap `ads_search_terms_monthly`, `ads_keyword_performance_monthly`,
-`ads_geo_performance_monthly`, `ads_device_performance_monthly`,
-`ads_network_performance_monthly`, `ads_audience_performance_monthly`,
-`ads_country_monthly`, `ads_region_monthly` en `linkedin_demographic_daily` — negen tabellen met
-negen bijna-identieke vormen.
+Dit vervangt negen tabellen met negen bijna-identieke vormen:
+`ads_search_terms_monthly`, `ads_keyword_performance_monthly`, `ads_geo_performance_monthly`,
+`ads_device_performance_monthly`, `ads_network_performance_monthly`,
+`ads_audience_performance_monthly`, `ads_country_monthly`, `ads_region_monthly`,
+`linkedin_demographic_daily`.
 
-### 2.4 Indexen
+Hier is de winst wél groot, en het risico klein: deze tabellen hebben nu al bijna dezelfde
+kolommen.
+
+### 2.4 Afgeleide waarden verdwijnen
+
+Geen `ctr`, `roas`, `conversion_rate`, `cpa` of `cost_per_conversion` meer als opgeslagen kolom.
+Die worden berekend waar ze getoond worden, uit de vijf kolommen van `fact_core`. Daarmee wordt
+§1.4 structureel onmogelijk: er kunnen geen twee antwoorden bestaan omdat er één bron is.
+
+Waar een platform een eigen ratio levert die afwijkt van zijn eigen componenten — zoals de
+PMax-conversieratio, factor drie ernaast — hoort die in de kanaaltabel onder een naam die zegt
+waar hij vandaan komt (`google_conversion_rate`), naast de berekening. Dan is het verschil
+zichtbaar in plaats van een raadsel, en kiest het scherm bewust welke het toont.
+
+### 2.5 Indexen
 
 ```sql
-create index on fact_daily (account_id, channel, level, date desc);
-create index on fact_daily (account_id, date desc) where level = 'account';
-create index on fact_dimension_daily (account_id, channel, dimension, date desc);
-create index on fact_dimension_daily (account_id, dimension, cost desc);  -- "duurste zoektermen"
-create index on fact_daily using gin (extra);
+create index on fact_core (account_id, channel, grain, period_start desc);
+create index on fact_core (account_id, grain, period_start desc) where level = 'account';
+create index on fact_dimension (account_id, channel, dimension, grain, period_start desc);
+create index on fact_dimension (account_id, dimension, cost desc);
 ```
 
-### 2.5 Toegang
+### 2.6 Toegang
 
 Met `accounts.agency_id` wordt RLS eindelijk uitdrukbaar:
 
 ```sql
-alter table fact_daily enable row level security;
+alter table fact_core enable row level security;
 
-create policy leest_eigen_bureau on fact_daily for select to authenticated
+create policy leest_eigen_bureau on fact_core for select to authenticated
 using (exists (
   select 1 from accounts a
   join user_agencies ua on ua.agency_id = a.agency_id
-  where a.id = fact_daily.account_id and ua.user_id = auth.uid()
+  where a.id = fact_core.account_id and ua.user_id = auth.uid()
 ));
 ```
 
@@ -283,19 +368,31 @@ geen deel uit halen, dus gaat het geheel mee in de prompt.
 kanaal:
 
 ```sql
--- Budgetanalyse: alleen campagneniveau, alleen deze twee maanden, alleen wat telt.
+-- Budgetanalyse: alleen campagneniveau, alleen deze maanden, alleen wat telt.
 select entity_name, sum(cost) as cost, sum(conversions) as conversions
-from fact_daily
+from fact_core
 where account_id = $1 and channel = $2 and level = 'campaign'
-  and date >= $3 and date < $4
+  and grain = 'month' and period_start >= $3 and period_start < $4
 group by entity_name order by cost desc limit 25;
+```
+
+Analyses die kanaaleigen metrieken nodig hebben joinen er één kanaaltabel bij, met een
+expliciete kolomlijst — nooit `select *`:
+
+```sql
+-- Creative fatigue: alleen wat fatigue betekent, niets meer.
+select c.entity_name, c.impressions, m.frequency, m.hook_rate, m.hold_rate
+from fact_core c
+join meta_metrics m using (account_id, level, entity_id, grain, period_start)
+where c.account_id = $1 and c.channel = 'meta' and c.level = 'creative'
+  and c.grain = 'day' and c.period_start >= $2;
 ```
 
 Dat is een paar kilobyte, niet een voorgebakken tekstblok. Concreet betekent dit:
 
 - **budgetverdeling** haalt campagnes met kosten en conversies, verder niets
 - **zoektermverspilling** haalt `dimension = 'search_term'` met kosten en nul conversies
-- **creative fatigue** haalt `level = 'creative'` plus `extra->>'frequency'`
+- **creative fatigue** haalt `level = 'creative'` plus drie kolommen uit `meta_metrics`
 - **geo** haalt `dimension = 'country'`
 
 Elk een aparte call met een aparte prompt en een aparte slice. Geen enkele call ziet de data van
@@ -314,10 +411,15 @@ een sync-route, een conversie-mapping, en meedoen in de 55 plekken waar de code 
 vertakt. Realistisch één tot twee weken per kanaal, en elk kanaal maakt het volgende duurder
 omdat er weer een woordenboek bijkomt.
 
-**Straks:** één adapter die het platform-antwoord op de vijf kanonieke velden mapt en de rest in
-`extra` zet. Geen schemawijziging, geen nieuwe tabel, geen nieuwe vertakking in de grafieken —
-die lezen `fact_daily` en zien een kanaal meer. Schatting: een dag of twee, waarvan het meeste
-in de API-koppeling van het platform zelf zit en niet in ons schema.
+**Straks:** één adapter die het platform-antwoord op de vijf velden van `fact_core` mapt, plus
+één `<kanaal>_metrics`-tabel voor wat dat platform eigen heeft. Geen wijziging aan bestaande
+tabellen, en geen nieuwe vertakking in de cross-channel schermen en portfolio — die lezen
+`fact_core` en zien er een kanaal bij staan.
+
+Eerlijke schatting: twee tot vier dagen, waarvan het grootste deel in de API-koppeling van het
+platform zelf zit. Dat is minder dan de een tot twee weken van nu, maar het is niet nul — en mijn
+eerste versie van dit document beweerde ten onrechte dat er helemaal geen schemawijziging meer
+nodig zou zijn.
 
 Wat wél per kanaal werk blijft: de kanaalspecifieke schermen. TikTok heeft geen zoektermen en
 LinkedIn geen shopping-feed. Dat is terecht werk — het gaat over wat het kanaal ís, niet over
@@ -340,7 +442,7 @@ eronder. Er verandert niets aan bestaande tabellen. Niets leest deze tabellen no
 niets breken.
 
 ### Fase 2 — de feitentabellen ernaast, dubbel geschreven
-`fact_daily` en `fact_dimension_daily` aanmaken. De sync schrijft vanaf dat moment naar **beide**
+`fact_core`, `fact_dimension` en de kanaaltabellen aanmaken. De sync schrijft vanaf dat moment naar **beide**
 plekken. De oude tabellen blijven de waarheid; de nieuwe worden gevuld en gecontroleerd.
 
 Controle voordat er iets omgaat: per tabel en per maand de sommen van impressies, klikken,
@@ -349,7 +451,7 @@ door. Dat is een script, geen inschatting.
 
 ### Fase 3 — views onder de oude namen
 Elke oude tabel wordt hernoemd naar `<naam>_legacy` en er komt een view met de oude naam die uit
-`fact_daily` leest en de oude kolomnamen teruggeeft:
+`fact_core` leest en de oude kolomnamen teruggeeft:
 
 ```sql
 alter table ads_campaign_monthly rename to ads_campaign_monthly_legacy;
@@ -359,13 +461,13 @@ select
   a.client_id,
   f.entity_id   as campaign_id,
   f.entity_name as campaign_name,
-  to_char(f.date, 'YYYY-MM') as month,
+  to_char(f.period_start, 'YYYY-MM') as month,
   sum(f.impressions) as impressions,
   sum(f.clicks)      as clicks,
   sum(f.cost)        as cost,
   sum(f.conversions) as conversions
-from fact_daily f join accounts a on a.id = f.account_id
-where f.channel = 'google' and f.level = 'campaign'
+from fact_core f join accounts a on a.id = f.account_id
+where f.channel = 'google' and f.level = 'campaign' and f.grain = 'month'
 group by 1,2,3,4;
 ```
 
@@ -373,12 +475,12 @@ group by 1,2,3,4;
 blijven werken zonder één regel wijziging. Gaat er iets mis, dan is de terugweg één
 `drop view` plus `alter table ... rename` — seconden werk, geen dataverlies.
 
-Let op: een view is niet schrijfbaar. Schrijfpaden moeten in deze fase al naar `fact_daily`
+Let op: een view is niet schrijfbaar. Schrijfpaden moeten in deze fase al naar de nieuwe tabellen
 wijzen. Dat zijn er weinig (de sync en een handvol server-routes) en die staan al op één plek in
 `lib/data-access/`.
 
 ### Fase 4 — lezers omzetten, één voor één
-Per scherm de query van de view naar `fact_daily` verleggen. Elk scherm apart, elk met de
+Per scherm de query van de view naar `fact_core` verleggen. Elk scherm apart, elk met de
 poorten én een gerenderde controle — dezelfde werkwijze als bij de tabelconversie: vooraf de
 sectiekoppen en waarden vastleggen, achteraf diffen.
 
