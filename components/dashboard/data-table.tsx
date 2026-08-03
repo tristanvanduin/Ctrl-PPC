@@ -249,8 +249,18 @@ export function AandeelCel({
           koploper kreeg een balk over de volle celbreedte en zag eruit als "geselecteerd",
           terwijl de kleinste een sliver naast zijn cijfers kreeg. Een baan met een vaste
           breedte leest ondubbelzinnig als schaal, en raakt de cijfers niet. */}
+      {/* De gradient uit de premium-referentie, een kwartslag gedraaid.
+          Daar stond `linear-gradient(90deg, …)`: het verloop liep langs de lengte van de streep —
+          precies de as die de waarde draagt. Dan heeft een streep van 34% een andere eindkleur dan
+          een van 80%, en leest de kleur als een tweede grootheid die er niet is; een korte streep
+          laat bovendien alleen het eerste stuk van de trap zien. Loodrecht op de lengte speelt dat
+          niet: elke streep heeft dezelfde kleurovergang van boven naar beneden, ongeacht hoe lang
+          hij is. Zo blijft de lengte het enige wat meet, en krijgt het vlak toch diepte. */}
       <span className="mt-1 block ml-auto h-[3px] rounded-full overflow-hidden" style={{ width: 72, background: "var(--spoor, rgba(15,23,42,0.07))" }} aria-hidden>
-        <span className="block h-full rounded-full" style={{ width: `${veilig * 100}%`, background: kleur, opacity: 0.75 }} />
+        <span
+          className="block h-full rounded-full"
+          style={{ width: `${veilig * 100}%`, backgroundImage: `linear-gradient(to bottom, ${kleur}, color-mix(in srgb, ${kleur} 72%, transparent))` }}
+        />
       </span>
     </td>
   );

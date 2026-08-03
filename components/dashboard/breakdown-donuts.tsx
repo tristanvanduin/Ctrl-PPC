@@ -50,9 +50,15 @@ function Streep({ aandeel, kleur, label }: { aandeel: number | null; kleur: stri
   const leeg = veilig <= 0;
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--spoor,#eef1f6)]" role="img" aria-label={label}>
+      {/* Loodrecht op de lengte, niet erlangs — zie de opmerking bij `AandeelCel` in data-table:
+          een verloop langs de streep maakt van de kleur een tweede grootheid. */}
       <div
         className="h-full rounded-full"
-        style={{ width: leeg ? "2px" : `${veilig}%`, backgroundColor: kleur, opacity: leeg ? 0.35 : 1 }}
+        style={{
+          width: leeg ? "2px" : `${veilig}%`,
+          backgroundImage: `linear-gradient(to bottom, ${kleur}, color-mix(in srgb, ${kleur} 72%, transparent))`,
+          opacity: leeg ? 0.35 : 1,
+        }}
       />
     </div>
   );

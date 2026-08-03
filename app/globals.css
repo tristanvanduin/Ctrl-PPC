@@ -211,6 +211,27 @@
 
   --kaart-lijn: #e8ebf3;
   --kaart-schaduw: 0 1px 2px rgb(15 23 42 / 0.03), 0 8px 24px -12px rgb(15 23 42 / 0.10);
+
+  /* ── Het materiaal van een oppervlak ──────────────────────────────────────
+   *
+   * Dit is de "glassmorphism" van de referentie, maar dan het deel dat werkt.
+   *
+   * Doorschijnende kaarten zijn hier zinloos: het paginavlak is een egale kleur (#f9fafc licht,
+   * #0f1115 donker), dus een doorschijnende kaart daarboven is gewoon een iets lichtere kaart —
+   * je betaalt het compositiewerk van `backdrop-filter` per laag en krijgt het effect niet, want
+   * er is niets om doorheen te zien. En doorschijnendheid ónder tekst kost contrast.
+   *
+   * Wat een oppervlak wél duur laat lezen is licht: een haarfijne lichtrand langs de bovenkant,
+   * alsof er iets van boven op valt. Eén pixel, een paar procent wit, geen blur en geen
+   * transparantie. Op donker is het effect sterker nodig en op licht juist bijna niets — vandaar
+   * twee waarden in plaats van één.
+   *
+   * Waar glas wél glas is, staat het er ook: de bovenbalk (de pagina schuift eronder door), de
+   * chip op de merkbalk en de grafiektooltip. Alle drie hebben iets achter zich. */
+  --kaart-hoogtelicht: inset 0 1px 0 rgb(255 255 255 / 0.6);
+  /* Het vlak achter de plakkende bovenbalk: doorschijnend genoeg om te zien dát er iets
+     onderdoor schuift, dicht genoeg om de tekst erop leesbaar te houden. */
+  --balk-vlak: rgb(255 255 255 / 0.72);
 }
 
 /* ── De donkere modus ──────────────────────────────────────────────────────
@@ -305,6 +326,10 @@
   --serie-8: #e66767;
   --kaart-lijn: #252a34;
   --kaart-schaduw: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  /* Op donker is de lichtrand het enige wat een kaart van het vlak eronder tilt — er is geen
+     slagschaduw die op bijna zwart nog iets doet. */
+  --kaart-hoogtelicht: inset 0 1px 0 rgb(255 255 255 / 0.07);
+  --balk-vlak: rgb(20 24 31 / 0.72);
 
   /* Neutralen: de trap omgeklapt. 50 wordt het diepste vlak, 900 de helderste letter. */
   --color-gray-50: #171a21;
@@ -483,7 +508,9 @@
   .rounded-xl.border.border-border.shadow-sm,
   .rounded-lg.border.border-border.shadow-sm {
     --tw-shadow: 0 0 #0000;
-    box-shadow: var(--kaart-schaduw);
+    /* De lichtrand bovenop de schaduw: samen zijn ze het materiaal van een kaart. Zie
+       `--kaart-hoogtelicht` voor waarom dit in plaats van doorschijnendheid. */
+    box-shadow: var(--kaart-hoogtelicht), var(--kaart-schaduw);
     border-color: var(--kaart-lijn);
   }
 }

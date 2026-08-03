@@ -110,7 +110,15 @@ export function TopBar() {
   const totalCount = notifications.length;
 
   return (
-    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6 sticky top-0 z-40">
+    // De enige plek in het dashboard waar glas ook echt glas is: deze balk staat op
+    // `sticky top-0`, dus de hele pagina schuift er letterlijk onderdoor. Er is dus een
+    // achtergrond om te vervagen en je ziet de inhoud bewegen. Op een kaart zou hetzelfde effect
+    // niets doen — daar ligt alleen een egaal paginavlak onder.
+    //
+    // `supports-[backdrop-filter]` houdt de balk dicht op browsers die het niet kunnen; zonder
+    // die terugval wordt hij daar half doorzichtig zónder vervaging, en loopt de tekst van de
+    // pagina dwars door de titel heen.
+    <header className="h-16 border-b border-border bg-card supports-[backdrop-filter]:bg-[var(--balk-vlak)] supports-[backdrop-filter]:backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-40">
       <h2 className="text-lg font-bold text-rm-blue-ink">{getTitle()}</h2>
 
       <div className="flex items-center gap-4">
