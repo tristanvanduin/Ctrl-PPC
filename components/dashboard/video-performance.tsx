@@ -44,10 +44,19 @@ function QuartileBar({ p25, p50, p75, p100 }: { p25: number | null; p50: number 
   return (
     <div className="flex items-end gap-1 h-9" role="img" aria-label={`Kijkdiepte: ${steps.map((s) => `${s.label} ${pct(s.v)}`).join(", ")}`}>
       {steps.map((s) => (
-        <div key={s.label} className="flex flex-col items-center gap-0.5 w-9">
-          <div className="w-full h-6 bg-slate-100 rounded-sm relative overflow-hidden">
+        <div key={s.label} className="flex flex-col items-center gap-0.5 w-6">
+          {/* Zes eenheden breed en niet negen: het plafond uit de mark-specificatie is
+              vierentwintig pixels, en dit stond op zesendertig. Bij een verzadigde vulling leest
+              zo'n breedte als een verfvlak in plaats van als een meetwaarde — dezelfde correctie
+              als bij de staafdiagrammen.
+
+              De baan komt uit `--spoor`, net als bij de aandeelstrepen; hij stond op `slate-100`,
+              een vaste tint die niets van het thema weet. En alleen de bovenkant is afgerond: aan
+              de basislijn hoort een balk vierkant te eindigen, want daar begint hij niet — daar
+              stáát hij op. */}
+          <div className="w-full h-6 rounded-sm relative overflow-hidden" style={{ background: "var(--spoor, rgba(15,23,42,0.07))" }}>
             <div
-              className="absolute bottom-0 left-0 right-0 bg-rm-blue/70 rounded-sm"
+              className="absolute bottom-0 left-0 right-0 bg-rm-blue/70 rounded-t-sm"
               style={{ height: `${Math.max(2, Math.min(100, (s.v ?? 0) * 100))}%` }}
             />
           </div>

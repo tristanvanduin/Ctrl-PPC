@@ -10,6 +10,7 @@ import { buildNetworkSplit, findImbalances, networkTotals, type NetworkRow } fro
 import { BREAKDOWN_DIMENSIES, metaWaardeLabel, type BreakdownKanaal } from "@/lib/analysis/breakdown-dimensions";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { useVorige } from "@/lib/use-vorige";
 
 // Waar het budget van Meta en LinkedIn landt, per uitsplitsing.
 //
@@ -160,16 +161,20 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
   }, [clientId, channel]);
 
   // Alleen dimensies waar daadwerkelijk iets in zit. Een lege keuzeknop belooft data die er niet is.
+  // De vorige uitsplitsing blijft staan zolang de nieuwe onderweg is.
+  const getoond = useVorige(segmenten);
+  const ververst = segmenten === null && getoond !== null;
+
   const beschikbaar = useMemo(() => {
-    if (!segmenten) return [];
-    const metData = new Set(segmenten.filter((s) => s.spend > 0 || s.impressies > 0).map((s) => s.dimensie));
+    if (!getoond) return [];
+    const metData = new Set(getoond.filter((s) => s.spend > 0 || s.impressies > 0).map((s) => s.dimensie));
     return BREAKDOWN_DIMENSIES[channel].filter((d) => metData.has(d.key));
-  }, [segmenten, channel]);
+  }, [getoond, channel]);
 
   const actief = dimensie ?? beschikbaar[0]?.key ?? null;
 
   const { slices, totalen, scheefheid, kleur } = useMemo(() => {
-    const vanDimensie = (segmenten ?? []).filter((s) => s.dimensie === actief);
+    const vanDimensie = (getoond ?? []).filter((s) => s.dimensie === actief);
     const rijen: NetworkRow[] = vanDimensie.map((s) => ({
       networkType: s.waarde, cost: s.spend, conversions: s.conversies,
       conversionsValue: 0, impressions: s.impressies, clicks: s.klikken,
@@ -181,9 +186,12 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
     const volgorde = gesplitst.map((s) => s.networkType);
     const kleur = (k: string) => CHART_CATEGORICAL[Math.max(0, volgorde.indexOf(k)) % CHART_CATEGORICAL.length];
     return { slices: gesplitst, totalen: networkTotals(gesplitst), scheefheid: findImbalances(gesplitst), kleur };
-  }, [segmenten, actief]);
+  }, [getoond, actief]);
 
-  if (segmenten === null) {
+  // Alleen een skelet als er nog nooit iets was. Wisselt de gebruiker van kanaal, dan blijft de
+  // vorige uitsplitsing staan op verlaagde dekking terwijl de nieuwe binnenkomt — geen terugval
+  // naar een skelet, geen hoogtesprong. Zie lib/use-vorige.ts.
+  if (getoond === null) {
     return <Laadvlak vorm="grafiek" hoogte={200} titel="Waar gaat het budget heen" />;
   }
   // Geen uitsplitsingen gesynct: niets tonen in plaats van een lege ring.
@@ -193,7 +201,11 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
   const kostenSlices: DonutSlice[] = slices.map((s) => ({ key: s.networkType, label: s.label, value: s.cost, color: kleur(s.networkType) }));
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div
+      className="bg-card rounded-xl border border-border shadow-sm overflow-hidden transition-opacity duration-200"
+      style={{ opacity: ververst ? 0.55 : 1 }}
+      aria-busy={ververst}
+    >
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <PieChart className="w-4.5 h-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">Waar gaat het budget heen</h3>
