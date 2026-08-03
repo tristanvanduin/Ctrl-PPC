@@ -289,17 +289,17 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
               const VerdictIcon = verdictIcons[r.verdict] ?? Search;
               return (
                 <tr key={i} className={`hover:bg-gray-50/50 transition-colors ${r.verdict === "irrelevant" ? "bg-red-50/20" : ""}`}>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2">
                     <span className="text-sm text-rm-gray font-medium">{r.searchTerm}</span>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground" title={`${r.campaignName} > ${r.adGroupName}`}>
+                  <td className="px-3 py-2 text-xs text-muted-foreground" title={`${r.campaignName} > ${r.adGroupName}`}>
                     <div className="text-xs text-rm-gray">{r.campaignName}</div>
                     <div className="text-micro text-muted-foreground">{r.adGroupName}</div>
                   </td>
-                  <td className="px-3 py-2.5 text-right text-sm text-rm-gray">{r.clicks}</td>
-                  <td className="px-3 py-2.5 text-right text-sm text-rm-gray">{fmt(r.cost)}</td>
-                  <td className="px-3 py-2.5 text-right text-sm text-rm-gray">{r.conversions}</td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3 py-2 text-right text-sm text-rm-gray">{r.clicks}</td>
+                  <td className="px-3 py-2 text-right text-sm text-rm-gray">{fmt(r.cost)}</td>
+                  <td className="px-3 py-2 text-right text-sm text-rm-gray">{r.conversions}</td>
+                  <td className="px-3 py-2 text-right">
                     <span className={`inline-block w-6 text-center text-xs font-bold rounded ${
                       r.relevanceScore >= 4 ? "text-emerald-600" :
                       r.relevanceScore >= 3 ? "text-amber-600" :
@@ -308,18 +308,18 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
                       {r.relevanceScore}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-micro font-medium rounded-full border ${verdictColors[r.verdict] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
                       <VerdictIcon className="w-3 h-3" />
                       {verdictLabels[r.verdict] || r.verdict}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2">
                     <span className={`text-xs font-medium ${actionColors[r.recommendedAction] || "text-gray-600"}`}>
                       {actionLabels[r.recommendedAction] || r.recommendedAction}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[250px]">
+                  <td className="px-3 py-2 text-xs text-muted-foreground max-w-[250px]">
                     {r.reason}
                   </td>
                 </tr>

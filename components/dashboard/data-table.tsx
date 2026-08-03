@@ -38,6 +38,24 @@
 import type { ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
+// ── Het ritme van een tabelcel ─────────────────────────────────────────────
+//
+// Dertien schermen gebruiken de componenten hieronder; vijf tabellen hebben eigen markup. Die
+// vijf hadden elk hun eigen maat: gemeten py-1.5, py-2, py-2.5 voor de cellen en px-2, px-3, px-4
+// voor de goot. Vier verschillende regelhoogtes dus, en daardoor voelt elk scherm net anders —
+// wat je als gebruiker niet als "een andere padding" ziet maar als "dit hoort niet bij elkaar".
+//
+// De maat staat daarom hier, geëxporteerd, en de losse tabellen gebruiken hem. Wie een nieuwe
+// tabel bouwt zonder deze componenten heeft nog steeds één plek om het ritme vandaan te halen.
+//
+// De kop is iets hoger dan de cel: hij draagt kleine hoofdletters met letterspatiëring en heeft
+// die lucht nodig om niet op de eerste rij te plakken.
+
+/** De opvulling van een kolomkop. */
+export const TABEL_KOP = "px-3 py-2.5";
+/** De opvulling van een gewone cel. */
+export const TABEL_CEL = "px-3 py-2";
+
 /** De tabel plus zijn horizontale scroll. Tabellen mogen nooit de pagina laten scrollen. */
 export function Tabel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -86,7 +104,7 @@ export function KolomKop({
   return (
     <th
       scope="col"
-      className={`px-3 py-2.5 text-micro font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${
+      className={`${TABEL_KOP} text-micro font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${
         getal ? "text-right" : "text-left"
       } ${breed ? "w-full" : ""} ${className}`}
     >
@@ -136,7 +154,7 @@ export function SorteerKop({
     <th
       scope="col"
       aria-sort={actief ? (richting === "asc" ? "ascending" : "descending") : "none"}
-      className={`px-3 py-2.5 text-micro font-semibold uppercase tracking-wider whitespace-nowrap ${
+      className={`${TABEL_KOP} text-micro font-semibold uppercase tracking-wider whitespace-nowrap ${
         getal ? "text-right" : "text-left"
       } ${breed ? "w-full" : ""}`}
     >
@@ -172,7 +190,7 @@ export function Rij({ children, className = "" }: { children: ReactNode; classNa
 /** De identiteitscel: naam links, eventueel met een tweede regel eronder. */
 export function NaamCel({ children, sub, className = "" }: { children: ReactNode; sub?: ReactNode; className?: string }) {
   return (
-    <td className={`px-3 py-2 align-middle ${className}`}>
+    <td className={`${TABEL_CEL} align-middle ${className}`}>
       {/* De naam wordt afgekapt: hij is een aanduiding, en een campagnenaam van honderd tekens
           duwt alle getallen uit beeld. */}
       <div className="text-rm-gray font-medium truncate max-w-[28rem]">{children}</div>
@@ -198,7 +216,7 @@ export function Cel({
   className?: string;
 }) {
   return (
-    <td className={`px-3 py-2 align-middle ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${nowrap ? "whitespace-nowrap" : ""} ${className}`}>
+    <td className={`${TABEL_CEL} align-middle ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${nowrap ? "whitespace-nowrap" : ""} ${className}`}>
       {children}
     </td>
   );
@@ -222,7 +240,7 @@ export function GetalCel({
   className?: string;
 }) {
   return (
-    <td className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${className}`}>
+    <td className={`${TABEL_CEL} text-right tabular-nums whitespace-nowrap ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${className}`}>
       {children}
     </td>
   );
@@ -254,7 +272,7 @@ export function AandeelCel({
 }) {
   const veilig = Number.isFinite(aandeel) ? Math.max(0, Math.min(1, aandeel)) : 0;
   return (
-    <td className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${className}`}>
+    <td className={`${TABEL_CEL} text-right tabular-nums whitespace-nowrap ${className}`}>
       <span className="text-rm-gray font-medium">{waarde}</span>
       {/* Een dunne lijn ónder het getal, op een vaste baan.
           Eerste poging was een vlak áchter het getal, maar dat leest als een markering: de
@@ -313,7 +331,7 @@ export function TotaalCel({
   className?: string;
 }) {
   return (
-    <td colSpan={colSpan} className={`px-3 py-2.5 ${getal ? "text-right tabular-nums" : "text-left"} whitespace-nowrap ${className}`}>
+    <td colSpan={colSpan} className={`${TABEL_KOP} ${getal ? "text-right tabular-nums" : "text-left"} whitespace-nowrap ${className}`}>
       {children}
     </td>
   );

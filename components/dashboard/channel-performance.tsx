@@ -301,25 +301,25 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
           <table className="w-full text-body">
             <thead>
               <tr className="text-left text-muted-foreground border-b border-border">
-                <th className="px-5 py-2 font-medium">Maand</th>
-                <th className="px-3 py-2 font-medium text-right">Spend</th>
-                <th className="px-3 py-2 font-medium text-right">Vertoningen</th>
-                <th className="px-3 py-2 font-medium text-right">Klikken</th>
-                <th className="px-3 py-2 font-medium text-right">CTR</th>
-                <th className="px-3 py-2 font-medium text-right">{convLabel}</th>
-                <th className="px-5 py-2 font-medium text-right">{useLeadsLabel ? "CPL" : "CPA"}</th>
+                <th className="px-5 py-2.5 font-medium">Maand</th>
+                <th className="px-3 py-2.5 font-medium text-right">Spend</th>
+                <th className="px-3 py-2.5 font-medium text-right">Vertoningen</th>
+                <th className="px-3 py-2.5 font-medium text-right">Klikken</th>
+                <th className="px-3 py-2.5 font-medium text-right">CTR</th>
+                <th className="px-3 py-2.5 font-medium text-right">{convLabel}</th>
+                <th className="px-5 py-2.5 font-medium text-right">{useLeadsLabel ? "CPL" : "CPA"}</th>
               </tr>
             </thead>
             <tbody>
               {[...fullMonths].reverse().map(([m, a]) => (
                 <tr key={m} className="border-b border-border/50">
-                  <td className="px-5 py-1.5 text-muted-foreground">{m}</td>
-                  <td className="px-3 py-1.5 text-right">{eur(a.spend)}</td>
-                  <td className="px-3 py-1.5 text-right">{fmt(a.impressions)}</td>
-                  <td className="px-3 py-1.5 text-right">{fmt(a.clicks)}</td>
-                  <td className="px-3 py-1.5 text-right">{pctS(ctr(a))}</td>
-                  <td className="px-3 py-1.5 text-right">{fmt(a.conv, 1)}</td>
-                  <td className="px-5 py-1.5 text-right">{eur(cpa(a))}</td>
+                  <td className="px-5 py-2 text-muted-foreground">{m}</td>
+                  <td className="px-3 py-2 text-right">{eur(a.spend)}</td>
+                  <td className="px-3 py-2 text-right">{fmt(a.impressions)}</td>
+                  <td className="px-3 py-2 text-right">{fmt(a.clicks)}</td>
+                  <td className="px-3 py-2 text-right">{pctS(ctr(a))}</td>
+                  <td className="px-3 py-2 text-right">{fmt(a.conv, 1)}</td>
+                  <td className="px-5 py-2 text-right">{eur(cpa(a))}</td>
                 </tr>
               ))}
             </tbody>
@@ -338,25 +338,25 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
             <table className="w-full text-body">
               <thead>
                 <tr className="text-left text-muted-foreground border-b border-border">
-                  <th className="px-5 py-2 font-medium">Campagne</th>
-                  <th className="px-3 py-2 font-medium text-right">Spend</th>
-                  <th className="px-3 py-2 font-medium text-right">Vertoningen</th>
-                  <th className="px-3 py-2 font-medium text-right">Klikken</th>
-                  <th className="px-3 py-2 font-medium text-right">CTR</th>
-                  <th className="px-3 py-2 font-medium text-right">{convLabel}</th>
-                  <th className="px-5 py-2 font-medium text-right">{useLeadsLabel ? "CPL" : "CPA"}</th>
+                  <th className="px-5 py-2.5 font-medium">Campagne</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Spend</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Vertoningen</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Klikken</th>
+                  <th className="px-3 py-2.5 font-medium text-right">CTR</th>
+                  <th className="px-3 py-2.5 font-medium text-right">{convLabel}</th>
+                  <th className="px-5 py-2.5 font-medium text-right">{useLeadsLabel ? "CPL" : "CPA"}</th>
                 </tr>
               </thead>
               <tbody>
                 {campaigns.map((c) => (
                   <tr key={c.entity} className="border-b border-border/50">
-                    <td className="px-5 py-1.5 text-rm-gray font-medium">{names.get(c.entity) ?? c.entity}</td>
-                    <td className="px-3 py-1.5 text-right">{eur(c.spend)}</td>
-                    <td className="px-3 py-1.5 text-right">{fmt(c.impressions)}</td>
-                    <td className="px-3 py-1.5 text-right">{fmt(c.clicks)}</td>
-                    <td className="px-3 py-1.5 text-right">{pctS(ctr(c))}</td>
-                    <td className="px-3 py-1.5 text-right">{fmt(c.conv, 1)}</td>
-                    <td className="px-5 py-1.5 text-right">{eur(cpa(c))}</td>
+                    <td className="px-5 py-2 text-rm-gray font-medium">{names.get(c.entity) ?? c.entity}</td>
+                    <td className="px-3 py-2 text-right">{eur(c.spend)}</td>
+                    <td className="px-3 py-2 text-right">{fmt(c.impressions)}</td>
+                    <td className="px-3 py-2 text-right">{fmt(c.clicks)}</td>
+                    <td className="px-3 py-2 text-right">{pctS(ctr(c))}</td>
+                    <td className="px-3 py-2 text-right">{fmt(c.conv, 1)}</td>
+                    <td className="px-5 py-2 text-right">{eur(cpa(c))}</td>
                   </tr>
                 ))}
               </tbody>

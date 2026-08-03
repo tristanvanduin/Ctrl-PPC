@@ -168,13 +168,13 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
           </caption>
           <thead>
             <tr>
-              <th scope="col" className="text-left font-medium text-meta text-muted-foreground px-2 py-1.5">Markt</th>
+              <th scope="col" className="text-left font-medium text-meta text-muted-foreground px-3 py-2.5">Markt</th>
               {totals.channels.map((ch) => (
-                <th key={ch} scope="col" className="text-right font-medium text-meta text-muted-foreground px-2 py-1.5 whitespace-nowrap">
+                <th key={ch} scope="col" className="text-right font-medium text-meta text-muted-foreground px-3 py-2.5 whitespace-nowrap">
                   {CHANNEL_LABEL[ch]}
                 </th>
               ))}
-              <th scope="col" className="text-right font-medium text-meta text-muted-foreground px-2 py-1.5">Totaal</th>
+              <th scope="col" className="text-right font-medium text-meta text-muted-foreground px-3 py-2.5">Totaal</th>
             </tr>
           </thead>
           <tbody>
@@ -182,7 +182,7 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
               const row = totals.byCountry.get(country)!;
               return (
                 <tr key={country} className="border-t border-border">
-                  <th scope="row" className="text-left font-medium px-2 py-1.5 whitespace-nowrap">
+                  <th scope="row" className="text-left font-medium px-3 py-2.5 whitespace-nowrap">
                     {countryLabel(country)}
                     <span className="text-micro text-muted-foreground ml-1.5">{eur(row.cost)}</span>
                   </th>
@@ -193,7 +193,7 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
                     return (
                       <td
                         key={ch}
-                        className="px-2 py-1.5 text-right tabular-nums relative"
+                        className="px-3 py-2 text-right tabular-nums relative"
                         style={fill ? { backgroundColor: fill.bg, color: fill.fg } : undefined}
                         onMouseEnter={() => setHover({ country, channel: ch })}
                         onMouseLeave={() => setHover(null)}
@@ -221,21 +221,21 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
                       </td>
                     );
                   })}
-                  <td className="px-2 py-1.5 text-right tabular-nums font-medium">{metric.fmt(metric.get(row))}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium">{metric.fmt(metric.get(row))}</td>
                 </tr>
               );
             })}
             <tr className="border-t-2 border-border font-medium">
-              <th scope="row" className="text-left px-2 py-1.5">Alle markten</th>
+              <th scope="row" className="text-left px-3 py-2.5">Alle markten</th>
               {totals.channels.map((ch) => {
                 const col = totals.byChannel.get(ch)!;
                 return (
-                  <td key={ch} className="px-2 py-1.5 text-right tabular-nums">
+                  <td key={ch} className="px-3 py-2 text-right tabular-nums">
                     {isUnsplit(ch) ? <span className="text-muted-foreground">{eur(col.cost)}</span> : metric.fmt(metric.get(col))}
                   </td>
                 );
               })}
-              <td className="px-2 py-1.5 text-right tabular-nums">{metric.fmt(metric.get(totals.grand))}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{metric.fmt(metric.get(totals.grand))}</td>
             </tr>
           </tbody>
         </table>

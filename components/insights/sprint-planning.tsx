@@ -554,13 +554,13 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         <table className="w-full">
           <thead className="bg-gray-50/50 border-b border-border">
             <tr>
-              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-16">Week</th>
-              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Taak</th>
-              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-24">Kanaal</th>
-              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-28">Status</th>
-              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-36">Verantwoordelijke</th>
-              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-24">Looptijd</th>
-              <th className="px-4 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-32">Metrics</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-16">Week</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Taak</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-24">Kanaal</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-28">Status</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-36">Verantwoordelijke</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-24">Looptijd</th>
+              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left w-32">Metrics</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -588,7 +588,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                       de groepsgegevens over de rest. De band ziet er hetzelfde uit, maar alles
                       staat in de kolom waar het bij hoort.
                     */}
-                    <td colSpan={2} className="px-4 py-2.5">
+                    <td colSpan={2} className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         {isCollapsed
                           ? <ChevronDown className="w-3.5 h-3.5 text-purple-400 shrink-0" />
@@ -599,10 +599,10 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 py-2">
                       <ChannelBadge channel={hyp ? channelOfSource(hyp.source) : null} className={OP_KOP_BADGE} />
                     </td>
-                    <td colSpan={4} className="px-4 py-2.5">
+                    <td colSpan={4} className="px-3 py-2">
                       <span className="flex items-center justify-end gap-2 text-micro text-purple-400">
                         {groupItems.length} taken · ICE {hyp?.ice_total?.toFixed(1) || "?"}
                         <button
@@ -622,8 +622,8 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                   ))}
                   {!isCollapsed && showAddTask === hypId && (
                     <tr className="bg-purple-50/20">
-                      <td className="px-4 py-2" />
-                      <td className="px-4 py-2" colSpan={4}>
+                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2" colSpan={4}>
                         <div className="flex items-center gap-2">
                           <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Nieuwe taak..." className="flex-1 text-xs border border-purple-200 rounded px-2 py-1 bg-card focus:outline-none focus:border-purple-400" />
                           <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded px-2 py-1 bg-card">
@@ -674,7 +674,7 @@ function SprintRow({ item, onUpdate, onUpdateFields, team, teamOk, currentWeek, 
 
   return (
     <tr className={`hover:bg-gray-50/50 transition-colors ${isOverdue ? "bg-red-50/30" : ""} ${item.status === "expired" ? "opacity-50" : ""}`}>
-      <td className="px-4 py-2.5">
+      <td className="px-3 py-2">
         <div className="flex items-center gap-1">
           <input
             type="number"
@@ -690,9 +690,9 @@ function SprintRow({ item, onUpdate, onUpdateFields, team, teamOk, currentWeek, 
           {isOverdue && <span className="text-micro text-red-500 font-bold">!</span>}
         </div>
       </td>
-      <td className="px-4 py-2.5 text-sm text-rm-gray">{item.task}</td>
-      <td className="px-4 py-2.5"><ChannelBadge channel={channel} className={OP_KOP_BADGE} /></td>
-      <td className="px-4 py-2.5">
+      <td className="px-3 py-2 text-sm text-rm-gray">{item.task}</td>
+      <td className="px-3 py-2"><ChannelBadge channel={channel} className={OP_KOP_BADGE} /></td>
+      <td className="px-3 py-2">
         <select
           value={item.status}
           onChange={(e) => onUpdate(item.id, "status", e.target.value)}
@@ -703,7 +703,7 @@ function SprintRow({ item, onUpdate, onUpdateFields, team, teamOk, currentWeek, 
           ))}
         </select>
       </td>
-      <td className="px-4 py-2.5">
+      <td className="px-3 py-2">
         {/*
           Was een <select> met twee opties. Wat er in de database staat is van alles: de merknaam
           van twee rebrandings geleden, klantnamen, en in vier rijen een hele hypothese die bij een
@@ -726,8 +726,8 @@ function SprintRow({ item, onUpdate, onUpdateFields, team, teamOk, currentWeek, 
           className={OP_KOP_VELD}
         />
       </td>
-      <td className="px-4 py-2.5 text-xs text-muted-foreground">{item.review_timeframe || "—"}</td>
-      <td className="px-4 py-2.5 text-xs text-muted-foreground">{item.metrics || "—"}</td>
+      <td className="px-3 py-2 text-xs text-muted-foreground">{item.review_timeframe || "—"}</td>
+      <td className="px-3 py-2 text-xs text-muted-foreground">{item.metrics || "—"}</td>
     </tr>
   );
 }

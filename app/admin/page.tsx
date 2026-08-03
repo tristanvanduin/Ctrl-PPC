@@ -233,18 +233,18 @@ export default function AdminPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>
-                <th className="px-4 py-2 font-medium">E-mail</th>
-                <th className="px-4 py-2 font-medium">Rol</th>
-                <th className="px-4 py-2 font-medium">Beurzen</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2" />
+                <th className="px-3 py-2.5 font-medium">E-mail</th>
+                <th className="px-3 py-2.5 font-medium">Rol</th>
+                <th className="px-3 py-2.5 font-medium">Beurzen</th>
+                <th className="px-3 py-2.5 font-medium">Status</th>
+                <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} className="border-t border-gray-100 align-top">
-                  <td className="px-4 py-2 text-gray-900">{user.email ?? user.id}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-3 py-2 text-gray-900">{user.email ?? user.id}</td>
+                  <td className="px-3 py-2">
                     <select
                       value={user.role ?? ""}
                       onChange={(e) => void wijzig(user.id, e.target.value as Role, user.clients)}
@@ -258,7 +258,7 @@ export default function AdminPage() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-3 py-2">
                     {user.seesAllClients ? (
                       <span className="text-gray-500">alle beurzen</span>
                     ) : (
@@ -291,8 +291,8 @@ export default function AdminPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-gray-600">{user.deactivated ? "gedeactiveerd" : "actief"}</td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-3 py-2 text-gray-600">{user.deactivated ? "gedeactiveerd" : "actief"}</td>
+                  <td className="px-3 py-2 text-right">
                     {!user.deactivated && (
                       <button
                         type="button"
@@ -307,7 +307,7 @@ export default function AdminPage() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan={5} className="px-3 py-2 text-center text-gray-500">
                     Geen gebruikers zichtbaar.
                   </td>
                 </tr>
