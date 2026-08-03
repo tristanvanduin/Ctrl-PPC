@@ -161,6 +161,33 @@ if (Number(rollup.afwijkend) > 0) {
   console.log(`  OK    rollups (${rollup.vergeleken} maandrijen tellen op tot hun dagen)`);
 }
 
+// Wezen: een kanaalmetriek zonder rij in fact_core.
+//
+// Dit is de controle die ontbrak toen het misging. De metriektabellen dragen geen impressies,
+// klikken of kosten — die staan alleen in fact_core. Een creative-metriek zonder kern-rij is
+// daarom onbruikbaar: je weet dan de hook_rate maar niet waarvan.
+//
+// Migratie 036 vulde fact_core op account- en campagneniveau, 041 vulde de metriektabellen op
+// alle drie de niveaus, en niemand merkte dat er 348 creative-rijen zonder tegenhanger stonden.
+// Rijaantallen klopten, sommen klopten, en toch was de join leeg. Alleen die join liet het zien —
+// dus die staat nu hier.
+for (const [tabel, kanaal] of [["meta_metrics", "meta"], ["linkedin_metrics", "linkedin"]]) {
+  const [{ wezen }] = await sql(`
+    select count(*) as wezen from ${tabel} m
+    where not exists (
+      select 1 from fact_core f
+      where f.account_id = m.account_id and f.channel = '${kanaal}'
+        and f.level = m.level and f.entity_id = m.entity_id
+        and f.grain = m.grain and f.period_start = m.period_start)`);
+  gecontroleerd++;
+  if (Number(wezen) > 0) {
+    gefaald++;
+    console.log(`  FOUT  ${tabel}: ${wezen} rij(en) zonder tegenhanger in fact_core`);
+  } else {
+    console.log(`  OK    ${tabel} heeft geen wezen`);
+  }
+}
+
 console.log(`\n${gecontroleerd} sommen vergeleken, ${gefaald} afwijking(en).`);
 if (gefaald > 0) {
   console.log("\nFase 3 mag NIET door zolang hier iets rood staat.");

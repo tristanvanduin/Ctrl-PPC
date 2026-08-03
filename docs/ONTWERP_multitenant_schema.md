@@ -560,8 +560,24 @@ Dezelfde afweging die de sync al maakt met `upsertBatch` tegenover `replaceBatch
 in het venster valt, laten staan wat erbuiten ligt. De waarde van dit product zit in de
 opgebouwde reeks, en die hoort langer te worden.
 
-**2b — nog te doen:** de kanaaltabellen (`meta_metrics`, `linkedin_metrics`, `google_metrics`) en
-`fact_dimension`.
+**2b — kanaaltabellen — GEDAAN (migratie 041, aangevuld met 042)**
+
+`meta_metrics` en `linkedin_metrics`, getypeerde kolommen en één tabel per kanaal met `level` in
+de sleutel. Daarmee vervangt één tabel er drie per kanaal. Gevuld met exact de rijaantallen van de
+bron: Meta 160/128/256, LinkedIn 160/128/92.
+
+Afgeleide verhoudingen staan er niet in (ctr, cpc, cpm, cpa, roas, cpl); die worden berekend uit
+`fact_core`. Wél bewaard zijn de verhoudingen die het platform zelf op een niet-reproduceerbare
+manier berekent — `hook_rate`, `hold_rate`, `reach`, `frequency` — met de betekenis "dit zegt het
+platform", naast wat de componenten zeggen.
+
+**Een gat dat alleen de join liet zien.** 036 vulde `fact_core` op account- en campagneniveau; 041
+vulde de metriektabellen op alle drie de niveaus. Er stonden daardoor 348 creative-rijen zonder
+tegenhanger in `fact_core`. Rijaantallen klopten, sommen klopten, en toch gaf de query die
+creative fatigue straks doet nul rijen terug. Rechtgezet in 042, en `verify-fact-core.mjs` heeft
+er nu een wezencontrole bij — getest dat die rood wordt.
+
+**Nog te doen in 2b:** `fact_dimension` (zoektermen, keywords, geo, device, netwerk, doelgroep).
 
 **2c — nog te doen:** de sync dubbel laten schrijven. Dit is de eerste stap die draaiende code
 raakt.
