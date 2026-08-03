@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Tabel, Kop, KolomKop, Body, Rij, RijKop, TotaalRij, TotaalCel } from "./data-table";
 import { Loader2, Grid3x3 } from "lucide-react";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { divergingColor, inkOn } from "@/lib/branding/chart-colors";
@@ -161,31 +162,26 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
         {hasUnsplit && " De PMax-kolom is bewust ongekleurd: daar is het budget per land bekend, maar de kanaalverdeling niet gemeten."}
       </p>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-body">
+      <Tabel>
           <caption className="sr-only">
             {metric.label} per land en kanaal, laatste 180 dagen. Blauw is beter dan het accountgemiddelde, rood slechter.
           </caption>
-          <thead>
-            <tr>
-              <th scope="col" className="text-left font-medium text-meta text-muted-foreground px-3 py-2.5">Markt</th>
-              {totals.channels.map((ch) => (
-                <th key={ch} scope="col" className="text-right font-medium text-meta text-muted-foreground px-3 py-2.5 whitespace-nowrap">
-                  {CHANNEL_LABEL[ch]}
-                </th>
-              ))}
-              <th scope="col" className="text-right font-medium text-meta text-muted-foreground px-3 py-2.5">Totaal</th>
-            </tr>
-          </thead>
-          <tbody>
+          <Kop>
+            <KolomKop breed>Markt</KolomKop>
+            {totals.channels.map((ch) => (
+              <KolomKop key={ch} getal>{CHANNEL_LABEL[ch]}</KolomKop>
+            ))}
+            <KolomKop getal>Totaal</KolomKop>
+          </Kop>
+          <Body>
             {totals.countries.map((country) => {
               const row = totals.byCountry.get(country)!;
               return (
-                <tr key={country} className="border-t border-border">
-                  <th scope="row" className="text-left font-medium px-3 py-2.5 whitespace-nowrap">
+                <Rij key={country}>
+                  <RijKop>
                     {countryLabel(country)}
                     <span className="text-micro text-muted-foreground ml-1.5">{eur(row.cost)}</span>
-                  </th>
+                  </RijKop>
                   {totals.channels.map((ch) => {
                     const cell = index.get(`${country}|${ch}`);
                     const fill = fillFor(cell);
@@ -222,24 +218,27 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
                     );
                   })}
                   <td className="px-3 py-2 text-right tabular-nums font-medium">{metric.fmt(metric.get(row))}</td>
-                </tr>
+                </Rij>
               );
             })}
-            <tr className="border-t-2 border-border font-medium">
-              <th scope="row" className="text-left px-3 py-2.5">Alle markten</th>
-              {totals.channels.map((ch) => {
-                const col = totals.byChannel.get(ch)!;
-                return (
-                  <td key={ch} className="px-3 py-2 text-right tabular-nums">
-                    {isUnsplit(ch) ? <span className="text-muted-foreground">{eur(col.cost)}</span> : metric.fmt(metric.get(col))}
-                  </td>
-                );
-              })}
-              <td className="px-3 py-2 text-right tabular-nums">{metric.fmt(metric.get(totals.grand))}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+          </Body>
+          {/* De totaalregel staat nu in een <tfoot> in plaats van als laatste rij in de body.
+              Dat is niet alleen netter HTML: een schermlezer kondigt een voet aan als samenvatting,
+              en bij het scrollen door honderd landen blijft duidelijk wat een gewone rij is en wat
+              de optelsom. */}
+          <TotaalRij>
+            <RijKop>Alle markten</RijKop>
+            {totals.channels.map((ch) => {
+              const col = totals.byChannel.get(ch)!;
+              return (
+                <TotaalCel key={ch} getal>
+                  {isUnsplit(ch) ? <span className="text-muted-foreground">{eur(col.cost)}</span> : metric.fmt(metric.get(col))}
+                </TotaalCel>
+              );
+            })}
+            <TotaalCel getal>{metric.fmt(metric.get(totals.grand))}</TotaalCel>
+          </TotaalRij>
+      </Tabel>
 
       {/* Legenda: bij een kleurschaal is de schaal zelf de legenda. */}
       <div className="flex items-center gap-2 text-micro text-muted-foreground">

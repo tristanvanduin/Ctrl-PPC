@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ALL_CLIENTS, ROLES, ROL_LABEL, scopeFor, type Role } from "@/lib/auth/roles";
 import { getAllClients, type Client } from "@/lib/clients";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel } from "@/components/dashboard/data-table";
 
 interface AdminUser {
   id: string;
@@ -230,21 +231,23 @@ export default function AdminPage() {
         <p className="text-sm text-gray-500">Laden...</p>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-card">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="px-3 py-2.5 font-medium">E-mail</th>
-                <th className="px-3 py-2.5 font-medium">Rol</th>
-                <th className="px-3 py-2.5 font-medium">Beurzen</th>
-                <th className="px-3 py-2.5 font-medium">Status</th>
-                <th className="px-3 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
+          {/* De gedeelde tabelcomponenten, net als de dertien andere schermen. Geen totaalregel en
+              geen aandeelstrepen: dit is een beheerlijst, geen datatabel — er valt niets op te
+              tellen en niets af te wegen. Wat het wél overneemt is het ritme, de kopstijl en de
+              horizontale scroll. */}
+          <Tabel>
+            <Kop>
+              <KolomKop breed>E-mail</KolomKop>
+              <KolomKop>Rol</KolomKop>
+              <KolomKop>Beurzen</KolomKop>
+              <KolomKop>Status</KolomKop>
+              <KolomKop><span className="sr-only">Acties</span></KolomKop>
+            </Kop>
+            <Body>
               {users.map((user) => (
-                <tr key={user.id} className="border-t border-gray-100 align-top">
-                  <td className="px-3 py-2 text-gray-900">{user.email ?? user.id}</td>
-                  <td className="px-3 py-2">
+                <Rij key={user.id} className="align-top">
+                  <NaamCel>{user.email ?? user.id}</NaamCel>
+                  <Cel>
                     <select
                       value={user.role ?? ""}
                       onChange={(e) => void wijzig(user.id, e.target.value as Role, user.clients)}
@@ -257,8 +260,8 @@ export default function AdminPage() {
                         </option>
                       ))}
                     </select>
-                  </td>
-                  <td className="px-3 py-2">
+                  </Cel>
+                  <Cel>
                     {user.seesAllClients ? (
                       <span className="text-gray-500">alle beurzen</span>
                     ) : (
@@ -290,9 +293,9 @@ export default function AdminPage() {
                         )}
                       </div>
                     )}
-                  </td>
-                  <td className="px-3 py-2 text-gray-600">{user.deactivated ? "gedeactiveerd" : "actief"}</td>
-                  <td className="px-3 py-2 text-right">
+                  </Cel>
+                  <Cel zacht nowrap>{user.deactivated ? "gedeactiveerd" : "actief"}</Cel>
+                  <Cel className="text-right">
                     {!user.deactivated && (
                       <button
                         type="button"
@@ -302,18 +305,18 @@ export default function AdminPage() {
                         Deactiveren
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </Cel>
+                </Rij>
               ))}
               {users.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-2 text-center text-gray-500">
-                    Geen gebruikers zichtbaar.
-                  </td>
-                </tr>
+                <Rij>
+                  <Cel colSpan={5} className="text-center" zacht>
+                    <span className="block py-2">Geen gebruikers zichtbaar.</span>
+                  </Cel>
+                </Rij>
               )}
-            </tbody>
-          </table>
+            </Body>
+          </Tabel>
         </div>
       )}
     </div>

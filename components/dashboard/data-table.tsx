@@ -202,21 +202,47 @@ export function NaamCel({ children, sub, className = "" }: { children: ReactNode
   );
 }
 
+/**
+ * De kop van een RIJ, voor een matrix.
+ *
+ * In een gewone lijst is de eerste cel een naam (NaamCel, een `td`) en is de kolomkop genoeg om
+ * te weten wat een cel betekent. In een kruistabel niet: daar wordt een cel pas begrijpelijk uit
+ * de combinatie van zijn kolom én zijn rij. `scope="row"` is wat een schermlezer die rij laat
+ * meelezen bij elke cel; zonder dat hoor je bij "€ 1.240" niet meer welk land dat was.
+ *
+ * Daarom bestaat dit naast NaamCel en is het geen dubbeling: het is een ander HTML-element met
+ * een andere betekenis, niet dezelfde cel in een ander jasje.
+ */
+export function RijKop({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <th scope="row" className={`${TABEL_CEL} text-left align-middle font-medium text-rm-gray whitespace-nowrap ${className}`}>
+      {children}
+    </th>
+  );
+}
+
 /** Een gewone cel voor tekst die geen getal en geen identiteit is: een type, een label, een advies. */
 export function Cel({
   children,
   zacht = false,
   nowrap = false,
+  colSpan,
   className = "",
 }: {
   children: ReactNode;
   zacht?: boolean;
   /** Korte labels ("Mobiele app", "YouTube-kanaal") mogen niet over twee regels breken. */
   nowrap?: boolean;
+  /**
+   * Over meerdere kolommen. Vrijwel altijd voor een lege staat: één regel "niets gevonden" die
+   * over de hele breedte loopt in plaats van in de eerste kolom te hangen met vier lege cellen
+   * ernaast.
+   */
+  colSpan?: number;
   className?: string;
 }) {
   return (
-    <td className={`${TABEL_CEL} align-middle ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${nowrap ? "whitespace-nowrap" : ""} ${className}`}>
+    <td colSpan={colSpan} className={`${TABEL_CEL} align-middle ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${nowrap ? "whitespace-nowrap" : ""} ${className}`}>
       {children}
     </td>
   );

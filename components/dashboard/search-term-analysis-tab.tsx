@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Search, ArrowUpDown, Loader2, Sparkles, ShieldAlert, ShieldCheck, ShieldQuestion, Eye } from "lucide-react";
+import { Search, Loader2, Sparkles, ShieldAlert, ShieldCheck, ShieldQuestion, Eye } from "lucide-react";
 import { useAnalysis } from "@/lib/analysis-context";
+import { Tabel, Kop, KolomKop, SorteerKop, Body, Rij, NaamCel, Cel, GetalCel } from "./data-table";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -155,17 +156,15 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
   const irrelevantCost = irrelevantTerms.reduce((s, r) => s + r.cost, 0);
   const uncertainTerms = results.filter((r) => r.verdict === "uncertain");
 
-  const SortTh = ({ col, label, align }: { col: SortKey; label: string; align?: string }) => (
-    <th
-      onClick={() => handleSort(col)}
-      className={`px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-rm-blue-ink ${align === "right" ? "text-right" : "text-left"}`}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {sortBy === col ? <span>{sortDir === "asc" ? "\u2191" : "\u2193"}</span> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
-      </span>
-    </th>
-  );
+  // SortTh stond hier: een <th> met onClick. Dat is voor een muis een knop en voor een
+  // toetsenbord niets — geen focus, geen Enter, en zonder aria-sort weet een schermlezer niet
+  // waarop de tabel gesorteerd staat; het pijltje was de enige drager van die informatie.
+  // SorteerKop uit data-table lost alle drie op en staat op dertien andere schermen.
+  const sorteer = (col: SortKey) => ({
+    actief: sortBy === col,
+    richting: sortDir as "asc" | "desc",
+    onSorteer: () => handleSort(col),
+  });
 
   // Loading state
   if (loading) {
@@ -269,65 +268,54 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
       )}
 
       {/* Results table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50/50 border-b border-border">
-            <tr>
-              <SortTh col="term" label="Zoekterm" />
-              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Campagne</th>
-              <SortTh col="clicks" label="Clicks" align="right" />
-              <SortTh col="cost" label="Kosten" align="right" />
-              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-right">Conv.</th>
-              <SortTh col="score" label="Score" align="right" />
-              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Beoordeling</th>
-              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Actie</th>
-              <th className="px-3 py-2.5 text-micro font-semibold text-muted-foreground uppercase tracking-wider text-left">Reden</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {filtered.map((r, i) => {
-              const VerdictIcon = verdictIcons[r.verdict] ?? Search;
-              return (
-                <tr key={i} className={`hover:bg-gray-50/50 transition-colors ${r.verdict === "irrelevant" ? "bg-red-50/20" : ""}`}>
-                  <td className="px-3 py-2">
-                    <span className="text-sm text-rm-gray font-medium">{r.searchTerm}</span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground" title={`${r.campaignName} > ${r.adGroupName}`}>
-                    <div className="text-xs text-rm-gray">{r.campaignName}</div>
-                    <div className="text-micro text-muted-foreground">{r.adGroupName}</div>
-                  </td>
-                  <td className="px-3 py-2 text-right text-sm text-rm-gray">{r.clicks}</td>
-                  <td className="px-3 py-2 text-right text-sm text-rm-gray">{fmt(r.cost)}</td>
-                  <td className="px-3 py-2 text-right text-sm text-rm-gray">{r.conversions}</td>
-                  <td className="px-3 py-2 text-right">
-                    <span className={`inline-block w-6 text-center text-xs font-bold rounded ${
-                      r.relevanceScore >= 4 ? "text-emerald-600" :
-                      r.relevanceScore >= 3 ? "text-amber-600" :
-                      "text-red-600"
-                    }`}>
-                      {r.relevanceScore}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-micro font-medium rounded-full border ${verdictColors[r.verdict] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                      <VerdictIcon className="w-3 h-3" />
-                      {verdictLabels[r.verdict] || r.verdict}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`text-xs font-medium ${actionColors[r.recommendedAction] || "text-gray-600"}`}>
-                      {actionLabels[r.recommendedAction] || r.recommendedAction}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground max-w-[250px]">
-                    {r.reason}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <Tabel>
+        <Kop>
+          <SorteerKop breed {...sorteer("term")}>Zoekterm</SorteerKop>
+          <KolomKop>Campagne</KolomKop>
+          <SorteerKop getal {...sorteer("clicks")}>Clicks</SorteerKop>
+          <SorteerKop getal {...sorteer("cost")}>Kosten</SorteerKop>
+          <KolomKop getal>Conv.</KolomKop>
+          <SorteerKop getal {...sorteer("score")}>Score</SorteerKop>
+          <KolomKop>Beoordeling</KolomKop>
+          <KolomKop>Actie</KolomKop>
+          <KolomKop>Reden</KolomKop>
+        </Kop>
+        <Body>
+          {filtered.map((r, i) => {
+            const VerdictIcon = verdictIcons[r.verdict] ?? Search;
+            return (
+              <Rij key={i} className={r.verdict === "irrelevant" ? "bg-red-50/20" : ""}>
+                <NaamCel>{r.searchTerm}</NaamCel>
+                {/* Campagne en advertentiegroep horen bij elkaar: de groep is de tweede regel
+                    onder de campagne, niet een eigen kolom. */}
+                <NaamCel sub={r.adGroupName}>{r.campaignName}</NaamCel>
+                <GetalCel>{r.clicks}</GetalCel>
+                <GetalCel>{fmt(r.cost)}</GetalCel>
+                <GetalCel>{r.conversions}</GetalCel>
+                {/* Geen aandeelstreep op de score: dat is een oordeel van 1 tot 5, geen grootheid
+                    die optelt. De kleur draagt hier de betekenis, met het cijfer ernaast. */}
+                <GetalCel className={
+                  r.relevanceScore >= 4 ? "text-emerald-600 font-bold" :
+                  r.relevanceScore >= 3 ? "text-amber-600 font-bold" :
+                  "text-red-600 font-bold"
+                }>{r.relevanceScore}</GetalCel>
+                <Cel nowrap>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-micro font-medium rounded-full border ${verdictColors[r.verdict] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                    <VerdictIcon className="w-3 h-3" />
+                    {verdictLabels[r.verdict] || r.verdict}
+                  </span>
+                </Cel>
+                <Cel nowrap>
+                  <span className={`text-xs font-medium ${actionColors[r.recommendedAction] || "text-gray-600"}`}>
+                    {actionLabels[r.recommendedAction] || r.recommendedAction}
+                  </span>
+                </Cel>
+                <Cel zacht className="max-w-[250px]">{r.reason}</Cel>
+              </Rij>
+            );
+          })}
+        </Body>
+      </Tabel>
 
       {filtered.length === 0 && (
         <div className="px-5 py-8 text-center text-sm text-muted-foreground">
