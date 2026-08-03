@@ -5,6 +5,7 @@ import { BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
+import { Sectie } from "@/components/ui/sectie";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Laadvlak } from "@/components/ui/laadvlak";
 
@@ -104,19 +105,21 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   if (blocks === null) return <Laadvlak vorm="tabel" regels={4} titel="Actieve kanalen &amp; campagnes" />;
 
+  // De losse kaart bovenaan met titel en samenvatting is een Sectie geworden. Hij zei precies wat
+  // een sectiekop zegt — wat je hier ziet en waarover — maar dan als kaart, waardoor dit het enige
+  // tabblad was zonder de structuur die Google, Meta en LinkedIn wel hebben.
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Layers className="w-4.5 h-4.5 text-rm-blue-ink" />
-          <h3 className="text-sm font-semibold text-rm-gray">Actieve kanalen & campagnes{geoClone ? ` — beurs ${geoClone}` : ""}</h3>
-        </div>
-        <p className="text-meta text-muted-foreground">
-          {activeChannels.length === 0
+      <Sectie
+        eerste
+        icoon={<Layers className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel={`Wat er draait${geoClone ? ` — beurs ${geoClone}` : ""}`}
+        bijschrift={
+          activeChannels.length === 0
             ? "Geen actieve campagnes gevonden voor deze scope."
-            : `Actief op ${activeChannels.length} kanaal${activeChannels.length === 1 ? "" : "en"}: ${activeChannels.map((b) => `${b.label} (${b.campaigns.length})`).join(" · ")}.`}
-        </p>
-      </div>
+            : `Actief op ${activeChannels.length} kanaal${activeChannels.length === 1 ? "" : "en"}: ${activeChannels.map((b) => `${b.label} (${b.campaigns.length})`).join(" · ")}.`
+        }
+      >
 
       {activeChannels.map((block) => (
         <div key={block.channel} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -175,6 +178,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
       {/* De wereldkaart stond hier en is naar Overzicht verhuisd. "Waar komt het vandaan" is een
           overzichtsvraag, geen campagnevraag — en op de drie andere kanalen stond hij al op
           Overzicht. Zie cross-channel-view. */}
+      </Sectie>
     </div>
   );
 }

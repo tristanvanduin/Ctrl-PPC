@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Calendar, TrendingUp, Gauge, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
@@ -297,34 +298,65 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
           <Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />
           <h3 className="text-sm font-semibold text-rm-gray">Maandprestaties</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-body">
-            <thead>
-              <tr className="text-left text-muted-foreground border-b border-border">
-                <th className="px-5 py-2.5 font-medium">Maand</th>
-                <th className="px-3 py-2.5 font-medium text-right">Spend</th>
-                <th className="px-3 py-2.5 font-medium text-right">Vertoningen</th>
-                <th className="px-3 py-2.5 font-medium text-right">Klikken</th>
-                <th className="px-3 py-2.5 font-medium text-right">CTR</th>
-                <th className="px-3 py-2.5 font-medium text-right">{convLabel}</th>
-                <th className="px-5 py-2.5 font-medium text-right">{useLeadsLabel ? "CPL" : "CPA"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...fullMonths].reverse().map(([m, a]) => (
-                <tr key={m} className="border-b border-border/50">
-                  <td className="px-5 py-2 text-muted-foreground">{m}</td>
-                  <td className="px-3 py-2 text-right">{eur(a.spend)}</td>
-                  <td className="px-3 py-2 text-right">{fmt(a.impressions)}</td>
-                  <td className="px-3 py-2 text-right">{fmt(a.clicks)}</td>
-                  <td className="px-3 py-2 text-right">{pctS(ctr(a))}</td>
-                  <td className="px-3 py-2 text-right">{fmt(a.conv, 1)}</td>
-                  <td className="px-5 py-2 text-right">{eur(cpa(a))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* De gedeelde tabelcomponenten: zelfde ritme, sorteerbare opmaak, aandeelstrepen en een
+            totaalregel als bij de dertien andere schermen. Handgeschreven <table> stond hier met
+            een eigen kopstijl en zonder som.
+
+            Aandeelstrepen alleen op wat optelt — spend, vertoningen, klikken, conversies. CTR en
+            CPA zijn verhoudingen: daar bestaat geen geheel om een aandeel van te zijn, en bij CPA
+            zou een lange streep "veel" zeggen waar het "duur" betekent. Zie data-table.tsx. */}
+        {(() => {
+          const rijen = [...fullMonths].reverse();
+          const som = rijen.reduce((t, [, a]) => ({
+            spend: t.spend + a.spend, impressions: t.impressions + a.impressions,
+            clicks: t.clicks + a.clicks, conv: t.conv + a.conv,
+          }), { spend: 0, impressions: 0, clicks: 0, conv: 0 });
+          // De noemer is de GROOTSTE rij en niet de som — zo doen de dertien andere schermen het
+          // ook (campaign-table, geo-breakdown, portfolio-scoreboard). Eerst deelde ik door het
+          // totaal, en bij vijf ongeveer gelijke maanden is dat vijf keer ~20%: vijf stompjes van
+          // een pixel of vijftien op een baan van 72, waar niets aan af te lezen valt. Tegen de
+          // grootste rij krijgt de koploper een volle baan en zijn de verhoudingen zichtbaar.
+          const grootste = rijen.reduce((t, [, a]) => ({
+            spend: Math.max(t.spend, a.spend), impressions: Math.max(t.impressions, a.impressions),
+            clicks: Math.max(t.clicks, a.clicks), conv: Math.max(t.conv, a.conv),
+          }), { spend: 0, impressions: 0, clicks: 0, conv: 0 });
+          const deel = (v: number, max: number) => (max > 0 ? v / max : 0);
+          return (
+            <Tabel>
+              <Kop>
+                <KolomKop breed>Maand</KolomKop>
+                <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+                <KolomKop getal>Vertoningen</KolomKop>
+                <KolomKop getal>Klikken</KolomKop>
+                <KolomKop getal>CTR</KolomKop>
+                <KolomKop getal>{convLabel}</KolomKop>
+                <KolomKop getal>{useLeadsLabel ? "CPL" : "CPA"}</KolomKop>
+              </Kop>
+              <Body>
+                {rijen.map(([m, a]) => (
+                  <Rij key={m}>
+                    <NaamCel>{m}</NaamCel>
+                    <AandeelCel waarde={eur(a.spend)} aandeel={deel(a.spend, grootste.spend)} />
+                    <AandeelCel waarde={fmt(a.impressions)} aandeel={deel(a.impressions, grootste.impressions)} />
+                    <AandeelCel waarde={fmt(a.clicks)} aandeel={deel(a.clicks, grootste.clicks)} />
+                    <GetalCel>{pctS(ctr(a))}</GetalCel>
+                    <AandeelCel waarde={fmt(a.conv, 1)} aandeel={deel(a.conv, grootste.conv)} />
+                    <GetalCel>{eur(cpa(a))}</GetalCel>
+                  </Rij>
+                ))}
+              </Body>
+              <TotaalRij>
+                <TotaalCel>Totaal</TotaalCel>
+                <TotaalCel getal>{eur(som.spend)}</TotaalCel>
+                <TotaalCel getal>{fmt(som.impressions)}</TotaalCel>
+                <TotaalCel getal>{fmt(som.clicks)}</TotaalCel>
+                <TotaalCel getal>{pctS(ctr(som))}</TotaalCel>
+                <TotaalCel getal>{fmt(som.conv, 1)}</TotaalCel>
+                <TotaalCel getal>{eur(cpa(som))}</TotaalCel>
+              </TotaalRij>
+            </Tabel>
+          );
+        })()}
       </div>
 
       {/* Campagnetabel */}
@@ -334,34 +366,55 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
             <BarChart3 className="w-4.5 h-4.5 text-rm-blue-ink" />
             <h3 className="text-sm font-semibold text-rm-gray">Campagnes (laatste 28 dagen)</h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-body">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b border-border">
-                  <th className="px-5 py-2.5 font-medium">Campagne</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Spend</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Vertoningen</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Klikken</th>
-                  <th className="px-3 py-2.5 font-medium text-right">CTR</th>
-                  <th className="px-3 py-2.5 font-medium text-right">{convLabel}</th>
-                  <th className="px-5 py-2.5 font-medium text-right">{useLeadsLabel ? "CPL" : "CPA"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.map((c) => (
-                  <tr key={c.entity} className="border-b border-border/50">
-                    <td className="px-5 py-2 text-rm-gray font-medium">{names.get(c.entity) ?? c.entity}</td>
-                    <td className="px-3 py-2 text-right">{eur(c.spend)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(c.impressions)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(c.clicks)}</td>
-                    <td className="px-3 py-2 text-right">{pctS(ctr(c))}</td>
-                    <td className="px-3 py-2 text-right">{fmt(c.conv, 1)}</td>
-                    <td className="px-5 py-2 text-right">{eur(cpa(c))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            const som = campaigns.reduce((t, c) => ({
+              spend: t.spend + c.spend, impressions: t.impressions + c.impressions,
+              clicks: t.clicks + c.clicks, conv: t.conv + c.conv,
+            }), { spend: 0, impressions: 0, clicks: 0, conv: 0 });
+            // Tegen de grootste campagne, net als campaign-table hiernaast. Zie de maandtabel.
+            const grootste = campaigns.reduce((t, c) => ({
+              spend: Math.max(t.spend, c.spend), impressions: Math.max(t.impressions, c.impressions),
+              clicks: Math.max(t.clicks, c.clicks), conv: Math.max(t.conv, c.conv),
+            }), { spend: 0, impressions: 0, clicks: 0, conv: 0 });
+            const deel = (v: number, max: number) => (max > 0 ? v / max : 0);
+            return (
+              <Tabel>
+                <Kop>
+                  {/* `breed` alleen hier: campagnenamen zijn lange vrije tekst, dus die kolom mag de
+                      overruimte opslokken zodat de getallen compact naast elkaar staan. */}
+                  <KolomKop breed>Campagne</KolomKop>
+                  <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+                  <KolomKop getal>Vertoningen</KolomKop>
+                  <KolomKop getal>Klikken</KolomKop>
+                  <KolomKop getal>CTR</KolomKop>
+                  <KolomKop getal>{convLabel}</KolomKop>
+                  <KolomKop getal>{useLeadsLabel ? "CPL" : "CPA"}</KolomKop>
+                </Kop>
+                <Body>
+                  {campaigns.map((c) => (
+                    <Rij key={c.entity}>
+                      <NaamCel>{names.get(c.entity) ?? c.entity}</NaamCel>
+                      <AandeelCel waarde={eur(c.spend)} aandeel={deel(c.spend, grootste.spend)} />
+                      <AandeelCel waarde={fmt(c.impressions)} aandeel={deel(c.impressions, grootste.impressions)} />
+                      <AandeelCel waarde={fmt(c.clicks)} aandeel={deel(c.clicks, grootste.clicks)} />
+                      <GetalCel>{pctS(ctr(c))}</GetalCel>
+                      <AandeelCel waarde={fmt(c.conv, 1)} aandeel={deel(c.conv, grootste.conv)} />
+                      <GetalCel>{eur(cpa(c))}</GetalCel>
+                    </Rij>
+                  ))}
+                </Body>
+                <TotaalRij>
+                  <TotaalCel>Totaal</TotaalCel>
+                  <TotaalCel getal>{eur(som.spend)}</TotaalCel>
+                  <TotaalCel getal>{fmt(som.impressions)}</TotaalCel>
+                  <TotaalCel getal>{fmt(som.clicks)}</TotaalCel>
+                  <TotaalCel getal>{pctS(ctr(som))}</TotaalCel>
+                  <TotaalCel getal>{fmt(som.conv, 1)}</TotaalCel>
+                  <TotaalCel getal>{eur(cpa(som))}</TotaalCel>
+                </TotaalRij>
+              </Tabel>
+            );
+          })()}
         </div>
       )}
     </div>
