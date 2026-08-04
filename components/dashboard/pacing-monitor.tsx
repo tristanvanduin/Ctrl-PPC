@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Clock, Target, Zap, AlertTriangle, TrendingUp, Calendar } from "lucide-react";
+import { Clock, Target, Zap, AlertTriangle, TrendingUp, Calendar, Flag } from "lucide-react";
 import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
@@ -129,9 +129,17 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         </span>
       </div>
 
-      {/* @2xl en niet lg: deze kaart kan nu in een bentokolom van 400px staan, en dan zijn vier
-          tegels naast elkaar 100px breed. lg: kijkt naar het venster en ziet dat verschil niet. */}
-      <div className="grid grid-cols-2 gap-4 @2xl:grid-cols-4">
+      {/* Zes blokken op een rij, en dat is geen opmaakkeuze maar een leesrichting: waar staan we
+          (twee ringen), hoe hard gaan we (twee tempo's), waar landt dat (twee uitkomsten). Elk
+          blok volgt uit het vorige. "Tempo conversies 3/dag" en "Op dit tempo 1.086" horen naast
+          elkaar omdat het tweede letterlijk uit het eerste volgt.
+
+          De landing stond eerst onder een scheidingslijn. Dat gebruikte 40% van de breedte en liet
+          de rest leeg -- hetzelfde gat als elders, alleen binnen een kaart.
+
+          @2xl en niet lg: op een breedte waar zes blokken niet passen vallen ze terug op twee
+          kolommen. lg: kijkt naar het venster en ziet die kaartbreedte niet. */}
+      <div className="grid grid-cols-2 gap-4 @2xl:grid-cols-3 @5xl:grid-cols-6">
         {/* Conversions pacing */}
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -199,46 +207,54 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             </p>
           )}
         </div>
-      </div>
 
-      {/* De landing. Dit stond er niet, en het was de vraag die na "3 per dag, nodig 6,8" meteen
-          komt: en waar kom ik dan uit?
+        {/* Waar dat op uitkomt: kolom vijf en zes van dezelfde rij, niet een blok eronder.
 
-          Twee getallen naast elkaar en niet een. "Op dit tempo" is een rechte lijn en met de hand
-          na te rekenen; de prognose weet dat november niet op juli lijkt. Alleen het eerste tonen
-          zou de prognosegrafiek elders op het scherm tegenspreken -- twee getallen die allebei
-          "het jaar" heten en niet hetzelfde zeggen. Het VERSCHIL is de boodschap.
+            Het stond eerst onder een scheidingslijn en gebruikte daar 40% van de breedte -- twee
+            lege kolommen naast zich, hetzelfde gat als elders maar dan binnen een kaart. En het
+            hoort inhoudelijk in die rij: de rij leest van links naar rechts als waar staan we
+            (twee ringen), hoe hard gaan we (twee tempo's), waar landt dat (twee uitkomsten). "Op
+            dit tempo 1.086" volgt letterlijk uit "Tempo conversies 3/dag" ernaast.
 
-          "geschat jaardoel" en niet "jaardoel": dat getal is vorig jaar x 1,10 uit
-          client-data/route.ts, want er is nog geen scherm om een doel in te voeren. */}
-      <div className="mt-4 border-t border-border pt-4">
-        <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
-          Waar je op uitkomt
-        </p>
-        <div className="mt-2 flex flex-wrap gap-x-10 gap-y-3">
-          <div>
-            <p className="text-micro text-muted-foreground">Op dit tempo</p>
-            <p className="text-lg font-bold text-rm-gray">{num(convLanding.opTempo)}</p>
-            {convLanding.deelVanDoel !== null && (
-              <p className="text-micro text-muted-foreground">
-                {Math.round(convLanding.deelVanDoel * 100)}% van geschat jaardoel
-              </p>
-            )}
+            Twee getallen en niet een: "op dit tempo" is een rechte lijn en met de hand na te
+            rekenen, de prognose weet dat november niet op juli lijkt. Alleen het eerste tonen zou
+            de prognosegrafiek elders op het scherm tegenspreken.
+
+            "geschat jaardoel" en niet "jaardoel": dat getal is vorig jaar x 1,10 uit
+            client-data/route.ts, want er is nog geen scherm om een doel in te voeren. */}
+        <div className="border-l border-border pl-4">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Flag className="w-3.5 h-3.5 text-muted-foreground" />
+            <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Op dit tempo</p>
           </div>
-          {convLanding.volgensPrognose !== null && (
-            <div>
-              <p className="text-micro text-muted-foreground">Volgens de prognose</p>
-              <p className="text-lg font-bold text-rm-gray">{num(convLanding.volgensPrognose)}</p>
-              <p className="text-micro text-muted-foreground">seizoen meegerekend</p>
-            </div>
+          <span className="text-lg font-bold text-rm-gray">{num(convLanding.opTempo)}</span>
+          {convLanding.deelVanDoel !== null && (
+            <p className="text-micro mt-1 text-muted-foreground">
+              {Math.round(convLanding.deelVanDoel * 100)}% van geschat jaardoel
+            </p>
           )}
         </div>
-        {/* Alleen bij een verschil dat ertoe doet. Een zin over elke afwijking leert de lezer hem
-            over te slaan, en dan mist hij hem op de dag dat er wél iets aan de hand is. */}
-        {convSeizoen && (
-          <p className="mt-2 text-meta leading-snug text-muted-foreground">{convSeizoen}</p>
+
+        {convLanding.volgensPrognose !== null && (
+          <div className="border-l border-border pl-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Target className="w-3.5 h-3.5 text-muted-foreground" />
+              <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Volgens prognose</p>
+            </div>
+            <span className="text-lg font-bold text-rm-gray">{num(convLanding.volgensPrognose)}</span>
+            <p className="text-micro mt-1 text-muted-foreground">seizoen meegerekend</p>
+          </div>
         )}
       </div>
+
+      {/* De duiding onder de hele rij en niet in een kolom: het is een zin over het VERSCHIL tussen
+          twee van die blokken, dus hij hoort bij geen van beide alleen. Alleen bij een afwijking
+          die ertoe doet -- een zin over elke afwijking leert de lezer hem over te slaan. */}
+      {convSeizoen && (
+        <p className="mt-4 border-t border-border pt-3 text-meta leading-snug text-muted-foreground">
+          {convSeizoen}
+        </p>
+      )}
     </div>
   );
 }
