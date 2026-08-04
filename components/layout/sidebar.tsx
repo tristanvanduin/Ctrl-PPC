@@ -9,6 +9,7 @@ import { loadApiClients } from "@/lib/clients";
 import { useAccess } from "@/lib/auth/use-access";
 import { migrateLocalStorageToSupabase } from "@/lib/migrate-to-supabase";
 import { loadClientGroups, type GroupWithMembers } from "@/lib/client-groups";
+import { bouwHierarchie, beschikbareAssen, type GroepAs, type Tak } from "@/lib/groepen/hierarchie";
 import { supabase } from "@/lib/supabase";
 import { visibleGeoClones, type GeoCloneVariant } from "@/lib/rai/geo-clone-catalog";
 import { BRAND_NAME } from "@/lib/branding/brand";
@@ -21,6 +22,56 @@ interface VisibleClient {
 // Fase 3 geo-clone-projecten: de beurzen/geo-clones van de ACTIEVE klant hangen als
 // sub-items onder die klant in het menu (event -> geo-clones), gedetecteerd uit de
 // campagnenamen. Een sub-item opent de klant met de beurs-scope voorgeselecteerd (?geo=).
+
+const AS_LABEL: Record<GroepAs, string> = {
+  merk: "Merk",
+  specialist: "Specialist",
+  vrij: "Map",
+};
+
+/**
+ * Eén tak van de groepsboom, met zijn subtakken.
+ *
+ * Recursief en niet twee keer uitgeschreven, want de tweede laag gedraagt zich precies als de
+ * eerste: inklapbaar, met een telling, met een restbak. Twee kopieën zouden binnen een maand uit
+ * elkaar lopen op precies het soort detail dat niemand naleest.
+ */
+function TakBlok({ tak, diepte, ingeklapt, wissel, Link }: {
+  tak: Tak<VisibleClient>;
+  diepte: number;
+  ingeklapt: Set<string>;
+  wissel: (id: string) => void;
+  Link: (p: { client: VisibleClient }) => React.ReactElement;
+}) {
+  const sleutel = tak.groepId ?? `rest-${diepte}`;
+  const dicht = ingeklapt.has(sleutel);
+  return (
+    <div className={diepte === 0 ? "mb-1" : "mb-0.5"}>
+      <button onClick={() => wissel(sleutel)}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white">
+        {dicht ? <ChevronRight className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
+        {dicht ? <FolderClosed className="h-3.5 w-3.5 shrink-0" /> : <FolderOpen className="h-3.5 w-3.5 shrink-0" />}
+        <span className="truncate text-body font-medium">{tak.naam}</span>
+        {/* Een groep die nog een voorstel is, hoort ook hier als voorstel te lezen -- niet alleen
+            op het instellingenscherm. Anders is een geraden indeling in de navigatie niet van een
+            bevestigde te onderscheiden. */}
+        {!tak.bevestigd && (
+          <span className="rounded-full bg-amber-400/20 px-1.5 text-micro text-amber-200">voorstel</span>
+        )}
+        <span className="ml-auto text-micro text-white/30">{tak.aantal}</span>
+      </button>
+      {!dicht && (
+        <div className="ml-4 mt-0.5 space-y-0.5">
+          {tak.takken.map((sub) => (
+            <TakBlok key={sub.groepId ?? `rest-${diepte + 1}`} tak={sub} diepte={diepte + 1}
+              ingeklapt={ingeklapt} wissel={wissel} Link={Link} />
+          ))}
+          {tak.klanten.map((client) => <Link key={client.id} client={client} />)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Sidebar() {
   return (
@@ -64,6 +115,34 @@ function SidebarInner() {
   const [visibleClients, setVisibleClients] = useState<VisibleClient[]>([]);
   const [groups, setGroups] = useState<GroupWithMembers[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // De gekozen assen overleven een herlaad: wie op specialist werkt, werkt daar de hele dag op.
+  const [hoofdAs, setHoofdAs] = useState<GroepAs | null>(null);
+  const [tweedeAs, setTweedeAs] = useState<GroepAs | null>(null);
+
+  useEffect(() => {
+    try {
+      const h = localStorage.getItem("groep-hoofdas");
+      const t = localStorage.getItem("groep-tweedeas");
+      if (h === "merk" || h === "specialist" || h === "vrij") setHoofdAs(h);
+      if (t === "merk" || t === "specialist" || t === "vrij") setTweedeAs(t);
+    } catch { /* privémodus: dan gewoon de standaard */ }
+  }, []);
+
+  function kiesAs(as: GroepAs) {
+    // Nog een keer op dezelfde as klikken schakelt de tweede laag uit.
+    const nieuw = as === hoofdAs ? null : as;
+    if (as === hoofdAs) { setTweedeAs(null); try { localStorage.removeItem("groep-tweedeas"); } catch {} return; }
+    setHoofdAs(nieuw);
+    try { localStorage.setItem("groep-hoofdas", String(nieuw)); } catch {}
+  }
+  function kiesTweede(as: GroepAs) {
+    const nieuw = as === tweedeAs ? null : as;
+    setTweedeAs(nieuw);
+    try {
+      if (nieuw) localStorage.setItem("groep-tweedeas", nieuw);
+      else localStorage.removeItem("groep-tweedeas");
+    } catch { /* idem */ }
+  }
   const [mounted, setMounted] = useState(false);
 
   const refreshData = useCallback(async () => {
@@ -119,26 +198,34 @@ function SidebarInner() {
   );
   const filteredIds = new Set(filtered.map((c) => c.id));
 
-  // Build grouped + ungrouped lists
-  const groupedClientIds = new Set(groups.flatMap((g) => g.clientIds));
-  const ungroupedClients = filtered.filter((c) => !groupedClientIds.has(c.id));
+  // ── Groeperen op een of twee assen ────────────────────────────────────────
+  //
+  // Hiervoor stonden alle groepen plat naast elkaar. Zodra dezelfde accounts zowel een merk als
+  // een specialist hebben, verscheen elk account twee keer in de lijst -- eenmaal onder "MPC" en
+  // eenmaal onder "Edwin" -- zonder dat iets zei dat het hetzelfde account was. Bij vier groepen
+  // valt dat mee; bij veertig specialisten en achthonderd accounts niet meer.
+  //
+  // Nu één hoofdas, met de andere as als tweede laag eronder. Elk account staat dan precies één
+  // keer in de boom; lib/groepen/__hierarchie_test.ts houdt dat vast, ook op 800 accounts.
+  const assen = beschikbareAssen(groups);
 
-  // Filter groups to only show those with visible+filtered clients
-  const visibleGroups = groups
-    .map((g) => ({
-      ...g,
-      clients: g.clientIds
-        .map((id) => filtered.find((c) => c.id === id))
-        .filter((c): c is VisibleClient => c !== undefined),
-    }))
-    .filter((g) => g.clients.length > 0 || !search);
+  // Groepen ZONDER soort tellen als "vrije map".
+  //
+  // Zonder deze regel verdwijnen ze uit de zijbalk, en dat is precies de stand van vandaag: drie
+  // van de vier groepen in de database zijn gemaakt voordat `soort` bestond en staan dus op null.
+  // Een gebruiker die deze versie installeert zou zijn mappen kwijt zijn en niets zien dat uitlegt
+  // waarom. Ze horen te blijven staan tot iemand ze indeelt, niet ervoor.
+  const groepenMetAs = groups.map((g) => (g.soort ? g : { ...g, soort: "vrij" as GroepAs }));
+  const beschikbaar = beschikbareAssen(groepenMetAs);
 
-  // Also filter groups by search on group name
-  const matchingGroups = search
-    ? visibleGroups.filter(
-        (g) => g.clients.length > 0 || g.name.toLowerCase().includes(search.toLowerCase())
-      )
-    : visibleGroups;
+  const actieveHoofdAs = hoofdAs && beschikbaar.includes(hoofdAs) ? hoofdAs : beschikbaar[0] ?? null;
+  const actieveTweedeAs = tweedeAs && tweedeAs !== actieveHoofdAs && beschikbaar.includes(tweedeAs) ? tweedeAs : null;
+
+  const boom: Tak<VisibleClient>[] = actieveHoofdAs
+    ? bouwHierarchie(filtered, groepenMetAs, actieveHoofdAs, actieveTweedeAs)
+    : [];
+  // Helemaal geen groepen: dan de kale lijst, zoals het altijd was.
+  const zonderIndeling = actieveHoofdAs ? [] : filtered;
 
   const totalCount = filtered.length;
 
@@ -237,47 +324,41 @@ function SidebarInner() {
         </p>
 
         {/* Grouped clients */}
-        {matchingGroups.map((group) => {
-          const isCollapsed = collapsedGroups.has(group.id);
-          const hasActiveClient = group.clients.some((c) => pathname === `/client/${c.id}`);
-
-          return (
-            <div key={group.id} className="mb-1">
-              <button
-                onClick={() => toggleGroup(group.id)}
-                className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors ${
-                  hasActiveClient && isCollapsed
-                    ? "bg-rm-orange/20 text-white"
-                    : "text-white/75 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="w-3 h-3 shrink-0" />
-                ) : (
-                  <ChevronDown className="w-3 h-3 shrink-0" />
-                )}
-                {isCollapsed ? (
-                  <FolderClosed className="w-3.5 h-3.5 shrink-0" />
-                ) : (
-                  <FolderOpen className="w-3.5 h-3.5 shrink-0" />
-                )}
-                <span className="truncate font-medium text-body">{group.name}</span>
-                <span className="ml-auto text-micro text-white/30">{group.clients.length}</span>
-              </button>
-
-              {!isCollapsed && (
-                <div className="ml-4 space-y-0.5 mt-0.5">
-                  {group.clients.map((client) => (
-                    <ClientLink key={client.id} client={client} />
-                  ))}
-                </div>
-              )}
+        {/* Waarop wordt gegroepeerd. Alleen tonen als er iets te kiezen valt: bij één as is een
+            keuzeknop met één knop alleen maar ruis. */}
+        {beschikbaar.length > 1 && (
+          <div className="mb-2 px-1">
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-micro text-white/40 mr-0.5">Groepeer op</span>
+              {beschikbaar.map((as) => (
+                <button key={as} onClick={() => kiesAs(as)}
+                  className={`rounded-md px-1.5 py-0.5 text-micro font-medium transition-colors ${
+                    actieveHoofdAs === as ? "bg-white/20 text-white" : "text-white/50 hover:bg-white/10 hover:text-white/80"}`}>
+                  {AS_LABEL[as]}
+                </button>
+              ))}
             </div>
-          );
-        })}
+            {beschikbaar.length > 1 && actieveHoofdAs && (
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                <span className="text-micro text-white/40 mr-0.5">daarbinnen</span>
+                {beschikbaar.filter((a) => a !== actieveHoofdAs).map((as) => (
+                  <button key={as} onClick={() => kiesTweede(as)}
+                    className={`rounded-md px-1.5 py-0.5 text-micro transition-colors ${
+                      actieveTweedeAs === as ? "bg-white/20 text-white" : "text-white/40 hover:bg-white/10 hover:text-white/70"}`}>
+                    {AS_LABEL[as]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Ungrouped clients */}
-        {ungroupedClients.map((client) => (
+        {boom.map((tak) => (
+          <TakBlok key={tak.groepId ?? "rest"} tak={tak} diepte={0}
+            ingeklapt={collapsedGroups} wissel={toggleGroup} Link={ClientLink} />
+        ))}
+
+        {zonderIndeling.map((client) => (
           <ClientLink key={client.id} client={client} />
         ))}
       </div>
