@@ -1,3 +1,15 @@
+-- INGEHAALD DOOR MIGRATIE 052 -- NIET MEER DRAAIEN.
+--
+-- Deze migratie bouwde een aparte `merken`-tabel. Dat niveau was nodig, maar het bestond al als
+-- client_groups + client_group_members, met een beheerscherm en drie handmatig gemaakte groepen.
+-- Twee daarvan waren identiek aan wat het algoritme voorstelde. 052 voegt beide samen in
+-- client_groups en verwijdert wat hier gemaakt is.
+--
+-- Het bestand blijft staan omdat de migratiereeks een logboek is en niet een wensenlijst: dit is
+-- werkelijk gedraaid, en de redenering eronder -- vooral over voorstel-versus-besluit en over een
+-- merk dat nooit twee bureaus mag raken -- is met 052 meeverhuisd. Opnieuw draaien maakt alleen
+-- een lege tabel aan waar niets naar wijst.
+
 -- 051: het niveau tussen bureau en account — het merk.
 --
 -- DRAAIEN: idempotent, veilig te herhalen. Puur additief: één nieuwe tabel en drie nullable
