@@ -28,6 +28,7 @@ import { dedupeEvidenceLines } from "@/lib/analysis/evidence-dedupe";
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { inferActionDomains, isActionAlignedWithStep } from "@/lib/analysis/step-validator";
 import { MONTHLY_FINAL_SOP_SECTIONS, MONTHLY_OPERATING_DETAIL_SECTIONS } from "@/lib/prompts/sop-prompts";
+import { opsomming } from "@/lib/util/tekst";
 
 export type ActionPhase = "immediate" | "short_term" | "medium_term";
 
@@ -3952,12 +3953,8 @@ function buildHypothesisProofEntries(opts: {
         .map((part) => safePresentationText(part).trim())
         .filter(Boolean)
     ).slice(0, 3);
-  const formatMetricList = (metrics: string[]): string => {
-    if (metrics.length === 0) return "de kernmetrics";
-    if (metrics.length === 1) return metrics[0];
-    if (metrics.length === 2) return `${metrics[0]} en ${metrics[1]}`;
-    return `${metrics.slice(0, -1).join(", ")} en ${metrics[metrics.length - 1]}`;
-  };
+  const formatMetricList = (metrics: string[]): string =>
+    metrics.length === 0 ? "de kernmetrics" : opsomming(metrics);
   const formatObjectLabel = (value: string): string => {
     const cleaned = safePresentationText(value).replace(/^(Campagne|Product|Ad group|Land|Keyword|Zoekterm|Device):\s*/i, "").trim();
     return cleaned || safePresentationText(value);

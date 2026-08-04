@@ -171,18 +171,46 @@ export function pmaxNetworkRows(clientId: string, assetGroupRowsIn: Row[], synce
 interface AssetDef { group: string; type: string; text: string; label: string }
 
 const ASSETS: AssetDef[] = [
-  { group: "demo-ag-standhouders-nl", type: "TEXT", text: "Boek uw stand op GreenTech 2026", label: "BEST" },
-  { group: "demo-ag-standhouders-nl", type: "TEXT", text: "Ontmoet 12.000 tuinbouwprofessionals", label: "GOOD" },
-  { group: "demo-ag-standhouders-nl", type: "IMAGE", text: "Beursvloer overzicht", label: "GOOD" },
+  // Google's eigen veldtypen (asset_group_asset.field_type), niet de grove TEXT/IMAGE die hier
+  // eerst stond: de sync slaat de fijne op, dus de demo hoort dat ook te doen. Anders toont de
+  // demo een uitsplitsing die een echt account nooit zo laat zien.
+  //
+  // Standhouders NL is compleet en haalt overal het minimum.
+  { group: "demo-ag-standhouders-nl", type: "HEADLINE", text: "Boek uw stand op GreenTech 2026", label: "BEST" },
+  { group: "demo-ag-standhouders-nl", type: "HEADLINE", text: "Ontmoet 12.000 tuinbouwprofessionals", label: "GOOD" },
+  { group: "demo-ag-standhouders-nl", type: "HEADLINE", text: "Stands vanaf 9 m²", label: "GOOD" },
+  { group: "demo-ag-standhouders-nl", type: "LONG_HEADLINE", text: "De vakbeurs voor tuinbouwtechniek, 9 t/m 12 juni in Amsterdam", label: "GOOD" },
+  { group: "demo-ag-standhouders-nl", type: "DESCRIPTION", text: "Reserveer uw stand voor de editie van 2026.", label: "GOOD" },
+  { group: "demo-ag-standhouders-nl", type: "DESCRIPTION", text: "Drie dagen, 12.000 vakbezoekers uit 40 landen.", label: "BEST" },
+  { group: "demo-ag-standhouders-nl", type: "MARKETING_IMAGE", text: "Beursvloer overzicht", label: "GOOD" },
+  { group: "demo-ag-standhouders-nl", type: "SQUARE_MARKETING_IMAGE", text: "Standopbouw vierkant", label: "GOOD" },
+  { group: "demo-ag-standhouders-nl", type: "PORTRAIT_MARKETING_IMAGE", text: "Bezoeker bij kas, staand", label: "GOOD" },
+  { group: "demo-ag-standhouders-nl", type: "LOGO", text: "GreenTech logo", label: "GOOD" },
   { group: "demo-ag-standhouders-nl", type: "YOUTUBE_VIDEO", text: "GreenTech in 30 seconden", label: "BEST" },
-  { group: "demo-ag-standhouders-intl", type: "TEXT", text: "Exhibit at GreenTech Amsterdam", label: "GOOD" },
-  { group: "demo-ag-standhouders-intl", type: "TEXT", text: "Meet the global horticulture sector", label: "LOW" },
-  { group: "demo-ag-standhouders-intl", type: "IMAGE", text: "Internationale standhouders", label: "GOOD" },
+
+  // Internationaal: compleet op de minima, maar zonder staand beeld en met een zwakke kop.
+  { group: "demo-ag-standhouders-intl", type: "HEADLINE", text: "Exhibit at GreenTech Amsterdam", label: "GOOD" },
+  { group: "demo-ag-standhouders-intl", type: "HEADLINE", text: "Meet the global horticulture sector", label: "LOW" },
+  { group: "demo-ag-standhouders-intl", type: "HEADLINE", text: "Book your booth for 2026", label: "GOOD" },
+  { group: "demo-ag-standhouders-intl", type: "LONG_HEADLINE", text: "The trade fair for horticulture technology, 9-12 June, Amsterdam", label: "GOOD" },
+  { group: "demo-ag-standhouders-intl", type: "DESCRIPTION", text: "Reserve your booth for the 2026 edition.", label: "GOOD" },
+  { group: "demo-ag-standhouders-intl", type: "DESCRIPTION", text: "Three days, 12,000 trade visitors from 40 countries.", label: "GOOD" },
+  { group: "demo-ag-standhouders-intl", type: "MARKETING_IMAGE", text: "Internationale standhouders", label: "GOOD" },
+  { group: "demo-ag-standhouders-intl", type: "SQUARE_MARKETING_IMAGE", text: "Internationaal vierkant", label: "GOOD" },
+  { group: "demo-ag-standhouders-intl", type: "LOGO", text: "GreenTech logo", label: "GOOD" },
   { group: "demo-ag-standhouders-intl", type: "YOUTUBE_VIDEO", text: "Exhibitor testimonial 2025", label: "GOOD" },
-  { group: "demo-ag-bezoekers-breed", type: "TEXT", text: "Bezoek de vakbeurs voor tuinbouwtechniek", label: "LOW" },
-  { group: "demo-ag-bezoekers-breed", type: "TEXT", text: "Registreer uw team", label: "GOOD" },
-  { group: "demo-ag-bezoekers-breed", type: "IMAGE", text: "Kas met LED-verlichting", label: "LOW" },
-  // Geen YOUTUBE_VIDEO in deze groep — dat is het gat.
+
+  // Bezoekers breed: TWEE koppen waar er drie moeten zijn, geen staand beeld, GEEN VIDEO. Dat is
+  // het gat waar de kaart over gaat -- een groep onder Google's minimum is niet volledig
+  // serveerbaar, en zonder eigen video maakt Google er zelf een.
+  { group: "demo-ag-bezoekers-breed", type: "HEADLINE", text: "Bezoek de vakbeurs voor tuinbouwtechniek", label: "LOW" },
+  { group: "demo-ag-bezoekers-breed", type: "HEADLINE", text: "Registreer uw team", label: "GOOD" },
+  { group: "demo-ag-bezoekers-breed", type: "LONG_HEADLINE", text: "Vier dagen innovatie in kas- en tuinbouwtechniek", label: "GOOD" },
+  { group: "demo-ag-bezoekers-breed", type: "DESCRIPTION", text: "Gratis toegang met uw vakregistratie.", label: "GOOD" },
+  { group: "demo-ag-bezoekers-breed", type: "DESCRIPTION", text: "Ontdek 400 exposanten uit de hele keten.", label: "LOW" },
+  { group: "demo-ag-bezoekers-breed", type: "MARKETING_IMAGE", text: "Kas met LED-verlichting", label: "LOW" },
+  { group: "demo-ag-bezoekers-breed", type: "SQUARE_MARKETING_IMAGE", text: "Kas vierkant", label: "GOOD" },
+  { group: "demo-ag-bezoekers-breed", type: "LOGO", text: "GreenTech logo", label: "GOOD" },
 ];
 
 const AG_NAME: Record<string, string> = Object.fromEntries(ASSET_GROUPS.map((a) => [a.id, a.name]));
@@ -194,8 +222,8 @@ export function pmaxAssetRows(clientId: string, months: string[], syncedAt: stri
       campaign_id: PMAX_CAMPAIGN.id, campaign_name: PMAX_CAMPAIGN.name,
       asset_group_id: a.group, asset_group_name: AG_NAME[a.group],
       asset_id: `demo-asset-${i + 1}`, asset_type: a.type,
-      asset_text: a.type === "TEXT" ? a.text : null,
-      asset_url: a.type === "TEXT" ? null : `https://demo.greentech-fictief.example/assets/${i + 1}`,
+      asset_text: /HEADLINE|DESCRIPTION/.test(a.type) ? a.text : null,
+      asset_url: /HEADLINE|DESCRIPTION/.test(a.type) ? null : `https://demo.greentech-fictief.example/assets/${i + 1}`,
       performance_label: a.label,
       // Google rapporteert per asset geen kosten of conversies; alleen het label en wat bereik.
       impressions: 0, clicks: 0, cost: 0, conversions: 0, conversions_value: 0,

@@ -29,6 +29,8 @@
  * security_invoker blijft werken.
  */
 
+import { opsomming } from "@/lib/util/tekst";
+
 export type Kanaal = "google" | "meta" | "linkedin";
 
 /** Waar per kanaal te kijken. De view volstaat: er hoeft maar één rij te bestaan. */
@@ -60,9 +62,10 @@ export const KANAAL_NAAM: Record<Kanaal, string> = {
  */
 export function kanalenOpsomming(beschikbaar: readonly Kanaal[]): string | null {
   const namen = ALLE_KANALEN.filter((k) => beschikbaar.includes(k)).map((k) => KANAAL_NAAM[k]);
+  // Null en geen lege tekst: hier betekent "niets" dat er geen zin hoort te staan, en dat is een
+  // keuze van deze functie en niet van de opsomming.
   if (namen.length === 0) return null;
-  if (namen.length === 1) return namen[0];
-  return `${namen.slice(0, -1).join(", ")} en ${namen[namen.length - 1]}`;
+  return opsomming(namen);
 }
 
 /** Wat de kanaalkiezer laat zien. `blended` is de samenvoeging van alles. */

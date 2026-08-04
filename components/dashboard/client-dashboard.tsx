@@ -537,7 +537,16 @@ export function ClientDashboard({ client }: { client: Client }) {
                   <div className="@container min-w-0 xl:col-span-8">
                     <VideoPerformance clientId={client.id} />
                   </div>
-                  <div className="@container min-w-0 xl:col-span-4 xl:row-span-2">
+                  {/* Ook deze rekt mee, en om dezelfde reden als de assetkaart hieronder -- alleen
+                      staat de speling nu aan de andere kant. Toen de assetdekking acht kolommen
+                      kreeg in plaats van drie werd de linkerkolom 573px tegen 528 rechts, en dan
+                      hangt de PMax-kaart 45px boven de onderrand van zijn buur.
+
+                      Welke kolom de langste is, hangt af van de klant: de assetkaart groeit met
+                      het aantal groepen dat aandacht vraagt, de ringen ernaast staan vast. Daarom
+                      rekken ze allebei mee -- dan valt de speling altijd binnen een kaart en nooit
+                      ertussen, welke kant hij ook op staat. */}
+                  <div className="@container min-w-0 xl:col-span-4 xl:row-span-2 xl:[&>div]:h-full">
                     <PmaxNetworkSplit clientId={client.id} />
                   </div>
                   {/* De rijhoogtes zijn min-content en 1fr, en de assetkaart rekt mee (h-full, en

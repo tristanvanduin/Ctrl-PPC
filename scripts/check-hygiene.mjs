@@ -42,6 +42,11 @@ const GEDEELD = {
   // keer text-lg. Wie doorklikte van het overzicht naar een kanaal zag dezelfde soort getallen
   // ineens kleiner, zonder dat er iets aan hun belang veranderd was.
   Kerncijfer: "components/ui/kerncijfer.tsx",
+  // De Nederlandse opsomming ("a, b en c") stond op drie plekken los uitgeschreven: bij de
+  // kanaalnamen, in de maandanalyse en in de PMax-assetdekking. Nog geen fout — maar het is
+  // exact het patroon waarmee median en safeDiv aan drie verschillende gedragingen kwamen, en
+  // de vierde kopie is degene die het nét anders doet.
+  opsomming: "lib/util/tekst.ts",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────

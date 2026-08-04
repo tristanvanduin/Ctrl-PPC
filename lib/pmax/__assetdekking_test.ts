@@ -1,7 +1,7 @@
 // Assetdekking per PMax-assetgroep. Deterministisch, geen IO.
 // Draaien: npx tsx lib/pmax/__assetdekking_test.ts
 
-import { analyseerAssetdekking, VERWACHTE_TYPES, type AssetRegel } from "./assetdekking";
+import { analyseerAssetdekking, groepsactie, TYPES, BANDEN, type AssetRegel } from "./assetdekking";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -9,193 +9,259 @@ function check(label: string, cond: boolean, detail = ""): void {
   else { failed += 1; console.error(`  FAIL  ${label}  ${detail}`); }
 }
 
-const r = (groep: string, type: string, label: string, id: string, month = "2026-07-01"): AssetRegel =>
-  ({ asset_group_name: groep, asset_type: type, performance_label: label, asset_id: id, month });
+let teller = 0;
+const r = (groep: string, type: string, label = "GOOD", month = "2026-07-01"): AssetRegel =>
+  ({ asset_group_name: groep, asset_type: type, performance_label: label, asset_id: `a${teller++}`, month });
 
-// ── HET GAT ───────────────────────────────────────────────────────────────
-//
-// Waar dit blok voor bestaat. Zonder eigen video maakt Google er zelf een uit je beeld en tekst;
-// die staat er dus wél, alleen niet een die jij hebt gemaakt, en hij presteert doorgaans slechter.
-// YouTube is tegelijk een van de sterkste plaatsingen binnen PMax, dus zo'n groep draait daar mee
-// met de zwakste creatie die er te maken valt.
-
-{
-  const d = analyseerAssetdekking([
-    r("Standhouders NL", "TEXT", "BEST", "a1"),
-    r("Standhouders NL", "IMAGE", "GOOD", "a2"),
-    r("Standhouders NL", "YOUTUBE_VIDEO", "BEST", "a3"),
-    r("Bezoekers breed", "TEXT", "LOW", "b1"),
-    r("Bezoekers breed", "IMAGE", "GOOD", "b2"),
-    // geen video
-  ]);
-  check("twee groepen gevonden", d.groepen.length === 2, String(d.groepen.length));
-  check("de groep zonder video wordt gemeld",
-    d.zonderVideo.join(",") === "Bezoekers breed", d.zonderVideo.join(","));
-  check("de complete groep niet", !d.zonderVideo.includes("Standhouders NL"));
-  check("het ontbrekende type staat op de groep",
-    d.groepen.find((g) => g.groep === "Bezoekers breed")?.ontbrekend.join(",") === "YOUTUBE_VIDEO",
-    JSON.stringify(d.groepen.find((g) => g.groep === "Bezoekers breed")?.ontbrekend));
-  check("de samenvatting noemt de video", /geen eigen video/.test(d.samenvatting ?? ""), String(d.samenvatting));
-  check("en waarom dat erg is", /slechter/.test(d.samenvatting ?? ""));
+/** Een groep die overal precies aan Google's minimum voldoet, plus video. */
+function compleet(groep: string): AssetRegel[] {
+  return [
+    r(groep, "HEADLINE"), r(groep, "HEADLINE"), r(groep, "HEADLINE"),
+    r(groep, "LONG_HEADLINE"),
+    r(groep, "DESCRIPTION"), r(groep, "DESCRIPTION"),
+    r(groep, "MARKETING_IMAGE"), r(groep, "SQUARE_MARKETING_IMAGE"),
+    r(groep, "LOGO"), r(groep, "YOUTUBE_VIDEO"),
+  ];
 }
 
-// Complete dekking: geen zin. Een blok dat altijd iets meldt leert de lezer de melding over te
-// slaan, en dan mist hij hem op de dag dat er wél iets is.
+// ── DE MINIMA VAN GOOGLE ──────────────────────────────────────────────────
+//
+// Uit developers.google.com/google-ads/api/performance-max/asset-requirements. Dit zijn harde
+// eisen: een assetgroep eronder is niet volledig serveerbaar. Deze controle legt de getallen vast
+// zodat ze niet ongemerkt kunnen verschuiven.
+
+{
+  const minima = Object.fromEntries(TYPES.map((t) => [t.type, [t.min, t.max]]));
+  check("HEADLINE 3–15", String(minima.HEADLINE) === "3,15", String(minima.HEADLINE));
+  check("LONG_HEADLINE 1–5", String(minima.LONG_HEADLINE) === "1,5", String(minima.LONG_HEADLINE));
+  check("DESCRIPTION 2–5", String(minima.DESCRIPTION) === "2,5", String(minima.DESCRIPTION));
+  check("MARKETING_IMAGE 1–20", String(minima.MARKETING_IMAGE) === "1,20", String(minima.MARKETING_IMAGE));
+  check("SQUARE_MARKETING_IMAGE 1–20", String(minima.SQUARE_MARKETING_IMAGE) === "1,20");
+  // Staand beeld en video hebben GEEN minimum. Dat is geen slordigheid maar een echt gegeven;
+  // zonder deze controle zou iemand er ooit een 1 van maken en meldt de kaart een tekort dat
+  // Google niet kent.
+  check("PORTRAIT geen minimum", String(minima.PORTRAIT_MARKETING_IMAGE) === "0,20");
+  check("YOUTUBE_VIDEO geen minimum", String(minima.YOUTUBE_VIDEO) === "0,15");
+  check("LOGO 1–5", String(minima.LOGO) === "1,5", String(minima.LOGO));
+  check("acht types", TYPES.length === 8, String(TYPES.length));
+}
+
+// Elk type hoort bij precies één band, en elke band heeft minstens één type. Anders staat er een
+// bandkop boven nul kolommen, of valt een kolom buiten alle koppen -- allebei onzichtbaar in tsc.
+{
+  const banden = new Set(BANDEN.map((b) => b.band));
+  check("elke band heeft kolommen", BANDEN.every((b) => TYPES.some((t) => t.band === b.band)),
+    BANDEN.map((b) => b.band).join(","));
+  check("elk type valt onder een bekende band", TYPES.every((t) => banden.has(t.band)),
+    TYPES.filter((t) => !banden.has(t.band)).map((t) => t.type).join(","));
+  // De banden staan aaneengesloten in TYPES; de matrix zet zijn scheidingslijnen op de overgangen,
+  // dus een type dat tussen twee andere banden in staat zou twee lijnen geven.
+  const volgorde = TYPES.map((t) => t.band);
+  check("de banden staan aaneengesloten",
+    volgorde.filter((b, i) => i === 0 || volgorde[i - 1] !== b).length === BANDEN.length,
+    volgorde.join(","));
+}
+
+{
+  const d = analyseerAssetdekking(compleet("Compleet"));
+  check("een complete groep heeft geen tekorten", d.groepen[0].tekorten.length === 0,
+    d.groepen[0].tekorten.join(","));
+  check("en vraagt geen aandacht", d.aandacht.length === 0);
+  check("en heeft dus geen actieregel", groepsactie(d.groepen[0]) === null,
+    String(groepsactie(d.groepen[0])));
+  check("hij telt als compleet", d.compleet === 1);
+}
+
+// ── HET TEKORT ────────────────────────────────────────────────────────────
+//
+// Twee koppen waar er drie moeten zijn. Dat is niet "bijna goed": de groep is dan niet volledig
+// serveerbaar. Op de grove indeling van de eerste versie (alles op één hoop "tekst") was dit
+// onzichtbaar -- en dat is precies waarom de fijne veldtypen ertoe doen.
+
 {
   const d = analyseerAssetdekking([
-    r("Compleet", "TEXT", "BEST", "a1"),
-    r("Compleet", "IMAGE", "GOOD", "a2"),
-    r("Compleet", "YOUTUBE_VIDEO", "GOOD", "a3"),
+    r("Te weinig koppen", "HEADLINE"), r("Te weinig koppen", "HEADLINE"),
+    r("Te weinig koppen", "LONG_HEADLINE"),
+    r("Te weinig koppen", "DESCRIPTION"), r("Te weinig koppen", "DESCRIPTION"),
+    r("Te weinig koppen", "MARKETING_IMAGE"), r("Te weinig koppen", "SQUARE_MARKETING_IMAGE"),
+    r("Te weinig koppen", "LOGO"), r("Te weinig koppen", "YOUTUBE_VIDEO"),
   ]);
-  check("complete dekking geeft geen samenvatting", d.samenvatting === null, String(d.samenvatting));
-  check("en geen ontbrekende types", d.groepen[0].ontbrekend.length === 0);
+  check("twee koppen is een tekort", d.groepen[0].tekorten.join(",") === "HEADLINE",
+    d.groepen[0].tekorten.join(","));
+  check("de kop-cel draagt de vlag",
+    d.groepen[0].perType.find((t) => t.type === "HEADLINE")?.tekort === true);
+  check("de andere cellen niet",
+    d.groepen[0].perType.filter((t) => t.tekort).length === 1);
+  // De actieregel noemt HET AANTAL DAT ONTBREEKT, niet het aantal dat er staat. "1 kop tekort"
+  // is een opdracht; "2 koppen" laat de lezer zelf het minimum uit zijn hoofd erbij halen.
+  check("de actieregel zegt wat er nog moet komen",
+    groepsactie(d.groepen[0]) === "1 kop tekort", String(groepsactie(d.groepen[0])));
+}
+
+// Twee tekorten tegelijk: enkelvoud en meervoud moeten allebei kloppen, en de opsomming leest als
+// een zin. Een regel als "2 kop en 1 beschrijvingen tekort" is grammaticaal fout op een scherm
+// waar de rest wél klopt, en dat valt meteen op.
+{
+  const d = analyseerAssetdekking([
+    r("Twee gaten", "HEADLINE"),
+    r("Twee gaten", "LONG_HEADLINE"),
+    r("Twee gaten", "MARKETING_IMAGE"), r("Twee gaten", "SQUARE_MARKETING_IMAGE"),
+    r("Twee gaten", "LOGO"), r("Twee gaten", "YOUTUBE_VIDEO"),
+  ]);
+  check("meervoud en enkelvoud in één opsomming",
+    groepsactie(d.groepen[0]) === "2 koppen en 2 beschrijvingen tekort",
+    String(groepsactie(d.groepen[0])));
+}
+
+// Staand beeld ontbreekt: GEEN tekort, want Google eist het niet. Zou dit als tekort tellen, dan
+// meldt de kaart een probleem dat er niet is en leert de gebruiker de melding negeren.
+{
+  const d = analyseerAssetdekking(compleet("Zonder staand"));
+  check("ontbrekend staand beeld is geen tekort",
+    d.groepen[0].perType.find((t) => t.type === "PORTRAIT_MARKETING_IMAGE")?.tekort === false);
+}
+
+// ── DE VIDEO ──────────────────────────────────────────────────────────────
+//
+// Formeel optioneel, in de praktijk het duurste gat: zonder eigen video maakt Google er zelf een
+// uit je beeld en koppen, en die presteert doorgaans slechter. Daarom apart bijgehouden en niet
+// als "tekort".
+
+{
+  const zonder = compleet("Zonder video").filter((x) => x.asset_type !== "YOUTUBE_VIDEO");
+  const d = analyseerAssetdekking(zonder);
+  check("geen video is geen formeel tekort", d.groepen[0].tekorten.length === 0,
+    d.groepen[0].tekorten.join(","));
+  check("maar wordt wel apart gemeld", d.groepen[0].zonderVideo === true);
+  check("en de groep vraagt aandacht", d.aandacht.length === 1);
+  check("de actieregel noemt het", groepsactie(d.groepen[0]) === "geen eigen video",
+    String(groepsactie(d.groepen[0])));
+  // En niet twee keer: video heeft geen minimum, dus hij mag niet óók als tekort meelopen.
+  check("en niet ook als tekort", !/tekort/.test(groepsactie(d.groepen[0]) ?? ""),
+    String(groepsactie(d.groepen[0])));
 }
 
 // ── ONBEOORDEELD IS GEEN ZWAK ─────────────────────────────────────────────
-//
-// Google labelt pas als er genoeg vertoningen zijn. PENDING en LEARNING betekenen "nog niet
-// beoordeeld", niet "slecht". Zonder dit onderscheid leest een verse assetgroep als verwaarloosd
-// op de dag dat hij live gaat -- hetzelfde onderscheid als `assessed` in health-score.ts.
 
 {
   const d = analyseerAssetdekking([
-    r("Vers", "TEXT", "PENDING", "a1"),
-    r("Vers", "IMAGE", "LEARNING", "a2"),
-    r("Vers", "YOUTUBE_VIDEO", "", "a3"),
+    r("Vers", "HEADLINE", "PENDING"), r("Vers", "HEADLINE", "LEARNING"), r("Vers", "HEADLINE", ""),
+    r("Vers", "LONG_HEADLINE", "PENDING"),
+    r("Vers", "DESCRIPTION", "PENDING"), r("Vers", "DESCRIPTION", "PENDING"),
+    r("Vers", "MARKETING_IMAGE", "PENDING"), r("Vers", "SQUARE_MARKETING_IMAGE", "PENDING"),
+    r("Vers", "LOGO", "PENDING"), r("Vers", "YOUTUBE_VIDEO", "PENDING"),
   ]);
   check("PENDING telt niet als zwak", d.zwakTotaal === 0, String(d.zwakTotaal));
   check("maar wel als onbeoordeeld",
-    d.groepen[0].perType.every((t) => t.onbeoordeeld === 1),
-    JSON.stringify(d.groepen[0].perType));
-  check("en er komt geen zwak-melding", !/laag/.test(d.samenvatting ?? ""), String(d.samenvatting));
+    d.groepen[0].perType.find((t) => t.type === "HEADLINE")?.onbeoordeeld === 3,
+    JSON.stringify(d.groepen[0].perType.find((t) => t.type === "HEADLINE")));
+  check("een verse groep vraagt geen aandacht", d.aandacht.length === 0);
 }
 
 {
-  const d = analyseerAssetdekking([
-    r("Zwak", "TEXT", "LOW", "a1"),
-    r("Zwak", "IMAGE", "LOW", "a2"),
-    r("Zwak", "YOUTUBE_VIDEO", "GOOD", "a3"),
-  ]);
-  check("LOW telt wel als zwak", d.zwakTotaal === 2, String(d.zwakTotaal));
-  check("de samenvatting noemt het aantal", /2 assets met het label "laag"/.test(d.samenvatting ?? ""),
-    String(d.samenvatting));
+  const d = analyseerAssetdekking([...compleet("Zwak"), r("Zwak", "HEADLINE", "LOW")]);
+  check("LOW telt als zwak", d.zwakTotaal === 1, String(d.zwakTotaal));
+  check("en zet de groep op aandacht", d.aandacht.length === 1);
+  check("de actieregel noemt het aantal", groepsactie(d.groepen[0]) === "1× label laag",
+    String(groepsactie(d.groepen[0])));
 }
 
 // ── Een asset komt in elke maand terug ────────────────────────────────────
 //
-// Zonder ontdubbelen telt dezelfde asset twaalf keer mee en lijkt elke groep goed gevuld. Het
-// meest recente label wint: dat is het oordeel van nu.
+// Zonder ontdubbelen telt dezelfde kop twaalf keer mee en zit elke groep ruim boven het minimum.
 
 {
   const d = analyseerAssetdekking([
-    r("Groep", "TEXT", "LOW", "a1", "2026-05-01"),
-    r("Groep", "TEXT", "GOOD", "a1", "2026-06-01"),
-    r("Groep", "TEXT", "BEST", "a1", "2026-07-01"),
-    r("Groep", "IMAGE", "GOOD", "a2", "2026-07-01"),
-    r("Groep", "YOUTUBE_VIDEO", "GOOD", "a3", "2026-07-01"),
+    { asset_group_name: "G", asset_type: "HEADLINE", performance_label: "LOW", asset_id: "x", month: "2026-05-01" },
+    { asset_group_name: "G", asset_type: "HEADLINE", performance_label: "GOOD", asset_id: "x", month: "2026-06-01" },
+    { asset_group_name: "G", asset_type: "HEADLINE", performance_label: "BEST", asset_id: "x", month: "2026-07-01" },
   ]);
-  const tekst = d.groepen[0].perType.find((t) => t.type === "TEXT")!;
-  check("dezelfde asset telt één keer", tekst.aantal === 1, String(tekst.aantal));
-  check("het meest recente label wint", tekst.zwak === 0, JSON.stringify(tekst));
-}
-{
-  // En andersom: eerst goed, later laag. Dan telt de laatste ook.
-  const d = analyseerAssetdekking([
-    r("Groep", "TEXT", "BEST", "a1", "2026-05-01"),
-    r("Groep", "TEXT", "LOW", "a1", "2026-07-01"),
-  ]);
-  check("een verslechterd label wint ook", d.zwakTotaal === 1, String(d.zwakTotaal));
+  const kop = d.groepen[0].perType.find((t) => t.type === "HEADLINE")!;
+  check("dezelfde asset telt één keer", kop.aantal === 1, String(kop.aantal));
+  check("het meest recente label wint", kop.zwak === 0, JSON.stringify(kop));
+  check("één kop is dus een tekort", kop.tekort === true);
 }
 
-// ── Typenamen normaliseren ────────────────────────────────────────────────
-// De API levert per veld een andere naam voor hetzelfde. Voor deze vraag is elke tekstvorm tekst.
+// ── Volgorde: wat gerepareerd moet worden bovenaan ────────────────────────
 
 {
-  const d = analyseerAssetdekking([
-    r("G", "HEADLINE", "GOOD", "a1"),
-    r("G", "DESCRIPTION", "GOOD", "a2"),
-    r("G", "LONG_HEADLINE", "GOOD", "a3"),
-    r("G", "MARKETING_IMAGE", "GOOD", "a4"),
-    r("G", "VIDEO", "GOOD", "a5"),
-  ]);
-  const tekst = d.groepen[0].perType.find((t) => t.type === "TEXT")!;
-  check("alle tekstvormen tellen als tekst", tekst.aantal === 3, String(tekst.aantal));
-  check("MARKETING_IMAGE telt als beeld",
-    d.groepen[0].perType.find((t) => t.type === "IMAGE")!.aantal === 1);
-  check("VIDEO telt als YOUTUBE_VIDEO",
-    d.groepen[0].perType.find((t) => t.type === "YOUTUBE_VIDEO")!.aantal === 1);
-  check("een complete groep meldt niets", d.samenvatting === null, String(d.samenvatting));
+  const zonderVideo = compleet("B zonder video").filter((x) => x.asset_type !== "YOUTUBE_VIDEO");
+  const metTekort = compleet("C met tekort").filter((x, i) => !(x.asset_type === "HEADLINE" && i < 2));
+  const d = analyseerAssetdekking([...zonderVideo, ...metTekort, ...compleet("A compleet")]);
+  check("een tekort staat boven een ontbrekende video",
+    d.aandacht[0].groep === "C met tekort", d.aandacht.map((g) => g.groep).join(","));
+  check("de complete groep valt buiten de aandachtslijst",
+    !d.aandacht.some((g) => g.groep === "A compleet"));
+  check("en wordt geteld", d.compleet === 1, String(d.compleet));
 }
 
-// ── Volgorde en onzin ─────────────────────────────────────────────────────
+// ── Oude en afwijkende typenamen ──────────────────────────────────────────
+//
+// Rijen uit een eerdere sync dragen nog de grove waarden. Die weggooien zou een tekort melden dat
+// er niet is; ze worden dus op de meest waarschijnlijke fijne soort gezet.
 
 {
   const d = analyseerAssetdekking([
-    r("Zebra", "TEXT", "GOOD", "z1"),
-    r("Alfa", "TEXT", "GOOD", "a1"),
+    r("Oud", "TEXT"), r("Oud", "IMAGE"), r("Oud", "VIDEO"), r("Oud", "LANDSCAPE_LOGO"),
   ]);
-  // Alfabetisch en niet in databasevolgorde: die verandert met de sync, en een lijst die van
-  // volgorde wisselt zonder dat er iets veranderde leest als ruis.
-  check("groepen staan alfabetisch", d.groepen.map((g) => g.groep).join(",") === "Alfa,Zebra",
-    d.groepen.map((g) => g.groep).join(","));
+  const per = Object.fromEntries(d.groepen[0].perType.map((t) => [t.type, t.aantal]));
+  check("TEXT wordt een kop", per.HEADLINE === 1, JSON.stringify(per));
+  check("IMAGE wordt liggend beeld", per.MARKETING_IMAGE === 1);
+  check("VIDEO wordt YOUTUBE_VIDEO", per.YOUTUBE_VIDEO === 1);
+  check("LANDSCAPE_LOGO telt als logo", per.LOGO === 1);
+}
+
+// ── HET GELD ACHTER HET GAT ───────────────────────────────────────────────
+//
+// Zonder kostenaandeel staan een groep van 2% en een van 32% naast elkaar alsof ze even dringend
+// zijn. Met dat aandeel is de volgorde binnen dezelfde ernst een keuze en geen alfabet.
+
+{
+  const regels = [...compleet("A klein"), ...compleet("B groot")]
+    .filter((x) => x.asset_type !== "YOUTUBE_VIDEO");
+  const d = analyseerAssetdekking(regels, { "A klein": 100, "B groot": 900 });
+  const per = Object.fromEntries(d.groepen.map((g) => [g.groep, g.kostenAandeel]));
+  check("het aandeel is kosten gedeeld door het totaal", per["B groot"] === 0.9, JSON.stringify(per));
+  check("bij gelijke ernst staat de duurste bovenaan",
+    d.aandacht[0].groep === "B groot", d.aandacht.map((g) => g.groep).join(","));
+}
+
+// Een groep zonder kostenregel krijgt null en geen 0. Nul zou lezen als "deze groep kost niets",
+// en dat is precies de fout die deze codebase vaker maakte: afwezigheid als gemeten waarde.
+{
+  const d = analyseerAssetdekking(compleet("Zonder kosten"), { "Andere groep": 500 });
+  check("geen kostenregel geeft null", d.groepen[0].kostenAandeel === null,
+    String(d.groepen[0].kostenAandeel));
+}
+
+// Het totaal loopt over ALLE kostenregels, ook van groepen die in dit venster geen assets hebben.
+// Zou het alleen over de getoonde groepen lopen, dan telt 300 van 1000 op tot 100%.
+{
+  const d = analyseerAssetdekking(compleet("Enige"), { "Enige": 300, "Buiten beeld": 700 });
+  check("het totaal telt ook groepen buiten beeld mee",
+    d.groepen[0].kostenAandeel === 0.3, String(d.groepen[0].kostenAandeel));
 }
 
 {
-  const d = analyseerAssetdekking([]);
-  check("geen regels geeft geen groepen", d.groepen.length === 0);
-  check("en geen samenvatting", d.samenvatting === null);
+  const d = analyseerAssetdekking(compleet("Geen kostentabel"));
+  check("zonder kostentabel is het aandeel null", d.groepen[0].kostenAandeel === null);
+  const nul = analyseerAssetdekking(compleet("Alles nul"), { "Alles nul": 0 });
+  check("een totaal van nul geeft geen deling", nul.groepen[0].kostenAandeel === null,
+    String(nul.groepen[0].kostenAandeel));
+}
+
+// ── Onzin ─────────────────────────────────────────────────────────────────
+
+{
+  check("geen regels geeft geen groepen", analyseerAssetdekking([]).groepen.length === 0);
+  check("en geen aandacht", analyseerAssetdekking([]).aandacht.length === 0);
   const rommel = analyseerAssetdekking([
-    { asset_group_name: null, asset_type: "TEXT", performance_label: "GOOD", asset_id: "x" },
-    { asset_group_name: "G", asset_type: "ONBEKEND_TYPE", performance_label: "GOOD", asset_id: "y" },
-    { asset_group_name: "  ", asset_type: "IMAGE", performance_label: "GOOD", asset_id: "z" },
+    { asset_group_name: null, asset_type: "HEADLINE", asset_id: "x" },
+    { asset_group_name: "G", asset_type: "ONBEKEND", asset_id: "y" },
+    { asset_group_name: "  ", asset_type: "LOGO", asset_id: "z" },
   ]);
   check("regels zonder groep of met een onbekend type vallen weg", rommel.groepen.length === 0,
-    JSON.stringify(rommel.groepen));
-}
-
-check("drie verwachte types, video achteraan",
-  VERWACHTE_TYPES.join(",") === "TEXT,IMAGE,YOUTUBE_VIDEO", VERWACHTE_TYPES.join(","));
-
-// ── Beperkt houden bij veel groepen ───────────────────────────────────────
-//
-// Een account kan tientallen assetgroepen hebben. Ze allemaal tonen maakt het blok onbegrensd
-// hoog en zet de lezer aan het zoeken naar de ene die ertoe doet. Wat er op het scherm hoort is
-// wat aandacht vraagt; de rest wordt geteld.
-
-{
-  const compleet = (n: string) => [r(n, "TEXT", "GOOD", `${n}-t`), r(n, "IMAGE", "GOOD", `${n}-i`), r(n, "YOUTUBE_VIDEO", "GOOD", `${n}-v`)];
-  const d = analyseerAssetdekking([
-    ...compleet("A"), ...compleet("B"), ...compleet("C"), ...compleet("D"),
-    r("Zonder video", "TEXT", "GOOD", "z-t"), r("Zonder video", "IMAGE", "GOOD", "z-i"),
-    r("Met zwak", "TEXT", "LOW", "m-t"), r("Met zwak", "IMAGE", "GOOD", "m-i"), r("Met zwak", "YOUTUBE_VIDEO", "GOOD", "m-v"),
-  ]);
-  check("alle groepen blijven beschikbaar", d.groepen.length === 6, String(d.groepen.length));
-  check("alleen twee vragen aandacht", d.aandacht.length === 2, String(d.aandacht.length));
-  check("de rest wordt geteld, niet opgesomd", d.compleet === 4, String(d.compleet));
-  // De ontbrekende video bovenaan: dat is de bevinding met de meeste impact.
-  check("ontbrekende video staat bovenaan", d.aandacht[0].groep === "Zonder video",
-    d.aandacht.map((g) => g.groep).join(","));
-}
-
-// Bij gelijke soort probleem telt het aantal zwakke assets, aflopend.
-{
-  const g = (n: string, zwak: number) => [
-    r(n, "TEXT", zwak > 0 ? "LOW" : "GOOD", `${n}-t`),
-    r(n, "TEXT", zwak > 1 ? "LOW" : "GOOD", `${n}-t2`),
-    r(n, "IMAGE", "GOOD", `${n}-i`), r(n, "YOUTUBE_VIDEO", "GOOD", `${n}-v`),
-  ];
-  const d = analyseerAssetdekking([...g("Een zwak", 1), ...g("Twee zwak", 2)]);
-  check("meer zwakke assets staat hoger", d.aandacht[0].groep === "Twee zwak",
-    d.aandacht.map((x) => `${x.groep}:${x.zwak}`).join(","));
-}
-
-// Alles in orde: niets vraagt aandacht, en dan hoort er ook geen lijst te staan.
-{
-  const d = analyseerAssetdekking([
-    r("A", "TEXT", "GOOD", "a1"), r("A", "IMAGE", "GOOD", "a2"), r("A", "YOUTUBE_VIDEO", "GOOD", "a3"),
-  ]);
-  check("zonder problemen geen aandachtslijst", d.aandacht.length === 0);
-  check("en alles telt als compleet", d.compleet === 1);
+    JSON.stringify(rommel.groepen.map((g) => g.groep)));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

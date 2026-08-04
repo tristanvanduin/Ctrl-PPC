@@ -13,6 +13,7 @@ import {
   type NetworkRow, type NetworkSlice,
 } from "@/lib/pmax/network-split";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Uitleg } from "@/components/ui/uitleg";
 
 // Waar Performance Max je budget laat landen. PMax verdeelt zelf over Zoeken, Display, YouTube,
 // Discover en Gmail; die verdeling werd wel gesynct maar bereikte alleen de analyse-lagen.
@@ -84,6 +85,33 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
         <PieChart className="w-4.5 h-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">Performance Max — waar gaat het budget heen</h3>
         <span className="text-meta text-muted-foreground">Google verdeelt zelf over de netwerken</span>
+        {/* BIJGEWERKT NAAR DE STAND VAN 2026, en het onderscheid is de hele boodschap.
+            Hier stond alleen "PMax laat de verdeling niet rechtstreeks sturen ... via assets,
+            doelgroepsignalen en uitsluitingen". Die zin klopt nog op het eerste punt maar leest
+            als "je ziet en kunt niets", en dat is achterhaald: Google levert inmiddels
+            kanaalrapportage met kosten en conversies per kanaal (dit blok bestaat daarvan),
+            een budgetprojectie naar maandeinde, demografie op leeftijd en geslacht, en
+            placementrapportage per netwerk.
+
+            Wat er NIET bij zit is een knop voor de verdeling zelf; die blijft algoritmisch. En
+            er kwamen twee sturingsknoppen bij die hier ontbraken: campagne-brede
+            uitsluitingszoekwoorden en het uitsluiten van klantenlijsten. Google's eigen
+            samenvatting: van autopilot naar assisted driving.
+
+            Bron: business.google.com, "New Performance Max steering and reporting updates
+            coming in 2026", nagekeken augustus 2026. PMax verandert per kwartaal -- staat deze
+            regel er over een jaar nog, kijk hem dan opnieuw na.
+
+            DEZE TEKST STOND ONDER DE BEVINDING, als vierde regel in het amberen blok. Hij is bij
+            elke klant identiek en verandert nooit, terwijl de regels erboven wél over deze
+            campagne gaan. Vaste uitleg boven wisselende cijfers laat de lezer het hele blok
+            overslaan -- inclusief de zin die er wél toe doet. Nu staat hij achter de i. */}
+        <Uitleg label="Waarop je bij Performance Max kunt sturen" side="bottom">
+          De verdeling zelf is geen knop: welk deel naar Zoeken of Maps gaat bepaalt Google. Sturen
+          doe je eromheen — via assets (meer of minder video en beeld), doelgroepsignalen,
+          uitsluitingszoekwoorden op campagneniveau, het uitsluiten van klantenlijsten, en
+          placement-uitsluitingen.
+        </Uitleg>
       </div>
 
       {/* De scheefheid eerst: dat is waarom deze kaart bestaat. */}
@@ -101,28 +129,6 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
               )}
             </p>
           ))}
-          {/* BIJGEWERKT NAAR DE STAND VAN 2026, en het onderscheid is de hele boodschap.
-              Hier stond alleen "PMax laat de verdeling niet rechtstreeks sturen ... via assets,
-              doelgroepsignalen en uitsluitingen". Die zin klopt nog op het eerste punt maar leest
-              als "je ziet en kunt niets", en dat is achterhaald: Google levert inmiddels
-              kanaalrapportage met kosten en conversies per kanaal (dit blok bestaat daarvan),
-              een budgetprojectie naar maandeinde, demografie op leeftijd en geslacht, en
-              placementrapportage per netwerk.
-
-              Wat er NIET bij zit is een knop voor de verdeling zelf; die blijft algoritmisch. En
-              er kwamen twee sturingsknoppen bij die hier ontbraken: campagne-brede
-              uitsluitingszoekwoorden en het uitsluiten van klantenlijsten. Google's eigen
-              samenvatting: van autopilot naar assisted driving.
-
-              Bron: business.google.com, "New Performance Max steering and reporting updates
-              coming in 2026", nagekeken augustus 2026. PMax verandert per kwartaal -- staat deze
-              regel er over een jaar nog, kijk hem dan opnieuw na. */}
-          <p className="text-meta text-muted-foreground">
-            De verdeling zelf is geen knop: welk deel naar Zoeken of Maps gaat bepaalt Google. Sturen doe
-            je eromheen — via assets (meer of minder video en beeld), doelgroepsignalen,
-            uitsluitingszoekwoorden op campagneniveau, het uitsluiten van klantenlijsten, en
-            placement-uitsluitingen. Zie de placements hieronder.
-          </p>
         </div>
       )}
 

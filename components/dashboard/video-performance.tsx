@@ -12,6 +12,7 @@ import {
   type VideoCampaignRow, type VideoDiagnosis,
 } from "@/lib/video/video-performance";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 // YouTube/Demand Gen-prestaties met de maten die bij video horen: CPM (wat kost bereik), CPV (wat
 // kost een view), view rate en kijkdiepte. Verschijnt alléén als er echt videocampagnes draaien —
@@ -157,13 +158,22 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
                     <GetalCel zacht>{eur2(a.cpm)}</GetalCel>
                     <GetalCel zacht>{eurCpv(a.cpv)}</GetalCel>
                     <Cel><QuartileBar p25={a.p25} p50={a.p50} p75={a.p75} p100={a.p100} /></Cel>
+                    {/* De badge IS de trigger. Hieronder stond dezelfde uitleg nog een keer als
+                        alinea, en in het badge-attribuut een derde keer -- drie kopieën van een
+                        zin die je één keer leest en daarna nooit meer. Een echte hover haalt hem
+                        binnen bereik van toetsenbord en aanraking, wat een title-attribuut geen
+                        van beide doet. */}
                     <Cel>
-                      <span
-                        className={`inline-block rounded-md border px-1.5 py-0.5 text-micro font-medium whitespace-nowrap ${DIAGNOSIS_STYLE[d]}`}
-                        title={VIDEO_DIAGNOSIS_EXPLAIN[d]}
-                      >
-                        {VIDEO_DIAGNOSIS_LABEL[d]}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger
+                          className={`inline-block cursor-help rounded-md border px-1.5 py-0.5 text-micro font-medium whitespace-nowrap ${DIAGNOSIS_STYLE[d]}`}
+                        >
+                          {VIDEO_DIAGNOSIS_LABEL[d]}
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-72 items-start text-left leading-snug">
+                          {VIDEO_DIAGNOSIS_EXPLAIN[d]}
+                        </TooltipContent>
+                      </Tooltip>
                     </Cel>
                   </Rij>
                 );
@@ -187,14 +197,6 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
         );
       })()}
 
-      {/* De duiding uitgeschreven: een badge alleen laat de lezer raden wat te doen. */}
-      <div className="px-5 py-3 border-t border-border space-y-1">
-        {[...new Set(aggs.map((a) => diagnoseVideo(a)))].map((d) => (
-          <p key={d} className="text-meta text-muted-foreground">
-            <strong className="text-rm-gray">{VIDEO_DIAGNOSIS_LABEL[d]}:</strong> {VIDEO_DIAGNOSIS_EXPLAIN[d]}
-          </p>
-        ))}
-      </div>
     </CollapsiblePanel>
   );
 }
