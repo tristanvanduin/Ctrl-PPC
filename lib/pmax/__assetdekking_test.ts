@@ -1,7 +1,9 @@
 // Assetdekking per PMax-assetgroep. Deterministisch, geen IO.
 // Draaien: npx tsx lib/pmax/__assetdekking_test.ts
 
-import { analyseerAssetdekking, groepsactie, TYPES, BANDEN, type AssetRegel } from "./assetdekking";
+import {
+  analyseerAssetdekking, absorbeertBudget, groepsactie, TYPES, BANDEN, type AssetRegel,
+} from "./assetdekking";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -162,7 +164,7 @@ function compleet(groep: string): AssetRegel[] {
   const d = analyseerAssetdekking([...compleet("Zwak"), r("Zwak", "HEADLINE", "LOW")]);
   check("LOW telt als zwak", d.zwakTotaal === 1, String(d.zwakTotaal));
   check("en zet de groep op aandacht", d.aandacht.length === 1);
-  check("de actieregel noemt het aantal", groepsactie(d.groepen[0]) === "1× label laag",
+  check("de actieregel noemt het aantal", groepsactie(d.groepen[0]) === "1 zwakke asset",
     String(groepsactie(d.groepen[0])));
 }
 
@@ -219,7 +221,10 @@ function compleet(groep: string): AssetRegel[] {
 {
   const regels = [...compleet("A klein"), ...compleet("B groot")]
     .filter((x) => x.asset_type !== "YOUTUBE_VIDEO");
-  const d = analyseerAssetdekking(regels, { "A klein": 100, "B groot": 900 });
+  const d = analyseerAssetdekking(regels, {
+    "A klein": { kosten: 100, conversies: 10 },
+    "B groot": { kosten: 900, conversies: 90 },
+  });
   const per = Object.fromEntries(d.groepen.map((g) => [g.groep, g.kostenAandeel]));
   check("het aandeel is kosten gedeeld door het totaal", per["B groot"] === 0.9, JSON.stringify(per));
   check("bij gelijke ernst staat de duurste bovenaan",
@@ -229,7 +234,7 @@ function compleet(groep: string): AssetRegel[] {
 // Een groep zonder kostenregel krijgt null en geen 0. Nul zou lezen als "deze groep kost niets",
 // en dat is precies de fout die deze codebase vaker maakte: afwezigheid als gemeten waarde.
 {
-  const d = analyseerAssetdekking(compleet("Zonder kosten"), { "Andere groep": 500 });
+  const d = analyseerAssetdekking(compleet("Zonder kosten"), { "Andere groep": { kosten: 500, conversies: 5 } });
   check("geen kostenregel geeft null", d.groepen[0].kostenAandeel === null,
     String(d.groepen[0].kostenAandeel));
 }
@@ -237,7 +242,10 @@ function compleet(groep: string): AssetRegel[] {
 // Het totaal loopt over ALLE kostenregels, ook van groepen die in dit venster geen assets hebben.
 // Zou het alleen over de getoonde groepen lopen, dan telt 300 van 1000 op tot 100%.
 {
-  const d = analyseerAssetdekking(compleet("Enige"), { "Enige": 300, "Buiten beeld": 700 });
+  const d = analyseerAssetdekking(compleet("Enige"), {
+    "Enige": { kosten: 300, conversies: 3 },
+    "Buiten beeld": { kosten: 700, conversies: 7 },
+  });
   check("het totaal telt ook groepen buiten beeld mee",
     d.groepen[0].kostenAandeel === 0.3, String(d.groepen[0].kostenAandeel));
 }
@@ -245,9 +253,65 @@ function compleet(groep: string): AssetRegel[] {
 {
   const d = analyseerAssetdekking(compleet("Geen kostentabel"));
   check("zonder kostentabel is het aandeel null", d.groepen[0].kostenAandeel === null);
-  const nul = analyseerAssetdekking(compleet("Alles nul"), { "Alles nul": 0 });
+  const nul = analyseerAssetdekking(compleet("Alles nul"), { "Alles nul": { kosten: 0, conversies: 0 } });
   check("een totaal van nul geeft geen deling", nul.groepen[0].kostenAandeel === null,
     String(nul.groepen[0].kostenAandeel));
+}
+
+// ── WANNEER EEN PERCENTAGE EEN BEVINDING WORDT ────────────────────────────
+//
+// "32% van de kosten" is even goed het teken van de beste groep als van de slechtste. Pas naast
+// het conversie-aandeel zegt het iets, en dan nog alleen als het ver genoeg uiteenloopt EN er
+// genoeg budget in omgaat om er iets aan te hebben.
+
+{
+  // 32% van de kosten, 11% van de conversies: verdubbeld en ruim boven de budgetdrempel.
+  const d = analyseerAssetdekking([...compleet("Slurper"), ...compleet("Rest")], {
+    "Slurper": { kosten: 320, conversies: 11 },
+    "Rest": { kosten: 680, conversies: 89 },
+  });
+  const slurper = d.groepen.find((g) => g.groep === "Slurper")!;
+  const rest = d.groepen.find((g) => g.groep === "Rest")!;
+  check("kost het dubbele van wat het levert", absorbeertBudget(slurper) === true,
+    `${slurper.kostenAandeel} vs ${slurper.conversieAandeel}`);
+  check("de andere groep niet", absorbeertBudget(rest) === false,
+    `${rest.kostenAandeel} vs ${rest.conversieAandeel}`);
+}
+
+// Wel de factor, niet het budget: 3% tegen 1% is verdubbeld, maar daar valt niets te halen. Zonder
+// die tweede drempel meldt de kaart elke kleine groep en leert de lezer de melding over te slaan.
+{
+  const d = analyseerAssetdekking([...compleet("Klein"), ...compleet("Groot")], {
+    "Klein": { kosten: 30, conversies: 1 },
+    "Groot": { kosten: 970, conversies: 99 },
+  });
+  const klein = d.groepen.find((g) => g.groep === "Klein")!;
+  check("een kleine groep haalt de drempel niet", absorbeertBudget(klein) === false,
+    String(klein.kostenAandeel));
+}
+
+// Normale spreiding: 30% kosten tegen 25% conversies. Assetgroepen lopen altijd wat uiteen; dat
+// melden zou van de bevinding een vaste regel maken.
+{
+  const d = analyseerAssetdekking([...compleet("A"), ...compleet("B")], {
+    "A": { kosten: 300, conversies: 25 },
+    "B": { kosten: 700, conversies: 75 },
+  });
+  check("normale spreiding is geen bevinding",
+    absorbeertBudget(d.groepen.find((g) => g.groep === "A")!) === false);
+}
+
+// Nul conversies in het HELE account: dan is er geen verdeling om een aandeel van te nemen. Zou
+// dat 0 worden, dan absorbeert elke groep volgens de regel budget -- terwijl het enige dat er aan
+// de hand is, is dat er nog niets geconverteerd heeft. Dezelfde fout als Number(null) === 0.
+{
+  const d = analyseerAssetdekking(compleet("Zonder conversies"), {
+    "Zonder conversies": { kosten: 1000, conversies: 0 },
+  });
+  const g = d.groepen[0];
+  check("zonder conversies geen aandeel", g.conversieAandeel === null, String(g.conversieAandeel));
+  check("en dus geen bevinding", absorbeertBudget(g) === false);
+  check("het kostenaandeel staat er wel", g.kostenAandeel === 1, String(g.kostenAandeel));
 }
 
 // ── Onzin ─────────────────────────────────────────────────────────────────

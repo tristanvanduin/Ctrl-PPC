@@ -158,6 +158,14 @@ export type Groepsdekking = {
    * hier al eerder misgegaan -- Number(null) is 0 en leest als een gemeten nul.
    */
   kostenAandeel: number | null;
+  /**
+   * Welk deel van de PMax-conversies door deze groep loopt, 0..1. Null als er niets te delen valt.
+   *
+   * Pas NAAST het kostenaandeel wordt een percentage een bevinding. "32% van de kosten" zegt niets
+   * over goed of fout; "32% van de kosten en 11% van de conversies" is controlepunt 47 uit de
+   * second opinion -- een assetgroep die budget absorbeert zonder te leveren.
+   */
+  conversieAandeel: number | null;
 };
 
 export type Assetdekking = {
@@ -196,14 +204,23 @@ function normaliseerType(waarde: unknown): Assettype | null {
 }
 
 /**
- * Kosten per assetgroep over hetzelfde venster, om het aandeel mee te bepalen.
+ * Kosten en conversies per assetgroep over hetzelfde venster, om de aandelen mee te bepalen.
  *
- * Optioneel: zonder deze tabel werkt de kaart gewoon, alleen zonder het aandeel. Een lege map en
+ * Optioneel: zonder deze tabel werkt de kaart gewoon, alleen zonder de aandelen. Een lege map en
  * een ontbrekende map zijn daarom hetzelfde geval, en allebei geven ze null en geen 0.
  */
-export type Kosten = Readonly<Record<string, number>>;
+export type Groepscijfers = Readonly<Record<string, { kosten: number; conversies: number }>>;
 
-export function analyseerAssetdekking(regels: readonly AssetRegel[], kosten?: Kosten): Assetdekking {
+/** Alleen positieve, eindige getallen tellen mee in een totaal. De rest is geen meting. */
+function bruikbaar(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+export function analyseerAssetdekking(
+  regels: readonly AssetRegel[],
+  cijfers?: Groepscijfers,
+): Assetdekking {
   // Per asset één regel: een asset komt in elke maand terug, en dan zou hij twaalf keer meetellen
   // en zou elke groep ruim boven het minimum lijken te zitten. Het meest recente label wint, want
   // dat is het oordeel van nu.
@@ -232,12 +249,12 @@ export function analyseerAssetdekking(regels: readonly AssetRegel[], kosten?: Ko
     g.set(a.type, t);
   }
 
-  // Het totaal over ALLE bekende kostenregels, ook die van groepen zonder assets in dit venster.
-  // Zou het totaal alleen over de getoonde groepen lopen, dan telden de aandelen naar 100% op
-  // terwijl er budget buiten beeld staat -- een percentage dat kloppend lijkt en het niet is.
-  const kostenTotaal = kosten
-    ? Object.values(kosten).reduce((s, v) => s + (Number.isFinite(v) && v > 0 ? v : 0), 0)
-    : 0;
+  // De totalen lopen over ALLE bekende regels, ook die van groepen zonder assets in dit venster.
+  // Zouden ze alleen over de getoonde groepen lopen, dan telden de aandelen naar 100% op terwijl
+  // er budget buiten beeld staat -- een percentage dat kloppend lijkt en het niet is.
+  const alle = cijfers ? Object.values(cijfers) : [];
+  const kostenTotaal = alle.reduce((s, v) => s + bruikbaar(v?.kosten), 0);
+  const conversieTotaal = alle.reduce((s, v) => s + bruikbaar(v?.conversies), 0);
 
   const groepen: Groepsdekking[] = [...perGroep.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "nl"))
@@ -246,17 +263,18 @@ export function analyseerAssetdekking(regels: readonly AssetRegel[], kosten?: Ko
         const t = tellingen.get(regel.type) ?? { aantal: 0, zwak: 0, onbeoordeeld: 0 };
         return { type: regel.type, aantal: t.aantal, zwak: t.zwak, onbeoordeeld: t.onbeoordeeld, tekort: t.aantal < regel.min };
       });
-      const eigenKosten = kosten?.[groep];
+      const eigen = cijfers?.[groep];
       return {
         groep,
         perType,
         tekorten: perType.filter((t) => t.tekort).map((t) => t.type),
         zonderVideo: (tellingen.get("YOUTUBE_VIDEO")?.aantal ?? 0) === 0,
         zwak: perType.reduce((s, t) => s + t.zwak, 0),
-        kostenAandeel:
-          kostenTotaal > 0 && eigenKosten !== undefined && Number.isFinite(eigenKosten)
-            ? eigenKosten / kostenTotaal
-            : null,
+        kostenAandeel: kostenTotaal > 0 && eigen !== undefined ? bruikbaar(eigen.kosten) / kostenTotaal : null,
+        // Bij nul conversies in het hele account is er geen verdeling om een aandeel van te nemen.
+        // Zou dat 0 worden, dan absorbeert volgens de regel hieronder ELKE groep budget -- terwijl
+        // het enige dat er aan de hand is, is dat er nog niets geconverteerd heeft.
+        conversieAandeel: conversieTotaal > 0 && eigen !== undefined ? bruikbaar(eigen.conversies) / conversieTotaal : null,
       };
     });
 
@@ -289,6 +307,35 @@ export function analyseerAssetdekking(regels: readonly AssetRegel[], kosten?: Ko
     tekortTotaal,
     zwakTotaal,
   };
+}
+
+/**
+ * Wanneer een assetgroep budget absorbeert zonder te leveren.
+ *
+ * ── WAAROM DEZE TWEE DREMPELS ───────────────────────────────────────────────
+ *
+ * Een percentage op zichzelf is geen bevinding. "32% van de kosten" is even goed het teken van de
+ * best draaiende groep als van de slechtste; pas naast het conversie-aandeel zegt het iets.
+ *
+ * FACTOR 2 -- het kostenaandeel minstens twee keer het conversie-aandeel. Assetgroepen lopen altijd
+ * uiteen; een groep die 30% kost en 25% levert is normaal en verdient geen melding. Verdubbeling is
+ * de grens waarboven het geen ruis meer kan zijn.
+ *
+ * MINSTENS 15% VAN HET BUDGET -- een groep die 3% kost en 1% levert voldoet aan de factor, maar
+ * daar valt niets te halen. Zonder deze tweede drempel meldt de kaart elke kleine groep en leert
+ * de lezer de melding over te slaan.
+ *
+ * Dit is controlepunt 47 uit de second opinion ("asset groups die budget absorberen zonder
+ * conversies"), maar dan op het scherm waar de assets van die groep staan -- want dat is meestal
+ * ook waar de oorzaak zit.
+ */
+export const ABSORBEERT_FACTOR = 2;
+export const ABSORBEERT_MIN_KOSTEN = 0.15;
+
+export function absorbeertBudget(g: Groepsdekking): boolean {
+  if (g.kostenAandeel === null || g.conversieAandeel === null) return false;
+  if (g.kostenAandeel < ABSORBEERT_MIN_KOSTEN) return false;
+  return g.kostenAandeel >= g.conversieAandeel * ABSORBEERT_FACTOR;
 }
 
 /**
@@ -325,7 +372,9 @@ export function groepsactie(g: Groepsdekking): string | null {
   }
 
   if (g.zonderVideo) delen.push("geen eigen video");
-  if (g.zwak > 0) delen.push(`${g.zwak}× label laag`);
+  // "zwakke assets" en niet "label laag": dat laatste is Google's term voor het veld, niet voor
+  // wat er aan de hand is. Wie de kaart voor het eerst ziet moet niet eerst leren wat een label is.
+  if (g.zwak > 0) delen.push(`${g.zwak} zwakke asset${g.zwak === 1 ? "" : "s"}`);
 
   return delen.length > 0 ? delen.join(" · ") : null;
 }

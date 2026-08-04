@@ -50,8 +50,8 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
 import { Uitleg, UitlegKop } from "@/components/ui/uitleg";
 import {
-  analyseerAssetdekking, groepsactie, TYPES, BANDEN,
-  type AssetRegel, type Kosten, type Typedekking, type Typeregel,
+  analyseerAssetdekking, absorbeertBudget, groepsactie, TYPES, BANDEN,
+  type AssetRegel, type Groepscijfers, type Typedekking, type Typeregel,
 } from "@/lib/pmax/assetdekking";
 
 /**
@@ -94,12 +94,17 @@ const randKlasse = (t: Typeregel | Typedekking) =>
   BANDSTART.has(t.type) ? "border-l border-border pl-1.5" : "";
 
 /**
- * Eén cel: hoeveel assets van dit type, en of dat er genoeg zijn.
+ * Eén cel: hoeveel assets van dit type.
  *
- * Een kaal getal is geen oordeel -- om "2" te wegen moet je het minimum uit je hoofd kennen. Bij
- * een tekort staat er daarom "2/3": het getal en de eis in hetzelfde blikveld, in de aandachtskleur.
- * Staat het goed, dan is het weer gewoon een getal; een kaart die overal een breuk toont, laat je
- * acht keer nadenken over zeven dingen die kloppen.
+ * ── WAAROM HIER GEEN "2/3" MEER STAAT ───────────────────────────────────────
+ *
+ * Een kaal getal is geen oordeel: om "2" te wegen moet je weten dat er drie moeten zijn. De eerste
+ * poging zette de eis in de cel ("2/3"), maar dat is een breuk die je moet ontcijferen op precies
+ * de plek waar je wilt scannen -- en de terugkoppeling was dat het niet duidelijk was. Terecht.
+ *
+ * De eis hoort niet acht keer per rij te staan maar één keer per kolom, in de kop. Daar staat nu
+ * "min 3" onder "Kop". Dan is de cel weer gewoon een getal, en zegt de kleur of het genoeg is --
+ * en die kleur is te lezen zonder de eis erbij, want je vergelijkt hem met de kop erboven.
  */
 function Typecel({ dekking, regel }: { dekking: Typedekking; regel: Typeregel }) {
   const leeg = dekking.aantal === 0;
@@ -130,18 +135,8 @@ function Typecel({ dekking, regel }: { dekking: Typedekking; regel: Typeregel })
             precies wat nul betekent zodra de groep zelf in de data zit -- en in amber las het als
             een minteken. "Niets gemeten" en "nul gemeten" mogen niet hetzelfde teken krijgen;
             hier is het het tweede. */}
-        {dekking.tekort ? `${dekking.aantal}/${regel.min}` : dekking.aantal}
+        {dekking.aantal}
       </span>
-      {/* Een STIP en geen tweede getal. In de eerste render stond er "2 1↓" naast elkaar en dat
-          leest als eenentwintig -- twee getallen zonder scheiding in dezelfde cel is een fout die
-          je pas ziet als je het rendert. Hoevéél er zwak zijn staat al in de actieregel naast de
-          naam; deze stip zegt alleen wáár ze zitten, en de hover geeft het aantal.
-
-          Zwak en onbeoordeeld staan apart en niet op één hoop: "we weten het nog niet" is geen
-          slecht oordeel, dus onbeoordeeld krijgt geen teken. */}
-      {dekking.zwak > 0 && (
-        <span className="mb-0.5 h-1.5 w-1.5 shrink-0 self-center rounded-full bg-red-500" aria-hidden />
-      )}
     </div>
   );
 }
@@ -151,7 +146,7 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
   // Apart van `rows`: de kosten zijn een toevoeging en geen voorwaarde. Zou de kaart op allebei
   // wachten, dan verdwijnt hij als deze tabel leeg is of de query faalt -- terwijl de assetdekking
   // zelf prima te tonen is. Null betekent hier "nog niet binnen of niet beschikbaar".
-  const [kosten, setKosten] = useState<Kosten | null>(null);
+  const [cijfers, setCijfers] = useState<Groepscijfers | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,27 +170,28 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
     // per id lopen en de assets niet, dan stond er een aandeel van de ene groep naast de assets
     // van twee.
     sb.from("ads_asset_group_performance_monthly")
-      .select("asset_group_name, cost")
+      .select("asset_group_name, cost, conversions")
       .eq("client_id", clientId)
       .gte("month", since)
       .then(({ data }: { data: Record<string, unknown>[] | null }) => {
         if (cancelled) return;
-        const som: Record<string, number> = {};
+        const som: Record<string, { kosten: number; conversies: number }> = {};
         for (const r of data ?? []) {
           const naam = String(r.asset_group_name ?? "").trim();
-          const c = Number(r.cost ?? 0);
-          if (!naam || !Number.isFinite(c)) continue;
-          som[naam] = (som[naam] ?? 0) + c;
+          if (!naam) continue;
+          const vak = som[naam] ?? (som[naam] = { kosten: 0, conversies: 0 });
+          vak.kosten += Number(r.cost ?? 0) || 0;
+          vak.conversies += Number(r.conversions ?? 0) || 0;
         }
-        setKosten(som);
-      }, () => { if (!cancelled) setKosten(null); });
+        setCijfers(som);
+      }, () => { if (!cancelled) setCijfers(null); });
 
     return () => { cancelled = true; };
   }, [clientId]);
 
   const dekking = useMemo(
-    () => (rows ? analyseerAssetdekking(rows, kosten ?? undefined) : null),
-    [rows, kosten],
+    () => (rows ? analyseerAssetdekking(rows, cijfers ?? undefined) : null),
+    [rows, cijfers],
   );
   // Vóór de vroege returns: React vereist dat hooks bij elke render in dezelfde volgorde draaien,
   // en een return ertussen breekt dat op het moment dat de data binnenkomt.
@@ -218,10 +214,10 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
         <Uitleg label="Waar deze getallen vandaan komen">
           Per assetgroep het aantal assets van elk veldtype dat Google onderscheidt. De minima zijn
           Google&apos;s eigen eisen voor een serveerbare assetgroep — een groep eronder draait niet op
-          alle plaatsingen. Een getal als <span className="font-semibold">2/3</span> betekent: twee
-          aangeleverd, drie vereist. De balk naast elke groep is haar aandeel in de PMax-kosten over
-          dezelfde periode — een gat in een groep die een derde van het budget draagt kost meer dan
-          hetzelfde gat in een groep van twee procent.
+          alle plaatsingen. Onder elke kolomkop staat wat Google minimaal vraagt; een getal
+          eronder kleurt oranje. Het percentage naast elke groep is haar aandeel in de PMax-kosten
+          over dezelfde periode; staat er <span className="font-semibold">32% kosten &rarr; 11%
+          conversies</span>, dan kost die groep meer dan twee keer wat ze oplevert.
         </Uitleg>
         <span className="ml-auto text-micro text-muted-foreground">
           {aandacht > 0
@@ -250,11 +246,15 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
             ))}
           </div>
 
+          {/* De EIS staat in de kop, één keer per kolom. Stond hij in de cel ("2/3"), dan moest je
+              hem acht keer per rij ontcijferen op precies de plek waar je wilt scannen. Nu leest
+              elke cel als een getal en zegt de kolomkop erboven waartegen je het houdt. */}
           <div className={`${KOLOMMEN} border-b border-border px-5 pt-1 pb-1.5`}>
             <span />
             {TYPES.map((t) => (
-              <span key={t.type} className={`text-right text-micro font-medium text-muted-foreground ${randKlasse(t)}`}>
+              <span key={t.type} className={`flex flex-col items-end ${randKlasse(t)}`}>
                 <UitlegKop
+                  className="text-micro font-medium text-muted-foreground"
                   uitleg={
                     <span>
                       <span className="font-semibold">{t.enkelvoud[0].toUpperCase() + t.enkelvoud.slice(1)}</span>
@@ -267,6 +267,12 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
                 >
                   {t.label}
                 </UitlegKop>
+                {/* text-micro is de ondergrens in dit ontwerp: alles daaronder is er ooit uitgehaald
+                    omdat het onleesbaar was (zie de kop van app/globals.css). Deze regel wordt dus
+                    zachter gezet en niet kleiner. */}
+                <span className="text-micro leading-tight text-muted-foreground/60">
+                  {t.min > 0 ? `min ${t.min}` : "optie"}
+                </span>
               </span>
             ))}
           </div>
@@ -281,39 +287,37 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
                         daardoor afgekapt op "Standhouders — internati…" -- de naam is waarmee je
                         de groep terugvindt in Google Ads, dus die mag als laatste inleveren. */}
                     <div className="truncate text-body text-rm-gray" title={g.groep}>{g.groep}</div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-start gap-3">
                       {/* De regel die zegt wat je moet doen. Alleen als er iets te doen is: bij
-                          een groep zonder gebrek is de lege ruimte de betere mededeling. */}
-                      {actie && <span className="truncate text-micro text-amber-700" title={actie}>{actie}</span>}
+                          een groep zonder gebrek is de lege ruimte de betere mededeling.
+
+                          HIJ MAG AFBREKEN en wordt niet afgekapt. Met de bevinding ernaast paste
+                          hij niet meer op één regel en stond er "3 zwakke as…" -- een instructie
+                          die je moet aanvullen uit je hoofd is geen instructie. Twee regels kosten
+                          hier niets: de kaart heeft onderaan toch ruimte over. */}
+                      {actie && <span className="text-micro leading-snug text-amber-700">{actie}</span>}
                       {/* Het geld achter het gat. Een ontbrekende video in een groep van 2% en
                           dezelfde in een groep van 32% zijn niet hetzelfde probleem, en zonder dit
                           getal staan ze naast elkaar alsof ze dat wel zijn. */}
+                      {/* UITGESCHREVEN, geen balk. Er stond hier een baan met een vulling en een
+                          kaal percentage, en zonder kolomkop wist niemand waar dat over ging --
+                          een balk zonder label is versiering.
+
+                          En het percentage staat er niet alleen meer. "32% van de kosten" is even
+                          goed het teken van de beste groep als van de slechtste; pas naast het
+                          conversie-aandeel is het een bevinding. Loopt dat ver uiteen, dan staat
+                          het er als "32% kosten → 11% conversies" in de aandachtskleur -- anders
+                          gewoon als context. Zie absorbeertBudget in lib/pmax/assetdekking.ts. */}
                       {g.kostenAandeel !== null && (
-                        <span
-                          className="ml-auto flex shrink-0 items-center gap-1.5"
-                          title={`Deze groep draagt ${pctKort(g.kostenAandeel)} van de PMax-kosten in dit venster`}
-                        >
-                          {/* Zelfde baan-en-vulling als de ranglijst naast de wereldkaart, en om
-                              dezelfde reden: twee percentages onder elkaar lees je als tekst, twee
-                              balken zie je. Geschaald op het geheel en niet op de grootste -- hier
-                              IS het een deel van een totaal, en dan hoort 32% ook een derde van de
-                              baan te vullen. */}
-                          <span
-                            className="relative block h-1.5 w-16 overflow-hidden rounded-full"
-                            style={{ background: "var(--spoor, rgba(15,23,42,0.07))" }}
-                            aria-hidden
-                          >
-                            <span
-                              className="absolute inset-y-0 left-0 rounded-full bg-rm-blue"
-                              // Ondergrens van 1,5%: een groep met een klein maar echt budget hoort
-                              // een streepje te krijgen in plaats van een lege baan.
-                              style={{ width: `${Math.max(g.kostenAandeel * 100, 1.5)}%` }}
-                            />
+                        absorbeertBudget(g) ? (
+                          <span className="ml-auto shrink-0 whitespace-nowrap text-micro font-medium tabular-nums text-amber-700">
+                            {pctKort(g.kostenAandeel)} kosten &rarr; {pctKort(g.conversieAandeel!)} conversies
                           </span>
-                          <span className="w-8 text-right text-micro tabular-nums text-muted-foreground">
-                            {pctKort(g.kostenAandeel)}
+                        ) : (
+                          <span className="ml-auto shrink-0 whitespace-nowrap text-micro tabular-nums text-muted-foreground">
+                            {pctKort(g.kostenAandeel)} van de kosten
                           </span>
-                        </span>
+                        )
                       )}
                     </div>
                   </div>
