@@ -126,8 +126,13 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      <div className="px-5 py-5">
-        <div className="flex flex-wrap items-start justify-center gap-10">
+      {/* Smalle kolom: kleinere marge en tussenruimte, zodat de twee ringen NAAST elkaar passen.
+          Op 411px breed vielen ze eronder met px-5 en gap-10 (2x180 + 40 + 40 = 440 > 411), en dan
+          werd deze kaart 859px hoog -- bijna twee keer de kaart ernaast. 2x180 + 16 + 24 = 400 past
+          wel. De ringen horen ook inhoudelijk naast elkaar: kosten en conversies zijn een
+          vergelijking, en die lees je niet als je moet scrollen tussen de twee. */}
+      <div className="px-3 py-5 @2xl:px-5">
+        <div className="flex flex-wrap items-start justify-center gap-4 @2xl:gap-10">
           <figure className="flex flex-col items-center gap-2">
             <DonutChart
               slices={costSlices}

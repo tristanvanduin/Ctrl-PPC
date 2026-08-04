@@ -156,5 +156,47 @@ const r = (groep: string, type: string, label: string, id: string, month = "2026
 check("drie verwachte types, video achteraan",
   VERWACHTE_TYPES.join(",") === "TEXT,IMAGE,YOUTUBE_VIDEO", VERWACHTE_TYPES.join(","));
 
+// ── Beperkt houden bij veel groepen ───────────────────────────────────────
+//
+// Een account kan tientallen assetgroepen hebben. Ze allemaal tonen maakt het blok onbegrensd
+// hoog en zet de lezer aan het zoeken naar de ene die ertoe doet. Wat er op het scherm hoort is
+// wat aandacht vraagt; de rest wordt geteld.
+
+{
+  const compleet = (n: string) => [r(n, "TEXT", "GOOD", `${n}-t`), r(n, "IMAGE", "GOOD", `${n}-i`), r(n, "YOUTUBE_VIDEO", "GOOD", `${n}-v`)];
+  const d = analyseerAssetdekking([
+    ...compleet("A"), ...compleet("B"), ...compleet("C"), ...compleet("D"),
+    r("Zonder video", "TEXT", "GOOD", "z-t"), r("Zonder video", "IMAGE", "GOOD", "z-i"),
+    r("Met zwak", "TEXT", "LOW", "m-t"), r("Met zwak", "IMAGE", "GOOD", "m-i"), r("Met zwak", "YOUTUBE_VIDEO", "GOOD", "m-v"),
+  ]);
+  check("alle groepen blijven beschikbaar", d.groepen.length === 6, String(d.groepen.length));
+  check("alleen twee vragen aandacht", d.aandacht.length === 2, String(d.aandacht.length));
+  check("de rest wordt geteld, niet opgesomd", d.compleet === 4, String(d.compleet));
+  // De ontbrekende video bovenaan: dat is de bevinding met de meeste impact.
+  check("ontbrekende video staat bovenaan", d.aandacht[0].groep === "Zonder video",
+    d.aandacht.map((g) => g.groep).join(","));
+}
+
+// Bij gelijke soort probleem telt het aantal zwakke assets, aflopend.
+{
+  const g = (n: string, zwak: number) => [
+    r(n, "TEXT", zwak > 0 ? "LOW" : "GOOD", `${n}-t`),
+    r(n, "TEXT", zwak > 1 ? "LOW" : "GOOD", `${n}-t2`),
+    r(n, "IMAGE", "GOOD", `${n}-i`), r(n, "YOUTUBE_VIDEO", "GOOD", `${n}-v`),
+  ];
+  const d = analyseerAssetdekking([...g("Een zwak", 1), ...g("Twee zwak", 2)]);
+  check("meer zwakke assets staat hoger", d.aandacht[0].groep === "Twee zwak",
+    d.aandacht.map((x) => `${x.groep}:${x.zwak}`).join(","));
+}
+
+// Alles in orde: niets vraagt aandacht, en dan hoort er ook geen lijst te staan.
+{
+  const d = analyseerAssetdekking([
+    r("A", "TEXT", "GOOD", "a1"), r("A", "IMAGE", "GOOD", "a2"), r("A", "YOUTUBE_VIDEO", "GOOD", "a3"),
+  ]);
+  check("zonder problemen geen aandachtslijst", d.aandacht.length === 0);
+  check("en alles telt als compleet", d.compleet === 1);
+}
+
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

@@ -75,6 +75,17 @@ export type Groepsdekking = {
 
 export type Assetdekking = {
   groepen: Groepsdekking[];
+  /**
+   * Groepen die iets missen of zwakke assets hebben. Dit is wat er op het scherm hoort.
+   *
+   * Een account kan tientallen assetgroepen hebben, over meerdere PMax-campagnes. Ze allemaal
+   * tonen maakt het blok onbegrensd hoog en zet de lezer aan het zoeken naar de ene die ertoe
+   * doet. De complete groepen worden geteld en niet opgesomd: "zeven compleet" zegt alles wat je
+   * over zeven groepen zonder probleem hoeft te weten.
+   */
+  aandacht: Groepsdekking[];
+  /** Hoeveel groepen niets mankeren. Alleen het aantal; zie hierboven. */
+  compleet: number;
   /** Groepen zonder eigen video. Het gat dat ertoe doet; zie de kop van dit bestand. */
   zonderVideo: string[];
   zwakTotaal: number;
@@ -143,7 +154,26 @@ export function analyseerAssetdekking(regels: readonly AssetRegel[]): Assetdekki
     .map((g) => g.groep);
   const zwakTotaal = groepen.reduce((s, g) => s + g.zwak, 0);
 
-  return { groepen, zonderVideo, zwakTotaal, samenvatting: bouwSamenvatting(zonderVideo, zwakTotaal) };
+  // Aandacht eerst, en binnen aandacht de ontbrekende video's bovenaan: dat is de bevinding met
+  // de meeste impact (zie de kop van dit bestand). Daarna op aantal zwakke assets, aflopend.
+  const aandacht = groepen
+    .filter((g) => g.ontbrekend.length > 0 || g.zwak > 0)
+    .sort((a, b) => {
+      const av = a.ontbrekend.includes("YOUTUBE_VIDEO") ? 1 : 0;
+      const bv = b.ontbrekend.includes("YOUTUBE_VIDEO") ? 1 : 0;
+      if (av !== bv) return bv - av;
+      if (a.zwak !== b.zwak) return b.zwak - a.zwak;
+      return a.groep.localeCompare(b.groep, "nl");
+    });
+
+  return {
+    groepen,
+    aandacht,
+    compleet: groepen.length - aandacht.length,
+    zonderVideo,
+    zwakTotaal,
+    samenvatting: bouwSamenvatting(zonderVideo, zwakTotaal),
+  };
 }
 
 /**
