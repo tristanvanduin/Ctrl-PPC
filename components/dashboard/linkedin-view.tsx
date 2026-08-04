@@ -25,7 +25,7 @@ const SECTIONS = [
   "Lead-forms",
 ];
 
-export function LinkedInView({ clientId, geoClone, edition }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null }) {
+export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
   const demo = isDemoMode();
   return (
     <div className="space-y-6">
@@ -40,7 +40,15 @@ export function LinkedInView({ clientId, geoClone, edition }: { clientId: string
             : <>Account-brede LinkedIn-cijfers: kerncijfers over de laatste 28 dagen, pacing tegen vorige maand, maandverloop en de campagnes.</>
         }
         delivers={SECTIONS}
-        analysesHint={<>De LinkedIn-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong> → LinkedIn.</>}
+        analysesHint={
+          /* De verwijzing "→ LinkedIn" klopt alleen als er een kanaalkiezer IS. Bij een klant
+             met alleen dit kanaal is die balk weg (zie lib/kanalen/beschikbaar.ts), en dan wijst
+             deze zin naar een tabblad dat niet bestaat -- je klikt en zoekt naar iets wat er niet is.
+             Voor 62 van de 71 klanten in de database is precies dat de situatie. */
+          meerdereKanalen
+            ? <>De LinkedIn-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong> → LinkedIn.</>
+            : <>De LinkedIn-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong>.</>
+        }
         warning={!demo ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
             Het LinkedIn-datamodel en de sync-laag staan klaar. Zodra de LinkedIn-koppeling live is en de

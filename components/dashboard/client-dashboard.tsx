@@ -377,8 +377,8 @@ export function ClientDashboard({ client }: { client: Client }) {
                   ook in demo-modus. */}
               <PeriodSummary data={clientData.data} />
               <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
-              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
-              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
+              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
+              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "blended" && <CrossChannelView clientId={client.id} />}
               {channel === "google" && (
               <>

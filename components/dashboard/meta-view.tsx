@@ -32,7 +32,7 @@ import { isDemoMode } from "@/lib/demo/demo-mode";
 
 const SECTIONS = ["Campagnes", "Ad sets", "Advertenties & creatives", "Breakdowns (leeftijd, plaatsing, device)"];
 
-export function MetaView({ clientId, geoClone, edition }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null }) {
+export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
   const [connected, setConnected] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -58,7 +58,15 @@ export function MetaView({ clientId, geoClone, edition }: { clientId: string; ge
             : <>Account-brede Meta-cijfers: kerncijfers over de laatste 28 dagen, pacing tegen vorige maand, maandverloop en de campagnes.</>
         }
         delivers={SECTIONS}
-        analysesHint={<>De Meta-analyses (maand-SOP, creative vision, briefing, signalen) draai je via het tabblad <strong>Analyses</strong> → Meta.</>}
+        analysesHint={
+          /* De verwijzing "→ Meta" klopt alleen als er een kanaalkiezer IS. Bij een klant
+             met alleen dit kanaal is die balk weg (zie lib/kanalen/beschikbaar.ts), en dan wijst
+             deze zin naar een tabblad dat niet bestaat -- je klikt en zoekt naar iets wat er niet is.
+             Voor 62 van de 71 klanten in de database is precies dat de situatie. */
+          meerdereKanalen
+            ? <>De Meta-analyses (maand-SOP, creative vision, briefing, signalen) draai je via het tabblad <strong>Analyses</strong> → Meta.</>
+            : <>De Meta-analyses (maand-SOP, creative vision, briefing, signalen) draai je via het tabblad <strong>Analyses</strong>.</>
+        }
         warning={connected === false ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
             Meta is nog niet gekoppeld. Configureer de Meta-credentials (env) en draai de sync; daarna vult dit tabblad met campagnes, ad sets, creatives en breakdowns.
