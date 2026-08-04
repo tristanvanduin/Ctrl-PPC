@@ -115,7 +115,7 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
 
   if (cells === null) {
     return (
-      <CollapsiblePanel {...panelProps}>
+      <CollapsiblePanel {...panelProps} naadloos>
         <div className="flex items-center justify-center py-10 text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin mr-2" aria-hidden /> <span className="text-body">Land × kanaal laden…</span>
         </div>
@@ -124,7 +124,7 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
   }
   if (!totals || totals.countries.length === 0) {
     return (
-      <CollapsiblePanel {...panelProps}>
+      <CollapsiblePanel {...panelProps} naadloos>
         <p className="text-body text-muted-foreground px-5 py-6">
           Nog geen land×kanaal-data. Dit komt uit <code>ads_geo_performance_monthly</code> gecombineerd
           met het campagnetype; zodra de geo-sync gedraaid heeft verschijnt de matrix hier.
@@ -136,7 +136,7 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
   const hasUnsplit = totals.channels.some(isUnsplit);
 
   return (
-    <CollapsiblePanel {...panelProps}>
+    <CollapsiblePanel {...panelProps} naadloos>
     <section className="space-y-3 px-5 py-4">
       <header className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex gap-1" role="group" aria-label="Metriek">

@@ -47,6 +47,7 @@ export function CollapsiblePanel({
   icon,
   meta,
   defaultOpen = true,
+  naadloos = false,
   children,
 }: {
   /** Stabiele sleutel voor het onthouden van open/dicht. Verander hem niet zonder reden. */
@@ -58,6 +59,14 @@ export function CollapsiblePanel({
   meta?: React.ReactNode;
   defaultOpen?: boolean;
   children: React.ReactNode;
+  /**
+   * Zonder eigen kaartrand, voor een paneel dat ín een andere kaart staat.
+   *
+   * Een paneel met rand, hoeken en schaduw binnen een kaart die datzelfde al heeft, geeft een
+   * kaart-in-een-kaart: twee randen op drie pixels van elkaar. Naadloos houdt alleen de scheiding
+   * bovenaan, zodat het als een volgend blok van dezelfde kaart leest.
+   */
+  naadloos?: boolean;
 }) {
   // Server en eerste client-render moeten hetzelfde opleveren, dus de opgeslagen keuze wordt
   // pas ná het monteren toegepast. Zou dat in de initializer staan, dan hydrateert React op een
@@ -78,7 +87,7 @@ export function CollapsiblePanel({
   const paneelId = `paneel-${id}`;
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className={naadloos ? "border-t border-border" : "bg-card rounded-xl border border-border shadow-sm overflow-hidden"}>
       <button
         type="button"
         onClick={toggle}

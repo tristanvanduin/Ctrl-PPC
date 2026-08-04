@@ -495,14 +495,18 @@ export function ClientDashboard({ client }: { client: Client }) {
                     : "Waar het verkeer en de conversies vandaan komen"
                 }
               >
-                <GeoBreakdown clientId={client.id} />
                 {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
-                    landentabel met één kolom -- dat is precies wat GeoBreakdown hierboven al toont,
-                    en het bijschrift belooft een "kanaalmix" die niet bestaat.
+                    landentabel met één kolom -- dat is precies wat de kaart al toont, en het
+                    bijschrift belooft een "kanaalmix" die niet bestaat.
 
-                    NAAST de kaart geprobeerd (7 + 5) en teruggedraaid: dit paneel begint ingeklapt,
-                    dus dat werd een strook van 60px naast een kaart van 481px. Gemeten. */}
-                {(kanalen?.length ?? 0) > 1 && <GeoChannelMatrix clientId={client.id} />}
+                    IN dezelfde kaart en niet eronder: als losse kaart werd het een dichtgeklapte
+                    strook van 60px onder een kaart van 600, en twee van die balkjes op elkaar lezen
+                    als restjes. Naast de kaart geprobeerd (7 + 5) en ook teruggedraaid, om dezelfde
+                    reden: een strook naast een kaart van 481px is geen compositie. */}
+                <GeoBreakdown
+                  clientId={client.id}
+                  verdieping={(kanalen?.length ?? 0) > 1 ? <GeoChannelMatrix clientId={client.id} /> : undefined}
+                />
               </Sectie>
 
               {/* Video, PMax-netwerken, placements en creatives horen bij elkaar: het is allemaal

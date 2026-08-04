@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { Globe2, Loader2, ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
 import { countryLabel } from "@/lib/countries";
@@ -51,7 +51,18 @@ const METRICS: MetricDef[] = [
 
 const CHANNEL_LABEL: Record<Channel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", blended: "Alle kanalen" };
 
-export function GeoBreakdown({ clientId, channel = "google" }: { clientId: string; channel?: Channel }) {
+export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
+  clientId: string;
+  channel?: Channel;
+  /**
+   * Extra uitsplitsing onderin dezelfde kaart, bijvoorbeeld land x kanaal.
+   *
+   * Als eigen kaart eronder werd dit een losse strook van 60px onder een kaart van 600: twee
+   * dichtgeklapte balkjes op elkaar lezen als restjes in plaats van als twee manieren om dieper
+   * te kijken. In dezelfde kaart is het één blok met twee uitklappers.
+   */
+  verdieping?: ReactNode;
+}) {
   const [metricKey, setMetricKey] = useState<MetricKey>("conversions");
   const [focus, setFocus] = useState<"US" | null>(null); // null = wereld, "US" = staten-drilldown
   // De tabel begint dicht: de kaart is het antwoord op "waar komt het vandaan", de tabel is de
@@ -276,6 +287,8 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
           </TotaalRij>
         </Tabel>
       </div>
+
+      {verdieping}
     </div>
   );
 }
