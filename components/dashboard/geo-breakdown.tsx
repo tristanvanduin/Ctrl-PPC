@@ -11,6 +11,7 @@ import { MapErrorBoundary } from "./map-error-boundary";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { GeoRanglijst } from "./geo-ranglijst";
 
 // De kaarten (SVG + geometrie + d3-geo) client-only en code-split laden: pas geladen als deze
 // weergave rendert, en nooit tijdens SSR.
@@ -179,7 +180,12 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
       {/* De kaart schaalde mee met de kolombreedte, en werd op een breed scherm bijna 400px hoog
           voordat er ook maar een cijfer in beeld kwam. Een wereldkaart wordt niet beter van meer
           pixels; hij wordt alleen duurder in verticale ruimte. */}
-      <div className="px-3 py-3 max-w-[680px] mx-auto w-full">
+      {/* Kaart en ranglijst naast elkaar. Twee vragen, twee vormen: de kaart zegt WAAR, de
+          ranglijst zegt WIE DE GROOTSTE IS en hoeveel dat scheelt. Dat tweede leest niemand van
+          een projectie af -- daar wint Groenland altijd. De ruimte naast een kaart van 680px was
+          op een breed scherm leeg; nu draagt hij de cijfers die anders een klik weg zaten. */}
+      <div className="grid grid-cols-1 gap-5 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="w-full max-w-[680px] mx-auto">
         {ranked.length === 0 ? (
           <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
         ) : (
@@ -205,6 +211,24 @@ export function GeoBreakdown({ clientId, channel = "google" }: { clientId: strin
             voor dit account nog niet gesynct.
           </p>
         )}
+      </div>
+
+      <GeoRanglijst
+        regels={ranked.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
+        metriekLabel={metric.label}
+        klikbaar={(code) => canDrillUs && code === "US" && focus == null}
+        onKlik={() => setFocus("US")}
+        totalen={[
+          { label: `Aantal ${geoWord}en`, waarde: String(ranked.length) },
+          { label: "Vertoningen", waarde: int(totaal.impressions) },
+          { label: "Klikken", waarde: int(totaal.clicks) },
+          { label: "Conversies", waarde: nf(1).format(totaal.conversions) },
+          // Ratio's uit de TOTALEN en niet als gemiddelde van de landwaarden: een gemiddelde CTR
+          // over landen weegt Nederland even zwaar als Malta.
+          { label: "CTR", waarde: pct(totaal.impressions > 0 ? totaal.clicks / totaal.impressions : null) },
+          { label: "CPA", waarde: eur(totaal.conversions > 0 ? totaal.cost / totaal.conversions : null) },
+        ]}
+      />
       </div>
 
       {/* Volledige tabel: alle metrics per land/staat, zodat je naast de gekozen metric ook de rest ziet. */}

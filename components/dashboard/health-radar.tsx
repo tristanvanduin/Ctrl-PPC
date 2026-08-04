@@ -103,7 +103,10 @@ export function HealthRadar({
           p.x === null || p.y === null ? null : (
             <circle
               key={p.as}
-              cx={p.x} cy={p.y} r={3.5}
+              // r=4 en niet 3,5: de ondergrens voor een afleesbare marker is 8px doorsnede. Op
+              // 3,5 was hij 7px -- net eronder, en dat is precies het soort misser dat je alleen
+              // vindt door hem na te meten in plaats van na te kijken.
+              cx={p.x} cy={p.y} r={4}
               fill={kleur}
               className="stroke-card"
               strokeWidth={2}
