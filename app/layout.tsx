@@ -6,6 +6,7 @@ import { TopBar } from "@/components/layout/top-bar";
 import { THEMA_INIT_SCRIPT } from "@/components/ui/thema-schakelaar";
 import { BRAND_NAME } from "@/lib/branding/brand";
 import "./globals.css";
+import { CANONIEK_DOMEIN } from "@/lib/domein";
 
 const ubuntu = Ubuntu({
   variable: "--font-ubuntu",
@@ -19,6 +20,11 @@ const ubuntu = Ubuntu({
 // voor een verwijzing die nergens naartoe leidde.
 
 export const metadata: Metadata = {
+  // metadataBase op het canonieke domein: zonder deze regel maakt Next relatieve URL's in
+  // og:image en canonical op basis van de host waar de pagina toevallig vandaan komt. Bij twee
+  // domeinen levert dat verwijzingen naar .nl op, terwijl daar alleen een doorverwijzing staat.
+  metadataBase: new URL(`https://${CANONIEK_DOMEIN}`),
+  alternates: { canonical: "/" },
   title: `${BRAND_NAME} — SEA Dashboard`,
   description: "Revenue & Conversie Forecasting Dashboard voor het SEA-team",
 };

@@ -11,6 +11,7 @@
 // =====================================================================
 
 import { NextResponse, type NextRequest } from "next/server";
+import { canoniekeDoelUrl } from "@/lib/domein";
 import { createServerClient } from "@supabase/ssr";
 import {
   isPublicPath, isCronPath, capabilityForApi, can, canAccessClient,
@@ -18,6 +19,21 @@ import {
 } from "@/lib/auth/roles";
 
 export async function middleware(request: NextRequest) {
+  // ── Canoniek domein ───────────────────────────────────────────────────────
+  //
+  // ctrlppc.com is de echte plek, ctrlppc.nl verwijst erheen. Dit staat BOVEN de auth-afslag met
+  // opzet: het is een domeinkwestie en geen authkwestie, en zolang de enforcement uit staat zou de
+  // doorverwijzing anders helemaal niet werken.
+  //
+  // Waarom dit ertoe doet en niet alleen netjes is: sessiecookies horen bij één domein. Logt
+  // iemand in op .nl en komt hij daarna op .com, dan is zijn sessie weg zonder foutmelding. De
+  // doorverwijzing vooraan zorgt dat er maar één domein is waarop dat kan gebeuren.
+  //
+  // 308 en geen 307: dit is een blijvende verhuizing, en zoekmachines mogen dat weten. De methode
+  // blijft behouden, dus een POST die hier langskomt gaat niet stiekem als GET verder.
+  const canoniek = canoniekeDoelUrl(request.url);
+  if (canoniek) return NextResponse.redirect(canoniek, 308);
+
   if (process.env.O1_AUTH_ENFORCED !== "true") return NextResponse.next();
 
   const { pathname } = request.nextUrl;
