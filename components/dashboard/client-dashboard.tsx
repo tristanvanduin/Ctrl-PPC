@@ -75,6 +75,7 @@ import { useClientData } from "@/lib/use-client-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import { Sectie } from "@/components/ui/sectie";
+import { Bento } from "@/components/ui/bento";
 
 interface Client {
   id: string;
@@ -451,10 +452,26 @@ export function ClientDashboard({ client }: { client: Client }) {
                   : "Per maand: waar staan we en wat is de trend?"}
                 actie={upcomingEdition && <TijdasKeuze value={tijdas} onChange={setTijdas} />}
               >
-                {beursAs
-                  ? <FairWeeksOverview clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition!} />
-                  : <MonthlyOverview clientId={client.id} countryFilter={countryFilter} />}
-                <PacingMonitor clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition} />
+                {/* De enige plek op deze pagina waar naast elkaar meetbaar beter is. De
+                    pacing-strook is 144px hoog -- de enige echt compacte kaart hier -- en stond
+                    als losse band onder een tabel van 388px. Ernaast leest hij als context bij
+                    die tabel in plaats van als een volgend onderwerp. */}
+                <Bento
+                  blokken={[
+                    {
+                      id: "verloop",
+                      span: 8,
+                      render: () => beursAs
+                        ? <FairWeeksOverview clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition!} />
+                        : <MonthlyOverview clientId={client.id} countryFilter={countryFilter} />,
+                    },
+                    {
+                      id: "pacing",
+                      span: 4,
+                      render: () => <PacingMonitor clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition} />,
+                    },
+                  ]}
+                />
               </Sectie>
 
               <Sectie
@@ -481,8 +498,10 @@ export function ClientDashboard({ client }: { client: Client }) {
                 <GeoBreakdown clientId={client.id} />
                 {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
                     landentabel met één kolom -- dat is precies wat GeoBreakdown hierboven al toont,
-                    en het bijschrift belooft een "kanaalmix" die niet bestaat. Voor 62 van de 71
-                    klanten stond hier dus een tweede kopie van de tabel erboven. */}
+                    en het bijschrift belooft een "kanaalmix" die niet bestaat.
+
+                    NAAST de kaart geprobeerd (7 + 5) en teruggedraaid: dit paneel begint ingeklapt,
+                    dus dat werd een strook van 60px naast een kaart van 481px. Gemeten. */}
                 {(kanalen?.length ?? 0) > 1 && <GeoChannelMatrix clientId={client.id} />}
               </Sectie>
 
@@ -494,6 +513,12 @@ export function ClientDashboard({ client }: { client: Client }) {
                 titel="Waar het budget landt"
                 bijschrift="Video, netwerken en placements"
               >
+                {/* NAAST ELKAAR GEPROBEERD EN TERUGGEDRAAID. Gemeten op de demo-klant:
+                      6 + 6  de videotabel vraagt 835px en krijgt er 622 -- scrollt
+                      8 + 4  tabel past (835/835), maar de PMax-kaart wordt 826px hoog naast een
+                             videokaart van 322px: een gat van 500px
+                    Alle drie de blokken hier zijn breed; er is geen compacte metgezel. Naast
+                    elkaar zetten ruilt een scrollende tabel in voor een groter gat. */}
                 <VideoPerformance clientId={client.id} />
                 <PmaxNetworkSplit clientId={client.id} />
                 <VideoPlacements clientId={client.id} />

@@ -114,7 +114,9 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         </span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* @2xl en niet lg: deze kaart kan nu in een bentokolom van 400px staan, en dan zijn vier
+          tegels naast elkaar 100px breed. lg: kijkt naar het venster en ziet dat verschil niet. */}
+      <div className="grid grid-cols-2 gap-4 @2xl:grid-cols-4">
         {/* Conversions pacing */}
         <div className="flex items-center gap-3">
           <div className="relative">
