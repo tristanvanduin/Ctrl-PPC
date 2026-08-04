@@ -18,6 +18,7 @@ import { metaDailyToDbRow, META_DAILY_CONFLICT } from "./rows";
 import { trailingWindow, backfillWindow, monthlyChunks } from "./sync-windows";
 import { logger } from "@/lib/logger";
 import { META_GRAPH_BASE } from "./api-version";
+import { schrijftabel } from "@/lib/data-access/feitentabellen";
 
 // De versie staat in lib/meta/api-version.ts, zodat hij niet opnieuw uit de pas kan lopen met
 // het koppelscherm. Blijft hier herge-exporteerd voor bestaande importeurs.
@@ -28,11 +29,13 @@ const log = logger.child("meta-sync");
 
 export type MetaLevel = "account" | "campaign" | "adset" | "ad";
 
+// adset staat er los in: die tabel krijgt geen view in fase 3, dus zijn schrijfbestemming
+// verandert niet mee. Hem toch door schrijftabel() halen zou een verband suggereren dat er niet is.
 const LEVEL_TABLE: Record<MetaLevel, string> = {
-  account: "meta_account_daily",
-  campaign: "meta_campaign_daily",
+  account: schrijftabel("meta_account_daily"),
+  campaign: schrijftabel("meta_campaign_daily"),
   adset: "meta_adset_daily",
-  ad: "meta_ad_daily",
+  ad: schrijftabel("meta_ad_daily"),
 };
 
 // De velden die we per insights-pull vragen. De transform mapt deze naar getypeerde kolommen.

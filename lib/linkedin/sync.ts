@@ -19,6 +19,7 @@ import { linkedinDailyToDbRow, linkedinDemographicToDbRow, LINKEDIN_DAILY_CONFLI
 import { buildAnalyticsQuery, splitFieldSets } from "./restli";
 import { trailingWindow, backfillWindow, monthlyChunks } from "./sync-windows";
 import { logger } from "@/lib/logger";
+import { schrijftabel } from "@/lib/data-access/feitentabellen";
 
 // Pin een recente ondersteunde versie; verifieer in de docs bij een upgrade (versies
 // verouderen na circa een jaar). Geen verspreide literals: alles via deze constante.
@@ -30,9 +31,9 @@ const log = logger.child("linkedin-sync");
 export type LinkedInLevel = "account" | "campaign" | "creative";
 
 const LEVEL_TABLE: Record<LinkedInLevel, string> = {
-  account: "linkedin_account_daily",
-  campaign: "linkedin_campaign_daily",
-  creative: "linkedin_creative_daily",
+  account: schrijftabel("linkedin_account_daily"),
+  campaign: schrijftabel("linkedin_campaign_daily"),
+  creative: schrijftabel("linkedin_creative_daily"),
 };
 
 const LEVEL_PIVOT: Record<LinkedInLevel, string> = {

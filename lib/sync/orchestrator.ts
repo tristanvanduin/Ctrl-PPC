@@ -58,6 +58,7 @@ import { aggregateSearchTermsByMonth } from "../api/google-ads-search-term-aggre
 import { negativesToDbRows } from "../api/google-ads-negatives-transform";
 import { syncMerchantProductSnapshots } from "../api/merchant-products";
 import { logger } from "@/lib/logger";
+import { schrijftabel } from "@/lib/data-access/feitentabellen";
 import { withFetchFailures, hasFetchFailure } from "../api/fetch-failures";
 import { buildRegionRows, overslaanSamenvatting } from "@/lib/geo/region-rows";
 
@@ -512,13 +513,13 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
 
   // Core tables
   await Promise.all([
-    syncDataset("ads_account_monthly", () => upsertBatch(supabase, "ads_account_monthly",
+    syncDataset("ads_account_monthly", () => upsertBatch(supabase, schrijftabel("ads_account_monthly"),
       monthlyRaw.map((m) => ({ client_id: clientId, month: m.date, impressions: m.impressions, clicks: m.clicks, cost: m.cost, conversions: m.conversions, conversions_value: m.conversionsValue, ctr: m.ctr, avg_cpc: m.avgCpc, cost_per_conversion: m.costPerConversion, conversion_rate: m.conversionRate, roas: roas(m.conversionsValue, m.cost) })),
       "client_id,month")),
     syncDataset("ads_account_weekly", () => upsertBatch(supabase, "ads_account_weekly",
       weeklyRaw.map((m) => ({ client_id: clientId, week_start: m.date, impressions: m.impressions, clicks: m.clicks, cost: m.cost, conversions: m.conversions, conversions_value: m.conversionsValue, ctr: m.ctr, avg_cpc: m.avgCpc, cost_per_conversion: m.costPerConversion, conversion_rate: m.conversionRate, roas: roas(m.conversionsValue, m.cost) })),
       "client_id,week_start")),
-    syncDataset("ads_campaign_monthly", () => upsertBatch(supabase, "ads_campaign_monthly",
+    syncDataset("ads_campaign_monthly", () => upsertBatch(supabase, schrijftabel("ads_campaign_monthly"),
       campaignsRaw.map((c) => ({ client_id: clientId, campaign_id: c.campaignId, campaign_name: c.campaignName, campaign_status: c.campaignStatus, campaign_type: c.campaignType, month: c.date, impressions: c.impressions, clicks: c.clicks, cost: c.cost, conversions: c.conversions, conversions_value: c.conversionsValue, ctr: c.ctr, avg_cpc: c.avgCpc, cost_per_conversion: c.costPerConversion, conversion_rate: c.conversionRate, roas: roas(c.conversionsValue, c.cost), avg_cpm: c.avgCpm, video_views: c.videoViews, avg_cpv: c.avgCpv, video_view_rate: c.videoViewRate, video_quartile_p25: c.videoQuartileP25, video_quartile_p50: c.videoQuartileP50, video_quartile_p75: c.videoQuartileP75, video_quartile_p100: c.videoQuartileP100 })),
       "client_id,campaign_id,month")),
     syncDataset("ads_campaign_impression_share", () => upsertBatch(supabase, "ads_campaign_impression_share",

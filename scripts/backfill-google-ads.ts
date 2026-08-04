@@ -39,6 +39,7 @@ import {
   type GoogleAdsCredentials,
 } from "../lib/api/google-ads";
 import { getDateRange13Months } from "../lib/sync/orchestrator";
+import { schrijftabel } from "../lib/data-access/feitentabellen";
 
 // ── Load .env.local ─────────────────────────────────────────────────────────
 
@@ -621,9 +622,9 @@ async function backfillClient(
 
   const results = await Promise.all([
     // Core tables
-    upsertBatch(supabase, "ads_account_monthly", monthlyRows, "client_id,month"),
+    upsertBatch(supabase, schrijftabel("ads_account_monthly"), monthlyRows, "client_id,month"),
     upsertBatch(supabase, "ads_account_weekly", weeklyRows, "client_id,week_start"),
-    upsertBatch(supabase, "ads_campaign_monthly", campaignRows, "client_id,campaign_id,month"),
+    upsertBatch(supabase, schrijftabel("ads_campaign_monthly"), campaignRows, "client_id,campaign_id,month"),
     upsertBatch(supabase, "ads_campaign_impression_share", isRows, "client_id,campaign_id,month"),
     upsertBatch(supabase, "ads_adgroup_monthly", agRows, "client_id,ad_group_id,month"),
     replaceBatch(supabase, "ads_search_terms_wasteful", dedup(stRows, ["client_id", "week_start", "search_term"]), clientId),
