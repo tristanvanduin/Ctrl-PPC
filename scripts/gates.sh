@@ -24,6 +24,7 @@ set -uo pipefail
 
 HYGIENE_TIMEOUT=${HYGIENE_TIMEOUT:-60}
 RPC_TIMEOUT=${RPC_TIMEOUT:-30}
+VIEW_TIMEOUT=${VIEW_TIMEOUT:-60}
 TSC_TIMEOUT=${TSC_TIMEOUT:-300}
 # De suite doet er ~32s over sinds de runner het tsx-binary rechtstreeks aanroept en
 # parallelliseert (was ~460s). 300s laat ruimte voor een tragere machine en vangt een
@@ -71,6 +72,16 @@ fi
 # gebeurd met verwijder_klant_data; zie migratie 040. Slaat zichzelf over zonder databasegegevens.
 if [ "$doel" = "alles" ] || [ "$doel" = "rpc" ]; then
   stap rpc-rechten "$RPC_TIMEOUT" node scripts/check-rpc-rechten.mjs || falen=$?
+fi
+
+# Zelfde soort poort, zelfde reden: dit staat in de DATABASE en niet in de code. Fase 3 van
+# docs/ONTWERP_multitenant_schema.md zet views onder de oude tabelnamen, en een view die een kolom
+# mist of een waarde anders berekent geeft geen fout maar een ander getal. De kandidaat-views staan
+# daarom eerst NAAST hun tabel zodat de vergelijking te maken is; deze poort maakt hem, elke run.
+# Heeft al een keer gewerkt: de eerste versie rekende conversion_rate zelf uit en zat er op 48,6 %
+# van de PMax-rijen naast. Slaat zichzelf over zonder databasegegevens.
+if [ "$doel" = "alles" ] || [ "$doel" = "views" ]; then
+  stap view-dekking "$VIEW_TIMEOUT" node scripts/check-view-dekking.mjs || falen=$?
 fi
 
 if [ "$doel" = "alles" ] || [ "$doel" = "tsc" ]; then
