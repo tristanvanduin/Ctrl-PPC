@@ -9,7 +9,7 @@ import { isDemoMode } from "@/lib/demo/demo-mode";
 import { type GeoAgg } from "@/lib/demo/geo-demo";
 import { MapErrorBoundary } from "./map-error-boundary";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
-import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
+import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { GeoRanglijst } from "./geo-ranglijst";
 
@@ -135,19 +135,13 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
   // inkleurt. Zo lezen kaart en tabel hetzelfde verhaal in plaats van elk een eigen.
   //
   // Alleen bij optelbare grootheden. CTR, conversieratio en CPA zijn verhoudingen: daar bestaat
-  // "aandeel van het geheel" niet, en bij CPA zou een lange streep "veel" zeggen waar het "duur"
-  // betekent. Kies je zo'n metric, dan staat er nergens een streep.
-  const balkKolom = (["impressions", "clicks", "conversions"] as const).find((k) => k === metricKey) ?? null;
-  // Tegen de koploper en niet tegen de som: bij vijftig landen is elk aandeel-van-het-totaal klein
-  // en zijn alle streepjes even kort.
-  const grootste = useMemo(
-    () => (balkKolom ? Math.max(0, ...ranked.map(({ c }) => c[balkKolom])) : 0),
-    [ranked, balkKolom],
-  );
-  const balk = (c: GeoAgg, kolom: "impressions" | "clicks" | "conversions", waarde: string) =>
-    balkKolom === kolom
-      ? <AandeelCel waarde={waarde} aandeel={grootste > 0 ? c[kolom] / grootste : 0} />
-      : <GetalCel>{waarde}</GetalCel>;
+  // GEEN AANDEELBALKEN IN DEZE TABEL. Ze stonden er wel, op de gekozen metric -- maar de ranglijst
+  // naast de kaart draagt precies diezelfde streep, voor dezelfde landen, in dezelfde volgorde.
+  // Twee keer hetzelfde beeld laat een lezer zoeken naar het verschil dat er niet is.
+  //
+  // De taakverdeling is nu: de LIJST toont de verhouding (rangorde + balk, één metric), de TABEL
+  // toont de cijfers naast elkaar (zes metrics, geen beeld). Dat zijn twee vragen en daarom twee
+  // vormen; hetzelfde onderscheid als tussen de kaart en de lijst.
 
   // Tijdens het laden nog niets concluderen: "één of geen land" was anders even waar voor elke
   // klant, en dan knippert de kaart weg en weer terug.
@@ -229,7 +223,10 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
         metriekLabel={metric.label}
         klikbaar={(code) => canDrillUs && code === "US" && focus == null}
         onKlik={() => setFocus("US")}
-        totalen={[
+        // Alleen zolang de tabel dicht is. Sla je hem open, dan staan diezelfde zes getallen
+        // tweehonderd pixels lager in zijn totaalrij. Dit blok bestaat om de kolom naast de kaart
+        // vol te maken; met de tabel open is de kaart toch al langer en zou het herhaling zijn.
+        totalen={tabelOpen ? undefined : [
           { label: `Aantal ${geoWord}en`, waarde: String(ranked.length) },
           { label: "Vertoningen", waarde: int(totaal.impressions) },
           { label: "Klikken", waarde: int(totaal.clicks) },
@@ -253,10 +250,10 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
         <Tabel>
           <Kop>
             <KolomKop>{focus === "US" ? "Staat" : "Land"}</KolomKop>
-            <KolomKop getal bijschrift={balkKolom === "impressions" ? "aandeel" : undefined}>Vertoningen</KolomKop>
-            <KolomKop getal bijschrift={balkKolom === "clicks" ? "aandeel" : undefined}>Klikken</KolomKop>
+            <KolomKop getal>Vertoningen</KolomKop>
+            <KolomKop getal>Klikken</KolomKop>
             <KolomKop getal>CTR</KolomKop>
-            <KolomKop getal bijschrift={balkKolom === "conversions" ? "aandeel" : undefined}>Conversies</KolomKop>
+            <KolomKop getal>Conversies</KolomKop>
             <KolomKop getal>Conv.ratio</KolomKop>
             <KolomKop getal>CPA</KolomKop>
           </Kop>
@@ -264,10 +261,10 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
             {ranked.map(({ c }) => (
               <Rij key={c.code}>
                 <NaamCel>{labelOf(c.code)}</NaamCel>
-                {balk(c, "impressions", int(c.impressions))}
-                {balk(c, "clicks", int(c.clicks))}
+                <GetalCel>{int(c.impressions)}</GetalCel>
+                <GetalCel>{int(c.clicks)}</GetalCel>
                 <GetalCel zacht>{pct(c.impressions > 0 ? c.clicks / c.impressions : null)}</GetalCel>
-                {balk(c, "conversions", c.conversions == null ? "—" : nf(1).format(c.conversions))}
+                <GetalCel>{c.conversions == null ? "—" : nf(1).format(c.conversions)}</GetalCel>
                 <GetalCel zacht>{pct(c.clicks > 0 ? c.conversions / c.clicks : null)}</GetalCel>
                 <GetalCel zacht>{eur(c.conversions > 0 ? c.cost / c.conversions : null)}</GetalCel>
               </Rij>
