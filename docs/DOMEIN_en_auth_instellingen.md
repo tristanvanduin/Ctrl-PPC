@@ -42,47 +42,67 @@ De test legt dat expliciet vast.
 
 ---
 
-## Wat met de hand moet — Supabase
+## Twee lijsten die niet hetzelfde zijn
 
-Deze staan in het Supabase-dashboard onder **Authentication → URL Configuration**. Ik kan ze niet
-lezen of zetten: het access token in deze omgeving mag wel SQL draaien maar geen projectconfiguratie
-benaderen (403 op `/v1/projects/{ref}/config/auth`).
+Dit werd in een eerdere versie van dit document door elkaar gehaald, en het is precies het soort
+verwarring dat een beveiligingsinstelling te ruim maakt.
 
-**Site URL**
+**De doorverwijslijst** staat in `lib/domein.ts`: welke domeinen naar het canonieke domein gaan.
+`localhost` staat daar **niet** in en hoort daar nooit in te staan — de test legt dat vast.
+
+**De toegestane-bestemmingenlijst** staat bij Supabase: waarheen een e-maillink iemand mág sturen
+na het klikken. Elke regel daarin is een bestemming waar een inloglink kan uitkomen. Hoe korter,
+hoe beter.
+
+---
+
+## Wat er NU moet — zolang er geen hosting is
+
+De app draait op dit moment nergens anders dan op een ontwikkelmachine. Zet Site URL dus nog
+**niet** op `ctrlppc.com`: dan wijzen alle uitnodigings- en herstelmails naar een domein waar
+niets staat.
+
+In Supabase, **Authentication → URL Configuration**:
 
 ```
-https://ctrlppc.com
+Site URL       http://localhost:3000
+
+Redirect URLs  http://localhost:3000/**
+               https://ctrlppc.com/**
+               https://www.ctrlppc.com/**
+               https://ctrlppc.nl/**
+               https://www.ctrlppc.nl/**
 ```
 
-Dit is waar Supabase naartoe wijst in de uitnodigings- en herstelmail als er geen expliciete
-`redirectTo` is meegegeven.
+De vier domeinregels doen vandaag niets — er resolvet nog niets — maar ze staan er alvast zodat
+de omschakeling straks één veld is in plaats van vijf.
 
-**Redirect URLs** (de toegestane lijst)
+**Nodig ook niemand uit zolang dit zo staat.** De link in die mail wijst naar `localhost:3000`, en
+dat is de machine van de ontvanger, niet de jouwe. Dat werkt dus voor niemand behalve jezelf.
 
-```
-https://ctrlppc.com/**
-https://www.ctrlppc.com/**
-https://ctrlppc.nl/**
-https://www.ctrlppc.nl/**
-http://localhost:3000/**
-```
+---
 
-De `.nl`-varianten horen erin ook al verwijzen ze door: iemand die op een oude link klikt komt
-eerst daar binnen, en als dat adres niet is toegestaan weigert Supabase het vóórdat de
-doorverwijzing kan werken.
+## Wat er STRAKS moet — zodra de app ergens draait
 
-`localhost` staat erin voor ontwikkeling. Haal hem eruit zodra er echt klanten op zitten — het is
-een toegestane bestemming voor een inloglink, en dat is een bestemming te veel.
+Twee wijzigingen, in deze volgorde:
+
+1. Site URL naar `https://ctrlppc.com`
+2. `http://localhost:3000/**` uit de Redirect URLs halen
+
+Die tweede is de belangrijke, en om precies de reden waarom hij nu wél mag: het is een toegestane
+bestemming voor een inloglink. Zolang jij de enige gebruiker bent is dat een risico dat je zelf
+draagt. Zodra er klanten op zitten niet meer.
 
 ---
 
 ## Wat met de hand moet — DNS en hosting
 
-- `ctrlppc.nl` en `www.ctrlppc.nl` moeten naar dezelfde applicatie wijzen. De doorverwijzing zit
-  in de app, dus het domein moet er wél op uitkomen. Een doorverwijzing bij de registrar werkt
-  ook, maar dan verliest hij meestal het pad — en dan komt iemand met een gedeelde klantlink op
-  de voorpagina uit.
-- `www.ctrlppc.com` idem.
+Er is nog geen hosting. Zodra die er is:
+
+- `ctrlppc.com` en `www.ctrlppc.com` naar de applicatie.
+- `ctrlppc.nl` en `www.ctrlppc.nl` naar **dezelfde applicatie**, niet naar een doorverwijzing bij
+  de registrar. De doorverwijzing zit in de app en behoudt daarmee het pad; een registrar-redirect
+  gooit dat meestal weg, en dan komt iemand met een gedeelde klantlink alsnog op de voorpagina.
 - HTTPS op alle vier, anders volgt er een extra doorverwijzing vóór de onze.
 
 ---
