@@ -587,7 +587,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                         eerste
                         icoon={<TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />}
                         titel="Waar dit jaar op uitkomt"
-                        bijschrift="Gerealiseerd plus prognose per maand, tegen het jaardoel"
+                        bijschrift="Gerealiseerd plus prognose per maand, tegen het geschatte jaardoel (vorig jaar +10%)"
                       >
                         <ForecastTable clientId={client.id} />
                       </Sectie>

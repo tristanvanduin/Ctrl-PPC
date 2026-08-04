@@ -166,7 +166,7 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
               ? `Verhoog maandelijks budget met ${Math.round(forecast.budgetRecommendation.spendIncreasePct)}% `
               : ""}
             naar {new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(forecast.budgetRecommendation.requiredMonthlySpend)}/maand
-            om het jaardoel te halen.
+            om het geschatte jaardoel te halen (vorig jaar +10%; er is nog geen doel ingevoerd).
           </p>
         </div>
       )}

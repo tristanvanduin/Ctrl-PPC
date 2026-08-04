@@ -90,7 +90,7 @@ export function ReportExport({ clientId }: { clientId: string }) {
     if (budget.behindTarget) {
       lines.push("## Budget Aanbeveling");
       lines.push("");
-      lines.push(`Het jaardoel wordt op basis van de huidige trend niet gehaald. Om het doel te bereiken:`);
+      lines.push(`Het GESCHATTE jaardoel (vorig jaar +10%, automatisch afgeleid \u2014 er is nog geen doel ingevoerd) wordt op basis van de huidige trend niet gehaald. Om dat niveau te bereiken:`);
       lines.push("");
       lines.push(`- **Conversie gap**: ${num(budget.conversionGap)} conversies tekort`);
       lines.push(`- **Huidige CPA**: ${fmt(budget.currentCpa)}`);

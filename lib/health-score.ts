@@ -103,8 +103,14 @@ export function computeHealthScore(
     name: "Doelstelling",
     score: targetScore,
     maxScore: 20,
+    // HERKOMST ERBIJ. Er is nog geen scherm om een jaardoel in te voeren: client_targets bestaat
+    // (migratie 002, mét channel-kolom) maar is leeg en wordt door niets geschreven. Het "doel"
+    // waar deze factor tegen afrekent komt uit app/api/google-ads/client-data/route.ts en is
+    // vorig jaar × 1,10. Dat is een extrapolatie met een groeiaanname erin, geen afspraak — en
+    // wie vorig jaar exact herhaalt, scoort hier per constructie slecht. Zolang dat zo is, hoort
+    // het woord "geschat" erbij te staan; anders leest een berekening als een belofte.
     description: heeftDoel
-      ? `Prognose ${Math.round(targetRatio * 100)}% van jaardoel`
+      ? `Prognose ${Math.round(targetRatio * 100)}% van geschat jaardoel (vorig jaar +10%)`
       : "Geen jaardoel ingesteld — niet beoordeeld",
     assessed: heeftDoel,
   });
@@ -112,8 +118,8 @@ export function computeHealthScore(
   if (targetRatio < 0.5 && conv.annualTarget > 0) {
     anomalies.push({
       severity: "critical",
-      title: "Jaardoel in gevaar",
-      description: `Prognose is slechts ${Math.round(targetRatio * 100)}% van het jaardoel. Zonder ingrijpen wordt het doel niet gehaald.`,
+      title: "Geschat jaardoel in gevaar",
+      description: `Prognose is slechts ${Math.round(targetRatio * 100)}% van het geschatte jaardoel (vorig jaar +10%; er is nog geen doel ingevoerd). Zonder ingrijpen wordt dat niveau niet gehaald.`,
     });
   }
 
