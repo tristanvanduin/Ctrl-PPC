@@ -25,6 +25,7 @@ set -uo pipefail
 HYGIENE_TIMEOUT=${HYGIENE_TIMEOUT:-60}
 RPC_TIMEOUT=${RPC_TIMEOUT:-30}
 VIEW_TIMEOUT=${VIEW_TIMEOUT:-60}
+GRENS_TIMEOUT=${GRENS_TIMEOUT:-60}
 TSC_TIMEOUT=${TSC_TIMEOUT:-300}
 # De suite doet er ~32s over sinds de runner het tsx-binary rechtstreeks aanroept en
 # parallelliseert (was ~460s). 300s laat ruimte voor een tragere machine en vangt een
@@ -82,6 +83,15 @@ fi
 # van de PMax-rijen naast. Slaat zichzelf over zonder databasegegevens.
 if [ "$doel" = "alles" ] || [ "$doel" = "views" ]; then
   stap view-dekking "$VIEW_TIMEOUT" node scripts/check-view-dekking.mjs || falen=$?
+fi
+
+# Kan bureau A bij de data van bureau B? Ook dit staat in de DATABASE en niet in de code, en het is
+# de enige soort fout die GEEN foutmelding geeft: te veel toegang laat de app juist beter werken.
+# De proef maakt echt een gebruiker aan bij het ene bureau en laat hem naar het andere vragen; met
+# de oude, bureau-blinde functie gaf dat `true`. Ruimt zichzelf op, ook bij een fout. Slaat over
+# zonder service-sleutel of met minder dan twee bureaus.
+if [ "$doel" = "alles" ] || [ "$doel" = "grens" ]; then
+  stap bureaugrens "$GRENS_TIMEOUT" node scripts/check-bureaugrens.mjs || falen=$?
 fi
 
 if [ "$doel" = "alles" ] || [ "$doel" = "tsc" ]; then
