@@ -10,6 +10,8 @@ import { PeriodSelector } from "@/components/dashboard/period-selector";
 import { formatRange } from "@/lib/period/period-range";
 import { DEMO_GREENTECH_ID, buildGreentechClientData } from "@/lib/demo/greentech-mock";
 import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "@/lib/api/adapter";
+import { loadClientGroups, type GroupWithMembers } from "@/lib/client-groups";
+import { bouwHierarchie } from "@/lib/groepen/hierarchie";
 import { comparePeriods } from "@/lib/period/apply-period";
 import type { PeriodRange } from "@/lib/period/period-range";
 import { formatRoas } from "@/lib/forecast-format";
@@ -122,6 +124,48 @@ function SummaryCard({ label, value, color, subtitle }: { label: string; value: 
 }
 
 // De provider zit om het scorebord heen; het bord zelf leest de periode via usePeriod.
+/**
+ * De kopregel van een merk, met het subtotaal erin.
+ *
+ * Het subtotaal staat in dezelfde kolommen als de accounts eronder, zodat het te vergelijken is
+ * zonder te rekenen. ROAS en CPA komen uit de SOMMEN en niet uit een gemiddelde van de losse
+ * waarden: dat laatste weegt een account van honderd euro even zwaar als een van honderdduizend.
+ */
+function MerkKopRij({ naam, bevestigd, aantal, totaal }: {
+  naam: string;
+  bevestigd: boolean;
+  aantal: number;
+  totaal: { conversions: number; revenue: number; adSpend: number; roas: number; cpa: number };
+}) {
+  return (
+    <Rij className="bg-muted/40">
+      <NaamCel>
+        <span className="inline-flex items-center gap-2">
+          <span className="text-sm font-semibold text-rm-blue-ink">{naam}</span>
+          <span className="text-micro text-muted-foreground">{aantal}</span>
+          {/* Een indeling die uit een naam is geraden hoort ook hier als voorstel te lezen. Een
+              subtotaal over een geraden groep is precies zo overtuigend als een over een juiste. */}
+          {!bevestigd && (
+            <span className="rounded-full bg-amber-100 px-1.5 py-px text-micro font-medium text-amber-800">
+              voorstel
+            </span>
+          )}
+        </span>
+      </NaamCel>
+      <GetalCel>{num(Math.round(totaal.conversions))}</GetalCel>
+      {/* Geen YoY op groepsniveau: dat zou een som van percentages zijn, en die bestaat niet.
+          Een streepje is hier eerlijker dan een getal dat er goed uitziet. */}
+      <GetalCel><span className="text-gray-300">—</span></GetalCel>
+      <GetalCel>{fmt(totaal.revenue)}</GetalCel>
+      <GetalCel>{formatRoas(totaal.roas)}</GetalCel>
+      <GetalCel>{totaal.conversions > 0 ? fmt(totaal.cpa) : <span className="text-gray-300">—</span>}</GetalCel>
+      <GetalCel>{fmt(totaal.adSpend)}</GetalCel>
+      <Cel>{null}</Cel>
+      <Cel>{null}</Cel>
+    </Rij>
+  );
+}
+
 export function PortfolioScoreboard() {
   return (
     <PeriodProvider scope="portfolio">
@@ -138,6 +182,19 @@ function PortfolioScoreboardBody() {
   const [sortBy, setSortBy] = useState<"name" | "conversions" | "revenue" | "roas" | "cpa" | "yoy">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [showEmpty, setShowEmpty] = useState(false);
+  // ── Vergelijken op merk ────────────────────────────────────────────────────
+  //
+  // ALLEEN op de merk-as, en dat is geen beperking maar de kern. Een merkgroep bevat land- of
+  // regiovarianten van dezelfde zaak, en de database staat toe dat een account bij hoogstens één
+  // merk hoort (migratie 052 en 053). Daardoor telt een subtotaal elk account precies één keer.
+  //
+  // Op de specialist-as geldt dat niet: twee mensen kunnen samen aan een account werken, dus
+  // optellen per specialist zou dezelfde omzet twee keer meenemen. Een vergelijking die dat doet
+  // ziet er precies zo uit als een die klopt, en daarom staat die as hier niet.
+  const [groepeer, setGroepeer] = useState(false);
+  const [groepen, setGroepen] = useState<GroupWithMembers[]>([]);
+
+  useEffect(() => { loadClientGroups().then(setGroepen).catch(() => setGroepen([])); }, []);
 
   useEffect(() => {
     const visible = getVisibleClients();
@@ -216,6 +273,31 @@ function PortfolioScoreboardBody() {
   const emptyCount = clients.filter(isEmptyAccount).length;
   const displayClients = showEmpty ? sortedClients : sortedClients.filter((c) => !isEmptyAccount(c));
 
+  // De merkindeling over de klanten die nu in beeld zijn. Groepen zonder soort tellen NIET mee:
+  // dit is de vergelijk-as, en meedoen op een indeling waarvan niemand heeft gezegd dat het een
+  // merk is, is precies de gok die het soort-veld moet uitsluiten.
+  const merkGroepen = groepen.filter((g) => g.soort === "merk");
+  const merkBoom = groepeer && merkGroepen.length > 0
+    ? bouwHierarchie(displayClients, merkGroepen, "merk")
+    : [];
+
+  /** Subtotaal over een tak. Sommen, en de verhoudingen daaruit -- nooit een gemiddelde van ratio's. */
+  function subtotaal(klanten: readonly Client[]) {
+    let conversions = 0, revenue = 0, adSpend = 0;
+    for (const k of klanten) {
+      const y = overviews.get(k.id)?.ytd;
+      if (!y) continue;
+      conversions += y.conversions; revenue += y.revenue; adSpend += y.adSpend;
+    }
+    // ROAS en CPA uit de SOMMEN, niet het gemiddelde van de losse ROAS'en. Dat laatste weegt een
+    // account van 100 euro even zwaar als een van 100.000 en geeft een getal dat nergens bij hoort.
+    return {
+      conversions, revenue, adSpend,
+      roas: adSpend > 0 ? revenue / adSpend : 0,
+      cpa: conversions > 0 ? adSpend / conversions : 0,
+    };
+  }
+
   // Een functie die JSX oplevert, geen component: een component dat tijdens de render ontstaat is
   // elke render een nieuw type en laat React de hele kop opnieuw ophangen. En de sorteerknop komt
   // uit de gedeelde tabellaag, zodat hij een echte knop is met aria-sort in plaats van een th met
@@ -268,6 +350,65 @@ function PortfolioScoreboardBody() {
   const now = new Date();
   const greeting = now.getHours() < 12 ? "Goedemorgen" : now.getHours() < 18 ? "Goedemiddag" : "Goedenavond";
   const dateStr = now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  /** Eén klantrij. Losgetrokken zodat de gegroepeerde en de platte stand dezelfde opbouw delen. */
+  function klantRij(client: Client) {
+              const overview = overviews.get(client.id);
+              const ytd = overview?.ytd;
+              const yoy = overview?.yoy;
+              const hasData = ytd && ytd.adSpend > 0;
+              const leeg = <span className="text-gray-300">—</span>;
+
+              return (
+                <Rij key={client.id} className="group">
+                  <NaamCel>
+                    <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-rm-blue-ink transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue">
+                      {/* Health dot */}
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                        !hasData ? "bg-gray-200" :
+                        (yoy?.convChange ?? 0) > 10 && ytd!.roas >= 2 ? "bg-green-400" :
+                        (yoy?.convChange ?? 0) > -10 ? "bg-amber-400" :
+                        "bg-red-400"
+                      }`} />
+                      {client.name}
+                    </Link>
+                  </NaamCel>
+                  {/* Twee strepen: conversies en spend. Dát is de vraag van een portfolio-overzicht
+                      — welke klant trekt het volume en welke trekt het budget — en die vergelijking
+                      lieten we eerst aan het hoofd van de lezer over. Op ROAS en CPA staat er geen:
+                      dat zijn verhoudingen, en bij CPA is laag juist beter. */}
+                  {hasData ? (
+                    <AandeelCel waarde={num(ytd.conversions)} aandeel={grootsteConv > 0 ? ytd.conversions / grootsteConv : 0} />
+                  ) : <GetalCel>{leeg}</GetalCel>}
+                  <GetalCel><TrendBadge value={yoy?.convChange ?? null} /></GetalCel>
+                  <GetalCel>{hasData ? fmt(ytd.revenue) : leeg}</GetalCel>
+                  <GetalCel className={!hasData ? "" : ytd.roas >= 3 ? "text-green-600 font-medium" : ytd.roas >= 1 ? "" : "text-red-500 font-medium"}>
+                    {hasData ? formatRoas(ytd.roas) : leeg}
+                  </GetalCel>
+                  <GetalCel zacht>{hasData ? fmt(ytd.cpa) : leeg}</GetalCel>
+                  {hasData ? (
+                    <AandeelCel waarde={fmt(ytd.adSpend)} aandeel={grootsteSpend > 0 ? ytd.adSpend / grootsteSpend : 0} kleur={CHART_CATEGORICAL[2]} />
+                  ) : <GetalCel>{leeg}</GetalCel>}
+                  <Cel>
+                    {overview?.monthlyConversions && overview.monthlyConversions.length > 1
+                      // Conversies zijn een volume, dus vanaf nul: de hoogte ís hier de betekenis.
+                      ? <Sparkline punten={overview.monthlyConversions} basis="nul" titel={`Conversies per maand voor ${client.name}`} />
+                      : leeg}
+                  </Cel>
+                  <Cel>
+                    {/* Alleen zichtbaar op hover was het probleem: met het toetsenbord kun je niet
+                        hoveren, dus de pijl was er wel maar onvindbaar. Focus laat hem nu ook zien. */}
+                    <Link
+                      href={`/client/${client.id}`}
+                      aria-label={`Open ${client.name}`}
+                      className="inline-flex opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue"
+                    >
+                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                    </Link>
+                  </Cel>
+                </Rij>
+              );
+  }
 
   return (
     <div className="space-y-6">
@@ -328,6 +469,25 @@ function PortfolioScoreboardBody() {
         </div>
       )}
 
+      {/* Alleen aanbieden als er iets te groeperen valt. Een knop die niets doet is erger dan
+          geen knop: hij belooft een indeling die er niet is. */}
+      {merkGroepen.length > 0 && (
+        <div className="mb-2 flex items-center gap-2">
+          <button
+            onClick={() => setGroepeer((v) => !v)}
+            className={`rounded-lg border px-2.5 py-1 text-meta font-medium transition-colors ${
+              groepeer ? "border-rm-blue bg-rm-blue/10 text-rm-blue-ink"
+                       : "border-border text-muted-foreground hover:border-rm-blue/40"}`}
+          >
+            Groepeer op merk
+          </button>
+          <span className="text-micro text-muted-foreground">
+            {merkGroepen.length} merk{merkGroepen.length !== 1 ? "en" : ""} &middot; alleen deze as,
+            want op de specialist-as kan een account bij meer mensen horen en telt een subtotaal dubbel
+          </span>
+        </div>
+      )}
+
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <Tabel>
           <Kop>
@@ -342,63 +502,15 @@ function PortfolioScoreboardBody() {
             <KolomKop><span className="sr-only">Openen</span></KolomKop>
           </Kop>
           <Body>
-            {displayClients.map((client) => {
-              const overview = overviews.get(client.id);
-              const ytd = overview?.ytd;
-              const yoy = overview?.yoy;
-              const hasData = ytd && ytd.adSpend > 0;
-              const leeg = <span className="text-gray-300">—</span>;
-
-              return (
-                <Rij key={client.id} className="group">
-                  <NaamCel>
-                    <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-rm-blue-ink transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue">
-                      {/* Health dot */}
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                        !hasData ? "bg-gray-200" :
-                        (yoy?.convChange ?? 0) > 10 && ytd!.roas >= 2 ? "bg-green-400" :
-                        (yoy?.convChange ?? 0) > -10 ? "bg-amber-400" :
-                        "bg-red-400"
-                      }`} />
-                      {client.name}
-                    </Link>
-                  </NaamCel>
-                  {/* Twee strepen: conversies en spend. Dát is de vraag van een portfolio-overzicht
-                      — welke klant trekt het volume en welke trekt het budget — en die vergelijking
-                      lieten we eerst aan het hoofd van de lezer over. Op ROAS en CPA staat er geen:
-                      dat zijn verhoudingen, en bij CPA is laag juist beter. */}
-                  {hasData ? (
-                    <AandeelCel waarde={num(ytd.conversions)} aandeel={grootsteConv > 0 ? ytd.conversions / grootsteConv : 0} />
-                  ) : <GetalCel>{leeg}</GetalCel>}
-                  <GetalCel><TrendBadge value={yoy?.convChange ?? null} /></GetalCel>
-                  <GetalCel>{hasData ? fmt(ytd.revenue) : leeg}</GetalCel>
-                  <GetalCel className={!hasData ? "" : ytd.roas >= 3 ? "text-green-600 font-medium" : ytd.roas >= 1 ? "" : "text-red-500 font-medium"}>
-                    {hasData ? formatRoas(ytd.roas) : leeg}
-                  </GetalCel>
-                  <GetalCel zacht>{hasData ? fmt(ytd.cpa) : leeg}</GetalCel>
-                  {hasData ? (
-                    <AandeelCel waarde={fmt(ytd.adSpend)} aandeel={grootsteSpend > 0 ? ytd.adSpend / grootsteSpend : 0} kleur={CHART_CATEGORICAL[2]} />
-                  ) : <GetalCel>{leeg}</GetalCel>}
-                  <Cel>
-                    {overview?.monthlyConversions && overview.monthlyConversions.length > 1
-                      // Conversies zijn een volume, dus vanaf nul: de hoogte ís hier de betekenis.
-                      ? <Sparkline punten={overview.monthlyConversions} basis="nul" titel={`Conversies per maand voor ${client.name}`} />
-                      : leeg}
-                  </Cel>
-                  <Cel>
-                    {/* Alleen zichtbaar op hover was het probleem: met het toetsenbord kun je niet
-                        hoveren, dus de pijl was er wel maar onvindbaar. Focus laat hem nu ook zien. */}
-                    <Link
-                      href={`/client/${client.id}`}
-                      aria-label={`Open ${client.name}`}
-                      className="inline-flex opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue"
-                    >
-                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                    </Link>
-                  </Cel>
-                </Rij>
-              );
-            })}
+            {/* Eén rij-opbouw voor beide standen. Twee kopieën zouden binnen een maand uit elkaar
+                lopen op een kolom die iemand maar op één plek bijwerkt. */}
+            {(groepeer && merkBoom.length > 0
+              ? merkBoom.flatMap((tak) => [
+                  <MerkKopRij key={`k-${tak.groepId ?? "rest"}`} naam={tak.naam}
+                    bevestigd={tak.bevestigd} aantal={tak.aantal} totaal={subtotaal(tak.klanten)} />,
+                  ...tak.klanten.map(klantRij),
+                ])
+              : displayClients.map(klantRij))}
           </Body>
           {/* De som van de zichtbare klanten. Stond alleen in de blauwe kop bovenaan, ver van de
               kolommen af; hier sluit hij aan op de cijfers waar hij bij hoort. De ROAS komt uit de

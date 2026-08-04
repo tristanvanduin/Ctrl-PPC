@@ -251,6 +251,10 @@ function ClientGroupsSection() {
   // en die melding hoort bij de groep te staan waar hij vandaan komt, niet ergens bovenaan.
   const [fout, setFout] = useState<Record<string, string>>({});
   const [laadfout, setLaadfout] = useState<string | null>(null);
+  const [groepZoek, setGroepZoek] = useState("");
+  // Welke groepen OPEN staan. Niet andersom: bij veertig specialisten is dicht de bruikbare
+  // begintoestand, en dan is een set van de paar open groepen kleiner dan een set van de rest.
+  const [open, setOpen] = useState<Set<string>>(new Set());
 
   // try/finally, en een zichtbare fout in plaats van niets.
   //
@@ -320,6 +324,34 @@ function ClientGroupsSection() {
   const onbevestigd = groups.filter((g) => !g.bevestigd).length;
   const nogInTeDelen = groups.filter((g) => g.bevestigd && !g.soort).length;
 
+  // ── Indelen in secties ────────────────────────────────────────────────────
+  //
+  // Bij vier groepen is één lijst prima. Bij een bureau met veertig specialisten staan er straks
+  // veertig kaarten met elk twintig accounts uitgeklapt onder elkaar: achthonderd regels in één
+  // blok. Vandaar secties, een zoekveld, en dicht als begintoestand.
+  //
+  // Voorstellen staan bovenaan en gaan NIET dicht. Die vragen om een antwoord; wegstoppen achter
+  // een klik maakt van "wacht op een mens" stilzwijgend "blijft eeuwig staan".
+  const gezocht = groepZoek.trim().toLowerCase();
+  const zichtbaar = gezocht
+    ? groups.filter((g) => g.name.toLowerCase().includes(gezocht))
+    : groups;
+
+  const SECTIES: { sleutel: string; titel: string; test: (g: GroupWithMembers) => boolean }[] = [
+    { sleutel: "voorstel", titel: "Voorstellen", test: (g) => !g.bevestigd },
+    { sleutel: "merk", titel: "Merken", test: (g) => g.bevestigd && g.soort === "merk" },
+    { sleutel: "specialist", titel: "Specialisten", test: (g) => g.bevestigd && g.soort === "specialist" },
+    { sleutel: "vrij", titel: "Vrije mappen", test: (g) => g.bevestigd && g.soort === "vrij" },
+    { sleutel: "onbepaald", titel: "Nog niet ingedeeld", test: (g) => g.bevestigd && !g.soort },
+  ];
+  const secties = SECTIES
+    .map((sec) => ({ ...sec, groepen: zichtbaar.filter(sec.test) }))
+    .filter((sec) => sec.groepen.length > 0);
+
+  function wisselOpen(id: string) {
+    setOpen((v) => { const n = new Set(v); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
   if (loading) return null;
 
   return (
@@ -360,9 +392,26 @@ function ClientGroupsSection() {
         </button>
       </div>
 
+      {/* Zoeken pas tonen als er iets te zoeken valt. Bij vier groepen is een zoekveld ruis. */}
+      {groups.length > 8 && (
+        <input
+          type="text"
+          value={groepZoek}
+          onChange={(e) => setGroepZoek(e.target.value)}
+          placeholder="Zoek een groep..."
+          className="mb-3 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-rm-blue focus:outline-none"
+        />
+      )}
+
       {/* Groups list */}
-      <div className="space-y-3">
-        {groups.map((group) => {
+      <div className="space-y-4">
+        {secties.map((sectie) => (
+        <div key={sectie.sleutel}>
+          <p className="mb-1.5 text-micro font-semibold uppercase tracking-wide text-muted-foreground">
+            {sectie.titel} <span className="font-normal">({sectie.groepen.length})</span>
+          </p>
+          <div className="space-y-3">
+        {sectie.groepen.map((group) => {
           const groupClients = group.clientIds
             .map((id) => allClients.find((c) => c.id === id))
             .filter((c): c is Client => c !== undefined);
@@ -398,6 +447,14 @@ function ClientGroupsSection() {
                   </div>
                 )}
                 <div className="flex items-center gap-1">
+                  {group.bevestigd && editingId !== group.id && (
+                    <button
+                      onClick={() => wisselOpen(group.id)}
+                      className="rounded px-1.5 py-1 text-micro text-muted-foreground hover:bg-gray-100"
+                    >
+                      {open.has(group.id) ? "Inklappen" : "Bekijken"}
+                    </button>
+                  )}
                   {editingId !== group.id && (
                     <button
                       onClick={() => { setEditingId(group.id); setEditingName(group.name); }}
@@ -449,7 +506,11 @@ function ClientGroupsSection() {
                 </p>
               )}
 
-              {/* Clients in this group */}
+              {/* Clients in this group.
+                  Dicht als begintoestand, want veertig groepen met elk twintig accounts
+                  uitgeklapt is achthonderd regels in één blok. Een voorstel staat altijd open:
+                  dat vraagt om een antwoord en hoort niet achter een klik te verdwijnen. */}
+              {(!group.bevestigd || open.has(group.id)) && (
               <div className="space-y-1 mb-2">
                 {groupClients.map((client) => (
                   <div
@@ -473,6 +534,7 @@ function ClientGroupsSection() {
                   <p className="text-meta text-muted-foreground px-2 py-1">Nog geen klanten in deze groep</p>
                 )}
               </div>
+              )}
 
               {/* Add client button */}
               {addingToGroup === group.id ? (
@@ -513,21 +575,30 @@ function ClientGroupsSection() {
                     Sluiten
                   </button>
                 </div>
-              ) : (
+              ) : !group.bevestigd || open.has(group.id) ? (
                 <button
                   onClick={() => setAddingToGroup(group.id)}
                   className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline mt-1"
                 >
                   <Plus className="w-3 h-3" /> Klant toevoegen
                 </button>
-              )}
+              ) : null}
             </div>
           );
         })}
 
+          </div>
+        </div>
+        ))}
+
         {groups.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-4">
             Nog geen groepen. Maak een groep aan om klanten te bundelen.
+          </p>
+        )}
+        {groups.length > 0 && secties.length === 0 && (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            Geen groep gevonden voor &ldquo;{groepZoek}&rdquo;.
           </p>
         )}
       </div>
