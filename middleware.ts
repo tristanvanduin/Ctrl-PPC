@@ -8,15 +8,32 @@
 // De scope-check hier dekt het beurs-id in de querystring en in het paginapad. Staat het in
 // een request-body, dan kan de middleware er niet bij zonder de stream op te eten; die
 // routes gebruiken requireClientAccess uit lib/auth/server.ts.
+//
+// ── WAAROM DIT NOG middleware.ts HEET EN GEEN proxy.ts ──────────────────────
+//
+// Next 16 schaft de naam `middleware` af en waarschuwt daarover bij elke build. De hernoeming
+// is geprobeerd en TERUGGEDRAAID, want in 16.2.2 met Turbopack wordt proxy.ts niet
+// geregistreerd. Gemeten aan .next/server/middleware-manifest.json na een schone build:
+//
+//   middleware.ts  →  "middleware": { "/": { ...matchers... } }
+//   proxy.ts       →  "middleware": {}, "sortedMiddleware": []
+//
+// Zowel `export function proxy` als `export default` geprobeerd; beide leeg. De build meldt
+// intussen wel "ƒ Proxy (Middleware)" in de routetabel, dus de build zegt ja terwijl het
+// manifest nee zegt -- er is geen foutmelding die dit verklapt. Hernoemen zou de hele
+// toegangscontrole stilzwijgend hebben uitgezet.
+//
+// Opnieuw proberen bij een volgende Next-versie, en dan het manifest controleren en niet de
+// buildmelding geloven.
 // =====================================================================
 
 import { NextResponse, type NextRequest } from "next/server";
-import { canoniekeDoelUrl } from "@/lib/domein";
+import { canoniekeDoelUrlVoorVerzoek } from "@/lib/domein";
 import { createServerClient } from "@supabase/ssr";
 import {
-  isPublicPath, isCronPath, capabilityForApi, can, canAccessClient,
-  clientIdFromPath, normalizeRole, scopeFor,
+  isPublicPath, isCronPath, capabilityForApi, can, canAccessClient, clientIdFromPath,
 } from "@/lib/auth/roles";
+import { bepaalScope } from "@/lib/auth/scope";
 
 export async function middleware(request: NextRequest) {
   // ── Canoniek domein ───────────────────────────────────────────────────────
@@ -31,7 +48,16 @@ export async function middleware(request: NextRequest) {
   //
   // 308 en geen 307: dit is een blijvende verhuizing, en zoekmachines mogen dat weten. De methode
   // blijft behouden, dus een POST die hier langskomt gaat niet stiekem als GET verder.
-  const canoniek = canoniekeDoelUrl(request.url);
+  //
+  // NIET request.url, maar de host-header. Next normaliseert request.url naar het adres waarop
+  // de server luistert; bij een verzoek met `Host: ctrlppc.nl` staat er gewoon
+  // http://localhost:3190/... in. Deze regel keek daar naar en heeft dus nooit iets gedaan.
+  // De uitleg en de meting staan bij canoniekeDoelUrlVoorVerzoek in lib/domein.ts.
+  const canoniek = canoniekeDoelUrlVoorVerzoek(
+    request.url,
+    request.headers.get("host"),
+    request.headers.get("x-forwarded-host")
+  );
   if (canoniek) return NextResponse.redirect(canoniek, 308);
 
   if (process.env.O1_AUTH_ENFORCED !== "true") return NextResponse.next();
@@ -78,12 +104,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const [{ data: roleRow }, { data: clientRows }] = await Promise.all([
-    supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
-    supabase.from("user_clients").select("client_id").eq("user_id", user.id),
-  ]);
-  const role = normalizeRole(roleRow?.role);
-  const scope = scopeFor(role, (clientRows ?? []).map((row) => String(row.client_id)));
+  // Dezelfde afleiding als in lib/auth/server.ts, uit één bestand. Hier stond eerst een eigen
+  // kopie die scopeFor() rechtstreeks aanriep, en die gaf voor een organisatiebrede rol
+  // ALL_CLIENTS terug: élke klant van élk bureau. De bureaugrens uit migratie 057 was daarmee
+  // wel in de database en in de routes doorgevoerd, maar niet in de poortwachter ervoor.
+  const { role, scope } = await bepaalScope(supabase as never, user.id);
 
   const clientId = clientIdFromPath(pathname, request.nextUrl.searchParams);
   if (clientId && !canAccessClient(scope, clientId)) {

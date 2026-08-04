@@ -51,3 +51,52 @@ export function canoniekeDoelUrl(huidigeUrl: string): string | null {
   url.port = "";
   return url.toString();
 }
+
+/**
+ * Hetzelfde, maar dan voor een binnenkomend verzoek — en dát is de versie die de middleware moet
+ * gebruiken.
+ *
+ * ── WAAROM DIT NODIG IS ─────────────────────────────────────────────────────
+ *
+ * `request.url` in de middleware draagt het gevraagde domein NIET. Gemeten op een zelf gehoste
+ * `next start` op poort 3190, met een verzoek waarin `Host: ctrlppc.nl` stond:
+ *
+ *   request.url                     http://localhost:3190/__proxy-check
+ *   request.nextUrl.href            http://localhost:3190/__proxy-check
+ *   request.headers.get("host")     ctrlppc.nl
+ *
+ * Next normaliseert de URL naar het adres waarop de server luistert. `canoniekeDoelUrl(request.url)`
+ * ziet daardoor nooit `ctrlppc.nl` en de doorverwijzing vuurde dus nooit — geen foutmelding, geen
+ * test die faalt, alleen een regel die er staat en niets doet. Op Vercel wérkt de oude versie
+ * toevallig, want daar zet het platform de host in de URL; dat maakt het erger, niet beter, want
+ * dan valt het pas op na een verhuizing.
+ *
+ * ── DE HEADER VERTROUWEN ────────────────────────────────────────────────────
+ *
+ * `x-forwarded-host` komt van buiten en is dus te vervalsen. Dat mag hier, en om een concrete
+ * reden: de bestemming van deze doorverwijzing wordt niet uit de header overgenomen. Hij bepaalt
+ * alleen óf er doorverwezen wordt; waarheen staat hierboven vast op CANONIEK_DOMEIN. Iemand die
+ * `x-forwarded-host: ctrlppc.nl` verzint, verwijst daarmee alleen zichzelf naar ctrlppc.com.
+ */
+export function canoniekeDoelUrlVoorVerzoek(
+  ruweUrl: string,
+  hostHeader: string | null | undefined,
+  doorgestuurdeHost?: string | null | undefined
+): string | null {
+  // x-forwarded-host wint: staat er een proxy voor, dan is dat het domein dat de bezoeker typte.
+  // Bij meerdere proxies staat er een komma-lijst; de eerste is de oorspronkelijke vraag.
+  const host = (doorgestuurdeHost ?? hostHeader ?? "").split(",")[0].trim();
+  if (!host) return canoniekeDoelUrl(ruweUrl);
+
+  let url: URL;
+  try {
+    url = new URL(ruweUrl);
+  } catch {
+    return null;
+  }
+  const [hostnaam, poort] = host.split(":");
+  if (!hostnaam) return null;
+  url.hostname = hostnaam;
+  url.port = poort ?? "";
+  return canoniekeDoelUrl(url.toString());
+}

@@ -5,7 +5,7 @@
 // schrijven en moeilijk terug te draaien zodra hij te breed staat: hij grijpt in voordat iemand
 // iets ziet, dus een fout hier maakt een omgeving onbereikbaar in plaats van lelijk.
 
-import { canoniekeDoelUrl, CANONIEK_DOMEIN } from "./domein";
+import { canoniekeDoelUrl, canoniekeDoelUrlVoorVerzoek, CANONIEK_DOMEIN } from "./domein";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -70,6 +70,46 @@ check("een domein dat er alleen op lijkt telt niet mee",
 
 check("onparseerbare invoer geeft null", canoniekeDoelUrl("geen url") === null);
 check("lege invoer geeft null", canoniekeDoelUrl("") === null);
+
+// ── De versie die de middleware gebruikt ──────────────────────────────────
+//
+// HET GEVAL WAAROM DEZE FUNCTIE BESTAAT. Gemeten op een zelf gehoste `next start` op poort 3190:
+// bij een verzoek met `Host: ctrlppc.nl` is request.url gewoon http://localhost:3190/... Next
+// normaliseert naar het adres waarop de server luistert. De doorverwijzing keek naar die URL en
+// vuurde dus nooit -- zonder foutmelding en zonder falende test, want er stond niets fout, er
+// werd alleen naar de verkeerde plek gekeken.
+
+check("de host-header wint van de genormaliseerde url",
+  canoniekeDoelUrlVoorVerzoek("http://localhost:3190/client/x?a=1", "ctrlppc.nl")
+    === `https://${CANONIEK_DOMEIN}/client/x?a=1`,
+  String(canoniekeDoelUrlVoorVerzoek("http://localhost:3190/client/x?a=1", "ctrlppc.nl")));
+check("met poort in de host-header ook",
+  canoniekeDoelUrlVoorVerzoek("http://localhost:3190/p", "ctrlppc.nl:8080") === `https://${CANONIEK_DOMEIN}/p`,
+  String(canoniekeDoelUrlVoorVerzoek("http://localhost:3190/p", "ctrlppc.nl:8080")));
+check("x-forwarded-host wint van host",
+  canoniekeDoelUrlVoorVerzoek("http://localhost:3190/p", "interne-loadbalancer:8080", "ctrlppc.nl")
+    === `https://${CANONIEK_DOMEIN}/p`,
+  String(canoniekeDoelUrlVoorVerzoek("http://localhost:3190/p", "interne-loadbalancer:8080", "ctrlppc.nl")));
+check("bij meerdere proxies telt de eerste",
+  canoniekeDoelUrlVoorVerzoek("http://localhost:3190/p", null, "ctrlppc.nl, interne-proxy")
+    === `https://${CANONIEK_DOMEIN}/p`,
+  String(canoniekeDoelUrlVoorVerzoek("http://localhost:3190/p", null, "ctrlppc.nl, interne-proxy")));
+
+// En vooral: de lokale ontwikkelmachine blijft met rust. Dit is het geval dat elke dag voorkomt.
+check("localhost met eigen host-header wordt niet doorverwezen",
+  canoniekeDoelUrlVoorVerzoek("http://localhost:3190/portfolio", "localhost:3190") === null,
+  String(canoniekeDoelUrlVoorVerzoek("http://localhost:3190/portfolio", "localhost:3190")));
+check("het canonieke domein zelf wordt niet doorverwezen",
+  canoniekeDoelUrlVoorVerzoek("http://localhost:3190/p", CANONIEK_DOMEIN) === null,
+  String(canoniekeDoelUrlVoorVerzoek("http://localhost:3190/p", CANONIEK_DOMEIN)));
+
+// Zonder host-header valt hij terug op de url zelf: dat is beter dan niets doen, en het is wat
+// er op een platform gebeurt dat de host wél in de url zet.
+check("zonder host-header valt hij terug op de url",
+  canoniekeDoelUrlVoorVerzoek("https://ctrlppc.nl/p", null) === `https://${CANONIEK_DOMEIN}/p`,
+  String(canoniekeDoelUrlVoorVerzoek("https://ctrlppc.nl/p", null)));
+check("onparseerbare url geeft ook hier null",
+  canoniekeDoelUrlVoorVerzoek("geen url", "ctrlppc.nl") === null);
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

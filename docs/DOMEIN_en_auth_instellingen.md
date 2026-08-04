@@ -3,7 +3,7 @@
 `ctrlppc.com` is canoniek. `ctrlppc.nl` verwijst erheen.
 
 Wat in de code staat, staat in `lib/domein.ts` — één plek, met een test ernaast
-(`lib/__domein_test.ts`, 17 controles). Wat **niet** in de code kan, staat hieronder: dat zijn
+(`lib/__domein_test.ts`, 25 controles). Wat **niet** in de code kan, staat hieronder: dat zijn
 instellingen bij de hostingpartij en bij Supabase, en die moet iemand met de hand zetten.
 
 ---
@@ -12,7 +12,7 @@ instellingen bij de hostingpartij en bij Supabase, en die moet iemand met de han
 
 Sessiecookies horen bij één domein. Logt iemand in op `.nl` en komt hij daarna op `.com`, dan is
 zijn sessie weg — zonder foutmelding, want er is niets misgegaan: de cookie hoort gewoon bij een
-ander domein. De doorverwijzing vooraan in de middleware zorgt dat er maar één domein is waarop
+ander domein. De doorverwijzing vooraan in `middleware.ts` zorgt dat er maar één domein is waarop
 iemand ingelogd kan raken.
 
 Dezelfde reden geldt voor de uitnodigings- en herstelmail. Supabase zet in die mail een link naar
@@ -39,6 +39,39 @@ Wat er bewust **niet** doorverwezen wordt: localhost, `127.0.0.1`, en de deploy-
 hostingplatform. Een doorverwijzing die "alles wat niet canoniek is" pakt, maakt elke
 voorvertoning onbruikbaar — je opent een preview-link en staat op productie zonder dat te zien.
 De test legt dat expliciet vast.
+
+### Waarom hij naar de host-header kijkt en niet naar `request.url`
+
+De eerste versie las `request.url` en deed daarmee niets. Gemeten op een zelf gehoste
+`next start`, bij een verzoek met `Host: ctrlppc.nl`:
+
+| | |
+|---|---|
+| `request.url` | `http://localhost:3190/…` |
+| `request.nextUrl.href` | `http://localhost:3190/…` |
+| `request.headers.get("host")` | `ctrlppc.nl` |
+
+Next normaliseert de URL naar het adres waarop de server luistert. Er was geen foutmelding en geen
+falende test — de regel stond er, hij keek alleen naar de verkeerde plek. Op Vercel wérkt de oude
+versie toevallig wel, want daar zet het platform de host in de URL; dat maakt het lastiger te
+vinden, niet minder kapot.
+
+Nu draait het op `host` en `x-forwarded-host`. Dat die headers van buiten komen en dus te
+vervalsen zijn, mag hier: de bestemming komt níét uit de header, die staat vast op het canonieke
+domein. Wie `x-forwarded-host: ctrlppc.nl` verzint, verwijst alleen zichzelf naar `ctrlppc.com`.
+
+Nagemeten op een draaiende server: `.nl` met pad en query → 308 naar `ctrlppc.com` met pad en
+query; `www.ctrlppc.com` → 308; achter een proxy met `x-forwarded-host` → 308; `localhost` → 200;
+`ctrlppc.com` zelf → 200.
+
+### En waarom het bestand nog `middleware.ts` heet
+
+Next 16 schaft die naam af ten gunste van `proxy.ts` en waarschuwt daarover bij elke build. De
+hernoeming is geprobeerd en teruggedraaid: in 16.2.2 met Turbopack blijft
+`.next/server/middleware-manifest.json` leeg bij `proxy.ts` en gevuld bij `middleware.ts` —
+terwijl de buildtabel in beide gevallen `ƒ Proxy (Middleware)` meldt. Hernoemen zet de hele
+toegangscontrole dus stilzwijgend uit. Bij een volgende Next-versie opnieuw proberen, en dan het
+manifest nakijken in plaats van de buildmelding geloven.
 
 ---
 
