@@ -39,28 +39,28 @@ const BRONNEN = [
     kanaal: "google", niveau: "account", korrel: "month",
     bron: `select sum(impressions) i, sum(clicks) c, sum(cost) k,
                   sum(conversions) v, sum(conversions_value) w
-           from ads_account_monthly s join accounts a on a.client_id = s.client_id`,
+           from ads_account_monthly_legacy s join accounts a on a.client_id = s.client_id`,
   },
   {
     naam: "google / campaign",
     kanaal: "google", niveau: "campaign", korrel: "month",
     bron: `select sum(impressions) i, sum(clicks) c, sum(cost) k,
                   sum(conversions) v, sum(conversions_value) w
-           from ads_campaign_monthly s join accounts a on a.client_id = s.client_id`,
+           from ads_campaign_monthly_legacy s join accounts a on a.client_id = s.client_id`,
   },
   {
     naam: "meta / account",
     kanaal: "meta", niveau: "account", korrel: "day",
     bron: `select sum(impressions) i, sum(clicks_all) c, sum(spend) k,
                   sum(coalesce(conversions,0) + coalesce(leads,0)) v, sum(conversion_value) w
-           from meta_account_daily s join accounts a on a.client_id = s.client_id`,
+           from meta_account_daily_legacy s join accounts a on a.client_id = s.client_id`,
   },
   {
     naam: "meta / campaign",
     kanaal: "meta", niveau: "campaign", korrel: "day",
     bron: `select sum(impressions) i, sum(clicks_all) c, sum(spend) k,
                   sum(coalesce(conversions,0) + coalesce(leads,0)) v, sum(conversion_value) w
-           from meta_campaign_daily s join accounts a on a.client_id = s.client_id`,
+           from meta_campaign_daily_legacy s join accounts a on a.client_id = s.client_id`,
   },
   {
     naam: "linkedin / account",
@@ -68,7 +68,7 @@ const BRONNEN = [
     bron: `select sum(impressions) i, sum(clicks) c, sum(spend) k,
                   sum(coalesce(one_click_leads,0) + coalesce(external_website_conversions,0)) v,
                   sum(conversion_value) w
-           from linkedin_account_daily s join accounts a on a.client_id = s.client_id`,
+           from linkedin_account_daily_legacy s join accounts a on a.client_id = s.client_id`,
   },
   {
     naam: "linkedin / campaign",
@@ -76,7 +76,7 @@ const BRONNEN = [
     bron: `select sum(impressions) i, sum(clicks) c, sum(spend) k,
                   sum(coalesce(one_click_leads,0) + coalesce(external_website_conversions,0)) v,
                   sum(conversion_value) w
-           from linkedin_campaign_daily s join accounts a on a.client_id = s.client_id`,
+           from linkedin_campaign_daily_legacy s join accounts a on a.client_id = s.client_id`,
   },
 ];
 

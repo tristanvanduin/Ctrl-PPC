@@ -27,6 +27,7 @@
 //   npx tsx scripts/demo/seed-demo-client.ts --check    # bewijs: draai de detectors op de data
 // ============================================================================
 
+import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
 import { createClient } from "@supabase/supabase-js";
 
 export const DEMO_CLIENT = "demo-greentech";
@@ -398,7 +399,7 @@ function printSql(tables: Record<string, Row[]>) {
       const chunk = rows.slice(i, i + 200);
       const values = chunk.map((r) => `(${cols.map((c) => sqlLit(r[c])).join(",")})`).join(",\n");
       const conflict = table === "linkedin_urn_labels" ? " on conflict (urn) do update set label=excluded.label" : "";
-      console.log(`insert into ${table} (${cols.join(",")}) values\n${values}${conflict};`);
+      console.log(`insert into ${fysiekeTabel(table)} (${cols.join(",")}) values\n${values}${conflict};`);
     }
   }
   // Demo-klant in de app-klantenlijst (idempotent).
@@ -417,7 +418,7 @@ async function insertViaSupabase(tables: Record<string, Row[]>) {
   for (const [table, rows] of Object.entries(tables)) {
     if (table !== "linkedin_urn_labels") await db.from(table).delete().eq("client_id", DEMO_CLIENT);
     for (let i = 0; i < rows.length; i += 400) {
-      const { error } = await db.from(table).upsert(rows.slice(i, i + 400));
+      const { error } = await db.from(fysiekeTabel(table)).upsert(rows.slice(i, i + 400));
       if (error) { console.error(`✗ ${table}: ${error.message}`); process.exit(1); }
     }
     console.log(`✓ ${table}: ${rows.length} rijen`);

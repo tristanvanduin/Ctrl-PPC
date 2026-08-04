@@ -51,8 +51,8 @@ import { sql } from "./supabase-sql.mjs";
 // groeien; daarom staat hij in het rapport in plaats van in stilte in een negeer-lijst.
 const PAREN = [
   {
-    tabel: "ads_account_monthly",
-    view: "kandidaat_ads_account_monthly",
+    tabel: "ads_account_monthly_legacy",
+    view: "ads_account_monthly",
     negeer: {
       id: "synthetische primaire sleutel van de oude tabel; geen enkele lezer selecteert hem",
       created_at: "wanneer de RIJ is weggeschreven, niet wanneer de data geldt; de view geeft synced_at",
@@ -63,8 +63,8 @@ const PAREN = [
     },
   },
   {
-    tabel: "ads_campaign_monthly",
-    view: "kandidaat_ads_campaign_monthly",
+    tabel: "ads_campaign_monthly_legacy",
+    view: "ads_campaign_monthly",
     negeer: {
       id: "idem",
       created_at: "idem",
@@ -75,8 +75,8 @@ const PAREN = [
     },
   },
   ...["account", "campaign", "ad"].map((n) => ({
-    tabel: `meta_${n}_daily`,
-    view: `kandidaat_meta_${n}_daily`,
+    tabel: `meta_${n}_daily_legacy`,
+    view: `meta_${n}_daily`,
     negeer: {
       created_at: "wanneer de RIJ is weggeschreven, niet wanneer de data geldt",
       updated_at: "idem",
@@ -85,8 +85,8 @@ const PAREN = [
     nulVsLeeg: ["clicks_all"],
   })),
   ...["account", "campaign", "creative"].map((n) => ({
-    tabel: `linkedin_${n}_daily`,
-    view: `kandidaat_linkedin_${n}_daily`,
+    tabel: `linkedin_${n}_daily_legacy`,
+    view: `linkedin_${n}_daily`,
     negeer: {
       created_at: "idem",
       updated_at: "idem",

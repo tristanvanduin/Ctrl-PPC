@@ -14,12 +14,12 @@
  * Nu staan ze hier. De hernoeming is dan acht regels in dit bestand, en de test ernaast bewaakt
  * dat er geen negende plek terugsluipt.
  *
- * ── DE WAARDEN ZIJN NU NOG GELIJK AAN DE SLEUTELS ────────────────────────────
+ * ── DE WAARDEN WIJZEN NU NAAR `*_legacy` ─────────────────────────────────────
  *
- * Dat is geen overbodige laag maar de volgorde van een expand/contract-migratie: eerst het
- * aangrijppunt maken en bewijzen dat alles er doorheen loopt, dan pas omzetten. Andersom zou de
- * omzetting en de invoering van de indirectie in één stap zitten, en dan is bij een storing niet
- * te zien welke van de twee het deed.
+ * Migratie 054 heeft de acht tabellen hernoemd en er views onder de oude naam overheen gezet.
+ * Lezers komen daardoor op de view uit; schrijvers moeten om die view heen, want een view is niet
+ * schrijfbaar. Dat is precies waarvoor deze module is gemaakt: de omzetting was acht regels hier,
+ * en de test ernaast bewees dat er geen negende plek was blijven staan.
  *
  * ── WAT HIER NIET IN STAAT ───────────────────────────────────────────────────
  *
@@ -29,14 +29,14 @@
  */
 
 export const FEITENTABELLEN = {
-  ads_account_monthly: "ads_account_monthly",
-  ads_campaign_monthly: "ads_campaign_monthly",
-  meta_account_daily: "meta_account_daily",
-  meta_campaign_daily: "meta_campaign_daily",
-  meta_ad_daily: "meta_ad_daily",
-  linkedin_account_daily: "linkedin_account_daily",
-  linkedin_campaign_daily: "linkedin_campaign_daily",
-  linkedin_creative_daily: "linkedin_creative_daily",
+  ads_account_monthly: "ads_account_monthly_legacy",
+  ads_campaign_monthly: "ads_campaign_monthly_legacy",
+  meta_account_daily: "meta_account_daily_legacy",
+  meta_campaign_daily: "meta_campaign_daily_legacy",
+  meta_ad_daily: "meta_ad_daily_legacy",
+  linkedin_account_daily: "linkedin_account_daily_legacy",
+  linkedin_campaign_daily: "linkedin_campaign_daily_legacy",
+  linkedin_creative_daily: "linkedin_creative_daily_legacy",
 } as const;
 
 export type Feitentabel = keyof typeof FEITENTABELLEN;
@@ -50,4 +50,16 @@ export type Feitentabel = keyof typeof FEITENTABELLEN;
  */
 export function schrijftabel(naam: Feitentabel): string {
   return FEITENTABELLEN[naam];
+}
+
+/**
+ * Vertaalt een tabelnaam naar de fysieke schrijfbestemming, of laat hem staan.
+ *
+ * Voor plekken die met een LIJST van tabelnamen werken en niet met losse aanroepen: de demo-seeder
+ * en -teardown lopen een record van tabel → rijen af. Die zouden na migratie 054 naar de views
+ * schrijven en `cannot insert into view` krijgen -- en de seeder logt fouten per tabel en gaat
+ * door, dus dat zou een half gevulde demoklant opleveren zonder dat iets faalt.
+ */
+export function fysiekeTabel(naam: string): string {
+  return (FEITENTABELLEN as Record<string, string>)[naam] ?? naam;
 }

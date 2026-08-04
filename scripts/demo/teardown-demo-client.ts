@@ -7,6 +7,7 @@
 //   npx tsx scripts/demo/teardown-demo-client.ts --sql    # print SQL (Management API)
 // ============================================================================
 
+import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
 import { createClient } from "@supabase/supabase-js";
 
 const DEMO_CLIENT = "demo-greentech";
@@ -25,7 +26,7 @@ const TABLES = [
 
 function printSql() {
   console.log(`-- DEMO-TEARDOWN voor ${DEMO_CLIENT}`);
-  for (const t of TABLES) console.log(`delete from ${t} where client_id='${DEMO_CLIENT}';`);
+  for (const t of TABLES) console.log(`delete from ${fysiekeTabel(t)} where client_id='${DEMO_CLIENT}';`);
   console.log(`delete from linkedin_urn_labels where urn like 'urn:li:function:demo-%';`);
   console.log(`update app_settings set value = coalesce((select jsonb_agg(e) from jsonb_array_elements(value) e where e->>'id' <> '${DEMO_CLIENT}'), '[]'::jsonb), updated_at=now() where key='api_clients';`);
 }

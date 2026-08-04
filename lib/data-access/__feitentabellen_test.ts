@@ -42,8 +42,6 @@ const OVERSLAAN = new Set(["node_modules", ".next", "migrations"]);
 const TOEGESTAAN: Record<string, string> = {
   "lib/data-access/feitentabellen.ts": "de module zelf; hier staan de namen per definitie",
   "lib/data-access/__feitentabellen_test.ts": "deze test zelf; hij moet de namen kunnen noemen om ernaar te zoeken",
-  "scripts/demo/seed-demo-client.ts": "vult de demoklant, draait niet in productie en niet via de sync",
-  "scripts/demo/teardown-demo-client.ts": "ruimt de demoklant op, idem",
   "lib/demo/demo-rows.ts": "de rijen van de mock-Supabase; raakt de database niet",
 };
 
@@ -77,7 +75,9 @@ const SCHRIJFVORMEN = (tabel: string) => [
  * rood blijft na de reparatie leert mensen om hem te negeren.
  */
 function zonderModuleAanroepen(bron: string): string {
-  return bron.replace(/schrijftabel\(\s*["'`][a-z_]+["'`]\s*\)/g, "SCHRIJFTABEL");
+  return bron
+    .replace(/schrijftabel\(\s*["'`][a-z_]+["'`]\s*\)/g, "SCHRIJFTABEL")
+    .replace(/fysiekeTabel\([^)]*\)/g, "SCHRIJFTABEL");
 }
 
 const gevonden: string[] = [];
