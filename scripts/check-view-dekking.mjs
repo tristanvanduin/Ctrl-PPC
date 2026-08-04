@@ -74,7 +74,49 @@ const PAREN = [
       roas: "cost > 0 and roas <> round((conversions_value/cost)::numeric, 4)",
     },
   },
+  ...["account", "campaign", "ad"].map((n) => ({
+    tabel: `meta_${n}_daily`,
+    view: `kandidaat_meta_${n}_daily`,
+    negeer: {
+      created_at: "wanneer de RIJ is weggeschreven, niet wanneer de data geldt",
+      updated_at: "idem",
+      clicks_all: "leeg in de bron, 0 in fact_core; zie `nul_vs_leeg` hieronder",
+    },
+    nulVsLeeg: ["clicks_all"],
+  })),
+  ...["account", "campaign", "creative"].map((n) => ({
+    tabel: `linkedin_${n}_daily`,
+    view: `kandidaat_linkedin_${n}_daily`,
+    negeer: {
+      created_at: "idem",
+      updated_at: "idem",
+      ...(n === "creative" ? { conversion_value: "idem, zie `nul_vs_leeg`" } : {}),
+    },
+    nulVsLeeg: n === "creative" ? ["conversion_value"] : [],
+  })),
 ];
+
+// ── WAT nulVsLeeg IS, EN WAAROM HET GEEN NEGEER-LIJST IS ────────────────────
+//
+// fact_core declareert zijn vijf grootheden als `not null default 0` en migratie 036 vulde ze met
+// coalesce(bron, 0). Waar de bron NULL had staat nu een nul, en die twee zijn daarna niet meer uit
+// elkaar te houden. Dat raakt precies deze kolommen:
+//
+//   meta_*_daily.clicks_all              160 + 128 + 256 rijen, alle leeg in de bron
+//   linkedin_creative_daily.conversion_value    92 rijen, alle leeg in de bron
+//
+// De informatie is weg uit fact_core, dus de view KAN de NULL niet teruggeven. Daarom staat het
+// hier als vastgestelde eigenschap in plaats van als iets wat nog te repareren valt.
+//
+// Maar niet als vrijbrief. De controle hieronder eist dat het verschil PRECIES dit is: de tabel
+// leeg én de view nul. Staat er in de tabel een getal waar de view iets anders zegt, dan is dat een
+// fout en geen bekende beperking. Zonder die eis zou "clicks_all overslaan" betekenen dat er
+// helemaal niet meer naar clicks_all gekeken wordt, en dan dekt de uitzondering de volgende fout af.
+//
+// Voor de app maakt het vandaag niets uit: sum() slaat NULL over en telt 0 als niets, en de lezers
+// schrijven `Number(x ?? 0)`. Voor avg() maakt het wél uit — NULL telt niet mee in de noemer, 0 wel.
+// Zolang deze kolommen in de bron volledig leeg zijn is er geen gemiddelde om te vertekenen; wordt
+// er ooit echt gesynct, dan vult de bron ze en verdwijnt het verschil vanzelf.
 
 // ── WAAROM roas ANDERS LIGT DAN conversion_rate ─────────────────────────────
 //
@@ -168,6 +210,22 @@ for (const paar of PAREN) {
   // worden hier vastgesteld: hoeveel rijen dat betreft, en dat de view wel klopt. Dat tweede is
   // wat de uitzondering verdedigbaar maakt -- zonder die controle zou "roas negeren" betekenen dat
   // niemand meer naar roas kijkt.
+  // De kolommen die fact_core niet als "onbekend" kan bewaren. Eis: de tabel is er leeg EN de view
+  // geeft nul. Elke andere combinatie is een echte afwijking en geen bekende beperking.
+  for (const kolom of paar.nulVsLeeg ?? []) {
+    const [{ leeg_in_bron, anders }] = await sql(`
+      select
+        (select count(*) from ${paar.tabel} where "${kolom}" is null) as leeg_in_bron,
+        (select count(*) from ${paar.tabel} t where t."${kolom}" is not null) as anders`);
+    const [{ view_niet_nul }] = await sql(`
+      select count(*) as view_niet_nul from ${paar.view} where coalesce("${kolom}", 0) <> 0`);
+    console.log(`  ${kolom}: ${leeg_in_bron} leeg in de bron → 0 in de view`);
+    if (Number(anders) > 0 || Number(view_niet_nul) > 0) {
+      console.log(`  FOUT  ${kolom} is niet louter leeg-tegen-nul: ${anders} gevuld in de tabel, ${view_niet_nul} niet-nul in de view`);
+      fouten++;
+    }
+  }
+
   for (const [kolom, uitdrukking] of Object.entries(paar.verouderd ?? {})) {
     const [{ scheef, view_fout }] = await sql(`
       select

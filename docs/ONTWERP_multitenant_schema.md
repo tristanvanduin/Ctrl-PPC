@@ -99,6 +99,51 @@ noemer bij PMax (interacties in plaats van klikken) of een andere conversieset.
 leidend is.** Een grafiek die `conversion_rate` leest en een grafiek die hem uitrekent tonen
 verschillende getallen voor dezelfde campagne in dezelfde maand. Beide zien er correct uit.
 
+#### 1.4b Nagemeten bij het bouwen van de views — de vermoedelijke verklaring klopte
+
+Bovenstaande noemde "een andere noemer bij PMax" als waarschijnlijke verklaring. Bij het bouwen
+van de kandidaat-views (migraties 046–048) is dat getoetst, en het bleek zo te zijn. De 682
+afwijkende rijen uitgesplitst naar campagnesoort:
+
+| | rijen | wijkt af |
+|---|---:|---:|
+| smal (search, shopping) | 3725 | 262 — 7,0 % |
+| breed (PMax, video, display) | 865 | 420 — **48,6 %** |
+
+De impliciete noemer bevestigt het: bij 350 klikken en een opgeslagen ratio van 3,32 % horen 1379
+noemer-eenheden. Google deelt `Conv. rate` door **interacties**, en bij PMax tellen engagements
+mee. Die noemer slaan wij niet op.
+
+**Daarmee is de regel uit §2.4 te scherp geformuleerd geweest.** "Afgeleide waarden gaan niet mee"
+is niet de goede scheidslijn. De vraag is:
+
+> Kunnen wij deze waarde uit onze eigen kolommen terugrekenen?
+
+- **Nee** → de opgeslagen waarde is de enige die we hebben. Bewaren, met de herkomst erbij.
+  `conversion_rate`, `ctr`, `cost_per_conversion`, `hook_rate`, `hold_rate`, `purchase_roas`.
+- **Ja** → berekenen. En dan is een afwijking geen meningsverschil maar bewijs dat de opslag scheef
+  staat: `roas` is onze eigen deling, en toch komt hij op 1049 van 4707 rijen niet uit op zijn eigen
+  `cost` en `conversions_value`. Oorzaak is §1.2 — Google kent conversies toe aan de klikdatum, dus
+  de waarde is na het wegschrijven nog bijgesteld.
+
+Zonder deze meting was elke PMax-conversieratio na fase 3 twee tot tien keer te hoog geweest.
+Geen foutmelding, geen lege grafiek, alleen een mooier getal.
+
+#### 1.4c `fact_core` kan geen "onbekend" bewaren
+
+De vijf grootheden staan als `not null default 0` en zijn gevuld met `coalesce(bron, 0)`. Waar de
+bron leeg was staat nu een nul, en die twee zijn daarna niet meer te scheiden. Gemeten:
+
+| kolom | rijen leeg in de bron |
+|---|---:|
+| `meta_*_daily.clicks_all` | 160 + 128 + 256 |
+| `linkedin_creative_daily.conversion_value` | 92 |
+
+Voor `sum()` maakt het niets uit en de lezers schrijven `Number(x ?? 0)`, dus vandaag is het
+onzichtbaar. Voor `avg()` niet — NULL telt niet mee in de noemer, 0 wel. `check-view-dekking.mjs`
+telt het per kolom en eist dat het verschil precies dit is; een gevulde bronwaarde die afwijkt is
+wél een fout.
+
 ### 1.5 Bijna geen referentiële integriteit
 
 6 foreign keys over 112 tabellen. Niets houdt een rij tegen die naar een niet-bestaande klant,
