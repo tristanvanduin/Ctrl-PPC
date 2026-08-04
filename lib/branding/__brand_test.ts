@@ -212,6 +212,12 @@ console.log("\nDe oude naam staat nergens meer als weergavetekst");
     // achtergebleven merkverwijzing in de weergave. Zou deze controle daarop blijven vallen, dan
     // kan er nooit een bureau met een eigen naam in de database staan — en dat is het doel.
     "scripts/migrations/035_bureaus_en_accounts.sql",
+    // Om dezelfde reden: de merkgroepering wordt getest op de ECHTE 71 accountnamen uit de
+    // database, en "Ranking Masters" is daar één van. Dat is een ACCOUNTNAAM als testgegeven, niet
+    // een merkvermelding in de weergave. Verzonnen namen zouden hier niet werken — de fout die die
+    // test vasthoudt ("Easy Living" belandde bij "Easy-Ergonomics") ontstaat juist door hoe echte
+    // klanten hun accounts noemen, en die had ik nooit bedacht.
+    "lib/branding/__merkgroepen_test.ts",
   ];
   const overtreders: string[] = [];
   for (const f of [...walk("lib"), ...walk("app"), ...walk("components"), ...walk("scripts")]) {
