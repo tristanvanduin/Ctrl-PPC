@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ALL_CLIENTS, ROLES, ROL_LABEL, scopeFor, type Role } from "@/lib/auth/roles";
+import { beoordeel, zwaarste, type Licht } from "@/lib/adoptie/stoplicht";
 import { getAllClients, type Client } from "@/lib/clients";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel } from "@/components/dashboard/data-table";
 
@@ -33,6 +34,127 @@ const ROL_UITLEG: Record<Role, string> = {
 
 function dektAlleBeurzen(role: Role | null): boolean {
   return role !== null && scopeFor(role, []) === ALL_CLIENTS;
+}
+
+// ── Adoptie per bureau ─────────────────────────────────────────────────────
+//
+// Het stoplicht dat zegt of de tool bij een bureau echt landt. Een bureau dat opzegt doet dat
+// zelden plotseling: er gaat maanden aan onbenutte licentie aan vooraf, en dat is te zien.
+//
+// Op BUREAUNIVEAU, niet per persoon. "3 van de 12 gebruikers actief" stuurt een gesprek met de
+// klant; een lijst met wie er lang niet inlogde stuurt een beoordelingsgesprek, en dat is een
+// ander gereedschap. De namen staan wel in de tabel eronder -- die stonden daar al -- maar dan als
+// onderdeel van gebruikersbeheer en niet als afrekening.
+
+const LICHT_STIJL: Record<Licht, { rand: string; vlak: string; punt: string; tekst: string; label: string }> = {
+  groen:    { rand: "border-green-200", vlak: "bg-green-50",  punt: "bg-green-500",  tekst: "text-green-800",  label: "Gezond" },
+  amber:    { rand: "border-amber-200", vlak: "bg-amber-50",  punt: "bg-amber-500",  tekst: "text-amber-800",  label: "Let op" },
+  rood:     { rand: "border-red-200",   vlak: "bg-red-50",    punt: "bg-red-500",    tekst: "text-red-800",    label: "Risico" },
+  onbekend: { rand: "border-border",    vlak: "bg-muted/40",  punt: "bg-gray-400",   tekst: "text-muted-foreground", label: "Onbekend" },
+};
+
+interface AdoptieRij {
+  agency_id: string; bureau: string; gekoppeld: number; actief: number;
+  adoptie: number | string | null; laatst_gezien: string | null; nooit_actief: number;
+}
+
+function AdoptieSectie() {
+  const [rijen, setRijen] = useState<AdoptieRij[] | null>(null);
+  const [fout, setFout] = useState<string | null>(null);
+  const [dagen, setDagen] = useState(30);
+
+  useEffect(() => {
+    let afgebroken = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/adoptie?dagen=${dagen}`);
+        const body = await res.json();
+        if (afgebroken) return;
+        if (!res.ok) { setFout(body?.error ?? `Fout ${res.status}`); setRijen([]); return; }
+        setFout(null);
+        setRijen(body.bureaus ?? []);
+      } catch (e) {
+        if (!afgebroken) { setFout(e instanceof Error ? e.message : String(e)); setRijen([]); }
+      }
+    })();
+    return () => { afgebroken = true; };
+  }, [dagen]);
+
+  if (rijen === null) return null;
+
+  const oordelen = rijen.map((r) => ({
+    rij: r,
+    oordeel: beoordeel({
+      bureau: r.bureau, gekoppeld: r.gekoppeld, actief: r.actief,
+      adoptie: r.adoptie === null ? null : Number(r.adoptie),
+      laatstGezien: r.laatst_gezien,
+    }),
+  }));
+  const totaal = zwaarste(oordelen.map((o) => o.oordeel.licht));
+
+  return (
+    <section className="mb-8">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h2 className="text-base font-semibold text-gray-900">Gebruik per bureau</h2>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-micro font-medium ${LICHT_STIJL[totaal].vlak} ${LICHT_STIJL[totaal].tekst}`}>
+          {/* Kleur nooit alleen: het bolletje staat naast een woord, zodat het ook leesbaar is
+              voor wie geen kleurverschil ziet en in een afdruk. */}
+          <span className={`h-2 w-2 rounded-full ${LICHT_STIJL[totaal].punt}`} />
+          {LICHT_STIJL[totaal].label}
+        </span>
+        <div className="ml-auto flex items-center gap-1">
+          {[7, 30, 90].map((d) => (
+            <button key={d} onClick={() => setDagen(d)}
+              className={`rounded-md px-2 py-0.5 text-micro font-medium transition-colors ${
+                dagen === d ? "bg-rm-blue/10 text-rm-blue-ink" : "text-muted-foreground hover:bg-gray-100"}`}>
+              {d} dagen
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="mb-3 text-xs text-gray-500">
+        Aandeel gekoppelde gebruikers dat in dit venster actief was, en hoe lang het stil is.
+        Activiteit komt uit de sessies &mdash; niet uit de laatste login, want die beweegt niet mee
+        als iemand ingelogd blijft.
+      </p>
+
+      {fout && (
+        <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-meta text-red-700">{fout}</p>
+      )}
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {oordelen.map(({ rij, oordeel }) => {
+          const st = LICHT_STIJL[oordeel.licht];
+          return (
+            <div key={rij.agency_id} className={`rounded-lg border p-3 ${st.rand} ${st.vlak}`}>
+              <div className="flex items-center gap-2">
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${st.punt}`} />
+                <span className="truncate text-sm font-semibold text-gray-900">{rij.bureau}</span>
+                <span className={`ml-auto shrink-0 text-micro font-medium ${st.tekst}`}>{st.label}</span>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-2">
+                <span className="text-xl font-semibold tabular-nums text-gray-900">
+                  {rij.adoptie === null ? "—" : `${Math.round(Number(rij.adoptie))}%`}
+                </span>
+                <span className="text-meta text-gray-600">{oordeel.reden}</span>
+              </div>
+              <p className="mt-1 text-micro text-gray-500">
+                {oordeel.dagenStil === null
+                  ? "nog geen activiteit gezien"
+                  : oordeel.dagenStil === 0
+                    ? "vandaag nog actief"
+                    : `laatst actief ${oordeel.dagenStil} dag${oordeel.dagenStil === 1 ? "" : "en"} geleden`}
+                {rij.nooit_actief > 0 && ` · ${rij.nooit_actief} nog nooit ingelogd`}
+              </p>
+            </div>
+          );
+        })}
+        {oordelen.length === 0 && (
+          <p className="text-sm text-muted-foreground">Nog geen bureaus.</p>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export default function AdminPage() {
@@ -145,6 +267,8 @@ export default function AdminPage() {
       <p className="mb-6 text-sm text-gray-500">
         De rol bepaalt wat iemand mag, de beurzen bepalen waarover. Alleen voor admins.
       </p>
+
+      <AdoptieSectie />
 
       <form onSubmit={invite} className="mb-8 rounded-lg border border-gray-200 bg-card p-4">
         <div className="flex flex-wrap items-end gap-3">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Settings, Building2, Search, FileCode2, FolderOpen, FolderClosed, ChevronDown, ChevronRight, MapPin, ListChecks, LayoutGrid } from "lucide-react";
+import { Settings, Building2, Search, FileCode2, FolderOpen, FolderClosed, ChevronDown, ChevronRight, MapPin, ListChecks, LayoutGrid , ShieldCheck } from "lucide-react";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { getVisibleClients, loadVisibleClientIds } from "@/lib/visible-clients";
 import { loadApiClients } from "@/lib/clients";
@@ -376,6 +376,27 @@ function SidebarInner() {
           <FileCode2 className="w-4 h-4" />
           Scripts
         </Link>
+        {/* Beheer stond nergens in de navigatie: de pagina bestond wel maar was alleen bereikbaar
+            door /admin in te typen. Een beheerscherm dat niemand kan vinden wordt niet gebruikt,
+            en sinds het stoplicht voor bureaugebruik erop staat is dat een gemis.
+
+            `can("user:manage")` en niet de rol: zodra de rechtenmatrix verandert, verandert deze
+            link mee. Zolang de enforcement uit staat geeft `can` overal true terug (zie
+            use-access.ts) -- dan is de link zichtbaar en de ROUTE nog steeds dicht, want die
+            controleert server-side. Zichtbaar zonder recht is hier het veilige verschil. */}
+        {access.can("user:manage") && (
+          <Link
+            href="/admin"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+              pathname === "/admin"
+                ? "bg-rm-orange text-white font-medium"
+                : "text-white/70 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            Beheer
+          </Link>
+        )}
         <Link
           href="/settings"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
