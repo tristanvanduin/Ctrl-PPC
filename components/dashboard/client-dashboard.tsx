@@ -22,7 +22,11 @@ import { SopTriggerButtons, type SopError } from "../insights/sop-trigger-button
 import { StandaloneAnalyses } from "../insights/standalone-analyses";
 import { HypothesesBlock } from "../insights/hypotheses-block";
 import { ProposalQueue } from "../insights/proposal-queue";
+import { supabase } from "@/lib/supabase";
 import { ChannelFilter } from "../insights/channel-filter";
+import {
+  laadBeschikbareKanalen, zichtbareTabs, geldigeKeuze, geenDataTekst, type Kanaal,
+} from "@/lib/kanalen/beschikbaar";
 import { MetaCreativeAnalyses } from "../insights/meta-creative-analyses";
 import { SignalAnalysisCard } from "./signal-analysis-card";
 import { CrossChannelAnalyses } from "./cross-channel-analyses";
@@ -112,10 +116,24 @@ const CHANNELS: { id: Channel; label: string; icon: React.ReactNode }[] = [
   { id: "linkedin", label: "LinkedIn", icon: <Briefcase className="w-3.5 h-3.5" /> },
 ];
 
-function ChannelTabs({ channel, onChange }: { channel: Channel; onChange: (c: Channel) => void }) {
+/**
+ * De kanaalkiezer, maar alleen voor de kanalen die deze klant écht heeft.
+ *
+ * Gemeten op de 71 accounts: 62 hebben alleen Google. Die zagen hier vier tabs, waarvan twee naar
+ * een leeg scherm leidden en "Alle kanalen" hetzelfde toonde als het enige kanaal. Bij één kanaal
+ * verdwijnt de balk daarom helemaal -- een kiezer met één knop is geen keuze.
+ */
+function ChannelTabs({ channel, onChange, beschikbaar }: {
+  channel: Channel;
+  onChange: (c: Channel) => void;
+  beschikbaar: readonly Kanaal[];
+}) {
+  const toegestaan = zichtbareTabs(beschikbaar);
+  if (toegestaan.length === 0) return null;
+  const zichtbaar = CHANNELS.filter((c) => (toegestaan as string[]).includes(c.id));
   return (
     <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-      {CHANNELS.map((c) => (
+      {zichtbaar.map((c) => (
         <button
           key={c.id}
           onClick={() => onChange(c.id)}
@@ -203,6 +221,26 @@ function DashboardPeriodPicker() {
 export function ClientDashboard({ client }: { client: Client }) {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [channel, setChannel] = useState<Channel>("blended");
+  // null = nog niet geladen. Dat onderscheid telt: "nog niet weten" mag er niet uitzien als
+  // "geen kanalen", anders flitst de lege staat op bij elke navigatie.
+  const [kanalen, setKanalen] = useState<Kanaal[] | null>(null);
+
+  useEffect(() => {
+    let levend = true;
+    if (!supabase) { setKanalen([]); return; }
+    laadBeschikbareKanalen(supabase as never, client.id)
+      .then((k) => { if (levend) setKanalen(k); })
+      .catch(() => { if (levend) setKanalen([]); });
+    return () => { levend = false; };
+  }, [client.id]);
+
+  // De keuze bijstellen zodra bekend is wat er is. Zonder dit blijf je hangen op een kanaal dat
+  // deze klant niet heeft: van een Meta-klant doorklikken naar een Google-only klant liet een
+  // leeg scherm zien onder een tab die niet eens meer bestond.
+  useEffect(() => {
+    if (!kanalen) return;
+    setChannel((huidig) => geldigeKeuze(huidig, kanalen) as Channel);
+  }, [kanalen]);
   // Beurs-scope; initieel en live gestuurd door ?geo= uit het menu (Fase 3), daarna ook
   // via de kiezer in de view aanpasbaar.
   const searchParams = useSearchParams();
@@ -254,6 +292,18 @@ export function ClientDashboard({ client }: { client: Client }) {
             clientId={client.id}
             onSyncComplete={() => setRefreshKey((k) => k + 1)}
           />
+        </div>
+      )}
+
+      {/* Acht van de 71 klanten hebben nog geen enkel kanaal met data. Die zagen tot nu toe een
+        volledig dashboard met overal nullen, en dat leest als "het gaat slecht" in plaats van
+        "er is nog niets gekoppeld".
+
+        Een melding en geen vervanging van het scherm: de weg naar de oplossing loopt via
+        Instellingen, en die zou je met een lege staat over het hele dashboard juist afsluiten. */}
+      {kanalen !== null && kanalen.length === 0 && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <p className="text-meta leading-snug text-amber-900">{geenDataTekst(kanalen)}</p>
         </div>
       )}
 
@@ -326,7 +376,7 @@ export function ClientDashboard({ client }: { client: Client }) {
               {/* De cijfers van de gekozen periode. Werkt op data die de pagina al heeft, dus
                   ook in demo-modus. */}
               <PeriodSummary data={clientData.data} />
-              <ChannelTabs channel={channel} onChange={setChannel} />
+              <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
               {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} />}
               {channel === "blended" && <CrossChannelView clientId={client.id} />}
@@ -438,7 +488,7 @@ export function ClientDashboard({ client }: { client: Client }) {
 
           {activeTab === "campaigns" && (
             <div className="space-y-6">
-              <ChannelTabs channel={channel} onChange={setChannel} />
+              <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
               {channel === "google" && (
                 <div>
                   {/* Twee vragen, twee secties. Wat draait er, en waar lekt het weg — dat laatste
@@ -505,7 +555,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                 </>
               ) : (
                 <>
-                  <ChannelTabs channel={channel} onChange={setChannel} />
+                  <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
                   {channel === "google" && (
                     <>
                       {/* De prognose is het antwoord; het budgetscenario is wat je ermee doet.
@@ -552,6 +602,7 @@ export function ClientDashboard({ client }: { client: Client }) {
             <div className="space-y-6">
               <PeriodSummary data={clientData.data} />
               <InsightsTab
+                kanalen={kanalen ?? []}
                 clientId={client.id}
                 onSopError={(error) => setSopErrors((prev) => [...prev, error])}
               />
@@ -686,7 +737,7 @@ function SettingsSections({ client }: { client: Client }) {
   );
 }
 
-function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: (error: SopError) => void }) {
+function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSopError?: (error: SopError) => void; kanalen: readonly Kanaal[] }) {
   const [, setRefreshKey] = useState(0);
   const [analysisChannel, setAnalysisChannel] = useState<Channel>("blended");
 
@@ -706,7 +757,7 @@ function InsightsTab({ clientId, onSopError }: { clientId: string; onSopError?: 
   return (
     <div className="space-y-6">
       {/* Alle analyses draaien hier, per kanaal; de kanaaltabs elders zijn data-weergaven. */}
-      <ChannelTabs channel={analysisChannel} onChange={setAnalysisChannel} />
+      <ChannelTabs channel={analysisChannel} onChange={setAnalysisChannel} beschikbaar={kanalen ?? []} />
 
       {analysisChannel === "google" && (
         <>
