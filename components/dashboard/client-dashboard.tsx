@@ -67,6 +67,7 @@ import { GeoChannelMatrix } from "./geo-channel-matrix";
 import { VideoPerformance } from "./video-performance";
 import { VideoPlacements } from "./video-placements";
 import { PmaxNetworkSplit } from "./pmax-network-split";
+import { PmaxAssetCoverage } from "./pmax-asset-coverage";
 import { TrackingAlert } from "./tracking-alert";
 import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
@@ -517,14 +518,38 @@ export function ClientDashboard({ client }: { client: Client }) {
                 titel="Waar het budget landt"
                 bijschrift="Video, netwerken en placements"
               >
-                {/* NAAST ELKAAR GEPROBEERD EN TERUGGEDRAAID. Gemeten op de demo-klant:
-                      6 + 6  de videotabel vraagt 835px en krijgt er 622 -- scrollt
-                      8 + 4  tabel past (835/835), maar de PMax-kaart wordt 826px hoog naast een
-                             videokaart van 322px: een gat van 500px
-                    Alle drie de blokken hier zijn breed; er is geen compacte metgezel. Naast
-                    elkaar zetten ruilt een scrollende tabel in voor een groter gat. */}
-                <VideoPerformance clientId={client.id} />
-                <PmaxNetworkSplit clientId={client.id} />
+                {/* Naast elkaar, met een DERDE blok in het gat.
+
+                    Eerder geprobeerd op 8 + 4 en teruggedraaid: de videotabel paste precies
+                    (835/835) maar de PMax-kaart werd 826px hoog naast een videokaart van 322px --
+                    een gat van 500px. Het probleem was niet de indeling maar dat er twee blokken
+                    waren voor drie plekken.
+
+                    De assetdekking vult dat gat, en niet als opvulling: de PMax-kaart ernaast zegt
+                    zelf dat de kanaalverdeling geen knop is en dat je stuurt via assets. Die
+                    assets stonden nergens op het scherm -- een kaart die een knop noemt en hem
+                    niet laat zien.
+
+                    row-span-2 op de PMax-kaart en geen drie losse rijen: die kaart is met zijn
+                    twee ringen ongeveer even hoog als de videotabel en de assetdekking samen, dus
+                    de twee kolommen lopen gelijk uit. */}
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:grid-rows-[min-content_1fr]">
+                  <div className="@container min-w-0 xl:col-span-8">
+                    <VideoPerformance clientId={client.id} />
+                  </div>
+                  <div className="@container min-w-0 xl:col-span-4 xl:row-span-2">
+                    <PmaxNetworkSplit clientId={client.id} />
+                  </div>
+                  {/* De rijhoogtes zijn min-content en 1fr, en de assetkaart rekt mee (h-full, en
+                      via [&>div] ook de kaart erbinnen). Zonder dat verdeelde het raster de
+                      overtollige hoogte van de PMax-kaart over BEIDE rijen: 61px tussen video en
+                      assets waar elders 16 staat, en de onderkanten 45px uit elkaar. Nu gaat alle
+                      speling naar de onderste kaart, waar hij als padding in een lijst leest in
+                      plaats van als een gat tussen twee kaarten. */}
+                  <div className="@container min-w-0 xl:col-span-8 xl:h-full xl:[&>div]:h-full">
+                    <PmaxAssetCoverage clientId={client.id} />
+                  </div>
+                </div>
                 <VideoPlacements clientId={client.id} />
               </Sectie>
 
