@@ -1,11 +1,20 @@
 // De netwerkverdeling binnen Performance Max: waar gaat het budget heen, en waar komen de
 // conversies vandaan.
 //
-// PMax is voor de adverteerder een black box — Google verdeelt het budget zelf over Zoeken,
-// Zoekpartners, Display, YouTube, Maps, Discover en Gmail. Die verdeling wordt wél gesynct maar
-// bereikte tot nu toe alleen de AI-lagen, nooit het scherm. Terwijl juist híer de scheefheid
-// zichtbaar wordt: als een derde van je budget naar Maps gaat en daar een tiende van de
-// conversies vandaan komt, is dat het gesprek.
+// "PMax is een black box" stond hier, en dat is achterhaald. Google verdeelt het budget nog steeds
+// zélf over Zoeken, Zoekpartners, Display, YouTube, Maps, Discover en Gmail -- die verdeling is
+// geen knop -- maar hij RAPPORTEERT hem inmiddels wel, met kosten en conversies per kanaal. Deze
+// module bestaat bij de gratie van die rapportage.
+//
+// Het onderscheid dat telt is dus niet zichtbaar-versus-onzichtbaar maar stuurbaar-versus-meetbaar.
+// De verdeling is meetbaar en niet stuurbaar, en juist daarom hoort ze op het scherm: als een
+// derde van je budget naar Maps gaat en daar een tiende van de conversies vandaan komt, kun je dat
+// niet met een schuifje rechtzetten, maar wel met assets, signalen en uitsluitingen. Zonder dit
+// blok zie je de scheefheid niet en stuur je dus nergens op.
+//
+// Nagekeken augustus 2026 tegen Google's eigen aankondiging van de PMax-updates voor 2026; die
+// noemt kanaalrapportage, budgetprojectie, demografie en placementrapportage als nieuw, en géén
+// knop voor de verdeling.
 //
 // Vandaar dat kosten en conversies naast elkaar staan en niet los: het aandeel op zichzelf zegt
 // weinig, het verschil tussen de twee aandelen is het signaal.

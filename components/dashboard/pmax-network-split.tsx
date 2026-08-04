@@ -101,9 +101,27 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
               )}
             </p>
           ))}
+          {/* BIJGEWERKT NAAR DE STAND VAN 2026, en het onderscheid is de hele boodschap.
+              Hier stond alleen "PMax laat de verdeling niet rechtstreeks sturen ... via assets,
+              doelgroepsignalen en uitsluitingen". Die zin klopt nog op het eerste punt maar leest
+              als "je ziet en kunt niets", en dat is achterhaald: Google levert inmiddels
+              kanaalrapportage met kosten en conversies per kanaal (dit blok bestaat daarvan),
+              een budgetprojectie naar maandeinde, demografie op leeftijd en geslacht, en
+              placementrapportage per netwerk.
+
+              Wat er NIET bij zit is een knop voor de verdeling zelf; die blijft algoritmisch. En
+              er kwamen twee sturingsknoppen bij die hier ontbraken: campagne-brede
+              uitsluitingszoekwoorden en het uitsluiten van klantenlijsten. Google's eigen
+              samenvatting: van autopilot naar assisted driving.
+
+              Bron: business.google.com, "New Performance Max steering and reporting updates
+              coming in 2026", nagekeken augustus 2026. PMax verandert per kwartaal -- staat deze
+              regel er over een jaar nog, kijk hem dan opnieuw na. */}
           <p className="text-meta text-muted-foreground">
-            PMax laat de verdeling niet rechtstreeks sturen. Wel bij te sturen via assets (meer of minder
-            video en beeld), doelgroepsignalen en uitsluitingen — zie de placements hieronder.
+            De verdeling zelf is geen knop: welk deel naar Zoeken of Maps gaat bepaalt Google. Sturen doe
+            je eromheen — via assets (meer of minder video en beeld), doelgroepsignalen,
+            uitsluitingszoekwoorden op campagneniveau, het uitsluiten van klantenlijsten, en
+            placement-uitsluitingen. Zie de placements hieronder.
           </p>
         </div>
       )}
