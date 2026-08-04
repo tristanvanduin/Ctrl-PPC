@@ -9,7 +9,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import {
-  can, canAccessClient, capabilitiesOf, normalizeRole, scopeFor,
+  ALL_CLIENTS, can, canAccessClient, capabilitiesOf, normalizeRole, scopeFor,
   type Capability, type ClientScope, type Role,
 } from "./roles";
 
@@ -46,18 +46,50 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data: roleRow }, { data: clientRows }] = await Promise.all([
-    supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
-    supabase.from("user_clients").select("client_id").eq("user_id", user.id),
-  ]);
+  // ── De scope is BUREAU-GEBONDEN ───────────────────────────────────────────
+  //
+  // Hiervoor stond hier alleen user_clients, en scopeFor() gaf voor een organisatiebrede rol
+  // ALL_CLIENTS terug: alle klanten van iedereen. Dat is dezelfde bureau-blinde aanname die
+  // migratie 057 in de database heeft rechtgezet, en die moet aan beide kanten weg.
+  //
+  // De database is inmiddels de handhaving: RLS geeft een gebruiker alleen de rijen van zijn eigen
+  // bureau. Zonder deze aanpassing zou de UI dus denken dat ze bij een klant mag die de database
+  // toch niet teruggeeft -- dat levert lege schermen op in plaats van een nette melding, en het is
+  // precies zo verwarrend als het klinkt.
+  //
+  // ALL_CLIENTS blijft bestaan voor de platformbeheerder. Dat is de enige rol die over bureaus
+  // heen kijkt, en dat staat expliciet in platform_beheerders (migratie 057) en niet in een rol.
+  const [{ data: roleRow }, { data: clientRows }, { data: platformRow }, { data: bureauRows }] =
+    await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
+      supabase.from("user_clients").select("client_id").eq("user_id", user.id),
+      supabase.from("platform_beheerders").select("user_id").eq("user_id", user.id).maybeSingle(),
+      supabase.from("user_agencies").select("agency_id").eq("user_id", user.id),
+    ]);
 
   const role = normalizeRole(roleRow?.role);
-  const assigned = (clientRows ?? []).map((row) => String(row.client_id));
+  const isPlatform = Boolean(platformRow);
+  const bureaus = (bureauRows ?? []).map((r) => String(r.agency_id));
+
+  let scope: ReturnType<typeof scopeFor>;
+  if (isPlatform) {
+    scope = ALL_CLIENTS;
+  } else if (scopeFor(role, []) === ALL_CLIENTS) {
+    // Organisatiebrede rol: alle klanten VAN ZIJN EIGEN BUREAUS. Geen bureau betekent geen
+    // klanten -- en dat is juist, want dan hoort iemand nog ergens aan gekoppeld te worden.
+    const { data: accountRows } = bureaus.length
+      ? await supabase.from("accounts").select("client_id").in("agency_id", bureaus)
+      : { data: [] };
+    scope = (accountRows ?? []).map((r) => String(r.client_id));
+  } else {
+    scope = (clientRows ?? []).map((row) => String(row.client_id));
+  }
+
   return {
     id: user.id,
     email: user.email ?? null,
     role,
-    scope: scopeFor(role, assigned),
+    scope,
     capabilities: capabilitiesOf(role),
   };
 }

@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 import { isDemoMode } from "./demo/demo-mode";
 import { createDemoSupabase } from "./demo/mock-supabase";
 import { demoRows } from "./demo/demo-rows";
@@ -6,9 +7,24 @@ import { demoRows } from "./demo/demo-rows";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/**
+ * createBrowserClient en niet createClient, en dat verschil blokkeerde fase 5.
+ *
+ * createClient uit supabase-js bewaart de sessie in localStorage. De middleware leest hem met
+ * createServerClient uit @supabase/ssr, en die kijkt in COOKIES. Die twee praten niet met elkaar.
+ *
+ * Met O1_AUTH_ENFORCED=true had dat dit opgeleverd: iemand logt in, de sessie gaat naar
+ * localStorage, de volgende navigatie komt langs de middleware, die vindt geen cookie en stuurt
+ * hem terug naar /login. Oneindige lus, en geen foutmelding die uitlegt waarom -- de login zelf
+ * slaagde immers.
+ *
+ * createBrowserClient schrijft dezelfde sessie naar cookies. Daarmee zien de browser (voor zijn
+ * PostgREST-queries) en de server (voor de middleware en de routes) hetzelfde. Het is verder
+ * dezelfde client: dezelfde methoden, hetzelfde gedrag.
+ */
 const realClient: SupabaseClient | null =
   supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
+    ? (createBrowserClient(supabaseUrl, supabaseAnonKey) as SupabaseClient)
     : null;
 
 /**
