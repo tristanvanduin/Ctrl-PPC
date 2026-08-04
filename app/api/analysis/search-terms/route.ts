@@ -105,9 +105,13 @@ export async function GET(request: NextRequest) {
 
   const analysisDate = latest[0].analysis_date;
 
+  // De periode staat al vast: analysis_date is één dag, de meest recente. Wat hier nog te winnen
+  // viel waren de kolommen — de mapper hieronder leest er elf, select("*") haalde ook model_used,
+  // created_at en id op om ze weg te gooien. Dit antwoord gaat naar de browser, dus dat zijn
+  // bytes over de lijn per bezoek.
   const { data: results } = await supabase
     .from("search_term_analysis")
-    .select("*")
+    .select("search_term, campaign_name, ad_group_name, clicks, cost, conversions, conversions_value, relevance_score, verdict, recommended_action, reason")
     .eq("client_id", clientId)
     .eq("analysis_date", analysisDate)
     .order("cost", { ascending: false });

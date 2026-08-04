@@ -226,10 +226,14 @@ export async function calculateLeadingIndicators(
   // berekende ook nog een safeDateStr die nergens werd gebruikt; die is meeverdwenen.
   const veiligeDatum = addDays(today(), -lagDays);
 
-  // Fetch last 6 weeks of weekly data to compute WoW for last 4
+  // Fetch last 6 weeks of weekly data to compute WoW for last 4.
+  //
+  // De .limit(6) begrenst het aantal rijen al; wat select("*") erbij haalde waren de kolommen.
+  // Deze lus leest er acht, dus die acht staan er nu. De rest van de tabel (afgeleide ratio's die
+  // hier niet gebruikt worden, synced_at, id) reisde mee zonder ooit gelezen te worden.
   const { data: weeklyData } = await supabase
     .from("ads_account_weekly")
-    .select("*")
+    .select("week_start, clicks, conversions, cost, ctr, avg_cpc, conversion_rate, cost_per_conversion")
     .eq("client_id", clientId)
     .order("week_start", { ascending: false })
     .limit(6);

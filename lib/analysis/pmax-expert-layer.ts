@@ -26,6 +26,38 @@ import { buildNetworkSplit, isBrowseNetwork } from "@/lib/pmax/network-split";
 // ook hoe de omliggende sommen (totale kosten, aandeel) al werkten; alleen de filters en de
 // tellingen keken naar rijen.
 
+// ── Het venster ────────────────────────────────────────────────────────────
+// De drempels hieronder staan op een TOTAAL over meerdere maanden: "€20+ spend en 0 conversies",
+// ">€10", ">5000 impressies". Tot nu toe was dat totaal de HELE historie, want geen van de
+// queries had een ondergrens. Dat kost twee dingen.
+//
+// Het leest onbegrensd. Elke maand die een klant ooit had gaat mee, en die stapel groeit alleen
+// maar. Bij twintig bureaus met twintig accounts is dat het verschil tussen een vaste leeslast
+// en een die met de tijd meegroeit.
+//
+// En, minder zichtbaar maar erger: een drempel op een levenslang totaal dooft nooit uit. Een
+// plaatsing die twee jaar geleden €25 verbrandde en sindsdien niet meer draait, blijft "€25
+// verspild" melden zolang de rij bestaat. Het signaal wordt daarmee een archief in plaats van
+// een waarneming. Dat gold ook voor de netwerkmix: die telde de kosten over alle jaren op, dus
+// "40% van de spend gaat naar Display" ging over een gemiddelde dat niemand kan bijsturen.
+//
+// Vandaar één venster voor alle PMax-queries. Twaalf maanden: lang genoeg voor seizoen, kort
+// genoeg om een vast plafond te zijn. Signaal 7 verderop houdt zijn eigen 90 dagen — een
+// maand-op-maand vergelijking heeft er maar twee nodig.
+//
+// De .limit() op plaatsingen en zoekcategorieën betekende hiervoor trouwens weinig: "de 100
+// duurste rijen" over vijf jaar heen kan uit vijf willekeurige maanden komen, en dan telt
+// aggregateByEntity per entiteit een ander stuk geschiedenis op. Binnen een venster is die
+// afkapping wél een afkapping van iets.
+const VENSTER_MAANDEN = 12;
+
+/** Eerste van de maand, VENSTER_MAANDEN terug. */
+function vensterStart(): string {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() - VENSTER_MAANDEN, 1);
+  return d.toISOString().slice(0, 10);
+}
+
 interface EntityTotals {
   label: string;
   cost: number;
@@ -92,13 +124,35 @@ export async function computePmaxInsights(
     };
   }
 
-  // Fetch PMAX data in parallel
+  // Fetch PMAX data in parallel.
+  //
+  // Kolommen bij naam, niet select("*"). Deze vijf tabellen dragen samen een kleine veertig
+  // kolommen waarvan er hieronder tien gebruikt worden; de rest reisde mee over de lijn om
+  // ongelezen weggegooid te worden. Bij naam noemen maakt bovendien zichtbaar wat een signaal
+  // werkelijk nodig heeft — een kolom die verdwijnt geeft nu een fout in plaats van een stille
+  // undefined.
+  const vanaf = vensterStart();
   const [networkData, assetGroupData, assetData, placementData, searchCatData] = await Promise.all([
-    supabase.from("ads_pmax_network_breakdown").select("*").eq("client_id", clientId).order("cost", { ascending: false }),
-    supabase.from("ads_asset_group_performance_monthly").select("*").eq("client_id", clientId).order("cost", { ascending: false }),
-    supabase.from("ads_pmax_asset_performance").select("*").eq("client_id", clientId),
-    supabase.from("ads_pmax_placements").select("*").eq("client_id", clientId).order("cost", { ascending: false }).limit(100),
-    supabase.from("ads_pmax_search_categories").select("*").eq("client_id", clientId).order("cost", { ascending: false }).limit(50),
+    supabase.from("ads_pmax_network_breakdown")
+      .select("network_type, cost, conversions, conversions_value, impressions, clicks")
+      .eq("client_id", clientId).gte("month", vanaf).order("cost", { ascending: false }),
+    supabase.from("ads_asset_group_performance_monthly")
+      .select("month, asset_group_name, cost, conversions, conversions_value")
+      .eq("client_id", clientId).gte("month", vanaf).order("cost", { ascending: false }),
+    supabase.from("ads_pmax_asset_performance")
+      .select("month, asset_type, performance_label")
+      .eq("client_id", clientId).gte("month", vanaf),
+    // placement_type en conversions_value staan hier niet voor de signalen maar voor
+    // buildPmaxPromptContext onderaan: die schrijft het plaatsingstype in de prompt en rekent er
+    // de ROAS per zoekthema uit. Zonder die twee blijft alles draaien -- het type wordt een lege
+    // string, de ROAS wordt "0" -- en dat is precies het soort stille schade dat select("*")
+    // toedekt. Vandaar dat ze hier apart genoemd staan met de reden erbij.
+    supabase.from("ads_pmax_placements")
+      .select("placement, placement_type, cost, conversions, impressions")
+      .eq("client_id", clientId).gte("month", vanaf).order("cost", { ascending: false }).limit(100),
+    supabase.from("ads_pmax_search_categories")
+      .select("category_label, cost, conversions, conversions_value, impressions")
+      .eq("client_id", clientId).gte("month", vanaf).order("cost", { ascending: false }).limit(50),
   ]);
 
   const networks = (networkData.data ?? []) as Array<Record<string, unknown>>;

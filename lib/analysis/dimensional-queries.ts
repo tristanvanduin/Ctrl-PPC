@@ -205,13 +205,30 @@ export async function fetchAudiencePerformance(
   return (data ?? []) as AudiencePerformanceMonthly[];
 }
 
+/**
+ * Uurstaat van de laatste dertig dagen.
+ *
+ * Als enige helper hier GEEN periodefilter, en dat is geen omissie. Deze tabel wordt per sync
+ * met replaceBatch geschreven: alle rijen van de klant eruit, de nieuwe momentopname erin. Er
+ * staat dus per klant precies één period_start, en een `.gte("period_start", …)` zou filteren op
+ * een kolom met één waarde — een controle die niets controleert.
+ *
+ * Dat het zo blijft is een bewuste keuze, niet een detail dat toevallig zo uitpakt: opeenvolgende
+ * periodes van dertig dagen overlappen, dus stapelen zou dubbeltellen. Zie de sectie "Bewust NIET
+ * aangeraakt" in scripts/pending-migration-history-accumulation.sql. Verandert dat ooit, dan moet
+ * hier een filter op de nieuwste period_start bij — niet een venster, want twee vensters optellen
+ * is precies de fout die de tabel nu vermijdt.
+ *
+ * Wat wél te winnen viel: de kolommen bij naam in plaats van select("*"), zodat id en synced_at
+ * niet meereizen.
+ */
 export async function fetchAdSchedulePerformance(
   supabase: SupabaseClient,
   clientId: string
 ): Promise<AdSchedulePerformance[]> {
   const { data } = await supabase
     .from("ads_ad_schedule_performance")
-    .select("*")
+    .select("client_id, period_start, period_end, campaign_id, campaign_name, day_of_week, hour_of_day, impressions, clicks, cost, conversions, conversions_value")
     .eq("client_id", clientId)
     .order("day_of_week", { ascending: true })
     .order("hour_of_day", { ascending: true });
