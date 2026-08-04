@@ -457,10 +457,18 @@ export function ClientDashboard({ client }: { client: Client }) {
               <Sectie
                 icoon={<Globe className="w-4.5 h-4.5 text-rm-blue-ink" />}
                 titel="Markten"
-                bijschrift="Waar het verkeer en de conversies vandaan komen, en met welke kanaalmix"
+                bijschrift={
+                  (kanalen?.length ?? 0) > 1
+                    ? "Waar het verkeer en de conversies vandaan komen, en met welke kanaalmix"
+                    : "Waar het verkeer en de conversies vandaan komen"
+                }
               >
                 <GeoBreakdown clientId={client.id} />
-                <GeoChannelMatrix clientId={client.id} />
+                {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
+                    landentabel met één kolom -- dat is precies wat GeoBreakdown hierboven al toont,
+                    en het bijschrift belooft een "kanaalmix" die niet bestaat. Voor 62 van de 71
+                    klanten stond hier dus een tweede kopie van de tabel erboven. */}
+                {(kanalen?.length ?? 0) > 1 && <GeoChannelMatrix clientId={client.id} />}
               </Sectie>
 
               {/* Video, PMax-netwerken, placements en creatives horen bij elkaar: het is allemaal
