@@ -75,7 +75,6 @@ import { useClientData } from "@/lib/use-client-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import { Sectie } from "@/components/ui/sectie";
-import { Bento } from "@/components/ui/bento";
 
 interface Client {
   id: string;
@@ -452,26 +451,27 @@ export function ClientDashboard({ client }: { client: Client }) {
                   : "Per maand: waar staan we en wat is de trend?"}
                 actie={upcomingEdition && <TijdasKeuze value={tijdas} onChange={setTijdas} />}
               >
-                {/* De enige plek op deze pagina waar naast elkaar meetbaar beter is. De
-                    pacing-strook is 144px hoog -- de enige echt compacte kaart hier -- en stond
-                    als losse band onder een tabel van 388px. Ernaast leest hij als context bij
-                    die tabel in plaats van als een volgend onderwerp. */}
-                <Bento
-                  blokken={[
-                    {
-                      id: "verloop",
-                      span: 8,
-                      render: () => beursAs
-                        ? <FairWeeksOverview clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition!} />
-                        : <MonthlyOverview clientId={client.id} countryFilter={countryFilter} />,
-                    },
-                    {
-                      id: "pacing",
-                      span: 4,
-                      render: () => <PacingMonitor clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition} />,
-                    },
-                  ]}
-                />
+                {/* NAAST ELKAAR GEPROBEERD EN TERUGGEDRAAID, en niet om de uitlijning.
+
+                    Beide kaarten beantwoorden "lopen we op schema", maar op een andere horizon --
+                    links per week, rechts per jaar -- en ze gebruiken daarvoor dezelfde woorden.
+                    "Prognose" betekent links een week en rechts een jaar; "Verwacht" links en "Op
+                    dit tempo" rechts zijn allebei een verwachting. Vier termen voor hetzelfde
+                    begrip op twee schalen, naast elkaar: dat nodigt uit tot een vergelijking die
+                    niet klopt.
+
+                    Waar naast elkaar wél werkt in deze app, gaat het om twee SOORTEN antwoord (de
+                    kaart zegt waar, de ranglijst zegt hoeveel) of om dezelfde data in twee
+                    duidelijk verschillende vormen (de boog en de radar op de gezondheidskaart).
+                    Twee kaartvormige blokken met percentages die allebei over schema gaan, zijn
+                    geen van beide.
+
+                    Onder elkaar markeert de verticale sprong de wisseling van horizon, en dat is
+                    precies het signaal dat naast elkaar ontbreekt. */}
+                {beursAs
+                  ? <FairWeeksOverview clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition!} />
+                  : <MonthlyOverview clientId={client.id} countryFilter={countryFilter} />}
+                <PacingMonitor clientId={client.id} countryFilter={countryFilter} edition={upcomingEdition} />
               </Sectie>
 
               <Sectie

@@ -7,6 +7,7 @@ import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
 import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { today } from "@/lib/reporting-date";
+import { berekenLanding, seizoensduiding } from "@/lib/pacing/landing";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -83,6 +84,20 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
   const convNeededPerDay = remainingDays > 0 ? convGap / remainingDays : 0;
   const spendNeededPerDay = remainingDays > 0 ? spendGap / remainingDays : 0;
 
+  // ── Waar land je? ──────────────────────────────────────────────────────
+  //
+  // De kaart zei hoe hard je gaat en wat er nodig is, maar niet waar je dan uitkomt -- terwijl dat
+  // de vraag is die er meteen op volgt. Twee antwoorden, want een rechte lijn en de prognose zijn
+  // niet hetzelfde: zie lib/pacing/landing.ts.
+  const convLanding = berekenLanding({
+    gerealiseerd: conv.ytdRealized,
+    tempoPerDag: dailyConvRate,
+    dagenResterend: remainingDays,
+    prognose: conv.adjustedAnnual,
+    doel: conv.annualTarget,
+  });
+  const convSeizoen = seizoensduiding(convLanding);
+
   // Status colors & labels
   // Conversions: straightforward pace check
   const convColor = convPaceRatio >= 0.9 ? "#22c55e" : convPaceRatio >= 0.7 ? "#f59e0b" : "#ef4444";
@@ -100,7 +115,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
     : spendPaceRatio >= 0.9 ? "Op schema" : spendPaceRatio >= 0.7 ? "Achterlopend" : "Sterk achter";
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+    <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <Zap className="w-4.5 h-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Pacing</h3>
@@ -184,6 +199,45 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             </p>
           )}
         </div>
+      </div>
+
+      {/* De landing. Dit stond er niet, en het was de vraag die na "3 per dag, nodig 6,8" meteen
+          komt: en waar kom ik dan uit?
+
+          Twee getallen naast elkaar en niet een. "Op dit tempo" is een rechte lijn en met de hand
+          na te rekenen; de prognose weet dat november niet op juli lijkt. Alleen het eerste tonen
+          zou de prognosegrafiek elders op het scherm tegenspreken -- twee getallen die allebei
+          "het jaar" heten en niet hetzelfde zeggen. Het VERSCHIL is de boodschap.
+
+          "geschat jaardoel" en niet "jaardoel": dat getal is vorig jaar x 1,10 uit
+          client-data/route.ts, want er is nog geen scherm om een doel in te voeren. */}
+      <div className="mt-4 border-t border-border pt-4">
+        <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
+          Waar je op uitkomt
+        </p>
+        <div className="mt-2 flex flex-wrap gap-x-10 gap-y-3">
+          <div>
+            <p className="text-micro text-muted-foreground">Op dit tempo</p>
+            <p className="text-lg font-bold text-rm-gray">{num(convLanding.opTempo)}</p>
+            {convLanding.deelVanDoel !== null && (
+              <p className="text-micro text-muted-foreground">
+                {Math.round(convLanding.deelVanDoel * 100)}% van geschat jaardoel
+              </p>
+            )}
+          </div>
+          {convLanding.volgensPrognose !== null && (
+            <div>
+              <p className="text-micro text-muted-foreground">Volgens de prognose</p>
+              <p className="text-lg font-bold text-rm-gray">{num(convLanding.volgensPrognose)}</p>
+              <p className="text-micro text-muted-foreground">seizoen meegerekend</p>
+            </div>
+          )}
+        </div>
+        {/* Alleen bij een verschil dat ertoe doet. Een zin over elke afwijking leert de lezer hem
+            over te slaan, en dan mist hij hem op de dag dat er wél iets aan de hand is. */}
+        {convSeizoen && (
+          <p className="mt-2 text-meta leading-snug text-muted-foreground">{convSeizoen}</p>
+        )}
       </div>
     </div>
   );
