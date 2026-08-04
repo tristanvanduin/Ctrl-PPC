@@ -94,6 +94,14 @@ if [ "$doel" = "alles" ] || [ "$doel" = "grens" ]; then
   stap bureaugrens "$GRENS_TIMEOUT" node scripts/check-bureaugrens.mjs || falen=$?
 fi
 
+# Een laag dieper dan de vorige. check-bureaugrens toetst of de FUNCTIES het goede antwoord geven;
+# dit toetst of de DATABASE ook echt rijen tegenhoudt -- met een echte login, een echt token en
+# echte HTTP naar PostgREST, precies wat de browser doet. Een functie die "false" zegt bewijst nog
+# niet dat er een policy op de goede kolom staat.
+if [ "$doel" = "alles" ] || [ "$doel" = "rls" ]; then
+  stap rls-scheiding "$GRENS_TIMEOUT" node scripts/check-rls-scheiding.mjs || falen=$?
+fi
+
 if [ "$doel" = "alles" ] || [ "$doel" = "tsc" ]; then
   stap tsc "$TSC_TIMEOUT" npx tsc --noEmit || falen=$?
 fi
