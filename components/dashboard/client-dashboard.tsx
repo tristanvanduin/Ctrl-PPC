@@ -25,7 +25,8 @@ import { ProposalQueue } from "../insights/proposal-queue";
 import { supabase } from "@/lib/supabase";
 import { ChannelFilter } from "../insights/channel-filter";
 import {
-  laadBeschikbareKanalen, zichtbareTabs, geldigeKeuze, geenDataTekst, type Kanaal,
+  laadBeschikbareKanalen, zichtbareTabs, geldigeKeuze, geenDataTekst, kanalenOpsomming,
+  type Kanaal,
 } from "@/lib/kanalen/beschikbaar";
 import { MetaCreativeAnalyses } from "../insights/meta-creative-analyses";
 import { SignalAnalysisCard } from "./signal-analysis-card";
@@ -277,13 +278,24 @@ export function ClientDashboard({ client }: { client: Client }) {
       <div className="flex justify-end -mt-3">
         <DashboardPeriodPicker />
       </div>
-      {/* Data source indicator + sync status */}
+      {/* Data source indicator + sync status.
+
+        Het bijschrift noemt de kanalen die deze klant écht heeft en niet vast "Google Ads". Bij de
+        LinkedIn-only doorloop stond er "Live data uit Google Ads" boven een scherm zonder één
+        Google-rij: grammaticaal in orde, feitelijk onwaar, en door geen test te vangen omdat er
+        niets aan gerekend wordt. Zolang de kanalen nog niet bekend zijn (null) blijft de balk weg
+        in plaats van te gokken; bij nul kanalen staat de amberkleurige melding er al.
+
+        Alleen dít bijschrift hangt aan de kanalen. De synchronisatieknop blijft staan, juist ook
+        bij een klant zonder data -- dat is de klant die hem het hardst nodig heeft. */}
       {clientData.source === "api" && !clientData.loading && !clientData.error && (
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
-            <Wifi className="w-3.5 h-3.5" />
-            Live data uit Google Ads
-          </div>
+          {kanalenOpsomming(kanalen ?? []) !== null && (
+            <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+              <Wifi className="w-3.5 h-3.5" />
+              Live data uit {kanalenOpsomming(kanalen ?? [])}
+            </div>
+          )}
           <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
             <Clock className="w-3.5 h-3.5" />
             Conversielag: {lagDays} {lagDays === 1 ? "dag" : "dagen"}
@@ -350,7 +362,9 @@ export function ClientDashboard({ client }: { client: Client }) {
       {clientData.loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-rm-blue-ink" />
-          <p className="text-sm text-muted-foreground">Data ophalen uit Google Ads...</p>
+          {/* Geen kanaalnaam hier: tijdens het laden is nog niet bekend wélke kanalen deze klant
+              heeft, dus elke naam zou een gok zijn. "Data ophalen" klopt altijd. */}
+          <p className="text-sm text-muted-foreground">Data ophalen...</p>
         </div>
       )}
 

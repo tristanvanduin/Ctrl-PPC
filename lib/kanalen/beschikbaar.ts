@@ -40,6 +40,31 @@ export const KANAAL_BRON: Record<Kanaal, { tabel: string; kolom: string }> = {
 
 export const ALLE_KANALEN: Kanaal[] = ["google", "meta", "linkedin"];
 
+/** Hoe een kanaal heet in een zin. Dezelfde namen als op de tabbladen. */
+export const KANAAL_NAAM: Record<Kanaal, string> = {
+  google: "Google Ads",
+  meta: "Meta",
+  linkedin: "LinkedIn",
+};
+
+/**
+ * De kanalen als opsomming, of null als er niets op te sommen valt.
+ *
+ * Waarom dit bestaat: bovenaan het dashboard stond "Live data uit Google Ads" als vaste tekst.
+ * Bij een klant zonder Google is dat een zin die klopt in grammatica en niet in feiten -- dezelfde
+ * soort fout als de verwijzing "→ Meta" naar een tabblad dat er niet is. Data-onderdelen zakken
+ * netjes naar nul als er niets is; zinnen doen dat niet, die blijven staan en liegen.
+ *
+ * De volgorde is die van ALLE_KANALEN en niet die van de invoer, anders wisselt de tekst per
+ * keer dat de kanalen opnieuw geladen worden.
+ */
+export function kanalenOpsomming(beschikbaar: readonly Kanaal[]): string | null {
+  const namen = ALLE_KANALEN.filter((k) => beschikbaar.includes(k)).map((k) => KANAAL_NAAM[k]);
+  if (namen.length === 0) return null;
+  if (namen.length === 1) return namen[0];
+  return `${namen.slice(0, -1).join(", ")} en ${namen[namen.length - 1]}`;
+}
+
 /** Wat de kanaalkiezer laat zien. `blended` is de samenvoeging van alles. */
 export type Kanaalkeuze = Kanaal | "blended";
 

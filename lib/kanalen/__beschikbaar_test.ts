@@ -6,8 +6,8 @@
 // -- niet een gedachte-experiment met drie gelijkwaardige kanalen.
 
 import {
-  zichtbareTabs, geldigeKeuze, geenDataTekst, laadBeschikbareKanalen, ALLE_KANALEN,
-  type Kanaal,
+  zichtbareTabs, geldigeKeuze, geenDataTekst, laadBeschikbareKanalen, kanalenOpsomming,
+  ALLE_KANALEN, type Kanaal,
 } from "./beschikbaar";
 
 let passed = 0, failed = 0;
@@ -65,6 +65,28 @@ check("zonder kanalen: blended als rustige terugval",
 
 check("geen kanalen levert een uitleg", (geenDataTekst([]) ?? "").length > 40);
 check("met een kanaal geen lege staat", geenDataTekst(["google"]) === null);
+
+// ── De opsomming in het bijschrift ────────────────────────────────────────
+//
+// Het bijschrift bovenaan het dashboard noemde altijd Google Ads. Bij de LinkedIn-only doorloop
+// stond er "Live data uit Google Ads" boven een scherm zonder één Google-rij. Een zin die geen
+// enkele test tegenhoudt, want er is niets aan gerekend.
+
+check("één kanaal: alleen dat kanaal", kanalenOpsomming(["linkedin"]) === "LinkedIn",
+  String(kanalenOpsomming(["linkedin"])));
+check("twee kanalen: met 'en' ertussen", kanalenOpsomming(["google", "meta"]) === "Google Ads en Meta",
+  String(kanalenOpsomming(["google", "meta"])));
+check("drie kanalen: komma's en één 'en'",
+  kanalenOpsomming(ALLE_KANALEN) === "Google Ads, Meta en LinkedIn",
+  String(kanalenOpsomming(ALLE_KANALEN)));
+// Vaste volgorde, net als bij de tabs: anders wisselt de tekst mee met de volgorde waarin de
+// drie queries toevallig terugkomen.
+check("volgorde volgt ALLE_KANALEN, niet de invoer",
+  kanalenOpsomming(["linkedin", "google"] as Kanaal[]) === "Google Ads en LinkedIn",
+  String(kanalenOpsomming(["linkedin", "google"] as Kanaal[])));
+// Zonder kanalen hoort er geen bijschrift te zijn, geen bijschrift met een gat erin.
+check("geen kanalen levert null", kanalenOpsomming([]) === null,
+  String(kanalenOpsomming([])));
 
 // tsx compileert dit bestand naar CommonJS; top-level await bestaat daar niet.
 async function main(): Promise<void> {
