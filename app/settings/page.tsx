@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { CheckCircle2, XCircle, Loader2, ExternalLink, Copy, Check, Eye, EyeOff, Building2, FolderPlus, Trash2, Pencil, Plus, X, FolderOpen } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, ExternalLink, Copy, Check, Eye, EyeOff, Building2, FolderPlus, Trash2, Pencil, Plus, X, FolderOpen, Sparkles, Globe, UserRound, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAllClients, saveApiClients, type Client } from "@/lib/clients";
 import { getVisibleClientIds, setVisibleClientIds } from "@/lib/visible-clients";
 import {
   loadClientGroups, createGroup, renameGroup, deleteGroup,
-  addClientToGroup, removeClientFromGroup,
-  type GroupWithMembers,
+  addClientToGroup, removeClientFromGroup, setGroupSoort, bevestigGroep, redenTekst,
+  type GroupWithMembers, type GroepSoort,
 } from "@/lib/client-groups";
 
 interface ConnectionStatus {
@@ -164,6 +164,78 @@ function ClientVisibilitySection() {
   );
 }
 
+
+// ── De soort van een groep ─────────────────────────────────────────────────
+//
+// Waarom dit gevraagd wordt in plaats van afgeleid: dezelfde drie accounts staan in deze database
+// gegroepeerd als "Labels Edwin" -- de persoon die ze beheert -- terwijl het naamalgoritme er
+// "GoedeInnovaties" van maakt. Eén verzameling, twee betekenissen. Alleen de gebruiker weet welke.
+//
+// De omschrijving staat bij elke optie en niet in een tooltip. Wie hier voor het eerst komt, weet
+// niet wat het verschil uitmaakt, en een keuze zonder uitleg wordt een willekeurige keuze.
+const SOORTEN: { waarde: GroepSoort; label: string; uitleg: string; icoon: typeof Globe }[] = [
+  { waarde: "merk", label: "Merk", icoon: Globe,
+    uitleg: "Land- of regiovarianten van dezelfde zaak. Deze mogen met elkaar vergeleken worden." },
+  { waarde: "specialist", label: "Specialist", icoon: UserRound,
+    uitleg: "Wie de accounts beheert. Bedoeld voor werkverdeling, niet voor vergelijking." },
+  { waarde: "vrij", label: "Vrije map", icoon: Folder,
+    uitleg: "Alleen om de zijbalk te ordenen, zonder verdere betekenis." },
+];
+
+function SoortKeuze({ waarde, onKies, compact = false, voorgesteld = null }: {
+  waarde: GroepSoort | null;
+  onKies: (s: GroepSoort) => void;
+  compact?: boolean;
+  /**
+   * Wat het algoritme denkt, in de voorstelstand.
+   *
+   * Apart van `waarde`, en dat is het verschil dat ertoe doet. In de eerste versie stond de
+   * voorgestelde soort gewoon als gekozen aangevinkt: blauwe rand, gevulde achtergrond. Op het
+   * scherm las dat als "dit is al besloten", direct onder de vraag "Klopt dit, en wat is het?".
+   * Precies de vergissing die dit hele blok moet voorkomen -- een gok die eruitziet als een besluit.
+   *
+   * Nu een gestippelde rand met het woord "voorgesteld" erbij: zichtbaar, maar niet aangevinkt.
+   */
+  voorgesteld?: GroepSoort | null;
+}) {
+  return (
+    <div className={compact ? "flex flex-wrap gap-1" : "grid gap-2 sm:grid-cols-3"}>
+      {SOORTEN.map((s) => {
+        const Icoon = s.icoon;
+        const actief = waarde === s.waarde;
+        const gesuggereerd = !actief && voorgesteld === s.waarde;
+        if (compact) {
+          return (
+            <button key={s.waarde} onClick={() => onKies(s.waarde)} title={s.uitleg}
+              className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-micro font-medium transition-colors ${
+                actief ? "border-rm-blue bg-rm-blue/10 text-rm-blue-ink"
+                       : "border-border text-muted-foreground hover:border-rm-blue/40"}`}>
+              <Icoon className="h-3 w-3 shrink-0" /> {s.label}
+            </button>
+          );
+        }
+        return (
+          <button key={s.waarde} onClick={() => onKies(s.waarde)}
+            className={`rounded-lg border p-2.5 text-left transition-colors ${
+              actief ? "border-rm-blue bg-rm-blue/5"
+                     : gesuggereerd ? "border-dashed border-amber-300 bg-card hover:border-rm-blue/40"
+                     : "border-border hover:border-rm-blue/40"}`}>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-rm-blue-ink">
+              <Icoon className="h-3.5 w-3.5 shrink-0" /> {s.label}
+              {gesuggereerd && (
+                <span className="ml-auto rounded-full bg-amber-100 px-1.5 py-px text-micro font-medium text-amber-800">
+                  voorgesteld
+                </span>
+              )}
+            </span>
+            <span className="mt-1 block text-micro leading-snug text-muted-foreground">{s.uitleg}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Client Groups Management ──────────────────────────────────────────────
 
 function ClientGroupsSection() {
@@ -175,12 +247,28 @@ function ClientGroupsSection() {
   const [editingName, setEditingName] = useState("");
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
+  // Per groep, want de database kan een soort weigeren (een account hoort bij hoogstens één merk)
+  // en die melding hoort bij de groep te staan waar hij vandaan komt, niet ergens bovenaan.
+  const [fout, setFout] = useState<Record<string, string>>({});
+  const [laadfout, setLaadfout] = useState<string | null>(null);
 
+  // try/finally, en een zichtbare fout in plaats van niets.
+  //
+  // Hiervoor stond hier een kale await met setLoading(false) erachter. Faalde het laden -- en dat
+  // gebeurt, de browser praat rechtstreeks met Supabase -- dan werd die regel nooit bereikt, bleef
+  // loading op true staan en gaf de sectie `null` terug. Het hele blok verdween dan van de pagina
+  // zonder melding. Zo gevonden: op /settings ontbrak "Klantgroepen" volledig terwijl er vier
+  // groepen in de database staan.
   const refresh = useCallback(async () => {
-    const loaded = await loadClientGroups();
-    setGroups(loaded);
-    setAllClients(getAllClients());
-    setLoading(false);
+    try {
+      setGroups(await loadClientGroups());
+      setAllClients(getAllClients());
+      setLaadfout(null);
+    } catch (e) {
+      setLaadfout(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -215,6 +303,12 @@ function ClientGroupsSection() {
     window.dispatchEvent(new Event("groups-changed"));
   }
 
+  async function handleSoort(groupId: string, soort: GroepSoort, bevestigen: boolean) {
+    const melding = bevestigen ? await bevestigGroep(groupId, soort) : await setGroupSoort(groupId, soort);
+    setFout((v) => ({ ...v, [groupId]: melding ?? "" }));
+    if (!melding) { await refresh(); window.dispatchEvent(new Event("groups-changed")); }
+  }
+
   async function handleRemoveClient(clientId: string, groupId: string) {
     await removeClientFromGroup(clientId, groupId);
     await refresh();
@@ -223,6 +317,8 @@ function ClientGroupsSection() {
 
   // Clients that are already in a group
   const assignedClientIds = new Set(groups.flatMap((g) => g.clientIds));
+  const onbevestigd = groups.filter((g) => !g.bevestigd).length;
+  const nogInTeDelen = groups.filter((g) => g.bevestigd && !g.soort).length;
 
   if (loading) return null;
 
@@ -232,10 +328,18 @@ function ClientGroupsSection() {
         <div>
           <h3 className="font-semibold text-rm-blue-ink text-base">Klantgroepen</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Organiseer klanten in mapjes in de sidebar. {groups.length} groep{groups.length !== 1 ? "en" : ""} aangemaakt.
+            Bundel accounts en leg vast wat de bundel betekent. {groups.length} groep{groups.length !== 1 ? "en" : ""}
+            {onbevestigd > 0 ? `, waarvan ${onbevestigd} voorgesteld` : ""}
+            {nogInTeDelen > 0 ? ` \u00b7 ${nogInTeDelen} nog niet ingedeeld` : ""}.
           </p>
         </div>
       </div>
+
+      {laadfout && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-meta leading-snug text-red-700">
+          De groepen konden niet geladen worden: {laadfout}
+        </p>
+      )}
 
       {/* Create new group */}
       <div className="flex gap-2 mb-4">
@@ -264,7 +368,8 @@ function ClientGroupsSection() {
             .filter((c): c is Client => c !== undefined);
 
           return (
-            <div key={group.id} className="border border-border rounded-lg p-4">
+            <div key={group.id} className={`rounded-lg border p-4 ${
+              group.bevestigd ? "border-border" : "border-amber-200 bg-amber-50/50"}`}>
               {/* Group header */}
               <div className="flex items-center justify-between mb-2">
                 {editingId === group.id ? (
@@ -285,6 +390,11 @@ function ClientGroupsSection() {
                     <FolderOpen className="w-4 h-4 text-rm-blue-ink" />
                     <span className="text-sm font-semibold text-rm-gray">{group.name}</span>
                     <span className="text-micro text-muted-foreground">({groupClients.length})</span>
+                    {!group.bevestigd && (
+                      <span className="flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-micro font-medium text-amber-800">
+                        <Sparkles className="h-2.5 w-2.5 shrink-0" /> Voorstel
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="flex items-center gap-1">
@@ -304,6 +414,40 @@ function ClientGroupsSection() {
                   </button>
                 </div>
               </div>
+
+              {/* Voorstel, of de soort van een bevestigde groep.
+                  Een voorstel ziet er anders uit dan een besluit -- dat is het hele punt van dit
+                  blok. Zonder dat verschil is een indeling die uit een naam is geraden op het
+                  scherm niet te onderscheiden van een indeling die iemand heeft bedacht. */}
+              {!group.bevestigd ? (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-card/70 p-3">
+                  {redenTekst(group.reden) && (
+                    <p className="mb-2 text-meta leading-snug text-amber-900">{redenTekst(group.reden)}</p>
+                  )}
+                  <p className="mb-2 text-meta font-medium text-rm-gray">Klopt dit, en wat is het?</p>
+                  <SoortKeuze waarde={null} voorgesteld={group.soort}
+                    onKies={(soort) => handleSoort(group.id, soort, true)} />
+                  <p className="mt-2 text-micro leading-snug text-muted-foreground">
+                    Ook &ldquo;dit is geen merk&rdquo; is een antwoord: kies dan Specialist of Vrije map.
+                    Verwijderen helpt niet &mdash; dan stelt het naamalgoritme deze groep bij de volgende
+                    ronde opnieuw voor.
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="text-micro text-muted-foreground">Soort:</span>
+                  <SoortKeuze compact waarde={group.soort} onKies={(soort) => handleSoort(group.id, soort, false)} />
+                  {!group.soort && (
+                    <span className="text-micro text-muted-foreground">nog niet ingedeeld</span>
+                  )}
+                </div>
+              )}
+
+              {fout[group.id] && (
+                <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-meta leading-snug text-red-700">
+                  {fout[group.id]}
+                </p>
+              )}
 
               {/* Clients in this group */}
               <div className="space-y-1 mb-2">

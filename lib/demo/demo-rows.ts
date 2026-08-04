@@ -85,7 +85,8 @@ const adsCampaignMonthly: Row[] = CAMPAIGNS.flatMap((c) =>
     const cost = Math.round(c.cost * f);
     const conversions = Math.round(c.conv * f);
     const conversionsValue = Math.round(conversions * c.aov);
-    return {
+  
+  return {
       client_id: CID, campaign_id: c.id, campaign_name: c.name, campaign_type: c.type,
       campaign_status: "ENABLED", month: monthISO(N_MONTHS - 1 - i),
       impressions, clicks, cost, conversions, conversions_value: conversionsValue,
@@ -550,6 +551,26 @@ const clientSettings: Row[] = [{
 }];
 
 // De volledige map; tabellen die hier niet in staan → passthrough naar de echte client.
+// ── Klantgroepen ───────────────────────────────────────────────────────────
+// Zonder deze rijen bleef het blok "Klantgroepen" op /settings in demomodus leeg, en dan is er
+// geen manier om te zien wat een groep kan zijn. Twee groepen, met opzet in twee verschillende
+// standen: één die iemand zelf heeft gemaakt en één die het naamalgoritme voorstelt. Dat verschil
+// is het hele punt van dat scherm, dus het hoort in de demo zichtbaar te zijn.
+const DEMO_GROEP_MERK = "demo-groep-merk";
+const DEMO_GROEP_VRIJ = "demo-groep-vrij";
+
+const clientGroups: Row[] = [
+  { id: DEMO_GROEP_VRIJ, name: "Beurzen 2026", sort_order: 1,
+    soort: "vrij", bevestigd: true, reden: null, created_at: iso() },
+  { id: DEMO_GROEP_MERK, name: "GreenTech", sort_order: 2,
+    soort: "merk", bevestigd: false, reden: "regiosuffix+scheidingsteken", created_at: iso() },
+];
+
+const clientGroupMembers: Row[] = [
+  { group_id: DEMO_GROEP_VRIJ, client_id: CID },
+  { group_id: DEMO_GROEP_MERK, client_id: CID },
+];
+
 export function demoRows(): Record<string, Row[]> {
   return {
     ads_campaign_monthly: adsCampaignMonthly,
@@ -575,6 +596,8 @@ export function demoRows(): Record<string, Row[]> {
     sop_insights: sopInsights,
     sop_recommendations: sopRecommendations,
     sprint_hypotheses: sprintHypotheses,
+    client_groups: clientGroups,
+    client_group_members: clientGroupMembers,
     sprint_items: sprintItems,
     sop_tasks: sopTasks,
     task_completions: [],
