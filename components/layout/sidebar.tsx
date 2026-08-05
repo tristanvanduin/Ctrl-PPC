@@ -295,12 +295,21 @@ function SidebarInner() {
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-72 bg-rm-blue flex flex-col z-50">
-      {/* Logo */}
+      {/* Logo.
+
+          ── GEEN <h1> ─────────────────────────────────────────────────────────
+          Dit was een <h1>, en de zijbalk staat op elke pagina. Nagemeten: elke pagina had er
+          daardoor twee, en die van de zijbalk kwam eerst in de DOM. Wie met een schermlezer op
+          kopniveau door de pagina springt, landt dus altijd eerst op de productnaam en nooit op
+          waar hij is -- en "Ctrl PPC" is geen paginatitel maar een merk.
+
+          Een <p> met dezelfde opmaak. Visueel verandert er niets; de koppenstructuur begint nu
+          bij de titel van de pagina zelf. */}
       <div className="p-6 pb-4">
-        <h1 className="text-white text-xl font-bold tracking-tight">
+        <p className="text-xl font-bold tracking-tight text-white">
           {BRAND_NAME}
-        </h1>
-        <p className="text-white/90 text-xs mt-1">SEA Dashboard</p>
+        </p>
+        <p className="mt-1 text-meta text-white/90">SEA Dashboard</p>
       </div>
 
       {/* Search */}

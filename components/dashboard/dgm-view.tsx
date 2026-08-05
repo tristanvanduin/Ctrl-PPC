@@ -725,8 +725,23 @@ function KpiCard({
   return (
     <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
       {/* Zelfde cijfer, zelfde maat als elders. De voortgangsbalk en de prognoseregel eronder
-          horen bij deze kaart en blijven van deze kaart. */}
-      <Kerncijfer label={label} waarde={fmtVal(realized)} />
+          horen bij deze kaart en blijven van deze kaart.
+
+          ── WAAROM ER EEN <div> OMHEEN STAAT ──────────────────────────────────
+          Kerncijfer rendert zelf een `flex h-full flex-col`, zodat hij een rastercel kan vullen
+          als hij er los in staat. Deze kaart is óók een rastercel, en rastercellen rekken naar de
+          hoogste van de rij -- dus kreeg de kaart een vaste hoogte, loste `h-full` op naar die
+          volle hoogte, en werd alles wat eronder komt eruit geduwd.
+
+          Nagemeten vóór deze wrapper: de kaart eindigde op y=755 en "Doel: 1.650" en
+          "Prognose: 1.246 (-24%)" stonden op y=777 -- tweeentwintig pixels BUITEN de kaartrand,
+          op de pagina-achtergrond. Op alle vijf de kaarten. Niets meldde dat, want overflow staat
+          op visible: het rendert gewoon en ziet eruit als een ontwerpkeuze.
+
+          De wrapper heeft een automatische hoogte, dus `h-full` erbinnen lost weer op naar auto. */}
+      <div>
+        <Kerncijfer label={label} waarde={fmtVal(realized)} />
+      </div>
       <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${barPct}%` }} />
       </div>

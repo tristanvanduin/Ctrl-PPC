@@ -127,9 +127,15 @@ export function ChatDrawer({ clientId, klantnaam }: { clientId: string; klantnaa
           een informatiedicht dashboard staat per definitie ergens op. De hoek rechtsonder is
           precies waar tabellen hun laatste kolom hebben.
 
-          Als cirkel is dat 44 bij 44 -- 63% minder afgedekt -- en bij hover of toetsenbordfocus
+          Ingeklapt is hij nagemeten 52 bij 44: 55% minder oppervlak. Bij hover of toetsenbordfocus
           schuift het woord er weer uit, zodat het niet aan een icoon alleen hangt wat hij doet.
-          De aria-label staat er los van, dus voor een schermlezer verandert er niets. */}
+          De aria-label staat er los van, dus voor een schermlezer verandert er niets.
+
+          NIET HELEMAAL OPGELOST, EN DAT HOORT HIER TE STAAN. Opnieuw nagemeten raakt hij nog
+          steeds dezelfde twee cellen: een vaste knop rechtsonder ligt altijd op de laatste kolom,
+          hoe klein je hem ook maakt. Weg krijgen betekent hem uit de pagina halen en in de
+          bovenbalk zetten, naast de bel. Dat is een besluit over de navigatie en geen
+          opmaakcorrectie, dus dat gaat niet stilletjes mee in een designronde. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
