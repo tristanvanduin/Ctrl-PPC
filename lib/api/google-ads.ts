@@ -3246,7 +3246,15 @@ export interface PmaxSearchCategoryRow {
   categoryLabel: string;
   impressions: number;
   clicks: number;
-  cost: number;
+  /**
+   * GEEN KOSTEN. Google levert ze niet op deze bron.
+   *
+   * Dit veld stond hier als `cost: number` en werd gevuld uit metrics.cost_micros -- een veld dat
+   * campaign_search_term_insight niet heeft. Eén ongeldig veld maakt de hele query ongeldig, dus
+   * die haalde nooit een rij op. Null en geen 0: een nul zou lezen als "deze categorie kostte
+   * niets", en dat is precies de fout die deze codebase vaker maakte.
+   */
+  cost: null;
   conversions: number;
   conversionsValue: number;
 }
@@ -3257,69 +3265,76 @@ export async function getPmaxSearchCategoriesByMonth(
   startDate: string,
   endDate: string
 ): Promise<PmaxSearchCategoryRow[]> {
-  // ⚠ DEZE QUERY IS NOOIT TEGEN EEN ECHT ACCOUNT GEDRAAID EN KLOPT VERMOEDELIJK NIET.
+  // ── WAAROM DIT PER CAMPAGNE GAAT EN ZONDER KOSTEN ────────────────────────
   //
-  // Nagekeken op 2026-08-05 tegen de documentatie, niet tegen een live account (er zijn geen
-  // werkende Google-sleutels). Twee dingen wijzen dezelfde kant op:
+  // De vorige versie deed één query over alle PMax-campagnes tegelijk, met metrics.cost_micros
+  // erbij. Allebei kan niet, en samen zorgden ze ervoor dat deze bron nooit een rij opleverde:
   //
-  //   1. metrics.cost_micros lijkt op campaign_search_term_insight NIET beschikbaar. Impressies,
-  //      klikken en conversies wel; kosten niet. Eén ongeldig veld maakt de HELE query ongeldig.
-  //   2. Search term insights vragen een filter op ÉÉN campagne. Filteren op
-  //      advertising_channel_type levert REQUIRES_FILTER_BY_SINGLE_RESOURCE -- je moet per
-  //      PMax-campagne apart ophalen.
+  //   1. campaign_search_term_insight EIST een filter op één campagne. Filteren op
+  //      advertising_channel_type geeft REQUIRES_FILTER_BY_SINGLE_RESOURCE. Het filterveld heet
+  //      campaign_search_term_insight.campaign_id -- niet campaign.id.
+  //   2. cost_micros bestaat niet op deze bron. Impressies, klikken, conversies en
+  //      conversiewaarde wel. Eén ongeldig veld maakt de HELE query ongeldig.
   //
-  // Waarom dat niet is opgevallen: een mislukte ophaal wordt netjes geregistreerd
-  // (recordFetchFailure -> de dataset komt als "ophalen mislukt" uit de sync, niet als nul rijen),
-  // maar er is nog nooit een echte sync gedraaid. En de demo VULT deze tabel zelf, inclusief
-  // kosten per categorie -- dus op het scherm ziet het er compleet uit.
+  // Dat viel niet op omdat de demo deze tabel zelf vult en een mislukte ophaal netjes wordt
+  // geregistreerd in plaats van te knallen -- en er nooit een echte sync is gedraaid.
   //
-  // Dat maakt het een productclaim en geen bug alleen: lib/analysis/pmax-expert-layer.ts meldt
-  // "€X spend op termen in buitenlandse talen" en drempelt zijn severity op dat bedrag. Als
-  // Google die kosten niet levert, is dat een euro-bedrag dat nergens vandaan komt.
+  // Nagekeken op 2026-08-05 tegen developers.google.com en de meldingen op de adwords-api-groep,
+  // NIET tegen een live account: er zijn geen Google-sleutels. De vorm klopt met de documentatie;
+  // dat is iets anders dan bewezen.
   //
-  // NIET BLIND HERSCHREVEN: per campagne ophalen betekent N API-calls in plaats van één, en dat
-  // wil je meten op quota voordat je het uitrolt. Te doen zodra er sleutels zijn:
-  //   a. cost_micros uit de SELECT halen en kijken of de query dan wél rijen geeft;
-  //   b. per PMax-campagne lussen met `WHERE campaign.id = ...`;
-  //   c. daarna de taal-lekkage-melding op impressies/klikken zetten in plaats van op euro's,
-  //      en de demo-fixture meelaten bewegen.
+  // N+1 CALLS, EN DAT IS HIER DE ENIGE WEG. Eén call om de PMax-campagnes te vinden, daarna één
+  // per campagne. Accounts met tientallen PMax-campagnes betalen dat in quota; het alternatief is
+  // geen data.
   try {
-    const rows = await queryGoogleAds(credentials, customerId, `
-      SELECT
-        campaign.id,
-        campaign.name,
-        campaign_search_term_insight.category_label,
-        segments.month,
-        metrics.impressions,
-        metrics.clicks,
-        metrics.cost_micros,
-        metrics.conversions,
-        metrics.conversions_value
-      FROM campaign_search_term_insight
-      WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-        AND campaign.advertising_channel_type = 'PERFORMANCE_MAX'
+    const campagnes = await queryGoogleAds(credentials, customerId, `
+      SELECT campaign.id, campaign.name
+      FROM campaign
+      WHERE campaign.advertising_channel_type = 'PERFORMANCE_MAX'
         AND campaign.status = 'ENABLED'
-      ORDER BY metrics.cost_micros DESC
     `);
 
-    return rows.map((row) => {
-      const c = row.campaign as Record<string, string>;
-      const insight = (row.campaignSearchTermInsight || row.campaign_search_term_insight) as Record<string, string>;
-      const s = row.segments as Record<string, string>;
-      const m = row.metrics as Record<string, number>;
+    const uit: PmaxSearchCategoryRow[] = [];
+    for (const c of campagnes) {
+      const camp = c.campaign as Record<string, string>;
+      const id = camp?.id;
+      if (!id) continue;
 
-      return {
-        date: s.month,
-        campaignId: c.id || "",
-        campaignName: c.name || "",
-        categoryLabel: insight.categoryLabel || insight.category_label || "",
-        impressions: m.impressions || 0,
-        clicks: m.clicks || 0,
-        cost: (m.costMicros || m.cost_micros || 0) / 1_000_000,
-        conversions: m.conversions || 0,
-        conversionsValue: m.conversionsValue || m.conversions_value || 0,
-      };
-    });
+      const rows = await queryGoogleAds(credentials, customerId, `
+        SELECT
+          campaign_search_term_insight.campaign_id,
+          campaign_search_term_insight.category_label,
+          segments.month,
+          metrics.impressions,
+          metrics.clicks,
+          metrics.conversions,
+          metrics.conversions_value
+        FROM campaign_search_term_insight
+        WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+          AND campaign_search_term_insight.campaign_id = ${id}
+        ORDER BY metrics.impressions DESC
+      `);
+
+      for (const row of rows) {
+        const insight = (row.campaignSearchTermInsight || row.campaign_search_term_insight) as Record<string, string>;
+        const s = row.segments as Record<string, string>;
+        const m = row.metrics as Record<string, number>;
+        uit.push({
+          date: s?.month ?? "",
+          campaignId: String(id),
+          // De naam komt uit de campagne-query hierboven: op deze bron is campaign.name niet
+          // selecteerbaar, en een lege naam maakt elke groepering in de UI naamloos.
+          campaignName: camp.name || "",
+          categoryLabel: insight?.categoryLabel || insight?.category_label || "",
+          impressions: m?.impressions || 0,
+          clicks: m?.clicks || 0,
+          cost: null,
+          conversions: m?.conversions || 0,
+          conversionsValue: m?.conversionsValue || m?.conversions_value || 0,
+        });
+      }
+    }
+    return uit;
   } catch (e) { recordFetchFailure("getPmaxSearchCategoriesByMonth", e); return []; }
 }
 

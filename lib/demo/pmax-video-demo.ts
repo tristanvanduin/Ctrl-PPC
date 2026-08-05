@@ -315,7 +315,7 @@ export function pmaxPlacementRows(clientId: string, months: string[], syncedAt: 
 
 // De vier onderste zijn consumententhema's: tuinliefhebbers, geen vakpubliek. Ze converteren niet
 // en dat is geen toeval — zonder feed en zonder zoekwoorden stuurt PMax op signalen die "tuinbouw"
-// en "tuinieren" niet uit elkaar houden. Samen ruim een kwart van de search-spend zonder één
+// en "tuinieren" niet uit elkaar houden. Samen ruim een kwart van de zoekvertoningen zonder één
 // aanvraag: dat is de verdunning die de expertlaag hoort te melden, en het is met uitsluitingen op
 // merk- en themaniveau aan te pakken.
 const SEARCH_CATEGORIES: Array<{ label: string; impW: number; clickW: number; convW: number }> = [
@@ -345,16 +345,26 @@ export function pmaxSearchCategoryRows(clientId: string, networkRows: Row[], syn
   for (const [month, t] of byMonth) {
     const imp = splitInt(t.impressions, SEARCH_CATEGORIES.map((c) => c.impW));
     const clk = splitInt(t.clicks, SEARCH_CATEGORIES.map((c) => c.clickW));
-    const cost = splitInt(t.cost, SEARCH_CATEGORIES.map((c) => c.clickW));
     const conv = splitInt(t.conversions, SEARCH_CATEGORIES.map((c) => c.convW));
     const val = splitAlong(t.conversions_value, conv, SEARCH_CATEGORIES.map((c) => c.convW));
     SEARCH_CATEGORIES.forEach((c, i) => {
       rows.push({
         client_id: clientId, month, campaign_id: PMAX_CAMPAIGN.id, campaign_name: PMAX_CAMPAIGN.name,
-        category_label: c.label, impressions: imp[i], clicks: clk[i], cost: cost[i],
+        category_label: c.label, impressions: imp[i], clicks: clk[i],
+        // ── GEEN KOSTEN, EN DAT IS DE ECHTE VORM ──────────────────────────────
+        //
+        // Hier stond de search-spend verdeeld naar klikaandeel. Dat was een verzinsel met een
+        // plausibele verdeelsleutel: campaign_search_term_insight kent geen cost_micros, dus in
+        // productie is deze kolom altijd leeg. Een demo die een kolom vult die live nooit gevuld
+        // raakt, laat een scherm zien dat bij een echte klant anders werkt -- precies het soort
+        // verschil dat je pas ontdekt als de klant meekijkt.
+        //
+        // Nul, net als bij pmaxPlacementRows: niet omdat er niets besteed is, maar omdat Google
+        // het op dit niveau niet publiceert.
+        cost: 0,
         conversions: conv[i], conversions_value: val[i], synced_at: syncedAt,
       });
     });
   }
-  return rows.sort((a, b) => Number(b.cost) - Number(a.cost));
+  return rows.sort((a, b) => Number(b.impressions) - Number(a.impressions));
 }

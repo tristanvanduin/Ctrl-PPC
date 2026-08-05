@@ -1293,7 +1293,7 @@ export async function POST(request: NextRequest) {
     // (searchRes haalt de wasteful-tabel op, een andere bron met een ander doel).
     const termsRes = await supabase
       .from("ads_search_terms_monthly")
-      .select("month, impressions, match_type, cost, clicks, conversions")
+      .select("month, search_term, impressions, match_type, cost, clicks, conversions")
       .eq("client_id", clientId)
       .gte("month", `${prevMonth}-01`)
       .lte("month", periodEnd);
@@ -1301,6 +1301,15 @@ export async function POST(request: NextRequest) {
       const rows = (termsRes.data ?? []).filter((r) => String(r.month ?? "").slice(0, 7) === m);
       return rows.length > 0 ? rows.reduce((acc, r) => acc + Number(r.impressions ?? 0), 0) : null;
     };
+
+    // Nieuw: de PMax-zoekcategorieën. Faalt deze query, dan blijft de lijst leeg en zegt de
+    // kannibalisatie-check dat er iets ontbreekt -- geen reden om de hele analyse te laten vallen.
+    const pmaxCatsRes = await supabase
+      .from("ads_pmax_search_categories")
+      .select("category_label")
+      .eq("client_id", clientId)
+      .gte("month", `${prevMonth}-01`)
+      .lte("month", periodEnd);
 
     const yoyRowForMonth = (accountYoyRes.data ?? []).find((r) => String(r.month ?? "").slice(0, 7) === analysisMonth) as { impressions_yoy_pct?: number | null } | undefined;
     const signalsSection = buildGoogleSignalsSection({
@@ -1321,6 +1330,10 @@ export async function POST(request: NextRequest) {
       searchTermsVolume: volumeFor(analysisMonth),
       prevSearchTermsVolume: volumeFor(prevMonth),
       searchTerms: (termsRes.data ?? []) as unknown as SearchTermMonthlyLite[],
+      // De PMax-zoekcategorieën voor de kannibalisatie-check. Zelfde venster als de zoektermen.
+      pmaxCategoryLabels: (pmaxCatsRes.data ?? [])
+        .map((r) => String((r as { category_label?: string }).category_label ?? "").trim())
+        .filter((x) => x.length > 0),
       negatives: (negativesRes.data ?? []) as unknown as NegativeKeywordRow[],
       changeHistory: changeHistoryRows.length > 0 ? changeHistoryRows : null,
       hasPmaxCampaign: (campaignMetaRes.data ?? []).some((m) => String((m as { campaign_type?: string }).campaign_type ?? "").toUpperCase().includes("PERFORMANCE_MAX")),

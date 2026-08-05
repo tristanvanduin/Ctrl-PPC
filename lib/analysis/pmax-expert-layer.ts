@@ -61,23 +61,38 @@ function vensterStart(): string {
 interface EntityTotals {
   label: string;
   cost: number;
+  clicks: number;
   conversions: number;
   impressions: number;
 }
 
-/** Voegt maandrijen samen tot één rij per entiteit, op de opgegeven sleutelkolom. */
+/**
+ * Voegt maandrijen samen tot één rij per entiteit, op de opgegeven sleutelkolom.
+ *
+ * ── WAAROM DE SORTERING TWEE SLEUTELS HEEFT ─────────────────────────────────
+ *
+ * Hier stond alleen `b.cost - a.cost`. Voor plaatsingen en assetgroepen klopt dat, maar
+ * zoekcategorieën komen van campaign_search_term_insight en dáár levert Google geen kosten
+ * (zie de kop van getPmaxSearchCategoriesByMonth). Elke rij had dus cost 0, de vergelijking gaf
+ * overal 0 terug, en de volgorde was de volgorde waarin de rijen toevallig binnenkwamen.
+ *
+ * Dat is geen cosmetisch verschil: de meldingen hieronder tonen `slice(0, 3)` en noemen dat de
+ * grootste categorieën. Zonder tweede sleutel noemden ze de eerste drie. Impressies als
+ * tiebreak maakt de volgorde weer een rangschikking op omvang.
+ */
 export function aggregateByEntity(rows: Array<Record<string, unknown>>, keyColumn: string): EntityTotals[] {
   const byKey = new Map<string, EntityTotals>();
   for (const r of rows) {
     const label = String(r[keyColumn] ?? "").trim();
     if (!label) continue;
-    const acc = byKey.get(label) ?? { label, cost: 0, conversions: 0, impressions: 0 };
+    const acc = byKey.get(label) ?? { label, cost: 0, clicks: 0, conversions: 0, impressions: 0 };
     acc.cost += Number(r.cost) || 0;
+    acc.clicks += Number(r.clicks) || 0;
     acc.conversions += Number(r.conversions) || 0;
     acc.impressions += Number(r.impressions) || 0;
     byKey.set(label, acc);
   }
-  return [...byKey.values()].sort((a, b) => b.cost - a.cost);
+  return [...byKey.values()].sort((a, b) => b.cost - a.cost || b.impressions - a.impressions);
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -336,17 +351,27 @@ export async function computePmaxInsights(
   // ── Signal 5: Search Category Dilution ──
 
   if (searchCats.length > 0) {
+    // ── DEZE MELDING STOND OP EEN KOLOM DIE ALTIJD LEEG IS ────────────────────
+    //
+    // De drempel was `c.cost > 10` en het percentage was een aandeel van de search-spend.
+    // campaign_search_term_insight levert geen kosten, dus cost was overal 0: geen enkele
+    // categorie haalde de drempel en dit signaal is nooit één keer afgegaan. Een detector die
+    // stilzwijgend niets doet is erger dan een detector die er niet is -- je denkt dat er
+    // gekeken is.
+    //
+    // Impressies levert Google wél. Dezelfde vraag ("hoeveel bereik gaat naar thema's die niet
+    // converteren"), gesteld in de eenheid die er is.
     const byCategory = aggregateByEntity(searchCats, "category_label");
-    const totalCost = byCategory.reduce((s, c) => s + c.cost, 0);
-    const zeroConvCats = byCategory.filter((c) => c.conversions === 0 && c.cost > 10);
-    const wasteCost = zeroConvCats.reduce((s, c) => s + c.cost, 0);
+    const totalImpr = byCategory.reduce((s, c) => s + c.impressions, 0);
+    const zeroConvCats = byCategory.filter((c) => c.conversions === 0 && c.impressions > 500);
+    const wasteImpr = zeroConvCats.reduce((s, c) => s + c.impressions, 0);
 
-    if (zeroConvCats.length > 3 && wasteCost > totalCost * 0.2) {
+    if (zeroConvCats.length > 3 && totalImpr > 0 && wasteImpr > totalImpr * 0.2) {
       signals.push({
         type: "search_dilution",
         severity: "medium",
         title: "PMAX zoekt breed zonder conversies in meerdere categorieën",
-        description: `${zeroConvCats.length} zoekcategorieën zonder conversies verbruiken ${Math.round((wasteCost / totalCost) * 100)}% van de search-spend. PMAX breidt mogelijk uit naar irrelevante zoekthema's.`,
+        description: `${zeroConvCats.length} zoekcategorieën zonder conversies zijn samen goed voor ${Math.round((wasteImpr / totalImpr) * 100)}% van de zoekvertoningen. PMAX breidt mogelijk uit naar irrelevante zoekthema's. Wat dat kost is niet te zien: Google levert geen kosten per zoekcategorie.`,
         confidence: "medium",
       });
     }
@@ -363,15 +388,24 @@ export async function computePmaxInsights(
       const label = c.label.toLowerCase();
       return foreignPatterns.test(label) || nonTargetLanguages.some((t) => label.includes(t));
     });
-    const foreignCost = foreignTerms.reduce((s, c) => s + c.cost, 0);
+    // GEEN EURO'S MEER IN DEZE MELDING.
+    //
+    // Hier stond "€X spend op termen in buitenlandse talen", met de severity gedrempeld op dat
+    // bedrag. Google levert op campaign_search_term_insight helemaal geen kosten (zie de kop van
+    // getPmaxSearchCategoriesByMonth); dat bedrag werd opgeteld uit een veld dat altijd leeg is.
+    // Een euro-bedrag dat nergens vandaan komt is erger dan geen bedrag: er wordt op gestuurd.
+    //
+    // Impressies en klikken levert hij wél, en die dragen het verhaal net zo goed: waar PMax
+    // vertoont in een taal die je niet target, adverteer je in een markt die je niet wilde.
     const foreignImpr = foreignTerms.reduce((s, c) => s + c.impressions, 0);
+    const foreignClicks = foreignTerms.reduce((s, c) => s + c.clicks, 0);
 
-    if (foreignTerms.length > 0 && (foreignCost > 10 || foreignImpr > 500)) {
+    if (foreignTerms.length > 0 && foreignImpr > 500) {
       signals.push({
         type: "search_language_leakage",
-        severity: foreignCost > 50 ? "high" : "medium",
+        severity: foreignClicks > 100 ? "high" : "medium",
         title: `PMAX taal-lekkage: ${foreignTerms.length} zoekcategorieën in niet-getargete talen`,
-        description: `€${Math.round(foreignCost)} spend en ${foreignImpr} impressies op termen in buitenlandse talen (o.a. ${foreignTerms.slice(0, 3).map((c) => `"${c.label}"`).join(", ")}). PMAX breidt uit naar markten die niet getarget worden. Controleer taalinstellingen en voeg negatieve zoekwoorden toe.`,
+        description: `${foreignImpr.toLocaleString("nl-NL")} impressies en ${foreignClicks.toLocaleString("nl-NL")} klikken op termen in buitenlandse talen (o.a. ${foreignTerms.slice(0, 3).map((c) => `"${c.label}"`).join(", ")}). PMAX breidt uit naar markten die niet getarget worden. Controleer taalinstellingen en voeg negatieve zoekwoorden toe. Kosten per zoekcategorie levert Google niet, dus wat dit kost is hier niet te zien.`,
         confidence: "high",
       });
     }

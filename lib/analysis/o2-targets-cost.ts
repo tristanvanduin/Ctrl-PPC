@@ -104,17 +104,39 @@ export function checkTargetPlausibility(
 
 // ── 4e. LLM-kosten ──────────────────────────────────────────────────────────
 
-// Prijs per 1 miljoen tokens in euro, per model. EEN plek; vul de waarden in
-// vanaf de provider-prijspagina. Laatst bijgewerkt: nog in te vullen.
-// Onbekend model: geen entry, kosten null.
+// Prijs per 1 miljoen tokens in EURO, per model. Eén plek; nergens anders hardcoden.
+//
+// ── INGEVULD OP 2026-08-05 ──────────────────────────────────────────────────
+//
+// Bron: ai.google.dev/gemini-api/docs/pricing, betaalde laag, standaardtarief. Google publiceert
+// in DOLLAR; de omrekening staat hieronder als aparte constante, zodat zichtbaar is dat het een
+// omrekening is en geen gepubliceerde europrijs.
+//
+// TWEE DINGEN OM TE WETEN VOORDAT JE HIEROP STUURT:
+//
+//   1. De naam in de router is niet de naam op de prijspagina. De router vraagt
+//      "gemini-3-flash-preview"; de pagina noemt de 3-generatie Flash zonder het woord preview.
+//      Ik heb ze op generatie gekoppeld. Wijkt Google's preview-tarief af, dan wijkt deze
+//      berekening mee -- controleer dat bij de eerste echte factuur.
+//   2. De wisselkoers is een MOMENTOPNAME. Bij een cap die op een tientje nauwkeurig moet zijn is
+//      dat ruim genoeg; bij een afrekening naar een klant niet.
+//
+// Onbekend model: geen entry, en dan blijft cost_eur null. Dat is eerlijker dan een schatting.
+
+/**
+ * Dollar naar euro. Eén plek, met de datum erbij, want een koers zonder datum is over een half
+ * jaar niet van een vergissing te onderscheiden.
+ */
+export const USD_PER_EUR = 1.08; // stand 2026-08-05
+const eur = (usdPer1M: number) => Math.round((usdPer1M / USD_PER_EUR) * 10000) / 10000;
+
 export const MODEL_PRICES: Record<string, { inputPer1M: number; outputPer1M: number }> = {
-  // W1.1e: vul hier de ACTUELE OpenRouter-prijzen in (per 1M tokens) en noteer de datum
-  // in het fase-rapport. Dit is de ENIGE prijsplek (no-go: nergens anders hardcoden).
-  // Zonder ingevulde prijs blijft cost_eur null; het totaal is dan expliciet partieel.
-  // De modellen die de router nu gebruikt (directe Gemini-endpoint):
-  // "gemini-3-flash-preview": { inputPer1M: 0, outputPer1M: 0 },
-  // "gemini-flash-lite-latest": { inputPer1M: 0, outputPer1M: 0 },
-  // "gemini-2.5-flash": { inputPer1M: 0, outputPer1M: 0 },
+  // Gemini 3 Flash: $1,50 in / $7,50 uit per 1M tokens.
+  "gemini-3-flash-preview": { inputPer1M: eur(1.50), outputPer1M: eur(7.50) },
+  // Gemini 2.5 Flash-Lite: $0,10 in / $0,40 uit.
+  "gemini-flash-lite-latest": { inputPer1M: eur(0.10), outputPer1M: eur(0.40) },
+  // Gemini 2.5 Flash: $0,30 in / $2,50 uit.
+  "gemini-2.5-flash": { inputPer1M: eur(0.30), outputPer1M: eur(2.50) },
 };
 
 /**

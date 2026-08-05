@@ -23,10 +23,10 @@ function check(name: string, cond: boolean, detail = "") {
 async function main() {
   console.log("aggregateByEntity");
   const rows = [
-    { category_label: "a", cost: 10, conversions: 0, impressions: 100 },
-    { category_label: "a", cost: 15, conversions: 2, impressions: 200 },
-    { category_label: "b", cost: 5, conversions: 0, impressions: 50 },
-    { category_label: "", cost: 99, conversions: 0, impressions: 1 },
+    { category_label: "a", cost: 10, clicks: 3, conversions: 0, impressions: 100 },
+    { category_label: "a", cost: 15, clicks: 4, conversions: 2, impressions: 200 },
+    { category_label: "b", cost: 5, clicks: 1, conversions: 0, impressions: 50 },
+    { category_label: "", cost: 99, clicks: 9, conversions: 0, impressions: 1 },
   ];
   const agg = aggregateByEntity(rows, "category_label");
   check("één rij per entiteit", agg.length === 2, String(agg.length));
@@ -34,6 +34,24 @@ async function main() {
   check("een converterende maand redt de categorie", agg[0].conversions === 2);
   check("naamloze rijen vallen weg", !agg.some((a) => a.label === ""));
   check("op kosten aflopend", agg[0].cost >= agg[1].cost);
+  check("klikken worden opgeteld", agg[0].clicks === 7, String(agg[0].clicks));
+
+  // Zoekcategorieën komen zonder kosten binnen (campaign_search_term_insight kent geen
+  // cost_micros). Zonder tweede sorteersleutel gaf de vergelijking overal 0 terug en was de
+  // volgorde de binnenkomstvolgorde -- terwijl de meldingen `slice(0, 3)` "de grootste" noemen.
+  const zonderKosten = aggregateByEntity(
+    [
+      { category_label: "klein", cost: 0, impressions: 100 },
+      { category_label: "groot", cost: 0, impressions: 9000 },
+      { category_label: "midden", cost: 0, impressions: 500 },
+    ],
+    "category_label"
+  );
+  check(
+    "zonder kosten op impressies aflopend",
+    zonderKosten.map((c) => c.label).join(",") === "groot,midden,klein",
+    zonderKosten.map((c) => c.label).join(",")
+  );
 
   console.log("\nDe expertlaag tegen de demo");
   const sb = createDemoSupabase(null, demoRows()) as never;

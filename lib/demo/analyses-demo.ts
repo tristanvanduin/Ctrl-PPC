@@ -30,9 +30,20 @@
 type Row = Record<string, unknown>;
 
 /** De sectienamen komen letterlijk uit lib/analysis/analysis-catalog.ts. */
-const ANALYSES: { section: string; output: string }[] = [
+/**
+ * ── DE SOP_TYPE MOET PER ANALYSE KLOPPEN ────────────────────────────────────
+ *
+ * Hier stond overal `sop_type: "standalone"`. Gevolg: de lijst op Analyse & advies meldde ze als
+ * GEDRAAID -- die kijkt alleen naar `section` -- maar de kaart die de tekst moet tonen vond niets,
+ * want elke analyse-route filtert op ZIJN EIGEN sop_type (`.eq("sop_type", SOP_TYPE)`). Een
+ * analyse die je wel ziet staan en niet kunt openen; precies wat er in de demo gebeurde.
+ *
+ * De waarden hieronder komen letterlijk uit de routes: app/api/analysis/<naam>/route.ts.
+ */
+const ANALYSES: { section: string; sopType: string; output: string }[] = [
   {
     section: "budget_allocation_v1",
+    sopType: "budget_allocation",
     output: `## Budgetallocatie — waar het budget meer kan doen
 
 **De bevinding.** GRT | Search | NL verliest 28% impressieaandeel aan budget en draait op 97% van
@@ -57,6 +68,7 @@ merkcampagne zelden zo en bij een generieke campagne meestal wel.`,
   },
   {
     section: "google_video_v1",
+    sopType: "google_video",
     output: `## Video & Performance Max
 
 **PMax laat het budget lopen waar de conversies niet zitten.** Maps krijgt 34% van het budget en
@@ -82,6 +94,7 @@ bewegen.`,
   },
   {
     section: "geo_markets_v1",
+    sopType: "geo_markets",
     output: `## Landen & staten
 
 **Zeven landen, en de verdeling is scheef op een verklaarbare manier.** Nederland levert 352
@@ -119,7 +132,7 @@ export function analyseOutputRows(clientId: string, analyseMaand: string, synced
 
   return ANALYSES.map((a, i) => ({
     client_id: clientId,
-    sop_type: "standalone",
+    sop_type: a.sopType,
     // Niet alle drie op dezelfde dag: een analyselijst waarin alles op dezelfde datum staat leest
     // als een import en niet als werk dat over de maand verspreid is gedaan.
     analysis_date: new Date(Date.UTC(eind.getUTCFullYear(), eind.getUTCMonth(), 4 + i * 6))

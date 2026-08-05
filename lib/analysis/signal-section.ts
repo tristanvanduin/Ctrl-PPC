@@ -17,6 +17,7 @@
 import {
   detectConcurrentiedruk,
   detectBrandOnderVuur,
+  detectPmaxKannibalisatie,
   type AuctionCampaignInput,
   type OwnChangeEvent,
 } from "@/lib/signals/google-auction-competition";
@@ -108,6 +109,12 @@ export interface DeviceMonthlyRow {
 // van die zoekterm in die maand.
 export interface SearchTermMonthlyLite {
   month: string;
+  /**
+   * De zoekterm zelf. Stond hier niet, en daarom kon de kannibalisatie-detector niet worden
+   * aangesloten: die legt de PMax-categorielabels naast de eigen zoektermen, en zonder de tekst
+   * valt er niets naast te leggen. Optioneel, want oudere aanroepers vullen hem niet.
+   */
+  search_term?: string | null;
   match_type: string | null;
   cost: number | null;
   clicks: number | null;
@@ -154,6 +161,11 @@ export interface SignalSectionInput {
   // bevestiging; null betekent dat de bron ontbreekt en de detector zwijgt.
   searchTermsVolume: number | null;
   prevSearchTermsVolume: number | null;
+  /**
+   * De PMax-zoekcategorieën uit ads_pmax_search_categories. Leeg laten is toegestaan: dan slaat de
+   * kannibalisatie-check zichzelf over en zegt hij dat ook.
+   */
+  pmaxCategoryLabels?: string[];
   changeHistory: ChangeHistoryRow[] | null; // null = bron niet geladen, dus degradatie
   hasPmaxCampaign: boolean;
 }
@@ -248,29 +260,64 @@ export function buildGoogleSignalsSection(input: SignalSectionInput): SignalSect
     detections.push(detectConcurrentiedruk(campaign));
     detections.push(detectBrandOnderVuur(campaign));
   }
+  // ── PMAX-KANNIBALISATIE ───────────────────────────────────────────────────
+  //
+  // Deze detector was geschreven en getest, en werd door niemand aangeroepen. In de plaats stond
+  // hier een regel die de analyse elke maand vertelde dat het niet meetbaar was -- terwijl de
+  // categorielabels gewoon in ads_pmax_search_categories staan.
+  //
+  // WELK PAAR. De detector werkt per (search-campagne, PMax-campagne). Een account kan er meerdere
+  // van allebei hebben, en alle combinaties langslopen zou de sectie vullen met varianten van
+  // hetzelfde verhaal. Gekozen: de GROOTSTE van elk op impressies in de analysemaand. Dat is waar
+  // een verschuiving het meeste geld raakt, en het is een keuze die je kunt navertellen -- anders
+  // dan "de eerste in de lijst", wat de volgorde van de database is.
   if (input.hasPmaxCampaign) {
-    // DE VORIGE ZIN KLOPTE NIET. Er stond dat de categorielabels "niet in de sync zitten", en dat
-    // is aantoonbaar onwaar: getPmaxSearchCategoriesByMonth haalt ze op uit
-    // campaign_search_term_insight en schrijft ze naar ads_pmax_search_categories. De analyse
-    // kreeg dus elke maand een reden te horen die niet bestond -- precies het soort mededeling
-    // dat je leert negeren, en dan mis je hem als er wél iets is.
-    //
-    // Wat er echt aan de hand is: dat endpoint levert CATEGORIELABELS en geen ruwe zoektermen,
-    // dus een exacte term-voor-term-overlap is niet te leggen. Een vergelijking op
-    // categorieniveau kan wél, en die is zelfs al geschreven en getest:
-    // detectPmaxKannibalisatie in lib/signals/google-auction-competition.ts. Alleen roept niemand
-    // hem aan.
-    //
-    // Aansluiten vraagt drie dingen die er nu niet zijn, en daarom staat het hier als
-    // beperking en niet als "kan niet":
-    //   1. de zoekterm-TEKST -- SearchTermMonthlyLite draagt alleen maand, match type en
-    //      metrics, en de route selecteert search_term niet eens;
-    //   2. ads_pmax_search_categories in deze invoer;
-    //   3. een keuze welke search-campagne je tegen welke PMax-campagne legt, want de detector
-    //      werkt per paar.
-    uncontrollable.push(
-      "PMax-kannibalisatie: PMax rapporteert categorielabels en geen ruwe zoektermen, dus een exacte overlap met de eigen zoektermen is niet te leggen (de labels zelf staan in ads_pmax_search_categories)",
-    );
+    const labels = (input.pmaxCategoryLabels ?? []).filter((x) => x && x.trim().length > 0);
+    const termen = input.searchTerms
+      .filter((t) => monthKey(t.month) === input.periodMonth)
+      .map((t) => String(t.search_term ?? "").trim())
+      .filter((t) => t.length > 0);
+
+    const isPmax = (naam: string) => input.pmaxCampaignNames.includes(naam);
+    const impressiesIn = (maand: string, pmax: boolean) => {
+      const per = new Map<string, number>();
+      for (const r of input.campaignMonthly) {
+        const naam = String(r.campaign_name ?? "");
+        if (!naam || monthKey(r.month) !== maand || isPmax(naam) !== pmax) continue;
+        per.set(naam, (per.get(naam) ?? 0) + (Number(r.impressions) || 0));
+      }
+      return per;
+    };
+
+    const grootste = (m: Map<string, number>) =>
+      [...m.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+
+    const searchNu = grootste(impressiesIn(input.periodMonth, false));
+    const pmaxNu = grootste(impressiesIn(input.periodMonth, true));
+
+    if (labels.length === 0 || termen.length === 0 || !searchNu || !pmaxNu) {
+      // Zeggen WAT er ontbreekt, en niet dat het principieel niet kan. Dat verschil bepaalt of
+      // iemand het ooit oplost.
+      const mist = [
+        labels.length === 0 ? "de PMax-zoekcategorieën" : null,
+        termen.length === 0 ? "de eigen zoektermen van deze maand" : null,
+        !searchNu || !pmaxNu ? "een search- en een PMax-campagne met impressies" : null,
+      ].filter(Boolean).join(", ");
+      uncontrollable.push(`PMax-kannibalisatie: niet te toetsen, want ${mist} ontbreken in deze run`);
+    } else {
+      const searchVorig = impressiesIn(input.prevMonth, false).get(searchNu[0]) ?? 0;
+      const pmaxVorig = impressiesIn(input.prevMonth, true).get(pmaxNu[0]) ?? 0;
+      detections.push(detectPmaxKannibalisatie({
+        searchCampaignName: searchNu[0],
+        pmaxCampaignName: pmaxNu[0],
+        pmaxCategoryLabels: labels,
+        searchTerms: termen,
+        searchImpressions: searchNu[1],
+        prevSearchImpressions: searchVorig,
+        pmaxImpressions: pmaxNu[1],
+        prevPmaxImpressions: pmaxVorig,
+      }));
+    }
   }
 
   // Diagnose-check 5: belofte versus levering, per campagne op de analysemaand.
