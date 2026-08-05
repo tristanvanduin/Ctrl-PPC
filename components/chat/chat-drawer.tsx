@@ -18,8 +18,33 @@
 // weghalen: dan ziet iemand een functie die voor zijn ogen verdwijnt, en dat leest als een storing.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MessageSquare, X, Send, Loader2, AlertCircle } from "lucide-react";
 import { magChatten } from "@/lib/chat/toegang";
+
+/**
+ * Het aanhechtingspunt in de bovenbalk. Deze id staat óók in components/layout/top-bar.tsx.
+ * Verandert hij daar, dan valt de knop hier terug op zijn oude zwevende plek -- zichtbaar dus,
+ * en niet stilzwijgend weg.
+ */
+const TOPBALK_SLOT = "topbalk-acties";
+
+/**
+ * De knop zelf, los van waar hij landt. Zo is hij identiek in de bovenbalk en in de terugval,
+ * en is er geen tweede versie die na een wijziging anders gaat lezen.
+ */
+function SparKnop({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex h-9 items-center gap-2 rounded-full bg-rm-orange px-3.5 text-body font-medium text-white transition-colors hover:brightness-110"
+      aria-label="Spar over deze klant"
+    >
+      <MessageSquare className="h-4 w-4 shrink-0" />
+      Sparren
+    </button>
+  );
+}
 
 type Bericht = {
   id?: string;
@@ -47,6 +72,14 @@ export function ChatDrawer({ clientId, klantnaam }: { clientId: string; klantnaa
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [laatsteVerbruik, setLaatsteVerbruik] = useState<Verbruik | null>(null);
   const bodemRef = useRef<HTMLDivElement>(null);
+
+  // Het aanhechtingspunt in de bovenbalk, ná de eerste verf gezocht: op de server bestaat er geen
+  // document, en tijdens hydratatie moet de eerste render aan beide kanten hetzelfde zijn. Null
+  // op de eerste doorloop betekent dus niet "de balk is er niet" maar "we weten het nog niet";
+  // de terugval hieronder verschijnt daardoor kort. Dat is één frame en zichtbaar noch erg -- de
+  // knop hangt sowieso achter de licentiecheck, die pas na een netwerkcall antwoord geeft.
+  const [aanhechting, setAanhechting] = useState<HTMLElement | null>(null);
+  useEffect(() => { setAanhechting(document.getElementById(TOPBALK_SLOT)); }, []);
 
   // De licentie één keer ophalen. Faalt dat, dan blijft licentie null en verschijnt de knop niet
   // -- een mislukte check hoort geen toegang te geven.
@@ -118,35 +151,32 @@ export function ChatDrawer({ clientId, klantnaam }: { clientId: string; klantnaa
 
   return (
     <>
-      {/* De knop. Rechtsonder vast, zodat hij bij het scrollen op zijn plek blijft -- het gesprek
-          gaat over wat er nú op het scherm staat.
+      {/* De knop.
 
-          ── WAAROM HIJ IN RUST EEN CIRKEL IS ────────────────────────────────────────
-          Dit was een pil van 115 bij 44 pixels. Nagemeten op het tabblad Sprintplanning dekte
-          hij twee cellen van de kolom Metrics af ("conversions" en "cost"): een vaste knop op
-          een informatiedicht dashboard staat per definitie ergens op. De hoek rechtsonder is
-          precies waar tabellen hun laatste kolom hebben.
+          ── HIJ ZWEEFDE, EN DEKTE DAARMEE DATA AF ─────────────────────────────────
+          Dit was een pil van 115 bij 44 rechtsonder vast. Nagemeten op het tabblad
+          Sprintplanning lag hij op twee cellen van de kolom Metrics ("conversions" en "cost").
+          Kleiner maken hielp maar half: als cirkel van 52 bij 44 raakte hij nog stééds diezelfde
+          twee cellen. Dat is geen kwestie van maat -- de hoek rechtsonder is nu eenmaal waar een
+          tabel zijn laatste kolom heeft, dus een vaste knop dáár ligt altijd op iets.
 
-          Ingeklapt is hij nagemeten 52 bij 44: 55% minder oppervlak. Bij hover of toetsenbordfocus
-          schuift het woord er weer uit, zodat het niet aan een icoon alleen hangt wat hij doet.
-          De aria-label staat er los van, dus voor een schermlezer verandert er niets.
+          Nu staat hij in de bovenbalk, naast de bel. Daar dekt hij per definitie niets af, hij
+          staat op elk tabblad op dezelfde plek, en hij is meteen zichtbaar in plaats van pas als
+          je naar beneden kijkt. Wat je opgeeft is de vaste positie tijdens het scrollen -- maar
+          de balk is `sticky top-0`, dus die is er alsnog.
 
-          NIET HELEMAAL OPGELOST, EN DAT HOORT HIER TE STAAN. Opnieuw nagemeten raakt hij nog
-          steeds dezelfde twee cellen: een vaste knop rechtsonder ligt altijd op de laatste kolom,
-          hoe klein je hem ook maakt. Weg krijgen betekent hem uit de pagina halen en in de
-          bovenbalk zetten, naast de bel. Dat is een besluit over de navigatie en geen
-          opmaakcorrectie, dus dat gaat niet stilletjes mee in een designronde. */}
+          ── WAAROM EEN PORTAL EN GEEN KNOP IN DE BOVENBALK ────────────────────────
+          De bovenbalk staat in de root-layout en weet niets van welke klant er open is; dit
+          component wel. Een portal laat de eigenaar van de toestand ook de eigenaar van de knop
+          blijven, in plaats van de klantcontext door de layout te trekken.
+
+          De terugval is met opzet en niet defensief geneuzel: is het aanhechtingspunt er niet
+          (een andere layout, een pagina zonder bovenbalk), dan zweeft hij weer rechtsonder. Een
+          knop die verdwijnt omdat een id is hernoemd, is erger dan een knop die iets afdekt. */}
       {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="group fixed bottom-6 right-6 z-40 flex h-11 items-center gap-2 overflow-hidden rounded-full bg-rm-orange px-3.5 text-body font-medium text-white shadow-lg transition-all hover:px-5 focus-visible:px-5"
-          aria-label="Spar over deze klant"
-        >
-          <MessageSquare className="h-4 w-4 shrink-0" />
-          <span className="max-w-0 whitespace-nowrap opacity-0 transition-all duration-200 group-hover:max-w-24 group-hover:opacity-100 group-focus-visible:max-w-24 group-focus-visible:opacity-100">
-            Sparren
-          </span>
-        </button>
+        aanhechting
+          ? createPortal(<SparKnop onClick={() => setOpen(true)} />, aanhechting)
+          : <div className="fixed bottom-6 right-6 z-40"><SparKnop onClick={() => setOpen(true)} /></div>
       )}
 
       {open && (

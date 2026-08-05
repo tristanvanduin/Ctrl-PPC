@@ -125,6 +125,19 @@ export function TopBar() {
       <h2 className="text-lg font-bold text-rm-blue-ink">{getTitle()}</h2>
 
       <div className="flex items-center gap-4">
+        {/* ── PLEK VOOR ACTIES VAN DE PAGINA ────────────────────────────────────
+            Leeg gelaten voor knoppen die bij het huidige scherm horen maar in de chrome thuis
+            zijn. Op dit moment vult alleen de sparrenknop hem, via een portal vanuit ChatDrawer.
+
+            Waarom niet gewoon hier een knop: de bovenbalk staat in de root-layout en weet niets
+            van welke klant er open is, terwijl de chatlade dat wel weet -- die hangt onder
+            client-dashboard. Een portal laat de eigenaar van de toestand ook de eigenaar van de
+            knop blijven, in plaats van de klantcontext door de layout te trekken.
+
+            De id staat óók in chat-drawer.tsx. Verandert hij, dan valt de knop daar terug op zijn
+            oude zwevende plek in plaats van te verdwijnen. */}
+        <div id="topbalk-acties" className="flex items-center gap-2" />
+
         {/* De thema-keuze staat in de bovenbalk en niet weggestopt in de instellingen: het is een
             weergavevoorkeur van dit scherm, geen accountinstelling. */}
         <ThemaSchakelaar />
