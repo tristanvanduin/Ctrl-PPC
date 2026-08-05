@@ -83,7 +83,7 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <PieChart className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">Performance Max — waar gaat het budget heen</h3>
+        <h3 className="text-title font-semibold text-rm-gray">Performance Max — waar gaat het budget heen</h3>
         <span className="text-meta text-muted-foreground">Google verdeelt zelf over de netwerken</span>
         {/* BIJGEWERKT NAAR DE STAND VAN 2026, en het onderscheid is de hele boodschap.
             Hier stond alleen "PMax laat de verdeling niet rechtstreeks sturen ... via assets,

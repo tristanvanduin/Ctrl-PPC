@@ -208,7 +208,7 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
     >
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <PieChart className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">Waar gaat het budget heen</h3>
+        <h3 className="text-title font-semibold text-rm-gray">Waar gaat het budget heen</h3>
         <span className="text-meta text-muted-foreground">laatste 60 dagen</span>
         <div className="ml-auto flex gap-1 bg-gray-100 rounded-lg p-0.5 flex-wrap">
           {beschikbaar.map((d) => (

@@ -220,7 +220,7 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
         <Layers className="h-4.5 w-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">Assets per groep</h3>
+        <h3 className="text-title font-semibold text-rm-gray">Assets per groep</h3>
         {/* De drie toestanden staan er alle drie in, en niet alleen het oranje. Er stond eerst
             "een getal eronder kleurt oranje" -- dan blijft het lichtgrijs onverklaard, en een
             kleur die je zelf moet raden is geen signaal maar ruis. */}

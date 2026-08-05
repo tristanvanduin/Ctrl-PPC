@@ -287,7 +287,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-rm-gray">SOP Analyse — {channelCfg.headerLabel}</h3>
+        <h3 className="text-title font-semibold text-rm-gray">SOP Analyse — {channelCfg.headerLabel}</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
           Klik op een analyse om deze handmatig uit te voeren. Output wordt opgeslagen bij Bestanden &gt; SOP&apos;s.
         </p>

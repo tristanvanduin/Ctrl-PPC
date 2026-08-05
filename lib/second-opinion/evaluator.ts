@@ -51,6 +51,9 @@ import {
 } from "../api/google-ads";
 import { mergeConversionActionsWithLiveStatus } from "../client-settings";
 import { today } from "../reporting-date";
+// Dezelfde analyse als de assetkaart op het dashboard. Twee schermen die over dezelfde assets
+// gaan en er langs twee rekenwijzen een ander oordeel over geven, is erger dan één streng oordeel.
+import { analyseerAssetdekking, TYPES } from "../pmax/assetdekking";
 
 // ── Account data context (loaded once per audit) ───────────────────────────
 
@@ -138,10 +141,16 @@ interface AccountContext {
     conversions: number;
     conversions_value: number;
   }>;
+  // asset_id en month staan er NIET voor de sier. ads_pmax_asset_performance heeft één rij per
+  // asset PER MAAND, dus zonder die twee telt dezelfde kop bij zes maanden zes keer mee -- en kan
+  // hij in twee labelbakken tegelijk vallen als Google zijn oordeel tussentijds bijstelt.
+  // analyseerAssetdekking ontdubbelt erop en laat het meest recente label winnen.
   pmaxAssets: Array<{
     asset_group_name: string;
+    asset_id: string;
     asset_type: string;
     performance_label: string;
+    month: string;
   }>;
   pmaxPlacements: Array<{
     placement: string;
@@ -292,7 +301,7 @@ async function loadFromSupabase(
     supabase.from("ads_search_terms_monthly").select("search_term, campaign_name, clicks, cost, conversions, conversions_value, ctr, conversion_rate").eq("client_id", clientId).eq("month", latestMonth).order("cost", { ascending: false }).limit(2000),
     // PMAX intelligence
     supabase.from("ads_pmax_network_breakdown").select("asset_group_name, network_type, cost, conversions, conversions_value").eq("client_id", clientId).order("cost", { ascending: false }),
-    supabase.from("ads_pmax_asset_performance").select("asset_group_name, asset_type, performance_label").eq("client_id", clientId),
+    supabase.from("ads_pmax_asset_performance").select("asset_group_name, asset_id, asset_type, performance_label, month").eq("client_id", clientId),
     supabase.from("ads_pmax_placements").select("placement, cost, conversions").eq("client_id", clientId).order("cost", { ascending: false }).limit(500),
   ]);
 
@@ -673,14 +682,25 @@ const evaluators: Record<number, Evaluator> = {
   },
 
   // #25: PMAX assets?
+  // #25 vroeg "zijn assets toegevoegd en geoptimaliseerd?" en telde assetgroepen MET IMPRESSIES.
+  // Dat is een andere vraag: een groep die draait op twee koppen en zonder video kreeg
+  // "Voldoende", want hij had impressies. Nu tegen Google's eigen minima per veldtype, via
+  // dezelfde analyse als de assetkaart op het dashboard (lib/pmax/assetdekking.ts).
   25: (ctx) => {
-    if (ctx.assetGroups.length === 0) {
-      const pmax = ctx.campaigns.filter((c) => c.campaign_type === "PERFORMANCE_MAX");
-      if (pmax.length === 0) return { score: "Niet van toepassing", comments: "Geen PMax campagnes in dit account.", confidence: "high" };
-      return { score: "Niet beoordeeld", comments: "Asset group data niet beschikbaar.", confidence: "low" };
-    }
-    const withImpressions = ctx.assetGroups.filter((ag) => ag.impressions > 0);
-    return { score: withImpressions.length > 0 ? "Voldoende" : "Onvoldoende", comments: `${ctx.assetGroups.length} asset groups, ${withImpressions.length} actief met impressies.`, confidence: "medium" };
+    const pmax = ctx.campaigns.filter((c) => c.campaign_type === "PERFORMANCE_MAX");
+    if (pmax.length === 0) return { score: "Niet van toepassing", comments: "Geen PMax campagnes in dit account.", confidence: "high" };
+    if (ctx.pmaxAssets.length === 0) return { score: "Niet beoordeeld", comments: "Geen asset performance data beschikbaar.", confidence: "low" };
+
+    const d = analyseerAssetdekking(ctx.pmaxAssets);
+    const onvolledig = d.groepen.filter((g) => g.tekorten.length > 0).length;
+    const zonderVideo = d.zonderVideo.length;
+    const comments = `${d.groepen.length} assetgroepen: ${d.compleet} voldoen aan alle minima, ${onvolledig} onder Google's minimum, ${zonderVideo} zonder eigen video.`;
+
+    // Onder het minimum is geen smaakkwestie: zo'n groep draait niet op alle plaatsingen.
+    if (onvolledig > 0) return { score: "Onvoldoende", comments, confidence: "high" };
+    // Video is formeel optioneel, dus dat drukt het oordeel niet naar onvoldoende.
+    if (zonderVideo > 0) return { score: "Voldoende", comments, confidence: "high" };
+    return { score: "Goed", comments, confidence: "high" };
   },
 
   // #26 + #33: Product performance verdeling
@@ -911,16 +931,25 @@ const evaluators: Record<number, Evaluator> = {
     const pmax = ctx.campaigns.filter((c) => c.campaign_type === "PERFORMANCE_MAX");
     if (pmax.length === 0) return { score: "Niet van toepassing", comments: "Geen PMax campagnes in dit account.", confidence: "high" };
     if (ctx.pmaxAssets.length === 0) return { score: "Niet beoordeeld", comments: "Geen asset performance data beschikbaar.", confidence: "low" };
-    const low = ctx.pmaxAssets.filter((a) => a.performance_label === "LOW").length;
-    const best = ctx.pmaxAssets.filter((a) => a.performance_label === "BEST").length;
-    const good = ctx.pmaxAssets.filter((a) => a.performance_label === "GOOD").length;
-    const total = ctx.pmaxAssets.length;
-    const types = [...new Set(ctx.pmaxAssets.map((a) => a.asset_type))];
-    const hasVideo = types.some((t) => t.includes("VIDEO") || t.includes("YOUTUBE"));
-    const comments = `${total} assets: ${best} BEST, ${good} GOOD, ${low} LOW. Types: ${types.join(", ")}. ${hasVideo ? "Video aanwezig." : "Geen video — overweeg toevoegen."}`;
-    if (low > best * 2 && low >= 3) return { score: "Onvoldoende", comments, confidence: "medium" };
-    if (best + good >= low) return { score: "Goed", comments, confidence: "high" };
-    return { score: "Voldoende", comments, confidence: "medium" };
+
+    // ONTDUBBELD, en dat verandert de uitkomst. Hiervoor werd elke rij geteld, en die tabel heeft
+    // één rij per asset per maand: bij zes maanden sync telde dezelfde kop zes keer. Erger nog,
+    // een asset die in maart LOW was en in juli BEST kwam in ALLEBEI de bakken terecht, waarna de
+    // drempel `low > best * 2` op verzonnen verhoudingen liep.
+    const d = analyseerAssetdekking(ctx.pmaxAssets);
+    const totaal = d.groepen.reduce((s, g) => s + g.perType.reduce((t, p) => t + p.aantal, 0), 0);
+    const zwak = d.zwakTotaal;
+    const onbeoordeeld = d.groepen.reduce((s, g) => s + g.perType.reduce((t, p) => t + p.onbeoordeeld, 0), 0);
+    const beoordeeld = totaal - onbeoordeeld;
+    const types = TYPES.filter((t) => d.groepen.some((g) => (g.perType.find((p) => p.type === t.type)?.aantal ?? 0) > 0));
+    const comments = `${totaal} unieke assets over ${d.groepen.length} groep(en): ${zwak} met het label laag, ${onbeoordeeld} nog niet beoordeeld. Types aanwezig: ${types.map((t) => t.label).join(", ")}.`;
+
+    // Het oordeel loopt over de BEOORDEELDE assets. Een verse groep waarin Google nog niets heeft
+    // gewogen is niet slecht, en die als "goed" tellen zou net zo misleidend zijn.
+    if (beoordeeld === 0) return { score: "Niet beoordeeld", comments: `${comments} Google heeft nog geen enkel oordeel gegeven.`, confidence: "low" };
+    if (zwak >= 3 && zwak > beoordeeld / 3) return { score: "Onvoldoende", comments, confidence: "high" };
+    if (zwak > 0) return { score: "Voldoende", comments, confidence: "high" };
+    return { score: "Goed", comments, confidence: "high" };
   },
 
   // #49: Placement waste?

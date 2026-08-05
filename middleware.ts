@@ -25,6 +25,18 @@
 //
 // Opnieuw proberen bij een volgende Next-versie, en dan het manifest controleren en niet de
 // buildmelding geloven.
+//
+// STAND 2026-08-05: dit project draait 16.2.2, en op npm staat 16.3.0. De voorwaarde voor een
+// hertest is dus vervuld, maar een Next-upgrade is een aparte beslissing en geen bijproduct van
+// een hernoeming. De volgorde als je het doet:
+//
+//   1. upgraden en de poorten draaien -- eerst zonder iets te hernoemen;
+//   2. dan pas middleware.ts -> proxy.ts, schoon bouwen (.next weg), en
+//      .next/server/middleware-manifest.json openen;
+//   3. staat daar "middleware": {} met een lege sortedMiddleware, dan is er niets geregistreerd
+//      en moet de hernoeming terug -- ook als de routetabel "ƒ Proxy (Middleware)" meldt.
+//
+// Draai stap 2 niet met een server aan: die serveert uit dezelfde .next.
 // =====================================================================
 
 import { NextResponse, type NextRequest } from "next/server";

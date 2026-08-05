@@ -125,7 +125,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
         <div key={block.channel} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             {CHANNEL_META[block.channel].icon}
-            <h3 className="text-sm font-semibold text-rm-gray">{block.label}</h3>
+            <h3 className="text-title font-semibold text-rm-gray">{block.label}</h3>
             <span className="text-micro text-muted-foreground">{block.campaigns.length} campagne{block.campaigns.length === 1 ? "" : "s"}</span>
           </div>
           {(() => {

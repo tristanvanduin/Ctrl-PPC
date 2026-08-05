@@ -93,7 +93,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-rm-gray">Losse analyses (Google)</h3>
+        <h3 className="text-title font-semibold text-rm-gray">Losse analyses (Google)</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
           Deterministisch voorgerekend, door het model verwoord. Draai los van de maandanalyse; de output wordt opgeslagen bij de analyse-uitvoer.
         </p>

@@ -96,7 +96,7 @@ export function CollapsiblePanel({
         className="w-full px-5 py-3 flex items-center gap-2 text-left hover:bg-gray-50/70 transition-colors"
       >
         {icon}
-        <h3 className="text-sm font-semibold text-rm-gray">{title}</h3>
+        <h3 className="text-title font-semibold text-rm-gray">{title}</h3>
         {subtitle && <span className="text-meta text-muted-foreground">{subtitle}</span>}
         <span className="ml-auto flex items-center gap-2">
           {meta}

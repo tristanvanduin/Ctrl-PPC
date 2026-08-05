@@ -50,7 +50,7 @@ export function ChannelViewHeader({
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center gap-2">
         {icon}
-        <h3 className="text-sm font-semibold text-rm-gray">{title}</h3>
+        <h3 className="text-title font-semibold text-rm-gray">{title}</h3>
         {geoClone && <span className="text-meta text-muted-foreground">— beurs {geoClone}</span>}
         <StatusBadge status={status} />
       </div>

@@ -93,7 +93,7 @@ export function AnalysisOverview({
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <Radar className="w-4.5 h-4.5 text-rm-blue-ink" />
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-rm-gray">Alle analyses</h3>
+          <h3 className="text-title font-semibold text-rm-gray">Alle analyses</h3>
           <p className="text-micro text-muted-foreground mt-0.5">
             {uitgevoerd.length} van {ANALYSE_CATALOGUS.length} gedraaid · klik een regel om naar het kanaal te gaan waar hij staat
           </p>

@@ -37,7 +37,7 @@ export function ScriptCard({
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-rm-gray truncate">{script.title}</h3>
+          <h3 className="text-title font-semibold text-rm-gray truncate">{script.title}</h3>
           {script.description && (
             <p className="text-meta text-muted-foreground mt-0.5 line-clamp-2">
               {script.description}

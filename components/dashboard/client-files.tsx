@@ -394,7 +394,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-sm font-semibold text-red-700">
+                <h3 className="text-title font-semibold text-red-700">
                   {errors.length} SOP analyse{errors.length !== 1 ? "s" : ""} mislukt
                 </h3>
                 <div className="mt-2 space-y-2">

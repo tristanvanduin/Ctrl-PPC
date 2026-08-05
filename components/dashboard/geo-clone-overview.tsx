@@ -76,7 +76,7 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center gap-2">
         <MapPin className="w-5 h-5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">{label} — beursoverzicht</h3>
+        <h3 className="text-title font-semibold text-rm-gray">{label} — beursoverzicht</h3>
         <span className="text-meta text-muted-foreground">({geoClone})</span>
       </div>
 

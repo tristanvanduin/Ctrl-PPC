@@ -38,7 +38,7 @@ export function MetaCreativeAnalyses({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-rm-gray">Creative-analyses (Meta)</h3>
+        <h3 className="text-title font-semibold text-rm-gray">Creative-analyses (Meta)</h3>
         <p className="text-micro text-muted-foreground mt-0.5">Losse creative-analyses; vereisen gesyncte Meta-data.</p>
       </div>
       <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-3">

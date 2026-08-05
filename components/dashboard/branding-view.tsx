@@ -70,7 +70,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
           <Palette className="w-5 h-5 text-rm-blue-ink" />
-          <h3 className="text-sm font-semibold text-rm-gray">Merk-identiteit</h3>
+          <h3 className="text-title font-semibold text-rm-gray">Merk-identiteit</h3>
         </div>
         <div className="px-5 py-4 space-y-4">
           <label className="block">
@@ -148,7 +148,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
       {/* Live preview */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-sm font-semibold text-rm-gray">Live preview</h3>
+          <h3 className="text-title font-semibold text-rm-gray">Live preview</h3>
         </div>
         <div className="p-5">
           <div className="rounded-xl overflow-hidden border border-border" style={{ background: theme.background, color: theme.foreground }}>

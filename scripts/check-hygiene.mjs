@@ -140,12 +140,29 @@ const TOEGESTANE_WEZEN = new Map([
   ["lib/scheduler/core.ts", "hoort bij pump-plan"],
   ["lib/meta/vision/attribute-source.ts", "bewaakt dat kleurclaims uit de pixel-laag komen; wacht op de vision-pijplijn"],
 
-  // Vermoedelijk ingehaald door een opvolger. Verwijderen zodra dat bevestigd is.
-  ["lib/log.ts", "staat naast het wel gebruikte lib/logger; vermoedelijk voorganger"],
-  ["lib/errors.ts", "staat naast lib/analysis/llm-error; vermoedelijk voorganger"],
+  // NAGEKEKEN 2026-08-05. Deze drie stonden hier als "vermoedelijk ingehaald door een opvolger",
+  // en dat hield geen van de drie stand. Ik heb de exports naast elkaar gelegd:
+  //
+  //   log.ts vs logger.ts        een RUN-logger met redactie (redactFields, buildLogRecord,
+  //                              createRunLogger) naast een niveau-logger (setLogLevel, logger).
+  //                              Verschillende dingen; logger.ts kan geen velden redigeren.
+  //   errors.ts vs llm-error.ts  een algemene AppError met categorieen naast een classificatie
+  //                              van LLM-fouten. Het tweede vervangt het eerste niet.
+  //   campaign-analysis.ts vs    een regelmachine met findings, severity en ManualCheck naast
+  //   comparison-facts.ts        maand-op-maand-vergelijkingen en benchmarks. Overlappend
+  //                              domein, geen vervanging: comparison-facts kent geen bevindingen.
+  //
+  // Een verkeerde reden is erger dan geen reden: hij nodigt uit tot een verwijdering die iets
+  // weghaalt wat nergens anders staat. Ze blijven dus staan, maar om de JUISTE reden -- gebouwd,
+  // geen consument -- en dat is dezelfde categorie als het blok hierboven.
+  ["lib/log.ts",
+    "run-logger met redactie; lib/logger dekt dit NIET (die kent alleen niveaus). Wacht op een consument"],
+  ["lib/errors.ts",
+    "AppError met foutcategorieen; lib/analysis/llm-error classificeert alleen LLM-fouten en vervangt dit niet"],
   ["lib/campaign-analysis.ts",
-    "analyse-engine van 738 regels, alleen door zijn eigen test geraakt; de levende tegenhanger " +
-    "is lib/analysis/comparison-facts.ts. Vermoedelijk ingehaald door de prepared-context-pijplijn"],
+    "regelmachine van 738 regels met findings/severity/ManualCheck, alleen door zijn eigen test " +
+    "geraakt. comparison-facts.ts is GEEN opvolger: dat rekent vergelijkingen, geen bevindingen. " +
+    "De vraag is of de prepared-context-pijplijn deze bevindingen al elders produceert"],
 ]);
 
 for (const f of bestanden) {

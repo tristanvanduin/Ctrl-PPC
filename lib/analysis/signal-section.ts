@@ -249,7 +249,28 @@ export function buildGoogleSignalsSection(input: SignalSectionInput): SignalSect
     detections.push(detectBrandOnderVuur(campaign));
   }
   if (input.hasPmaxCampaign) {
-    uncontrollable.push("PMax-kannibalisatie: de PMax-categorielabels zitten niet in de sync, dus de overlap met de eigen zoektermen is niet meetbaar");
+    // DE VORIGE ZIN KLOPTE NIET. Er stond dat de categorielabels "niet in de sync zitten", en dat
+    // is aantoonbaar onwaar: getPmaxSearchCategoriesByMonth haalt ze op uit
+    // campaign_search_term_insight en schrijft ze naar ads_pmax_search_categories. De analyse
+    // kreeg dus elke maand een reden te horen die niet bestond -- precies het soort mededeling
+    // dat je leert negeren, en dan mis je hem als er wél iets is.
+    //
+    // Wat er echt aan de hand is: dat endpoint levert CATEGORIELABELS en geen ruwe zoektermen,
+    // dus een exacte term-voor-term-overlap is niet te leggen. Een vergelijking op
+    // categorieniveau kan wél, en die is zelfs al geschreven en getest:
+    // detectPmaxKannibalisatie in lib/signals/google-auction-competition.ts. Alleen roept niemand
+    // hem aan.
+    //
+    // Aansluiten vraagt drie dingen die er nu niet zijn, en daarom staat het hier als
+    // beperking en niet als "kan niet":
+    //   1. de zoekterm-TEKST -- SearchTermMonthlyLite draagt alleen maand, match type en
+    //      metrics, en de route selecteert search_term niet eens;
+    //   2. ads_pmax_search_categories in deze invoer;
+    //   3. een keuze welke search-campagne je tegen welke PMax-campagne legt, want de detector
+    //      werkt per paar.
+    uncontrollable.push(
+      "PMax-kannibalisatie: PMax rapporteert categorielabels en geen ruwe zoektermen, dus een exacte overlap met de eigen zoektermen is niet te leggen (de labels zelf staan in ads_pmax_search_categories)",
+    );
   }
 
   // Diagnose-check 5: belofte versus levering, per campagne op de analysemaand.

@@ -88,7 +88,7 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">{title}</h3>
+        <h3 className="text-title font-semibold text-rm-gray">{title}</h3>
         <span className="text-meta text-muted-foreground">spend en {lineLabel.toLowerCase()}, zelfde maanden</span>
       </div>
 
@@ -289,7 +289,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">{title}</h3>
+        <h3 className="text-title font-semibold text-rm-gray">{title}</h3>
         {/* De legenda staat boven de plot: je leest hem vóór de grafiek, niet erna. */}
         <Legenda items={legenda} className="ml-auto" />
       </div>

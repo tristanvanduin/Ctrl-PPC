@@ -148,7 +148,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
           <TrendingDown className="w-4 h-4 text-rm-blue-ink" />
-          <h3 className="text-sm font-semibold text-rm-gray">Creative-vermoeidheid</h3>
+          <h3 className="text-title font-semibold text-rm-gray">Creative-vermoeidheid</h3>
           <KanaalMerk channel={channel} />
           <span className="text-micro text-muted-foreground">CTR-traject per creative over de maanden</span>
         </div>
@@ -196,7 +196,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             <Layers className="w-4 h-4 text-rm-blue-ink" />
-            <h3 className="text-sm font-semibold text-rm-gray">Asset-uitsplitsing (RSA)</h3>
+            <h3 className="text-title font-semibold text-rm-gray">Asset-uitsplitsing (RSA)</h3>
             <KanaalMerk channel={channel} />
             <span className="text-micro text-muted-foreground">welke headlines/descriptions het gewicht trekken</span>
           </div>

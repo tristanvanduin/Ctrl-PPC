@@ -154,7 +154,7 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <Globe2 className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">
+        <h3 className="text-title font-semibold text-rm-gray">
           Waar komt het vandaan{focus === "US" ? " — Verenigde Staten" : ""}
         </h3>
         <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>

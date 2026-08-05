@@ -3257,6 +3257,32 @@ export async function getPmaxSearchCategoriesByMonth(
   startDate: string,
   endDate: string
 ): Promise<PmaxSearchCategoryRow[]> {
+  // ⚠ DEZE QUERY IS NOOIT TEGEN EEN ECHT ACCOUNT GEDRAAID EN KLOPT VERMOEDELIJK NIET.
+  //
+  // Nagekeken op 2026-08-05 tegen de documentatie, niet tegen een live account (er zijn geen
+  // werkende Google-sleutels). Twee dingen wijzen dezelfde kant op:
+  //
+  //   1. metrics.cost_micros lijkt op campaign_search_term_insight NIET beschikbaar. Impressies,
+  //      klikken en conversies wel; kosten niet. Eén ongeldig veld maakt de HELE query ongeldig.
+  //   2. Search term insights vragen een filter op ÉÉN campagne. Filteren op
+  //      advertising_channel_type levert REQUIRES_FILTER_BY_SINGLE_RESOURCE -- je moet per
+  //      PMax-campagne apart ophalen.
+  //
+  // Waarom dat niet is opgevallen: een mislukte ophaal wordt netjes geregistreerd
+  // (recordFetchFailure -> de dataset komt als "ophalen mislukt" uit de sync, niet als nul rijen),
+  // maar er is nog nooit een echte sync gedraaid. En de demo VULT deze tabel zelf, inclusief
+  // kosten per categorie -- dus op het scherm ziet het er compleet uit.
+  //
+  // Dat maakt het een productclaim en geen bug alleen: lib/analysis/pmax-expert-layer.ts meldt
+  // "€X spend op termen in buitenlandse talen" en drempelt zijn severity op dat bedrag. Als
+  // Google die kosten niet levert, is dat een euro-bedrag dat nergens vandaan komt.
+  //
+  // NIET BLIND HERSCHREVEN: per campagne ophalen betekent N API-calls in plaats van één, en dat
+  // wil je meten op quota voordat je het uitrolt. Te doen zodra er sleutels zijn:
+  //   a. cost_micros uit de SELECT halen en kijken of de query dan wél rijen geeft;
+  //   b. per PMax-campagne lussen met `WHERE campaign.id = ...`;
+  //   c. daarna de taal-lekkage-melding op impressies/klikken zetten in plaats van op euro's,
+  //      en de demo-fixture meelaten bewegen.
   try {
     const rows = await queryGoogleAds(credentials, customerId, `
       SELECT

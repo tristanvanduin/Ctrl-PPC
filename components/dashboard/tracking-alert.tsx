@@ -78,7 +78,7 @@ export function TrackingAlert({ clientId, onNavigateToSettings }: {
       <div className="flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-red-700">
+          <h3 className="text-title font-semibold text-red-700">
             Mogelijke tracking anomalie gedetecteerd
           </h3>
           <p className="text-xs text-red-600 mt-1">

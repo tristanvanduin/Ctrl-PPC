@@ -37,6 +37,19 @@
        body   12px  tabel- en lopende tekst
        lead   13px  nadruk binnen lopende tekst
        title  15px  kleine kopjes
+
+     STAND 2026-08-05 — ÉÉN AFWIJKING OVER, BEWUST.
+
+     Er stonden 51 kaartkoppen op Tailwind's eigen `text-sm` (14px), en dat is precies de
+     tussenmaat waar deze kop voor waarschuwt. 35 daarvan waren gewone kaarttitels; die staan nu
+     op `text-title`, waar ze horen. Nagemeten na de wijziging: geen enkele kop kreeg er een regel
+     bij, ook "Performance Max — waar gaat het budget heen" niet in zijn kolom van 411px.
+
+     De overige 16 zijn `uppercase tracking-wide` — sectielabels in kleinkapitaal, een andere
+     typografische rol dan een kaarttitel. Ze staan nog op 14px. Welke stap ze horen te krijgen is
+     een ONTWERPKEUZE en geen opruimklus: op `title` (15px) worden ze luider dan de kaarttitels
+     waar ze naast staan, op `lead` (13px) zachter. Die keuze hoort bij de eigenaar, en tot dan
+     staat hij hier zwart op wit in plaats van als 16 losse toevalligheden.
      ───────────────────────────────────────────────────────────────────────── */
   --text-micro: 0.625rem;
   --text-meta: 0.6875rem;

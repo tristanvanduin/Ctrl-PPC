@@ -55,7 +55,7 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
   return (
     <div className="bg-card rounded-xl border border-rm-blue/20 p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-rm-blue-ink">
+        <h3 className="text-title font-semibold text-rm-blue-ink">
           {isEdit ? "Script bewerken" : "Nieuw script"}
         </h3>
         <button onClick={onCancel} className="p-1 rounded-md hover:bg-gray-100">

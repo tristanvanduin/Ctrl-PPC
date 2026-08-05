@@ -38,7 +38,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
             {icon}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-rm-blue-ink">{label}</h3>
+            <h3 className="text-title font-semibold text-rm-blue-ink">{label}</h3>
             {subtitle && <p className="text-micro text-muted-foreground">{subtitle}</p>}
           </div>
         </div>

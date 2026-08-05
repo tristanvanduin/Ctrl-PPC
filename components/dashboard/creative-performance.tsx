@@ -231,7 +231,7 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
       {summary && (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border">
-            <h3 className="text-sm font-semibold text-rm-gray">Samenvatting</h3>
+            <h3 className="text-title font-semibold text-rm-gray">Samenvatting</h3>
           </div>
           <div className="px-5 py-4 space-y-3">
             <p className="text-body text-rm-gray leading-relaxed">{summary.summaryText}</p>

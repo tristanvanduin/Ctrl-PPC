@@ -301,7 +301,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       {/* Report list (when no active report) */}
       {!report && !generating && !loading && reports.length > 0 && (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-border"><h3 className="text-sm font-semibold text-rm-gray">Eerdere rapportages</h3></div>
+          <div className="px-5 py-3 border-b border-border"><h3 className="text-title font-semibold text-rm-gray">Eerdere rapportages</h3></div>
           <div className="divide-y divide-border">
             {reports.map((r) => (
               <button key={r.id} onClick={() => loadReport(r.id)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors text-left">
@@ -330,7 +330,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       {!report && !generating && !loading && reports.length === 0 && (
         <div className="bg-card rounded-xl border border-border shadow-sm p-12 text-center">
           <FileText className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-rm-gray mb-1">Nog geen rapportages</h3>
+          <h3 className="text-title font-semibold text-rm-gray mb-1">Nog geen rapportages</h3>
           <p className="text-xs text-muted-foreground mb-4">Genereer een rapport met grafieken, KPI&apos;s en analyse per metric.</p>
           <button onClick={generateReport} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rm-blue text-white text-sm font-medium hover:bg-rm-blue/90">
             <Plus className="w-4 h-4" /> Eerste rapport genereren

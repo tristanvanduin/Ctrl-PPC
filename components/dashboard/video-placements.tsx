@@ -108,7 +108,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <Ban className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">Waar je video&apos;s draaien</h3>
+        <h3 className="text-title font-semibold text-rm-gray">Waar je video&apos;s draaien</h3>
         <span className="text-meta text-muted-foreground">voorstel welke placements uit te sluiten</span>
       </div>
 

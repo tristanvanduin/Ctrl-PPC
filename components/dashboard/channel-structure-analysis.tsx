@@ -166,7 +166,7 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <Layers className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-gray">Structuur & segment-efficiëntie</h3>
+        <h3 className="text-title font-semibold text-rm-gray">Structuur & segment-efficiëntie</h3>
         <span className="text-micro text-muted-foreground">waar landt het budget binnen {dimLabel}</span>
       </div>
       <div className="px-5 py-4">

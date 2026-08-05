@@ -108,7 +108,7 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
           <Radar className="w-4.5 h-4.5 text-rm-blue-ink" />
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-rm-gray">Cross-channel-analyse</h3>
+            <h3 className="text-title font-semibold text-rm-gray">Cross-channel-analyse</h3>
             <p className="text-micro text-muted-foreground mt-0.5">
               Eén deterministische run; de sub-analyses hieronder komen uit dezelfde detectie. Getriggerde signalen landen in de goedkeuringswachtrij.
             </p>
