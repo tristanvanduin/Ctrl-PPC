@@ -117,18 +117,28 @@ function Typecel({ dekking, regel }: { dekking: Typedekking; regel: Typeregel })
     ? `Geen ${regel.enkelvoud} in deze groep`
     : [
         `${dekking.aantal} ${dekking.aantal === 1 ? regel.enkelvoud : regel.meervoud}`,
-        dekking.zwak > 0 ? `${dekking.zwak} met het label laag` : null,
+        dekking.zwak > 0 ? `${dekking.zwak} zwak` : null,
         dekking.onbeoordeeld > 0 ? `${dekking.onbeoordeeld} nog niet beoordeeld` : null,
       ].filter(Boolean).join(", ");
 
   return (
     <div className={`flex items-baseline justify-end gap-1 tabular-nums ${randKlasse(dekking)}`} title={titel}>
+      {/* text-body en geen text-sm, en normaal gewicht waar niets aan de hand is.
+          ── WAAROM DIT ERTOE DOET ──────────────────────────────────────────────
+          Hier stond `text-sm font-semibold`. Dat is twee afwijkingen tegelijk van elk ander getal
+          op dit scherm: 14px waar de tabellen 12 gebruiken, én halfvet waar GetalCel normaal
+          gewicht heeft. text-sm staat bovendien niet eens op de huisladder
+          (micro/meta/body/lead/title in app/globals.css) -- het is precies de tussenmaat waar de
+          kop van dat bestand voor waarschuwt. Groter plus zwaarder leest niet als "iets groter",
+          het leest als een ander lettertype, en dat was ook de terugkoppeling.
+
+          Halfvet is nu voorbehouden aan de cellen die eruit horen te springen. Als alles zwaar is,
+          springt er niets uit. */}
       <span
         className={
-          dekking.tekort ? "text-sm font-bold text-amber-700"
-            : gemist ? "text-sm font-bold text-amber-700"
-            : leeg ? "text-sm text-muted-foreground/50"
-            : "text-sm font-semibold text-rm-gray"
+          dekking.tekort || gemist ? "text-body font-semibold text-amber-700"
+            : leeg ? "text-body text-muted-foreground/50"
+            : "text-body text-rm-gray"
         }
       >
         {/* Een 0 en geen streepje. Het streepje stond er voor "niet aangeleverd", maar dat is
