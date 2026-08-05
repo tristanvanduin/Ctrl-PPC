@@ -23,6 +23,7 @@ import {
   pmaxAssetRows, videoPlacementRows, pmaxPlacementRows, pmaxSearchCategoryRows,
 } from "./pmax-video-demo";
 import { OWNER_TEAM, OWNER_CLIENT } from "../branding/brand";
+import { analyseOutputRows } from "./analyses-demo";
 
 type Row = Record<string, unknown>;
 
@@ -501,6 +502,8 @@ const adsAudiencePerformanceMonthly: Row[] = audiencePerformanceRows(CID, adsAcc
 // de second opinion — die alle vijf leeg bleven zolang de demo geen PMax- of videocampagne had.
 const adsAssetGroupPerformanceMonthly: Row[] = assetGroupRows(CID, adsCampaignMonthly, DIM_MONTHS, iso());
 const adsPmaxNetworkBreakdown: Row[] = pmaxNetworkRows(CID, adsAssetGroupPerformanceMonthly, iso());
+// monthISO(1) is de laatste afgesloten maand -- dezelfde als waar de rest van de demo op eindigt.
+const sopAnalysisOutput: Row[] = analyseOutputRows(CID, monthISO(1).slice(0, 7), iso());
 const adsPmaxAssetPerformance: Row[] = pmaxAssetRows(CID, DIM_MONTHS, iso());
 const adsVideoPlacements: Row[] = videoPlacementRows(CID, DIM_MONTHS, iso());
 const adsPmaxPlacements: Row[] = pmaxPlacementRows(CID, DIM_MONTHS, iso());
@@ -593,6 +596,9 @@ export function demoRows(): Record<string, Row[]> {
     ads_pmax_placements: adsPmaxPlacements,
     ads_pmax_search_categories: adsPmaxSearchCategories,
     ads_video_placements: adsVideoPlacements,
+    // Drie gedraaide analyses. Zie de kop van analyses-demo.ts voor waarom het er drie zijn en
+    // niet twintig.
+    sop_analysis_output: sopAnalysisOutput,
     sop_insights: sopInsights,
     sop_recommendations: sopRecommendations,
     sprint_hypotheses: sprintHypotheses,
