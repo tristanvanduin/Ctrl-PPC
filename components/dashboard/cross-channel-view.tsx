@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Globe, Info, Layers, Loader2, TrendingUp } from "lucide-react";
+import { Globe, Info, Layers, Loader2, TrendingUp, TriangleAlert } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
@@ -144,26 +144,24 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
       >
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
 
-        <div className="px-5 py-4">
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-meta text-blue-800 flex gap-2 mb-4">
-            <Info className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>
-              Blended cijfers zijn <strong>indicatief</strong>: elk kanaal meet zijn eigen attributie, dus de som is geen
-              exacte verdeling. Bedragen alleen optellen over kanalen met gelijke valuta.
-            </span>
-          </div>
+        {/* ── DE TABEL SMALLER, MET DE WAARSCHUWINGEN ERNAAST ──────────────────
+            Hier stonden twee volle-breedte banners bóven een tabel van zes kolommen, en die tabel
+            liep zelf ook over de volle kaartbreedte. Drie brede blokken onder elkaar, met veel
+            witruimte rechts in alle drie.
 
-          {/* Lens 5 met cijfers erbij, in plaats van alleen de algemene waarschuwing hierboven. */}
-          {betrouwbaarheid && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-meta text-amber-900 flex gap-2 mb-4">
-              <Info className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                Over de laatste {chartMonths.length} maanden claimen de kanalen samen{" "}
-                <strong>{fmt(betrouwbaarheid.blendedSum)} conversies</strong>. {betrouwbaarheid.detail}
-              </span>
-            </div>
-          )}
+            Nu staat de tabel in acht van de twaalf kolommen en staan de twee mededelingen ernaast.
+            Geen opvulling: het zijn de twee voorbehouden die je bij déZE cijfers moet kennen, en
+            naast de cijfers gelezen worden ze eerder gelezen dan erboven, waar je ze overslaat op
+            weg naar de tabel.
 
+            Bewust NIET de kanaalverdeling ernaast gezet, hoe verleidelijk ook: die staat al in de
+            grafiek erboven én in de eerste kolom van deze tabel. Een derde kopie is geen bento
+            maar herhaling.
+
+            Onder lg valt alles terug op één kolom en staat de tabel weer voluit -- op een smal
+            scherm is naast elkaar geen indeling maar gedrang. */}
+        <div className="grid gap-4 px-5 py-4 lg:grid-cols-12">
+          <div className="min-w-0 lg:col-span-8">
           {rows === null && !error && (
             <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Laden...
@@ -287,6 +285,29 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
               </>
             );
           })()}
+          </div>
+
+          {/* De twee voorbehouden, naast de cijfers waar ze over gaan. */}
+          <aside className="flex flex-col gap-3 lg:col-span-4">
+            {betrouwbaarheid && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-meta leading-snug text-amber-900">
+                <p className="mb-1 flex items-center gap-1.5 font-semibold">
+                  <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+                  Dubbeltelling
+                </p>
+                Over de laatste {chartMonths.length} maanden claimen de kanalen samen{" "}
+                <strong>{fmt(betrouwbaarheid.blendedSum)} conversies</strong>. {betrouwbaarheid.detail}
+              </div>
+            )}
+            <div className="rounded-lg border border-border bg-gray-50/70 px-4 py-3 text-meta leading-snug text-muted-foreground">
+              <p className="mb-1 flex items-center gap-1.5 font-semibold text-rm-gray">
+                <Info className="h-3.5 w-3.5 shrink-0" />
+                Waarom &quot;blended&quot; indicatief is
+              </p>
+              Elk kanaal meet zijn eigen attributie, dus de som is geen exacte verdeling. Bedragen
+              alleen optellen over kanalen met gelijke valuta.
+            </div>
+          </aside>
         </div>
       </div>
       </Sectie>
