@@ -53,7 +53,33 @@ function weeks(monthly: Monthly[], upToMonth: number): Weekly[] {
 const BASE_2024 = { conv: 82, spend: 6800, clicks: 3900, imp: 78000 };
 const BASE_2025 = { conv: 95, spend: 7400, clicks: 4300, imp: 85000 };
 const BASE_2026 = { conv: 104, spend: 7900, clicks: 4600, imp: 90000 };
-const REALIZED_MONTH = 6; // t/m juni "gerealiseerd"
+/**
+ * Tot welke maand de demo "gerealiseerd" is.
+ *
+ * ── WAAROM DIT MEELOOPT MET DE KLOK ─────────────────────────────────────────
+ *
+ * Hier stond `= 6` met de opmerking "t/m juni gerealiseerd". Dat klopte toen het geschreven werd
+ * en niet meer daarna. Op 5 augustus 2026 vraagt de standaardperiode van het dashboard om
+ * augustus 2025 t/m juli 2026, filtert deze constante juli weg, en meldt de hero-kaart in amber:
+ * "Voor juli 2026 is geen data geladen; dat totaal ontbreekt hierboven."
+ *
+ * Dat is het eerste blok dat iemand ziet. In een demonstratie leest dat als een kapotte app,
+ * terwijl er alleen een getal was blijven staan.
+ *
+ * Nu: gerealiseerd tot en met de laatste AFGESLOTEN maand. De lopende maand blijft eruit, want
+ * die is per definitie incompleet -- dat is de bedoeling van de constante, en dat blijft zo.
+ */
+const DEMO_JAAR = 2026;
+function gerealiseerdeMaanden(): number {
+  const nu = new Date();
+  const jaar = nu.getUTCFullYear();
+  // Het demo-jaar ligt volledig in het verleden: dan is er niets meer aan de gang.
+  if (jaar > DEMO_JAAR) return 12;
+  // getUTCMonth() is nul-gebaseerd, dus in augustus (7) is dat precies "t/m juli".
+  // Minimaal 1: bij nul zou months[REALIZED_MONTH - 1] verderop undefined opleveren.
+  return Math.min(12, Math.max(1, jaar < DEMO_JAAR ? 1 : nu.getUTCMonth()));
+}
+const REALIZED_MONTH = gerealiseerdeMaanden();
 
 const CAMPAIGN_DEFS = [
   { id: "demo-c-grt", name: "GRT | Search | NL", type: "SEARCH", share: 0.42, is: { sis: 0.55, budgetLost: 0.28, rankLost: 0.05, budget: 140, util: 0.97 } },

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, Settings, Calendar, Target, Loader2, AlertTriangle, Wifi, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Globe, Megaphone, Briefcase, Layers, Sparkles } from "lucide-react";
+import { BarChart3, Settings, Calendar, Target, Loader2, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Globe, Megaphone, Briefcase, Layers, Sparkles } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import { SyncStatusBadge } from "./sync-status-badge";
 import { getClientSettings } from "@/lib/client-settings";
@@ -36,6 +36,7 @@ import { ChannelForecast } from "./channel-forecast";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
 import { DEMO_GREENTECH_ID } from "@/lib/demo/greentech-mock";
+import { isDemoMode } from "@/lib/demo/demo-mode";
 import type { InsightChannel } from "@/lib/insights/channel-of";
 import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
 import { PeriodSelector } from "./period-selector";
@@ -227,6 +228,11 @@ export function ClientDashboard({ client }: { client: Client }) {
   // null = nog niet geladen. Dat onderscheid telt: "nog niet weten" mag er niet uitzien als
   // "geen kanalen", anders flitst de lege staat op bij elke navigatie.
   const [kanalen, setKanalen] = useState<Kanaal[] | null>(null);
+  // Alleen gebruikt voor het bronbijschrift verderop. isDemoMode() leest window.location, dus dit
+  // hoort in een effect en niet in de eerste render -- anders rendert de server iets anders dan de
+  // client en klapt de hydratie eruit.
+  const [demoModus, setDemoModus] = useState(false);
+  useEffect(() => { setDemoModus(isDemoMode()); }, []);
 
   useEffect(() => {
     let levend = true;
@@ -292,11 +298,25 @@ export function ClientDashboard({ client }: { client: Client }) {
         bij een klant zonder data -- dat is de klant die hem het hardst nodig heeft. */}
       {clientData.source === "api" && !clientData.loading && !clientData.error && (
         <div className="flex items-center gap-2 flex-wrap">
+          {/* "Live" alleen als het live IS. In demo-modus komen deze cijfers uit
+              lib/demo/demo-rows.ts en niet uit een koppeling; er zijn niet eens sleutels. De
+              badge zei toch "Live data uit Google Ads, Meta en LinkedIn" -- in een demonstratie
+              is dat de zin waar je collega je op aanspreekt, en terecht.
+
+              Dezelfde fout als de LinkedIn-doorloop hierboven, één laag dieper: toen was de
+              KANAALNAAM onwaar, nu het woord "live". Zelfde les, dus dezelfde behandeling. */}
           {kanalenOpsomming(kanalen ?? []) !== null && (
-            <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
-              <Wifi className="w-3.5 h-3.5" />
-              Live data uit {kanalenOpsomming(kanalen ?? [])}
-            </div>
+            demoModus ? (
+              <div className="flex items-center gap-2 text-xs text-rm-blue-ink bg-rm-blue/10 border border-rm-blue/20 rounded-lg px-3 py-1.5">
+                <FlaskConical className="w-3.5 h-3.5" />
+                Demodata — {kanalenOpsomming(kanalen ?? [])}, geen live koppeling
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+                <Wifi className="w-3.5 h-3.5" />
+                Live data uit {kanalenOpsomming(kanalen ?? [])}
+              </div>
+            )
           )}
           <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
             <Clock className="w-3.5 h-3.5" />

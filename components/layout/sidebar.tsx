@@ -145,19 +145,41 @@ function SidebarInner() {
   }
   const [mounted, setMounted] = useState(false);
 
+  // allSettled en geen all, en dat is het verschil tussen een zijbalk en een lege zijbalk.
+  //
+  // Deze drie laden alle drie uit app_settings in Supabase. Valt er één om -- geen netwerk, geen
+  // sleutels, of een demo op een machine zonder backend -- dan verwerpt Promise.all het geheel en
+  // wordt setVisibleClients NOOIT bereikt. Resultaat: "KLANTEN (0)" terwijl de klanten lokaal
+  // gewoon bekend zijn, inclusief de demoklant die getAllClients() in demo-modus zelf toevoegt.
+  //
+  // Gezien in een doorloop op localhost: de calls naar app_settings gaven ERR_CONNECTION_RESET en
+  // de zijbalk bleef leeg. Er stond geen foutmelding bij; de lijst was er gewoon niet.
+  //
+  // Met allSettled zetten we altijd wat we lokaal weten, en vult wat wél laadt dat aan.
   const refreshData = useCallback(async () => {
-    const [, , loadedGroups] = await Promise.all([
+    // EERST zetten wat lokaal bekend is. getVisibleClients() leest uit de klantregistratie plus
+    // localStorage en heeft de calls hieronder niet nodig; in demo-modus zit de demoklant er al
+    // in. Wachtte de zijbalk op die calls, dan stond er "KLANTEN (0)" zolang de backend niet
+    // antwoordde -- en op een machine zonder backend dus voorgoed. Gemeten: die calls settelden
+    // niet binnen zeven seconden, dus allSettled alleen was niet genoeg. Dat beschermt tegen een
+    // fout, niet tegen wachten.
+    setVisibleClients(getVisibleClients());
+
+    const [, , groepen] = await Promise.allSettled([
       loadApiClients(),
       loadVisibleClientIds(),
       loadClientGroups(),
     ]);
+    // En daarna bijwerken met wat de gedeelde instellingen alsnog opleveren.
     setVisibleClients(getVisibleClients());
-    setGroups(loadedGroups);
+    if (groepen.status === "fulfilled") setGroups(groepen.value);
   }, []);
 
   useEffect(() => {
     async function init() {
-      await migrateLocalStorageToSupabase();
+      // De migratie mag de lijst niet gijzelen: hij praat met dezelfde backend die er misschien
+      // niet is. Faalt hij, dan is dat jammer voor de migratie en niet voor de navigatie.
+      await migrateLocalStorageToSupabase().catch(() => {});
       await refreshData();
     }
     init();

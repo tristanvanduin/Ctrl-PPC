@@ -33,13 +33,33 @@ const data = buildClientDataFromApi(
   api.realizedThroughMonth,
 );
 
+// ── DEZE TEST STOND STIL IN DE TIJD ────────────────────────────────────────
+//
+// Hier stond `alle.length === 30` en "eindigt in juni 2026", plus verderop `const nu = "2026-07"`.
+// Alle drie bevroren op het moment van schrijven. Daardoor bleef deze test groen terwijl het
+// dashboard in augustus 2026 wél een amberen melding gaf: "Voor juli 2026 is geen data geladen."
+// De test toetste de foto, de app leefde door.
+//
+// Nu leiden de verwachtingen zich af uit dezelfde bron als de app: realizedThroughMonth uit de
+// mock, en de echte klok voor "nu". Wat er getoetst wordt is de EIGENSCHAP -- de demo dekt zijn
+// eigen standaardperiode -- en niet de stand van één dag.
+const GEREALISEERD = api.realizedThroughMonth as number;
+const LAATSTE_MAAND = `2026-${String(GEREALISEERD).padStart(2, "0")}`;
+// Dezelfde maand die de UI als "nu" hanteert: de lopende maand, in UTC net als de demo-data.
+const NU = (() => {
+  const n = new Date();
+  return `${n.getUTCFullYear()}-${String(n.getUTCMonth() + 1).padStart(2, "0")}`;
+})();
+
 console.log("De demo-data door de adapter");
 {
   const alle = flattenMonths(data);
   check("er zijn maanden", alle.length > 0, String(alle.length));
-  check("2024 en 2025 zijn compleet plus 2026 tot juni", alle.length === 30, String(alle.length));
+  check("2024 en 2025 compleet plus 2026 tot de laatste afgesloten maand",
+    alle.length === 24 + GEREALISEERD, `${alle.length} bij gerealiseerd t/m ${GEREALISEERD}`);
   check("begint in januari 2024", alle[0].key === "2024-01", alle[0]?.key);
-  check("eindigt in juni 2026", alle[alle.length - 1].key === "2026-06", alle[alle.length - 1]?.key);
+  check("eindigt op de laatste gerealiseerde maand",
+    alle[alle.length - 1].key === LAATSTE_MAAND, `${alle[alle.length - 1]?.key} vs ${LAATSTE_MAAND}`);
   check("elke maand heeft besteding", alle.every((m) => m.adSpend > 0));
   check("geen dubbele maanden", new Set(alle.map((m) => m.key)).size === alle.length);
   check("oplopend gesorteerd", alle.every((m, i) => i === 0 || alle[i - 1].key < m.key));
@@ -50,7 +70,9 @@ console.log("\nDe standaardinstelling van de kiezer");
   // last_12m plus same_period_last_year is wat een gebruiker als eerste ziet. Beide moeten
   // volledig gedekt zijn, anders opent het dashboard met een waarschuwing over ontbrekende
   // maanden terwijl er niets aan de hand is.
-  const nu = "2026-07"; // laatste volledige maand: juni 2026, gelijk aan de demo
+  // De echte klok, net als de app. Zie de toelichting bovenaan: een vastgezette "nu" liet
+  // deze test een dag toetsen in plaats van een eigenschap.
+  const nu = NU;
   const p = resolvePeriod("last_12m", null, nu);
   const c = resolveComparison(p, "same_period_last_year")!;
   const huidig = slicePeriod(data, p);
@@ -64,7 +86,7 @@ console.log("\nDe standaardinstelling van de kiezer");
 
 console.log("\nElke preset levert cijfers op de demo");
 {
-  const nu = "2026-07";
+  const nu = NU;
   for (const preset of PERIOD_PRESETS) {
     const p = resolvePeriod(preset, { start: "2025-03", end: "2025-09" }, nu);
     const s = slicePeriod(data, p);
@@ -77,7 +99,7 @@ console.log("\nElke preset levert cijfers op de demo");
 
 console.log("\nElke vergelijking levert een deltaset op");
 {
-  const nu = "2026-07";
+  const nu = NU;
   for (const mode of COMPARISON_MODES) {
     const p = resolvePeriod("last_6m", null, nu);
     const c = resolveComparison(p, mode);
