@@ -236,7 +236,11 @@ export async function POST(request: NextRequest) {
   // deze controle één env-lookup en geen databasequery.
   const plafond = await controleerPlafond(
     db,
-    schatCallKosten(MODEL_CATALOG.strong, geschatteTokens, CHAT_MAX_TOKENS)
+    schatCallKosten(MODEL_CATALOG.strong, geschatteTokens, CHAT_MAX_TOKENS),
+    new Date(),
+    // Het bureau is hier al bekend uit zoekBureau; het plafond geldt per bureau en niet
+    // platformbreed, anders betaalt het ene bureau het verbruik van het andere op.
+    bureau.agencyId
   );
   if (plafond.blokkeert) {
     logger.warn("[chat] geweigerd op maandplafond", { clientId, tekort: plafond.tekort });
@@ -280,6 +284,7 @@ export async function POST(request: NextRequest) {
   void recordUsage(db, {
     runKey: `chat-${sessionId}`,
     clientId,
+    agencyId: bureau.agencyId,
     callLabel: "chat",
     model: antwoord.model,
     promptTokens: antwoord.promptTokens,

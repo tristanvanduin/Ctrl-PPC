@@ -263,6 +263,14 @@ export function channelFromSopType(sopType: string): string | null {
 export function buildUsageRow(input: {
   runKey: string;
   clientId?: string | null;
+  /**
+   * Het bureau waaraan deze call toegerekend wordt (migratie 061).
+   *
+   * Zonder dit veld is verbruik alleen per klant te bepalen en nooit per bureau -- en een
+   * creditmodel is per definitie een saldo per bureau. Nullable, want een platformbrede call
+   * heeft geen bureau; zie de kop van de migratie voor waarom dat geen NOT NULL mag worden.
+   */
+  agencyId?: string | null;
   channel?: string | null;
   sopType?: string | null;
   stepLabel?: string | null;
@@ -270,12 +278,13 @@ export function buildUsageRow(input: {
   model: string;
   promptTokens: number;
   completionTokens: number;
-  /** Deel van promptTokens dat uit de providercache kwam; telt mee in de prijs, niet als kolom. */
+  /** Deel van promptTokens dat uit de providercache kwam. Telt mee in de prijs én als kolom. */
   cachedPromptTokens?: number;
 }): Record<string, unknown> {
   return {
     run_key: input.runKey,
     client_id: input.clientId ?? null,
+    agency_id: input.agencyId ?? null,
     channel: input.channel ?? null,
     sop_type: input.sopType ?? null,
     step_label: input.stepLabel ?? null,
@@ -283,10 +292,18 @@ export function buildUsageRow(input: {
     model: input.model,
     prompt_tokens: input.promptTokens,
     completion_tokens: input.completionTokens,
-    // Bewust GEEN kolom voor de gecachte tokens: llm_usage heeft die niet en de insert is
-    // fire-and-forget met een stille catch, dus een onbekende kolom zou alle kostenregistratie
-    // geruisloos uitzetten. De korting zit wel in cost_eur verwerkt. De migratie die de kolom
-    // toevoegt staat klaar in scripts/pending-migration-cached-tokens.sql.
+    // ── DEZE KOLOM WERD WEGGEGOOID ────────────────────────────────────────────
+    //
+    // Hier stond dat llm_usage geen kolom voor gecachte tokens heeft en dat de migratie
+    // "klaarstaat" in scripts/pending-migration-cached-tokens.sql. Die migratie is op
+    // 28 juli 2026 gedraaid (staat zo in schema_migrations), maar de code is nooit
+    // bijgetrokken -- dus is bij elke call sindsdien het aantal gecachte tokens verdwenen.
+    //
+    // Waarom dat telt: de korting zit al in cost_eur, dus aan de kosten zie je niet of de cache
+    // werkte. Breekt een wijziging het gedeelde promptbegin, dan gaat er niets kapot en wordt
+    // alleen alles weer vol afgerekend. Dat is precies het soort stille verslechtering waar dit
+    // getal voor bedoeld was.
+    cached_prompt_tokens: Math.max(0, Math.min(input.cachedPromptTokens ?? 0, input.promptTokens)),
     cost_eur: computeCallCost(
       input.model, input.promptTokens, input.completionTokens, MODEL_PRICES, input.cachedPromptTokens ?? 0
     ),
@@ -297,12 +314,52 @@ export function buildUsageRow(input: {
 // LIVE-ONGETEST: de insert is pas tegen de gemigreerde llm_usage-tabel (003) te
 // verifieren. Fire-and-forget bij ontwerp: een logging-fout mag nooit een analyse breken.
 // =====================================================================
+/**
+ * clientId → agency_id, met een cache voor de duur van het proces.
+ *
+ * ── WAAROM DE OPZOEKING HIER STAAT EN NIET BIJ DE AANROEPER ────────────────
+ *
+ * recordUsage wordt op twee plekken aangeroepen: de chat-route (die het bureau al kent) en
+ * runAnalysisStep (die alleen een clientId heeft). De keuze was: elke aanroeper het bureau laten
+ * meegeven, of het hier oplossen als het ontbreekt. Dat tweede, omdat de eerste variant betekent
+ * dat een derde aanroepplaats het stilzwijgend kan vergeten -- en dan staat er een null in een
+ * kolom waar de facturatie op leunt, zonder dat iets dat meldt.
+ *
+ * De cache maakt er één query per klant per proces van. Een klant verhuist niet van bureau
+ * binnen de levensduur van een serverproces; gebeurt dat toch, dan is de rij hoogstens tot de
+ * volgende koude start aan het oude bureau toegerekend.
+ *
+ * Bij een fout: null. Zie de kop van migratie 061 voor waarom dat mag.
+ */
+const bureauCache = new Map<string, string | null>();
+
+export async function bureauVanKlant(
+  supabase: SupabaseClient,
+  clientId: string | null | undefined
+): Promise<string | null> {
+  if (!clientId) return null;
+  const gecacht = bureauCache.get(clientId);
+  if (gecacht !== undefined) return gecacht;
+  try {
+    const { data } = await supabase
+      .from("accounts").select("agency_id").eq("client_id", clientId).maybeSingle();
+    const id = (data?.agency_id as string | undefined) ?? null;
+    bureauCache.set(clientId, id);
+    return id;
+  } catch {
+    // Niet cachen bij een fout: een tijdelijke storing mag niet betekenen dat deze klant tot de
+    // volgende herstart als bureauloos geboekt wordt.
+    return null;
+  }
+}
+
 export async function recordUsage(
   supabase: SupabaseClient,
   input: Parameters<typeof buildUsageRow>[0]
 ): Promise<void> {
   try {
-    await supabase.from("llm_usage").insert(buildUsageRow(input));
+    const agencyId = input.agencyId ?? await bureauVanKlant(supabase, input.clientId);
+    await supabase.from("llm_usage").insert(buildUsageRow({ ...input, agencyId }));
   } catch {
     // bewust stil: kostenregistratie is nooit een breekpunt voor de analyse
   }

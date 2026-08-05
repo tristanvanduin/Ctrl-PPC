@@ -14,6 +14,7 @@ import {
 import { type OpenRouterResponse } from "./openrouter-client";
 import { callRouted } from "./llm-router";
 import { daysAgo, today } from "../reporting-date";
+import { externAccountId } from "@/lib/tenancy/klanten";
 
 const SOP_OUTPUT_CONFLICT_COLUMNS = "client_id,sop_type,analysis_date,section";
 
@@ -62,16 +63,10 @@ function getGoogleAdsCredentials(): GoogleAdsCredentials | null {
   };
 }
 
+// Het customer-id kwam uit het globale app_settings-blob; nu uit accounts, waar ook het bureau
+// staat. Zie de kop van lib/tenancy/klanten.ts voor waarom dat blob weg moest.
 async function getCustomerId(supabase: SupabaseClient, clientId: string): Promise<string | null> {
-  const { data } = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", "api_clients")
-    .maybeSingle();
-
-  if (!data?.value || !Array.isArray(data.value)) return null;
-  const client = (data.value as Array<{ id: string; googleAdsCustomerId?: string }>).find((c) => c.id === clientId);
-  return client?.googleAdsCustomerId ?? null;
+  return externAccountId(supabase, clientId);
 }
 
 export async function fetchClientContext(

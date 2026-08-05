@@ -166,13 +166,22 @@ export function schatCallKosten(model: string, promptTokens: number, completionT
  */
 export async function leesMaandverbruik(
   supabase: SupabaseClient,
-  nu: Date = new Date()
+  nu: Date = new Date(),
+  agencyId?: string | null
 ): Promise<{ besteed: number; onbekend: number }> {
   try {
-    const { data, error } = await supabase
-      .from("llm_usage")
-      .select("cost_eur")
-      .gte("created_at", maandStart(nu));
+    // ── PER BUREAU, NIET PLATFORMBREED ────────────────────────────────────────
+    //
+    // De eerste versie telde ALLE rijen van de maand op. Met één bureau is dat hetzelfde getal;
+    // met twee bureaus betaalt het ene het plafond van het andere op, en loopt bureau A tegen een
+    // blokkade aan door verbruik dat het niet gedaan heeft. Dat is geen randgeval maar de eerste
+    // dag dat er een tweede klant is.
+    //
+    // Zonder agencyId blijft het gedrag platformbreed. Dat is met opzet: er zijn calls zonder
+    // bureau (zie migratie 061), en die horen ergens tegen afgezet te worden.
+    let q = supabase.from("llm_usage").select("cost_eur").gte("created_at", maandStart(nu));
+    if (agencyId) q = q.eq("agency_id", agencyId);
+    const { data, error } = await q;
     if (error || !data) return { besteed: 0, onbekend: 0 };
     let besteed = 0;
     let onbekend = 0;
@@ -193,10 +202,12 @@ export async function leesMaandverbruik(
 export async function controleerPlafond(
   supabase: SupabaseClient,
   schatting: number,
-  nu: Date = new Date()
+  nu: Date = new Date(),
+  /** Het bureau waarvoor het plafond geldt. Weglaten telt platformbreed; zie leesMaandverbruik. */
+  agencyId?: string | null
 ): Promise<PlafondOordeel> {
   const plafond = leesPlafond();
   if (plafond == null) return { toestand: "geen_plafond", blokkeert: false };
-  const { besteed, onbekend } = await leesMaandverbruik(supabase, nu);
+  const { besteed, onbekend } = await leesMaandverbruik(supabase, nu, agencyId);
   return beoordeelPlafond({ plafond, besteed, onbekend, schatting });
 }

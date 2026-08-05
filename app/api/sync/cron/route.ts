@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { syncClient, type SyncResult } from "@/lib/sync/orchestrator";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
+import { synckandidaten } from "@/lib/tenancy/klanten";
 
 /**
  * GET /api/sync/cron — Nightly scheduled sync for all active clients.
@@ -55,19 +56,17 @@ export async function GET(request: NextRequest) {
   const credentials = getCredentials();
   if (!credentials) return Response.json({ error: "Google Ads credentials niet geconfigureerd" }, { status: 500 });
 
-  // Get all Google Ads-connected clients from app_settings
-  const { data: settingsRow } = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", "api_clients")
-    .maybeSingle();
-
-  if (!settingsRow?.value || !Array.isArray(settingsRow.value)) {
-    return Response.json({ error: "Geen clients geconfigureerd" }, { status: 404 });
-  }
-
-  const clients = (settingsRow.value as Array<{ id: string; name?: string; googleAdsCustomerId?: string }>)
-    .filter((c) => c.googleAdsCustomerId);
+  // ── DE KLANTENLIJST KOMT UIT accounts, NIET UIT HET GLOBALE BLOB ──────────
+  //
+  // Hier stond app_settings.api_clients: één JSON-rij met alle klanten van het hele platform,
+  // zonder agency_id. Deze cron synct wat daarin staat, dus zodra er een tweede bureau is,
+  // draaien diens accounts mee in deze run -- met de credentials van dit bureau.
+  //
+  // `accounts` heeft de bureaukoppeling wel. De aanroeper kan een bureau meegeven via
+  // ?agency_id=; zonder dat blijft het gedrag platformbreed, zoals het vandaag is. Zie de kop
+  // van lib/tenancy/klanten.ts.
+  const agencyFilter = request.nextUrl.searchParams.get("agency_id");
+  const clients = await synckandidaten(supabase, { bron: "google-ads", agencyId: agencyFilter });
 
   if (clients.length === 0) {
     return Response.json({ error: "Geen clients met Google Ads koppeling" }, { status: 404 });
@@ -83,20 +82,20 @@ export async function GET(request: NextRequest) {
       const result: SyncResult = await syncClient({
         supabase,
         credentials,
-        clientId: client.id,
-        customerId: client.googleAdsCustomerId!,
+        clientId: client.clientId,
+        customerId: client.externId!,
         syncType: "scheduled",
         triggeredBy: "cron",
       });
 
       await syncMerchantProductSnapshots({
         supabase,
-        clientId: client.id,
+        clientId: client.clientId,
         credentials,
       });
 
       results.push({
-        clientId: client.id,
+        clientId: client.clientId,
         status: result.status,
         rows: result.totalRowsWritten,
       });
@@ -109,7 +108,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       failed++;
       results.push({
-        clientId: client.id,
+        clientId: client.clientId,
         status: "failed",
         rows: 0,
         error: err instanceof Error ? err.message : "Onbekende fout",

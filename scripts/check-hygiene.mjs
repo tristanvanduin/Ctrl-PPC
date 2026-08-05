@@ -51,6 +51,15 @@ const GEDEELD = {
   // `one_click_leads` in de kolom Metrics. Eén vertaaltabel, en die laat onbekende waarden door,
   // want het model schrijft er ook hele zinnen in.
   metriekLabel: "lib/util/tekst.ts",
+  // "Welke klanten zijn er, en van welk bureau" werd op vier plekken beantwoord uit één globaal
+  // JSON-blob (app_settings.api_clients) dat geen agency_id kent -- met twee letterlijk
+  // identieke kopieën van getCustomerId erin. Eén huis, en dat huis leest uit accounts.
+  klantVanId: "lib/tenancy/klanten.ts",
+  externAccountId: "lib/tenancy/klanten.ts",
+  synckandidaten: "lib/tenancy/klanten.ts",
+  // Het bureau bij een klant. Zat als losse opzoeking in de chat-route en moest bij de
+  // kostenregistratie opnieuw; een derde kopie zou een derde cache-strategie krijgen.
+  bureauVanKlant: "lib/analysis/o2-targets-cost.ts",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────

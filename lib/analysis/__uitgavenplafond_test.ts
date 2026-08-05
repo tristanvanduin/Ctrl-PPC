@@ -6,7 +6,7 @@
 
 import {
   beoordeelPlafond, leesPlafond, maandStart, resetDatum, schatCallKosten,
-  WAARSCHUWINGSGRENS, PLAFOND_ENV,
+  WAARSCHUWINGSGRENS, PLAFOND_ENV, leesMaandverbruik,
 } from "./uitgavenplafond";
 
 let passed = 0;
@@ -117,9 +117,52 @@ check("over de jaargrens heen klopt hij ook",
   resetDatum(new Date("2026-12-20T00:00:00Z")) === "2027-01-01",
   resetDatum(new Date("2026-12-20T00:00:00Z")));
 
+// De query wordt hier nagebootst, want het punt is nét welke filters erop komen te staan: met
+// twee bureaus in dezelfde tabel betaalt het ene het plafond van het andere op als agency_id
+// ontbreekt, en dat is de eerste dag dat er een tweede klant is -- geen randgeval.
+function nepClient(rijen: Array<{ cost_eur: number | null; agency_id: string | null }>) {
+  const gebruikt: string[] = [];
+  const bouw = (filter: (r: (typeof rijen)[number]) => boolean) => ({
+    gte(_kolom: string, _waarde: string) { gebruikt.push("gte:created_at"); return this; },
+    eq(kolom: string, waarde: string) {
+      gebruikt.push(`eq:${kolom}`);
+      return bouw((r) => filter(r) && (r as Record<string, unknown>)[kolom] === waarde);
+    },
+    then(res: (v: { data: unknown; error: null }) => void) {
+      res({ data: rijen.filter(filter).map((r) => ({ cost_eur: r.cost_eur })), error: null });
+    },
+  });
+  return { from: () => ({ select: () => bouw(() => true) }), gebruikt };
+}
+
+const rijen = [
+  { cost_eur: 10, agency_id: "bureau-a" },
+  { cost_eur: 5, agency_id: "bureau-a" },
+  { cost_eur: 40, agency_id: "bureau-b" },
+  { cost_eur: null, agency_id: "bureau-a" },
+];
+
 console.log("\nschatCallKosten");
 check("een bekend model levert een bedrag", schatCallKosten("gemini-3-flash-preview", 30000, 1000) > 0);
 check("een onbekend model schat niet en geeft nul", schatCallKosten("iets-anders", 30000, 1000) === 0);
 
-console.log(`\n${passed} geslaagd, ${failed} gefaald`);
-if (failed > 0) process.exit(1);
+async function main() {
+  console.log("\nleesMaandverbruik per bureau");
+  const alles = await leesMaandverbruik(nepClient(rijen) as never);
+  check("zonder bureau telt hij platformbreed", alles.besteed === 55, JSON.stringify(alles));
+  check("en telt de prijsloze call als onbekend", alles.onbekend === 1, String(alles.onbekend));
+
+  const client = nepClient(rijen);
+  const perBureau = await leesMaandverbruik(client as never, new Date(), "bureau-a");
+  check("met bureau telt hij alleen dat bureau", perBureau.besteed === 15, JSON.stringify(perBureau));
+  check("het bureaufilter staat echt op de query", client.gebruikt.includes("eq:agency_id"), client.gebruikt.join(","));
+  check(
+    "bureau-b betaalt niet mee aan het plafond van bureau-a",
+    (await leesMaandverbruik(nepClient(rijen) as never, new Date(), "bureau-b")).besteed === 40
+  );
+
+  console.log(`\n${passed} geslaagd, ${failed} gefaald`);
+  if (failed > 0) process.exit(1);
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });

@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { syncClient } from "@/lib/sync/orchestrator";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { klantVanId } from "@/lib/tenancy/klanten";
 
 export const maxDuration = 120; // 2 minutes for full sync
 
@@ -45,21 +46,13 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Verwacht: { client_id: string }" }, { status: 400 });
   }
 
-  // Look up Google Ads customer ID
-  const { data: settingsRow } = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", "api_clients")
-    .maybeSingle();
-
-  if (!settingsRow?.value || !Array.isArray(settingsRow.value)) {
-    return Response.json({ error: "Geen clients geconfigureerd" }, { status: 404 });
+  // Het customer-id uit accounts, niet uit het globale app_settings-blob. Zie de kop van
+  // lib/tenancy/klanten.ts: dat blob kent geen bureau, dus elke vraag erover was platformbreed.
+  const klant = await klantVanId(supabase, clientId);
+  if (!klant) {
+    return Response.json({ error: `Client "${clientId}" is niet bekend` }, { status: 404 });
   }
-
-  const client = (settingsRow.value as Array<{ id: string; googleAdsCustomerId?: string }>)
-    .find((c) => c.id === clientId);
-
-  if (!client?.googleAdsCustomerId) {
+  if (!klant.externId) {
     return Response.json({ error: `Client "${clientId}" heeft geen Google Ads koppeling` }, { status: 404 });
   }
 
@@ -68,7 +61,7 @@ export async function POST(request: NextRequest) {
       supabase,
       credentials,
       clientId,
-      customerId: client.googleAdsCustomerId,
+      customerId: klant.externId,
       syncType: "manual",
       triggeredBy: "api",
     });

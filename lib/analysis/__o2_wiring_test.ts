@@ -59,8 +59,33 @@ const row = buildUsageRow({
   runKey: "job-1", clientId: "client-9", channel: "google_ads", sopType: "monthly",
   stepLabel: "Account Performance", model: "nep/onbekend-model", promptTokens: 1200, completionTokens: 300,
 });
-const expected = ["run_key", "client_id", "channel", "sop_type", "step_label", "call_label", "model", "prompt_tokens", "completion_tokens", "cost_eur"];
-assert(expected.every((k) => k in row), "usage-rij bevat exact de 003-kolommen");
+const expected = ["run_key", "client_id", "agency_id", "channel", "sop_type", "step_label", "call_label", "model", "prompt_tokens", "completion_tokens", "cached_prompt_tokens", "cost_eur"];
+assert(expected.every((k) => k in row), "usage-rij bevat alle kolommen van llm_usage (003 + 061 + cached tokens)");
+
+// agency_id (migratie 061): zonder bureau een expliciete null, niet weglaten -- een ontbrekende
+// sleutel en een lege sleutel lezen in een insert hetzelfde, maar niet in een code-review.
+assert(row.agency_id === null, "zonder bureau is agency_id null");
+const metBureau = buildUsageRow({
+  runKey: "job-2", clientId: "client-9", agencyId: "b-1", model: "x", promptTokens: 10, completionTokens: 1,
+});
+assert(metBureau.agency_id === "b-1", "meegegeven bureau komt in de rij");
+
+// cached_prompt_tokens: de kolom bestaat sinds 28 juli en werd tot nu toe niet geschreven.
+assert(row.cached_prompt_tokens === 0, "zonder gecachte tokens een nul, geen null");
+const metCache = buildUsageRow({
+  runKey: "job-3", model: "x", promptTokens: 1000, completionTokens: 10, cachedPromptTokens: 400,
+});
+assert(metCache.cached_prompt_tokens === 400, "gecachte tokens komen in de rij");
+// Meer gecacht dan verstuurd kan niet; bij een rare melding van de provider liever afkappen dan
+// een getal wegschrijven dat de rest van de berekening onderuithaalt.
+const teVeel = buildUsageRow({
+  runKey: "job-4", model: "x", promptTokens: 100, completionTokens: 1, cachedPromptTokens: 999,
+});
+assert(teVeel.cached_prompt_tokens === 100, "meer gecacht dan verstuurd wordt afgekapt op promptTokens");
+const negatief = buildUsageRow({
+  runKey: "job-5", model: "x", promptTokens: 100, completionTokens: 1, cachedPromptTokens: -5,
+});
+assert(negatief.cached_prompt_tokens === 0, "een negatief aantal gecachte tokens wordt nul");
 assert(row.run_key === "job-1" && row.prompt_tokens === 1200 && row.completion_tokens === 300, "usage-waarden overgenomen");
 assert(row.cost_eur === null, "onbekend model geeft cost_eur null (partieel totaal expliciet)");
 

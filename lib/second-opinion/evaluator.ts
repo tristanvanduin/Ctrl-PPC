@@ -54,6 +54,7 @@ import { today } from "../reporting-date";
 // Dezelfde analyse als de assetkaart op het dashboard. Twee schermen die over dezelfde assets
 // gaan en er langs twee rekenwijzen een ander oordeel over geven, is erger dan één streng oordeel.
 import { analyseerAssetdekking, TYPES } from "../pmax/assetdekking";
+import { externAccountId } from "@/lib/tenancy/klanten";
 
 // ── Account data context (loaded once per audit) ───────────────────────────
 
@@ -181,16 +182,10 @@ function getCredentials(): GoogleAdsCredentials | null {
   };
 }
 
+// Stond hier letterlijk twee keer in de codebase (ook in lib/analysis/helpers.ts), allebei op
+// het globale app_settings-blob. Eén huis: lib/tenancy/klanten.ts.
 async function getCustomerId(supabase: SupabaseClient, clientId: string): Promise<string | null> {
-  const { data } = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", "api_clients")
-    .maybeSingle();
-  if (!data?.value || !Array.isArray(data.value)) return null;
-  const client = (data.value as Array<{ id: string; googleAdsCustomerId?: string }>)
-    .find((c) => c.id === clientId);
-  return client?.googleAdsCustomerId ?? null;
+  return externAccountId(supabase, clientId);
 }
 
 // ── Load account data: Supabase first, then live API fallback ──────────────
