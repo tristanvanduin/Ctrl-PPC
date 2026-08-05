@@ -322,10 +322,19 @@ export function ClientDashboard({ client }: { client: Client }) {
             <Clock className="w-3.5 h-3.5" />
             Conversielag: {lagDays} {lagDays === 1 ? "dag" : "dagen"}
           </div>
-          <SyncStatusBadge
-            clientId={client.id}
-            onSyncComplete={() => setRefreshKey((k) => k + 1)}
-          />
+          {/* Geen synchronisatieknop in demo-modus.
+              De knop roept een server-route aan, en die gaat langs de mock heen: server-side is er
+              geen demo-client, dus hij praat met de echte Google-API. Zonder sleutels wordt dat een
+              foutmelding, en dit is precies zo'n knop waar iemand tijdens een demonstratie
+              spontaan op drukt.
+              Buiten de demo blijft hij staan, juist ook bij een klant zonder data -- dat is de
+              klant die hem het hardst nodig heeft. */}
+          {!demoModus && (
+            <SyncStatusBadge
+              clientId={client.id}
+              onSyncComplete={() => setRefreshKey((k) => k + 1)}
+            />
+          )}
         </div>
       )}
 
