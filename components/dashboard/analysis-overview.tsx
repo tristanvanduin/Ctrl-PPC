@@ -11,6 +11,15 @@ import {
   type AnalyseStatus,
 } from "@/lib/analysis/analysis-catalog";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
+
+/**
+ * Hoeveel niet-gedraaide analyses er standaard staan.
+ *
+ * Vijf is genoeg om te laten zien wat er klaarstaat; twintig maakt van een voorraadlijst het
+ * langste blok op de pagina, zonder één uitkomst te tonen.
+ */
+const OPEN_ZICHTBAAR = 5;
 
 // Wat kan ik hier draaien, en wat heb ik al gedraaid?
 //
@@ -82,11 +91,16 @@ export function AnalysisOverview({
     return () => { cancelled = true; };
   }, [clientId]);
 
+  // Groeperen en de inkorting VÓÓR de vroege return. Een hook onder een `return` draait niet bij
+  // elke render, en dan klapt React eruit op het moment dat de data binnenkomt -- precies de
+  // volgorde die je in de demo pas ziet, niet in tsc. Bij runs === null is de kaart een laadvlak
+  // en zijn deze twee onschadelijk.
+  const { uitgevoerd, open } = groepeerOpStatus(runs ?? new Map());
+  const openLijst = useTruncatedList(open, OPEN_ZICHTBAAR);
+
   if (runs === null) {
     return <Laadvlak vorm="kaartjes" regels={6} />;
   }
-
-  const { uitgevoerd, open } = groepeerOpStatus(runs);
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -111,14 +125,28 @@ export function AnalysisOverview({
         </>
       )}
 
+      {/* INGEKORT, en alleen deze helft.
+          Wat GEDRAAID is, is de oogst -- die staat er voluit. Wat nog niet gedraaid is, is een
+          voorraadlijst, en bij een verse klant staan daar alle twintig regels in. Dat is precies
+          wat je in de demo zag: twintig keer "nog niet", en de kaart werd het langste blok op de
+          pagina zonder één uitkomst te tonen.
+          Vijf en de rest achter een knop mét het aantal -- hetzelfde patroon als bij de
+          assetdekking. "Meer tonen" zonder getal laat je klikken om erachter te komen of het de
+          moeite is. */}
       {open.length > 0 && (
         <>
           <div className="px-5 py-1.5 bg-gray-50/70 border-y border-border">
             <span className="text-micro font-semibold text-muted-foreground uppercase tracking-wide">Nog niet gedraaid</span>
           </div>
           <div className="divide-y divide-border/50">
-            {open.map((a) => <Regel key={a.section} a={a} onKies={onKiesKanaal} />)}
+            {openLijst.zichtbaar.map((a) => <Regel key={a.section} a={a} onKies={onKiesKanaal} />)}
           </div>
+          <MeerKnop
+            verborgen={openLijst.verborgen}
+            uitgeklapt={openLijst.uitgeklapt}
+            onToggle={openLijst.toggle}
+            eenheid="analyses"
+          />
         </>
       )}
     </div>

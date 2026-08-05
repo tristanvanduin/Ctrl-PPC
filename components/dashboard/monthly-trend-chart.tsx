@@ -269,6 +269,8 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
     const som = (reeks: string) => data.reduce((t, r) => t + Number(r[reeks] ?? 0), 0);
     return som(s) > som(beste) ? s : beste;
   }, series[0]);
+  // Voor de aandelen in de kolom rechts. Nul-veilig: bij een leeg venster is er niets te delen.
+  const totaalAlles = data.reduce((t, r) => t + series.reduce((s2, s) => s2 + Number(r[s] ?? 0), 0), 0);
   const hoogste = Math.max(0, ...data.flatMap((r) => series.map((s) => Number(r[s] ?? 0))));
   const schaal = asSchaal(hoogste);
   const legenda: LegendaItem[] = series.map((s, i) => ({ label: s, kleur: kleurVan(i) }));
@@ -293,7 +295,19 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
         {/* De legenda staat boven de plot: je leest hem vóór de grafiek, niet erna. */}
         <Legenda items={legenda} className="ml-auto" />
       </div>
-      <div className="px-3 py-4" style={{ height, maxWidth: plotBreedte(data.length) }}>
+      {/* Plot links, de cijfers ertegenaan — dezelfde indeling als MonthlyTrendChart hierboven,
+          en om dezelfde reden.
+
+          De plot is zo breed als zijn data (zie plotBreedte). Bij zes maanden bleef er ruim een
+          derde kaart over, en die stond leeg: een grafiek die in witruimte zweeft leest als een
+          kaart die niet af is, hoe netjes de balken zelf ook zijn. Dat was ook de terugkoppeling
+          -- "straalt geen premium uit" ging niet over de marks maar over de leegte eromheen.
+
+          Wat er rechts staat is geen opvulling maar de vraag die deze grafiek oproept en niet
+          beantwoordt: hoeveel draagt elk kanaal nou eigenlijk? Dat tel je niet op uit achttien
+          balkjes. Het kleurblokje bindt de regel aan zijn balken. */}
+      <div className="flex items-stretch">
+      <div className="min-w-0 flex-1 px-3 py-4" style={{ height, maxWidth: plotBreedte(data.length) }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={PLOT_MARGE_LABELS} barCategoryGap={GROEP_GAP} barGap={BALK_GAP}>
             <Raster />
@@ -318,6 +332,30 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+
+      <div className="hidden shrink-0 flex-col justify-center gap-5 border-l border-border px-6 py-4 lg:flex" style={{ width: 230 }}>
+        <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
+          Totaal over {data.length} {data.length === 1 ? "maand" : "maanden"}
+        </p>
+        {series.map((s, i) => {
+          const som = data.reduce((t, r) => t + Number(r[s] ?? 0), 0);
+          const deel = totaalAlles > 0 ? som / totaalAlles : 0;
+          return (
+            <div key={s}>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: kleurVan(i) }} aria-hidden />
+                <span className="text-meta text-muted-foreground">{s}</span>
+                <span className="ml-auto text-micro tabular-nums text-muted-foreground">
+                  {new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 0 }).format(deel)}
+                </span>
+              </div>
+              <div className="mt-0.5 text-lead font-semibold tabular-nums text-rm-gray">{volledigEuro(som)}</div>
+            </div>
+          );
+        })}
+      </div>
+      </div>
+
       {laatstarters.length > 0 && (
         <p className="px-5 pb-4 -mt-1 text-micro text-muted-foreground">
           {laatstarters.map((x) => `${x.naam} vanaf ${x.maand}`).join(", ")} — daarvóór is er geen meting, geen nul.
