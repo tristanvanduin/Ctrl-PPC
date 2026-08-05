@@ -144,15 +144,28 @@ class MockQuery implements PromiseLike<Result> {
     return data;
   }
 
+  /**
+   * Geen demo-rijen voor deze tabel? Dan LEEG, en geen netwerkcall.
+   *
+   * ── WAT HIER STOND EN WAAROM HET WEG IS ─────────────────────────────────
+   *
+   * Dit was een passthrough: de opgenomen calls werden opnieuw afgespeeld op de echte client.
+   * De gedachte was dat de mock alleen de demoklant onderschept, zodat je in hetzelfde tabblad
+   * ook de echte klanten kon bekijken.
+   *
+   * Het gevolg was dat elke query ZONDER client_id-filter alsnog naar de echte database ging --
+   * app_settings bijvoorbeeld, die de klantenlijst aanstuurt. In een doorloop op localhost gaf
+   * dat ERR_CONNECTION_RESET, bleef de zijbalk op "KLANTEN (0)" staan, en hing de klantenlijst
+   * op zijn skeletten. Een demo die op een backend wacht is geen demo.
+   *
+   * Nu geldt één regel: in demo-modus komt alles uit lib/demo/demo-rows.ts, en wat daar niet in
+   * staat is leeg. Geen netwerk, geen wachten, geen echte data die per ongeluk in beeld komt.
+   *
+   * De prijs is bewust: in een demo-tabblad zijn de echte klanten niet te bekijken. Daarvoor is
+   * ?demo=0 of een ander tabblad -- zie lib/demo/demo-mode.ts.
+   */
   private async delegate(): Promise<Result> {
-    if (!this.real) return this.singleMode ? { data: null, error: null } : { data: [], error: null };
-    // Herbouw de query op de echte client door de opgenomen calls te replayen.
-    let q: unknown = this.real.from(this.table);
-    for (const { m, args } of this.calls) {
-      const fn = (q as Record<string, unknown>)[m];
-      if (typeof fn === "function") q = (fn as (...x: unknown[]) => unknown).apply(q, args);
-    }
-    return (q as PromiseLike<Result>);
+    return this.singleMode ? { data: null, error: null } : { data: [], error: null };
   }
 
   then<TR1 = Result, TR2 = never>(
