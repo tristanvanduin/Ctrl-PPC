@@ -14,6 +14,9 @@ import {
   mergeConversionActionsWithLiveStatus,
   saveClientSettings,
 } from "@/lib/client-settings";
+import {
+  BEDRIJFSMODELLEN, nichesPerGroep, isBekendeNiche, normaliseerNiche,
+} from "@/lib/benchmark/segment";
 import { useClientDataState } from "@/lib/client-data-provider";
 import { invalidateClientCache } from "@/lib/use-client-data";
 
@@ -74,6 +77,11 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
   const [kpiRoas, setKpiRoas] = useState<KpiConfig>({ enabled: false, value: 0, period: "year", inputMode: "absolute", growthPct: 0 });
   const [kpiCpa, setKpiCpa] = useState<KpiConfig>({ enabled: false, value: 0, period: "month", inputMode: "absolute", growthPct: 0 });
   const [sector, setSector] = useState<string>("");
+  const [bedrijfsmodel, setBedrijfsmodel] = useState<string>("");
+  const [niche, setNiche] = useState<string>("");
+  // Los van `niche` bewaard: schakelt iemand van "Anders" terug naar een vaste keuze en weer
+  // terug, dan staat zijn getypte tekst er nog. Anders is hij die kwijt bij elke omweg.
+  const [vrijeNiche, setVrijeNiche] = useState<string>("");
   const [aovSegment, setAovSegment] = useState<string>("");
   const [convOverrides, setConvOverrides] = useState<Record<string, number>>({});
   const [conversionLagDays, setConversionLagDays] = useState<number>(3);
@@ -111,6 +119,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
 
     setSettings(baseSettings);
     setSector(baseSettings.sector ?? "");
+    setBedrijfsmodel(baseSettings.bedrijfsmodel ?? "");
+    setNiche(baseSettings.niche ?? "");
+    setVrijeNiche(isBekendeNiche(baseSettings.niche) ? "" : (baseSettings.niche ?? ""));
     setAovSegment(baseSettings.aovSegment ?? "");
     setConvOverrides(baseSettings.kpiTargets.conversionOverrides ?? {});
     setConversionLagDays(baseSettings.conversionLagDays ?? 3);
@@ -244,6 +255,11 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       kpiTargets,
       sector: sector || null,
       aovSegment: aovSegment || null,
+      bedrijfsmodel: bedrijfsmodel || null,
+      // Bij het opslaan nog een keer normaliseren. De onBlur op het vrije veld doet het al, maar
+      // wie typt en meteen op opslaan klikt, verlaat dat veld nooit -- en dan zou "Tandarts " als
+      // eigen segment landen naast "tandarts".
+      niche: normaliseerNiche(niche) || null,
       conversionLagDays,
       activeCountries: activeCountries.length > 0 ? activeCountries : null,
       merchantAccountId: merchantAccountId.trim() || null,
@@ -468,8 +484,84 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           <h2 className="text-title font-semibold text-rm-blue-ink">Sector & Benchmarks</h2>
         </div>
         <p className="text-body text-muted-foreground mb-5">
-          Kies de sector voor sectorale benchmark vergelijkingen in de analyses.
+          Waar deze klant in valt. Bepaalt waarmee hij vergeleken wordt in de analyses.
         </p>
+
+        {/* ── Bedrijfsmodel en niche ────────────────────────────────────────────
+            Twee velden en niet één, omdat het oude `sector`-veld drie dingen op één hoop gooide:
+            b2b_saas is een model én een niche, fysiotherapie alleen een niche, en
+            ecommerce_laag_ticket een model plus een ticketgrootte die hiernaast al in AOV staat.
+            Voor een vergelijking is dat onbruikbaar -- "hoe doen b2b-accounts het" is niet te
+            beantwoorden als het antwoord over vier keuzes verspreid zit.
+
+            Model is grofmazig en vult zich snel; niche is fijnmazig en duurt. Dat is met opzet:
+            een grof segment dat klopt is meer waard dan een fijn segment dat te dun is. */}
+        <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-rm-gray">Bedrijfsmodel</label>
+            <div className="flex gap-2">
+              {BEDRIJFSMODELLEN.map((m) => (
+                <button
+                  key={m.waarde}
+                  type="button"
+                  onClick={() => { setBedrijfsmodel(bedrijfsmodel === m.waarde ? "" : m.waarde); setSaved(false); }}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-body transition-colors ${
+                    bedrijfsmodel === m.waarde
+                      ? "border-rm-blue bg-rm-blue/10 font-medium text-rm-blue-ink"
+                      : "border-border text-muted-foreground hover:border-rm-blue"
+                  }`}
+                >
+                  {m.label}
+                  <span className="mt-0.5 block text-micro font-normal text-muted-foreground">{m.uitleg}</span>
+                </button>
+              ))}
+            </div>
+            {/* Leeg laten mag. Er is bewust geen "beide": die keuze trekt elke twijfelaar aan en
+                levert dan drie dunne segmenten op in plaats van twee dikke. */}
+            <p className="mt-1 text-meta text-muted-foreground">
+              Weet je het niet zeker? Laat leeg — dat is beter dan gokken.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="niche-keuze" className="mb-1.5 block text-sm font-medium text-rm-gray">Niche</label>
+            <select
+              id="niche-keuze"
+              value={isBekendeNiche(niche) || !niche ? niche : "__vrij__"}
+              onChange={(e) => {
+                setNiche(e.target.value === "__vrij__" ? (vrijeNiche || " ") : e.target.value);
+                setSaved(false);
+              }}
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:border-rm-blue focus:outline-none"
+            >
+              <option value="">— Geen niche —</option>
+              {nichesPerGroep().map((g) => (
+                <optgroup key={g.groep} label={g.groep}>
+                  {g.opties.map((o) => <option key={o.waarde} value={o.waarde}>{o.label}</option>)}
+                </optgroup>
+              ))}
+              <option value="__vrij__">Anders, namelijk…</option>
+            </select>
+            {/* Het vrije veld is het groeipad van de lijst, niet een ontsnapping eraan: wat er
+                drie keer in staat, hoort een vaste keuze te worden. Daarom wordt het genormaliseerd
+                opgeslagen -- "Tandarts", "tandarts " en "tand-arts" zijn anders drie segmenten van
+                één account, en dan haalt niets ooit een drempel. */}
+            {niche !== "" && !isBekendeNiche(niche) && (
+              <input
+                type="text"
+                value={vrijeNiche}
+                placeholder="bijv. tandheelkunde"
+                onChange={(e) => { setVrijeNiche(e.target.value); setNiche(e.target.value); setSaved(false); }}
+                onBlur={(e) => { const n = normaliseerNiche(e.target.value); setNiche(n ?? ""); }}
+                className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-rm-blue focus:outline-none"
+              />
+            )}
+            <p className="mt-1 text-meta text-muted-foreground">
+              Staat je niche er niet bij? Kies &ldquo;Anders&rdquo; en typ hem. Wat vaker voorkomt,
+              nemen we op in de lijst.
+            </p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Sector dropdown */}

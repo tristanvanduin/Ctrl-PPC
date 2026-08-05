@@ -174,6 +174,110 @@ function AdoptieSectie() {
   );
 }
 
+
+// ── Benchmarkdekking ────────────────────────────────────────────────────────
+//
+// Laat zien of het invullen van bedrijfsmodel en niche ergens toe leidt. Zonder dit scherm is de
+// drempel in lib/benchmark/cel.ts een abstractie: je vult velden en hoopt maar wat. Hier staat
+// per segment hoeveel accounts en bureaus er nog bij moeten.
+
+interface Cel {
+  model: string | null;
+  niche: string | null;
+  nicheLabel: string | null;
+  accounts: number;
+  bureaus: number;
+  deelbaar: boolean;
+  reden: string | null;
+}
+interface Dekking {
+  stand: {
+    bureaus: number; bureausMetToestemming: number; accounts: number;
+    accountsInDePool: number; metModel: number; metNiche: number;
+  };
+  cellen: Cel[];
+  deelbaar: number;
+}
+
+function BenchmarkSectie() {
+  const [data, setData] = useState<Dekking | null>(null);
+  const [anoniem, setAnoniem] = useState(false);
+
+  useEffect(() => {
+    let af = false;
+    fetch("/api/admin/benchmarkdekking")
+      .then(async (res) => {
+        if (af) return;
+        if (res.status === 401 || res.status === 403) { setAnoniem(true); return; }
+        if (!res.ok) return;
+        setData(await res.json());
+      })
+      .catch(() => { /* stil: een dekkingsoverzicht mag de pagina niet breken */ });
+    return () => { af = true; };
+  }, []);
+
+  if (anoniem || !data) return null;
+  const { stand } = data;
+  const label = (c: Cel) =>
+    c.model && c.niche ? `${c.model.toUpperCase()} + ${c.nicheLabel}`
+      : c.niche ? String(c.nicheLabel)
+      : String(c.model ?? "").toUpperCase();
+
+  return (
+    <section className="mb-8">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h2 className="text-title font-semibold text-rm-gray">Benchmarkdekking</h2>
+        <span className="text-meta text-muted-foreground">
+          {data.deelbaar} van {data.cellen.length} segmenten haalt de drempel
+        </span>
+      </div>
+      <p className="mb-3 text-meta text-muted-foreground">
+        Een segment mag pas gedeeld worden bij genoeg accounts én genoeg verschillende bureaus.
+        Dat tweede is de belangrijkste: één bureau met tien vergelijkbare klanten is tien accounts,
+        maar verraadt het boek van dat ene bureau.
+      </p>
+
+      <div className="mb-3 grid gap-2 sm:grid-cols-4">
+        {[
+          ["Bureaus met toestemming", `${stand.bureausMetToestemming} van ${stand.bureaus}`],
+          ["Accounts in de pool", `${stand.accountsInDePool} van ${stand.accounts}`],
+          ["Met bedrijfsmodel", `${stand.metModel} van ${stand.accounts}`],
+          ["Met niche", `${stand.metNiche} van ${stand.accounts}`],
+        ].map(([kop, waarde]) => (
+          <div key={kop} className="rounded-lg border border-border bg-card p-3">
+            <span className="block text-micro uppercase tracking-wider text-muted-foreground">{kop}</span>
+            <span className="mt-0.5 block text-title font-semibold tabular-nums text-rm-gray">{waarde}</span>
+          </div>
+        ))}
+      </div>
+
+      {data.cellen.length === 0 ? (
+        <p className="rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-meta text-muted-foreground">
+          Nog geen enkel segment. Er is toestemming van minstens één bureau nodig, plus een
+          bedrijfsmodel of niche op de klanten.
+        </p>
+      ) : (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {data.cellen.map((c) => (
+            <li key={label(c)} className={`rounded-lg border p-3 ${
+              c.deelbaar ? "border-green-200 bg-green-50/60" : "border-border bg-card"}`}>
+              <div className="flex items-baseline gap-2">
+                <span className="text-body font-medium text-rm-gray">{label(c)}</span>
+                <span className="ml-auto text-meta tabular-nums text-muted-foreground">
+                  {c.accounts} accounts · {c.bureaus} bureaus
+                </span>
+              </div>
+              <p className={`mt-0.5 text-micro ${c.deelbaar ? "text-green-700" : "text-muted-foreground"}`}>
+                {c.deelbaar ? "haalt de drempel" : c.reden}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [beurzen, setBeurzen] = useState<Client[]>([]);
@@ -290,6 +394,8 @@ export default function AdminPage() {
       </p>
 
       <AdoptieSectie />
+
+      <BenchmarkSectie />
 
       <form onSubmit={invite} className="mb-8 rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-end gap-3">

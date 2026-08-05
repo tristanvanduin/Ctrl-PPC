@@ -67,6 +67,13 @@ export interface ClientSettings {
   kpiTargets: KpiTargets;
   sector?: string | null;
   aovSegment?: string | null;
+  /**
+   * b2b of b2c. Apart van `sector`, want dat veld gooide model en niche op één hoop -- zie de
+   * kop van lib/benchmark/segment.ts. Leeg = onbekend, en dat is bewust: er is geen "beide".
+   */
+  bedrijfsmodel?: string | null;
+  /** De niche, genormaliseerd. Vaste lijst plus vrije invoer; zie lib/benchmark/segment.ts. */
+  niche?: string | null;
   /** Number of days conversions typically lag behind clicks. Default: 3. */
   conversionLagDays: number;
   /** Active countries for multi-country clients. Null = auto-detect. E.g. ["NL", "DE", "FR"] */
@@ -150,6 +157,8 @@ export async function loadClientSettings(clientId: string): Promise<ClientSettin
         conversionActions: data.conversion_actions ?? FALLBACK_CONVERSION_ACTIONS,
         kpiTargets: { ...DEFAULT_KPI_TARGETS, ...(data.kpi_targets ?? {}) },
         sector: data.sector ?? null,
+        bedrijfsmodel: data.bedrijfsmodel ?? null,
+        niche: data.niche ?? null,
         aovSegment: data.aov_segment ?? null,
         conversionLagDays: data.conversion_lag_days ?? 3,
         activeCountries: data.active_countries ?? null,
@@ -189,6 +198,8 @@ export async function saveClientSettings(settings: ClientSettings): Promise<void
       conversion_actions: settings.conversionActions,
       kpi_targets: settings.kpiTargets,
       sector: settings.sector ?? null,
+      bedrijfsmodel: settings.bedrijfsmodel ?? null,
+      niche: settings.niche ?? null,
       aov_segment: settings.aovSegment ?? null,
       conversion_lag_days: settings.conversionLagDays ?? 3,
       active_countries: settings.activeCountries ?? null,

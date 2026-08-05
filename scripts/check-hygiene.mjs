@@ -72,6 +72,14 @@ const GEDEELD = {
   bewaarKoppeling: "lib/tenancy/koppelingen.ts",
   leesRefreshToken: "lib/tenancy/koppelingen.ts",
   beoordeelVerval: "lib/tenancy/koppelingen.ts",
+  // De keuzelijst stond hardgecodeerd in de JSX van client-settings.tsx. De aggregatie kan dan
+  // niet weten welke waarden geldig zijn, en dan verschijnt er vroeg of laat een niche in de data
+  // die nergens in een menu staat -- of andersom.
+  normaliseerNiche: "lib/benchmark/segment.ts",
+  uitOudeSector: "lib/benchmark/segment.ts",
+  // De regel waar het hele "geanonimiseerd"-verhaal op rust. Eén plek, met vaste drempels.
+  beoordeelCel: "lib/benchmark/cel.ts",
+  celoverzicht: "lib/benchmark/cel.ts",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────
