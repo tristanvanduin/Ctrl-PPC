@@ -4,6 +4,8 @@ import { syncClient } from "@/lib/sync/orchestrator";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { klantVanId } from "@/lib/tenancy/klanten";
+import { credentialsVoorBureau } from "@/lib/tenancy/credentials";
+import { logger } from "@/lib/logger";
 
 export const maxDuration = 120; // 2 minutes for full sync
 
@@ -21,21 +23,10 @@ function getSupabase() {
   return createClient(url, key);
 }
 
-function getCredentials(): GoogleAdsCredentials | null {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) return null;
-  return { developerToken, clientId, clientSecret, refreshToken, managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID };
-}
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
-
-  const credentials = getCredentials();
-  if (!credentials) return Response.json({ error: "Google Ads credentials niet geconfigureerd" }, { status: 500 });
 
   let clientId: string;
   try {
@@ -56,10 +47,23 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: `Client "${clientId}" heeft geen Google Ads koppeling` }, { status: 404 });
   }
 
+  // De credentials van het BUREAU van deze klant. Valt terug op de omgeving zolang het bureau nog
+  // niet gekoppeld heeft; `bron` maakt zichtbaar welke van de twee het werd, zodat een terugval
+  // niet stil blijft. Zie de kop van lib/tenancy/credentials.ts.
+  const cred = await credentialsVoorBureau(supabase, klant.agencyId);
+  if (!cred) {
+    return Response.json({ error: "Google Ads credentials niet geconfigureerd" }, { status: 500 });
+  }
+  if (cred.bron === "omgeving" && klant.agencyId) {
+    logger.warn("[sync] bureau heeft geen eigen koppeling, terugval op de omgeving", {
+      clientId, agencyId: klant.agencyId,
+    });
+  }
+
   try {
     const result = await syncClient({
       supabase,
-      credentials,
+      credentials: cred.credentials,
       clientId,
       customerId: klant.externId,
       syncType: "manual",

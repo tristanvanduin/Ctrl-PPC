@@ -2,29 +2,16 @@ import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
+import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 
 export const maxDuration = 300;
 
-function getCredentials(): GoogleAdsCredentials | null {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) return null;
-  return {
-    developerToken,
-    clientId,
-    clientSecret,
-    refreshToken,
-    managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
-  };
-}
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
 
-  const credentials = getCredentials();
+  const credentials = credentialsUitOmgeving();
   let clientId: string;
   try {
     const body = await request.json();

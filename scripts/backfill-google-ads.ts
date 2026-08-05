@@ -40,6 +40,7 @@ import {
 } from "../lib/api/google-ads";
 import { getDateRange13Months } from "../lib/sync/orchestrator";
 import { schrijftabel } from "../lib/data-access/feitentabellen";
+import { credentialsUitOmgeving } from "../lib/tenancy/credentials";
 
 // ── Load .env.local ─────────────────────────────────────────────────────────
 
@@ -78,25 +79,6 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
 const SINGLE_CLIENT = args.find((a) => a.startsWith("--client="))?.split("=")[1];
 
-function getCredentials(): GoogleAdsCredentials {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) {
-    console.error("❌ Google Ads credentials ontbreken in .env.local");
-    process.exit(1);
-  }
-
-  return {
-    developerToken,
-    clientId,
-    clientSecret,
-    refreshToken,
-    managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
-  };
-}
 
 function getSupabase(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -714,7 +696,13 @@ async function main(): Promise<void> {
   console.log("=== Google Ads Backfill Script ===\n");
   if (DRY_RUN) console.log("🏜️  DRY RUN — er wordt niets weggeschreven.\n");
 
-  const credentials = getCredentials();
+  // De oude lokale getCredentials() stopte het script zelf bij ontbrekende sleutels; de gedeelde
+  // versie geeft null terug, want een module hoort geen process.exit te doen. Hier dus expliciet.
+  const credentials = credentialsUitOmgeving();
+  if (!credentials) {
+    console.error("❌ Google Ads credentials ontbreken in .env.local");
+    process.exit(1);
+  }
   const supabase = getSupabase();
 
   // 1. Load clients from Supabase app_settings

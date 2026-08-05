@@ -55,6 +55,7 @@ import { today } from "../reporting-date";
 // gaan en er langs twee rekenwijzen een ander oordeel over geven, is erger dan één streng oordeel.
 import { analyseerAssetdekking, TYPES } from "../pmax/assetdekking";
 import { externAccountId } from "@/lib/tenancy/klanten";
+import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 
 // ── Account data context (loaded once per audit) ───────────────────────────
 
@@ -167,20 +168,6 @@ interface AccountContext {
 
 // ── Google Ads credentials helper ──────────────────────────────────────────
 
-function getCredentials(): GoogleAdsCredentials | null {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) return null;
-  return {
-    developerToken,
-    clientId,
-    clientSecret,
-    refreshToken,
-    managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
-  };
-}
 
 // Stond hier letterlijk twee keer in de codebase (ook in lib/analysis/helpers.ts), allebei op
 // het globale app_settings-blob. Eén huis: lib/tenancy/klanten.ts.
@@ -215,7 +202,7 @@ async function loadAccountContext(
   let conversionActions = (settingsData?.conversion_actions ?? []) as AccountContext["conversionActions"];
   const kpiTargets = (settingsData?.kpi_targets ?? null) as Record<string, unknown> | null;
 
-  const credentials = getCredentials();
+  const credentials = credentialsUitOmgeving();
   const customerId = await getCustomerId(supabase, clientId);
 
   if (credentials && customerId) {
@@ -307,7 +294,7 @@ async function loadFromSupabase(
   let adGroupTargeting: AdGroupTargetingInfo[] = [];
   let frequencyCaps: FrequencyCapInfo[] = [];
 
-  const creds = getCredentials();
+  const creds = credentialsUitOmgeving();
   const custId = await getCustomerId(supabase, clientId);
   if (creds && custId) {
     const [locRes, urlRes, shopRes, tgtRes, freqRes] = await Promise.all([

@@ -6,6 +6,7 @@ import {
 import { googleAdsMonthlyToApiData } from "@/lib/api/adapter";
 import { today } from "@/lib/reporting-date";
 import { addMonths, isValidMonth, monthIndex, type Month } from "@/lib/period/period-range";
+import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 
 /** De laatste dag van een maand, als YYYY-MM-DD. Dag 0 van de volgende maand. */
 function laatsteDag(m: Month): string {
@@ -33,19 +34,6 @@ function periodeUit(params: URLSearchParams): { start: Month; end: Month; cmpSta
     : { start: end, end: start, cmpStart: cmpEnd, cmpEnd: cmpStart };
 }
 
-function getCredentials(): GoogleAdsCredentials | null {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) return null;
-
-  return {
-    developerToken, clientId, clientSecret, refreshToken,
-    managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
-  };
-}
 
 /**
  * Fetch overview KPIs for multiple Google Ads accounts in parallel.
@@ -60,7 +48,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "customerIds required" }, { status: 400 });
   }
 
-  const credentials = getCredentials();
+  const credentials = credentialsUitOmgeving();
   if (!credentials) {
     return Response.json({ error: "Not configured" }, { status: 500 });
   }

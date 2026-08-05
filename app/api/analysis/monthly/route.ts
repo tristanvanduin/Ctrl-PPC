@@ -84,25 +84,8 @@ import { toPromptTable } from "@/lib/analysis/prompt-table";
 import { callLogMark, logCacheSummary } from "@/lib/analysis/openrouter-client";
 import { buildTaskStatusGrounding } from "@/lib/tasks/task-tracking";
 import { priorTasksVoorGrounding } from "@/lib/tasks/prior-tasks";
+import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 
-function getCredentials(): GoogleAdsCredentials | null {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) {
-    return null;
-  }
-
-  return {
-    developerToken,
-    clientId,
-    clientSecret,
-    refreshToken,
-    managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
-  };
-}
 
 function normalizeText(value: string): string {
   return value
@@ -1137,7 +1120,7 @@ export async function POST(request: NextRequest) {
 
   const apiKey = getOpenRouterKey();
   if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
-  const googleAdsCredentials = getCredentials();
+  const googleAdsCredentials = credentialsUitOmgeving();
 
   let clientId: string;
   let jobId = crypto.randomUUID();

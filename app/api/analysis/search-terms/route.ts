@@ -37,30 +37,13 @@ import { fetchStrategicContext } from "@/lib/analysis/expert-layers";
 import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
 import { logger } from "@/lib/logger";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 
 export const maxDuration = 300; // 5 minutes for full analysis with many batches
 
 const OPENROUTER_MODEL = "google/gemini-3-flash-preview";
 const BATCH_SIZE = 100; // Smaller batches = less token overflow risk with enhanced schema
 
-function getCredentials(): GoogleAdsCredentials | null {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) {
-    return null;
-  }
-
-  return {
-    developerToken,
-    clientId,
-    clientSecret,
-    refreshToken,
-    managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
-  };
-}
 
 interface AiVerdict {
   searchTerm: string;
@@ -144,7 +127,7 @@ export async function POST(request: NextRequest) {
   const apiKey = getOpenRouterKey();
   if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
 
-  const credentials = getCredentials();
+  const credentials = credentialsUitOmgeving();
   if (!credentials) return Response.json({ error: "Google Ads API niet geconfigureerd" }, { status: 500 });
 
   let clientId: string;

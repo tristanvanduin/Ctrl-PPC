@@ -7,28 +7,11 @@ import {
   getConversionActions,
   type GoogleAdsCredentials,
 } from "@/lib/api/google-ads";
+import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 
-function getCredentials(): GoogleAdsCredentials | null {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) {
-    return null;
-  }
-
-  return {
-    developerToken,
-    clientId,
-    clientSecret,
-    refreshToken,
-    managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
-  };
-}
 
 export async function GET(request: NextRequest) {
-  const credentials = getCredentials();
+  const credentials = credentialsUitOmgeving();
   if (!credentials) {
     return Response.json(
       { error: "Google Ads API credentials not configured", connected: false },

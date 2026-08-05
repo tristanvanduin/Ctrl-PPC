@@ -4,6 +4,7 @@ import { syncClient, type SyncResult } from "@/lib/sync/orchestrator";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
 import { synckandidaten } from "@/lib/tenancy/klanten";
+import { credentialsVoorBureau } from "@/lib/tenancy/credentials";
 
 /**
  * GET /api/sync/cron — Nightly scheduled sync for all active clients.
@@ -27,20 +28,6 @@ function getSupabase() {
   return createClient(url, key);
 }
 
-function getCredentials(): GoogleAdsCredentials | null {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) return null;
-  return {
-    developerToken,
-    clientId,
-    clientSecret,
-    refreshToken,
-    managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
-  };
-}
 
 export async function GET(request: NextRequest) {
   // Verify cron secret
@@ -53,8 +40,6 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
 
-  const credentials = getCredentials();
-  if (!credentials) return Response.json({ error: "Google Ads credentials niet geconfigureerd" }, { status: 500 });
 
   // ── DE KLANTENLIJST KOMT UIT accounts, NIET UIT HET GLOBALE BLOB ──────────
   //
@@ -77,11 +62,36 @@ export async function GET(request: NextRequest) {
   let succeeded = 0;
   let failed = 0;
 
+  // ── DE CREDENTIALS PER BUREAU, ÉÉN KEER OPGEHAALD ─────────────────────────
+  //
+  // Niet per klant: een bureau heeft één MCC waar al zijn klanten onder hangen, dus per klant
+  // ophalen betekent zeventig keer hetzelfde geheim uit de kluis halen. Deze cache leeft alleen
+  // binnen deze run, en de klantenlijst is op bureau gesorteerd noch gegroepeerd -- vandaar een
+  // Map en geen "vorige".
+  // In een lokale constante, want binnen de geneste functie hieronder houdt TypeScript de
+  // vernauwing van de vroege return niet vast.
+  const db = supabase;
+  const credPerBureau = new Map<string, Awaited<ReturnType<typeof credentialsVoorBureau>>>();
+  async function credsVoor(agencyId: string | null) {
+    const sleutel = agencyId ?? "(geen bureau)";
+    if (!credPerBureau.has(sleutel)) {
+      credPerBureau.set(sleutel, await credentialsVoorBureau(db, agencyId));
+    }
+    return credPerBureau.get(sleutel) ?? null;
+  }
+
   for (const client of clients) {
     try {
+      const cred = await credsVoor(client.agencyId);
+      if (!cred) {
+        failed++;
+        results.push({ clientId: client.clientId, status: "failed", rows: 0, error: "geen credentials" });
+        continue;
+      }
+
       const result: SyncResult = await syncClient({
         supabase,
-        credentials,
+        credentials: cred.credentials,
         clientId: client.clientId,
         customerId: client.externId!,
         syncType: "scheduled",
@@ -91,7 +101,7 @@ export async function GET(request: NextRequest) {
       await syncMerchantProductSnapshots({
         supabase,
         clientId: client.clientId,
-        credentials,
+        credentials: cred.credentials,
       });
 
       results.push({

@@ -60,6 +60,18 @@ const GEDEELD = {
   // Het bureau bij een klant. Zat als losse opzoeking in de chat-route en moest bij de
   // kostenregistratie opnieuw; een derde kopie zou een derde cache-strategie krijgen.
   bureauVanKlant: "lib/analysis/o2-targets-cost.ts",
+  // De Google Ads-credentials stonden TWAALF keer los opgebouwd, allemaal uit dezelfde vijf
+  // omgevingsvariabelen. Twaalf plekken die bij een tweede bureau omgezet moeten worden, met
+  // twaalf kansen om er een te vergeten -- en een vergeten plek betekent dat bureau B met de
+  // sleutels van bureau A praat.
+  credentialsUitOmgeving: "lib/tenancy/credentials.ts",
+  credentialsVoorBureau: "lib/tenancy/credentials.ts",
+  credentialsVoorKlant: "lib/tenancy/credentials.ts",
+  // De OAuth-koppeling en het geheim erachter. Eén deur naar de vault.
+  leesKoppeling: "lib/tenancy/koppelingen.ts",
+  bewaarKoppeling: "lib/tenancy/koppelingen.ts",
+  leesRefreshToken: "lib/tenancy/koppelingen.ts",
+  beoordeelVerval: "lib/tenancy/koppelingen.ts",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────
