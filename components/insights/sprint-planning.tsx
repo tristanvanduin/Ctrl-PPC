@@ -9,6 +9,7 @@ import { channelOfSource, CHANNEL_LABEL, type InsightChannel } from "@/lib/insig
 import { dbInsert, dbUpdate, dbUpdateIn } from "@/lib/data-access/client-write";
 import { ChannelFilter, ChannelBadge } from "./channel-filter";
 import { today } from "@/lib/reporting-date";
+import { metriekLabel } from "@/lib/util/tekst";
 
 interface SprintItem {
   id: string;
@@ -424,7 +425,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     return (
       <div className="bg-card rounded-xl border border-border p-8 shadow-sm text-center">
         <Calendar className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
-        <p className="text-sm text-muted-foreground mb-3">Nog geen sprintplanning.</p>
+        <p className="text-body text-muted-foreground mb-3">Nog geen sprintplanning.</p>
         <button
           onClick={() => setShowAddHypothesis(true)}
           className="px-4 py-2 text-xs font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 transition-colors"
@@ -727,7 +728,8 @@ function SprintRow({ item, onUpdate, onUpdateFields, team, teamOk, currentWeek, 
         />
       </td>
       <td className="px-3 py-2 text-xs text-muted-foreground">{item.review_timeframe || "—"}</td>
-      <td className="px-3 py-2 text-xs text-muted-foreground">{item.metrics || "—"}</td>
+      {/* Vertaald, niet ruw: hier stond `one_click_leads` in beeld. Zie metriekLabel. */}
+      <td className="px-3 py-2 text-xs text-muted-foreground">{metriekLabel(item.metrics) || "—"}</td>
     </tr>
   );
 }

@@ -18,6 +18,7 @@ import { cpaTrendFrom } from "@/lib/analysis/trend";
 import { formatRoas, formatPercent } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { metriekLabel } from "@/lib/util/tekst";
 
 // ─── Account type vocabulary ─────────────────────────────────────────
 
@@ -921,7 +922,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                   Health score: {health.grade === "?" ? `niet te bepalen (${health.assessedCount}/5 factoren beoordeeld)` : `${health.total}/100 (${health.grade})`}
                 </span>
               </div>
-              <p className={`text-base font-medium ${sc.text}`}>{traject.summary}</p>
+              <p className={`text-title font-medium ${sc.text}`}>{traject.summary}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Stand per {dateLabel()} · {traject.confidence}
               </p>
@@ -1079,7 +1080,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                     )}
                     {action.metric && (
                       <span className="text-micro text-muted-foreground px-1.5 py-0.5 rounded bg-gray-100">
-                        Metric: {action.metric}
+                        Meting: {metriekLabel(action.metric)}
                       </span>
                     )}
                   </div>
@@ -1159,7 +1160,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                 <span className="text-xs text-rm-gray font-medium">{progressPct}% voltooid</span>
                 <span className="text-micro text-muted-foreground">{done} klaar · {active} actief · {expired} verlopen · {backlog} backlog</span>
               </div>
-              <div className="w-full h-3 bg-card rounded-full border border-gray-200 overflow-hidden flex">
+              <div className="w-full h-3 bg-card rounded-full border border-border overflow-hidden flex">
                 {done > 0 && <div className="h-full bg-emerald-500" style={{ width: `${(done / total) * 100}%` }} />}
                 {ongoing > 0 && <div className="h-full bg-blue-500" style={{ width: `${(ongoing / total) * 100}%` }} />}
                 {inPlanning > 0 && <div className="h-full bg-yellow-400" style={{ width: `${(inPlanning / total) * 100}%` }} />}

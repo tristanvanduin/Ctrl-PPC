@@ -47,6 +47,10 @@ const GEDEELD = {
   // exact het patroon waarmee median en safeDiv aan drie verschillende gedragingen kwamen, en
   // de vierde kopie is degene die het nét anders doet.
   opsomming: "lib/util/tekst.ts",
+  // De metrieknaam werd op drie plekken onbewerkt getoond -- in de sprinttabel stond letterlijk
+  // `one_click_leads` in de kolom Metrics. Eén vertaaltabel, en die laat onbekende waarden door,
+  // want het model schrijft er ook hele zinnen in.
+  metriekLabel: "lib/util/tekst.ts",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────

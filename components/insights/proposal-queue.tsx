@@ -7,6 +7,7 @@ import { prioritizeQueue, summarizePlan } from "@/lib/learning/prioritize-queue"
 import { channelOfSource, type InsightChannel } from "@/lib/insights/channel-of";
 import { dbUpdate } from "@/lib/data-access/client-write";
 import { ChannelBadge } from "./channel-filter";
+import { metriekLabel } from "@/lib/util/tekst";
 
 // De goedkeuringswachtrij: ALLE pending voorstellen uit sprint_hypotheses, ongeacht bron
 // (zoektermen, losse analyses, second opinion, Meta/LinkedIn/cross-signalen). De maand-
@@ -222,7 +223,7 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
               <div className="mt-2 space-y-1 text-meta text-muted-foreground">
                 {p.rationale && <p><span className="font-medium text-rm-gray">Onderbouwing:</span> {p.rationale}</p>}
                 {p.expected_result && <p><span className="font-medium text-rm-gray">Verwacht:</span> {p.expected_result}</p>}
-                {p.measurement_metric && <p><span className="font-medium text-rm-gray">Meting:</span> {p.measurement_metric}</p>}
+                {p.measurement_metric && <p><span className="font-medium text-rm-gray">Meting:</span> {metriekLabel(p.measurement_metric)}</p>}
                 {p.timeframe && <p><span className="font-medium text-rm-gray">Termijn:</span> {p.timeframe}</p>}
               </div>
             )}

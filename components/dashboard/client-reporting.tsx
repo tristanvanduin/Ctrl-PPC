@@ -262,7 +262,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
             <FileText className="w-4.5 h-4.5 text-rm-blue-ink" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-gray-900 leading-tight">Rapportage</h2>
+            <h2 className="text-title font-bold text-rm-gray leading-tight">Rapportage</h2>
             <p className="text-xs text-muted-foreground">Maandrapportage — per metric, met grafieken en bewerkbare tekst</p>
           </div>
         </div>
@@ -321,7 +321,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       {generating && (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-rm-blue-ink" />
-          <p className="text-sm text-muted-foreground">Rapport wordt gegenereerd...</p>
+          <p className="text-body text-muted-foreground">Rapport wordt gegenereerd...</p>
           <p className="text-micro text-muted-foreground">Data ophalen, metrics berekenen, tekst genereren — ca. 30-60 sec</p>
         </div>
       )}

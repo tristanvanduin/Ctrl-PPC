@@ -97,7 +97,7 @@ function ClientVisibilitySection() {
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-rm-blue-ink text-base">Klanten in sidebar</h3>
+          <h3 className="font-semibold text-rm-blue-ink text-title">Klanten in sidebar</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Selecteer welke klanten zichtbaar zijn in het menu. {visibleCount} van {allClients.length} zichtbaar.
             {allClients.length > 0 && allClients[0].source === "google-ads" && (
@@ -358,7 +358,7 @@ function ClientGroupsSection() {
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-rm-blue-ink text-base">Klantgroepen</h3>
+          <h3 className="font-semibold text-rm-blue-ink text-title">Klantgroepen</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Bundel accounts en leg vast wat de bundel betekent. {groups.length} groep{groups.length !== 1 ? "en" : ""}
             {onbevestigd > 0 ? `, waarvan ${onbevestigd} voorgesteld` : ""}
@@ -592,12 +592,12 @@ function ClientGroupsSection() {
         ))}
 
         {groups.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">
+          <p className="text-body text-muted-foreground text-center py-4">
             Nog geen groepen. Maak een groep aan om klanten te bundelen.
           </p>
         )}
         {groups.length > 0 && secties.length === 0 && (
-          <p className="py-4 text-center text-sm text-muted-foreground">
+          <p className="py-4 text-center text-body text-muted-foreground">
             Geen groep gevonden voor &ldquo;{groepZoek}&rdquo;.
           </p>
         )}
@@ -706,7 +706,7 @@ export default function SettingsPage() {
         {/* ── Google Ads ──────────────────────────────────────── */}
         <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue-ink text-base">Google Ads API</h3>
+            <h3 className="font-semibold text-rm-blue-ink text-title">Google Ads API</h3>
             <StatusBadge connected={googleConnected} />
           </div>
 
@@ -743,7 +743,7 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-muted-foreground">
                 Voeg de volgende variabelen toe aan je <code className="font-mono text-xs">.env.local</code>:
               </p>
 
@@ -804,7 +804,7 @@ export default function SettingsPage() {
         {/* ── Meta Ads ────────────────────────────────────────── */}
         <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue-ink text-base">Meta Ads API</h3>
+            <h3 className="font-semibold text-rm-blue-ink text-title">Meta Ads API</h3>
             <StatusBadge connected={metaConnected} />
           </div>
 
@@ -841,7 +841,7 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-muted-foreground">
                 Voeg de volgende variabelen toe aan je <code className="font-mono text-xs">.env.local</code>:
               </p>
 
@@ -889,11 +889,11 @@ export default function SettingsPage() {
         {/* ── LinkedIn Ads ────────────────────────────────────── */}
         <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue-ink text-base">LinkedIn Ads API</h3>
+            <h3 className="font-semibold text-rm-blue-ink text-title">LinkedIn Ads API</h3>
             <span className="text-meta text-muted-foreground px-2 py-0.5 rounded-full bg-gray-100">Via .env.local</span>
           </div>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-body text-muted-foreground">
               Het LinkedIn-datamodel en de sync-laag staan klaar. Voeg de volgende variabelen toe aan je{" "}
               <code className="font-mono text-xs">.env.local</code> om de koppeling te activeren:
             </p>
@@ -931,7 +931,7 @@ export default function SettingsPage() {
 
       {/* Architecture info */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-        <h3 className="font-semibold text-rm-blue-ink text-base mb-3">Architectuur</h3>
+        <h3 className="font-semibold text-rm-blue-ink text-title mb-3">Architectuur</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-muted-foreground">
           <div className="space-y-1">
             <p className="font-semibold text-rm-gray">API Calls</p>
