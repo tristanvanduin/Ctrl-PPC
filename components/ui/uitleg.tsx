@@ -24,6 +24,23 @@
 import { Info } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
+/**
+ * Eén blok in de bubbel, en dat is geen opsmuk maar een reparatie.
+ *
+ * TooltipContent is een `inline-flex` met `gap-1.5` (components/ui/tooltip.tsx). Alles wat je
+ * erin zet wordt dus een FLEX-ITEM -- ook losse tekststukken, want die worden anonieme items. Bij
+ * één string valt dat niet op; zodra er een `<span>` of een `<br />` tussen staat, komen de delen
+ * NAAST elkaar in kolommen van een paar tekens breed. Gerenderd en gezien: de uitleg viel uiteen
+ * in twee kolommen met één woord per regel.
+ *
+ * Dit blok is één item, en daarbinnen loopt de tekst gewoon door. Niet oplossen door `block` aan
+ * de popup-klasse te plakken: die botst met `inline-flex` uit dezelfde Tailwind-laag, en dan
+ * beslist de volgorde in de gegenereerde CSS in plaats van de volgorde in het attribuut.
+ */
+function Inhoud({ children }: { children: React.ReactNode }) {
+  return <span className="block">{children}</span>;
+}
+
 export function Uitleg({
   children,
   /** Wat er in de knop-toelichting komt voor wie hem niet ziet maar hoort. */
@@ -46,7 +63,7 @@ export function Uitleg({
         <Info className="h-3.5 w-3.5" />
       </TooltipTrigger>
       <TooltipContent side={side} className="max-w-64 items-start text-left leading-snug">
-        {children}
+        <Inhoud>{children}</Inhoud>
       </TooltipContent>
     </Tooltip>
   );
@@ -76,7 +93,7 @@ export function UitlegKop({
         {children}
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-64 items-start text-left leading-snug">
-        {uitleg}
+        <Inhoud>{uitleg}</Inhoud>
       </TooltipContent>
     </Tooltip>
   );

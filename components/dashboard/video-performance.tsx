@@ -170,8 +170,12 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
                         >
                           {VIDEO_DIAGNOSIS_LABEL[d]}
                         </TooltipTrigger>
+                        {/* In een `block`, net als in components/ui/uitleg.tsx: de bubbel is een
+                            inline-flex met gap, dus losse kinderen worden kolommen. Hier is het nu
+                            één string en zou het goed gaan, maar de volgende die er een <strong>
+                            bij zet ziet de tekst uiteenvallen zonder te weten waarom. */}
                         <TooltipContent side="left" className="max-w-72 items-start text-left leading-snug">
-                          {VIDEO_DIAGNOSIS_EXPLAIN[d]}
+                          <span className="block">{VIDEO_DIAGNOSIS_EXPLAIN[d]}</span>
                         </TooltipContent>
                       </Tooltip>
                     </Cel>

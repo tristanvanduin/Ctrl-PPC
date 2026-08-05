@@ -221,13 +221,28 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
         <Layers className="h-4.5 w-4.5 text-rm-blue-ink" />
         <h3 className="text-sm font-semibold text-rm-gray">Assets per groep</h3>
+        {/* De drie toestanden staan er alle drie in, en niet alleen het oranje. Er stond eerst
+            "een getal eronder kleurt oranje" -- dan blijft het lichtgrijs onverklaard, en een
+            kleur die je zelf moet raden is geen signaal maar ruis. */}
         <Uitleg label="Waar deze getallen vandaan komen">
-          Per assetgroep het aantal assets van elk veldtype dat Google onderscheidt. De minima zijn
-          Google&apos;s eigen eisen voor een serveerbare assetgroep — een groep eronder draait niet op
-          alle plaatsingen. Onder elke kolomkop staat wat Google minimaal vraagt; een getal
-          eronder kleurt oranje. Het percentage naast elke groep is haar aandeel in de PMax-kosten
-          over dezelfde periode; staat er <span className="font-semibold">32% kosten &rarr; 11%
-          conversies</span>, dan kost die groep meer dan twee keer wat ze oplevert.
+          Per assetgroep het aantal assets van elk veldtype dat Google onderscheidt. Onder elke
+          kolomkop staat het minimum voor een serveerbare assetgroep — een groep eronder draait niet
+          op alle plaatsingen.
+          <br />
+          {/* De kleurnamen staan hier ONGEKLEURD, en dat is geen vergetelheid. Deze bubbel is
+              bg-foreground met text-background: in de lichte modus donker met lichte letters, in
+              de donkere modus precies andersom. Elke kleur die je hier vastzet werkt dus op één
+              van de twee thema's niet -- amber-300 leest op de donkere bubbel en verdwijnt op de
+              lichte. Het woord "oranje" zegt het al; de kleur zelf staat in de tabel. */}
+          <span className="font-semibold">Oranje</span> = onder dat minimum, of geen eigen video
+          (die is niet verplicht, maar zonder maakt Google er zelf een).{" "}
+          <span className="font-semibold">Donker</span> = voldoet.{" "}
+          <span className="font-semibold">Lichtgrijs</span> = nul, maar optioneel — dat is alleen
+          4:5, en dat kost je hooguit de staande plaatsingen.
+          <br />
+          Het percentage naast elke groep is haar aandeel in de PMax-kosten over dezelfde periode;
+          staat er <span className="font-semibold">32% kosten &rarr; 11% conversies</span>, dan kost
+          die groep meer dan twee keer wat ze oplevert.
         </Uitleg>
         <span className="ml-auto text-micro text-muted-foreground">
           {aandacht > 0
