@@ -69,3 +69,30 @@ en de build per definitie niet zien:
 De poort draait in een seconde. Voeg je bewust een uitzondering toe, zet er dan de reden bij:
 een uitzondering zonder reden is over drie maanden niet meer van een vergissing te
 onderscheiden.
+
+## De kaartoverloop-controle (niet in de poorten)
+
+`scripts/check-kaartoverloop.mjs` zoekt tekst die BUITEN zijn eigen kaartrand rendert. Hij staat
+bewust niet in `scripts/gates.sh`: hij heeft een draaiende server en een browser nodig, en de
+poorten moeten snel blijven. Draai hem na opmaakwerk aan kaarten en rasters:
+
+```
+npx next build && npx next start -p 3190     # eerst bouwen, zonder draaiende server
+node scripts/check-kaartoverloop.mjs
+```
+
+**Waarom hij er is.** Op Doelen & voortgang stonden "Doel: 1.650" en "Prognose: 1.246 (-24%)"
+tweeentwintig pixels onder de onderrand van hun kaart, op de pagina-achtergrond. Op alle vijf de
+kaarten. Tsc zag het niet, de tests niet, de build niet: `overflow` staat op `visible`, dus het
+rendert gewoon en het leest als een ontwerpkeuze.
+
+**De onderliggende val.** Een kind met `h-full` in een RASTERCEL. Rastercellen rekken naar de
+hoogste van hun rij, dus krijgt de kaart een definitieve hoogte, lost `h-full` op naar die volle
+hoogte, en wordt alles wat ná dat kind komt eruit geduwd. `Kerncijfer` rendert zo'n
+`flex h-full flex-col` — met goede reden, hij moet een cel kunnen vullen als hij er los in staat.
+Zet je er iets ná Kerncijfer in een kaart, wikkel hem dan in een `<div>` met automatische hoogte.
+
+**De zelftest hoort erbij.** Aan het eind zet het script de bug in de browser terug en eist dat
+de detector hem vindt. Vindt hij hem niet, dan faalt het script — want dan zei "OK" hierboven
+niets. Dat is geen extraatje: deze codebase heeft eerder een controle gehad die iets anders
+verifieerde dan hij beweerde, en die stond er maanden groen bij.
