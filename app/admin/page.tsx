@@ -61,6 +61,15 @@ interface AdoptieRij {
 function AdoptieSectie() {
   const [rijen, setRijen] = useState<AdoptieRij[] | null>(null);
   const [fout, setFout] = useState<string | null>(null);
+  // ── NIET INGELOGD IS GEEN FOUT ───────────────────────────────────────────────
+  //
+  // Een 401 belandde in dezelfde rode balk als een kapotte server, met de tekst "Niet ingelogd".
+  // Dit scherm is alleen voor beheerders, dus voor iedereen die hier per ongeluk komt -- en voor
+  // iedereen die de demo bekijkt -- was dat het eerste wat er stond. Drie rode vlakken onder
+  // elkaar op een scherm dat gewoon doet wat het hoort te doen.
+  //
+  // Rood is voor "er is iets stuk". Niet ingelogd zijn is een stand, geen storing.
+  const [anoniem, setAnoniem] = useState(false);
   const [dagen, setDagen] = useState(30);
 
   useEffect(() => {
@@ -70,7 +79,9 @@ function AdoptieSectie() {
         const res = await fetch(`/api/admin/adoptie?dagen=${dagen}`);
         const body = await res.json();
         if (afgebroken) return;
+        if (res.status === 401 || res.status === 403) { setAnoniem(true); setFout(null); setRijen([]); return; }
         if (!res.ok) { setFout(body?.error ?? `Fout ${res.status}`); setRijen([]); return; }
+        setAnoniem(false);
         setFout(null);
         setRijen(body.bureaus ?? []);
       } catch (e) {
@@ -95,7 +106,7 @@ function AdoptieSectie() {
   return (
     <section className="mb-8">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h2 className="text-base font-semibold text-gray-900">Gebruik per bureau</h2>
+        <h2 className="text-title font-semibold text-rm-gray">Gebruik per bureau</h2>
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-micro font-medium ${LICHT_STIJL[totaal].vlak} ${LICHT_STIJL[totaal].tekst}`}>
           {/* Kleur nooit alleen: het bolletje staat naast een woord, zodat het ook leesbaar is
               voor wie geen kleurverschil ziet en in een afdruk. */}
@@ -112,7 +123,7 @@ function AdoptieSectie() {
           ))}
         </div>
       </div>
-      <p className="mb-3 text-xs text-gray-500">
+      <p className="mb-3 text-meta text-muted-foreground">
         Aandeel gekoppelde gebruikers dat in dit venster actief was, en hoe lang het stil is.
         Activiteit komt uit de sessies &mdash; niet uit de laatste login, want die beweegt niet mee
         als iemand ingelogd blijft.
@@ -122,6 +133,12 @@ function AdoptieSectie() {
         <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-meta text-red-700">{fout}</p>
       )}
 
+      {anoniem && (
+        <p className="mb-3 rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-meta text-muted-foreground">
+          Deze cijfers zijn alleen zichtbaar als beheerder. Log in om ze te zien.
+        </p>
+      )}
+
       <div className="grid gap-2 sm:grid-cols-2">
         {oordelen.map(({ rij, oordeel }) => {
           const st = LICHT_STIJL[oordeel.licht];
@@ -129,16 +146,16 @@ function AdoptieSectie() {
             <div key={rij.agency_id} className={`rounded-lg border p-3 ${st.rand} ${st.vlak}`}>
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${st.punt}`} />
-                <span className="truncate text-sm font-semibold text-gray-900">{rij.bureau}</span>
+                <span className="truncate text-body font-semibold text-rm-gray">{rij.bureau}</span>
                 <span className={`ml-auto shrink-0 text-micro font-medium ${st.tekst}`}>{st.label}</span>
               </div>
               <div className="mt-1.5 flex items-baseline gap-2">
-                <span className="text-xl font-semibold tabular-nums text-gray-900">
+                <span className="text-xl font-semibold tabular-nums text-rm-gray">
                   {rij.adoptie === null ? "—" : `${Math.round(Number(rij.adoptie))}%`}
                 </span>
-                <span className="text-meta text-gray-600">{oordeel.reden}</span>
+                <span className="text-meta text-muted-foreground">{oordeel.reden}</span>
               </div>
-              <p className="mt-1 text-micro text-gray-500">
+              <p className="mt-1 text-micro text-muted-foreground">
                 {oordeel.dagenStil === null
                   ? "nog geen activiteit gezien"
                   : oordeel.dagenStil === 0
@@ -149,8 +166,8 @@ function AdoptieSectie() {
             </div>
           );
         })}
-        {oordelen.length === 0 && (
-          <p className="text-sm text-muted-foreground">Nog geen bureaus.</p>
+        {oordelen.length === 0 && !anoniem && (
+          <p className="text-body text-muted-foreground">Nog geen bureaus.</p>
         )}
       </div>
     </section>
@@ -162,6 +179,8 @@ export default function AdminPage() {
   const [beurzen, setBeurzen] = useState<Client[]>([]);
   const [laden, setLaden] = useState(true);
   const [melding, setMelding] = useState<string | null>(null);
+  // Zie de opmerking bij AdoptieSectie: 401 is een stand, geen storing, en hoort dus niet rood.
+  const [meldingIsFout, setMeldingIsFout] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("performance_marketeer");
   const [inviteClients, setInviteClients] = useState<string[]>([]);
@@ -171,11 +190,13 @@ export default function AdminPage() {
     setLaden(true);
     const res = await fetch("/api/admin/users");
     if (res.status === 401 || res.status === 403) {
-      setMelding("Log in als admin om gebruikers te beheren.");
+      setMelding("Log in als beheerder om gebruikers te beheren.");
+      setMeldingIsFout(false);
       setUsers([]);
       setLaden(false);
       return;
     }
+    setMeldingIsFout(true);
     const data = (await res.json().catch(() => null)) as { users?: AdminUser[]; error?: string } | null;
     if (!res.ok) {
       setMelding(data?.error ?? "Laden mislukt.");
@@ -263,17 +284,17 @@ export default function AdminPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="mb-1 text-xl font-semibold text-gray-900">Gebruikersbeheer</h1>
-      <p className="mb-6 text-sm text-gray-500">
+      <h1 className="mb-1 text-page font-bold text-rm-blue-ink">Gebruikersbeheer</h1>
+      <p className="mb-6 text-body text-muted-foreground">
         De rol bepaalt wat iemand mag, de beurzen bepalen waarover. Alleen voor admins.
       </p>
 
       <AdoptieSectie />
 
-      <form onSubmit={invite} className="mb-8 rounded-lg border border-gray-200 bg-card p-4">
+      <form onSubmit={invite} className="mb-8 rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="grow">
-            <label htmlFor="invite-email" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="invite-email" className="mb-1 block text-body font-medium text-rm-gray">
               E-mail uitnodigen
             </label>
             <input
@@ -282,18 +303,18 @@ export default function AdminPage() {
               required
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-md border border-border px-3 py-2 text-body focus:border-rm-blue focus:outline-none"
             />
           </div>
           <div>
-            <label htmlFor="invite-role" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="invite-role" className="mb-1 block text-body font-medium text-rm-gray">
               Rol
             </label>
             <select
               id="invite-role"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as Role)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="rounded-md border border-border px-3 py-2 text-body focus:border-rm-blue focus:outline-none"
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>
@@ -305,20 +326,20 @@ export default function AdminPage() {
           <button
             type="submit"
             disabled={bezig}
-            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
+            className="rounded-md bg-rm-blue px-4 py-2 text-body font-medium text-white hover:bg-rm-blue/90 disabled:opacity-60"
           >
             {bezig ? "Bezig..." : "Uitnodigen"}
           </button>
         </div>
 
-        <p className="mt-2 text-xs text-gray-500">{ROL_UITLEG[inviteRole]}</p>
+        <p className="mt-2 text-meta text-muted-foreground">{ROL_UITLEG[inviteRole]}</p>
 
-        <fieldset className="mt-4 border-t border-gray-100 pt-3">
+        <fieldset className="mt-4 border-t border-border pt-3">
           <legend className="sr-only">Beurzen</legend>
-          <p className="mb-2 text-sm font-medium text-gray-700">
+          <p className="mb-2 text-body font-medium text-rm-gray">
             Beurzen{" "}
             {inviteDektAlles && (
-              <span className="font-normal text-gray-500">
+              <span className="font-normal text-muted-foreground">
                 — deze rol dekt alle beurzen, ook nieuwe
               </span>
             )}
@@ -327,10 +348,10 @@ export default function AdminPage() {
             {beursOpties.map((beurs) => (
               <label
                 key={beurs.id}
-                className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${
+                className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-body ${
                   inviteDektAlles
-                    ? "cursor-not-allowed border-gray-200 text-gray-400"
-                    : "cursor-pointer border-gray-300 text-gray-700"
+                    ? "cursor-not-allowed border-border text-muted-foreground"
+                    : "cursor-pointer border-border text-rm-gray"
                 }`}
               >
                 <input
@@ -343,18 +364,26 @@ export default function AdminPage() {
               </label>
             ))}
             {beursOpties.length === 0 && (
-              <p className="text-sm text-gray-500">Nog geen beurzen bekend.</p>
+              <p className="text-body text-muted-foreground">Nog geen beurzen bekend.</p>
             )}
           </div>
         </fieldset>
       </form>
 
-      {melding && <p className="mb-4 text-sm text-red-600">{melding}</p>}
+      {melding && (
+        <p className={`mb-4 rounded-lg border px-3 py-2 text-body ${
+          meldingIsFout
+            ? "border-red-200 bg-red-50 text-red-700"
+            : "border-border bg-gray-50/70 text-muted-foreground"
+        }`}>
+          {melding}
+        </p>
+      )}
 
       {laden ? (
-        <p className="text-sm text-gray-500">Laden...</p>
+        <p className="text-body text-muted-foreground">Laden...</p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-card">
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
           {/* De gedeelde tabelcomponenten, net als de dertien andere schermen. Geen totaalregel en
               geen aandeelstrepen: dit is een beheerlijst, geen datatabel — er valt niets op te
               tellen en niets af te wegen. Wat het wél overneemt is het ritme, de kopstijl en de
@@ -375,7 +404,7 @@ export default function AdminPage() {
                     <select
                       value={user.role ?? ""}
                       onChange={(e) => void wijzig(user.id, e.target.value as Role, user.clients)}
-                      className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
+                      className="rounded-md border border-border px-2 py-1 text-body focus:border-rm-blue focus:outline-none"
                     >
                       {user.role === null && <option value="">geen rol</option>}
                       {ROLES.map((r) => (
@@ -387,7 +416,7 @@ export default function AdminPage() {
                   </Cel>
                   <Cel>
                     {user.seesAllClients ? (
-                      <span className="text-gray-500">alle beurzen</span>
+                      <span className="text-muted-foreground">alle beurzen</span>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {beursOpties.map((beurs) => {
@@ -400,10 +429,10 @@ export default function AdminPage() {
                                 user.role &&
                                 void wijzig(user.id, user.role, toggleBeurs(user.clients, beurs.id))
                               }
-                              className={`rounded-full border px-2.5 py-0.5 text-xs ${
+                              className={`rounded-full border px-2.5 py-0.5 text-meta ${
                                 aan
-                                  ? "border-gray-900 bg-gray-900 text-white"
-                                  : "border-gray-300 text-gray-500 hover:border-gray-400"
+                                  ? "border-rm-blue bg-rm-blue text-white"
+                                  : "border-border text-muted-foreground hover:border-gray-400"
                               }`}
                             >
                               {beurs.name}
@@ -411,7 +440,7 @@ export default function AdminPage() {
                           );
                         })}
                         {user.clients.length === 0 && (
-                          <span className="text-xs text-amber-700">
+                          <span className="text-meta text-amber-700">
                             geen beurs toegewezen — ziet niets
                           </span>
                         )}
@@ -424,7 +453,7 @@ export default function AdminPage() {
                       <button
                         type="button"
                         onClick={() => void deactiveer(user.id, user.email)}
-                        className="text-sm text-red-600 underline hover:text-red-700"
+                        className="text-body text-red-600 underline hover:text-red-700"
                       >
                         Deactiveren
                       </button>

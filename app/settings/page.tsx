@@ -678,8 +678,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-rm-blue-ink">Instellingen</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <h1 className="text-page font-bold text-rm-blue-ink">Instellingen</h1>
+        <p className="mt-1 text-body text-muted-foreground">
           API koppelingen en dashboard configuratie. Credentials worden ingesteld via{" "}
           <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">.env.local</code>
         </p>

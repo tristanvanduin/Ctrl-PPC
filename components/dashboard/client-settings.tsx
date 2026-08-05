@@ -310,9 +310,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <BarChart3 className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-base font-semibold text-rm-blue-ink">KPI-doelstellingen</h2>
+          <h2 className="text-title font-semibold text-rm-blue-ink">KPI-doelstellingen</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-5">
+        <p className="text-body text-muted-foreground mb-5">
           Activeer de KPIs waar deze klant op stuurt. Vul alleen in wat relevant is.
         </p>
 
@@ -372,13 +372,13 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <Target className="w-5 h-5 text-rm-blue-ink" />
-            <h2 className="text-base font-semibold text-rm-blue-ink">Conversie-acties</h2>
+            <h2 className="text-title font-semibold text-rm-blue-ink">Conversie-acties</h2>
           </div>
           <span className="text-xs text-muted-foreground">
             {selectedCount} van {conversionActions.length} geselecteerd
           </span>
         </div>
-        <p className="text-sm text-muted-foreground mb-4">
+        <p className="text-body text-muted-foreground mb-4">
           Selecteer welke conversie-acties meegenomen worden in het dashboard.
         </p>
 
@@ -465,9 +465,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Building2 className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-base font-semibold text-rm-blue-ink">Sector & Benchmarks</h2>
+          <h2 className="text-title font-semibold text-rm-blue-ink">Sector & Benchmarks</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-5">
+        <p className="text-body text-muted-foreground mb-5">
           Kies de sector voor sectorale benchmark vergelijkingen in de analyses.
         </p>
 
@@ -539,9 +539,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Clock className="w-5 h-5 text-amber-500" />
-          <h2 className="text-base font-semibold text-amber-600">Conversielag</h2>
+          <h2 className="text-title font-semibold text-amber-600">Conversielag</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-5">
+        <p className="text-body text-muted-foreground mb-5">
           Aantal dagen dat conversies vertraagd binnenkomen. Voorkomt valse waarschuwingen in recente periodes.
         </p>
         <div className="flex items-center gap-3">
@@ -553,7 +553,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
             onChange={(e) => { setConversionLagDays(Math.max(0, Math.min(30, parseInt(e.target.value) || 0))); setSaved(false); }}
             className="w-24 text-sm"
           />
-          <span className="text-sm text-muted-foreground">dagen (standaard: 3)</span>
+          <span className="text-body text-muted-foreground">dagen (standaard: 3)</span>
         </div>
       </div>
       )}
@@ -563,15 +563,24 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <AlertTriangle className="w-5 h-5 text-rm-orange-ink" />
-          <h2 className="text-base font-semibold text-rm-orange-ink">Handmatige conversiecijfers</h2>
+          <h2 className="text-title font-semibold text-rm-orange-ink">Handmatige conversiecijfers</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-5">
+        <p className="text-body text-muted-foreground mb-5">
           Voor maanden waarin de tracking stuk was. De prognose rekent dan met het getal dat je hier
           invult in plaats van met de gemeten nul — een nul door kapotte meting is geen nul in de markt,
           en zonder deze correctie trekt hij de hele jaarlijn omlaag.
         </p>
 
-        <div className="space-y-2">
+        {/* ── ACHT VELDEN ONDER ELKAAR IS ACHT KEER NEGENHONDERD PIXELS NIETS ────
+            Dit was één rij per maand: een label van 64 pixels, een veld van 128, en dan de rest
+            van de kaart leeg -- nagemeten ruwweg 900 pixels per regel, acht regels lang. Op een
+            scherm dat verder van de ene naar de andere kant is ingedeeld valt dat op als een
+            half afgemaakt formulier.
+
+            Een raster van vier maakt er twee regels van, en dat is bovendien hoe je ernaar kijkt:
+            je zoekt de maand waarin de meting stuk was, niet de eerstvolgende regel. Op smal valt
+            hij terug op twee en dan op één. */}
+        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           {(() => {
             const currentYear = new Date().getFullYear();
             const currentMonth = new Date().getMonth(); // 0-based
@@ -581,9 +590,12 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
               const key = `${currentYear}-${String(i + 1).padStart(2, "0")}`;
               const hasOverride = convOverrides[key] !== undefined && convOverrides[key] > 0;
               return (
-                <div key={key} className="flex items-center gap-3">
-                  <span className="text-sm text-rm-gray w-16">{months[i]} {currentYear}</span>
+                <div key={key} className="min-w-0">
+                  <label htmlFor={`conv-override-${key}`} className="mb-1 block text-meta font-medium text-rm-gray">
+                    {months[i]} {currentYear}
+                  </label>
                   <Input
+                    id={`conv-override-${key}`}
                     type="number"
                     placeholder="—"
                     value={hasOverride ? convOverrides[key] : ""}
@@ -600,10 +612,10 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
                       });
                       setSaved(false);
                     }}
-                    className="w-32 text-sm"
+                    className="w-full text-body"
                   />
                   {hasOverride && (
-                    <span className="text-micro text-rm-orange-ink font-medium">Override actief</span>
+                    <span className="mt-1 block text-micro font-medium text-rm-orange-ink">Override actief</span>
                   )}
                 </div>
               );
@@ -623,9 +635,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Globe className="w-5 h-5 text-rm-orange-ink" />
-          <h2 className="text-base font-semibold text-rm-orange-ink">Actieve landen</h2>
+          <h2 className="text-title font-semibold text-rm-orange-ink">Actieve landen</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-4">
+        <p className="text-body text-muted-foreground mb-4">
           Selecteer de landen waarin dit account actief adverteert. Wordt gebruikt voor land-filtering en multi-country rapportages.
         </p>
 
@@ -687,9 +699,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Globe className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-base font-semibold text-rm-blue-ink">Merchant Center</h2>
+          <h2 className="text-title font-semibold text-rm-blue-ink">Merchant Center</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-5">
+        <p className="text-body text-muted-foreground mb-5">
           Koppel hier de Merchant productbron voor deze klant. Deze instellingen worden gebruikt voor product-relevantie, Merchant snapshots en veiligere SOP-beslissingen.
         </p>
 
@@ -748,9 +760,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <ImageIcon className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-base font-semibold text-rm-blue-ink">Client Logo</h2>
+          <h2 className="text-title font-semibold text-rm-blue-ink">Client Logo</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-4">
+        <p className="text-body text-muted-foreground mb-4">
           Upload het logo van de klant. Dit wordt gebruikt op de cover van maandrapportages.
         </p>
         <div className="flex items-center gap-4">
@@ -768,11 +780,11 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           ) : (
             <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed border-border hover:border-rm-blue/40 cursor-pointer transition-colors">
               {logoUploading ? (
-                <span className="text-sm text-muted-foreground">Uploaden...</span>
+                <span className="text-body text-muted-foreground">Uploaden...</span>
               ) : (
                 <>
                   <Upload className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Logo uploaden (PNG, JPG)</span>
+                  <span className="text-body text-muted-foreground">Logo uploaden (PNG, JPG)</span>
                 </>
               )}
               <input type="file" accept="image/png,image/jpeg,image/svg+xml" onChange={handleLogoUpload} className="hidden" />
@@ -894,7 +906,7 @@ function KpiCard({
                   placeholder="bijv. 10"
                   className="w-24"
                 />
-                <span className="text-sm text-muted-foreground">% groei</span>
+                <span className="text-body text-muted-foreground">% groei</span>
               </div>
               {config.growthPct > 0 && (
                 <p className="text-xs text-muted-foreground mt-2">
@@ -932,7 +944,7 @@ function KpiCard({
 
               {/* Value input */}
               <div className="flex items-center gap-2">
-                {prefix && <span className="text-sm text-muted-foreground">{prefix}</span>}
+                {prefix && <span className="text-body text-muted-foreground">{prefix}</span>}
                 <Input
                   type="number"
                   step={step}
@@ -942,7 +954,7 @@ function KpiCard({
                   placeholder={placeholder}
                   className="flex-1"
                 />
-                {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
+                {suffix && <span className="text-body text-muted-foreground">{suffix}</span>}
               </div>
 
               {/* Summary */}

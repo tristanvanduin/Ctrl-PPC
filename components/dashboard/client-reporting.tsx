@@ -326,15 +326,45 @@ export function ClientReporting({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* ── DE LEGE STAND, MET DE INHOUD ERBIJ ──────────────────────────────────
+          Dit was een icoon en één regel in een kaart van 240 pixels hoog, met daaronder nog eens
+          250 pixels niets -- op een tabblad dat bij een nieuwe klant en in de demo altijd leeg
+          is. Wie hier komt weet daarna niet wat een rapport bevat en dus ook niet of hij op de
+          knop wil drukken.
+
+          De drie blokken hieronder zijn geen opvulling maar de inhoudsopgave van wat de knop
+          maakt: ze komen letterlijk uit de rapportopbouw (KPI-band, grafiek per metric, tekst per
+          metric). Verandert die opbouw, dan hoort deze lijst mee te veranderen. */}
       {!report && !generating && !loading && reports.length === 0 && (
-        <div className="bg-card rounded-xl border border-border shadow-sm p-12 text-center">
-          <FileText className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-          <h3 className="text-title font-semibold text-rm-gray mb-1">Nog geen rapportages</h3>
-          <p className="text-xs text-muted-foreground mb-4">Genereer een rapport met grafieken, KPI&apos;s en analyse per metric.</p>
-          <button onClick={generateReport} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rm-blue text-white text-sm font-medium hover:bg-rm-blue/90">
-            <Plus className="w-4 h-4" /> Eerste rapport genereren
-          </button>
+        <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rm-blue/10">
+              <FileText className="h-6 w-6 text-rm-blue-ink" />
+            </div>
+            <h3 className="text-title font-semibold text-rm-gray">Nog geen rapportages</h3>
+            <p className="mt-1.5 text-body text-muted-foreground">
+              Een rapport zet de maand van deze klant op papier: de cijfers, de grafieken en de
+              duiding erbij, in bewerkbare tekst die je zelf kunt aanpassen voordat je hem deelt.
+            </p>
+            <ul className="mt-5 grid gap-2 text-left sm:grid-cols-3">
+              {[
+                ["KPI-band", "conversies, omzet, kosten, ROAS en CPA tegenover dezelfde periode vorig jaar"],
+                ["Grafiek per metric", "het maandverloop, met de vergelijkingsperiode eronder"],
+                ["Tekst per metric", "wat er gebeurde en waarom, door jou aan te passen"],
+              ].map(([titel, wat]) => (
+                <li key={titel} className="rounded-lg border border-border bg-gray-50/70 px-3 py-2.5">
+                  <span className="block text-body font-medium text-rm-gray">{titel}</span>
+                  <span className="mt-0.5 block text-meta leading-snug text-muted-foreground">{wat}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={generateReport}
+              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-rm-blue px-4 py-2 text-body font-medium text-white transition-colors hover:bg-rm-blue/90"
+            >
+              <Plus className="h-4 w-4" /> Eerste rapport genereren
+            </button>
+          </div>
         </div>
       )}
 

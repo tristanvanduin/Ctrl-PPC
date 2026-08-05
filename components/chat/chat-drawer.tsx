@@ -119,15 +119,27 @@ export function ChatDrawer({ clientId, klantnaam }: { clientId: string; klantnaa
   return (
     <>
       {/* De knop. Rechtsonder vast, zodat hij bij het scrollen op zijn plek blijft -- het gesprek
-          gaat over wat er nú op het scherm staat. */}
+          gaat over wat er nú op het scherm staat.
+
+          ── WAAROM HIJ IN RUST EEN CIRKEL IS ────────────────────────────────────────
+          Dit was een pil van 115 bij 44 pixels. Nagemeten op het tabblad Sprintplanning dekte
+          hij twee cellen van de kolom Metrics af ("conversions" en "cost"): een vaste knop op
+          een informatiedicht dashboard staat per definitie ergens op. De hoek rechtsonder is
+          precies waar tabellen hun laatste kolom hebben.
+
+          Als cirkel is dat 44 bij 44 -- 63% minder afgedekt -- en bij hover of toetsenbordfocus
+          schuift het woord er weer uit, zodat het niet aan een icoon alleen hangt wat hij doet.
+          De aria-label staat er los van, dus voor een schermlezer verandert er niets. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-rm-orange px-5 py-3 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105"
+          className="group fixed bottom-6 right-6 z-40 flex h-11 items-center gap-2 overflow-hidden rounded-full bg-rm-orange px-3.5 text-body font-medium text-white shadow-lg transition-all hover:px-5 focus-visible:px-5"
           aria-label="Spar over deze klant"
         >
-          <MessageSquare className="h-4 w-4" />
-          Sparren
+          <MessageSquare className="h-4 w-4 shrink-0" />
+          <span className="max-w-0 whitespace-nowrap opacity-0 transition-all duration-200 group-hover:max-w-24 group-hover:opacity-100 group-focus-visible:max-w-24 group-focus-visible:opacity-100">
+            Sparren
+          </span>
         </button>
       )}
 

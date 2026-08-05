@@ -50,9 +50,18 @@ export default function ClientsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-rm-blue-ink">Klanten</h1>
-        <p className="text-muted-foreground mt-1">
-          Overzicht van alle klantaccounts en hun prestaties.
+        <h1 className="text-page font-bold text-rm-blue-ink">Klanten</h1>
+        {/* Hier stond "Overzicht van alle klantaccounts en hun prestaties." De prestaties staan
+            er niet: een kaart toont een naam, initialen en of het demodata is. Een ondertitel die
+            iets belooft wat het scherm eronder niet levert, is de goedkoopste manier om een
+            product minder te vertrouwen. Wie de cijfers per klant wil, hoort hier te lezen waar
+            ze wél staan. */}
+        <p className="mt-1 text-body text-muted-foreground">
+          Kies een account om het dashboard te openen. Cijfers naast elkaar per klant staan onder{" "}
+          <Link href="/portfolio" className="font-medium text-rm-blue-ink underline underline-offset-2">
+            Portfolio
+          </Link>
+          .
         </p>
       </div>
 

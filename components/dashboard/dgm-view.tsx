@@ -881,8 +881,16 @@ export function DgmView({ clientId }: { clientId: string }) {
   // sprintstatus, prognose, beslissingen, verdieping — maar ze stonden allemaal op dezelfde
   // `space-y-6` als de inhoud binnen zo'n blok. Zonder verschil tussen "tussen onderwerpen" en
   // "binnen een onderwerp" groepeert er niets. De inhoud houdt zijn eigen krappere afstanden.
+  // ── GEEN EIGEN MAXIMUMBREEDTE ─────────────────────────────────────────────
+  //
+  // Hier stond `max-w-5xl` (1024px). De inhoudskolom van het klantdashboard is 1312px, en elk
+  // ander tabblad vult die. Dit tabblad hield er dus 288 pixels van over als een lege strook
+  // rechts, precies zo breed dat je hem ziet maar niet meteen weet waarom -- en bij het wisselen
+  // van tabblad sprong de inhoud van breed naar smal en terug.
+  //
+  // Een leesbreedte-maximum is zinnig voor lopende tekst; dit blad is kaarten, balken en tabellen.
   return (
-    <div className="space-y-10 max-w-5xl">
+    <div className="space-y-10">
 
       {/* ─── 1. Executive Snapshot ─── */}
       <div className={`rounded-xl border-2 ${sc.border} ${sc.bg} p-5`}>
@@ -912,7 +920,10 @@ export function DgmView({ clientId }: { clientId: string }) {
         <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
           Voortgang trajectdoelen
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Vijf doelen op drie kolommen liet de zesde plek leeg, en die plek staat midden in het
+            scherm. Vijf kolommen op de volle breedte is dezelfde indeling als de KPI-band op
+            Overzicht, dus de twee schermen lezen hetzelfde. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {conv.annualTarget > 0 && (
             <KpiCard
               label={vocab.conversions.charAt(0).toUpperCase() + vocab.conversions.slice(1)}

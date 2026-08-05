@@ -205,6 +205,18 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
               conversions: s.conversions + a.conversions, waarde: s.waarde + a.waarde,
             }), { spend: 0, clicks: 0, conversions: 0, waarde: 0 });
 
+            // ── EEN KOLOM DIE ALLEEN STREEPJES BEVAT, HOORT ER NIET TE STAAN ──────
+            //
+            // Conv.waarde stond er altijd. Bij een klant die geen conversiewaarde meet -- een
+            // beursformule met aanvragen in plaats van orders, dus de meeste hier -- was dat een
+            // kolom van zes em-streepjes breed. Dat kost de breedte van een kolom en leest als
+            // kapot in plaats van als niet-gemeten.
+            //
+            // Is er ergens waarde, dan staat de kolom er gewoon. Is die nergens, dan valt hij weg
+            // en zegt de kaart ernaast in één regel waaróm -- dat is het verschil tussen een gat
+            // en een antwoord.
+            const heeftWaarde = tot.waarde > 0;
+
             return (
               <>
                 <Tabel>
@@ -213,7 +225,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
                     <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
                     <KolomKop getal>Klikken</KolomKop>
                     <KolomKop getal bijschrift="aandeel">Conversies</KolomKop>
-                    <KolomKop getal>Conv.waarde</KolomKop>
+                    {heeftWaarde && <KolomKop getal>Conv.waarde</KolomKop>}
                     <KolomKop getal>CPA</KolomKop>
                   </Kop>
                   <Body>
@@ -227,7 +239,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
                           aandeel={grootsteConv > 0 ? a.conversions / grootsteConv : 0}
                           kleur={CHART_CATEGORICAL[2]}
                         />
-                        <GetalCel zacht>{a.waarde > 0 ? eur(a.waarde) : "—"}</GetalCel>
+                        {heeftWaarde && <GetalCel zacht>{a.waarde > 0 ? eur(a.waarde) : "—"}</GetalCel>}
                         <GetalCel zacht>{a.conversions > 0 ? eur(a.spend / a.conversions) : "—"}</GetalCel>
                       </Rij>
                     ))}
@@ -237,7 +249,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
                     <TotaalCel getal>{eur(tot.spend)}</TotaalCel>
                     <TotaalCel getal>{fmt(tot.clicks)}</TotaalCel>
                     <TotaalCel getal>{fmt(tot.conversions)}</TotaalCel>
-                    <TotaalCel getal>{tot.waarde > 0 ? eur(tot.waarde) : "—"}</TotaalCel>
+                    {heeftWaarde && <TotaalCel getal>{eur(tot.waarde)}</TotaalCel>}
                     {/* De CPA uit de totalen, niet als gemiddelde van de kanaal-CPA's: dat zou
                         LinkedIn even zwaar laten wegen als Google. */}
                     <TotaalCel getal>{tot.conversions > 0 ? eur(tot.spend / tot.conversions) : "—"}</TotaalCel>
@@ -260,7 +272,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
                       <KolomKop getal>Spend</KolomKop>
                       <KolomKop getal>Klikken</KolomKop>
                       <KolomKop getal>Conversies</KolomKop>
-                      <KolomKop getal>Conv.waarde</KolomKop>
+                      {heeftWaarde && <KolomKop getal>Conv.waarde</KolomKop>}
                       <KolomKop>Valuta</KolomKop>
                     </Kop>
                     <Body>
@@ -274,7 +286,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
                             <GetalCel>{eur(r.spend)}</GetalCel>
                             <GetalCel zacht>{fmt(r.clicks)}</GetalCel>
                             <GetalCel>{fmt(r.conversions)}</GetalCel>
-                            <GetalCel zacht>{eur(r.conversion_value)}</GetalCel>
+                            {heeftWaarde && <GetalCel zacht>{eur(r.conversion_value)}</GetalCel>}
                             <td className="px-3 py-2 text-muted-foreground">{r.currency ?? "—"}</td>
                           </Rij>
                         ))
@@ -307,6 +319,19 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
               Elk kanaal meet zijn eigen attributie, dus de som is geen exacte verdeling. Bedragen
               alleen optellen over kanalen met gelijke valuta.
             </div>
+            {/* De weggevallen kolom, één keer uitgelegd in plaats van zes keer een streepje.
+                Zie de opmerking bij `heeftWaarde` hierboven. */}
+            {rows && rows.length > 0 && rows.every((r) => !((r.conversion_value ?? 0) > 0)) && (
+              <div className="rounded-lg border border-border bg-gray-50/70 px-4 py-3 text-meta leading-snug text-muted-foreground">
+                <p className="mb-1 flex items-center gap-1.5 font-semibold text-rm-gray">
+                  <Info className="h-3.5 w-3.5 shrink-0" />
+                  Geen conversiewaarde
+                </p>
+                Geen van de kanalen levert in deze periode een conversiewaarde, dus die kolom staat
+                er niet. Sturen gaat hier op CPA. Wil je op ROAS sturen, dan moet er in Google,
+                Meta en LinkedIn een waarde aan de conversie hangen.
+              </div>
+            )}
           </aside>
         </div>
       </div>

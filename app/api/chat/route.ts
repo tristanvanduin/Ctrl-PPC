@@ -26,7 +26,8 @@
 
 import { NextRequest } from "next/server";
 import { getOpenRouterKey } from "@/lib/analysis/helpers";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callRouted, MODEL_CATALOG } from "@/lib/analysis/llm-router";
+import { controleerPlafond, schatCallKosten } from "@/lib/analysis/uitgavenplafond";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { realServerClient, supabaseForClient } from "@/lib/demo/server-supabase";
 import { magChatten, normaliseerLicentie, GEEN_LICENTIE_TEKST } from "@/lib/chat/toegang";
@@ -40,6 +41,9 @@ export const maxDuration = 60;
 
 /** Hoeveel tekens een vraag mag zijn. Ruim, maar niet ongelimiteerd: dit is invoer van buiten. */
 const MAX_VRAAG = 4000;
+
+/** Het antwoordbudget van een chatbeurt. Staat hier omdat de plafondschatting hem ook nodig heeft. */
+const CHAT_MAX_TOKENS = 1500;
 
 type Bureaugegevens = { agencyId: string; licentie: string; klantnaam: string };
 
@@ -221,6 +225,24 @@ export async function POST(request: NextRequest) {
     hypotheses: context.hypotheses,
   });
 
+  // ── Het maandplafond ──────────────────────────────────────────────────────
+  //
+  // Hier, en niet verderop: pas als de context is opgebouwd weten we hoeveel tokens deze beurt
+  // gaat kosten, en dat moet in de schatting mee (zie keuze 1 in uitgavenplafond.ts). Maar nog
+  // vóór de vraag wordt weggeschreven, want een geblokkeerde beurt hoort niet als onbeantwoord
+  // bericht in het gesprek te blijven staan.
+  //
+  // Zonder LLM_MAAND_PLAFOND_EUR verandert er niets: dan is het oordeel "geen_plafond" en doet
+  // deze controle één env-lookup en geen databasequery.
+  const plafond = await controleerPlafond(
+    db,
+    schatCallKosten(MODEL_CATALOG.strong, geschatteTokens, CHAT_MAX_TOKENS)
+  );
+  if (plafond.blokkeert) {
+    logger.warn("[chat] geweigerd op maandplafond", { clientId, tekort: plafond.tekort });
+    return Response.json({ error: plafond.tekst, session_id: sessionId }, { status: 429 });
+  }
+
   // De vraag van de gebruiker eerst wegschrijven. Gaat de LLM-call daarna stuk, dan staat zijn
   // bericht er nog -- anders typt hij iets, ziet hij een foutmelding en is zijn tekst weg.
   await db.from("chat_messages").insert({ session_id: sessionId, rol: "user", inhoud: vraag });
@@ -232,7 +254,7 @@ export async function POST(request: NextRequest) {
       systemPrompt: systeemPrompt,
       userMessage: bouwGebruikersbericht(historie, vraag),
       label: "chat",
-      maxTokens: 1500,
+      maxTokens: CHAT_MAX_TOKENS,
       temperature: 0.3,   // hoger dan de analyses (0): dit is een gesprek, geen rapportage
     });
   } catch (e) {

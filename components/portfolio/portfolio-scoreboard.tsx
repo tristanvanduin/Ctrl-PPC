@@ -432,7 +432,7 @@ function PortfolioScoreboardBody() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-white/60 text-sm">{dateStr}</p>
-            <h1 className="text-2xl font-bold mt-1">{greeting}</h1>
+            <h1 className="mt-1 text-page font-bold">{greeting}</h1>
             <p className="text-white/70 mt-2 text-sm max-w-lg">
               {activeCount > 0
                 ? `${activeCount} actieve klanten · ${growingCount} groeiend · ${decliningCount > 0 ? `${decliningCount} vragen aandacht` : "alles op schema"}`

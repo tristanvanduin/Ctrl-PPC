@@ -75,6 +75,28 @@
   --text-figure: 1.875rem;
   --text-hero: 3rem;
 
+  /* ── En de stap die de ladder overhield: de paginatitel ────────────────────
+     De vijf stappen lopen tot `title` (15px) en dat is bewust een KLEIN KOPJE --
+     de titel van een kaart. De <h1> bovenaan een pagina is iets anders, en die
+     had geen stap. Gevolg, geteld over de acht <h1>'s in de app:
+
+       text-2xl font-bold      Klanten, Instellingen, Portfolio, Vandaag
+       text-xl  font-semibold  Gebruikersbeheer
+       text-lg  font-bold      Scriptbibliotheek -- en dan nog als <h2>
+
+     Drie maten en twee gewichten voor dezelfde rol, op het buitenste niveau van
+     de app: precies waar iemand die binnenkomt zijn eerste indruk vormt. En de
+     ondertitels liepen mee uiteen, van `text-meta` (11px) tot geen klasse en dus
+     de browserstandaard van 16px -- groter dan de kop van de kaart eronder.
+
+     `page` is de zesde stap en is er alleen voor de <h1> van een pagina. Erbij
+     hoort een ondertitel op `body`; dat staat hier zwart op wit omdat een
+     conventie die alleen in de bestanden staat, opnieuw uiteenloopt.
+
+       page  24px  de <h1> van een pagina, font-bold
+     ────────────────────────────────────────────────────────────────────────── */
+  --text-page: 1.5rem;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: "Ubuntu", ui-sans-serif, system-ui, sans-serif;

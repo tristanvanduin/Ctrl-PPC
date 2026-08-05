@@ -68,8 +68,10 @@ export function ScriptLibrary() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-rm-blue-ink">Scriptbibliotheek</h2>
-          <p className="text-meta text-muted-foreground mt-0.5">
+          {/* Dit was een <h2> op text-lg terwijl elke andere pagina zijn titel in een <h1> zet.
+              Voor een schermlezer begon deze pagina daarmee zonder kop. */}
+          <h1 className="text-page font-bold text-rm-blue-ink">Scriptbibliotheek</h1>
+          <p className="mt-1 text-body text-muted-foreground">
             Bewaar en organiseer je Google Ads scripts
           </p>
         </div>
@@ -159,14 +161,50 @@ export function ScriptLibrary() {
           <p className="text-sm text-muted-foreground">Scripts laden...</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12">
-          <FileCode2 className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">
-            {scripts.length === 0
-              ? "Nog geen scripts opgeslagen"
-              : "Geen scripts gevonden voor deze zoekopdracht"
-            }
-          </p>
+        // ── EEN LEEG SCHERM MAG UITLEGGEN WAAR HET VOOR IS ──────────────────────
+        //
+        // Hier stond een grijs icoon en vier woorden, in het midden van achthonderd pixels niets.
+        // Dat is de stand van deze pagina in een verse installatie én in de demo, dus het is het
+        // enige wat de meeste mensen hier ooit zien. Wie niet weet wat een Google Ads-script is,
+        // leert het hier niet, en wie het wel weet, weet niet waarom hij het hiér zou bewaren.
+        //
+        // Nu een kaart met dezelfde rand en achtergrond als de rest van de app, en drie voorbeelden
+        // van wat er in hoort. Geen verzonnen scripts in de lijst: dan zou de teller liegen.
+        <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
+          {scripts.length === 0 ? (
+            <div className="mx-auto max-w-xl text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rm-blue/10">
+                <FileCode2 className="h-6 w-6 text-rm-blue-ink" />
+              </div>
+              <p className="text-title font-semibold text-rm-gray">Nog geen scripts opgeslagen</p>
+              <p className="mt-1.5 text-body text-muted-foreground">
+                Bewaar hier de Google Ads-scripts die je bij meerdere accounts gebruikt, met een
+                beschrijving en tags erbij, zodat een collega ze terugvindt zonder te vragen.
+              </p>
+              <ul className="mx-auto mt-5 grid gap-2 text-left sm:grid-cols-3">
+                {[
+                  ["Budgetbewaking", "meldt een campagne die zijn maandbudget te snel opmaakt"],
+                  ["N-gram-rapport", "haalt terugkerende woorden uit de zoektermen"],
+                  ["Linkchecker", "loopt de bestemmings-URL's na op 404's"],
+                ].map(([titel, wat]) => (
+                  <li key={titel} className="rounded-lg border border-border bg-gray-50/70 px-3 py-2.5">
+                    <span className="block text-body font-medium text-rm-gray">{titel}</span>
+                    <span className="mt-0.5 block text-meta leading-snug text-muted-foreground">{wat}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => setEditing("new")}
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-rm-blue px-4 py-2 text-body font-medium text-white transition-colors hover:bg-rm-blue/90"
+              >
+                <Plus className="h-3.5 w-3.5" /> Eerste script toevoegen
+              </button>
+            </div>
+          ) : (
+            <p className="py-4 text-center text-body text-muted-foreground">
+              Geen scripts gevonden voor deze zoekopdracht.
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

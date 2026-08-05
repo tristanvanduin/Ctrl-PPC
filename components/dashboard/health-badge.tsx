@@ -97,34 +97,70 @@ export function HealthBadge({ clientId }: { clientId: string }) {
           )}
         </div>
 
-        {/* Anomalies */}
-        {health.anomalies.length > 0 && (
-          <div className="flex-1 min-w-0">
-            <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Anomalieën ({health.anomalies.length})
+        {/* ── DE RECHTERKOLOM ────────────────────────────────────────────────────
+            Hier stonden alleen de anomalieën. Dat zijn er in een gezond account twee, dus twee
+            regels tekst naast een radar van driehonderd pixels hoog: nagemeten op het tabblad
+            Google Ads bleef er rechtsonder een leeg vlak van ruwweg 450 bij 240 pixels over, op
+            de eerste kaart van het belangrijkste scherm.
+
+            Wat eronder is gekomen is geen opvulling maar het ontbrekende derde niveau. De boog
+            zegt HOE VER (één getal), de radar zegt WAARUIT (de vorm), en deze lijst zegt WAAROM:
+            per as de score en de reden, en die reden werd al berekend (`factor.description` in
+            lib/health-score.ts) maar nergens getoond. Een radar zonder legenda laat je raden wat
+            "Hygiëne" op 12 van de 20 betekent.
+
+            Niet-beoordeelde assen staan er gedempt bij en met een streepje in plaats van een nul,
+            om dezelfde reden als bij de staafjes hierboven. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {health.anomalies.length > 0 && (
+            <div className="min-w-0">
+              <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                Anomalieën ({health.anomalies.length})
+              </p>
+              <div className="space-y-1.5">
+                {health.anomalies.slice(0, 6).map((a, i) => (
+                  <div key={i} className="flex items-start gap-1.5">
+                    {a.severity === "critical" ? (
+                      <AlertTriangle className="w-3 h-3 text-red-500 shrink-0 mt-0.5" />
+                    ) : a.severity === "warning" ? (
+                      <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
+                    ) : (
+                      <Info className="w-3 h-3 text-blue-500 shrink-0 mt-0.5" />
+                    )}
+                    <span className="text-meta leading-tight">
+                      <span className="text-rm-gray font-medium">{a.title}</span>
+                      <span className="text-muted-foreground"> — {a.description}</span>
+                    </span>
+                  </div>
+                ))}
+                {health.anomalies.length > 6 && (
+                  <span className="text-micro text-muted-foreground">+{health.anomalies.length - 6} meer</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="min-w-0">
+            <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Waaruit de score bestaat
             </p>
-            <div className="space-y-1.5">
-              {health.anomalies.slice(0, 6).map((a, i) => (
-                <div key={i} className="flex items-start gap-1.5">
-                  {a.severity === "critical" ? (
-                    <AlertTriangle className="w-3 h-3 text-red-500 shrink-0 mt-0.5" />
-                  ) : a.severity === "warning" ? (
-                    <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
-                  ) : (
-                    <Info className="w-3 h-3 text-blue-500 shrink-0 mt-0.5" />
-                  )}
-                  <span className="text-meta leading-tight">
-                    <span className="text-rm-gray font-medium">{a.title}</span>
-                    <span className="text-muted-foreground"> — {a.description}</span>
+            <dl className="grid gap-x-5 gap-y-1.5 sm:grid-cols-2">
+              {health.factors.map((f) => (
+                <div key={f.name} className="flex min-w-0 items-baseline gap-2">
+                  <dt className={`shrink-0 text-meta font-medium ${f.assessed ? "text-rm-gray" : "text-muted-foreground/60"}`}>
+                    {f.name}
+                  </dt>
+                  <span className={`shrink-0 text-meta tabular-nums ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+                    {f.assessed ? `${f.score}/${f.maxScore}` : "—"}
                   </span>
+                  <dd className={`min-w-0 flex-1 truncate text-micro ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`} title={f.description}>
+                    {f.description}
+                  </dd>
                 </div>
               ))}
-              {health.anomalies.length > 6 && (
-                <span className="text-micro text-muted-foreground">+{health.anomalies.length - 6} meer</span>
-              )}
-            </div>
+            </dl>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
