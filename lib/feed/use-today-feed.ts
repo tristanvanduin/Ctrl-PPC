@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
+import { dbUpsert } from "@/lib/data-access/client-write";
 import { getVisibleClients } from "@/lib/visible-clients";
 import {
   insightToFeedItem, recommendationToFeedItem, hypothesisToFeedItem, taskToFeedItem, overviewToFeedItems,
@@ -236,7 +237,7 @@ export function useTodayFeed(): TodayFeed {
       updated_by: currentUser, updated_at: new Date().toISOString(),
       ...patch,
     };
-    const { error: upErr } = await sb.from("feed_item_state").upsert(row, { onConflict: "item_key" });
+    const { error: upErr } = await dbUpsert("feed_item_state", item.clientId, row as unknown as Record<string, unknown>);
     if (upErr) { setError(`Kon feed-state niet opslaan (migratie 029 toegepast?): ${upErr.message}`); return; }
     refresh();
   }, [stateRows, currentUser, refresh]);

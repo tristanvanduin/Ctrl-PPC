@@ -7,6 +7,7 @@
 import { supabase } from "./supabase";
 import type { GoogleAdsConversionAction } from "./api/google-ads";
 import { dbUpsert } from "./data-access/client-write";
+import { dbSelectOne } from "./data-access/client-read";
 
 // --- Conversion actions ---
 
@@ -143,13 +144,24 @@ export function getClientSettings(clientId: string): ClientSettings {
  * Load settings from Supabase into cache (async).
  * Should be called on component mount.
  */
+interface ClientSettingsRow {
+  conversion_actions?: ConversionAction[] | null;
+  kpi_targets?: Partial<KpiTargets> | null;
+  sector?: string | null;
+  bedrijfsmodel?: string | null;
+  niche?: string | null;
+  aov_segment?: string | null;
+  conversion_lag_days?: number | null;
+  active_countries?: string[] | null;
+  merchant_account_id?: string | null;
+  merchant_feed_label?: string | null;
+  merchant_content_language?: string | null;
+  merchant_channel?: string | null;
+}
+
 export async function loadClientSettings(clientId: string): Promise<ClientSettings> {
   if (supabase) {
-    const { data } = await supabase
-      .from("client_settings")
-      .select("*")
-      .eq("client_id", clientId)
-      .maybeSingle();
+    const { data } = await dbSelectOne<ClientSettingsRow>("client_settings", { select: "*", clientId });
 
     if (data) {
       const settings: ClientSettings = {

@@ -70,6 +70,15 @@ export const WRITABLE_TABLES: Record<string, TableWritePolicy> = {
   sop_tasks: { capability: "sprint:write", clientColumn: "client_id", operations: ["update"] },
   sop_recommendations: { capability: "sprint:write", clientColumn: "client_id", operations: ["update"] },
   task_completions: { capability: "sprint:write", clientColumn: "client_id", operations: CRUD },
+  // Snooze/toewijzing/afronden vanuit de Vandaag-feed. Natuurlijke sleutel op item_key (de
+  // bron-id van het feed-item), dus upsert met dat conflictdoel -- zelfde reden als
+  // client_settings hierboven.
+  feed_item_state: {
+    capability: "sprint:write",
+    clientColumn: "client_id",
+    operations: ["upsert"],
+    conflictTarget: "item_key",
+  },
 
   // ── Documenten en notities ────────────────────────────────────────────────
   client_files: { capability: "sprint:write", clientColumn: "client_id", operations: ["insert", "delete"] },
