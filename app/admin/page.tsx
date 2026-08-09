@@ -13,6 +13,7 @@ import { beoordeel, zwaarste, type Licht } from "@/lib/adoptie/stoplicht";
 import { getAllClients, type Client } from "@/lib/clients";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel } from "@/components/dashboard/data-table";
 import { SegmentatieBulk } from "@/components/dashboard/segmentatie-bulk";
+import { MacroTrendsPreview } from "@/components/dashboard/macrotrends-preview";
 
 interface AdminUser {
   id: string;
@@ -397,6 +398,8 @@ export default function AdminPage() {
       <AdoptieSectie />
 
       <SegmentatieBulk />
+
+      <MacroTrendsPreview />
 
       <BenchmarkSectie />
 
