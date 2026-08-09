@@ -6,41 +6,41 @@
 // opnieuw geschreven. Wat wél nieuw is: een uniforme QualityGateResult eromheen, en een
 // try/catch-vangnet in runGates() zodat een falende poort de pijplijn nooit kan meeslepen.
 //
-// ── VIER VAN DE NEGEN DRAAIEN VANDAAG AL OP ECHTE DATA, VIJF NIET ────────────
+// ── FASE 2: DE VIJF ONTBREKENDE POORTEN BLIJKEN AL GEVOED TE WORDEN ─────────
 //
-// Onderzocht per module welke invoer hij nodig heeft, tegen wat er vandaag in de database staat
-// (9 augustus 2026):
+// Fase 1 concludeerde dat vijf poorten hun invoer alleen als in-memory object tijdens een
+// levende 13-staps-run hebben, en dus zonder de pijplijn aan te raken niet te vullen zijn.
+// Uitgezocht in app/api/analysis/monthly/route.ts of dat klopt: de route bewaart ALLES wat
+// deze poorten nodig hebben, elke run, als JSON in sop_analysis_output --
 //
-//   Data Quality Gate    computeDataReliability    ads_account_monthly + ads_campaign_monthly.
-//                        VOLLEDIG voedbaar.
-//   Math Gate            classifyRankLossCause     ads_campaign_impression_share +
-//                        ads_keyword_performance_monthly (de module zegt dit zelf in zijn kop).
-//                        VOLLEDIG voedbaar.
-//   Evidence Gate        validateFindingClaims     sop_insights (entity_name/entity_type/metric/
-//                        current_value) tegen een canonical map uit ads_campaign_monthly /
-//                        ads_account_monthly. VOLLEDIG voedbaar.
-//   Causal Chain Gate    computeKpiChain           twee ads_account_monthly-rijen. VOLLEDIG
-//                        voedbaar.
+//   section "structured_monthly_v2"   recommendations (ThreadRecommendation[]), tasks
+//                                      (ThreadTask[]), findings (NormalizedFinding[]),
+//                                      parsed_steps (narrative/log_entries/findings/actions
+//                                      per stap), coverage (SopCoverage[])
+//   section "quality_gate_monthly_v2" step_validations (StepValidationResult[]),
+//                                      acceptance (AcceptanceReport), passed/state/
+//                                      blocking_reasons (het Publish-oordeel zelf)
 //
-//   Contradiction Gate   resolveContradictions     RecommendationLike vereist action_intent_
-//                        class, action_unit_value, primary_entity_scope/key -- GEEN van deze
-//                        kolommen bestaat in sop_recommendations.
-//   Step Purity Gate     validateStepOutput        StepOutput vereist log_entries en top_3_
-//                        findings als structuur; sop_analysis_output bewaart alleen de
-//                        narratieve tekst, niet deze structuur.
-//   Coverage Gate        enforceSopCoverage        IssueCluster vereist entity_scope,
-//                        entity_identity_key, coverage_dimensions -- niet opgeslagen.
-//   Action Gating Gate   applyActionGating         Finding vereist issue_cluster (verplicht,
-//                        geen kolom-equivalent) en step -- niet opgeslagen.
-//   Publish Gate         buildMonthlyQualityGate   ThreadRecommendation/ThreadTask/StepResult
-//                        bestaan alleen als in-memory objecten TIJDENS een levende 13-staps-run.
+// ThreadRecommendation extends Recommendation MET action_intent_class, action_unit_key,
+// primary_entity_scope, primary_entity_key, canonical_entity_name en dependencies -- exact
+// RecommendationLike. ThreadTask extends Task op dezelfde manier -- exact TaskLike.
+// NormalizedFinding extends Finding, dus voldoet aan Finding[] zonder meer. Geen van deze
+// objecten hoeft dus uit de LEVENDE pijplijn te komen: ze liggen al in de database, als
+// bijproduct van een write die er toch al was. Vandaar GEEN interceptor in monthly-v2.ts of
+// pump-plan.ts, en geen enkele regel in de 13-staps-route gewijzigd voor Fase 2 -- lezen uit
+// wat er al staat is de veiligere weg naar hetzelfde doel.
 //
-// Dat is geen gok maar een meting per module, hieronder bij elke poort herhaald. De vijf rechts
-// zijn dus vandaag nog niet te vullen zonder de 13-staps-pijplijn zelf aan te raken -- en dat mag
-// niet in deze fase. Ze retourneren eerlijk `warn: input ontbreekt` in plaats van een verzonnen
-// pass. Dat IS shadow mode: een poort die nog niet gevoed kan worden, meldt dat met een reden,
-// en blokkeert niets. Zodra Fase 2 ze in de levende pijplijn aansluit, hoeft alleen de aanroep in
-// de route te veranderen -- deze wrapper-functies zijn al correct.
+// Drie poorten (Step Purity, Coverage, Publish) krijgen daarom een SNEL PAD: in plaats van
+// zelf te herberekenen wat de levende run al berekende (en daarmee het risico te lopen een
+// andere uitkomst te geven dan de run zelf gaf), lezen ze het AL BEREKENDE resultaat direct.
+// Het oude pad (zelf herberekenen vanuit ruwe StepOutput/IssueCluster/opts) blijft bestaan
+// voor een aanroeper die die ruwe vorm wél heeft -- vandaar "of/of", nooit een breking wijziging.
+//
+// Twee poorten (Contradiction, Sprint Readiness) hadden geen bestaande berekening om op mee
+// te liften -- resolveContradictions en applyActionGating worden vandaag nergens in de
+// pijplijn aangeroepen. Die draaien dus voor het eerst, als een ECHTE tweede mening naast de
+// dedup-logica die al inline in monthly-structured.ts zit. Onenigheid daartussen is precies
+// het soort signaal waar shadow mode voor bestaat.
 
 import type { GateStatus, QualityGateResult } from "./types";
 import { logger } from "@/lib/logger";
@@ -50,11 +50,11 @@ import { spendWeightedQualityScore, classifyRankLossCause, type KeywordQsRow } f
 import { buildCanonicalMetricMap, validateFindingClaims } from "@/lib/analysis/claim-consistency";
 import { computeKpiChain } from "@/lib/analysis/kpi-chain";
 import { resolveContradictions, type RecommendationLike, type TaskLike } from "@/lib/analysis/contradiction-resolver";
-import { validateStepOutput } from "@/lib/analysis/step-validator";
+import { validateStepOutput, type StepValidationResult } from "@/lib/analysis/step-validator";
 import { enforceSopCoverage } from "@/lib/analysis/coverage-enforcer";
 import { applyActionGating } from "@/lib/analysis/action-gating";
 import { validateMonthlyAcceptance, buildMonthlyQualityGate } from "@/lib/analysis/monthly-acceptance";
-import type { IssueCluster, CoverageDimension } from "@/lib/analysis/canonicalize";
+import type { IssueCluster, CoverageDimension, SopCoverage } from "@/lib/analysis/canonicalize";
 import type { Finding, Recommendation, StepOutput } from "@/lib/schema/analysis-schema";
 
 // ── De invoer, per poort optioneel ───────────────────────────────────────────
@@ -82,9 +82,22 @@ export interface GateInput {
   };
   kpiChain?: Parameters<typeof computeKpiChain>[0];
   contradiction?: { recommendations: RecommendationLike[]; tasks: TaskLike[] };
+
+  // Step Purity: het snelle pad (al gevalideerd door de levende run) of het ruwe pad (zelf
+  // valideren vanuit één StepOutput).
+  stepValidationsReport?: StepValidationResult[];
   stepPurity?: { stepNumber: number; output: StepOutput; priorStepConclusion?: string };
+
+  // Coverage: het snelle pad (SopCoverage[], het resultaat van enforceSopCoverage in de
+  // levende run) of het ruwe pad (zelf enforceSopCoverage draaien vanuit IssueCluster[]).
+  coverageReport?: SopCoverage[];
   coverage?: { clusters: IssueCluster[]; dimensionAvailability: Partial<Record<CoverageDimension, boolean>> };
+
   actionGating?: { findings: Finding[]; recommendations: Recommendation[] };
+
+  // Publish: het snelle pad (het MonthlyQualityGateReport dat de levende run al opsloeg) of
+  // het ruwe pad (zelf validateMonthlyAcceptance + buildMonthlyQualityGate draaien).
+  publishReport?: { passed: boolean; state: string; blockingReasons: string[] };
   monthlyAcceptance?: Parameters<typeof validateMonthlyAcceptance>[0];
 }
 
@@ -136,34 +149,36 @@ function causalChainGate(input: GateInput): QualityGateResult {
   return resultaat("Causal Chain Gate", "pass", chain.formattedChain);
 }
 
-// 5. Contradiction Gate — botsende aanbevelingen op dezelfde entiteit/metriek.
-// LIVE-INVOER ONTBREEKT VANDAAG: RecommendationLike vereist action_intent_class, action_unit_key,
-// primary_entity_scope, primary_entity_key en canonical_entity_name; geen van deze kolommen
-// bestaat in sop_recommendations (gemeten 9 augustus 2026).
+// 5. Contradiction Gate — botsende aanbevelingen op dezelfde entiteit/metriek. Draait voor het
+// eerst als expliciete tweede mening: resolveContradictions wordt nergens anders aangeroepen in
+// de pijplijn, dus onenigheid met de dedup die al inline in monthly-structured.ts zit is een
+// echt signaal en geen ruis.
 function contradictionGate(input: GateInput): QualityGateResult {
   if (!input.contradiction) {
-    return ontbrekendeInvoer(
-      "Contradiction Gate",
-      "RecommendationLike vereist action_intent_class/action_unit_key/primary_entity_scope/" +
-      "primary_entity_key, niet aanwezig in sop_recommendations; alleen te vullen vanuit de levende 13-staps-run"
-    );
+    return ontbrekendeInvoer("Contradiction Gate", "geen ThreadRecommendation[]/ThreadTask[] meegegeven");
   }
   const opgelost = resolveContradictions(input.contradiction.recommendations, input.contradiction.tasks);
   const samengevoegd = input.contradiction.recommendations.length - opgelost.recommendations.length;
   if (samengevoegd === 0) return resultaat("Contradiction Gate", "pass", "geen tegenstrijdige aanbevelingen gevonden");
-  return resultaat("Contradiction Gate", "warn", `${samengevoegd} aanbeveling(en) samengevoegd wegens een conflict op dezelfde entiteit`);
+  return resultaat("Contradiction Gate", "warn", `${samengevoegd} aanbeveling(en) zou resolveContradictions samenvoegen wegens een conflict op dezelfde entiteit`);
 }
 
-// 6. Step Purity Gate — narratief, log-format en step-purity van één stapoutput.
-// LIVE-INVOER ONTBREEKT VANDAAG: StepOutput vereist log_entries en top_3_findings als structuur;
-// sop_analysis_output bewaart alleen de narratieve tekst van een stap, niet deze structuur.
+// 6. Step Purity Gate — narratief, log-format en step-purity van de stapoutputs.
 function stepPurityGate(input: GateInput): QualityGateResult {
+  if (input.stepValidationsReport) {
+    const validaties = input.stepValidationsReport;
+    if (validaties.length === 0) return resultaat("Step Purity Gate", "warn", "de opgeslagen run bevat geen stapvalidaties");
+    const ongeldig = validaties.filter((v) => !v.valid).map((v) => v.stepNumber);
+    const waarschuwingen = validaties.flatMap((v) => v.warnings);
+    if (ongeldig.length > 0) {
+      const fouten = validaties.filter((v) => !v.valid).flatMap((v) => v.errors);
+      return resultaat("Step Purity Gate", "fail", `${ongeldig.length} ongeldige stap(pen) (${ongeldig.join(", ")}): ${fouten.slice(0, 2).join(" | ")}`);
+    }
+    if (waarschuwingen.length > 0) return resultaat("Step Purity Gate", "warn", `${waarschuwingen.length} waarschuwing(en) over ${validaties.length} stappen`);
+    return resultaat("Step Purity Gate", "pass", `${validaties.length} stappen zonder waarschuwing`);
+  }
   if (!input.stepPurity) {
-    return ontbrekendeInvoer(
-      "Step Purity Gate",
-      "StepOutput (log_entries, top_3_findings als structuur) wordt niet apart opgeslagen; " +
-      "alleen te vullen vanuit de levende 13-staps-run"
-    );
+    return ontbrekendeInvoer("Step Purity Gate", "geen stepValidationsReport (opgeslagen run) of stepPurity (ruwe StepOutput) meegegeven");
   }
   const { stepNumber, output, priorStepConclusion } = input.stepPurity;
   const validatie = validateStepOutput(stepNumber, output, priorStepConclusion);
@@ -173,15 +188,18 @@ function stepPurityGate(input: GateInput): QualityGateResult {
 }
 
 // 7. Coverage Gate — welke SOP-dimensies zijn behandeld tegenover wat beschikbaar was.
-// LIVE-INVOER ONTBREEKT VANDAAG: IssueCluster vereist entity_scope, entity_identity_key en
-// coverage_dimensions; deze velden worden niet opgeslagen.
 function coverageGate(input: GateInput): QualityGateResult {
+  if (input.coverageReport) {
+    const rijen = input.coverageReport;
+    const ontbrekend = rijen.filter((r) => r.status === "no_signal" && r.data_available);
+    const gedekt = rijen.filter((r) => r.status === "covered");
+    if (ontbrekend.length > 0) {
+      return resultaat("Coverage Gate", "warn", `beschikbare dimensies zonder signaal: ${ontbrekend.map((r) => r.dimension).join(", ")}`);
+    }
+    return resultaat("Coverage Gate", "pass", `${gedekt.length} dimensie(s) gedekt (uit de opgeslagen run)`);
+  }
   if (!input.coverage) {
-    return ontbrekendeInvoer(
-      "Coverage Gate",
-      "IssueCluster (entity_scope, entity_identity_key, coverage_dimensions) bestaat alleen " +
-      "tijdens de levende 13-staps-run"
-    );
+    return ontbrekendeInvoer("Coverage Gate", "geen coverageReport (opgeslagen run) of coverage (ruwe IssueCluster[]) meegegeven");
   }
   const uitkomst = enforceSopCoverage(input.coverage.clusters, input.coverage.dimensionAvailability);
   if (!uitkomst.traceabilityOk) return resultaat("Coverage Gate", "fail", "een gedekte dimensie verwijst naar een cluster dat niet bestaat");
@@ -191,33 +209,29 @@ function coverageGate(input: GateInput): QualityGateResult {
   return resultaat("Coverage Gate", "pass", `${uitkomst.surfacedDimensions.length} dimensie(s) gedekt`);
 }
 
-// 8. Sprint Readiness Gate — mag een aanbeveling als direct_action de deur uit.
-// LIVE-INVOER ONTBREEKT VANDAAG: Finding vereist issue_cluster (verplicht veld, geen kolom-
-// equivalent) en step; sop_insights bewaart geen van beide.
+// 8. Sprint Readiness Gate — mag een aanbeveling als direct_action de deur uit. Draait, net als
+// de Contradiction Gate, voor het eerst als expliciete controle: applyActionGating wordt
+// nergens in de pijplijn zelf aangeroepen.
 function sprintReadinessGate(input: GateInput): QualityGateResult {
   if (!input.actionGating) {
-    return ontbrekendeInvoer(
-      "Sprint Readiness Gate",
-      "Finding.issue_cluster (verplicht) en Finding.step hebben geen kolom-equivalent in " +
-      "sop_insights; alleen te vullen vanuit de levende 13-staps-run"
-    );
+    return ontbrekendeInvoer("Sprint Readiness Gate", "geen NormalizedFinding[]/ThreadRecommendation[] meegegeven");
   }
   const voor = input.actionGating.recommendations.filter((r) => (r as Record<string, unknown>).action_readiness === "direct_action").length;
   const na = applyActionGating(input.actionGating.findings, input.actionGating.recommendations)
     .filter((r) => (r as Record<string, unknown>).action_readiness === "direct_action").length;
   if (na === voor) return resultaat("Sprint Readiness Gate", "pass", `${na} aanbeveling(en) blijven direct_action`);
-  return resultaat("Sprint Readiness Gate", "warn", `${voor - na} aanbeveling(en) afgewaardeerd van direct_action`);
+  return resultaat("Sprint Readiness Gate", "warn", `${voor - na} aanbeveling(en) zou applyActionGating afwaarderen van direct_action`);
 }
 
 // 9. Publish Gate — mag de maandrun naar structured save/export.
-// LIVE-INVOER ONTBREEKT VANDAAG: ThreadRecommendation/ThreadTask/StepResult zijn in-memory
-// objecten die alleen bestaan tijdens een levende maandrun.
 function publishGate(input: GateInput): QualityGateResult {
+  if (input.publishReport) {
+    const r = input.publishReport;
+    if (r.passed) return resultaat("Publish Gate", "pass", "alle acceptatiecriteria gehaald (uit de opgeslagen run)");
+    return resultaat("Publish Gate", r.state === "blocked_invalid_steps" ? "fail" : "warn", r.blockingReasons.join(" | "));
+  }
   if (!input.monthlyAcceptance) {
-    return ontbrekendeInvoer(
-      "Publish Gate",
-      "ThreadRecommendation/ThreadTask/StepResult bestaan alleen tijdens een levende 13-staps-run"
-    );
+    return ontbrekendeInvoer("Publish Gate", "geen publishReport (opgeslagen run) of monthlyAcceptance (ruwe opts) meegegeven");
   }
   const acceptance = validateMonthlyAcceptance(input.monthlyAcceptance);
   const rapport = buildMonthlyQualityGate({ stepValidations: input.monthlyAcceptance.stepValidations ?? [], acceptance });

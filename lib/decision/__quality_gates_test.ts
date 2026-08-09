@@ -3,6 +3,8 @@
 // eerder een controle gehad die iets anders verifieerde dan hij beweerde.
 
 import { GATES, runGates, type GateInput } from "./quality-gates";
+import type { RecommendationLike } from "@/lib/analysis/contradiction-resolver";
+import type { Finding, Recommendation } from "@/lib/schema/analysis-schema";
 
 let passed = 0;
 let failed = 0;
@@ -50,6 +52,78 @@ const metData: GateInput = {
 const metDataResultaat = runGates(metData).find((r) => r.gateName === "Data Quality Gate");
 check("met echte data geeft de Data Quality Gate geen 'input ontbreekt' meer",
   !(metDataResultaat?.reason ?? "").includes("input ontbreekt"), JSON.stringify(metDataResultaat));
+
+console.log("\nFase 2: de snelle paden die de al-opgeslagen run hergebruiken");
+
+const metStepValidaties: GateInput = {
+  ...basisInvoer,
+  stepValidationsReport: [
+    { stepNumber: 1, valid: true, warnings: [], errors: [] },
+    { stepNumber: 2, valid: true, warnings: ["klein foutje"], errors: [] },
+  ],
+};
+const stepPurityUitkomst = runGates(metStepValidaties).find((r) => r.gateName === "Step Purity Gate");
+check("stepValidationsReport geeft warn bij een waarschuwing, geen 'input ontbreekt'",
+  stepPurityUitkomst?.status === "warn" && !(stepPurityUitkomst.reason ?? "").includes("input ontbreekt"),
+  JSON.stringify(stepPurityUitkomst));
+
+const metOngeldigeStap: GateInput = {
+  ...basisInvoer,
+  stepValidationsReport: [{ stepNumber: 3, valid: false, warnings: [], errors: ["AC-07: geen log entries"] }],
+};
+const stepPurityFail = runGates(metOngeldigeStap).find((r) => r.gateName === "Step Purity Gate");
+check("een ongeldige stap geeft fail, niet warn of pass", stepPurityFail?.status === "fail", JSON.stringify(stepPurityFail));
+
+const metCoverageReport: GateInput = {
+  ...basisInvoer,
+  coverageReport: [
+    { dimension: "campaign", data_available: true, findings_surfaced: 3, surfaced_cluster_ids: ["c1"], status: "covered", note: "" },
+    { dimension: "audience", data_available: true, findings_surfaced: 0, surfaced_cluster_ids: [], status: "no_signal", note: "" },
+  ],
+};
+const coverageUitkomst = runGates(metCoverageReport).find((r) => r.gateName === "Coverage Gate");
+check("coverageReport vangt een beschikbare dimensie zonder signaal",
+  coverageUitkomst?.status === "warn" && (coverageUitkomst.reason ?? "").includes("audience"),
+  JSON.stringify(coverageUitkomst));
+
+const metPublishReport: GateInput = {
+  ...basisInvoer,
+  publishReport: { passed: false, state: "blocked_invalid_steps", blockingReasons: ["Step 4 is invalid"] },
+};
+const publishUitkomst = runGates(metPublishReport).find((r) => r.gateName === "Publish Gate");
+check("publishReport met passed=false geeft fail bij blocked_invalid_steps", publishUitkomst?.status === "fail", JSON.stringify(publishUitkomst));
+
+console.log("\nContradiction Gate en Sprint Readiness Gate draaien voor het eerst op echte vorm");
+
+const recA: RecommendationLike = {
+  phase: "immediate", ice_total: 8, rationale: "test", measurement_metric: "CPA", dependencies: [],
+  action_intent_class: "budget_reduce", action_unit_key: "campaign:123", primary_entity_scope: "campaign",
+  primary_entity_key: "123", canonical_entity_name: "Campagne A",
+};
+const recB: RecommendationLike = { ...recA, ice_total: 5 }; // zelfde entiteit, ander bod -> conflict
+const contradictionUitkomst = runGates({ ...basisInvoer, contradiction: { recommendations: [recA, recB], tasks: [] } })
+  .find((r) => r.gateName === "Contradiction Gate");
+check("twee aanbevelingen op dezelfde entiteit worden samengevoegd, niet 'input ontbreekt'",
+  contradictionUitkomst?.status === "warn" && !(contradictionUitkomst.reason ?? "").includes("input ontbreekt"),
+  JSON.stringify(contradictionUitkomst));
+
+const kleinBedragFinding: Finding = {
+  step: 1, issue_cluster: "search_budget_cap", entity_type: "campaign", entity_name: "Campagne A",
+  metric: "cost", current_value: 10, previous_value: 8, change_pct: 25, severity: "low",
+  insight_type: "risk", is_seasonal: false, is_structural: false, cause: null, action_required: true,
+  evidence_level: "deterministic", confidence: "high",
+};
+const kleinBedragRec: Recommendation = {
+  finding_index: 0, cluster_id: "c1", thread_id: null, source: "finding", hypothesis: "test",
+  expected_result: "test", measurement_metric: "cost", timeframe: "2 weken", rationale: "test",
+  ice_impact: 5, ice_confidence: 5, ice_ease: 5, ice_total: 5,
+  action_readiness: "direct_action", evidence_level: "deterministic", confidence: "high",
+};
+const sprintUitkomst = runGates({ ...basisInvoer, actionGating: { findings: [kleinBedragFinding], recommendations: [kleinBedragRec] } })
+  .find((r) => r.gateName === "Sprint Readiness Gate");
+check("een klein bedrag (<€50) wordt afgewaardeerd van direct_action, niet 'input ontbreekt'",
+  sprintUitkomst?.status === "warn" && !(sprintUitkomst.reason ?? "").includes("input ontbreekt"),
+  JSON.stringify(sprintUitkomst));
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

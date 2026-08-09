@@ -1,18 +1,26 @@
-// De consument van de negen kwaliteitspoorten. Voedt de vier die vandaag al op echte data
-// kunnen draaien (zie de kop van lib/decision/quality-gates.ts); de andere vijf krijgen eerlijk
-// geen invoer mee en komen dus als "warn: input ontbreekt" terug -- dat IS shadow mode, geen
-// gebrek eraan.
+// De consument van de negen kwaliteitspoorten.
+//
+// Vier draaien op live ads_*-tabellen (Data Quality, Math, Evidence, Causal Chain). Vijf lezen
+// -- sinds Fase 2 -- uit sop_analysis_output.structured_monthly_v2, de JSON die de 13-staps-
+// route ELKE RUN AL OPSLAAT: ThreadRecommendation[]/ThreadTask[] (Contradiction), StepValidation-
+// Result[] (Step Purity), SopCoverage[] (Coverage), NormalizedFinding[] (Sprint Readiness) en het
+// al berekende MonthlyQualityGateReport (Publish). Zie de kop van lib/decision/quality-gates.ts
+// voor het volledige overzicht per poort.
 //
 // Diagnostisch en read-only: er wordt niets geschreven, geen legacy-route aangeraakt, geen
-// LLM-aanroep. Raakt de 13-staps audit op geen enkele manier -- hij leest alleen dezelfde
-// tabellen die de audit ook al vult.
+// LLM-aanroep. Raakt de 13-staps audit op geen enkele manier -- geen regel in
+// app/api/analysis/monthly/route.ts, lib/prompts/monthly-v2.ts of lib/scheduler/pump-plan.ts is
+// hiervoor gewijzigd. Deze route leest alleen tabellen die de audit toch al vulde.
 
 import { requireCapability } from "@/lib/auth/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { klantVanId } from "@/lib/tenancy/klanten";
 import { runGates, type GateInput } from "@/lib/decision/quality-gates";
 import type { KeywordQsRow } from "@/lib/analysis/metric-cross-checks";
-import type { Finding } from "@/lib/schema/analysis-schema";
+import type { RecommendationLike, TaskLike } from "@/lib/analysis/contradiction-resolver";
+import type { StepValidationResult } from "@/lib/analysis/step-validator";
+import type { SopCoverage } from "@/lib/analysis/canonicalize";
+import type { Finding, Recommendation } from "@/lib/schema/analysis-schema";
 
 function adminUnavailable(): Response {
   return Response.json({ error: "SUPABASE_SERVICE_ROLE_KEY ontbreekt server-side" }, { status: 500 });
@@ -52,7 +60,7 @@ export async function GET(request: Request) {
     analysisDate = (data?.analysis_date as string | undefined) ?? null;
   }
 
-  const [{ data: accountMonthly }, { data: campaignMonthly }, { data: impressionShare }, { data: keywords }, { data: settings }, { data: insights }] =
+  const [{ data: accountMonthly }, { data: campaignMonthly }, { data: impressionShare }, { data: keywords }, { data: settings }, { data: insights }, { data: structuredRun }] =
     await Promise.all([
       admin.from("ads_account_monthly")
         .select("month, impressions, clicks, cost, conversions, conversions_value")
@@ -72,7 +80,36 @@ export async function GET(request: Request) {
             .select("affected_entity, affected_entity_type, metric, current_value")
             .eq("client_id", clientId).eq("analysis_date", analysisDate)
         : Promise.resolve({ data: [] as unknown[] }),
+      // De rijke bron voor de vijf poorten die Fase 1 nog niet kon voeden: dezelfde JSON die de
+      // 13-staps-route elke run al opslaat. Zie de kop van dit bestand.
+      analysisDate
+        ? admin.from("sop_analysis_output")
+            .select("output")
+            .eq("client_id", clientId).eq("analysis_date", analysisDate).eq("section", "structured_monthly_v2")
+            .maybeSingle()
+        : Promise.resolve({ data: null as { output: string } | null }),
     ]);
+
+  // De JSON kan qua vorm afwijken tussen oudere en nieuwere runs (nieuwe velden komen erbij,
+  // ontbrekende velden zijn hier al eerder als "input ontbreekt" behandeld). Vandaar parsen in
+  // een try/catch die nooit de hele route laat vallen -- een kapotte of oude blob levert gewoon
+  // vijf poorten met "input ontbreekt" op, net als vóór Fase 2.
+  interface StructuredRun {
+    recommendations?: unknown[];
+    tasks?: unknown[];
+    findings?: unknown[];
+    coverage?: unknown[];
+    step_validations?: unknown[];
+    quality_gate?: { passed: boolean; state: string; blocking_reasons: string[] };
+  }
+  let structured: StructuredRun | null = null;
+  if (structuredRun?.output) {
+    try {
+      structured = JSON.parse(structuredRun.output) as StructuredRun;
+    } catch {
+      structured = null;
+    }
+  }
 
   const accountRijen = (accountMonthly ?? []).slice().reverse(); // oud → nieuw voor de KPI-chain
   const laatsteMaand = impressionShare?.[0]?.month as string | undefined;
@@ -127,9 +164,29 @@ export async function GET(request: Request) {
       resultMetric: "conversions",
     } : undefined,
 
-    // contradiction, stepPurity, coverage, actionGating, monthlyAcceptance: bewust ongezet. Hun
-    // invoer bestaat vandaag niet buiten een levende 13-staps-run -- zie de kop van
-    // quality-gates.ts voor de meting per poort.
+    // De vijf poorten uit Fase 2: allemaal uit dezelfde structured_monthly_v2-rij, geen van
+    // allen herberekend -- ThreadRecommendation/ThreadTask/NormalizedFinding voldoen structureel
+    // aan RecommendationLike/TaskLike/Finding (geverifieerd tegen de echte database, zie de
+    // commit-boodschap), dus een simpele cast volstaat.
+    contradiction: (structured?.recommendations && structured.tasks) ? {
+      recommendations: structured.recommendations as RecommendationLike[],
+      tasks: structured.tasks as TaskLike[],
+    } : undefined,
+
+    stepValidationsReport: structured?.step_validations as StepValidationResult[] | undefined,
+
+    coverageReport: structured?.coverage as SopCoverage[] | undefined,
+
+    actionGating: (structured?.findings && structured.recommendations) ? {
+      findings: structured.findings as Finding[],
+      recommendations: structured.recommendations as Recommendation[],
+    } : undefined,
+
+    publishReport: structured?.quality_gate ? {
+      passed: structured.quality_gate.passed,
+      state: structured.quality_gate.state,
+      blockingReasons: structured.quality_gate.blocking_reasons,
+    } : undefined,
   };
 
   const resultaten = runGates(gateInput);
@@ -140,6 +197,11 @@ export async function GET(request: Request) {
       rankLoss: Boolean(gateInput.rankLoss),
       claimCheck: Boolean(gateInput.claimCheck),
       kpiChain: Boolean(gateInput.kpiChain),
+      contradiction: Boolean(gateInput.contradiction),
+      stepValidationsReport: Boolean(gateInput.stepValidationsReport),
+      coverageReport: Boolean(gateInput.coverageReport),
+      actionGating: Boolean(gateInput.actionGating),
+      publishReport: Boolean(gateInput.publishReport),
     },
     resultaten,
   });
