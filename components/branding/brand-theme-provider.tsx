@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 import { resolveEventTheme, type BrandVisualIdentity, type EventTheme } from "@/lib/branding/theme";
 import { resolveBranding, type GeoCloneBranding } from "@/lib/rai/geo-clone-settings";
 
@@ -78,7 +79,7 @@ export function BrandThemeProvider({
 
     (async () => {
       // Account-branding uit de brand guide.
-      const { data: cs } = await sb.from("client_settings").select("brand_guide").eq("client_id", clientId).maybeSingle();
+      const { data: cs } = await dbSelectOne<{ brand_guide: unknown }>("client_settings", { select: "brand_guide", clientId });
       const guide = (cs?.brand_guide ?? {}) as { brandName?: string; visual?: BrandVisualIdentity };
       const accountBranding: GeoCloneBranding = { brandName: guide.brandName ?? null, ...(guide.visual ?? {}) };
 

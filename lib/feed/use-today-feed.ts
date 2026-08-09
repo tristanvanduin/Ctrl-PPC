@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { getVisibleClients } from "@/lib/visible-clients";
 import {
   insightToFeedItem, recommendationToFeedItem, hypothesisToFeedItem, taskToFeedItem, overviewToFeedItems,
@@ -103,11 +104,26 @@ export function useTodayFeed(): TodayFeed {
         // Nieuwste eerst voor aanbevelingen en hypotheses, eerst-vervallend voor taken — dat is de
         // selectie die je wilt overhouden als er wordt afgekapt.
         const [insights, recs, hyps, tasks, stateRes] = await Promise.all([
-          sb!.from("sop_insights").select("id, client_id, sop_type, insight_type, title, description, severity, affected_entity, metric, change_pct, action_required, created_at").in("client_id", ids).order("created_at", { ascending: false }).limit(150),
-          sb!.from("sop_recommendations").select("id, client_id, sop_type, hypothesis, expected_result, ice_total, status, created_at").in("client_id", ids).eq("status", "open").order("created_at", { ascending: false }).limit(150),
-          sb!.from("sprint_hypotheses").select("id, client_id, source, hypothesis, expected_result, rationale, ice_total, status, created_at").in("client_id", ids).eq("status", "pending").order("created_at", { ascending: false }).limit(150),
-          sb!.from("sop_tasks").select("id, client_id, title, description, priority, due_date, status").in("client_id", ids).eq("status", "open").order("due_date", { ascending: true }).limit(150),
-          sb!.from("feed_item_state").select("*").in("client_id", ids),
+          dbSelect<InsightRow>("sop_insights", {
+            select: "id, client_id, sop_type, insight_type, title, description, severity, affected_entity, metric, change_pct, action_required, created_at",
+            clientIds: ids, order: { column: "created_at", ascending: false }, limit: 150,
+          }),
+          dbSelect<RecommendationRow>("sop_recommendations", {
+            select: "id, client_id, sop_type, hypothesis, expected_result, ice_total, status, created_at",
+            clientIds: ids, filters: [{ op: "eq", column: "status", value: "open" }],
+            order: { column: "created_at", ascending: false }, limit: 150,
+          }),
+          dbSelect<HypothesisRow>("sprint_hypotheses", {
+            select: "id, client_id, source, hypothesis, expected_result, rationale, ice_total, status, created_at",
+            clientIds: ids, filters: [{ op: "eq", column: "status", value: "pending" }],
+            order: { column: "created_at", ascending: false }, limit: 150,
+          }),
+          dbSelect<TaskRow>("sop_tasks", {
+            select: "id, client_id, title, description, priority, due_date, status",
+            clientIds: ids, filters: [{ op: "eq", column: "status", value: "open" }],
+            order: { column: "due_date", ascending: true }, limit: 150,
+          }),
+          dbSelect<FeedStateRow>("feed_item_state", { select: "*", clientIds: ids }),
         ]);
         if (cancelled) return;
         const firstErr = insights.error || recs.error || hyps.error || tasks.error;

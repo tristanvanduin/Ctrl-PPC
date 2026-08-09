@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { TrendingUp, Info } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 import { forecastChannelMetric, type MonthValue } from "@/lib/analysis/channel-forecast";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { resolveChannelConversionConfig, sumSelectedConversions, conversionSourcesFor, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
@@ -54,7 +55,7 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
       ...cfg.sources.map((s) =>
         sb.from(s.table).select(`date, spend, ${convFieldsFor(s.channelKey).join(", ")}`).eq("client_id", clientId).gte("date", since)
       ),
-      sb.from("client_settings").select("channel_conversion_config").eq("client_id", clientId).maybeSingle(),
+      dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId }),
     ]).then((results) => {
       if (cancelled) return;
       const sourceResults = results.slice(0, cfg.sources.length);

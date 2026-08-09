@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { getClientSettings } from "@/lib/client-settings";
 import { RAI_GEO_CLONES } from "@/lib/rai/geo-clone-catalog";
 import { dbUpsert } from "@/lib/data-access/client-write";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 import {
   resolveGeoCloneSettings,
   type AccountSettings,
@@ -43,7 +44,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
     setAccount(null); setError(null); setSaved(false); setOverride({});
 
     Promise.all([
-      sb.from("client_settings").select("brand_guide, rai_events").eq("client_id", clientId).maybeSingle(),
+      dbSelectOne<{ brand_guide: unknown; rai_events: unknown }>("client_settings", { select: "brand_guide, rai_events", clientId }),
       sb.from("geo_clone_settings").select("branding, goals, event").eq("client_id", clientId).eq("geo_clone", geoClone).maybeSingle(),
     ]).then(([csRes, gcRes]) => {
       if (cancelled) return;

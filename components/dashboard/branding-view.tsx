@@ -5,6 +5,7 @@ import { Loader2, Palette, Save, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { resolveEventTheme, type BrandVisualIdentity } from "@/lib/branding/theme";
 import { dbUpsert } from "@/lib/data-access/client-write";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 
 // Branding-tab: de merk-identiteit per klant/account. Bewerkt client_settings.brand_guide
 // (jsonb, migratie 019). Dit is gezicht 1 (de visuele identiteit) van de brand guide; de
@@ -30,7 +31,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
     if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setGuide(null); setError(null); setSaved(false);
-    sb.from("client_settings").select("brand_guide").eq("client_id", clientId).maybeSingle()
+    dbSelectOne<{ brand_guide: unknown }>("client_settings", { select: "brand_guide", clientId })
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) { setError(error.message); return; }

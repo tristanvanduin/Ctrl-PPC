@@ -14,6 +14,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getAuthUser } from "@/lib/auth/server";
 import { can, canAccessClient } from "@/lib/auth/roles";
 import { isWriteOperation, policyFor, validateWrite, type WriteOperation } from "@/lib/data-access/write-policy";
+import { validateRead, readPolicyFor, type ReadFilter } from "@/lib/data-access/read-policy";
 
 function authEnforced(): boolean {
   return process.env.O1_AUTH_ENFORCED === "true";
@@ -80,4 +81,78 @@ export async function POST(request: Request, context: { params: Promise<{ table:
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ ok: true, data: data ?? [] });
+}
+
+// De leeskant. Zelfde vlag, zelfde reden als POST hierboven: zolang O1_AUTH_ENFORCED uit staat
+// gaat de leesactie door zonder rechten- en scope-check, precies het gedrag dat de browser nu
+// met de anon-sleutel al had. Wat WEL verandert: de query loopt voortaan server-side met de
+// service role, zodat migratie 065 (RLS op deze tabellen) straks aan kan zonder dat er eerst een
+// sessie moet bestaan. Zie lib/data-access/read-policy.ts voor het "waarom nu al" per tabel.
+interface ReadBody {
+  select?: string;
+  clientId?: string | null;
+  clientIds?: string[];
+  filters?: ReadFilter[];
+  order?: { column: string; ascending?: boolean };
+  limit?: number;
+  single?: "maybeSingle" | "single";
+}
+
+export async function GET(request: Request, context: { params: Promise<{ table: string }> }) {
+  const { table } = await context.params;
+  const url = new URL(request.url);
+  const q = url.searchParams.get("q");
+  const body = (q ? JSON.parse(q) : null) as ReadBody | null;
+  if (!body?.select) return Response.json({ error: "q met minstens select is verplicht" }, { status: 400 });
+
+  let inScope = true;
+  if (authEnforced()) {
+    const user = await getAuthUser();
+    if (!user) return Response.json({ error: "Niet ingelogd" }, { status: 401 });
+    const policy = readPolicyFor(table);
+    if (!policy) return Response.json({ error: `tabel ${table} is niet leesbaar` }, { status: 400 });
+    if (!can(user.role, policy.capability)) {
+      return Response.json({ error: "Onvoldoende rechten" }, { status: 403 });
+    }
+    inScope = !policy.clientColumn || (
+      body.clientId
+        ? canAccessClient(user.scope, body.clientId)
+        : (body.clientIds ?? []).every((id) => canAccessClient(user.scope, id))
+    );
+  }
+
+  const check = validateRead(
+    { table, select: body.select, clientId: body.clientId, clientIds: body.clientIds, filters: body.filters, order: body.order, limit: body.limit, single: body.single },
+    inScope,
+  );
+  if (!check.ok) return Response.json({ error: check.error }, { status: check.status });
+
+  const admin = getSupabaseAdmin();
+  if (!admin) {
+    return Response.json({ error: "SUPABASE_SERVICE_ROLE_KEY ontbreekt server-side" }, { status: 500 });
+  }
+
+  let query = admin.from(table).select(check.select);
+  if (check.clientFilter) {
+    query = "clientId" in check.clientFilter
+      ? query.eq(check.clientFilter.column, check.clientFilter.clientId)
+      : query.in(check.clientFilter.column, check.clientFilter.clientIds);
+  }
+  for (const f of check.filters) {
+    if (f.op === "eq") query = query.eq(f.column, f.value);
+    else if (f.op === "neq") query = query.neq(f.column, f.value);
+    else if (f.op === "in") query = query.in(f.column, f.values);
+    else if (f.op === "isNull") query = query.is(f.column, null);
+    else if (f.op === "notNull") query = query.not(f.column, "is", null);
+  }
+  if (check.order) query = query.order(check.order.column, { ascending: check.order.ascending });
+  if (check.limit != null) query = query.limit(check.limit);
+
+  const { data, error } =
+    check.single === "maybeSingle" ? await query.maybeSingle()
+      : check.single === "single" ? await query.single()
+        : await query;
+
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+  return Response.json({ ok: true, data: data ?? (check.single ? null : []) });
 }

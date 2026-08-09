@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Radar, CheckCircle2, Circle } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import {
   ANALYSE_CATALOGUS,
   KANAAL_LABEL,
@@ -67,27 +67,25 @@ export function AnalysisOverview({
   const [runs, setRuns] = useState<Map<string, string> | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setRuns(new Map()); return; }
     let cancelled = false;
     setRuns(null);
     // Eén query voor alle twintig analyses, begrensd op de secties uit de catalogus. Het
     // alternatief — elke kaart haalt zijn eigen laatste run op — was twintig requests voor
     // twintig datums.
-    sb.from("sop_analysis_output")
-      .select("section, analysis_date")
-      .eq("client_id", clientId)
-      .in("section", ANALYSE_CATALOGUS.map((a) => a.section))
-      .then(({ data }) => {
-        if (cancelled) return;
-        const laatste = new Map<string, string>();
-        for (const r of (data ?? []) as { section: string; analysis_date: string | null }[]) {
-          if (!r.analysis_date) continue;
-          const huidig = laatste.get(r.section);
-          if (!huidig || r.analysis_date > huidig) laatste.set(r.section, r.analysis_date);
-        }
-        setRuns(laatste);
-      }, () => { if (!cancelled) setRuns(new Map()); });
+    dbSelect<{ section: string; analysis_date: string | null }>("sop_analysis_output", {
+      select: "section, analysis_date", clientId,
+      filters: [{ op: "in", column: "section", values: ANALYSE_CATALOGUS.map((a) => a.section) }],
+    }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) { setRuns(new Map()); return; }
+      const laatste = new Map<string, string>();
+      for (const r of data) {
+        if (!r.analysis_date) continue;
+        const huidig = laatste.get(r.section);
+        if (!huidig || r.analysis_date > huidig) laatste.set(r.section, r.analysis_date);
+      }
+      setRuns(laatste);
+    });
     return () => { cancelled = true; };
   }, [clientId]);
 

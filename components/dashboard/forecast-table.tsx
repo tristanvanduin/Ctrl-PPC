@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, MONTH_LABELS, type ForecastMetric } from "@/lib/forecast";
-import { supabase } from "@/lib/supabase";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalVoet, VoetRij, TotaalCel } from "./data-table";
 
@@ -24,9 +24,8 @@ export function ForecastTable({ clientId }: { clientId: string }) {
   // beursloos jaar). We waarschuwen eerlijk en verwijzen naar de event-relatieve beursanalyse.
   const [hasEvents, setHasEvents] = useState(false);
   useEffect(() => {
-    if (!supabase) return;
     let cancelled = false;
-    supabase.from("client_settings").select("rai_events").eq("client_id", clientId).maybeSingle()
+    dbSelectOne<{ rai_events: unknown }>("client_settings", { select: "rai_events", clientId })
       .then(({ data }) => {
         if (cancelled) return;
         const evs = (data?.rai_events as { events?: unknown[] } | null)?.events;

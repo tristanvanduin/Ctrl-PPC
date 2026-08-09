@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Inbox, Check, X, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { prioritizeQueue, summarizePlan } from "@/lib/learning/prioritize-queue";
 import { channelOfSource, type InsightChannel } from "@/lib/insights/channel-of";
 import { dbUpdate } from "@/lib/data-access/client-write";
@@ -94,17 +95,16 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!supabase) { setProposals([]); return; }
-    const { data } = await supabase
-      .from("sprint_hypotheses")
-      .select("id, hypothesis, expected_result, measurement_metric, timeframe, rationale, ice_total, ice_impact, ice_confidence, ice_ease, source, created_at")
-      .eq("client_id", clientId)
-      .eq("status", "pending")
+    const { data } = await dbSelect<Proposal>("sprint_hypotheses", {
+      select: "id, hypothesis, expected_result, measurement_metric, timeframe, rationale, ice_total, ice_impact, ice_confidence, ice_ease, source, created_at",
+      clientId,
+      filters: [{ op: "eq", column: "status", value: "pending" }],
       // De database sorteert grof; de fijne volgorde en de sprint/backlog-splitsing komen uit
       // prioritizeQueue hieronder. Deze order blijft staan zodat de lijst ook klopt als de
       // prioritering ooit wegvalt.
-      .order("ice_total", { ascending: false });
-    setProposals(((data ?? []) as Proposal[]).filter((p) => !EXCLUDED_SOURCES.has((p.source ?? "").toLowerCase())));
+      order: { column: "ice_total", ascending: false },
+    });
+    setProposals(data.filter((p) => !EXCLUDED_SOURCES.has((p.source ?? "").toLowerCase())));
   }, [clientId]);
 
   useEffect(() => { void refresh(); }, [refresh, refreshKey]);

@@ -12,7 +12,7 @@ import { isTeamOwner } from "@/lib/branding/brand";
 import { computeForecast, type ClientForecast, type ForecastKPI } from "@/lib/forecast";
 import { computeHealthScore, type HealthScore, type Anomaly } from "@/lib/health-score";
 import { getClientSettings } from "@/lib/client-settings";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "@/lib/use-client-data";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
 import { formatRoas, formatPercent } from "@/lib/forecast-format";
@@ -833,43 +833,29 @@ export function DgmView({ clientId }: { clientId: string }) {
   const [sprintHypotheses, setSprintHypotheses] = useState<{ id: string; hypothesis: string; status: string; ice_total: number; timeframe: string | null }[]>([]);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase
-      .from("sop_insights")
-      .select("id, title, description, severity, insight_type, affected_entity, affected_entity_type, metric, action_required")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false })
-      .limit(20)
-      .then(({ data: rows }) => setDbInsights((rows ?? []) as DbInsight[]));
+    dbSelect<DbInsight>("sop_insights", {
+      select: "id, title, description, severity, insight_type, affected_entity, affected_entity_type, metric, action_required",
+      clientId, order: { column: "created_at", ascending: false }, limit: 20,
+    }).then(({ data: rows }) => setDbInsights(rows));
 
-    supabase
-      .from("sop_recommendations")
-      .select("id, insight_id, hypothesis, expected_result, measurement_metric, timeframe, ice_impact, ice_confidence, ice_ease, ice_total")
-      .eq("client_id", clientId)
-      .order("ice_total", { ascending: false })
-      .limit(20)
-      .then(({ data: rows }) => setDbRecs((rows ?? []) as DbRecommendation[]));
+    dbSelect<DbRecommendation>("sop_recommendations", {
+      select: "id, insight_id, hypothesis, expected_result, measurement_metric, timeframe, ice_impact, ice_confidence, ice_ease, ice_total",
+      clientId, order: { column: "ice_total", ascending: false }, limit: 20,
+    }).then(({ data: rows }) => setDbRecs(rows));
 
-    supabase
-      .from("sop_tasks")
-      .select("id, title, description, action_type, affected_campaign, priority, frequency, status, due_date, recommendation_id")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false })
-      .limit(20)
-      .then(({ data: rows }) => setDbTasks((rows ?? []) as DbTask[]));
+    dbSelect<DbTask>("sop_tasks", {
+      select: "id, title, description, action_type, affected_campaign, priority, frequency, status, due_date, recommendation_id",
+      clientId, order: { column: "created_at", ascending: false }, limit: 20,
+    }).then(({ data: rows }) => setDbTasks(rows));
 
-    supabase
-      .from("sprint_items")
-      .select("id, task, status, owner, hypothesis_id, week_number")
-      .eq("client_id", clientId)
-      .then(({ data: rows }) => setSprintItems((rows ?? []) as typeof sprintItems));
+    dbSelect<typeof sprintItems[number]>("sprint_items", {
+      select: "id, task, status, owner, hypothesis_id, week_number", clientId,
+    }).then(({ data: rows }) => setSprintItems(rows));
 
-    supabase
-      .from("sprint_hypotheses")
-      .select("id, hypothesis, status, ice_total, timeframe")
-      .eq("client_id", clientId)
-      .in("status", ["accepted", "pending", "completed"])
-      .then(({ data: rows }) => setSprintHypotheses((rows ?? []) as typeof sprintHypotheses));
+    dbSelect<typeof sprintHypotheses[number]>("sprint_hypotheses", {
+      select: "id, hypothesis, status, ice_total, timeframe", clientId,
+      filters: [{ op: "in", column: "status", values: ["accepted", "pending", "completed"] }],
+    }).then(({ data: rows }) => setSprintHypotheses(rows));
   }, [clientId]);
 
   const traject = computeTrajectStatus(forecast, health);

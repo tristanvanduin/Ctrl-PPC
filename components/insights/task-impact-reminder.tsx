@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bell, Eye, X, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase, type TaskCompletion, type KpiSnapshot } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
 import { dbUpdate } from "@/lib/data-access/client-write";
@@ -37,17 +38,17 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
   const clientData = useClientHistoricalData(clientId);
 
   const fetchReminders = useCallback(async () => {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from("task_completions")
-      .select("*")
-      .eq("client_id", clientId)
-      .eq("reminder_dismissed", false)
-      .is("followup_checked_at", null)
-      .order("completed_at", { ascending: false });
+    const { data } = await dbSelect<TaskCompletion>("task_completions", {
+      select: "*", clientId,
+      filters: [
+        { op: "eq", column: "reminder_dismissed", value: false },
+        { op: "isNull", column: "followup_checked_at" },
+      ],
+      order: { column: "completed_at", ascending: false },
+    });
 
     // Filter to only show reminders that are due
-    const due = (data ?? []).filter((tc: TaskCompletion) => {
+    const due = data.filter((tc: TaskCompletion) => {
       const daysSince = daysAgo(tc.completed_at);
       return daysSince >= tc.reminder_days;
     });

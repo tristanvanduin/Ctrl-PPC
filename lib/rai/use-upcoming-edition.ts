@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 import { today } from "@/lib/reporting-date";
 import { selectUpcomingEdition, type RaiEventCfg, type UpcomingEdition } from "./fair-weeks";
 
@@ -16,11 +16,9 @@ export function useUpcomingEdition(clientId: string): UpcomingEdition | null {
   const [edition, setEdition] = useState<UpcomingEdition | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) return;
     let cancelled = false;
     setEdition(null);
-    sb.from("client_settings").select("rai_events").eq("client_id", clientId).maybeSingle()
+    dbSelectOne<{ rai_events: unknown }>("client_settings", { select: "rai_events", clientId })
       .then(({ data }) => {
         if (cancelled) return;
         const events = (data?.rai_events as { events?: RaiEventCfg[] } | null)?.events;

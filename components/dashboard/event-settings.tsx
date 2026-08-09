@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Loader2, CalendarClock, Save, CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 
 // RAI event-instellingen per klant: beurzen/geo-clones met cadans (jaarlijks/2-jaarlijks/anders)
 // en de datums van de afgelopen edities. Slaat op in client_settings.rai_events (migratie 024).
@@ -35,7 +36,7 @@ export function EventSettings({ clientId }: { clientId: string }) {
     if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setEvents(null); setError(null); setSaved(false);
-    sb.from("client_settings").select("rai_events").eq("client_id", clientId).maybeSingle()
+    dbSelectOne<{ rai_events: unknown }>("client_settings", { select: "rai_events", clientId })
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) { setError(error.message); setEvents([]); return; }

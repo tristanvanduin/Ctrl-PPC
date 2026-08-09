@@ -5,7 +5,7 @@ import { Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
 import { useClientHistoricalData, useClientDataState, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import type { ImpressionShareData } from "@/lib/use-client-data";
 import { channelOfSopType, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
@@ -313,15 +313,12 @@ export function RecommendationsBlock({
   const [dbRecs, setDbRecs] = useState<DbRecommendation[]>([]);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase
-      .from("sop_recommendations")
-      .select("id, insight_id, hypothesis, expected_result, measurement_metric, timeframe, ice_impact, ice_confidence, ice_ease, ice_total, sop_type")
-      .eq("client_id", clientId)
-      .not("insight_id", "is", null)
-      .order("ice_total", { ascending: false })
-      .limit(20)
-      .then(({ data: rows }) => setDbRecs((rows ?? []) as DbRecommendation[]));
+    dbSelect<DbRecommendation>("sop_recommendations", {
+      select: "id, insight_id, hypothesis, expected_result, measurement_metric, timeframe, ice_impact, ice_confidence, ice_ease, ice_total, sop_type",
+      clientId,
+      filters: [{ op: "notNull", column: "insight_id" }],
+      order: { column: "ice_total", ascending: false }, limit: 20,
+    }).then(({ data: rows }) => setDbRecs(rows));
   }, [clientId, refreshKey]);
 
   // Kanaal-filter via de sop_type van de analyse die de aanbeveling schreef.

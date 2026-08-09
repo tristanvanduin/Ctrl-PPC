@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Loader2, Save, CheckCircle2, Target } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 import {
   conversionSourcesFor,
   resolveChannelConversionConfig,
@@ -31,7 +32,7 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
     if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setConfig(null); setError(null); setSaved(false);
-    sb.from("client_settings").select("channel_conversion_config").eq("client_id", clientId).maybeSingle()
+    dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId })
       .then(({ data }) => {
         if (cancelled) return;
         setConfig(resolveChannelConversionConfig((data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null));

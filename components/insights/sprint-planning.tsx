@@ -5,6 +5,7 @@ import { OWNER_TEAM, OWNER_CLIENT, ownerLabel, toewijzingLabel, normalizeOwner, 
 import { EigenaarKiezer, haalTeam, type Teamlid } from "./eigenaar-kiezer";
 import { Download, ChevronDown, ChevronUp, Loader2, Calendar, Plus, X, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { channelOfSource, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
 import { dbInsert, dbUpdate, dbUpdateIn } from "@/lib/data-access/client-write";
 import { ChannelFilter, ChannelBadge } from "./channel-filter";
@@ -93,11 +94,14 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     // afwijzing sloeg setLoading(false) over. Een laadtoestand hoort altijd te eindigen.
     try {
     const [{ data: itemsData }, { data: hypData }] = await Promise.all([
-      supabase.from("sprint_items").select("*").eq("client_id", clientId).order("week_number", { ascending: true }),
-      supabase.from("sprint_hypotheses").select("id, hypothesis, status, ice_total, source").eq("client_id", clientId).in("status", ["accepted", "completed"]),
+      dbSelect<SprintItem>("sprint_items", { select: "*", clientId, order: { column: "week_number", ascending: true } }),
+      dbSelect<{ id: string; hypothesis: string; status: string; ice_total: number; source: string | null }>("sprint_hypotheses", {
+        select: "id, hypothesis, status, ice_total, source", clientId,
+        filters: [{ op: "in", column: "status", values: ["accepted", "completed"] }],
+      }),
     ]);
 
-    const allItems = (itemsData ?? []) as SprintItem[];
+    const allItems = itemsData;
 
     // Auto-expire: items with week_number > 2 weeks ago that aren't done
     const expiredIds: string[] = [];

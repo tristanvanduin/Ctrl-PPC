@@ -6,6 +6,7 @@ import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { supabase, type KpiSnapshot } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
 import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
@@ -294,27 +295,25 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
     setAiTasksLoading(true);
 
     // Fetch tasks for current frequency
-    supabase
-      .from("sop_tasks")
-      .select("*")
-      .eq("client_id", clientId)
-      .eq("frequency", FREQUENCY_MAP[cadence])
-      .neq("status", "completed")
-      .order("priority")
-      .then(({ data: rows }) => {
-        setAiTasks((rows ?? []) as AiTask[]);
-        setAiTasksLoading(false);
-      });
+    dbSelect<AiTask>("sop_tasks", {
+      select: "*", clientId,
+      filters: [
+        { op: "eq", column: "frequency", value: FREQUENCY_MAP[cadence] },
+        { op: "neq", column: "status", value: "completed" },
+      ],
+      order: { column: "priority" },
+    }).then(({ data: rows }) => {
+      setAiTasks(rows);
+      setAiTasksLoading(false);
+    });
 
     // Fetch recommendation → insight_id + kanaal mapping for filtering
-    supabase
-      .from("sop_recommendations")
-      .select("id, insight_id, sop_type")
-      .eq("client_id", clientId)
-      .then(({ data: rows }) => {
+    dbSelect<{ id: string; insight_id: string | null; sop_type: string | null }>("sop_recommendations", {
+      select: "id, insight_id, sop_type", clientId,
+    }).then(({ data: rows }) => {
         const map = new Map<string, string>();
         const chMap = new Map<string, InsightChannel>();
-        for (const r of (rows ?? []) as Array<{ id: string; insight_id: string | null; sop_type: string | null }>) {
+        for (const r of rows) {
           if (r.insight_id) map.set(r.id, r.insight_id);
           chMap.set(r.id, channelOfSopType(r.sop_type));
         }

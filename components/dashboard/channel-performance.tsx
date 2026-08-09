@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Calendar, TrendingUp, Gauge, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { today as vandaag } from "@/lib/reporting-date";
@@ -103,7 +104,7 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
       // account-tabel draagt geen campagnenaam en kan dus niet per beurs gesplitst worden.
       sb.from(cfg.campaignTable).select(cfg.select).eq("client_id", clientId).gte("date", since),
       sb.from(cfg.nameTable).select(`${cfg.nameId}, name`).eq("client_id", clientId),
-      sb.from("client_settings").select("channel_conversion_config").eq("client_id", clientId).maybeSingle(),
+      dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId }),
     ]).then(([accRes, campRes, nameRes, settingsRes]) => {
       if (cancelled) return;
       if (accRes.error) { setError(accRes.error.message); setAccount([]); return; }

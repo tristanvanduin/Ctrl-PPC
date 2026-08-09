@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2, Calendar, CheckCircle2, AlertCircle, FileDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { useAnalysis } from "@/lib/analysis-context";
 import { getAllClients } from "@/lib/clients";
 import { useGenerationProgress } from "@/lib/use-generation-progress";
@@ -100,24 +101,18 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
 
   // Load last analysis dates on mount
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) return;
-
     async function loadLastDates() {
-      if (!sb) return;
       const types: SopType[] = channelCfg.types;
       const updates: Partial<Record<SopType, SopStatus>> = {};
 
       for (const type of types) {
-        const { data } = await sb
-          .from("sop_analysis_output")
-          .select("analysis_date")
-          .eq("client_id", clientId)
-          .eq("sop_type", channelCfg.sopTypeKey[type])
-          .order("analysis_date", { ascending: false })
-          .limit(1);
+        const { data } = await dbSelect<{ analysis_date: string }>("sop_analysis_output", {
+          select: "analysis_date", clientId,
+          filters: [{ op: "eq", column: "sop_type", value: channelCfg.sopTypeKey[type] }],
+          order: { column: "analysis_date", ascending: false }, limit: 1,
+        });
 
-        if (data && data.length > 0) {
+        if (data.length > 0) {
           updates[type] = { ...status[type], lastDate: data[0].analysis_date };
         }
       }

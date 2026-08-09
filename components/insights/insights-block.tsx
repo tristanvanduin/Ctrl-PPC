@@ -5,7 +5,7 @@ import { AlertTriangle, TrendingUp, TrendingDown, Info, DollarSign, Filter, X, C
 import { useClientHistoricalData, useClientDataState, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import type { ImpressionShareData, AccountStructureData, WastefulSearchTermData, AdGroupBleederData, ChangeHistoryData } from "@/lib/use-client-data";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
@@ -792,14 +792,10 @@ export function InsightsBlock({
   const [dbInsights, setDbInsights] = useState<DbInsight[]>([]);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase
-      .from("sop_insights")
-      .select("id, title, description, severity, insight_type, affected_entity, affected_entity_type, metric, action_required, sop_type")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false })
-      .limit(20)
-      .then(({ data: rows }) => setDbInsights((rows ?? []) as DbInsight[]));
+    dbSelect<DbInsight>("sop_insights", {
+      select: "id, title, description, severity, insight_type, affected_entity, affected_entity_type, metric, action_required, sop_type",
+      clientId, order: { column: "created_at", ascending: false }, limit: 20,
+    }).then(({ data: rows }) => setDbInsights(rows));
   }, [clientId, refreshKey]);
 
   // Kanaal-filter: het kanaal volgt uit de sop_type van de analyse die het inzicht schreef.
