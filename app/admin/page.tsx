@@ -12,6 +12,7 @@ import { ALL_CLIENTS, ROLES, ROL_LABEL, scopeFor, type Role } from "@/lib/auth/r
 import { beoordeel, zwaarste, type Licht } from "@/lib/adoptie/stoplicht";
 import { getAllClients, type Client } from "@/lib/clients";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel } from "@/components/dashboard/data-table";
+import { SegmentatieBulk } from "@/components/dashboard/segmentatie-bulk";
 
 interface AdminUser {
   id: string;
@@ -394,6 +395,8 @@ export default function AdminPage() {
       </p>
 
       <AdoptieSectie />
+
+      <SegmentatieBulk />
 
       <BenchmarkSectie />
 
