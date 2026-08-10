@@ -1,8 +1,8 @@
 // EXECUTION_PLAN.md Stap 6: Hypothesis Discovery en Classification, bewust gescheiden.
 //
 // Discovery is OPEN: een implementatie mag een hypothese opleveren die in geen enkele vaste
-// categorie past, en hoort dat ook te mogen (het HypothesisDiscovery-contract hieronder heeft
-// nog geen implementatie, net als ContextEngine uit Stap 5).
+// categorie past, en hoort dat ook te mogen. Fase 2 gaf het contract zijn eerste implementatie,
+// zie signal-hypothesis-discovery.ts.
 //
 // Classificatie is GESLOTEN en draait NA discovery. classify() mag nooit een hypothese
 // weggooien of aanpassen (zie de test): een hypothese die niet past krijgt null, geen gegokte
@@ -13,12 +13,21 @@
 // een uitzondering met opzet: dat is de "past nergens anders"-categorie, en die heeft geen eigen
 // trefwoordenveld om op te matchen. classify() kent hem alleen toe als discovery een hypothese
 // al expliciet zo getagd heeft, nooit als tekstgok.
+//
+// FASE 2-CORRECTIE OP HET CONTRACT: discover() kreeg agencyId/accountId als expliciete invoer
+// erbij. Zonder die twee kon een implementatie de tenant-scoping op Hypothesis (TenantScoped)
+// alleen uit causes[0] of context halen -- en beide zijn vandaag altijd leeg/undefined, want er
+// bestaat geen CandidateCause-producent en geen ContextEngine-implementatie. Het contract was
+// dus onbruikbaar voor elke echte implementatie totdat dit gat dicht ging. Dezelfde twee velden
+// als ChannelProvider.collectSignals/analyze in channel-provider.ts, om consistent te blijven.
 
 import type { CandidateCause, ContextAnalysis, Hypothesis, Signal } from "./types";
 
 /** Open. Mag hypotheses opleveren die in geen enkele categorie passen. */
 export interface HypothesisDiscovery {
   discover(input: {
+    agencyId: string;
+    accountId: string;
     signals: Signal[];
     causes: CandidateCause[];
     context?: ContextAnalysis;
