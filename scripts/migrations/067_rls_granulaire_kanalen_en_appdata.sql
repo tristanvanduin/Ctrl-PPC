@@ -1,9 +1,11 @@
 -- 067: het 059/065-patroon doorgetrokken naar de granulaire Google Ads-, Meta/LinkedIn- en
 -- klant-gebonden appdata-tabellen.
 --
--- NIET UITGEVOERD TEGEN DE DATABASE. Dit bestand is geschreven en klaargezet op verzoek, maar
--- bewust niet toegepast -- zie de sectie "WAAROM DIT NOG NIET DRAAIT" hieronder. Draai hem pas na
--- die afweging, met scripts/supabase-sql.mjs --file scripts/migrations/067_rls_granulaire_kanalen_en_appdata.sql.
+-- TOEGEPAST op 10 augustus 2026, ná de Fase 3B-brug (commit 30dc6e3) die de zeventien
+-- rechtstreekse browser-lezers hieronder omzette naar service-role-routes. Gemeten na toepassing:
+-- 103 van de 122 tabellen in public hebben nu RLS (was 45 vóór deze migratie), exact zoals de
+-- controlequery onderaan voorspelde. Zie de sectie "WAAROM DIT NOG NIET DRAAIT" hieronder voor
+-- de situatie zoals die was toen dit bestand werd geschreven, vóór de brug.
 -- Terugdraaien: `alter table <naam> disable row level security` per tabel in deze migratie.
 --
 -- ── WAT ER ONTBRAK ───────────────────────────────────────────────────────────
