@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ListChecks, LayoutGrid, Settings, Terminal, Building2 } from "lucide-react";
+import { Search, ListChecks, LayoutGrid, Settings, Terminal, Building2, Radar } from "lucide-react";
 import { getVisibleClients } from "@/lib/visible-clients";
 
 // Fase 5, Task 2: Cmd+K/Ctrl+K quick-search. Er bestond nog geen command-palette in de app
@@ -24,6 +24,7 @@ function staticItems(): Item[] {
     { id: "portfolio", label: "Portfolio", sub: "Klantoverzicht", href: "/portfolio", icon: LayoutGrid },
     { id: "instellingen", label: "Instellingen", href: "/settings", icon: Settings },
     { id: "scripts", label: "Scripts", href: "/scripts", icon: Terminal },
+    { id: "decision-terminal", label: "Decision Terminal", sub: "Hypotheses, attributie, decision log", href: "/decision-terminal", icon: Radar },
   ];
 }
 

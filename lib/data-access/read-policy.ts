@@ -60,6 +60,12 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   client_notes: { capability: "client:read", clientColumn: "client_id" },
   client_sync_status: { capability: "client:read", clientColumn: "client_id" },
   geo_clone_settings: { capability: "client:read", clientColumn: "client_id" },
+
+  // Decision Terminal (Fase 2, Task 4): de Decision Log-component leest ads_change_history
+  // rechtstreeks vanuit de browser. Migratie 067 zette hier al RLS op zonder browser-lezer op
+  // dat moment; dit is de eerste, dus meteen via het service-role-pad en nooit via de anon-key,
+  // net als de zeventien tabellen hierboven.
+  ads_change_history: { capability: "client:read", clientColumn: "client_id" },
 };
 
 export function isReadableTable(table: string): boolean {
