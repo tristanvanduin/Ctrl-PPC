@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Mail, Phone } from "lucide-react";
 import { DemoForm } from "@/components/marketing/demo-form";
 
 export const metadata: Metadata = {
@@ -27,6 +28,17 @@ export default function DemoPage() {
       </div>
       <div className="mt-10">
         <DemoForm />
+      </div>
+
+      <div className="mt-6 flex flex-col items-center gap-3 text-sm text-off-white/60 sm:flex-row sm:justify-center sm:gap-8">
+        <a href="tel:+31611062649" className="flex items-center gap-2 hover:text-off-white">
+          <Phone className="h-4 w-4 text-neon-indigo" aria-hidden />
+          +31 6 11062649
+        </a>
+        <a href="mailto:info@ctrlppc.com" className="flex items-center gap-2 hover:text-off-white">
+          <Mail className="h-4 w-4 text-neon-indigo" aria-hidden />
+          info@ctrlppc.com
+        </a>
       </div>
     </div>
   );
