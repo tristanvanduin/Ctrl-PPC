@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PieChart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
@@ -127,10 +128,11 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
       };
 
       if (channel === "meta") {
-        const { data } = await sb!.from("meta_breakdown_daily")
-          .select("breakdown_type, breakdown_value, spend, conversions, impressions, link_clicks")
-          .eq("client_id", clientId).gte("date", since);
-        for (const r of (data ?? []) as Record<string, unknown>[]) {
+        const { data } = await dbSelect<Record<string, unknown>>("meta_breakdown_daily", {
+          select: "breakdown_type, breakdown_value, spend, conversions, impressions, link_clicks",
+          clientId, filters: [{ op: "gte", column: "date", value: since }],
+        });
+        for (const r of data) {
           const waarde = String(r.breakdown_value ?? "");
           if (!waarde) continue;
           tel(String(r.breakdown_type ?? ""), waarde, metaWaardeLabel(waarde),
@@ -140,13 +142,16 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
         // De pivot-waarden zijn URN's; de leesbare naam staat in een aparte labeltabel. Zonder die
         // vertaling staat er "urn:li:function:8" in de legenda.
         const [{ data: rijen }, { data: labels }] = await Promise.all([
-          sb!.from("linkedin_demographic_daily")
-            .select("pivot_type, pivot_value_urn, spend, leads, impressions, clicks")
-            .eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("linkedin_demographic_daily", {
+            select: "pivot_type, pivot_value_urn, spend, leads, impressions, clicks",
+            clientId, filters: [{ op: "gte", column: "date", value: since }],
+          }),
+          // linkedin_urn_labels is een gedeelde opzoektabel zonder client_id: blijft de
+          // rechtstreekse anon-lezer, buiten migratie 067's scope (zie de kop van die migratie).
           sb!.from("linkedin_urn_labels").select("urn, label"),
         ]);
         const naam = new Map((labels ?? []).map((l: Record<string, unknown>) => [String(l.urn), String(l.label ?? l.urn)]));
-        for (const r of (rijen ?? []) as Record<string, unknown>[]) {
+        for (const r of rijen) {
           const urn = String(r.pivot_value_urn ?? "");
           if (!urn) continue;
           tel(String(r.pivot_type ?? ""), urn, naam.get(urn) ?? urn,

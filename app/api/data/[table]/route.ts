@@ -142,6 +142,8 @@ export async function GET(request: Request, context: { params: Promise<{ table: 
     if (f.op === "eq") query = query.eq(f.column, f.value);
     else if (f.op === "neq") query = query.neq(f.column, f.value);
     else if (f.op === "in") query = query.in(f.column, f.values);
+    else if (f.op === "gte") query = query.gte(f.column, f.value);
+    else if (f.op === "lte") query = query.lte(f.column, f.value);
     else if (f.op === "isNull") query = query.is(f.column, null);
     else if (f.op === "notNull") query = query.not(f.column, "is", null);
   }

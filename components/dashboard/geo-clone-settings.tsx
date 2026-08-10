@@ -45,7 +45,9 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
 
     Promise.all([
       dbSelectOne<{ brand_guide: unknown; rai_events: unknown }>("client_settings", { select: "brand_guide, rai_events", clientId }),
-      sb.from("geo_clone_settings").select("branding, goals, event").eq("client_id", clientId).eq("geo_clone", geoClone).maybeSingle(),
+      dbSelectOne<{ branding: unknown; goals: unknown; event: unknown }>("geo_clone_settings", {
+        select: "branding, goals, event", clientId, filters: [{ op: "eq", column: "geo_clone", value: geoClone }],
+      }),
     ]).then(([csRes, gcRes]) => {
       if (cancelled) return;
       if (csRes.error && !csRes.data) { /* client_settings kan nog leeg zijn — geen harde fout */ }

@@ -46,6 +46,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layers, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
 import { Uitleg, UitlegKop } from "@/components/ui/uitleg";
@@ -165,36 +166,34 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
     // Zelfde venster als de netwerkkaart ernaast: anders gaan twee kaarten over dezelfde campagne
     // over een andere periode, en dan spreken ze elkaar tegen zonder dat iemand ziet waarom.
     const since = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
-    sb.from("ads_pmax_asset_performance")
-      .select("asset_group_name, asset_id, asset_type, performance_label, month")
-      .eq("client_id", clientId)
-      .gte("month", since)
-      .then(({ data }: { data: Record<string, unknown>[] | null }) => {
-        if (cancelled) return;
-        setRows((data ?? []) as AssetRegel[]);
-      }, () => { if (!cancelled) setRows([]); });
+    dbSelect<Record<string, unknown>>("ads_pmax_asset_performance", {
+      select: "asset_group_name, asset_id, asset_type, performance_label, month",
+      clientId, filters: [{ op: "gte", column: "month", value: since }],
+    }).then(({ data }) => {
+      if (cancelled) return;
+      setRows(data as AssetRegel[]);
+    }, () => { if (!cancelled) setRows([]); });
 
     // Op NAAM samengevoegd en niet op asset_group_id, omdat de dekking hierboven dat ook doet.
     // Twee gelijknamige groepen in twee campagnes tellen dus als één rij -- aan beide kanten,
     // dus het percentage blijft kloppen bij de assets waar het naast staat. Zouden de kosten wél
     // per id lopen en de assets niet, dan stond er een aandeel van de ene groep naast de assets
     // van twee.
-    sb.from("ads_asset_group_performance_monthly")
-      .select("asset_group_name, cost, conversions")
-      .eq("client_id", clientId)
-      .gte("month", since)
-      .then(({ data }: { data: Record<string, unknown>[] | null }) => {
-        if (cancelled) return;
-        const som: Record<string, { kosten: number; conversies: number }> = {};
-        for (const r of data ?? []) {
-          const naam = String(r.asset_group_name ?? "").trim();
-          if (!naam) continue;
-          const vak = som[naam] ?? (som[naam] = { kosten: 0, conversies: 0 });
-          vak.kosten += Number(r.cost ?? 0) || 0;
-          vak.conversies += Number(r.conversions ?? 0) || 0;
-        }
-        setCijfers(som);
-      }, () => { if (!cancelled) setCijfers(null); });
+    dbSelect<Record<string, unknown>>("ads_asset_group_performance_monthly", {
+      select: "asset_group_name, cost, conversions",
+      clientId, filters: [{ op: "gte", column: "month", value: since }],
+    }).then(({ data }) => {
+      if (cancelled) return;
+      const som: Record<string, { kosten: number; conversies: number }> = {};
+      for (const r of data) {
+        const naam = String(r.asset_group_name ?? "").trim();
+        if (!naam) continue;
+        const vak = som[naam] ?? (som[naam] = { kosten: 0, conversies: 0 });
+        vak.kosten += Number(r.cost ?? 0) || 0;
+        vak.conversies += Number(r.conversions ?? 0) || 0;
+      }
+      setCijfers(som);
+    }, () => { if (!cancelled) setCijfers(null); });
 
     return () => { cancelled = true; };
   }, [clientId]);

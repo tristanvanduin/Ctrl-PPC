@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PieChart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
@@ -46,21 +47,20 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
     const sb = supabase;
     if (!sb) { setRows([]); return; }
     const since = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
-    sb.from("ads_pmax_network_breakdown")
-      .select("network_type, cost, conversions, conversions_value, impressions, clicks")
-      .eq("client_id", clientId)
-      .gte("month", since)
-      .then(({ data }: { data: Record<string, unknown>[] | null }) => {
-        if (cancelled) return;
-        setRows((data ?? []).map((r) => ({
-          networkType: String(r.network_type ?? "UNKNOWN"),
-          cost: Number(r.cost ?? 0),
-          conversions: Number(r.conversions ?? 0),
-          conversionsValue: Number(r.conversions_value ?? 0),
-          impressions: Number(r.impressions ?? 0),
-          clicks: Number(r.clicks ?? 0),
-        })));
-      }, () => { if (!cancelled) setRows([]); });
+    dbSelect<Record<string, unknown>>("ads_pmax_network_breakdown", {
+      select: "network_type, cost, conversions, conversions_value, impressions, clicks",
+      clientId, filters: [{ op: "gte", column: "month", value: since }],
+    }).then(({ data }) => {
+      if (cancelled) return;
+      setRows(data.map((r) => ({
+        networkType: String(r.network_type ?? "UNKNOWN"),
+        cost: Number(r.cost ?? 0),
+        conversions: Number(r.conversions ?? 0),
+        conversionsValue: Number(r.conversions_value ?? 0),
+        impressions: Number(r.impressions ?? 0),
+        clicks: Number(r.clicks ?? 0),
+      })));
+    }, () => { if (!cancelled) setRows([]); });
 
     return () => { cancelled = true; };
   }, [clientId]);

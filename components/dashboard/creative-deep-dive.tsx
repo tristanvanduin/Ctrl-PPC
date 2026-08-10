@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { TrendingDown, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 // De drempels komen uit de rekenkern en worden hier niet opnieuw gekozen: de kleur van het cijfer
 // moet omslaan op exact hetzelfde punt waarop het oordeel omslaat.
 import { analyzeCreativeFatigue, FATIGUE_DROP, SOFT_DROP, type CreativePeriodRow, type FatigueStatus } from "@/lib/analysis/creative-fatigue";
@@ -91,7 +92,10 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
     async function load() {
       if (channel === "google") {
         const [{ data: perf, error: e1 }, { data: assets, error: e2 }] = await Promise.all([
-          sb!.from("ads_creative_performance").select("ad_id, ad_group_name, campaign_name, month, impressions, clicks").eq("client_id", clientId).gte("month", since),
+          dbSelect<Record<string, unknown>>("ads_creative_performance", {
+            select: "ad_id, ad_group_name, campaign_name, month, impressions, clicks",
+            clientId, filters: [{ op: "gte", column: "month", value: since }],
+          }),
           sb!.from("google_ads_rsa_assets").select("asset_text, field_type, performance_label, impressions, clicks").eq("client_id", clientId).gte("month", since),
         ]);
         if (e1 || e2) { if (!cancelled) { setError((e1 ?? e2)!.message); setPeriodRows([]); } return; }
@@ -106,16 +110,18 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
         if (!cancelled) { setPeriodRows(rows); setAssetRows(arows); }
       } else if (channel === "meta") {
         const [{ data: ads }, { data: daily, error: e }] = await Promise.all([
-          sb!.from("meta_ads").select("ad_id, name").eq("client_id", clientId),
+          dbSelect<{ ad_id: string; name: string | null }>("meta_ads", { select: "ad_id, name", clientId }),
           sb!.from("meta_ad_daily").select("entity_id, date, impressions, link_clicks").eq("client_id", clientId).gte("date", since),
         ]);
         if (e) { if (!cancelled) { setError(e.message); setPeriodRows([]); } return; }
-        const nameMap = new Map((ads ?? []).map((a) => [String(a.ad_id), String(a.name ?? a.ad_id)]));
+        const nameMap = new Map(ads.map((a) => [String(a.ad_id), String(a.name ?? a.ad_id)]));
         const rows = bucketize((daily ?? []) as unknown as Record<string, unknown>[], "entity_id", "link_clicks", (id) => nameMap.get(id) ?? id);
         if (!cancelled) setPeriodRows(rows);
       } else {
         const [{ data: creatives }, { data: daily, error: e }] = await Promise.all([
-          sb!.from("linkedin_creatives").select("creative_urn, headline, post_text").eq("client_id", clientId),
+          dbSelect<{ creative_urn: string; headline: string | null; post_text: string | null }>("linkedin_creatives", {
+            select: "creative_urn, headline, post_text", clientId,
+          }),
           sb!.from("linkedin_creative_daily").select("entity_urn, date, impressions, clicks").eq("client_id", clientId).gte("date", since),
         ]);
         if (e) { if (!cancelled) { setError(e.message); setPeriodRows([]); } return; }

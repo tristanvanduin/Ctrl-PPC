@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Sectie } from "@/components/ui/sectie";
@@ -43,9 +44,9 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
     async function load() {
       const [gRes, mNamesRes, mDailyRes, lNamesRes, lDailyRes] = await Promise.all([
         sb!.from("ads_campaign_monthly").select("campaign_name, month, cost, conversions").eq("client_id", clientId).gte("month", sinceMonth),
-        sb!.from("meta_campaigns").select("campaign_id, name").eq("client_id", clientId),
+        dbSelect<{ campaign_id: string; name: string | null }>("meta_campaigns", { select: "campaign_id, name", clientId }),
         sb!.from("meta_campaign_daily").select("entity_id, spend, conversions").eq("client_id", clientId).gte("date", sinceDay),
-        sb!.from("linkedin_campaigns").select("campaign_urn, name").eq("client_id", clientId),
+        dbSelect<{ campaign_urn: string; name: string | null }>("linkedin_campaigns", { select: "campaign_urn, name", clientId }),
         sb!.from("linkedin_campaign_daily").select("entity_urn, spend, one_click_leads").eq("client_id", clientId).gte("date", sinceDay),
       ]);
       if (cancelled) return;
@@ -73,11 +74,11 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
         return map;
       };
       const mMap = aggByEntity(
-        (mNamesRes.data ?? []).map((c) => ({ id: String(c.campaign_id), name: String(c.name ?? c.campaign_id) })),
+        mNamesRes.data.map((c) => ({ id: String(c.campaign_id), name: String(c.name ?? c.campaign_id) })),
         (mDailyRes.data ?? []).map((r) => ({ entity: String(r.entity_id), spend: num(r.spend), conv: num(r.conversions) })),
       );
       const lMap = aggByEntity(
-        (lNamesRes.data ?? []).map((c) => ({ id: String(c.campaign_urn), name: String(c.name ?? c.campaign_urn) })),
+        lNamesRes.data.map((c) => ({ id: String(c.campaign_urn), name: String(c.name ?? c.campaign_urn) })),
         (lDailyRes.data ?? []).map((r) => ({ entity: String(r.entity_urn), spend: num(r.spend), conv: num(r.one_click_leads) })),
       );
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Sparkles, ImageOff, ArrowUpRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { summarizeCreatives, type CreativeRow } from "@/lib/analysis/creative-summary";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
 import { Laadvlak } from "@/components/ui/laadvlak";
@@ -56,13 +57,13 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
 
     async function load() {
       if (channel === "google") {
-        const { data, error } = await sb!
-          .from("ads_creative_performance")
-          .select("ad_id, ad_group_name, campaign_name, ad_type, headlines, descriptions, final_urls, impressions, clicks, cost, conversions")
-          .eq("client_id", clientId)
-          .gte("month", since)
-          .order("cost", { ascending: false })
-          .limit(12);
+        const { data, error } = await dbSelect<Record<string, unknown>>("ads_creative_performance", {
+          select: "ad_id, ad_group_name, campaign_name, ad_type, headlines, descriptions, final_urls, impressions, clicks, cost, conversions",
+          clientId,
+          filters: [{ op: "gte", column: "month", value: since }],
+          order: { column: "cost", ascending: false },
+          limit: 12,
+        });
         if (error) { if (!cancelled) { setError(error.message); setCards([]); } return; }
         // Metrics per ad_id sommeren over de periode + de tekst uit de eerste rij met assets.
         const byAd = new Map<string, CreativeCard>();
@@ -102,11 +103,13 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
         if (!cancelled) setCards([...byAd.values()].sort((a, b) => b.cost - a.cost));
       } else if (channel === "meta") {
         const [{ data: ads }, { data: creatives }, { data: daily }] = await Promise.all([
-          sb!.from("meta_ads").select("ad_id, name, creative_id").eq("client_id", clientId),
-          sb!.from("meta_creatives").select("creative_id, title, body, thumbnail_url, format, call_to_action_type, link_url").eq("client_id", clientId),
+          dbSelect<Record<string, unknown>>("meta_ads", { select: "ad_id, name, creative_id", clientId }),
+          dbSelect<Record<string, unknown>>("meta_creatives", {
+            select: "creative_id, title, body, thumbnail_url, format, call_to_action_type, link_url", clientId,
+          }),
           sb!.from("meta_ad_daily").select("entity_id, impressions, link_clicks, spend, conversions").eq("client_id", clientId).gte("date", since),
         ]);
-        const cr = new Map((creatives ?? []).map((c) => [String(c.creative_id), c as Record<string, unknown>]));
+        const cr = new Map(creatives.map((c) => [String(c.creative_id), c as Record<string, unknown>]));
         const metrics = new Map<string, { impressions: number; clicks: number; cost: number; conversions: number }>();
         for (const d of (daily ?? []) as Record<string, unknown>[]) {
           const id = String(d.entity_id);
@@ -128,7 +131,9 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
         if (!cancelled) setCards(list.sort((a, b) => b.cost - a.cost).slice(0, 12));
       } else {
         const [{ data: creatives }, { data: daily }] = await Promise.all([
-          sb!.from("linkedin_creatives").select("creative_urn, headline, post_text, image_storage_path, cta_label, landing_url, format").eq("client_id", clientId),
+          dbSelect<Record<string, unknown>>("linkedin_creatives", {
+            select: "creative_urn, headline, post_text, image_storage_path, cta_label, landing_url, format", clientId,
+          }),
           sb!.from("linkedin_creative_daily").select("entity_urn, impressions, clicks, spend, external_website_conversions, one_click_leads").eq("client_id", clientId).gte("date", since),
         ]);
         const metrics = new Map<string, { impressions: number; clicks: number; cost: number; conversions: number }>();

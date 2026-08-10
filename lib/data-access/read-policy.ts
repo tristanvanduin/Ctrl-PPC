@@ -38,6 +38,28 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // Fase 5: is_primary voor de sidebar-groepering (primair direct uitgeklapt, back-up in een
   // ingeklapt mapje). Alleen id/is_primary worden gelezen, nooit agency_id of source hier.
   accounts: { capability: "client:read", clientColumn: "client_id" },
+
+  // Migratie 067: de granulaire Google Ads-, Meta/LinkedIn- en appdata-tabellen die rechtstreeks
+  // met de anon-sleutel werden gelezen. Zie de kop van scripts/migrations/067_rls_granulaire_
+  // kanalen_en_appdata.sql voor de volledige lijst schermen per tabel; deze zeventien zijn precies
+  // de tabellen uit die migratie met een gevonden browser-lezer.
+  meta_breakdown_daily: { capability: "client:read", clientColumn: "client_id" },
+  linkedin_demographic_daily: { capability: "client:read", clientColumn: "client_id" },
+  meta_campaigns: { capability: "client:read", clientColumn: "client_id" },
+  linkedin_campaigns: { capability: "client:read", clientColumn: "client_id" },
+  meta_hourly_performance: { capability: "client:read", clientColumn: "client_id" },
+  meta_ads: { capability: "client:read", clientColumn: "client_id" },
+  meta_creatives: { capability: "client:read", clientColumn: "client_id" },
+  linkedin_creatives: { capability: "client:read", clientColumn: "client_id" },
+  ads_creative_performance: { capability: "client:read", clientColumn: "client_id" },
+  ads_pmax_asset_performance: { capability: "client:read", clientColumn: "client_id" },
+  ads_asset_group_performance_monthly: { capability: "client:read", clientColumn: "client_id" },
+  ads_pmax_network_breakdown: { capability: "client:read", clientColumn: "client_id" },
+  client_files: { capability: "client:read", clientColumn: "client_id" },
+  client_folders: { capability: "client:read", clientColumn: "client_id" },
+  client_notes: { capability: "client:read", clientColumn: "client_id" },
+  client_sync_status: { capability: "client:read", clientColumn: "client_id" },
+  geo_clone_settings: { capability: "client:read", clientColumn: "client_id" },
 };
 
 export function isReadableTable(table: string): boolean {
@@ -48,14 +70,22 @@ export function readPolicyFor(table: string): TableReadPolicy | null {
   return isReadableTable(table) ? READABLE_TABLES[table] : null;
 }
 
-// Bewust een kleine, vaste verzameling operatoren -- precies wat de twintig omgezette lezers
-// nodig hebben (nagemeten, geen giswerk): gelijk, ongelijk, "zit in deze lijst", en de twee
-// vormen van een null-check. Geen vrije operator-string vanuit de client: dat zou net zo goed
-// een eigen SQL-achtige taal zijn, met alle validatieproblemen van dien.
+// Bewust een kleine, vaste verzameling operatoren -- precies wat de omgezette lezers nodig
+// hebben (nagemeten, geen giswerk): gelijk, ongelijk, "zit in deze lijst", groter-of-gelijk en
+// kleiner-of-gelijk voor een rollend datumvenster, en de twee vormen van een null-check. Geen
+// vrije operator-string vanuit de client: dat zou net zo goed een eigen SQL-achtige taal zijn,
+// met alle validatieproblemen van dien.
+//
+// gte/lte kwamen erbij met de granulaire kanaaltabellen (migratie 067): elke omgezette lezer
+// daar filtert op een rollend venster ("laatste 60 dagen", "sinds vorige maand") op de datum-
+// of maandkolom, nooit op de beurskolom -- dezelfde bescherming als bij eq/neq/in hieronder
+// geldt dus automatisch mee.
 export type ReadFilter =
   | { op: "eq"; column: string; value: string | number | boolean }
   | { op: "neq"; column: string; value: string | number | boolean }
   | { op: "in"; column: string; values: Array<string | number> }
+  | { op: "gte"; column: string; value: string | number }
+  | { op: "lte"; column: string; value: string | number }
   | { op: "isNull"; column: string }
   | { op: "notNull"; column: string };
 

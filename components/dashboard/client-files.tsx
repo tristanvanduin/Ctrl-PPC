@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbDelete, dbInsert } from "@/lib/data-access/client-write";
+import { dbSelect } from "@/lib/data-access/client-read";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SopError } from "../insights/sop-trigger-buttons";
 
@@ -228,11 +229,11 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
     if (!supabase) { setLoading(false); return; }
 
     const [{ data: foldersData }, { data: filesData }] = await Promise.all([
-      supabase.from("client_folders").select("*").eq("client_id", clientId).order("name"),
-      supabase.from("client_files").select("*").eq("client_id", clientId).order("uploaded_at", { ascending: false }),
+      dbSelect<ClientFolder>("client_folders", { select: "*", clientId, order: { column: "name" } }),
+      dbSelect<ClientFile>("client_files", { select: "*", clientId, order: { column: "uploaded_at", ascending: false } }),
     ]);
 
-    let loadedFolders = foldersData ?? [];
+    let loadedFolders = foldersData;
 
     // Ensure all default folders exist (adds missing ones for existing clients too).
     // Guard tegen dubbele seeding: maximaal één keer per klant binnen deze mount.
@@ -242,9 +243,8 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
       seededClientRef.current = clientId;
       const inserts = missing.map((name) => ({ name }));
       await dbInsert("client_folders", clientId, inserts);
-      const { data: newFolders } = await supabase
-        .from("client_folders").select("*").eq("client_id", clientId).order("name");
-      loadedFolders = newFolders ?? [];
+      const { data: newFolders } = await dbSelect<ClientFolder>("client_folders", { select: "*", clientId, order: { column: "name" } });
+      loadedFolders = newFolders;
     }
 
     // Ontdubbel op naam (verdedig tegen historisch dubbel geseede mappen); bestanden
@@ -257,7 +257,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
     });
 
     setFolders(loadedFolders);
-    setFiles(filesData ?? []);
+    setFiles(filesData);
     if (!activeFolder && loadedFolders.length > 0) {
       setActiveFolder(loadedFolders[0].name);
     }

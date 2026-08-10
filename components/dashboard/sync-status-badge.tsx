@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, CheckCircle2, AlertTriangle, XCircle, Clock, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelectOne } from "@/lib/data-access/client-read";
 
 type FreshnessStatus = "fresh" | "stale" | "missing" | "partial" | "unknown";
 
@@ -83,11 +84,15 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
   const loadStatus = useCallback(async () => {
     if (!supabase) return;
 
-    const { data } = await supabase
-      .from("client_sync_status")
-      .select("last_sync_at, freshness_status, datasets_available, datasets_total")
-      .eq("client_id", clientId)
-      .maybeSingle();
+    const { data } = await dbSelectOne<{
+      last_sync_at: string | null;
+      freshness_status: string | null;
+      datasets_available: number | null;
+      datasets_total: number | null;
+    }>("client_sync_status", {
+      select: "last_sync_at, freshness_status, datasets_available, datasets_total",
+      clientId,
+    });
 
     if (data) {
       const lastSyncAt = data.last_sync_at as string | null;

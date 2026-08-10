@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Loader2, Layers, TrendingUp, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { buildMetaBreakdownSignals, metaBreakdownTypeLabel, type MetaBreakdownRow } from "@/lib/signals/meta-breakdown";
 import { buildLinkedInDemographicSignals, type LinkedInDemographicRow } from "@/lib/signals/linkedin-demographic";
 import { buildBudgetConcentrationSignals, type BudgetEntityRow } from "@/lib/signals/budget-concentration";
@@ -69,11 +70,16 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
       const asOfDate = today();
       if (channel === "meta") {
         const [{ data, error }, { data: campDaily }, { data: campNames }, { data: acctDaily }, { data: hourly }] = await Promise.all([
-          sb!.from("meta_breakdown_daily").select("breakdown_type, breakdown_value, date, impressions, link_clicks, spend, conversions").eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("meta_breakdown_daily", {
+            select: "breakdown_type, breakdown_value, date, impressions, link_clicks, spend, conversions",
+            clientId, filters: [{ op: "gte", column: "date", value: since }],
+          }),
           sb!.from("meta_campaign_daily").select("entity_id, spend, conversions").eq("client_id", clientId).gte("date", since),
-          sb!.from("meta_campaigns").select("campaign_id, name").eq("client_id", clientId),
+          dbSelect<{ campaign_id: string; name: string | null }>("meta_campaigns", { select: "campaign_id, name", clientId }),
           sb!.from("meta_account_daily").select("date, spend, conversions, link_clicks").eq("client_id", clientId).gte("date", since),
-          sb!.from("meta_hourly_performance").select("hour, spend, conversions").eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("meta_hourly_performance", {
+            select: "hour, spend, conversions", clientId, filters: [{ op: "gte", column: "date", value: since }],
+          }),
         ]);
         if (error) { if (!cancelled) { setError(error.message); setStories([]); } return; }
         const rows: MetaBreakdownRow[] = (data ?? []).map((r) => ({
@@ -102,10 +108,14 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
         if (!cancelled) setStories(merged.triggered);
       } else {
         const [{ data: demo, error: demoErr }, { data: labels }, { data: campDaily }, { data: campNames }, { data: acctDaily }] = await Promise.all([
-          sb!.from("linkedin_demographic_daily").select("pivot_type, pivot_value_urn, date, spend, leads").eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("linkedin_demographic_daily", {
+            select: "pivot_type, pivot_value_urn, date, spend, leads", clientId, filters: [{ op: "gte", column: "date", value: since }],
+          }),
+          // linkedin_urn_labels is een gedeelde opzoektabel zonder client_id: blijft de
+          // rechtstreekse anon-lezer, buiten migratie 067's scope (zie de kop van die migratie).
           sb!.from("linkedin_urn_labels").select("urn, label"),
           sb!.from("linkedin_campaign_daily").select("entity_urn, spend, one_click_leads").eq("client_id", clientId).gte("date", since),
-          sb!.from("linkedin_campaigns").select("campaign_urn, name").eq("client_id", clientId),
+          dbSelect<{ campaign_urn: string; name: string | null }>("linkedin_campaigns", { select: "campaign_urn, name", clientId }),
           sb!.from("linkedin_account_daily").select("date, spend, one_click_leads, clicks").eq("client_id", clientId).gte("date", since),
         ]);
         if (demoErr) { if (!cancelled) { setError(demoErr.message); setStories([]); } return; }

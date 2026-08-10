@@ -87,7 +87,9 @@ export function BrandThemeProvider({
       let override: GeoCloneBranding | null = null;
       if (geoClone) {
         try {
-          const { data: gc } = await sb.from("geo_clone_settings").select("branding").eq("client_id", clientId).eq("geo_clone", geoClone).maybeSingle();
+          const { data: gc } = await dbSelectOne<{ branding: unknown }>("geo_clone_settings", {
+            select: "branding", clientId, filters: [{ op: "eq", column: "geo_clone", value: geoClone }],
+          });
           override = (gc?.branding ?? null) as GeoCloneBranding | null;
         } catch { override = null; }
       }

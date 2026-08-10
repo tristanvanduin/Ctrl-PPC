@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { StickyNote, Plus, Pencil, Trash2, X, Save, Check } from "lucide-react";
 import { supabase, type ClientNote } from "@/lib/supabase";
 import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
+import { dbSelect } from "@/lib/data-access/client-read";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -102,12 +103,10 @@ export function ClientNotes({ clientId }: { clientId: string }) {
     // staan, en dan is niet te zien of het traag is, leeg, of stuk. Ditzelfde patroon liet de
     // sprintpagina oneindig laden.
     try {
-      const { data } = await supabase
-        .from("client_notes")
-        .select("*")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false });
-      setNotes(data ?? []);
+      const { data } = await dbSelect<ClientNote>("client_notes", {
+        select: "*", clientId, order: { column: "created_at", ascending: false },
+      });
+      setNotes(data);
     } finally {
       setLoading(false);
     }
