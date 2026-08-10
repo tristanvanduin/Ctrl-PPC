@@ -14,6 +14,7 @@ import { bouwHierarchie, beschikbareAssen, type GroepAs, type Tak } from "@/lib/
 import { supabase } from "@/lib/supabase";
 import { visibleGeoClones, type GeoCloneVariant } from "@/lib/rai/geo-clone-catalog";
 import { BRAND_NAME } from "@/lib/branding/brand";
+import { SidebarLogo } from "@/components/layout/sidebar-logo";
 
 interface VisibleClient {
   id: string;
@@ -337,9 +338,12 @@ function SidebarInner() {
           Een <p> met dezelfde opmaak. Visueel verandert er niets; de koppenstructuur begint nu
           bij de titel van de pagina zelf. */}
       <div className="p-6 pb-4">
-        <p className="text-xl font-bold tracking-tight text-white">
-          {BRAND_NAME}
-        </p>
+        <div className="flex items-center gap-2.5">
+          <SidebarLogo className="h-7 w-auto shrink-0" />
+          <p className="text-xl font-bold tracking-tight text-white">
+            {BRAND_NAME}
+          </p>
+        </div>
         <p className="mt-1 text-meta text-white/90">SEA Dashboard</p>
       </div>
 

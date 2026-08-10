@@ -280,6 +280,81 @@ function BenchmarkSectie() {
   );
 }
 
+// ── Whitelabel per bureau ────────────────────────────────────────────────
+//
+// De aan/uitknop voor migratie 068: welk bureau mag een eigen logo uploaden in plaats van het
+// Ctrl PPC-icoon (components/dashboard/agency-branding-section.tsx, alleen zichtbaar op de
+// instellingenpagina van dat bureau als deze knop hier op AAN staat). Bewust hier en niet op de
+// instellingenpagina zelf: een bureau schakelt dit niet voor zichzelf in.
+interface WhitelabelAgency {
+  id: string;
+  name: string;
+  whitelabel_actief: boolean;
+}
+
+function WhitelabelSectie() {
+  const [agencies, setAgencies] = useState<WhitelabelAgency[] | null>(null);
+  const [anoniem, setAnoniem] = useState(false);
+  const [bezig, setBezig] = useState<string | null>(null);
+
+  const laad = useCallback(() => {
+    fetch("/api/admin/whitelabel")
+      .then(async (res) => {
+        if (res.status === 401 || res.status === 403) { setAnoniem(true); return; }
+        if (!res.ok) return;
+        const data = await res.json();
+        setAgencies(data.agencies ?? []);
+      })
+      .catch(() => { /* stil: geen reden om de rest van het scherm te breken */ });
+  }, []);
+
+  useEffect(() => { laad(); }, [laad]);
+
+  async function schakel(agency: WhitelabelAgency) {
+    setBezig(agency.id);
+    try {
+      await fetch("/api/admin/whitelabel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agencyId: agency.id, actief: !agency.whitelabel_actief }),
+      });
+      laad();
+    } finally {
+      setBezig(null);
+    }
+  }
+
+  if (anoniem || !agencies) return null;
+
+  return (
+    <section className="mb-8">
+      <h2 className="mb-1 text-title font-semibold text-rm-gray">Whitelabel per bureau</h2>
+      <p className="mb-3 text-meta text-muted-foreground">
+        Alleen bureaus met deze schakelaar aan zien de huisstijl-sectie in hun instellingen en
+        mogen een eigen logo uploaden. Standaard uit: zonder upload blijft het Ctrl PPC-icoon staan.
+      </p>
+      <ul className="space-y-1.5">
+        {agencies.map((a) => (
+          <li key={a.id} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
+            <span className="text-body text-rm-gray">{a.name}</span>
+            <button
+              onClick={() => schakel(a)}
+              disabled={bezig === a.id}
+              className={`rounded-full px-3 py-1 text-micro font-semibold transition-colors ${
+                a.whitelabel_actief
+                  ? "bg-green-100 text-green-800 hover:bg-green-200"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {a.whitelabel_actief ? "Aan" : "Uit"}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [beurzen, setBeurzen] = useState<Client[]>([]);
@@ -396,6 +471,8 @@ export default function AdminPage() {
       </p>
 
       <AdoptieSectie />
+
+      <WhitelabelSectie />
 
       <SegmentatieBulk />
 

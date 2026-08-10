@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, XCircle, Loader2, ExternalLink, Copy, Check, Eye, EyeOff, Building2, FolderPlus, Trash2, Pencil, Plus, X, FolderOpen, Sparkles, Globe, UserRound, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AgencyBrandingSection } from "@/components/dashboard/agency-branding-section";
 import { getAllClients, saveApiClients, type Client } from "@/lib/clients";
 import { getVisibleClientIds, setVisibleClientIds } from "@/lib/visible-clients";
 import {
@@ -695,6 +696,9 @@ export default function SettingsPage() {
           </p>
         </div>
       )}
+
+      {/* ── Huisstijl (alleen zichtbaar met whitelabel_actief) ──────────────── */}
+      <AgencyBrandingSection />
 
       {/* ── Client Visibility ──────────────────────────────── */}
       <ClientVisibilitySection />

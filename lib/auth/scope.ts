@@ -42,6 +42,8 @@ export type ScopeUitkomst = {
   /** Staat de gebruiker in platform_beheerders? Alleen die kijkt over bureaus heen. */
   isPlatform: boolean;
   scope: ClientScope;
+  /** De bureaus (agency_id) waar deze gebruiker lid van is. Voor white-label-logoresolutie. */
+  agencyIds: string[];
 };
 
 /**
@@ -63,20 +65,20 @@ export async function bepaalScope(supabase: ScopeClient, userId: string): Promis
   const bureaus = ((bureauRows.data ?? []) as Array<{ agency_id: unknown }>)
     .map((r) => String(r.agency_id));
 
-  if (isPlatform) return { role, isPlatform, scope: ALL_CLIENTS };
+  if (isPlatform) return { role, isPlatform, scope: ALL_CLIENTS, agencyIds: bureaus };
 
   if (scopeFor(role, []) === ALL_CLIENTS) {
     // Organisatiebrede rol: alle klanten van zijn eigen bureaus. Geen bureau betekent geen
     // klanten -- en dat is juist, want dan hoort iemand nog ergens aan gekoppeld te worden.
     // Stilzwijgend terugvallen op "dan maar alles" is hoe de bureaugrens hier verdween.
-    if (bureaus.length === 0) return { role, isPlatform, scope: [] };
+    if (bureaus.length === 0) return { role, isPlatform, scope: [], agencyIds: bureaus };
     const accountRows = await supabase.from("accounts").select("client_id").in("agency_id", bureaus);
     const scope = ((accountRows.data ?? []) as Array<{ client_id: unknown }>)
       .map((r) => String(r.client_id));
-    return { role, isPlatform, scope };
+    return { role, isPlatform, scope, agencyIds: bureaus };
   }
 
   const scope = ((clientRows.data ?? []) as Array<{ client_id: unknown }>)
     .map((r) => String(r.client_id));
-  return { role, isPlatform, scope };
+  return { role, isPlatform, scope, agencyIds: bureaus };
 }

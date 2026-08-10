@@ -27,6 +27,10 @@ export interface Access {
   scope: ClientScope;
   /** Er wordt niet gefilterd: geen sessie omdat de enforcement uit staat. */
   unrestricted: boolean;
+  /** Het eigen bureau, voor white-label-logoresolutie. Null zonder sessie of zonder bureau. */
+  agencyId: string | null;
+  /** Mag dit bureau een eigen logo tonen in de app-shell? Door een platformbeheerder gezet. */
+  whitelabelActief: boolean;
 }
 
 interface MeResponse {
@@ -35,6 +39,8 @@ interface MeResponse {
   role?: Role | null;
   capabilities?: Capability[];
   scope?: ClientScope;
+  agencyId?: string | null;
+  whitelabelActief?: boolean;
 }
 
 export function useAccess(): Access {
@@ -43,6 +49,8 @@ export function useAccess(): Access {
   const [scope, setScope] = useState<ClientScope>([]);
   const [unrestricted, setUnrestricted] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [agencyId, setAgencyId] = useState<string | null>(null);
+  const [whitelabelActief, setWhitelabelActief] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -50,6 +58,8 @@ export function useAccess(): Access {
       .then(async (res) => (res.ok ? ((await res.json()) as MeResponse) : null))
       .then((data) => {
         if (!live || !data) return;
+        setAgencyId(data.agencyId ?? null);
+        setWhitelabelActief(data.whitelabelActief ?? false);
         // De server zegt nu expliciet of er gehandhaafd wordt, in plaats van dat we het uit een
         // 401 moeten afleiden. Staat de handhaving uit, dan blijft alles zichtbaar.
         if (data.enforced === false) return;
@@ -72,6 +82,8 @@ export function useAccess(): Access {
     loading,
     scope,
     unrestricted,
+    agencyId,
+    whitelabelActief,
     can: (capability) => unrestricted || capabilities.includes(capability),
     canAccessClient: (clientId) => unrestricted || canAccessClient(scope, clientId),
   };
