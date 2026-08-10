@@ -43,6 +43,17 @@ if (daling.ok) {
 const grens = parseHypothesis({ expectedResult: "De CPA blijft onder €25", measurementMetric: "cpa", timeframe: "4 weken" });
 assert(grens.ok && grens.parsed.predicate.direction === "below" && grens.parsed.predicate.threshold === 25, "een absolute grens wint van de relatieve richting: onder 25 is een grens, geen daling");
 
+// Regressie: "minimaal 10%" naast "daling" moet een relatieve daling van 10% opleveren, geen
+// absolute grens van 10. Live data (sprint_hypotheses) bevatte precies deze formulering en werd
+// vóór deze fix gelezen als "cpa boven 10" -- het tegenovergestelde verdict.
+const percentageMetMinimaal = parseHypothesis({ expectedResult: "CPA-daling van minimaal 10% voor het totale account.", measurementMetric: "CPA", timeframe: "2 weken" });
+assert(percentageMetMinimaal.ok && percentageMetMinimaal.parsed.predicate.direction === "decrease", "een percentage bij een relatief woord wint van 'minimaal': dit is een daling, geen absolute grens");
+assert(percentageMetMinimaal.ok && percentageMetMinimaal.parsed.predicate.threshold === undefined && percentageMetMinimaal.parsed.relativeThreshold === 0.1, "de 10% reist als relatieve eis mee, niet als absolute drempel van 10");
+
+// Zonder percentage blijft "minimaal" gewoon een absolute grens, ongewijzigd gedrag.
+const absoluutMetMinimaal = parseHypothesis({ expectedResult: "De ROAS blijft minimaal 3", measurementMetric: "roas", timeframe: "4 weken" });
+assert(absoluutMetMinimaal.ok && absoluutMetMinimaal.parsed.predicate.direction === "above" && absoluutMetMinimaal.parsed.predicate.threshold === 3, "zonder percentage is 'minimaal' nog altijd een absolute ondergrens");
+
 const stijging = parseHypothesis({ expectedResult: "De ROAS stijgt naar een hoger niveau", measurementMetric: "roas", timeframe: "2 weken" });
 assert(stijging.ok && stijging.parsed.predicate.direction === "increase" && stijging.parsed.predicate.threshold === undefined, "een richting zonder getal levert een predicaat zonder drempel: elke beweging telt");
 

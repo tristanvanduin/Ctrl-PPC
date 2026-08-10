@@ -104,7 +104,20 @@ export function parseWindowDays(timeframe: string | null | undefined): number | 
   return null;
 }
 
+// Een percentage bij een relatief richtingwoord wint van een absoluut woord in dezelfde zin.
+// "CPA-daling van minimaal 10%" bevat zowel "daling" (relatief) als "minimaal" (normaal een
+// absolute ondergrens), en zonder deze volgorde won "minimaal" met een absolute grens van 10 --
+// het tegenovergestelde van wat de zin zegt (een daling van minstens 10 procent). Een percentage
+// beschrijft in deze hypotheses altijd een relatieve beweging, nooit een absolute waarde: niemand
+// schrijft "CPA onder 25%". Zonder percentage blijft de bestaande volgorde gelden (absoluut
+// eerst), want "CPA onder €25" heeft geen relatief woord nodig om correct te zijn.
 function detectDirection(text: string): Predicate["direction"] | null {
+  const heeftPercentage = /\d+(?:[.,]\d+)?\s?%/.test(text);
+  if (heeftPercentage) {
+    for (const [pattern, direction] of RELATIVE_PATTERNS) {
+      if (pattern.test(text)) return direction;
+    }
+  }
   for (const [pattern, direction] of ABSOLUTE_PATTERNS) {
     if (pattern.test(text)) return direction;
   }

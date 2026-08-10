@@ -1,6 +1,9 @@
 // =====================================================================
-// STATUS: GEBOUWD EN GETEST, MAAR NOG NIET GEWIRED (code-review must-fix 3).
-// De evaluator wordt nog niet aangeroepen. Activeren vereist de persist bij run-afronding plus de evaluator-job op de O3-cron plus de daily-tabellen. Neem niet aan dat de lerende loop live is.
+// STATUS: gewired sinds commit 1a557ff (16 juli): app/api/cron/evaluate-hypotheses/route.ts
+// roept deze evaluator wekelijks aan (vercel.json) op accountniveau-weekdata. Deze regel zei
+// eerder "nog niet gewired" -- dat klopte niet meer sinds die route bestaat en was daarmee
+// zelf een van de redenen dat de kolomfout hieronder zo lang onopgemerkt bleef: wie deze
+// kop las nam aan dat er niets aan te controleren viel.
 // =====================================================================
 // ============================================================
 // H1: hypothese-evaluator, de deterministische kern

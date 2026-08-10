@@ -152,20 +152,31 @@ function describeOutcome(verdict: string, metric: string, baseline: number | und
   return `${metric} ging van ${b} in het venster voor acceptatie naar ${m} erna; verdict ${verdict}.`;
 }
 
+// BUGFIX: schreef eerder naar verdict/verdict_reason, kolommen die niet bestaan (migratie 021
+// voegde alleen verdict_metrics toe; het verdict zelf hoort naar outcome/result_met/learning uit
+// migratie 010 -- exact de kolommen die lib/memory/client-memory.ts leest). Elke update faalde
+// dus stil: supabase-js gooit niet bij een foutieve kolomnaam, en deze functie controleerde de
+// foutcode niet. Resultaat: 0 van de 127 hypotheses kreeg ooit een outcome, ook al draait deze
+// cron al wekelijks sinds 16 juli. result_met is expliciet null (niet false) bij unmeasurable en
+// expired: "geen oordeel" is een andere uitkomst dan "doel niet gehaald", en client-memory.ts
+// maakt dat onderscheid ook (resultMet == null valt terug op outcome/status).
 async function writeVerdict(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   id: string,
   outcome: { verdict: string; reason: string; metrics: unknown },
   now: Date
 ): Promise<void> {
-  await supabase
+  const resultMet = outcome.verdict === "accepted" ? true : outcome.verdict === "rejected" ? false : null;
+  const { error } = await supabase
     .from("sprint_hypotheses")
     .update({
-      verdict: outcome.verdict,
-      verdict_reason: outcome.reason,
+      outcome: outcome.verdict,
+      result_met: resultMet,
+      learning: outcome.reason,
       verdict_metrics: outcome.metrics,
       evaluated_at: now.toISOString(),
     })
     .eq("id", id)
     .is("evaluated_at", null); // idempotent: een tweede cron-run overschrijft geen bestaand verdict
+  if (error) console.error(`[evaluate-hypotheses] schrijven van uitkomst voor ${id} mislukt: ${error.message}`);
 }
