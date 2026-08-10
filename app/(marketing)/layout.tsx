@@ -29,6 +29,7 @@ const NAV_LINKS = [
   { href: "/pricing", label: "Pricing" },
   { href: "/faq", label: "FAQ" },
   { href: "/blog", label: "Blog" },
+  { href: "/demo", label: "Demo" },
 ];
 
 export default function MarketingLayout({
@@ -104,6 +105,7 @@ export default function MarketingLayout({
             <Link href="/pricing" className="hover:text-off-white">Pricing</Link>
             <Link href="/faq" className="hover:text-off-white">FAQ</Link>
             <Link href="/blog" className="hover:text-off-white">Blog</Link>
+            <Link href="/demo" className="hover:text-off-white">Demo</Link>
             <span>&copy; {new Date().getFullYear()} Ctrl PPC</span>
           </div>
         </div>

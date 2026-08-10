@@ -156,6 +156,7 @@ assert(isPublicPath("/api/public/platform-pulse"), "de platform-pulse-aggregaten
 // /blog meteen naar /login zijn gestuurd, dezelfde fout als bij '/' in Fase 5.
 assert(isPublicPath("/pricing") && isPublicPath("/faq"), "pricing en faq zijn publiek (Fase 7)");
 assert(isPublicPath("/blog") && isPublicPath("/blog/gemiddelde-cpa-verkeerde-vraag"), "blog en blogartikelen zijn publiek (Fase 7)");
+assert(isPublicPath("/demo") && isPublicPath("/api/public/demo-request"), "de demo-CTA en zijn formulierroute zijn publiek (Fase 7)");
 assert(!isPublicPath("/vandaag") && !isPublicPath("/dashboard"), "de ingelogde app is niet publiek");
 assert(!isPublicPath("/api/analysis/monthly"), "API-routes zijn niet publiek");
 assert(!isPublicPath("/api/public/god-mode"), "alleen platform-pulse is publiek, niet elk /api/public-pad per ongeluk");

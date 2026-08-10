@@ -175,6 +175,9 @@ export function isPublicPath(pathname: string): boolean {
   // naar /login zijn gestuurd, dezelfde fout als hierboven maar dan voor drie nieuwe pagina's.
   if (pathname === "/pricing" || pathname === "/faq") return true;
   if (pathname === "/blog" || pathname.startsWith("/blog/")) return true;
+  // De demo-CTA: het formulier zelf en de route waar het naar post moeten allebei zonder
+  // sessie werken, want een bezoeker die een demo aanvraagt heeft er per definitie nog geen.
+  if (pathname === "/demo" || pathname === "/api/public/demo-request") return true;
   return false;
 }
 

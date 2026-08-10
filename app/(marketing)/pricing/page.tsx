@@ -42,10 +42,10 @@ function Tier({ titel, subtitel, punten }: { titel: string; subtitel: string; pu
         ))}
       </ul>
       <a
-        href="/login"
+        href="/demo"
         className="mt-8 block rounded-[6px] border border-neon-indigo/40 px-5 py-3 text-center text-sm font-semibold text-neon-indigo transition-colors hover:bg-neon-indigo/10"
       >
-        Vraag toegang aan
+        Demo aanvragen
       </a>
     </div>
   );

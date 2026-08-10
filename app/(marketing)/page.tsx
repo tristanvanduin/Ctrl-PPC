@@ -77,11 +77,11 @@ export default async function HomePage() {
         </p>
         <div className="mt-10 flex items-center justify-center">
           <a
-            href="/login"
+            href="/demo"
             className="rounded-[6px] px-7 py-3.5 text-sm font-semibold text-midnight-slate transition-transform hover:scale-[1.02]"
             style={{ backgroundColor: "#818cf8", boxShadow: "0 0 40px rgba(129, 140, 248, 0.45)" }}
           >
-            Bekijk het platform
+            Demo aanvragen
           </a>
         </div>
       </section>

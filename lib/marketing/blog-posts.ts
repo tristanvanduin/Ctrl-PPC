@@ -1,8 +1,11 @@
-// Fase 7, Task 3: voorbeeldcontent voor /blog. Er is geen CMS in deze codebase en dat wordt met
-// deze drie posts ook niet geintroduceerd: een vaste lijst is genoeg voor een grid-overzicht en
-// een artikel-template, en een echte redactieworkflow is een aparte beslissing voor later. De
-// inhoud is door mij geschreven als representatief voorbeeld van het soort technische analyse dat
-// deze rubriek zou dragen; het bevat bewust geen verzonnen klantcijfers of onderzoeksclaims.
+// Fase 7, Task 3 (uitgebreid in de SEO/GEO-fase): voorbeeldcontent voor /blog. Er is geen CMS
+// in deze codebase en dat wordt met deze posts ook niet geintroduceerd: een vaste lijst is
+// genoeg voor een grid-overzicht en een artikel-template, en een echte redactieworkflow is een
+// aparte beslissing voor later. De laatste drie (kanaalsynergie, RSA-assets, KPI-relaties) zijn
+// gericht geschreven op zoekopdrachten en LLM-vragen van een specialist die naar precies dit
+// probleem zoekt, en zijn gegrond in echte, bestaande analysecapaciteit (lib/cross-channel/
+// funnel-overlap.ts, rsa-insights-facts.ts, lib/analysis/kpi-relations) -- geen verzonnen
+// klantcijfers of onderzoeksclaims, ook hier niet.
 
 export interface BlogPost {
   slug: string;
@@ -83,6 +86,97 @@ export const BLOG_POSTS: BlogPost[] = [
         "een eigen uitkomst, niet als een verborgen 'nee'. Die laatste stap is waar de meeste " +
         "attributiepogingen stranden: een niet-uitgevoerde hypothese wordt dan alsnog beoordeeld op cijfers " +
         "die er niets mee te maken hadden.",
+    ],
+  },
+  {
+    slug: "kanaalsynergie-bewijzen",
+    titel: "Kanaalsynergie bewijzen tussen Google, Meta en LinkedIn",
+    samenvatting:
+      "Elk kanaal levert zijn eigen rapport, en geen enkel rapport laat zien of de kanalen elkaar versterken of dezelfde warme doelgroep dubbel betalen. Een concrete manier om dat wel te zien.",
+    datum: "2026-07-28",
+    leesminuten: 8,
+    inhoud: [
+      "Vraag een specialist of zijn kanalen elkaar versterken, en het antwoord is bijna altijd een gevoel, " +
+        "geen cijfer. Google Ads rapporteert over Google Ads, Meta rapporteert over Meta, en geen van beide " +
+        "weet dat de ander bestaat. Kanaalsynergie bewijzen betekent dus niet 'nog een rapport erbij', maar " +
+        "een laag die over de kanalen heen naar dezelfde vraag kijkt.",
+      "Die vraag valt uiteen in drie rollen die elke campagne, op elk kanaal, in feite speelt: prospecting " +
+        "(nieuwe vraag aanboren), retargeting (een warme doelgroep terugpakken) en branded capture (vraag " +
+        "vangen die er toch al was, op je eigen merknaam). Een campagne kun je op zijn eigen signalen in een " +
+        "van de drie indelen: draait hij op eigen merktermen, dan is het branded capture. Richt hij zich op " +
+        "een custom audience, websitebezoekers of een klantenlijst, dan is het retargeting. Is de doelgroep " +
+        "breed of een lookalike, of is het campagnetype vraag-genererend (display, video, demand gen), dan " +
+        "is het prospecting.",
+      "Zodra elke campagne op elk kanaal een rol heeft, worden twee dingen zichtbaar die geen enkel los " +
+        "kanaalrapport laat zien. Het eerste is het dubbel-betaal-risico: twee of drie kanalen die allemaal " +
+        "dezelfde warme pool retargeten, wat de blended CPA opdrijft zonder dat een van de losse rapporten " +
+        "daar iets vreemds aan ziet, want binnen elk kanaal apart lijkt de retargeting-campagne prima te " +
+        "presteren. Het tweede is het groeiplafond: een portfolio dat overwegend uit retargeting en branded " +
+        "capture bestaat, zonder een campagne die nieuwe vraag aanboort, groeit niet meer zodra de bestaande " +
+        "pool doorverkocht is, en dat patroon is pas zichtbaar als je alle kanalen naast elkaar legt.",
+      "Wat dit in de praktijk oplevert, hangt af van hoeveel doelgroepdata er beschikbaar is: op Google " +
+        "Ads is de rolclassificatie vandaag volledig, want merktermen en campagnetype staan gewoon in de " +
+        "data die elk account al heeft. Op Meta en LinkedIn is diezelfde classificatie zo goed als de " +
+        "doelgroepdata die eronder ligt, en groeit hij mee zodra die dieper wordt uitgelezen. Een " +
+        "onherkende campagne komt bewust als 'onbekend' terug in plaats van geraden te worden: bij " +
+        "kanaalsynergie is een verkeerde gok duurder dan een eerlijk 'dit weten we nog niet'.",
+    ],
+  },
+  {
+    slug: "rsa-asset-dubbeltelling",
+    titel: "De asset-valkuil in RSA-rapportages: wanneer je topregel een dubbeltelling is",
+    samenvatting:
+      "De meeste RSA-analyses stoppen op ad group-niveau. Ga je een laag dieper, naar losse assets, dan loop je zo een dubbeltelling in die je beste headline juist slechter laat lijken dan hij is.",
+    datum: "2026-08-04",
+    leesminuten: 6,
+    inhoud: [
+      "Een Responsive Search Ad bestaat niet uit één advertentietekst, maar uit een pool van headlines en " +
+        "beschrijvingen die Google zelf combineert. De meeste rapportages stoppen op ad group-niveau: hoe " +
+        "presteert deze RSA als geheel. Dat mist precies het niveau waarop de echte vraag zit, namelijk welke " +
+        "individuele headline of beschrijving het werk doet.",
+      "Ga je een laag dieper, naar performance per asset, dan is er een reden waarom weinig specialisten dat " +
+        "structureel doen: dezelfde impressie, klik of conversie telt mee voor elke asset die in die specifieke " +
+        "combinatie stond. Een headline die toevallig vaak samen met een sterke tweede headline werd getoond, " +
+        "oogt beter dan hij op zichzelf is. Zonder een hierarchie die dat corrigeert, leidt 'onze best " +
+        "presterende headline' zo tot een conclusie die vooral zegt iets over wie hij toevallig naast zich " +
+        "had staan.",
+      "De correctie is geen ingewikkelde statistiek, maar discipline in de volgorde van lezen: eerst de " +
+        "combinaties die het vaakst voorkwamen apart houden van combinaties die zelden getoond zijn, en pas " +
+        "daarna een asset op zijn eigen merites beoordelen, niet op het gemiddelde van elke combinatie waar " +
+        "hij ooit in zat. Wie die hierarchie overslaat, optimaliseert op ruis die eruitziet als een patroon.",
+      "Het is dezelfde reden waarom copy-analyse op asset-niveau (het equivalent op Meta heet creative " +
+        "fatigue, een ander mechanisme met hetzelfde symptoom: een goed cijfer dat een verkeerd verhaal " +
+        "vertelt) een apart soort aandacht verdient, los van de gewone ad group-rapportage. Het is niet " +
+        "meer werk voor meer werk, het is de plek waar de dubbeltelling anders onopgemerkt blijft.",
+    ],
+  },
+  {
+    slug: "acht-kpi-relaties-die-rapportages-missen",
+    titel: "Acht KPI-relaties die de meeste rapportages nooit tegen elkaar afzetten",
+    samenvatting:
+      "Een rapportage zet CPA, CTR en bereik meestal los van elkaar neer. Het signaal zit vaak niet in een van de twee, maar in de verhouding ertussen.",
+    datum: "2026-08-10",
+    leesminuten: 7,
+    inhoud: [
+      "De meeste rapportages behandelen elke KPI als een eigen rijtje: CPA deze maand, CTR deze maand, " +
+        "bereik deze maand. Los bekeken zegt geen van de drie iets fout, en toch kan de combinatie een " +
+        "probleem verbergen dat pas zichtbaar wordt zodra je twee KPI's expliciet tegen elkaar afzet.",
+      "Een paar concrete voorbeelden. CPA-decompositie splitst een gestegen CPA uit naar zijn twee " +
+        "mogelijke oorzaken, een gedaalde CTR of een gestegen CPC, want de vervolgstap is voor allebei " +
+        "anders. Een belofte-kloof zet de boodschap in de advertentie af tegen wat de landingspagina " +
+        "daadwerkelijk levert: een hoge CTR met een lage conversieratio is vaak geen targetingprobleem maar " +
+        "een verwachtingenprobleem. Vanity-engagement herkent een campagne met veel interactie en weinig " +
+        "waarde, het soort cijfer dat in een rapportage goed oogt en in de omzet niets doet.",
+      "De andere vijf volgen dezelfde logica: verzadiging (herhaalde vertoning aan dezelfde mensen zonder " +
+        "extra rendement), bereik-verdunning (een groeiend bereik met een dalende relevantie per persoon), " +
+        "waarde-mix (conversies die in aantal stijgen maar in waarde dalen), herhaling-versus-bereik (frequency " +
+        "die oploopt terwijl bereik stilstaat, een teken dat de doelgroep is uitgeput) en dure zichtbaarheid " +
+        "(een topplek die meer kost dan hij aan extra conversies oplevert). Acht relaties, en geen ervan is " +
+        "zichtbaar in een rapportage die elke KPI apart neerzet.",
+      "Wat ze gemeen hebben: elke relatie draait om twee metrics die vrijwel nooit op dezelfde rij van een " +
+        "rapportage staan, laat staan expliciet tegen elkaar afgezet worden. Dat is geen onwil van wie de " +
+        "rapportage bouwt, het is gewoon niet waar een standaardoverzicht voor gebouwd is. Het is wel precies " +
+        "waar de volgende beslissing vandaan komt.",
     ],
   },
 ];
