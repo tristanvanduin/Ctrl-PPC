@@ -172,6 +172,13 @@ const TOEGESTANE_WEZEN = new Map([
   ["lib/scheduler/pump-plan.ts", "hervatbare maandrun; wacht op runNextSteps, de IO-orkestratie"],
   ["lib/scheduler/core.ts", "hoort bij pump-plan"],
   ["lib/meta/vision/attribute-source.ts", "bewaakt dat kleurclaims uit de pixel-laag komen; wacht op de vision-pijplijn"],
+  ["lib/context/context-types.ts",
+    "EXECUTION_PLAN.md Stap 5: businessEventsUitRaiEvents() plus de herexport van BusinessEvent/" +
+    "ContextAnalysis. Bewust alleen interface en mapping, geen route roept dit vandaag aan. " +
+    "Krijgt een consument zodra een analyse-route contextinvoer nodig heeft."],
+  ["lib/context/context-engine.ts",
+    "EXECUTION_PLAN.md Stap 5: het ContextEngine-contract, met opzet zonder implementatie. " +
+    "Hoort bij lib/context/context-types.ts hierboven."],
 
   // NAGEKEKEN 2026-08-05. Deze drie stonden hier als "vermoedelijk ingehaald door een opvolger",
   // en dat hield geen van de drie stand. Ik heb de exports naast elkaar gelegd:

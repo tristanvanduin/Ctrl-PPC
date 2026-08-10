@@ -53,3 +53,25 @@ export interface ChannelAnalysisResult {
   signals: Signal[];
   summary?: string;
 }
+
+// Stap 5 (EXECUTION_PLAN.md): Context Intelligence. Zelfde regel als hierboven: alleen wat
+// lib/context/context-types.ts en context-engine.ts echt gebruiken, niet de volledige
+// blueprint-vorm.
+
+/**
+ * Eén business event, gemapt uit client_settings.rai_events (de enige harde bron die vandaag
+ * bestaat, zie lib/context/context-types.ts). Nooit door een AI verzonnen: dit is altijd een
+ * doorvertaling van wat een gebruiker zelf heeft ingevuld in Instellingen.
+ */
+export interface BusinessEvent extends TenantScoped {
+  id: string;
+  name: string;
+  cadence: "annual" | "biennial" | "custom" | null;
+  editions: { date: string; label: string }[];
+}
+
+/** De contextlaag voor één klant: welke business events er lopen. Krijgt meer velden zodra een
+ *  consument ze nodig heeft (zie ContextEngine in lib/context/context-engine.ts). */
+export interface ContextAnalysis extends TenantScoped {
+  businessEvents: BusinessEvent[];
+}
