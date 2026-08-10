@@ -16,6 +16,10 @@ import {
   type GoogleAccountMonthlyRow,
 } from "@/lib/events/account-event-points";
 import type { Cadence, Edition } from "@/lib/rai/geo-clone-settings";
+import { buildEditions, pickCurrentEdition } from "@/lib/rai/geo-clone-analysis";
+import { previousEditionFor } from "@/lib/rai/event-comparison";
+import type { DailyPoint } from "@/lib/rai/event-time-axis";
+import { buildEditionCurves, deriveCpaCurve } from "@/lib/analysis/event-curves";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 
@@ -76,17 +80,63 @@ export async function GET(request: NextRequest) {
   }
   if (channels.length === 0) return Response.json({ error: "Geen campagnedata voor deze klant" }, { status: 404 });
 
+  const asOfDate = today();
+  const cadence = event.cadence ?? "annual";
+  const eventEditions = event.editions ?? [];
+
   const result = analyzeAccountEvent({
     eventId,
     eventName: (event.name ?? event.abbrev ?? eventId).trim(),
-    cadence: event.cadence ?? "annual",
-    editions: event.editions ?? [],
+    cadence,
+    editions: eventEditions,
     conversionsTarget,
-    asOfDate: today(),
+    asOfDate,
     channels,
   });
 
+  // Fase 6: de trendlijnen voor de Forecaster-UI. Zelfde editie-resolutie als analyzeAccountEvent
+  // hierboven (dezelfde pure functies, dezelfde invoer), maar dan om de VOLLEDIGE curve op te
+  // halen in plaats van alleen het huidige punt -- dat geeft cumulativeCurve() al, alleen
+  // analyzeAccountEvent vraagt er zelf niet om. Geen tweede berekening, wel een tweede aanroep;
+  // zie lib/analysis/event-curves.ts voor waarom dat hier hoort en niet in lib/events.
+  const editionsBuilt = buildEditions(eventId, cadence, eventEditions);
+  const currentEdition = pickCurrentEdition(editionsBuilt, asOfDate);
+  const previousEdition = currentEdition ? previousEditionFor(editionsBuilt, currentEdition.editionId).edition : null;
+
+  type CpaCurves = { current: ReturnType<typeof deriveCpaCurve>; previous: ReturnType<typeof deriveCpaCurve> };
+  const perChannelSpendCurves: Record<string, ReturnType<typeof buildEditionCurves>> = {};
+  const perChannelConvCurves: Record<string, ReturnType<typeof buildEditionCurves>> = {};
+  const perChannelCpaCurves: Record<string, CpaCurves> = {};
+  const allConvPoints: DailyPoint[] = [];
+  const allCostPoints: DailyPoint[] = [];
+
+  for (const c of channels) {
+    const convCurves = buildEditionCurves(c.points, currentEdition, previousEdition);
+    const costCurves = buildEditionCurves(c.costPoints, currentEdition, previousEdition);
+    perChannelConvCurves[c.channel] = convCurves;
+    perChannelSpendCurves[c.channel] = costCurves;
+    perChannelCpaCurves[c.channel] = {
+      current: deriveCpaCurve(convCurves.current, costCurves.current),
+      previous: deriveCpaCurve(convCurves.previous, costCurves.previous),
+    };
+    allConvPoints.push(...c.points);
+    allCostPoints.push(...c.costPoints);
+  }
+  const blendedConvCurves = buildEditionCurves(allConvPoints, currentEdition, previousEdition);
+  const blendedCostCurves = buildEditionCurves(allCostPoints, currentEdition, previousEdition);
+
   return Response.json({
+    channels: channels.map((c) => c.channel),
+    curves: {
+      conversions: { blended: blendedConvCurves, ...perChannelConvCurves },
+      spend: { blended: blendedCostCurves, ...perChannelSpendCurves },
+      cpa: {
+        blended: { current: deriveCpaCurve(blendedConvCurves.current, blendedCostCurves.current), previous: deriveCpaCurve(blendedConvCurves.previous, blendedCostCurves.previous) },
+        ...perChannelCpaCurves,
+      },
+    },
+    perChannelForecast: result.perChannelForecast,
+    blendedForecast: result.blendedForecast,
     pacing: {
       eventId,
       eventName: result.eventName,

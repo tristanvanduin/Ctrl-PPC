@@ -27,6 +27,7 @@ import { MetaCreativeAnalyses } from "../insights/meta-creative-analyses";
 import { SignalAnalysisCard } from "./signal-analysis-card";
 import { CrossChannelAnalyses } from "./cross-channel-analyses";
 import { ChannelForecast } from "./channel-forecast";
+import { EventForecaster } from "./event-forecaster";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
 import { DEMO_GREENTECH_ID } from "@/lib/demo/greentech-mock";
@@ -439,6 +440,10 @@ export function ClientDashboard({ client }: { client: Client }) {
               ) : (
                 <>
                   <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
+                  {/* Fase 6: de T-minus Forecaster, los van de kalenderjaar-prognose hieronder en
+                      los van de kanaal-subtab hierboven (hij heeft zijn eigen kanaal-toggle). Toont
+                      zichzelf niet als de klant geen events met een editiedatum heeft ingesteld. */}
+                  <EventForecaster clientId={client.id} />
                   {channel === "google" && <GoogleForecast clientId={client.id} />}
                   {channel === "blended" && (
                     <>
