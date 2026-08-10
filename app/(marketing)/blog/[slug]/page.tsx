@@ -19,7 +19,28 @@ export async function generateMetadata({
   return {
     title: `${post.titel}: Ctrl PPC`,
     description: post.samenvatting,
-    openGraph: { title: post.titel, description: post.samenvatting, type: "article" },
+    alternates: { canonical: `/blog/${post.slug}` },
+    openGraph: {
+      title: post.titel,
+      description: post.samenvatting,
+      type: "article",
+      publishedTime: post.datum,
+    },
+  };
+}
+
+// BlogPosting-structured data: geeft een crawler (en een AI-antwoordmachine) de datum, auteur
+// en samenvatting zonder dat opnieuw uit de opgemaakte pagina te hoeven raden.
+function articleJsonLd(post: NonNullable<ReturnType<typeof getBlogPost>>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.titel,
+    description: post.samenvatting,
+    datePublished: post.datum,
+    author: { "@type": "Organization", name: "Ctrl PPC" },
+    publisher: { "@type": "Organization", name: "Ctrl PPC" },
+    mainEntityOfPage: { "@type": "WebPage", "@id": `https://ctrlppc.com/blog/${post.slug}` },
   };
 }
 
@@ -38,6 +59,11 @@ export default async function BlogArticlePage({
 
   return (
     <article className="mx-auto max-w-2xl px-6 py-24">
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd(post)) }}
+      />
       <Link href="/blog" className="inline-flex items-center gap-1.5 text-sm text-off-white/50 hover:text-off-white">
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
         Alle artikelen

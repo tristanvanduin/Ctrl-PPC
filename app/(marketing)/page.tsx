@@ -14,11 +14,35 @@ export const metadata: Metadata = {
   title: "Ctrl PPC: Performance Intelligence Platform",
   description:
     "Stop met dashboards bouwen. Start met beslissingen nemen. Eén platform dat signalen omzet in getoetste hypotheses, per kanaal, zonder limiet op accounts.",
+  alternates: { canonical: "/" },
   openGraph: {
     title: "Ctrl PPC: Performance Intelligence Platform",
     description: "Stop met dashboards bouwen. Start met beslissingen nemen.",
     type: "website",
   },
+};
+
+// Organization + SoftwareApplication: wat een crawler of AI-antwoordmachine over het product
+// zelf moet weten, los van de opgemaakte hero-tekst. offers.price ontbreekt bewust -- er staat
+// nergens een bedrag vastgelegd in de codebase, en een verzonnen prijs in structured data is
+// nog misleidender dan een op de pagina zelf, want dit is precies wat een zoekmachine of
+// AI-systeem als feit overneemt.
+const ORGANIZATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Ctrl PPC",
+  url: "https://ctrlppc.com",
+  description: "Performance Intelligence Platform voor performance marketing.",
+};
+
+const SOFTWARE_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Ctrl PPC",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description:
+    "Leest advertentie-accounts over kanalen heen, stelt getoetste hypotheses voor via een 6-staps Decision Framework, en observeert het resultaat zonder zelf wijzigingen door te voeren.",
 };
 
 export default async function HomePage() {
@@ -27,6 +51,16 @@ export default async function HomePage() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }}
+      />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_JSON_LD) }}
+      />
       <section className="mx-auto max-w-4xl px-6 pt-24 pb-16 text-center sm:pt-32">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
           Performance Intelligence Platform

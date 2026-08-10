@@ -8,6 +8,12 @@ import { Check, Infinity as InfinityIcon } from "lucide-react";
 export const metadata: Metadata = {
   title: "Pricing: Ctrl PPC",
   description: "Voor in-house teams en bureaus. Geen limiet op accounts, geen aparte rekening per klant.",
+  alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "Pricing: Ctrl PPC",
+    description: "Voor in-house teams en bureaus. Geen limiet op accounts, geen aparte rekening per klant.",
+    type: "website",
+  },
 };
 
 const IN_HOUSE_PUNTEN = [

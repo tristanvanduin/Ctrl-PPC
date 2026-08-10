@@ -5,6 +5,12 @@ import { BLOG_POSTS } from "@/lib/marketing/blog-posts";
 export const metadata: Metadata = {
   title: "Blog: Ctrl PPC",
   description: "Technische analyses over performance marketing: attributie, biedstrategie en wat een dashboard je niet vertelt.",
+  alternates: { canonical: "/blog" },
+  openGraph: {
+    title: "Blog: Ctrl PPC",
+    description: "Technische analyses over performance marketing: attributie, biedstrategie en wat een dashboard je niet vertelt.",
+    type: "website",
+  },
 };
 
 function formatDatum(iso: string): string {

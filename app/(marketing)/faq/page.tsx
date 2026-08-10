@@ -8,6 +8,12 @@ import { FaqAccordion, type FaqItem } from "@/components/marketing/faq-accordion
 export const metadata: Metadata = {
   title: "FAQ: Ctrl PPC",
   description: "Veelgestelde vragen over data-privacy, RLS en het verschil tussen observatie en automatische executie.",
+  alternates: { canonical: "/faq" },
+  openGraph: {
+    title: "FAQ: Ctrl PPC",
+    description: "Veelgestelde vragen over data-privacy, RLS en het verschil tussen observatie en automatische executie.",
+    type: "website",
+  },
 };
 
 const VRAGEN: FaqItem[] = [
@@ -56,9 +62,29 @@ const VRAGEN: FaqItem[] = [
   },
 ];
 
+// FAQPage-structured data: dezelfde vragen/antwoorden als hierboven, machineleesbaar. Dit is
+// wat Google's FAQ-rich-results leest en wat een AI-antwoordmachine (ChatGPT, Perplexity) het
+// makkelijkst letterlijk kan citeren -- geen aparte tekst, gewoon VRAGEN zelf als JSON-LD.
+function faqJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: VRAGEN.map((v) => ({
+      "@type": "Question",
+      name: v.vraag,
+      acceptedAnswer: { "@type": "Answer", text: v.antwoord },
+    })),
+  };
+}
+
 export default function FaqPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-24">
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd()) }}
+      />
       <div className="text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">FAQ</p>
         <h1 className="mt-4 font-marketing-heading text-4xl font-extrabold text-off-white">

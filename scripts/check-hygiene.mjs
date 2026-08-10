@@ -131,10 +131,15 @@ for (const [f, tekst] of inhoud) {
   }
 }
 
-// Next.js roept deze bestanden zelf aan; die hebben per definitie geen importeur.
+// Next.js roept deze bestanden zelf aan; die hebben per definitie geen importeur. robots.ts,
+// sitemap.ts en opengraph-image.tsx kwamen erbij toen die conventie voor het eerst gebruikt
+// werd (Fase 7) en meteen als drie "wezen" verscheen -- dezelfde categorie als page.tsx, alleen
+// nog niet op de lijst.
 const INGANGEN = new Set([
   "page.tsx", "layout.tsx", "route.ts", "error.tsx", "loading.tsx",
   "not-found.tsx", "global-error.tsx", "middleware.ts", "proxy.ts",
+  "robots.ts", "sitemap.ts", "manifest.ts",
+  "opengraph-image.tsx", "twitter-image.tsx", "icon.tsx", "apple-icon.tsx",
 ]);
 const isIngang = (f) =>
   (f.startsWith("app/") && INGANGEN.has(basename(f))) ||
