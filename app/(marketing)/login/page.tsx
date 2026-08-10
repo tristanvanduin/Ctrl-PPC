@@ -47,13 +47,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-card p-6 shadow-sm">
-        <h1 className="mb-1 text-lg font-semibold text-gray-900">Inloggen</h1>
-        <p className="mb-5 text-sm text-gray-500">Toegang is op uitnodiging.</p>
+    <div className="flex min-h-[calc(100vh-73px)] items-center justify-center px-4">
+      <div className="w-full max-w-sm rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6">
+        <h1 className="mb-1 text-lg font-semibold text-off-white">Inloggen</h1>
+        <p className="mb-5 text-sm text-off-white/50">Toegang is op uitnodiging.</p>
         <form onSubmit={login} className="space-y-4">
           <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-off-white/70">
               E-mail
             </label>
             <input
@@ -62,11 +62,11 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-[6px] border border-off-white/15 bg-midnight-slate px-3 py-2 text-sm text-off-white focus:border-neon-indigo focus:outline-none"
             />
           </div>
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="mb-1 block text-sm font-medium text-off-white/70">
               Wachtwoord
             </label>
             <input
@@ -75,14 +75,15 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-[6px] border border-off-white/15 bg-midnight-slate px-3 py-2 text-sm text-off-white focus:border-neon-indigo focus:outline-none"
             />
           </div>
-          {melding && <p className="text-sm text-red-600">{melding}</p>}
+          {melding && <p className="text-sm text-amber-waste">{melding}</p>}
           <button
             type="submit"
             disabled={bezig}
-            className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
+            className="w-full rounded-[6px] px-3 py-2 text-sm font-medium text-midnight-slate disabled:opacity-60"
+            style={{ backgroundColor: "#818cf8" }}
           >
             {bezig ? "Bezig..." : "Inloggen"}
           </button>
@@ -90,7 +91,7 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={wachtwoordVergeten}
-          className="mt-4 text-sm text-gray-500 underline hover:text-gray-700"
+          className="mt-4 text-sm text-off-white/50 underline hover:text-off-white"
         >
           Wachtwoord vergeten
         </button>

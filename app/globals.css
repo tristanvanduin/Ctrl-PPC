@@ -178,6 +178,25 @@
   --color-rm-orange-ink: var(--rm-orange-ink, var(--brand-accent, #F16B37));
   --color-rm-gray: var(--rm-gray, #32373c);
   --color-rm-border: var(--rm-border, #E1E5F2);
+
+  /* ── Blueprint v2.0: de marketingsite (Fase 7) ──────────────────────────
+     Vaste kleuren, niet gekoppeld aan .dark / de licht-donker-schakelaar: de marketingsite
+     (Homepage, Pricing, FAQ, Blog, /login) heeft altijd hetzelfde donkere command-center-
+     uiterlijk, ongeacht de themavoorkeur van een ingelogde gebruiker op een ander tabblad. */
+  --color-midnight-slate: #121820;
+  --color-midnight-slate-raised: #1a222d;
+  --color-off-white: #f4f3ef;
+  --color-neon-indigo: #818cf8;
+  --color-amber-waste: #f5960b;
+  --color-copper: #f16b37;
+
+  /* Eigen lettertype-tokens, los van --font-heading/--font-mono: die twee horen bij het
+     ingelogde dashboard (Gilroy/Ubuntu, de systeem-mono-stapel) en blijven ongewijzigd. De
+     marketingsite laadt Plus Jakarta Sans en JetBrains Mono zelf in app/(marketing)/layout.tsx;
+     deze tokens wijzen naar de CSS-variabelen die next/font daar blootlegt, met een leesbare
+     terugval voor het korte moment vóór het lettertype geladen is. */
+  --font-marketing-heading: var(--font-jakarta), "Satoshi", ui-sans-serif, system-ui, sans-serif;
+  --font-marketing-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
 :root {

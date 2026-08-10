@@ -1,23 +1,17 @@
 import type { Metadata } from "next";
-import { Ubuntu } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Sidebar } from "@/components/layout/sidebar";
-import { TopBar } from "@/components/layout/top-bar";
 import { THEMA_INIT_SCRIPT } from "@/components/ui/thema-schakelaar";
 import { BRAND_NAME } from "@/lib/branding/brand";
 import "./globals.css";
 import { CANONIEK_DOMEIN } from "@/lib/domein";
 
-const ubuntu = Ubuntu({
-  variable: "--font-ubuntu",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "700"],
-});
-
-// Open Sans stond hier in drie gewichten, en --font-open-sans werd nergens gebruikt. Het kwam
-// alleen binnen via --font-mono, waar het niet hoorde omdat het geen monospace-lettertype is
-// (zie de toelichting in globals.css). Dat waren dus drie lettertypebestanden per paginabezoek
-// voor een verwijzing die nergens naartoe leidde.
+// Fase 7: de root-layout is bewust minimaal. Tot deze fase rendeerde hij zelf de dashboard-
+// chrome (Sidebar/TopBar), voor élke route, ook / en /login voor een anonieme bezoeker -- die
+// zag dan de interne klantnavigatie en een lege "KLANTEN (0)"-lijst. De chrome staat nu in
+// app/(app)/layout.tsx (ingelogd, met Sidebar/TopBar en het Ubuntu-lettertype) en
+// app/(marketing)/layout.tsx (voor login, / en de marketingpagina's, met een eigen donker
+// thema en eigen lettertypes). Deze laag houdt alleen over wat écht voor alle routes geldt:
+// het HTML-skelet, de flits-preventie voor het thema, en de tooltip-provider.
 
 export const metadata: Metadata = {
   // metadataBase op het canonieke domein: zonder deze regel maakt Next relatieve URL's in
@@ -25,7 +19,7 @@ export const metadata: Metadata = {
   // domeinen levert dat verwijzingen naar .nl op, terwijl daar alleen een doorverwijzing staat.
   metadataBase: new URL(`https://${CANONIEK_DOMEIN}`),
   alternates: { canonical: "/" },
-  title: `${BRAND_NAME} — SEA Dashboard`,
+  title: `${BRAND_NAME}: SEA Dashboard`,
   description: "Revenue & Conversie Forecasting Dashboard voor het SEA-team",
 };
 
@@ -35,26 +29,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="nl"
-      className={`${ubuntu.variable} h-full antialiased`}
-    >
+    <html lang="nl" className="h-full antialiased">
       <head>
         {/* Vóór React en vóór de eerste verf: anders laadt de pagina in het licht en klapt hij een
             fractie later om. Die witte flits op een donker scherm is precies het moment waarop een
             product er goedkoop uitziet. */}
         <script dangerouslySetInnerHTML={{ __html: THEMA_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-full flex">
-        <TooltipProvider>
-          <Sidebar />
-          <div className="flex-1 flex flex-col min-h-screen ml-72">
-            <TopBar />
-            <main className="flex-1 p-6">
-              {children}
-            </main>
-          </div>
-        </TooltipProvider>
+      <body className="min-h-screen">
+        <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>
   );
