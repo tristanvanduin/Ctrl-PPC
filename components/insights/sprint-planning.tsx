@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Fragment } from "react";
-import { OWNER_TEAM, OWNER_CLIENT, ownerLabel, toewijzingLabel, normalizeOwner, normalizeSoort } from "@/lib/branding/brand";
+import { OWNER_TEAM, OWNER_CLIENT, ownerLabel, toewijzingLabel, normalizeSoort } from "@/lib/branding/brand";
 import { EigenaarKiezer, haalTeam, type Teamlid } from "./eigenaar-kiezer";
 import { Download, ChevronDown, ChevronUp, Loader2, Calendar, Plus, X, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +11,8 @@ import { dbInsert, dbUpdate, dbUpdateIn } from "@/lib/data-access/client-write";
 import { ChannelFilter, ChannelBadge } from "./channel-filter";
 import { today } from "@/lib/reporting-date";
 import { metriekLabel } from "@/lib/util/tekst";
+import { parseHypothesis } from "@/lib/learning/hypothesis-parser";
+import { importSprintCsv, type SprintCsvImportSummary } from "@/lib/learning/sprint-csv-import";
 
 interface SprintItem {
   id: string;
@@ -39,6 +41,7 @@ interface HypothesisRef {
   status: string;
   ice_total: number;
   source: string | null;
+  expected_result: string | null;
 }
 
 const STATUS_OPTIONS = [
@@ -70,10 +73,12 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   const [newHypothesis, setNewHypothesis] = useState("");
   const [newMetrics, setNewMetrics] = useState("");
   const [newTimeframe, setNewTimeframe] = useState("");
+  const [newExpectedResult, setNewExpectedResult] = useState("");
   const [showAddTask, setShowAddTask] = useState<string | null>(null); // hypothesis_id or "standalone"
   const [newTask, setNewTask] = useState("");
   const [newOwner, setNewOwner] = useState(OWNER_TEAM);
   const [importing, setImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<SprintCsvImportSummary | null>(null);
   // Eén keer voor de hele tabel, niet per rij — zie haalTeam.
   const [team, setTeam] = useState<Teamlid[]>([]);
   // ok=false betekent "niet opgehaald", niet "leeg". De kiezer zegt daardoor iets anders.
@@ -95,8 +100,8 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     try {
     const [{ data: itemsData }, { data: hypData }] = await Promise.all([
       dbSelect<SprintItem>("sprint_items", { select: "*", clientId, order: { column: "week_number", ascending: true } }),
-      dbSelect<{ id: string; hypothesis: string; status: string; ice_total: number; source: string | null }>("sprint_hypotheses", {
-        select: "id, hypothesis, status, ice_total, source", clientId,
+      dbSelect<{ id: string; hypothesis: string; status: string; ice_total: number; source: string | null; expected_result: string | null }>("sprint_hypotheses", {
+        select: "id, hypothesis, status, ice_total, source, expected_result", clientId,
         filters: [{ op: "in", column: "status", values: ["accepted", "completed"] }],
       }),
     ]);
@@ -192,6 +197,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
       hypothesis: newHypothesis.trim(),
       measurement_metric: newMetrics.trim() || null,
       timeframe: newTimeframe.trim() || null,
+      expected_result: newExpectedResult.trim() || null,
       status: "accepted",
       accepted_at: new Date().toISOString(),
     });
@@ -212,6 +218,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     setNewHypothesis("");
     setNewMetrics("");
     setNewTimeframe("");
+    setNewExpectedResult("");
     setNewTask("");
     setShowAddHypothesis(false);
     await refresh();
@@ -235,92 +242,19 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     await refresh();
   }
 
+  // De ontleding, formaatdetectie en het wegschrijven zitten in lib/learning/sprint-csv-import.ts
+  // -- gedeeld met components/dashboard/client-files.tsx, dat dezelfde kolomstructuur leest bij
+  // een upload in de map "Sprintplanning". Zie de kop van die module voor waarom: twee losse
+  // implementaties waren al uit de pas gaan lopen.
   async function importCSV(file: File) {
     if (!supabase) return;
     setImporting(true);
+    setImportSummary(null);
 
     try {
       const text = await file.text();
-      const lines = text.split("\n");
-      const headers = lines[0].split(",").map((h) => h.trim());
-
-      // Parse CSV with quote handling
-      const rows: Record<string, string>[] = [];
-      let currentRow: string[] = [];
-      let inQuote = false;
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!inQuote) currentRow = [];
-
-        let field = inQuote ? currentRow[currentRow.length - 1] + "\n" : "";
-        for (let j = 0; j < line.length; j++) {
-          const ch = line[j];
-          if (ch === '"') { inQuote = !inQuote; }
-          else if (ch === "," && !inQuote) { currentRow.push(field); field = ""; }
-          else { field += ch; }
-        }
-        if (inQuote) { currentRow[currentRow.length - 1] = field; continue; }
-        currentRow.push(field);
-
-        const obj: Record<string, string> = {};
-        for (let k = 0; k < headers.length; k++) obj[headers[k]] = (currentRow[k] || "").trim();
-        if (obj["Taak"] || obj["taak"] || obj["Task"]) rows.push(obj);
-      }
-
-      const statusMap: Record<string, string> = {
-        "Klaar": "done", "To Do": "todo", "in Planning": "in_planning",
-        "On going": "ongoing", "Backlog / Verlopen": "expired", "Backlog": "backlog", "Verlopen": "expired",
-      };
-
-      // Group by hypothesis
-      const groups = new Map<string, typeof rows>();
-      for (const row of rows) {
-        const hyp = row["Hypothese"] || row["hypothese"] || "(geen hypothese)";
-        if (!groups.has(hyp)) groups.set(hyp, []);
-        groups.get(hyp)!.push(row);
-      }
-
-      for (const [hypothesis, tasks] of groups) {
-        const allDone = tasks.every((t) => statusMap[t["Status"]] === "done");
-        const metrics = tasks[0]["Metrics"] || tasks[0]["metrics"] || null;
-        const timeframe = tasks[0]["Looptijd tot Beoordeling"] || tasks[0]["looptijd"] || null;
-
-        const { data: hypRows } = await dbInsert("sprint_hypotheses", clientId, {
-          hypothesis: hypothesis === "(geen hypothese)" ? "Import: geen hypothese" : hypothesis,
-          measurement_metric: metrics, timeframe,
-          status: allDone ? "completed" : "accepted",
-          accepted_at: new Date().toISOString(),
-        });
-        const hyp = hypRows?.[0] as { id: string } | undefined;
-
-        if (!hyp) continue;
-
-        const sprintItems = tasks.map((t) => ({
-          hypothesis_id: hyp.id,
-          week_number: t["Week"] || t["week"] ? parseInt(t["Week"] || t["week"]) : null,
-          task: t["Taak"] || t["taak"] || t["Task"] || "(geen taak)",
-          status: statusMap[t["Status"] || t["status"]] || "todo",
-          // De KANT komt uit "Kant" en niet uit "Verantwoordelijke". Dat onderscheid is de reden
-          // dat de rommel in deze kolom ooit is ontstaan: die kolom bevat sinds de toewijzing een
-          // persoons-, functie- of bedrijfsnaam, en die als kant terugschrijven maakt van elke
-          // bureaupersoon stilzwijgend een klant-taak — `normalizeOwner` kent de naam immers niet.
-          //
-          // Oudere bestanden hebben geen Kant-kolom; daar stond wel een rol of een bureaunaam in
-          // Verantwoordelijke, en die wordt genormaliseerd. Vandaar de terugval.
-          //
-          // De verbijzondering zelf wordt BEWUST niet teruggelezen: uit "Sanne" valt niet af te
-          // leiden of dat een persoon, een functie of een bedrijf is, en een gok zou hier een
-          // verwijzing naar de verkeerde gebruiker kunnen opleveren. Een geïmporteerde taak komt
-          // dus op de kant binnen en wordt daarna in de planning verbijzonderd.
-          owner: normalizeOwner(t["Kant"] || t["kant"] || t["Verantwoordelijke"] || t["verantwoordelijke"] || OWNER_TEAM),
-          metrics: t["Metrics"] || t["metrics"] || null,
-          review_timeframe: t["Looptijd tot Beoordeling"] || t["looptijd"] || null,
-        }));
-
-        await dbInsert("sprint_items", clientId, sprintItems);
-      }
-
+      const summary = await importSprintCsv(text, clientId);
+      setImportSummary(summary);
       await refresh();
     } catch (err) {
       console.error("CSV import failed:", err);
@@ -343,7 +277,11 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     // toewijzing een persoons- of functienaam, en uit "Sanne" is niet meer af te lezen of dat
     // werk bij het bureau of bij de klant ligt. Die verdeling is juist waar deze export op
     // gelezen wordt, en hij is de enige kolom die de import terugleest.
-    const headers = ["Week", "Taak", "Kanaal", "Status", "Kant", "Verantwoordelijke", "Hypothese", "Looptijd tot Beoordeling", "Metrics"];
+    // Verwacht Resultaat staat erbij zodat een export-en-heriimport de koppeling met de
+    // H1-evaluator niet stilzwijgend laat vallen: zonder deze kolom in de export zou een
+    // agency die zijn plan exporteert, bewerkt en terugimporteert daarmee elke bestaande
+    // expected_result kwijtraken.
+    const headers = ["Week", "Taak", "Kanaal", "Status", "Kant", "Verantwoordelijke", "Hypothese", "Looptijd tot Beoordeling", "Metrics", "Verwacht Resultaat"];
     const rows = filteredItems.map((item) => {
       const hyp = item.hypothesis_id ? hypotheses.get(item.hypothesis_id) : null;
       const statusLabel = STATUS_OPTIONS.find((s) => s.value === item.status)?.label || item.status;
@@ -361,6 +299,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         `"${(hyp?.hypothesis || "").replace(/"/g, '""')}"`,
         item.review_timeframe || "",
         item.metrics || "",
+        `"${(hyp?.expected_result || "").replace(/"/g, '""')}"`,
       ].join(",");
     });
 
@@ -495,44 +434,90 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         </div>
       </div>
 
+      {/* Import-samenvatting: niet-blokkerend. De import zelf is al klaar op het moment dat dit
+          staat -- dit meldt alleen hoeveel hypotheses de H1-evaluator nooit kan toetsen omdat
+          Verwacht Resultaat ontbreekt of niet eenduidig te lezen is (zie parseHypothesis). */}
+      {importSummary && (
+        <div className="px-5 py-3 border-b border-border bg-amber-50 flex items-start justify-between gap-3">
+          <p className="text-meta text-amber-800">
+            {importSummary.hypothesesImported} hypothese{importSummary.hypothesesImported === 1 ? "" : "n"} geimporteerd
+            {importSummary.tasksImported > 0 ? `, ${importSummary.tasksImported} taken` : ""}.
+            {(importSummary.missingExpectedResult > 0 || importSummary.unparseableExpectedResult > 0) && (
+              <>
+                {" "}Daarvan {importSummary.missingExpectedResult + importSummary.unparseableExpectedResult} zonder toetsbaar Verwacht Resultaat
+                {importSummary.missingExpectedResult > 0 && ` (${importSummary.missingExpectedResult} zonder waarde`}
+                {importSummary.unparseableExpectedResult > 0 && `${importSummary.missingExpectedResult > 0 ? ", " : " ("}${importSummary.unparseableExpectedResult} niet eenduidig`}
+                {(importSummary.missingExpectedResult > 0 || importSummary.unparseableExpectedResult > 0) && ")"}
+                : die blijven &quot;unmeasurable&quot; tot de tekst is aangescherpt.
+              </>
+            )}
+          </p>
+          <button onClick={() => setImportSummary(null)} className="shrink-0 text-amber-600 hover:text-amber-800"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+
       {/* Kanaal-filter: snel zien wat er per kanaal op de lijst staat. */}
       <div className="px-5 py-2.5 border-b border-border bg-gray-50/40">
         <ChannelFilter value={channelFilter} onChange={setChannelFilter} counts={channelCounts} />
       </div>
 
       {/* Add hypothesis form */}
-      {showAddHypothesis && (
-        <div className="px-5 py-4 border-b border-border bg-purple-50/30 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-purple-700">Nieuwe hypothese + taak toevoegen</p>
-            <button onClick={() => setShowAddHypothesis(false)} className="p-1 hover:bg-purple-100 rounded"><X className="w-3.5 h-3.5 text-purple-400" /></button>
+      {showAddHypothesis && (() => {
+        // Niet-blokkerend: parseHypothesis() is dezelfde functie die de wekelijkse H1-evaluator
+        // gebruikt, dus wat hier als toetsbaar geldt is precies wat straks ook echt getoetst
+        // wordt. Leeg is geen fout (misschien is er bewust geen meetbaar doel), maar wel iets
+        // om te weten voor je "Toevoegen" klikt.
+        const expectedTrim = newExpectedResult.trim();
+        const parseResult = expectedTrim
+          ? parseHypothesis({ expectedResult: expectedTrim, measurementMetric: newMetrics.trim() || null, timeframe: newTimeframe.trim() || null })
+          : null;
+        const hint = !expectedTrim
+          ? "Zonder Verwacht Resultaat kan de AI-leerlus deze hypothese niet automatisch evalueren."
+          : parseResult && !parseResult.ok
+            ? `Niet automatisch toetsbaar: ${parseResult.reason}.`
+            : null;
+
+        return (
+          <div className="px-5 py-4 border-b border-border bg-purple-50/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-purple-700">Nieuwe hypothese + taak toevoegen</p>
+              <button onClick={() => setShowAddHypothesis(false)} className="p-1 hover:bg-purple-100 rounded"><X className="w-3.5 h-3.5 text-purple-400" /></button>
+            </div>
+            <textarea
+              value={newHypothesis}
+              onChange={(e) => setNewHypothesis(e.target.value)}
+              placeholder="Hypothese: Met het [actie] verwachten we [verwachting]..."
+              className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-purple-400 resize-none"
+              rows={2}
+            />
+            <textarea
+              value={newExpectedResult}
+              onChange={(e) => setNewExpectedResult(e.target.value)}
+              placeholder="Verwacht resultaat (bijv. CPA daalt met minimaal 10%)"
+              className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-purple-400 resize-none"
+              rows={1}
+            />
+            {hint && <p className="text-micro text-amber-700">{hint}</p>}
+            <input
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              placeholder="Eerste taak (optioneel)"
+              className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-purple-400"
+            />
+            <div className="flex gap-3">
+              <input value={newMetrics} onChange={(e) => setNewMetrics(e.target.value)} placeholder="Metrics (bijv. ROAS, CR)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:border-purple-400" />
+              <input value={newTimeframe} onChange={(e) => setNewTimeframe(e.target.value)} placeholder="Looptijd (bijv. 3 maanden)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:border-purple-400" />
+              <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card">
+                <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>
+                <option value={OWNER_CLIENT}>{ownerLabel(OWNER_CLIENT)}</option>
+              </select>
+            </div>
+            <button onClick={addHypothesisWithTask} disabled={!newHypothesis.trim()} className="px-4 py-1.5 text-xs font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40 transition-colors">
+              Toevoegen
+            </button>
           </div>
-          <textarea
-            value={newHypothesis}
-            onChange={(e) => setNewHypothesis(e.target.value)}
-            placeholder="Hypothese: Met het [actie] verwachten we [verwachting]..."
-            className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-purple-400 resize-none"
-            rows={2}
-          />
-          <input
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            placeholder="Eerste taak (optioneel)"
-            className="w-full text-sm border border-purple-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-purple-400"
-          />
-          <div className="flex gap-3">
-            <input value={newMetrics} onChange={(e) => setNewMetrics(e.target.value)} placeholder="Metrics (bijv. ROAS, CR)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:border-purple-400" />
-            <input value={newTimeframe} onChange={(e) => setNewTimeframe(e.target.value)} placeholder="Looptijd (bijv. 3 maanden)" className="flex-1 text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:border-purple-400" />
-            <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-purple-200 rounded-lg px-3 py-1.5 bg-card">
-              <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>
-              <option value={OWNER_CLIENT}>{ownerLabel(OWNER_CLIENT)}</option>
-            </select>
-          </div>
-          <button onClick={addHypothesisWithTask} disabled={!newHypothesis.trim()} className="px-4 py-1.5 text-xs font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40 transition-colors">
-            Toevoegen
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Add standalone task form */}
       {showAddTask === "standalone" && (

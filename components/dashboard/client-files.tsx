@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { OWNER_TEAM } from "@/lib/branding/brand";
 import {
   FolderPlus, Upload, Trash2, Download, FileText, FileSpreadsheet,
   Image as ImageIcon, File, FolderOpen, Plus, X, Loader2, AlertCircle, CheckCircle2,
@@ -9,152 +8,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { dbDelete, dbInsert } from "@/lib/data-access/client-write";
 import { dbSelect } from "@/lib/data-access/client-read";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { importSprintCsv, type SprintCsvImportSummary } from "@/lib/learning/sprint-csv-import";
 import type { SopError } from "../insights/sop-trigger-buttons";
-
-/**
- * Auto-parse a sprint planning CSV into sprint_hypotheses + sprint_items.
- * Reuses the same CSV format as the sprint-planning component's importCSV.
- */
-async function parseSprintCSV(file: File, clientId: string, sb: SupabaseClient) {
-  const text = await file.text();
-  const lines = text.split("\n");
-  if (lines.length < 2) return;
-
-  const headers = lines[0].split(",").map((h) => h.trim());
-
-  // Parse CSV with quote handling
-  const rows: Record<string, string>[] = [];
-  let currentRow: string[] = [];
-  let inQuote = false;
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (!inQuote) currentRow = [];
-
-    let field = inQuote ? currentRow[currentRow.length - 1] + "\n" : "";
-    for (let j = 0; j < line.length; j++) {
-      const ch = line[j];
-      if (ch === '"') { inQuote = !inQuote; }
-      else if (ch === "," && !inQuote) { currentRow.push(field); field = ""; }
-      else { field += ch; }
-    }
-    if (inQuote) { currentRow[currentRow.length - 1] = field; continue; }
-    currentRow.push(field);
-
-    const obj: Record<string, string> = {};
-    for (let k = 0; k < headers.length; k++) obj[headers[k]] = (currentRow[k] || "").trim();
-    if (obj["Taak"] || obj["taak"] || obj["Task"]) rows.push(obj);
-  }
-
-  const statusMap: Record<string, string> = {
-    "Klaar": "done", "To Do": "todo", "in Planning": "in_planning",
-    "On going": "ongoing", "Backlog / Verlopen": "expired", "Backlog": "backlog", "Verlopen": "expired",
-  };
-
-  // Detect format: hypotheses-only (has "Hypothese" column but no "Taak") or full sprint items
-  const hasTaskCol = headers.some((h) => ["Taak", "taak", "Task"].includes(h));
-  const hasHypCol = headers.some((h) => ["Hypothese", "hypothese"].includes(h));
-
-  if (!hasTaskCol && hasHypCol) {
-    // ── Hypotheses-only format ──
-    // Each row is a hypothesis, not a task. Import as hypotheses with a placeholder task.
-    const hypRows = rows.length > 0 ? rows : [];
-    // Re-parse: accept all rows that have a Hypothese value (not requiring Taak)
-    const allRows: Record<string, string>[] = [];
-    let cr2: string[] = [];
-    let iq2 = false;
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (!iq2) cr2 = [];
-      let f2 = iq2 ? cr2[cr2.length - 1] + "\n" : "";
-      for (let j = 0; j < line.length; j++) {
-        const ch = line[j];
-        if (ch === '"') { iq2 = !iq2; }
-        else if (ch === "," && !iq2) { cr2.push(f2); f2 = ""; }
-        else { f2 += ch; }
-      }
-      if (iq2) { cr2[cr2.length - 1] = f2; continue; }
-      cr2.push(f2);
-      const o: Record<string, string> = {};
-      for (let k = 0; k < headers.length; k++) o[headers[k]] = (cr2[k] || "").trim();
-      if (o["Hypothese"] || o["hypothese"]) allRows.push(o);
-    }
-
-    let count = 0;
-    for (const row of allRows) {
-      const hypText = (row["Hypothese"] || row["hypothese"] || "").replace(/<|>/g, "").trim();
-      if (!hypText) continue;
-
-      const metrics = (row["Metrics"] || row["metrics"] || "").replace(/<|>/g, "").replace(/#N\/A/g, "").trim() || null;
-      const timeframe = (row["Looptijd"] || row["looptijd"] || row["Looptijd tot Beoordeling"] || "").replace(/<|>/g, "").replace(/#N\/A/g, "").trim() || null;
-      const weekStr = row["Meten vanaf week:"] || row["Week"] || "";
-      const weekNum = parseInt(weekStr.replace(/#N\/A/g, "")) || null;
-
-      // Losse hypotheses zijn voorstellen: ze horen eerst in de goedkeuringswachtrij bij
-      // Bevindingen (status pending), en gaan pas naar de sprintplanning zodra ze zijn
-      // geaccepteerd. Daarom hier géén accepted-status en géén placeholder-sprinttaak.
-      // De route geeft de ingevoegde rijen terug, dus [0] vervangt .single().
-      const { data: hypRows } = await dbInsert("sprint_hypotheses", clientId, {
-        hypothesis: hypText,
-        measurement_metric: metrics,
-        timeframe: timeframe,
-        status: "pending",
-        source: "sprint_import",
-      });
-      const hyp = hypRows?.[0] as { id: string } | undefined;
-
-      if (!hyp) continue;
-      void weekNum; // week is pas relevant zodra het voorstel geaccepteerd is
-      count++;
-    }
-
-    console.log(`[parseSprintCSV] Imported ${count} hypotheses as pending proposals (hypotheses-only format)`);
-    return;
-  }
-
-  // ── Full sprint items format (with Taak column) ──
-  if (rows.length === 0) return;
-
-  // Group by hypothesis
-  const groups = new Map<string, typeof rows>();
-  for (const row of rows) {
-    const hyp = row["Hypothese"] || row["hypothese"] || "(geen hypothese)";
-    if (!groups.has(hyp)) groups.set(hyp, []);
-    groups.get(hyp)!.push(row);
-  }
-
-  for (const [hypothesis, tasks] of groups) {
-    const allDone = tasks.every((t) => statusMap[t["Status"]] === "done");
-    const metrics = tasks[0]["Metrics"] || tasks[0]["metrics"] || null;
-    const timeframe = tasks[0]["Looptijd tot Beoordeling"] || tasks[0]["looptijd"] || null;
-
-    const { data: hypRows } = await dbInsert("sprint_hypotheses", clientId, {
-      hypothesis: hypothesis === "(geen hypothese)" ? "Import: geen hypothese" : hypothesis,
-      measurement_metric: metrics, timeframe,
-      status: allDone ? "completed" : "accepted",
-      accepted_at: new Date().toISOString(),
-    });
-    const hyp = hypRows?.[0] as { id: string } | undefined;
-
-    if (!hyp) continue;
-
-    const sprintItems = tasks.map((t) => ({
-      client_id: clientId,
-      hypothesis_id: hyp.id,
-      week_number: t["Week"] || t["week"] ? parseInt(t["Week"] || t["week"]) : null,
-      task: t["Taak"] || t["taak"] || t["Task"] || "(geen taak)",
-      status: statusMap[t["Status"] || t["status"]] || "todo",
-      owner: t["Verantwoordelijke"] || t["verantwoordelijke"] || OWNER_TEAM,
-      metrics: t["Metrics"] || t["metrics"] || null,
-      review_timeframe: t["Looptijd tot Beoordeling"] || t["looptijd"] || null,
-    }));
-
-    await dbInsert("sprint_items", clientId, sprintItems);
-  }
-
-  console.log(`[parseSprintCSV] Imported ${rows.length} items from ${groups.size} hypotheses`);
-}
 
 interface ClientFolder {
   id: string;
@@ -220,6 +75,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sprintImportSummary, setSprintImportSummary] = useState<SprintCsvImportSummary | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Onthoudt voor welke klant we de standaardmappen al hebben aangemaakt, zodat een snelle
   // dubbele mount (React strict mode) niet twee keer dezelfde set inschiet → dubbele mappen.
@@ -284,6 +140,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
     if (!supabase || !e.target.files?.length) return;
     setUploading(true);
     setUploadError(null);
+    setSprintImportSummary(null);
 
     const errors: string[] = [];
 
@@ -316,14 +173,17 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
         errors.push(`${file.name}: ${dbErr.message}`);
       }
 
-      // Auto-parse sprint planning CSVs into sprint_items
+      // Auto-parse sprint planning CSVs into sprint_items. Gedeeld met de importknop op de
+      // sprintplanning-kaart (lib/learning/sprint-csv-import.ts) -- zie die module voor het
+      // waarom van "een implementatie, twee aanroepers".
       if (activeFolder === "Sprintplanning" && file.name.toLowerCase().endsWith(".csv")) {
         try {
-          await parseSprintCSV(file, clientId, supabase);
-          console.log(`[client-files] Auto-parsed sprint planning: ${file.name}`);
+          const text = await file.text();
+          const summary = await importSprintCsv(text, clientId);
+          setSprintImportSummary(summary);
         } catch (parseErr) {
           console.error(`[client-files] Sprint parse failed for ${file.name}:`, parseErr);
-          errors.push(`${file.name}: sprint import mislukt — ${parseErr instanceof Error ? parseErr.message : "onbekende fout"}`);
+          errors.push(`${file.name}: sprint import mislukt: ${parseErr instanceof Error ? parseErr.message : "onbekende fout"}`);
         }
       }
     }
@@ -523,6 +383,22 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
               </div>
             )}
           </div>
+
+          {/* Sprintplanning-import: niet-blokkerend. De import is al klaar; dit meldt alleen
+              hoeveel hypotheses de H1-evaluator nooit kan toetsen zonder Verwacht Resultaat. */}
+          {sprintImportSummary && (
+            <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between">
+              <p className="text-meta text-amber-800">
+                {sprintImportSummary.hypothesesImported} hypothese{sprintImportSummary.hypothesesImported === 1 ? "" : "n"} uit sprintplanning geimporteerd
+                {sprintImportSummary.tasksImported > 0 ? `, ${sprintImportSummary.tasksImported} taken` : ""}.
+                {(sprintImportSummary.missingExpectedResult + sprintImportSummary.unparseableExpectedResult) > 0 &&
+                  ` ${sprintImportSummary.missingExpectedResult + sprintImportSummary.unparseableExpectedResult} zonder toetsbaar Verwacht Resultaat.`}
+              </p>
+              <button onClick={() => setSprintImportSummary(null)} className="text-meta text-muted-foreground ml-2">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
           {/* Upload error */}
           {uploadError && (
