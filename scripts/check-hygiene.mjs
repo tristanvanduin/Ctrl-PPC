@@ -160,10 +160,6 @@ const TOEGESTANE_WEZEN = new Map([
 
   // Gebouwd en getest, wacht op een consument. Dit is de bak waar het meeste in zit; hij hoort
   // te krimpen. Zie het gesprek van 2026-07-28 voor de beoordeling per stuk.
-  ["lib/analysis/contradiction-resolver.ts",
-    "detecteert tegenstrijdige aanbevelingen op action_intent_class; is een VERVANGING van de " +
-    "zwakkere regel 4 in action-gating.ts en van de clusterlogica in monthly-structured.ts, " +
-    "geen toevoeging — daarom een aparte beslissing"],
   ["lib/cross-channel/funnel-overlap.ts",
     "lens 2; classifyFunnelRole leest het objective niet, dus Meta en LinkedIn komen als " +
     "onbekend uit de classificatie. Wacht op doelgroepdata (targeting_summary, Meta-adsets)"],
