@@ -75,3 +75,25 @@ export interface BusinessEvent extends TenantScoped {
 export interface ContextAnalysis extends TenantScoped {
   businessEvents: BusinessEvent[];
 }
+
+// Stap 6 (EXECUTION_PLAN.md): Hypothesis Discovery en Classification. Zelfde regel: alleen wat
+// lib/decision/hypothesis-discovery.ts echt gebruikt.
+
+/** Een mogelijke oorzaak, aangeleverd als discovery-invoer. Vorm is provisorisch, net als Signal:
+ *  firmt op zodra een echte discovery-implementatie laat zien wat er echt in zit. */
+export interface CandidateCause extends TenantScoped {
+  id: string;
+  description: string;
+}
+
+/**
+ * Een hypothese. `category` is bewust een open string, geen HYPOTHESIS_CATEGORIES-lid: discovery
+ * mag hypotheses opleveren die in geen enkele vaste categorie passen (zie hypothesis-discovery.ts
+ * voor de reden waarom discovery en classificatie twee gescheiden stappen zijn). classify()
+ * normaliseert dit veld naar de gesloten lijst, of naar null als niets past.
+ */
+export interface Hypothesis extends TenantScoped {
+  id: string;
+  statement: string;
+  category?: string | null;
+}
