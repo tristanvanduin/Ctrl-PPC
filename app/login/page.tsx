@@ -27,7 +27,7 @@ export default function LoginPage() {
       setMelding("Inloggen mislukt: controleer e-mail en wachtwoord.");
       return;
     }
-    const next = new URLSearchParams(window.location.search).get("next") || "/";
+    const next = new URLSearchParams(window.location.search).get("next") || "/vandaag";
     window.location.href = next;
   }
 

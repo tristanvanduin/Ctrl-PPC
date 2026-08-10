@@ -6,6 +6,7 @@ import { Settings, Building2, Search, FileCode2, FolderOpen, FolderClosed, Chevr
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { getVisibleClients, loadVisibleClientIds } from "@/lib/visible-clients";
 import { loadApiClients } from "@/lib/clients";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { useAccess } from "@/lib/auth/use-access";
 import { migrateLocalStorageToSupabase } from "@/lib/migrate-to-supabase";
 import { loadClientGroups, type GroupWithMembers } from "@/lib/client-groups";
@@ -113,6 +114,13 @@ function SidebarInner() {
   const access = useAccess();
   const [search, setSearch] = useState("");
   const [visibleClients, setVisibleClients] = useState<VisibleClient[]>([]);
+  // Fase 5: back-up-accounts (accounts.is_primary = false, migratie 066) staan niet standaard
+  // uitgeklapt. Default true voor elk bestaand account (zie de migratie), dus deze set is leeg
+  // totdat iemand een account expliciet als back-up markeert -- geen zichtbaar verschil vandaag.
+  const [backupClientIds, setBackupClientIds] = useState<Set<string>>(new Set());
+  // Los van collapsedGroups (dat is een set van DICHTE groepen, default open): het back-up-
+  // mapje is precies andersom -- standaard DICHT, tot iemand hem opent.
+  const [backupOpen, setBackupOpen] = useState(false);
   const [groups, setGroups] = useState<GroupWithMembers[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   // De gekozen assen overleven een herlaad: wie op specialist werkt, werkt daar de hele dag op.
@@ -203,6 +211,23 @@ function SidebarInner() {
     };
   }, [refreshData]);
 
+  // Fase 5: welke van de zichtbare klanten een back-up-account zijn (accounts.is_primary =
+  // false). Eén lichte query per wijziging van de zichtbare lijst, via de service-role-brug
+  // (lib/data-access/client-read.ts) zoals de rest van het dashboard sinds Fase 3A leest.
+  const zichtbareIds = visibleClients.map((c) => c.id).sort().join(",");
+  useEffect(() => {
+    if (!zichtbareIds) { setBackupClientIds(new Set()); return; }
+    let cancelled = false;
+    dbSelect<{ client_id: string; is_primary: boolean | null }>("accounts", {
+      select: "client_id, is_primary",
+      clientIds: zichtbareIds.split(","),
+    }).then(({ data }) => {
+      if (cancelled) return;
+      setBackupClientIds(new Set(data.filter((r) => r.is_primary === false).map((r) => r.client_id)));
+    }).catch(() => { if (!cancelled) setBackupClientIds(new Set()); });
+    return () => { cancelled = true; };
+  }, [zichtbareIds]);
+
   function toggleGroup(groupId: string) {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -219,6 +244,12 @@ function SidebarInner() {
     (c) => c.name.toLowerCase().includes(search.toLowerCase()) && access.canAccessClient(c.id)
   );
   const filteredIds = new Set(filtered.map((c) => c.id));
+
+  // Fase 5: primaire accounts (het merendeel, altijd) door de bestaande boom -- geen wijziging
+  // aan wat er vandaag al staat. Back-up-accounts vallen apart en krijgen hun eigen, standaard
+  // ingeklapte mapje onderaan, buiten de merk/specialist-groepering om.
+  const primaireKlanten = filtered.filter((c) => !backupClientIds.has(c.id));
+  const backupKlanten = filtered.filter((c) => backupClientIds.has(c.id));
 
   // ── Groeperen op een of twee assen ────────────────────────────────────────
   //
@@ -244,10 +275,10 @@ function SidebarInner() {
   const actieveTweedeAs = tweedeAs && tweedeAs !== actieveHoofdAs && beschikbaar.includes(tweedeAs) ? tweedeAs : null;
 
   const boom: Tak<VisibleClient>[] = actieveHoofdAs
-    ? bouwHierarchie(filtered, groepenMetAs, actieveHoofdAs, actieveTweedeAs)
+    ? bouwHierarchie(primaireKlanten, groepenMetAs, actieveHoofdAs, actieveTweedeAs)
     : [];
   // Helemaal geen groepen: dan de kale lijst, zoals het altijd was.
-  const zonderIndeling = actieveHoofdAs ? [] : filtered;
+  const zonderIndeling = actieveHoofdAs ? [] : primaireKlanten;
 
   const totalCount = filtered.length;
 
@@ -329,9 +360,9 @@ function SidebarInner() {
       {/* Primaire nav: de dagelijkse cockpit + het klassieke scorebord */}
       <div className="px-3 pb-2 space-y-0.5">
         <Link
-          href="/"
+          href="/vandaag"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-            pathname === "/" ? "bg-rm-orange text-white font-medium" : "text-white/70 hover:bg-white/10 hover:text-white"
+            pathname === "/vandaag" ? "bg-rm-orange text-white font-medium" : "text-white/70 hover:bg-white/10 hover:text-white"
           }`}
         >
           <ListChecks className="w-4 h-4" />
@@ -392,6 +423,31 @@ function SidebarInner() {
         {zonderIndeling.map((client) => (
           <ClientLink key={client.id} client={client} />
         ))}
+
+        {/* Fase 5: back-up-accounts (accounts.is_primary = false) staan los van de merk/
+            specialist-indeling, standaard dicht. Alleen zichtbaar zodra er echt een back-up-
+            account is -- vandaag heeft elk account is_primary = true, dus dit blok rendert dan
+            niets. */}
+        {backupKlanten.length > 0 && (
+          <div className="mb-1 mt-1">
+            <button
+              onClick={() => setBackupOpen((o) => !o)}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              {backupOpen ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+              {backupOpen ? <FolderOpen className="h-3.5 w-3.5 shrink-0" /> : <FolderClosed className="h-3.5 w-3.5 shrink-0" />}
+              <span className="truncate text-body font-medium">Back-up accounts</span>
+              <span className="ml-auto text-micro text-white/30">{backupKlanten.length}</span>
+            </button>
+            {backupOpen && (
+              <div className="ml-4 mt-0.5 space-y-0.5">
+                {backupKlanten.map((client) => (
+                  <ClientLink key={client.id} client={client} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bottom nav */}

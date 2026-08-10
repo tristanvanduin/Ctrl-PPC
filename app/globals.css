@@ -114,6 +114,9 @@
      De systeemstapel en geen webfont: die is overal aanwezig, kost geen download, en is wat
      editors en GitHub ook gebruiken. */
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* Alias zodat getallen/KPI's/data-tabellen expliciet `var(--mono)` kunnen gebruiken (Fase 5) in
+     plaats van de Tailwind-klasse `font-mono` -- zelfde stapel, zelfde reden als hierboven. */
+  --mono: var(--font-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -515,6 +518,39 @@
 
   --color-rose-100: #351822;
   --color-rose-700: #efaebd;
+}
+
+/* ── Executive Terminal (Fase 5) ────────────────────────────────────────────
+ * Neon-indigo accent voor de nieuwe platform-brede schermen (homepage-pulse, God Mode,
+ * Agency God View). Scoped via .terminal, BOVENOP .dark -- geen vervanging van de bestaande
+ * donkere modus en geen wijziging aan de licht/donker/systeem-schakelaar. Buiten .dark doet
+ * .terminal niets: in de lichte modus blijven de gewone merkkleuren gelden.
+ */
+.dark .terminal {
+  --terminal-accent: #818cf8;
+  --terminal-accent-soft: rgba(129, 140, 248, 0.14);
+  --terminal-accent-ring: rgba(129, 140, 248, 0.35);
+  --terminal-glow: 0 0 24px rgba(129, 140, 248, 0.25);
+}
+
+/* Live-metric 'tick': subtiel, functioneel, geen slot-machine-effect -- een korte opkomst per
+ * update, geen aftellende cijfers. @media (prefers-reduced-motion) hierboven/-onder zet de
+ * animatieduur al globaal naar 0.01ms, dus dit erft die regel automatisch mee. */
+@keyframes tick {
+  from { opacity: 0.5; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Herbruikbare teller-typografie: monospace, 'high-density' letter-spacing. Los van .terminal,
+ * zodat <Counter isLive> overal in de app dezelfde cijfertypografie draagt, niet alleen op de
+ * nieuwe schermen. */
+.teller-waarde {
+  font-family: var(--mono);
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.teller-tick {
+  animation: tick 1500ms ease-in-out;
 }
 
 @layer base {

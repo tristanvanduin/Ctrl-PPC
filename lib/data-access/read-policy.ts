@@ -35,6 +35,9 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // hetzelfde bestand (lib/feed/use-today-feed.ts) als vier tabellen die er wél in staan. Een
   // vijfde query in diezelfde Promise.all ongemoeid laten was vreemder dan hem meenemen.
   feed_item_state: { capability: "client:read", clientColumn: "client_id" },
+  // Fase 5: is_primary voor de sidebar-groepering (primair direct uitgeklapt, back-up in een
+  // ingeklapt mapje). Alleen id/is_primary worden gelezen, nooit agency_id of source hier.
+  accounts: { capability: "client:read", clientColumn: "client_id" },
 };
 
 export function isReadableTable(table: string): boolean {

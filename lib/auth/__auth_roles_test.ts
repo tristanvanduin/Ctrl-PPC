@@ -145,8 +145,15 @@ assert(isPublicPath("/login"), "/login is publiek");
 assert(isPublicPath("/auth/callback") && isPublicPath("/auth/reset"), "auth-callbacks zijn publiek");
 assert(isPublicPath("/_next/static/chunk.js") && isPublicPath("/favicon.ico"), "Next-internals zijn publiek");
 assert(isPublicPath("/logo.png") && isPublicPath("/fonts/inter.woff2"), "statische assets zijn publiek");
-assert(!isPublicPath("/") && !isPublicPath("/dashboard"), "de app zelf is niet publiek");
+// Fase 5: '/' is de nieuwe publieke marketingpagina (Hero + Global Platform Pulse), niet meer de
+// ingelogde cockpit -- die staat op /vandaag en blijft, net als elke andere app-pagina, niet
+// publiek. /api/public/platform-pulse levert de aggregaat-cijfers voor diezelfde pagina en moet
+// dus ook zonder sessie werken; andere API-routes blijven dicht.
+assert(isPublicPath("/"), "de marketingpagina is publiek (Fase 5)");
+assert(isPublicPath("/api/public/platform-pulse"), "de platform-pulse-aggregaten zijn publiek (Fase 5)");
+assert(!isPublicPath("/vandaag") && !isPublicPath("/dashboard"), "de ingelogde app is niet publiek");
 assert(!isPublicPath("/api/analysis/monthly"), "API-routes zijn niet publiek");
+assert(!isPublicPath("/api/public/god-mode"), "alleen platform-pulse is publiek, niet elk /api/public-pad per ongeluk");
 assert(!isPublicPath("/api/sync/cron"), "cron is geen publiek pad (eigen secret-patroon)");
 
 assert(isCronPath("/api/sync/cron") && isCronPath("/api/sync/cron/daily"), "cron-paden herkend");

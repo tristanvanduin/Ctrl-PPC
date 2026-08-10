@@ -126,7 +126,10 @@ export async function middleware(request: NextRequest) {
   if (clientId && !canAccessClient(scope, clientId)) {
     if (isApi) return NextResponse.json({ error: "Onvoldoende rechten" }, { status: 403 });
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    // '/' is sinds Fase 5 de publieke marketingpagina, niet meer de ingelogde cockpit -- een
+    // ingelogde gebruiker die hier terechtkomt hoort naar zijn eigen startpagina terug te gaan,
+    // niet naar de uitlogpagina van het product.
+    url.pathname = "/vandaag";
     url.search = "";
     return NextResponse.redirect(url);
   }

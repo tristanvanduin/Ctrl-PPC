@@ -164,6 +164,12 @@ export function isPublicPath(pathname: string): boolean {
   if (pathname === "/login" || pathname.startsWith("/auth/")) return true;
   if (pathname.startsWith("/_next/") || pathname === "/favicon.ico") return true;
   if (/\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|woff2?)$/i.test(pathname)) return true;
+  // Fase 5: de publieke marketingpagina ('/', Hero + Global Platform Pulse) en de aggregaat-
+  // totalen die ze toont. Zonder dit zou O1_AUTH_ENFORCED een bezoeker zonder sessie meteen naar
+  // /login sturen voordat hij de marketingpagina ooit ziet -- precies wat een pre-login pagina
+  // niet mag doen. /api/public/platform-pulse geeft uitsluitend SOM/COUNT-aggregaten terug (zie
+  // die route), geen per-klant data, dus zonder sessie blootstellen is hier geen risico.
+  if (pathname === "/" || pathname === "/api/public/platform-pulse") return true;
   return false;
 }
 

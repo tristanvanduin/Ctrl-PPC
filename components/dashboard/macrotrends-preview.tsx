@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "./data-table";
+import { segmentLabel } from "@/lib/macro/types";
 
 interface Cel_ {
   sleutel: { agencyId: string; channel: string; bedrijfsmodel: string | null; niche: string | null; maand: string };
@@ -22,13 +23,6 @@ interface Antwoord {
   aantalCellen: number;
   aantalKlantenIngelezen: number;
   cellen: Cel_[];
-}
-
-function label(s: Cel_["sleutel"]): string {
-  if (s.bedrijfsmodel && s.niche) return `${s.bedrijfsmodel.toUpperCase()} + ${s.niche}`;
-  if (s.niche) return s.niche;
-  if (s.bedrijfsmodel) return s.bedrijfsmodel.toUpperCase();
-  return "Alle segmenten";
 }
 
 export function MacroTrendsPreview() {
@@ -91,7 +85,7 @@ export function MacroTrendsPreview() {
         <Body>
           {rijen.map((c, i) => (
             <Rij key={i}>
-              <NaamCel sub={c.sleutel.agencyId}>{label(c.sleutel)}</NaamCel>
+              <NaamCel sub={c.sleutel.agencyId}>{segmentLabel(c.sleutel)}</NaamCel>
               <Cel nowrap zacht>{c.sleutel.channel}</Cel>
               <GetalCel>{c.accounts}</GetalCel>
               <GetalCel>{c.metrics.spend.toLocaleString("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}</GetalCel>

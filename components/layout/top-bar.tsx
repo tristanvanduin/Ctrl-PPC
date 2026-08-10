@@ -2,9 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Bell, AlertTriangle, Info, X } from "lucide-react";
+import { Bell, AlertTriangle, Info, X, Search } from "lucide-react";
 import { getAllClients } from "@/lib/clients";
 import { ThemaSchakelaar } from "@/components/ui/thema-schakelaar";
+import { CommandPalette } from "./command-palette";
+import { UserMenu } from "./user-menu";
 
 interface Notification {
   clientName: string;
@@ -97,7 +99,8 @@ export function TopBar() {
   }, []);
 
   const getTitle = () => {
-    if (pathname === "/") return "Vandaag";
+    if (pathname === "/") return "Ctrl PPC";
+    if (pathname === "/vandaag") return "Vandaag";
     if (pathname === "/portfolio") return "Klantoverzicht";
     if (pathname === "/settings") return "Instellingen";
     if (!mounted) return "Dashboard";
@@ -137,6 +140,18 @@ export function TopBar() {
             De id staat óók in chat-drawer.tsx. Verandert hij, dan valt de knop daar terug op zijn
             oude zwevende plek in plaats van te verdwijnen. */}
         <div id="topbalk-acties" className="flex items-center gap-2" />
+
+        {/* Cmd+K/Ctrl+K quick-search (Fase 5). De knop is de ontdekbare ingang; de sneltoets werkt
+            overal, ook zonder deze knop ooit aangeklikt te hebben (zie command-palette.tsx). */}
+        <button
+          onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+          className="hidden items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-meta text-muted-foreground transition-colors hover:bg-gray-100 sm:flex"
+        >
+          <Search className="h-3.5 w-3.5" />
+          Zoeken
+          <kbd className="ml-1 rounded border border-border bg-gray-50 px-1 text-micro">⌘K</kbd>
+        </button>
+        <CommandPalette />
 
         {/* De thema-keuze staat in de bovenbalk en niet weggestopt in de instellingen: het is een
             weergavevoorkeur van dit scherm, geen accountinstelling. */}
@@ -212,6 +227,8 @@ export function TopBar() {
             : ""
           }
         </span>
+
+        <UserMenu />
       </div>
     </header>
   );

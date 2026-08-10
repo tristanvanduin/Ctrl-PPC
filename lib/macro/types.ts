@@ -68,3 +68,15 @@ export const MIN_ACCOUNTS_VOOR_TREND = 3;
 export function magAlsTrendGelden(accounts: number): boolean {
   return accounts >= MIN_ACCOUNTS_VOOR_TREND;
 }
+
+/** Leesbaar segmentlabel voor een cel-sleutel. Gedeeld tussen MacroTrendsPreview en de nieuwe
+ *  Agency God View (Fase 5) zodat hetzelfde segment overal hetzelfde label draagt. Structureel
+ *  getypeerd (niet Pick<MacroSleutel, ...>): beide consumenten hebben hun eigen, losser getypeerde
+ *  API-antwoordvorm (bedrijfsmodel als kale string, niet het Bedrijfsmodel-union), en deze functie
+ *  doet toch niets specifieks met de union -- alleen een truthy-check en toUpperCase(). */
+export function segmentLabel(s: { bedrijfsmodel: string | null; niche: string | null }): string {
+  if (s.bedrijfsmodel && s.niche) return `${s.bedrijfsmodel.toUpperCase()} + ${s.niche}`;
+  if (s.niche) return s.niche;
+  if (s.bedrijfsmodel) return s.bedrijfsmodel.toUpperCase();
+  return "Alle segmenten";
+}
