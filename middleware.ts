@@ -40,7 +40,6 @@
 // =====================================================================
 
 import { NextResponse, type NextRequest } from "next/server";
-import { canoniekeDoelUrlVoorVerzoek } from "@/lib/domein";
 import { createServerClient } from "@supabase/ssr";
 import {
   isPublicPath, isCronPath, capabilityForApi, can, canAccessClient, clientIdFromPath,
@@ -48,29 +47,11 @@ import {
 import { bepaalScope } from "@/lib/auth/scope";
 
 export async function middleware(request: NextRequest) {
-  // ── Canoniek domein ───────────────────────────────────────────────────────
-  //
-  // ctrlppc.com is de echte plek, ctrlppc.nl verwijst erheen. Dit staat BOVEN de auth-afslag met
-  // opzet: het is een domeinkwestie en geen authkwestie, en zolang de enforcement uit staat zou de
-  // doorverwijzing anders helemaal niet werken.
-  //
-  // Waarom dit ertoe doet en niet alleen netjes is: sessiecookies horen bij één domein. Logt
-  // iemand in op .nl en komt hij daarna op .com, dan is zijn sessie weg zonder foutmelding. De
-  // doorverwijzing vooraan zorgt dat er maar één domein is waarop dat kan gebeuren.
-  //
-  // 308 en geen 307: dit is een blijvende verhuizing, en zoekmachines mogen dat weten. De methode
-  // blijft behouden, dus een POST die hier langskomt gaat niet stiekem als GET verder.
-  //
-  // NIET request.url, maar de host-header. Next normaliseert request.url naar het adres waarop
-  // de server luistert; bij een verzoek met `Host: ctrlppc.nl` staat er gewoon
-  // http://localhost:3190/... in. Deze regel keek daar naar en heeft dus nooit iets gedaan.
-  // De uitleg en de meting staan bij canoniekeDoelUrlVoorVerzoek in lib/domein.ts.
-  const canoniek = canoniekeDoelUrlVoorVerzoek(
-    request.url,
-    request.headers.get("host"),
-    request.headers.get("x-forwarded-host")
-  );
-  if (canoniek) return NextResponse.redirect(canoniek, 308);
+  // De www/non-www- en .nl->.com-doorverwijzing stond hier tot een productie-uitval met
+  // ERR_TOO_MANY_REDIRECTS: Vercel doet die doorverwijzing sinds kort zelf op domeinniveau,
+  // en de twee bleken elkaar te lussen. Verwijderd, niet uitgeschakeld -- de doorverwijzing
+  // hoort nu op precies één plek te staan, niet op twee die elkaar kunnen tegenspreken.
+  // lib/domein.ts en lib/__domein_test.ts zijn om dezelfde reden verwijderd.
 
   if (process.env.O1_AUTH_ENFORCED !== "true") return NextResponse.next();
 
