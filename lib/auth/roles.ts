@@ -170,6 +170,11 @@ export function isPublicPath(pathname: string): boolean {
   // niet mag doen. /api/public/platform-pulse geeft uitsluitend SOM/COUNT-aggregaten terug (zie
   // die route), geen per-klant data, dus zonder sessie blootstellen is hier geen risico.
   if (pathname === "/" || pathname === "/api/public/platform-pulse") return true;
+  // Fase 7: de rest van de marketingsite (app/(marketing)/). Ontbrak hier tot deze controle --
+  // met O1_AUTH_ENFORCED aan zou een bezoeker zonder sessie op /pricing, /faq of /blog meteen
+  // naar /login zijn gestuurd, dezelfde fout als hierboven maar dan voor drie nieuwe pagina's.
+  if (pathname === "/pricing" || pathname === "/faq") return true;
+  if (pathname === "/blog" || pathname.startsWith("/blog/")) return true;
   return false;
 }
 

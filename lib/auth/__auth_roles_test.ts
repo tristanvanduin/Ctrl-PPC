@@ -151,6 +151,11 @@ assert(isPublicPath("/logo.png") && isPublicPath("/fonts/inter.woff2"), "statisc
 // dus ook zonder sessie werken; andere API-routes blijven dicht.
 assert(isPublicPath("/"), "de marketingpagina is publiek (Fase 5)");
 assert(isPublicPath("/api/public/platform-pulse"), "de platform-pulse-aggregaten zijn publiek (Fase 5)");
+// Fase 7: de rest van de marketingsite. Dit ontbrak toen O1_AUTH_ENFORCED voor het eerst
+// overwogen werd -- zonder deze regels zou een bezoeker zonder sessie op /pricing, /faq of
+// /blog meteen naar /login zijn gestuurd, dezelfde fout als bij '/' in Fase 5.
+assert(isPublicPath("/pricing") && isPublicPath("/faq"), "pricing en faq zijn publiek (Fase 7)");
+assert(isPublicPath("/blog") && isPublicPath("/blog/gemiddelde-cpa-verkeerde-vraag"), "blog en blogartikelen zijn publiek (Fase 7)");
 assert(!isPublicPath("/vandaag") && !isPublicPath("/dashboard"), "de ingelogde app is niet publiek");
 assert(!isPublicPath("/api/analysis/monthly"), "API-routes zijn niet publiek");
 assert(!isPublicPath("/api/public/god-mode"), "alleen platform-pulse is publiek, niet elk /api/public-pad per ongeluk");
