@@ -15,8 +15,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { klantVanId } from "@/lib/tenancy/klanten";
 import { runGates, type GateInput } from "./quality-gates";
-import { availableProviders } from "./channel-provider";
+import { availableProviders, registerProvider } from "./channel-provider";
+import { googleProvider } from "./providers/google-provider";
+import { metaProvider } from "./providers/meta-provider";
+import { linkedinProvider } from "./providers/linkedin-provider";
 import { today } from "@/lib/reporting-date";
+
+// Fase 2, Task 3: registratie bij import, hetzelfde patroon als registerAdapter() in
+// lib/analysis/channel-adapter.ts (elke adapter registreert zichzelf bij het laden van zijn
+// module; de consumerende route importeert de modules en triggert zo de registratie). Hier is
+// handleDecisionSkeleton die consument: elke aanroep van een van de drie decision-routes laadt
+// dit bestand, en dus de drie providers hieronder.
+registerProvider(googleProvider);
+registerProvider(metaProvider);
+registerProvider(linkedinProvider);
 
 export type DecisionRunType = "weekly" | "biweekly" | "monthly";
 

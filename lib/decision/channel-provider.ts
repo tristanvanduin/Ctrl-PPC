@@ -54,6 +54,9 @@ export function availableProviders(): Channel[] {
   return [...registry.keys()];
 }
 
-// Fase 2: isAvailable() moet leunen op laadBeschikbareKanalen() uit lib/kanalen/beschikbaar.ts,
-// dat al per klant uitzoekt welke kanalen data hebben. In Stap 3 worden nul providers
-// geregistreerd -- de interface plus de registry is het doel van deze stap, geen implementatie.
+// Fase 2: de drie providers staan in lib/decision/providers/, geregistreerd zodra
+// lib/decision/decision-skeleton.ts wordt geladen (zie daar). isAvailable() leunt op
+// heeftKanaalData() in providers/beschikbaarheid.ts, dat dezelfde KANAAL_BRON gebruikt als
+// lib/kanalen/beschikbaar.ts (dat al per klant uitzoekt welke kanalen data hebben). Alleen
+// google heeft een echte collectSignals(); meta en linkedin zijn nog stubs die altijd een lege
+// signalenlijst geven, zie de kop van die twee bestanden voor de reden.
