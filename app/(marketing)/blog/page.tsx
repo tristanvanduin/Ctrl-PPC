@@ -34,7 +34,7 @@ export default function BlogIndexPage() {
             href={`/blog/${post.slug}`}
             className="group flex flex-col rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6 transition-colors hover:border-neon-indigo/40"
           >
-            <p className="text-xs text-off-white/40" style={{ fontFamily: "var(--font-marketing-mono)" }}>
+            <p className="text-xs text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>
               {formatDatum(post.datum)} - {post.leesminuten} min
             </p>
             <h2 className="mt-3 font-marketing-heading text-lg font-bold text-off-white group-hover:text-neon-indigo">

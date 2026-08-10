@@ -10,6 +10,10 @@ import { useMemo, useState } from "react";
 // ad-hoc onderzoek) komen hier bovenop en tellen dus niet mee: dit is het MINIMUM, niet het
 // plafond. Zelfde regel als eerder: de aannames staan zichtbaar in de UI, niet verstopt in de
 // berekening.
+//
+// text-off-white/40 op deze en andere marketingpagina's gaf 3,56:1 contrast tegen
+// --midnight-slate (WCAG AA vereist 4,5:1 voor gewone tekst); nagerekend en overal opgehoogd
+// naar /60 (6,42:1). /50 (4,84:1) haalt de norm net wel en is met opzet ongemoeid gelaten.
 
 interface Analyse {
   naam: string;
@@ -120,7 +124,7 @@ export function RoiCalculator() {
         </ul>
       )}
 
-      <p className="mt-4 text-xs leading-relaxed text-off-white/40">
+      <p className="mt-4 text-xs leading-relaxed text-off-white/60">
         Dit zijn de 7 analyses die standaard voor elke klant draaien plus de maandrapportage, met een
         geschatte tijdsbesteding per stuk als een specialist ze handmatig zou doen. Extra analyses en
         diepe duiken zijn hierboven op mogelijk en tellen dus niet mee: dit is het minimum, geen

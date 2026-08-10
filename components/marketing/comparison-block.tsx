@@ -29,7 +29,7 @@ export function ComparisonBlock() {
       <div className="mt-12 grid gap-6 lg:grid-cols-2">
         {/* Links: De Dashboard Illusie */}
         <div className="relative overflow-hidden rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">De Dashboard Illusie</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/60">De Dashboard Illusie</p>
           <p className="mt-2 text-sm text-off-white/50">
             Grafieken per kanaal, netjes naast elkaar. Geen enkele vertelt je welke te vertrouwen is, of
             wat je eraan moet doen.
@@ -58,7 +58,7 @@ export function ComparisonBlock() {
           <div className="mt-6 space-y-3" style={{ fontFamily: "var(--font-marketing-mono)" }}>
             {DIAGNOSE_REGELS.map((r) => (
               <div key={r.label} className="flex flex-wrap gap-x-3 text-sm">
-                <span className="w-24 shrink-0 text-off-white/40">{r.label}</span>
+                <span className="w-24 shrink-0 text-off-white/60">{r.label}</span>
                 <span className="text-off-white">{r.value}</span>
               </div>
             ))}

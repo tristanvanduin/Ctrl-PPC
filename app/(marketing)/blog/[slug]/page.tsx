@@ -69,7 +69,7 @@ export default async function BlogArticlePage({
         Alle artikelen
       </Link>
 
-      <p className="mt-8 text-xs text-off-white/40" style={{ fontFamily: "var(--font-marketing-mono)" }}>
+      <p className="mt-8 text-xs text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>
         {formatDatum(post.datum)} - {post.leesminuten} min leestijd
       </p>
       <h1 className="mt-3 font-marketing-heading text-3xl font-extrabold leading-tight text-off-white sm:text-4xl">
