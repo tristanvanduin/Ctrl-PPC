@@ -172,6 +172,11 @@ const TOEGESTANE_WEZEN = new Map([
   ["lib/scheduler/pump-plan.ts", "hervatbare maandrun; wacht op runNextSteps, de IO-orkestratie"],
   ["lib/scheduler/core.ts", "hoort bij pump-plan"],
   ["lib/meta/vision/attribute-source.ts", "bewaakt dat kleurclaims uit de pixel-laag komen; wacht op de vision-pijplijn"],
+  ["lib/decision/channel-provider.ts",
+    "EXECUTION_PLAN.md Stap 3: de provider-registry naast lib/analysis/channel-adapter.ts. " +
+    "Registreert bewust nul providers (dat is het doel van deze stap, geen omissie); krijgt zijn " +
+    "eerste consument in Stap 4 (de decision-routes importeren availableProviders). Haal deze " +
+    "regel dan weg."],
 
   // NAGEKEKEN 2026-08-05. Deze drie stonden hier als "vermoedelijk ingehaald door een opvolger",
   // en dat hield geen van de drie stand. Ik heb de exports naast elkaar gelegd:
