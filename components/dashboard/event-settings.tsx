@@ -5,6 +5,7 @@ import { Loader2, CalendarClock, Save, CheckCircle2, Plus, Trash2 } from "lucide
 import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
 import { dbSelectOne } from "@/lib/data-access/client-read";
+import { AccountEventPacing } from "./account-event-pacing";
 
 // RAI event-instellingen per klant: beurzen/geo-clones met cadans (jaarlijks/2-jaarlijks/anders)
 // en de datums van de afgelopen edities. Slaat op in client_settings.rai_events (migratie 024).
@@ -30,6 +31,9 @@ export function EventSettings({ clientId }: { clientId: string }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumpt na een geslaagde save zodat de T-minus-pacing hieronder de net opgeslagen edities
+  // leest i.p.v. de vorige stand (de pacing-route leest server-side, niet de lokale formstate).
+  const [savedTick, setSavedTick] = useState(0);
 
   useEffect(() => {
     const sb = supabase;
@@ -66,7 +70,7 @@ export function EventSettings({ clientId }: { clientId: string }) {
     const { error } = await dbUpsert("client_settings", clientId, { rai_events: { events: clean } });
     setSaving(false);
     if (error) setError(error.message.includes("rai_events") ? "Kolom ontbreekt — draai eerst migratie 024_rai_events.sql." : error.message);
-    else { setSaved(true); setTimeout(() => setSaved(false), 4000); }
+    else { setSaved(true); setSavedTick((t) => t + 1); setTimeout(() => setSaved(false), 4000); }
   }
 
   if (error && !events) {
@@ -147,6 +151,13 @@ export function EventSettings({ clientId }: { clientId: string }) {
                 </button>
               </div>
             </div>
+
+            {/* Live T-minus-preview, alleen zodra er een opgeslagen datum is: de pacing-route
+                leest server-side, dus een net toegevoegde maar nog niet opgeslagen editie zou
+                hier stil de vorige (of geen) stand tonen. */}
+            {ev.editions.some((ed) => ed.date) && (
+              <AccountEventPacing clientId={clientId} eventId={ev.id} refreshKey={savedTick} />
+            )}
           </div>
         ))}
 
