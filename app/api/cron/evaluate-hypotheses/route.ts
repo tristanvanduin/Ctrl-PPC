@@ -8,11 +8,22 @@
 // acceptatie: geen race-condities, en het werkt ook voor hypotheses die eerder zijn
 // aangenomen.
 //
-// EERLIJKE BEPERKING, in elke uitkomst vermeld: sprint_hypotheses draagt geen
+// EERLIJKE BEPERKING OP DE METRIEK, in elke uitkomst vermeld: sprint_hypotheses draagt geen
 // entiteit-referentie en er bestaat geen campagne-weekdata (alleen ads_account_weekly en
-// ads_country_weekly). Evalueren kan daarom UITSLUITEND op accountniveau. Een hypothese
-// over een enkele campagne afmeten aan het accountgemiddelde is ruis; dat staat in de
-// verdict_reason zodat niemand het verdict zwaarder weegt dan het verdient.
+// ads_country_weekly). Meten kan daarom UITSLUITEND op accountniveau. Een hypothese over een
+// enkele campagne afmeten aan het accountgemiddelde is ruis; dat staat in de reden zodat
+// niemand het verdict zwaarder weegt dan het verdient.
+//
+// UITVOERINGSDETECTIE, apart van de metriek: ads_change_history draagt WEL een campagnenaam
+// per wijziging. Dat lost de metriekbeperking hierboven niet op (nog steeds geen
+// campagne-weekdata om een effect aan op te hangen), maar het beantwoordt een eerdere, andere
+// vraag: is de interventie uberhaupt doorgevoerd, ongeacht wie dat deed (specialist, tool of
+// script)? Zonder herkenbaar type in de tekst blijft dit onbekend, nooit een gok. Zie
+// lib/learning/hypothesis-evaluator.ts (detectExecutionAccountWide) en
+// lib/learning/change-history-classifier.ts. Een hypothese die nooit is aangeraakt levert
+// daardoor "niet_uitgevoerd" op in plaats van een verworpen verdict dat suggereert dat de
+// interventie is geprobeerd en mislukt: dat is een andere les, en de kop van
+// hypothesis-evaluator.ts zei dat al voordat dit bestand het waarmaakte.
 //
 // LIVE-ONGETEST: vergt migratie 021 en aangenomen hypotheses met een verstreken venster.
 // =====================================================================
@@ -20,7 +31,8 @@
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { parseHypothesis, resolvePredicate } from "@/lib/learning/hypothesis-parser";
-import { evaluateHypothesisOutcome } from "@/lib/learning/hypothesis-evaluator";
+import { evaluateHypothesisOutcome, detectExecutionAccountWide, type ChangeEvent } from "@/lib/learning/hypothesis-evaluator";
+import { classificeerChangeHistory, type RawChangeHistoryRow } from "@/lib/learning/change-history-classifier";
 import { aggregateWeeks, weeksInWindow, addDays, isDerivableMetric, type WeeklyRow } from "@/lib/learning/weekly-metrics";
 
 export const maxDuration = 300;
@@ -72,15 +84,24 @@ export async function GET(request: NextRequest) {
   const results: Array<{ id: string; verdict: string; reason: string }> = [];
   const skipped: Array<{ id: string; reason: string }> = [];
 
-  // Weekdata per klant, eenmalig geladen.
+  // Weekdata en changehistory per klant, eenmalig geladen.
   const weeklyByClient = new Map<string, WeeklyRow[]>();
+  const changeHistoryByClient = new Map<string, ChangeEvent[]>();
   for (const clientId of new Set(rows.map((r) => r.client_id))) {
-    const { data } = await supabase
-      .from("ads_account_weekly")
-      .select("week_start, impressions, clicks, cost, conversions, conversions_value")
-      .eq("client_id", clientId)
-      .order("week_start");
-    weeklyByClient.set(clientId, (data ?? []) as WeeklyRow[]);
+    const [{ data: weekly }, { data: changes }] = await Promise.all([
+      supabase
+        .from("ads_account_weekly")
+        .select("week_start, impressions, clicks, cost, conversions, conversions_value")
+        .eq("client_id", clientId)
+        .order("week_start"),
+      supabase
+        .from("ads_change_history")
+        .select("resource_type, change_type, campaign_name, change_datetime, old_value, new_value")
+        .eq("client_id", clientId)
+        .order("change_datetime"),
+    ]);
+    weeklyByClient.set(clientId, (weekly ?? []) as WeeklyRow[]);
+    changeHistoryByClient.set(clientId, classificeerChangeHistory((changes ?? []) as RawChangeHistoryRow[]));
   }
 
   for (const row of rows) {
@@ -93,7 +114,7 @@ export async function GET(request: NextRequest) {
 
     // Een onparsebare hypothese krijgt geen gegokt verdict maar een eerlijke reden.
     if (!parsed.ok) {
-      const outcome = { verdict: "unmeasurable", reason: `niet toetsbaar geformuleerd: ${parsed.reason}`, metrics: [] };
+      const outcome = { verdict: "unmeasurable", resultMet: null, reason: `niet toetsbaar geformuleerd: ${parsed.reason}`, metrics: [] };
       results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
       if (!dryRun) await writeVerdict(supabase, row.id, outcome, now);
       continue;
@@ -108,7 +129,7 @@ export async function GET(request: NextRequest) {
 
     const metric = parsed.parsed.predicate.metric;
     if (!isDerivableMetric(metric)) {
-      const outcome = { verdict: "unmeasurable", reason: `de metric ${metric} zit niet in de weekdata op accountniveau, dus er is niets om tegen te meten`, metrics: [] };
+      const outcome = { verdict: "unmeasurable", resultMet: null, reason: `de metric ${metric} zit niet in de weekdata op accountniveau, dus er is niets om tegen te meten`, metrics: [] };
       results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
       if (!dryRun) await writeVerdict(supabase, row.id, outcome, now);
       continue;
@@ -121,7 +142,7 @@ export async function GET(request: NextRequest) {
     // De relatieve eis omzetten met de ECHTE baseline: de evaluator leest de drempel als
     // absolute magnitude, dus zonder deze stap zou vijftien procent als 0,15 euro gelden.
     const predicate = resolvePredicate(parsed.parsed, baseline);
-    const outcome = evaluateHypothesisOutcome({
+    const metrickUitkomst = evaluateHypothesisOutcome({
       successPredicates: [predicate],
       guardrailPredicates: [],
       baseline,
@@ -131,9 +152,40 @@ export async function GET(request: NextRequest) {
       ageInDays: Math.floor((now.getTime() - acceptedAt.getTime()) / (24 * 3600 * 1000)),
     });
 
-    const reason = `${describeOutcome(outcome.verdict, predicate.metric, baseline[predicate.metric], measured[predicate.metric])} ${ACCOUNT_SCOPE_NOTE}`;
-    results.push({ id: row.id, verdict: outcome.verdict, reason });
-    if (!dryRun) await writeVerdict(supabase, row.id, { verdict: outcome.verdict, reason, metrics: outcome.metrics }, now);
+    const metrickReden = `${describeOutcome(metrickUitkomst.verdict, predicate.metric, baseline[predicate.metric], measured[predicate.metric])} ${ACCOUNT_SCOPE_NOTE}`;
+
+    // Uitvoeringsdetectie: alleen zinvol als de metriek zelf al een oordeel (accepted/rejected)
+    // opleverde. Bij unmeasurable/expired is er sowieso geen betrouwbaar gemeten effect om aan
+    // uitvoering te koppelen, en verandert de uitvoeringsstatus niets aan het verdict.
+    let verdict: string = metrickUitkomst.verdict;
+    let resultMet: boolean | null = metrickUitkomst.verdict === "accepted" ? true : metrickUitkomst.verdict === "rejected" ? false : null;
+    let reason = metrickReden;
+
+    if (metrickUitkomst.verdict === "accepted" || metrickUitkomst.verdict === "rejected") {
+      const vensterStart = acceptedAt.toISOString().slice(0, 10);
+      const vensterEind = windowEnd.toISOString().slice(0, 10);
+      const alleEvents = changeHistoryByClient.get(row.client_id) ?? [];
+      const vensterEvents = alleEvents.filter((e) => e.date >= vensterStart && e.date <= vensterEind);
+      const uitvoering = detectExecutionAccountWide(row.hypothesis, vensterEvents, true);
+
+      if (uitvoering.status === "not_executed") {
+        // Verworpen maar niet uitgevoerd is een andere les dan uitgevoerd en verworpen (zie de
+        // kop van hypothesis-evaluator.ts): het metriekverdict wint hier niet, want een beweging
+        // die niet aan een interventie is toe te schrijven is geen leerpunt over die interventie.
+        verdict = "niet_uitgevoerd";
+        resultMet = null;
+        reason = `${metrickReden} Niet uitgevoerd: geen wijziging van het bedoelde type gevonden in ads_change_history in het meetvenster, dus de gemeten beweging kan niet aan deze interventie worden toegeschreven.`;
+      } else if (uitvoering.status === "detected") {
+        verdict = metrickUitkomst.verdict === "accepted" ? "uitgevoerd_en_gehaald" : "uitgevoerd_en_niet_gehaald";
+        reason = `${metrickReden} Uitgevoerd: ${uitvoering.evidence}.`;
+      } else {
+        reason = `${metrickReden} Uitvoering niet vast te stellen: de interventietekst bevat geen herkenbaar wijzigingstype (budget, bod, pauze, zoekwoord) om tegen ads_change_history te toetsen.`;
+      }
+    }
+
+    const outcome = { verdict, resultMet, reason, metrics: metrickUitkomst.metrics };
+    results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
+    if (!dryRun) await writeVerdict(supabase, row.id, outcome, now);
   }
 
   return Response.json({
@@ -152,26 +204,17 @@ function describeOutcome(verdict: string, metric: string, baseline: number | und
   return `${metric} ging van ${b} in het venster voor acceptatie naar ${m} erna; verdict ${verdict}.`;
 }
 
-// BUGFIX: schreef eerder naar verdict/verdict_reason, kolommen die niet bestaan (migratie 021
-// voegde alleen verdict_metrics toe; het verdict zelf hoort naar outcome/result_met/learning uit
-// migratie 010 -- exact de kolommen die lib/memory/client-memory.ts leest). Elke update faalde
-// dus stil: supabase-js gooit niet bij een foutieve kolomnaam, en deze functie controleerde de
-// foutcode niet. Resultaat: 0 van de 127 hypotheses kreeg ooit een outcome, ook al draait deze
-// cron al wekelijks sinds 16 juli. result_met is expliciet null (niet false) bij unmeasurable en
-// expired: "geen oordeel" is een andere uitkomst dan "doel niet gehaald", en client-memory.ts
-// maakt dat onderscheid ook (resultMet == null valt terug op outcome/status).
 async function writeVerdict(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   id: string,
-  outcome: { verdict: string; reason: string; metrics: unknown },
+  outcome: { verdict: string; resultMet: boolean | null; reason: string; metrics: unknown },
   now: Date
 ): Promise<void> {
-  const resultMet = outcome.verdict === "accepted" ? true : outcome.verdict === "rejected" ? false : null;
   const { error } = await supabase
     .from("sprint_hypotheses")
     .update({
       outcome: outcome.verdict,
-      result_met: resultMet,
+      result_met: outcome.resultMet,
       learning: outcome.reason,
       verdict_metrics: outcome.metrics,
       evaluated_at: now.toISOString(),

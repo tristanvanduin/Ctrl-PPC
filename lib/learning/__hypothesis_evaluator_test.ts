@@ -1,7 +1,7 @@
 // Verificatie van de H1 deterministische kern.
 // Draaien: npx tsx lib/learning/__hypothesis_evaluator_test.ts
 
-import { evaluateHypothesisOutcome, detectExecution, type Predicate, type ChangeEvent } from "./hypothesis-evaluator";
+import { evaluateHypothesisOutcome, detectExecution, detectExecutionAccountWide, intendedTypes, type Predicate, type ChangeEvent } from "./hypothesis-evaluator";
 
 let passed = 0, failed = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -81,6 +81,22 @@ check("zonder dekking altijd unknown",
   detectExecution("Verhoog het dagbudget van Campagne X", "Campagne X", events, false).status === "unknown");
 check("interventie zonder herkenbaar type valt terug op elke wijziging op de entiteit",
   detectExecution("Herzie de structuur van Campagne X", "Campagne X", events, true).status === "detected");
+
+console.log("\nUitvoeringsdetectie, accountbreed (geen entiteit-referentie)");
+check("herkenbaar type ergens op het account: detected, geen entity nodig",
+  detectExecutionAccountWide("Verhoog het dagbudget", events, true).status === "detected");
+check("evidence vermeldt het gematchte event",
+  (detectExecutionAccountWide("Verhoog het dagbudget", events, true).evidence ?? "").includes("budget"));
+check("herkenbaar type maar geen matchend event: not_executed",
+  detectExecutionAccountWide("Pauzeer de campagne", events, true).status === "not_executed");
+check("zonder dekking altijd unknown",
+  detectExecutionAccountWide("Verhoog het dagbudget", events, false).status === "unknown");
+check("geen herkenbaar type: unknown, geen gok op basis van 'er gebeurde iets'",
+  detectExecutionAccountWide("Herzie de structuur van het account", events, true).status === "unknown");
+
+console.log("\nintendedTypes is nu extern bruikbaar (accountbrede classificatie leunt erop)");
+check("budget-tekst geeft het type budget", intendedTypes("Verhoog het dagbudget").includes("budget"));
+check("tekst zonder herkenbaar woord geeft een lege lijst", intendedTypes("Doe iets slims").length === 0);
 
 console.log("\nRESULTAAT: " + passed + " geslaagd, " + failed + " gefaald\n");
 if (failed > 0) process.exit(1);

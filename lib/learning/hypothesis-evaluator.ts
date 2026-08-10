@@ -157,7 +157,7 @@ const INTENT_MAP: { keywords: RegExp; types: string[] }[] = [
   { keywords: /uitsluiten|uitsluiting|negatief|negative/i, types: ["keyword_excluded"] },
 ];
 
-function intendedTypes(intervention: string): string[] {
+export function intendedTypes(intervention: string): string[] {
   const out = new Set<string>();
   for (const rule of INTENT_MAP) {
     if (rule.keywords.test(intervention)) rule.types.forEach((t) => out.add(t));
@@ -187,6 +187,34 @@ export function detectExecution(
     ? sameEntity.find((e) => types.includes(e.type))
     : sameEntity[0];
 
+  if (match) {
+    return { status: "detected", evidence: `${match.type} op ${match.entity} (${match.date})` };
+  }
+  return { status: "not_executed", evidence: null };
+}
+
+/**
+ * Accountbrede variant van detectExecution. sprint_hypotheses draagt geen entiteit-referentie
+ * (zie de kop van app/api/cron/evaluate-hypotheses/route.ts), dus een exacte entity-match zoals
+ * detectExecution die vraagt is voor de meeste hypotheses niet mogelijk. Deze functie vraagt niet
+ * WELKE campagne is aangepast, alleen OF er ergens in het account een wijziging van het bedoelde
+ * type is doorgevoerd, ongeacht wie: specialist, tool of script.
+ *
+ * Zonder herkenbaar type in de interventietekst is er niets specifieks om aan te toetsen, en
+ * zonder entity is er niets om op te filteren -- "er gebeurde iets op het account" is geen
+ * signaal. Dat geeft unknown, geen gok.
+ */
+export function detectExecutionAccountWide(
+  intervention: string,
+  changeEvents: ChangeEvent[],
+  hasCoverage: boolean
+): { status: ExecutionStatus; evidence: string | null } {
+  if (!hasCoverage) return { status: "unknown", evidence: null };
+
+  const types = intendedTypes(intervention);
+  if (types.length === 0) return { status: "unknown", evidence: null };
+
+  const match = changeEvents.find((e) => types.includes(e.type));
   if (match) {
     return { status: "detected", evidence: `${match.type} op ${match.entity} (${match.date})` };
   }
