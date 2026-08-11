@@ -24,10 +24,10 @@ export function DemoForm() {
         body: JSON.stringify({ naam, email, bedrijf, bericht }),
       });
       const data = await res.json();
-      if (!res.ok) { setFout(data.error ?? "Versturen mislukt"); return; }
+      if (!res.ok) { setFout(data.error ?? "Failed to send"); return; }
       setVerzonden(true);
     } catch {
-      setFout("Versturen mislukt, probeer het later opnieuw.");
+      setFout("Failed to send, please try again later.");
     } finally {
       setVersturen(false);
     }
@@ -36,9 +36,9 @@ export function DemoForm() {
   if (verzonden) {
     return (
       <div className="rounded-[6px] border border-neon-indigo/40 bg-midnight-slate-raised p-8 text-center">
-        <p className="font-marketing-heading text-xl font-bold text-off-white">Bedankt.</p>
+        <p className="font-marketing-heading text-xl font-bold text-off-white">Thanks.</p>
         <p className="mt-2 text-sm text-off-white/60">
-          We nemen zo snel mogelijk contact met je op om een moment te vinden.
+          We will get in touch as soon as possible to find a time.
         </p>
       </div>
     );
@@ -47,28 +47,28 @@ export function DemoForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-8">
       <div>
-        <label htmlFor="naam" className="mb-1 block text-sm font-medium text-off-white/70">Naam</label>
+        <label htmlFor="naam" className="mb-1 block text-sm font-medium text-off-white/70">Name</label>
         <input
           id="naam" required value={naam} onChange={(e) => setNaam(e.target.value)}
           className="w-full rounded-[6px] border border-off-white/15 bg-midnight-slate px-3 py-2 text-sm text-off-white focus:border-neon-indigo focus:outline-none"
         />
       </div>
       <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium text-off-white/70">E-mail</label>
+        <label htmlFor="email" className="mb-1 block text-sm font-medium text-off-white/70">Email</label>
         <input
           id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded-[6px] border border-off-white/15 bg-midnight-slate px-3 py-2 text-sm text-off-white focus:border-neon-indigo focus:outline-none"
         />
       </div>
       <div>
-        <label htmlFor="bedrijf" className="mb-1 block text-sm font-medium text-off-white/70">Bureau / bedrijf (optioneel)</label>
+        <label htmlFor="bedrijf" className="mb-1 block text-sm font-medium text-off-white/70">Agency / company (optional)</label>
         <input
           id="bedrijf" value={bedrijf} onChange={(e) => setBedrijf(e.target.value)}
           className="w-full rounded-[6px] border border-off-white/15 bg-midnight-slate px-3 py-2 text-sm text-off-white focus:border-neon-indigo focus:outline-none"
         />
       </div>
       <div>
-        <label htmlFor="bericht" className="mb-1 block text-sm font-medium text-off-white/70">Waar wil je naar kijken? (optioneel)</label>
+        <label htmlFor="bericht" className="mb-1 block text-sm font-medium text-off-white/70">What do you want to look at? (optional)</label>
         <textarea
           id="bericht" rows={3} value={bericht} onChange={(e) => setBericht(e.target.value)}
           className="w-full rounded-[6px] border border-off-white/15 bg-midnight-slate px-3 py-2 text-sm text-off-white focus:border-neon-indigo focus:outline-none"
@@ -81,7 +81,7 @@ export function DemoForm() {
         className="w-full rounded-[6px] px-5 py-3 text-sm font-semibold text-midnight-slate disabled:opacity-60"
         style={{ backgroundColor: "#818cf8" }}
       >
-        {versturen ? "Versturen..." : "Demo aanvragen"}
+        {versturen ? "Sending..." : "Request a demo"}
       </button>
     </form>
   );

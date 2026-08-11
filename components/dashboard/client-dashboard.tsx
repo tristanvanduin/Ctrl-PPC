@@ -810,7 +810,7 @@ function OutcomesTab({ clientId }: { clientId: string }) {
         titel="Wat eruit volgt"
         bijschrift="Aanbevelingen, hypotheses en de taken die eruit voortkomen"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <div className="space-y-4">
             <RecommendationsBlock clientId={clientId} selectedInsightId={selectedInsightId} refreshKey={refreshKey} channel={channelFilter} />
             <HypothesesBlock clientId={clientId} refreshKey={refreshKey} onWorkflowChange={() => setRefreshKey((k) => k + 1)} channel={channelFilter} />
