@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { Check, Infinity as InfinityIcon } from "lucide-react";
-import { TIERS, sopDekkingVoor } from "@/lib/marketing/tiers";
+import { Check, Clock, Infinity as InfinityIcon } from "lucide-react";
+import { TIERS, sopDekkingVoor, type TierFeature } from "@/lib/marketing/tiers";
 
 // Fase 7, Task 3, herzien onder de Blueprint v2.0-brief (radical transparency): de echte 5-tier
-// ladder (agencies.licentie, migratie 071) als storefront, geen "neem contact op"-gate. Prijzen
-// zijn expliciet gelabeld "indicative" -- zie lib/marketing/tiers.ts voor wat al vastlag en wat
-// hier voor het eerst is ingevuld.
+// ladder (agencies.licentie, migratie 071) als storefront, geen "neem contact op"-gate. Prijzen en
+// featurelijst komen uit lib/marketing/tiers.ts en zijn niet langer een placeholder -- zie de
+// toelichting daar voor wat al vastlag, wat nieuw is aangeleverd, en welke features nog roadmap
+// zijn. Niet-gebouwde features krijgen hier een "Coming soon"-label in plaats van te worden
+// verzwegen of als feit gepresenteerd.
 export const metadata: Metadata = {
   title: "Pricing: Ctrl PPC",
   description: "Five tiers, one decision engine. No limit on accounts, no separate invoice per client.",
@@ -16,6 +18,26 @@ export const metadata: Metadata = {
     type: "website",
   },
 };
+
+function FeatureRow({ feature }: { feature: TierFeature }) {
+  return (
+    <li className="flex items-start gap-2 text-xs leading-relaxed text-off-white/70">
+      {feature.gebouwd ? (
+        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-indigo" aria-hidden />
+      ) : (
+        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-off-white/30" aria-hidden />
+      )}
+      <span className={feature.gebouwd ? undefined : "text-off-white/50"}>
+        {feature.tekst}
+        {!feature.gebouwd && (
+          <span className="ml-1.5 rounded-[4px] border border-off-white/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-off-white/40">
+            Coming soon
+          </span>
+        )}
+      </span>
+    </li>
+  );
+}
 
 function TierCard({ tier, uitgelicht }: { tier: (typeof TIERS)[number]; uitgelicht: boolean }) {
   const sopDekking = sopDekkingVoor(tier.licentie);
@@ -34,6 +56,7 @@ function TierCard({ tier, uitgelicht }: { tier: (typeof TIERS)[number]; uitgelic
         </span>
       )}
       <h3 className="font-marketing-heading text-lg font-bold text-off-white">{tier.naam}</h3>
+      <p className="mt-1 text-xs text-off-white/50">{tier.focus}</p>
 
       <div className="mt-4 flex items-baseline gap-1">
         {tier.vanafPerMaand === null ? (
@@ -43,7 +66,7 @@ function TierCard({ tier, uitgelicht }: { tier: (typeof TIERS)[number]; uitgelic
             <span className="font-marketing-heading text-2xl font-extrabold text-off-white">
               {"€"}{tier.vanafPerMaand.toLocaleString("en-US")}
             </span>
-            <span className="text-xs text-off-white/50">/mo, indicative</span>
+            <span className="text-xs text-off-white/50">/mo</span>
           </>
         )}
       </div>
@@ -61,11 +84,12 @@ function TierCard({ tier, uitgelicht }: { tier: (typeof TIERS)[number]; uitgelic
 
       <ul className="mt-4 flex-1 space-y-2.5">
         {tier.features.map((f) => (
-          <li key={f} className="flex gap-2 text-xs leading-relaxed text-off-white/70">
-            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-indigo" aria-hidden />
-            {f}
-          </li>
+          <FeatureRow key={f.tekst} feature={f} />
         ))}
+        <li className="border-t border-off-white/10 pt-2.5">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-off-white/40">Reporting</p>
+          <FeatureRow feature={tier.rapportage} />
+        </li>
       </ul>
 
       <a
@@ -88,8 +112,12 @@ export default function PricingPage() {
         </h1>
         <p className="mt-4 text-off-white/60">
           Five tiers of decisioning, not five gates to a sales call. Every tier runs the full
-          hypothesis loop, the difference is scale: how many accounts, how much compute. The
-          numbers below are starting points, not the final quote.
+          hypothesis loop, the difference is scale: how many accounts, how much compute, and how
+          much control over what your client sees. Features marked{" "}
+          <span className="whitespace-nowrap rounded-[4px] border border-off-white/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-off-white/50">
+            Coming soon
+          </span>{" "}
+          are on the roadmap, not shipped yet.
         </p>
       </div>
 
