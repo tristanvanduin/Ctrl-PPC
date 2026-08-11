@@ -1,6 +1,7 @@
 import { Ubuntu } from "next/font/google";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
+import { SopDekkingBanner } from "@/components/layout/sop-dekking-banner";
 
 const ubuntu = Ubuntu({
   variable: "--font-ubuntu",
@@ -22,6 +23,7 @@ export default function AppLayout({
       <Sidebar />
       <div className="ml-72 flex min-h-screen flex-1 flex-col">
         <TopBar />
+        <SopDekkingBanner />
         <main className="flex-1 p-6">{children}</main>
       </div>
     </div>
