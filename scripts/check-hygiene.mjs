@@ -208,6 +208,14 @@ const TOEGESTANE_WEZEN = new Map([
     "regelmachine van 738 regels met findings/severity/ManualCheck, alleen door zijn eigen test " +
     "geraakt. comparison-facts.ts is GEEN opvolger: dat rekent vergelijkingen, geen bevindingen. " +
     "De vraag is of de prepared-context-pijplijn deze bevindingen al elders produceert"],
+
+  // 11 augustus 2026: op beide homepage-plekken losgekoppeld nadat bleek dat de enige echte
+  // productbeelden een Nederlandstalige UI tonen onder een Engelstalige, wereldwijd gepositioneerde
+  // pagina -- tegensprekend bewijs, niet ontbrekend bewijs, en dus erger dan de fallback die hij
+  // zelf al bood. Blijft staan voor zodra er Engelstalige opnames zijn (product-feature, geen
+  // marketingfix): zie de kop van het bestand.
+  ["components/marketing/product-video.tsx",
+    "wacht op Engelstalige productbeelden; zie de koptekst voor waarom de Nederlandse video eruit is"],
 ]);
 
 for (const f of bestanden) {

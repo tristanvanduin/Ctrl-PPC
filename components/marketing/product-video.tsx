@@ -3,22 +3,38 @@
 //
 // src/embedUrl stay optional: without one, this renders a static terminal-style preview instead
 // of a fake play button that does nothing when clicked - a non-functional player would be more
-// misleading than no video at all. Real footage (public/videos/) landed on 11 August 2026 and is
-// wired into the homepage; the fallback stays here for any future slot that doesn't have footage
-// yet.
+// misleading than no video at all.
 //
-// preload="metadata" is deliberate: the two homepage clips are 5.0MB and 1.6MB, and without it
-// the browser fetches the full file for every visitor on page load, not just the ones who press
-// play. No compression tooling is available in this environment (ffmpeg could not be installed,
-// network-restricted sandbox) -- if the source files can be re-encoded at a lower bitrate before
-// upload, that would help more than anything this component can do.
+// REMOVED FROM THE HOMEPAGE ENTIRELY, 11 August 2026, same day it was added. Real footage
+// (public/videos/) landed and was wired in first, but that footage is a recording of the actual
+// product, and the actual product's UI is Dutch throughout ("Zoek klant", "Vandaag",
+// "Conversielag: 3 dagen" - every screen). The marketing site is deliberately English-only for a
+// "world wide" audience; a Dutch-language video under English copy is not a missing-evidence
+// problem the way no-video-at-all is, it is contradicting evidence, actively undercutting the page
+// around it -- worse than the fallback it would have been shown instead of.
 //
-// POSTER (audit, 11 August 2026): the first homepage video sits just below the fold and is a
-// plausible LCP candidate. Without a poster, the browser has nothing to paint for it until enough
-// of the file loads to extract a frame. Both homepage videos now have a real poster generated from
-// their own first second of footage (public/videos/*-poster.jpg) -- not a mockup or a placeholder,
-// an actual frame, captured via Playwright screenshotting the <video> element directly (same
-// ffmpeg-less constraint as above; this sidesteps it rather than working around it).
+// The fallback itself turned out not to earn a spot either, once the video was gone: its PREVIEW_
+// REGELS readout is near-identical to ComparisonBlock's DIAGNOSE_REGELS, already shown higher on
+// the same homepage. Two placeholder boxes repeating that same fabricated example a second and
+// third time read as filler, not as a considered choice -- caught by the user, not by any of the
+// automated checks, because nothing here is technically broken. Both call sites are gone from
+// app/(marketing)/page.tsx. This component is unused today; see TOEGESTANE_WEZEN in
+// scripts/check-hygiene.mjs for why it stays in the tree rather than getting deleted.
+//
+// The files (public/videos/*.webm, *-poster.jpg) stay too -- this is a positioning problem, not a
+// footage-quality one, and the footage itself may still be useful once there is an English UI to
+// record (product feature, not a marketing fix).
+//
+// preload="metadata" is deliberate for any future src usage: the two clips currently in
+// public/videos/ are 5.0MB and 1.6MB, and without it the browser fetches the full file for every
+// visitor on page load, not just the ones who press play. No compression tooling is available in
+// this environment (ffmpeg could not be installed, network-restricted sandbox) -- if the source
+// files can be re-encoded at a lower bitrate before upload, that would help more than anything
+// this component can do.
+//
+// POSTER: a video slot that does carry real src/poster props should always pass both -- without a
+// poster the browser has nothing to paint until enough of the file loads to extract a frame, and
+// this component's own <video> tag has no built-in fallback for that gap.
 
 interface ProductVideoProps {
   src?: string;

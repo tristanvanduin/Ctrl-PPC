@@ -5,7 +5,6 @@ import { PlatformPulse } from "@/components/terminal/platform-pulse";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
-import { ProductVideo } from "@/components/marketing/product-video";
 import { QualityGateMatrix } from "@/components/marketing/quality-gate-matrix";
 import { PrimaryCta } from "@/components/marketing/primary-cta";
 
@@ -95,16 +94,10 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <ProductVideo src="/videos/dashboard-demo.webm" poster="/videos/dashboard-demo-poster.jpg" />
       <TrustBanner />
       <ComparisonBlock />
       <QualityGateMatrix />
       <FeaturesBlock />
-      <ProductVideo
-        src="/videos/decision-terminal-demo.webm"
-        poster="/videos/decision-terminal-demo-poster.jpg"
-        caption="The Decision Terminal, live"
-      />
     </>
   );
 }
