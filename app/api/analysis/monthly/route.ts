@@ -25,6 +25,7 @@ import "@/lib/analysis/adapters/linkedin-ads"; // registreert de LinkedIn-adapte
 import { buildLinkedinAnalysisData } from "@/lib/linkedin/analysis-data";
 import { buildLinkedinStepMessage, linkedinStepName } from "@/lib/linkedin/step-message";
 import { goalsPlausibilityFromMonthly, resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, type TargetRow } from "@/lib/analysis/o2-targets-cost";
+import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { buildGoalsSection } from "@/lib/prompts/sop-prompts";
 import type { LinkedInIcp } from "@/lib/linkedin/icp-fit";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -1137,6 +1138,10 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: "Verwacht: { client_id: string }" }, { status: 400 });
+  }
+
+  if (!(await magSopDraaien(supabase, clientId))) {
+    return Response.json({ error: "SOP's zijn uitgeschakeld voor dit account." }, { status: 403 });
   }
 
   try {
