@@ -27,6 +27,7 @@ const jetbrainsMono = JetBrains_Mono({
 const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/vs", label: "Compare" },
   { href: "/faq", label: "FAQ" },
   { href: "/blog", label: "Blog" },
   { href: "/demo", label: "Demo" },
@@ -103,6 +104,7 @@ export default function MarketingLayout({
           <Logo compact />
           <div className="flex items-center gap-6 text-sm text-off-white/50">
             <Link href="/pricing" className="hover:text-off-white">Pricing</Link>
+            <Link href="/vs" className="hover:text-off-white">Compare</Link>
             <Link href="/faq" className="hover:text-off-white">FAQ</Link>
             <Link href="/blog" className="hover:text-off-white">Blog</Link>
             <Link href="/demo" className="hover:text-off-white">Demo</Link>

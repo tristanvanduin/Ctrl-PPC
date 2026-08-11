@@ -1,4 +1,4 @@
-const KANALEN = ["Google Ads", "Meta Ads", "LinkedIn Ads", "Shopify", "Bing Ads", "WooCommerce"];
+const KANALEN = ["Google Ads", "Meta Ads", "LinkedIn Ads", "Bing Ads", "Shopify", "WooCommerce"];
 
 // Fase 7, Task 2: micro-trust banner. Tekstchips, geen nagemaakte merklogo's -- die bestaan hier
 // niet in de codebase en een zelfgetekende imitatie zou een officiële samenwerking suggereren
