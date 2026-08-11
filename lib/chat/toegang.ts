@@ -12,33 +12,56 @@
  * gebeurd met de bureaugrens die wel in de routes zat en niet in de middleware.
  */
 
-/** De licentievormen zoals ze in agencies.licentie staan (migratie 060). */
-export type Licentie = "basis" | "premium" | "enterprise";
+/**
+ * De licentievormen zoals ze in agencies.licentie staan (migratie 071, was drie waarden in 060).
+ * Volgorde is betekenisvol: RANG hieronder gebruikt de index als rang, laag naar hoog.
+ */
+export type Licentie = "basis" | "core" | "growth" | "scale" | "professional" | "enterprise";
 
-export const LICENTIES: readonly Licentie[] = ["basis", "premium", "enterprise"];
+export const LICENTIES: readonly Licentie[] =
+  ["basis", "core", "growth", "scale", "professional", "enterprise"];
+
+/** Rang per licentie, voor "heeft tenminste tier X". Zie heeftTenminste hieronder. */
+const RANG: Record<Licentie, number> = Object.fromEntries(
+  LICENTIES.map((l, i) => [l, i])
+) as Record<Licentie, number>;
+
+/**
+ * Heeft dit bureau tenminste de gegeven tier? Rang-gebaseerd in plaats van een opsomming van
+ * losse namen, want dat wordt bij zes tiers onleesbaar. Dat is GEEN "alles behalve basis"-regel
+ * (zie de waarschuwing bij normaliseerLicentie): een onbekende waarde normaliseert eerst naar
+ * 'basis' (rang 0) en zakt dus altijd onderaan, nooit stilzwijgend naar een hogere rang.
+ */
+export function heeftTenminste(licentie: string | null | undefined, minimum: Licentie): boolean {
+  return RANG[normaliseerLicentie(licentie)] >= RANG[minimum];
+}
 
 /**
  * Mag dit bureau de chat gebruiken?
  *
- * Een opsomming van wat er wél mag, en niet `!== "basis"`. Dat scheelt niets vandaag en alles op
- * de dag dat er een vierde licentievorm bijkomt: een regel die "alles behalve basis" zegt geeft
- * die nieuwe vorm stilzwijgend toegang, ook als dat een proefaccount is. Dezelfde afweging als bij
- * de doorverwijslijst in lib/domein.ts.
+ * ── DE GRENS OP 'growth' IS AFGELEID, NIET BESLOTEN ─────────────────────────
+ *
+ * Voor migratie 071 lag de grens op 'premium'. Van de vijf nieuwe tiers is 'growth' de enige die
+ * het gedrag van vandaag ongewijzigd laat: het is de tier waar het demo-bureau (voorheen premium)
+ * naartoe is gemigreerd, juist omdat growth de eerste tier is met een features-sprong boven basis
+ * (cross-account inzichten). Welke tier chat ECHT hoort te ontgrendelen volgens de blueprint staat
+ * nergens vastgelegd -- die noemt chat niet als apart onderdeel van een tier. Herijk deze grens
+ * zodra dat besloten is.
  */
 export function magChatten(licentie: string | null | undefined): boolean {
-  return licentie === "premium" || licentie === "enterprise";
+  return heeftTenminste(licentie, "growth");
 }
 
 /** Nette uitleg voor wie niet mag. Wordt zowel in de UI als in het API-antwoord gebruikt. */
 export const GEEN_LICENTIE_TEKST =
-  "De spar-assistent hoort bij Premium. Neem contact op om je bureau te upgraden.";
+  "De spar-assistent hoort bij Growth en hoger. Neem contact op om je bureau te upgraden.";
 
 /**
  * Normaliseert wat er uit de database komt naar een bekende licentievorm.
  *
- * Onbekend wordt 'basis' en niet 'premium': als de waarde niet te plaatsen is, hoort de uitkomst
- * de minst ruime te zijn. Een fout in de andere richting geeft toegang weg op grond van een
- * typefout.
+ * Onbekend wordt 'basis' en niet een hogere tier: als de waarde niet te plaatsen is, hoort de
+ * uitkomst de minst ruime te zijn. Een fout in de andere richting geeft toegang weg op grond van
+ * een typefout.
  */
 export function normaliseerLicentie(waarde: unknown): Licentie {
   const tekst = String(waarde ?? "").toLowerCase().trim();

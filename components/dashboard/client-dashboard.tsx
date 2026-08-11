@@ -538,7 +538,7 @@ export function ClientDashboard({ client }: { client: Client }) {
       )}
       {/* De spar-assistent. Buiten de tabbladen en buiten ClientDataProvider: het gesprek gaat over
           de klant en niet over het tabblad waar je toevallig staat, en de drawer haalt zijn eigen
-          context server-side op. Rendert niets als het bureau geen premium-licentie heeft. */}
+          context server-side op. Rendert niets als het bureau geen tenminste growth-licentie heeft. */}
       <ChatDrawer clientId={client.id} klantnaam={client.name} />
     </div>
     </BrandThemeProvider>

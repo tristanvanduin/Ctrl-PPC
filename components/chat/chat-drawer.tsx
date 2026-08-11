@@ -10,8 +10,9 @@
 //
 // ── HET LICENTIESLOT ────────────────────────────────────────────────────────
 //
-// De knop verschijnt alleen bij een premium bureau, maar dat is netheid en geen beveiliging: de
-// route weigert het verzoek zelf ook (403). Beide kanten gebruiken dezelfde magChatten() uit
+// De knop verschijnt alleen bij een bureau met tenminste growth (migratie 071), maar dat is
+// netheid en geen beveiliging: de route weigert het verzoek zelf ook (403). Beide kanten
+// gebruiken dezelfde magChatten() uit
 // lib/chat/toegang.ts -- twee kopieën van dezelfde regel lopen uit elkaar zodra er één verandert.
 //
 // Zolang de licentie nog niet geladen is verschijnt er NIETS. Niet de knop vast tonen en later
