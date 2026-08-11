@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Check, Clock, Infinity as InfinityIcon } from "lucide-react";
 import { TIERS, sopDekkingVoor, type TierFeature } from "@/lib/marketing/tiers";
+import { IntelligenceStore } from "@/components/marketing/intelligence-store";
 
 // Fase 7, Task 3, herzien onder de Blueprint v2.0-brief (radical transparency): de echte 5-tier
 // ladder (agencies.licentie, migratie 071) als storefront, geen "neem contact op"-gate. Prijzen en
@@ -139,6 +140,8 @@ export default function PricingPage() {
         Just want the dashboard and the forecast? Basis is free, unlimited accounts, no automatic
         SOP runs. Upgrade whenever you want the engine to start forming hypotheses on its own.
       </p>
+
+      <IntelligenceStore />
     </div>
   );
 }
