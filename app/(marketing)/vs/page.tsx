@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Check, Clock, X } from "lucide-react";
 import { KILL_SHOT_ROWS, SUCCESS_TAX_EXAMPLES } from "@/lib/marketing/comparison";
 import { ComingSoonBadge } from "@/components/marketing/coming-soon-badge";
@@ -115,7 +116,10 @@ export default function VsPage() {
         <Clock className="h-5 w-5 shrink-0 text-copper" aria-hidden />
         <span>
           <strong className="font-semibold text-copper">No Limits, same as every tier:</strong> your
-          software cost stays flat while your accounts scale.
+          software cost stays flat while your accounts scale. See{" "}
+          <Link href="/pricing" className="font-semibold text-copper underline hover:text-off-white">
+            the full breakdown
+          </Link>.
         </span>
       </div>
 

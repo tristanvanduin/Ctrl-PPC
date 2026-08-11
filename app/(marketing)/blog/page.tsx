@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BLOG_POSTS } from "@/lib/marketing/blog-posts";
+import { formatBlogDate } from "@/lib/marketing/format-date";
 
+// Description was Dutch (audit, 11 August 2026) -- the literal text Google shows under the blue
+// link in search results, on an otherwise fully English page.
 export const metadata: Metadata = {
   title: "Blog: Ctrl PPC",
-  description: "Technische analyses over performance marketing: attributie, biedstrategie en wat een dashboard je niet vertelt.",
+  description: "Technical analysis of performance marketing: attribution, bid strategy, and what a dashboard does not tell you.",
   alternates: { canonical: "/blog" },
   openGraph: {
     title: "Blog: Ctrl PPC",
-    description: "Technische analyses over performance marketing: attributie, biedstrategie en wat een dashboard je niet vertelt.",
+    description: "Technical analysis of performance marketing: attribution, bid strategy, and what a dashboard does not tell you.",
     type: "website",
   },
 };
-
-function formatDatum(iso: string): string {
-  return new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
-}
 
 export default function BlogIndexPage() {
   return (
@@ -38,7 +37,7 @@ export default function BlogIndexPage() {
               Analysis
             </span>
             <p className="mt-3 text-xs text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>
-              {formatDatum(post.datum)} - {post.leesminuten} min
+              {formatBlogDate(post.datum)} - {post.leesminuten} min
             </p>
             <h2 className="mt-2 font-marketing-heading text-lg font-bold text-off-white group-hover:text-neon-indigo">
               {post.titel}

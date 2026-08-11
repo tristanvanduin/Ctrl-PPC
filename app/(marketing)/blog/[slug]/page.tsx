@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { BLOG_POSTS, getBlogPost } from "@/lib/marketing/blog-posts";
+import { formatBlogDate } from "@/lib/marketing/format-date";
+import { PrimaryCta } from "@/components/marketing/primary-cta";
 
 export function generateStaticParams() {
   return BLOG_POSTS.map((post) => ({ slug: post.slug }));
@@ -44,10 +46,6 @@ function articleJsonLd(post: NonNullable<ReturnType<typeof getBlogPost>>) {
   };
 }
 
-function formatDatum(iso: string): string {
-  return new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
-}
-
 export default async function BlogArticlePage({
   params,
 }: {
@@ -56,6 +54,15 @@ export default async function BlogArticlePage({
   const { slug } = await params;
   const post = getBlogPost(slug);
   if (!post) notFound();
+
+  // Elk artikel had er tot nu toe geen: alleen "All articles" bovenaan (audit, 11 augustus 2026).
+  // Per post gekozen, niet automatisch de eerste twee uit de lijst -- zie de commentaren bij
+  // gerelateerdeSlugs/gerelateerdePaginas in lib/marketing/blog-posts.ts voor de reden per artikel.
+  const gerelateerdePosts = (post.gerelateerdeSlugs ?? [])
+    .map((s) => getBlogPost(s))
+    .filter((p): p is NonNullable<typeof p> => !!p && p.slug !== post.slug);
+  const gerelateerdePaginas = post.gerelateerdePaginas ?? [];
+  const heeftGerelateerd = gerelateerdePosts.length > 0 || gerelateerdePaginas.length > 0;
 
   return (
     <article className="mx-auto max-w-2xl px-6 pt-14 pb-20 sm:pt-20">
@@ -70,7 +77,7 @@ export default async function BlogArticlePage({
       </Link>
 
       <p className="mt-8 text-xs text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>
-        {formatDatum(post.datum)} - {post.leesminuten} min leestijd
+        {formatBlogDate(post.datum)} - {post.leesminuten} min read
       </p>
       <h1 className="mt-3 font-marketing-heading text-3xl font-extrabold leading-tight text-off-white sm:text-4xl">
         {post.titel}
@@ -82,6 +89,44 @@ export default async function BlogArticlePage({
             {alinea}
           </p>
         ))}
+      </div>
+
+      {heeftGerelateerd && (
+        <div className="mt-16 border-t border-off-white/10 pt-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">Related reading</p>
+          <ul className="mt-4 space-y-2.5">
+            {gerelateerdePaginas.map((p) => (
+              <li key={p.href}>
+                <Link
+                  href={p.href}
+                  className="group flex items-center gap-2 text-sm text-neon-indigo hover:text-off-white"
+                >
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  {p.label}
+                </Link>
+              </li>
+            ))}
+            {gerelateerdePosts.map((p) => (
+              <li key={p.slug}>
+                <Link
+                  href={`/blog/${p.slug}`}
+                  className="group flex items-center gap-2 text-sm text-off-white/70 hover:text-off-white"
+                >
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-off-white/30 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  {p.titel}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Elk artikel eindigde tot nu toe in het niets -- de enige link op de hele pagina was "All
+          articles" bovenaan (audit, 11 augustus 2026). Een lezer die een technische analyse
+          uitleest is precies degene die klaar is voor de volgende stap, niet voor een terugknop. */}
+      <div className="mt-10 flex flex-col items-center gap-3 border-t border-off-white/10 pt-10 text-center">
+        <p className="text-off-white/60">See how the Decision Framework applies to your own accounts.</p>
+        <PrimaryCta>Request a demo</PrimaryCta>
       </div>
     </article>
   );

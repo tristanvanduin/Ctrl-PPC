@@ -27,6 +27,25 @@ const jetbrainsMono = JetBrains_Mono({
 // marketingpagina -- header, desktop-nav, footer, alles -- als client-JS moest hydrateren voor een
 // toggle die de meeste sessies nooit aanraken. Die state zit nu geisoleerd in
 // components/marketing/mobile-nav.tsx; deze layout is weer een gewone server component.
+//
+// LANG-FIX (audit, 11 augustus 2026). app/layout.tsx zet <html lang="nl">, terecht voor het
+// ingelogde product (Nederlandstalig door de hele UI), fout voor de Engelstalige marketingsite die
+// eronder hangt -- dat is elke pagina in deze layout. Next staat maar één <html>-declaratie toe,
+// in de root layout, en een geneste layout (deze) kan hem niet overschrijven. Een middleware-route
+// die per pad een ander lang-attribuut server-side zou zetten kan wel, maar middleware.ts bewaakt
+// vandaag de hele auth-poort (zie de koptekst daar: "LIVE-ONGETEST", meerdere vroege returns) --
+// daar een tweede, losstaande verantwoordelijkheid doorheen weven voor een cosmetisch attribuut is
+// niet de afweging waard.
+//
+// In plaats daarvan hetzelfde patroon als THEMA_INIT_SCRIPT in app/layout.tsx: een inline script
+// dat vóór de rest van de pagina draait en het attribuut corrigeert. Google's indexeerder rendert
+// JavaScript voordat hij een pagina beoordeelt, dus dit is voor de zoekmachine die het meest
+// uitmaakt volledig gelijkwaardig aan een server-side fix. Een crawler die geen JS uitvoert ziet
+// nog heel even "nl" in de ruwe HTML -- een reële maar kleine resterende onvolkomenheid, en de
+// juiste vervolgstap zou een eigen, kleine proxy-laag zijn die alleen dit doet, niet uitbreiding
+// van de auth-poortwachter.
+const LANG_FIX_SCRIPT = `document.documentElement.lang="en";`;
+
 const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/pricing", label: "Pricing" },
@@ -45,6 +64,7 @@ export default function MarketingLayout({
     <div
       className={`${jakarta.variable} ${jetbrainsMono.variable} marketing min-h-screen bg-midnight-slate text-off-white`}
     >
+      <script dangerouslySetInnerHTML={{ __html: LANG_FIX_SCRIPT }} />
       <header className="sticky top-0 z-40 border-b border-off-white/10 bg-midnight-slate/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" aria-label="Ctrl PPC, terug naar de homepage">

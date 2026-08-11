@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Check, Clock, Infinity as InfinityIcon } from "lucide-react";
 import { TIERS, sopDekkingVoor, type TierFeature } from "@/lib/marketing/tiers";
 import { IntelligenceStore } from "@/components/marketing/intelligence-store";
@@ -168,6 +169,10 @@ export default function PricingPage() {
       <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-off-white/50">
         Just want the dashboard and the forecast? Basis is free, unlimited accounts, no automatic
         SOP runs. Upgrade whenever you want the engine to start forming hypotheses on its own.
+        Curious how this differs from a traditional dashboard tool?{" "}
+        <Link href="/vs" className="font-semibold text-neon-indigo hover:underline">
+          See the comparison
+        </Link>.
       </p>
 
       <IntelligenceStore />
