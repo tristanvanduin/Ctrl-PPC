@@ -25,6 +25,7 @@ import "@/lib/analysis/adapters/linkedin-ads"; // registreert de LinkedIn-adapte
 import { buildLinkedinAnalysisData } from "@/lib/linkedin/analysis-data";
 import { buildLinkedinStepMessage, linkedinStepName } from "@/lib/linkedin/step-message";
 import { goalsPlausibilityFromMonthly, resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, type TargetRow } from "@/lib/analysis/o2-targets-cost";
+import { verbruikCredit } from "@/lib/analysis/credit-costs";
 import { buildGoalsSection } from "@/lib/prompts/sop-prompts";
 import type { LinkedInIcp } from "@/lib/linkedin/icp-fit";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -968,6 +969,8 @@ async function runMetaMonthlyAnalysis(
     conclusionText: conclusions.slice(-1)[0] ?? conclusions.join("\n\n"),
   });
 
+  await verbruikCredit(supabase, { clientId, label: adapter.sopTypeKey, runKey: jobId });
+
   return Response.json({
     ok: true,
     channel: adapter.channel,
@@ -1099,6 +1102,8 @@ async function runLinkedinMonthlyAnalysis(
     parsedSteps, allSteps, canonical, curatedFindings, curatedClusters,
     conclusionText: conclusions.slice(-1)[0] ?? conclusions.join("\n\n"),
   });
+
+  await verbruikCredit(supabase, { clientId, label: adapter.sopTypeKey, runKey: jobId });
 
   return Response.json({
     ok: true,
@@ -2820,6 +2825,7 @@ ${conclusions.join("\n\n---\n\n")}`,
       },
       partialOutputExists,
     });
+    await verbruikCredit(supabase, { clientId, label: adapter.sopTypeKey, runKey: jobId });
 
     logCacheSummary(callMark, `monthly ${clientId}`);
 

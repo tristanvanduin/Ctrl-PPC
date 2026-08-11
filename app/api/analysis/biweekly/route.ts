@@ -22,6 +22,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { verbruikCredit } from "@/lib/analysis/credit-costs";
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
@@ -236,6 +237,7 @@ ${enrichment.hypothesisTracking ? "\nAls er uitgevoerde hypotheses zijn die nog 
         tasks: extraction.tasks.length,
       },
     });
+    await verbruikCredit(supabase, { clientId, label: "biweekly", runKey: jobId });
 
     return Response.json({
       jobId,

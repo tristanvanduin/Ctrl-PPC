@@ -208,12 +208,6 @@ const TOEGESTANE_WEZEN = new Map([
     "regelmachine van 738 regels met findings/severity/ManualCheck, alleen door zijn eigen test " +
     "geraakt. comparison-facts.ts is GEEN opvolger: dat rekent vergelijkingen, geen bevindingen. " +
     "De vraag is of de prepared-context-pijplijn deze bevindingen al elders produceert"],
-  ["lib/analysis/credit-costs.ts",
-    "creditgrootboek-fundament (migratie 070) voor het tier-model uit de v2.0-blueprint, alleen " +
-    "door zijn eigen test geraakt. Wacht op twee productbeslissingen die in de kop van het bestand " +
-    "staan: WAAR een SOP-run credits afschrijft (per run, niet per LLM-call) en wat er gebeurt bij " +
-    "een leeg saldo (zacht waarschuwen zoals uitgavenplafond.ts, of hard blokkeren). Krijgt een " +
-    "consument zodra die twee genomen zijn"],
 ]);
 
 for (const f of bestanden) {

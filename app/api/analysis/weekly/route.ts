@@ -24,6 +24,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { verbruikCredit } from "@/lib/analysis/credit-costs";
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
@@ -201,6 +202,7 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
         tasks: extraction.tasks.length,
       },
     });
+    await verbruikCredit(supabase, { clientId, label: "weekly", runKey: jobId });
 
     return Response.json({
       jobId,
