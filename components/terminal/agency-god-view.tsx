@@ -5,6 +5,7 @@ import { Loader2, Building2 } from "lucide-react";
 import { Counter } from "@/components/ui/counter";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "@/components/dashboard/data-table";
 import { segmentLabel, magAlsTrendGelden, MIN_ACCOUNTS_VOOR_TREND } from "@/lib/macro/types";
+import { CodeRoodPaneel } from "@/components/adoptie/code-rood-paneel";
 
 // Fase 5, Task 3: Agency God View -- geaggregeerde macro-data en de eigen portfolio, voor
 // performance_marketeer (organisatiebreed maar bureau-gescoped, zie lib/auth/scope.ts). Leunt op
@@ -56,6 +57,7 @@ export function AgencyGodView() {
     return (
       <div className="terminal space-y-4">
         <h1 className="text-page font-bold text-rm-blue-ink">Agency God View</h1>
+        <CodeRoodPaneel />
         <p className="rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-body text-muted-foreground">
           Nog geen cellen — geen klant van dit bureau heeft in het venster sinds {data.vanaf} zowel
           spend als een gekoppeld segment.
@@ -79,6 +81,8 @@ export function AgencyGodView() {
         <h1 className="text-page font-bold text-rm-blue-ink">Agency God View</h1>
         <span className="text-meta text-muted-foreground">eigen bureau · {laatsteMaand.slice(0, 7)}</span>
       </div>
+
+      <CodeRoodPaneel />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Counter value={totaalSegment?.metrics.spend ?? 0} label="Spend deze maand" format="currency" isLive />

@@ -51,6 +51,7 @@ import { ChannelConversionSettings } from "./channel-conversion-settings";
 import { ChannelStructureAnalysis } from "./channel-structure-analysis";
 import { GeoCloneScope } from "./geo-clone-scope";
 import { TrackingAlert } from "./tracking-alert";
+import { CodeRoodBanner } from "./code-rood-banner";
 import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
@@ -368,6 +369,7 @@ export function ClientDashboard({ client }: { client: Client }) {
       {clientData.data && (
         <ClientDataProvider clientId={client.id}>
         <AnalysisProvider>
+          <CodeRoodBanner clientId={client.id} />
           <TrackingAlert clientId={client.id} onNavigateToSettings={() => setActiveTab("settings")} />
 
           <GeoCloneScope value={geoClone} onChange={setGeoClone} />
