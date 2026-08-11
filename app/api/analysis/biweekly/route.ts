@@ -22,7 +22,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
-import { verbruikCredit } from "@/lib/analysis/credit-costs";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
@@ -43,6 +43,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const creditOordeel = await controleerSaldo(supabase, { clientId, label: "biweekly" });
+    if (creditOordeel.blokkeert) {
+      return Response.json({ error: creditOordeel.tekst }, { status: 402 });
+    }
+
     await createProgressJob(supabase, {
       jobId,
       clientId,

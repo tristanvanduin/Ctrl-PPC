@@ -35,11 +35,20 @@ import { bureauVanKlant } from "./o2-targets-cost";
 // staat, de rekening nog niet. Vul CREDIT_COSTS pas in als die beslissing genomen is, en noteer de
 // datum, net als bij MODEL_PRICES.
 //
-// ── WAT DIT BESTAND NOG NIET DOET ────────────────────────────────────────────
+// ── BLOKKEREN: DE BLUEPRINT HEEFT DIT AL BESLIST ─────────────────────────────
 //
-// Geen blokkeer- of waarschuwlogica. uitgavenplafond.ts waarschuwt vanaf 80% en blokkeert bij 100%
-// -- een bewuste keuze met een eigen redenering. Of credits hetzelfde patroon volgen, of iets
-// anders (bijv. altijd doorlaten en achteraf een Credit Pack voorstellen), is nog niet besloten.
+// Anders dan bij het EUR-plafond (uitgavenplafond.ts, warn bij 80%, block bij 100%, een keuze die
+// dit bestand zelf moest maken) staat de regel voor credits al in de blueprint: "Nooit onbeperkt.
+// Elke tier krijgt een riante vaste credit-pool. Bereikt een agency het limiet [...]? Dan kopen ze
+// een Credit Pack bij of ze upgraden." Dat is een harde blokkade bij saldo < kosten, met een
+// koop/upgrade-pad als oplossing -- geen zachte waarschuwing zoals bij het EUR-plafond.
+//
+// GEEN "bijna op"-waarschuwingsband zoals uitgavenplafond.ts. Die zou een percentage van de
+// TOEGEKENDE pool per periode vereisen (hoeveel credits kreeg dit bureau deze maand, hoeveel is
+// daarvan op), en of credit-pools per kalendermaand resetten, doorrollen, of iets anders doen staat
+// nergens vastgelegd -- de blueprint noemt alleen "een vaste credit-pool" per tier, geen
+// resetritme. Dat verzinnen om een warn-band te kunnen tonen zou dezelfde fout zijn als CREDIT_COSTS
+// vast getallen geven: een aanname die eruitziet als een beslissing.
 
 /**
  * Creditkosten per analyse-label (sop_type of call_label), in hele credits.
@@ -105,25 +114,59 @@ export function buildLedgerRij(input: {
   };
 }
 
+export type CreditOordeel =
+  | { toestand: "onbekende_kosten"; blokkeert: false }
+  | { toestand: "geen_bureau"; blokkeert: false }
+  | { toestand: "onbekend_saldo"; blokkeert: false }
+  | { toestand: "genoeg"; blokkeert: false; resterend: number }
+  | { toestand: "ontoereikend"; blokkeert: true; tekort: number; tekst: string };
+
 /**
- * Leest het volledige grootboek van een bureau en geeft het saldo. Bij een leesfout: 0 -- de
- * veilige kant op zolang er geen blokkeerlogica bestaat die op dit getal leunt (zie de kop van
- * dit bestand), zodat een database die even niet antwoordt geen analyse kan tegenhouden die dat
- * vandaag ook niet doet.
+ * Het oordeel. Puur: geen tijd, geen database — alles komt uit `saldo` en `kosten`, zodat dit met
+ * vaste getallen te testen is, net als beoordeelPlafond in uitgavenplafond.ts.
+ *
+ * Twee ingangen die NOOIT blokkeren, met opzet: `kosten === null` (onbekend label, CREDIT_COSTS
+ * nog leeg) en `saldo === null` (leesSaldo kon het grootboek niet lezen). Beide zijn "we weten het
+ * niet", en "we weten het niet" mag nooit hetzelfde gedrag krijgen als "het saldo is op" -- dat zou
+ * een prijsdecisie die nog niet genomen is, of een tijdelijke storing, laten functioneren als een
+ * harde blokkade die niemand zo bedoeld heeft.
+ */
+export function beoordeelSaldo(saldo: number | null, kosten: number | null): CreditOordeel {
+  if (kosten == null) return { toestand: "onbekende_kosten", blokkeert: false };
+  if (saldo == null) return { toestand: "onbekend_saldo", blokkeert: false };
+  if (saldo >= kosten) return { toestand: "genoeg", blokkeert: false, resterend: saldo - kosten };
+  return {
+    toestand: "ontoereikend",
+    blokkeert: true,
+    tekort: kosten - saldo,
+    tekst:
+      `Onvoldoende credits: deze analyse kost ${kosten}, er resteren er ${Math.max(0, saldo)}. ` +
+      `Koop een Credit Pack bij of upgrade de tier.`,
+  };
+}
+
+/**
+ * Leest het volledige grootboek van een bureau en geeft het saldo. Bij een leesfout: null, NIET 0.
+ *
+ * Dat onderscheid is met opzet, en is bijgesteld toen beoordeelSaldo/controleerSaldo hierop kwamen
+ * te leunen: 0 is een geldig saldo (op, mag blokkeren), maar "de database antwoordde niet" is dat
+ * niet. Zou leesSaldo bij een fout 0 teruggeven, dan blokkeert een tijdelijke storing een analyse
+ * die dat op een normale dag niet zou doen -- exact de fout die deze functie oorspronkelijk claimde
+ * te vermijden, tot er blokkeerlogica bijkwam die het getal ook echt gebruikte.
  */
 export async function leesSaldo(
   supabase: SupabaseClient,
   agencyId: string
-): Promise<number> {
+): Promise<number | null> {
   try {
     const { data, error } = await supabase
       .from("credit_ledger")
       .select("event, amount")
       .eq("agency_id", agencyId);
-    if (error || !data) return 0;
+    if (error || !data) return null;
     return saldoUit(data as LedgerRij[]);
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -166,4 +209,30 @@ export async function verbruikCredit(
   const agencyId = input.agencyId ?? await bureauVanKlant(supabase, input.clientId);
   if (!agencyId) return;
   await recordCredit(supabase, { agencyId, event: "consume", amount, reason: input.label, runKey: input.runKey });
+}
+
+/**
+ * De volledige pre-flight controle: lees de kosten, lees het grootboek, en oordeel. Eén aanroep
+ * voor een route die wil weten of hij een SOP-run mag starten -- zelfde vorm als controleerPlafond
+ * in uitgavenplafond.ts. Hoort VOOR het werk te draaien, niet erna (zie de wiring in de routes):
+ * verbruikCredit schrijft achteraf af, dit hier is de poort ervoor.
+ *
+ * Vandaag altijd blokkeert: false, want CREDIT_COSTS is leeg (toestand "onbekende_kosten"). Dat is
+ * bewust hetzelfde inerte gedrag als verbruikCredit: de wiring staat, de blokkade wordt pas echt
+ * zodra er een prijs is.
+ */
+export async function controleerSaldo(
+  supabase: SupabaseClient,
+  input: {
+    clientId?: string | null;
+    agencyId?: string | null;
+    label: string;
+  }
+): Promise<CreditOordeel> {
+  const kosten = creditKostenVoor(input.label);
+  if (kosten == null) return { toestand: "onbekende_kosten", blokkeert: false };
+  const agencyId = input.agencyId ?? await bureauVanKlant(supabase, input.clientId);
+  if (!agencyId) return { toestand: "geen_bureau", blokkeert: false };
+  const saldo = await leesSaldo(supabase, agencyId);
+  return beoordeelSaldo(saldo, kosten);
 }

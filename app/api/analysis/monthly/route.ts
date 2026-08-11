@@ -25,7 +25,7 @@ import "@/lib/analysis/adapters/linkedin-ads"; // registreert de LinkedIn-adapte
 import { buildLinkedinAnalysisData } from "@/lib/linkedin/analysis-data";
 import { buildLinkedinStepMessage, linkedinStepName } from "@/lib/linkedin/step-message";
 import { goalsPlausibilityFromMonthly, resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, type TargetRow } from "@/lib/analysis/o2-targets-cost";
-import { verbruikCredit } from "@/lib/analysis/credit-costs";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 import { buildGoalsSection } from "@/lib/prompts/sop-prompts";
 import type { LinkedInIcp } from "@/lib/linkedin/icp-fit";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -1145,6 +1145,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const creditOordeel = await controleerSaldo(supabase, { clientId, label: adapter.sopTypeKey });
+    if (creditOordeel.blokkeert) {
+      return Response.json({ error: creditOordeel.tekst }, { status: 402 });
+    }
+
     if (adapter.channel === "meta_ads") {
       return await runMetaMonthlyAnalysis(supabase, adapter, clientId, jobId, evalCapture);
     }
