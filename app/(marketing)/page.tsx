@@ -87,10 +87,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <ProductVideo />
+      <ProductVideo src="/videos/dashboard-demo.webm" />
       <TrustBanner />
       <ComparisonBlock />
       <FeaturesBlock />
+      <ProductVideo src="/videos/decision-terminal-demo.webm" caption="The Decision Terminal, live" />
 
       <section className="mx-auto max-w-6xl px-6 py-20">
         <h2 className="text-center font-marketing-heading text-2xl font-bold text-off-white">

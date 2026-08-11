@@ -1,16 +1,17 @@
 // Reusable Midnight Slate video container. 6px radius, neon-indigo glow border, no iframe
 // chrome - the brief is explicit that this must not look like a bolted-on embed.
 //
-// No real product video or Loom recording exists in the codebase yet, so passing src/embedUrl
-// stays optional. Without one, this renders a static terminal-style preview instead of a fake
-// play button that does nothing when clicked - a non-functional player would be more misleading
-// than no video at all. Swap in a real asset later by passing src (mp4/webm) or embedUrl (Loom/
-// YouTube) - the container styling does not change.
+// src/embedUrl stay optional: without one, this renders a static terminal-style preview instead
+// of a fake play button that does nothing when clicked - a non-functional player would be more
+// misleading than no video at all. Real footage (public/videos/) landed on 11 August 2026 and is
+// wired into the homepage; the fallback stays here for any future slot that doesn't have footage
+// yet.
 
 interface ProductVideoProps {
   src?: string;
   embedUrl?: string;
   poster?: string;
+  caption?: string;
 }
 
 const PREVIEW_REGELS = [
@@ -42,9 +43,14 @@ function TerminalPreview() {
   );
 }
 
-export function ProductVideo({ src, embedUrl, poster }: ProductVideoProps) {
+export function ProductVideo({ src, embedUrl, poster, caption }: ProductVideoProps) {
   return (
     <section className="mx-auto max-w-4xl px-6 pb-16">
+      {caption && (
+        <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
+          {caption}
+        </p>
+      )}
       <div
         className="overflow-hidden rounded-[6px] border border-neon-indigo/20 bg-midnight-slate-raised/60 backdrop-blur-sm"
         style={{ boxShadow: "0 0 60px rgba(129, 140, 248, 0.12)" }}
