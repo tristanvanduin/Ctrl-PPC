@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle } from "lucide-react";
+import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { Sectie } from "@/components/ui/sectie";
@@ -24,6 +24,7 @@ import { CreativePerformance } from "./creative-performance";
 import { SearchTermsTable } from "./search-terms-table";
 import { ForecastTable } from "./forecast-table";
 import { BudgetScenario } from "./budget-scenario";
+import { AudienceSplit } from "./audience-split";
 
 // De Google-weergave, geëxtraheerd uit client-dashboard.tsx (was daar 1.070 van de 1.070 regels
 // gedeeld met Meta, LinkedIn en blended). Zelfde verdeling als Meta en LinkedIn al hadden:
@@ -277,6 +278,18 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
         bijschrift="Alle campagnes van dit account over de laatste 30 dagen"
       >
         <CampaignTable clientId={clientId} geoClone={geoClone} countryFilter={countryFilter} onCountryFilterChange={onCountryFilterChange} />
+      </Sectie>
+      {/* Wie de campagnes bereiken, tussen "wat draait er" en "hoe zien de advertenties eruit" --
+          de doelgroepmix is een targeting-vraag, geen creative-vraag, en hoort dus vóór de
+          advertenties zelf. Rendert niets zonder doelgroepdata (bv. alleen Performance Max zonder
+          expliciete signalen), dus de sectie kan leeg blijven zoals de andere kaarten hier ook
+          stil zijn zonder data. */}
+      <Sectie
+        icoon={<Users className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Doelgroepsignalen"
+        bijschrift="Welk type doelgroep de campagnes bereikt, en wat het oplevert"
+      >
+        <AudienceSplit clientId={clientId} />
       </Sectie>
       {/* De advertenties zelf horen hier en niet op Overzicht.
           Ze stonden in de sectie "Waar het budget landt", samen met video, netwerken

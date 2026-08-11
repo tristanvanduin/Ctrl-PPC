@@ -55,6 +55,10 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   ads_pmax_asset_performance: { capability: "client:read", clientColumn: "client_id" },
   ads_asset_group_performance_monthly: { capability: "client:read", clientColumn: "client_id" },
   ads_pmax_network_breakdown: { capability: "client:read", clientColumn: "client_id" },
+  // Doelgroepsplitsing (components/dashboard/audience-split.tsx): dezelfde reden als de twee
+  // regels hierboven om browser-side te mogen lezen, gewoon een nieuwe consument van een tabel
+  // die al bestond (migratie 067) maar tot nu toe geen UI-lezer had.
+  ads_audience_performance_monthly: { capability: "client:read", clientColumn: "client_id" },
   client_files: { capability: "client:read", clientColumn: "client_id" },
   client_folders: { capability: "client:read", clientColumn: "client_id" },
   client_notes: { capability: "client:read", clientColumn: "client_id" },
