@@ -8,6 +8,11 @@ import { ImageResponse } from "next/og";
 // Geen custom lettertype geladen: dat vraagt een font-buffer erbij (fetch of fs.readFile) voor
 // wat hier een systeem-sans-serif ook goed genoeg doet. Als dit ooit het merklettertype moet
 // dragen, is dat de eerste plek om aan te passen.
+//
+// TAGLINE FIX (11 augustus 2026): stond in het Nederlands op een verder volledig Engelstalige
+// site (dezelfde klasse fout als de eerdere html-lang- en blog-datumfixes), en zei "Stop met
+// dashboards bouwen" -- terwijl /pricing het dashboard zelf gratis aanbiedt. Vertaald en
+// verzacht naar dezelfde "erbovenop, niet in plaats van"-positionering als /vs en ComparisonBlock.
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -46,7 +51,7 @@ export default function OpengraphImage() {
           Performance Intelligence Platform
         </div>
         <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: "rgba(244,243,239,0.6)" }}>
-          Stop met dashboards bouwen. Start met beslissingen nemen.
+          Beyond the dashboard. Into the decision.
         </div>
       </div>
     ),

@@ -1,14 +1,23 @@
-import { X } from "lucide-react";
-
 // Fase 7, Task 2 (Blok 2): het splitscherm. Links een generiek "dashboard" -- grafieken die
-// niets vertellen over de oorzaak, doorgestreept met Amber Waste. Rechts hoe Ctrl PPC hetzelfde
-// account leest: een diagnose met een oorzaak, in JetBrains Mono, met een Neon Indigo gloed.
-// De rechterkant is illustratief or de echte lezing die de Decision Core oplevert (signaal ->
-// hypothese -> kwaliteitspoort, zie lib/decision/), geen live data.
+// niets vertellen over de oorzaak. Rechts hoe Ctrl PPC hetzelfde account leest: een diagnose met
+// een oorzaak, in JetBrains Mono, met een Neon Indigo gloed. De rechterkant is illustratief voor
+// de echte lezing die de Decision Core oplevert (signaal -> hypothese -> kwaliteitspoort, zie
+// lib/decision/), geen live data.
 //
 // De twee kaarttitels stonden op <p>, niet op een koptag (audit, 11 augustus 2026) -- de
 // visuele hierarchie zei "titel", de heading-outline die crawlers en screenreaders gebruiken zei
 // niets. Nu <h3>, onder de <h2> van deze sectie.
+//
+// REPOSITIONERING (11 augustus 2026, op vraag van de eigenaar): de linkerkant heette eerst "The
+// Dashboard Illusion" met een grote X eroverheen. Dat is teruggedraaid na een terechte vraag: Ctrl
+// PPC heeft zelf een substantiele dashboardlaag (gratis op elke tier, zie /pricing -- "Just want
+// the dashboard and the forecast? Basis is free"), en die data voedt op macro-niveau ook de
+// analyselaag zelf. "Je dashboard is een illusie" naast "hier is ons gratis dashboard" is een
+// tegenspraak die een scherpe prospect direct ziet. De X en de "Illusion"-naam zijn weg; de
+// vergelijking blijft (een los dashboard stopt bij wat er gebeurde, geen oorzaak, geen actie),
+// maar erkent nu dat het dashboard zelf niet het probleem is -- het is de basislaag, inbegrepen,
+// niet de illusie. Zie ook app/(marketing)/vs/page.tsx en app/(marketing)/opengraph-image.tsx
+// voor dezelfde correctie elders op de site.
 
 const NEP_BALKEN = [40, 65, 30, 80, 45, 60, 35];
 
@@ -34,11 +43,12 @@ export function ComparisonBlock() {
       </p>
 
       <div className="mt-12 grid gap-6 lg:grid-cols-2">
-        {/* Left: The Dashboard Illusion */}
+        {/* Left: Dashboards Alone */}
         <div className="relative overflow-hidden rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/60">The Dashboard Illusion</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/60">Dashboards Alone</h3>
           <p className="mt-2 text-sm text-off-white/50">
-            Charts per channel, lined up neatly. None of them tell you which one to trust, or what to
+            Charts per channel, lined up neatly -- included free on every Ctrl PPC tier too. On its
+            own, it stops at what happened: it does not tell you which number to trust, or what to
             do about it.
           </p>
 
@@ -46,10 +56,6 @@ export function ComparisonBlock() {
             {NEP_BALKEN.map((h, i) => (
               <div key={i} className="flex-1 rounded-t-sm bg-off-white/60" style={{ height: `${h}%` }} />
             ))}
-          </div>
-
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <X className="h-24 w-24 text-amber-waste" strokeWidth={2.5} aria-hidden />
           </div>
         </div>
 

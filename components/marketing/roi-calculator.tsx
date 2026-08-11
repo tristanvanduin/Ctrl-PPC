@@ -2,14 +2,19 @@
 
 import { useMemo, useState } from "react";
 
-// Fase 7-upgrade: niet langer "willekeurige uren per account", maar het standaardpakket dat
-// voor elke klant loopt: de 7 analyses (bid-strategy, budget-allocation, quality-score,
-// impression-share, cross-channel, kpi-relations, monthly) plus de maandrapportage
-// (client-reports/pdf). Elke regel is de tijd die een specialist daar naar schatting handmatig
-// aan kwijt zou zijn -- niet een percentage van iets vaags. Extra analyses (diepe duiken,
-// ad-hoc onderzoek) komen hier bovenop en tellen dus niet mee: dit is het MINIMUM, niet het
-// plafond. Zelfde regel als eerder: de aannames staan zichtbaar in de UI, niet verstopt in de
-// berekening.
+// Herzien na een terechte vraag: de vorige versie ("de 7 analyses die voor elke klant lopen")
+// telde budget-allocation, bid-strategy, quality-score, impression-share, cross-channel en
+// kpi-relations mee als het automatische standaardpakket. Dat klopt niet -- lib/analysis/
+// credit-costs.ts noemt die zes expliciet "HANDMATIGE deep-dive-routes", nooit de automatische
+// SOP-cadans, bestemd om ooit credit-gated te worden. Wat automatisch draait voor elke klant is
+// monthly + weekly + biweekly (lib/tenancy/sop-dekking.ts: "Automatische SOP's (monthly/weekly/
+// biweekly) zijn nooit credit-gated"). Herbouwd op die drie, elk met zijn eigen frequentie per
+// maand -- weekly draait circa 4x, biweekly 2x, monthly 1x -- in plaats van alles als eenmalig te
+// tellen. Tijdsschatting per keer blijft dezelfde methode: wat een specialist er naar schatting
+// handmatig aan kwijt zou zijn, gebaseerd op de stappen in de SOP-prompt zelf (weekly: 3 korte,
+// gerichte checks uit buildWeeklyPrompt; biweekly: 4 stappen tegen de maandanalyse-verwachting uit
+// buildBiWeeklyPrompt; monthly: de 9-staps diepe analyse). Extra analyses (de deep-dives hierboven,
+// ad-hoc onderzoek) komen hier nog steeds bovenop en tellen niet mee: dit blijft het MINIMUM.
 //
 // text-off-white/40 op deze en andere marketingpagina's gaf 3,56:1 contrast tegen
 // --midnight-slate (WCAG AA vereist 4,5:1 voor gewone tekst); nagerekend en overal opgehoogd
@@ -18,20 +23,17 @@ import { useMemo, useState } from "react";
 interface Analyse {
   naam: string;
   minuten: number;
+  keerPerMaand: number;
 }
 
 const STANDAARDPAKKET: Analyse[] = [
-  { naam: "Monthly analysis", minuten: 90 },
-  { naam: "Budget allocation", minuten: 30 },
-  { naam: "Bid strategy", minuten: 30 },
-  { naam: "Quality Score", minuten: 20 },
-  { naam: "Impression Share", minuten: 20 },
-  { naam: "Channel synergy", minuten: 40 },
-  { naam: "KPI relations", minuten: 30 },
-  { naam: "Monthly report", minuten: 60 },
+  { naam: "Monthly analysis (9 steps)", minuten: 90, keerPerMaand: 1 },
+  { naam: "Weekly health check", minuten: 20, keerPerMaand: 4 },
+  { naam: "Biweekly check-in", minuten: 45, keerPerMaand: 2 },
+  { naam: "Monthly report", minuten: 60, keerPerMaand: 1 },
 ];
 
-const MINUTEN_TOTAAL = STANDAARDPAKKET.reduce((som, a) => som + a.minuten, 0);
+const MINUTEN_TOTAAL = STANDAARDPAKKET.reduce((som, a) => som + a.minuten * a.keerPerMaand, 0);
 const UREN_PER_KLANT_PER_MAAND = MINUTEN_TOTAAL / 60;
 
 interface Invoer {
@@ -110,25 +112,28 @@ export function RoiCalculator() {
         onClick={() => setToonPakket((v) => !v)}
         className="mt-4 text-xs font-semibold text-off-white/50 underline hover:text-off-white"
       >
-        {toonPakket ? "Hide the standard package" : `Where do those ${UREN_PER_KLANT_PER_MAAND.toFixed(1)}h per client come from?`}
+        {toonPakket
+          ? "Hide the standard package"
+          : `Where do those ${UREN_PER_KLANT_PER_MAAND.toFixed(1)}h per client (x ${klanten} clients = ${urenPerMaand.toFixed(0)}h) come from?`}
       </button>
 
       {toonPakket && (
         <ul className="mt-3 space-y-1 border-t border-off-white/10 pt-3">
           {STANDAARDPAKKET.map((a) => (
             <li key={a.naam} className="flex items-center justify-between text-xs text-off-white/60">
-              <span>{a.naam}</span>
-              <span>{a.minuten} min</span>
+              <span>{a.naam}{a.keerPerMaand > 1 ? ` (x ${a.keerPerMaand}/month)` : ""}</span>
+              <span>{a.minuten} min{a.keerPerMaand > 1 ? ` = ${a.minuten * a.keerPerMaand} min/mo` : ""}</span>
             </li>
           ))}
         </ul>
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-off-white/60">
-        These are the 7 analyses that run for every client by default, plus the monthly report, with
-        an estimated time cost per item if a specialist did them by hand. Extra analyses and deep
-        dives come on top of this and are not counted here: this is the minimum, not the ceiling. An
-        estimate based on your input, not a measured result.
+        These are the three automatic SOP cadences that run for every client by default -- monthly,
+        weekly, and biweekly -- each with an estimated time cost per run if a specialist did it by
+        hand, at the frequency it actually runs. Manual deep dives (budget allocation, bid strategy,
+        and similar on-demand analyses) come on top of this and are not counted here: this is the
+        minimum, not the ceiling. An estimate based on your input, not a measured result.
       </p>
     </div>
   );
