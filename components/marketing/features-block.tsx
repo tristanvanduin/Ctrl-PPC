@@ -18,7 +18,7 @@ const FRAMEWORK_STAPPEN = [
   { stap: "3", titel: "Quality gate", omschrijving: "Every hypothesis has to clear hard criteria before it counts." },
   { stap: "4", titel: "Execution", omschrijving: "Observed, not automated: we see what actually changed." },
   { stap: "5", titel: "Attribution", omschrijving: "The result gets linked back to the hypothesis that predicted it." },
-  { stap: "6", titel: "Memory", omschrijving: "The outcome is remembered, for the next decision." },
+  { stap: "6", titel: "Agency memory", omschrijving: "The outcome is remembered, for the next decision." },
 ];
 
 export function FeaturesBlock() {
@@ -73,7 +73,8 @@ export function FeaturesBlock() {
           </h3>
           <p className="mt-4 text-sm leading-relaxed text-off-white/60">
             One platform for every account and every agency you manage, without a new invoice opening
-            for each extra client.
+            for each extra client. Cross-channel synergy compounds with every account you add, not
+            just every channel.
           </p>
           <div className="mt-6">
             <RoiCalculator />

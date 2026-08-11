@@ -72,9 +72,9 @@ export default async function HomePage() {
           We built the engine that is.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-base text-off-white/60 sm:text-lg">
-          Chat-to-chart is still just a chart. Typing a prompt and getting a graph back is an insight,
-          not a decision. Ctrl PPC reads every account across every channel, forms a testable
-          hypothesis, executes it, and remembers what worked. No prompting required.
+          AI dashboards ship "AI insights." That is still a chart with better handwriting. Ctrl PPC
+          is decisioning: it reads every account across every channel, forms a testable hypothesis,
+          executes it, and closes the learning loop by remembering what worked.
         </p>
         <div className="mt-8 flex items-center justify-center sm:mt-10">
           <a

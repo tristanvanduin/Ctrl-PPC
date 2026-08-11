@@ -1,74 +1,76 @@
 import type { Metadata } from "next";
 import { Check, Infinity as InfinityIcon } from "lucide-react";
-import { PRICING } from "@/lib/marketing/pricing";
+import { TIERS, sopDekkingVoor } from "@/lib/marketing/tiers";
 
-// Fase 7, Task 3, herzien onder de Blueprint v2.0-brief (radical transparency): een storefront
-// met een prijs ATF, geen "neem contact op"-gate. De bedragen komen uit lib/marketing/pricing.ts
-// en zijn expliciet gelabeld "indicative" -- er staat nog geen afgesproken prijs vast, en dat
-// verbergen achter een contactformulier is precies wat de brief aanvalt. Een rond, herkenbaar
-// indicatief bedrag tonen is eerlijker dan een gok verbergen achter "neem contact op".
+// Fase 7, Task 3, herzien onder de Blueprint v2.0-brief (radical transparency): de echte 5-tier
+// ladder (agencies.licentie, migratie 071) als storefront, geen "neem contact op"-gate. Prijzen
+// zijn expliciet gelabeld "indicative" -- zie lib/marketing/tiers.ts voor wat al vastlag en wat
+// hier voor het eerst is ingevuld.
 export const metadata: Metadata = {
   title: "Pricing: Ctrl PPC",
-  description: "For in-house teams and agencies. No limit on accounts, no separate invoice per client.",
+  description: "Five tiers, one decision engine. No limit on accounts, no separate invoice per client.",
   alternates: { canonical: "/pricing" },
   openGraph: {
     title: "Pricing: Ctrl PPC",
-    description: "For in-house teams and agencies. No limit on accounts, no separate invoice per client.",
+    description: "Five tiers, one decision engine. No limit on accounts, no separate invoice per client.",
     type: "website",
   },
 };
 
-const IN_HOUSE_PUNTEN = [
-  "One platform for every account you own, across every channel",
-  "The full 6-step Decision Framework, no stripped-down version",
-  "Access for your entire marketing team",
-];
-
-const AGENCY_PUNTEN = [
-  "No limit on the number of client accounts",
-  "One agency-wide view next to the per-client view",
-  "Client reporting that scales without repaying per client",
-];
-
-function Tier({
-  titel,
-  subtitel,
-  vanafPerMaand,
-  valuta,
-  punten,
-}: {
-  titel: string;
-  subtitel: string;
-  vanafPerMaand: number;
-  valuta: string;
-  punten: string[];
-}) {
+function TierCard({ tier, uitgelicht }: { tier: (typeof TIERS)[number]; uitgelicht: boolean }) {
+  const sopDekking = sopDekkingVoor(tier.licentie);
   return (
-    <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-8">
-      <h3 className="font-marketing-heading text-xl font-bold text-off-white">{titel}</h3>
-      <p className="mt-1 text-sm text-off-white/50">{subtitel}</p>
-
-      <div className="mt-6 flex items-baseline gap-1.5">
-        <span className="font-marketing-heading text-4xl font-extrabold text-off-white">
-          {"€"}{vanafPerMaand.toLocaleString("en-US")}
+    <div
+      className={`flex flex-col rounded-[6px] border p-6 ${
+        uitgelicht
+          ? "border-neon-indigo/50 bg-midnight-slate-raised"
+          : "border-off-white/10 bg-midnight-slate-raised"
+      }`}
+      style={uitgelicht ? { boxShadow: "0 0 40px rgba(129, 140, 248, 0.15)" } : undefined}
+    >
+      {uitgelicht && (
+        <span className="mb-3 w-fit rounded-[4px] bg-neon-indigo/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-neon-indigo">
+          Most agencies start here
         </span>
-        <span className="text-sm text-off-white/50">/mo {valuta}, indicative</span>
-      </div>
-      <p className="mt-1.5 text-xs text-off-white/40">
-        Starting price. Your quote scales with account count, ask us for an exact number.
-      </p>
+      )}
+      <h3 className="font-marketing-heading text-lg font-bold text-off-white">{tier.naam}</h3>
 
-      <ul className="mt-6 space-y-3">
-        {punten.map((p) => (
-          <li key={p} className="flex gap-2.5 text-sm text-off-white/70">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-neon-indigo" aria-hidden />
-            {p}
+      <div className="mt-4 flex items-baseline gap-1">
+        {tier.vanafPerMaand === null ? (
+          <span className="font-marketing-heading text-2xl font-extrabold text-off-white">Custom</span>
+        ) : (
+          <>
+            <span className="font-marketing-heading text-2xl font-extrabold text-off-white">
+              {"€"}{tier.vanafPerMaand.toLocaleString("en-US")}
+            </span>
+            <span className="text-xs text-off-white/50">/mo, indicative</span>
+          </>
+        )}
+      </div>
+
+      <div className="mt-4 space-y-1.5 border-y border-off-white/10 py-4 text-xs text-off-white/60">
+        <div className="flex justify-between gap-2">
+          <span>Compute credits/mo</span>
+          <span className="shrink-0 text-off-white">{tier.creditsPerMaand.toLocaleString("en-US")}</span>
+        </div>
+        <div className="flex justify-between gap-2">
+          <span>Accounts on auto-SOPs</span>
+          <span className="shrink-0 text-off-white">{Number.isFinite(sopDekking) ? sopDekking : "Unlimited"}</span>
+        </div>
+      </div>
+
+      <ul className="mt-4 flex-1 space-y-2.5">
+        {tier.features.map((f) => (
+          <li key={f} className="flex gap-2 text-xs leading-relaxed text-off-white/70">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-indigo" aria-hidden />
+            {f}
           </li>
         ))}
       </ul>
+
       <a
         href="/demo"
-        className="mt-8 block rounded-[6px] border border-neon-indigo/40 px-5 py-3 text-center text-sm font-semibold text-neon-indigo transition-colors hover:bg-neon-indigo/10"
+        className="mt-6 block rounded-[6px] border border-neon-indigo/40 px-4 py-2.5 text-center text-sm font-semibold text-neon-indigo transition-colors hover:bg-neon-indigo/10"
       >
         Request a demo
       </a>
@@ -85,8 +87,9 @@ export default function PricingPage() {
           What it costs, up front
         </h1>
         <p className="mt-4 text-off-white/60">
-          No account limit, no per-client invoice. Access is by invitation; the numbers below are
-          starting points, not the final gate.
+          Five tiers of decisioning, not five gates to a sales call. Every tier runs the full
+          hypothesis loop, the difference is scale: how many accounts, how much compute. The
+          numbers below are starting points, not the final quote.
         </p>
       </div>
 
@@ -98,22 +101,16 @@ export default function PricingPage() {
         </span>
       </div>
 
-      <div className="mt-8 grid gap-6 md:grid-cols-2">
-        <Tier
-          titel="In-house team"
-          subtitel="For the marketing team behind one brand."
-          vanafPerMaand={PRICING.inHouse.vanafPerMaand}
-          valuta={PRICING.inHouse.valuta}
-          punten={IN_HOUSE_PUNTEN}
-        />
-        <Tier
-          titel="Agency"
-          subtitel="For agencies managing multiple client accounts."
-          vanafPerMaand={PRICING.agency.vanafPerMaand}
-          valuta={PRICING.agency.valuta}
-          punten={AGENCY_PUNTEN}
-        />
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        {TIERS.map((tier) => (
+          <TierCard key={tier.licentie} tier={tier} uitgelicht={tier.licentie === "growth"} />
+        ))}
       </div>
+
+      <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-off-white/50">
+        Just want the dashboard and the forecast? Basis is free, unlimited accounts, no automatic
+        SOP runs. Upgrade whenever you want the engine to start forming hypotheses on its own.
+      </p>
     </div>
   );
 }

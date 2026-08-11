@@ -19,7 +19,10 @@ const DIAGNOSE_REGELS = [
 export function ComparisonBlock() {
   return (
     <section className="mx-auto max-w-6xl px-6 py-20">
-      <h2 className="text-center font-marketing-heading text-3xl font-bold text-off-white sm:text-4xl">
+      <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
+        Intelligence is not decisioning
+      </p>
+      <h2 className="mt-2 text-center font-marketing-heading text-3xl font-bold text-off-white sm:text-4xl">
         Numbers are not a diagnosis
       </h2>
       <p className="mx-auto mt-3 max-w-2xl text-center text-off-white/60">
