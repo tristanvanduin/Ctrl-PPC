@@ -14,7 +14,7 @@ import { ProductVideo } from "@/components/marketing/product-video";
 export const metadata: Metadata = {
   title: "Ctrl PPC: The Cross-Channel Decision Engine",
   description:
-    "Dashboards show you what happened. A chart is not a decision. Ctrl PPC reads every account, forms a testable hypothesis, executes it, and remembers what worked - across channels, with no account limit.",
+    "Dashboards show you what happened. A chart is not a decision. Ctrl PPC reads every account, forms a testable hypothesis, and remembers what worked once you act on it - across channels, with no account limit.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Ctrl PPC: The Cross-Channel Decision Engine",
@@ -74,7 +74,7 @@ export default async function HomePage() {
         <p className="mx-auto mt-6 max-w-2xl text-base text-off-white/60 sm:text-lg">
           AI dashboards ship "AI insights." That is still a chart with better handwriting. Ctrl PPC
           is decisioning: it reads every account across every channel, forms a testable hypothesis,
-          executes it, and closes the learning loop by remembering what worked.
+          and closes the learning loop by remembering what worked after you act on it.
         </p>
         <div className="mt-8 flex items-center justify-center sm:mt-10">
           <a
@@ -87,13 +87,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <ProductVideo src="/videos/dashboard-demo.webm" />
-      <TrustBanner />
-      <ComparisonBlock />
-      <FeaturesBlock />
-      <ProductVideo src="/videos/decision-terminal-demo.webm" caption="The Decision Terminal, live" />
-
-      <section className="mx-auto max-w-6xl px-6 py-20">
+      <section className="mx-auto max-w-6xl px-6 pb-16">
         <h2 className="text-center font-marketing-heading text-2xl font-bold text-off-white">
           Global Platform Pulse
         </h2>
@@ -104,6 +98,12 @@ export default async function HomePage() {
           <PlatformPulse />
         </div>
       </section>
+
+      <ProductVideo src="/videos/dashboard-demo.webm" />
+      <TrustBanner />
+      <ComparisonBlock />
+      <FeaturesBlock />
+      <ProductVideo src="/videos/decision-terminal-demo.webm" caption="The Decision Terminal, live" />
     </>
   );
 }

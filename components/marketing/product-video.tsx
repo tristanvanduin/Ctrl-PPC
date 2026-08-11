@@ -6,6 +6,12 @@
 // misleading than no video at all. Real footage (public/videos/) landed on 11 August 2026 and is
 // wired into the homepage; the fallback stays here for any future slot that doesn't have footage
 // yet.
+//
+// preload="metadata" is deliberate: the two homepage clips are 5.0MB and 1.6MB, and without it
+// the browser fetches the full file for every visitor on page load, not just the ones who press
+// play. No compression tooling is available in this environment (ffmpeg could not be installed,
+// network-restricted sandbox) -- if the source files can be re-encoded at a lower bitrate before
+// upload, that would help more than anything this component can do.
 
 interface ProductVideoProps {
   src?: string;
@@ -45,7 +51,7 @@ function TerminalPreview() {
 
 export function ProductVideo({ src, embedUrl, poster, caption }: ProductVideoProps) {
   return (
-    <section className="mx-auto max-w-4xl px-6 pb-16">
+    <section className="mx-auto max-w-2xl px-6 pb-16">
       {caption && (
         <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
           {caption}
@@ -67,7 +73,7 @@ export function ProductVideo({ src, embedUrl, poster, caption }: ProductVideoPro
           </div>
         ) : src ? (
           // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video className="aspect-video w-full" src={src} poster={poster} controls />
+          <video className="aspect-video w-full" src={src} poster={poster} controls preload="metadata" />
         ) : (
           <TerminalPreview />
         )}
