@@ -6,6 +6,7 @@ import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
 import { ProductVideo } from "@/components/marketing/product-video";
+import { QualityGateMatrix } from "@/components/marketing/quality-gate-matrix";
 
 // Fase 7, Task 2: de homepage volgens Blueprint v2.0. Vervangt de minimale Fase 5-hero (die
 // alleen de kop en de Platform Pulse had) door de volledige structuur uit de brief: hero,
@@ -102,6 +103,7 @@ export default async function HomePage() {
       <ProductVideo src="/videos/dashboard-demo.webm" />
       <TrustBanner />
       <ComparisonBlock />
+      <QualityGateMatrix />
       <FeaturesBlock />
       <ProductVideo src="/videos/decision-terminal-demo.webm" caption="The Decision Terminal, live" />
     </>
