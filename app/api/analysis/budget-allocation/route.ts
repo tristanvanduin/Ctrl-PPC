@@ -15,6 +15,7 @@ import { buildBudgetAllocationPrompt } from "@/lib/prompts/budget-allocation-pro
 import { saveBudgetAllocationHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 const SECTION = "budget_allocation_v1";
 const SOP_TYPE = "budget_allocation";
@@ -53,6 +54,11 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: "client_id is verplicht" }, { status: 400 });
+  }
+
+  const creditOordeel = await controleerSaldo(supabase, { clientId, label: SOP_TYPE });
+  if (creditOordeel.blokkeert) {
+    return Response.json({ error: creditOordeel.tekst }, { status: 402 });
   }
 
   const [isRes, monthlyRes, targetRes, clientCtx] = await Promise.all([
@@ -153,6 +159,7 @@ export async function POST(request: NextRequest) {
 
   // Voed de goedkeuringswachtrij: aggregeer de op/af-schaal-adviezen tot één voorstel.
   await saveBudgetAllocationHypotheses(supabase, { summary, scaleUp, scaleDown }, { clientId, analysisId: null });
+  await verbruikCredit(supabase, { clientId, label: SOP_TYPE, runKey: `budget-allocation-${clientId}-${analysisDate}` });
 
   return Response.json({ analysis: response.output, summary, scaleUp, scaleDown, campaigns: facts });
 }

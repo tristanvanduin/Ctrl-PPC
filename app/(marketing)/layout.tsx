@@ -67,7 +67,7 @@ export default function MarketingLayout({
               href="/login"
               className="rounded-[6px] border border-off-white/15 px-4 py-2 text-sm font-semibold text-off-white transition-colors hover:border-neon-indigo hover:text-neon-indigo"
             >
-              Inloggen
+              Log in
             </Link>
             <button
               onClick={() => setOpen((o) => !o)}

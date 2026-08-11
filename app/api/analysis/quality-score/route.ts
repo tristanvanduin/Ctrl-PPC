@@ -15,6 +15,7 @@ import { analyzeQualityScore, type KeywordQsPerformanceRow } from "@/lib/analysi
 import { buildQualityScorePrompt } from "@/lib/prompts/quality-score-prompt";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 const SECTION = "quality_score_v1";
 const SOP_TYPE = "quality_score";
@@ -55,6 +56,11 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: "client_id is verplicht" }, { status: 400 });
+  }
+
+  const creditOordeel = await controleerSaldo(supabase, { clientId, label: SOP_TYPE });
+  if (creditOordeel.blokkeert) {
+    return Response.json({ error: creditOordeel.tekst }, { status: 402 });
   }
 
   // Data ophalen: de keyword-maandrijen (de sync vult deze al; 13 maanden waar beschikbaar).
@@ -121,6 +127,7 @@ export async function POST(request: NextRequest) {
 
   // Voed de goedkeuringswachtrij: flags + prioriteits-keywords tot één voorstel.
   await saveQualityScoreHypotheses(supabase, { flags: facts.flags, priorityKeywords: facts.priorityKeywords }, { clientId, analysisId: null });
+  await verbruikCredit(supabase, { clientId, label: SOP_TYPE, runKey: `quality-score-${clientId}-${analysisDate}` });
 
   return Response.json({ analysis: response.output, summary: facts.summary, flags: facts.flags, priorityKeywords: facts.priorityKeywords });
 }

@@ -7,18 +7,18 @@ import { RoiCalculator } from "./roi-calculator";
 // quality-gates.ts en hypothesis-evaluator.ts voor de daadwerkelijke implementatie van elke stap.
 
 const PIJNPUNTEN = [
-  "Losse exports per kanaal die nooit op dezelfde dag zijn bijgewerkt",
-  "Een aanbeveling zonder meetbare verwachting, dus zonder manier om hem later te toetsen",
-  "Wijzigingen in het account die niemand terugkoppelt aan het resultaat dat ze zouden verklaren",
+  "Separate exports per channel that are never updated on the same day",
+  "A recommendation with no measurable expectation, so there is no way to test it later",
+  "Account changes that nobody links back to the result they were supposed to explain",
 ];
 
 const FRAMEWORK_STAPPEN = [
-  { stap: "1", titel: "Signaal", omschrijving: "Automatische detectie per kanaal: Google, Meta, LinkedIn." },
-  { stap: "2", titel: "Hypothese", omschrijving: "Een concrete, meetbare voorspelling. Geen vage aanbeveling." },
-  { stap: "3", titel: "Kwaliteitspoort", omschrijving: "Elke hypothese moet langs harde criteria voor hij telt." },
-  { stap: "4", titel: "Uitvoering", omschrijving: "Geobserveerd, niet geautomatiseerd: wij zien wat er veranderde." },
-  { stap: "5", titel: "Attributie", omschrijving: "Het resultaat teruggekoppeld aan de hypothese die het voorspelde." },
-  { stap: "6", titel: "Geheugen", omschrijving: "De uitkomst blijft onthouden, voor de volgende beslissing." },
+  { stap: "1", titel: "Signal", omschrijving: "Automatic detection per channel: Google, Meta, LinkedIn." },
+  { stap: "2", titel: "Hypothesis", omschrijving: "A concrete, measurable prediction. Not a vague suggestion." },
+  { stap: "3", titel: "Quality gate", omschrijving: "Every hypothesis has to clear hard criteria before it counts." },
+  { stap: "4", titel: "Execution", omschrijving: "Observed, not automated: we see what actually changed." },
+  { stap: "5", titel: "Attribution", omschrijving: "The result gets linked back to the hypothesis that predicted it." },
+  { stap: "6", titel: "Agency memory", omschrijving: "The outcome is remembered, for the next decision." },
 ];
 
 export function FeaturesBlock() {
@@ -29,7 +29,7 @@ export function FeaturesBlock() {
         <div>
           <AlertTriangle className="h-8 w-8 text-amber-waste" aria-hidden />
           <h3 className="mt-4 font-marketing-heading text-xl font-bold text-off-white">
-            Waar performance marketing op vastloopt
+            Where performance marketing breaks down
           </h3>
           <ul className="mt-4 space-y-3">
             {PIJNPUNTEN.map((p) => (
@@ -45,7 +45,7 @@ export function FeaturesBlock() {
         <div>
           <ListChecks className="h-8 w-8 text-neon-indigo" aria-hidden />
           <h3 className="mt-4 font-marketing-heading text-xl font-bold text-off-white">
-            Het 6-staps Decision Framework
+            The 6-step Decision Framework
           </h3>
           <ol className="mt-4 space-y-4">
             {FRAMEWORK_STAPPEN.map((s) => (
@@ -69,11 +69,12 @@ export function FeaturesBlock() {
         <div>
           <InfinityIcon className="h-8 w-8 text-copper" aria-hidden />
           <h3 className="mt-4 font-marketing-heading text-xl font-bold text-off-white">
-            Geen limiet op accounts
+            No limit on accounts
           </h3>
           <p className="mt-4 text-sm leading-relaxed text-off-white/60">
-            Eén platform voor elk account en elk bureau dat je beheert, zonder dat elke extra klant een
-            aparte rekening opent.
+            One platform for every account and every agency you manage, without a new invoice opening
+            for each extra client. Cross-channel synergy compounds with every account you add, not
+            just every channel.
           </p>
           <div className="mt-6">
             <RoiCalculator />

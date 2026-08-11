@@ -15,6 +15,7 @@ import { buildBidStrategyPrompt } from "@/lib/prompts/bid-strategy-prompt";
 import { saveBidStrategyHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 const SECTION = "bid_strategy_v1";
 const SOP_TYPE = "bid_strategy";
@@ -53,6 +54,11 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: "client_id is verplicht" }, { status: 400 });
+  }
+
+  const creditOordeel = await controleerSaldo(supabase, { clientId, label: SOP_TYPE });
+  if (creditOordeel.blokkeert) {
+    return Response.json({ error: creditOordeel.tekst }, { status: 402 });
   }
 
   const [isRes, monthlyRes, targetRes, clientCtx] = await Promise.all([
@@ -147,6 +153,7 @@ export async function POST(request: NextRequest) {
 
   // Voed de goedkeuringswachtrij: aggregeer de biedstrategie-mismatches tot één voorstel.
   await saveBidStrategyHypotheses(supabase, { summary, campaigns: facts }, { clientId, analysisId: null });
+  await verbruikCredit(supabase, { clientId, label: SOP_TYPE, runKey: `bid-strategy-${clientId}-${analysisDate}` });
 
   return Response.json({ analysis: response.output, summary, campaigns: facts });
 }

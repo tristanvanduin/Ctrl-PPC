@@ -30,11 +30,14 @@ interface AnalysisState {
   lastDate: string | null;
   output: string | null;
   error: string | null;
+  creditBlocked: boolean;
   success: boolean;
   expanded: boolean;
 }
 
-const EMPTY: AnalysisState = { running: false, lastDate: null, output: null, error: null, success: false, expanded: false };
+const EMPTY: AnalysisState = {
+  running: false, lastDate: null, output: null, error: null, creditBlocked: false, success: false, expanded: false,
+};
 
 export function StandaloneAnalyses({ clientId }: { clientId: string }) {
   const [state, setState] = useState<Record<string, AnalysisState>>(
@@ -66,7 +69,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
   }, [clientId, fetchLatest]);
 
   async function run(a: AnalysisConfig) {
-    patch(a.key, { running: true, error: null, success: false });
+    patch(a.key, { running: true, error: null, creditBlocked: false, success: false });
     try {
       const res = await fetch(a.endpoint, {
         method: "POST",
@@ -74,6 +77,14 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
         body: JSON.stringify({ client_id: clientId }),
       });
       const data = await res.json();
+      // 402: geen mislukte run, maar een ontoereikend creditsaldo (controleerSaldo in
+      // lib/analysis/credit-costs.ts). Eigen pad, geen generieke foutmelding -- de tekst wijst al
+      // naar Credit Pack of upgrade, en dat verdient een duidelijke CTA, geen rode fouttekst die
+      // eruitziet als een bug in de analyse zelf.
+      if (res.status === 402) {
+        patch(a.key, { running: false, error: data.error || "Onvoldoende credits", creditBlocked: true });
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Analyse mislukt");
       patch(a.key, {
         running: false,
@@ -111,6 +122,8 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                     ? "border-rm-blue/30 bg-rm-blue/5 cursor-wait"
                     : s.success
                     ? "border-emerald-300 bg-emerald-50"
+                    : s.creditBlocked
+                    ? "border-copper/40 bg-copper/5"
                     : s.error
                     ? "border-red-300 bg-red-50"
                     : "border-border hover:border-rm-blue/40 hover:bg-gray-50 cursor-pointer"
@@ -120,7 +133,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                   <span className="text-sm font-semibold text-rm-gray">{a.label}</span>
                   {s.running && <Loader2 className="w-4 h-4 text-rm-blue-ink animate-spin" />}
                   {s.success && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                  {s.error && <AlertCircle className="w-4 h-4 text-red-500" />}
+                  {s.error && !s.creditBlocked && <AlertCircle className="w-4 h-4 text-red-500" />}
                 </div>
                 <p className="text-micro text-muted-foreground">{a.description}</p>
                 {s.lastDate && (
@@ -129,9 +142,22 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                     Laatst: {s.lastDate}
                   </div>
                 )}
-                {s.error && <p className="text-micro text-red-500 mt-1 truncate">{s.error}</p>}
+                {s.error && !s.creditBlocked && <p className="text-micro text-red-500 mt-1 truncate">{s.error}</p>}
                 {s.running && <p className="text-micro text-rm-blue-ink mt-1">Bezig...</p>}
               </button>
+              {s.creditBlocked && (
+                <div className="rounded-md border border-copper/30 bg-copper/5 px-3 py-2 text-micro text-rm-gray">
+                  <p>{s.error}</p>
+                  <div className="mt-1.5 flex items-center gap-3">
+                    <a href="/pricing" target="_blank" rel="noopener noreferrer" className="font-semibold text-copper hover:underline">
+                      View plans
+                    </a>
+                    <a href="mailto:info@ctrlppc.com?subject=Credit%20Pack" className="font-semibold text-copper hover:underline">
+                      Buy a Credit Pack
+                    </a>
+                  </div>
+                </div>
+              )}
               {s.output && (
                 <>
                   <button

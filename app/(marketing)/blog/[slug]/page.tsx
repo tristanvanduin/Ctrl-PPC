@@ -58,7 +58,7 @@ export default async function BlogArticlePage({
   if (!post) notFound();
 
   return (
-    <article className="mx-auto max-w-2xl px-6 py-24">
+    <article className="mx-auto max-w-2xl px-6 pt-14 pb-20 sm:pt-20">
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
@@ -66,7 +66,7 @@ export default async function BlogArticlePage({
       />
       <Link href="/blog" className="inline-flex items-center gap-1.5 text-sm text-off-white/50 hover:text-off-white">
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-        Alle artikelen
+        All articles
       </Link>
 
       <p className="mt-8 text-xs text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>

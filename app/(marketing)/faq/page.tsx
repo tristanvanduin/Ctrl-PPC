@@ -4,61 +4,62 @@ import { FaqAccordion, type FaqItem } from "@/components/marketing/faq-accordion
 // Fase 7, Task 3: FAQ. De antwoorden over privacy, RLS en observatie-vs-executie beschrijven
 // hoe het platform daadwerkelijk werkt (Row Level Security per bureau, en een leeslaag zonder
 // een enkele schrijfaanroep naar een advertentieplatform), geen marketingtaal die losstaat van
-// de implementatie.
+// de implementatie. Naar het Engels vertaald voor de Blueprint v2.0-brief; feitelijke inhoud
+// ongewijzigd, alleen de taal.
 export const metadata: Metadata = {
   title: "FAQ: Ctrl PPC",
-  description: "Veelgestelde vragen over data-privacy, RLS en het verschil tussen observatie en automatische executie.",
+  description: "Frequently asked questions about data privacy, RLS, and the difference between observation and automatic execution.",
   alternates: { canonical: "/faq" },
   openGraph: {
     title: "FAQ: Ctrl PPC",
-    description: "Veelgestelde vragen over data-privacy, RLS en het verschil tussen observatie en automatische executie.",
+    description: "Frequently asked questions about data privacy, RLS, and the difference between observation and automatic execution.",
     type: "website",
   },
 };
 
 const VRAGEN: FaqItem[] = [
   {
-    vraag: "Wijzigt Ctrl PPC zelf iets in mijn advertentie-accounts?",
+    vraag: "Does Ctrl PPC change anything in my ad accounts itself?",
     antwoord:
-      "Nee. Ctrl PPC leest je accounts en stelt hypotheses voor, maar voert zelf niets uit in Google Ads, " +
-      "Meta of LinkedIn. Wie een hypothese accepteert, voert de wijziging zelf door in het platform. Ctrl " +
-      "PPC observeert daarna wat er in het account veranderd is en koppelt dat terug aan de hypothese die " +
-      "het voorspelde: dat is de attributiestap in het Decision Framework, geen automatische executie.",
+      "No. Ctrl PPC reads your accounts and proposes hypotheses, but never executes anything itself in " +
+      "Google Ads, Meta, or LinkedIn. Whoever accepts a hypothesis makes the change themselves in the " +
+      "platform. Ctrl PPC then observes what changed in the account and links that back to the hypothesis " +
+      "that predicted it: that is the attribution step in the Decision Framework, not automatic execution.",
   },
   {
-    vraag: "Hoe is mijn data afgeschermd van andere klanten en andere bureaus?",
+    vraag: "How is my data isolated from other clients and other agencies?",
     antwoord:
-      "Via Row Level Security (RLS) in de database zelf, niet alleen via een controle in de applicatie. " +
-      "Elke rij is gekoppeld aan een klant en een bureau, en de database weigert een rij te tonen aan wie " +
-      "daar geen rechten toe heeft, ongeacht welke query de applicatie stuurt.",
+      "Through Row Level Security (RLS) in the database itself, not just a check in the application. " +
+      "Every row is tied to a client and an agency, and the database refuses to show a row to anyone " +
+      "without access to it, regardless of what query the application sends.",
   },
   {
-    vraag: "Wordt mijn advertentiedata gedeeld met andere klanten of gebruikt om andere accounts te trainen?",
+    vraag: "Is my ad data shared with other clients or used to train other accounts?",
     antwoord:
-      "Nee. Elk account is gekoppeld aan precies één klant en één bureau, en blijft daarbinnen. Alleen " +
-      "geaggregeerde, geanonimiseerde benchmarks (zonder herleidbare cijfers per account) worden ooit over " +
-      "klanten heen samengevoegd, en alleen voor bureaus die daar zelf voor kiezen.",
+      "No. Every account is tied to exactly one client and one agency, and stays within that boundary. " +
+      "Only aggregated, anonymized benchmarks (with no traceable per-account figures) are ever combined " +
+      "across clients, and only for agencies that opt into that themselves.",
   },
   {
-    vraag: "Hoe weet ik of een geaccepteerde hypothese echt heeft gewerkt?",
+    vraag: "How do I know if an accepted hypothesis actually worked?",
     antwoord:
-      "Elke hypothese heeft een verwacht resultaat en een meetbare metric. Na de meetperiode vergelijkt " +
-      "Ctrl PPC de baseline met het gemeten resultaat, en kijkt of de bijbehorende wijziging ook " +
-      "daadwerkelijk is doorgevoerd in het account. Zonder herkenbare uitvoering telt een toevallige " +
-      "beweging in de cijfers niet als bevestiging.",
+      "Every hypothesis has an expected result and a measurable metric. After the measurement period, " +
+      "Ctrl PPC compares the baseline to the measured result, and checks whether the corresponding change " +
+      "was actually made in the account. Without recognizable execution, a coincidental move in the " +
+      "numbers does not count as confirmation.",
   },
   {
-    vraag: "Werkt dit ook als ik maar op één kanaal actief ben?",
+    vraag: "Does this work if I am only active on one channel?",
     antwoord:
-      "Ja. Elk kanaal (Google, Meta, LinkedIn) levert zijn eigen signalen onafhankelijk van de andere. Meer " +
-      "kanalen geven een breder beeld, maar zijn geen vereiste om te starten.",
+      "Yes. Each channel (Google, Meta, LinkedIn) delivers its own signals independently of the others. " +
+      "More channels give a broader picture, but are not required to get started.",
   },
   {
-    vraag: "Is dit ook geschikt voor een bureau met meerdere klanten?",
+    vraag: "Is this suitable for an agency with multiple clients?",
     antwoord:
-      "Ja, dat is het uitgangspunt: elk klantaccount van een bureau blijft afgeschermd via RLS, en een " +
-      "bureau krijgt daarnaast een eigen bureaubrede blik over al zijn klanten heen, zonder dat elke extra " +
-      "klant een aparte rekening of een aparte integratie vraagt.",
+      "Yes, that is the starting point: every client account of an agency stays isolated through RLS, and " +
+      "an agency also gets its own agency-wide view across all its clients, without each extra client " +
+      "requiring a separate invoice or a separate integration.",
   },
 ];
 
@@ -79,7 +80,7 @@ function faqJsonLd() {
 
 export default function FaqPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-24">
+    <div className="mx-auto max-w-3xl px-6 pt-14 pb-20 sm:pt-20">
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
@@ -87,8 +88,8 @@ export default function FaqPage() {
       />
       <div className="text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">FAQ</p>
-        <h1 className="mt-4 font-marketing-heading text-4xl font-extrabold text-off-white">
-          Veelgestelde vragen
+        <h1 className="mt-4 font-marketing-heading text-3xl font-extrabold text-off-white sm:text-4xl">
+          Frequently asked questions
         </h1>
       </div>
       <div className="mt-12">

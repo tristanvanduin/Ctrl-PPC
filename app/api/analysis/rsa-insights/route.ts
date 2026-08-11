@@ -15,6 +15,7 @@ import { saveRsaInsightsHypotheses } from "@/lib/analysis/standalone-to-hypothes
 import { buildRsaInsightsPrompt } from "@/lib/prompts/rsa-insights-prompt";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 const SECTION = "rsa_insights_v1";
 const SOP_TYPE = "rsa_insights";
@@ -55,6 +56,11 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: "client_id is verplicht" }, { status: 400 });
+  }
+
+  const creditOordeel = await controleerSaldo(supabase, { clientId, label: SOP_TYPE });
+  if (creditOordeel.blokkeert) {
+    return Response.json({ error: creditOordeel.tekst }, { status: 402 });
   }
 
   const [assetRes, clientCtx] = await Promise.all([
@@ -119,6 +125,7 @@ export async function POST(request: NextRequest) {
 
   // Voed de goedkeuringswachtrij: aggregeer de geprioriteerde schrijfopdrachten tot één voorstel.
   await saveRsaInsightsHypotheses(supabase, facts, { clientId, analysisId: null });
+  await verbruikCredit(supabase, { clientId, label: SOP_TYPE, runKey: `rsa-insights-${clientId}-${analysisDate}` });
 
   return Response.json({ analysis: response.output, summary: facts.summary, actions: facts.actions });
 }

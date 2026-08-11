@@ -16,6 +16,7 @@ import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { buildPeriodEvaluation, renderPeriodEvaluationSection, type PeriodHypothesis, type PeriodMonthRow } from "@/lib/analysis/period-evaluation";
 import { today as vandaag } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 const SECTION = "period_evaluation_v1";
 const SOP_TYPE = "period_evaluation";
@@ -58,6 +59,11 @@ export async function POST(request: NextRequest) {
   }
   const clientId = typeof body.client_id === "string" ? body.client_id : "";
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
+
+  const creditOordeel = await controleerSaldo(supabase, { clientId, label: SOP_TYPE });
+  if (creditOordeel.blokkeert) {
+    return Response.json({ error: creditOordeel.tekst }, { status: 402 });
+  }
 
   // De periode: expliciet from en to, of een aantal maanden terug (default een kwartaal).
   const today = new Date();
@@ -180,6 +186,8 @@ Kort: (1) het oordeel over de periode in twee zinnen, (2) wat het plan was en wa
     },
   });
   if (saveError) return Response.json({ error: "Opslaan mislukt", detail: saveError }, { status: 500 });
+
+  await verbruikCredit(supabase, { clientId, label: SOP_TYPE, runKey: `period-evaluation-${clientId}-${analysisDate}` });
 
   return Response.json({ evaluation: response.output, facts: evaluation });
 }

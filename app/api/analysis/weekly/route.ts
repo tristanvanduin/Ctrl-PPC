@@ -24,6 +24,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
@@ -41,6 +42,10 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: "Verwacht: { client_id: string }" }, { status: 400 });
+  }
+
+  if (!(await magSopDraaien(supabase, clientId))) {
+    return Response.json({ error: "SOP's zijn uitgeschakeld voor dit account." }, { status: 403 });
   }
 
   try {

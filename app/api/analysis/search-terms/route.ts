@@ -38,6 +38,7 @@ import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
 import { logger } from "@/lib/logger";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 export const maxDuration = 300; // 5 minutes for full analysis with many batches
 
@@ -143,6 +144,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const analysisDate = fmt(new Date());
+
+    const creditOordeel = await controleerSaldo(supabase, { clientId, label: "search_terms" });
+    if (creditOordeel.blokkeert) {
+      return Response.json({ error: creditOordeel.tekst }, { status: 402 });
+    }
 
     // Phase 1: Fetch all data in parallel
     const [searchTerms, productPerformance, accountStructure, clientCtx, keywords, locationTargets, adCopy, strategicContext] = await Promise.all([
@@ -480,6 +486,8 @@ ${toPromptTable(termsJson)}`;
       // Aggregeer de geadviseerde negatives als voorstel in de goedkeuringswachtrij.
       await saveSearchTermVerdictsAsHypotheses(supabase, allVerdicts, { clientId, analysisId: null });
     }
+
+    await verbruikCredit(supabase, { clientId, label: "search_terms", runKey: `search-terms-${clientId}-${analysisDate}` });
 
     return Response.json({
       results: allVerdicts.map((v) => ({

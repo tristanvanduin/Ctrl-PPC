@@ -21,14 +21,14 @@ interface Analyse {
 }
 
 const STANDAARDPAKKET: Analyse[] = [
-  { naam: "Maandanalyse", minuten: 90 },
-  { naam: "Budget-allocatie", minuten: 30 },
-  { naam: "Bod-strategie", minuten: 30 },
+  { naam: "Monthly analysis", minuten: 90 },
+  { naam: "Budget allocation", minuten: 30 },
+  { naam: "Bid strategy", minuten: 30 },
   { naam: "Quality Score", minuten: 20 },
   { naam: "Impression Share", minuten: 20 },
-  { naam: "Kanaalsynergie", minuten: 40 },
-  { naam: "KPI-verhoudingen", minuten: 30 },
-  { naam: "Maandrapportage", minuten: 60 },
+  { naam: "Channel synergy", minuten: 40 },
+  { naam: "KPI relations", minuten: 30 },
+  { naam: "Monthly report", minuten: 60 },
 ];
 
 const MINUTEN_TOTAAL = STANDAARDPAKKET.reduce((som, a) => som + a.minuten, 0);
@@ -55,16 +55,16 @@ export function RoiCalculator() {
     [klanten, uurtarief],
   );
 
-  const euroFmt = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+  const euroFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
   return (
     <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6" style={{ fontFamily: "var(--font-marketing-mono)" }}>
-      <p className="text-xs uppercase tracking-[0.2em] text-off-white/50">Minimale maandelijkse besparing</p>
+      <p className="text-xs uppercase tracking-[0.2em] text-off-white/50">Minimum monthly savings</p>
 
       <div className="mt-5 space-y-5">
         <label className="block">
           <div className="flex items-center justify-between text-sm text-off-white/80">
-            <span>Aantal klanten</span>
+            <span>Number of clients</span>
             <span className="text-neon-indigo">{klanten}</span>
           </div>
           <input
@@ -79,7 +79,7 @@ export function RoiCalculator() {
 
         <label className="block">
           <div className="flex items-center justify-between text-sm text-off-white/80">
-            <span>Uurtarief van je specialist</span>
+            <span>Your specialist&apos;s hourly rate</span>
             <span className="text-neon-indigo">{euroFmt.format(uurtarief)}</span>
           </div>
           <input
@@ -96,11 +96,11 @@ export function RoiCalculator() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 border-t border-off-white/10 pt-5">
         <div>
-          <p className="text-xs uppercase tracking-[0.15em] text-off-white/50">Uren per maand</p>
-          <p className="mt-1 text-2xl font-bold text-off-white">{urenPerMaand.toFixed(0)}u</p>
+          <p className="text-xs uppercase tracking-[0.15em] text-off-white/50">Hours per month</p>
+          <p className="mt-1 text-2xl font-bold text-off-white">{urenPerMaand.toFixed(0)}h</p>
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.15em] text-off-white/50">Minimale waarde</p>
+          <p className="text-xs uppercase tracking-[0.15em] text-off-white/50">Minimum value</p>
           <p className="mt-1 text-2xl font-bold text-neon-indigo">{euroFmt.format(euroPerMaand)}</p>
         </div>
       </div>
@@ -110,7 +110,7 @@ export function RoiCalculator() {
         onClick={() => setToonPakket((v) => !v)}
         className="mt-4 text-xs font-semibold text-off-white/50 underline hover:text-off-white"
       >
-        {toonPakket ? "Verberg het standaardpakket" : `Waar komt ${UREN_PER_KLANT_PER_MAAND.toFixed(1)}u per klant vandaan?`}
+        {toonPakket ? "Hide the standard package" : `Where do those ${UREN_PER_KLANT_PER_MAAND.toFixed(1)}h per client come from?`}
       </button>
 
       {toonPakket && (
@@ -125,10 +125,10 @@ export function RoiCalculator() {
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-off-white/60">
-        Dit zijn de 7 analyses die standaard voor elke klant draaien plus de maandrapportage, met een
-        geschatte tijdsbesteding per stuk als een specialist ze handmatig zou doen. Extra analyses en
-        diepe duiken zijn hierboven op mogelijk en tellen dus niet mee: dit is het minimum, geen
-        plafond. Een schatting op basis van jouw invoer, geen gemeten resultaat.
+        These are the 7 analyses that run for every client by default, plus the monthly report, with
+        an estimated time cost per item if a specialist did them by hand. Extra analyses and deep
+        dives come on top of this and are not counted here: this is the minimum, not the ceiling. An
+        estimate based on your input, not a measured result.
       </p>
     </div>
   );
