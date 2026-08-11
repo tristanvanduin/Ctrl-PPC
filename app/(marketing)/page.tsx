@@ -5,19 +5,20 @@ import { PlatformPulse } from "@/components/terminal/platform-pulse";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
+import { ProductVideo } from "@/components/marketing/product-video";
 
 // Fase 7, Task 2: de homepage volgens Blueprint v2.0. Vervangt de minimale Fase 5-hero (die
 // alleen de kop en de Platform Pulse had) door de volledige structuur uit de brief: hero,
 // vergelijking, trust-banner, features + ROI-calculator. De auth-redirect blijft ongewijzigd --
 // een ingelogde gebruiker hoort hier nooit de marketingpagina te zien.
 export const metadata: Metadata = {
-  title: "Ctrl PPC: Performance Intelligence Platform",
+  title: "Ctrl PPC: The Cross-Channel Decision Engine",
   description:
-    "Stop met dashboards bouwen. Start met beslissingen nemen. Eén platform dat signalen omzet in getoetste hypotheses, per kanaal, zonder limiet op accounts.",
+    "Dashboards show you what happened. A chart is not a decision. Ctrl PPC reads every account, forms a testable hypothesis, executes it, and remembers what worked - across channels, with no account limit.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Ctrl PPC: Performance Intelligence Platform",
-    description: "Stop met dashboards bouwen. Start met beslissingen nemen.",
+    title: "Ctrl PPC: The Cross-Channel Decision Engine",
+    description: "A chart is not a decision. We build the engine that decides.",
     type: "website",
   },
 };
@@ -32,7 +33,7 @@ const ORGANIZATION_JSON_LD = {
   "@type": "Organization",
   name: "Ctrl PPC",
   url: "https://ctrlppc.com",
-  description: "Performance Intelligence Platform voor performance marketing.",
+  description: "The cross-channel decision engine for performance marketing.",
 };
 
 const SOFTWARE_JSON_LD = {
@@ -42,7 +43,7 @@ const SOFTWARE_JSON_LD = {
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   description:
-    "Leest advertentie-accounts over kanalen heen, stelt getoetste hypotheses voor via een 6-staps Decision Framework, en observeert het resultaat zonder zelf wijzigingen door te voeren.",
+    "Reads ad accounts across channels, forms a testable hypothesis through a 6-step Decision Framework, and observes the result without executing changes itself.",
 };
 
 export default async function HomePage() {
@@ -61,31 +62,32 @@ export default async function HomePage() {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_JSON_LD) }}
       />
-      <section className="mx-auto max-w-4xl px-6 pt-24 pb-16 text-center sm:pt-32">
+      <section className="mx-auto max-w-4xl px-6 pt-14 pb-10 text-center sm:pt-20 sm:pb-14">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
-          Performance Intelligence Platform
+          The Cross-Channel Decision Engine
         </p>
-        <h1 className="mx-auto mt-5 font-marketing-heading text-4xl font-extrabold leading-tight text-off-white sm:text-6xl">
-          Stop met dashboards bouwen.
+        <h1 className="mx-auto mt-5 font-marketing-heading text-3xl font-extrabold leading-tight text-off-white sm:text-5xl md:text-6xl">
+          A chart is not a decision.
           <br />
-          Start met beslissingen nemen.
+          We built the engine that is.
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-off-white/60">
-          Elk uur dat naar het verzamelen en netjes maken van cijfers gaat, is een uur dat niet naar de
-          volgende beslissing gaat. Ctrl PPC leest je accounts, stelt een getoetste hypothese voor, en
-          onthoudt wat werkte.
+        <p className="mx-auto mt-6 max-w-2xl text-base text-off-white/60 sm:text-lg">
+          Chat-to-chart is still just a chart. Typing a prompt and getting a graph back is an insight,
+          not a decision. Ctrl PPC reads every account across every channel, forms a testable
+          hypothesis, executes it, and remembers what worked. No prompting required.
         </p>
-        <div className="mt-10 flex items-center justify-center">
+        <div className="mt-8 flex items-center justify-center sm:mt-10">
           <a
             href="/demo"
             className="rounded-[6px] px-7 py-3.5 text-sm font-semibold text-midnight-slate transition-transform hover:scale-[1.02]"
             style={{ backgroundColor: "#818cf8", boxShadow: "0 0 40px rgba(129, 140, 248, 0.45)" }}
           >
-            Demo aanvragen
+            Request a demo
           </a>
         </div>
       </section>
 
+      <ProductVideo />
       <TrustBanner />
       <ComparisonBlock />
       <FeaturesBlock />
@@ -95,7 +97,7 @@ export default async function HomePage() {
           Global Platform Pulse
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-center text-sm text-off-white/50">
-          Live cijfers over alle aangesloten accounts, niet gesimuleerd.
+          Live numbers across every connected account. Not simulated.
         </p>
         <div className="dark terminal mt-8">
           <PlatformPulse />

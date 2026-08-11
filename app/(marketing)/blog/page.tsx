@@ -19,25 +19,28 @@ function formatDatum(iso: string): string {
 
 export default function BlogIndexPage() {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-24">
+    <div className="mx-auto max-w-5xl px-6 pt-14 pb-20 sm:pt-20">
       <div className="text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">Blog</p>
-        <h1 className="mt-4 font-marketing-heading text-4xl font-extrabold text-off-white">
-          Technische analyses, geen productnieuws
+        <h1 className="mt-4 font-marketing-heading text-3xl font-extrabold text-off-white sm:text-4xl">
+          Technical analysis, not product news
         </h1>
       </div>
 
-      <div className="mt-14 grid gap-6 sm:grid-cols-2">
+      <div className="mt-10 grid gap-6 sm:grid-cols-2 sm:mt-14">
         {BLOG_POSTS.map((post) => (
           <Link
             key={post.slug}
             href={`/blog/${post.slug}`}
-            className="group flex flex-col rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6 transition-colors hover:border-neon-indigo/40"
+            className="group flex flex-col rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6 transition-all hover:border-neon-indigo/40 hover:shadow-[0_0_32px_rgba(129,140,248,0.15)]"
           >
-            <p className="text-xs text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>
+            <span className="w-fit rounded-[4px] border border-neon-indigo/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-neon-indigo">
+              Analysis
+            </span>
+            <p className="mt-3 text-xs text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>
               {formatDatum(post.datum)} - {post.leesminuten} min
             </p>
-            <h2 className="mt-3 font-marketing-heading text-lg font-bold text-off-white group-hover:text-neon-indigo">
+            <h2 className="mt-2 font-marketing-heading text-lg font-bold text-off-white group-hover:text-neon-indigo">
               {post.titel}
             </h2>
             <p className="mt-2 flex-1 text-sm leading-relaxed text-off-white/60">{post.samenvatting}</p>

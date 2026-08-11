@@ -79,7 +79,7 @@ function faqJsonLd() {
 
 export default function FaqPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-24">
+    <div className="mx-auto max-w-3xl px-6 pt-14 pb-20 sm:pt-20">
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
@@ -87,8 +87,8 @@ export default function FaqPage() {
       />
       <div className="text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">FAQ</p>
-        <h1 className="mt-4 font-marketing-heading text-4xl font-extrabold text-off-white">
-          Veelgestelde vragen
+        <h1 className="mt-4 font-marketing-heading text-3xl font-extrabold text-off-white sm:text-4xl">
+          Frequently asked questions
         </h1>
       </div>
       <div className="mt-12">
