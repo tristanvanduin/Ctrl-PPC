@@ -25,7 +25,6 @@ import "@/lib/analysis/adapters/linkedin-ads"; // registreert de LinkedIn-adapte
 import { buildLinkedinAnalysisData } from "@/lib/linkedin/analysis-data";
 import { buildLinkedinStepMessage, linkedinStepName } from "@/lib/linkedin/step-message";
 import { goalsPlausibilityFromMonthly, resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, type TargetRow } from "@/lib/analysis/o2-targets-cost";
-import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 import { buildGoalsSection } from "@/lib/prompts/sop-prompts";
 import type { LinkedInIcp } from "@/lib/linkedin/icp-fit";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -969,8 +968,6 @@ async function runMetaMonthlyAnalysis(
     conclusionText: conclusions.slice(-1)[0] ?? conclusions.join("\n\n"),
   });
 
-  await verbruikCredit(supabase, { clientId, label: adapter.sopTypeKey, runKey: jobId });
-
   return Response.json({
     ok: true,
     channel: adapter.channel,
@@ -1103,8 +1100,6 @@ async function runLinkedinMonthlyAnalysis(
     conclusionText: conclusions.slice(-1)[0] ?? conclusions.join("\n\n"),
   });
 
-  await verbruikCredit(supabase, { clientId, label: adapter.sopTypeKey, runKey: jobId });
-
   return Response.json({
     ok: true,
     channel: adapter.channel,
@@ -1145,11 +1140,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const creditOordeel = await controleerSaldo(supabase, { clientId, label: adapter.sopTypeKey });
-    if (creditOordeel.blokkeert) {
-      return Response.json({ error: creditOordeel.tekst }, { status: 402 });
-    }
-
     if (adapter.channel === "meta_ads") {
       return await runMetaMonthlyAnalysis(supabase, adapter, clientId, jobId, evalCapture);
     }
@@ -2830,7 +2820,6 @@ ${conclusions.join("\n\n---\n\n")}`,
       },
       partialOutputExists,
     });
-    await verbruikCredit(supabase, { clientId, label: adapter.sopTypeKey, runKey: jobId });
 
     logCacheSummary(callMark, `monthly ${clientId}`);
 

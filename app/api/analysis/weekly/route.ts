@@ -24,7 +24,6 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
-import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
@@ -45,11 +44,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const creditOordeel = await controleerSaldo(supabase, { clientId, label: "weekly" });
-    if (creditOordeel.blokkeert) {
-      return Response.json({ error: creditOordeel.tekst }, { status: 402 });
-    }
-
     await createProgressJob(supabase, {
       jobId,
       clientId,
@@ -207,7 +201,6 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
         tasks: extraction.tasks.length,
       },
     });
-    await verbruikCredit(supabase, { clientId, label: "weekly", runKey: jobId });
 
     return Response.json({
       jobId,

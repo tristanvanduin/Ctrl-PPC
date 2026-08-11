@@ -15,6 +15,7 @@ import { buildMessageMatchFacts, buildMessageMatchPrompt, MessageMatchSchema, ty
 import { extractPageText } from "@/lib/analysis/page-extract";
 import { saveLandingAuditHypotheses, type LandingAuditItem } from "@/lib/analysis/standalone-to-hypotheses";
 import { today } from "@/lib/reporting-date";
+import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 const SECTION = "landing_audit_v1";
 const SOP_TYPE = "landing_audit";
@@ -102,6 +103,11 @@ export async function POST(request: NextRequest) {
   const clientId = typeof body.client_id === "string" ? body.client_id : "";
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
   const maxPages = typeof body.max_pages === "number" && body.max_pages > 0 ? Math.floor(body.max_pages) : DEFAULT_MAX_PAGES;
+
+  const creditOordeel = await controleerSaldo(supabase, { clientId, label: SOP_TYPE });
+  if (creditOordeel.blokkeert) {
+    return Response.json({ error: creditOordeel.tekst }, { status: 402 });
+  }
 
   // ── 1. De best converterende ad-groepen uit de laatste maand keyword-data. ──
   const { data: keywordRows, error: keywordError } = await supabase
@@ -243,6 +249,7 @@ export async function POST(request: NextRequest) {
     grootsteGap: r.judgement?.grootste_gap ?? null,
   }));
   await saveLandingAuditHypotheses(supabase, auditItems, { clientId, analysisId: null });
+  await verbruikCredit(supabase, { clientId, label: SOP_TYPE, runKey: `landing-audit-${clientId}-${analysisDate}` });
 
   return Response.json({
     markdown,

@@ -9,31 +9,43 @@ import { bureauVanKlant } from "./o2-targets-cost";
 // levert de rekensom -- wat kost een analyse in credits, wat is het saldo -- en een schrijffunctie
 // voor het grootboek (migratie 070).
 //
+// ── CREDITS GELDEN ALLEEN VOOR DEEP DIVES, NOOIT VOOR AUTOMATISCHE SOP'S ─────
+//
+// Bijgesteld op 2026-08-11, na een eerdere, foute aanname: de automatische SOP-cadansen (monthly,
+// weekly, biweekly) werden hier eerst OOK credit-gate't. Dat is teruggedraaid. De regel is: een
+// bureau binnen zijn SOP-dekking (hoeveel klantaccounts tenminste automatische SOP's mogen
+// draaien, per tier) draait AL zijn SOP's automatisch en zonder gedoe -- geen creditcheck, geen
+// afschrijving. Overschrijdt het aantal gekoppelde accounts de SOP-dekking, dan is dat een APARTE
+// controle bij het koppelen van een account (nog te bouwen: een melding met een keuze --
+// upgraden, dekking bijkopen, of SOP's uitzetten voor de accounts die niet meer passen), niet iets
+// wat dit bestand regelt.
+//
+// verbruikCredit()/controleerSaldo() hieronder gelden dus uitsluitend voor de HANDMATIGE
+// deep-dive-routes (budget-allocation, bid-strategy, search-terms, ...). Daar geldt wel de harde
+// blokkade uit de blueprint (zie hieronder) zodra CREDIT_COSTS is ingevuld.
+//
 // ── HET CHARGE-POINT: PER RUN, NIET PER LLM-CALL ────────────────────────────
 //
-// Onderzocht op 2026-08-11: er is GEEN gedeelde functie die bij elke SOP-run precies eenmaal
-// vuurt. markProgressCompleted (lib/progress/server.ts) leek de kandidaat, maar dekt maar 4 van de
-// 29 analyseroutes (monthly, weekly, biweekly, pdf) -- en zelfs binnen monthly/route.ts vuurt hij
-// alleen op het Google-pad, niet op de Meta- en LinkedIn-paden (runMetaMonthlyAnalysis,
-// runLinkedinMonthlyAnalysis roepen hem nooit aan; dat is een bestaand gat, los van credits).
-// Het enige dat WEL bij elke route klopt: precies één terugkeer met de succesvolle
-// Response.json(...) aan het eind. verbruikCredit() hieronder wordt daarom per route,
-// vlak voor die ene terugkeer, aangeroepen -- vooralsnog alleen gewired op de drie
-// automatische SOP-cadansen (monthly x3 kanalen, weekly, biweekly). De 22 handmatige
-// deep-dive-routes (budget-allocation, bid-strategy, ...) hebben nog geen charge-point;
-// dat is hetzelfde eenregelige patroon, alleen nog niet toegepast.
+// Onderzocht op 2026-08-11: er is GEEN gedeelde functie die bij elke run precies eenmaal vuurt.
+// markProgressCompleted (lib/progress/server.ts) leek de kandidaat, maar dekt alleen monthly/
+// weekly/biweekly/pdf -- en die vier zijn hierboven juist uitgesloten van credits. De deep-dive-
+// routes hebben sowieso geen job-tracking. Het enige dat bij elke deep-dive-route klopt: precies
+// één terugkeer met de succesvolle Response.json(...) aan het eind. verbruikCredit() wordt daarom
+// per route, vlak voor die ene terugkeer, aangeroepen. Gewired op 7 van de 22 deep-dive-routes
+// (de routes die daadwerkelijk een LLM-call en een eigen recordUsage hebben); de overige 15 doen
+// geen LLM-call en hebben dus niets om credits voor af te schrijven.
 //
 // ── WAAROM DE PRIJS ZELF NOG LEEG STAAT ──────────────────────────────────────
 //
 // Zelfde reden als waarom MODEL_PRICES in o2-targets-cost.ts een tijdlang leeg heeft gestaan met
 // een "nog in te vullen"-commentaar: CREDIT_COSTS hieronder is een PLACEHOLDER. De blueprint noemt
 // creditpools per tier (10.000 / 25.000 / 50.000 / 100.000) maar legt nergens vast hoeveel credits
-// één SOP-run of één deep-dive kost -- dat is een prijsbeslissing, geen technisch detail, en een
-// verzonnen getal hier zou straks als een afgesproken prijs ogen terwijl niemand hem heeft
-// vastgesteld. Met CREDIT_COSTS leeg is verbruikCredit() vandaag een no-op op elke aanroep (zie
-// creditKostenVoor: onbekend label geeft null, en dan wordt er niets weggeschreven) -- de wiring
-// staat, de rekening nog niet. Vul CREDIT_COSTS pas in als die beslissing genomen is, en noteer de
-// datum, net als bij MODEL_PRICES.
+// één deep-dive kost -- dat is een prijsbeslissing, geen technisch detail, en een verzonnen getal
+// hier zou straks als een afgesproken prijs ogen terwijl niemand hem heeft vastgesteld. Met
+// CREDIT_COSTS leeg is verbruikCredit() vandaag een no-op op elke aanroep (zie creditKostenVoor:
+// onbekend label geeft null, en dan wordt er niets weggeschreven) -- de wiring staat, de rekening
+// nog niet. Vul CREDIT_COSTS pas in als die beslissing genomen is, en noteer de datum, net als bij
+// MODEL_PRICES.
 //
 // ── BLOKKEREN: DE BLUEPRINT HEEFT DIT AL BESLIST ─────────────────────────────
 //
@@ -51,7 +63,9 @@ import { bureauVanKlant } from "./o2-targets-cost";
 // vast getallen geven: een aanname die eruitziet als een beslissing.
 
 /**
- * Creditkosten per analyse-label (sop_type of call_label), in hele credits.
+ * Creditkosten per deep-dive-label (sop_type/SOP_TYPE-constante uit de deep-dive-routes), in hele
+ * credits. NIET voor monthly/weekly/biweekly -- die zijn per definitie nooit credit-gated, zie de
+ * kop van dit bestand.
  *
  * ── NOG IN TE VULLEN ─────────────────────────────────────────────────────────
  *
@@ -59,10 +73,10 @@ import { bureauVanKlant } from "./o2-targets-cost";
  * creditKostenVoor() null -- eerlijker dan een schatting, zelfde regel als computeCallCost.
  */
 export const CREDIT_COSTS: Record<string, number> = {
-  // "monthly": 10,
-  // "weekly": 5,
-  // "biweekly": 7,
-  // "deep-dive:...": ...,
+  // "budget_allocation": 10,
+  // "bid_strategy": 10,
+  // "search_terms": 8,
+  // ...de overige deep-dive-labels...
 };
 
 /**

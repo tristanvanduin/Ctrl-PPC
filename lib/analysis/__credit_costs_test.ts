@@ -17,7 +17,7 @@ check(
 );
 check(
   "bekend label geeft zijn vaste kosten",
-  creditKostenVoor("monthly", { monthly: 10 }) === 10
+  creditKostenVoor("budget_allocation", { budget_allocation: 10 }) === 10
 );
 check(
   "CREDIT_COSTS staat leeg totdat de prijsbeslissing genomen is",
@@ -54,11 +54,11 @@ check(
 );
 
 console.log("\nbuildLedgerRij");
-const rij = buildLedgerRij({ agencyId: "bureau-1", event: "consume", amount: 10, reason: "sop:monthly", runKey: "run-1" });
+const rij = buildLedgerRij({ agencyId: "bureau-1", event: "consume", amount: 10, reason: "budget_allocation", runKey: "run-1" });
 check("agency_id komt door", rij.agency_id === "bureau-1");
 check("event komt door", rij.event === "consume");
 check("amount komt door", rij.amount === 10);
-check("reason komt door", rij.reason === "sop:monthly");
+check("reason komt door", rij.reason === "budget_allocation");
 check("run_key komt door", rij.run_key === "run-1");
 
 const rijZonderExtras = buildLedgerRij({ agencyId: "bureau-1", event: "grant", amount: 100 });
