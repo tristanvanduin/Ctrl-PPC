@@ -1,4 +1,5 @@
-import { AlertTriangle, ListChecks, Infinity as InfinityIcon } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ListChecks, Infinity as InfinityIcon, ArrowRight } from "lucide-react";
 import { RoiCalculator } from "./roi-calculator";
 import { ExecutionNode } from "./execution-node";
 
@@ -45,6 +46,16 @@ export function FeaturesBlock() {
           <div className="mt-5">
             <ExecutionNode />
           </div>
+          {/* Deze kolom is de teaser: elke stap krijgt hier drie regels. De diepe versie -- de
+              echte codepaden per stap, plus hoe stap 6 teruggaat naar stap 1 -- staat op
+              /how-it-works (audit-vervolg, 11 augustus 2026). */}
+          <Link
+            href="/how-it-works"
+            className="group mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-neon-indigo hover:text-off-white"
+          >
+            See the full loop
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </Link>
         </div>
 
         {/* Kolom 3: 'No Limits' propositie + ROI-calculator */}

@@ -46,8 +46,11 @@ const jetbrainsMono = JetBrains_Mono({
 // van de auth-poortwachter.
 const LANG_FIX_SCRIPT = `document.documentElement.lang="en";`;
 
+// Geen "Home"-item: het logo linkt al naar / (zie de Link eromheen hieronder), en een los
+// "Home"-item ernaast is een dubbele knop voor dezelfde bestemming (audit-vervolg, 11 augustus
+// 2026). Scheelt ook meteen een navlink op precies het breakpoint dat al krap zat.
 const NAV_LINKS = [
-  { href: "/", label: "Home" },
+  { href: "/how-it-works", label: "How It Works" },
   { href: "/pricing", label: "Pricing" },
   { href: "/vs", label: "Compare" },
   { href: "/faq", label: "FAQ" },
@@ -70,12 +73,14 @@ export default function MarketingLayout({
           <Link href="/" aria-label="Ctrl PPC, terug naar de homepage">
             <Logo compact className="scale-90" />
           </Link>
-          <nav className="hidden items-center gap-8 sm:flex">
+          {/* lg:flex, niet sm:flex: zeven navlinks pasten niet meer tussen 640-1023px zodra "How
+              It Works" erbij kwam -- zie mobile-nav.tsx voor de gemeten breuk bij 660px. */}
+          <nav className="hidden items-center gap-8 lg:flex">
             {NAV_LINKS.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="text-sm font-medium text-off-white/70 transition-colors hover:text-off-white"
+                className="whitespace-nowrap text-sm font-medium text-off-white/70 transition-colors hover:text-off-white"
               >
                 {l.label}
               </Link>
@@ -98,7 +103,12 @@ export default function MarketingLayout({
       <footer className="border-t border-off-white/10">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-6 py-10 text-center sm:flex-row sm:justify-between sm:text-left">
           <Logo compact />
-          <div className="flex items-center gap-6 text-sm text-off-white/50">
+          {/* flex-wrap: zeven items in deze rij (zes links + copyright) pasten niet meer op één
+              regel van 390px na het toevoegen van "How It Works" -- 21px horizontale overflow,
+              gemeten (audit-vervolg, 11 augustus 2026). Op sm+ is er ruim plek voor één regel; op
+              mobiel valt de rij nu netjes over twee regels in plaats van over de rand te lopen. */}
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-off-white/50">
+            <Link href="/how-it-works" className="hover:text-off-white">How It Works</Link>
             <Link href="/pricing" className="hover:text-off-white">Pricing</Link>
             <Link href="/vs" className="hover:text-off-white">Compare</Link>
             <Link href="/faq" className="hover:text-off-white">FAQ</Link>

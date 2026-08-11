@@ -14,6 +14,11 @@ import { Menu, X } from "lucide-react";
 // The toggle button was a 32px square (p-2 around a 16px icon) -- below the 44px minimum tap
 // target. Same audit pass, fixed here alongside the extraction.
 //
+// sm:hidden -> lg:hidden (audit-vervolg, 11 augustus 2026): met "How It Works" als zevende
+// item paste de volledige desktop-nav niet meer tussen 640-1023px -- gemeten bij 660px: "How It
+// Works" brak over drie regels en overlapte de Log in-knop. lg (1024px) is de breedte waar de
+// nav met ruimte over past (geverifieerd op 1280px); onder die grens draagt deze knop de nav.
+//
 // The dropdown panel is `absolute`, not a document-flow sibling of the header's inner flex row
 // like the original markup had it. That is a consequence of the split: this component renders the
 // button and the panel together (they share the `open` state), but the button lives deep inside
@@ -31,13 +36,13 @@ export function MobileNav({ links }: { links: { href: string; label: string }[] 
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label={open ? "Menu sluiten" : "Menu openen"}
-        className="flex h-11 w-11 items-center justify-center rounded-[6px] border border-off-white/15 text-off-white sm:hidden"
+        className="flex h-11 w-11 items-center justify-center rounded-[6px] border border-off-white/15 text-off-white lg:hidden"
       >
         {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </button>
 
       {open && (
-        <nav className="absolute inset-x-0 top-full border-t border-off-white/10 bg-midnight-slate px-6 py-3 sm:hidden">
+        <nav className="absolute inset-x-0 top-full border-t border-off-white/10 bg-midnight-slate px-6 py-3 lg:hidden">
           {links.map((l) => (
             <Link
               key={l.href}

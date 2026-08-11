@@ -762,4 +762,12 @@
   .animate-pulse {
     animation: none !important;
   }
+
+  /* SMIL (<animateMotion>, de reizende stip in DecisionLoopRing) luistert niet naar
+     animation-duration hierboven -- dat is een CSS-eigenschap en SMIL is een ander
+     animatiemechanisme. Verbergen in plaats van vertragen: er is geen "1 iteratie" die hier
+     betekenis heeft, het stipje reist gewoon rond. */
+  .loop-travel-dot {
+    display: none;
+  }
 }
