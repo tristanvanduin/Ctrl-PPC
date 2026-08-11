@@ -76,10 +76,12 @@ export const BLOG_POSTS: BlogPost[] = [
         "falling short. Two very different conversations, both landing on the same red number on an average " +
         "dashboard.",
     ],
-    // De post noemt "de dashboard illusion" letterlijk -- dat is de naam van de sectie op /vs en
-    // op de homepage. Directe match, geen gok.
+    // De post noemt "de dashboard illusion" letterlijk als specifieke claim (het scherm toont een
+    // uitkomst, niet de twee metrics die de oorzaak uit elkaar trekken) -- dat blijft correct.
+    // De sectienaam op /vs zelf is intussen herzien (11 augustus 2026, zie de comment daar); het
+    // linklabel hieronder volgt die herziening.
     gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "acht-kpi-relaties-die-rapportages-missen"],
-    gerelateerdePaginas: [{ label: "The Dashboard Illusion, in full", href: "/vs" }],
+    gerelateerdePaginas: [{ label: "Beyond the dashboard layer, in full", href: "/vs" }],
   },
   {
     slug: "attributie-zonder-trackingcode",

@@ -47,11 +47,17 @@ export function PlatformPulse() {
   const getoond = visible && data ? data : LEEG;
 
   return (
-    <div ref={ref} className="terminal grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <Counter value={getoond.adSpendOptimized} label="Ad spend optimized" format="currency" isLive />
-      <Counter value={getoond.hypothesesTested} label="Hypotheses tested" isLive />
-      <Counter value={getoond.analysesRun} label="Analyses run" isLive />
-      <Counter value={getoond.activeClients} label="Active clients" isLive />
+    <div
+      ref={ref}
+      className="terminal rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/60 p-6 backdrop-blur-sm"
+      style={{ boxShadow: "0 0 40px rgba(0, 0, 0, 0.25)" }}
+    >
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Counter value={getoond.adSpendOptimized} label="Ad spend optimized" format="currency" isLive />
+        <Counter value={getoond.hypothesesTested} label="Hypotheses tested" isLive />
+        <Counter value={getoond.analysesRun} label="Analyses run" isLive />
+        <Counter value={getoond.activeClients} label="Active clients" isLive />
+      </div>
     </div>
   );
 }

@@ -175,6 +175,11 @@ export function isPublicPath(pathname: string): boolean {
   // naar /login zijn gestuurd, dezelfde fout als hierboven maar dan voor drie nieuwe pagina's.
   if (pathname === "/pricing" || pathname === "/faq") return true;
   if (pathname === "/blog" || pathname.startsWith("/blog/")) return true;
+  // Ontbrak hier: /how-it-works en /vs zijn gebouwd na deze lijst en zijn er nooit aan
+  // toegevoegd, waardoor O1_AUTH_ENFORCED elke bezoeker zonder sessie naar /login stuurde --
+  // ook via "See the full loop" op de homepage, wiens link zelf wel correct naar
+  // /how-it-works wijst. Gevonden doordat de site live achter een login bleek te zitten.
+  if (pathname === "/how-it-works" || pathname === "/vs") return true;
   // De demo-CTA: het formulier zelf en de route waar het naar post moeten allebei zonder
   // sessie werken, want een bezoeker die een demo aanvraagt heeft er per definitie nog geen.
   if (pathname === "/demo" || pathname === "/api/public/demo-request") return true;

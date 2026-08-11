@@ -15,10 +15,15 @@ interface GateCheck {
   gevolg?: string;
 }
 
+// De drie namen hieronder zijn 3 van de 9 echte gates uit lib/decision/quality-gates.ts (GATES),
+// niet verzonnen voorbeeldlabels. Eerdere versie gebruikte "Organic Brand Volume", "Meta Frequency
+// Cap" en "Shopify Inventory" -- geen daarvan bestaat als gate, en Shopify is bovendien een
+// ongebouwde integratie (zie de "Coming soon"-badge in TrustBanner). Gevonden bij een audit op de
+// live site.
 const CHECKS: GateCheck[] = [
-  { naam: "Organic Brand Volume", status: "PASS" },
-  { naam: "Meta Frequency Cap", status: "PASS" },
-  { naam: "Shopify Inventory", status: "FAIL", gevolg: "Halt Execution" },
+  { naam: "Evidence Gate", status: "PASS" },
+  { naam: "Causal Chain Gate", status: "PASS" },
+  { naam: "Coverage Gate", status: "FAIL", gevolg: "Halt Execution" },
 ];
 
 export function QualityGateMatrix() {

@@ -22,13 +22,20 @@ import { PrimaryCta } from "@/components/marketing/primary-cta";
 //
 // Row and Success Tax card titles were <p> tags styled as headings, same audit pass: promoted to
 // <h3> under this page's <h1> so the heading outline matches the visual one.
+//
+// REPOSITIONING (11 August 2026): title and H1 said "Decisioning, Not Dashboards" / "The
+// Alternative to the Dashboard Illusion" -- an absolute claim that does not survive contact with
+// /pricing, which offers the dashboard itself for free on every tier. Changed to "Not Just
+// Dashboards" / "Beyond the Dashboard Layer": the comparison targets against Optmyzr, Triple
+// Whale, Supermetrics, Madgicx, and Skai stands (they are reporting/bid-management tools first),
+// the point is not that dashboards are fake, it is that a dashboard alone is not a decision.
 export const metadata: Metadata = {
-  title: "Ctrl PPC vs. Legacy Platforms | Decisioning, Not Dashboards",
+  title: "Ctrl PPC vs. Legacy Platforms | Not Just Dashboards",
   description:
-    "Stop paying the success tax. Compare Ctrl PPC against Optmyzr, Triple Whale, and others. See why modern agencies use a decision engine instead of passive dashboards.",
+    "Stop paying the success tax. Compare Ctrl PPC against Optmyzr, Triple Whale, and others. See why modern agencies use a decision engine on top of their dashboard, not instead of it.",
   alternates: { canonical: "/vs" },
   openGraph: {
-    title: "Ctrl PPC vs. Legacy Platforms | Decisioning, Not Dashboards",
+    title: "Ctrl PPC vs. Legacy Platforms | Not Just Dashboards",
     description:
       "Stop paying the success tax. Compare Ctrl PPC against Optmyzr, Triple Whale, and others.",
     type: "website",
@@ -71,12 +78,13 @@ export default function VsPage() {
       <div className="mx-auto max-w-2xl text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">Compare</p>
         <h1 className="mt-4 font-marketing-heading text-3xl font-extrabold text-off-white sm:text-4xl md:text-5xl">
-          The Alternative to the Dashboard Illusion
+          Beyond the Dashboard Layer
         </h1>
         <p className="mt-4 text-off-white/60">
           Optmyzr, Triple Whale, Supermetrics, Madgicx, Skai: five different platforms with a
           similar pattern. Pricing that scales with ad spend, and insights that stay locked to
-          a single account. We built Ctrl PPC to work differently on both counts.
+          a single account. Ctrl PPC includes the dashboard layer free on every tier -- the
+          difference is what happens on top of it.
         </p>
       </div>
 

@@ -2,14 +2,22 @@
 
 import { useMemo, useState } from "react";
 
-// Fase 7-upgrade: niet langer "willekeurige uren per account", maar het standaardpakket dat
-// voor elke klant loopt: de 7 analyses (bid-strategy, budget-allocation, quality-score,
-// impression-share, cross-channel, kpi-relations, monthly) plus de maandrapportage
-// (client-reports/pdf). Elke regel is de tijd die een specialist daar naar schatting handmatig
-// aan kwijt zou zijn -- niet een percentage van iets vaags. Extra analyses (diepe duiken,
-// ad-hoc onderzoek) komen hier bovenop en tellen dus niet mee: dit is het MINIMUM, niet het
-// plafond. Zelfde regel als eerder: de aannames staan zichtbaar in de UI, niet verstopt in de
-// berekening.
+// Herzien twee keer na terechte feedback. Eerste keer: de vorige versie ("de 7 analyses die voor
+// elke klant lopen") telde budget-allocation, bid-strategy, quality-score, impression-share,
+// cross-channel en kpi-relations mee als het automatische standaardpakket. Dat klopt niet --
+// lib/analysis/credit-costs.ts noemt die zes expliciet "HANDMATIGE deep-dive-routes", nooit de
+// automatische SOP-cadans. Wat automatisch draait is monthly + weekly + biweekly
+// (lib/tenancy/sop-dekking.ts). Tweede keer (11 augustus 2026): een eerste herbouw op die drie,
+// elk als los item met een frequentie-vermenigvuldiging (weekly x4/maand, biweekly x2/maand), werd
+// terecht als zwak ervaren -- een kaal "x keer per maand" zegt niets over de inhoud of de
+// bewijslast waarom iets zoveel tijd kost. Herbouwd naar drie grotere, herkenbare blokken die elk
+// een korte inhoudsbeschrijving dragen (wat er in zit, niet alleen hoe vaak het draait): de
+// maandelijkse diepe analyse, de doorlopende monitoring (weekly + biweekly samengevoegd, want voor
+// de lezer is "wat wordt er gecontroleerd tussen twee maandanalyses in" één verhaal, geen twee
+// aparte regels), en de rapportage. Tijdsschatting per blok blijft dezelfde methode: wat een
+// specialist er naar schatting handmatig aan kwijt zou zijn, gebaseerd op de stappen in de
+// SOP-prompts zelf (lib/prompts/sop-prompts.ts: buildWeeklyPrompt's 3 stappen, buildBiWeeklyPrompt's
+// 4 stappen, de monthly 9-staps diepe analyse).
 //
 // text-off-white/40 op deze en andere marketingpagina's gaf 3,56:1 contrast tegen
 // --midnight-slate (WCAG AA vereist 4,5:1 voor gewone tekst); nagerekend en overal opgehoogd
@@ -17,21 +25,31 @@ import { useMemo, useState } from "react";
 
 interface Analyse {
   naam: string;
-  minuten: number;
+  beschrijving: string;
+  minutenPerMaand: number;
 }
 
 const STANDAARDPAKKET: Analyse[] = [
-  { naam: "Monthly analysis", minuten: 90 },
-  { naam: "Budget allocation", minuten: 30 },
-  { naam: "Bid strategy", minuten: 30 },
-  { naam: "Quality Score", minuten: 20 },
-  { naam: "Impression Share", minuten: 20 },
-  { naam: "Channel synergy", minuten: 40 },
-  { naam: "KPI relations", minuten: 30 },
-  { naam: "Monthly report", minuten: 60 },
+  {
+    naam: "Monthly deep dive",
+    beschrijving:
+      "9 steps: account, campaigns, ad groups, auction insights, search terms, creative, audience & device, geography, network & schedule -- plus 3 sprint hypotheses.",
+    minutenPerMaand: 90,
+  },
+  {
+    naam: "Ongoing monitoring",
+    beschrijving:
+      "Weekly (x4): tracking health, keyword/search-term bleeders, budget anomalies. Biweekly (x2): re-checks account, campaign, ad group, and device pacing against the monthly forecast.",
+    minutenPerMaand: 20 * 4 + 45 * 2,
+  },
+  {
+    naam: "Monthly report",
+    beschrijving: "Client-facing PDF synthesis of the month's findings.",
+    minutenPerMaand: 60,
+  },
 ];
 
-const MINUTEN_TOTAAL = STANDAARDPAKKET.reduce((som, a) => som + a.minuten, 0);
+const MINUTEN_TOTAAL = STANDAARDPAKKET.reduce((som, a) => som + a.minutenPerMaand, 0);
 const UREN_PER_KLANT_PER_MAAND = MINUTEN_TOTAAL / 60;
 
 interface Invoer {
@@ -110,24 +128,30 @@ export function RoiCalculator() {
         onClick={() => setToonPakket((v) => !v)}
         className="mt-4 text-xs font-semibold text-off-white/50 underline hover:text-off-white"
       >
-        {toonPakket ? "Hide the standard package" : `Where do those ${UREN_PER_KLANT_PER_MAAND.toFixed(1)}h per client come from?`}
+        {toonPakket
+          ? "Hide the standard package"
+          : `Where do those ${UREN_PER_KLANT_PER_MAAND.toFixed(1)}h per client (x ${klanten} clients = ${urenPerMaand.toFixed(0)}h) come from?`}
       </button>
 
       {toonPakket && (
-        <ul className="mt-3 space-y-1 border-t border-off-white/10 pt-3">
+        <ul className="mt-3 space-y-2.5 border-t border-off-white/10 pt-3">
           {STANDAARDPAKKET.map((a) => (
-            <li key={a.naam} className="flex items-center justify-between text-xs text-off-white/60">
-              <span>{a.naam}</span>
-              <span>{a.minuten} min</span>
+            <li key={a.naam} className="text-xs">
+              <div className="flex items-center justify-between text-off-white/80">
+                <span className="font-semibold">{a.naam}</span>
+                <span className="text-off-white/60">{a.minutenPerMaand} min/mo</span>
+              </div>
+              <p className="mt-0.5 leading-relaxed text-off-white/50">{a.beschrijving}</p>
             </li>
           ))}
         </ul>
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-off-white/60">
-        These are the 7 analyses that run for every client by default, plus the monthly report, with
-        an estimated time cost per item if a specialist did them by hand. Extra analyses and deep
-        dives come on top of this and are not counted here: this is the minimum, not the ceiling. An
+        These are the three automatic SOP runs that happen for every client by default --
+        monthly, weekly, and biweekly -- with an estimated time cost if a specialist did each by
+        hand. Manual deep dives (budget allocation, bid strategy, and similar on-demand analyses)
+        come on top of this and are not counted here: this is the minimum, not the ceiling. An
         estimate based on your input, not a measured result.
       </p>
     </div>
