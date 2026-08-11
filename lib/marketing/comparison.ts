@@ -1,11 +1,20 @@
-// Data for /vs: the kill-shot comparison table plus the concrete pricing evidence backing the
-// "Success Tax" claim.
+// Data for /vs: the kill-shot comparison table plus the pricing-structure evidence backing the
+// "Success Tax" observation.
 //
 // SOURCE: user-supplied competitive intelligence (Manus_Critical_Vulnerability_Brief.pdf,
-// Manus_Competitive_Teardown_Analysis.pdf, 11 August 2026). The pricing figures per platform are
-// taken directly from that research, not independently re-verified here -- treat them as the
-// commissioned intelligence they are, not as claims this codebase can check against a live
-// source. If a competitor's public pricing changes, this file is the one place to update it.
+// Manus_Competitive_Teardown_Analysis.pdf, 11 August 2026).
+//
+// LEGAL/TONE PASS (11 August 2026): the first draft of this file quoted the source brief's exact
+// dollar figures and percentage jumps per competitor (e.g. "$299/mo -> $499/mo, a 67% increase").
+// Flagged by the user as too aggressive and legally exposed: those numbers are unverified by this
+// codebase, could be stale or wrong at any given moment, and comparative advertising law (EU
+// Comparative Advertising Directive in particular) requires claims to be objectively verifiable
+// and not primarily disparaging. Reworked to describe each platform's PRICING STRUCTURE (tiered
+// by spend/GMV, cost increases as clients scale) instead of specific current amounts -- the
+// structural claim is stable and verifiable from each platform's own published pricing page,
+// while the exact numbers are not something this codebase can keep current. Tone softened
+// throughout: no more "punishes", "taxes", "traps" as verbs describing what a named competitor
+// does to its customers.
 //
 // ROW 3/4 INTEGRITY NOTE: the source brief frames Ctrl PPC's whole edge as "autonomous execution"
 // and "zero manual handoffs" -- language that directly contradicts the FAQ (Ctrl PPC never
@@ -29,15 +38,15 @@ export const KILL_SHOT_ROWS: readonly KillShotRow[] = [
   {
     label: "The Business Model",
     legacy: "The Success Tax",
-    legacyDetail: "Punishes growth by taxing ad spend or GMV. The more you succeed, the more the tool costs.",
+    legacyDetail: "Pricing tied to ad spend or GMV rather than to value delivered, so the bill grows as your accounts grow.",
     ctrlPpc: "Predictable Infrastructure",
-    ctrlPpcDetail: "A flat tier rate, plus optional Volume Compute for high-volume accounts. We do not profit more when you scale.",
+    ctrlPpcDetail: "A flat tier rate, plus optional Volume Compute for high-volume accounts. Our price does not move when your spend does.",
     gebouwd: true,
   },
   {
     label: "Agency Memory",
     legacy: "Isolated Account Silos",
-    legacyDetail: "Solve a problem for Client A, and that insight dies with the account manager. Client B waits weeks for the same fix.",
+    legacyDetail: "A pattern solved for one client typically stays with that account and the person who found it, not shared automatically with the rest of the portfolio.",
     ctrlPpc: "Agency Memory",
     ctrlPpcDetail: "What worked is remembered, not lost when an account manager moves on. Automatic cross-client propagation is on the roadmap.",
     gebouwd: false,
@@ -66,25 +75,29 @@ export interface SuccessTaxExample {
   example: string;
 }
 
+// Structural claims only, not the source brief's exact dollar figures and percentage jumps -- see
+// the file header. Each of these describes the published TIER STRUCTURE, which is stable and
+// checkable against each platform's own pricing page, not a specific current amount this codebase
+// would need to keep up to date to stay accurate.
 export const SUCCESS_TAX_EXAMPLES: readonly SuccessTaxExample[] = [
   {
     platform: "Optmyzr",
     mechanism: "Tiered by trailing 30-day ad spend",
-    example: "$299/mo at $25K spend -> $499/mo at $50K spend. A 67% price jump for scaling one account.",
+    example: "Crossing into a higher spend tier moves the account to a higher-priced plan automatically.",
   },
   {
     platform: "Triple Whale",
     mechanism: "Tiered by 12-month GMV",
-    example: "$179/mo at $1M GMV -> $259/mo at $3M GMV. Scale to $50M GMV and it is a 28x increase for the same core platform.",
+    example: "The subscription tier is set by trailing GMV, so a growing brand is moved to higher tiers over time.",
   },
   {
     platform: "Madgicx",
     mechanism: "Tiered by monthly Meta spend",
-    example: "$45/mo under $1K spend -> $99/mo at $1K-2.5K spend. A 120% jump for the first tier of growth.",
+    example: "Meta spend growth pushes the account into a higher tier, independent of any change in the service itself.",
   },
   {
     platform: "Skai",
     mechanism: "Tiered by annual ad spend",
-    example: "$114K/yr at $4M spend -> $504K/yr at $20M spend. A 4.4x price increase for the same platform.",
+    example: "Enterprise pricing scales with annual spend across a wide range, reaching into six figures at higher tiers.",
   },
 ];

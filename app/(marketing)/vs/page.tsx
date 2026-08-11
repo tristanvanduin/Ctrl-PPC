@@ -66,9 +66,9 @@ export default function VsPage() {
           The Alternative to the Dashboard Illusion
         </h1>
         <p className="mt-4 text-off-white/60">
-          Optmyzr, Triple Whale, Supermetrics, Madgicx, Skai: five different platforms, one
-          shared model. They tax your growth and trap your best insights in a single account.
-          Ctrl PPC does neither.
+          Optmyzr, Triple Whale, Supermetrics, Madgicx, Skai: five different platforms with a
+          similar pattern. Pricing that scales with ad spend, and insights that stay locked to
+          a single account. We built Ctrl PPC to work differently on both counts.
         </p>
       </div>
 
@@ -80,7 +80,11 @@ export default function VsPage() {
 
       <div className="mt-16">
         <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
-          The Success Tax, in numbers
+          How the Success Tax is structured
+        </p>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-[11px] text-off-white/40">
+          Based on each platform's own published pricing structure, not specific current rates.
+          Pricing changes over time - check directly with the platform before deciding.
         </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {SUCCESS_TAX_EXAMPLES.map((ex) => (
@@ -98,10 +102,6 @@ export default function VsPage() {
             </div>
           ))}
         </div>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-[11px] text-off-white/35">
-          Figures from published pricing pages as of this analysis. Verify current rates directly
-          with each platform before making a purchasing decision.
-        </p>
       </div>
 
       <div className="mt-14 flex items-center justify-center gap-3 rounded-[6px] border border-copper/30 bg-copper/5 px-6 py-4 text-sm text-off-white/80">
