@@ -5,7 +5,8 @@ import { PlatformPulse } from "@/components/terminal/platform-pulse";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
-import { ProductVideo } from "@/components/marketing/product-video";
+import { QualityGateMatrix } from "@/components/marketing/quality-gate-matrix";
+import { PrimaryCta } from "@/components/marketing/primary-cta";
 
 // Fase 7, Task 2: de homepage volgens Blueprint v2.0. Vervangt de minimale Fase 5-hero (die
 // alleen de kop en de Platform Pulse had) door de volledige structuur uit de brief: hero,
@@ -14,7 +15,7 @@ import { ProductVideo } from "@/components/marketing/product-video";
 export const metadata: Metadata = {
   title: "Ctrl PPC: The Cross-Channel Decision Engine",
   description:
-    "Dashboards show you what happened. A chart is not a decision. Ctrl PPC reads every account, forms a testable hypothesis, executes it, and remembers what worked - across channels, with no account limit.",
+    "Dashboards show you what happened. A chart is not a decision. Ctrl PPC reads every account, forms a testable hypothesis, and remembers what worked once you act on it - across channels, with no account limit.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Ctrl PPC: The Cross-Channel Decision Engine",
@@ -74,25 +75,14 @@ export default async function HomePage() {
         <p className="mx-auto mt-6 max-w-2xl text-base text-off-white/60 sm:text-lg">
           AI dashboards ship "AI insights." That is still a chart with better handwriting. Ctrl PPC
           is decisioning: it reads every account across every channel, forms a testable hypothesis,
-          executes it, and closes the learning loop by remembering what worked.
+          and closes the learning loop by remembering what worked after you act on it.
         </p>
         <div className="mt-8 flex items-center justify-center sm:mt-10">
-          <a
-            href="/demo"
-            className="rounded-[6px] px-7 py-3.5 text-sm font-semibold text-midnight-slate transition-transform hover:scale-[1.02]"
-            style={{ backgroundColor: "#818cf8", boxShadow: "0 0 40px rgba(129, 140, 248, 0.45)" }}
-          >
-            Request a demo
-          </a>
+          <PrimaryCta />
         </div>
       </section>
 
-      <ProductVideo />
-      <TrustBanner />
-      <ComparisonBlock />
-      <FeaturesBlock />
-
-      <section className="mx-auto max-w-6xl px-6 py-20">
+      <section className="mx-auto max-w-6xl px-6 pb-16">
         <h2 className="text-center font-marketing-heading text-2xl font-bold text-off-white">
           Global Platform Pulse
         </h2>
@@ -103,6 +93,11 @@ export default async function HomePage() {
           <PlatformPulse />
         </div>
       </section>
+
+      <TrustBanner />
+      <ComparisonBlock />
+      <QualityGateMatrix />
+      <FeaturesBlock />
     </>
   );
 }

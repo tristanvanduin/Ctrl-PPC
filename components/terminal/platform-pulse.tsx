@@ -48,10 +48,10 @@ export function PlatformPulse() {
 
   return (
     <div ref={ref} className="terminal grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <Counter value={getoond.adSpendOptimized} label="Geoptimaliseerde ad spend" format="currency" isLive />
-      <Counter value={getoond.hypothesesTested} label="Geteste hypotheses" isLive />
-      <Counter value={getoond.analysesRun} label="Uitgevoerde analyses" isLive />
-      <Counter value={getoond.activeClients} label="Actieve klanten" isLive />
+      <Counter value={getoond.adSpendOptimized} label="Ad spend optimized" format="currency" isLive />
+      <Counter value={getoond.hypothesesTested} label="Hypotheses tested" isLive />
+      <Counter value={getoond.analysesRun} label="Analyses run" isLive />
+      <Counter value={getoond.activeClients} label="Active clients" isLive />
     </div>
   );
 }

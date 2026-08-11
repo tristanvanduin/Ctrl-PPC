@@ -8,8 +8,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const basis = `https://${CANONIEK_DOMEIN}`;
   const statisch: MetadataRoute.Sitemap = [
     { url: basis, changeFrequency: "monthly", priority: 1 },
+    { url: `${basis}/how-it-works`, changeFrequency: "monthly", priority: 0.9 },
     { url: `${basis}/demo`, changeFrequency: "monthly", priority: 0.9 },
     { url: `${basis}/pricing`, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${basis}/vs`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${basis}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${basis}/blog`, changeFrequency: "weekly", priority: 0.7 },
   ];

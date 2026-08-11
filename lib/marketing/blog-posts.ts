@@ -7,6 +7,11 @@
 // funnel-overlap.ts, rsa-insights-facts.ts, lib/analysis/kpi-relations) -- geen verzonnen
 // klantcijfers of onderzoeksclaims, ook hier niet.
 
+export interface RelatedPage {
+  label: string;
+  href: string;
+}
+
 export interface BlogPost {
   slug: string;
   titel: string;
@@ -14,6 +19,12 @@ export interface BlogPost {
   datum: string;
   leesminuten: number;
   inhoud: string[];
+  /** Slugs of other posts that genuinely share a theme -- not "the other five", picked per post. */
+  gerelateerdeSlugs?: string[];
+  /** Product pages the post's own content actually points to (audit, 11 August 2026: every post
+   *  dead-ended before this -- the only link on the whole page was "back to all articles"). Left
+   *  empty where nothing on the page is a real match, rather than forcing one. */
+  gerelateerdePaginas?: RelatedPage[];
 }
 
 export const BLOG_POSTS: BlogPost[] = [
@@ -39,6 +50,10 @@ export const BLOG_POSTS: BlogPost[] = [
         "Framework builds on this: the hypothesis that follows from a signal points to the segment where the " +
         "problem actually sits, not to the account as a whole.",
     ],
+    // Noemt het 6-staps Decision Framework zelf; verwijst naar waar dat staat uitgelegd. De twee
+    // andere posts delen hetzelfde onderwerp: een gemiddelde/totaal dat de echte oorzaak verbergt.
+    gerelateerdeSlugs: ["impression-share-dashboard-vertelt-niet", "acht-kpi-relaties-die-rapportages-missen"],
+    gerelateerdePaginas: [{ label: "The 6-step Decision Framework", href: "/" }],
   },
   {
     slug: "impression-share-dashboard-vertelt-niet",
@@ -61,6 +76,10 @@ export const BLOG_POSTS: BlogPost[] = [
         "falling short. Two very different conversations, both landing on the same red number on an average " +
         "dashboard.",
     ],
+    // De post noemt "de dashboard illusion" letterlijk -- dat is de naam van de sectie op /vs en
+    // op de homepage. Directe match, geen gok.
+    gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "acht-kpi-relaties-die-rapportages-missen"],
+    gerelateerdePaginas: [{ label: "The Dashboard Illusion, in full", href: "/vs" }],
   },
   {
     slug: "attributie-zonder-trackingcode",
@@ -83,6 +102,10 @@ export const BLOG_POSTS: BlogPost[] = [
         "outcome, not a hidden \"no\". That last step is where most attribution attempts run aground: an " +
         "unexecuted hypothesis still gets judged on numbers that had nothing to do with it.",
     ],
+    // De FAQ beantwoordt vrijwel dezelfde vraag ("hoe weet ik of een hypothese echt werkte") in
+    // net andere bewoordingen -- een lezer die dit artikel uitleest heeft die vraag al gesteld.
+    gerelateerdeSlugs: ["kanaalsynergie-bewijzen", "rsa-asset-dubbeltelling"],
+    gerelateerdePaginas: [{ label: "How do I know a hypothesis actually worked?", href: "/faq" }],
   },
   {
     slug: "kanaalsynergie-bewijzen",
@@ -117,6 +140,10 @@ export const BLOG_POSTS: BlogPost[] = [
         "deliberately comes back as \"unknown\" instead of being guessed: in channel synergy, a wrong guess " +
         "is more expensive than an honest \"we don't know yet\".",
     ],
+    // Sluit direct aan op de "no limit on accounts, cross-channel synergy"-claim op de homepage --
+    // dit artikel is de onderbouwing van precies die zin.
+    gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "attributie-zonder-trackingcode"],
+    gerelateerdePaginas: [{ label: "No limit on accounts, cross-channel by default", href: "/" }],
   },
   {
     slug: "rsa-asset-dubbeltelling",
@@ -144,6 +171,9 @@ export const BLOG_POSTS: BlogPost[] = [
         "deserves its own kind of attention, separate from ordinary ad group reporting. It is not more work " +
         "for its own sake, it is the place where the double count otherwise goes unnoticed.",
     ],
+    // Geen productpagina hoort hier logisch bij -- dit is een technisch RSA-detail zonder directe
+    // pitch-match, en een gedwongen link zou precies het soort ruis zijn die dit artikel afraadt.
+    gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "gemiddelde-cpa-verkeerde-vraag"],
   },
   {
     slug: "acht-kpi-relaties-die-rapportages-missen",
@@ -173,6 +203,10 @@ export const BLOG_POSTS: BlogPost[] = [
         "on the part of whoever builds the report, it is simply not what a standard overview is built for. It " +
         "is, however, exactly where the next decision comes from.",
     ],
+    // Dit artikel is de meest directe onderbouwing van de eigen tagline ("a chart is not a
+    // decision"): het is letterlijk het argument waarom losse KPI's geen antwoord zijn.
+    gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "impression-share-dashboard-vertelt-niet"],
+    gerelateerdePaginas: [{ label: "A chart is not a decision", href: "/" }],
   },
 ];
 

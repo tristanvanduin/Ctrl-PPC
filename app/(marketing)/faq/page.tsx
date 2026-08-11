@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { FaqAccordion, type FaqItem } from "@/components/marketing/faq-accordion";
+import { PrimaryCta } from "@/components/marketing/primary-cta";
 
 // Fase 7, Task 3: FAQ. De antwoorden over privacy, RLS en observatie-vs-executie beschrijven
 // hoe het platform daadwerkelijk werkt (Row Level Security per bureau, en een leeslaag zonder
@@ -94,6 +95,14 @@ export default function FaqPage() {
       </div>
       <div className="mt-12">
         <FaqAccordion items={VRAGEN} />
+      </div>
+
+      {/* Zonder deze afsluiting was FAQ een doodlopende pagina: geen enkele link naar /demo of
+          /pricing binnen de content, alleen de nav bovenaan (audit, 11 augustus 2026). Iemand die
+          hier klaar leest is precies degene die overtuigd genoeg is om een volgende stap te zetten. */}
+      <div className="mt-16 flex flex-col items-center gap-4 text-center">
+        <p className="text-off-white/60">Still have a question this page did not answer?</p>
+        <PrimaryCta>Talk to us</PrimaryCta>
       </div>
     </div>
   );

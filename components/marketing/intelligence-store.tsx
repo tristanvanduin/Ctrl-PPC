@@ -14,14 +14,7 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Clock, Sparkles } from "lucide-react";
 import { MODULES, BUNDLES, moduleById, type StoreModule } from "@/lib/marketing/modules";
-
-function ComingSoonTag() {
-  return (
-    <span className="rounded-[4px] border border-off-white/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-off-white/40">
-      Coming soon
-    </span>
-  );
-}
+import { ComingSoonBadge } from "./coming-soon-badge";
 
 function ModuleCard({
   mod,
@@ -51,7 +44,7 @@ function ModuleCard({
     >
       <div className="flex items-start justify-between gap-2">
         <h4 className="font-marketing-heading text-sm font-bold text-off-white">{mod.naam}</h4>
-        {!mod.gebouwd && <ComingSoonTag />}
+        {!mod.gebouwd && <ComingSoonBadge />}
       </div>
       <p className="mt-1.5 flex-1 text-xs leading-relaxed text-off-white/50">{mod.omschrijving}</p>
 
@@ -85,7 +78,7 @@ function ModuleCard({
             type="button"
             onClick={onToggle}
             disabled={lockedByBundle}
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               selected
                 ? "border-neon-indigo bg-neon-indigo text-midnight-slate"
                 : "border-off-white/20 text-off-white/50 hover:border-neon-indigo hover:text-neon-indigo"
@@ -93,7 +86,7 @@ function ModuleCard({
             aria-pressed={selected}
             aria-label={selected ? `Remove ${mod.naam}` : `Add ${mod.naam}`}
           >
-            {selected ? <Check className="h-3.5 w-3.5" aria-hidden /> : <span className="text-sm leading-none">+</span>}
+            {selected ? <Check className="h-4 w-4" aria-hidden /> : <span className="text-base leading-none">+</span>}
           </button>
         </div>
       )}
@@ -236,7 +229,7 @@ export function IntelligenceStore() {
                     <Sparkles className="h-4 w-4 text-copper" aria-hidden />
                     <h4 className="font-marketing-heading text-sm font-bold text-off-white">{bundle.naam}</h4>
                   </div>
-                  {!allBuilt && <ComingSoonTag />}
+                  {!allBuilt && <ComingSoonBadge />}
                 </div>
                 <p className="mt-1.5 text-xs text-off-white/50">{bundle.focus}</p>
                 <p className="mt-2 text-xs text-off-white/40">
@@ -258,7 +251,7 @@ export function IntelligenceStore() {
                   <button
                     type="button"
                     onClick={() => toggleBundle(bundle.id)}
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
                       active
                         ? "border-neon-indigo bg-neon-indigo text-midnight-slate"
                         : "border-off-white/20 text-off-white/50 hover:border-neon-indigo hover:text-neon-indigo"
@@ -266,7 +259,7 @@ export function IntelligenceStore() {
                     aria-pressed={active}
                     aria-label={active ? `Remove ${bundle.naam}` : `Add ${bundle.naam}`}
                   >
-                    {active ? <Check className="h-3.5 w-3.5" aria-hidden /> : <span className="text-sm leading-none">+</span>}
+                    {active ? <Check className="h-4 w-4" aria-hidden /> : <span className="text-base leading-none">+</span>}
                   </button>
                 </div>
               </div>

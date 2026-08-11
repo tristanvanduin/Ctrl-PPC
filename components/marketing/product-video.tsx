@@ -1,16 +1,46 @@
 // Reusable Midnight Slate video container. 6px radius, neon-indigo glow border, no iframe
 // chrome - the brief is explicit that this must not look like a bolted-on embed.
 //
-// No real product video or Loom recording exists in the codebase yet, so passing src/embedUrl
-// stays optional. Without one, this renders a static terminal-style preview instead of a fake
-// play button that does nothing when clicked - a non-functional player would be more misleading
-// than no video at all. Swap in a real asset later by passing src (mp4/webm) or embedUrl (Loom/
-// YouTube) - the container styling does not change.
+// src/embedUrl stay optional: without one, this renders a static terminal-style preview instead
+// of a fake play button that does nothing when clicked - a non-functional player would be more
+// misleading than no video at all.
+//
+// REMOVED FROM THE HOMEPAGE ENTIRELY, 11 August 2026, same day it was added. Real footage
+// (public/videos/) landed and was wired in first, but that footage is a recording of the actual
+// product, and the actual product's UI is Dutch throughout ("Zoek klant", "Vandaag",
+// "Conversielag: 3 dagen" - every screen). The marketing site is deliberately English-only for a
+// "world wide" audience; a Dutch-language video under English copy is not a missing-evidence
+// problem the way no-video-at-all is, it is contradicting evidence, actively undercutting the page
+// around it -- worse than the fallback it would have been shown instead of.
+//
+// The fallback itself turned out not to earn a spot either, once the video was gone: its PREVIEW_
+// REGELS readout is near-identical to ComparisonBlock's DIAGNOSE_REGELS, already shown higher on
+// the same homepage. Two placeholder boxes repeating that same fabricated example a second and
+// third time read as filler, not as a considered choice -- caught by the user, not by any of the
+// automated checks, because nothing here is technically broken. Both call sites are gone from
+// app/(marketing)/page.tsx. This component is unused today; see TOEGESTANE_WEZEN in
+// scripts/check-hygiene.mjs for why it stays in the tree rather than getting deleted.
+//
+// The files (public/videos/*.webm, *-poster.jpg) stay too -- this is a positioning problem, not a
+// footage-quality one, and the footage itself may still be useful once there is an English UI to
+// record (product feature, not a marketing fix).
+//
+// preload="metadata" is deliberate for any future src usage: the two clips currently in
+// public/videos/ are 5.0MB and 1.6MB, and without it the browser fetches the full file for every
+// visitor on page load, not just the ones who press play. No compression tooling is available in
+// this environment (ffmpeg could not be installed, network-restricted sandbox) -- if the source
+// files can be re-encoded at a lower bitrate before upload, that would help more than anything
+// this component can do.
+//
+// POSTER: a video slot that does carry real src/poster props should always pass both -- without a
+// poster the browser has nothing to paint until enough of the file loads to extract a frame, and
+// this component's own <video> tag has no built-in fallback for that gap.
 
 interface ProductVideoProps {
   src?: string;
   embedUrl?: string;
   poster?: string;
+  caption?: string;
 }
 
 const PREVIEW_REGELS = [
@@ -42,9 +72,14 @@ function TerminalPreview() {
   );
 }
 
-export function ProductVideo({ src, embedUrl, poster }: ProductVideoProps) {
+export function ProductVideo({ src, embedUrl, poster, caption }: ProductVideoProps) {
   return (
-    <section className="mx-auto max-w-4xl px-6 pb-16">
+    <section className="mx-auto max-w-2xl px-6 pb-16">
+      {caption && (
+        <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
+          {caption}
+        </p>
+      )}
       <div
         className="overflow-hidden rounded-[6px] border border-neon-indigo/20 bg-midnight-slate-raised/60 backdrop-blur-sm"
         style={{ boxShadow: "0 0 60px rgba(129, 140, 248, 0.12)" }}
@@ -61,7 +96,7 @@ export function ProductVideo({ src, embedUrl, poster }: ProductVideoProps) {
           </div>
         ) : src ? (
           // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video className="aspect-video w-full" src={src} poster={poster} controls />
+          <video className="aspect-video w-full" src={src} poster={poster} controls preload="metadata" />
         ) : (
           <TerminalPreview />
         )}
