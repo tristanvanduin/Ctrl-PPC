@@ -12,6 +12,13 @@
 // play. No compression tooling is available in this environment (ffmpeg could not be installed,
 // network-restricted sandbox) -- if the source files can be re-encoded at a lower bitrate before
 // upload, that would help more than anything this component can do.
+//
+// POSTER (audit, 11 August 2026): the first homepage video sits just below the fold and is a
+// plausible LCP candidate. Without a poster, the browser has nothing to paint for it until enough
+// of the file loads to extract a frame. Both homepage videos now have a real poster generated from
+// their own first second of footage (public/videos/*-poster.jpg) -- not a mockup or a placeholder,
+// an actual frame, captured via Playwright screenshotting the <video> element directly (same
+// ffmpeg-less constraint as above; this sidesteps it rather than working around it).
 
 interface ProductVideoProps {
   src?: string;

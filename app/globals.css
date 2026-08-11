@@ -197,6 +197,14 @@
      terugval voor het korte moment vóór het lettertype geladen is. */
   --font-marketing-heading: var(--font-jakarta), "Satoshi", ui-sans-serif, system-ui, sans-serif;
   --font-marketing-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* De gloed van de primaire CTA ("Request a demo"): stond identiek in page.tsx en vs/page.tsx,
+     los van de rest van het knopmarkup dat ook woordelijk gelijk was (audit, 11 augustus 2026) --
+     zie components/marketing/primary-cta.tsx, dat nu beide vervangt. De overige boxShadow-waarden
+     in de marketingcomponenten zijn elk maar op één plek gebruikt (comparison-block, execution-
+     node, product-video, intelligence-store, de tier-highlight) en dus geen duplicaat om op te
+     lossen -- die blijven inline, precies waar hun context staat. */
+  --glow-neon-indigo-cta: 0 0 40px rgba(129, 140, 248, 0.45);
 }
 
 :root {
@@ -537,6 +545,19 @@
 
   --color-rose-100: #351822;
   --color-rose-700: #efaebd;
+}
+
+/* ── Marketingsite: focus-zichtbaarheid (audit, 11 augustus 2026) ───────────
+ * Elke CTA en link had een hover-status; geen enkele had een eigen focus-status voor toetsenbord-
+ * en switch-gebruikers. Ze vielen terug op de gedeelde `outline-ring/50` uit de basislaag, en die
+ * is getoetst tegen de lichte/donkere APP-thema's, nooit tegen midnight-slate. Eén regel, scoped op
+ * de marketingroot, in plaats van een focus-klasse los toevoegen aan tien bestanden.
+ */
+.marketing a:focus-visible,
+.marketing button:focus-visible {
+  outline: 2px solid var(--color-neon-indigo);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ── Executive Terminal (Fase 5) ────────────────────────────────────────────

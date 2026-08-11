@@ -7,6 +7,7 @@ import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
 import { ProductVideo } from "@/components/marketing/product-video";
 import { QualityGateMatrix } from "@/components/marketing/quality-gate-matrix";
+import { PrimaryCta } from "@/components/marketing/primary-cta";
 
 // Fase 7, Task 2: de homepage volgens Blueprint v2.0. Vervangt de minimale Fase 5-hero (die
 // alleen de kop en de Platform Pulse had) door de volledige structuur uit de brief: hero,
@@ -78,13 +79,7 @@ export default async function HomePage() {
           and closes the learning loop by remembering what worked after you act on it.
         </p>
         <div className="mt-8 flex items-center justify-center sm:mt-10">
-          <a
-            href="/demo"
-            className="rounded-[6px] px-7 py-3.5 text-sm font-semibold text-midnight-slate transition-transform hover:scale-[1.02]"
-            style={{ backgroundColor: "#818cf8", boxShadow: "0 0 40px rgba(129, 140, 248, 0.45)" }}
-          >
-            Request a demo
-          </a>
+          <PrimaryCta />
         </div>
       </section>
 
@@ -100,12 +95,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <ProductVideo src="/videos/dashboard-demo.webm" />
+      <ProductVideo src="/videos/dashboard-demo.webm" poster="/videos/dashboard-demo-poster.jpg" />
       <TrustBanner />
       <ComparisonBlock />
       <QualityGateMatrix />
       <FeaturesBlock />
-      <ProductVideo src="/videos/decision-terminal-demo.webm" caption="The Decision Terminal, live" />
+      <ProductVideo
+        src="/videos/decision-terminal-demo.webm"
+        poster="/videos/decision-terminal-demo-poster.jpg"
+        caption="The Decision Terminal, live"
+      />
     </>
   );
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Check, Clock, X } from "lucide-react";
 import { KILL_SHOT_ROWS, SUCCESS_TAX_EXAMPLES } from "@/lib/marketing/comparison";
+import { ComingSoonBadge } from "@/components/marketing/coming-soon-badge";
+import { PrimaryCta } from "@/components/marketing/primary-cta";
 
 // The comparison page against the legacy status quo (Optmyzr, Triple Whale, Supermetrics,
 // Madgicx, Skai). Canonical stays relative (resolved via metadataBase in app/layout.tsx, same as
@@ -10,13 +12,22 @@ import { KILL_SHOT_ROWS, SUCCESS_TAX_EXAMPLES } from "@/lib/marketing/comparison
 // rest of the site. See lib/marketing/comparison.ts for why rows 3 and 4 of the table are worded
 // the way they are -- the source brief's "autonomous execution" framing contradicts the FAQ and
 // was not published as-is.
+//
+// TITLE FIX (audit, 11 August 2026): this metadata originally said "The Autonomous Decision
+// Engine" -- the same claim rows 3/4 were reworded to avoid, just left standing in the one place
+// search engines and AI answer engines actually quote verbatim. The FAQ states plainly that Ctrl
+// PPC "never executes anything itself." A title contradicting the page's own body copy is worse
+// than the claim it replaces, so it is gone from both the title and openGraph.title.
+//
+// Row and Success Tax card titles were <p> tags styled as headings, same audit pass: promoted to
+// <h3> under this page's <h1> so the heading outline matches the visual one.
 export const metadata: Metadata = {
-  title: "Ctrl PPC vs. Legacy Platforms | The Autonomous Decision Engine",
+  title: "Ctrl PPC vs. Legacy Platforms | Decisioning, Not Dashboards",
   description:
     "Stop paying the success tax. Compare Ctrl PPC against Optmyzr, Triple Whale, and others. See why modern agencies use a decision engine instead of passive dashboards.",
   alternates: { canonical: "/vs" },
   openGraph: {
-    title: "Ctrl PPC vs. Legacy Platforms | The Autonomous Decision Engine",
+    title: "Ctrl PPC vs. Legacy Platforms | Decisioning, Not Dashboards",
     description:
       "Stop paying the success tax. Compare Ctrl PPC against Optmyzr, Triple Whale, and others.",
     type: "website",
@@ -33,7 +44,7 @@ function KillShotRowBlock({ row }: { row: (typeof KILL_SHOT_ROWS)[number] }) {
       <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/40 p-4">
         <div className="flex items-center gap-2">
           <X className="h-3.5 w-3.5 shrink-0 text-off-white/30" aria-hidden />
-          <p className="text-sm font-semibold text-off-white/50">{row.legacy}</p>
+          <h3 className="text-sm font-semibold text-off-white/50">{row.legacy}</h3>
         </div>
         <p className="mt-1.5 text-xs leading-relaxed text-off-white/35">{row.legacyDetail}</p>
       </div>
@@ -44,12 +55,8 @@ function KillShotRowBlock({ row }: { row: (typeof KILL_SHOT_ROWS)[number] }) {
       >
         <div className="flex items-center gap-2">
           <Check className="h-3.5 w-3.5 shrink-0 text-neon-indigo" aria-hidden />
-          <p className="text-sm font-semibold text-off-white">{row.ctrlPpc}</p>
-          {!row.gebouwd && (
-            <span className="rounded-[4px] border border-off-white/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-off-white/40">
-              Coming soon
-            </span>
-          )}
+          <h3 className="text-sm font-semibold text-off-white">{row.ctrlPpc}</h3>
+          {!row.gebouwd && <ComingSoonBadge />}
         </div>
         <p className="mt-1.5 text-xs leading-relaxed text-off-white/70">{row.ctrlPpcDetail}</p>
       </div>
@@ -93,7 +100,7 @@ export default function VsPage() {
               className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 p-4"
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-off-white">{ex.platform}</p>
+                <h3 className="text-sm font-bold text-off-white">{ex.platform}</h3>
                 <span className="text-[10px] uppercase tracking-wide text-off-white/40">{ex.mechanism}</span>
               </div>
               <p className="mt-2 text-xs leading-relaxed text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>
@@ -113,13 +120,7 @@ export default function VsPage() {
       </div>
 
       <div className="mt-10 flex items-center justify-center">
-        <a
-          href="/demo"
-          className="rounded-[6px] px-7 py-3.5 text-sm font-semibold text-midnight-slate transition-transform hover:scale-[1.02]"
-          style={{ backgroundColor: "#818cf8", boxShadow: "0 0 40px rgba(129, 140, 248, 0.45)" }}
-        >
-          Request a demo
-        </a>
+        <PrimaryCta />
       </div>
     </div>
   );

@@ -2,6 +2,10 @@
 // list of validation checks a hypothesis has to clear before it counts, matching step 3 of the
 // Decision Framework (lib/decision/quality-gates.ts). Representative example data, same treatment
 // as ComparisonBlock's DIAGNOSE_REGELS -- illustrative of the mechanism, not a live feed.
+//
+// The section title was a styled <p> with nothing else on the page claiming an <h2> at this point
+// in the outline (audit, 11 August 2026). Promoted to <h2> so the heading structure matches what
+// the section visually is: its own topic, not a caption inside ComparisonBlock above it.
 
 import { CheckCircle2, XCircle } from "lucide-react";
 
@@ -24,9 +28,9 @@ export function QualityGateMatrix() {
         className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/70 p-6"
         style={{ boxShadow: "0 0 40px rgba(0, 0, 0, 0.3)" }}
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neon-indigo">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-neon-indigo">
           Quality Gate: Validation Run
-        </p>
+        </h2>
         <p className="mt-1.5 text-xs text-off-white/40">
           Every hypothesis clears this before it reaches you. No check, no execution.
         </p>

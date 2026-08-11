@@ -5,6 +5,10 @@ import { X } from "lucide-react";
 // account leest: een diagnose met een oorzaak, in JetBrains Mono, met een Neon Indigo gloed.
 // De rechterkant is illustratief or de echte lezing die de Decision Core oplevert (signaal ->
 // hypothese -> kwaliteitspoort, zie lib/decision/), geen live data.
+//
+// De twee kaarttitels stonden op <p>, niet op een koptag (audit, 11 augustus 2026) -- de
+// visuele hierarchie zei "titel", de heading-outline die crawlers en screenreaders gebruiken zei
+// niets. Nu <h3>, onder de <h2> van deze sectie.
 
 const NEP_BALKEN = [40, 65, 30, 80, 45, 60, 35];
 
@@ -32,7 +36,7 @@ export function ComparisonBlock() {
       <div className="mt-12 grid gap-6 lg:grid-cols-2">
         {/* Left: The Dashboard Illusion */}
         <div className="relative overflow-hidden rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/60">The Dashboard Illusion</p>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/60">The Dashboard Illusion</h3>
           <p className="mt-2 text-sm text-off-white/50">
             Charts per channel, lined up neatly. None of them tell you which one to trust, or what to
             do about it.
@@ -54,9 +58,9 @@ export function ComparisonBlock() {
           className="rounded-[6px] border border-neon-indigo/40 bg-midnight-slate-raised p-6"
           style={{ boxShadow: "0 0 32px rgba(129, 140, 248, 0.18)" }}
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neon-indigo">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-neon-indigo">
             Ctrl PPC: Primary Diagnosis
-          </p>
+          </h3>
 
           <div className="mt-6 space-y-3" style={{ fontFamily: "var(--font-marketing-mono)" }}>
             {DIAGNOSE_REGELS.map((r) => (

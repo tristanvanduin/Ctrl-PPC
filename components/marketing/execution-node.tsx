@@ -35,7 +35,7 @@ export function ExecutionNode() {
               {s.stap.slice(1)}
             </span>
             <div className="min-w-0 pb-0.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-off-white">{s.titel}</p>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-off-white">{s.titel}</h4>
               <p className="mt-0.5 text-xs leading-relaxed text-off-white/50" style={{ fontFamily: "var(--font-sans, inherit)" }}>
                 {s.omschrijving}
               </p>
