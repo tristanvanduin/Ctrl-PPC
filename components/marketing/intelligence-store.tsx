@@ -12,7 +12,7 @@
 // the running total never double-counts the same capability twice.
 
 import { useMemo, useState } from "react";
-import { Check, Clock, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Clock, Sparkles } from "lucide-react";
 import { MODULES, BUNDLES, moduleById, type StoreModule } from "@/lib/marketing/modules";
 
 function ComingSoonTag() {
@@ -114,6 +114,7 @@ function ModuleCard({
 }
 
 export function IntelligenceStore() {
+  const [open, setOpen] = useState(false);
   const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(new Set());
   const [godViewTier, setGodViewTier] = useState<number | null>(null);
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
@@ -183,8 +184,19 @@ export function IntelligenceStore() {
         <p className="mx-auto mt-2 max-w-2xl text-sm text-off-white/50">
           Expand any tier with individual modules, or take a bundle at a lower combined rate.
         </p>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="mx-auto mt-5 flex items-center gap-1.5 rounded-[6px] border border-off-white/15 px-4 py-2 text-xs font-semibold text-off-white/70 transition-colors hover:border-neon-indigo hover:text-neon-indigo"
+        >
+          {open ? "Hide modules & bundles" : "Explore modules & bundles"}
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+        </button>
       </div>
 
+      {open && (
+      <>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {MODULES.map((mod) => (
           <ModuleCard
@@ -262,6 +274,8 @@ export function IntelligenceStore() {
           })}
         </div>
       </div>
+      </>
+      )}
 
       {count > 0 && (
         <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
