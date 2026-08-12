@@ -40,6 +40,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // de schermen erbij. Niet half.
 
 export interface Klant {
+  /** De interne uuid (accounts.id) -- nodig om fact_core rechtstreeks te bevragen (account_id is
+   *  daar de sleutel, niet client_id). Voor bestaande consumenten die alleen clientId gebruikten
+   *  verandert er niets; dit is een toevoeging. */
+  id: string;
   clientId: string;
   naam: string;
   /** "google-ads", "meta", "demo", ... */
@@ -50,6 +54,7 @@ export interface Klant {
 }
 
 interface AccountRij {
+  id: string;
   client_id: string;
   name: string | null;
   source: string | null;
@@ -59,6 +64,7 @@ interface AccountRij {
 
 function naarKlant(r: AccountRij): Klant {
   return {
+    id: r.id,
     clientId: r.client_id,
     naam: r.name ?? r.client_id,
     bron: r.source ?? "onbekend",
@@ -67,7 +73,7 @@ function naarKlant(r: AccountRij): Klant {
   };
 }
 
-const KOLOMMEN = "client_id, name, source, external_id, agency_id";
+const KOLOMMEN = "id, client_id, name, source, external_id, agency_id";
 
 /**
  * Eén klant op zijn id. Null als hij niet bestaat.
