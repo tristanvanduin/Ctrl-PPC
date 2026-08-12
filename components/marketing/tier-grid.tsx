@@ -2,15 +2,25 @@
 
 // Losgetrokken uit app/(marketing)/pricing/page.tsx (12 augustus 2026, mobiele audit): zes
 // tier-kaarten voluit tonen maakte /pricing op mobiel een "mega lange scroll" (eigenaars woorden).
-// Zelfde patroon als IntelligenceStore verderop op deze pagina: de eerste drie (Foundation, Core,
-// Growth -- Growth is al de "Most agencies start here"-kaart) staan altijd open, Scale/Professional/
-// Enterprise gaan achter een "Show all 6 tiers"-toggle. Niemand raakt een tier kwijt, de standaard-
-// scroll op mobiel wordt ruwweg gehalveerd.
+//
+// EERSTE VERSIE (teruggedraaid, zelfde dag): drie tiers altijd zichtbaar, Scale/Professional/
+// Enterprise achter een sectie-brede "Show all 6 tiers"-toggle. Terecht afgekeurd door de eigenaar:
+// "jij hebt het afgekapt op tiers" -- wie niet op de toggle klikt, ziet drie tiers die misschien
+// geen van alle passen en de andere drie bestaan voor die bezoeker dan effectief niet. Dat is een
+// reeel conversierisico dat de content-inkorting hieronder niet heeft: elke kaart -- prijs, naam,
+// focus, CTA -- staat altijd, alleen de VOLLEDIGE featurelijst per kaart is standaard ingekort tot
+// de eerste drie echte features, met een "+N more"-knop per kaart voor de rest.
+//
+// "Everything in [vorige tier]" is bewust uitgesloten van die eerste drie: het is een
+// overervingszin, geen USP, en zou als eerste regel een zwakke opener geven. Blijft wel zichtbaar
+// zodra een kaart wordt uitgeklapt.
 
 import { useState } from "react";
 import { Check, ChevronDown, Clock, Gift } from "lucide-react";
 import { sopDekkingVoor, type TierDefinitie, type TierFeature } from "@/lib/marketing/tiers";
 import { ComingSoonBadge } from "./coming-soon-badge";
+
+const KERN_AANTAL = 3;
 
 function FeatureRow({ feature }: { feature: TierFeature }) {
   return (
@@ -40,6 +50,17 @@ function TierCard({
 }) {
   const sopDekking = sopDekkingVoor(tier.licentie);
   const isFoundation = tier.licentie === "basis";
+  const [expanded, setExpanded] = useState(false);
+
+  const kernFeatures = tier.features.filter((f) => !f.tekst.startsWith("Everything in"));
+  const overervingFeature = tier.features.find((f) => f.tekst.startsWith("Everything in"));
+  const zichtbareFeatures = kernFeatures.slice(0, KERN_AANTAL);
+  const verborgenFeatures = kernFeatures.slice(KERN_AANTAL);
+  // Alles wat achter "+N more" schuilgaat: de overige kernfeatures, de overervingsregel (als die
+  // er is), en de rapportageregel -- die laatste stond hiervoor altijd zichtbaar maar hoort bij
+  // dezelfde "detail, niet kernpunt"-categorie als de rest.
+  const verborgenAantal = verborgenFeatures.length + (overervingFeature ? 1 : 0) + 1;
+
   return (
     <div
       className={`relative flex flex-col rounded-[6px] border p-6 ${
@@ -95,20 +116,41 @@ function TierCard({
       </div>
 
       <ul className="mt-4 flex-1 space-y-2.5">
-        {tier.features.map((f) => (
+        {zichtbareFeatures.map((f) => (
           <FeatureRow key={f.tekst} feature={f} />
         ))}
-        {/* Was one <li> wrapping a <p> and a <FeatureRow> that renders its own <li> -- an <li>
-            nested inside an <li>, invalid HTML the browser silently reparents, which produced a
-            DOM shape different from what React rendered and threw a hydration error on every load
-            (found via audit verification, 11 August 2026). Two siblings instead: the label keeps
-            the border-t/pt-2.5 that visually separated this row, the feature row is its own <li>
-            same as every other row above it. */}
-        <li className="border-t border-off-white/10 pt-2.5 list-none">
-          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-off-white/40">Reporting</p>
-        </li>
-        <FeatureRow feature={tier.rapportage} />
+
+        {expanded && (
+          <>
+            {verborgenFeatures.map((f) => (
+              <FeatureRow key={f.tekst} feature={f} />
+            ))}
+            {overervingFeature && <FeatureRow feature={overervingFeature} />}
+            {/* Was one <li> wrapping a <p> and a <FeatureRow> that renders its own <li> -- an
+                <li> nested inside an <li>, invalid HTML the browser silently reparents, which
+                produced a DOM shape different from what React rendered and threw a hydration
+                error on every load (found via audit verification, 11 August 2026). Two siblings
+                instead: the label keeps the border-t/pt-2.5 that visually separated this row,
+                the feature row is its own <li> same as every other row above it. */}
+            <li className="border-t border-off-white/10 pt-2.5 list-none">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-off-white/40">Reporting</p>
+            </li>
+            <FeatureRow feature={tier.rapportage} />
+          </>
+        )}
       </ul>
+
+      {verborgenAantal > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-off-white/50 hover:text-neon-indigo"
+        >
+          {expanded ? "Show fewer features" : `+${verborgenAantal} more`}
+          <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />
+        </button>
+      )}
 
       {/* Coupon-kaartje (12 augustus 2026, derde versie): stond eerst boven de tier-grid, toen
           vastgeplakt op de bovenrand van elke kaart -- daar botste hij op Growth met "Most agencies
@@ -141,45 +183,17 @@ function TierCard({
   );
 }
 
-const ALTIJD_ZICHTBAAR = 3;
-
 export function TierGrid({ tiers, foundationOpen }: { tiers: readonly TierDefinitie[]; foundationOpen: boolean }) {
-  const [showAll, setShowAll] = useState(false);
-  const zichtbaar = tiers.slice(0, ALTIJD_ZICHTBAAR);
-  const inklapbaar = tiers.slice(ALTIJD_ZICHTBAAR);
-
   return (
-    <>
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {zichtbaar.map((tier) => (
-          <TierCard
-            key={tier.licentie}
-            tier={tier}
-            uitgelicht={tier.licentie === "growth"}
-            foundationOpen={tier.licentie === "basis" ? foundationOpen : undefined}
-          />
-        ))}
-      </div>
-
-      {showAll && (
-        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {inklapbaar.map((tier) => (
-            <TierCard key={tier.licentie} tier={tier} uitgelicht={false} />
-          ))}
-        </div>
-      )}
-
-      <div className="mt-8 text-center">
-        <button
-          type="button"
-          onClick={() => setShowAll((v) => !v)}
-          aria-expanded={showAll}
-          className="mx-auto flex items-center gap-1.5 rounded-[6px] border border-off-white/15 px-4 py-2.5 text-xs font-semibold text-off-white/70 transition-colors hover:border-neon-indigo hover:text-neon-indigo"
-        >
-          {showAll ? "Show fewer tiers" : `Show all ${tiers.length} tiers`}
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showAll ? "rotate-180" : ""}`} aria-hidden />
-        </button>
-      </div>
-    </>
+    <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {tiers.map((tier) => (
+        <TierCard
+          key={tier.licentie}
+          tier={tier}
+          uitgelicht={tier.licentie === "growth"}
+          foundationOpen={tier.licentie === "basis" ? foundationOpen : undefined}
+        />
+      ))}
+    </div>
   );
 }
