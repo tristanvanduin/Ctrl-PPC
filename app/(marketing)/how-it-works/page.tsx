@@ -69,6 +69,37 @@ export default function HowItWorksPage() {
         </p>
       </div>
 
+      {/* Three Layers, added 12 August 2026 from the positioning strategy doc: frames where the
+          loop below actually lives, without touching the loop content itself (verified against
+          lib/marketing/loop.ts and deliberately excludes God View - see that file's header
+          comment on why God View is not part of this loop). God View copy stays honest about
+          scope: the cross-tenant version does not exist yet, only single-agency/platform-admin
+          views (components/terminal/god-mode.tsx, agency-god-view.tsx) and the not-built
+          "God View" module in the Intelligence Store on /pricing. */}
+      <div className="mt-14 grid gap-6 sm:grid-cols-3">
+        <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">Layer 1 - Foundation</p>
+          <p className="mt-2 text-sm text-off-white/60">
+            Connect Google, Meta, LinkedIn, and Microsoft Ads. See what happened, dashboarding,
+            forecasting, KPI monitoring. Free, unlimited accounts, no cap.
+          </p>
+        </div>
+        <div className="rounded-[6px] border border-neon-indigo/30 bg-midnight-slate-raised/50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neon-indigo">Layer 2 - Auto-SOP</p>
+          <p className="mt-2 text-sm text-off-white/60">
+            The loop below. Reads the data, forms a hypothesis, checks it against nine gates, hands
+            it to you to execute, and learns from what happened.
+          </p>
+        </div>
+        <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">Layer 3 - God View</p>
+          <p className="mt-2 text-sm text-off-white/60">
+            Collective intelligence across every connected account. The direction we are building
+            toward, not a live feature today.
+          </p>
+        </div>
+      </div>
+
       <div className="mt-14">
         <DecisionLoopRing />
       </div>

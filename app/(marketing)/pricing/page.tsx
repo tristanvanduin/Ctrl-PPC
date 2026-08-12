@@ -37,11 +37,11 @@ const PRICING_JSON_LD = {
 
 export const metadata: Metadata = {
   title: "Pricing: Ctrl PPC",
-  description: "Five tiers, one decision engine. No limit on accounts, no separate invoice per client.",
+  description: "Foundation is free forever. Five tiers of decisioning on top of it. No limit on accounts, no separate invoice per client.",
   alternates: { canonical: "/pricing" },
   openGraph: {
     title: "Pricing: Ctrl PPC",
-    description: "Five tiers, one decision engine. No limit on accounts, no separate invoice per client.",
+    description: "Foundation is free forever. Five tiers of decisioning on top of it. No limit on accounts, no separate invoice per client.",
     type: "website",
   },
 };
@@ -145,10 +145,11 @@ export default function PricingPage() {
           What it costs, up front
         </h1>
         <p className="mt-4 text-off-white/60">
-          Five tiers of decisioning, not five gates to a sales call. Every tier runs the full
-          hypothesis loop, the difference is scale: how many accounts, how much compute, and how
-          much control over what your client sees. Features marked <ComingSoonBadge /> are on the
-          roadmap, not shipped yet.
+          Foundation is free, forever - connect every account and see what happened. Five tiers of
+          decisioning sit on top of it, not five gates to a sales call: every paid tier runs the
+          full hypothesis loop, the difference is scale, how many accounts, how much compute, and
+          how much control over what your client sees. Features marked <ComingSoonBadge /> are on
+          the roadmap, not shipped yet.
         </p>
       </div>
 
@@ -160,16 +161,14 @@ export default function PricingPage() {
         </span>
       </div>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {TIERS.map((tier) => (
           <TierCard key={tier.licentie} tier={tier} uitgelicht={tier.licentie === "growth"} />
         ))}
       </div>
 
       <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-off-white/50">
-        Just want the dashboard and the forecast? Basis is free, unlimited accounts, no automatic
-        SOP runs. Upgrade whenever you want the engine to start forming hypotheses on its own.
-        Curious how this differs from a traditional dashboard tool?{" "}
+        Curious how Foundation differs from a traditional dashboard tool?{" "}
         <Link href="/vs" className="font-semibold text-neon-indigo hover:underline">
           See the comparison
         </Link>.
