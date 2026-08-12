@@ -15,12 +15,13 @@ type SopType = "weekly" | "biweekly" | "monthly";
 export type SopChannel = "google_ads" | "meta_ads" | "linkedin_ads";
 
 // Per kanaal: welke SOPs bestaan er, onder welke sop_type slaat de engine ze op, en hoe heet
-// het in de kop van het geexporteerde bestand. Meta en LinkedIn hebben (bewust) alleen de
-// maand-SOP; hun adapters (11 resp. 9 stappen) draaien via dezelfde /api/analysis/monthly.
+// het in de kop van het geexporteerde bestand. Meta en LinkedIn hebben nu alle drie de SOPs:
+// weekly/biweekly draaien via /api/analysis/weekly en /biweekly met channel-dispatch, monthly
+// via hun eigen adapters (11 resp. 9 stappen) op dezelfde /api/analysis/monthly.
 const CHANNEL_CONFIG: Record<SopChannel, { types: SopType[]; sopTypeKey: Record<SopType, string>; headerLabel: string }> = {
   google_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "weekly", biweekly: "biweekly", monthly: "monthly" }, headerLabel: "SEA" },
-  meta_ads: { types: ["monthly"], sopTypeKey: { weekly: "weekly", biweekly: "biweekly", monthly: "meta_monthly" }, headerLabel: "Meta Ads" },
-  linkedin_ads: { types: ["monthly"], sopTypeKey: { weekly: "weekly", biweekly: "biweekly", monthly: "linkedin_monthly" }, headerLabel: "LinkedIn Ads" },
+  meta_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "meta_weekly", biweekly: "meta_biweekly", monthly: "meta_monthly" }, headerLabel: "Meta Ads" },
+  linkedin_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "linkedin_weekly", biweekly: "linkedin_biweekly", monthly: "linkedin_monthly" }, headerLabel: "LinkedIn Ads" },
 };
 
 interface SopStatus {
@@ -185,7 +186,8 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
         // niet als "Stap 1: ..., Stap 2: ..."-dump in het bestand dat de specialist opent.
         const analysisDate = data.analysisDate || today();
         const period = type === "monthly" ? data.period : { start: data.periodStart, end: data.periodEnd };
-        const typeLabel = type === "monthly" ? `Maandelijkse ${channelCfg.headerLabel}` : type === "weekly" ? "Wekelijkse" : "Tweewekelijkse";
+        const cadenceLabel = type === "monthly" ? "Maandelijkse" : type === "weekly" ? "Wekelijkse" : "Tweewekelijkse";
+        const typeLabel = `${cadenceLabel} ${channelCfg.headerLabel}`;
         const header = `# ${typeLabel} Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${period?.start} t/m ${period?.end}\n**Model:** ${data.model}\n\n---\n\n`;
         const markdown = header + (data.fullOutput || data.output || "Geen output");
 
