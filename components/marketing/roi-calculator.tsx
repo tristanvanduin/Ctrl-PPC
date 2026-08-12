@@ -73,6 +73,11 @@ const KANAAL_MULTIPLIER_PER_EXTRA_KANAAL = 0.6;
 // "Progress vs. monthly target" blijft ongewijzigd -- "monthly" verwijst daar naar de
 // doelstelling zelf (een normaal bedrijfsbegrip), niet naar hoe vaak Ctrl PPC checkt, en is
 // letterlijk de eigen formulering van de eigenaar ("vs maand doelstellingen").
+//
+// Achtste keer, zelfde dag ("nu staan de kanalen naast elkaar, ik denk dat een row break
+// cleaner is"): de kanaalregel per item stond op 1 doorlopende regel ("Google: ... -- Meta: ...
+// -- LinkedIn: ..."), verdicht voor de zesde keer hierboven. Terug naar 1 rij per kanaal --
+// minder gedrongen, nog steeds korter dan de originele 4-regelige versie uit de vijfde keer.
 const KANAAL_REGEL = (g: string, m: string, l: string) =>
   [{ k: "Google", t: g }, { k: "Meta", t: m }, { k: "LinkedIn", t: l }];
 
@@ -239,9 +244,13 @@ export function RoiCalculator() {
                 </div>
                 <p className="mt-0.5 leading-relaxed text-off-white/50">{a.beschrijving}</p>
                 {a.kanalen.length > 0 && (
-                  <p className="mt-1 text-[11px] leading-relaxed text-off-white/40">
-                    {a.kanalen.map((k) => `${k.k}: ${k.t}`).join(" -- ")}
-                  </p>
+                  <div className="mt-1 space-y-0.5">
+                    {a.kanalen.map((k) => (
+                      <p key={k.k} className="text-[11px] leading-relaxed text-off-white/40">
+                        <span className="text-off-white/55">{k.k}:</span> {k.t}
+                      </p>
+                    ))}
+                  </div>
                 )}
               </li>
             ))}
