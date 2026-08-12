@@ -50,10 +50,24 @@ import { useMemo, useState } from "react";
 // tijdsopname (die bestaat niet), dus geen valse precisie zoals 11/13 of 9/13 zou suggereren.
 const KANAAL_MULTIPLIER_PER_EXTRA_KANAAL = 0.6;
 
+// Vijfde keer (12 augustus 2026, na live-controle op mobiel): "Monthly deep dive" perste Google,
+// Meta en LinkedIn in een enkele doorlopende zin -- Meta en LinkedIn verdwenen visueel ("ik mis
+// hier de linkedin en meta"), en "ICP-fit" las als interne sales-jargon, niet als marketingtaal
+// ("ik vind de termen niet voldoen aan de marketing termen"). Opgesplitst naar drie eigen regels,
+// een per kanaal, herschreven naar wat het kanaal daadwerkelijk oplevert i.p.v. het vaktermen-label
+// ervoor: "search intent" -> "what buyers are searching for", "ICP-fit" -> "reaching the right
+// decision-makers". Nog steeds geen letterlijke stappenlijst of -aantal, zelfde grens als eerder.
+const KANAAL_DEEP_DIVE = [
+  { kanaal: "Google Ads", tekst: "What buyers are searching for, and whether you're winning the auction" },
+  { kanaal: "Meta", tekst: "Which creative is working, and when your audience is worn out" },
+  { kanaal: "LinkedIn", tekst: "Whether you're reaching the right decision-makers, and how leads move through the funnel" },
+];
+
 interface Analyse {
   naam: string;
   beschrijving: string;
   minutenPerMaand: number;
+  kanalen?: typeof KANAAL_DEEP_DIVE;
 }
 
 const STANDAARDPAKKET: Analyse[] = [
@@ -72,8 +86,9 @@ const STANDAARDPAKKET: Analyse[] = [
   {
     naam: "Monthly deep dive",
     beschrijving:
-      "Reasoning shaped per channel -- search intent for Google, creative & audience fatigue for Meta, ICP-fit and lead funnel for LinkedIn -- every finding cleared through the same quality gates, ending in hypothesis validation.",
+      "Every finding cleared through the same quality gates, ending in hypothesis validation -- reasoning shaped around what each channel actually is:",
     minutenPerMaand: 90,
+    kanalen: KANAAL_DEEP_DIVE,
   },
   {
     naam: "Monthly report",
@@ -198,6 +213,16 @@ export function RoiCalculator() {
                   <span className="text-off-white/60">{a.minutenPerMaand} min/mo</span>
                 </div>
                 <p className="mt-0.5 leading-relaxed text-off-white/50">{a.beschrijving}</p>
+                {a.kanalen && (
+                  <ul className="mt-1.5 space-y-1 border-l border-off-white/10 pl-2.5">
+                    {a.kanalen.map((k) => (
+                      <li key={k.kanaal} className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                        <span className="shrink-0 font-semibold text-off-white/60 sm:w-20">{k.kanaal}</span>
+                        <span className="leading-relaxed text-off-white/45">{k.tekst}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
