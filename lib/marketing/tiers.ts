@@ -34,7 +34,7 @@
 // tier-grid. Naam "Foundation" komt uit de positioneringsstrategie (Strategie_v3.pdf); "basis"
 // blijft de interne licentie-sleutel, geen migratie nodig.
 //
-// SECOND OPINION-WELKOMSTCADEAU (12 augustus 2026, drie correcties): de 5 gratis trialruns
+// SECOND OPINION-WELKOMSTCADEAU (12 augustus 2026, vier correcties): de 5 gratis trialruns
 // (migratie 074, lib/analysis/second-opinion-trial.ts) stonden eerst alleen in de backend en de
 // dashboard-teller, niet op deze prijspagina. Eerste poging: een featureregel op Core. Twee
 // problemen daarmee, allebei van de eigenaar: (1) de database-trigger vuurt bij ELKE overgang
@@ -46,6 +46,15 @@
 // gedraaide, gestippelde tag die op elke betaalde kaart zelf overlapt (TierCard in
 // app/(marketing)/pricing/page.tsx), niet los ernaast.
 //
+// VIERDE CORRECTIE, DE REIKWIJDTE: dit is GEEN structurele "upgrade van Foundation ontgrendelt
+// het cadeau"-regel bedoeld als permanente tier-eigenschap. Het doel (eigenaar): tier aantrekkelijker
+// maken tijdens de launch, en de kracht van Second Opinion laten proeven zodat de losse module
+// (250/mnd) later daadwerkelijk wordt afgenomen -- een acquisitiemiddel, geen tier-feature. Beperking
+// naar de eerste X afnemers of de eerste X weken is overwogen maar NIET gebouwd: "dit moet nog
+// bedacht worden." Voor nu, met opzet: iedereen die een betaald abonnement neemt krijgt het, zonder
+// aantal- of tijdslimiet (zo staat de trigger in migratie 074 er ook al) -- kan later beperkt worden,
+// kan ook gewoon standaard blijven staan voor alle nieuwe gebruikers. Nog geen van beide besloten;
+// dit is niet half afgebouwd, het is bewust nog open.
 // CRM UIT PROFESSIONAL, BI OP AANVRAAG BIJ ENTERPRISE (12 augustus 2026): Professional noemde
 // "Business Intelligence Connect: Shopify, WooCommerce, CRM, WordPress" als roadmapfeature -- dat
 // botste met de eerdere, expliciete "geen CRM/ERP-koppeling, hier wil ik echt wegblijven" (n.a.v.
