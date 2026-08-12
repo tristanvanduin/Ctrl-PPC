@@ -6,6 +6,16 @@
 // The section title was a styled <p> with nothing else on the page claiming an <h2> at this point
 // in the outline (audit, 11 August 2026). Promoted to <h2> so the heading structure matches what
 // the section visually is: its own topic, not a caption inside ComparisonBlock above it.
+//
+// SPACING FIX (12 augustus 2026, "toch een grotere witruimte dan elders"): this section's own
+// pb-16 sat directly in front of FeaturesBlock's py-16 on the homepage. Padding does not collapse
+// like margins do, so that stacked to a 128px gap (this section's 64px + FeaturesBlock's own
+// 64px top) versus the 64px gap everywhere else on the page (ComparisonBlock's own pb-16 into
+// this section's un-padded top). A DOM sweep on section-box boundaries missed this because
+// adjacent section boxes always touch at 0px regardless of padding -- the empty space lives
+// INSIDE the padding, not between the boxes. Removed the self-owned bottom padding; the next
+// element's own top spacing (FeaturesBlock's py-16 here, space-y-14 on how-it-works) now owns the
+// gap on both sides, matching every other transition on the page.
 
 import { CheckCircle2, XCircle } from "lucide-react";
 
@@ -35,7 +45,7 @@ const CHECKS: GateCheck[] = [
 
 export function QualityGateMatrix() {
   return (
-    <section className="mx-auto max-w-3xl px-6 pb-16">
+    <section className="mx-auto max-w-3xl px-6">
       <div
         className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/70 p-6"
         style={{ boxShadow: "0 0 40px rgba(0, 0, 0, 0.3)" }}

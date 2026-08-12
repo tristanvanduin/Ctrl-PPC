@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-// Herzien twee keer na terechte feedback. Eerste keer: de vorige versie ("de 7 analyses die voor
+// Herzien drie keer na terechte feedback. Eerste keer: de vorige versie ("de 7 analyses die voor
 // elke klant lopen") telde budget-allocation, bid-strategy, quality-score, impression-share,
 // cross-channel en kpi-relations mee als het automatische standaardpakket. Dat klopt niet --
 // lib/analysis/credit-costs.ts noemt die zes expliciet "HANDMATIGE deep-dive-routes", nooit de
@@ -11,13 +11,28 @@ import { useMemo, useState } from "react";
 // elk als los item met een frequentie-vermenigvuldiging (weekly x4/maand, biweekly x2/maand), werd
 // terecht als zwak ervaren -- een kaal "x keer per maand" zegt niets over de inhoud of de
 // bewijslast waarom iets zoveel tijd kost. Herbouwd naar drie grotere, herkenbare blokken die elk
-// een korte inhoudsbeschrijving dragen (wat er in zit, niet alleen hoe vaak het draait): de
-// maandelijkse diepe analyse, de doorlopende monitoring (weekly + biweekly samengevoegd, want voor
-// de lezer is "wat wordt er gecontroleerd tussen twee maandanalyses in" één verhaal, geen twee
-// aparte regels), en de rapportage. Tijdsschatting per blok blijft dezelfde methode: wat een
-// specialist er naar schatting handmatig aan kwijt zou zijn, gebaseerd op de stappen in de
-// SOP-prompts zelf (lib/prompts/sop-prompts.ts: buildWeeklyPrompt's 3 stappen, buildBiWeeklyPrompt's
-// 4 stappen, de monthly 9-staps diepe analyse).
+// een korte inhoudsbeschrijving dragen.
+//
+// Derde keer (12 augustus 2026, mobiele design-review): "weekly/biweekly/monthly" als itemnamen
+// was zelf het volgende probleem -- cadans-jargon, geen marketingtaal, en het verstopte "Ongoing
+// monitoring" als een vage paraplu over twee heel verschillende controles. Opgesplitst naar wat
+// elk item inhoudelijk DOET: "Anomaly detection" (het weekly-signaal, vroeg problemen vangen) en
+// "Progress vs. monthly target" (het biweekly-signaal, prognose-vs-doelstelling).
+//
+// Vierde keer, zelfde dag: de "Monthly deep dive"-beschrijving noemde eerst 6 vaste pijlers uit
+// docs/ANALYSE-LOGICA.md #5.1 -- maar die tabel documenteert alleen het Google Ads-pad. "Dit is
+// weer extreem google minded", terecht -- app/api/analysis/monthly/route.ts draait per kanaal een
+// eigen stappenreeks (lib/analysis/adapters/: Google, Meta, LinkedIn), elk gebouwd rond wat dat
+// kanaal daadwerkelijk is, niet een generiek sjabloon met een kanaallabel erop. Herschreven naar
+// kanaalspecifieke aandachtsgebieden (zoekintentie voor Google, creative/audience-fatigue voor
+// Meta, ICP-fit en lead funnel voor LinkedIn) zonder de exacte stappenlijst of het stappenaantal
+// per kanaal te noemen -- genoeg om doordacht en specifiek te ogen, niet genoeg om de SOP-structuur
+// zelf na te bouwen. Wat wel gedeeld is over elk kanaal, en veilig hardop te zeggen: elk kanaal
+// eindigt in hypothesevalidatie en clear't dezelfde kwaliteitspoorten voor synthese
+// (finalizeChannelMonthlySynthesis, gedeeld door Google/Meta/LinkedIn -- zie deliverable-example.tsx
+// voor dezelfde correctie). Tijdsschatting per blok blijft dezelfde methode: wat een specialist er
+// naar schatting handmatig aan kwijt zou zijn, gebaseerd op de stappen in de SOP-prompts zelf
+// (lib/prompts/sop-prompts.ts: buildWeeklyPrompt, buildBiWeeklyPrompt, de monthly diepe analyse).
 //
 // text-off-white/40 op deze en andere marketingpagina's gaf 3,56:1 contrast tegen
 // --midnight-slate (WCAG AA vereist 4,5:1 voor gewone tekst); nagerekend en overal opgehoogd
@@ -31,16 +46,22 @@ interface Analyse {
 
 const STANDAARDPAKKET: Analyse[] = [
   {
-    naam: "Monthly deep dive",
+    naam: "Anomaly detection",
     beschrijving:
-      "9 steps: account, campaigns, ad groups, auction insights, search terms, creative, audience & device, geography, network & schedule -- plus 3 sprint hypotheses.",
-    minutenPerMaand: 90,
+      "Weekly (x4): tracking health, keyword and search-term bleeders, budget anomalies -- catches problems before they compound.",
+    minutenPerMaand: 20 * 4,
   },
   {
-    naam: "Ongoing monitoring",
+    naam: "Progress vs. monthly target",
     beschrijving:
-      "Weekly (x4): tracking health, keyword/search-term bleeders, budget anomalies. Biweekly (x2): re-checks account, campaign, ad group, and device pacing against the monthly forecast.",
-    minutenPerMaand: 20 * 4 + 45 * 2,
+      "Biweekly (x2): re-checks account, campaign, ad group, and device pacing against the monthly forecast -- is the month on track?",
+    minutenPerMaand: 45 * 2,
+  },
+  {
+    naam: "Monthly deep dive",
+    beschrijving:
+      "Reasoning shaped per channel -- search intent for Google, creative & audience fatigue for Meta, ICP-fit and lead funnel for LinkedIn -- every finding cleared through the same quality gates, ending in hypothesis validation.",
+    minutenPerMaand: 90,
   },
   {
     naam: "Monthly report",
@@ -151,11 +172,21 @@ export function RoiCalculator() {
               iemand er iets voor hoefde te doen. Hoort inhoudelijk bij dezelfde uitleg als het
               pakket erboven, dus nu ook achter dezelfde knop (12 augustus 2026, mobiele audit). */}
           <p className="mt-4 text-xs leading-relaxed text-off-white/60">
-            These are the three automatic SOP runs that happen for every client by default --
+            These are the automatic SOP runs that happen for every covered client by default --
             monthly, weekly, and biweekly -- with an estimated time cost if a specialist did each
             by hand. Manual deep dives (budget allocation, bid strategy, and similar on-demand
             analyses) come on top of this and are not counted here: this is the minimum, not the
             ceiling. An estimate based on your input, not a measured result.
+          </p>
+          {/* Disclaimer (12 augustus 2026, mobiele design-review): dit rekentool-scherm suggereert
+              stilzwijgend dat elke klant in het slider-cijfer automatische SOP's krijgt, maar die
+              dekking is tier-afhankelijk (lib/tenancy/sop-dekking.ts: 0 op Foundation, oplopend
+              per tier). Zonder deze regel leest de besparing als een garantie die op een lagere
+              tier niet klopt. */}
+          <p className="mt-2 text-xs leading-relaxed text-off-white/40">
+            How many client accounts run these automatically depends on your tier -- Foundation
+            does not include automatic SOPs, and paid tiers cover a set number of accounts each.
+            See the current limits on <a href="/pricing" className="underline hover:text-off-white/70">the pricing page</a>.
           </p>
         </>
       )}

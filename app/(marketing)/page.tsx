@@ -83,13 +83,18 @@ export default async function HomePage() {
           <PrimaryCta />
           {/* Foundation-cap (12 augustus 2026, bijgesteld na "dit is niet first 50, daarna gaat de
               tier weer open"): foundationBeschikbaar() telt hoeveel bureaus NU op licentie=basis
-              staan, niet hoeveel er ooit zijn geweest -- een slot komt vrij zodra een bestaand
-              Foundation-account upgradet. "The first 50" suggereerde een eenmalige, uitgeputte
-              lichting; de tekst moet het draaiende-plafond-gedrag beschrijven, niet een cutoff. */}
+              staan, niet hoeveel er ooit zijn geweest -- een slot komt vrij zodra een bestaande
+              Foundation-licentie upgradet. "The first 50" suggereerde een eenmalige, uitgeputte
+              lichting; de tekst moet het draaiende-plafond-gedrag beschrijven, niet een cutoff.
+              "Accounts" vervangen door "licenses" (zelfde dag, tweede correctie): de cap zit op
+              agencies.licentie -- een freelancer met 5 advertentie-accounts, een bureau met 80, of
+              een in-house team tellen allemaal als EEN licentie. "Accounts" botste met de andere
+              claim op deze pagina, "unlimited accounts", die over iets anders gaat (advertentie-
+              accounts per licentie, altijd onbeperkt). */}
           <p className="text-xs text-off-white/40">
             {foundationOpen
-              ? "Foundation is free, forever - capped at 50 accounts at a time during launch, no card required."
-              : "Foundation is full for now - slots reopen as accounts upgrade. Request access to join the waitlist."}
+              ? "Foundation is free, forever - capped at 50 licenses at a time during launch, no card required."
+              : "Foundation is full for now - slots reopen as licenses upgrade. Request access to join the waitlist."}
           </p>
         </div>
       </section>

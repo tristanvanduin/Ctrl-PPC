@@ -6,19 +6,25 @@
 // instead. This example shows the shape of that fix, not a live client report -- same
 // "representative example data" treatment as QualityGateMatrix's CHECKS.
 //
-// Step names are the real 13 (app/api/analysis/monthly/route.ts, runNarrativeStep calls), not
-// invented labels -- same discipline as QualityGateMatrix's gate names. Two of the real 13
-// (steps 11 and 13) carry Dutch internal names -- "Geografische Performance" and "Hypotheses &
-// Sprintplanning" -- because the app itself is Dutch-first; only this marketing site is English.
-// Translated, not renamed, so this stays a real "not invented labels" list rather than reverting
-// to the same Dutch-leak-on-an-English-page bug already fixed once on the blog (12 August 2026,
-// found during a mobile screenshot review).
-const RAW_STEPS = [
-  "Account Performance", "Campaign Performance", "Ad Group Performance",
-  "Competitor & Auction Insights", "Keyword Performance", "Product Performance",
-  "Search Term Performance", "Creative Performance", "Audience Performance",
-  "Device & Engagement Performance", "Geographic Performance",
-  "Checkout, Schedule & Network Performance", "Hypotheses & Sprint Planning",
+// REFRAME (12 August 2026, owner correction, two rounds): first round dropped the "13 steps run
+// in the background" headline for a fixed "6 pillars" list -- but that list (Account Performance,
+// Campaign Performance, Ad Group & Search Terms, ...) came from docs/ANALYSE-LOGICA.md #5.1, which
+// only documents the Google Ads path. Second round, same day: "dit is weer extreem google minded
+// ... we doen veel meer dan alleen die google campagnes" -- correct. app/api/analysis/monthly/
+// route.ts runs a genuinely different step sequence per channel (Google, Meta, and LinkedIn adapters
+// in lib/analysis/adapters/), each shaped around what that channel actually is: search intent and
+// auction dynamics for Google, creative and audience fatigue for Meta, ICP-fit and lead funnel for
+// LinkedIn. Naming those channel-specific focus areas is the honest version of "6 pillars" -- not
+// the exact ordered step list or step count for any channel, which would hand a competitor the
+// blueprint to rebuild the SOP structure themselves (see: "niet dat we teveel weggeven dat ze zelf
+// de sop gaan nabouwen met onze structuur"). What IS genuinely shared across every channel, and
+// safe to say plainly: every channel's reasoning ends in hypothesis validation, and every finding
+// clears the same quality gates (see QualityGateMatrix) before synthesis -- confirmed in code via
+// finalizeChannelMonthlySynthesis, the shared synthesis layer all three channels run through.
+const CHANNEL_FOCUS = [
+  { kanaal: "Google Ads", focus: "Search intent, auction dynamics, account & campaign performance" },
+  { kanaal: "Meta", focus: "Creative & audience performance, frequency and fatigue" },
+  { kanaal: "LinkedIn", focus: "ICP-fit, lead funnel, account & campaign performance" },
 ];
 
 interface PriorityRow {
@@ -45,24 +51,31 @@ const PRIORITIES: PriorityRow[] = [
 
 export function DeliverableExample() {
   return (
-    <section className="mx-auto max-w-3xl px-6 pb-16">
+    // SPACING FIX (12 augustus 2026, same root cause as quality-gate-matrix.tsx): pb-16 here
+    // stacked against the "Ultimate Positioning" paragraph's own mt-16 further down
+    // how-it-works/page.tsx, doubling to 128px. Removed; the next element's own top spacing owns
+    // the gap now, same convention as the rest of the page.
+    <section className="mx-auto max-w-3xl px-6">
       <div
         className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/70 p-6"
         style={{ boxShadow: "0 0 40px rgba(0, 0, 0, 0.3)" }}
       >
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-neon-indigo">
-          The Deliverable: One Document, Not Thirteen
+          The Deliverable: Structured Per Channel, One Document
         </h2>
         <p className="mt-1.5 text-xs text-off-white/40">
-          Illustrative example. The 13 steps run every month, but they are reasoning, not the report.
+          Illustrative example. Each channel gets reasoning shaped around how it actually works, not a generic template.
         </p>
 
-        <div className="mt-5" style={{ fontFamily: "var(--font-marketing-mono)" }}>
-          <p className="text-[11px] uppercase tracking-wide text-off-white/30">
-            13 steps run in the background
-          </p>
-          <p className="mt-2 text-[11px] leading-relaxed text-off-white/25">
-            {RAW_STEPS.join(" -- ")}
+        <div className="mt-5 space-y-2" style={{ fontFamily: "var(--font-marketing-mono)" }}>
+          {CHANNEL_FOCUS.map((c) => (
+            <div key={c.kanaal} className="flex flex-col gap-1 text-[11px] sm:flex-row sm:items-baseline sm:gap-3">
+              <span className="shrink-0 uppercase tracking-wide text-off-white/40 sm:w-24">{c.kanaal}</span>
+              <span className="leading-relaxed text-off-white/25">{c.focus}</span>
+            </div>
+          ))}
+          <p className="mt-2 text-[10px] leading-relaxed text-off-white/20">
+            Every channel's reasoning ends in hypothesis validation, and every finding clears the same quality gates before it reaches you.
           </p>
         </div>
 

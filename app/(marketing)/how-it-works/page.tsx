@@ -161,7 +161,7 @@ export default function HowItWorksPage() {
             The deliverable, in practice
           </p>
           <p className="mt-2 text-sm text-off-white/60">
-            Thirteen steps of reasoning every month. One document, not thirteen.
+            Reasoning shaped around how each channel actually works, validated by the same quality gates. One document, not a report per channel.
           </p>
           <div className="mt-4">
             <DeliverableExample />

@@ -169,12 +169,16 @@ function TierCard({
         {isFoundation && foundationOpen === false ? "Join the waitlist" : "Request a demo"}
       </a>
       {/* Geen live aantal ("X van de 50") -- zie foundation-cap.ts voor waarom. Alleen de twee
-          statussen die geen bijwerking nodig hebben om waar te blijven. */}
+          statussen die geen bijwerking nodig hebben om waar te blijven.
+          "Accounts" -> "licenses" (12 augustus 2026): de cap zit op agencies.licentie, niet op
+          advertentie-accounts -- een freelancer met 5 accounts, een bureau met 80, of een
+          in-house team tellen allemaal als EEN licentie. "Accounts" botste met "Unlimited
+          accounts, channels, and users" verderop op dezelfde kaart, die over iets anders gaat. */}
       {isFoundation && (
         <p className="mt-2 text-center text-[11px] text-off-white/40">
           {foundationOpen === false
-            ? "Full for now - not a one-time cutoff. A slot opens up whenever an existing Foundation account upgrades, or we raise the cap."
-            : "Up to 50 Foundation accounts at a time while we scale our own API usage deliberately - not a one-time first-come-first-served batch."}
+            ? "Full for now - not a one-time cutoff. A slot opens up whenever an existing Foundation license upgrades, or we raise the cap."
+            : "Up to 50 Foundation licenses at a time while we scale our own API usage deliberately - not a one-time first-come-first-served batch."}
         </p>
       )}
     </div>

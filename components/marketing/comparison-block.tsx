@@ -18,6 +18,16 @@
 // maar erkent nu dat het dashboard zelf niet het probleem is -- het is de basislaag, inbegrepen,
 // niet de illusie. Zie ook app/(marketing)/vs/page.tsx en app/(marketing)/opengraph-image.tsx
 // voor dezelfde correctie elders op de site.
+//
+// TWEEDE NUANCESLAG (12 augustus 2026, mobiele screenshot-review): de body-tekst en de grafiek
+// waren nog steeds negatiever getoond dan verdiend, vooral omdat dashboarding niet zomaar "ook
+// inbegrepen" is -- het IS de volledige inhoud van de Foundation-tier (zie lib/marketing/tiers.ts:
+// "Dashboarding, forecasting, and KPI monitoring" zijn letterlijk Foundation's drie features).
+// "Stops at what happened", "does not tell you" klonk als een tekortkoming van iets dat de site
+// zelf gratis weggeeft. Herschreven om te erkennen dat dit de basis is die elk account nodig
+// heeft, met "free forever" er expliciet bij, i.p.v. alleen de beperking te benoemen. De grafiek
+// ging van opacity-40 + grayscale (oogt uitgeschakeld) naar opacity-70 zonder grayscale (oogt
+// gewoon, niet stuk) -- het punt is een ander soort laag, niet een mindere kwaliteit dashboard.
 
 const NEP_BALKEN = [40, 65, 30, 80, 45, 60, 35];
 
@@ -57,12 +67,12 @@ export function ComparisonBlock() {
         <div className="relative overflow-hidden rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6">
           <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/60">Dashboards Alone</h3>
           <p className="mt-2 text-sm text-off-white/50">
-            Charts per channel, lined up neatly -- included free on every Ctrl PPC tier too. On its
-            own, it stops at what happened: it does not tell you which number to trust, or what to
-            do about it.
+            Real-time charts per channel, forecasting, and KPI monitoring -- this is Foundation,
+            free forever on every tier above it too. It is the base every account needs. On its
+            own, it answers what happened; the why and the next action live one layer up.
           </p>
 
-          <div className="relative mt-8 flex h-40 items-end gap-3 opacity-40 grayscale">
+          <div className="relative mt-8 flex h-40 items-end gap-3 opacity-70">
             {NEP_BALKEN.map((h, i) => (
               <div key={i} className="flex-1 rounded-t-sm bg-off-white/60" style={{ height: `${h}%` }} />
             ))}
