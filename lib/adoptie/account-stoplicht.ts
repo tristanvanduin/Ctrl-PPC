@@ -28,6 +28,17 @@
  * dat op zichzelf al rood zou moeten zijn -- geen combinatie nodig, er is geen onschuldige
  * verklaring voor. Dat hoort thuis waar de sync-laag onderscheid kan maken tussen "token
  * ingetrokken" en een gewone sync-fout, en staat daarom nog niet hier.
+ *
+ * ── NIEUWE-GEBRUIKER-SIGNAAL IS VANDAAG GOOGLE-ONLY, EN DAT IS GEEN KEUZE (12 aug 2026) ───────
+ *
+ * Fase B van het kanaalpariteitswerk (docs/ONTWERP_multitenant_schema.md) was van plan dit naar
+ * Meta uit te breiden via meta_change_log -- gecheckt, en dat kan niet: die tabel bestaat wel
+ * (migratie 007) maar heeft GEEN gebruikersveld, alleen client_id, event_time, object_type,
+ * object_id, change_summary, raw. detecteerNieuweGebruiker() heeft een e-mailadres nodig om
+ * "bekend" van "nieuw" te onderscheiden; zonder wie-deed-het is er niets om aan te herkennen.
+ * LinkedIn heeft zelfs geen change-log-tabel, punt uit. Dit is dus geen bewuste beperking zoals
+ * de toegangsontzegging hierboven, maar een echt gat: pas op te lossen door de Meta-sync uit te
+ * breiden (als de Graph API dat uberhaupt levert) of door een ander signaal voor die kanalen.
  */
 
 export type Licht = "groen" | "amber" | "rood" | "onbekend";
