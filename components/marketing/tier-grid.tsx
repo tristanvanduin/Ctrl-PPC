@@ -11,9 +11,10 @@
 // focus, CTA -- staat altijd, alleen de VOLLEDIGE featurelijst per kaart is standaard ingekort tot
 // de eerste drie echte features, met een "+N more"-knop per kaart voor de rest.
 //
-// "Everything in [vorige tier]" is bewust uitgesloten van die eerste drie: het is een
-// overervingszin, geen USP, en zou als eerste regel een zwakke opener geven. Blijft wel zichtbaar
-// zodra een kaart wordt uitgeklapt.
+// "Everything in [vorige tier]" stond eerst als eerste regel van elke featurelijst -- geen USP,
+// een overervingszin, vijf keer herhaald. Verwijderd uit lib/marketing/tiers.ts (12 augustus 2026,
+// zie de toelichting daar) en vervangen door een enkele zin op de prijspagina zelf, dus deze
+// component hoeft er niet meer omheen te filteren.
 
 import { useState } from "react";
 import { Check, ChevronDown, Clock, Gift } from "lucide-react";
@@ -52,14 +53,12 @@ function TierCard({
   const isFoundation = tier.licentie === "basis";
   const [expanded, setExpanded] = useState(false);
 
-  const kernFeatures = tier.features.filter((f) => !f.tekst.startsWith("Everything in"));
-  const overervingFeature = tier.features.find((f) => f.tekst.startsWith("Everything in"));
-  const zichtbareFeatures = kernFeatures.slice(0, KERN_AANTAL);
-  const verborgenFeatures = kernFeatures.slice(KERN_AANTAL);
-  // Alles wat achter "+N more" schuilgaat: de overige kernfeatures, de overervingsregel (als die
-  // er is), en de rapportageregel -- die laatste stond hiervoor altijd zichtbaar maar hoort bij
-  // dezelfde "detail, niet kernpunt"-categorie als de rest.
-  const verborgenAantal = verborgenFeatures.length + (overervingFeature ? 1 : 0) + 1;
+  const zichtbareFeatures = tier.features.slice(0, KERN_AANTAL);
+  const verborgenFeatures = tier.features.slice(KERN_AANTAL);
+  // Alles wat achter "+N more" schuilgaat: de overige kernfeatures plus de rapportageregel -- die
+  // laatste stond hiervoor altijd zichtbaar maar hoort bij dezelfde "detail, niet kernpunt"-
+  // categorie als de rest.
+  const verborgenAantal = verborgenFeatures.length + 1;
 
   return (
     <div
@@ -125,7 +124,6 @@ function TierCard({
             {verborgenFeatures.map((f) => (
               <FeatureRow key={f.tekst} feature={f} />
             ))}
-            {overervingFeature && <FeatureRow feature={overervingFeature} />}
             {/* Was one <li> wrapping a <p> and a <FeatureRow> that renders its own <li> -- an
                 <li> nested inside an <li>, invalid HTML the browser silently reparents, which
                 produced a DOM shape different from what React rendered and threw a hydration

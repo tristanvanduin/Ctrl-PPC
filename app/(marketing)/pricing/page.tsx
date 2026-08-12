@@ -84,9 +84,13 @@ export default async function PricingPage() {
       </div>
 
       {/* De coupon-tag zit op de kaart zelf ("+5 free Second Opinions" in TierGrid's TierCard),
-          niet meer als los blok tussen deze band en de grid -- zie de toelichting daar. TierGrid
-          toont Foundation/Core/Growth altijd, Scale/Professional/Enterprise achter een toggle
-          (12 augustus 2026, mobiele audit -- zie components/marketing/tier-grid.tsx). */}
+          niet meer als los blok tussen deze band en de grid -- zie de toelichting daar. Elke kaart
+          toont zijn eigen 3 kernfeatures plus een "+N more"-knop (12 augustus 2026, mobiele audit
+          -- zie components/marketing/tier-grid.tsx). */}
+      <p className="mx-auto mt-8 max-w-2xl text-center text-xs text-off-white/40">
+        Each tier includes everything from the tier before it - listed once here, not repeated on
+        every card below.
+      </p>
       <TierGrid tiers={TIERS} foundationOpen={foundationOpen} />
 
       <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-off-white/50">

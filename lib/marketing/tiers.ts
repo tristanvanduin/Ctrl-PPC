@@ -1,5 +1,14 @@
 // De 5-tier ladder voor de pricing-storefront.
 //
+// "EVERYTHING IN [VORIGE TIER]" VERWIJDERD UIT DE FEATURELIJSTEN (12 augustus 2026): stond eerst
+// als eerste regel op Core t/m Enterprise, herhaald in elke featurelijst -- vijf keer dezelfde
+// overervingszin. Op vraag van de eigenaar ("zonde om 1 van de 3 [kern]punten aan overig te
+// besteden") vervangen door EEN zin op de prijspagina zelf (app/(marketing)/pricing/page.tsx) die
+// het systemisch dekt: elke tier bevat alles van de tier eronder, dat hoeft niet per kaart herhaald.
+// De ladder is nog steeds cumulatief in de werkelijkheid (elke hogere licentie in
+// lib/chat/toegang.ts's RANG erft alles van de lagere) -- dit is alleen een copy-verplaatsing,
+// geen inhoudelijke wijziging.
+//
 // PRIJZEN EN FEATURELIJST: door de gebruiker aangeleverd op 11 augustus 2026 als het definitieve
 // uitgangspunt (niet langer een placeholder zoals de eerdere versie van dit bestand). Charm-
 // pricing gekozen uit de aangeboden paren (749/750, 1249/1250, 1999/2000, 2999/3000): telkens het
@@ -106,7 +115,6 @@ export const TIERS: readonly TierDefinitie[] = [
     vanafPerMaand: 749,
     creditsPerMaand: 10_000,
     features: [
-      { tekst: "Everything in Foundation", gebouwd: true },
       { tekst: "GA4 integration", gebouwd: true },
       { tekst: "Agency Memory: hypotheses, sprint items, and learnings that compound over time", gebouwd: true },
       { tekst: "Code Oranje & Code Red churn protocols from day one", gebouwd: true },
@@ -120,7 +128,6 @@ export const TIERS: readonly TierDefinitie[] = [
     vanafPerMaand: 1_249,
     creditsPerMaand: 25_000,
     features: [
-      { tekst: "Everything in Core", gebouwd: true },
       { tekst: "Cross-account portfolio view", gebouwd: true },
       { tekst: "External alerts to Slack or Teams", gebouwd: false },
     ],
@@ -133,7 +140,6 @@ export const TIERS: readonly TierDefinitie[] = [
     vanafPerMaand: 1_999,
     creditsPerMaand: 50_000,
     features: [
-      { tekst: "Everything in Growth", gebouwd: true },
       { tekst: "Custom Playbook Engine, including the AI SOP Extractor", gebouwd: false },
       { tekst: "Priority queue on our servers", gebouwd: false },
     ],
@@ -149,7 +155,6 @@ export const TIERS: readonly TierDefinitie[] = [
     vanafPerMaand: 2_999,
     creditsPerMaand: 100_000,
     features: [
-      { tekst: "Everything in Scale", gebouwd: true },
       { tekst: "Business Intelligence Connect: Shopify, WooCommerce, WordPress", gebouwd: false },
       { tekst: "MCP Sandbox: bring your own AI into a secured debate with ours", gebouwd: false },
     ],
@@ -162,7 +167,6 @@ export const TIERS: readonly TierDefinitie[] = [
     vanafPerMaand: null,
     creditsPerMaand: 500_000,
     features: [
-      { tekst: "Everything in Professional", gebouwd: true },
       { tekst: "Full BI API and webhook exports - available on request for qualifying volume, not a standard inclusion", gebouwd: false },
       { tekst: "Dedicated servers, white-glove onboarding, custom security SLAs", gebouwd: false },
     ],
