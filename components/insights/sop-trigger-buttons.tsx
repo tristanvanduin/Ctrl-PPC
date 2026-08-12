@@ -180,23 +180,14 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Analyse mislukt");
 
-        // Build markdown from response
-        let markdown: string;
+        // Build markdown from response. De executive summary (fullOutput / deliverable_markdown)
+        // is de synthese, niet de losse stappen -- die laatste zijn backend-redenering en horen
+        // niet als "Stap 1: ..., Stap 2: ..."-dump in het bestand dat de specialist opent.
         const analysisDate = data.analysisDate || today();
-
-        if (type === "monthly" && data.steps) {
-          const header = `# Maandelijkse ${channelCfg.headerLabel} Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${data.period?.start} t/m ${data.period?.end}\n**Model:** ${data.model}\n\n---\n\n`;
-          const stepsContent = data.steps
-            .map((s: { step: number; name: string; output: string }) =>
-              `## Stap ${s.step}: ${s.name}\n\n${s.output}`
-            )
-            .join("\n\n---\n\n");
-          markdown = header + stepsContent;
-        } else {
-          const typeLabel = type === "weekly" ? "Wekelijkse" : "Tweewekelijkse";
-          const header = `# ${typeLabel} SEA Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${data.periodStart} t/m ${data.periodEnd}\n**Model:** ${data.model}\n\n---\n\n`;
-          markdown = header + (data.output || data.fullOutput || "Geen output");
-        }
+        const period = type === "monthly" ? data.period : { start: data.periodStart, end: data.periodEnd };
+        const typeLabel = type === "monthly" ? `Maandelijkse ${channelCfg.headerLabel}` : type === "weekly" ? "Wekelijkse" : "Tweewekelijkse";
+        const header = `# ${typeLabel} Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${period?.start} t/m ${period?.end}\n**Model:** ${data.model}\n\n---\n\n`;
+        const markdown = header + (data.fullOutput || data.output || "Geen output");
 
         await uploadSopFile(type, analysisDate, markdown);
 

@@ -972,6 +972,8 @@ async function runMetaMonthlyAnalysis(
   return Response.json({
     ok: true,
     channel: adapter.channel,
+    analysisDate,
+    model: allSteps[0]?.model,
     period: { start: periodStart, end: periodEnd },
     steps: parsedSteps.length,
     findings: curatedFindings.length,
@@ -980,6 +982,7 @@ async function runMetaMonthlyAnalysis(
     tasks: synthesis.structured.tasks.length,
     qualityGate: { passed: synthesis.qualityGate.passed, state: synthesis.qualityGate.state },
     tokensUsed: allSteps.reduce((sum, current) => sum + (current.tokensUsed || 0), 0),
+    fullOutput: sanitizeOutput(synthesis.structured.deliverable_markdown),
   });
 }
 
@@ -1104,6 +1107,8 @@ async function runLinkedinMonthlyAnalysis(
   return Response.json({
     ok: true,
     channel: adapter.channel,
+    analysisDate,
+    model: allSteps[0]?.model,
     period: { start: periodStart, end: periodEnd },
     steps: parsedSteps.length,
     findings: curatedFindings.length,
@@ -1112,6 +1117,7 @@ async function runLinkedinMonthlyAnalysis(
     tasks: synthesis.structured.tasks.length,
     qualityGate: { passed: synthesis.qualityGate.passed, state: synthesis.qualityGate.state },
     tokensUsed: allSteps.reduce((sum, current) => sum + (current.tokensUsed || 0), 0),
+    fullOutput: sanitizeOutput(synthesis.structured.deliverable_markdown),
   });
 }
 
