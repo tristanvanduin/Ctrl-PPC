@@ -31,9 +31,16 @@
 -- migratie verbreedt alleen het toegestane bereik van de kolom en herijkt de ENE bestaande
 -- consument (magChatten in lib/chat/toegang.ts) op de nieuwe namen.
 
+-- BUGFIX (12 augustus 2026, gevonden bij de eerste echte uitvoering van dit bestand -- deze
+-- migratie stond al maanden als "voltooid" geboekt maar was nooit tegen de database gedraaid):
+-- de UPDATE moet na het loslaten van de oude constraint komen, niet ervoor. CHECK-constraints
+-- worden direct per statement gevalideerd, niet pas aan het eind van het bestand -- de UPDATE naar
+-- 'growth' liep stuk op de nog actieve oude constraint (alleen basis/premium/enterprise) omdat hij
+-- in de oorspronkelijke volgorde vóór de ALTER TABLE stond.
+alter table agencies drop constraint if exists agencies_licentie_geldig;
+
 update agencies set licentie = 'growth' where licentie = 'premium';
 
-alter table agencies drop constraint if exists agencies_licentie_geldig;
 alter table agencies add constraint agencies_licentie_geldig
   check (licentie in ('basis', 'core', 'growth', 'scale', 'professional', 'enterprise'));
 

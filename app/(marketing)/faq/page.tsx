@@ -68,8 +68,11 @@ const VRAGEN: FaqItem[] = [
       "Connecting an ad account costs us nothing to the platforms themselves - Google, Meta, LinkedIn, and " +
       "Microsoft do not charge for API access. More connected accounts sharpen the sector and niche " +
       "benchmarks every account sees, so an unlimited free tier makes the whole platform more useful, not " +
-      "less profitable. Foundation gives you the dashboard, forecast, and KPI monitoring forever; you only " +
-      "pay when you want the engine to explain why something happened, not just what happened.",
+      "less profitable. Foundation gives you the dashboard, forecast, and KPI monitoring forever, with no " +
+      "cap on accounts, channels, or users once you are on it; you only pay when you want the engine to " +
+      "explain why something happened, not just what happened. We are limiting the first 50 agencies while " +
+      "we scale our own API usage deliberately - that cap is on new signups during this launch phase, not " +
+      "on what an existing Foundation account can connect.",
   },
   {
     vraag: "How do you avoid blaming the account when the real cause is the market?",

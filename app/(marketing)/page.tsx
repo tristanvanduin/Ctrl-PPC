@@ -7,6 +7,7 @@ import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
 import { QualityGateMatrix } from "@/components/marketing/quality-gate-matrix";
 import { PrimaryCta } from "@/components/marketing/primary-cta";
+import { foundationBeschikbaar } from "@/lib/marketing/foundation-cap";
 
 // Fase 7, Task 2: de homepage volgens Blueprint v2.0. Vervangt de minimale Fase 5-hero (die
 // alleen de kop en de Platform Pulse had) door de volledige structuur uit de brief: hero,
@@ -50,6 +51,7 @@ const SOFTWARE_JSON_LD = {
 export default async function HomePage() {
   const user = await getAuthUser();
   if (user) redirect("/vandaag");
+  const foundationOpen = await foundationBeschikbaar();
 
   return (
     <>
@@ -79,8 +81,11 @@ export default async function HomePage() {
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10">
           <PrimaryCta />
+          {/* Foundation-cap (12 augustus 2026): geen live aantal, zie lib/marketing/foundation-cap.ts. */}
           <p className="text-xs text-off-white/40">
-            Foundation is free, forever - connect every account, no card required.
+            {foundationOpen
+              ? "Foundation is free, forever - the first 50 accounts, no card required."
+              : "Foundation is fully claimed for now - request access to join the waitlist."}
           </p>
         </div>
       </section>

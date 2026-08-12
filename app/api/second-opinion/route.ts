@@ -14,6 +14,8 @@ import {
 import { logger } from "@/lib/logger";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { bureauVanKlant } from "@/lib/analysis/o2-targets-cost";
+import { controleerSecondOpinionTrial, verbruikSecondOpinionTrial } from "@/lib/analysis/second-opinion-trial";
 
 /**
  * POST /api/second-opinion — trigger a second opinion audit.
@@ -39,6 +41,16 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: 'Verwacht: { client_id: string, mode: "quick" | "full" }' }, { status: 400 });
+  }
+
+  // Poort vóór het werk begint, niet erna -- zelfde volgorde als controleerSaldo in
+  // credit-costs.ts. Second Opinion had hiervoor geen enkele toegangscontrole; Foundation-bureaus
+  // (licentie 'basis') worden hier voor het eerst geweerd, betaalde bureaus krijgen hun 5 gratis
+  // trialruns (migratie 074) en daarna een duidelijke blokkade.
+  const agencyId = await bureauVanKlant(supabase, clientId);
+  const trialOordeel = await controleerSecondOpinionTrial(supabase, agencyId);
+  if (!trialOordeel.toegestaan) {
+    return Response.json({ error: trialOordeel.tekst }, { status: 403 });
   }
 
   try {
@@ -174,6 +186,10 @@ export async function POST(request: NextRequest) {
       partialOutputExists: pdfStoragePath === null,
     });
 
+    // Afschrijven na een geslaagde run, zelfde volgorde als verbruikCredit in credit-costs.ts:
+    // achteraf, nooit een breekpunt voor de audit zelf (agencyId staat al vast uit de poort hierboven).
+    if (agencyId) await verbruikSecondOpinionTrial(supabase, { agencyId, runKey: runId });
+
     return Response.json({
       jobId,
       runId,
@@ -213,7 +229,12 @@ export async function GET(request: NextRequest) {
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
-  return Response.json({ runs: data ?? [] });
+  // Toegangsstaat meegeven zodat de UI de knoppen en de teller kan tonen zonder een tweede
+  // round-trip; zelfde oordeel als de POST-poort hierboven, hier alleen lezend.
+  const agencyId = await bureauVanKlant(supabase, clientId);
+  const secondOpinionAccess = await controleerSecondOpinionTrial(supabase, agencyId);
+
+  return Response.json({ runs: data ?? [], secondOpinionAccess });
 }
 
 /**

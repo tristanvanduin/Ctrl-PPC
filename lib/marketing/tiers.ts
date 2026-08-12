@@ -33,6 +33,14 @@
 // tier in het toegangssysteem, stond op /pricing tot nu toe alleen als een losse zin onder de
 // tier-grid. Naam "Foundation" komt uit de positioneringsstrategie (Strategie_v3.pdf); "basis"
 // blijft de interne licentie-sleutel, geen migratie nodig.
+//
+// CRM UIT PROFESSIONAL, BI OP AANVRAAG BIJ ENTERPRISE (12 augustus 2026): Professional noemde
+// "Business Intelligence Connect: Shopify, WooCommerce, CRM, WordPress" als roadmapfeature -- dat
+// botste met de eerdere, expliciete "geen CRM/ERP-koppeling, hier wil ik echt wegblijven" (n.a.v.
+// het Funnel.io-reverse-engineering-document). CRM eruit, de drie e-commerce-integraties (Shopify/
+// WooCommerce/WordPress) blijven staan, dat was nooit het bezwaar. Enterprise's BI-API/webhook-
+// exportregel was een standaard-inbegrepen belofte op een tier die toch al "Custom" prijst --
+// herschreven naar op-aanvraag/bij voldoende volume, in lijn met hoe de rest van Enterprise werkt.
 
 import type { Licentie } from "@/lib/chat/toegang";
 import { SOP_DEKKING } from "@/lib/tenancy/sop-dekking";
@@ -121,7 +129,7 @@ export const TIERS: readonly TierDefinitie[] = [
     creditsPerMaand: 100_000,
     features: [
       { tekst: "Everything in Scale", gebouwd: true },
-      { tekst: "Business Intelligence Connect: Shopify, WooCommerce, CRM, WordPress", gebouwd: false },
+      { tekst: "Business Intelligence Connect: Shopify, WooCommerce, WordPress", gebouwd: false },
       { tekst: "MCP Sandbox: bring your own AI into a secured debate with ours", gebouwd: false },
     ],
     rapportage: { tekst: "Swap and personalize individual charts within the 3 master templates", gebouwd: false },
@@ -134,7 +142,7 @@ export const TIERS: readonly TierDefinitie[] = [
     creditsPerMaand: 500_000,
     features: [
       { tekst: "Everything in Professional", gebouwd: true },
-      { tekst: "Full BI API and webhook exports to your own PowerBI or data lake", gebouwd: false },
+      { tekst: "Full BI API and webhook exports - available on request for qualifying volume, not a standard inclusion", gebouwd: false },
       { tekst: "Dedicated servers, white-glove onboarding, custom security SLAs", gebouwd: false },
     ],
     rapportage: { tekst: "Fully custom reporting", gebouwd: false },

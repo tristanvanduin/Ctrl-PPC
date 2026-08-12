@@ -5,6 +5,7 @@ import { TIERS, sopDekkingVoor, type TierFeature } from "@/lib/marketing/tiers";
 import { IntelligenceStore } from "@/components/marketing/intelligence-store";
 import { ComingSoonBadge } from "@/components/marketing/coming-soon-badge";
 import { CANONIEK_DOMEIN } from "@/lib/domein";
+import { foundationBeschikbaar } from "@/lib/marketing/foundation-cap";
 
 // Fase 7, Task 3, herzien onder de Blueprint v2.0-brief (radical transparency): de echte 5-tier
 // ladder (agencies.licentie, migratie 071) als storefront, geen "neem contact op"-gate. Prijzen en
@@ -12,6 +13,10 @@ import { CANONIEK_DOMEIN } from "@/lib/domein";
 // toelichting daar voor wat al vastlag, wat nieuw is aangeleverd, en welke features nog roadmap
 // zijn. Niet-gebouwde features krijgen hier een "Coming soon"-label in plaats van te worden
 // verzwegen of als feit gepresenteerd.
+//
+// FOUNDATION-CAP (12 augustus 2026): de Foundation-kaart wisselt CTA-tekst op foundationBeschikbaar()
+// (lib/marketing/foundation-cap.ts) -- een echte, harde grens (bewust API-belasting beheersbaar
+// houden tijdens de launch-fase), nooit een live "X van de 50"-teller. Zie dat bestand voor waarom.
 //
 // SCHEMA (audit, 11 augustus 2026): de homepage heeft Organization + SoftwareApplication JSON-LD,
 // bewust zonder offers.price -- er lag toen nergens een bedrag vast. Dat argument geldt hier niet
@@ -62,19 +67,33 @@ function FeatureRow({ feature }: { feature: TierFeature }) {
   );
 }
 
-function TierCard({ tier, uitgelicht }: { tier: (typeof TIERS)[number]; uitgelicht: boolean }) {
+function TierCard({
+  tier,
+  uitgelicht,
+  foundationOpen,
+}: {
+  tier: (typeof TIERS)[number];
+  uitgelicht: boolean;
+  /** Alleen relevant voor de Foundation-kaart (licentie "basis"); zie foundation-cap.ts. */
+  foundationOpen?: boolean;
+}) {
   const sopDekking = sopDekkingVoor(tier.licentie);
+  const isFoundation = tier.licentie === "basis";
   return (
     <div
-      className={`flex flex-col rounded-[6px] border p-6 ${
+      className={`relative flex flex-col rounded-[6px] border p-6 ${
         uitgelicht
           ? "border-neon-indigo/50 bg-midnight-slate-raised"
           : "border-off-white/10 bg-midnight-slate-raised"
       }`}
       style={uitgelicht ? { boxShadow: "0 0 40px rgba(129, 140, 248, 0.15)" } : undefined}
     >
+      {/* Absoluut gepositioneerd (12 augustus 2026, design feedback): stond eerst in de gewone
+          flow (mb-3 boven de titel), waardoor alleen deze kaart extra hoogte kreeg en de rest van
+          de content -- titel, prijs, features -- lager begon dan op de buurkaarten. Zwevend boven
+          de kaartrand houdt elke kaart intern op dezelfde starthoogte, ongeacht welke uitgelicht is. */}
       {uitgelicht && (
-        <span className="mb-3 w-fit rounded-[4px] bg-neon-indigo/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-neon-indigo">
+        <span className="absolute -top-3 left-6 rounded-[4px] border border-neon-indigo/40 bg-midnight-slate-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-neon-indigo">
           Most agencies start here
         </span>
       )}
@@ -125,13 +144,23 @@ function TierCard({ tier, uitgelicht }: { tier: (typeof TIERS)[number]; uitgelic
         href="/demo"
         className="mt-6 block rounded-[6px] border border-neon-indigo/40 px-4 py-2.5 text-center text-sm font-semibold text-neon-indigo transition-colors hover:bg-neon-indigo/10"
       >
-        Request a demo
+        {isFoundation && foundationOpen === false ? "Join the waitlist" : "Request a demo"}
       </a>
+      {/* Geen live aantal ("X van de 50") -- zie foundation-cap.ts voor waarom. Alleen de twee
+          statussen die geen bijwerking nodig hebben om waar te blijven. */}
+      {isFoundation && (
+        <p className="mt-2 text-center text-[11px] text-off-white/40">
+          {foundationOpen === false
+            ? "Foundation is fully claimed for now while we scale deliberately."
+            : "Limited to the first 50 accounts while we scale deliberately."}
+        </p>
+      )}
     </div>
   );
 }
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const foundationOpen = await foundationBeschikbaar();
   return (
     <div className="mx-auto max-w-6xl px-6 pt-14 pb-20 sm:pt-20">
       <script
@@ -163,7 +192,12 @@ export default function PricingPage() {
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {TIERS.map((tier) => (
-          <TierCard key={tier.licentie} tier={tier} uitgelicht={tier.licentie === "growth"} />
+          <TierCard
+            key={tier.licentie}
+            tier={tier}
+            uitgelicht={tier.licentie === "growth"}
+            foundationOpen={tier.licentie === "basis" ? foundationOpen : undefined}
+          />
         ))}
       </div>
 

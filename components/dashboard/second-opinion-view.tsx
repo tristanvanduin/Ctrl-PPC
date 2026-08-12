@@ -18,6 +18,11 @@ interface Props { clientId: string; clientName: string; }
 interface RunSummary { id: string; mode: string; status: string; created_at: string; completed_at: string | null; section_summaries: SectionSummary[] | null; pdf_storage_path: string | null; error: string | null; }
 interface RunDetail { id: string; mode: string; status: string; created_at: string; results: AuditRowResult[] | null; section_summaries: SectionSummary[] | null; }
 
+// Vorm van lib/analysis/second-opinion-trial.ts's SecondOpinionOordeel, hier lokaal (net als
+// RunSummary/RunDetail hierboven) i.p.v. geimporteerd -- dit bestand kende server-only libs al
+// nergens rechtstreeks, alleen de API-response.
+interface SecondOpinionAccess { toestand: string; toegestaan: boolean; resterend?: number | null; tekst?: string }
+
 // ── Design tokens ──────────────────────────────────────────────────────────
 
 const SCORE_STYLE: Record<AuditScore, { text: string; bg: string; border: string; badge: string }> = {
@@ -96,6 +101,7 @@ function AuditKeuze({ icoon, titel, telling, randKleur, bezig, uitgeschakeld, on
 
 export function SecondOpinionView({ clientId, clientName }: Props) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
+  const [access, setAccess] = useState<SecondOpinionAccess | null>(null);
   const [activeRun, setActiveRun] = useState<RunDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [runningMode, setRunningMode] = useState<"quick" | "full" | null>(null);
@@ -109,7 +115,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
 
   const fetchRuns = useCallback(async () => {
     const res = await fetch(`/api/second-opinion?client_id=${clientId}`);
-    if (res.ok) { const data = await res.json(); setRuns(data.runs ?? []); }
+    if (res.ok) { const data = await res.json(); setRuns(data.runs ?? []); setAccess(data.secondOpinionAccess ?? null); }
   }, [clientId]);
 
   useEffect(() => { fetchRuns(); }, [fetchRuns]);
@@ -191,6 +197,21 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
         bijschrift={`Account-audit op het ${BRAND_NAME}-template`}
       >
 
+      {/* ── Toegangsstaat: Second Opinion had hiervoor geen enkele poort. Foundation-klanten en
+          klanten zonder trialsaldo meer zien hier waarom de knoppen op slot staan; wie nog
+          proefruns over heeft ziet het aantal, net zo min gegokt als de dekking hierboven. */}
+      {access && !access.toegestaan && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-700 mb-3">
+          {access.tekst}{" "}
+          <a href="/demo" className="font-semibold underline">Neem contact op</a>
+        </div>
+      )}
+      {access && access.toegestaan && typeof access.resterend === "number" && (
+        <p className="text-micro text-muted-foreground mb-2">
+          {access.resterend} van 5 gratis second opinions resterend
+        </p>
+      )}
+
       {/* ── Audit trigger cards ──
           De aantallen komen uit het template zelf en staan niet in de tekst. Er stond "10 Low
           Hanging Fruit checks" en "Alle checks over 9 categorieën"; zulke getallen lopen achter
@@ -203,7 +224,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
           telling={dekking.snel}
           randKleur="hover:border-amber-300"
           bezig={runningMode === "quick"}
-          uitgeschakeld={runningMode !== null}
+          uitgeschakeld={runningMode !== null || (access !== null && !access.toegestaan)}
           onStart={() => startAudit("quick")}
         />
         <AuditKeuze
@@ -212,7 +233,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
           telling={dekking.volledig}
           randKleur="hover:border-orange-300"
           bezig={runningMode === "full"}
-          uitgeschakeld={runningMode !== null}
+          uitgeschakeld={runningMode !== null || (access !== null && !access.toegestaan)}
           onStart={() => startAudit("full")}
         />
       </div>
