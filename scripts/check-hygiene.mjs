@@ -216,6 +216,18 @@ const TOEGESTANE_WEZEN = new Map([
   // marketingfix): zie de kop van het bestand.
   ["components/marketing/product-video.tsx",
     "wacht op Engelstalige productbeelden; zie de koptekst voor waarom de Nederlandse video eruit is"],
+
+  // 11 augustus 2026: Code Rood/Amber per account (niet te verwarren met stoplicht.ts, dat is
+  // per bureau). Kernlogica en getest, gebouwd vooruitlopend op zijn UI/API-consument -- die is
+  // een apart, nog te scopen vervolgstuk (waar dit in de app getoond wordt, en de queries die
+  // ForecastAfwijkingSignaal/de change-history-rijen echt vullen). Zie de koptekst van het
+  // bestand voor de combinatie-regel en waarom rood zeldzaam moet blijven.
+  ["lib/adoptie/account-stoplicht.ts",
+    "Code Rood/Amber per account; kernlogica en getest, wacht op de UI/API-consument"],
+  ["lib/adoptie/code-rood.ts",
+    "combineert account-stoplicht.ts met health-score.ts's critical-anomalies (best of both " +
+    "worlds, besluit eigenaar 11-08-2026); kernlogica en getest, wacht op dezelfde UI/API-" +
+    "consument als account-stoplicht.ts"],
 ]);
 
 for (const f of bestanden) {

@@ -8,6 +8,7 @@ import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
 import { GeoBreakdown } from "./geo-breakdown";
 import { BreakdownDonuts } from "./breakdown-donuts";
+import { ChannelHealthBadge } from "./channel-health-badge";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 
@@ -73,6 +74,8 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
           </div>
         ) : undefined}
       />
+
+      <ChannelHealthBadge clientId={clientId} channel="meta" />
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
       <Sectie

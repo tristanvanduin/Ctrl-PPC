@@ -11,6 +11,12 @@
 // bigger feature than what exists - components/terminal/god-mode.tsx and agency-god-view.tsx are
 // single-agency or platform-admin views, not a cross-tenant benchmark product. AI Council,
 // SEO & Organic Synergy, and Case Study Module have no trace in the codebase at all.
+//
+// Cross Channel Intelligence (added 12 August 2026, from the positioning strategy doc): distinct
+// from SEO & Organic Synergy above. That module is Search Console-specific (organic vs paid
+// cannibalization). This one is ad-channel halo effects (Meta spend lifting Search Brand two days
+// later, that kind of pattern) across Google/Meta/LinkedIn/Bing. No trace in the codebase - the
+// strategy doc itself calls this "largely future architecture."
 
 export interface ModulePriceTier {
   naam: string;
@@ -65,6 +71,13 @@ export const MODULES: readonly StoreModule[] = [
     omschrijving: "Search Console integration for synergy and cannibalization checks.",
     gebouwd: false,
     prijs: 250,
+  },
+  {
+    id: "cross-channel-intelligence",
+    naam: "Cross Channel Intelligence",
+    omschrijving: "Detects when one paid channel is feeding demand another channel harvests, so credit lands on the right campaign.",
+    gebouwd: false,
+    prijs: 350,
   },
   {
     id: "case-study",

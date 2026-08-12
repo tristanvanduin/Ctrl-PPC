@@ -3,13 +3,18 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   FolderPlus, Upload, Trash2, Download, FileText, FileSpreadsheet,
-  Image as ImageIcon, File, FolderOpen, Plus, X, Loader2, AlertCircle, CheckCircle2,
+  Image as ImageIcon, File, FolderOpen, Plus, X, Loader2, AlertCircle, CheckCircle2, Eye,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbDelete, dbInsert } from "@/lib/data-access/client-write";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { importSprintCsv, type SprintCsvImportSummary } from "@/lib/learning/sprint-csv-import";
+import { MarkdownFileViewer } from "./markdown-file-viewer";
 import type { SopError } from "../insights/sop-trigger-buttons";
+
+function isMarkdownFile(file: { content_type: string | null; file_name: string }): boolean {
+  return file.content_type === "text/markdown" || file.file_name.toLowerCase().endsWith(".md");
+}
 
 interface ClientFolder {
   id: string;
@@ -206,6 +211,19 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
     if (data?.signedUrl) {
       window.open(data.signedUrl, "_blank");
     }
+  }
+
+  const [viewingFile, setViewingFile] = useState<ClientFile | null>(null);
+  const [viewUrl, setViewUrl] = useState<string | null>(null);
+
+  async function handleView(file: ClientFile) {
+    if (!supabase) return;
+    setViewingFile(file);
+    setViewUrl(null);
+    const { data } = await supabase.storage
+      .from("client-files")
+      .createSignedUrl(file.storage_path, 60);
+    setViewUrl(data?.signedUrl ?? null);
   }
 
   async function handleDeleteFile(fileId: string) {
@@ -452,6 +470,15 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                     </p>
                   </div>
                   <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {isMarkdownFile(file) && (
+                      <button
+                        onClick={() => handleView(file)}
+                        className="p-1.5 rounded-md hover:bg-card hover:shadow-sm"
+                        title="Bekijken"
+                      >
+                        <Eye className="w-3 h-3 text-rm-blue-ink" />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDownload(file)}
                       className="p-1.5 rounded-md hover:bg-card hover:shadow-sm"
@@ -474,6 +501,13 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
         </div>
       </div>
       </div>
+      {viewingFile && (
+        <MarkdownFileViewer
+          title={viewingFile.file_name}
+          url={viewUrl}
+          onClose={() => { setViewingFile(null); setViewUrl(null); }}
+        />
+      )}
     </div>
   );
 }

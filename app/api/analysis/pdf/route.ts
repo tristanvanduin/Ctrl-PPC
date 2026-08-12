@@ -16,8 +16,23 @@ import {
 } from "@/lib/progress/server";
 import { logger } from "@/lib/logger";
 
+// De negen sop_type-waarden die de analyse-routes daadwerkelijk schrijven: Google's drie
+// kale namen, en Meta/LinkedIn's kanaal-voorvoegsel-varianten (zie sop-trigger-buttons.tsx
+// CHANNEL_CONFIG). Alleen "monthly" (Google) krijgt hieronder de verrijkte structured-data-tak;
+// meta_monthly/linkedin_monthly draaien via dezelfde finalizeChannelMonthlySynthesis en hebben dus
+// ook een geldige "full"-sectie, maar sop_insights/sop_recommendations/sop_tasks zijn niet op
+// kanaal gescheiden (alleen client_id + analysis_date) -- die tak zou bij een Google- en
+// Meta-maandanalyse op dezelfde datum de verkeerde bevindingen kunnen tonen. Bewust overgeslagen
+// tot die tabellen een sop_type-kolom hebben.
+const VALID_SOP_TYPES = [
+  "weekly", "biweekly", "monthly",
+  "meta_weekly", "meta_biweekly", "meta_monthly",
+  "linkedin_weekly", "linkedin_biweekly", "linkedin_monthly",
+] as const;
+type PdfSopType = typeof VALID_SOP_TYPES[number];
+
 /**
- * GET /api/analysis/pdf?client_id=xxx&sop_type=weekly|biweekly|monthly&client_name=yyy
+ * GET /api/analysis/pdf?client_id=xxx&sop_type=weekly|biweekly|monthly|meta_weekly|...&client_name=yyy
  *
  * Generates and returns a PDF for the most recent SOP analysis.
  * Also saves the PDF to Supabase Storage and links it in client_files.
@@ -27,14 +42,15 @@ export async function GET(request: NextRequest) {
   if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
 
   const clientId = request.nextUrl.searchParams.get("client_id");
-  const sopType = request.nextUrl.searchParams.get("sop_type") as "weekly" | "biweekly" | "monthly" | null;
+  const sopTypeParam = request.nextUrl.searchParams.get("sop_type");
   const clientName = request.nextUrl.searchParams.get("client_name") || clientId || "Onbekend";
   const jobId = request.nextUrl.searchParams.get("job_id") || crypto.randomUUID();
 
   if (!clientId) return Response.json({ error: "client_id parameter vereist" }, { status: 400 });
-  if (!sopType || !["weekly", "biweekly", "monthly"].includes(sopType)) {
-    return Response.json({ error: "sop_type parameter vereist (weekly|biweekly|monthly)" }, { status: 400 });
+  if (!sopTypeParam || !(VALID_SOP_TYPES as readonly string[]).includes(sopTypeParam)) {
+    return Response.json({ error: `sop_type parameter vereist (${VALID_SOP_TYPES.join("|")})` }, { status: 400 });
   }
+  const sopType = sopTypeParam as PdfSopType;
 
   await createProgressJob(supabase, {
     jobId,
@@ -102,12 +118,17 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: `Geen ${sopType} analyse gevonden voor deze client` }, { status: 404 });
   }
 
+  // De renderer kent alleen de layout-vorm (weekly/biweekly/monthly), geen kanaal -- de
+  // klantnaam draagt de kanaalcontext al. meta_weekly/linkedin_biweekly/etc. worden dus
+  // teruggebracht tot hun basisvorm voor alles wat de renderer en de bestandsnaam raakt.
+  const baseType: "weekly" | "biweekly" | "monthly" = sopType.endsWith("monthly") ? "monthly" : sopType.endsWith("biweekly") ? "biweekly" : "weekly";
+
   try {
     // Build PDF props
     const pdfProps: SopPdfProps = {
       clientName,
       clientId,
-      sopType,
+      sopType: baseType,
       analysisDate: analysis.analysis_date,
       periodStart: analysis.period_start || analysis.analysis_date,
       periodEnd: analysis.period_end || analysis.analysis_date,
@@ -212,7 +233,7 @@ export async function GET(request: NextRequest) {
       biweekly: "Tweewekelijks",
       monthly: "Maandelijks",
     };
-    const filename = `SOP-${typeLabel[sopType]}-${analysis.analysis_date}.pdf`;
+    const filename = `SOP-${typeLabel[baseType]}-${analysis.analysis_date}.pdf`;
     const storagePath = `${clientId}/SOP's/${Date.now()}-${filename}`;
 
     await updateProgressPhase(supabase, {

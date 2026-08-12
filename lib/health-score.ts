@@ -351,13 +351,25 @@ export function computeHealthScore(
     assessed: hygieneBeoordeeld,
   });
 
-  // ── Totaal ──
-  //
-  // Alleen beoordeelde factoren tellen mee, en het totaal wordt geschaald naar 100 zodat de
-  // grenzen voor A tot en met F blijven kloppen. Zou een niet-beoordeelde factor als nul
-  // meetellen, dan zakt een account met weinig data naar een F terwijl er niets mis is; telde
-  // hij als vol mee, dan kreeg een leeg account een B. Geen van beide is waar: het antwoord
-  // is dat we het niet weten.
+  // Sort anomalies by severity
+  const severityOrder = { critical: 0, warning: 1, info: 2 };
+  anomalies.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
+  return { factors, anomalies, ...samenvatFactoren(factors) };
+}
+
+/**
+ * Alleen beoordeelde factoren tellen mee, en het totaal wordt geschaald naar 100 zodat de
+ * grenzen voor A tot en met F blijven kloppen. Zou een niet-beoordeelde factor als nul
+ * meetellen, dan zakt een account met weinig data naar een F terwijl er niets mis is; telde
+ * hij als vol mee, dan kreeg een leeg account een B. Geen van beide is waar: het antwoord
+ * is dat we het niet weten.
+ *
+ * Los van computeHealthScore geëxporteerd zodat een aanroeper achteraf een factor kan
+ * herbeoordelen (bijv. channel-health-badge.tsx dat Hygiëne voor Meta/LinkedIn op "niet
+ * beoordeeld" zet) zonder deze rekensom een tweede keer te schrijven.
+ */
+export function samenvatFactoren(factors: readonly HealthFactor[]): Pick<HealthScore, "total" | "grade" | "color" | "assessedCount"> {
   const beoordeeld = factors.filter((f) => f.assessed);
   const behaald = beoordeeld.reduce((s, f) => s + f.score, 0);
   const haalbaar = beoordeeld.reduce((s, f) => s + f.maxScore, 0);
@@ -381,9 +393,24 @@ export function computeHealthScore(
     total >= 55 ? "text-amber-500" :
     total >= 40 ? "text-orange-500" : "text-red-500";
 
-  // Sort anomalies by severity
-  const severityOrder = { critical: 0, warning: 1, info: 2 };
-  anomalies.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+  return { total, grade, color, assessedCount: beoordeeld.length };
+}
 
-  return { total, grade, color, factors, anomalies, assessedCount: beoordeeld.length };
+/**
+ * Voor kanalen zonder Google-specifieke verspillingsdata (Meta, LinkedIn): computeHealthScore's
+ * Hygiëne-factor valt bij ontbrekende wastefulTerms/adGroupBleeders terug op "geen verspilling
+ * gevonden" zodra er besteding is -- een bewuste keuze, vastgelegd in __health_score_test.ts
+ * ("hygiene is beoordeeld zodra er besteding is"). Voor Google betekent dat "geen bewijs van
+ * verspilling gevonden"; voor een kanaal waar nooit naar verspilling is GEKEKEN is dezelfde volle
+ * score misleidend -- geen groen signaal maar een onbeantwoorde vraag die eruitziet als een.
+ *
+ * Haalt de factor er daarom achteraf uit en herschaalt het totaal opnieuw, zonder de gedeelde
+ * computeHealthScore (en zijn geteste Google-gedrag) aan te raken.
+ */
+export function zonderKanaalSpecifiekeHygiene(health: HealthScore): HealthScore {
+  const factors = health.factors.map((f) => f.name === "Hygiëne"
+    ? { ...f, assessed: false, score: 0, description: "Niet beoordeeld voor dit kanaal — geen equivalent van Google's zoekterm-/ad group-verspilling." }
+    : f
+  );
+  return { ...health, factors, ...samenvatFactoren(factors) };
 }

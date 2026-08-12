@@ -62,6 +62,23 @@ const VRAGEN: FaqItem[] = [
       "an agency also gets its own agency-wide view across all its clients, without each extra client " +
       "requiring a separate invoice or a separate integration.",
   },
+  {
+    vraag: "Why is Foundation free and unlimited?",
+    antwoord:
+      "Connecting an ad account costs us nothing to the platforms themselves - Google, Meta, LinkedIn, and " +
+      "Microsoft do not charge for API access. More connected accounts sharpen the sector and niche " +
+      "benchmarks every account sees, so an unlimited free tier makes the whole platform more useful, not " +
+      "less profitable. Foundation gives you the dashboard, forecast, and KPI monitoring forever; you only " +
+      "pay when you want the engine to explain why something happened, not just what happened.",
+  },
+  {
+    vraag: "How do you avoid blaming the account when the real cause is the market?",
+    antwoord:
+      "Before Ctrl PPC concludes an account got worse, it checks the account's own context: seasonal " +
+      "patterns, business events, budget changes, and recent tracking changes, against the forecast engine " +
+      "and change history. A drop in leads because market-wide search demand fell 28% gets flagged as a " +
+      "demand shift, not an account failure. This runs on every SOP analysis, not as a separate purchase.",
+  },
 ];
 
 // FAQPage-structured data: dezelfde vragen/antwoorden als hierboven, machineleesbaar. Dit is

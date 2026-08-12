@@ -7,6 +7,7 @@ import { useTodayFeed } from "@/lib/feed/use-today-feed";
 import type { FeedItem, FeedSeverity, FeedChannel } from "@/lib/feed/feed-item";
 import { FeedCard } from "./feed-card";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { CodeRoodPaneel } from "@/components/adoptie/code-rood-paneel";
 
 // De "Vandaag"-cockpit: cross-client triage. Beantwoordt in één blik — is er iets kapot,
 // welke beslissingen wachten, wat moet vandaag, wat is nieuw, en wie is veilig buiten beeld.
@@ -137,6 +138,11 @@ export function TodayFeed() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
         {/* Feed */}
         <div className="space-y-6">
+          {/* Code Rood/Amber: klant-churnrisico, los van de triage-banden hieronder -- zie de
+              koptekst van code-rood-paneel.tsx voor waarom dit een eigen vocabulaire heeft. Toont
+              zichzelf niet (null) zolang er niets open staat. */}
+          <CodeRoodPaneel />
+
           {BANDS.map((b) => (
             <section key={b.key}>
               <div className="flex items-center gap-2.5 mb-2.5">

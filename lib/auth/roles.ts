@@ -151,6 +151,17 @@ export function canAccessClient(scope: ClientScope, clientId: string | null | un
 // user_clients; staat daar niets, dan is de scope leeg en niet stilzwijgend alles.
 const ORGANISATION_WIDE_ROLES: readonly Role[] = ["admin", "performance_marketeer", "it"];
 
+/**
+ * Dezelfde rollenset als de database-kant `app_ziet_hele_bureau()` (migratie 057) -- de
+ * "C-level"-rollen in dit model. Gebruikt om te bepalen wie een Code Rood/Amber-melding mag
+ * accepteren/afwijzen (scripts/migrations/073_code_rood_meldingen.sql): een klant-gebonden
+ * viewer/brand_strateeg mag de melding zien, niet de keuze maken die het account uit zijn
+ * normale plek in de sidebar trekt.
+ */
+export function zietHeleBureau(role: Role | null | undefined): boolean {
+  return !!role && ORGANISATION_WIDE_ROLES.includes(role);
+}
+
 export function scopeFor(role: Role | null | undefined, assigned: readonly string[]): ClientScope {
   if (!role) return [];
   if (ORGANISATION_WIDE_ROLES.includes(role)) return ALL_CLIENTS;

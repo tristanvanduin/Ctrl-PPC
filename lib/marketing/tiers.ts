@@ -23,6 +23,11 @@
 // SOP-DEKKING (accounts met automatische SOP's) komt uit lib/tenancy/sop-dekking.ts en is HIER
 // niet gewijzigd: die getallen (20/50/100/200) zijn een eerdere, apart gegeven indicatie en
 // stonden niet in deze prijsopgave.
+//
+// FOUNDATION (12 augustus 2026): zesde kaart, licentie "basis" -- bestond al als gratis rang-0
+// tier in het toegangssysteem, stond op /pricing tot nu toe alleen als een losse zin onder de
+// tier-grid. Naam "Foundation" komt uit de positioneringsstrategie (Strategie_v3.pdf); "basis"
+// blijft de interne licentie-sleutel, geen migratie nodig.
 
 import type { Licentie } from "@/lib/chat/toegang";
 import { SOP_DEKKING } from "@/lib/tenancy/sop-dekking";
@@ -45,14 +50,31 @@ export interface TierDefinitie {
 
 export const TIERS: readonly TierDefinitie[] = [
   {
+    // "basis" bestond al als rang-0 licentie (lib/chat/toegang.ts, SOP_DEKKING.basis = 0) --
+    // gratis, geen enkele cap op accounts/kanalen/gebruikers, alleen nooit een automatische SOP.
+    // Stond tot 12 augustus 2026 alleen als losse zin onder de tier-grid, niet als kaart.
+    licentie: "basis",
+    naam: "Foundation",
+    focus: "Connect everything. See what happened, always free.",
+    vanafPerMaand: 0,
+    creditsPerMaand: 0,
+    features: [
+      { tekst: "Google Ads, Meta Ads, LinkedIn Ads, and Microsoft Ads", gebouwd: true },
+      { tekst: "Unlimited accounts, channels, and users", gebouwd: true },
+      { tekst: "Dashboarding, forecasting, and KPI monitoring", gebouwd: true },
+    ],
+    rapportage: { tekst: "No automatic SOP analyses - upgrade to Core when you want the why", gebouwd: true },
+  },
+  {
     licentie: "core",
     naam: "Core",
     focus: "The data engine and operational foundation.",
     vanafPerMaand: 749,
     creditsPerMaand: 10_000,
     features: [
-      { tekst: "Unlimited accounts, channels, and users", gebouwd: true },
+      { tekst: "Everything in Foundation", gebouwd: true },
       { tekst: "GA4 integration", gebouwd: true },
+      { tekst: "Agency Memory: hypotheses, sprint items, and learnings that compound over time", gebouwd: true },
       { tekst: "Code Oranje & Code Red churn protocols from day one", gebouwd: false },
     ],
     rapportage: { tekst: "Standard report templates, not yet customizable", gebouwd: true },

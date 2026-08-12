@@ -20,6 +20,19 @@ export function HealthBadge({ clientId }: { clientId: string }) {
     dataState?.adGroupBleeders,
   ), [forecast, dataState]);
 
+  return <HealthBadgeView health={health} />;
+}
+
+/**
+ * Het presentationele deel van HealthBadge, los van waar de score vandaan komt.
+ *
+ * Google's HealthBadge hierboven leunt op ClientDataProvider/ForecastContext -- Google-specifiek
+ * opgebouwd (customerId, live API-call via /api/google-ads/client-data). Meta en LinkedIn hebben
+ * dat pad nooit gehad; hun tegenhanger (components/dashboard/channel-health-badge.tsx) haalt de
+ * score via /api/analysis/channel-forecast en rendert hem hiermee, zonder de weergave een tweede
+ * keer te bouwen.
+ */
+export function HealthBadgeView({ health }: { health: HealthScore }) {
   // Eén plek voor de statuskleur. De boog en de radar tonen dezelfde score, dus een tweede
   // ternary ernaast zou vroeg of laat iets anders zeggen dan de eerste.
   const radarKleur = health.grade === "?" ? "#9ca3af"

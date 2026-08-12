@@ -15,12 +15,13 @@ type SopType = "weekly" | "biweekly" | "monthly";
 export type SopChannel = "google_ads" | "meta_ads" | "linkedin_ads";
 
 // Per kanaal: welke SOPs bestaan er, onder welke sop_type slaat de engine ze op, en hoe heet
-// het in de kop van het geexporteerde bestand. Meta en LinkedIn hebben (bewust) alleen de
-// maand-SOP; hun adapters (11 resp. 9 stappen) draaien via dezelfde /api/analysis/monthly.
+// het in de kop van het geexporteerde bestand. Meta en LinkedIn hebben nu alle drie de SOPs:
+// weekly/biweekly draaien via /api/analysis/weekly en /biweekly met channel-dispatch, monthly
+// via hun eigen adapters (11 resp. 9 stappen) op dezelfde /api/analysis/monthly.
 const CHANNEL_CONFIG: Record<SopChannel, { types: SopType[]; sopTypeKey: Record<SopType, string>; headerLabel: string }> = {
   google_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "weekly", biweekly: "biweekly", monthly: "monthly" }, headerLabel: "SEA" },
-  meta_ads: { types: ["monthly"], sopTypeKey: { weekly: "weekly", biweekly: "biweekly", monthly: "meta_monthly" }, headerLabel: "Meta Ads" },
-  linkedin_ads: { types: ["monthly"], sopTypeKey: { weekly: "weekly", biweekly: "biweekly", monthly: "linkedin_monthly" }, headerLabel: "LinkedIn Ads" },
+  meta_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "meta_weekly", biweekly: "meta_biweekly", monthly: "meta_monthly" }, headerLabel: "Meta Ads" },
+  linkedin_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "linkedin_weekly", biweekly: "linkedin_biweekly", monthly: "linkedin_monthly" }, headerLabel: "LinkedIn Ads" },
 };
 
 interface SopStatus {
@@ -180,23 +181,15 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Analyse mislukt");
 
-        // Build markdown from response
-        let markdown: string;
+        // Build markdown from response. De executive summary (fullOutput / deliverable_markdown)
+        // is de synthese, niet de losse stappen -- die laatste zijn backend-redenering en horen
+        // niet als "Stap 1: ..., Stap 2: ..."-dump in het bestand dat de specialist opent.
         const analysisDate = data.analysisDate || today();
-
-        if (type === "monthly" && data.steps) {
-          const header = `# Maandelijkse ${channelCfg.headerLabel} Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${data.period?.start} t/m ${data.period?.end}\n**Model:** ${data.model}\n\n---\n\n`;
-          const stepsContent = data.steps
-            .map((s: { step: number; name: string; output: string }) =>
-              `## Stap ${s.step}: ${s.name}\n\n${s.output}`
-            )
-            .join("\n\n---\n\n");
-          markdown = header + stepsContent;
-        } else {
-          const typeLabel = type === "weekly" ? "Wekelijkse" : "Tweewekelijkse";
-          const header = `# ${typeLabel} SEA Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${data.periodStart} t/m ${data.periodEnd}\n**Model:** ${data.model}\n\n---\n\n`;
-          markdown = header + (data.output || data.fullOutput || "Geen output");
-        }
+        const period = type === "monthly" ? data.period : { start: data.periodStart, end: data.periodEnd };
+        const cadenceLabel = type === "monthly" ? "Maandelijkse" : type === "weekly" ? "Wekelijkse" : "Tweewekelijkse";
+        const typeLabel = `${cadenceLabel} ${channelCfg.headerLabel}`;
+        const header = `# ${typeLabel} Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${period?.start} t/m ${period?.end}\n**Model:** ${data.model}\n\n---\n\n`;
+        const markdown = header + (data.fullOutput || data.output || "Geen output");
 
         await uploadSopFile(type, analysisDate, markdown);
 

@@ -68,19 +68,21 @@ export function thirteenMonthStart(periodEnd: string): string {
 
 // --- Laag 2: fetch en orkestratie (LIVE-ONGETEST aan de fetch-grens) ---
 
-// Bouwt een entity_id -> naam map uit een entiteit-tabel (meta_campaigns/meta_adsets/meta_ads).
-async function fetchNameMap(supabase: SupabaseClient, clientId: string, table: string, nameColumn: string): Promise<Map<string, string>> {
-  const { data } = await supabase.from(table).select(`entity_id, ${nameColumn}`).eq("client_id", clientId);
+// Bouwt een id -> naam map uit een entiteit-tabel (meta_campaigns/meta_adsets/meta_ads).
+// idColumn is de PK van die tabel (campaign_id/adset_id/ad_id) -- dat is ook de waarde die
+// terugkomt als entity_id in de meta_*_daily-tabellen, dus de map is daar direct op te sleutelen.
+export async function fetchNameMap(supabase: SupabaseClient, clientId: string, table: string, idColumn: string, nameColumn: string): Promise<Map<string, string>> {
+  const { data } = await supabase.from(table).select(`${idColumn}, ${nameColumn}`).eq("client_id", clientId);
   const map = new Map<string, string>();
   for (const row of (data ?? []) as unknown as DbRow[]) {
-    const id = String(row.entity_id ?? "");
+    const id = String((row as Record<string, unknown>)[idColumn] ?? "");
     const name = String((row as Record<string, unknown>)[nameColumn] ?? "");
     if (id && name) map.set(id, name);
   }
   return map;
 }
 
-async function fetchDaily(supabase: SupabaseClient, clientId: string, table: string, start: string, end: string): Promise<DbRow[]> {
+export async function fetchDaily(supabase: SupabaseClient, clientId: string, table: string, start: string, end: string): Promise<DbRow[]> {
   const { data } = await supabase.from(table).select("*").eq("client_id", clientId).gte("date", start).lte("date", end);
   return (data ?? []) as DbRow[];
 }
@@ -102,9 +104,9 @@ export async function buildMetaAnalysisData(
   const start = thirteenMonthStart(periodEnd);
 
   const [campaignNames, adsetNames, adNames] = await Promise.all([
-    fetchNameMap(supabase, clientId, "meta_campaigns", "campaign_name"),
-    fetchNameMap(supabase, clientId, "meta_adsets", "adset_name"),
-    fetchNameMap(supabase, clientId, "meta_ads", "ad_name"),
+    fetchNameMap(supabase, clientId, "meta_campaigns", "campaign_id", "name"),
+    fetchNameMap(supabase, clientId, "meta_adsets", "adset_id", "name"),
+    fetchNameMap(supabase, clientId, "meta_ads", "ad_id", "name"),
   ]);
 
   const [accountRaw, campaignRaw, adsetRaw, adRaw, breakdownRaw] = await Promise.all([

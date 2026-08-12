@@ -83,8 +83,8 @@ export default function VsPage() {
         <p className="mt-4 text-off-white/60">
           Optmyzr, Triple Whale, Supermetrics, Madgicx, Skai: five different platforms with a
           similar pattern. Pricing that scales with ad spend, and insights that stay locked to
-          a single account. Ctrl PPC includes the dashboard layer free on every tier -- the
-          difference is what happens on top of it.
+          a single account. Ctrl PPC includes the dashboard layer free forever on Foundation --
+          the difference is what happens on top of it.
         </p>
       </div>
 

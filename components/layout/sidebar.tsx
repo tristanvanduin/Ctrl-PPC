@@ -122,6 +122,12 @@ function SidebarInner() {
   // Los van collapsedGroups (dat is een set van DICHTE groepen, default open): het back-up-
   // mapje is precies andersom -- standaard DICHT, tot iemand hem opent.
   const [backupOpen, setBackupOpen] = useState(false);
+  // Code Rood: klanten met een GEACCEPTEERDE rood-melding (scripts/migrations/073_code_rood_
+  // meldingen.sql), pas dan uit hun normale map getrokken -- besluit eigenaar 11 aug 2026, met de
+  // volgorde-correctie dat dit NA accepteren gebeurt, niet meteen bij detectie. Standaard OPEN
+  // (het omgekeerde van het back-up-mapje hierboven): dit is zeldzaam en urgent, geen archief.
+  const [codeRoodKlanten, setCodeRoodKlanten] = useState<VisibleClient[]>([]);
+  const [codeRoodOpen, setCodeRoodOpen] = useState(true);
   const [groups, setGroups] = useState<GroupWithMembers[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   // De gekozen assen overleven een herlaad: wie op specialist werkt, werkt daar de hele dag op.
@@ -229,6 +235,22 @@ function SidebarInner() {
     return () => { cancelled = true; };
   }, [zichtbareIds]);
 
+  // Eén lichte fetch, zelfde route als het Today-paneel en de dashboardbanner
+  // (lib/adoptie/use-code-rood.ts) -- hier los aangeroepen omdat de zijbalk buiten elke
+  // React-boom staat die de hook al ergens anders mount.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/adoptie/code-rood")
+      .then((r) => r.json())
+      .then((json: { meldingen?: { clientId: string; clientNaam: string; licht: string; status: string }[]; error?: string }) => {
+        if (cancelled || json.error) return;
+        const geaccepteerd = (json.meldingen ?? []).filter((m) => m.licht === "rood" && m.status === "geaccepteerd");
+        setCodeRoodKlanten(geaccepteerd.map((m) => ({ id: m.clientId, name: m.clientNaam })));
+      })
+      .catch(() => { if (!cancelled) setCodeRoodKlanten([]); });
+    return () => { cancelled = true; };
+  }, []);
+
   function toggleGroup(groupId: string) {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -241,10 +263,14 @@ function SidebarInner() {
   // Filter op zoekterm en op de eigen beurs-scope. Zolang de auth-enforcement uit staat
   // laat canAccessClient alles door (zie lib/auth/use-access.ts); daarna houdt iemand van
   // Aquatech alleen Aquatech over in de lijst.
+  const codeRoodIds = new Set(codeRoodKlanten.map((c) => c.id));
   const filtered = visibleClients.filter(
-    (c) => c.name.toLowerCase().includes(search.toLowerCase()) && access.canAccessClient(c.id)
+    (c) => c.name.toLowerCase().includes(search.toLowerCase()) && access.canAccessClient(c.id) && !codeRoodIds.has(c.id)
   );
   const filteredIds = new Set(filtered.map((c) => c.id));
+  const codeRoodZichtbaar = codeRoodKlanten.filter(
+    (c) => access.canAccessClient(c.id) && c.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   // Fase 5: primaire accounts (het merendeel, altijd) door de bestaande boom -- geen wijziging
   // aan wat er vandaag al staat. Back-up-accounts vallen apart en krijgen hun eigen, standaard
@@ -385,6 +411,28 @@ function SidebarInner() {
 
       {/* Client list with groups */}
       <div className="flex-1 overflow-y-auto px-3 space-y-0.5">
+        {/* Code Rood: alleen wie een klant al accepteerde staat hier, en pas dan -- zie de
+            toelichting bij codeRoodKlanten hierboven. "waar iedereen bij kan" (besluit eigenaar):
+            geen rolcheck, wie de klant al mag zien ziet ook deze map. */}
+        {codeRoodZichtbaar.length > 0 && (
+          <div className="mb-2">
+            <button
+              onClick={() => setCodeRoodOpen((o) => !o)}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-200 transition-colors hover:bg-red-500/20"
+            >
+              {codeRoodOpen ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+              <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+              <span className="truncate text-body font-semibold">Code Rood</span>
+              <span className="ml-auto text-micro font-bold text-white bg-red-600 rounded-full px-1.5">{codeRoodZichtbaar.length}</span>
+            </button>
+            {codeRoodOpen && (
+              <div className="ml-4 mt-0.5 space-y-0.5">
+                {codeRoodZichtbaar.map((client) => <ClientLink key={client.id} client={client} />)}
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="text-white/90 text-meta font-semibold uppercase tracking-wider px-3 py-2">
           Klanten{mounted ? ` (${totalCount})` : ""}
         </p>

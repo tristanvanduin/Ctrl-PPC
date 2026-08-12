@@ -156,7 +156,7 @@ const LINKEDIN_PURITY_RULES: Partial<Record<number, StepPurityRule>> = {
 };
 
 // Benchmarks per accounttype als richtwaarden. LinkedIn is leadgen B2B-georienteerd; CPL leidt.
-const LINKEDIN_BENCHMARKS: Record<AccountType, string> = {
+export const LINKEDIN_BENCHMARKS: Record<AccountType, string> = {
   ecommerce_roas: "LinkedIn-benchmarks (richtwaarden): LinkedIn is leadgen-georienteerd, dus CPL leidt tenzij conversiewaarde echt aanwezig is; gebruik ROAS niet als hoofdmaat. CTR single image 0,4 tot 0,65%, document ads hoger, form completion 10 tot 15%, video view rate circa 30%. CPC en CPL zijn markt-contextueel; rapporteer altijd tegen de eigen historie.",
   ecommerce_cpa: "LinkedIn-benchmarks (richtwaarden): CPL leidt; conversiewaarde alleen als die echt aanwezig is. CTR single image 0,4 tot 0,65%, form completion 10 tot 15%, video view rate circa 30%. Rapporteer CPC en CPL tegen de eigen historie, niet tegen een absolute norm.",
   leadgen_cpa: "LinkedIn-benchmarks (richtwaarden, leadgen B2B): CTR single image 0,4 tot 0,65%, document ads hoger, form completion 10 tot 15%, video view rate circa 30%. CPC en CPL zijn markt-contextueel; rapporteer altijd tegen de eigen historie. CPL afmeten tegen de target uit client_settings.",
