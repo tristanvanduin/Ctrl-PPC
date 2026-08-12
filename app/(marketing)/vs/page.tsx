@@ -5,8 +5,10 @@ import { KILL_SHOT_ROWS, SUCCESS_TAX_EXAMPLES } from "@/lib/marketing/comparison
 import { ComingSoonBadge } from "@/components/marketing/coming-soon-badge";
 import { PrimaryCta } from "@/components/marketing/primary-cta";
 
-// The comparison page against the legacy status quo (Optmyzr, Triple Whale, Supermetrics,
-// Madgicx, Skai). Canonical stays relative (resolved via metadataBase in app/layout.tsx, same as
+// The comparison page against the legacy status quo (Optmyzr, Triple Whale, Madgicx, Skai,
+// Revealbot, Northbeam, Adalysis, Opteo -- see lib/marketing/comparison.ts for the full,
+// individually-verified list and why Supermetrics is named but not counted among them).
+// Canonical stays relative (resolved via metadataBase in app/layout.tsx, same as
 // every other marketing page), not hardcoded to www -- CANONIEK_DOMEIN is non-www, and
 // middleware.ts documents a past production incident from a www redirect that was removed. A
 // hardcoded www canonical here would put this one page on a different canonical scheme than the
@@ -81,10 +83,10 @@ export default function VsPage() {
           Beyond the Dashboard Layer
         </h1>
         <p className="mt-4 text-off-white/60">
-          Optmyzr, Triple Whale, Supermetrics, Madgicx, Skai: five different platforms with a
-          similar pattern. Pricing that scales with ad spend, and insights that stay locked to
-          a single account. Ctrl PPC includes the dashboard layer free forever on Foundation --
-          the difference is what happens on top of it.
+          A familiar pattern across PPC management, attribution, and reporting tools: pricing that
+          scales with ad spend or GMV, and insights that stay locked to a single account. Ctrl PPC
+          includes the dashboard layer free forever on Foundation -- the difference is what
+          happens on top of it.
         </p>
       </div>
 

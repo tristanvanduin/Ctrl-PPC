@@ -79,6 +79,14 @@ export interface SuccessTaxExample {
 // the file header. Each of these describes the published TIER STRUCTURE, which is stable and
 // checkable against each platform's own pricing page, not a specific current amount this codebase
 // would need to keep up to date to stay accurate.
+//
+// EXPANDED (12 augustus 2026, "zijn dit uberhaupt alle en de beste concurrenten"): stond eerst op
+// 4 platformen. Elk hieronder toegevoegd is geverifieerd via een live websearch tegen de eigen
+// pricing-pagina van dat platform op de datum hierboven -- niet uit trainingsdata overgenomen,
+// want prijsmodellen veranderen. Supermetrics blijft bewust BUITEN deze lijst: het is wel genoemd
+// als concurrent in de pagina-intro, maar de pricing is getierd op databronnen/gebruikers, niet op
+// spend of GMV -- geen Success Tax-voorbeeld, dus geen plek hier. Adalysis is het scherpste
+// voorbeeld van de acht: de tier herberekent zichzelf elke maand op basis van werkelijke spend.
 export const SUCCESS_TAX_EXAMPLES: readonly SuccessTaxExample[] = [
   {
     platform: "Optmyzr",
@@ -98,6 +106,26 @@ export const SUCCESS_TAX_EXAMPLES: readonly SuccessTaxExample[] = [
   {
     platform: "Skai",
     mechanism: "Tiered by annual ad spend",
-    example: "Enterprise pricing scales with annual spend across a wide range, reaching into six figures at higher tiers.",
+    example: "Enterprise pricing scales with annual spend across a wide range, reaching well into seven figures at the highest tiers.",
+  },
+  {
+    platform: "Revealbot",
+    mechanism: "Tiered by monthly ad spend across connected accounts",
+    example: "Combined spend crossing a tier's ceiling triggers an upgrade or an overage charge, independent of how the automation itself is used.",
+  },
+  {
+    platform: "Northbeam",
+    mechanism: "Tiered by media spend and pageview volume",
+    example: "Growth past the entry tier's spend threshold moves the account to a materially higher-priced plan, with the top tier priced individually.",
+  },
+  {
+    platform: "Adalysis",
+    mechanism: "Tiered by trailing monthly ad spend, recalculated automatically",
+    example: "The plan tier is recalculated each month against actual spend, moving the account up or down without a manual upgrade.",
+  },
+  {
+    platform: "Opteo",
+    mechanism: "Tiered by account count and monthly ad spend ceiling",
+    example: "Crossing either the account-count or the spend ceiling on a plan requires moving to the next tier up.",
   },
 ];

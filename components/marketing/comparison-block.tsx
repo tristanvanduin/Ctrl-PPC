@@ -28,6 +28,15 @@
 // heeft, met "free forever" er expliciet bij, i.p.v. alleen de beperking te benoemen. De grafiek
 // ging van opacity-40 + grayscale (oogt uitgeschakeld) naar opacity-70 zonder grayscale (oogt
 // gewoon, niet stuk) -- het punt is een ander soort laag, niet een mindere kwaliteit dashboard.
+//
+// DERDE NUANCESLAG (12 augustus 2026, zelfde review, direct erna): de correctie hierboven ging
+// te ver de andere kant op -- "ik vind de dashboarding nu wel echt te licht ... de echte winst
+// zit bij de analyse en het vervolg erop. dat stuk mis ik." Dashboarding blijft waardevol en
+// gratis (geen terugval naar de eerste, te negatieve versie), maar de zin die zei waar het
+// echte rendement zit is verdwenen in de vorige pass. Toegevoegd: een expliciete slotzin die
+// benoemt dat de analyselaag is waar het rendement zit, niet als tekortkoming van het dashboard
+// maar als plaatsbepaling -- "waardevol op zichzelf" staat naast "het rendement zit een laag
+// hoger", niet in plaats van.
 
 const NEP_BALKEN = [40, 65, 30, 80, 45, 60, 35];
 
@@ -68,8 +77,10 @@ export function ComparisonBlock() {
           <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/60">Dashboards Alone</h3>
           <p className="mt-2 text-sm text-off-white/50">
             Real-time charts per channel, forecasting, and KPI monitoring -- this is Foundation,
-            free forever on every tier above it too. It is the base every account needs. On its
-            own, it answers what happened; the why and the next action live one layer up.
+            free forever on every tier above it too. It is genuinely valuable on its own: the base
+            every account needs, and where most agencies run today. But the return that actually
+            moves the needle -- the diagnosis, the hypothesis, the next action -- lives one layer
+            up, not here.
           </p>
 
           <div className="relative mt-8 flex h-40 items-end gap-3 opacity-70">

@@ -64,20 +64,56 @@ interface PriorityRow {
   action: string;
 }
 
-const PRIORITIES: PriorityRow[] = [
-  {
-    naam: "Priority 1",
-    why: "Search Brand CPA rose 34% MoM while impression share held steady.",
-    impact: "~EUR 4,200/mo in avoidable spend at current pace.",
-    action: "Split Brand from Generic, cap Generic tROAS.",
-  },
-  {
-    naam: "Priority 2",
-    why: "Three ad sets show frequency above 3.5 with hook rate falling.",
-    impact: "CTR decay compounding week over week.",
-    action: "Refresh creative on the two oldest ad sets.",
-  },
-];
+// PRIORITIES-PER-KANAAL (12 augustus 2026, "je verwacht dat ook de blokken eronder mee
+// veranderen"): stond eerst als 1 vaste array voor alle 3 tabs -- een Search-CPA-bevinding en een
+// Meta ad-set-frequency-bevinding, allebei zichtbaar ongeacht welk kanaal je koos. Nu per kanaal,
+// met vocabulaire dat bij dat kanaal hoort (ad set/hook rate/frequency voor Meta, lead
+// form/senioriteitstargeting voor LinkedIn) -- zelfde "illustrative example"-behandeling als
+// hierboven, niet een live klantrapport.
+const PRIORITIES_PER_KANAAL: Record<(typeof CHANNEL_PILLARS)[number]["kanaal"], PriorityRow[]> = {
+  "Google Ads": [
+    {
+      naam: "Priority 1",
+      why: "Search Brand CPA rose 34% MoM while impression share held steady.",
+      impact: "~EUR 4,200/mo in avoidable spend at current pace.",
+      action: "Split Brand from Generic, cap Generic tROAS.",
+    },
+    {
+      naam: "Priority 2",
+      why: "Three non-brand ad groups show Quality Score below 5, inflating CPCs 20%+.",
+      impact: "~EUR 2,100/mo in avoidable CPC premium.",
+      action: "Add negatives, tighten ad group themes to match search intent.",
+    },
+  ],
+  "Meta": [
+    {
+      naam: "Priority 1",
+      why: "Three ad sets show frequency above 3.5 with hook rate falling.",
+      impact: "CTR decay compounding week over week.",
+      action: "Refresh creative on the two oldest ad sets.",
+    },
+    {
+      naam: "Priority 2",
+      why: "Retargeting audience overlaps 40% with an active lookalike, inflating CPMs.",
+      impact: "~EUR 1,800/mo in wasted overlap spend.",
+      action: "Exclude the retargeting audience from the lookalike ad set.",
+    },
+  ],
+  "LinkedIn": [
+    {
+      naam: "Priority 1",
+      why: "Lead form completion rate dropped 22% after switching to a longer form.",
+      impact: "~15 fewer qualified leads/mo at current volume.",
+      action: "Revert to the 3-field form, test length as its own experiment.",
+    },
+    {
+      naam: "Priority 2",
+      why: "Sponsored Content targeting 'Director+' seniority converts 3x the broader audience.",
+      impact: "Budget still concentrated on lower-converting seniority tiers.",
+      action: "Shift budget toward Director+ segments, tailor messaging to that tier.",
+    },
+  ],
+};
 
 export function DeliverableExample() {
   const [kanaal, setKanaal] = useState<(typeof CHANNEL_PILLARS)[number]["kanaal"]>("Google Ads");
@@ -138,7 +174,7 @@ export function DeliverableExample() {
         </div>
 
         <div className="space-y-2.5" style={{ fontFamily: "var(--font-marketing-mono)" }}>
-          {PRIORITIES.map((p) => (
+          {PRIORITIES_PER_KANAAL[kanaal].map((p) => (
             <div
               key={p.naam}
               className="rounded-[6px] border border-neon-indigo/30 bg-neon-indigo/5 px-3 py-2.5"

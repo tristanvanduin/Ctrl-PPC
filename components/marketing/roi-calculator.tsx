@@ -171,13 +171,13 @@ export function RoiCalculator() {
           <input
             type="range"
             min={1}
-            max={3}
+            max={4}
             value={kanalenPerKlant}
             onChange={(e) => setKanalenPerKlant(Number(e.target.value))}
             className="mt-2 w-full accent-[#818cf8]"
           />
           <p className="mt-1.5 text-[11px] leading-relaxed text-off-white/40">
-            Google, Meta, and LinkedIn each get their own analysis -- more connected channels means more manual work replaced, not just more accounts.
+            Google, Meta, LinkedIn, and Bing (coming soon) each get their own analysis -- more connected channels means more manual work replaced, not just more accounts.
           </p>
         </label>
       </div>
@@ -243,6 +243,7 @@ export function RoiCalculator() {
               {" "}{Math.round(KANAAL_MULTIPLIER_PER_EXTRA_KANAAL * 100)}% on top of the single-channel
               package above -- its own analysis, but with shared account-level context rather than
               a fully separate trajectory.
+              {kanalenPerKlant === 4 && " Bing support is in development; this slot assumes the same time savings once it's live, not a measured result today."}
             </p>
           )}
           {/* Disclaimer (12 augustus 2026, mobiele design-review): dit rekentool-scherm suggereert
