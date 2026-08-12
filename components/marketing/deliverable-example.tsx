@@ -45,7 +45,7 @@ const PRIORITIES: PriorityRow[] = [
 
 export function DeliverableExample() {
   return (
-    <section className="mx-auto max-w-3xl px-6 pb-20">
+    <section className="mx-auto max-w-3xl px-6 pb-16">
       <div
         className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/70 p-6"
         style={{ boxShadow: "0 0 40px rgba(0, 0, 0, 0.3)" }}

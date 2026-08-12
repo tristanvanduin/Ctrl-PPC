@@ -19,7 +19,7 @@ const PIJNPUNTEN = [
 
 export function FeaturesBlock() {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-20">
+    <section className="mx-auto max-w-6xl px-6 py-16">
       <div className="grid gap-10 lg:grid-cols-3">
         {/* Kolom 1: Industrie-pijn */}
         <div>

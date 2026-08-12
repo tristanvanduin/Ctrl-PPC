@@ -134,26 +134,31 @@ export function RoiCalculator() {
       </button>
 
       {toonPakket && (
-        <ul className="mt-3 space-y-2.5 border-t border-off-white/10 pt-3">
-          {STANDAARDPAKKET.map((a) => (
-            <li key={a.naam} className="text-xs">
-              <div className="flex items-center justify-between text-off-white/80">
-                <span className="font-semibold">{a.naam}</span>
-                <span className="text-off-white/60">{a.minutenPerMaand} min/mo</span>
-              </div>
-              <p className="mt-0.5 leading-relaxed text-off-white/50">{a.beschrijving}</p>
-            </li>
-          ))}
-        </ul>
-      )}
+        <>
+          <ul className="mt-3 space-y-2.5 border-t border-off-white/10 pt-3">
+            {STANDAARDPAKKET.map((a) => (
+              <li key={a.naam} className="text-xs">
+                <div className="flex items-center justify-between text-off-white/80">
+                  <span className="font-semibold">{a.naam}</span>
+                  <span className="text-off-white/60">{a.minutenPerMaand} min/mo</span>
+                </div>
+                <p className="mt-0.5 leading-relaxed text-off-white/50">{a.beschrijving}</p>
+              </li>
+            ))}
+          </ul>
 
-      <p className="mt-4 text-xs leading-relaxed text-off-white/60">
-        These are the three automatic SOP runs that happen for every client by default --
-        monthly, weekly, and biweekly -- with an estimated time cost if a specialist did each by
-        hand. Manual deep dives (budget allocation, bid strategy, and similar on-demand analyses)
-        come on top of this and are not counted here: this is the minimum, not the ceiling. An
-        estimate based on your input, not a measured result.
-      </p>
+          {/* Stond hiervoor los van de toggle, altijd zichtbaar -- verlengde de pagina zonder dat
+              iemand er iets voor hoefde te doen. Hoort inhoudelijk bij dezelfde uitleg als het
+              pakket erboven, dus nu ook achter dezelfde knop (12 augustus 2026, mobiele audit). */}
+          <p className="mt-4 text-xs leading-relaxed text-off-white/60">
+            These are the three automatic SOP runs that happen for every client by default --
+            monthly, weekly, and biweekly -- with an estimated time cost if a specialist did each
+            by hand. Manual deep dives (budget allocation, bid strategy, and similar on-demand
+            analyses) come on top of this and are not counted here: this is the minimum, not the
+            ceiling. An estimate based on your input, not a measured result.
+          </p>
+        </>
+      )}
     </div>
   );
 }

@@ -38,7 +38,10 @@ const KERN_REGELS = [
 
 export function ComparisonBlock() {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-20">
+    // py-16 (was py-20, 12 augustus 2026): zes marketingcomponenten droegen elk hun eigen
+    // sectiepadding zonder gedeelde schaal (py-20/pb-20/pb-16 door elkaar) -- gelijkgetrokken op
+    // py-16/pb-16, dezelfde waarde als product-video.tsx en de homepage al gebruikten.
+    <section className="mx-auto max-w-6xl px-6 py-16">
       <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
         Intelligence is not decisioning
       </p>
