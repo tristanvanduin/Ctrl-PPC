@@ -97,6 +97,15 @@ function TierCard({
           Most agencies start here
         </span>
       )}
+      {/* Losse badge (12 augustus 2026, na "waar staat dat het tijdelijk is?"): de kleine tekst
+          onder de CTA-knop hieronder was blijkbaar niet opvallend genoeg om als "dit is een
+          launch-only regel" te lezen. Copper i.p.v. indigo -- ander signaal dan "aanbevolen",
+          zelfde token als de "No Limits"-band verderop op deze pagina. */}
+      {isFoundation && foundationOpen !== false && (
+        <span className="absolute -top-3 left-6 rounded-[4px] border border-copper/40 bg-midnight-slate-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-copper">
+          Launch offer: first 50, free
+        </span>
+      )}
       <h3 className="font-marketing-heading text-lg font-bold text-off-white">{tier.naam}</h3>
       <p className="mt-1 text-xs text-off-white/50">{tier.focus}</p>
 
@@ -151,8 +160,8 @@ function TierCard({
       {isFoundation && (
         <p className="mt-2 text-center text-[11px] text-off-white/40">
           {foundationOpen === false
-            ? "Foundation is fully claimed for now while we scale deliberately."
-            : "Limited to the first 50 accounts while we scale deliberately."}
+            ? "Foundation is fully claimed for now - a temporary launch-phase limit, not a permanent cap."
+            : "Temporary launch-phase limit: the first 50 accounts, while we scale our own API usage deliberately."}
         </p>
       )}
     </div>

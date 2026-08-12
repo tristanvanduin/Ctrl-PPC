@@ -81,11 +81,13 @@ export default async function HomePage() {
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10">
           <PrimaryCta />
-          {/* Foundation-cap (12 augustus 2026): geen live aantal, zie lib/marketing/foundation-cap.ts. */}
+          {/* Foundation-cap (12 augustus 2026): geen live aantal, zie lib/marketing/foundation-cap.ts.
+              "Temporary" expliciet in de tekst -- de eerste versie zei alleen "the first 50", wat
+              zonder verdere toelichting als een permanent plafond te lezen was. */}
           <p className="text-xs text-off-white/40">
             {foundationOpen
-              ? "Foundation is free, forever - the first 50 accounts, no card required."
-              : "Foundation is fully claimed for now - request access to join the waitlist."}
+              ? "Foundation is free, forever - temporarily capped at the first 50 accounts, no card required."
+              : "Foundation is fully claimed for now (a temporary launch-phase cap) - request access to join the waitlist."}
           </p>
         </div>
       </section>
