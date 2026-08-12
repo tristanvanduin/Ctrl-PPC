@@ -1,8 +1,10 @@
 -- 073: persistentie voor Code Rood/Amber-meldingen per account.
 --
 -- Idempotent, puur additief. GESCHREVEN, NIET TOEGEPAST -- zelfde status als migratie 065:
--- draai hem pas als de detectiejob (lib/adoptie/code-rood.ts + account-stoplicht.ts) ook
--- daadwerkelijk ergens vandaan geroepen wordt. Een tabel zonder schrijver is een wees.
+-- draai hem samen met de eerste keer dat de detectiejob (lib/adoptie/detecteer-code-rood.ts,
+-- aangeroepen vanuit app/api/cron/evaluate-code-rood, geregistreerd in vercel.json) daadwerkelijk
+-- moet kunnen schrijven. Een tabel zonder schrijver is een wees; die schrijver bestaat nu wel,
+-- alleen de migratie zelf moet nog handmatig gedraaid worden (node scripts/supabase-sql.mjs).
 -- Draaien: node scripts/supabase-sql.mjs --file scripts/migrations/073_code_rood_meldingen.sql
 -- Terugdraaien: de policies droppen, `drop table code_rood_meldingen`.
 --
@@ -19,14 +21,19 @@
 -- hoort de bestaande open rij bij te werken (nieuwe redenen, gedetecteerd_op ongewijzigd of niet
 -- -- aan de schrijver), niet een tweede naast te zetten. Zonder deze grens verdrinkt Today in
 -- duplicaten bij elke nieuwe run van de detectiejob.
-
+--
+-- STATUS 'opgelost': de detectiejob (lib/adoptie/detecteer-code-rood.ts, aangeroepen vanuit
+-- app/api/cron/evaluate-code-rood) zet een melding hierheen als een latere run géén signaal meer
+-- vindt -- maar ALLEEN als hij nog 'open' was. Een 'geaccepteerd'/'afgewezen' rij is mensbezit:
+-- een melding die een mens al beoordeelde verandert niet stilzwijgend terug, ook niet als de
+-- cijfers herstellen. Alleen een mens die nooit gereageerd heeft, mag de job voor je opruimen.
 create table if not exists code_rood_meldingen (
   id              uuid primary key default gen_random_uuid(),
   client_id       text not null,
   licht           text not null check (licht in ('amber', 'rood')),
   redenen         jsonb not null default '[]'::jsonb,
   gedetecteerd_op timestamptz not null default now(),
-  status          text not null default 'open' check (status in ('open', 'geaccepteerd', 'afgewezen')),
+  status          text not null default 'open' check (status in ('open', 'geaccepteerd', 'afgewezen', 'opgelost')),
   gereageerd_door uuid references auth.users(id),
   gereageerd_op   timestamptz,
   created_at      timestamptz not null default now()

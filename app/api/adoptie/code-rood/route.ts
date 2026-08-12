@@ -4,10 +4,9 @@
 // lijst terug (zie isTabelOntbreekt), zodat de rest van de app niet crasht op een tabel die er
 // nog niet is.
 //
-// LET OP: er is nog GEEN detectiejob die hier daadwerkelijk rijen in schrijft. Deze route en de
-// UI die hem aanroept zijn dus vandaag correct maar leeg -- ze tonen precies niets tot er een
-// periodieke evaluatie bijkomt die lib/adoptie/code-rood.ts per klant aanroept en het resultaat
-// hier upsert (met de service-role; er is bewust geen insert-policy voor authenticated).
+// De schrijver is app/api/cron/evaluate-code-rood (met de service-role; er is bewust geen
+// insert-policy voor authenticated), dagelijks via vercel.json. Tot migratie 073 handmatig is
+// toegepast blijft deze route wel al werkend maar leeg (zie isTabelOntbreekt hieronder).
 //
 // Scope-regel: lezen mag iedereen die de klant mag lezen (auth.scope, zelfde afleiding als
 // overal); accepteren/afwijzen alleen bureau-brede rollen (zietHeleBureau), zelfde grens als de
@@ -24,7 +23,7 @@ interface MeldingRij {
   licht: "amber" | "rood";
   redenen: string[];
   gedetecteerd_op: string;
-  status: "open" | "geaccepteerd" | "afgewezen";
+  status: "open" | "geaccepteerd" | "afgewezen" | "opgelost";
   gereageerd_op: string | null;
 }
 

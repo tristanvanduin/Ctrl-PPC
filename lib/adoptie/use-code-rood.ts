@@ -12,7 +12,7 @@ export interface CodeRoodMelding {
   licht: "amber" | "rood";
   redenen: string[];
   gedetecteerdOp: string;
-  status: "open" | "geaccepteerd" | "afgewezen";
+  status: "open" | "geaccepteerd" | "afgewezen" | "opgelost";
   gereageerdOp: string | null;
 }
 

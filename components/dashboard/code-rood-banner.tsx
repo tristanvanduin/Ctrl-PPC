@@ -11,7 +11,10 @@ import { useCodeRoodMeldingen } from "@/lib/adoptie/use-code-rood";
 
 export function CodeRoodBanner({ clientId }: { clientId: string }) {
   const { meldingen, magReageren, reageer } = useCodeRoodMeldingen();
-  const melding = meldingen.find((m) => m.clientId === clientId && m.status !== "afgewezen");
+  // Alleen open of geaccepteerd: afgewezen is gezien-en-klaar, opgelost is door de detectiejob
+  // zelf teruggetrokken (zie de STATUS 'opgelost'-toelichting in migratie 073) -- geen van beide
+  // hoort nog een banner te tonen.
+  const melding = meldingen.find((m) => m.clientId === clientId && (m.status === "open" || m.status === "geaccepteerd"));
   if (!melding) return null;
 
   const rood = melding.licht === "rood";
