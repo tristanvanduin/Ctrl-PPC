@@ -34,11 +34,15 @@
 // tier-grid. Naam "Foundation" komt uit de positioneringsstrategie (Strategie_v3.pdf); "basis"
 // blijft de interne licentie-sleutel, geen migratie nodig.
 //
-// SECOND OPINION-WELKOMSTCADEAU OP CORE (12 augustus 2026): de 5 gratis trialruns (migratie 074,
-// lib/analysis/second-opinion-trial.ts) stonden alleen in de backend en in de dashboard-teller --
-// niet op deze prijspagina, waar het als upsell-argument juist moet werken. Toegevoegd aan Core
-// (de eerste betaalde tier, waar de trigger voor het eerst afgaat); "Everything in Core" op de
-// tiers erboven neemt hem vanzelf mee.
+// SECOND OPINION-WELKOMSTCADEAU (12 augustus 2026, twee correcties): de 5 gratis trialruns
+// (migratie 074, lib/analysis/second-opinion-trial.ts) stonden eerst alleen in de backend en de
+// dashboard-teller, niet op deze prijspagina. Eerste poging: een featureregel op Core. Twee
+// problemen daarmee, allebei van de eigenaar: (1) de database-trigger vuurt bij ELKE overgang
+// basis -> een betaalde tier, niet alleen naar Core specifiek -- een regel alleen op Core was dus
+// feitelijk onvolledig voor wie direct naar Growth of hoger upgradet. (2) "alleen een check valt
+// niet op" -- begraven tussen vier andere checkmarks deed het niet als upsell-argument. Nu een
+// los coupon-gestileerd blok op de prijspagina zelf (naast de tier-grid, niet in een featurelijst
+// van een specifieke tier), zodat het zowel klopt als opvalt.
 //
 // CRM UIT PROFESSIONAL, BI OP AANVRAAG BIJ ENTERPRISE (12 augustus 2026): Professional noemde
 // "Business Intelligence Connect: Shopify, WooCommerce, CRM, WordPress" als roadmapfeature -- dat
@@ -95,7 +99,6 @@ export const TIERS: readonly TierDefinitie[] = [
       { tekst: "GA4 integration", gebouwd: true },
       { tekst: "Agency Memory: hypotheses, sprint items, and learnings that compound over time", gebouwd: true },
       { tekst: "Code Oranje & Code Red churn protocols from day one", gebouwd: true },
-      { tekst: "Welcome gift: 5 free Second Opinion audits on upgrade from Foundation", gebouwd: true },
     ],
     rapportage: { tekst: "Standard report templates, not yet customizable", gebouwd: true },
   },

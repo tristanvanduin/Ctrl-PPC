@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Check, Clock, Infinity as InfinityIcon } from "lucide-react";
+import { Check, Clock, Gift, Infinity as InfinityIcon } from "lucide-react";
 import { TIERS, sopDekkingVoor, type TierFeature } from "@/lib/marketing/tiers";
 import { IntelligenceStore } from "@/components/marketing/intelligence-store";
 import { ComingSoonBadge } from "@/components/marketing/coming-soon-badge";
@@ -103,7 +103,7 @@ function TierCard({
           zelfde token als de "No Limits"-band verderop op deze pagina. */}
       {isFoundation && foundationOpen !== false && (
         <span className="absolute -top-3 left-6 rounded-[4px] border border-copper/40 bg-midnight-slate-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-copper">
-          Launch offer: first 50, free
+          Launch cap: 50 at a time
         </span>
       )}
       <h3 className="font-marketing-heading text-lg font-bold text-off-white">{tier.naam}</h3>
@@ -160,8 +160,8 @@ function TierCard({
       {isFoundation && (
         <p className="mt-2 text-center text-[11px] text-off-white/40">
           {foundationOpen === false
-            ? "Foundation is fully claimed for now - a temporary launch-phase limit, not a permanent cap."
-            : "Temporary launch-phase limit: the first 50 accounts, while we scale our own API usage deliberately."}
+            ? "Full for now - not a one-time cutoff. A slot opens up whenever an existing Foundation account upgrades, or we raise the cap."
+            : "Up to 50 Foundation accounts at a time while we scale our own API usage deliberately - not a one-time first-come-first-served batch."}
         </p>
       )}
     </div>
@@ -196,6 +196,19 @@ export default async function PricingPage() {
         <span>
           <strong className="font-semibold text-copper">No Limits:</strong> every plan scales with your
           accounts, without a new invoice opening for each extra client.
+        </span>
+      </div>
+
+      {/* Coupon-blok, niet een featureregel op één tier (12 augustus 2026, correctie): de trigger
+          in migratie 074 vuurt bij ELKE overgang basis -> een betaalde tier, dus dit hoort niet bij
+          Core specifiek; en "alleen een check valt niet op" -- vandaar dashed border + eigen icoon
+          i.p.v. begraven in een checklist. Zie lib/marketing/tiers.ts voor de volledige toelichting. */}
+      <div className="mt-4 flex items-center justify-center gap-3 rounded-[6px] border border-dashed border-neon-indigo/40 bg-neon-indigo/5 px-6 py-4 text-sm text-off-white/80">
+        <Gift className="h-5 w-5 shrink-0 text-neon-indigo" aria-hidden />
+        <span>
+          <strong className="font-semibold text-neon-indigo">Welcome gift:</strong> upgrade from
+          Foundation to any paid tier and unlock 5 free Second Opinion audits - normally part of a
+          {" "}&euro;250/mo add-on.
         </span>
       </div>
 

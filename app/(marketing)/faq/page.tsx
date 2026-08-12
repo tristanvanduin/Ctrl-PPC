@@ -70,9 +70,11 @@ const VRAGEN: FaqItem[] = [
       "benchmarks every account sees, so an unlimited free tier makes the whole platform more useful, not " +
       "less profitable. Foundation gives you the dashboard, forecast, and KPI monitoring forever, with no " +
       "cap on accounts, channels, or users once you are on it; you only pay when you want the engine to " +
-      "explain why something happened, not just what happened. We are limiting the first 50 agencies while " +
-      "we scale our own API usage deliberately - that cap is on new signups during this launch phase, not " +
-      "on what an existing Foundation account can connect.",
+      "explain why something happened, not just what happened. During this launch phase we cap Foundation " +
+      "at 50 agencies at a time (to scale our own API usage deliberately, not to limit growth) - not a " +
+      "one-time first-come-first-served batch. A slot opens up whenever an existing Foundation agency " +
+      "upgrades, or as we raise the cap; it is never a permanent cutoff on what an existing account can " +
+      "connect.",
   },
   {
     vraag: "How do you avoid blaming the account when the real cause is the market?",
