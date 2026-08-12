@@ -9,6 +9,7 @@
 import { WORLD_KNOWLEDGE_GROUNDING } from "./shared-grounding";
 import { IS_LOSS_ALARM_PCT, PMAX_LEARNING_WEEKS, PMAX_LEARNING_CONVERSIONS } from "../analysis/thresholds";
 import { META_WEEKLY, LINKEDIN_WEEKLY } from "./weekly-channel-content";
+import { META_BIWEEKLY, LINKEDIN_BIWEEKLY } from "./biweekly-channel-content";
 import { META_BENCHMARKS } from "../analysis/adapters/meta-ads";
 import { LINKEDIN_BENCHMARKS } from "../analysis/adapters/linkedin-ads";
 
@@ -1300,9 +1301,13 @@ Sorteer van hoog naar laag ICE. Geef voor elke hypothese ook aan:
 export function buildBiWeeklyPrompt(
   goalsSection: string,
   accountType: AccountType,
-  previousMonthlyOutput: string
+  previousMonthlyOutput: string,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
 ): string {
-  const benchmarks = getBenchmarks(accountType);
+  const benchmarks = channel === "meta_ads" ? META_BENCHMARKS[accountType]
+    : channel === "linkedin_ads" ? LINKEDIN_BENCHMARKS[accountType]
+    : getBenchmarks(accountType);
+  const content = channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null;
 
   return `
 Je bent een senior SEA specialist die een bi-weekly check-in uitvoert.
@@ -1340,7 +1345,7 @@ Vermeld altijd de prognose bij stap 1 en vergelijk met de doelstelling.
 
 ## Stap 1: Account Performance
 
-Gebruik: account_monthly (this month + last 2 months), account_weekly (laatste 30 dagen)
+Gebruik: ${content ? content.step1Dataset : "account_monthly (this month + last 2 months), account_weekly (laatste 30 dagen)"}
 
 ### Werkwijze
 1. Ligt de maand op schema voor de doelstellingen?
@@ -1363,7 +1368,7 @@ TOP 3 BEVINDINGEN STAP 1: [bevinding 1] | [bevinding 2] | [bevinding 3]
 
 ## Stap 2: Campagne Performance
 
-Gebruik: campaign_monthly (this month + last 2 months), conclusie stap 1
+Gebruik: ${content ? content.step2Dataset : "campaign_monthly (this month + last 2 months), conclusie stap 1"}
 
 ### Werkwijze
 1. Ontwikkelen de campagnes uit de maandanalyse zich zoals verwacht?
@@ -1381,34 +1386,34 @@ TOP 3 BEVINDINGEN STAP 2: [bevinding 1] | [bevinding 2] | [bevinding 3]
 
 ---
 
-## Stap 3: Ad Group Performance
+## Stap 3: ${content ? content.step3Title : "Ad Group Performance"}
 
-Gebruik: adgroup_monthly (this month + last 2 months), conclusies stap 1 + 2
+Gebruik: ${content ? content.step3Dataset : "adgroup_monthly (this month + last 2 months), conclusies stap 1 + 2"}
 
-### Werkwijze
+${content ? content.step3Body : `### Werkwijze
 1. Ontwikkelen de ad groups uit de maandanalyse zich zoals verwacht?
 2. Effect van optimalisaties zichtbaar?
 
 ### Output format
 "Ad Group X (geïdentificeerd in maandanalyse) ontwikkelt zich [conform/afwijkend]:
-[beschrijving met concrete cijfers en vergelijking met maandanalyse verwachting]."
+[beschrijving met concrete cijfers en vergelijking met maandanalyse verwachting]."`}
 
 TOP 3 BEVINDINGEN STAP 3: [bevinding 1] | [bevinding 2] | [bevinding 3]
 
 ---
 
-## Stap 4: Device & Engagement
+## Stap 4: ${content ? content.step4Title : "Device & Engagement"}
 
-Gebruik: device performance data indien beschikbaar, conclusies stap 1 t/m 3
+Gebruik: ${content ? content.step4Dataset : "device performance data indien beschikbaar, conclusies stap 1 t/m 3"}
 
-### Werkwijze
+${content ? content.step4Body : `### Werkwijze
 1. Negatieve engagement ontwikkelingen?
 2. Device-specifieke afwijkingen die de conversieontwikkeling verklaren?
 
 ### Output format
 "[Device X] toont een [positieve/negatieve] ontwikkeling: [metric] [steeg/daalde]
 van [waarde] naar [waarde] — dit [verklaart/verklaart niet] de conversieontwikkeling
-uit stap 1."
+uit stap 1."`}
 
 TOP 3 BEVINDINGEN STAP 4: [bevinding 1] | [bevinding 2] | [bevinding 3]
 
