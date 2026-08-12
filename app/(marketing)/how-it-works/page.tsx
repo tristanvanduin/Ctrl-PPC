@@ -6,6 +6,7 @@ import { DecisionLoop } from "@/components/marketing/decision-loop";
 import { DecisionLoopRing } from "@/components/marketing/decision-loop-ring";
 import { QualityGateMatrix } from "@/components/marketing/quality-gate-matrix";
 import { ContextChips } from "@/components/marketing/context-chips";
+import { DeliverableExample } from "@/components/marketing/deliverable-example";
 import { PrimaryCta } from "@/components/marketing/primary-cta";
 
 // The dedicated "how it works" page, requested after the user shared three AI-generated reference
@@ -147,7 +148,29 @@ export default function HowItWorksPage() {
             <QualityGateMatrix />
           </div>
         </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
+            The deliverable, in practice
+          </p>
+          <p className="mt-2 text-sm text-off-white/60">
+            Thirteen steps of reasoning every month. One document, not thirteen.
+          </p>
+          <div className="mt-4">
+            <DeliverableExample />
+          </div>
+        </div>
       </div>
+
+      {/* Ultimate Positioning uit Strategie_v3.pdf (p.11), 12 augustus 2026 -- geen nieuwe claim,
+          dezelfde zes loop-stadia hierboven in vier woorden samengevat: wat gebeurde er (Signal),
+          waarom (Hypothesis/Quality Gate), wat nu (Execution), welke impact (Attribution/Agency
+          Memory). "Ads To Impact" en de rest van de positioneringstaal expliciet niet gebruikt --
+          zie eerder gesprek over de herkomst van die term. */}
+      <p className="mx-auto mt-16 max-w-xl text-center text-sm text-off-white/50">
+        What happened. Why it happened. What to do next. What impact that decision creates. At
+        scale, across every account.
+      </p>
 
       <div className="mt-8 flex flex-col items-center gap-3 border-t border-off-white/10 pt-10 text-center">
         <p className="text-off-white/60">See the loop run against your own accounts.</p>

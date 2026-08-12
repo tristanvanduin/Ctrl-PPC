@@ -11,14 +11,19 @@
 // kent geen cap), GA4-integratie (lib/ga4/), Cross-Account Portfolio-view
 // (components/terminal/agency-god-view.tsx), de creditgrootboek-infrastructuur zelf (migratie
 // 070, controleerSaldo/verbruikCredit blokkeren echt -- alleen de PRIJS per analyse staat nog
-// leeg, dat is een prijsbeslissing, geen ontbrekende feature). Niet gebouwd: Code Oranje/Code
-// Red-protocollen, de volledige rapportage-aanpasbaarheid vanaf Growth (koppen/body bewerken,
-// verbergen, 3 master-templates, grafiekopties -- alleen de kale, niet-aanpasbare rapportage van
-// Core bestaat al), Custom Playbook Engine + AI SOP Extractor, Priority Queue, Business
-// Intelligence Connect (Shopify/WooCommerce/CRM/WordPress), MCP Sandbox, en alles onder
-// Enterprise (BI/webhook-exports, dedicated servers, custom SLA's). De pagina toont niet-gebouwde
-// items met een "Coming soon"-label in plaats van ze te verzwijgen of als feit te presenteren --
-// zie de PR-discussie voor de drie opties die zijn afgewogen.
+// leeg, dat is een prijsbeslissing, geen ontbrekende feature). Niet gebouwd: de volledige
+// rapportage-aanpasbaarheid vanaf Growth (koppen/body bewerken, verbergen, 3 master-templates,
+// grafiekopties -- alleen de kale, niet-aanpasbare rapportage van Core bestaat al), Custom
+// Playbook Engine + AI SOP Extractor, Priority Queue, Business Intelligence Connect
+// (Shopify/WooCommerce/CRM/WordPress), MCP Sandbox, en alles onder Enterprise (BI/webhook-exports,
+// dedicated servers, custom SLA's). De pagina toont niet-gebouwde items met een "Coming
+// soon"-label in plaats van ze te verzwijgen of als feit te presenteren -- zie de PR-discussie
+// voor de drie opties die zijn afgewogen.
+//
+// CODE ORANJE/CODE RED (12 augustus 2026): stond hier als "niet gebouwd", was stale. De
+// detectiejob (lib/adoptie/detecteer-code-rood.ts) draait als cron (vercel.json,
+// /api/cron/evaluate-code-rood), de UI-sequentie en persistentie zijn gebouwd (migratie 073,
+// toegepast), inclusief tests (lib/adoptie/__code_rood_test.ts). gebouwd: true.
 //
 // SOP-DEKKING (accounts met automatische SOP's) komt uit lib/tenancy/sop-dekking.ts en is HIER
 // niet gewijzigd: die getallen (20/50/100/200) zijn een eerdere, apart gegeven indicatie en
@@ -75,7 +80,7 @@ export const TIERS: readonly TierDefinitie[] = [
       { tekst: "Everything in Foundation", gebouwd: true },
       { tekst: "GA4 integration", gebouwd: true },
       { tekst: "Agency Memory: hypotheses, sprint items, and learnings that compound over time", gebouwd: true },
-      { tekst: "Code Oranje & Code Red churn protocols from day one", gebouwd: false },
+      { tekst: "Code Oranje & Code Red churn protocols from day one", gebouwd: true },
     ],
     rapportage: { tekst: "Standard report templates, not yet customizable", gebouwd: true },
   },

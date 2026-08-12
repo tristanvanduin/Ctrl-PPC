@@ -6,10 +6,15 @@ interface ContextSource {
   naam: string;
 }
 
+// "Shopify Data" stond hier als voorbeeldbron, maar Business Intelligence Connect (Shopify/
+// WooCommerce/CRM/WordPress) is een ongebouwde integratie (gebouwd: false in
+// lib/marketing/tiers.ts) -- dezelfde fout die al eens gevonden en gefixt is in
+// quality-gate-matrix.tsx ("Shopify Inventory" als gate-naam). Vervangen door GA4, wat wel
+// gebouwd is (lib/ga4/) en al genoemd wordt als bron voor de Signal-stap in loop.ts.
 const DEFAULT_SOURCES: ContextSource[] = [
   { naam: "Meta API" },
   { naam: "GSC Trend" },
-  { naam: "Shopify Data" },
+  { naam: "GA4 Signal" },
 ];
 
 export function ContextChips({ sources = DEFAULT_SOURCES }: { sources?: ContextSource[] }) {
