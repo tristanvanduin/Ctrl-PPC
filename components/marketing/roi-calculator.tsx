@@ -53,47 +53,72 @@ const KANAAL_MULTIPLIER_PER_EXTRA_KANAAL = 0.6;
 // Vijfde keer (12 augustus 2026, na live-controle op mobiel): "Monthly deep dive" perste Google,
 // Meta en LinkedIn in een enkele doorlopende zin -- Meta en LinkedIn verdwenen visueel ("ik mis
 // hier de linkedin en meta"), en "ICP-fit" las als interne sales-jargon, niet als marketingtaal
-// ("ik vind de termen niet voldoen aan de marketing termen"). Opgesplitst naar drie eigen regels,
-// een per kanaal, herschreven naar wat het kanaal daadwerkelijk oplevert i.p.v. het vaktermen-label
-// ervoor: "search intent" -> "what buyers are searching for", "ICP-fit" -> "reaching the right
-// decision-makers". Nog steeds geen letterlijke stappenlijst of -aantal, zelfde grens als eerder.
-const KANAAL_DEEP_DIVE = [
-  { kanaal: "Google Ads", tekst: "What buyers are searching for, and whether you're winning the auction" },
-  { kanaal: "Meta", tekst: "Which creative is working, and when your audience is worn out" },
-  { kanaal: "LinkedIn", tekst: "Whether you're reaching the right decision-makers, and how leads move through the funnel" },
-];
+// ("ik vind de termen niet voldoen aan de marketing termen"). Eerst opgesplitst naar drie eigen
+// REGELS per kanaal -- loste de zichtbaarheid op, maar maakte het blok voor 1 item al 4 regels
+// lang.
+//
+// Zesde keer, zelfde dag ("moeten weekly en biweekly niet ook geupdatet worden?? dit is een lap
+// tekst, kan het korter"): twee eisen die tegen elkaar in leken te staan -- alle 3 items moeten
+// per-kanaal info tonen (lib/prompts/sop-prompts.ts: buildWeeklyPrompt en buildBiWeeklyPrompt
+// hebben net zo goed echte META_WEEKLY/LINKEDIN_WEEKLY- en META_BIWEEKLY/LINKEDIN_BIWEEKLY-content,
+// niet alleen de monthly-adapters), maar het geheel moest korter, niet langer. Opgelost door de
+// kanaalweergave te verdichten van 3 losse rijen naar EEN regel per item ("Google: ... -- Meta:
+// ... -- LinkedIn: ..."), toegepast op alle 3 -- meer dekking, minder ruimte per item.
+//
+// Zevende keer, zelfde dag ("ik wil ook van de termen weekly, biweekly en monthly af"): de
+// itembeschrijvingen zeiden nog letterlijk "Weekly (x4)" en "Biweekly (x2)", en twee van de vier
+// itemnamen waren zelf een cadans-label ("Monthly deep dive", "Monthly report"). Cadans-woorden
+// vervangen door een neutrale "xN/mo"-multiplier (het getal blijft zichtbaar, het Engelse
+// cadanswoord niet) en de twee resterende cadans-namen herschreven naar wat het item DOET.
+// "Progress vs. monthly target" blijft ongewijzigd -- "monthly" verwijst daar naar de
+// doelstelling zelf (een normaal bedrijfsbegrip), niet naar hoe vaak Ctrl PPC checkt, en is
+// letterlijk de eigen formulering van de eigenaar ("vs maand doelstellingen").
+const KANAAL_REGEL = (g: string, m: string, l: string) =>
+  [{ k: "Google", t: g }, { k: "Meta", t: m }, { k: "LinkedIn", t: l }];
 
 interface Analyse {
   naam: string;
   beschrijving: string;
   minutenPerMaand: number;
-  kanalen?: typeof KANAAL_DEEP_DIVE;
+  kanalen: ReturnType<typeof KANAAL_REGEL>;
 }
 
 const STANDAARDPAKKET: Analyse[] = [
   {
-    naam: "Anomaly detection",
-    beschrijving:
-      "Weekly (x4): tracking health, keyword and search-term bleeders, budget anomalies -- catches problems before they compound.",
+    naam: "Continuous anomaly detection",
+    beschrijving: "x4/mo -- catches problems before they compound.",
     minutenPerMaand: 20 * 4,
+    kanalen: KANAAL_REGEL(
+      "keyword and search-term waste",
+      "ad set bleeders and creative fatigue",
+      "campaign bleeders, weighted for low B2B volume",
+    ),
   },
   {
     naam: "Progress vs. monthly target",
-    beschrijving:
-      "Biweekly (x2): re-checks account, campaign, ad group, and device pacing against the monthly forecast -- is the month on track?",
+    beschrijving: "x2/mo -- is the month on track against forecast?",
     minutenPerMaand: 45 * 2,
+    kanalen: KANAAL_REGEL(
+      "ad group and device pacing",
+      "ad set pacing and audience saturation",
+      "creative and bid pacing",
+    ),
   },
   {
-    naam: "Monthly deep dive",
-    beschrijving:
-      "Every finding cleared through the same quality gates, ending in hypothesis validation -- reasoning shaped around what each channel actually is:",
+    naam: "Deep dive analysis",
+    beschrijving: "Every finding clears the same quality gates, ending in hypothesis validation.",
     minutenPerMaand: 90,
-    kanalen: KANAAL_DEEP_DIVE,
+    kanalen: KANAAL_REGEL(
+      "what buyers are searching for, and the auction",
+      "which creative works, and audience fatigue",
+      "reaching the right decision-makers, and the lead funnel",
+    ),
   },
   {
-    naam: "Monthly report",
-    beschrijving: "Client-facing PDF synthesis of the month's findings.",
+    naam: "Client report",
+    beschrijving: "PDF synthesis of the findings, ready to send.",
     minutenPerMaand: 60,
+    kanalen: [],
   },
 ];
 
@@ -213,49 +238,32 @@ export function RoiCalculator() {
                   <span className="text-off-white/60">{a.minutenPerMaand} min/mo</span>
                 </div>
                 <p className="mt-0.5 leading-relaxed text-off-white/50">{a.beschrijving}</p>
-                {a.kanalen && (
-                  <ul className="mt-1.5 space-y-1 border-l border-off-white/10 pl-2.5">
-                    {a.kanalen.map((k) => (
-                      <li key={k.kanaal} className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
-                        <span className="shrink-0 font-semibold text-off-white/60 sm:w-20">{k.kanaal}</span>
-                        <span className="leading-relaxed text-off-white/45">{k.tekst}</span>
-                      </li>
-                    ))}
-                  </ul>
+                {a.kanalen.length > 0 && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-off-white/40">
+                    {a.kanalen.map((k) => `${k.k}: ${k.t}`).join(" -- ")}
+                  </p>
                 )}
               </li>
             ))}
           </ul>
 
-          {/* Stond hiervoor los van de toggle, altijd zichtbaar -- verlengde de pagina zonder dat
-              iemand er iets voor hoefde te doen. Hoort inhoudelijk bij dezelfde uitleg als het
-              pakket erboven, dus nu ook achter dezelfde knop (12 augustus 2026, mobiele audit). */}
+          {/* Zesde keer (12 augustus 2026, "dit is wel echt een lap tekst"): 3 aparte
+              disclaimer-paragrafen (schatting/handmatige deep dives, kanaal-multiplier,
+              tier-dekking) samengevoegd tot 2 kortere -- inhoud niet weggelaten, wel ontdaan van
+              overlap ("minimum, niet het plafond" zei hetzelfde als "niet meegeteld"). */}
           <p className="mt-4 text-xs leading-relaxed text-off-white/60">
-            These are the automatic SOP runs that happen for every covered client by default --
-            monthly, weekly, and biweekly -- with an estimated time cost if a specialist did each
-            by hand, for one channel. Manual deep dives (budget allocation, bid strategy, and
-            similar on-demand analyses) come on top of this and are not counted here: this is the
-            minimum, not the ceiling. An estimate based on your input, not a measured result.
+            Estimate based on your input, not a measured result -- manual deep dives (budget
+            allocation, bid strategy, and similar on-demand work) are on top and not counted here.
+            Automatic coverage depends on your tier, Foundation has none; see the current limits
+            on <a href="/pricing" className="underline hover:text-off-white/70">the pricing page</a>.
           </p>
           {kanalenPerKlant > 1 && (
             <p className="mt-2 text-xs leading-relaxed text-off-white/60">
-              At {kanalenPerKlant} channels per client, each additional channel adds an estimated
-              {" "}{Math.round(KANAAL_MULTIPLIER_PER_EXTRA_KANAAL * 100)}% on top of the single-channel
-              package above -- its own analysis, but with shared account-level context rather than
-              a fully separate trajectory.
-              {kanalenPerKlant === 4 && " Bing support is in development; this slot assumes the same time savings once it's live, not a measured result today."}
+              Each additional channel adds an estimated {Math.round(KANAAL_MULTIPLIER_PER_EXTRA_KANAAL * 100)}%,
+              not a full extra trajectory -- shared account context lowers the cost.
+              {kanalenPerKlant === 4 && " Bing is in development; this slot assumes the same savings once it's live."}
             </p>
           )}
-          {/* Disclaimer (12 augustus 2026, mobiele design-review): dit rekentool-scherm suggereert
-              stilzwijgend dat elke klant in het slider-cijfer automatische SOP's krijgt, maar die
-              dekking is tier-afhankelijk (lib/tenancy/sop-dekking.ts: 0 op Foundation, oplopend
-              per tier). Zonder deze regel leest de besparing als een garantie die op een lagere
-              tier niet klopt. */}
-          <p className="mt-2 text-xs leading-relaxed text-off-white/40">
-            How many client accounts run these automatically depends on your tier -- Foundation
-            does not include automatic SOPs, and paid tiers cover a set number of accounts each.
-            See the current limits on <a href="/pricing" className="underline hover:text-off-white/70">the pricing page</a>.
-          </p>
         </>
       )}
     </div>
