@@ -51,7 +51,7 @@ export function FeaturesBlock() {
               /how-it-works (audit-vervolg, 11 augustus 2026). */}
           <Link
             href="/how-it-works"
-            className="group mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-neon-indigo hover:text-off-white"
+            className="group mt-4 inline-flex items-center gap-1.5 py-2.5 text-sm font-semibold text-neon-indigo hover:text-off-white"
           >
             See the full loop
             <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />

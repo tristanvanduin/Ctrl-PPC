@@ -7,14 +7,18 @@
 // "representative example data" treatment as QualityGateMatrix's CHECKS.
 //
 // Step names are the real 13 (app/api/analysis/monthly/route.ts, runNarrativeStep calls), not
-// invented labels -- same discipline as QualityGateMatrix's gate names.
-
+// invented labels -- same discipline as QualityGateMatrix's gate names. Two of the real 13
+// (steps 11 and 13) carry Dutch internal names -- "Geografische Performance" and "Hypotheses &
+// Sprintplanning" -- because the app itself is Dutch-first; only this marketing site is English.
+// Translated, not renamed, so this stays a real "not invented labels" list rather than reverting
+// to the same Dutch-leak-on-an-English-page bug already fixed once on the blog (12 August 2026,
+// found during a mobile screenshot review).
 const RAW_STEPS = [
   "Account Performance", "Campaign Performance", "Ad Group Performance",
   "Competitor & Auction Insights", "Keyword Performance", "Product Performance",
   "Search Term Performance", "Creative Performance", "Audience Performance",
-  "Device & Engagement Performance", "Geografische Performance",
-  "Checkout, Schedule & Network Performance", "Hypotheses & Sprintplanning",
+  "Device & Engagement Performance", "Geographic Performance",
+  "Checkout, Schedule & Network Performance", "Hypotheses & Sprint Planning",
 ];
 
 interface PriorityRow {

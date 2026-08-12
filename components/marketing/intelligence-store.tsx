@@ -181,7 +181,7 @@ export function IntelligenceStore() {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="mx-auto mt-5 flex items-center gap-1.5 rounded-[6px] border border-off-white/15 px-4 py-2 text-xs font-semibold text-off-white/70 transition-colors hover:border-neon-indigo hover:text-neon-indigo"
+          className="mx-auto mt-5 flex items-center gap-1.5 rounded-[6px] border border-off-white/15 px-4 py-2.5 text-xs font-semibold text-off-white/70 transition-colors hover:border-neon-indigo hover:text-neon-indigo"
         >
           {open ? "Hide modules & bundles" : "Explore modules & bundles"}
           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />

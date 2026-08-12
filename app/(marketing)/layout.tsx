@@ -106,14 +106,19 @@ export default function MarketingLayout({
           {/* flex-wrap: zeven items in deze rij (zes links + copyright) pasten niet meer op één
               regel van 390px na het toevoegen van "How It Works" -- 21px horizontale overflow,
               gemeten (audit-vervolg, 11 augustus 2026). Op sm+ is er ruim plek voor één regel; op
-              mobiel valt de rij nu netjes over twee regels in plaats van over de rand te lopen. */}
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-off-white/50">
-            <Link href="/how-it-works" className="hover:text-off-white">How It Works</Link>
-            <Link href="/pricing" className="hover:text-off-white">Pricing</Link>
-            <Link href="/vs" className="hover:text-off-white">Compare</Link>
-            <Link href="/faq" className="hover:text-off-white">FAQ</Link>
-            <Link href="/blog" className="hover:text-off-white">Blog</Link>
-            <Link href="/demo" className="hover:text-off-white">Demo</Link>
+              mobiel valt de rij nu netjes over twee regels in plaats van over de rand te lopen.
+
+              py-2.5 op elke link (12 augustus 2026, mobiele audit): zonder padding was het
+              tikgebied hier exact de tekstregel, 20px hoog -- ruim onder de 44px-vuistregel die
+              de hamburger-knop en de Intelligence Store al kregen (zie mobile-nav.tsx en task 57).
+              Met py-2.5 komt elke link op 40px, hetzelfde als de mobiele menu-items. */}
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-off-white/50">
+            <Link href="/how-it-works" className="py-2.5 hover:text-off-white">How It Works</Link>
+            <Link href="/pricing" className="py-2.5 hover:text-off-white">Pricing</Link>
+            <Link href="/vs" className="py-2.5 hover:text-off-white">Compare</Link>
+            <Link href="/faq" className="py-2.5 hover:text-off-white">FAQ</Link>
+            <Link href="/blog" className="py-2.5 hover:text-off-white">Blog</Link>
+            <Link href="/demo" className="py-2.5 hover:text-off-white">Demo</Link>
             <span>&copy; {new Date().getFullYear()} Ctrl PPC</span>
           </div>
         </div>

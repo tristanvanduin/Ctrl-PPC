@@ -126,7 +126,7 @@ export function RoiCalculator() {
       <button
         type="button"
         onClick={() => setToonPakket((v) => !v)}
-        className="mt-4 text-xs font-semibold text-off-white/50 underline hover:text-off-white"
+        className="mt-4 py-2.5 text-xs font-semibold text-off-white/50 underline hover:text-off-white"
       >
         {toonPakket
           ? "Hide the standard package"
