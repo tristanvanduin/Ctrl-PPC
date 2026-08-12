@@ -768,6 +768,112 @@ interface AssessedSearchTermRow {
 // acceptance-rapport en de quality-gate. Meta/LinkedIn draaien (nog) zonder checkpoints en zonder
 // per-stap step-validations, dus die gaan als leeg mee; de coverage-, aanbevelings- en taak-
 // criteria van het acceptance-rapport blijven volledig van kracht, net als bij Google.
+// Schrijft findings/recommendations/tasks naar sop_insights/sop_recommendations/sop_tasks.
+// Gedeeld door Google's inline pad en finalizeChannelMonthlySynthesis (Meta/LinkedIn): tot deze
+// extractie riep alleen het Google-pad dit aan, dus Meta/LinkedIn's synthese werd wel berekend
+// (structured_monthly_v2, de PDF-deliverable) maar nooit in deze drie tabellen gezet. sop_insights
+// en sop_recommendations hebben al een sop_type-kolom (geen migratie nodig, al zichtbaar in de
+// bestaande Google-schrijfcode); sop_tasks koppelt alleen via recommendation_id.
+async function persistMonthlyStructuredData(opts: {
+  supabase: SupabaseClient;
+  clientId: string;
+  analysisId: string | null;
+  sopType: string;
+  analysisDate: string;
+  curatedFindings: NormalizedFinding[];
+  structured: Pick<ReturnType<typeof buildStructuredMonthlyOutput>, "recommendations" | "tasks" | "clusters">;
+}): Promise<void> {
+  const { supabase, clientId, analysisId, sopType, analysisDate, curatedFindings: findings, structured } = opts;
+  if (findings.length === 0) return;
+
+  const findingIndexById = new Map(findings.map((finding, index) => [finding.finding_id, index]));
+  const recs = structured.recommendations.map((recommendation) => ({
+    ...recommendation,
+    finding_index: findingIndexById.get(structured.clusters.find((cluster) => cluster.cluster_id === recommendation.cluster_id)?.related_finding_ids[0] || "") ?? null,
+  }));
+  const tasks = structured.tasks;
+
+  try {
+    const insightRows = findings.map((finding) => ({
+      client_id: clientId,
+      analysis_id: analysisId,
+      sop_type: sopType,
+      analysis_date: analysisDate,
+      insight_type: finding.insight_type,
+      title: `[Stap ${finding.step}][${finding.issue_cluster}] ${finding.display_label ?? finding.entity_name}: ${finding.metric}`.slice(0, 80),
+      description: `${finding.display_label ?? finding.entity_name} — ${finding.metric}: ${finding.current_value ?? "n.v.t."}${finding.previous_value != null ? ` (was ${finding.previous_value})` : ""}. Cluster: ${finding.issue_cluster}. Oorzaak: ${finding.cause}`,
+      severity: finding.severity,
+      affected_entity: finding.display_label ?? finding.entity_name,
+      affected_entity_type: finding.entity_type,
+      metric: finding.metric,
+      current_value: finding.current_value ?? null,
+      previous_value: finding.previous_value ?? null,
+      change_pct: finding.change_pct ?? null,
+      is_seasonal: finding.is_seasonal,
+      is_structural: finding.is_structural,
+      action_required: finding.action_required,
+    }));
+
+    const { data: insertedInsights } = await supabase
+      .from("sop_insights")
+      .insert(insightRows)
+      .select("id");
+
+    const insightIds = (insertedInsights ?? []).map((row: { id: string }) => row.id);
+
+    const recRows = recs.map((rec) => ({
+      client_id: clientId,
+      analysis_id: analysisId,
+      insight_id: rec.finding_index !== null ? (insightIds[rec.finding_index] ?? null) : null,
+      sop_type: sopType,
+      analysis_date: analysisDate,
+      hypothesis: rec.hypothesis,
+      expected_result: rec.expected_result,
+      measurement_metric: rec.measurement_metric,
+      timeframe: rec.timeframe,
+      rationale: `${rec.rationale} Thread: ${rec.thread_id ?? "geen"}. Phase: ${rec.phase}.`,
+      ice_impact: rec.ice_impact,
+      ice_confidence: rec.ice_confidence,
+      ice_ease: rec.ice_ease,
+      ice_total: rec.ice_total,
+      status: "open",
+    }));
+
+    const { data: insertedRecs } = await supabase
+      .from("sop_recommendations")
+      .insert(recRows)
+      .select("id");
+
+    const recIds = (insertedRecs ?? []).map((row: { id: string }) => row.id);
+
+    const taskRows = tasks.map((task) => {
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + task.due_date_days);
+      return {
+        client_id: clientId,
+        recommendation_id: recIds[task.recommendation_index] ?? null,
+        analysis_date: analysisDate,
+        title: task.title,
+        description: `${task.description} Thread: ${task.thread_id ?? "geen"}. Phase: ${task.phase}.`,
+        action_type: task.action_type,
+        affected_campaign: task.affected_campaign,
+        affected_adgroup: task.affected_adgroup,
+        affected_keyword: task.affected_keyword,
+        current_value: task.current_value,
+        target_value: task.target_value,
+        priority: task.priority,
+        frequency: task.frequency,
+        status: "open",
+        due_date: dueDate.toISOString().split("T")[0],
+      };
+    });
+
+    await supabase.from("sop_tasks").insert(taskRows);
+  } catch (e) {
+    logger.error("Failed to save structured data:", e instanceof Error ? e.message : e);
+  }
+}
+
 async function finalizeChannelMonthlySynthesis(opts: {
   supabase: SupabaseClient;
   adapter: ChannelAdapter;
@@ -850,6 +956,11 @@ async function finalizeChannelMonthlySynthesis(opts: {
     success_next_month: structured.success_next_month,
     what_is_not_the_problem: structured.what_is_not_the_problem,
   }));
+
+  await persistMonthlyStructuredData({
+    supabase, clientId, analysisId: null, sopType: adapter.sopTypeKey, analysisDate,
+    curatedFindings, structured,
+  });
 
   return { structured, acceptanceReport, qualityGate };
 }
@@ -2456,7 +2567,6 @@ ${conclusions.join("\n\n---\n\n")}`,
     const curatedFindings = curateMonthlyStructuredFindings(canonical.findings);
     const curatedClusters = clusterFindings(curatedFindings);
     const enforcedCoverage = enforceSopCoverage(curatedClusters, dimensionAvailability);
-    const findingIndexById = new Map(curatedFindings.map((finding, index) => [finding.finding_id, index]));
     await updateProgressPhase(supabase, {
       jobId,
       phaseKey: "build_recommendations",
@@ -2722,96 +2832,11 @@ ${conclusions.join("\n\n---\n\n")}`,
       throw new Error("Opslaan structured_monthly_v2 leverde geen save receipt op.");
     }
 
-    let structuredSaved = Boolean(qualityGateReceipt && fullReceipt && structuredReceipt);
-    const recs = structured.recommendations.map((recommendation) => ({
-      ...recommendation,
-      finding_index: findingIndexById.get(structured.clusters.find((cluster) => cluster.cluster_id === recommendation.cluster_id)?.related_finding_ids[0] || "") ?? null,
-    }));
-    const tasks = structured.tasks;
-    const findings = curatedFindings;
-
-    if (findings.length > 0) {
-      try {
-        const insightRows = findings.map((finding) => ({
-          client_id: clientId,
-          analysis_id: analysisId,
-          sop_type: adapter.sopTypeKey,
-          analysis_date: analysisDate,
-          insight_type: finding.insight_type,
-          title: `[Stap ${finding.step}][${finding.issue_cluster}] ${finding.display_label ?? finding.entity_name}: ${finding.metric}`.slice(0, 80),
-          description: `${finding.display_label ?? finding.entity_name} — ${finding.metric}: ${finding.current_value ?? "n.v.t."}${finding.previous_value != null ? ` (was ${finding.previous_value})` : ""}. Cluster: ${finding.issue_cluster}. Oorzaak: ${finding.cause}`,
-          severity: finding.severity,
-          affected_entity: finding.display_label ?? finding.entity_name,
-          affected_entity_type: finding.entity_type,
-          metric: finding.metric,
-          current_value: finding.current_value ?? null,
-          previous_value: finding.previous_value ?? null,
-          change_pct: finding.change_pct ?? null,
-          is_seasonal: finding.is_seasonal,
-          is_structural: finding.is_structural,
-          action_required: finding.action_required,
-        }));
-
-        const { data: insertedInsights } = await supabase
-          .from("sop_insights")
-          .insert(insightRows)
-          .select("id");
-
-        const insightIds = (insertedInsights ?? []).map((row: { id: string }) => row.id);
-
-        const recRows = recs.map((rec) => ({
-          client_id: clientId,
-          analysis_id: analysisId,
-          insight_id: rec.finding_index !== null ? (insightIds[rec.finding_index] ?? null) : null,
-          sop_type: adapter.sopTypeKey,
-          analysis_date: analysisDate,
-          hypothesis: rec.hypothesis,
-          expected_result: rec.expected_result,
-          measurement_metric: rec.measurement_metric,
-          timeframe: rec.timeframe,
-          rationale: `${rec.rationale} Thread: ${rec.thread_id ?? "geen"}. Phase: ${rec.phase}.`,
-          ice_impact: rec.ice_impact,
-          ice_confidence: rec.ice_confidence,
-          ice_ease: rec.ice_ease,
-          ice_total: rec.ice_total,
-          status: "open",
-        }));
-
-        const { data: insertedRecs } = await supabase
-          .from("sop_recommendations")
-          .insert(recRows)
-          .select("id");
-
-        const recIds = (insertedRecs ?? []).map((row: { id: string }) => row.id);
-
-        const taskRows = tasks.map((task) => {
-          const dueDate = new Date();
-          dueDate.setDate(dueDate.getDate() + task.due_date_days);
-          return {
-            client_id: clientId,
-            recommendation_id: recIds[task.recommendation_index] ?? null,
-            analysis_date: analysisDate,
-            title: task.title,
-            description: `${task.description} Thread: ${task.thread_id ?? "geen"}. Phase: ${task.phase}.`,
-            action_type: task.action_type,
-            affected_campaign: task.affected_campaign,
-            affected_adgroup: task.affected_adgroup,
-            affected_keyword: task.affected_keyword,
-            current_value: task.current_value,
-            target_value: task.target_value,
-            priority: task.priority,
-            frequency: task.frequency,
-            status: "open",
-            due_date: dueDate.toISOString().split("T")[0],
-          };
-        });
-
-        await supabase.from("sop_tasks").insert(taskRows);
-        structuredSaved = structuredSaved && true;
-      } catch (e) {
-        logger.error("Failed to save structured data:", e instanceof Error ? e.message : e);
-      }
-    }
+    const structuredSaved = Boolean(qualityGateReceipt && fullReceipt && structuredReceipt);
+    await persistMonthlyStructuredData({
+      supabase, clientId, analysisId, sopType: adapter.sopTypeKey, analysisDate,
+      curatedFindings, structured,
+    });
 
     const totalTokens = [...steps, ...machineSteps].reduce((sum, step) => sum + step.tokensUsed, 0);
     const totalLatency = [...steps, ...machineSteps].reduce((sum, step) => sum + step.latencyMs, 0);
@@ -2857,9 +2882,9 @@ ${conclusions.join("\n\n---\n\n")}`,
         checkpoints: checkpointSteps.length,
       },
       structured: {
-        findings: findings.length,
-        recommendations: recs.length,
-        tasks: tasks.length,
+        findings: curatedFindings.length,
+        recommendations: structured.recommendations.length,
+        tasks: structured.tasks.length,
         saved: structuredSaved,
         findingsParseOk: parsedSteps.every((step) => Array.isArray(step.findings)),
         recsParseOk: true,
