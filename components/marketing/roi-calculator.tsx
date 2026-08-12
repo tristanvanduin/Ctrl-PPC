@@ -37,6 +37,18 @@ import { useMemo, useState } from "react";
 // text-off-white/40 op deze en andere marketingpagina's gaf 3,56:1 contrast tegen
 // --midnight-slate (WCAG AA vereist 4,5:1 voor gewone tekst); nagerekend en overal opgehoogd
 // naar /60 (6,42:1). /50 (4,84:1) haalt de norm net wel en is met opzet ongemoeid gelaten.
+//
+// DERDE AS: KANALEN PER KLANT (12 augustus 2026, eigenaar): STANDAARDPAKKET hierboven is de
+// automatische SOP-cyclus voor 1 kanaal. Maar app/api/analysis/monthly/route.ts draait
+// per kanaal een VOLLEDIG eigen stappenreeks (Google/Meta/LinkedIn-adapters, zie
+// deliverable-example.tsx) -- een klant met alle drie kanalen aangesloten levert dus ook drie
+// keer zoveel handmatig werk op om te vervangen, niet slechts een. Geen platte x2/x3 per extra
+// kanaal ("misschien niet de tijd x2 of x3, maar wel een extra layer eroverheen") -- gekozen
+// voor +60% van het basispakket per extra kanaal: reflecteert dat elk kanaal zijn eigen SOP-run
+// nodig heeft, maar met gedeeld accountniveau-overzicht i.p.v. drie volledig losse trajecten.
+// 60% is een bewuste, ronde, conservatieve inschatting -- geen gemeten kanaal-voor-kanaal
+// tijdsopname (die bestaat niet), dus geen valse precisie zoals 11/13 of 9/13 zou suggereren.
+const KANAAL_MULTIPLIER_PER_EXTRA_KANAAL = 0.6;
 
 interface Analyse {
   naam: string;
@@ -76,22 +88,26 @@ const UREN_PER_KLANT_PER_MAAND = MINUTEN_TOTAAL / 60;
 interface Invoer {
   klanten: number;
   uurtarief: number;
+  kanalenPerKlant: number;
 }
 
-function berekenBesparing({ klanten, uurtarief }: Invoer) {
-  const urenPerMaand = UREN_PER_KLANT_PER_MAAND * klanten;
+function berekenBesparing({ klanten, uurtarief, kanalenPerKlant }: Invoer) {
+  const kanaalMultiplier = 1 + (kanalenPerKlant - 1) * KANAAL_MULTIPLIER_PER_EXTRA_KANAAL;
+  const urenPerKlantPerMaand = UREN_PER_KLANT_PER_MAAND * kanaalMultiplier;
+  const urenPerMaand = urenPerKlantPerMaand * klanten;
   const euroPerMaand = urenPerMaand * uurtarief;
-  return { urenPerMaand, euroPerMaand };
+  return { urenPerKlantPerMaand, urenPerMaand, euroPerMaand };
 }
 
 export function RoiCalculator() {
   const [klanten, setKlanten] = useState(15);
   const [uurtarief, setUurtarief] = useState(65);
+  const [kanalenPerKlant, setKanalenPerKlant] = useState(1);
   const [toonPakket, setToonPakket] = useState(false);
 
-  const { urenPerMaand, euroPerMaand } = useMemo(
-    () => berekenBesparing({ klanten, uurtarief }),
-    [klanten, uurtarief],
+  const { urenPerKlantPerMaand, urenPerMaand, euroPerMaand } = useMemo(
+    () => berekenBesparing({ klanten, uurtarief, kanalenPerKlant }),
+    [klanten, uurtarief, kanalenPerKlant],
   );
 
   const euroFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
@@ -131,6 +147,24 @@ export function RoiCalculator() {
             className="mt-2 w-full accent-[#818cf8]"
           />
         </label>
+
+        <label className="block">
+          <div className="flex items-center justify-between text-sm text-off-white/80">
+            <span>Channels per client (avg.)</span>
+            <span className="text-neon-indigo">{kanalenPerKlant}</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={3}
+            value={kanalenPerKlant}
+            onChange={(e) => setKanalenPerKlant(Number(e.target.value))}
+            className="mt-2 w-full accent-[#818cf8]"
+          />
+          <p className="mt-1.5 text-[11px] leading-relaxed text-off-white/40">
+            Google, Meta, and LinkedIn each get their own analysis -- more connected channels means more manual work replaced, not just more accounts.
+          </p>
+        </label>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 border-t border-off-white/10 pt-5">
@@ -151,7 +185,7 @@ export function RoiCalculator() {
       >
         {toonPakket
           ? "Hide the standard package"
-          : `Where do those ${UREN_PER_KLANT_PER_MAAND.toFixed(1)}h per client (x ${klanten} clients = ${urenPerMaand.toFixed(0)}h) come from?`}
+          : `Where do those ${urenPerKlantPerMaand.toFixed(1)}h per client (x ${klanten} clients = ${urenPerMaand.toFixed(0)}h) come from?`}
       </button>
 
       {toonPakket && (
@@ -174,10 +208,18 @@ export function RoiCalculator() {
           <p className="mt-4 text-xs leading-relaxed text-off-white/60">
             These are the automatic SOP runs that happen for every covered client by default --
             monthly, weekly, and biweekly -- with an estimated time cost if a specialist did each
-            by hand. Manual deep dives (budget allocation, bid strategy, and similar on-demand
-            analyses) come on top of this and are not counted here: this is the minimum, not the
-            ceiling. An estimate based on your input, not a measured result.
+            by hand, for one channel. Manual deep dives (budget allocation, bid strategy, and
+            similar on-demand analyses) come on top of this and are not counted here: this is the
+            minimum, not the ceiling. An estimate based on your input, not a measured result.
           </p>
+          {kanalenPerKlant > 1 && (
+            <p className="mt-2 text-xs leading-relaxed text-off-white/60">
+              At {kanalenPerKlant} channels per client, each additional channel adds an estimated
+              {" "}{Math.round(KANAAL_MULTIPLIER_PER_EXTRA_KANAAL * 100)}% on top of the single-channel
+              package above -- its own analysis, but with shared account-level context rather than
+              a fully separate trajectory.
+            </p>
+          )}
           {/* Disclaimer (12 augustus 2026, mobiele design-review): dit rekentool-scherm suggereert
               stilzwijgend dat elke klant in het slider-cijfer automatische SOP's krijgt, maar die
               dekking is tier-afhankelijk (lib/tenancy/sop-dekking.ts: 0 op Foundation, oplopend

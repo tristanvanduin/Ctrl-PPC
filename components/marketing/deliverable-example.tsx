@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 // The Deliverable: same terminal-diagnostics styling as QualityGateMatrix, illustrating a
 // different real fix (12 August 2026) -- the specialist-facing output used to be the 13 raw
 // monthly step outputs concatenated ("Stap 1: ..., Stap 2: ..."), because the trigger button
@@ -6,26 +10,52 @@
 // instead. This example shows the shape of that fix, not a live client report -- same
 // "representative example data" treatment as QualityGateMatrix's CHECKS.
 //
-// REFRAME (12 August 2026, owner correction, two rounds): first round dropped the "13 steps run
-// in the background" headline for a fixed "6 pillars" list -- but that list (Account Performance,
+// REFRAME (12 August 2026, owner correction, three rounds): round 1 dropped the "13 steps run in
+// the background" headline for a fixed "6 pillars" list -- but that list (Account Performance,
 // Campaign Performance, Ad Group & Search Terms, ...) came from docs/ANALYSE-LOGICA.md #5.1, which
-// only documents the Google Ads path. Second round, same day: "dit is weer extreem google minded
-// ... we doen veel meer dan alleen die google campagnes" -- correct. app/api/analysis/monthly/
-// route.ts runs a genuinely different step sequence per channel (Google, Meta, and LinkedIn adapters
-// in lib/analysis/adapters/), each shaped around what that channel actually is: search intent and
-// auction dynamics for Google, creative and audience fatigue for Meta, ICP-fit and lead funnel for
-// LinkedIn. Naming those channel-specific focus areas is the honest version of "6 pillars" -- not
-// the exact ordered step list or step count for any channel, which would hand a competitor the
-// blueprint to rebuild the SOP structure themselves (see: "niet dat we teveel weggeven dat ze zelf
-// de sop gaan nabouwen met onze structuur"). What IS genuinely shared across every channel, and
-// safe to say plainly: every channel's reasoning ends in hypothesis validation, and every finding
-// clears the same quality gates (see QualityGateMatrix) before synthesis -- confirmed in code via
-// finalizeChannelMonthlySynthesis, the shared synthesis layer all three channels run through.
-const CHANNEL_FOCUS = [
-  { kanaal: "Google Ads", focus: "Search intent, auction dynamics, account & campaign performance" },
-  { kanaal: "Meta", focus: "Creative & audience performance, frequency and fatigue" },
-  { kanaal: "LinkedIn", focus: "ICP-fit, lead funnel, account & campaign performance" },
-];
+// only documents the Google Ads path. Round 2, same day: "dit is weer extreem google minded ...
+// we doen veel meer dan alleen die google campagnes" -- correct, so round 2 collapsed every
+// channel to one summary line each. Round 3, same day: "moeten we voor de andere kanalen ook de
+// marketing termen over de echte sop stappen doen" -- Google shouldn't be the only channel that
+// gets a real pillar breakdown; Meta and LinkedIn earn the same depth.
+//
+// The pillars below are MY grouping of each channel's real steps (verified against
+// lib/analysis/adapters/{meta-ads,linkedin-ads}.ts and app/api/analysis/monthly/route.ts's Google
+// path), not an existing doc -- same principle as docs/ANALYSE-LOGICA.md #5.1 did for Google
+// (13 raw steps -> 6 named pillars), applied the same way to Meta's real 11 steps and LinkedIn's
+// real 9. Every channel's real step list literally starts with "Account Performance" and ends
+// with "Hypotheses en Sprintplanning" -- that symmetry across channels is real, not invented, and
+// is why every pillar list below opens and closes the same way. The pillar names group the real
+// steps; they are not the exact ordered step list or step count for any channel, which would hand
+// a competitor the blueprint to rebuild the SOP structure themselves (see: "niet dat we teveel
+// weggeven dat ze zelf de sop gaan nabouwen met onze structuur"). What IS genuinely shared across
+// every channel, and safe to say plainly regardless of which tab is open: every channel's
+// reasoning ends in hypothesis validation, and every finding clears the same quality gates (see
+// QualityGateMatrix) before synthesis -- confirmed in code via finalizeChannelMonthlySynthesis,
+// the shared synthesis layer all three channels run through.
+const CHANNEL_PILLARS = [
+  {
+    kanaal: "Google Ads",
+    pillars: [
+      "Account Performance", "Campaign Performance", "Search & Auction Depth",
+      "Creative & Audience", "Optimization Recommendations", "Hypothesis Validation",
+    ],
+  },
+  {
+    kanaal: "Meta",
+    pillars: [
+      "Account Performance", "Campaign & Budget Structure", "Ad Set & Audience Performance",
+      "Creative Performance & Fatigue", "Placement, Funnel & Schedule", "Hypothesis Validation",
+    ],
+  },
+  {
+    kanaal: "LinkedIn",
+    pillars: [
+      "Account Performance", "Campaign Performance & Budget", "Creative Performance",
+      "ICP-Fit & Demographics", "Lead Funnel, Audience & Pacing", "Hypothesis Validation",
+    ],
+  },
+] as const;
 
 interface PriorityRow {
   naam: string;
@@ -50,6 +80,9 @@ const PRIORITIES: PriorityRow[] = [
 ];
 
 export function DeliverableExample() {
+  const [kanaal, setKanaal] = useState<(typeof CHANNEL_PILLARS)[number]["kanaal"]>("Google Ads");
+  const actief = CHANNEL_PILLARS.find((c) => c.kanaal === kanaal) ?? CHANNEL_PILLARS[0];
+
   return (
     // SPACING FIX (12 augustus 2026, same root cause as quality-gate-matrix.tsx): pb-16 here
     // stacked against the "Ultimate Positioning" paragraph's own mt-16 further down
@@ -67,13 +100,32 @@ export function DeliverableExample() {
           Illustrative example. Each channel gets reasoning shaped around how it actually works, not a generic template.
         </p>
 
-        <div className="mt-5 space-y-2" style={{ fontFamily: "var(--font-marketing-mono)" }}>
-          {CHANNEL_FOCUS.map((c) => (
-            <div key={c.kanaal} className="flex flex-col gap-1 text-[11px] sm:flex-row sm:items-baseline sm:gap-3">
-              <span className="shrink-0 uppercase tracking-wide text-off-white/40 sm:w-24">{c.kanaal}</span>
-              <span className="leading-relaxed text-off-white/25">{c.focus}</span>
-            </div>
+        <div className="mt-4 flex gap-1.5" role="tablist" aria-label="Channel">
+          {CHANNEL_PILLARS.map((c) => (
+            <button
+              key={c.kanaal}
+              type="button"
+              role="tab"
+              aria-selected={kanaal === c.kanaal}
+              onClick={() => setKanaal(c.kanaal)}
+              className={`rounded-[4px] border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                kanaal === c.kanaal
+                  ? "border-neon-indigo/50 bg-neon-indigo/10 text-neon-indigo"
+                  : "border-off-white/10 text-off-white/40 hover:text-off-white/70"
+              }`}
+            >
+              {c.kanaal}
+            </button>
           ))}
+        </div>
+
+        <div className="mt-4" style={{ fontFamily: "var(--font-marketing-mono)" }}>
+          <p className="text-[11px] uppercase tracking-wide text-off-white/30">
+            Six focus areas, run every month
+          </p>
+          <p className="mt-2 text-[11px] leading-relaxed text-off-white/25">
+            {actief.pillars.join(" -- ")}
+          </p>
           <p className="mt-2 text-[10px] leading-relaxed text-off-white/20">
             Every channel's reasoning ends in hypothesis validation, and every finding clears the same quality gates before it reaches you.
           </p>
