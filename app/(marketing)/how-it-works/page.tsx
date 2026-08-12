@@ -124,7 +124,7 @@ export default function HowItWorksPage() {
 
       {/* Illustraties bij twee specifieke stadia, met al gebouwde componenten -- geen nieuwe
           visuals nodig voor wat de homepage al correct laat zien. */}
-      <div className="mt-16 space-y-10">
+      <div className="mt-16 space-y-14">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
             Stage 01, in practice

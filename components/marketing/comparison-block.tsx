@@ -21,12 +21,19 @@
 
 const NEP_BALKEN = [40, 65, 30, 80, 45, 60, 35];
 
-const DIAGNOSE_REGELS = [
+// Hierarchy pass (12 augustus 2026, design feedback): alle vijf regels stonden op gelijk gewicht
+// -- zelfde grootte, alleen het label gedimd -- waardoor niets eruit sprong en het blok werd
+// overgescand in plaats van gelezen. SCAN/SIGNAL zijn nu de opzet (klein, compact), ROOT CAUSE en
+// HYPOTHESIS de twee regels die de sectie-titel ("Numbers are not a diagnosis") daadwerkelijk
+// waarmaken -- die krijgen het formaat en de helderheid, niet de context eromheen.
+const SETUP_REGELS = [
   { label: "SCAN", value: "71 accounts, 3 channels" },
   { label: "SIGNAL", value: "Search CPA (mobile) +34% vs. target" },
+];
+
+const KERN_REGELS = [
   { label: "ROOT CAUSE", value: "Bid strategy not reacting to the 19:00-22:00 peak window" },
   { label: "HYPOTHESIS", value: "tROAS +10% during evening hours -> CPA -15%" },
-  { label: "STATUS", value: "awaiting quality gate" },
 ];
 
 export function ComparisonBlock() {
@@ -68,14 +75,26 @@ export function ComparisonBlock() {
             Ctrl PPC: Primary Diagnosis
           </h3>
 
-          <div className="mt-6 space-y-3" style={{ fontFamily: "var(--font-marketing-mono)" }}>
-            {DIAGNOSE_REGELS.map((r) => (
-              <div key={r.label} className="flex flex-wrap gap-x-3 text-sm">
-                <span className="w-28 shrink-0 text-off-white/60">{r.label}</span>
-                <span className="text-off-white">{r.value}</span>
-              </div>
-            ))}
-            <div className="flex items-center gap-2 pt-2 text-sm text-neon-indigo">
+          <div className="mt-6" style={{ fontFamily: "var(--font-marketing-mono)" }}>
+            <div className="space-y-1.5">
+              {SETUP_REGELS.map((r) => (
+                <div key={r.label} className="flex flex-wrap gap-x-3 text-xs">
+                  <span className="w-24 shrink-0 text-off-white/40">{r.label}</span>
+                  <span className="text-off-white/60">{r.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 space-y-4 border-l-2 border-neon-indigo/50 pl-4">
+              {KERN_REGELS.map((r) => (
+                <div key={r.label}>
+                  <p className="text-[11px] uppercase tracking-wide text-neon-indigo/80">{r.label}</p>
+                  <p className="mt-1 text-base leading-snug text-off-white">{r.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex items-center gap-2 text-xs text-off-white/50">
               <span className="inline-block h-3.5 w-2 animate-pulse bg-neon-indigo" aria-hidden />
               <span>awaiting next signal_</span>
             </div>

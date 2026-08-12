@@ -20,6 +20,13 @@ interface GateCheck {
 // Cap" en "Shopify Inventory" -- geen daarvan bestaat als gate, en Shopify is bovendien een
 // ongebouwde integratie (zie de "Coming soon"-badge in TrustBanner). Gevonden bij een audit op de
 // live site.
+//
+// KLEUR (12 augustus 2026, design feedback): FAIL/HALT EXECUTION stond op amber. Het product
+// maakt zelf al het onderscheid tussen amber (waarschuwing) en rood (harde stop) --
+// components/dashboard/code-rood-banner.tsx gebruikt rood voor "churnrisico, alle hands on
+// deck" en amber voor "wees alert". Een HALT is geen waarschuwing, het is de harde stop. Amber
+// hier gaf geen doorbraak-verband, alleen kleurherhaling. Naar rood-tokens (--color-red-400/500
+// e.v., app/globals.css) i.p.v. amber-waste.
 const CHECKS: GateCheck[] = [
   { naam: "Evidence Gate", status: "PASS" },
   { naam: "Causal Chain Gate", status: "PASS" },
@@ -40,13 +47,13 @@ export function QualityGateMatrix() {
           Every hypothesis clears this before it reaches you. No check, no execution.
         </p>
 
-        <div className="mt-5 space-y-2.5" style={{ fontFamily: "var(--font-marketing-mono)" }}>
+        <div className="mt-5 space-y-3" style={{ fontFamily: "var(--font-marketing-mono)" }}>
           {CHECKS.map((check, i) => (
             <div
               key={check.naam}
-              className={`flex flex-col gap-2 rounded-[6px] border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 ${
+              className={`flex flex-col gap-2.5 rounded-[6px] border px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 ${
                 check.status === "FAIL"
-                  ? "border-amber-waste/40 bg-amber-waste/5"
+                  ? "border-red-400/50 bg-red-400/10"
                   : "border-off-white/10 bg-midnight-slate/40"
               }`}
             >
@@ -58,7 +65,7 @@ export function QualityGateMatrix() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {check.gevolg && (
-                  <span className="text-[11px] uppercase tracking-wide text-amber-waste">{check.gevolg}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-red-400">{check.gevolg}</span>
                 )}
                 {check.status === "PASS" ? (
                   <span className="flex items-center gap-1.5 text-emerald-400">
@@ -66,7 +73,7 @@ export function QualityGateMatrix() {
                     PASS
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-amber-waste">
+                  <span className="flex items-center gap-1.5 font-semibold text-red-400">
                     <XCircle className="h-3.5 w-3.5" aria-hidden />
                     FAIL
                   </span>
