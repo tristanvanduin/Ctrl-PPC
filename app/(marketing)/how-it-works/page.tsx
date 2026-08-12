@@ -77,13 +77,20 @@ export default function HowItWorksPage() {
           comment on why God View is not part of this loop). God View copy stays honest about
           scope: the cross-tenant version does not exist yet, only single-agency/platform-admin
           views (components/terminal/god-mode.tsx, agency-god-view.tsx) and the not-built
-          "God View" module in the Intelligence Store on /pricing. */}
+          "God View" module in the Intelligence Store on /pricing.
+
+          Layer 1 text updated 12 August 2026: said "unlimited accounts, no cap", which stopped
+          being true once lib/marketing/foundation-cap.ts shipped (50 agencies at a time during
+          launch). Found via an "unlimited" grep sweep across app/(marketing), same overclaim
+          class already fixed once on the FAQ page. Still true and now said explicitly: unlimited
+          per agency, the cap is on new agencies during launch, not on what one account can do. */}
       <div className="mt-14 grid gap-6 sm:grid-cols-3">
         <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">Layer 1 - Foundation</p>
           <p className="mt-2 text-sm text-off-white/60">
             Connect Google, Meta, LinkedIn, and Microsoft Ads. See what happened, dashboarding,
-            forecasting, KPI monitoring. Free, unlimited accounts, no cap.
+            forecasting, KPI monitoring. Free and unlimited per agency, capped at 50 agencies
+            during launch.
           </p>
         </div>
         <div className="rounded-[6px] border border-neon-indigo/30 bg-midnight-slate-raised/50 p-5">
