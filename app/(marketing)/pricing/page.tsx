@@ -149,6 +149,18 @@ function TierCard({
         <FeatureRow feature={tier.rapportage} />
       </ul>
 
+      {/* Coupon-kaartje (12 augustus 2026, derde versie): stond eerst boven de tier-grid, toen
+          vastgeplakt op de bovenrand van elke kaart -- daar botste hij op Growth met "Most agencies
+          start here" en gaf het bovenaan "veel drukte" (eigenaars woorden). Onderin, vlak boven de
+          CTA, is er geen andere badge om mee te botsen en blijft het gestippelde/gedraaide
+          coupon-gevoel overeind zonder het kaartrand-overlap-risico van de vorige versie. */}
+      {!isFoundation && (
+        <div className="mx-auto mt-4 flex w-fit -rotate-1 items-center gap-1.5 rounded-[4px] border border-dashed border-neon-indigo/50 bg-neon-indigo/5 px-2.5 py-1.5 text-[11px] font-semibold text-neon-indigo">
+          <Gift className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          +5 free Second Opinions
+        </div>
+      )}
+
       <a
         href="/demo"
         className="mt-6 block rounded-[6px] border border-neon-indigo/40 px-4 py-2.5 text-center text-sm font-semibold text-neon-indigo transition-colors hover:bg-neon-indigo/10"
@@ -199,18 +211,8 @@ export default async function PricingPage() {
         </span>
       </div>
 
-      {/* Coupon-blok, niet een featureregel op één tier (12 augustus 2026, correctie): de trigger
-          in migratie 074 vuurt bij ELKE overgang basis -> een betaalde tier, dus dit hoort niet bij
-          Core specifiek; en "alleen een check valt niet op" -- vandaar dashed border + eigen icoon
-          i.p.v. begraven in een checklist. Zie lib/marketing/tiers.ts voor de volledige toelichting. */}
-      <div className="mt-4 flex items-center justify-center gap-3 rounded-[6px] border border-dashed border-neon-indigo/40 bg-neon-indigo/5 px-6 py-4 text-sm text-off-white/80">
-        <Gift className="h-5 w-5 shrink-0 text-neon-indigo" aria-hidden />
-        <span>
-          <strong className="font-semibold text-neon-indigo">Welcome gift:</strong> upgrade from
-          Foundation to any paid tier and unlock 5 free Second Opinion audits - normally part of a
-          {" "}&euro;250/mo add-on.
-        </span>
-      </div>
+      {/* De coupon-tag zit vanaf hier op de kaart zelf (TierCard, "+5 free Second Opinions"), niet
+          meer als los blok tussen deze band en de grid -- zie de toelichting bij die tag. */}
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {TIERS.map((tier) => (

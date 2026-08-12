@@ -34,15 +34,17 @@
 // tier-grid. Naam "Foundation" komt uit de positioneringsstrategie (Strategie_v3.pdf); "basis"
 // blijft de interne licentie-sleutel, geen migratie nodig.
 //
-// SECOND OPINION-WELKOMSTCADEAU (12 augustus 2026, twee correcties): de 5 gratis trialruns
+// SECOND OPINION-WELKOMSTCADEAU (12 augustus 2026, drie correcties): de 5 gratis trialruns
 // (migratie 074, lib/analysis/second-opinion-trial.ts) stonden eerst alleen in de backend en de
 // dashboard-teller, niet op deze prijspagina. Eerste poging: een featureregel op Core. Twee
 // problemen daarmee, allebei van de eigenaar: (1) de database-trigger vuurt bij ELKE overgang
 // basis -> een betaalde tier, niet alleen naar Core specifiek -- een regel alleen op Core was dus
 // feitelijk onvolledig voor wie direct naar Growth of hoger upgradet. (2) "alleen een check valt
-// niet op" -- begraven tussen vier andere checkmarks deed het niet als upsell-argument. Nu een
-// los coupon-gestileerd blok op de prijspagina zelf (naast de tier-grid, niet in een featurelijst
-// van een specifieke tier), zodat het zowel klopt als opvalt.
+// niet op" -- begraven tussen vier andere checkmarks deed het niet als upsell-argument. Tweede
+// poging: een los coupon-blok naast de tier-grid. Derde correctie (eigenaar): "een coupon blokje
+// dat vast geniet lijkt op de tier kaart, zodat je ziet dat het echt extra is, een bonus" -- nu een
+// gedraaide, gestippelde tag die op elke betaalde kaart zelf overlapt (TierCard in
+// app/(marketing)/pricing/page.tsx), niet los ernaast.
 //
 // CRM UIT PROFESSIONAL, BI OP AANVRAAG BIJ ENTERPRISE (12 augustus 2026): Professional noemde
 // "Business Intelligence Connect: Shopify, WooCommerce, CRM, WordPress" als roadmapfeature -- dat
