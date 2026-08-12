@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CANONIEK_DOMEIN } from "@/lib/domein";
 import { LOOP_STAGES } from "@/lib/marketing/loop";
 import { DecisionLoop } from "@/components/marketing/decision-loop";
@@ -99,6 +100,13 @@ export default function HowItWorksPage() {
           </p>
         </div>
       </div>
+      <p className="mt-4 text-center text-sm text-off-white/40">
+        Every connected account starts on Foundation, free. The loop below runs on accounts you put
+        on Auto-SOP, from the Core tier up.{" "}
+        <Link href="/pricing" className="font-semibold text-neon-indigo hover:underline">
+          See pricing
+        </Link>.
+      </p>
 
       <div className="mt-14">
         <DecisionLoopRing />

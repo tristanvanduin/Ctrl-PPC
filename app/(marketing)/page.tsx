@@ -77,8 +77,11 @@ export default async function HomePage() {
           is decisioning: it reads every account across every channel, forms a testable hypothesis,
           and closes the learning loop by remembering what worked after you act on it.
         </p>
-        <div className="mt-8 flex items-center justify-center sm:mt-10">
+        <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10">
           <PrimaryCta />
+          <p className="text-xs text-off-white/40">
+            Foundation is free, forever - connect every account, no card required.
+          </p>
         </div>
       </section>
 
