@@ -51,7 +51,7 @@ interface ExtractionOptions {
   supabase: SupabaseClient;
   apiKey: string;
   clientId: string;
-  sopType: "weekly" | "biweekly" | "monthly";
+  sopType: "weekly" | "biweekly" | "monthly" | "meta_weekly" | "linkedin_weekly" | "meta_biweekly" | "linkedin_biweekly";
   analysisDate: string;
   periodStart: string;
   periodEnd: string;
@@ -164,7 +164,7 @@ ${analysisOutput}`,
   // W2.5 (W2): number-gate voor de korte cadans. Markeert en schrapt percentages en euro's in
   // aanbevelingen en taken die niet herleidbaar zijn tot de gegronde analyse-output. Alleen
   // weekly en biweekly; monthly heeft zijn eigen gate in buildStructuredMonthlyOutput.
-  if (sopType === "weekly" || sopType === "biweekly") {
+  if (sopType.endsWith("weekly") || sopType.endsWith("biweekly")) {
     const allowed = extractGroundedNumbers(analysisOutput + " " + findings.map((f) => JSON.stringify(f)).join(" "));
     let flaggedNumbers = 0;
     recs = recs.map((rec) => {

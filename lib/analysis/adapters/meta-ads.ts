@@ -182,7 +182,7 @@ const META_PURITY_RULES: Partial<Record<number, StepPurityRule>> = {
 };
 
 // Benchmarks per accounttype, als richtwaarden (geen harde normen). Meta-context.
-const META_BENCHMARKS: Record<AccountType, string> = {
+export const META_BENCHMARKS: Record<AccountType, string> = {
   ecommerce_roas: "Meta-benchmarks (richtwaarden, e-commerce ROAS): Link CTR feed 0,8 tot 1,5%, hook rate video 25 tot 40%, hold rate 10 tot 20%, frequency-alarm boven 3,5 per 7 dagen bij prospecting. Vermeld CPM-context bij spend-verschuivingen. ROAS afmeten tegen de target uit client_settings.",
   ecommerce_cpa: "Meta-benchmarks (richtwaarden, e-commerce CPA): Link CTR feed 0,8 tot 1,5%, hook rate video 25 tot 40%, hold rate 10 tot 20%, frequency-alarm boven 3,5 per 7 dagen bij prospecting. CPA afmeten tegen de target; let op CVR- en funnel-drop-offs als kostendrijver.",
   leadgen_cpa: "Meta-benchmarks (richtwaarden, leadgen CPA): Link CTR feed 0,8 tot 1,5%, hook rate video 25 tot 40%, frequency-alarm boven 3,5 per 7 dagen. Beoordeel leadkwaliteit-signalen waar beschikbaar; CPA tegen de target.",
