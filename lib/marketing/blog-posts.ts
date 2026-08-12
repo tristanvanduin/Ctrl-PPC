@@ -5,7 +5,15 @@
 // gericht geschreven op zoekopdrachten en LLM-vragen van een specialist die naar precies dit
 // probleem zoekt, en zijn gegrond in echte, bestaande analysecapaciteit (lib/cross-channel/
 // funnel-overlap.ts, rsa-insights-facts.ts, lib/analysis/kpi-relations) -- geen verzonnen
-// klantcijfers of onderzoeksclaims, ook hier niet.
+// klantcijfers of onderzoeksclaims, ook hier niet. Geverifieerd (12 augustus 2026): de
+// classificatielogica en de acht KPI-relaties in die drie bestanden komen woord voor woord
+// overeen met wat de posts erover beweren.
+//
+// LEESMINUTEN GECORRIGEERD (12 augustus 2026, blog-audit): elk artikel gaf 5-8 minuten op,
+// terwijl de werkelijke woordentelling (174-343 woorden) op ~200 wpm neerkomt op 1-2 minuten --
+// een factor 3-6x te hoog, op elk artikel. "min read" staat letterlijk op de pagina
+// (app/(marketing)/blog/[slug]/page.tsx, blog/page.tsx), dus dit was geen interne schatting maar
+// een zichtbare, verifieerbare claim die niet klopte. Herberekend als Math.ceil(woorden / 200).
 
 export interface RelatedPage {
   label: string;
@@ -34,7 +42,7 @@ export const BLOG_POSTS: BlogPost[] = [
     samenvatting:
       "A single monthly CPA number averages two very different accounts into the same outcome. What that hides, and what to look at instead.",
     datum: "2026-06-02",
-    leesminuten: 6,
+    leesminuten: 1,
     inhoud: [
       "A campaign with a CPA of 40 euros can describe two very different accounts: one that sits stably " +
         "around 40 euros everywhere, and one that hits 15 euros on desktop during the day and 90 on mobile " +
@@ -61,7 +69,7 @@ export const BLOG_POSTS: BlogPost[] = [
     samenvatting:
       "Impression share drops, and the dashboard shows a red line. The reason why is usually missing, and that reason determines which action makes sense.",
     datum: "2026-06-24",
-    leesminuten: 5,
+    leesminuten: 1,
     inhoud: [
       "Search impression share drops for one of two reasons: budget or rank. A dashboard that only shows " +
         "the percentage forces you to guess which one it is, and the wrong guess spends money in the wrong " +
@@ -89,7 +97,7 @@ export const BLOG_POSTS: BlogPost[] = [
     samenvatting:
       "You do not need to manually log every change to know whether a hypothesis was executed. The change history the platform already keeps tells you.",
     datum: "2026-07-15",
-    leesminuten: 7,
+    leesminuten: 1,
     inhoud: [
       "Every ad platform keeps a change history: what was changed, when, and by whom. That history is " +
         "rarely used for anything besides an after-the-fact audit, even though it is also the missing link " +
@@ -115,7 +123,7 @@ export const BLOG_POSTS: BlogPost[] = [
     samenvatting:
       "Every channel delivers its own report, and no report shows whether the channels reinforce each other or double-pay for the same warm audience. A concrete way to actually see it.",
     datum: "2026-07-28",
-    leesminuten: 8,
+    leesminuten: 2,
     inhoud: [
       "Ask a specialist whether their channels reinforce each other, and the answer is almost always a " +
         "feeling, not a number. Google Ads reports on Google Ads, Meta reports on Meta, and neither knows " +
@@ -153,7 +161,7 @@ export const BLOG_POSTS: BlogPost[] = [
     samenvatting:
       "Most RSA analysis stops at the ad group level. Go one layer deeper, to individual assets, and you can walk into a double count that makes your best headline look worse than it is.",
     datum: "2026-08-04",
-    leesminuten: 6,
+    leesminuten: 2,
     inhoud: [
       "A Responsive Search Ad is not one piece of ad copy but a pool of headlines and descriptions that " +
         "Google combines itself. Most reporting stops at the ad group level: how does this RSA perform as a " +
@@ -183,7 +191,7 @@ export const BLOG_POSTS: BlogPost[] = [
     samenvatting:
       "A report usually lists CPA, CTR, and reach separately. The signal is often not in either one, but in the ratio between them.",
     datum: "2026-08-10",
-    leesminuten: 7,
+    leesminuten: 2,
     inhoud: [
       "Most reports treat every KPI as its own line: CPA this month, CTR this month, reach this month. Read " +
         "on their own, none of the three says anything is wrong, and yet the combination can hide a problem " +
