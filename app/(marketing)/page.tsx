@@ -71,22 +71,30 @@ export default async function HomePage() {
           de vouw dan nodig. Platform Pulse zelf blijft NIET boven de vouw: hero-met-CTA boven de
           vouw en het eerste bewijs (live cijfers) op de eerste scroll is het gangbare patroon,
           geen tekortkoming. Deze pass maakt alleen de hero minder zwaar, wat de afstand tot Pulse
-          als bijeffect verkort. */}
-      <section className="mx-auto max-w-4xl px-6 pt-14 pb-8 text-center sm:pt-20 sm:pb-10">
+          als bijeffect verkort.
+
+          TWEEDE RONDE (zelfde dag, "cijfers toch standaard op het scherm... zonder kwaliteit
+          verlies of het gevoel van drukte"): op een normaal desktop-viewport (niet uitgezoomd)
+          stond Pulse's kop nog net aan de onderrand, de kerncijfers zelf niet zichtbaar zonder
+          scrollen. Verticale marges verder verkleind (pt-20->pt-12, pb-10->pb-8, mt-5->mt-4,
+          mt-6->mt-4, mt-8/10->mt-6, en Pulse's eigen mt-8->mt-5 verderop), niet de tekstgrootte --
+          dat blijft de knop die al eerder is omgedraaid. Elke regel blijft zijn eigen ademruimte
+          houden, alleen minder ervan. */}
+      <section className="mx-auto max-w-4xl px-6 pt-10 pb-6 text-center sm:pt-12 sm:pb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
           The Cross-Channel Decision Engine
         </p>
-        <h1 className="mx-auto mt-5 font-marketing-heading text-3xl font-extrabold leading-tight text-off-white sm:text-4xl md:text-5xl">
+        <h1 className="mx-auto mt-4 font-marketing-heading text-3xl font-extrabold leading-tight text-off-white sm:text-4xl md:text-5xl">
           A chart is not a decision.
           <br />
           We built the engine that is.
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-base text-off-white/60 sm:text-lg">
+        <p className="mx-auto mt-4 max-w-2xl text-base text-off-white/60 sm:text-lg">
           AI dashboards ship "AI insights." That is still a chart with better handwriting. Ctrl PPC
           is decisioning: it reads every account across every channel, forms a testable hypothesis,
           and closes the learning loop by remembering what worked after you act on it.
         </p>
-        <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10">
+        <div className="mt-6 flex flex-col items-center gap-3">
           <PrimaryCta />
           {/* Foundation-cap (12 augustus 2026, bijgesteld na "dit is niet first 50, daarna gaat de
               tier weer open"): foundationBeschikbaar() telt hoeveel bureaus NU op licentie=basis
@@ -113,7 +121,7 @@ export default async function HomePage() {
         <p className="mx-auto mt-2 max-w-xl text-center text-sm text-off-white/50">
           Live numbers across every connected account. Not simulated.
         </p>
-        <div className="dark terminal mt-8">
+        <div className="dark terminal mt-5">
           <PlatformPulse />
         </div>
       </section>

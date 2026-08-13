@@ -460,6 +460,94 @@ export const BLOG_POSTS: BlogPost[] = [
     tags: ["Agency Ops"],
     contentType: "Method",
   },
+  {
+    slug: "linkedin-icp-waste",
+    titel: "How much of your LinkedIn spend never reaches your actual buyer",
+    samenvatting:
+      "LinkedIn's own targeting reports spend and leads by job function, seniority, industry, and company size. Most accounts never set that breakdown against who they are actually trying to reach.",
+    datum: "2026-08-13",
+    leesminuten: 2,
+    inhoud: [
+      "LinkedIn Campaign Manager reports impressions, clicks, spend, and leads broken down by job function, " +
+        "seniority, industry, and company size for every campaign. Most accounts read the campaign-level CPL " +
+        "and stop there, never crossing that demographic breakdown against the profile they were actually " +
+        "trying to reach.",
+      "The check itself is not complicated: define the ideal customer profile as the set of job functions, " +
+        "seniority levels, industries, and company sizes worth targeting, then set LinkedIn's own demographic " +
+        "split against it. Spend and leads inside that profile are the number that matters; everything " +
+        "outside it is functionally cost with no route to a real buyer, whatever the blended CPL says.",
+      "The pattern worth watching for specifically: a segment absorbing a real share of spend while sitting " +
+        "entirely outside the profile -- individual contributors on a campaign built for decision-makers, or " +
+        "an industry the account has never once closed a deal in. No single line in a standard LinkedIn report " +
+        "flags this; the campaign-level CPL can look perfectly healthy while a meaningful slice of the budget " +
+        "buys reach that was never going to convert.",
+      "The harder case, and the one worth naming honestly: LinkedIn does not disclose demographic data for " +
+        "every impression -- a share sits below a reporting threshold and never gets attributed to any " +
+        "segment. Treating that unattributed slice as fine is a guess dressed as a finding; the honest version " +
+        "of this check reports coverage alongside the fit numbers, not instead of them.",
+    ],
+    gerelateerdeSlugs: ["linkedin-creative-verval-zonder-frequency", "kanaalsynergie-bewijzen"],
+    tags: ["LinkedIn"],
+    contentType: "Signal",
+  },
+  {
+    slug: "linkedin-creative-verval-zonder-frequency",
+    titel: "Why 'creative fatigue' means something different on LinkedIn than on Meta",
+    samenvatting:
+      "Meta shows you frequency per ad, so fatigue is a number you can watch directly. LinkedIn never reports it -- creative decay has to be read a different way entirely.",
+    datum: "2026-08-13",
+    leesminuten: 2,
+    inhoud: [
+      "Creative fatigue on Meta has a direct measurement: frequency climbs, and CTR usually falls alongside " +
+        "it, so a specialist watches one number rise against another and knows roughly when to refresh. " +
+        "LinkedIn does not report frequency per creative at all -- the exact input that measurement depends on " +
+        "simply is not available in the platform's own reporting.",
+      "What LinkedIn does report, per creative, is CTR and engagement over the days it has been running. That " +
+        "is the workaround: instead of watching exposure per person climb, watch performance decay over " +
+        "time-live. A creative holding a stable CTR at day 40 is behaving differently from one that opened " +
+        "strong and has been sliding for two weeks straight, even though neither shows a frequency number to " +
+        "explain why.",
+      "The distinction that actually matters in practice: a slow, steady decline across every creative in a " +
+        "campaign usually points to audience-level saturation, not any single creative wearing out, since " +
+        "LinkedIn audiences are typically smaller and slower-refreshing than Meta's, so the whole pool sees " +
+        "the same ad more often over a longer stretch. A sharp decline isolated to one creative, with others " +
+        "in the same campaign holding steady, points at that specific asset, not the audience underneath it.",
+      "Reading time-live as a fatigue proxy only works if it is compared like for like -- format against " +
+        "format, since a document ad and a single-image ad decay on entirely different timelines. Treating " +
+        "the two as one curve just because they ran in the same campaign produces a refresh signal that fires " +
+        "at the wrong moment for one of them, every time.",
+    ],
+    gerelateerdeSlugs: ["linkedin-icp-waste", "rsa-asset-dubbeltelling"],
+    tags: ["LinkedIn", "Meta"],
+    contentType: "Signal",
+  },
+  {
+    slug: "linkedin-audience-network-lekkage",
+    titel: "The LinkedIn toggle that quietly changes where your ads actually run",
+    samenvatting:
+      "Audience Network extends a LinkedIn campaign's reach beyond LinkedIn itself, bundled into the same campaign-level number. Whether that extra reach is worth what it costs is a question most reports never separate out.",
+    datum: "2026-08-13",
+    leesminuten: 1,
+    inhoud: [
+      "LinkedIn campaigns carry a setting, on by default in some campaign types, that extends delivery beyond " +
+        "LinkedIn itself to a network of partner apps and websites -- Audience Network. The campaign still " +
+        "reports as one line: one CPL, one CTR, one spend total, with no visible split between LinkedIn's own " +
+        "inventory and the extended network underneath it.",
+      "The concrete question worth asking is not whether to turn it off, since more reach at a lower CPM is " +
+        "genuinely useful when it converts -- it is whether the leads or engagement coming from that extended " +
+        "reach hold up against what the same budget does on LinkedIn's own inventory. A campaign-level CPL " +
+        "that looks stable can still be quietly propped up by cheap volume from placements the buyer never " +
+        "associates with LinkedIn at all.",
+      "The honest limitation, worth stating plainly: LinkedIn does not report cost and conversions split by " +
+        "placement within a campaign, so this is a before/after comparison, not a live dashboard number -- " +
+        "toggle it, hold everything else constant, and read the campaign's CPL and lead quality across a " +
+        "clean window on each side. There is no other way to see it, because the platform never shows the " +
+        "split directly.",
+    ],
+    gerelateerdeSlugs: ["linkedin-icp-waste", "pmax-network-mix-verschuiving"],
+    tags: ["LinkedIn"],
+    contentType: "Signal",
+  },
   // DRAFT (12 augustus 2026, niet gepubliceerd op verzoek van de eigenaar -- "ik zou dit gewoon
   // schrijven en desnoods als concept opslaan en pas later publiceren"): een uitgebreide pro/con van
   // dashboarding-alleen. De homepage-positionering liet het "illusie"-frame vallen omdat het
