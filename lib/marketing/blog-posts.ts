@@ -334,6 +334,75 @@ export const BLOG_POSTS: BlogPost[] = [
     tags: ["Google Ads"],
   },
   {
+    slug: "pmax-asset-group-risico",
+    titel: "One asset group can quietly become your whole Performance Max campaign",
+    samenvatting:
+      "A single asset group taking over most of a PMax campaign's spend is a concentration risk worth naming. A separate asset group can spend real money with zero conversions for months without either one showing up in the campaign total.",
+    datum: "2026-08-13",
+    leesminuten: 1,
+    inhoud: [
+      "A Performance Max campaign is built from asset groups, and the campaign-level report shows one " +
+        "blended result even when the asset groups underneath it behave completely differently -- one " +
+        "dominating spend, others barely touching the budget.",
+      "Concentration is the first pattern worth naming: when a single asset group takes over most of a " +
+        "campaign's spend, that is the exact opposite of what spreading budget across asset groups is meant " +
+        "to protect against, even while the campaign's headline number looks unremarkable.",
+      "Waste is the second, more direct pattern, and it is a separate question from concentration: an asset " +
+        "group can carry sustained, real spend with zero conversions for the same window a concentration " +
+        "check would look at, sitting inside a campaign total that still looks fine. Performance labels and " +
+        "asset-group spend are both visible in Google's own interface, but rarely checked together against " +
+        "the campaign's own history -- which is exactly why either pattern can run for a full reporting cycle " +
+        "before anyone notices.",
+    ],
+    gerelateerdeSlugs: ["pmax-network-mix-verschuiving", "pmax-creative-dekking"],
+    tags: ["Google Ads"],
+  },
+  {
+    slug: "pmax-creative-dekking",
+    titel: "Why a Performance Max campaign with no video assets is leaving reach on the table",
+    samenvatting:
+      "Performance Max serves across placements that reward different asset types. A campaign built only on images quietly caps how well it can perform on the video-first inventory it is still paying to reach.",
+    datum: "2026-08-13",
+    leesminuten: 1,
+    inhoud: [
+      "Performance Max serves across a wide mix of placements -- Search, Shopping, Display, YouTube, " +
+        "Discover, Gmail, Maps -- and each favors different asset types. A campaign built entirely from " +
+        "images has nothing to serve well on the video-first inventory it is still bidding into.",
+      "The signal worth checking is not just whether there are enough assets, but whether performance " +
+        "labels skew heavily toward the low end without a comparable share performing well -- creative " +
+        "fatigue at the asset-group level, the same underlying pattern as ad fatigue elsewhere, just less " +
+        "visible because PMax abstracts the placement away from the specialist reading the report.",
+      "The fix is not \"add more of everything\", it is closing the specific gap: video coverage for " +
+        "video-first inventory, and enough asset variety that the mix is not leaning on a shrinking pool of " +
+        "top performers to carry the whole campaign.",
+    ],
+    gerelateerdeSlugs: ["pmax-asset-group-risico", "rsa-asset-dubbeltelling"],
+    tags: ["Google Ads"],
+  },
+  {
+    slug: "pmax-zoekcategorie-dilutie",
+    titel: "How much of your Performance Max reach never has a chance to convert",
+    samenvatting:
+      "PMax can spread meaningful impression volume across search categories that never produce a single conversion -- reach that looks like growth on a report and behaves like waste in practice.",
+    datum: "2026-08-13",
+    leesminuten: 1,
+    inhoud: [
+      "Performance Max expands into search categories automatically, and expansion is the point of the " +
+        "campaign type -- reaching adjacent demand a narrower campaign would miss. The failure mode is not " +
+        "expansion itself, it is expansion that keeps costing impressions in categories that never convert.",
+      "The pattern worth watching: several search categories, each individually unremarkable, that together " +
+        "account for a meaningful share of a campaign's total impression volume while contributing zero " +
+        "conversions between them. No single category looks alarming; the sum does.",
+      "Google does not report cost at the search-category level inside PMax, the same limitation behind the " +
+        "language-leakage pattern -- so this is a volume question, not a spend question: reach that never " +
+        "gets a chance to convert, sized in impressions, not euros. The distinction that actually matters: " +
+        "PMax testing new territory and finding nothing is different from PMax repeatedly returning to " +
+        "territory it has already proven does not convert. The second is what deserves attention.",
+    ],
+    gerelateerdeSlugs: ["pmax-taal-lekkage", "pmax-network-mix-verschuiving"],
+    tags: ["Google Ads"],
+  },
+  {
     slug: "false-positive-prevention-seizoen-vs-structureel",
     titel: "The question every performance drop needs answered before you touch the budget",
     samenvatting:
