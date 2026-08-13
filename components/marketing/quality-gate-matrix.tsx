@@ -8,14 +8,17 @@
 // the section visually is: its own topic, not a caption inside ComparisonBlock above it.
 //
 // SPACING FIX (12 augustus 2026, "toch een grotere witruimte dan elders"): this section's own
-// pb-16 sat directly in front of FeaturesBlock's py-16 on the homepage. Padding does not collapse
-// like margins do, so that stacked to a 128px gap (this section's 64px + FeaturesBlock's own
-// 64px top) versus the 64px gap everywhere else on the page (ComparisonBlock's own pb-16 into
-// this section's un-padded top). A DOM sweep on section-box boundaries missed this because
-// adjacent section boxes always touch at 0px regardless of padding -- the empty space lives
-// INSIDE the padding, not between the boxes. Removed the self-owned bottom padding; the next
-// element's own top spacing (FeaturesBlock's py-16 here, space-y-14 on how-it-works) now owns the
-// gap on both sides, matching every other transition on the page.
+// pb-16 used to sit directly in front of FeaturesBlock's py-16 when this component still rendered
+// on the homepage. Padding does not collapse like margins do, so that stacked to a 128px gap
+// versus the 64px gap everywhere else on the page. Removed the self-owned bottom padding; the
+// next element's own top spacing now owns the gap on both sides.
+//
+// HOMEPAGE REMOVAL (13 augustus 2026, "ik wil het blok met quality gates niet op de homepage"):
+// this component sat alone in a max-w-3xl single column, sandwiched between ComparisonBlock
+// (max-w-6xl, 2-column grid) and FeaturesBlock (max-w-6xl, 3-column grid) -- a narrow single
+// section breaking the wide/wide rhythm on both sides. Removed from app/(marketing)/page.tsx; it
+// stays on /how-it-works ("Stage 03, in practice"), where it illustrates one specific stage inside
+// a page that is already deep-dive in nature, not sandwiched between wide multi-column sections.
 
 import { CheckCircle2, XCircle } from "lucide-react";
 

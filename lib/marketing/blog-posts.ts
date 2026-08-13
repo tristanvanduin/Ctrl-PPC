@@ -43,6 +43,10 @@ export interface BlogPost {
    *  nieuwe post zijn eigen net-iets-andere label verzint en de filter na een paar posts
    *  onbruikbaar wordt. Toegevoegd 12 augustus 2026 op verzoek van de eigenaar (tag-filter /blog). */
   tags?: BlogTag[];
+  /** Wat voor stuk dit is (zie CONTENT_TYPES), los van tags (waarover het gaat). Verplicht, niet
+   *  optioneel -- dit vervangt de hardcoded "Analysis"-badge op elke kaart, dus elke post
+   *  (inclusief drafts) heeft er een nodig. Toegevoegd 13 augustus 2026. */
+  contentType: ContentType;
 }
 
 /** Vaste taxonomie, niet vrij per post uit te breiden -- zie het commentaar bij BlogPost.tags. */
@@ -50,6 +54,20 @@ export const ALLE_TAGS = [
   "Google Ads", "Meta", "LinkedIn", "Cross-Channel", "Attribution", "Dashboards", "Agency Ops",
 ] as const;
 export type BlogTag = (typeof ALLE_TAGS)[number];
+
+// CONTENT-TYPE (13 augustus 2026, "alle blogs hebben de banner Analysis... is alles ook echt een
+// analysis blog of zitten er andere tags/labels die logischer zijn... puur voor het type content
+// dat je kan verwachten"): de badge op elke kaart was een vaste, hardcoded string in
+// blog-grid.tsx -- geen enkele post had er echt "Analysis" op staan, het stond er gewoon altijd.
+// Dit is een tweede as, los van BlogTag (kanaal/onderwerp): niet WAAROVER een post gaat, maar WAT
+// voor stuk het is. Ingedeeld op basis van wat elke post daadwerkelijk doet, niet verzonnen:
+//  - Method: leert een herbruikbare manier om iets goed te lezen/diagnosticeren (bv. "vraag een
+//    uitsplitsing i.p.v. het gemiddelde", "scheid budget- van rank-oorzaak").
+//  - Signal: wijst op een specifiek, smal, controleerbaar patroon in een account (bv. een van de
+//    PMax-signalen, de RSA-dubbeltelling) -- geen algemene methode, een concrete check.
+//  - Capability: een eerlijke stand van zaken over wat het product zelf wel/niet doet.
+export const CONTENT_TYPES = ["Method", "Signal", "Capability"] as const;
+export type ContentType = (typeof CONTENT_TYPES)[number];
 
 export const BLOG_POSTS: BlogPost[] = [
   {
@@ -79,6 +97,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["impression-share-dashboard-vertelt-niet", "acht-kpi-relaties-die-rapportages-missen"],
     gerelateerdePaginas: [{ label: "The 6-step Decision Framework", href: "/" }],
     tags: ["Google Ads"],
+    contentType: "Method",
   },
   {
     slug: "impression-share-dashboard-vertelt-niet",
@@ -108,6 +127,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "acht-kpi-relaties-die-rapportages-missen"],
     gerelateerdePaginas: [{ label: "Beyond the dashboard layer, in full", href: "/vs" }],
     tags: ["Google Ads", "Dashboards"],
+    contentType: "Method",
   },
   {
     slug: "attributie-zonder-trackingcode",
@@ -135,6 +155,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["kanaalsynergie-bewijzen", "rsa-asset-dubbeltelling"],
     gerelateerdePaginas: [{ label: "How do I know a hypothesis actually worked?", href: "/faq" }],
     tags: ["Attribution"],
+    contentType: "Method",
   },
   {
     slug: "kanaalsynergie-bewijzen",
@@ -174,6 +195,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "attributie-zonder-trackingcode"],
     gerelateerdePaginas: [{ label: "No limit on accounts, cross-channel by default", href: "/" }],
     tags: ["Cross-Channel", "Google Ads", "Meta", "LinkedIn"],
+    contentType: "Method",
   },
   {
     slug: "rsa-asset-dubbeltelling",
@@ -205,6 +227,7 @@ export const BLOG_POSTS: BlogPost[] = [
     // pitch-match, en een gedwongen link zou precies het soort ruis zijn die dit artikel afraadt.
     gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "gemiddelde-cpa-verkeerde-vraag"],
     tags: ["Google Ads", "Meta"],
+    contentType: "Signal",
   },
   {
     slug: "agency-memory-overleeft-een-personeelswissel",
@@ -245,6 +268,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdePaginas: [{ label: "Agency Memory on the comparison page", href: "/vs" }],
     published: true,
     tags: ["Agency Ops", "Google Ads", "Meta", "LinkedIn"],
+    contentType: "Capability",
   },
   {
     slug: "acht-kpi-relaties-die-rapportages-missen",
@@ -279,6 +303,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "impression-share-dashboard-vertelt-niet"],
     gerelateerdePaginas: [{ label: "A chart is not a decision", href: "/" }],
     tags: ["Dashboards"],
+    contentType: "Method",
   },
   {
     slug: "pmax-network-mix-verschuiving",
@@ -307,6 +332,7 @@ export const BLOG_POSTS: BlogPost[] = [
     ],
     gerelateerdeSlugs: ["rsa-asset-dubbeltelling", "pmax-taal-lekkage"],
     tags: ["Google Ads"],
+    contentType: "Signal",
   },
   {
     slug: "pmax-taal-lekkage",
@@ -332,6 +358,7 @@ export const BLOG_POSTS: BlogPost[] = [
     ],
     gerelateerdeSlugs: ["pmax-network-mix-verschuiving", "gemiddelde-cpa-verkeerde-vraag"],
     tags: ["Google Ads"],
+    contentType: "Signal",
   },
   {
     slug: "pmax-asset-group-risico",
@@ -356,6 +383,7 @@ export const BLOG_POSTS: BlogPost[] = [
     ],
     gerelateerdeSlugs: ["pmax-network-mix-verschuiving", "pmax-creative-dekking"],
     tags: ["Google Ads"],
+    contentType: "Signal",
   },
   {
     slug: "pmax-creative-dekking",
@@ -378,6 +406,7 @@ export const BLOG_POSTS: BlogPost[] = [
     ],
     gerelateerdeSlugs: ["pmax-asset-group-risico", "rsa-asset-dubbeltelling"],
     tags: ["Google Ads"],
+    contentType: "Signal",
   },
   {
     slug: "pmax-zoekcategorie-dilutie",
@@ -401,6 +430,7 @@ export const BLOG_POSTS: BlogPost[] = [
     ],
     gerelateerdeSlugs: ["pmax-taal-lekkage", "pmax-network-mix-verschuiving"],
     tags: ["Google Ads"],
+    contentType: "Signal",
   },
   {
     slug: "false-positive-prevention-seizoen-vs-structureel",
@@ -428,6 +458,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "gemiddelde-cpa-verkeerde-vraag"],
     gerelateerdePaginas: [{ label: "How do you avoid blaming the account when the real cause is the market?", href: "/faq" }],
     tags: ["Agency Ops"],
+    contentType: "Method",
   },
   // DRAFT (12 augustus 2026, niet gepubliceerd op verzoek van de eigenaar -- "ik zou dit gewoon
   // schrijven en desnoods als concept opslaan en pas later publiceren"): een uitgebreide pro/con van
@@ -466,6 +497,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdePaginas: [{ label: "Beyond the dashboard layer, in full", href: "/vs" }],
     published: false,
     tags: ["Dashboards"],
+    contentType: "Method",
   },
   // DRAFT (12 augustus 2026, niet gepubliceerd): visiestuk over God View. gebouwd: false in
   // lib/marketing/modules.ts -- dit artikel maakt nergens de claim dat het vandaag te gebruiken is,
@@ -504,6 +536,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdePaginas: [],
     published: false,
     tags: ["Agency Ops"],
+    contentType: "Capability",
   },
 ];
 

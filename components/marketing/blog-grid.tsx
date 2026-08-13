@@ -60,7 +60,7 @@ export function BlogGrid({ posts }: { posts: BlogPost[] }) {
             className="group flex flex-col rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6 transition-all hover:border-neon-indigo/40 hover:shadow-[0_0_32px_rgba(129,140,248,0.15)]"
           >
             <span className="w-fit rounded-[4px] border border-neon-indigo/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-neon-indigo">
-              Analysis
+              {post.contentType}
             </span>
             <p className="mt-3 text-xs text-off-white/60" style={{ fontFamily: "var(--font-marketing-mono)" }}>
               {formatBlogDate(post.datum)} - {post.leesminuten} min

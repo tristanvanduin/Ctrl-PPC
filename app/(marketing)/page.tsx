@@ -5,7 +5,6 @@ import { PlatformPulse } from "@/components/terminal/platform-pulse";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
-import { QualityGateMatrix } from "@/components/marketing/quality-gate-matrix";
 import { PrimaryCta } from "@/components/marketing/primary-cta";
 import { foundationBeschikbaar } from "@/lib/marketing/foundation-cap";
 
@@ -65,11 +64,19 @@ export default async function HomePage() {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_JSON_LD) }}
       />
-      <section className="mx-auto max-w-4xl px-6 pt-14 pb-10 text-center sm:pt-20 sm:pb-14">
+      {/* Kopgrootte + padding verkleind (13 augustus 2026, "header/titels mega groot" +
+          ATF-vraag over Platform Pulse): text-5xl/text-6xl was de enige plek op de site die twee
+          stappen tegelijk sprong (elke andere pagina-h1 gaat 3xl -> 4xl -> 5xl, zie how-it-works
+          en /blog) -- niet consistent, en op mobiel samen met pb-10 duwde het Pulse verder onder
+          de vouw dan nodig. Platform Pulse zelf blijft NIET boven de vouw: hero-met-CTA boven de
+          vouw en het eerste bewijs (live cijfers) op de eerste scroll is het gangbare patroon,
+          geen tekortkoming. Deze pass maakt alleen de hero minder zwaar, wat de afstand tot Pulse
+          als bijeffect verkort. */}
+      <section className="mx-auto max-w-4xl px-6 pt-14 pb-8 text-center sm:pt-20 sm:pb-10">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
           The Cross-Channel Decision Engine
         </p>
-        <h1 className="mx-auto mt-5 font-marketing-heading text-3xl font-extrabold leading-tight text-off-white sm:text-5xl md:text-6xl">
+        <h1 className="mx-auto mt-5 font-marketing-heading text-3xl font-extrabold leading-tight text-off-white sm:text-4xl md:text-5xl">
           A chart is not a decision.
           <br />
           We built the engine that is.
@@ -113,7 +120,6 @@ export default async function HomePage() {
 
       <TrustBanner />
       <ComparisonBlock />
-      <QualityGateMatrix />
       <FeaturesBlock />
     </>
   );

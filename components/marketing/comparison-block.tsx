@@ -64,7 +64,11 @@ export function ComparisonBlock() {
       <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
         Intelligence is not decisioning
       </p>
-      <h2 className="mt-2 text-center font-marketing-heading text-3xl font-bold text-off-white sm:text-4xl">
+      {/* text-4xl -> text-3xl (13 augustus 2026, "header/titels mega groot"): dit was de enige
+          sectiekop op de homepage die zwaarder woog dan Global Platform Pulse's eigen h2
+          (text-2xl) zonder daar een reden voor te hebben -- allebei zijn secundaire secties onder
+          de hero. Gelijkgetrokken zodat de hero de enige echt grote kop op de pagina blijft. */}
+      <h2 className="mt-2 text-center font-marketing-heading text-2xl font-bold text-off-white sm:text-3xl">
         Numbers are not a diagnosis
       </h2>
       <p className="mx-auto mt-3 max-w-2xl text-center text-off-white/60">
