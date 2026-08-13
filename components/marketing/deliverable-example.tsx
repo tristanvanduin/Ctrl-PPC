@@ -17,42 +17,40 @@ import { useState } from "react";
 // we doen veel meer dan alleen die google campagnes" -- correct, so round 2 collapsed every
 // channel to one summary line each. Round 3, same day: "moeten we voor de andere kanalen ook de
 // marketing termen over de echte sop stappen doen" -- Google shouldn't be the only channel that
-// gets a real pillar breakdown; Meta and LinkedIn earn the same depth.
+// gets real depth; Meta and LinkedIn earn the same treatment.
 //
-// The pillars below are MY grouping of each channel's real steps (verified against
+// Round 4 (same day, standing rule now): "nooit de echte werking, alleen impact en voordelen" --
+// the 6 "pillar" labels (Account Performance, Campaign & Budget Structure, ...) were themselves a
+// methodology outline dressed as marketing copy: they told the reader HOW the analysis is
+// organized, not what they get from it. Even though no literal step order or count was exposed
+// (that boundary was already respected), a named 6-part taxonomy still reads as "here is our
+// process." Rewritten to pure outcome language: what you know or can see after the analysis, not
+// the shape of how it got there. Content grounded the same way as before (verified against
 // lib/analysis/adapters/{meta-ads,linkedin-ads}.ts and app/api/analysis/monthly/route.ts's Google
-// path), not an existing doc -- same principle as docs/ANALYSE-LOGICA.md #5.1 did for Google
-// (13 raw steps -> 6 named pillars), applied the same way to Meta's real 11 steps and LinkedIn's
-// real 9. Every channel's real step list literally starts with "Account Performance" and ends
-// with "Hypotheses en Sprintplanning" -- that symmetry across channels is real, not invented, and
-// is why every pillar list below opens and closes the same way. The pillar names group the real
-// steps; they are not the exact ordered step list or step count for any channel, which would hand
-// a competitor the blueprint to rebuild the SOP structure themselves (see: "niet dat we teveel
-// weggeven dat ze zelf de sop gaan nabouwen met onze structuur"). What IS genuinely shared across
-// every channel, and safe to say plainly regardless of which tab is open: every channel's
-// reasoning ends in hypothesis validation, and every finding clears the same quality gates (see
-// QualityGateMatrix) before synthesis -- confirmed in code via finalizeChannelMonthlySynthesis,
-// the shared synthesis layer all three channels run through.
-const CHANNEL_PILLARS = [
+// path), just phrased as what the reader receives instead of a labeled category list.
+const CHANNEL_OUTCOMES = [
   {
     kanaal: "Google Ads",
-    pillars: [
-      "Account Performance", "Campaign Performance", "Search & Auction Depth",
-      "Creative & Audience", "Optimization Recommendations", "Hypothesis Validation",
+    outcomes: [
+      "Know exactly why a Search or PMax metric moved, not just that it did",
+      "See where you are actually winning the auction, not just spending more",
+      "Creative and audience calls backed by evidence, not a hunch",
     ],
   },
   {
     kanaal: "Meta",
-    pillars: [
-      "Account Performance", "Campaign & Budget Structure", "Ad Set & Audience Performance",
-      "Creative Performance & Fatigue", "Placement, Funnel & Schedule", "Hypothesis Validation",
+    outcomes: [
+      "Catch creative fatigue before it quietly drains performance",
+      "Know which audience segment is actually converting, not just spending",
+      "Placement and budget calls backed by evidence, not a hunch",
     ],
   },
   {
     kanaal: "LinkedIn",
-    pillars: [
-      "Account Performance", "Campaign Performance & Budget", "Creative Performance",
-      "ICP-Fit & Demographics", "Lead Funnel, Audience & Pacing", "Hypothesis Validation",
+    outcomes: [
+      "Know whether budget is actually reaching the right decision-makers",
+      "See how leads move through the funnel, not just how many arrive",
+      "Bidding and targeting calls backed by evidence, not a hunch",
     ],
   },
 ] as const;
@@ -70,7 +68,7 @@ interface PriorityRow {
 // met vocabulaire dat bij dat kanaal hoort (ad set/hook rate/frequency voor Meta, lead
 // form/senioriteitstargeting voor LinkedIn) -- zelfde "illustrative example"-behandeling als
 // hierboven, niet een live klantrapport.
-const PRIORITIES_PER_KANAAL: Record<(typeof CHANNEL_PILLARS)[number]["kanaal"], PriorityRow[]> = {
+const PRIORITIES_PER_KANAAL: Record<(typeof CHANNEL_OUTCOMES)[number]["kanaal"], PriorityRow[]> = {
   "Google Ads": [
     {
       naam: "Priority 1",
@@ -116,8 +114,8 @@ const PRIORITIES_PER_KANAAL: Record<(typeof CHANNEL_PILLARS)[number]["kanaal"], 
 };
 
 export function DeliverableExample() {
-  const [kanaal, setKanaal] = useState<(typeof CHANNEL_PILLARS)[number]["kanaal"]>("Google Ads");
-  const actief = CHANNEL_PILLARS.find((c) => c.kanaal === kanaal) ?? CHANNEL_PILLARS[0];
+  const [kanaal, setKanaal] = useState<(typeof CHANNEL_OUTCOMES)[number]["kanaal"]>("Google Ads");
+  const actief = CHANNEL_OUTCOMES.find((c) => c.kanaal === kanaal) ?? CHANNEL_OUTCOMES[0];
 
   return (
     // SPACING FIX (12 augustus 2026, same root cause as quality-gate-matrix.tsx): pb-16 here
@@ -133,11 +131,11 @@ export function DeliverableExample() {
           The Deliverable: Structured Per Channel, One Document
         </h2>
         <p className="mt-1.5 text-xs text-off-white/40">
-          Illustrative example. Each channel gets reasoning shaped around how it actually works, not a generic template.
+          Illustrative example. What you actually learn about each channel, not a generic template.
         </p>
 
         <div className="mt-4 flex gap-1.5" role="tablist" aria-label="Channel">
-          {CHANNEL_PILLARS.map((c) => (
+          {CHANNEL_OUTCOMES.map((c) => (
             <button
               key={c.kanaal}
               type="button"
@@ -157,11 +155,13 @@ export function DeliverableExample() {
 
         <div className="mt-4" style={{ fontFamily: "var(--font-marketing-mono)" }}>
           <p className="text-[11px] uppercase tracking-wide text-off-white/30">
-            Six focus areas, run every month
+            What you get, every month
           </p>
-          <p className="mt-2 text-[11px] leading-relaxed text-off-white/25">
-            {actief.pillars.join(" -- ")}
-          </p>
+          <ul className="mt-2 space-y-1">
+            {actief.outcomes.map((o) => (
+              <li key={o} className="text-[11px] leading-relaxed text-off-white/25">{o}</li>
+            ))}
+          </ul>
           <p className="mt-2 text-[10px] leading-relaxed text-off-white/20">
             Every channel's reasoning ends in hypothesis validation, and every finding clears the same quality gates before it reaches you.
           </p>

@@ -39,7 +39,17 @@ export interface BlogPost {
    *  gewoon schrijven en desnoods als concept opslaan en pas later publiceren") -- er was tot dan
    *  geen manier om een artikel te schrijven zonder het meteen live te zetten. */
   published?: boolean;
+  /** Kleine, vaste taxonomie (zie ALLE_TAGS) i.p.v. vrije tekst per post -- voorkomt dat elke
+   *  nieuwe post zijn eigen net-iets-andere label verzint en de filter na een paar posts
+   *  onbruikbaar wordt. Toegevoegd 12 augustus 2026 op verzoek van de eigenaar (tag-filter /blog). */
+  tags?: BlogTag[];
 }
+
+/** Vaste taxonomie, niet vrij per post uit te breiden -- zie het commentaar bij BlogPost.tags. */
+export const ALLE_TAGS = [
+  "Google Ads", "Meta", "LinkedIn", "Cross-Channel", "Attribution", "Dashboards", "Agency Ops",
+] as const;
+export type BlogTag = (typeof ALLE_TAGS)[number];
 
 export const BLOG_POSTS: BlogPost[] = [
   {
@@ -68,6 +78,7 @@ export const BLOG_POSTS: BlogPost[] = [
     // andere posts delen hetzelfde onderwerp: een gemiddelde/totaal dat de echte oorzaak verbergt.
     gerelateerdeSlugs: ["impression-share-dashboard-vertelt-niet", "acht-kpi-relaties-die-rapportages-missen"],
     gerelateerdePaginas: [{ label: "The 6-step Decision Framework", href: "/" }],
+    tags: ["Google Ads"],
   },
   {
     slug: "impression-share-dashboard-vertelt-niet",
@@ -96,6 +107,7 @@ export const BLOG_POSTS: BlogPost[] = [
     // linklabel hieronder volgt die herziening.
     gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "acht-kpi-relaties-die-rapportages-missen"],
     gerelateerdePaginas: [{ label: "Beyond the dashboard layer, in full", href: "/vs" }],
+    tags: ["Google Ads", "Dashboards"],
   },
   {
     slug: "attributie-zonder-trackingcode",
@@ -122,6 +134,7 @@ export const BLOG_POSTS: BlogPost[] = [
     // net andere bewoordingen -- een lezer die dit artikel uitleest heeft die vraag al gesteld.
     gerelateerdeSlugs: ["kanaalsynergie-bewijzen", "rsa-asset-dubbeltelling"],
     gerelateerdePaginas: [{ label: "How do I know a hypothesis actually worked?", href: "/faq" }],
+    tags: ["Attribution"],
   },
   {
     slug: "kanaalsynergie-bewijzen",
@@ -160,6 +173,7 @@ export const BLOG_POSTS: BlogPost[] = [
     // dit artikel is de onderbouwing van precies die zin.
     gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "attributie-zonder-trackingcode"],
     gerelateerdePaginas: [{ label: "No limit on accounts, cross-channel by default", href: "/" }],
+    tags: ["Cross-Channel", "Google Ads", "Meta", "LinkedIn"],
   },
   {
     slug: "rsa-asset-dubbeltelling",
@@ -190,6 +204,7 @@ export const BLOG_POSTS: BlogPost[] = [
     // Geen productpagina hoort hier logisch bij -- dit is een technisch RSA-detail zonder directe
     // pitch-match, en een gedwongen link zou precies het soort ruis zijn die dit artikel afraadt.
     gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "gemiddelde-cpa-verkeerde-vraag"],
+    tags: ["Google Ads", "Meta"],
   },
   {
     slug: "agency-memory-overleeft-een-personeelswissel",
@@ -229,6 +244,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["attributie-zonder-trackingcode", "kanaalsynergie-bewijzen"],
     gerelateerdePaginas: [{ label: "Agency Memory on the comparison page", href: "/vs" }],
     published: true,
+    tags: ["Agency Ops", "Google Ads", "Meta", "LinkedIn"],
   },
   {
     slug: "acht-kpi-relaties-die-rapportages-missen",
@@ -262,6 +278,7 @@ export const BLOG_POSTS: BlogPost[] = [
     // decision"): het is letterlijk het argument waarom losse KPI's geen antwoord zijn.
     gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "impression-share-dashboard-vertelt-niet"],
     gerelateerdePaginas: [{ label: "A chart is not a decision", href: "/" }],
+    tags: ["Dashboards"],
   },
   // DRAFT (12 augustus 2026, niet gepubliceerd op verzoek van de eigenaar -- "ik zou dit gewoon
   // schrijven en desnoods als concept opslaan en pas later publiceren"): een uitgebreide pro/con van
@@ -299,6 +316,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["impression-share-dashboard-vertelt-niet", "gemiddelde-cpa-verkeerde-vraag"],
     gerelateerdePaginas: [{ label: "Beyond the dashboard layer, in full", href: "/vs" }],
     published: false,
+    tags: ["Dashboards"],
   },
   // DRAFT (12 augustus 2026, niet gepubliceerd): visiestuk over God View. gebouwd: false in
   // lib/marketing/modules.ts -- dit artikel maakt nergens de claim dat het vandaag te gebruiken is,
@@ -336,6 +354,7 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["agency-memory-overleeft-een-personeelswissel"],
     gerelateerdePaginas: [],
     published: false,
+    tags: ["Agency Ops"],
   },
 ];
 
