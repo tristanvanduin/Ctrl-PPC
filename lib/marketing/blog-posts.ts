@@ -280,6 +280,86 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdePaginas: [{ label: "A chart is not a decision", href: "/" }],
     tags: ["Dashboards"],
   },
+  {
+    slug: "pmax-network-mix-verschuiving",
+    titel: "When Performance Max quietly moves your budget away from Search",
+    samenvatting:
+      "PMax reports one blended number for the whole campaign. Underneath, spend can drift heavily toward Display, Video, Discover, Gmail, and Maps without a proportional share of conversions -- and the headline CPA never says so.",
+    datum: "2026-08-13",
+    leesminuten: 2,
+    inhoud: [
+      "A Performance Max campaign reports as one line: one CPA, one ROAS, one blended number. What that " +
+        "number hides is where the spend actually went. PMax can allocate budget across Search, Shopping, " +
+        "Display, Video, Discover, Gmail, and Maps, and a campaign showing a stable, on-target CPA can still " +
+        "be quietly reallocating toward inventory that converts far worse than the average suggests.",
+      "The concrete check is a network-level split of spend against conversions. When the browse and " +
+        "discovery inventory -- Display, Video, Discover, Gmail, Maps combined -- absorbs a disproportionate " +
+        "share of cost relative to the conversions it generates, that is a real signal, even while the " +
+        "campaign-level average still looks healthy: the strong-converting slice of the campaign is quietly " +
+        "subsidizing the average.",
+      "The opposite failure mode matters just as much and is easier to miss: too little of the budget " +
+        "actually reaching Search within a PMax campaign means the campaign leans heavily on lower-intent " +
+        "inventory instead of the channel most likely to convert. Neither direction shows up in the headline " +
+        "number Google surfaces by default.",
+      "Why this stays invisible for months: Google's own reporting does not put network-level cost and " +
+        "conversion split next to the campaign's headline metric by default, so the drift compounds quietly " +
+        "until someone deliberately goes looking for it.",
+    ],
+    gerelateerdeSlugs: ["rsa-asset-dubbeltelling", "pmax-taal-lekkage"],
+    tags: ["Google Ads"],
+  },
+  {
+    slug: "pmax-taal-lekkage",
+    titel: "Performance Max can quietly start bidding in languages you never targeted",
+    samenvatting:
+      "PMax expands reach automatically, and that expansion can drift into search categories in languages your account was never set up to serve -- with no cost figure attached, because Google does not report spend at that level.",
+    datum: "2026-08-13",
+    leesminuten: 1,
+    inhoud: [
+      "Performance Max is built to expand reach automatically, matching queries loosely against your assets " +
+        "and audience signals. That is a strength when it finds genuinely adjacent demand, and a real cost " +
+        "when it drifts into search categories the account was never set up to serve.",
+      "One concrete, checkable version of this: search categories that show up in scripts the account never " +
+        "targeted -- Arabic, Cyrillic, Chinese, Japanese characters appearing in a campaign built for Latin-" +
+        "script markets. Google does not report cost per search category inside PMax, so this specific leak " +
+        "never shows up as a spend line -- the only signals available are impressions and clicks per " +
+        "category, which is exactly why it goes unnoticed: there is no euro figure to trigger an alert on, " +
+        "only volume drifting somewhere it should not be.",
+      "The fix is not to distrust PMax's expansion, since reaching adjacent demand is the point of the " +
+        "campaign type. It is to check, on a cadence Google's own dashboard never prompts, what the " +
+        "expansion actually reached -- and to treat a search category outside the account's targeted " +
+        "languages as a language-and-market question, not a performance number to average away.",
+    ],
+    gerelateerdeSlugs: ["pmax-network-mix-verschuiving", "gemiddelde-cpa-verkeerde-vraag"],
+    tags: ["Google Ads"],
+  },
+  {
+    slug: "false-positive-prevention-seizoen-vs-structureel",
+    titel: "The question every performance drop needs answered before you touch the budget",
+    samenvatting:
+      "A metric falling because the whole market slowed down calls for a different response than the same metric falling because something in the account broke. Confusing the two is the more expensive mistake.",
+    datum: "2026-08-13",
+    leesminuten: 2,
+    inhoud: [
+      "A metric can fall for two entirely different reasons that look identical on a chart: the account got " +
+        "worse, or the market did. A recommendation built on the wrong one wastes budget fixing something " +
+        "that was never broken, or cuts spend right as demand recovers on its own.",
+      "The check that separates them is not complicated, but it is the first one skipped under time " +
+        "pressure: compare the change month-over-month against the same change year-over-year. A metric down " +
+        "both ways points to something structural in the account. A metric down month-over-month but stable " +
+        "or up year-over-year points to a seasonal pattern the account did not cause and does not need " +
+        "fixing.",
+      "That distinction only matters if it actually blocks a bad recommendation before it reaches someone, " +
+        "not just a note buried in an appendix. A finding that cannot show a plausible cause, or cannot point " +
+        "to real evidence behind it, does not get to become a recommendation -- no matter how clean the " +
+        "correlation looks on its own.",
+      "The result of getting this right is boring, and that is the point: fewer recommendations, not more, " +
+        "each one more likely to survive contact with what actually happened once someone acts on it.",
+    ],
+    gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "gemiddelde-cpa-verkeerde-vraag"],
+    gerelateerdePaginas: [{ label: "How do you avoid blaming the account when the real cause is the market?", href: "/faq" }],
+    tags: ["Agency Ops"],
+  },
   // DRAFT (12 augustus 2026, niet gepubliceerd op verzoek van de eigenaar -- "ik zou dit gewoon
   // schrijven en desnoods als concept opslaan en pas later publiceren"): een uitgebreide pro/con van
   // dashboarding-alleen. De homepage-positionering liet het "illusie"-frame vallen omdat het
