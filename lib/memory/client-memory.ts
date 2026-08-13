@@ -1,6 +1,9 @@
 // =====================================================================
-// STATUS: GEBOUWD EN GETEST, MAAR NOG NIET GEWIRED (code-review must-fix 3).
-// getClientMemory wordt nog niet aangeroepen. Activeren vereist een consument die het resultaat in de prompt-grounding injecteert. Neem niet aan dat de memory-laag live is.
+// STATUS (bijgewerkt 12 augustus 2026): GEWIRED. app/api/analysis/monthly/route.ts roept
+// getClientMemory + buildClientMemoryGrounding aan op alle drie kanalen (Google, Meta, LinkedIn)
+// en injecteert clientMemorySection in de prompt-grounding -- geverifieerd via grep, niet
+// aangenomen. De oorspronkelijke "nog niet gewired"-status hierboven gold bij het schrijven van
+// dit bestand, niet meer nu.
 // =====================================================================
 // ============================================================
 // E1: memory-leeslaag

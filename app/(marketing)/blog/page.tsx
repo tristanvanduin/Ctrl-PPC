@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BLOG_POSTS } from "@/lib/marketing/blog-posts";
+import { getPublishedBlogPosts } from "@/lib/marketing/blog-posts";
 import { formatBlogDate } from "@/lib/marketing/format-date";
 
 // Description was Dutch (audit, 11 August 2026) -- the literal text Google shows under the blue
@@ -27,7 +27,7 @@ export default function BlogIndexPage() {
       </div>
 
       <div className="mt-10 grid gap-6 sm:grid-cols-2 sm:mt-14">
-        {BLOG_POSTS.map((post) => (
+        {getPublishedBlogPosts().map((post) => (
           <Link
             key={post.slug}
             href={`/blog/${post.slug}`}

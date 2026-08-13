@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { BLOG_POSTS, getBlogPost } from "@/lib/marketing/blog-posts";
+import { getPublishedBlogPosts, getPublishedBlogPost } from "@/lib/marketing/blog-posts";
 import { formatBlogDate } from "@/lib/marketing/format-date";
 import { PrimaryCta } from "@/components/marketing/primary-cta";
 
 export function generateStaticParams() {
-  return BLOG_POSTS.map((post) => ({ slug: post.slug }));
+  return getPublishedBlogPosts().map((post) => ({ slug: post.slug }));
 }
 
 export async function generateMetadata({
@@ -16,7 +16,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = getBlogPost(slug);
+  const post = getPublishedBlogPost(slug);
   if (!post) return {};
   return {
     title: `${post.titel}: Ctrl PPC`,
@@ -33,7 +33,7 @@ export async function generateMetadata({
 
 // BlogPosting-structured data: geeft een crawler (en een AI-antwoordmachine) de datum, auteur
 // en samenvatting zonder dat opnieuw uit de opgemaakte pagina te hoeven raden.
-function articleJsonLd(post: NonNullable<ReturnType<typeof getBlogPost>>) {
+function articleJsonLd(post: NonNullable<ReturnType<typeof getPublishedBlogPost>>) {
   return {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -52,14 +52,16 @@ export default async function BlogArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = getBlogPost(slug);
+  const post = getPublishedBlogPost(slug);
   if (!post) notFound();
 
   // Elk artikel had er tot nu toe geen: alleen "All articles" bovenaan (audit, 11 augustus 2026).
   // Per post gekozen, niet automatisch de eerste twee uit de lijst -- zie de commentaren bij
   // gerelateerdeSlugs/gerelateerdePaginas in lib/marketing/blog-posts.ts voor de reden per artikel.
+  // Draft-only-gerelateerd (12 augustus 2026): een gepubliceerd artikel mag nooit doorlinken naar
+  // een concept dat nog niet live is -- getPublishedBlogPost filtert dat vanzelf uit.
   const gerelateerdePosts = (post.gerelateerdeSlugs ?? [])
-    .map((s) => getBlogPost(s))
+    .map((s) => getPublishedBlogPost(s))
     .filter((p): p is NonNullable<typeof p> => !!p && p.slug !== post.slug);
   const gerelateerdePaginas = post.gerelateerdePaginas ?? [];
   const heeftGerelateerd = gerelateerdePosts.length > 0 || gerelateerdePaginas.length > 0;

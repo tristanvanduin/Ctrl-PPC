@@ -49,7 +49,14 @@ export const KILL_SHOT_ROWS: readonly KillShotRow[] = [
     legacyDetail: "A pattern solved for one client typically stays with that account and the person who found it, not shared automatically with the rest of the portfolio.",
     ctrlPpc: "Agency Memory",
     ctrlPpcDetail: "What worked is remembered, not lost when an account manager moves on. Automatic cross-client propagation is on the roadmap.",
-    gebouwd: false,
+    // gebouwd (12 augustus 2026, tijdens onderzoek voor de agency-memory-blogpost): stond op
+    // false, wat de ComingSoonBadge op de HELE regel zette. Maar de eerste zin van ctrlPpcDetail
+    // ("what worked is remembered, not lost when an account manager moves on") is nu geverifieerd
+    // echt en live -- lib/memory/client-memory.ts wordt aantoonbaar aangeroepen vanuit
+    // app/api/analysis/monthly/route.ts op alle 3 kanalen (grep, niet aangenomen). Alleen de
+    // tweede zin ("automatic cross-client propagation") is nog roadmap, en die nuance stond al
+    // correct in de tekst zelf. true, met de roadmap-nuance in de tekst i.p.v. de badge.
+    gebouwd: true,
   },
   {
     label: "The End Product",

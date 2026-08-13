@@ -33,6 +33,12 @@ export interface BlogPost {
    *  dead-ended before this -- the only link on the whole page was "back to all articles"). Left
    *  empty where nothing on the page is a real match, rather than forcing one. */
   gerelateerdePaginas?: RelatedPage[];
+  /** false = written but not live: no static route, absent from /blog, 404 if visited directly.
+   *  Omitted (undefined) means published, same as every post before this field existed -- no need
+   *  to touch the 6 existing posts. Added 12 augustus 2026 op verzoek van de eigenaar ("ik zou dit
+   *  gewoon schrijven en desnoods als concept opslaan en pas later publiceren") -- er was tot dan
+   *  geen manier om een artikel te schrijven zonder het meteen live te zetten. */
+  published?: boolean;
 }
 
 export const BLOG_POSTS: BlogPost[] = [
@@ -186,6 +192,45 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "gemiddelde-cpa-verkeerde-vraag"],
   },
   {
+    slug: "agency-memory-overleeft-een-personeelswissel",
+    titel: "Why agency memory outlives the person who built it",
+    samenvatting:
+      "A pattern one specialist finds for one client usually leaves with that specialist. What Ctrl PPC actually remembers today, and what is still on the roadmap.",
+    datum: "2026-08-13",
+    leesminuten: 2,
+    inhoud: [
+      "Ask an agency where its best PPC knowledge lives, and the honest answer is usually: in a person, not " +
+        "in the account. A specialist notices that raising tROAS during the evening peak window cut CPA by " +
+        "15 percent, ships the change, and moves on -- and that pattern exists nowhere durable. A monthly " +
+        "report gets filed and rarely reopened; a message in a chat thread from four months ago is " +
+        "functionally gone. When that specialist changes teams or leaves, the client does not just lose a " +
+        "person -- the account loses everything that person learned about it.",
+      "Before every monthly analysis, Ctrl PPC reads back a client's own history: the report timeline, and " +
+        "every hypothesis proposed for that account, with its status, its measured outcome, and the learning " +
+        "that came out of it. That record feeds straight into the next analysis, so a hypothesis that already " +
+        "failed six months ago does not get proposed again as if nothing happened, and one that worked " +
+        "becomes the starting assumption for what comes next, not a fresh guess with no memory behind it. It " +
+        "runs the same way across Google, Meta, and LinkedIn: the history is read per client, not per channel.",
+      "What this does not do yet, worth saying plainly: it does not carry a pattern found on one client over " +
+        "to a different client in the same portfolio. If evening-hour bid adjustments worked for three " +
+        "ecommerce accounts, nothing today automatically flags that as worth testing on a fourth -- that kind " +
+        "of cross-client propagation, an agency's whole book learning from itself, is on the roadmap, not " +
+        "live. What is live is memory within a single account, continuity that survives regardless of who is " +
+        "looking at it this month. \"Agency memory\" invites a bigger claim than what exists today; this is " +
+        "the honest version.",
+      "Even in that narrower form, the difference is real. Without it, a specialist re-litigates the same " +
+        "experiment every few months because nobody recorded it already failed. With it, the account keeps " +
+        "what it learned regardless of who is logged in -- the record of what was tried, what worked, and " +
+        "what did not, does not leave when a person does.",
+    ],
+    // Attributie levert de uitkomst (result_met/learning in sprint_hypotheses) die dit artikel als
+    // bewijs gebruikt; kanaalsynergie deelt de kanaal-neutrale behandeling (Google/Meta/LinkedIn
+    // gelijk, geen Google-specifieke claim).
+    gerelateerdeSlugs: ["attributie-zonder-trackingcode", "kanaalsynergie-bewijzen"],
+    gerelateerdePaginas: [{ label: "Agency Memory on the comparison page", href: "/vs" }],
+    published: true,
+  },
+  {
     slug: "acht-kpi-relaties-die-rapportages-missen",
     titel: "Eight KPI relationships most reports never set against each other",
     samenvatting:
@@ -218,8 +263,93 @@ export const BLOG_POSTS: BlogPost[] = [
     gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "impression-share-dashboard-vertelt-niet"],
     gerelateerdePaginas: [{ label: "A chart is not a decision", href: "/" }],
   },
+  // DRAFT (12 augustus 2026, niet gepubliceerd op verzoek van de eigenaar -- "ik zou dit gewoon
+  // schrijven en desnoods als concept opslaan en pas later publiceren"): een uitgebreide pro/con van
+  // dashboarding-alleen. De homepage-positionering liet het "illusie"-frame vallen omdat het
+  // tegenspreekt dat Foundation zelf een gratis dashboard is (zie comparison-block.tsx) -- maar een
+  // blogartikel heeft ruimte voor de nuance die één paneel niet had, bevestigd door de eigenaar.
+  {
+    slug: "dashboard-illusie-pro-con",
+    titel: "The Dashboard Illusion: what a dashboard gets right, and exactly where it stops",
+    samenvatting:
+      "Dashboarding is not fake, and pretending otherwise is a bad argument. Here is what it is actually good for, and the precise point where it runs out.",
+    datum: "2026-08-13",
+    leesminuten: 2,
+    inhoud: [
+      "Start with the honest case for dashboarding, because the counter-argument is worthless without it. " +
+        "Real-time charts per channel, a forecast, KPI monitoring: this is genuinely useful, genuinely how " +
+        "most agencies run today, and not a lesser or broken version of anything. It answers a real question " +
+        "-- what happened -- fast, and answering that fast has value on its own.",
+      "The illusion is not that a dashboard lies. It is that a stable-looking line implies a stable account, " +
+        "and that is not always true. Two campaigns can show the exact same CPA chart -- flat, unremarkable -- " +
+        "with completely different stories underneath: one drifting with the season, one breaking " +
+        "structurally. The dashboard renders both identically, because a chart shows a metric moved, not why " +
+        "it moved. The interpretation still has to happen somewhere. A dashboard just does not do it, and " +
+        "rarely admits that it does not.",
+      "The same pattern shows up in specific, checkable metrics. Search impression share drops for one of " +
+        "two reasons -- budget or rank -- and a dashboard that only shows the percentage forces a guess. The " +
+        "two metrics that actually separate the causes exist in the platform, they are just rarely on the " +
+        "same screen as the headline number, which is exactly where \"the dashboard illusion\" earns its name: " +
+        "not a false chart, a true chart that answers a smaller question than the one being asked of it.",
+      "None of this is a criticism of dashboards doing their job badly. It is a description of a different " +
+        "job entirely: a dashboard has no memory of what was already tried on this account, proposes no " +
+        "hypothesis, and clears no quality gate before a number becomes a recommendation someone acts on. " +
+        "That is not a missing feature. It is the layer a dashboard was never built to be.",
+    ],
+    gerelateerdeSlugs: ["impression-share-dashboard-vertelt-niet", "gemiddelde-cpa-verkeerde-vraag"],
+    gerelateerdePaginas: [{ label: "Beyond the dashboard layer, in full", href: "/vs" }],
+    published: false,
+  },
+  // DRAFT (12 augustus 2026, niet gepubliceerd): visiestuk over God View. gebouwd: false in
+  // lib/marketing/modules.ts -- dit artikel maakt nergens de claim dat het vandaag te gebruiken is,
+  // alleen waarom het concept (geanonimiseerde data over alle bureaus heen) waarde zou hebben. Geen
+  // "roadmap"-framing (op verzoek van de eigenaar: "ik zou dit niet als roadmap item plaatsen") --
+  // de grens is niet het label, het is dat de tekst nooit "je kunt dit nu gebruiken" zegt.
+  {
+    slug: "god-view-collectieve-marktdata",
+    titel: "Why the next generation of PPC benchmarks will not come from your own accounts",
+    samenvatting:
+      "A benchmark built from your own client portfolio is a benchmark built from a few dozen accounts. The interesting comparison sits outside your own book, and no single agency can build it alone.",
+    datum: "2026-08-13",
+    leesminuten: 2,
+    inhoud: [
+      "Every agency benchmarks against itself, because it is the only data it has: this client's CPA against " +
+        "that one, this quarter against last quarter. It is a real comparison and a narrow one -- a handful of " +
+        "accounts in one or two verticals, run by one team, with one set of blind spots. A number that looks " +
+        "unusual inside that portfolio might be completely ordinary for the sector, and there is no way to " +
+        "know from inside a single agency's own client list.",
+      "The comparison that actually answers \"is this normal\" sits outside any one agency's book: thousands " +
+        "of accounts, anonymized, aggregated by sector and niche, so a single connected account sharpens the " +
+        "picture for every other account on the same category, not just its own. No individual agency can " +
+        "build that on its own client list, no matter how good the team is -- it requires scale across " +
+        "agencies, not within one.",
+      "This is not a claim about what exists in any single account view today. It is a claim about the shape " +
+        "of the comparison that matters: not \"how does this client compare to your other clients\", but \"how " +
+        "does this client compare to every account like it, anywhere\". That is a fundamentally different " +
+        "question, and it needs fundamentally different data to answer -- data that only accumulates by being " +
+        "the platform many agencies run on, not by any one agency working harder on its own numbers.",
+      "The reason this matters for how agencies should think about tooling: a benchmark built inside your own " +
+        "portfolio gets marginally better as you add clients. A benchmark built across agencies gets better " +
+        "for everyone every time anyone connects an account -- a different kind of asset entirely, and one no " +
+        "single agency, however good, can replicate by itself.",
+    ],
+    gerelateerdeSlugs: ["agency-memory-overleeft-een-personeelswissel"],
+    gerelateerdePaginas: [],
+    published: false,
+  },
 ];
 
 export function getBlogPost(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((p) => p.slug === slug);
+}
+
+/** Draft posts (published: false) never resolve here -- used by both the listing and the
+ *  static-params generation, so a draft has no built route at all, not just a hidden link. */
+export function getPublishedBlogPost(slug: string): BlogPost | undefined {
+  const post = getBlogPost(slug);
+  return post && post.published !== false ? post : undefined;
+}
+
+export function getPublishedBlogPosts(): BlogPost[] {
+  return BLOG_POSTS.filter((p) => p.published !== false);
 }
