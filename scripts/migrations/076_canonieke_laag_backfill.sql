@@ -3,76 +3,89 @@
 -- DRAAIEN: idempotent (elke UPDATE is een no-op op een rij die al klopt). Volgt op 075; draai
 -- nooit vóór die migratie.
 --
+-- ── ÉÉN DOORGANG PER TABEL, NIET VIER ────────────────────────────────────────
+--
+-- De eerste versie deed vier aparte UPDATE's over fact_dimension (330.601 rijen, 142 MB): eerst
+-- agency_id/client_id, dan source_table, dan leads/data_quality_score, dan twee keer currency.
+-- Als één samenhangende SQL-tekst via de Management API duurde dat samen langer dan de
+-- HTTP-timeout van die API (Cloudflare gaf een 524 terug) -- en omdat de hele tekst één
+-- transactie is, ging de volledige migratie daarmee onderuit, inclusief het werk dat al klaar
+-- was. Hieronder staat elke tabel in ÉÉN UPDATE die alle kolommen in een keer zet; dat is niet
+-- alleen sneller maar ook het enige dat deze migratie nog uitvoerbaar maakt op deze
+-- projectgrootte. Wie dit bestand in zijn geheel opnieuw stuurt na een 524, verliest niets: elke
+-- losse instructie is nog steeds idempotent.
+--
 -- ── agency_id / client_id: altijd afleidbaar, dus NOT NULL ──────────────────
 --
 -- Elke fact_core/fact_dimension-rij heeft een account_id die naar accounts wijst (foreign key,
--- bestaat al). agency_id en client_id zijn dus voor GEEN ENKELE rij onbekend -- vandaar dwingend
--- na de backfill, in tegenstelling tot currency en leads hieronder.
-
-update fact_core f set agency_id = a.agency_id, client_id = a.client_id
-  from accounts a where a.id = f.account_id and (f.agency_id is distinct from a.agency_id
-    or f.client_id is distinct from a.client_id);
-
-update fact_dimension f set agency_id = a.agency_id, client_id = a.client_id
-  from accounts a where a.id = f.account_id and (f.agency_id is distinct from a.agency_id
-    or f.client_id is distinct from a.client_id);
-
--- ── source_table: precies per kanaal/niveau, zodat de backfill dezelfde herkomst draagt als de
---    vernieuwde refresh_fact_from_legacy() straks voor nieuwe rijen zet (migratie 077) ──────────
-
-update fact_core set source_table = case
-    when channel = 'google' and level = 'account'  then 'ads_account_monthly_legacy'
-    when channel = 'google' and level = 'campaign' then 'ads_campaign_monthly_legacy'
-    when channel = 'meta'     and level = 'account'  then 'meta_account_daily_legacy'
-    when channel = 'meta'     and level = 'campaign' then 'meta_campaign_daily_legacy'
-    when channel = 'meta'     and level = 'creative' then 'meta_ad_daily_legacy'
-    when channel = 'linkedin' and level = 'account'  then 'linkedin_account_daily_legacy'
-    when channel = 'linkedin' and level = 'campaign' then 'linkedin_campaign_daily_legacy'
-    when channel = 'linkedin' and level = 'creative' then 'linkedin_creative_daily_legacy'
-  end
-where source_table is null;
-
--- De twee 'region'-inserts uit migratie 043 schrijven naar dezelfde dimension-waarde vanuit twee
--- verschillende brontabellen; alleen campaign_id onderscheidt ze (leeg = accountbreed = uit
--- ads_region_monthly, gevuld = per campagne = uit ads_geo_performance_monthly).
-update fact_dimension set source_table = case
-    when channel = 'google' and dimension = 'search_term' then 'ads_search_terms_monthly'
-    when channel = 'google' and dimension = 'keyword'     then 'ads_keyword_performance_monthly'
-    when channel = 'google' and dimension = 'device'      then 'ads_device_performance_monthly'
-    when channel = 'google' and dimension = 'network'     then 'ads_network_performance_monthly'
-    when channel = 'google' and dimension = 'audience'    then 'ads_audience_performance_monthly'
-    when channel = 'google' and dimension = 'country'     then 'ads_country_monthly'
-    when channel = 'google' and dimension = 'region' and campaign_id <> '' then 'ads_geo_performance_monthly'
-    when channel = 'google' and dimension = 'region' and campaign_id  = '' then 'ads_region_monthly'
-    when channel = 'linkedin' then 'linkedin_demographic_daily'
-  end
-where source_table is null;
-
--- ── currency: bekend waar er een connectie is, eerlijk onbekend voor Google en oudere rijen ─────
-
-update fact_core f set currency = c.currency
-  from meta_connections c where c.client_id = f.client_id and f.channel = 'meta' and f.currency is null;
-
-update fact_core f set currency = c.currency
-  from linkedin_connections c where c.client_id = f.client_id and f.channel = 'linkedin' and f.currency is null;
-
-update fact_dimension f set currency = c.currency
-  from meta_connections c where c.client_id = f.client_id and f.channel = 'meta' and f.currency is null;
-
-update fact_dimension f set currency = c.currency
-  from linkedin_connections c where c.client_id = f.client_id and f.channel = 'linkedin' and f.currency is null;
-
--- ── leads / data_quality_score: veilige defaults, geen verzonnen precisie ───────────────────────
+-- bestaat al). agency_id en client_id zijn dus voor GEEN ENKELE rij onbekend.
+--
+-- ── source_table: precies per kanaal/niveau/dimensie ─────────────────────────
+--
+-- Dezelfde herkomst die de vernieuwde refresh_fact_from_legacy() straks voor nieuwe rijen zet
+-- (migratie 077). De twee 'region'-dimensierijen uit migratie 043 komen uit twee verschillende
+-- brontabellen; alleen campaign_id onderscheidt ze (leeg = accountbreed = ads_region_monthly,
+-- gevuld = per campagne = ads_geo_performance_monthly).
+--
+-- ── leads / data_quality_score: veilige defaults, geen verzonnen precisie ───
 --
 -- leads op 0 en niet op een herrekende waarde: de precieze leads/conversions-splitsing voor
 -- bestaande Meta/LinkedIn-rijen komt vanzelf goed zodra migratie 077's vernieuwde
--- refresh_fact_from_legacy() nogmaals over deze rijen heen loopt (on conflict do update). Deze
--- migratie hoeft dat dus niet te herhalen; 0 is intussen een correcte ondergrens, geen gok.
+-- refresh_fact_from_legacy() nogmaals over deze rijen heen loopt (on conflict do update).
+--
+-- ── currency: bekend waar er een connectie is, eerlijk onbekend voor Google ──
 
-update fact_core set leads = 0 where leads is null;
-update fact_dimension set leads = 0 where leads is null;
-update fact_core set data_quality_score = 1.0 where data_quality_score is null;
-update fact_dimension set data_quality_score = 1.0 where data_quality_score is null;
+update fact_core f set
+  agency_id = a.agency_id,
+  client_id = a.client_id,
+  leads = coalesce(f.leads, 0),
+  data_quality_score = coalesce(f.data_quality_score, 1.0),
+  source_table = case
+    when f.channel = 'google'   and f.level = 'account'  then 'ads_account_monthly_legacy'
+    when f.channel = 'google'   and f.level = 'campaign' then 'ads_campaign_monthly_legacy'
+    when f.channel = 'meta'     and f.level = 'account'  then 'meta_account_daily_legacy'
+    when f.channel = 'meta'     and f.level = 'campaign' then 'meta_campaign_daily_legacy'
+    when f.channel = 'meta'     and f.level = 'creative' then 'meta_ad_daily_legacy'
+    when f.channel = 'linkedin' and f.level = 'account'  then 'linkedin_account_daily_legacy'
+    when f.channel = 'linkedin' and f.level = 'campaign' then 'linkedin_campaign_daily_legacy'
+    when f.channel = 'linkedin' and f.level = 'creative' then 'linkedin_creative_daily_legacy'
+  end
+from accounts a
+where a.id = f.account_id;
+
+update fact_dimension f set
+  agency_id = a.agency_id,
+  client_id = a.client_id,
+  leads = coalesce(f.leads, 0),
+  data_quality_score = coalesce(f.data_quality_score, 1.0),
+  source_table = case
+    when f.channel = 'google' and f.dimension = 'search_term' then 'ads_search_terms_monthly'
+    when f.channel = 'google' and f.dimension = 'keyword'     then 'ads_keyword_performance_monthly'
+    when f.channel = 'google' and f.dimension = 'device'      then 'ads_device_performance_monthly'
+    when f.channel = 'google' and f.dimension = 'network'     then 'ads_network_performance_monthly'
+    when f.channel = 'google' and f.dimension = 'audience'    then 'ads_audience_performance_monthly'
+    when f.channel = 'google' and f.dimension = 'country'     then 'ads_country_monthly'
+    when f.channel = 'google' and f.dimension = 'region' and f.campaign_id <> '' then 'ads_geo_performance_monthly'
+    when f.channel = 'google' and f.dimension = 'region' and f.campaign_id  = '' then 'ads_region_monthly'
+    when f.channel = 'linkedin' then 'linkedin_demographic_daily'
+  end
+from accounts a
+where a.id = f.account_id;
+
+-- currency: kleine, gefilterde subset (alleen meta/linkedin-rijen), losse pass omdat de bron een
+-- andere tabel is dan accounts.
+
+update fact_core f set currency = c.currency
+  from meta_connections c where c.client_id = f.client_id and f.channel = 'meta' and f.currency is null;
+update fact_core f set currency = c.currency
+  from linkedin_connections c where c.client_id = f.client_id and f.channel = 'linkedin' and f.currency is null;
+update fact_dimension f set currency = c.currency
+  from meta_connections c where c.client_id = f.client_id and f.channel = 'meta' and f.currency is null;
+update fact_dimension f set currency = c.currency
+  from linkedin_connections c where c.client_id = f.client_id and f.channel = 'linkedin' and f.currency is null;
+
+-- Eén ALTER TABLE per tabel met alle kolommen erin: Postgres doet dan één validatiescan per
+-- tabel, niet één per kolom.
 
 alter table fact_core
   alter column agency_id set not null,
