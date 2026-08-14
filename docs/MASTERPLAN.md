@@ -37,7 +37,7 @@ niet opnieuw ter discussie komen zonder dat iemand dit document wijzigt.
 | 2 | **OpenRouter, meerdere modellen.** | `lib/analysis/llm-router.ts` gaat van het directe Gemini-endpoint naar OpenRouter. Dit is een voorwaarde voor AI Council, niet alleen een leveranciersvoorkeur: een adversariele review met modellen van dezelfde familie is geen review. |
 | 3 | **Bouwfase, dan launching customer, dan sales.** | Geen enkele module wordt gebouwd voor een klant die er niet is. De poorten in fase 5 tot en met 7 zijn hierop afgestemd. |
 | 4 | **Specialisten vullen targets; jij doet de testcases.** | `client_targets` (nu 0 rijen) krijgt een invoerscherm in fase 2. Dit is geen bijzaak: zonder targets is de hele universele analyselaag stuurloos. Zie sectie 3.4. |
-| 5 | **De sync staat stil sinds 17 april 2026.** | Zie sectie 2.1. Dit is de meest urgente bevinding van dit hele traject. |
+| 5 | **De sync staat stil sinds 17 april 2026: verloren toegang tot de gekoppelde accounts, bevestigd door de opdrachtgever.** | Zie sectie 2.1. Geen codefout; blijft open tot de koppeling hersteld is (sectie 6 lost dit structureel op). |
 | 6 | **Een applicatie-koppeling, OAuth per bureau.** | Zie sectie 6 voor het volledige connectormodel en de kostenbesparing. |
 | 7 | **Sleutelkeuze: `agency_id` overal, `client_id` als bedrijfssleutel, `account_id` waar platformspecifiek.** | Zie sectie 1.1 voor de motivering. |
 | 8 | **Search Console wordt gebouwd.** | Fase 2. Zonder GSC is Demand Intelligence half en is False Positive Prevention niet te bewijzen. |
@@ -75,11 +75,35 @@ fase 1.8 en het is de enige structurele wijziging in dit plan waar ik geen alter
 
 ## 2. De gecorrigeerde werkelijkheid
 
-### 2.1 De sync staat vier maanden stil
+### 2.1 De sync staat vier maanden stil — bevestigd, en de mechaniek erachter
 
-Dit is de correctie op mijn eigen eerdere review. Ik schreef dat `fact_dimension` drie maanden
-achterloopt op `fact_core` en dat de projectie stil faalt. **Dat klopt niet.** Wat er werkelijk aan
-de hand is:
+**Update 14 augustus, na uitvoering van fase 0.1:** bevestigd door de opdrachtgever — de toegang
+tot de gekoppelde Google Ads-accounts is verloren, en dat is de oorzaak. Wat volgt is hoe dat zich
+in de database laat zien, en waarom dat spoor eerst zonder die bevestiging is nagelopen: het
+verschil tussen "credentials ontbreken" en "de API-aanroep faalt" bepaalt namelijk of er ooit een
+harde foutmelding was te zien geweest, en dat bepaalt op zijn beurt of hier nog een losse
+alarmering nodig is.
+
+`syncClient()` (`lib/sync/orchestrator.ts`) schrijft een `sync_runs`-rij met `status: "running"`
+**voordat** er een Google Ads-aanroep gebeurt, en zet hem bij een mislukte aanroep op `"failed"`
+met de foutmelding erbij. Sinds 17 april staat er geen enkele rij meer, ook geen mislukte. Dat
+sluit uit dat de sync draaide en tegen een ongeldig token aanliep — die faalwijze laat altijd een
+spoor na.
+
+Wat wél bij de bevestigde oorzaak past: `credentialsVoorBureau()` in `lib/tenancy/credentials.ts`
+geeft `null` terug zodra de omgevingsfallback (`GOOGLE_ADS_REFRESH_TOKEN`) ontbreekt of leeg is.
+De aanroepende lus in `/api/sync/cron` (`app/api/sync/cron/route.ts`) doet dan `continue` **voordat
+`syncClient()` wordt aangeroepen** — en dus voordat er een `sync_runs`-rij ontstaat. Een verlopen
+of ingetrokken toegang die vertaald is naar een leeg of verwijderd token, produceert precies dit
+beeld: geen enkel spoor in de database, wel een "geen credentials"-regel in de JSON-respons van de
+cron, die niemand leest omdat het een cron is en geen scherm.
+
+Dit is dus geen losstaand mysterie meer, maar het bevestigt wél iets structureels: **een
+credentialsfout die vóór `syncClient()` optreedt, is vandaag onzichtbaar voor iedereen behalve wie
+toevallig de cron-respons naleest.** Dat is een gat dat sectie 6 (OAuth per bureau, met een
+zichtbare koppelstatus) dichtzet, en dat tot die tijd niet vanzelf verdwijnt.
+
+Wat er verder werkelijk aan de hand is, gemeten vóór de bevestiging:
 
 | Meting | Waarde |
 |---|---|
@@ -97,23 +121,23 @@ Het gat dat ik zag was de demoklant, die als enige mei, juni en juli heeft.
 gefaald, want dan stond er een mislukte run. Hij is gestopt met starten, of hij crasht voordat hij
 een `sync_runs`-rij aanmaakt, bijvoorbeeld bij het laden van credentials.
 
-Jouw vermoeden dat de toegang tot de Ranking Masters-accounts weg is, past hier goed op. Een
-ontbrekend of ingetrokken refresh token laat de sync afbreken bij de eerste API-aanroep, mogelijk
-voordat er iets gelogd wordt.
-
 **Is dit ernstig?** De data is niet stuk en er is niets verloren dat niet opnieuw op te halen is:
 Google Ads bewaart historie, dus zodra de koppeling terug is haalt een backfill de vier maanden op.
-Wat wel ernstig is, is het tweede deel:
 
-> `client_sync_status.freshness_status` staat op **"fresh"** terwijl de data vier maanden oud is.
+**Wat wel ernstig leek en genuanceerder bleek:** de gemeten kolom `client_sync_status.
+freshness_status` staat op "fresh" voor alle elf klanten, terwijl de data voor tien van de elf vier
+maanden oud is. Uitgezocht wie dat veld echt gebruikt: de twee productiepaden die specialisten en
+gebruikers zien — `checkDataFreshness()` (de SOP-preflight) en `SyncStatusBadge` (de badge op het
+klantdashboard) — **herrekenen de versheid allebei live uit `last_sync_at`** en negeren de
+opgeslagen kolom. Die twee zouden vandaag al terecht "verouderd" tonen. De kolom zelf is dus wel
+degelijk een geschreven leugen (hij claimt een momentopname te zijn en is dat niet), maar hij was
+nog aan niemand doorgegeven. De ene plek die hem wél ongefilterd doorgaf — `GET /api/sync` — had
+geen actieve aanroeper in de frontend. Gerepareerd in fase 0.1 zodat de volgende consument die wél
+bouwt, geen bestaande leugen erft. Zie de commit van 14 augustus voor de precieze wijziging.
 
-Dat is een controle die iets anders meet dan hij beweert. Deze codebase heeft daar een expliciete
-waarschuwing over in `AGENTS.md`, opgeschreven na precies zo'n geval. Het is ook het gevaarlijkste
-type fout voor dit product: als een versheidsindicator kan liegen, kan elke analyse die erop
-vertrouwt met vier maanden oude cijfers een aanbeveling doen zonder dat iemand het merkt.
-
-**Dit is fase 0.1 en het gaat voor alles.** Niet omdat de ontbrekende data urgent is, maar omdat
-elke analyse die we hierna bouwen op een versheidsgarantie leunt die vandaag niet waar is.
+**Dit was fase 0.1 en ging voor alles.** Niet omdat de ontbrekende data zelf urgent was, maar omdat
+elke analyse die hierna gebouwd wordt op een versheidsgarantie moet kunnen leunen die klopt — en nu
+op de twee plekken die ertoe doen, klopt.
 
 ### 2.2 Wat de documenten fout hebben over de database
 
@@ -523,16 +547,27 @@ geverifieerd worden voordat er een opruimjob op komt.
 Elke fase heeft een poort. De poort is geen formaliteit: als hij dicht is, wordt de fase niet
 gebouwd, ook niet "alvast een beetje".
 
-### Fase 0: de werkelijkheid betrouwbaar maken
-**Poort: geen. Dit gaat voor alles.**
+### Fase 0: de werkelijkheid betrouwbaar maken — **KLAAR** (commit `2f9093d`)
+**Poort: geen. Ging voor alles.**
 
-- De sync weer aan de praat, of vaststellen waarom hij stilstaat
-- `client_sync_status.freshness_status` moet de waarheid vertellen; een indicator die "fresh" zegt
-  bij vier maanden oude data is gevaarlijker dan geen indicator
-- `REALIZED_THROUGH_MONTH` en `CURRENT_YEAR` uit `lib/types.ts`, afleiden uit de data
-- Een poortscript dat versheid meet en in `scripts/gates.sh` valt
+- ~~`REALIZED_THROUGH_MONTH` en `CURRENT_YEAR` uit `lib/types.ts`, afleiden uit de data~~ —
+  gedaan. `monthly-overview.tsx` leidt de grens nu af uit `result.points` (het laatste punt met
+  `realized !== null`); de twee dode constanten en de ongebruikte import zijn verwijderd.
+- ~~Vaststellen waarom de sync stilstaat~~ — bevestigd: verloren toegang tot de gekoppelde
+  accounts, geen codefout. `sync_runs` krijgt sinds 17 april geen enkele rij meer, ook geen
+  mislukte, wat past bij een credentialscontrole die faalt vóór `syncClient()` wordt aangeroepen
+  (zie sectie 2.1 voor het mechanisme). Blijft open tot de koppeling hersteld is — sectie 6 lost
+  dit structureel op met OAuth per bureau en een zichtbare koppelstatus.
+- ~~`freshness_status` moet de waarheid vertellen~~ — genuanceerd. De twee productiepaden die
+  gebruikers zien (`checkDataFreshness`, `SyncStatusBadge`) herrekenen al live en toonden nooit
+  de leugen. `GET /api/sync` gaf de rauwe kolom wel ongefilterd door, zonder actieve aanroeper;
+  nu gerepareerd zodat de volgende consument geen bestaande fout erft.
+- Geen apart poortscript voor versheid gebouwd: dat zou een levende operationele toestand
+  (staat de sync aan) meten met hetzelfde mechanisme als de code-juistheidspoorten (staat de
+  rechtenstructuur goed), en dat zijn andere soorten waarheid. De juiste bewaking hiervan is een
+  zichtbare koppelstatus per bureau, niet een build-gate — zie sectie 6.
 
-*Klaar wanneer:* een verlopen koppeling zichtbaar is in de UI binnen 24 uur.
+Geen migratie nodig gebleken. Alle poorten (`hygiene`, `tsc`, `test`) groen.
 
 ### Fase 1: de canonieke laag afmaken
 **Poort: fase 0 groen.**
