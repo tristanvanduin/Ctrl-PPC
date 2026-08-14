@@ -50,7 +50,3 @@ export function getHistoricalYear(data: ClientHistoricalData, year: number): Mon
     month: i + 1, conversions: 0, revenue: 0, adSpend: 0, weeks: [],
   }));
 }
-
-// Months with realized data for the current year
-export const REALIZED_THROUGH_MONTH = 3; // Jan–Mar
-export const CURRENT_YEAR = 2026;
