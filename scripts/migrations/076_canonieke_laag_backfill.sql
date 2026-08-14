@@ -3,6 +3,25 @@
 -- DRAAIEN: idempotent (elke UPDATE is een no-op op een rij die al klopt). Volgt op 075; draai
 -- nooit vóór die migratie.
 --
+-- ── TOEGEPAST OP 14 AUGUSTUS 2026, EN WAT DAT KOSTTE ─────────────────────────
+--
+-- De fact_dimension-UPDATE hieronder (330.601 rijen) in één keer sturen via de Management API
+-- vulde de schijf van het toenmalige nano-compute-project en liet Postgres crashen: WAL kon niet
+-- meer wegschrijven ("No space left on device"), het serverproces stierf op signal 6, en de
+-- database deed 92 seconden crash-recovery voor hij weer online was. Geen dataverlies -- Postgres'
+-- eigen WAL-redo garandeert dat -- maar wel een productie-uitval van enkele minuten.
+--
+-- Toegepast is dit UITEINDELIJK in zeven batches van 50.000 rijen, elk als eigen verzoek, met een
+-- telling ertussen (`where agency_id is null limit 50000` -- vanzelf hervatbaar, dus een
+-- afgebroken batch kost geen herhaald werk). Na afloop stond fact_dimension door de vele
+-- tupelversies op 275 MB; `vacuum full` bracht dat terug naar 148 MB, iets boven de originele
+-- 142 MB (de zes nieuwe kolommen zelf). Dit liep pas soepel nadat het project van nano naar micro
+-- compute ging -- dezelfde soort batch duurde daarvoor tientallen seconden, daarna 2 tot 8.
+--
+-- Wie dit bestand als geheel opnieuw stuurt op een klein compute-tier loopt hetzelfde risico. Op
+-- een tabel van deze omvang: batches van hooguit 50.000 rijen, apart verzonden, met een
+-- `vacuum full` erna zodra de laatste batch klaar is.
+--
 -- ── ÉÉN DOORGANG PER TABEL, NIET VIER ────────────────────────────────────────
 --
 -- De eerste versie deed vier aparte UPDATE's over fact_dimension (330.601 rijen, 142 MB): eerst
