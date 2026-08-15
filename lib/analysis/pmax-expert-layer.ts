@@ -95,6 +95,68 @@ export function aggregateByEntity(rows: Array<Record<string, unknown>>, keyColum
   return [...byKey.values()].sort((a, b) => b.cost - a.cost || b.impressions - a.impressions);
 }
 
+// ── Cannibalisatie: PMax versus Search/Shopping ─────────────────────────────
+//
+// Losgetrokken uit computePmaxInsights (was signaal 7 inline) zodat lib/pmax-scorecard.ts
+// dezelfde vergelijking gebruikt voor zijn cannibalisatie-factor in plaats van de maand-op-maand-
+// som een tweede keer te schrijven. De signaaltekst blijft hier; de scorecard leest alleen de
+// groeicijfers en de ernst.
+
+export interface CannibalisatieUitkomst {
+  pmaxConvGrowth: number;
+  otherConvGrowth: number;
+  totalGrowth: number;
+  /** null = geen cannibalisatie gedetecteerd (of te weinig geschiedenis). */
+  severity: "hoog" | "mogelijk" | null;
+}
+
+/**
+ * `campMonthly` zijn ads_campaign_monthly-rijen (campaign_name, month, cost, conversions) over de
+ * laatste ~90 dagen; `pmaxCampaignNames` de namen van de PMax-campagnes uit hetzelfde account.
+ * Vergelijkt de laatste twee kalendermaanden in de rijen — geen venster-parameter, want de
+ * aanroeper bepaalt via zijn eigen query al hoever terug hij kijkt.
+ */
+export function detecteerCannibalisatie(
+  campMonthly: Array<Record<string, unknown>>,
+  pmaxCampaignNames: readonly string[],
+): CannibalisatieUitkomst | null {
+  const months = [...new Set(campMonthly.map((r) => String(r.month).slice(0, 7)))].sort();
+  if (months.length < 2) return null;
+
+  const latestMonth = months[months.length - 1];
+  const prevMonth = months[months.length - 2];
+  const pmaxNames = new Set(pmaxCampaignNames);
+  let pmaxCostCur = 0, pmaxCostPrev = 0, pmaxConvCur = 0, pmaxConvPrev = 0;
+  let otherCostCur = 0, otherCostPrev = 0, otherConvCur = 0, otherConvPrev = 0;
+
+  for (const r of campMonthly) {
+    const m = String(r.month).slice(0, 7);
+    const isPmax = pmaxNames.has(String(r.campaign_name));
+    const cost = Number(r.cost) || 0;
+    const conv = Number(r.conversions) || 0;
+
+    if (m === latestMonth) {
+      if (isPmax) { pmaxCostCur += cost; pmaxConvCur += conv; }
+      else { otherCostCur += cost; otherConvCur += conv; }
+    } else if (m === prevMonth) {
+      if (isPmax) { pmaxCostPrev += cost; pmaxConvPrev += conv; }
+      else { otherCostPrev += cost; otherConvPrev += conv; }
+    }
+  }
+  void pmaxCostCur; void pmaxCostPrev; void otherCostCur; void otherCostPrev; // bewaard voor toekomstig kostenperspectief, nu ongebruikt
+
+  const pmaxConvGrowth = pmaxConvPrev > 0 ? ((pmaxConvCur - pmaxConvPrev) / pmaxConvPrev) : 0;
+  const otherConvGrowth = otherConvPrev > 0 ? ((otherConvCur - otherConvPrev) / otherConvPrev) : 0;
+  const totalConvCur = pmaxConvCur + otherConvCur;
+  const totalConvPrev = pmaxConvPrev + otherConvPrev;
+  const totalGrowth = totalConvPrev > 0 ? ((totalConvCur - totalConvPrev) / totalConvPrev) : 0;
+
+  const cannibaliserend = pmaxConvGrowth > 0.2 && otherConvGrowth < -0.15;
+  const severity = !cannibaliserend ? null : totalGrowth < pmaxConvGrowth * 0.5 ? "hoog" : "mogelijk";
+
+  return { pmaxConvGrowth, otherConvGrowth, totalGrowth, severity };
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface PmaxSignal {
@@ -434,49 +496,18 @@ export async function computePmaxInsights(
     .gte("month", new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0])
     .order("month");
 
-  if (campMonthly && campMonthly.length > 0) {
-    const months = [...new Set(campMonthly.map((r) => String(r.month).slice(0, 7)))].sort();
-    if (months.length >= 2) {
-      const latestMonth = months[months.length - 1];
-      const prevMonth = months[months.length - 2];
+  const cannibalisatie = campMonthly && campMonthly.length > 0
+    ? detecteerCannibalisatie(campMonthly as Array<Record<string, unknown>>, pmaxCampaigns.map((c) => String(c.campaign_name)))
+    : null;
 
-      const pmaxNames = new Set(pmaxCampaigns.map((c) => String(c.campaign_name)));
-      let pmaxCostCur = 0, pmaxCostPrev = 0, pmaxConvCur = 0, pmaxConvPrev = 0;
-      let otherCostCur = 0, otherCostPrev = 0, otherConvCur = 0, otherConvPrev = 0;
-
-      for (const r of campMonthly) {
-        const m = String(r.month).slice(0, 7);
-        const isPmax = pmaxNames.has(String(r.campaign_name));
-        const cost = Number(r.cost) || 0;
-        const conv = Number(r.conversions) || 0;
-
-        if (m === latestMonth) {
-          if (isPmax) { pmaxCostCur += cost; pmaxConvCur += conv; }
-          else { otherCostCur += cost; otherConvCur += conv; }
-        } else if (m === prevMonth) {
-          if (isPmax) { pmaxCostPrev += cost; pmaxConvPrev += conv; }
-          else { otherCostPrev += cost; otherConvPrev += conv; }
-        }
-      }
-
-      // Detect cannibalization: PMAX grows, others shrink, TOTAL doesn't grow proportionally
-      const pmaxConvGrowth = pmaxConvPrev > 0 ? ((pmaxConvCur - pmaxConvPrev) / pmaxConvPrev) : 0;
-      const otherConvGrowth = otherConvPrev > 0 ? ((otherConvCur - otherConvPrev) / otherConvPrev) : 0;
-      const totalConvCur = pmaxConvCur + otherConvCur;
-      const totalConvPrev = pmaxConvPrev + otherConvPrev;
-      const totalGrowth = totalConvPrev > 0 ? ((totalConvCur - totalConvPrev) / totalConvPrev) : 0;
-
-      if (pmaxConvGrowth > 0.2 && otherConvGrowth < -0.15) {
-        const cannibalPct = totalGrowth < pmaxConvGrowth * 0.5 ? "hoog" : "mogelijk";
-        signals.push({
-          type: "pmax_cannibalization",
-          severity: cannibalPct === "hoog" ? "critical" : "high",
-          title: `PMAX cannibalisatie ${cannibalPct}: Search/Shopping conversies dalen terwijl PMAX groeit`,
-          description: `PMAX conv. ${pmaxConvGrowth > 0 ? "+" : ""}${Math.round(pmaxConvGrowth * 100)}% MoM, Search/Shopping conv. ${Math.round(otherConvGrowth * 100)}% MoM. Totaal account groeit slechts ${Math.round(totalGrowth * 100)}%. PMAX lijkt conversies van bestaande campagnes over te nemen i.p.v. incrementeel te groeien.`,
-          confidence: cannibalPct === "hoog" ? "high" : "medium",
-        });
-      }
-    }
+  if (cannibalisatie?.severity) {
+    signals.push({
+      type: "pmax_cannibalization",
+      severity: cannibalisatie.severity === "hoog" ? "critical" : "high",
+      title: `PMAX cannibalisatie ${cannibalisatie.severity}: Search/Shopping conversies dalen terwijl PMAX groeit`,
+      description: `PMAX conv. ${cannibalisatie.pmaxConvGrowth > 0 ? "+" : ""}${Math.round(cannibalisatie.pmaxConvGrowth * 100)}% MoM, Search/Shopping conv. ${Math.round(cannibalisatie.otherConvGrowth * 100)}% MoM. Totaal account groeit slechts ${Math.round(cannibalisatie.totalGrowth * 100)}%. PMAX lijkt conversies van bestaande campagnes over te nemen i.p.v. incrementeel te groeien.`,
+      confidence: cannibalisatie.severity === "hoog" ? "high" : "medium",
+    });
   }
 
   // ── Build prompt context ──

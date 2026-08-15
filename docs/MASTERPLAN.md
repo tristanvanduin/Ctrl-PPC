@@ -474,7 +474,32 @@ nog niet gebouwd zijn). Geverifieerd tegen een echte klant (`scripts/verify-sear
 scorecard.ts`, alle 5 factoren beoordeeld) en handmatig in de browser tegen de demo-omgeving
 (2/5 beoordeeld, de rest eerlijk "—" i.p.v. gegokt — precies het gedrag dat de poort eiste).
 
-PMax-, Meta- en LinkedIn-scorecards blijven ongebouwd tot die kanalen echte data hebben.
+~~*PMax-scorecard, klaar wanneer:* vijf factoren, eigen opbouw (geen Search-logica hergebruikt),
+draait tegen echte PMax-campagnedata~~ — **gedaan, met een eerlijke kanttekening.**
+`lib/pmax-scorecard.ts`: vijf factoren (Asset Health, Feed Health, Netwerkmix-efficiëntie,
+Placement-efficiëntie, Cannibalisatie met Search/Shopping), vier ervan een herschaling van
+functies die al bestonden voor de PMax-signalen en de assetdekkingskaart
+(`analyseerAssetdekking`, `buildNetworkSplit`/`findImbalances`, `aggregateByEntity`) in plaats van
+een tweede rekensom. `detecteerCannibalisatie()` losgetrokken uit signaal 7 van
+`lib/analysis/pmax-expert-layer.ts` zodat scorecard en SOP-signaal dezelfde vergelijking gebruiken.
+
+Geverifieerd tegen echte klanten (`scripts/verify-pmax-scorecard.ts`) en dat leverde een
+bevinding op die niet in de aanname zat: `ads_pmax_asset_performance` en `ads_pmax_placements`
+hebben **nul rijen, voor elke klant, altijd** — niet gesynct, ondanks dat `lib/pmax/
+assetdekking.ts` en de assetdekkingskaart (`pmax-asset-coverage.tsx`) er al op gebouwd zijn. Alleen
+`ads_pmax_network_breakdown` heeft echte data (bevestigd op `gads-4140363870`: 399 rijen, Netwerkmix
+scoort 20/20 op een echte, geen gegokte, meting). Cannibalisatie gebruikt hetzelfde venster
+(laatste 90 dagen) als het bestaande SOP-signaal en loopt daardoor tegen dezelfde sync-stilstand
+aan als sectie 2.1 al beschreef (laatste echte maand april 2026) — vandaag dus bij elke klant
+"te weinig maanden". Feed Health is zoals gepland altijd onbeoordeeld (geen Merchant Center-
+koppeling). Resultaat: 1 van 5 factoren toont vandaag een echt cijfer, de overige vier tonen
+eerlijk "niet beoordeeld" met de reden erbij — geen crash, geen gok, precies regel 3. Zodra de
+asset-/placement-sync (opnieuw) gaat schrijven en de sync-stilstand is opgelost, lichten de
+overige factoren vanzelf op zonder codewijziging.
+
+PMax staat op de Campagnes-tab naast Search, met dezelfde `CampagneTypeTabs`-kiezer
+(`components/dashboard/pmax-scorecard.tsx`). Meta- en LinkedIn-scorecards blijven ongebouwd tot
+die kanalen echte data hebben.
 
 ---
 
@@ -704,10 +729,10 @@ ander (correcter) cijfer, hierboven verklaard in plaats van stilzwijgend doorgev
   klant/maand-combinaties.
 - ~~`market_relation_type` met `insufficient_data` als eerlijke standaard~~ — stond al zo in het
   contract vanaf de eerste versie.
-- **Campaign Type Intelligence** (per-campagnetype scorecards) — **nog te doen**, zie sectie 5.4.
-  Toegevoegd 15 augustus. Zelfde soort item als `confidence_breakdown`: geen externe afhankelijkheid,
-  bouwbaar op wat fase 1 al oplevert, met dezelfde kanaalbeperking (alleen Google Ads tot een ander
-  kanaal echte data heeft) als de herziene poort hierboven.
+- ~~**Campaign Type Intelligence** (per-campagnetype scorecards)~~ — **gedaan voor Search en PMax**,
+  zie sectie 5.4. Shopping en Display blijven open (geen aparte campagnetype-data bekeken; PMax
+  bleek zelf al twee van zijn vijf factoren zonder echte data te zitten, zie de kanttekening in
+  5.4 — de asset-/placement-sync draait al langer niet).
 
 *Klaar wanneer (herzien 15 augustus):* de zes regels uit sectie 3.2 aantoonbaar gehaald voor elk
 kanaal dat echte data heeft — vandaag uitsluitend Google Ads, de enige historie die ooit echt
