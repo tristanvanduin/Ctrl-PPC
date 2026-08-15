@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/server";
 import { PlatformPulse } from "@/components/terminal/platform-pulse";
+import { RoiCalculator } from "@/components/marketing/roi-calculator";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
@@ -126,6 +127,29 @@ export default async function HomePage() {
         </p>
         <div className="dark terminal mt-5">
           <PlatformPulse />
+        </div>
+      </section>
+
+      {/* ROI-calculator (15 augustus 2026, op vraag van de eigenaar, "dit is een converterend
+          blok, mega ver omlaag, voelt te los"): stond eerst onderaan FeaturesBlock, na Comparison
+          en de drie intro-kolommen -- de laagste plek op de homepage, zonder eigen kop, wat
+          zowel te ver naar beneden voelde als losstaand. Hierheen verplaatst: direct na Platform
+          Pulse, zodat de volgorde is "hier is het live bewijs" -> "hier is wat dat voor jou
+          waard is," met een eigen kop en subtitel in plaats van kaal het widget te tonen. Zie
+          components/marketing/features-block.tsx voor de eerdere plek en waarom die niet werkte. */}
+      <section className="mx-auto max-w-6xl px-6 pb-16">
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
+          The Math
+        </p>
+        <h2 className="mt-3 text-center font-marketing-heading text-2xl font-bold text-off-white">
+          What is this actually worth to you?
+        </h2>
+        <p className="mx-auto mt-2 max-w-xl text-center text-sm text-off-white/50">
+          A minimum estimate, built from the real steps this replaces - not a marketing number.
+          Move the sliders to match your book of business.
+        </p>
+        <div className="mx-auto mt-6 max-w-xl">
+          <RoiCalculator />
         </div>
       </section>
 
