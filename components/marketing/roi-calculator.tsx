@@ -90,6 +90,11 @@ const KANAAL_MULTIPLIER_PER_EXTRA_KANAAL = 0.6;
 // 1 kolom (dit bestand raakt de sectielayout niet meer aan) zodat hij goed past in een helft-
 // breedte kolom naast components/marketing/god-view-companion.tsx. Zie app/(marketing)/page.tsx
 // voor de sectieplaatsing (moest achter TrustBanner, niet ertussenin) en de 2-koloms opzet.
+//
+// Elfde keer, zelfde dag ("geef de kopkolom ernaast echt meer body"): STANDAARDPAKKET geeft nu
+// `export` mee zodat app/(marketing)/page.tsx de itemnamen kan hergebruiken in een "Replaces"-lijst
+// naast de calculator -- een tweede, losstaande lijst onderhouden was het exact soort duplicatie
+// die de hygienepoort (AGENTS.md) al eerder ving bij median/safeDiv.
 const KANAAL_REGEL = (g: string, m: string, l: string) =>
   [{ k: "Google", t: g }, { k: "Meta", t: m }, { k: "LinkedIn", t: l }];
 
@@ -100,7 +105,7 @@ interface Analyse {
   kanalen: ReturnType<typeof KANAAL_REGEL>;
 }
 
-const STANDAARDPAKKET: Analyse[] = [
+export const STANDAARDPAKKET: Analyse[] = [
   {
     naam: "Continuous anomaly detection",
     beschrijving: "x4/mo -- catches problems before they compound.",

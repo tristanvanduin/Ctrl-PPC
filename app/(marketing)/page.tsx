@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/server";
 import { PlatformPulse } from "@/components/terminal/platform-pulse";
-import { RoiCalculator } from "@/components/marketing/roi-calculator";
+import { RoiCalculator, STANDAARDPAKKET } from "@/components/marketing/roi-calculator";
 import { GodViewCompanion } from "@/components/marketing/god-view-companion";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
@@ -110,12 +110,21 @@ export default async function HomePage() {
               accounts per licentie, altijd onbeperkt).
 
               50 -> 15 (15 augustus 2026): zie lib/marketing/foundation-cap.ts voor de motivering
-              (databaseruimte + exclusiviteit naast de bestaande API-reden). */}
-          <p className="text-xs text-off-white/40">
-            {foundationOpen
-              ? "Foundation is free, forever - capped at 15 licenses at a time during launch, no card required."
-              : "Foundation is full for now - slots reopen as licenses upgrade. Request access to join the waitlist."}
-          </p>
+              (databaseruimte + exclusiviteit naast de bestaande API-reden).
+
+              REGEL VERWIJDERD IN DE OPEN-STAAT (15 augustus 2026, eigenaar: "met maar 15 licenties
+              is het niet waard dit op de homepage te benoemen"): de "capped at 15 licenses"-zin
+              stond hier expliciet uitgeschreven -- een klein getal hardop noemen op de belangrijkste
+              pagina van de site werkt averechts. De wachtlijst-tekst in de vol-staat blijft, want
+              die is operationeel nodig (een bezoeker moet weten dat de CTA naar een wachtlijst
+              leidt voordat hij erop klikt); alleen de vrije-staat kreeg geen tekst terug. De
+              werkelijke cap blijft ongewijzigd (FOUNDATION_CAP=15, foundation-cap.ts) en staat nog
+              wel op /faq, /how-it-works en de pricing-kaart -- alleen niet meer hier. */}
+          {!foundationOpen && (
+            <p className="text-xs text-off-white/40">
+              Foundation is full for now - slots reopen as licenses upgrade. Request access to join the waitlist.
+            </p>
+          )}
         </div>
       </section>
 
@@ -176,9 +185,19 @@ export default async function HomePage() {
           krijgt deze sectie een eigen vorm: de kop staat niet meer gecentreerd BOVEN een grid, maar
           links ERNAAST, in een rij van drie in plaats van een kop-rij plus een inhoud-rij. Op
           mobiel valt dit terug naar gestapeld (kop, dan calculator, dan companion), nog steeds in
-          leesvolgorde. */}
+          leesvolgorde.
+
+          ZESDE RONDE, ZELFDE DAG ("er is meer ruimte bij what's it actually worth to you, geef
+          hier echt meer body"): de kopkolom had na de subtitel niks meer -- veel lege ruimte
+          naast de calculator, die wel vol staat. Geen verzonnen vulling: de "Replaces"-lijst
+          hieronder is STANDAARDPAKKET.map(a => a.naam), dezelfde vier items die de calculator zelf
+          al gebruikt om te rekenen (nu geexporteerd uit roi-calculator.tsx i.p.v. een tweede lijst
+          te onderhouden) -- geeft de kopkolom echte inhoud die letterlijk verklaart waar de cijfers
+          vandaan komen, in plaats van tekst toe te voegen om de ruimte te vullen. Kolomverhouding
+          ook licht aangepast (0.8/1.5/1 -> 0.9/1.4/1.1) zodat God View iets meer ruimte krijgt,
+          zoals gevraagd. */}
       <section className="mx-auto max-w-6xl px-6 py-16">
-        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.5fr_1fr] lg:items-start">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.4fr_1.1fr] lg:items-start">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
               The Math
@@ -190,6 +209,17 @@ export default async function HomePage() {
               A minimum estimate, built from the real steps this replaces - not a marketing
               number. Move the sliders to match your book of business.
             </p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.15em] text-off-white/40">
+              Replaces
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {STANDAARDPAKKET.map((a) => (
+                <li key={a.naam} className="flex gap-2 text-sm leading-relaxed text-off-white/60">
+                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-neon-indigo/60" />
+                  {a.naam}
+                </li>
+              ))}
+            </ul>
           </div>
           <RoiCalculator />
           <GodViewCompanion />
