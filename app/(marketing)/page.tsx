@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/server";
 import { PlatformPulse } from "@/components/terminal/platform-pulse";
-import { GodViewTeaser } from "@/components/marketing/god-view-teaser";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
@@ -130,7 +129,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <GodViewTeaser />
       <TrustBanner />
       <ComparisonBlock />
       <FeaturesBlock />

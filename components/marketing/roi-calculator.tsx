@@ -179,22 +179,6 @@ export function RoiCalculator() {
 
         <label className="block">
           <div className="flex items-center justify-between text-sm text-off-white/80">
-            <span>Your specialist&apos;s hourly rate</span>
-            <span className="text-neon-indigo">{euroFmt.format(uurtarief)}</span>
-          </div>
-          <input
-            type="range"
-            min={20}
-            max={200}
-            step={5}
-            value={uurtarief}
-            onChange={(e) => setUurtarief(Number(e.target.value))}
-            className="mt-2 w-full accent-[#818cf8]"
-          />
-        </label>
-
-        <label className="block">
-          <div className="flex items-center justify-between text-sm text-off-white/80">
             <span>Channels per client (avg.)</span>
             <span className="text-neon-indigo">{kanalenPerKlant}</span>
           </div>
@@ -209,6 +193,22 @@ export function RoiCalculator() {
           <p className="mt-1.5 text-[11px] leading-relaxed text-off-white/40">
             Google, Meta, LinkedIn, and Bing (coming soon) each get their own analysis -- more connected channels means more manual work replaced, not just more accounts.
           </p>
+        </label>
+
+        <label className="block">
+          <div className="flex items-center justify-between text-sm text-off-white/80">
+            <span>Your specialist&apos;s hourly rate</span>
+            <span className="text-neon-indigo">{euroFmt.format(uurtarief)}</span>
+          </div>
+          <input
+            type="range"
+            min={20}
+            max={200}
+            step={5}
+            value={uurtarief}
+            onChange={(e) => setUurtarief(Number(e.target.value))}
+            className="mt-2 w-full accent-[#818cf8]"
+          />
         </label>
       </div>
 

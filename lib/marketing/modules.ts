@@ -28,12 +28,20 @@
 // God View keeps its single-card, three-variant shape (kept deliberately, not split into three
 // cards per the scorecard's per-tier sections) - each tier's `tagline` carries the scorecard's
 // differentiation (see the market / act on it / move first) without the added component cost.
+//
+// GOD VIEW TIER DEPTH (15 August 2026, on the owner's request, after "3 tiers, 2 sentences"):
+// the God View module's read-more panel used to compress Standard/Tactical/Pulse into one clause
+// each. Each tier now carries its own `detail` paragraph, rendered by intelligence-store.tsx as a
+// per-tier breakdown instead of one flat block of text - matches how much explanation three
+// distinctly-priced tiers actually need.
 
 export interface ModulePriceTier {
   naam: string;
   prijsPerMaand: number;
   /** Korte kwalificatie die het verschil met de andere tiers laat zien, bv. "See the market". */
   tagline: string;
+  /** Eigen alinea per tier voor het read-more-paneel - alleen God View heeft genoeg te zeggen per tier. */
+  detail: string;
 }
 
 export interface StoreModule {
@@ -53,12 +61,30 @@ export const MODULES: readonly StoreModule[] = [
     naam: "God View",
     omschrijving: "Anonymized market data across all agencies.",
     detail:
-      "Benchmarks, niche trends, churn risk, and opportunity patterns pooled anonymously across every connected agency - market intelligence no single account can see on its own. Standard shows what the market is doing. Tactical turns that into prioritized actions. Pulse flags high-frequency shifts the moment they happen, for agencies who want to move first.",
+      "Three tiers, each answering a different question about the market your accounts compete in - benchmarks, niche trends, churn risk, and opportunity patterns pooled anonymously across every connected agency, none of it visible from inside a single account.",
     gebouwd: false,
     prijs: [
-      { naam: "Standard", prijsPerMaand: 750, tagline: "See the market" },
-      { naam: "Tactical", prijsPerMaand: 1_250, tagline: "Act on it" },
-      { naam: "Pulse", prijsPerMaand: 2_500, tagline: "Move first" },
+      {
+        naam: "Standard",
+        prijsPerMaand: 750,
+        tagline: "See the market",
+        detail:
+          "The read: where your accounts and your niche stand against the anonymized market right now. Benchmarks by sector and segment, trend lines, churn-risk signals, and the opportunity patterns other agencies are already seeing - so a client conversation about \"why is CPA up\" starts from where the market actually is, not a guess.",
+      },
+      {
+        naam: "Tactical",
+        prijsPerMaand: 1_250,
+        tagline: "Act on it",
+        detail:
+          "Standard shows what the market is doing. Tactical is the layer above it: the same market signals turned into prioritized, ranked actions across your portfolio - which account to act on first, and why, instead of a benchmark you still have to interpret yourself.",
+      },
+      {
+        naam: "Pulse",
+        prijsPerMaand: 2_500,
+        tagline: "Move first",
+        detail:
+          "For agencies that want to know before the next reporting cycle does. Pulse surfaces high-frequency market shifts the moment they happen instead of waiting for the monthly benchmark to catch up - a frontrunner tier, priced and positioned for agencies that move on early signals as a matter of course, not everyone on Standard.",
+      },
     ],
   },
   {

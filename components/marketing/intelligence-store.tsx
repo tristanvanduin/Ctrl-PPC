@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Clock, Info, Sparkles, X } from "lucide-react";
-import { MODULES, BUNDLES, moduleById, type StoreModule } from "@/lib/marketing/modules";
+import { MODULES, BUNDLES, moduleById, type StoreModule, type ModulePriceTier } from "@/lib/marketing/modules";
 import { ComingSoonBadge } from "./coming-soon-badge";
 
 function ModuleInfoPopover({ mod, onReadMore, onClose }: { mod: StoreModule; onReadMore: () => void; onClose: () => void }) {
@@ -95,7 +95,7 @@ function ModuleCard({
 
       {isVariantModule && (
         <div className="mt-3 space-y-1.5">
-          {(mod.prijs as { naam: string; prijsPerMaand: number; tagline: string }[]).map((t, i) => (
+          {(mod.prijs as ModulePriceTier[]).map((t, i) => (
             <button
               key={t.naam}
               type="button"
@@ -373,7 +373,7 @@ export function IntelligenceStore() {
             role="dialog"
             aria-modal="true"
             aria-label={`${detailModule.naam} details`}
-            className="absolute inset-y-0 right-0 flex w-full max-w-sm translate-x-0 flex-col border-l border-off-white/10 bg-midnight-slate p-6 shadow-[0_0_60px_rgba(0,0,0,0.5)] duration-300 animate-in slide-in-from-right"
+            className="absolute inset-y-0 right-0 flex w-full max-w-md translate-x-0 flex-col overflow-y-auto border-l border-off-white/10 bg-midnight-slate p-6 shadow-[0_0_60px_rgba(0,0,0,0.5)] duration-300 animate-in slide-in-from-right"
           >
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-marketing-heading text-lg font-bold text-off-white">{detailModule.naam}</h3>
@@ -388,6 +388,24 @@ export function IntelligenceStore() {
             </div>
             {!detailModule.gebouwd && <div className="mt-3 self-start"><ComingSoonBadge /></div>}
             <p className="mt-4 text-sm leading-relaxed text-off-white/70">{detailModule.detail}</p>
+
+            {Array.isArray(detailModule.prijs) && (
+              <div className="mt-5 space-y-4 border-t border-off-white/10 pt-5">
+                {(detailModule.prijs as ModulePriceTier[]).map((t) => (
+                  <div key={t.naam}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm font-bold text-off-white">
+                        {t.naam} <span className="font-normal text-off-white/40">- {t.tagline}</span>
+                      </p>
+                      <p className="shrink-0 text-xs font-semibold text-neon-indigo">
+                        {"€"}{t.prijsPerMaand.toLocaleString("en-US")}/mo
+                      </p>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-off-white/60">{t.detail}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

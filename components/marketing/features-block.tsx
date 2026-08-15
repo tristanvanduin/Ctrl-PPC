@@ -10,6 +10,14 @@ import { ExecutionNode } from "./execution-node";
 // De platte genummerde lijst is op 11 augustus 2026 vervangen door ExecutionNode -- een verbonden
 // verticale tijdlijn i.p.v. losse genummerde bolletjes, met de Context Chips op de Signal-stap
 // zodat de herkomst van de data zichtbaar is, niet alleen het label.
+//
+// ROI-CALCULATOR UIT DE KOLOM GEHAALD (15 augustus 2026, op vraag van de eigenaar): stond eerst
+// in kolom 3, waardoor die kolom altijd veel langer was dan kolom 1 en 2 -- drie kolommen van
+// duidelijk verschillende lengte naast elkaar, met kolom 3 nog verder uitschietend zodra
+// "Where do those hours come from?" wordt opengeklapt. Kolom 3 houdt nu alleen de korte intro
+// (net zo lang als kolom 1 en 2), de calculator krijgt een eigen sectie eronder, vol breedte --
+// een interactieve tool met een uitklapstaat verdient sowieso meer ruimte dan een derde van deze
+// grid, los van het uitlijningsprobleem.
 
 const PIJNPUNTEN = [
   "Separate exports per channel that are never updated on the same day",
@@ -69,10 +77,11 @@ export function FeaturesBlock() {
             for each extra client. Cross-channel synergy compounds with every account you add, not
             just every channel.
           </p>
-          <div className="mt-6">
-            <RoiCalculator />
-          </div>
         </div>
+      </div>
+
+      <div className="mx-auto mt-12 max-w-xl">
+        <RoiCalculator />
       </div>
     </section>
   );
