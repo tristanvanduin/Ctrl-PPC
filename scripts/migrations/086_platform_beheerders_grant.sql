@@ -1,0 +1,24 @@
+-- 086: ontbrekende GRANT op platform_beheerders -- migratie 084 loste maar de helft op.
+--
+-- ── WAAROM 084 NIET VOLDOENDE WAS ──────────────────────────────────────────────
+--
+-- Migratie 084 voegde een RLS-policy toe (user_id = auth.uid() or app_role() = 'admin'), en die
+-- policy is inhoudelijk juist -- pg_policies bevestigde hem. Maar RLS is de TWEEDE laag. De
+-- eerste laag is een gewone SQL GRANT, en die had platform_beheerders nooit gekregen: als
+-- enige tabel in het hele public-schema stond hij niet in information_schema.role_table_grants
+-- voor authenticated. Zonder GRANT SELECT wijst Postgres een query af voor RLS er ook maar naar
+-- kijkt -- "permission denied for table platform_beheerders", niet "0 rijen". Bevestigd door de
+-- query letterlijk te draaien als de echte gebruiker (SET LOCAL ROLE authenticated + SET LOCAL
+-- request.jwt.claims): dat gaf exact die foutmelding, ook na migratie 084.
+--
+-- Elke andere tabel met hetzelfde RLS-patroon (user_roles, user_clients, user_agencies,
+-- google_ads_rsa_assets, google_ads_ad_meta, ...) heeft deze GRANT wel -- kennelijk hoorde hij
+-- bij het aanmaken van platform_beheerders in migratie 057 gewoon bij de rest van de DDL, en is
+-- hij daar als enige weggevallen. Geen enkele andere tabel in public mist 'm (geverifieerd met
+-- een sweep over alle tabellen).
+--
+-- anon krijgt 'm ook, in lijn met het patroon van de rest van het schema: RLS beslist welke
+-- rijen zichtbaar zijn (voor anon nul, want auth.uid() is dan null), de GRANT beslist alleen of
+-- de query uberhaupt mag starten.
+
+grant select on public.platform_beheerders to authenticated, anon;
