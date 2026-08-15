@@ -569,18 +569,42 @@ gebouwd, ook niet "alvast een beetje".
 
 Geen migratie nodig gebleken. Alle poorten (`hygiene`, `tsc`, `test`) groen.
 
-### Fase 1: de canonieke laag afmaken
+### Fase 1: de canonieke laag afmaken — **KLAAR** (commits `596dc35`..`6505634`)
 **Poort: fase 0 groen.**
 
-- `fact_core` verbreden: `agency_id`, `client_id`, `currency`, `leads`, `data_quality_score`, `source_table`
-- `fact_dimension` dezelfde tenantkolommen
-- Projectie uitbreiden naar Google week en dag, impression share, PMax, producten, geo, netwerk, schema
-- Batchgewijze backfill met hervatpunt
-- `blended_account_monthly` herschrijven op `fact_core` zodat er een waarheid is in plaats van twee
-- **De UNIQUE op `accounts.client_id` opheffen** (sectie 1.1)
+- ~~`fact_core` verbreden~~ / ~~`fact_dimension` dezelfde tenantkolommen~~ — gedaan (075/076):
+  `agency_id`, `client_id`, `currency`, `leads`, `data_quality_score`, `source_table`, NOT NULL
+  waar altijd afleidbaar.
+- ~~Projectie uitbreiden~~ — gedaan, maar de kernvondst was groter dan gepland: `fact_dimension`
+  had sinds migratie 043 **geen doorlopend onderhoud**, los van de sync-status. Migratie 078
+  geeft `refresh_fact_from_legacy()` de negen dimensies uit 043 terug, nu als `on conflict do
+  update`. Google week-grain toegevoegd op accountniveau (`ads_account_weekly`). Impression
+  share, PMax, producten en ad schedule zijn bewust **niet** meegenomen — expliciete
+  productbeslissing voor een latere migratie, niet vergeten.
+- Onderweg gevonden en gerepareerd: `refresh_rollups()` (dag naar week/maand) brak op de nieuwe
+  NOT NULL-kolommen omdat hij ze niet zette. Migratie 079.
+- ~~Batchgewijze backfill met hervatpunt~~ — nodig gebleken op de eerste, ongebatchte poging: die
+  vulde de schijf van het toenmalige nano-compute-project en liet de database crashen (WAL kon
+  niet meer wegschrijven, 92 seconden crash-recovery, geen dataverlies). Daarna in batches van
+  50.000 rijen per verzoek, na een upgrade naar Pro met micro compute.
+- ~~`blended_account_monthly` herschrijven op `fact_core`~~ — gedaan (080). Geverifieerd tegen de
+  oude view: Google en Meta exact gelijk. LinkedIn-conversies weken af (209 oud, 369 nieuw) — geen
+  fout, de oude view telde alleen `external_website_conversions` en miste `one_click_leads`, die
+  `fact_core` al sinds migratie 044/050 meetelt als vastgelegde standaard. De nieuwe view is de
+  correctere van de twee.
+- **Onvoorzien, niet gepland maar wel gebouwd:** een rollende bewaartermijn van twee maanden op
+  zoekterm-niveau data (`prune_zoekterm_historie()`, migratie 077), verankerd per klant op diens
+  eigen laatste maand. Ontstond uit een schaalgesprek over 10.000 accounts en de disk-crash
+  hierboven. Bracht de database van 373 MB naar 178 MB.
+- **De UNIQUE op `accounts.client_id` opheffen** — blijft bewust uitgesteld. Herijkt tijdens fase
+  1: hij blokkeert niet "Google + Meta voor één klant" (dat werkt al via de los op `client_id`
+  gesleutelde `meta_connections`/`linkedin_connections`), alleen twee Google-accounts onder één
+  klant. Smaller probleem, groter blast radius (minstens vier plekken met `.maybeSingle()` op
+  `accounts.client_id`) dan aanvankelijk gedacht. Apart besluit zodra een klant het nodig heeft.
 
 *Klaar wanneer:* elke bestaande grafiek toont dezelfde cijfers als ervoor, aangetoond met een test
-en niet met een steekproef.
+en niet met een steekproef. Gedaan voor Google en Meta (exact gelijk); voor LinkedIn bewust een
+ander (correcter) cijfer, hierboven verklaard in plaats van stilzwijgend doorgevoerd.
 
 ### Fase 2: analyses waar je op kunt bouwen
 **Poort: fase 1 groen.**
