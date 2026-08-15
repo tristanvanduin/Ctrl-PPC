@@ -165,19 +165,32 @@ export default async function HomePage() {
           components/marketing/god-view-companion.tsx naast elkaar, 3:2-verhouding zodat de
           calculator het grootste en eerste blok blijft. `items-stretch` (het grid-default) laat
           het kortere buurblok meestrekken naar de hoogte van de calculator in plaats van een gat
-          open te laten. */}
+          open te laten.
+
+          VIJFDE RONDE, ZELFDE DAG ("voelt als een template invuloefening -- titel, 2 blokken
+          naast elkaar, nieuwe header, 2 blokken naast elkaar, eentonige opbouw"): terecht --
+          components/marketing/comparison-block.tsx (de sectie hierna) is exact hetzelfde skelet:
+          gecentreerd label -> gecentreerde h2 -> gecentreerde p -> grid met 2 kaarten eronder.
+          Twee secties met identiek DNA, direct na elkaar. Comparison zelf blijft ongewijzigd (een
+          bestaande component met een lange eigen historie, niet in scope) -- in plaats daarvan
+          krijgt deze sectie een eigen vorm: de kop staat niet meer gecentreerd BOVEN een grid, maar
+          links ERNAAST, in een rij van drie in plaats van een kop-rij plus een inhoud-rij. Op
+          mobiel valt dit terug naar gestapeld (kop, dan calculator, dan companion), nog steeds in
+          leesvolgorde. */}
       <section className="mx-auto max-w-6xl px-6 py-16">
-        <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
-          The Math
-        </p>
-        <h2 className="mt-3 text-center font-marketing-heading text-2xl font-bold text-off-white">
-          What is this actually worth to you?
-        </h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-sm text-off-white/50">
-          A minimum estimate, built from the real steps this replaces - not a marketing number.
-          Move the sliders to match your book of business.
-        </p>
-        <div className="mt-6 grid gap-6 lg:grid-cols-[3fr_2fr]">
+        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.5fr_1fr] lg:items-start">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
+              The Math
+            </p>
+            <h2 className="mt-3 font-marketing-heading text-2xl font-bold text-off-white">
+              What is this actually worth to you?
+            </h2>
+            <p className="mt-2 text-sm text-off-white/50">
+              A minimum estimate, built from the real steps this replaces - not a marketing
+              number. Move the sliders to match your book of business.
+            </p>
+          </div>
           <RoiCalculator />
           <GodViewCompanion />
         </div>

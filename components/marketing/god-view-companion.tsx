@@ -14,10 +14,14 @@ import { ComingSoonBadge } from "./coming-soon-badge";
 //
 // Copy reuses the `positionering` line from lib/marketing/modules.ts (the God View entry) rather
 // than inventing a fourth version of the same pitch.
+//
+// Sits in a 3-column, top-aligned row next to RoiCalculator (app/(marketing)/page.tsx, "The Math"
+// section) - not stretched to match the calculator's height. It's meant to read as the shorter,
+// quieter neighbor, not an equal-weight twin.
 
 export function GodViewCompanion() {
   return (
-    <div className="flex h-full flex-col justify-center rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 p-6">
+    <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 p-6">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">Beyond your own numbers</p>
       <h3 className="mt-2 font-marketing-heading text-base font-bold text-off-white">
         God View: market intelligence on top
