@@ -30,7 +30,7 @@ function ModuleInfoPopover({ mod, onReadMore, onClose }: { mod: StoreModule; onR
         aria-label={`${mod.naam} summary`}
         className="absolute left-0 top-full z-50 mt-2 w-64 rounded-[6px] border border-off-white/15 bg-midnight-slate p-3 shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
       >
-        <p className="text-xs leading-relaxed text-off-white/70">{mod.omschrijving}</p>
+        <p className="text-xs leading-relaxed text-off-white/70">{mod.positionering}</p>
         <button
           type="button"
           onClick={onReadMore}

@@ -147,8 +147,15 @@ export default async function HomePage() {
           uitkomst rechts, zie components/marketing/roi-calculator.tsx) in plaats van breder
           gecentreerd te worden, want er was geen inhoudelijk relevante buur om ernaast te zetten
           zonder iets anders te forceren dat er niet hoort. Zie components/marketing/features-block.tsx
-          voor de eerdere plek en waarom die niet werkte. */}
-      <section className="mx-auto max-w-6xl px-6 pb-16">
+          voor de eerdere plek en waarom die niet werkte.
+
+          DERDE RONDE, ZELFDE DAG ("let op de spacing en marges, The Math heb je nu echt slecht
+          geplaatst"): deze sectie had `pb-16` zonder `pt-`, dus stond "The Math" vrijwel plakkend
+          tegen de onderrand van TrustBanner (die zelf `border-y` + `py-8` is, geen eigen
+          margin-bottom) -- geen enkele ademruimte tussen twee opeenvolgende sectiekoppen.
+          ComparisonBlock en FeaturesBlock gebruiken allebei `py-16`; deze sectie nu ook, voor
+          dezelfde verticale ademruimte als de rest van de pagina. */}
+      <section className="mx-auto max-w-6xl px-6 py-16">
         <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
           The Math
         </p>

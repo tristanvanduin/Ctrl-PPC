@@ -34,6 +34,16 @@
 // each. Each tier now carries its own `detail` paragraph, rendered by intelligence-store.tsx as a
 // per-tier breakdown instead of one flat block of text - matches how much explanation three
 // distinctly-priced tiers actually need.
+//
+// POSITIONERING FIELD (15 August 2026, after "the info by the icons still doesn't have the right
+// positioning chosen between the short and long summary"): the info-icon popover used to just
+// repeat `omschrijving`, the same sentence already sitting on the card - clicking the icon added
+// no new information, and the actual positioning angle from the scorecard's "Aanbeveling module"
+// column (e.g. "sell as sales enablement, not an audit") only showed up two clicks deep, in the
+// read-more panel, where most visitors never go. `positionering` is the popover's own content now:
+// a short, distinct hook pulled from that same scorecard guidance - what the module IS stays on
+// the card (`omschrijving`), why/how it's sold moves to the popover (`positionering`), the full
+// explanation stays in the panel (`detail`). Three tiers of content, three different jobs.
 
 export interface ModulePriceTier {
   naam: string;
@@ -47,7 +57,10 @@ export interface ModulePriceTier {
 export interface StoreModule {
   id: string;
   naam: string;
+  /** Wat de module doet - altijd zichtbaar op de kaart zelf. */
   omschrijving: string;
+  /** Waarom/hoe hij verkocht wordt - de popover achter het info-icoontje. Nooit gelijk aan omschrijving. */
+  positionering: string;
   /** Langere, klantgerichte alinea voor het read-more-paneel. */
   detail: string;
   gebouwd: boolean;
@@ -60,6 +73,7 @@ export const MODULES: readonly StoreModule[] = [
     id: "god-view",
     naam: "God View",
     omschrijving: "Anonymized market data across all agencies.",
+    positionering: "One name, three speeds - see the market, act on it, or move first, priced by how fast you need to know.",
     detail:
       "Three tiers, each answering a different question about the market your accounts compete in - benchmarks, niche trends, churn risk, and opportunity patterns pooled anonymously across every connected agency, none of it visible from inside a single account.",
     gebouwd: false,
@@ -91,6 +105,7 @@ export const MODULES: readonly StoreModule[] = [
     id: "whitelabel",
     naam: "Whitelabel Portal",
     omschrijving: "Custom branding over tier templates.",
+    positionering: "Feels like your own software, not a reseller badge stuck on ours.",
     detail:
       "A fully branded client environment that feels like your own software - branded portal, branded reports, and branded Second Opinions. Built for agencies that sell on professionalism as much as performance.",
     gebouwd: true,
@@ -100,6 +115,7 @@ export const MODULES: readonly StoreModule[] = [
     id: "ai-council",
     naam: "The AI Council",
     omschrijving: "Multi-LLM debate engine.",
+    positionering: "Reserved for calls big enough to deserve a second opinion from a different model family.",
     detail:
       "Multiple AI models challenge a recommendation before it reaches your team. Reserved for high-impact outputs only, not every routine suggestion.",
     gebouwd: false,
@@ -109,6 +125,7 @@ export const MODULES: readonly StoreModule[] = [
     id: "second-opinion",
     naam: "Second Opinion",
     omschrijving: "Independent account-level validation.",
+    positionering: "Built to win the next pitch, not to audit your own team.",
     detail:
       "An independent read on where the biggest opportunities, mistakes, and growth potential sit inside an account - built as a sales tool, not an audit. Pairs automatically with God View to become market-aware once that's active.",
     gebouwd: true,
@@ -118,6 +135,7 @@ export const MODULES: readonly StoreModule[] = [
     id: "demand-intelligence",
     naam: "Demand Intelligence",
     omschrijving: "Demand context and false-positive prevention for paid performance.",
+    positionering: "Answers whether it's SEO, paid, or the market - not an SEO checker with a new name.",
     detail:
       "Explains whether a change in results comes from demand, SEO, paid search, or the market itself - not a standalone SEO checker. Example: paid traffic drops, organic rises, total demand stays flat. That's cannibalization, not an account problem.",
     gebouwd: false,
@@ -127,6 +145,7 @@ export const MODULES: readonly StoreModule[] = [
     id: "demand-flow-intelligence",
     naam: "Demand Flow Intelligence",
     omschrijving: "Shows which channel creates demand and which one just harvests it.",
+    positionering: "Credit lands on the channel that created the demand, not just the one that closed it.",
     detail:
       "Foundation shows channels in isolation. Demand Flow Intelligence shows how they influence each other, so credit lands on the channel that created the demand - not just the one that captured the last click.",
     gebouwd: false,
@@ -136,6 +155,7 @@ export const MODULES: readonly StoreModule[] = [
     id: "proof-engine",
     naam: "Proof Engine",
     omschrijving: "Sales-ready proof, built from market risk and your own client data.",
+    positionering: "Your next pitch, backed by market data and real results - not a generic case study.",
     detail:
       "Automatically builds the case for why your agency is the right choice for a prospect or vertical - grounded in market problems and real account outcomes, not a generic case-study template. Pairs with Second Opinion in the Agency Growth Bundle.",
     gebouwd: false,
@@ -145,6 +165,7 @@ export const MODULES: readonly StoreModule[] = [
     id: "volume-compute",
     naam: "Volume Compute",
     omschrijving: "Dynamically priced blocks of extra compute (Credit Packs).",
+    positionering: "Infrastructure for scale, not a feature we lead the pitch with.",
     detail:
       "Extra processing capacity for agencies running an unusually high volume of analyses or accounts. Infrastructure and fair-use scaling, not a strategic feature.",
     gebouwd: true,
