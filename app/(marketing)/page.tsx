@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/server";
 import { PlatformPulse } from "@/components/terminal/platform-pulse";
 import { RoiCalculator } from "@/components/marketing/roi-calculator";
+import { GodViewCompanion } from "@/components/marketing/god-view-companion";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
@@ -154,7 +155,17 @@ export default async function HomePage() {
           tegen de onderrand van TrustBanner (die zelf `border-y` + `py-8` is, geen eigen
           margin-bottom) -- geen enkele ademruimte tussen twee opeenvolgende sectiekoppen.
           ComparisonBlock en FeaturesBlock gebruiken allebei `py-16`; deze sectie nu ook, voor
-          dezelfde verticale ademruimte als de rest van de pagina. */}
+          dezelfde verticale ademruimte als de rest van de pagina.
+
+          VIERDE RONDE, ZELFDE DAG (eigenaar: "een god view blok naast die ROI calculator kan
+          toegevoegde waarde bieden, mits het niet de aandacht afleidt"): de eerdere twee-koloms
+          opzet BINNEN RoiCalculator zelf (sliders/uitkomst naast elkaar) teruggedraaid -- die ging
+          uit van de volle paginabreedte en zou te smal ogen zodra hij een buur krijgt. In plaats
+          daarvan: RoiCalculator (terug naar 1 kolom) en het nieuwe, bewust rustige
+          components/marketing/god-view-companion.tsx naast elkaar, 3:2-verhouding zodat de
+          calculator het grootste en eerste blok blijft. `items-stretch` (het grid-default) laat
+          het kortere buurblok meestrekken naar de hoogte van de calculator in plaats van een gat
+          open te laten. */}
       <section className="mx-auto max-w-6xl px-6 py-16">
         <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
           The Math
@@ -166,8 +177,9 @@ export default async function HomePage() {
           A minimum estimate, built from the real steps this replaces - not a marketing number.
           Move the sliders to match your book of business.
         </p>
-        <div className="mt-6">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[3fr_2fr]">
           <RoiCalculator />
+          <GodViewCompanion />
         </div>
       </section>
 
