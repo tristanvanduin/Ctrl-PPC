@@ -691,7 +691,7 @@ Geen migratie nodig gebleken. Alle poorten (`hygiene`, `tsc`, `test`) groen.
 en niet met een steekproef. Gedaan voor Google en Meta (exact gelijk); voor LinkedIn bewust een
 ander (correcter) cijfer, hierboven verklaard in plaats van stilzwijgend doorgevoerd.
 
-### Fase 2: analyses waar je op kunt bouwen — **DEELS KLAAR**
+### Fase 2: analyses waar je op kunt bouwen — **KLAAR** (Search Console bewust buiten scope, zie hieronder)
 **Poort: fase 1 groen.**
 
 - ~~Het gedeelde kanaaloutputcontract als TypeScript-type, met validatietests~~ — gedaan.
