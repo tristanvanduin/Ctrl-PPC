@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/server";
 import { PlatformPulse } from "@/components/terminal/platform-pulse";
-import { RoiCalculator, STANDAARDPAKKET } from "@/components/marketing/roi-calculator";
+import { RoiCalculator } from "@/components/marketing/roi-calculator";
+import { STANDAARDPAKKET } from "@/lib/marketing/roi-pakket";
 import { GodViewCompanion } from "@/components/marketing/god-view-companion";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
@@ -191,11 +192,21 @@ export default async function HomePage() {
           hier echt meer body"): de kopkolom had na de subtitel niks meer -- veel lege ruimte
           naast de calculator, die wel vol staat. Geen verzonnen vulling: de "Replaces"-lijst
           hieronder is STANDAARDPAKKET.map(a => a.naam), dezelfde vier items die de calculator zelf
-          al gebruikt om te rekenen (nu geexporteerd uit roi-calculator.tsx i.p.v. een tweede lijst
-          te onderhouden) -- geeft de kopkolom echte inhoud die letterlijk verklaart waar de cijfers
-          vandaan komen, in plaats van tekst toe te voegen om de ruimte te vullen. Kolomverhouding
-          ook licht aangepast (0.8/1.5/1 -> 0.9/1.4/1.1) zodat God View iets meer ruimte krijgt,
-          zoals gevraagd. */}
+          al gebruikt om te rekenen -- geeft de kopkolom echte inhoud die letterlijk verklaart waar
+          de cijfers vandaan komen, in plaats van tekst toe te voegen om de ruimte te vullen.
+          Kolomverhouding ook licht aangepast (0.8/1.5/1 -> 0.9/1.4/1.1) zodat God View iets meer
+          ruimte krijgt, zoals gevraagd.
+
+          ZEVENDE RONDE, ZELFDE DAG ("this page couldn't load, a server error occurred"): de
+          eerste poging importeerde STANDAARDPAKKET rechtstreeks uit components/marketing/
+          roi-calculator.tsx (met een `export` ervoor). Compileerde en testte groen, maar crashte
+          in productie: die component heeft "use client", en deze pagina is een Server Component --
+          een niet-componentexport importeren uit een "use client"-bestand geeft in de App Router
+          een lege client-referentie in plaats van de echte waarde, dus `STANDAARDPAKKET.map(...)`
+          crasht zodra de pagina echt gerenderd wordt. `next build` ving dit niet, want de homepage
+          is dynamisch (de auth-redirect hierboven) en wordt dus nooit tijdens de build gerenderd.
+          STANDAARDPAKKET komt nu uit lib/marketing/roi-pakket.ts, een gewoon bestand zonder "use
+          client", dat zowel deze pagina als roi-calculator.tsx importeren. */}
       <section className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.4fr_1.1fr] lg:items-start">
           <div>
