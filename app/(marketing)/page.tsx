@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/server";
 import { PlatformPulse } from "@/components/terminal/platform-pulse";
+import { RoiCalculator } from "@/components/marketing/roi-calculator";
+import { STANDAARDPAKKET } from "@/lib/marketing/roi-pakket";
+import { GodViewCompanion } from "@/components/marketing/god-view-companion";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
@@ -105,12 +108,24 @@ export default async function HomePage() {
               agencies.licentie -- een freelancer met 5 advertentie-accounts, een bureau met 80, of
               een in-house team tellen allemaal als EEN licentie. "Accounts" botste met de andere
               claim op deze pagina, "unlimited accounts", die over iets anders gaat (advertentie-
-              accounts per licentie, altijd onbeperkt). */}
-          <p className="text-xs text-off-white/40">
-            {foundationOpen
-              ? "Foundation is free, forever - capped at 50 licenses at a time during launch, no card required."
-              : "Foundation is full for now - slots reopen as licenses upgrade. Request access to join the waitlist."}
-          </p>
+              accounts per licentie, altijd onbeperkt).
+
+              50 -> 15 (15 augustus 2026): zie lib/marketing/foundation-cap.ts voor de motivering
+              (databaseruimte + exclusiviteit naast de bestaande API-reden).
+
+              REGEL VERWIJDERD IN DE OPEN-STAAT (15 augustus 2026, eigenaar: "met maar 15 licenties
+              is het niet waard dit op de homepage te benoemen"): de "capped at 15 licenses"-zin
+              stond hier expliciet uitgeschreven -- een klein getal hardop noemen op de belangrijkste
+              pagina van de site werkt averechts. De wachtlijst-tekst in de vol-staat blijft, want
+              die is operationeel nodig (een bezoeker moet weten dat de CTA naar een wachtlijst
+              leidt voordat hij erop klikt); alleen de vrije-staat kreeg geen tekst terug. De
+              werkelijke cap blijft ongewijzigd (FOUNDATION_CAP=15, foundation-cap.ts) en staat nog
+              wel op /faq, /how-it-works en de pricing-kaart -- alleen niet meer hier. */}
+          {!foundationOpen && (
+            <p className="text-xs text-off-white/40">
+              Foundation is full for now - slots reopen as licenses upgrade. Request access to join the waitlist.
+            </p>
+          )}
         </div>
       </section>
 
@@ -127,6 +142,101 @@ export default async function HomePage() {
       </section>
 
       <TrustBanner />
+
+      {/* ROI-calculator (15 augustus 2026, op vraag van de eigenaar, "dit is een converterend
+          blok, mega ver omlaag, voelt te los"): stond eerst onderaan FeaturesBlock, na Comparison
+          en de drie intro-kolommen -- de laagste plek op de homepage, zonder eigen kop, wat
+          zowel te ver naar beneden voelde als losstaand. Hierheen verplaatst, direct na Platform
+          Pulse, met een eigen kop en subtitel in plaats van kaal het widget te tonen.
+
+          TWEEDE RONDE, ZELFDE DAG ("Pulse en plugin staan altijd samen boven aan" + "breekt de
+          pagina als enige sectie die in het midden staat"): dat plaatste de calculator TUSSEN
+          Platform Pulse en TrustBanner in, wat dat paar uit elkaar trok -- teruggezet zodat Pulse
+          en TrustBanner weer direct opeenvolgen, calculator erna. En een smalle, gecentreerde
+          max-w-xl-kaart was de enige niet-volle-breedte sectie tussen overigens allemaal
+          max-w-6xl-secties -- RoiCalculator zelf is nu twee kolommen breed (sliders links,
+          uitkomst rechts, zie components/marketing/roi-calculator.tsx) in plaats van breder
+          gecentreerd te worden, want er was geen inhoudelijk relevante buur om ernaast te zetten
+          zonder iets anders te forceren dat er niet hoort. Zie components/marketing/features-block.tsx
+          voor de eerdere plek en waarom die niet werkte.
+
+          DERDE RONDE, ZELFDE DAG ("let op de spacing en marges, The Math heb je nu echt slecht
+          geplaatst"): deze sectie had `pb-16` zonder `pt-`, dus stond "The Math" vrijwel plakkend
+          tegen de onderrand van TrustBanner (die zelf `border-y` + `py-8` is, geen eigen
+          margin-bottom) -- geen enkele ademruimte tussen twee opeenvolgende sectiekoppen.
+          ComparisonBlock en FeaturesBlock gebruiken allebei `py-16`; deze sectie nu ook, voor
+          dezelfde verticale ademruimte als de rest van de pagina.
+
+          VIERDE RONDE, ZELFDE DAG (eigenaar: "een god view blok naast die ROI calculator kan
+          toegevoegde waarde bieden, mits het niet de aandacht afleidt"): de eerdere twee-koloms
+          opzet BINNEN RoiCalculator zelf (sliders/uitkomst naast elkaar) teruggedraaid -- die ging
+          uit van de volle paginabreedte en zou te smal ogen zodra hij een buur krijgt. In plaats
+          daarvan: RoiCalculator (terug naar 1 kolom) en het nieuwe, bewust rustige
+          components/marketing/god-view-companion.tsx naast elkaar, 3:2-verhouding zodat de
+          calculator het grootste en eerste blok blijft. `items-stretch` (het grid-default) laat
+          het kortere buurblok meestrekken naar de hoogte van de calculator in plaats van een gat
+          open te laten.
+
+          VIJFDE RONDE, ZELFDE DAG ("voelt als een template invuloefening -- titel, 2 blokken
+          naast elkaar, nieuwe header, 2 blokken naast elkaar, eentonige opbouw"): terecht --
+          components/marketing/comparison-block.tsx (de sectie hierna) is exact hetzelfde skelet:
+          gecentreerd label -> gecentreerde h2 -> gecentreerde p -> grid met 2 kaarten eronder.
+          Twee secties met identiek DNA, direct na elkaar. Comparison zelf blijft ongewijzigd (een
+          bestaande component met een lange eigen historie, niet in scope) -- in plaats daarvan
+          krijgt deze sectie een eigen vorm: de kop staat niet meer gecentreerd BOVEN een grid, maar
+          links ERNAAST, in een rij van drie in plaats van een kop-rij plus een inhoud-rij. Op
+          mobiel valt dit terug naar gestapeld (kop, dan calculator, dan companion), nog steeds in
+          leesvolgorde.
+
+          ZESDE RONDE, ZELFDE DAG ("er is meer ruimte bij what's it actually worth to you, geef
+          hier echt meer body"): de kopkolom had na de subtitel niks meer -- veel lege ruimte
+          naast de calculator, die wel vol staat. Geen verzonnen vulling: de "Replaces"-lijst
+          hieronder is STANDAARDPAKKET.map(a => a.naam), dezelfde vier items die de calculator zelf
+          al gebruikt om te rekenen -- geeft de kopkolom echte inhoud die letterlijk verklaart waar
+          de cijfers vandaan komen, in plaats van tekst toe te voegen om de ruimte te vullen.
+          Kolomverhouding ook licht aangepast (0.8/1.5/1 -> 0.9/1.4/1.1) zodat God View iets meer
+          ruimte krijgt, zoals gevraagd.
+
+          ZEVENDE RONDE, ZELFDE DAG ("this page couldn't load, a server error occurred"): de
+          eerste poging importeerde STANDAARDPAKKET rechtstreeks uit components/marketing/
+          roi-calculator.tsx (met een `export` ervoor). Compileerde en testte groen, maar crashte
+          in productie: die component heeft "use client", en deze pagina is een Server Component --
+          een niet-componentexport importeren uit een "use client"-bestand geeft in de App Router
+          een lege client-referentie in plaats van de echte waarde, dus `STANDAARDPAKKET.map(...)`
+          crasht zodra de pagina echt gerenderd wordt. `next build` ving dit niet, want de homepage
+          is dynamisch (de auth-redirect hierboven) en wordt dus nooit tijdens de build gerenderd.
+          STANDAARDPAKKET komt nu uit lib/marketing/roi-pakket.ts, een gewoon bestand zonder "use
+          client", dat zowel deze pagina als roi-calculator.tsx importeren. */}
+      <section className="mx-auto max-w-6xl px-6 py-16">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.4fr_1.1fr] lg:items-start">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
+              The Math
+            </p>
+            <h2 className="mt-3 font-marketing-heading text-2xl font-bold text-off-white">
+              What is this actually worth to you?
+            </h2>
+            <p className="mt-2 text-sm text-off-white/50">
+              A minimum estimate, built from the real steps this replaces - not a marketing
+              number. Move the sliders to match your book of business.
+            </p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.15em] text-off-white/40">
+              Replaces
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {STANDAARDPAKKET.map((a) => (
+                <li key={a.naam} className="flex gap-2 text-sm leading-relaxed text-off-white/60">
+                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-neon-indigo/60" />
+                  {a.naam}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <RoiCalculator />
+          <GodViewCompanion />
+        </div>
+      </section>
+
       <ComparisonBlock />
       <FeaturesBlock />
     </>

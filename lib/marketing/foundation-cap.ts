@@ -9,8 +9,16 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 // automatisch bijhoudt (agencies.licentie wordt vandaag handmatig gezet). Geen publieke API-route:
 // de twee marketingpagina's die dit tonen (pricing, homepage) zijn server components en lezen dit
 // rechtstreeks, geen client-side round-trip nodig zolang er geen live ticker gevraagd is.
+//
+// 50 -> 15 (15 augustus 2026, op vraag van de eigenaar): tweede reden toegevoegd naast de
+// API-belasting hierboven -- de 8GB-database moet niet grotendeels gevuld raken met gratis
+// Foundation-data voordat er omzet tegenover staat. Een lagere cap beschermt databaseruimte terwijl
+// het platform klein is, en schept bijna als bijeffect meer exclusiviteit/urgentie op een tier die
+// toch al permanent gratis blijft. Geen permanent plafond: zodra omzet en schaal het toelaten kan de
+// cap omhoog (foundationBeschikbaar() telt altijd live tegen agencies.licentie, dus een hogere
+// FOUNDATION_CAP werkt met terugwerkende kracht zonder migratie).
 
-export const FOUNDATION_CAP = 50;
+export const FOUNDATION_CAP = 15;
 
 /**
  * Is er nog een Foundation-plek vrij? `true` bij een leesfout -- een tijdelijke storing mag de

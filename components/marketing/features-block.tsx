@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { AlertTriangle, ListChecks, Infinity as InfinityIcon, ArrowRight } from "lucide-react";
-import { RoiCalculator } from "./roi-calculator";
 import { ExecutionNode } from "./execution-node";
 
 // Fase 7, Task 2 (Blok 3): drie kolommen. De middelste (het 6-staps Decision Framework) volgt
@@ -10,6 +9,19 @@ import { ExecutionNode } from "./execution-node";
 // De platte genummerde lijst is op 11 augustus 2026 vervangen door ExecutionNode -- een verbonden
 // verticale tijdlijn i.p.v. losse genummerde bolletjes, met de Context Chips op de Signal-stap
 // zodat de herkomst van de data zichtbaar is, niet alleen het label.
+//
+// ROI-CALCULATOR UIT DE KOLOM GEHAALD (15 augustus 2026, op vraag van de eigenaar): stond eerst
+// in kolom 3, waardoor die kolom altijd veel langer was dan kolom 1 en 2 -- drie kolommen van
+// duidelijk verschillende lengte naast elkaar, met kolom 3 nog verder uitschietend zodra
+// "Where do those hours come from?" wordt opengeklapt. Kolom 3 houdt nu alleen de korte intro
+// (net zo lang als kolom 1 en 2).
+//
+// TWEEDE RONDE, ZELFDE DAG ("voelt te los, mega ver omlaag, dit is een converterend blok"): de
+// calculator eerst hieronder in een eigen, ongelabelde sectie gezet -- nog steeds onderaan de
+// homepage, na Comparison en deze drie kolommen, zonder eigen intro. Verplaatst naar app/(marketing)/
+// page.tsx, direct na Platform Pulse: hoger op de pagina (voor de meeste bezoekers al afgehaakt
+// zijn), met een eigen kop en subtitel zodat hij niet meer als een losstaand widget oogt. Dit
+// bestand raakt de calculator niet meer aan.
 
 const PIJNPUNTEN = [
   "Separate exports per channel that are never updated on the same day",
@@ -58,7 +70,7 @@ export function FeaturesBlock() {
           </Link>
         </div>
 
-        {/* Kolom 3: 'No Limits' propositie + ROI-calculator */}
+        {/* Kolom 3: 'No Limits' propositie */}
         <div>
           <InfinityIcon className="h-8 w-8 text-copper" aria-hidden />
           <h3 className="mt-4 font-marketing-heading text-xl font-bold text-off-white">
@@ -69,9 +81,6 @@ export function FeaturesBlock() {
             for each extra client. Cross-channel synergy compounds with every account you add, not
             just every channel.
           </p>
-          <div className="mt-6">
-            <RoiCalculator />
-          </div>
         </div>
       </div>
     </section>

@@ -2,7 +2,7 @@
 // /pricing. Same integrity rule as lib/marketing/tiers.ts - `gebouwd` marks whether the
 // underlying capability is real today, checked against the codebase before publishing:
 //
-// Built: Second Opinion Module (app/api/second-opinion/, real routes with a working PDF export),
+// Built: Second Opinion (app/api/second-opinion/, real routes with a working PDF export),
 // Whitelabel Portal (agencies.whitelabel_actief, migration 068, an admin-toggled real column),
 // Volume Compute (the credit ledger mechanism itself is real, migration 070 - only the per-tier
 // self-serve purchase flow is simulated here, same as everything else on this page).
@@ -10,23 +10,59 @@
 // Not built: God View as described here (anonymized market data ACROSS AGENCIES) is a materially
 // bigger feature than what exists - components/terminal/god-mode.tsx and agency-god-view.tsx are
 // single-agency or platform-admin views, not a cross-tenant benchmark product. AI Council,
-// SEO & Organic Synergy, and Case Study Module have no trace in the codebase at all.
+// Demand Intelligence, and Proof Engine have no trace in the codebase at all.
 //
-// Cross Channel Intelligence (added 12 August 2026, from the positioning strategy doc): distinct
-// from SEO & Organic Synergy above. That module is Search Console-specific (organic vs paid
+// Demand Flow Intelligence (added 12 August 2026, from the positioning strategy doc): distinct
+// from Demand Intelligence above. That module is Search Console-specific (organic vs paid
 // cannibalization). This one is ad-channel halo effects (Meta spend lifting Search Brand two days
 // later, that kind of pattern) across Google/Meta/LinkedIn/Bing. No trace in the codebase - the
 // strategy doc itself calls this "largely future architecture."
+//
+// NAMING AND COPY (15 August 2026, from Ctrl PPC Module Scorecard v2): renamed three modules to
+// their definitive names - Second Opinion Module -> Second Opinion, SEO & Organic Synergy ->
+// Demand Intelligence, Cross Channel Intelligence -> Demand Flow Intelligence, Case Study Module
+// -> Proof Engine, and the God View "Real-Time" tier -> "Pulse". `detail` is new: the longer,
+// benefit-framed paragraph shown in the read-more panel in intelligence-store.tsx. It is written
+// as customer-facing copy, not a restatement of the scorecard's internal positioning notes (e.g.
+// "sell this as sales enablement, not an audit" informed the wording but isn't quoted directly).
+// God View keeps its single-card, three-variant shape (kept deliberately, not split into three
+// cards per the scorecard's per-tier sections) - each tier's `tagline` carries the scorecard's
+// differentiation (see the market / act on it / move first) without the added component cost.
+//
+// GOD VIEW TIER DEPTH (15 August 2026, on the owner's request, after "3 tiers, 2 sentences"):
+// the God View module's read-more panel used to compress Standard/Tactical/Pulse into one clause
+// each. Each tier now carries its own `detail` paragraph, rendered by intelligence-store.tsx as a
+// per-tier breakdown instead of one flat block of text - matches how much explanation three
+// distinctly-priced tiers actually need.
+//
+// POSITIONERING FIELD (15 August 2026, after "the info by the icons still doesn't have the right
+// positioning chosen between the short and long summary"): the info-icon popover used to just
+// repeat `omschrijving`, the same sentence already sitting on the card - clicking the icon added
+// no new information, and the actual positioning angle from the scorecard's "Aanbeveling module"
+// column (e.g. "sell as sales enablement, not an audit") only showed up two clicks deep, in the
+// read-more panel, where most visitors never go. `positionering` is the popover's own content now:
+// a short, distinct hook pulled from that same scorecard guidance - what the module IS stays on
+// the card (`omschrijving`), why/how it's sold moves to the popover (`positionering`), the full
+// explanation stays in the panel (`detail`). Three tiers of content, three different jobs.
 
 export interface ModulePriceTier {
   naam: string;
   prijsPerMaand: number;
+  /** Korte kwalificatie die het verschil met de andere tiers laat zien, bv. "See the market". */
+  tagline: string;
+  /** Eigen alinea per tier voor het read-more-paneel - alleen God View heeft genoeg te zeggen per tier. */
+  detail: string;
 }
 
 export interface StoreModule {
   id: string;
   naam: string;
+  /** Wat de module doet - altijd zichtbaar op de kaart zelf. */
   omschrijving: string;
+  /** Waarom/hoe hij verkocht wordt - de popover achter het info-icoontje. Nooit gelijk aan omschrijving. */
+  positionering: string;
+  /** Langere, klantgerichte alinea voor het read-more-paneel. */
+  detail: string;
   gebouwd: boolean;
   /** Een enkele prijs, of meerdere keuzebare varianten (zoals God View). */
   prijs: number | ModulePriceTier[];
@@ -37,17 +73,41 @@ export const MODULES: readonly StoreModule[] = [
     id: "god-view",
     naam: "God View",
     omschrijving: "Anonymized market data across all agencies.",
+    positionering: "One name, three speeds - see the market, act on it, or move first, priced by how fast you need to know.",
+    detail:
+      "Three tiers, each answering a different question about the market your accounts compete in - benchmarks, niche trends, churn risk, and opportunity patterns pooled anonymously across every connected agency, none of it visible from inside a single account.",
     gebouwd: false,
     prijs: [
-      { naam: "Standard", prijsPerMaand: 750 },
-      { naam: "Tactical", prijsPerMaand: 1_250 },
-      { naam: "Real-Time", prijsPerMaand: 2_500 },
+      {
+        naam: "Standard",
+        prijsPerMaand: 750,
+        tagline: "See the market",
+        detail:
+          "The read: where your accounts and your niche stand against the anonymized market right now. Benchmarks by sector and segment, trend lines, churn-risk signals, and the opportunity patterns other agencies are already seeing - so a client conversation about \"why is CPA up\" starts from where the market actually is, not a guess.",
+      },
+      {
+        naam: "Tactical",
+        prijsPerMaand: 1_250,
+        tagline: "Act on it",
+        detail:
+          "Standard shows what the market is doing. Tactical is the layer above it: the same market signals turned into prioritized, ranked actions across your portfolio - which account to act on first, and why, instead of a benchmark you still have to interpret yourself.",
+      },
+      {
+        naam: "Pulse",
+        prijsPerMaand: 2_500,
+        tagline: "Move first",
+        detail:
+          "For agencies that want to know before the next reporting cycle does. Pulse surfaces high-frequency market shifts the moment they happen instead of waiting for the monthly benchmark to catch up - a frontrunner tier, priced and positioned for agencies that move on early signals as a matter of course, not everyone on Standard.",
+      },
     ],
   },
   {
     id: "whitelabel",
     naam: "Whitelabel Portal",
     omschrijving: "Custom branding over tier templates.",
+    positionering: "Feels like your own software, not a reseller badge stuck on ours.",
+    detail:
+      "A fully branded client environment that feels like your own software - branded portal, branded reports, and branded Second Opinions. Built for agencies that sell on professionalism as much as performance.",
     gebouwd: true,
     prijs: 500,
   },
@@ -55,34 +115,49 @@ export const MODULES: readonly StoreModule[] = [
     id: "ai-council",
     naam: "The AI Council",
     omschrijving: "Multi-LLM debate engine.",
+    positionering: "Reserved for calls big enough to deserve a second opinion from a different model family.",
+    detail:
+      "Multiple AI models challenge a recommendation before it reaches your team. Reserved for high-impact outputs only, not every routine suggestion.",
     gebouwd: false,
     prijs: 300,
   },
   {
     id: "second-opinion",
-    naam: "Second Opinion Module",
+    naam: "Second Opinion",
     omschrijving: "Independent account-level validation.",
+    positionering: "Built to win the next pitch, not to audit your own team.",
+    detail:
+      "An independent read on where the biggest opportunities, mistakes, and growth potential sit inside an account - built as a sales tool, not an audit. Pairs automatically with God View to become market-aware once that's active.",
     gebouwd: true,
     prijs: 250,
   },
   {
-    id: "seo-synergy",
-    naam: "SEO & Organic Synergy",
-    omschrijving: "Search Console integration for synergy and cannibalization checks.",
+    id: "demand-intelligence",
+    naam: "Demand Intelligence",
+    omschrijving: "Demand context and false-positive prevention for paid performance.",
+    positionering: "Answers whether it's SEO, paid, or the market - not an SEO checker with a new name.",
+    detail:
+      "Explains whether a change in results comes from demand, SEO, paid search, or the market itself - not a standalone SEO checker. Example: paid traffic drops, organic rises, total demand stays flat. That's cannibalization, not an account problem.",
     gebouwd: false,
     prijs: 250,
   },
   {
-    id: "cross-channel-intelligence",
-    naam: "Cross Channel Intelligence",
-    omschrijving: "Detects when one paid channel is feeding demand another channel harvests, so credit lands on the right campaign.",
+    id: "demand-flow-intelligence",
+    naam: "Demand Flow Intelligence",
+    omschrijving: "Shows which channel creates demand and which one just harvests it.",
+    positionering: "Credit lands on the channel that created the demand, not just the one that closed it.",
+    detail:
+      "Foundation shows channels in isolation. Demand Flow Intelligence shows how they influence each other, so credit lands on the channel that created the demand - not just the one that captured the last click.",
     gebouwd: false,
     prijs: 350,
   },
   {
-    id: "case-study",
-    naam: "Case Study Module",
-    omschrijving: "Automated success story generation for sales.",
+    id: "proof-engine",
+    naam: "Proof Engine",
+    omschrijving: "Sales-ready proof, built from market risk and your own client data.",
+    positionering: "Your next pitch, backed by market data and real results - not a generic case study.",
+    detail:
+      "Automatically builds the case for why your agency is the right choice for a prospect or vertical - grounded in market problems and real account outcomes, not a generic case-study template. Pairs with Second Opinion in the Agency Growth Bundle.",
     gebouwd: false,
     prijs: 150,
   },
@@ -90,6 +165,9 @@ export const MODULES: readonly StoreModule[] = [
     id: "volume-compute",
     naam: "Volume Compute",
     omschrijving: "Dynamically priced blocks of extra compute (Credit Packs).",
+    positionering: "Infrastructure for scale, not a feature we lead the pitch with.",
+    detail:
+      "Extra processing capacity for agencies running an unusually high volume of analyses or accounts. Infrastructure and fair-use scaling, not a strategic feature.",
     gebouwd: true,
     prijs: 0, // dynamisch: geen vast bedrag, zie de weergave in intelligence-store.tsx
   },
@@ -108,14 +186,14 @@ export const BUNDLES: readonly StoreBundle[] = [
     id: "agency-growth",
     naam: "The Agency Growth Bundle",
     focus: "Sales and social proof.",
-    moduleIds: ["second-opinion", "case-study"],
+    moduleIds: ["second-opinion", "proof-engine"],
     prijsPerMaand: 325,
   },
   {
     id: "deep-intelligence",
     naam: "The Deep Intelligence Bundle",
     focus: "Hardcore strategy and absolute retention.",
-    moduleIds: ["ai-council", "seo-synergy"],
+    moduleIds: ["ai-council", "demand-intelligence"],
     prijsPerMaand: 450,
   },
 ];

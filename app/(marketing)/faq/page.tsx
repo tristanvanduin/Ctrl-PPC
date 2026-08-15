@@ -71,8 +71,8 @@ const VRAGEN: FaqItem[] = [
       "less profitable. Foundation gives you the dashboard, forecast, and KPI monitoring forever, with no " +
       "cap on accounts, channels, or users once you are on it; you only pay when you want the engine to " +
       "explain why something happened, not just what happened. During this launch phase we cap Foundation " +
-      "at 50 licenses at a time (to scale our own API usage deliberately, not to limit growth) - not a " +
-      "one-time first-come-first-served batch. Whether you are a freelancer, an in-house team, or an " +
+      "at 15 licenses at a time, to scale our own API usage and database capacity deliberately alongside " +
+      "real revenue - not a one-time first-come-first-served batch. Whether you are a freelancer, an in-house team, or an " +
       "agency with dozens of client accounts, that is one license either way. A slot opens up whenever an " +
       "existing Foundation license upgrades, or as we raise the cap; it is never a permanent cutoff on " +
       "what an existing license can connect.",

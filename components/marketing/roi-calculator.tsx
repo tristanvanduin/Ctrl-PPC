@@ -1,148 +1,38 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { STANDAARDPAKKET, KANAAL_MULTIPLIER_PER_EXTRA_KANAAL, berekenBesparing } from "@/lib/marketing/roi-pakket";
 
-// Herzien drie keer na terechte feedback. Eerste keer: de vorige versie ("de 7 analyses die voor
-// elke klant lopen") telde budget-allocation, bid-strategy, quality-score, impression-share,
-// cross-channel en kpi-relations mee als het automatische standaardpakket. Dat klopt niet --
-// lib/analysis/credit-costs.ts noemt die zes expliciet "HANDMATIGE deep-dive-routes", nooit de
-// automatische SOP-cadans. Wat automatisch draait is monthly + weekly + biweekly
-// (lib/tenancy/sop-dekking.ts). Tweede keer (11 augustus 2026): een eerste herbouw op die drie,
-// elk als los item met een frequentie-vermenigvuldiging (weekly x4/maand, biweekly x2/maand), werd
-// terecht als zwak ervaren -- een kaal "x keer per maand" zegt niets over de inhoud of de
-// bewijslast waarom iets zoveel tijd kost. Herbouwd naar drie grotere, herkenbare blokken die elk
-// een korte inhoudsbeschrijving dragen.
-//
-// Derde keer (12 augustus 2026, mobiele design-review): "weekly/biweekly/monthly" als itemnamen
-// was zelf het volgende probleem -- cadans-jargon, geen marketingtaal, en het verstopte "Ongoing
-// monitoring" als een vage paraplu over twee heel verschillende controles. Opgesplitst naar wat
-// elk item inhoudelijk DOET: "Anomaly detection" (het weekly-signaal, vroeg problemen vangen) en
-// "Progress vs. monthly target" (het biweekly-signaal, prognose-vs-doelstelling).
-//
-// Vierde keer, zelfde dag: de "Monthly deep dive"-beschrijving noemde eerst 6 vaste pijlers uit
-// docs/ANALYSE-LOGICA.md #5.1 -- maar die tabel documenteert alleen het Google Ads-pad. "Dit is
-// weer extreem google minded", terecht -- app/api/analysis/monthly/route.ts draait per kanaal een
-// eigen stappenreeks (lib/analysis/adapters/: Google, Meta, LinkedIn), elk gebouwd rond wat dat
-// kanaal daadwerkelijk is, niet een generiek sjabloon met een kanaallabel erop. Herschreven naar
-// kanaalspecifieke aandachtsgebieden (zoekintentie voor Google, creative/audience-fatigue voor
-// Meta, ICP-fit en lead funnel voor LinkedIn) zonder de exacte stappenlijst of het stappenaantal
-// per kanaal te noemen -- genoeg om doordacht en specifiek te ogen, niet genoeg om de SOP-structuur
-// zelf na te bouwen. Wat wel gedeeld is over elk kanaal, en veilig hardop te zeggen: elk kanaal
-// eindigt in hypothesevalidatie en clear't dezelfde kwaliteitspoorten voor synthese
-// (finalizeChannelMonthlySynthesis, gedeeld door Google/Meta/LinkedIn -- zie deliverable-example.tsx
-// voor dezelfde correctie). Tijdsschatting per blok blijft dezelfde methode: wat een specialist er
-// naar schatting handmatig aan kwijt zou zijn, gebaseerd op de stappen in de SOP-prompts zelf
-// (lib/prompts/sop-prompts.ts: buildWeeklyPrompt, buildBiWeeklyPrompt, de monthly diepe analyse).
+// The package data (STANDAARDPAKKET), the channel-multiplier constant, and the calculation itself
+// live in lib/marketing/roi-pakket.ts, not here (15 August 2026, bugfix - see that file's header
+// for why: this component has "use client", and a Server Component importing a plain data export
+// from a "use client" module crashes at request time in the App Router). This file is UI only now.
+// Layout history below is about this component specifically; the package's own content history
+// (why these four items, this wording) moved to roi-pakket.ts with the data.
 //
 // text-off-white/40 op deze en andere marketingpagina's gaf 3,56:1 contrast tegen
 // --midnight-slate (WCAG AA vereist 4,5:1 voor gewone tekst); nagerekend en overal opgehoogd
 // naar /60 (6,42:1). /50 (4,84:1) haalt de norm net wel en is met opzet ongemoeid gelaten.
 //
-// DERDE AS: KANALEN PER KLANT (12 augustus 2026, eigenaar): STANDAARDPAKKET hierboven is de
-// automatische SOP-cyclus voor 1 kanaal. Maar app/api/analysis/monthly/route.ts draait
-// per kanaal een VOLLEDIG eigen stappenreeks (Google/Meta/LinkedIn-adapters, zie
-// deliverable-example.tsx) -- een klant met alle drie kanalen aangesloten levert dus ook drie
-// keer zoveel handmatig werk op om te vervangen, niet slechts een. Geen platte x2/x3 per extra
-// kanaal ("misschien niet de tijd x2 of x3, maar wel een extra layer eroverheen") -- gekozen
-// voor +60% van het basispakket per extra kanaal: reflecteert dat elk kanaal zijn eigen SOP-run
-// nodig heeft, maar met gedeeld accountniveau-overzicht i.p.v. drie volledig losse trajecten.
-// 60% is een bewuste, ronde, conservatieve inschatting -- geen gemeten kanaal-voor-kanaal
-// tijdsopname (die bestaat niet), dus geen valse precisie zoals 11/13 of 9/13 zou suggereren.
-const KANAAL_MULTIPLIER_PER_EXTRA_KANAAL = 0.6;
-
-// Vijfde keer (12 augustus 2026, na live-controle op mobiel): "Monthly deep dive" perste Google,
-// Meta en LinkedIn in een enkele doorlopende zin -- Meta en LinkedIn verdwenen visueel ("ik mis
-// hier de linkedin en meta"), en "ICP-fit" las als interne sales-jargon, niet als marketingtaal
-// ("ik vind de termen niet voldoen aan de marketing termen"). Eerst opgesplitst naar drie eigen
-// REGELS per kanaal -- loste de zichtbaarheid op, maar maakte het blok voor 1 item al 4 regels
-// lang.
+// Negende keer (15 augustus 2026, "in zijn eentje moet het enorm breed worden of een relevante
+// sectie ernaast krijgen, anders breekt het de pagina"): eerst geprobeerd als een kaart met twee
+// kolommen intern (sliders links, uitkomst rechts) om zelf breed genoeg te zijn. Teruggedraaid in
+// de tiende ronde hieronder -- een interne lg-breedtesplitsing gaat uit van de volle paginabreedte,
+// niet van de helft daarvan zodra er een buur naast komt te staan, en zou dan juist te smal ogen.
 //
-// Zesde keer, zelfde dag ("moeten weekly en biweekly niet ook geupdatet worden?? dit is een lap
-// tekst, kan het korter"): twee eisen die tegen elkaar in leken te staan -- alle 3 items moeten
-// per-kanaal info tonen (lib/prompts/sop-prompts.ts: buildWeeklyPrompt en buildBiWeeklyPrompt
-// hebben net zo goed echte META_WEEKLY/LINKEDIN_WEEKLY- en META_BIWEEKLY/LINKEDIN_BIWEEKLY-content,
-// niet alleen de monthly-adapters), maar het geheel moest korter, niet langer. Opgelost door de
-// kanaalweergave te verdichten van 3 losse rijen naar EEN regel per item ("Google: ... -- Meta:
-// ... -- LinkedIn: ..."), toegepast op alle 3 -- meer dekking, minder ruimte per item.
+// Tiende keer, zelfde dag (eigenaar wil alsnog een buurblok, "een god view blok naast die ROI
+// calculator kan toegevoegde waarde bieden, mits het niet de aandacht afleidt"): kaart terug naar
+// 1 kolom (dit bestand raakt de sectielayout niet meer aan) zodat hij goed past in een helft-
+// breedte kolom naast components/marketing/god-view-companion.tsx. Zie app/(marketing)/page.tsx
+// voor de sectieplaatsing (moest achter TrustBanner, niet ertussenin) en de 2-koloms opzet.
 //
-// Zevende keer, zelfde dag ("ik wil ook van de termen weekly, biweekly en monthly af"): de
-// itembeschrijvingen zeiden nog letterlijk "Weekly (x4)" en "Biweekly (x2)", en twee van de vier
-// itemnamen waren zelf een cadans-label ("Monthly deep dive", "Monthly report"). Cadans-woorden
-// vervangen door een neutrale "xN/mo"-multiplier (het getal blijft zichtbaar, het Engelse
-// cadanswoord niet) en de twee resterende cadans-namen herschreven naar wat het item DOET.
-// "Progress vs. monthly target" blijft ongewijzigd -- "monthly" verwijst daar naar de
-// doelstelling zelf (een normaal bedrijfsbegrip), niet naar hoe vaak Ctrl PPC checkt, en is
-// letterlijk de eigen formulering van de eigenaar ("vs maand doelstellingen").
-//
-// Achtste keer, zelfde dag ("nu staan de kanalen naast elkaar, ik denk dat een row break
-// cleaner is"): de kanaalregel per item stond op 1 doorlopende regel ("Google: ... -- Meta: ...
-// -- LinkedIn: ..."), verdicht voor de zesde keer hierboven. Terug naar 1 rij per kanaal --
-// minder gedrongen, nog steeds korter dan de originele 4-regelige versie uit de vijfde keer.
-const KANAAL_REGEL = (g: string, m: string, l: string) =>
-  [{ k: "Google", t: g }, { k: "Meta", t: m }, { k: "LinkedIn", t: l }];
-
-interface Analyse {
-  naam: string;
-  beschrijving: string;
-  minutenPerMaand: number;
-  kanalen: ReturnType<typeof KANAAL_REGEL>;
-}
-
-const STANDAARDPAKKET: Analyse[] = [
-  {
-    naam: "Continuous anomaly detection",
-    beschrijving: "x4/mo -- catches problems before they compound.",
-    minutenPerMaand: 20 * 4,
-    kanalen: KANAAL_REGEL(
-      "keyword and search-term waste",
-      "ad set bleeders and creative fatigue",
-      "campaign bleeders, weighted for low B2B volume",
-    ),
-  },
-  {
-    naam: "Progress vs. monthly target",
-    beschrijving: "x2/mo -- is the month on track against forecast?",
-    minutenPerMaand: 45 * 2,
-    kanalen: KANAAL_REGEL(
-      "ad group and device pacing",
-      "ad set pacing and audience saturation",
-      "creative and bid pacing",
-    ),
-  },
-  {
-    naam: "Deep dive analysis",
-    beschrijving: "Every finding clears the same quality gates, ending in hypothesis validation.",
-    minutenPerMaand: 90,
-    kanalen: KANAAL_REGEL(
-      "what buyers are searching for, and the auction",
-      "which creative works, and audience fatigue",
-      "reaching the right decision-makers, and the lead funnel",
-    ),
-  },
-  {
-    naam: "Client report",
-    beschrijving: "PDF synthesis of the findings, ready to send.",
-    minutenPerMaand: 60,
-    kanalen: [],
-  },
-];
-
-const MINUTEN_TOTAAL = STANDAARDPAKKET.reduce((som, a) => som + a.minutenPerMaand, 0);
-const UREN_PER_KLANT_PER_MAAND = MINUTEN_TOTAAL / 60;
-
-interface Invoer {
-  klanten: number;
-  uurtarief: number;
-  kanalenPerKlant: number;
-}
-
-function berekenBesparing({ klanten, uurtarief, kanalenPerKlant }: Invoer) {
-  const kanaalMultiplier = 1 + (kanalenPerKlant - 1) * KANAAL_MULTIPLIER_PER_EXTRA_KANAAL;
-  const urenPerKlantPerMaand = UREN_PER_KLANT_PER_MAAND * kanaalMultiplier;
-  const urenPerMaand = urenPerKlantPerMaand * klanten;
-  const euroPerMaand = urenPerMaand * uurtarief;
-  return { urenPerKlantPerMaand, urenPerMaand, euroPerMaand };
-}
+// Elfde keer, zelfde dag ("geef de kopkolom ernaast echt meer body"): app/(marketing)/page.tsx
+// wilde STANDAARDPAKKET hergebruiken voor een "Replaces"-lijst naast de calculator. Eerste poging
+// was gewoon `export` toevoegen hier -- leek te werken (tsc, tests, build waren allemaal groen),
+// maar crashte in productie op de homepage ("this page couldn't load"), want de homepage is
+// dynamisch (auth-redirect) en wordt dus nooit door `next build` echt gerenderd om de fout te
+// vinden. Twaalfde keer: de data verhuisd naar lib/marketing/roi-pakket.ts (geen "use client")
+// i.p.v. alleen een exportsleutelwoord toe te voegen aan een "use client"-bestand.
 
 export function RoiCalculator() {
   const [klanten, setKlanten] = useState(15);
@@ -179,22 +69,6 @@ export function RoiCalculator() {
 
         <label className="block">
           <div className="flex items-center justify-between text-sm text-off-white/80">
-            <span>Your specialist&apos;s hourly rate</span>
-            <span className="text-neon-indigo">{euroFmt.format(uurtarief)}</span>
-          </div>
-          <input
-            type="range"
-            min={20}
-            max={200}
-            step={5}
-            value={uurtarief}
-            onChange={(e) => setUurtarief(Number(e.target.value))}
-            className="mt-2 w-full accent-[#818cf8]"
-          />
-        </label>
-
-        <label className="block">
-          <div className="flex items-center justify-between text-sm text-off-white/80">
             <span>Channels per client (avg.)</span>
             <span className="text-neon-indigo">{kanalenPerKlant}</span>
           </div>
@@ -209,6 +83,22 @@ export function RoiCalculator() {
           <p className="mt-1.5 text-[11px] leading-relaxed text-off-white/40">
             Google, Meta, LinkedIn, and Bing (coming soon) each get their own analysis -- more connected channels means more manual work replaced, not just more accounts.
           </p>
+        </label>
+
+        <label className="block">
+          <div className="flex items-center justify-between text-sm text-off-white/80">
+            <span>Your specialist&apos;s hourly rate</span>
+            <span className="text-neon-indigo">{euroFmt.format(uurtarief)}</span>
+          </div>
+          <input
+            type="range"
+            min={20}
+            max={200}
+            step={5}
+            value={uurtarief}
+            onChange={(e) => setUurtarief(Number(e.target.value))}
+            className="mt-2 w-full accent-[#818cf8]"
+          />
         </label>
       </div>
 
