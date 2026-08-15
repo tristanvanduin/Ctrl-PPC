@@ -11,46 +11,91 @@
 // Selecting a bundle deselects its constituent modules (and locks them, shown as "In bundle") so
 // the running total never double-counts the same capability twice.
 
-import { useMemo, useState } from "react";
-import { Check, ChevronDown, Clock, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, ChevronDown, Clock, Info, Sparkles, X } from "lucide-react";
 import { MODULES, BUNDLES, moduleById, type StoreModule } from "@/lib/marketing/modules";
 import { ComingSoonBadge } from "./coming-soon-badge";
+
+function ModuleInfoPopover({ mod, onReadMore, onClose }: { mod: StoreModule; onReadMore: () => void; onClose: () => void }) {
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="fixed inset-0 z-40 cursor-default"
+      />
+      <div
+        role="dialog"
+        aria-label={`${mod.naam} summary`}
+        className="absolute left-0 top-full z-50 mt-2 w-64 rounded-[6px] border border-off-white/15 bg-midnight-slate p-3 shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
+      >
+        <p className="text-xs leading-relaxed text-off-white/70">{mod.omschrijving}</p>
+        <button
+          type="button"
+          onClick={onReadMore}
+          className="mt-2 text-xs font-semibold text-neon-indigo hover:underline"
+        >
+          Read more
+        </button>
+      </div>
+    </>
+  );
+}
 
 function ModuleCard({
   mod,
   selected,
   lockedByBundle,
   godViewTier,
+  infoOpen,
   onToggle,
   onSelectGodViewTier,
+  onToggleInfo,
+  onReadMore,
 }: {
   mod: StoreModule;
   selected: boolean;
   lockedByBundle: boolean;
   godViewTier: number | null;
+  infoOpen: boolean;
   onToggle: () => void;
   onSelectGodViewTier: (tierIndex: number | null) => void;
+  onToggleInfo: () => void;
+  onReadMore: () => void;
 }) {
   const isVariantModule = Array.isArray(mod.prijs);
   const isDynamic = !isVariantModule && mod.prijs === 0;
 
   return (
     <div
-      className={`flex flex-col rounded-[6px] border p-5 backdrop-blur-sm transition-colors ${
+      className={`relative flex flex-col rounded-[6px] border p-5 backdrop-blur-sm transition-colors ${
         selected || godViewTier !== null
           ? "border-neon-indigo/50 bg-midnight-slate-raised/80"
           : "border-off-white/10 bg-midnight-slate-raised/50 hover:border-neon-indigo/30"
       } hover:shadow-[0_0_28px_rgba(129,140,248,0.12)]`}
     >
       <div className="flex items-start justify-between gap-2">
-        <h4 className="font-marketing-heading text-sm font-bold text-off-white">{mod.naam}</h4>
+        <div className="relative flex items-center gap-1.5">
+          <h4 className="font-marketing-heading text-sm font-bold text-off-white">{mod.naam}</h4>
+          <button
+            type="button"
+            onClick={onToggleInfo}
+            aria-label={`About ${mod.naam}`}
+            aria-expanded={infoOpen}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-off-white/40 transition-colors hover:text-neon-indigo"
+          >
+            <Info className="h-3.5 w-3.5" aria-hidden />
+          </button>
+          {infoOpen && <ModuleInfoPopover mod={mod} onReadMore={onReadMore} onClose={onToggleInfo} />}
+        </div>
         {!mod.gebouwd && <ComingSoonBadge />}
       </div>
       <p className="mt-1.5 flex-1 text-xs leading-relaxed text-off-white/50">{mod.omschrijving}</p>
 
       {isVariantModule && (
         <div className="mt-3 space-y-1.5">
-          {(mod.prijs as { naam: string; prijsPerMaand: number }[]).map((t, i) => (
+          {(mod.prijs as { naam: string; prijsPerMaand: number; tagline: string }[]).map((t, i) => (
             <button
               key={t.naam}
               type="button"
@@ -61,7 +106,10 @@ function ModuleCard({
                   : "border-off-white/10 text-off-white/60 hover:border-off-white/25"
               }`}
             >
-              <span>{t.naam}</span>
+              <span className="flex flex-col items-start">
+                <span>{t.naam}</span>
+                <span className={`text-[10px] ${godViewTier === i ? "text-neon-indigo/70" : "text-off-white/35"}`}>{t.tagline}</span>
+              </span>
               <span className="font-semibold">{"€"}{t.prijsPerMaand.toLocaleString("en-US")}/mo</span>
             </button>
           ))}
@@ -111,6 +159,18 @@ export function IntelligenceStore() {
   const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(new Set());
   const [godViewTier, setGodViewTier] = useState<number | null>(null);
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
+  const [infoOpenId, setInfoOpenId] = useState<string | null>(null);
+  const [detailModuleId, setDetailModuleId] = useState<string | null>(null);
+  const detailModule = detailModuleId ? moduleById(detailModuleId) : undefined;
+
+  useEffect(() => {
+    if (!detailModuleId) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setDetailModuleId(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [detailModuleId]);
 
   const lockedModuleIds = useMemo(() => {
     const locked = new Set<string>();
@@ -198,8 +258,14 @@ export function IntelligenceStore() {
             selected={selectedModuleIds.has(mod.id)}
             lockedByBundle={lockedModuleIds.has(mod.id)}
             godViewTier={mod.id === "god-view" ? godViewTier : null}
+            infoOpen={infoOpenId === mod.id}
             onToggle={() => toggleModule(mod.id)}
             onSelectGodViewTier={setGodViewTier}
+            onToggleInfo={() => setInfoOpenId((cur) => (cur === mod.id ? null : mod.id))}
+            onReadMore={() => {
+              setInfoOpenId(null);
+              setDetailModuleId(mod.id);
+            }}
           />
         ))}
       </div>
@@ -291,6 +357,37 @@ export function IntelligenceStore() {
             >
               Initialize Upgrade
             </a>
+          </div>
+        </div>
+      )}
+
+      {detailModule && (
+        <div className="fixed inset-0 z-[60]">
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setDetailModuleId(null)}
+            className="absolute inset-0 bg-midnight-slate/70 backdrop-blur-sm"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${detailModule.naam} details`}
+            className="absolute inset-y-0 right-0 flex w-full max-w-sm translate-x-0 flex-col border-l border-off-white/10 bg-midnight-slate p-6 shadow-[0_0_60px_rgba(0,0,0,0.5)] duration-300 animate-in slide-in-from-right"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-marketing-heading text-lg font-bold text-off-white">{detailModule.naam}</h3>
+              <button
+                type="button"
+                onClick={() => setDetailModuleId(null)}
+                aria-label="Close"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] text-off-white/50 transition-colors hover:bg-off-white/10 hover:text-off-white"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+            {!detailModule.gebouwd && <div className="mt-3 self-start"><ComingSoonBadge /></div>}
+            <p className="mt-4 text-sm leading-relaxed text-off-white/70">{detailModule.detail}</p>
           </div>
         </div>
       )}
