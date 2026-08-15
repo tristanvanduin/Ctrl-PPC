@@ -143,7 +143,7 @@ const rijen = [
 ];
 
 console.log("\nschatCallKosten");
-check("een bekend model levert een bedrag", schatCallKosten("gemini-3-flash-preview", 30000, 1000) > 0);
+check("een bekend model levert een bedrag", schatCallKosten("google/gemini-3.7-flash", 30000, 1000) > 0);
 check("een onbekend model schat niet en geeft nul", schatCallKosten("iets-anders", 30000, 1000) === 0);
 
 async function main() {

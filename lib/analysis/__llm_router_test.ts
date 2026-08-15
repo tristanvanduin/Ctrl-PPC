@@ -1,7 +1,7 @@
 // Verificatie van O4-kern (model-routing en fallback) met de ECHTE llm-router.
 // Draaien: npx tsx lib/analysis/__llm_router_test.ts
 
-import { resolveTier, resolveChain, callRouted, MODEL_CATALOG } from "./llm-router";
+import { resolveTier, resolveChain, callRouted, callLayer, MODEL_CATALOG, LAYER_MODEL } from "./llm-router";
 import type { OpenRouterResponse } from "./openrouter-client";
 
 let passed = 0, failed = 0;
@@ -49,6 +49,28 @@ check("de router zet temperatuur 0 (deterministisch)", capturedTemp === 0);
 
 console.log("\n5. Determinisme");
 check("zelfde label kiest hetzelfde primaire model", resolveChain("monthly-step-3-x").chain[0] === resolveChain("monthly-step-3-x").chain[0]);
+
+console.log("\n6. callLayer: happy path gebruikt het primaire model per laag");
+const calls3: string[] = [];
+const okAlways = async (req: { model?: string }) => { calls3.push(req.model!); return fakeResp(req.model!); };
+const rNarrative = await callLayer("narrative", { apiKey: "x", systemPrompt: "s", userMessage: "u" }, okAlways as never);
+check("narrative gebruikt Claude Sonnet 5", rNarrative.model === LAYER_MODEL.narrative.primary);
+check("triage-model verschilt van narrative-model (geen kopie van dezelfde keten)", LAYER_MODEL.triage.primary !== LAYER_MODEL.narrative.primary);
+
+console.log("\n7. callLayer: valt terug op het laagspecifieke fallback-model");
+const calls4: string[] = [];
+const failPrimary = async (req: { model?: string }) => {
+  calls4.push(req.model!);
+  if (req.model === LAYER_MODEL.reasoning.primary) throw new Error("primair model faalt");
+  return fakeResp(req.model!);
+};
+const rReasoning = await callLayer("reasoning", { apiKey: "x", systemPrompt: "s", userMessage: "u" }, failPrimary as never);
+check("probeert eerst Grok 4.6", calls4[0] === LAYER_MODEL.reasoning.primary);
+check("valt terug op het fallback-model van de laag", rReasoning.model === LAYER_MODEL.reasoning.fallback);
+
+console.log("\n8. callLayer: vier lagen, vier verschillende primaire modellen (geen kopie van elkaar)");
+const primairen = new Set(Object.values(LAYER_MODEL).map((m) => m.primary));
+check("elke laag heeft een eigen primair model", primairen.size === 4, [...primairen].join(", "));
 
 console.log("\nRESULTAAT: " + passed + " geslaagd, " + failed + " gefaald\n");
 if (failed > 0) process.exit(1);

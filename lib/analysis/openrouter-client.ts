@@ -9,11 +9,14 @@ import { sanitizeLLMPayload } from "../security/sanitize-llm-payload";
 import { classifyLLMError, type LLMErrorClassification } from "./llm-error";
 import { logger } from "@/lib/logger";
 
-// LLM-endpoint. Default: Google's OpenAI-compatibele Gemini-endpoint (zelfde chat-completions-
-// formaat als OpenRouter, dus de client hieronder blijft ongewijzigd). Override via LLM_BASE_URL
-// als je terug wilt naar OpenRouter of een andere OpenAI-compatibele provider.
+// LLM-endpoint. Sinds masterplan Fase 3 (15 augustus) staat LLM_BASE_URL in .env.local op echt
+// OpenRouter (https://openrouter.ai/api/v1) -- de terugval hieronder op Google's directe
+// OpenAI-compatibele Gemini-endpoint blijft staan als noodgreep voor een omgeving zonder
+// OPENROUTER_API_KEY, zelfde chat-completions-formaat dus de client hieronder blijft ongewijzigd.
 const OPENROUTER_BASE = process.env.LLM_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta/openai";
-const DEFAULT_MODEL = "gemini-3-flash-preview";
+// Alleen de terugval-waarde als callRouted()/callLayer() geen model meegeeft (zou niet moeten
+// gebeuren; beide zetten altijd expliciet een model uit MODEL_CATALOG/LAYER_MODEL).
+const DEFAULT_MODEL = "google/gemini-3.7-flash";
 const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_TIMEOUT_MS = 120_000; // 2 minutes
 const MAX_RETRIES = 2;

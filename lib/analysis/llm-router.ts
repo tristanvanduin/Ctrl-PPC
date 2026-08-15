@@ -8,6 +8,13 @@
  *
  * De tweede provider (Copilot of Azure) en de deployment-beschikbaarheid zitten niet in deze
  * kern; die zijn gated op het platform-antwoord (zie O4_llm_model_routing.md).
+ *
+ * ── SINDS 15 AUGUSTUS: ECHT OPENROUTER, NIET MEER DE DIRECTE GEMINI-ENDPOINT ──────────────
+ *
+ * `LLM_BASE_URL` (openrouter-client.ts) wijst nu naar https://openrouter.ai/api/v1. Model-ID's
+ * dragen daarom het OpenRouter-voorvoegsel (google/, x-ai/, anthropic/, openai/) en zijn
+ * geverifieerd tegen de echte catalogus (GET /api/v1/models), niet aangenomen -- zie
+ * docs/ARCHITECTURE-MODEL-ROUTING.md voor de volledige onderbouwing en prijzen.
  */
 
 import {
@@ -16,14 +23,15 @@ import {
   type OpenRouterResponse,
 } from "./openrouter-client";
 
-// Model-catalogus. Model-ID's van de directe Gemini-endpoint (zonder google/-prefix). De
-// fallback is bewust OOK een Gemini-model, zodat een fout nooit terugvalt op een betaald
-// account bij een andere provider. Bevestig de exacte strings tegen het Gemini-aanbod van
-// jullie key (models.list).
+// Model-catalogus voor de bestaande heavy/medium/light-keten. Zelfde rolverdeling en zelfde
+// prijsniveau als vóór de overstap naar OpenRouter (zie lib/analysis/o2-targets-cost.ts,
+// MODEL_PRICES) -- dit is een endpoint-wissel, geen modelwissel voor de bestaande aanroepers.
+// De fallback is bewust OOK een Gemini-model, zodat een fout nooit terugvalt op een betaald
+// account bij een andere provider.
 export const MODEL_CATALOG = {
-  strong: "gemini-3-flash-preview",
-  cheap: "gemini-flash-lite-latest",
-  crossFallback: "gemini-2.5-flash",
+  strong: "google/gemini-3.7-flash",
+  cheap: "google/gemini-2.5-flash-lite",
+  crossFallback: "google/gemini-2.5-flash",
 } as const;
 
 export type Tier = "heavy" | "medium" | "light";
@@ -84,4 +92,53 @@ export async function callRouted(
     }
   }
   throw lastError ?? new Error("callRouted: geen model in de keten");
+}
+
+// ── Layers: routeren op WAT VOOR SOORT WERK het is, niet op stapnummer ──────────────────────
+//
+// Additief naast het bestaande Tier-systeem hierboven, geen vervanging. De vijftien bestaande
+// aanroepers van callRouted() blijven ongewijzigd op MODEL_CATALOG/TIER_CHAIN draaien -- een
+// stilzwijgende overstap van al die productieroutes naar andere modellen (met andere kosten,
+// latency en gedrag) hoort niet in dezelfde wijziging als "het endpoint klopt weer" te zitten.
+//
+// callLayer() is voor NIEUWE code (te beginnen bij de Fase 3-actiequeue) die per taaksoort een
+// model kiest in plaats van per analysestap: Layer 1 (data/validatie) is geen LLM-aanroep en
+// heeft dus geen entry -- dat blijft SQL/TypeScript, zie de vertrouwensdoctrine-regel "de LLM
+// rekent niet" (EXECUTION_PLAN.md 1.6, ook hier van toepassing).
+//
+// Modelkeuze en prijzen: zie docs/ARCHITECTURE-MODEL-ROUTING.md.
+export type Layer = "triage" | "reasoning" | "narrative" | "strategic";
+
+export const LAYER_MODEL: Record<Layer, { primary: string; fallback: string }> = {
+  // Snel, goedkoop filteren en categoriseren.
+  triage: { primary: "google/gemini-3.7-flash", fallback: "google/gemini-2.5-flash-lite" },
+  // Meerstaps redeneren en hypothesevorming.
+  reasoning: { primary: "x-ai/grok-4.6", fallback: "google/gemini-3.7-flash" },
+  // Klantgerichte tekst: claim-discipline en nuance wegen hier zwaarder dan snelheid.
+  narrative: { primary: "anthropic/claude-sonnet-5", fallback: "google/gemini-3.7-flash" },
+  // Alleen voor de zwaarste, zeldzaamste analyses (bv. God View); vandaag zonder consument --
+  // God View heeft structureel te weinig bureaus om te draaien (zie MASTERPLAN.md sectie 12).
+  strategic: { primary: "anthropic/claude-opus-5", fallback: "openai/gpt-5.6-sol" },
+};
+
+/**
+ * Voert een LLM-call uit voor een gegeven laag: probeert het primaire model, valt bij een fout
+ * terug op het laagspecifieke fallback-model. Zelfde fallback-vorm als callRouted(), maar
+ * gekozen op taaksoort in plaats van op stapnummer.
+ */
+export async function callLayer(
+  layer: Layer,
+  opts: RoutedRequest,
+  callFn: (req: OpenRouterRequest) => Promise<OpenRouterResponse> = callOpenRouter
+): Promise<OpenRouterResponse> {
+  const { primary, fallback } = LAYER_MODEL[layer];
+  let lastError: Error | null = null;
+  for (const model of [primary, fallback]) {
+    try {
+      return await callFn({ ...opts, model, temperature: opts.temperature ?? 0 });
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+  throw lastError ?? new Error(`callLayer: geen model beschikbaar voor laag ${layer}`);
 }

@@ -120,22 +120,20 @@ export function checkTargetPlausibility(
 
 // Prijs per 1 miljoen tokens in EURO, per model. Eén plek; nergens anders hardcoden.
 //
-// ── INGEVULD OP 2026-08-05 ──────────────────────────────────────────────────
+// ── BIJGEWERKT OP 2026-08-15, BRON GEWIJZIGD ────────────────────────────────
 //
-// Bron: ai.google.dev/gemini-api/docs/pricing, betaalde laag, standaardtarief. Google publiceert
-// in DOLLAR; de omrekening staat hieronder als aparte constante, zodat zichtbaar is dat het een
-// omrekening is en geen gepubliceerde europrijs.
+// Tot en met 3.6 Flash kwam de dollarprijs van ai.google.dev/gemini-api/docs/pricing, met een
+// handmatige koppeling tussen de routernaam en de naam op de prijspagina (die niet gelijk waren).
+// Sinds llm-router.ts overging op echt OpenRouter (masterplan Fase 3) komt de prijs rechtstreeks
+// uit de live OpenRouter-catalogus (GET https://openrouter.ai/api/v1/models) -- geen schatting,
+// geen handmatige naamkoppeling meer nodig, want het model-ID hieronder is LETTERLIJK het ID dat
+// de API teruggeeft en dat prijsveld draagt.
 //
 // TWEE DINGEN OM TE WETEN VOORDAT JE HIEROP STUURT:
 //
-//   1. De naam in de router is niet de naam op de prijspagina. De router vraagt
-//      "gemini-3-flash-preview"; de pagina noemt de 3-generatie Flash zonder het woord preview.
-//      Ik heb ze op generatie gekoppeld. Wijkt Google's preview-tarief af, dan wijkt deze
-//      berekening mee -- controleer dat bij de eerste echte factuur.
+//   1. Onbekend model: geen entry, en dan blijft cost_eur null. Dat is eerlijker dan een schatting.
 //   2. De wisselkoers is een MOMENTOPNAME. Bij een cap die op een tientje nauwkeurig moet zijn is
 //      dat ruim genoeg; bij een afrekening naar een klant niet.
-//
-// Onbekend model: geen entry, en dan blijft cost_eur null. Dat is eerlijker dan een schatting.
 
 /**
  * Dollar naar euro. Eén plek, met de datum erbij, want een koers zonder datum is over een half
@@ -145,12 +143,22 @@ export const USD_PER_EUR = 1.08; // stand 2026-08-05
 const eur = (usdPer1M: number) => Math.round((usdPer1M / USD_PER_EUR) * 10000) / 10000;
 
 export const MODEL_PRICES: Record<string, { inputPer1M: number; outputPer1M: number }> = {
-  // Gemini 3 Flash: $1,50 in / $7,50 uit per 1M tokens.
-  "gemini-3-flash-preview": { inputPer1M: eur(1.50), outputPer1M: eur(7.50) },
+  // ── MODEL_CATALOG (llm-router.ts, bestaande heavy/medium/light-keten) ──
+  // Gemini 3.7 Flash: $0,38 in / $1,88 uit -- goedkoper én nieuwer dan 3.6 Flash.
+  "google/gemini-3.7-flash": { inputPer1M: eur(0.38), outputPer1M: eur(1.88) },
   // Gemini 2.5 Flash-Lite: $0,10 in / $0,40 uit.
-  "gemini-flash-lite-latest": { inputPer1M: eur(0.10), outputPer1M: eur(0.40) },
+  "google/gemini-2.5-flash-lite": { inputPer1M: eur(0.10), outputPer1M: eur(0.40) },
   // Gemini 2.5 Flash: $0,30 in / $2,50 uit.
-  "gemini-2.5-flash": { inputPer1M: eur(0.30), outputPer1M: eur(2.50) },
+  "google/gemini-2.5-flash": { inputPer1M: eur(0.30), outputPer1M: eur(2.50) },
+  // ── LAYER_MODEL (llm-router.ts, nieuw: triage/reasoning/narrative/strategic) ──
+  // Grok 4.6: $2,00 in / $6,00 uit.
+  "x-ai/grok-4.6": { inputPer1M: eur(2.00), outputPer1M: eur(6.00) },
+  // Claude Sonnet 5: $2,00 in / $10,00 uit.
+  "anthropic/claude-sonnet-5": { inputPer1M: eur(2.00), outputPer1M: eur(10.00) },
+  // Claude Opus 5: $5,00 in / $25,00 uit.
+  "anthropic/claude-opus-5": { inputPer1M: eur(5.00), outputPer1M: eur(25.00) },
+  // GPT-5.6 Sol: $5,00 in / $30,00 uit.
+  "openai/gpt-5.6-sol": { inputPer1M: eur(5.00), outputPer1M: eur(30.00) },
 };
 
 /**

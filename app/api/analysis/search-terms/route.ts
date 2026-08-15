@@ -42,7 +42,12 @@ import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 export const maxDuration = 300; // 5 minutes for full analysis with many batches
 
-const OPENROUTER_MODEL = "google/gemini-3-flash-preview";
+// Label voor de search_term_analysis-rij (model_used). callRouted() (regel 332) kiest het
+// werkelijke model per batch via MODEL_CATALOG, met een fallback-keten bij een storing -- dit is
+// dus de VERWACHTE waarde, niet gegarandeerd de exacte per batch. Zelfde constante als
+// MODEL_CATALOG.strong in lib/analysis/llm-router.ts; daar niet vandaan geimporteerd om dit
+// bestand niet te koppelen aan de interne vorm van de router voor één labelveld.
+const OPENROUTER_MODEL = "google/gemini-3.7-flash";
 const BATCH_SIZE = 100; // Smaller batches = less token overflow risk with enhanced schema
 
 
