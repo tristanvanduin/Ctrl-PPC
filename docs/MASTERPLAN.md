@@ -606,19 +606,53 @@ Geen migratie nodig gebleken. Alle poorten (`hygiene`, `tsc`, `test`) groen.
 en niet met een steekproef. Gedaan voor Google en Meta (exact gelijk); voor LinkedIn bewust een
 ander (correcter) cijfer, hierboven verklaard in plaats van stilzwijgend doorgevoerd.
 
-### Fase 2: analyses waar je op kunt bouwen
+### Fase 2: analyses waar je op kunt bouwen — **DEELS KLAAR**
 **Poort: fase 1 groen.**
 
-- Het gedeelde kanaaloutputcontract als TypeScript-type, met validatietests
-- Bestaande Google-output erop mappen via een maplaag; de monthly-route van 2.913 regels blijft ongemoeid
-- **Targetinvoer** voor specialisten, `client_targets` gevuld
-- **Search Console** koppeling en signalen
-- De kwaliteitspoorten van shadow mode naar blokkerend
-- `confidence_breakdown` als vijf componenten in het contract
-- `market_relation_type` met `insufficient_data` als eerlijke standaard
+- ~~Het gedeelde kanaaloutputcontract als TypeScript-type, met validatietests~~ — gedaan.
+  `lib/analysis/channel-output-contract.ts`, met een echte mapper voor Google
+  (`mapGoogleMonthlyToSharedOutput`). Geverifieerd tegen een echte klant/maand: alle rijen landen,
+  niets zoekgeraakt (`scripts/verify-channel-output-contract.ts`).
+- ~~Bestaande Google-output erop mappen via een maplaag~~ — gedaan, zie hierboven. De monthly-route
+  van 2.913 regels is ongemoeid gebleven.
+- ~~**Targetinvoer** voor specialisten, `client_targets` gevuld~~ — gedaan (migratie 082). Bleek
+  groter dan gepland: `client_targets` lag al bekabeld maar was functioneel dood (0 rijen) terwijl
+  `client_settings.kpi_targets` via een aparte weg de echte analyse dreef voor de 3 klanten die een
+  target hadden. `client_targets` is nu de enige bron voor cpa/roas in `monthly/route.ts` en 4 van
+  de 7 overige lezers (`bid-strategy`, `budget-allocation`, `biweekly`, `meta-briefing`); 2 lezers
+  gebruiken `conversionsAbsolute` (geen client_targets-equivalent, bewust niet aangeraakt), 1
+  gebruikt alleen een boolean-vlag. De invoer-UI (bestaande CPA/ROAS-velden in de instellingenpagina)
+  schrijft voortaan naar beide bronnen tegelijk.
+- **Search Console** koppeling en signalen — **blijft open.** Vergt Google Cloud OAuth-credentials
+  van de opdrachtgever; geen codewerk mogelijk zonder die stap.
+- ~~De kwaliteitspoorten van shadow mode naar blokkerend~~ — **herzien.** Onderzocht: de negen
+  poorten (`lib/decision/quality-gates.ts`) hingen nergens aan de echte, live pijplijn — alleen aan
+  een admin-diagnosescherm en een niet-blootgestelde skeleton-route. Shadow mode op de live
+  pijplijn bestond dus niet, en "naar blokkerend" had op dat moment niets om van te promoveren.
+  Migratie 083 + `monthly/route.ts` roepen de negen poorten nu wél aan, op elke echte run, puur
+  observerend (`quality_gate_observations`, fire-and-forget, nooit blokkerend). Geverifieerd tegen
+  een echte klant/maand: alle 9 poorten leverden een resultaat op. Daadwerkelijk blokkerend maken
+  wacht bewust op een periode aan verzamelde observaties — geen technische blokkade, een
+  kalibratievraag.
+- `confidence_breakdown` als vijf componenten in het contract — **nog te doen.** Het enige
+  onderdeel van deze fase dat nog codewerk vergt zonder externe afhankelijkheid: grotendeels af te
+  leiden uit wat er al ligt (`data_quality_score` uit fase 1, conversieaantallen, spreiding over
+  meerdere maanden); `market_corroboration` blijft eerlijk `insufficient_data` zolang God View leeg is.
+- ~~`market_relation_type` met `insufficient_data` als eerlijke standaard~~ — stond al zo in het
+  contract vanaf de eerste versie.
 
-*Klaar wanneer:* een analyse voor een testklant voldoet aan alle zes regels uit sectie 3.2,
-handmatig nagelopen op een echte maand.
+*Klaar wanneer (herzien 15 augustus):* de zes regels uit sectie 3.2 aantoonbaar gehaald voor elk
+kanaal dat echte data heeft — vandaag uitsluitend Google Ads, de enige historie die ooit echt
+gesynct is. Voor kanalen zonder data (Meta, LinkedIn, GA4, Search Console) is `insufficient_data`
+het bewijs dat de poort werkt, niet een teken dat hij dichtblijft: regel 3 van de vertrouwensdoctrine
+zegt letterlijk dat dit een eerlijk antwoord is, geen storing.
+
+De oorspronkelijke formulering ("handmatig nagelopen op een echte maand", zonder kanaal te
+specificeren) was op dit punt onsluitbaar en is daarom herzien. Meta/LinkedIn/GA4/Search Console
+krijgen pas echte data via een klant die ze gebruikt, en die klant komt bewust niet binnen voordat
+het product waarmaakt wat het belooft (besluit, herbevestigd 15 augustus) — een cirkel die zichzelf
+nooit doorbreekt als de poort alle kanalen tegelijk eist. Zie sectie 12, die dit risico al benoemde
+voordat het zich voordeed, en fase 5 hieronder voor wat dit betekent voor "een klant die wil".
 
 ### Fase 3: uitvoering en werkvoorraad
 **Poort: fase 2 groen.**
@@ -642,6 +676,16 @@ waarop het product demonstreerbaar wordt.
 
 ### Fase 5: launching customer
 **Poort: fase 4 groen, en een klant die wil.**
+
+**"Een klant die wil" (herzien 15 augustus):** een klant op wat het product vandaag aantoonbaar
+waarmaakt — de Google Ads-analyse volgens de zes regels uit sectie 3.2 — niet op de volledige
+multi-kanaal-visie uit de negentien strategische documenten. Meta/LinkedIn/GA4/Search Console
+blijven `insufficient_data` tot ze dat eerlijk niet meer zijn, en dat wordt niet voor de klant
+verzwegen: het IS de vertrouwensdoctrine in werking (regel 3, sectie 3.2). Vastgelegd naar
+aanleiding van de vraag hoe dit product ooit een eerste klant kan krijgen als elk kanaal eerst
+tegen een klant getest moet worden die er nog niet is — dezelfde cirkel als bij de fase-2-poort
+hierboven, en met dezelfde oplossing: positioneren op wat bewezen is, eerlijk zijn over wat dat niet
+is, in plaats van wachten op een validatie die nooit vanzelf komt.
 
 Geen nieuwe bouw. Draaien, meten, bijstellen. Dit is de fase waar het plan zich bewijst of niet, en
 de enige fase waarvan de uitkomst het plan mag wijzigen.
