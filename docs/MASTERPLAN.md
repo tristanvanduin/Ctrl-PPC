@@ -682,10 +682,14 @@ ander (correcter) cijfer, hierboven verklaard in plaats van stilzwijgend doorgev
   een echte klant/maand: alle 9 poorten leverden een resultaat op. Daadwerkelijk blokkerend maken
   wacht bewust op een periode aan verzamelde observaties — geen technische blokkade, een
   kalibratievraag.
-- `confidence_breakdown` als vijf componenten in het contract — **nog te doen.** Het enige
-  onderdeel van deze fase dat nog codewerk vergt zonder externe afhankelijkheid: grotendeels af te
-  leiden uit wat er al ligt (`data_quality_score` uit fase 1, conversieaantallen, spreiding over
-  meerdere maanden); `market_corroboration` blijft eerlijk `insufficient_data` zolang God View leeg is.
+- ~~`confidence_breakdown` als vijf componenten in het contract~~ — gedaan, deels. Twee van de vijf
+  eerlijk gevuld met echte data: `effectSize` uit `sop_insights.change_pct` (2.650 van 3.462 rijen
+  gevuld), `sampleSize` via dezelfde `buildCanonicalMetricMap` die de Evidence Gate al gebruikt.
+  Drie blijven bewust `null`: `trackingQuality` omdat `fact_core.data_quality_score` op 1.0 staat
+  voor alle 9.543 rijen zonder uitzondering (een dode default, geen gemeten signaal -- die tonen
+  zou zelf de fake precisie zijn die regel 3 verbiedt), `consistency` omdat er geen multi-maand-
+  lezing bestaat, `marketCorroboration` omdat God View leeg is. Geverifieerd tegen twee echte
+  klant/maand-combinaties.
 - ~~`market_relation_type` met `insufficient_data` als eerlijke standaard~~ — stond al zo in het
   contract vanaf de eerste versie.
 - **Campaign Type Intelligence** (per-campagnetype scorecards) — **nog te doen**, zie sectie 5.4.
