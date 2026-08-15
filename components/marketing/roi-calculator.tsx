@@ -78,6 +78,14 @@ const KANAAL_MULTIPLIER_PER_EXTRA_KANAAL = 0.6;
 // cleaner is"): de kanaalregel per item stond op 1 doorlopende regel ("Google: ... -- Meta: ...
 // -- LinkedIn: ..."), verdicht voor de zesde keer hierboven. Terug naar 1 rij per kanaal --
 // minder gedrongen, nog steeds korter dan de originele 4-regelige versie uit de vijfde keer.
+//
+// Negende keer (15 augustus 2026, "in zijn eentje moet het enorm breed worden of een relevante
+// sectie ernaast krijgen, anders breekt het de pagina"): stond op de homepage als losse,
+// gecentreerde max-w-xl-kaart tussen overigens allemaal max-w-6xl-secties. In plaats van een
+// buur te forceren die er niet hoort, is de kaart zelf nu twee kolommen op lg-breedte: sliders
+// links, uitkomst (uren/waarde + de pakket-toggle) rechts met een verticale scheidingslijn. Op
+// mobiel valt het gewoon terug naar 1 kolom, ongewijzigd gedrag. Zie app/(marketing)/page.tsx
+// voor de sectieplaatsing zelf (moest achter TrustBanner, niet ertussenin).
 const KANAAL_REGEL = (g: string, m: string, l: string) =>
   [{ k: "Google", t: g }, { k: "Meta", t: m }, { k: "LinkedIn", t: l }];
 
@@ -158,80 +166,84 @@ export function RoiCalculator() {
   const euroFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
   return (
-    <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6" style={{ fontFamily: "var(--font-marketing-mono)" }}>
+    <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6 lg:p-8" style={{ fontFamily: "var(--font-marketing-mono)" }}>
       <p className="text-xs uppercase tracking-[0.2em] text-off-white/50">Minimum monthly savings</p>
 
-      <div className="mt-5 space-y-5">
-        <label className="block">
-          <div className="flex items-center justify-between text-sm text-off-white/80">
-            <span>Number of clients</span>
-            <span className="text-neon-indigo">{klanten}</span>
-          </div>
-          <input
-            type="range"
-            min={1}
-            max={100}
-            value={klanten}
-            onChange={(e) => setKlanten(Number(e.target.value))}
-            className="mt-2 w-full accent-[#818cf8]"
-          />
-        </label>
+      <div className="mt-5 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+        <div className="space-y-5">
+          <label className="block">
+            <div className="flex items-center justify-between text-sm text-off-white/80">
+              <span>Number of clients</span>
+              <span className="text-neon-indigo">{klanten}</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={100}
+              value={klanten}
+              onChange={(e) => setKlanten(Number(e.target.value))}
+              className="mt-2 w-full accent-[#818cf8]"
+            />
+          </label>
 
-        <label className="block">
-          <div className="flex items-center justify-between text-sm text-off-white/80">
-            <span>Channels per client (avg.)</span>
-            <span className="text-neon-indigo">{kanalenPerKlant}</span>
-          </div>
-          <input
-            type="range"
-            min={1}
-            max={4}
-            value={kanalenPerKlant}
-            onChange={(e) => setKanalenPerKlant(Number(e.target.value))}
-            className="mt-2 w-full accent-[#818cf8]"
-          />
-          <p className="mt-1.5 text-[11px] leading-relaxed text-off-white/40">
-            Google, Meta, LinkedIn, and Bing (coming soon) each get their own analysis -- more connected channels means more manual work replaced, not just more accounts.
-          </p>
-        </label>
+          <label className="block">
+            <div className="flex items-center justify-between text-sm text-off-white/80">
+              <span>Channels per client (avg.)</span>
+              <span className="text-neon-indigo">{kanalenPerKlant}</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={4}
+              value={kanalenPerKlant}
+              onChange={(e) => setKanalenPerKlant(Number(e.target.value))}
+              className="mt-2 w-full accent-[#818cf8]"
+            />
+            <p className="mt-1.5 text-[11px] leading-relaxed text-off-white/40">
+              Google, Meta, LinkedIn, and Bing (coming soon) each get their own analysis -- more connected channels means more manual work replaced, not just more accounts.
+            </p>
+          </label>
 
-        <label className="block">
-          <div className="flex items-center justify-between text-sm text-off-white/80">
-            <span>Your specialist&apos;s hourly rate</span>
-            <span className="text-neon-indigo">{euroFmt.format(uurtarief)}</span>
-          </div>
-          <input
-            type="range"
-            min={20}
-            max={200}
-            step={5}
-            value={uurtarief}
-            onChange={(e) => setUurtarief(Number(e.target.value))}
-            className="mt-2 w-full accent-[#818cf8]"
-          />
-        </label>
-      </div>
-
-      <div className="mt-6 grid grid-cols-2 gap-4 border-t border-off-white/10 pt-5">
-        <div>
-          <p className="text-xs uppercase tracking-[0.15em] text-off-white/50">Hours per month</p>
-          <p className="mt-1 text-2xl font-bold text-off-white">{urenPerMaand.toFixed(0)}h</p>
+          <label className="block">
+            <div className="flex items-center justify-between text-sm text-off-white/80">
+              <span>Your specialist&apos;s hourly rate</span>
+              <span className="text-neon-indigo">{euroFmt.format(uurtarief)}</span>
+            </div>
+            <input
+              type="range"
+              min={20}
+              max={200}
+              step={5}
+              value={uurtarief}
+              onChange={(e) => setUurtarief(Number(e.target.value))}
+              className="mt-2 w-full accent-[#818cf8]"
+            />
+          </label>
         </div>
-        <div>
-          <p className="text-xs uppercase tracking-[0.15em] text-off-white/50">Minimum value</p>
-          <p className="mt-1 text-2xl font-bold text-neon-indigo">{euroFmt.format(euroPerMaand)}</p>
+
+        <div className="border-t border-off-white/10 pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] text-off-white/50">Hours per month</p>
+              <p className="mt-1 text-2xl font-bold text-off-white">{urenPerMaand.toFixed(0)}h</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] text-off-white/50">Minimum value</p>
+              <p className="mt-1 text-2xl font-bold text-neon-indigo">{euroFmt.format(euroPerMaand)}</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setToonPakket((v) => !v)}
+            className="mt-4 py-2.5 text-xs font-semibold text-off-white/50 underline hover:text-off-white"
+          >
+            {toonPakket
+              ? "Hide the standard package"
+              : `Where do those ${urenPerKlantPerMaand.toFixed(1)}h per client (x ${klanten} clients = ${urenPerMaand.toFixed(0)}h) come from?`}
+          </button>
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={() => setToonPakket((v) => !v)}
-        className="mt-4 py-2.5 text-xs font-semibold text-off-white/50 underline hover:text-off-white"
-      >
-        {toonPakket
-          ? "Hide the standard package"
-          : `Where do those ${urenPerKlantPerMaand.toFixed(1)}h per client (x ${klanten} clients = ${urenPerMaand.toFixed(0)}h) come from?`}
-      </button>
 
       {toonPakket && (
         <>

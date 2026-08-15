@@ -130,13 +130,24 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <TrustBanner />
+
       {/* ROI-calculator (15 augustus 2026, op vraag van de eigenaar, "dit is een converterend
           blok, mega ver omlaag, voelt te los"): stond eerst onderaan FeaturesBlock, na Comparison
           en de drie intro-kolommen -- de laagste plek op de homepage, zonder eigen kop, wat
-          zowel te ver naar beneden voelde als losstaand. Hierheen verplaatst: direct na Platform
-          Pulse, zodat de volgorde is "hier is het live bewijs" -> "hier is wat dat voor jou
-          waard is," met een eigen kop en subtitel in plaats van kaal het widget te tonen. Zie
-          components/marketing/features-block.tsx voor de eerdere plek en waarom die niet werkte. */}
+          zowel te ver naar beneden voelde als losstaand. Hierheen verplaatst, direct na Platform
+          Pulse, met een eigen kop en subtitel in plaats van kaal het widget te tonen.
+
+          TWEEDE RONDE, ZELFDE DAG ("Pulse en plugin staan altijd samen boven aan" + "breekt de
+          pagina als enige sectie die in het midden staat"): dat plaatste de calculator TUSSEN
+          Platform Pulse en TrustBanner in, wat dat paar uit elkaar trok -- teruggezet zodat Pulse
+          en TrustBanner weer direct opeenvolgen, calculator erna. En een smalle, gecentreerde
+          max-w-xl-kaart was de enige niet-volle-breedte sectie tussen overigens allemaal
+          max-w-6xl-secties -- RoiCalculator zelf is nu twee kolommen breed (sliders links,
+          uitkomst rechts, zie components/marketing/roi-calculator.tsx) in plaats van breder
+          gecentreerd te worden, want er was geen inhoudelijk relevante buur om ernaast te zetten
+          zonder iets anders te forceren dat er niet hoort. Zie components/marketing/features-block.tsx
+          voor de eerdere plek en waarom die niet werkte. */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
         <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-neon-indigo">
           The Math
@@ -148,12 +159,11 @@ export default async function HomePage() {
           A minimum estimate, built from the real steps this replaces - not a marketing number.
           Move the sliders to match your book of business.
         </p>
-        <div className="mx-auto mt-6 max-w-xl">
+        <div className="mt-6">
           <RoiCalculator />
         </div>
       </section>
 
-      <TrustBanner />
       <ComparisonBlock />
       <FeaturesBlock />
     </>
