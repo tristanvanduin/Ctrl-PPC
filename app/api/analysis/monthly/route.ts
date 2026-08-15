@@ -24,7 +24,10 @@ import { buildMetaStepMessage, metaStepName } from "@/lib/meta/step-message";
 import "@/lib/analysis/adapters/linkedin-ads"; // registreert de LinkedIn-adapter zodat getAdapter("linkedin_ads") resolvet
 import { buildLinkedinAnalysisData } from "@/lib/linkedin/analysis-data";
 import { buildLinkedinStepMessage, linkedinStepName } from "@/lib/linkedin/step-message";
-import { resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, type TargetRow } from "@/lib/analysis/o2-targets-cost";
+import { resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, bureauVanKlant, type TargetRow } from "@/lib/analysis/o2-targets-cost";
+import { recordGateObservations } from "@/lib/decision/gate-observations";
+import type { GateInput } from "@/lib/decision/quality-gates";
+import type { KeywordQsRow } from "@/lib/analysis/metric-cross-checks";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { buildGoalsSection } from "@/lib/prompts/sop-prompts";
 import type { LinkedInIcp } from "@/lib/linkedin/icp-fit";
@@ -2836,6 +2839,66 @@ ${conclusions.join("\n\n---\n\n")}`,
     await persistMonthlyStructuredData({
       supabase, clientId, analysisId, sopType: adapter.sopTypeKey, analysisDate,
       curatedFindings, structured,
+    });
+
+    // Fase 2 (docs/MASTERPLAN.md): eerste, bewust niet-blokkerende observatie van de negen
+    // kwaliteitspoorten op deze echte run. Zie de kop van migratie 083 en
+    // lib/decision/gate-observations.ts voor het waarom -- runGates() hing tot nu toe nergens aan
+    // deze route. Draait op data die hierboven toch al berekend is, fire-and-forget: een fout of
+    // trage observatie mag deze respons nooit vertragen of laten falen. Alleen deze functie: de
+    // POST-handler stuurt meta_ads/linkedin_ads al eerder naar hun eigen handler door (regel 1268
+    // e.v.), dus adapter.channel is hier altijd "google_ads".
+    const laatsteMaand = (rijen: Record<string, unknown>[]): string | undefined =>
+      rijen.reduce<string | undefined>((max, r) => {
+        const m = String(r.month ?? "");
+        return m && (!max || m > max) ? m : max;
+      }, undefined);
+    const isMaand = laatsteMaand(isData as Record<string, unknown>[]);
+    const isRijenLaatsteMaand = isMaand ? (isData as Record<string, unknown>[]).filter((r) => String(r.month ?? "") === isMaand) : [];
+    const kwMaand = laatsteMaand(keywordData as Record<string, unknown>[]);
+    const kwRijenLaatsteMaand = kwMaand ? (keywordData as Record<string, unknown>[]).filter((r) => String(r.month ?? "") === kwMaand) : [];
+    const accountDataChrono = accountData as Record<string, unknown>[]; // al oplopend besteld (order("month"))
+
+    void bureauVanKlant(supabase, clientId).then((agencyId) => {
+      const gateInput: GateInput = {
+        runId: jobId,
+        agencyId: agencyId ?? "onbekend",
+        accountId: clientId,
+        analysisDate,
+        dataQuality: accountDataChrono.length > 0 ? {
+          accountMonthly: accountDataChrono as Array<{ month: string; impressions: number; clicks: number; cost: number; conversions: number; conversions_value: number; ctr?: number; avg_cpc?: number; conversion_rate?: number; cost_per_conversion?: number; roas?: number }>,
+          campaignMonthly: campaignData as unknown as Array<{ campaign_name: string; month: string; cost: number; conversions: number; conversions_value: number }>,
+          conversionLagDays: (settingsForLag?.conversion_lag_days as number) ?? 3,
+          lastCompleteMonth,
+          hasKpiTargets: !!clientCtx.goalsSection,
+        } : undefined,
+        rankLoss: isRijenLaatsteMaand.length > 0 ? {
+          keywords: kwRijenLaatsteMaand.map((k): KeywordQsRow => ({
+            cost: Number(k.cost ?? 0),
+            quality_score: k.quality_score == null ? null : Number(k.quality_score),
+          })),
+          rankLostIs: isRijenLaatsteMaand.reduce((som, r) => som + Number(r.search_rank_lost_is ?? 0), 0) / isRijenLaatsteMaand.length,
+        } : undefined,
+        claimCheck: curatedFindings.length > 0 ? {
+          stepNumber: 1,
+          findings: curatedFindings,
+          campaignRows: campaignData as Record<string, unknown>[],
+          accountRows: accountData as Record<string, unknown>[],
+          periodStart,
+          periodEnd,
+        } : undefined,
+        kpiChain: accountDataChrono.length >= 2 ? {
+          previousMonth: accountDataChrono[accountDataChrono.length - 2] as unknown as Record<string, number>,
+          currentMonth: accountDataChrono[accountDataChrono.length - 1] as unknown as Record<string, number>,
+          resultMetric: "conversions",
+        } : undefined,
+        contradiction: { recommendations: structured.recommendations, tasks: structured.tasks },
+        stepValidationsReport: officialStepValidations,
+        coverageReport: enforcedCoverage.coverage,
+        actionGating: { findings: curatedFindings, recommendations: structured.recommendations },
+        publishReport: { passed: qualityGate.passed, state: qualityGate.state, blockingReasons: qualityGate.blocking_reasons },
+      };
+      return recordGateObservations(supabase, gateInput);
     });
 
     const totalTokens = [...steps, ...machineSteps].reduce((sum, step) => sum + step.tokensUsed, 0);
