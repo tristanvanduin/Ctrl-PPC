@@ -425,6 +425,45 @@ Deterministisch, geen AI. De AI mag de forecast uitleggen en nooit berekenen.
 denkt dat maart de laatste gerealiseerde maand is. De rekenkern in `forecast.ts` leidt het wel uit
 de data af, dus dit is een presentatiefout met een reparatie van twee regels.
 
+### 5.4 Campaign Type Intelligence: per-campagnetype scorecards
+
+Toegevoegd 15 augustus, gevalideerd tegen een externe prompt (Copilot) die voorstelde elk
+campagnetype (Search, PMax, Meta, LinkedIn) een eigen scorecard, KPI-set en health-check te geven
+in plaats van dezelfde generieke grafieken overal te tonen. Het onderliggende probleem klopt: een
+Search-campagne en een PMax-campagne hebben andere succesfactoren, en dat verschil verdwijnt in een
+generiek dashboard.
+
+**Waarom dit een fase-2-achtig item is en geen fase-6-achtig item:** in tegenstelling tot God View
+zit hier geen poort voor. Het is presentatie- en analyselaag bovenop data die al bestaat: `fact_core`/
+`fact_dimension` (fase 1, klaar) en het `campaign_type`-veld dat nu al gebruikt wordt om PMax te
+herkennen (`app/api/analysis/monthly/route.ts`). Geen externe afhankelijkheid, geen wachtende klant.
+
+**Wel dezelfde inperking als de herziene fase-2-poort (sectie 9):** alleen bouwen voor kanalen met
+echte data. Vandaag is dat Google Ads (Search en PMax hebben allebei echte historie). Meta- en
+LinkedIn-scorecards blijven `insufficient_data`/uitgesteld tot die kanalen echte data hebben —
+zelfde regel 3 van de vertrouwensdoctrine, nu toegepast op een nieuwe module in plaats van op de
+analysepijplijn.
+
+**Twee concrete regels voor de bouw, uit de validatie:**
+
+1. **Aansluiten op de bestaande healthscore-conventie**, niet een eigen scoretaal per kanaal
+   verzinnen. `lib/health-score.ts` heeft al een accountbreed patroon (5 factoren, 0–100, cijfer
+   A–F, met een expliciete "te weinig data" state per factor in plaats van een gegokte score). Een
+   per-campagnetype-scorecard is een verbijzondering van dit patroon, geen nieuw patroon.
+2. **Geen Search-logica hergebruiken voor PMax "omdat de code er staat"** — sectie 5.1 waarschuwt
+   hier al expliciet voor bij Meta/LinkedIn, en dezelfde val geldt tussen Search en PMax. PMax
+   krijgt een eigen opbouw (feed health, asset health, cannibalisatie met Search — waarvoor
+   `lib/cross-channel/funnel-overlap.ts` al bestaat, zie sectie 5.2), geen kopie van de
+   Search-scorecard met andere labels.
+
+**Wat dit niet is:** een vervanging van de bestaande kaarten en grafieken. De scorecard is een
+nieuwe, bovenliggende laag ("hoe gezond is dit campagnetype") die naar de bestaande detailschermen
+doorverwijst, niet andersom.
+
+*Klaar wanneer:* een Search-scorecard voor de echte klant toont vijf of meer van de factoren met
+een cijfer, niet met een gok, op dezelfde manier als `lib/health-score.ts` een factor als
+"onbeoordeeld" laat in plaats van hem nul te geven bij te weinig data.
+
 ---
 
 ## 6. Connectorarchitectuur
@@ -498,9 +537,9 @@ scorecard; de kolom "poort" is wat dit plan eraan toevoegt.
 | Module | Wat het doet | Poort die open moet |
 |---|---|---|
 | **Foundation** (gratis) | Datafundering, dashboarding, forecasting | Fase 1 en 2. Dit is de instap en de bron van netwerkdata. |
-| **God View Standard** | Markt zien: benchmarks, trends | Vier bureaus met opt-in, segmentdekking boven zestig procent |
-| **God View Tactical** | Markt vertalen naar actie | God View Standard levert rijen |
-| **God View Pulse** | Hoogfrequente marktverandering | Twaalf maanden gevulde marktsignalen |
+| **God View Standard** | Markt zien: benchmarks, trends | Vier bureaus met opt-in, segmentdekking boven zestig procent. Alleen geanonimiseerde, gekwalificeerde marktdata (`gv_private_contributions`/`gv_market_signals`) — geen ruwe klantdata. |
+| **God View Tactical** | Markt vertalen naar actie | God View Standard levert rijen **én** `agency_memory_events` heeft historie (fase 4). Marktdata alleen wordt generieke dashboardinformatie; leercontext zonder marktdata is een gok over wat markt is versus account. Beide nodig, niet een van beide. |
+| **God View Pulse** | Hoogfrequente marktverandering | God View Tactical draait **én** twaalf maanden gevulde marktsignalen **én** playbook-evaluaties/trackrecorddata (fase 4, sectie 3.3) om te zien of een signaaltype nog voorspellende waarde heeft. |
 | **Second Opinion** | Onafhankelijke accountbeoordeling | Draait al. Wordt markt-aware zodra God View er is. |
 | **AI Council** | Meerdere modellen dagen de aanbeveling uit | OpenRouter met meerdere modellen (besluit 2), plus harde rondelimiet en kostenplafond per review |
 | **Demand Flow Intelligence** | Welk kanaal creeert vraag, welk kanaal oogst | GA4-koppeling gemodelleerd, funnelrolclassificatie gerepareerd |
@@ -512,6 +551,15 @@ scorecard; de kolom "poort" is wat dit plan eraan toevoegt.
 **De regel die hierbij hoort:** `lib/marketing/modules.ts` draagt per module een `gebouwd`-vlag,
 geverifieerd tegen de codebase. Die conventie blijft en wordt strenger: een module gaat pas op
 `gebouwd: true` als er een productieconsument is die echte data leest, niet als de tabel bestaat.
+
+**Verduidelijkt 15 augustus, gevalideerd tegen een externe prompt (Copilot):** God View Standard,
+Tactical en Pulse zijn geen oplopende reeks waarbij elke laag alleen de vorige nodig heeft. Tactical
+en Pulse hebben BEIDE zowel de marktdata (Standard) als het geheugen (`agency_memory_events`, fase
+4) nodig — marktdata zonder leercontext is een generiek dashboard, leercontext zonder marktdata kan
+"jij" en "de markt" niet uit elkaar houden (sectie 3.1, punt 2). Dat zat al impliciet in loop 3 en 4
+(sectie 4), maar stond niet expliciet op modulenveau. Geen van beide tabellen (`gv_*`,
+`agency_memory_events`) bestaat vandaag (geverifieerd tegen `information_schema.tables`, 15
+augustus) — dit is dus nog puur documentatie, geen schema-wijziging.
 
 ---
 
@@ -640,6 +688,10 @@ ander (correcter) cijfer, hierboven verklaard in plaats van stilzwijgend doorgev
   meerdere maanden); `market_corroboration` blijft eerlijk `insufficient_data` zolang God View leeg is.
 - ~~`market_relation_type` met `insufficient_data` als eerlijke standaard~~ — stond al zo in het
   contract vanaf de eerste versie.
+- **Campaign Type Intelligence** (per-campagnetype scorecards) — **nog te doen**, zie sectie 5.4.
+  Toegevoegd 15 augustus. Zelfde soort item als `confidence_breakdown`: geen externe afhankelijkheid,
+  bouwbaar op wat fase 1 al oplevert, met dezelfde kanaalbeperking (alleen Google Ads tot een ander
+  kanaal echte data heeft) als de herziene poort hierboven.
 
 *Klaar wanneer (herzien 15 augustus):* de zes regels uit sectie 3.2 aantoonbaar gehaald voor elk
 kanaal dat echte data heeft — vandaag uitsluitend Google Ads, de enige historie die ooit echt
