@@ -460,9 +460,19 @@ analysepijplijn.
 nieuwe, bovenliggende laag ("hoe gezond is dit campagnetype") die naar de bestaande detailschermen
 doorverwijst, niet andersom.
 
-*Klaar wanneer:* een Search-scorecard voor de echte klant toont vijf of meer van de factoren met
-een cijfer, niet met een gok, op dezelfde manier als `lib/health-score.ts` een factor als
-"onbeoordeeld" laat in plaats van hem nul te geven bij te weinig data.
+~~*Klaar wanneer:* een Search-scorecard voor de echte klant toont vijf of meer van de factoren met
+een cijfer, niet met een gok~~ — **gedaan.** `lib/search-scorecard.ts`: vijf factoren (Impression
+Share, Search Quality, Conversion Efficiency, Auction Pressure, Demand Capture), waarvan drie
+Copilot's prompt niet specificeerde welke kolom erachter zat — nagegaan tegen
+`ads_campaign_impression_share` en `ads_keyword_performance_monthly`, en waar mogelijk bestaande
+functies hergebruikt (`spendWeightedQualityScore` van de Math Gate, `trendOver` van de
+Efficiency-factor) in plaats van dezelfde rekensom een derde keer te schrijven. Getoond via
+`HealthBadgeView` (met een titel/icoon-parameter, geen tweede kopie van de presentatielaag), op
+`GoogleView` naast `HealthBadge`. Geverifieerd tegen een echte klant (`scripts/verify-search-
+scorecard.ts`, alle 5 factoren beoordeeld) en handmatig in de browser tegen de demo-omgeving
+(2/5 beoordeeld, de rest eerlijk "—" i.p.v. gegokt — precies het gedrag dat de poort eiste).
+
+PMax-, Meta- en LinkedIn-scorecards blijven ongebouwd tot die kanalen echte data hebben.
 
 ---
 

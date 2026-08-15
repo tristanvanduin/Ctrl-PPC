@@ -5,6 +5,7 @@ import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { Sectie } from "@/components/ui/sectie";
 import { HealthBadge } from "./health-badge";
+import { SearchScorecard } from "./search-scorecard";
 import { EventPacing } from "./event-pacing";
 import { GeoCloneOverview } from "./geo-clone-overview";
 import { ClientNotes } from "./client-notes";
@@ -86,6 +87,7 @@ export function GoogleView({
   return (
     <>
       <HealthBadge clientId={clientId} />
+      <SearchScorecard clientId={clientId} />
       {geoClone ? (
         // Beurs gekozen: her-geaggregeerd beursoverzicht (uit campagnedata) i.p.v. de
         // account-brede kaarten, die niet per beurs te splitsen zijn.

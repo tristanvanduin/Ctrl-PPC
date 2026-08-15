@@ -32,7 +32,17 @@ export function HealthBadge({ clientId }: { clientId: string }) {
  * score via /api/analysis/channel-forecast en rendert hem hiermee, zonder de weergave een tweede
  * keer te bouwen.
  */
-export function HealthBadgeView({ health }: { health: HealthScore }) {
+export function HealthBadgeView({
+  health,
+  titel = "Account Health",
+  Icoon = Activity,
+}: {
+  health: HealthScore;
+  /** Sectie 5.4 (Campaign Type Intelligence) hergebruikt deze view voor de Search-scorecard --
+   *  zelfde opbouw, andere titel/icoon, geen tweede kopie van vier lagen presentatielogica. */
+  titel?: string;
+  Icoon?: typeof Activity;
+}) {
   // Eén plek voor de statuskleur. De boog en de radar tonen dezelfde score, dus een tweede
   // ternary ernaast zou vroeg of laat iets anders zeggen dan de eerste.
   const radarKleur = health.grade === "?" ? "#9ca3af"
@@ -78,8 +88,8 @@ export function HealthBadgeView({ health }: { health: HealthScore }) {
             gaten is geen vorm maar ruis die eruitziet als een meting. */}
         <div className="shrink-0">
           <div className="flex items-center gap-2 mb-3">
-            <Activity className="w-4 h-4 text-rm-blue-ink" />
-            <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Account Health</h3>
+            <Icoon className="w-4 h-4 text-rm-blue-ink" />
+            <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">{titel}</h3>
           </div>
           {magRadarTonen(health.factors) ? (
             <HealthRadar factoren={health.factors} kleur={radarKleur} />
