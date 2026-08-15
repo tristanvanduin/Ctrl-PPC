@@ -132,11 +132,21 @@ export default function HowItWorksPage() {
       </div>
 
       {/* Illustraties bij twee specifieke stadia, met al gebouwde componenten -- geen nieuwe
-          visuals nodig voor wat de homepage al correct laat zien. */}
+          visuals nodig voor wat de homepage al correct laat zien. Niet alle zes stadia krijgen
+          hier een eigen "in practice"-uitwerking, alleen Signal en Quality Gate, want alleen
+          daarvoor bestaat al een showcase-component (ContextChips, QualityGateMatrix).
+
+          LABELS HERZIEN (15 augustus 2026, "waar is stage 2, is het niet gek dat je van 1 naar 3
+          gaat?"): stonden hier als "Stage 01, in practice" / "Stage 03, in practice" -- expliciet
+          genummerd, wat een lezer een doorlopende reeks laat verwachten. Het overslaan van stage 2
+          (Hypothesis, wel behandeld in de loop hierboven, alleen zonder eigen showcase-component)
+          las daardoor als een fout, ook al was het bewust. Herschreven naar wat elk blok toont in
+          plaats van welk stadiumnummer het is, zelfde patroon als "The deliverable, in practice"
+          verderop -- geen nummer meer om over te struikelen. */}
       <div className="mt-16 space-y-14">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
-            Stage 01, in practice
+            The signal, in practice
           </p>
           <p className="mt-2 text-sm text-off-white/60">
             Every signal carries where it came from, not just what it says.
@@ -148,7 +158,7 @@ export default function HowItWorksPage() {
 
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">
-            Stage 03, in practice
+            The quality gates, in practice
           </p>
           <p className="mt-2 text-sm text-off-white/60">
             The nine gates a hypothesis has to clear, running against a real example.
