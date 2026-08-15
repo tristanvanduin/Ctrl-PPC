@@ -63,6 +63,17 @@ export const WRITABLE_TABLES: Record<string, TableWritePolicy> = {
     // botsen zou de klonen van elkaar overschrijven.
     conflictTarget: "client_id,geo_clone",
   },
+  // Fase 2 (docs/MASTERPLAN.md): cpa/roas komen sinds migratie 082 uit client_targets, niet meer
+  // uit kpi_targets, voor de maandanalyse. client-settings.tsx schrijft de cpa/roas-velden van
+  // zijn bestaande formulier daarom voortaan ook hierheen (naast kpi_targets, dat de overige
+  // doelvelden blijft dragen -- zie de kop van lib/analysis/o2-targets-cost.ts). Conflictdoel
+  // gelijk aan de unique-constraint uit migratie 002: één rij per klant/kanaal/metric/ingang.
+  client_targets: {
+    capability: "settings:write",
+    clientColumn: "client_id",
+    operations: ["upsert", "delete"],
+    conflictTarget: "client_id,channel,metric,valid_from",
+  },
 
   // ── Sprint en planning ────────────────────────────────────────────────────
   sprint_items: { capability: "sprint:write", clientColumn: "client_id", operations: CRUD },

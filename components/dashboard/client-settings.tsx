@@ -19,6 +19,7 @@ import {
 } from "@/lib/benchmark/segment";
 import { useClientDataState } from "@/lib/client-data-provider";
 import { invalidateClientCache } from "@/lib/use-client-data";
+import { dbUpsert, dbDelete } from "@/lib/data-access/client-write";
 
 /**
  * De acht kaarten in dit paneel, los aan te vragen.
@@ -230,6 +231,36 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
 
   // ── Save / Reset ──
 
+  // De maandanalyse gebruikt sinds migratie 082 uitsluitend client_targets voor cpa/roas (zie de
+  // kop van lib/analysis/o2-targets-cost.ts) -- kpi_targets.cpaTarget/roasTarget blijven daarnaast
+  // bestaan voor de andere lezers die nog niet zijn overgezet (admin/kwaliteitspoorten, biweekly,
+  // bid-strategy, meta-briefing, budget-allocation, geo-clone, event-pacing). Deze twee velden
+  // schrijven daarom voortaan naar BEIDE plekken, in de pas gehouden bij elke opslag. Vaste
+  // valid_from: kpi_targets kende geen tijdsdimensie, dus is er één doorlopende rij per metric in
+  // plaats van een nieuwe versie per bewerking (zie migratie 082 voor dezelfde keuze).
+  const CLIENT_TARGETS_VALID_FROM = "2000-01-01";
+
+  async function syncClientTargets(cpaTarget: number, roasTarget: number) {
+    for (const [metric, value] of [["cpa", cpaTarget], ["roas", roasTarget]] as const) {
+      if (value > 0) {
+        await dbUpsert("client_targets", clientId, {
+          channel: "google_ads",
+          metric,
+          target_value: value,
+          valid_from: CLIENT_TARGETS_VALID_FROM,
+          valid_to: null,
+          note: "client-settings.tsx",
+        });
+      } else {
+        await dbDelete("client_targets", clientId, {
+          channel: "google_ads",
+          metric,
+          valid_from: CLIENT_TARGETS_VALID_FROM,
+        });
+      }
+    }
+  }
+
   function handleSave() {
     if (!settings) return;
 
@@ -267,6 +298,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       merchantContentLanguage: merchantContentLanguage.trim() || null,
       merchantChannel: merchantChannel.trim() || null,
     });
+    void syncClientTargets(kpiTargets.cpaTarget, kpiTargets.roasTarget);
     invalidateClientCache(clientId);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
