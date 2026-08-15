@@ -468,7 +468,9 @@ Copilot's prompt niet specificeerde welke kolom erachter zat — nagegaan tegen
 functies hergebruikt (`spendWeightedQualityScore` van de Math Gate, `trendOver` van de
 Efficiency-factor) in plaats van dezelfde rekensom een derde keer te schrijven. Getoond via
 `HealthBadgeView` (met een titel/icoon-parameter, geen tweede kopie van de presentatielaag), op
-`GoogleView` naast `HealthBadge`. Geverifieerd tegen een echte klant (`scripts/verify-search-
+`GoogleCampagnes` (niet Overzicht — hoort bij "wat draait er", met een campagnetype-kiezer ernaast
+in dezelfde pil-stijl als de bestaande kanaalkiezer; PMax/Shopping/Display tonen expliciet dat ze
+nog niet gebouwd zijn). Geverifieerd tegen een echte klant (`scripts/verify-search-
 scorecard.ts`, alle 5 factoren beoordeeld) en handmatig in de browser tegen de demo-omgeving
 (2/5 beoordeeld, de rest eerlijk "—" i.p.v. gegokt — precies het gedrag dat de poort eiste).
 
