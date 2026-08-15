@@ -83,13 +83,15 @@ export default function HowItWorksPage() {
           being true once lib/marketing/foundation-cap.ts shipped (50 agencies at a time during
           launch). Found via an "unlimited" grep sweep across app/(marketing), same overclaim
           class already fixed once on the FAQ page. Still true and now said explicitly: unlimited
-          per agency, the cap is on new agencies during launch, not on what one account can do. */}
+          per agency, the cap is on new agencies during launch, not on what one account can do.
+
+          50 -> 15 (15 August 2026): see lib/marketing/foundation-cap.ts for why. */}
       <div className="mt-14 grid gap-6 sm:grid-cols-3">
         <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">Layer 1 - Foundation</p>
           <p className="mt-2 text-sm text-off-white/60">
             Connect Google, Meta, LinkedIn, and Microsoft Ads. See what happened, dashboarding,
-            forecasting, KPI monitoring. Free and unlimited per agency, capped at 50 agencies
+            forecasting, KPI monitoring. Free and unlimited per agency, capped at 15 agencies
             during launch.
           </p>
         </div>

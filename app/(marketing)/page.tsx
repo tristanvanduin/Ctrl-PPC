@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/server";
 import { PlatformPulse } from "@/components/terminal/platform-pulse";
+import { GodViewTeaser } from "@/components/marketing/god-view-teaser";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
@@ -105,10 +106,13 @@ export default async function HomePage() {
               agencies.licentie -- een freelancer met 5 advertentie-accounts, een bureau met 80, of
               een in-house team tellen allemaal als EEN licentie. "Accounts" botste met de andere
               claim op deze pagina, "unlimited accounts", die over iets anders gaat (advertentie-
-              accounts per licentie, altijd onbeperkt). */}
+              accounts per licentie, altijd onbeperkt).
+
+              50 -> 15 (15 augustus 2026): zie lib/marketing/foundation-cap.ts voor de motivering
+              (databaseruimte + exclusiviteit naast de bestaande API-reden). */}
           <p className="text-xs text-off-white/40">
             {foundationOpen
-              ? "Foundation is free, forever - capped at 50 licenses at a time during launch, no card required."
+              ? "Foundation is free, forever - capped at 15 licenses at a time during launch, no card required."
               : "Foundation is full for now - slots reopen as licenses upgrade. Request access to join the waitlist."}
           </p>
         </div>
@@ -126,6 +130,7 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <GodViewTeaser />
       <TrustBanner />
       <ComparisonBlock />
       <FeaturesBlock />
