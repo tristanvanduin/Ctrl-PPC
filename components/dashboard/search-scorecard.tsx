@@ -32,10 +32,13 @@ export function SearchScorecard({ clientId }: { clientId: string }) {
     return () => { actief = false; };
   }, [clientId]);
 
-  if (error) return null; // Zelfde stille degradatie als andere optionele kaarten: geen Search-data is geen crash.
-  if (!health) return null;
-  // Geen Search-campagnes voor deze klant: geen lege kaart tonen die niets zegt.
-  if (campaignCount === 0) return null;
+  // Sinds de verhuizing naar de Campagnes-tab (masterplan sectie 5.4) is dit de enige inhoud van
+  // een expliciete, benoemde sectie met een eigen type-kiezer -- stil niets tonen zou hier lezen
+  // als kapot, niet als "geen data". Vandaar een boodschap in plaats van null, anders dan toen dit
+  // nog een van de vele optionele kaarten op Overzicht was.
+  if (error) return <p className="text-meta text-muted-foreground">Scorecard kon niet geladen worden: {error}</p>;
+  if (!health) return <p className="text-meta text-muted-foreground">Scorecard laden…</p>;
+  if (campaignCount === 0) return <p className="text-meta text-muted-foreground">Geen Search-campagnes gevonden voor deze klant.</p>;
 
   return <HealthBadgeView health={health} titel="Search Scorecard" Icoon={Search} />;
 }
