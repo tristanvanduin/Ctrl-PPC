@@ -978,6 +978,20 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     console.error(`[sync] projectie naar fact_core mislukt voor ${clientId}: ${projectieFout.message}`);
   }
 
+  // Zoekterm-niveau data ouder dan twee maanden opruimen (migratie 077). Verankerd op DEZE
+  // klant se eigen laatste maand, niet op de kalenderdatum van vandaag -- dat onderscheid bleek
+  // hard nodig: "twee maanden vanaf vandaag" had tijdens een sync-uitval de enige data die er nog
+  // was ook weggegooid. Loopt na elke sync mee, dus geen aparte cron nodig zolang pg_cron uit
+  // staat (masterplan besluit 1). Zelfde tolerantie als de projectie hierboven: een fout hier
+  // laat de sync niet mislukken, want de rijen die niet opgeruimd worden zijn een kostenprobleem,
+  // geen correctheidsprobleem.
+  const { error: retentieFout } = await supabase.rpc("prune_zoekterm_historie", {
+    p_client_id: clientId,
+  });
+  if (retentieFout) {
+    console.error(`[sync] zoekterm-retentie mislukt voor ${clientId}: ${retentieFout.message}`);
+  }
+
   return {
     runId, clientId, status,
     startedAt: now, finishedAt,

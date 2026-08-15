@@ -24,6 +24,7 @@ import {
   updateProgressPhase,
 } from "@/lib/progress/server";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
+import { resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Gedeeld door alle drie de kanalen: elke stap sluit af met "TOP 3 BEVINDINGEN STAP N: ...",
@@ -130,18 +131,33 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
 
   // Compute comparison facts for biweekly (same as monthly — uses account monthly data)
   const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-  const { data: bwClientSector } = await supabase.from("client_settings").select("sector, aov_segment, kpi_targets").eq("client_id", clientId).maybeSingle();
+  const [{ data: bwClientSector }, { data: bwTargetRows }] = await Promise.all([
+    supabase.from("client_settings").select("sector, aov_segment").eq("client_id", clientId).maybeSingle(),
+    supabase.from("client_targets").select("channel, metric, target_value, valid_from, valid_to").eq("client_id", clientId).eq("channel", "google_ads"),
+  ]);
   const bwSectorKey = bwClientSector?.sector || (accountType.startsWith("ecommerce") ? "ecommerce_mid_ticket" : accountType.startsWith("leadgen") ? "leadgen_generiek" : null);
   let bwBenchmarkRows: Array<{ metric: string; low: number; median: number; high: number; top10: number }> = [];
   if (bwSectorKey) {
     const { data: bmData } = await supabase.from("benchmark_sectors").select("metric, low, median, high, top10").eq("sector", bwSectorKey);
     bwBenchmarkRows = (bmData ?? []) as typeof bwBenchmarkRows;
   }
-  const kpiRaw = bwClientSector?.kpi_targets as Record<string, number> | null;
+  // client_targets in plaats van kpi_targets (fase 2, docs/MASTERPLAN.md): zelfde bron als
+  // monthly/route.ts sinds migratie 082, zodat er geen tweede lezing van hetzelfde getal bestaat.
+  const bwResolvedTargets = resolveTargets(
+    (bwTargetRows ?? []).map((row): TargetRow => ({
+      channel: String(row.channel),
+      metric: String(row.metric),
+      targetValue: Number(row.target_value),
+      validFrom: String(row.valid_from),
+      validTo: row.valid_to == null ? null : String(row.valid_to),
+    })),
+    "google_ads",
+    periodEnd
+  );
   const bwComparisonFacts = computeComparisonFacts({
     accountData: accountData as Array<{ month: string; impressions: number; clicks: number; cost: number; conversions: number; conversions_value: number; ctr: number; avg_cpc: number; conversion_rate: number; cost_per_conversion: number; roas?: number }>,
     monthlyTargets: targetResult?.monthlyExpected ?? null,
-    kpiTargets: kpiRaw ? { roasTarget: kpiRaw.roasTarget ?? 0, cpaTarget: kpiRaw.cpaTarget ?? 0 } : null,
+    kpiTargets: { roasTarget: bwResolvedTargets.roas ?? 0, cpaTarget: bwResolvedTargets.cpa ?? 0 },
     sectorBenchmarks: bwBenchmarkRows,
     lastCompleteMonth: lastMonth,
   });

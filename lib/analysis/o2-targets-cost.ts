@@ -1,8 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // =====================================================================
-// STATUS: GEBOUWD EN GETEST, MAAR NOG NIET GEWIRED (code-review must-fix 3).
-// Deze helpers worden nog niet aangeroepen. Activeren vereist de tabellen client_targets en llm_usage plus de wiring in de prepared context en recordUsage. Neem niet aan dat targets of kosten live zijn.
+// STATUS (bijgewerkt 2026-08-15, fase 2 docs/MASTERPLAN.md): GEWIRED EN LIVE.
+//
+// resolveTargets/checkTargetPlausibility/buildConfiguredTargetsBlock/targetActualsFromMonthly
+// worden aangeroepen in app/api/analysis/monthly/route.ts en zijn sinds migratie 082 de ENIGE
+// bron voor cpa/roas-targets in die route (kpi_targets is daar losgelaten). recordUsage/
+// buildUsageRow/computeCallCost draaien al langer live in 9 analyseroutes en de chat-route.
+//
+// client_targets heeft vandaag alleen rijen voor de drie klanten die een niet-lege
+// client_settings.kpi_targets hadden op het moment van migratie 082 (zie de kop van die
+// migratie) -- elke andere klant krijgt hier terecht {} terug, niet een gok.
+//
+// Nog NIET overgezet: de overige lezers van kpi_targets (admin/kwaliteitspoorten, biweekly,
+// bid-strategy, meta-briefing, budget-allocation, geo-clone, event-pacing) en de niet-cpa/roas
+// velden van kpi_targets (revenueMode, conversionsMode, revenueAbsolute, revenueGrowthPct,
+// conversionsAbsolute, conversionsGrowthPct) -- die laatste hebben geen client_targets-
+// equivalent en zijn geen kandidaat voor deze tabel in haar huidige vorm.
 // =====================================================================
 // ============================================================
 // O2: targets-resolutie, plausibiliteitsguard en LLM-kosten (pure kern)

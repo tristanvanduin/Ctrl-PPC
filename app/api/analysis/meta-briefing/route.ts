@@ -22,6 +22,7 @@ import { flagFatiguedWinners, type PatternAggregate } from "@/lib/meta/vision/pa
 import { emptyBrandGuide, brandContextForBriefing, type BrandGuide } from "@/lib/branding/brand-guide";
 import { FEATURES_VERSION } from "@/app/api/analysis/meta-creatives/route";
 import { today as vandaag } from "@/lib/reporting-date";
+import { resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 
 const SECTION = "meta_briefing_v1";
 const SOP_TYPE = "meta_briefing";
@@ -156,11 +157,28 @@ export async function POST(request: NextRequest) {
   // ── 4. De merkgids, met degradatie naar leeg (migratie 019 kan nog ontbreken). ──
   let guide: BrandGuide = emptyBrandGuide(clientId);
   try {
-    const { data: settings } = await supabase.from("client_settings").select("brand_guide, kpi_targets").eq("client_id", clientId).maybeSingle();
+    const { data: settings } = await supabase.from("client_settings").select("brand_guide").eq("client_id", clientId).maybeSingle();
     if (settings?.brand_guide) guide = { ...emptyBrandGuide(clientId), ...(settings.brand_guide as Partial<BrandGuide>) };
-    const kpi = settings?.kpi_targets as { cpaTarget?: number; roasTarget?: number } | null;
-    if (kpi?.cpaTarget) kop.doelstelling = `CPA-target ${kpi.cpaTarget}`;
-    else if (kpi?.roasTarget) kop.doelstelling = `ROAS-target ${kpi.roasTarget}`;
+    // client_targets in plaats van kpi_targets (fase 2, docs/MASTERPLAN.md), channel=meta_ads:
+    // kpi_targets had nooit een kanaal-dimensie en droeg in de praktijk altijd het Google-target
+    // -- dat als Meta-doelstelling tonen was onjuist. client_targets heeft voor meta_ads bewust
+    // geen rijen, dus deze regel blijft voortaan leeg totdat er een echt Meta-target is ingevoerd.
+    const { data: targetRows } = await supabase
+      .from("client_targets").select("channel, metric, target_value, valid_from, valid_to")
+      .eq("client_id", clientId).eq("channel", "meta_ads");
+    const kpi = resolveTargets(
+      (targetRows ?? []).map((row): TargetRow => ({
+        channel: String(row.channel),
+        metric: String(row.metric),
+        targetValue: Number(row.target_value),
+        validFrom: String(row.valid_from),
+        validTo: row.valid_to == null ? null : String(row.valid_to),
+      })),
+      "meta_ads",
+      periodEnd
+    );
+    if (kpi.cpa) kop.doelstelling = `CPA-target ${kpi.cpa}`;
+    else if (kpi.roas) kop.doelstelling = `ROAS-target ${kpi.roas}`;
   } catch {
     // geen settings of kolom: de lege gids volstaat, de briefing benoemt dan geen merkregels
   }

@@ -32,7 +32,6 @@ import {
   ClientHistoricalData,
   MonthlyRecord,
   WeeklyRecord,
-  REALIZED_THROUGH_MONTH,
 } from "./types";
 import { median, medianAbsoluteDeviation } from "@/lib/util/stats";
 

@@ -24,7 +24,10 @@ import { buildMetaStepMessage, metaStepName } from "@/lib/meta/step-message";
 import "@/lib/analysis/adapters/linkedin-ads"; // registreert de LinkedIn-adapter zodat getAdapter("linkedin_ads") resolvet
 import { buildLinkedinAnalysisData } from "@/lib/linkedin/analysis-data";
 import { buildLinkedinStepMessage, linkedinStepName } from "@/lib/linkedin/step-message";
-import { goalsPlausibilityFromMonthly, resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, type TargetRow } from "@/lib/analysis/o2-targets-cost";
+import { resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, bureauVanKlant, type TargetRow } from "@/lib/analysis/o2-targets-cost";
+import { recordGateObservations } from "@/lib/decision/gate-observations";
+import type { GateInput } from "@/lib/decision/quality-gates";
+import type { KeywordQsRow } from "@/lib/analysis/metric-cross-checks";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { buildGoalsSection } from "@/lib/prompts/sop-prompts";
 import type { LinkedInIcp } from "@/lib/linkedin/icp-fit";
@@ -1445,21 +1448,41 @@ export async function POST(request: NextRequest) {
     }).section;
 
     const accountData = accountRes.data ?? [];
-    // W1.1 (O2): plausibiliteits-flag op de goals-targets tegen de laatste twee afgesloten
-    // maanden. Zonder flag geen herbouw, dus byte-identiek aan het bestaande pad.
+
+    // Fase 2 (docs/MASTERPLAN.md): cpa/roas-targets en hun plausibiliteit komen sinds
+    // 2026-08-15 uitsluitend nog uit client_targets, nooit meer uit kpi_targets. Tot dan
+    // bestonden er twee onafhankelijke lezingen van in wezen hetzelfde getal (kpi_targets hier,
+    // client_targets in het "W1.1c"-blok verderop) die uiteen konden lopen en allebei in de
+    // prompt konden belanden. Eén keer opgehaald, drie keer gebruikt: goalsSection (hieronder),
+    // het configured-targets-blok en de comparison-facts (verderop in dit bestand).
+    const { data: configuredTargetRows } = await supabase
+      .from("client_targets")
+      .select("channel, metric, target_value, valid_from, valid_to")
+      .eq("client_id", clientId)
+      .eq("channel", "google_ads");
+    const configuredTargets = resolveTargets(
+      ((configuredTargetRows ?? []) as Array<Record<string, unknown>>).map((row) => ({
+        channel: String(row.channel),
+        metric: String(row.metric),
+        targetValue: Number(row.target_value),
+        validFrom: String(row.valid_from),
+        validTo: row.valid_to == null ? null : String(row.valid_to),
+      })) as TargetRow[],
+      "google_ads",
+      periodEnd
+    );
+
     let goalsTargetsImplausible = false;
     if (clientCtx.goalsConfig) {
-      const goalsPlausibility = goalsPlausibilityFromMonthly(
-        clientCtx.goalsConfig as { cpaTarget?: number; roasTarget?: number },
-        accountData as Array<{ month?: string; cost?: number; conversions?: number; conversions_value?: number }>
-      );
-      if (goalsPlausibility?.target_implausible) {
-        goalsSection = buildGoalsSection({
-          ...(clientCtx.goalsConfig as unknown as Parameters<typeof buildGoalsSection>[0]),
-          plausibility: { target_implausible: true, detail: goalsPlausibility.detail },
-        });
-        goalsTargetsImplausible = true;
-      }
+      // cpaTarget/roasTarget komen niet meer uit clientCtx.goalsConfig (kpi_targets) -- de
+      // overige velden (omzet/conversie-doelen, primaire actie) hebben geen client_targets-
+      // equivalent en blijven gewoon uit kpi_targets komen. De plausibiliteit van cpa/roas wordt
+      // hieronder in het configured-targets-blok getoond, niet hier nog een keer.
+      goalsSection = buildGoalsSection({
+        ...(clientCtx.goalsConfig as unknown as Parameters<typeof buildGoalsSection>[0]),
+        cpaTarget: configuredTargets.cpa ?? 0,
+        roasTarget: configuredTargets.roas ?? 0,
+      });
     }
     if (!usePreparedSummary && accountData.length === 0) {
       const freshness = await checkDataFreshness(supabase, clientId);
@@ -1532,26 +1555,7 @@ export async function POST(request: NextRequest) {
       campaignMetaData,
     });
 
-    // W1.1c: ingestelde targets (client_targets) voor deze maand. UITSLUITEND uit
-    // client_targets (no-go: geen kpiTargets in dit pad); leeg in productie tot WL.2,
-    // dus zonder targets blijft het pad byte-identiek.
-    // LIVE-ONGETEST tot migratie 002 draait.
-    const { data: configuredTargetRows } = await supabase
-      .from("client_targets")
-      .select("channel, metric, target_value, valid_from, valid_to")
-      .eq("client_id", clientId)
-      .eq("channel", "google_ads");
-    const configuredTargets = resolveTargets(
-      ((configuredTargetRows ?? []) as Array<Record<string, unknown>>).map((row) => ({
-        channel: String(row.channel),
-        metric: String(row.metric),
-        targetValue: Number(row.target_value),
-        validFrom: String(row.valid_from),
-        validTo: row.valid_to == null ? null : String(row.valid_to),
-      })) as TargetRow[],
-      "google_ads",
-      periodEnd
-    );
+    // W1.1c: het contextblok voor de al hierboven opgehaalde ingestelde targets (client_targets).
     const configuredBlock = buildConfiguredTargetsBlock(
       configuredTargets,
       targetActualsFromMonthly(accountData as Array<{ month?: string; cost?: number; conversions?: number; conversions_value?: number }>)
@@ -1706,11 +1710,10 @@ ${runningContext}`,
       ? `\n\n## Account YoY Vergelijking (% verschil t.o.v. dezelfde maand vorig jaar)\n\`\`\`\n${toPromptTable(accountYoyData)}\n\`\`\``
       : "\n\n## Account YoY Vergelijking\nGeen YoY data beschikbaar (minder dan 12 maanden historie).";
     const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
-    const kpiTargetsRaw = clientCtx.goalsSection ? {
-      roasTarget: (await supabase.from("client_settings").select("kpi_targets").eq("client_id", clientId).maybeSingle()).data?.kpi_targets as Record<string, number> | null,
-    } : null;
-    const roasTarget = (kpiTargetsRaw?.roasTarget as unknown as Record<string, number>)?.roasTarget ?? 0;
-    const cpaTarget = (kpiTargetsRaw?.roasTarget as unknown as Record<string, number>)?.cpaTarget ?? 0;
+    // Zelfde resolved client_targets-waarden als goalsSection en het configured-targets-blok
+    // hierboven -- geen aparte kpi_targets-lezing meer voor dit derde gebruik van hetzelfde getal.
+    const roasTarget = configuredTargets.roas ?? 0;
+    const cpaTarget = configuredTargets.cpa ?? 0;
     const { data: clientSectorData } = await supabase
       .from("client_settings")
       .select("sector, aov_segment")
@@ -2836,6 +2839,66 @@ ${conclusions.join("\n\n---\n\n")}`,
     await persistMonthlyStructuredData({
       supabase, clientId, analysisId, sopType: adapter.sopTypeKey, analysisDate,
       curatedFindings, structured,
+    });
+
+    // Fase 2 (docs/MASTERPLAN.md): eerste, bewust niet-blokkerende observatie van de negen
+    // kwaliteitspoorten op deze echte run. Zie de kop van migratie 083 en
+    // lib/decision/gate-observations.ts voor het waarom -- runGates() hing tot nu toe nergens aan
+    // deze route. Draait op data die hierboven toch al berekend is, fire-and-forget: een fout of
+    // trage observatie mag deze respons nooit vertragen of laten falen. Alleen deze functie: de
+    // POST-handler stuurt meta_ads/linkedin_ads al eerder naar hun eigen handler door (regel 1268
+    // e.v.), dus adapter.channel is hier altijd "google_ads".
+    const laatsteMaand = (rijen: Record<string, unknown>[]): string | undefined =>
+      rijen.reduce<string | undefined>((max, r) => {
+        const m = String(r.month ?? "");
+        return m && (!max || m > max) ? m : max;
+      }, undefined);
+    const isMaand = laatsteMaand(isData as Record<string, unknown>[]);
+    const isRijenLaatsteMaand = isMaand ? (isData as Record<string, unknown>[]).filter((r) => String(r.month ?? "") === isMaand) : [];
+    const kwMaand = laatsteMaand(keywordData as Record<string, unknown>[]);
+    const kwRijenLaatsteMaand = kwMaand ? (keywordData as Record<string, unknown>[]).filter((r) => String(r.month ?? "") === kwMaand) : [];
+    const accountDataChrono = accountData as Record<string, unknown>[]; // al oplopend besteld (order("month"))
+
+    void bureauVanKlant(supabase, clientId).then((agencyId) => {
+      const gateInput: GateInput = {
+        runId: jobId,
+        agencyId: agencyId ?? "onbekend",
+        accountId: clientId,
+        analysisDate,
+        dataQuality: accountDataChrono.length > 0 ? {
+          accountMonthly: accountDataChrono as Array<{ month: string; impressions: number; clicks: number; cost: number; conversions: number; conversions_value: number; ctr?: number; avg_cpc?: number; conversion_rate?: number; cost_per_conversion?: number; roas?: number }>,
+          campaignMonthly: campaignData as unknown as Array<{ campaign_name: string; month: string; cost: number; conversions: number; conversions_value: number }>,
+          conversionLagDays: (settingsForLag?.conversion_lag_days as number) ?? 3,
+          lastCompleteMonth,
+          hasKpiTargets: !!clientCtx.goalsSection,
+        } : undefined,
+        rankLoss: isRijenLaatsteMaand.length > 0 ? {
+          keywords: kwRijenLaatsteMaand.map((k): KeywordQsRow => ({
+            cost: Number(k.cost ?? 0),
+            quality_score: k.quality_score == null ? null : Number(k.quality_score),
+          })),
+          rankLostIs: isRijenLaatsteMaand.reduce((som, r) => som + Number(r.search_rank_lost_is ?? 0), 0) / isRijenLaatsteMaand.length,
+        } : undefined,
+        claimCheck: curatedFindings.length > 0 ? {
+          stepNumber: 1,
+          findings: curatedFindings,
+          campaignRows: campaignData as Record<string, unknown>[],
+          accountRows: accountData as Record<string, unknown>[],
+          periodStart,
+          periodEnd,
+        } : undefined,
+        kpiChain: accountDataChrono.length >= 2 ? {
+          previousMonth: accountDataChrono[accountDataChrono.length - 2] as unknown as Record<string, number>,
+          currentMonth: accountDataChrono[accountDataChrono.length - 1] as unknown as Record<string, number>,
+          resultMetric: "conversions",
+        } : undefined,
+        contradiction: { recommendations: structured.recommendations, tasks: structured.tasks },
+        stepValidationsReport: officialStepValidations,
+        coverageReport: enforcedCoverage.coverage,
+        actionGating: { findings: curatedFindings, recommendations: structured.recommendations },
+        publishReport: { passed: qualityGate.passed, state: qualityGate.state, blockingReasons: qualityGate.blocking_reasons },
+      };
+      return recordGateObservations(supabase, gateInput);
     });
 
     const totalTokens = [...steps, ...machineSteps].reduce((sum, step) => sum + step.tokensUsed, 0);

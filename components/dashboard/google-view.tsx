@@ -1,10 +1,12 @@
 "use client";
 
-import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users } from "lucide-react";
+import { useState } from "react";
+import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/rai/fair-weeks";
 import { Sectie } from "@/components/ui/sectie";
 import { HealthBadge } from "./health-badge";
+import { SearchScorecard } from "./search-scorecard";
 import { EventPacing } from "./event-pacing";
 import { GeoCloneOverview } from "./geo-clone-overview";
 import { ClientNotes } from "./client-notes";
@@ -265,14 +267,71 @@ interface GoogleCampagnesProps {
   onCountryFilterChange: (value: string | null) => void;
 }
 
-/** De Campagnes-tab voor Google Ads: wat draait er, de advertenties zelf, en waar het weglekt. */
+// campaign_type-waarden zoals ze echt in ads_campaign_impression_share staan (nagemeten
+// 15 augustus 2026): SEARCH, PERFORMANCE_MAX, SHOPPING, DISPLAY.
+type CampagneType = "SEARCH" | "PERFORMANCE_MAX" | "SHOPPING" | "DISPLAY";
+const CAMPAGNE_TYPES: { id: CampagneType; label: string }[] = [
+  { id: "SEARCH", label: "Search" },
+  { id: "PERFORMANCE_MAX", label: "Performance Max" },
+  { id: "SHOPPING", label: "Shopping" },
+  { id: "DISPLAY", label: "Display" },
+];
+
+/** Zelfde pil-stijl als de kanaalkiezer in client-dashboard.tsx (ChannelTabs) -- een tweede
+ *  filteras naast kanaal, geen nieuwe visuele taal ernaast. */
+function CampagneTypeTabs({ type, onChange }: { type: CampagneType; onChange: (t: CampagneType) => void }) {
+  return (
+    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+      {CAMPAGNE_TYPES.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            type === t.id ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Sectie 5.4 (Campaign Type Intelligence): per campagnetype zijn eigen scorecard. Alleen Search
+ * heeft er vandaag een -- de enige met genoeg echte data om zonder gok te bouwen (zie de kop van
+ * lib/search-scorecard.ts). De andere drie tonen eerlijk dat ze nog niet gebouwd zijn in plaats
+ * van een score te verzinnen -- dezelfde regel 3 uit de vertrouwensdoctrine als overal elders in
+ * dit contract.
+ */
+function CampagneScorecard({ clientId, type }: { clientId: string; type: CampagneType }) {
+  if (type === "SEARCH") return <SearchScorecard clientId={clientId} />;
+  return (
+    <div className="rounded-xl border border-dashed border-border p-5 text-meta text-muted-foreground">
+      Nog geen scorecard voor {CAMPAGNE_TYPES.find((t) => t.id === type)?.label} — alleen Search is
+      vandaag gebouwd (masterplan sectie 5.4).
+    </div>
+  );
+}
+
+/** De Campagnes-tab voor Google Ads: scorecard per campagnetype, wat draait er, de advertenties
+ *  zelf, en waar het weglekt. */
 export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFilterChange }: GoogleCampagnesProps) {
+  const [campagneType, setCampagneType] = useState<CampagneType>("SEARCH");
   return (
     <div>
+      <Sectie
+        eerste
+        icoon={<Gauge className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        titel="Scorecard"
+        bijschrift="Hoe gezond is dit campagnetype — vijf factoren, per type verschillend"
+        actie={<CampagneTypeTabs type={campagneType} onChange={setCampagneType} />}
+      >
+        <CampagneScorecard clientId={clientId} type={campagneType} />
+      </Sectie>
       {/* Twee vragen, twee secties. Wat draait er, en waar lekt het weg — dat laatste
           is geen detail van het eerste maar een eigen onderwerp met een eigen actie. */}
       <Sectie
-        eerste
         icoon={<LayoutGrid className="w-4.5 h-4.5 text-rm-blue-ink" />}
         titel="Wat er draait"
         bijschrift="Alle campagnes van dit account over de laatste 30 dagen"

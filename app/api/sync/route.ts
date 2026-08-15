@@ -6,6 +6,7 @@ import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { klantVanId } from "@/lib/tenancy/klanten";
 import { credentialsVoorBureau } from "@/lib/tenancy/credentials";
 import { logger } from "@/lib/logger";
+import { checkDataFreshness } from "@/lib/sync/freshness";
 
 export const maxDuration = 120; // 2 minutes for full sync
 
@@ -101,8 +102,18 @@ export async function GET(request: NextRequest) {
     .order("started_at", { ascending: false })
     .limit(5);
 
+  // freshness_status op client_sync_status wordt eenmalig geschreven aan het eind van een
+  // sync-run (lib/sync/orchestrator.ts) en blijft daarna "fresh" staan, ook maanden nadat de
+  // sync is opgehouden te draaien -- de kolom zegt "de laatste run die draaide, slaagde", niet
+  // "de data is nu actueel". checkDataFreshness() herrekent dat live uit last_sync_at, precies
+  // zoals SyncStatusBadge dat client-side ook al doet; deze route deed dat niet en gaf de rauwe
+  // kolom door aan wie hem ook maar aanroept. Zie docs/MASTERPLAN.md sectie 2.1.
+  const freshness = await checkDataFreshness(supabase, clientId);
+
   return Response.json({
-    syncStatus: status ?? { client_id: clientId, freshness_status: "missing", last_sync_at: null },
+    syncStatus: status
+      ? { ...status, freshness_status: freshness.freshnessStatus }
+      : { client_id: clientId, freshness_status: freshness.freshnessStatus, last_sync_at: null },
     recentRuns: runs ?? [],
   });
 }

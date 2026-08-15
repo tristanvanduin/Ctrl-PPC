@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { TrendingUp, TrendingDown, CheckCircle2, Clock, ArrowRight } from "lucide-react";
-import { REALIZED_THROUGH_MONTH } from "@/lib/types";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, ForecastMetric, ForecastPoint } from "@/lib/forecast";
@@ -167,10 +166,20 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
   const result = forecast[metric];
   const format = formatterFor(metric);
 
-  // Previous = last realized month, Current = first forecast, Next = second forecast
-  const prevMonth = result.points[REALIZED_THROUGH_MONTH - 1]; // Mar (index 2)
-  const currMonth = result.points[REALIZED_THROUGH_MONTH];      // Apr (index 3)
-  const nextMonth = result.points[REALIZED_THROUGH_MONTH + 1];  // May (index 4)
+  // Previous = last realized month, Current = first forecast, Next = second forecast.
+  //
+  // Afgeleid uit result.points zelf (het laatste punt met realized !== null), niet uit een
+  // hardgecodeerde kalendermaand. REALIZED_THROUGH_MONT stond vast op 3 (maart); een dashboard
+  // dat in augustus nog denkt dat maart de laatste gerealiseerde maand is, toont de verkeerde
+  // drie maanden als "vorige/huidige/volgende" -- zie docs/MASTERPLAN.md sectie 5.3.
+  const realizedThroughIdx = Math.max(
+    0,
+    result.points.reduce((last, p, i) => (p.realized !== null ? i : last), 0)
+  );
+  const realizedThroughMonth = realizedThroughIdx + 1;
+  const prevMonth = result.points[realizedThroughIdx];
+  const currMonth = result.points[realizedThroughIdx + 1];
+  const nextMonth = result.points[realizedThroughIdx + 2];
 
   // Current month partial realization from weekly data
   const now = new Date();
@@ -180,7 +189,7 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
 
   // Sum realized weeks for current month, or estimate from daily run rate
   const currentMonthWeeks = result.weeklyPoints.filter(
-    (wp) => wp.month === REALIZED_THROUGH_MONTH + 1
+    (wp) => wp.month === realizedThroughMonth + 1
   );
   const weeklyRealized = currentMonthWeeks
     .filter((wp) => wp.realized !== null)
@@ -210,7 +219,7 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
       })();
 
   // All 12 months for the strip — focus months are highlighted
-  const focusIndices = new Set([REALIZED_THROUGH_MONTH - 1, REALIZED_THROUGH_MONTH, REALIZED_THROUGH_MONTH + 1]);
+  const focusIndices = new Set([realizedThroughIdx, realizedThroughIdx + 1, realizedThroughIdx + 2]);
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
