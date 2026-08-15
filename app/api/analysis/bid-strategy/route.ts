@@ -9,7 +9,7 @@
 import { NextRequest } from "next/server";
 import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { callRouted } from "@/lib/analysis/llm-router";
-import { recordUsage } from "@/lib/analysis/o2-targets-cost";
+import { recordUsage, resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { analyzeBidStrategy, type CampaignBidInput, type BidGoal } from "@/lib/analysis/bid-strategy-facts";
 import { buildBidStrategyPrompt } from "@/lib/prompts/bid-strategy-prompt";
 import { saveBidStrategyHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       .select("campaign_id, month, conversions_value")
       .eq("client_id", clientId)
       .order("month", { ascending: false }),
-    supabase.from("client_settings").select("kpi_targets").eq("client_id", clientId).maybeSingle(),
+    supabase.from("client_targets").select("channel, metric, target_value, valid_from, valid_to").eq("client_id", clientId).eq("channel", "google_ads"),
     fetchClientContext(supabase, clientId),
   ]);
 
@@ -101,10 +101,23 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const kpi = (targetRes.data?.kpi_targets ?? null) as Record<string, unknown> | null;
+  // client_targets in plaats van kpi_targets (fase 2, docs/MASTERPLAN.md): zelfde bron als
+  // monthly/route.ts sinds migratie 082, zodat er geen tweede lezing van hetzelfde getal bestaat.
+  const months = isRows.map((r) => r.month).filter(Boolean).sort();
+  const resolvedTargets = resolveTargets(
+    (targetRes.data ?? []).map((row): TargetRow => ({
+      channel: String(row.channel),
+      metric: String(row.metric),
+      targetValue: Number(row.target_value),
+      validFrom: String(row.valid_from),
+      validTo: row.valid_to == null ? null : String(row.valid_to),
+    })),
+    "google_ads",
+    months.length > 0 ? `${months[months.length - 1]}-01` : today()
+  );
   const goal: BidGoal = {
-    hasCpaTarget: typeof kpi?.cpaTarget === "number" && kpi.cpaTarget > 0,
-    hasRoasTarget: typeof kpi?.roasTarget === "number" && kpi.roasTarget > 0,
+    hasCpaTarget: (resolvedTargets.cpa ?? 0) > 0,
+    hasRoasTarget: (resolvedTargets.roas ?? 0) > 0,
   };
 
   const { campaigns: facts, summary } = analyzeBidStrategy(campaigns, goal);
@@ -119,7 +132,6 @@ export async function POST(request: NextRequest) {
   });
 
   const analysisDate = today();
-  const months = isRows.map((r) => r.month).filter(Boolean).sort();
 
   void recordUsage(supabase, {
     runKey: `bid-strategy-${clientId}-${analysisDate}`,
