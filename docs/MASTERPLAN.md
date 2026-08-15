@@ -761,6 +761,16 @@ de enige fase waarvan de uitkomst het plan mag wijzigen.
 ### Fase 6: de markt
 **Poort: vier bureaus met opt-in, segmentdekking boven zestig procent.**
 
+- **`app_settings`-klantenlijst uitfaseren voordat het tweede bureau aansluit.** Live incident
+  15 augustus: de zijbalk-klantenlijst (`lib/clients.ts` sleutel `api_clients`, `lib/visible-
+  clients.ts` sleutel `visible_client_ids`) is één platte, gedeelde `app_settings`-rij zonder
+  `agency_id` -- letterlijk dezelfde lijst voor alle gebruikers, van elk bureau. Migratie 087 gaf
+  de tabel een policy (`auth.uid() is not null`, was RLS-aan-zonder-policy, zelfde bugvorm als
+  `platform_beheerders` in 084/086) zodat de zijbalk vandaag weer werkt met één echt bureau. Dat
+  is een noodgreep: zodra bureau twee aansluit, ziet bureau A's gebruiker bureau B's klantnamen
+  in zijn menu en omgekeerd, ook al blijft de onderliggende data afgeschermd via RLS op
+  `accounts`. Moet voor die tijd vervangen zijn door een zijbalk die rechtstreeks uit `accounts`
+  leest via `app_zichtbare_klanten()`, dezelfde bureaugrens die de rest van de app al gebruikt.
 - OAuth per bureau volledig (sectie 6), want zonder dat gaat deze poort nooit open
 - `gv_source_qualification` op de bestaande regels uit `lib/benchmark/cel.ts`
 - `gv_private_contributions`, service-role only, geen policy
