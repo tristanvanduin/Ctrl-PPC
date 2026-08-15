@@ -13,6 +13,7 @@ import {
   type SopInsightRow,
   type SopRecommendationRow,
 } from "../lib/analysis/channel-output-contract";
+import { buildCanonicalMetricMap } from "../lib/analysis/claim-consistency";
 
 try { readFileSync(".env.local", "utf8"); } catch { /* dan de omgeving zelf */ }
 if (!(process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL) || !process.env.SUPABASE_ACCESS_TOKEN) {
@@ -40,18 +41,46 @@ async function main(): Promise<void> {
     ? { clientId: clientIdArg, datum: datumArg }
     : await laatsteEchteCombinatie();
 
-  const insights: SopInsightRow[] = await sql(`
-    select insight_type, title, description, severity, affected_entity, action_required
+  // De Management API geeft numeric-kolommen als JSON-string terug ("151.6", niet 151.6) --
+  // anders dan de echte supabase-js-client die de live route gebruikt. Expliciet naar Number
+  // hier, anders faalt change_pct stil op de typeof-check in computeConfidenceBreakdown en lijkt
+  // effectSize ten onrechte "geen data" terwijl de rijen er echt staan.
+  const ruweInsights: Array<Record<string, unknown>> = await sql(`
+    select insight_type, title, description, severity, affected_entity, affected_entity_type,
+           change_pct, action_required
     from sop_insights where client_id = '${clientId}' and analysis_date = '${datum}'
   `);
+  const insights: SopInsightRow[] = ruweInsights.map((r) => ({
+    insight_type: String(r.insight_type),
+    title: String(r.title),
+    description: String(r.description),
+    severity: String(r.severity),
+    affected_entity: r.affected_entity == null ? null : String(r.affected_entity),
+    affected_entity_type: r.affected_entity_type == null ? null : String(r.affected_entity_type),
+    action_required: r.action_required as boolean | null,
+    change_pct: r.change_pct == null ? null : Number(r.change_pct),
+  }));
   const recommendations: SopRecommendationRow[] = await sql(`
     select hypothesis, rationale, measurement_metric, timeframe, ice_total
     from sop_recommendations where client_id = '${clientId}' and analysis_date = '${datum}'
   `);
 
+  // Voor confidenceBreakdown.sampleSize: dezelfde canonicalMetrics-vorm als de Evidence Gate
+  // (lib/decision/quality-gates.ts) tegen dezelfde brontabellen bouwt.
+  const maand = datum.slice(0, 7);
+  const campaignRows = await sql(`
+    select campaign_name, month, cost, conversions, conversions_value, clicks
+    from ads_campaign_monthly where client_id = '${clientId}' and month = '${maand}-01'
+  `);
+  const accountRows = await sql(`
+    select month, cost, conversions, conversions_value, clicks
+    from ads_account_monthly where client_id = '${clientId}' and month = '${maand}-01'
+  `);
+  const canonicalMetrics = buildCanonicalMetricMap(campaignRows, accountRows, datum, datum);
+
   console.log(`${clientId} / ${datum}: ${insights.length} insights, ${recommendations.length} recommendations\n`);
 
-  const out = mapGoogleMonthlyToSharedOutput(clientId, datum, insights, recommendations);
+  const out = mapGoogleMonthlyToSharedOutput(clientId, datum, insights, recommendations, canonicalMetrics);
 
   console.log(`signals:       ${out.signals.length}`);
   console.log(`risks:         ${out.risks.length}`);
@@ -60,6 +89,7 @@ async function main(): Promise<void> {
   console.log(`hypotheses:    ${out.hypotheses.length}`);
   console.log(`targetStatus:  ${out.targetStatus.status}`);
   console.log(`marketContext: ${out.marketContext.marketRelationType}`);
+  console.log(`confidenceBreakdown: ${out.confidenceBreakdown ? JSON.stringify(out.confidenceBreakdown) : "null"}`);
 
   const totaalIn = insights.length + recommendations.length;
   const totaalUit = out.signals.length + out.risks.length + out.opportunities.length + out.hypotheses.length;
