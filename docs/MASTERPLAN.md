@@ -1641,3 +1641,52 @@ mobiel/responsive-check moet expliciet een paar tussenliggende breedtes (700–1
 alleen de twee uiterste ankerpunten.
 
 Typecheck schoon, volledige testsuite (281 bestanden) en `next build` slagen na beide fixes.
+
+**Naschrift, zelfde dag: de opdrachtgever had gelijk, en het was groter dan de gradient.** Na het
+draaien van de migraties meldde hij vanaf `ctrlppc.com/admin` dezelfde blauwe streep, plus de
+scherpe vraag: "waarom is er uberhaupt een blauwe lijn hier, dat blauw is niet eens een kleur die
+we hanteren." Eerst de verwarring opgehelderd die daarbij ontstond: hij keek op GitHub naar de
+commit-geschiedenis van een branch genaamd `claude/ctrl-ppc-masterplan` en concludeerde dat dat
+"de enige masterplan op main" was — dat is een andere, losstaande branch van een eerdere/andere
+sessie (laatste commit 15 augustus, nooit gemerged), niet `main`. Geverifieerd: `main` op GitHub
+wees exact naar het laatste commit van deze sessie. Los daarvan bleek zijn kernvraag over de kleur
+volledig terecht:
+
+- De responsive-fix zelf stond al goed live (bevestigd door de gecompileerde CSS van
+  `www.ctrlppc.com` rechtstreeks op te halen en te doorzoeken op de media-query).
+- Maar **acht andere plekken** in `app/globals.css` se klassieke `:root{}`-blok (het shadcn-
+  conventieblok, niet de nieuwere `@theme`-laag) hadden de ingetrokken merkkleur (#08288C/
+  #F16B37/#0a35b0) nog letterlijk hardgecodeerd staan: `--primary`, `--secondary-foreground`,
+  `--accent`, `--ring`, `--chart-1`, `--chart-2`, `--sidebar`, `--sidebar-primary`,
+  `--sidebar-accent`, `--sidebar-ring`, plus `--kaart-hoog`/`--kaart-hover` voor de wereldkaart/
+  VS-kaart. Sectie 13.2's kleurcorrectie (verderop in dit document) had eerder vandaag alleen de
+  `@theme`-laag en het nieuwe `--sidebar-panel`-token geraakt — dit oudere blok was gewoon
+  gemist. `.dark{}` had het juiste patroon (`var(--brand-primary, ...)`) al overal, op één
+  vergeten `--accent`-fallback na.
+- **Waarom dit specifiek op `/settings` en `/admin` zichtbaar was, en niet overal**:
+  `BrandThemeProvider` (`components/branding/brand-theme-provider.tsx`) zet `--primary`/
+  `--sidebar`/etc. als **inline style** op de document-root, en draait alleen op klantpagina's
+  (`clientId` is een verplichte prop). Bureau-brede pagina's zonder klantcontext — settings,
+  admin — hebben die provider niet, en vielen dus terug op de kale `:root{}`-stylesheet-waarden.
+  Klantpagina's toonden intussen al gewoon de juiste kleur (inline style wint altijd van een
+  stylesheet), wat verklaart waarom dit niet eerder was opgevallen: het was niet overal stuk,
+  alleen op de bureau-brede schermen.
+- Concreet zichtbaar gevolg: de standaardknop (`bg-primary`, `button.tsx` se default-variant —
+  de meestgebruikte knopstijl in de hele app) rendert op elke bureau-brede pagina in het oude
+  navy. "Verbinden met Google Ads" in de eerdere schermafdruk was daar een voorbeeld van, niet
+  een OAuth-bug.
+
+Gefixt: alle acht naar `var(--brand-primary, #4f46e5)` / `var(--brand-accent, #f5960b)`, exact
+hetzelfde patroon als `--sidebar-panel` en `.dark{}` al gebruikten. De twee kaartcomponenten
+(`world-map.tsx`, `us-states-map.tsx`) kregen dezelfde correctie op hun eigen defensieve
+CSS-fallback. Bewust ongemoeid gelaten: een placeholder-tekst in het klant-brandingformulier (een
+voorbeeldwaarde in een vrij invoerveld, geen productclaim) en een vierkleurig avatarpalet
+(decoratief, geen merkclaim). Geverifieerd met `getComputedStyle` op `--primary`/
+`--sidebar-panel` én de daadwerkelijke knopkleur, niet alleen visueel — typecheck, volledige
+testsuite en `next build` slagen.
+
+**De les:** een kleurcorrectie "op verzoek van de eigenaar" die maar één van twee plekken raakt
+waar diezelfde token-namen gedefinieerd staan, is geen voltooide correctie — hij verplaatst het
+zichtbaarheidsprobleem naar de paginacategorie die toevallig niet getest werd. Bij een volgende
+merk-/kleurwijziging: zoek op de letterlijke oude hexwaarde over het HELE bestand (`:root` én
+`.dark` én elke component-eigen fallback), niet alleen in de laag waar de wijziging bedoeld was.
