@@ -9,6 +9,10 @@ import {
   MONTHLY_STEP9_INSTRUCTION as MONTHLY_NETWORK_SCHEDULE_INSTRUCTION,
 } from "@/lib/prompts/sop-prompts";
 
+// F4 fase2: stap 1 bundelt Account+Campagne+Ad Group (oud 1+2+3) in één call. Het log-format
+// is de UNIE van de drie oude formats -- de validator-skeleton (LOG_FORMAT_SKELETONS[1] in
+// step-validator.ts) checkt op al deze zinsdelen, dus ze moeten alle drie ergens in de
+// gecombineerde output voorkomen, niet slechts één per niveau.
 export const SOP_LOG_FORMATS: Record<number, string> = {
   1: `## VERPLICHT Log-format (format is vast, waarden zijn DYNAMISCH uit echte data)
 
@@ -16,10 +20,19 @@ Gebruik dit format voor je bevindingen. Vervang alle tekst tussen [ ] door echte
 De percentages en getallen hieronder zijn VOORBEELDEN van de structuur, NIET de echte waarden.
 Vul ALTIJD de echte waarden uit de data in.
 
-FORMAT:
+FORMAT Account-niveau:
 "Het verschil van [werkelijk %] met [naam doelstelling] is te verklaren door [KPI A], [KPI B], [KPI C] - [KPI A] [stijgt/daalt] Maand op Maand met [werkelijk %] - dit ligt in lijn met de ontwikkeling van de afgelopen [aantal] maanden, waarin [KPI A] gemiddeld met [werkelijk %] [steeg/daalde] Maand op Maand - [KPI A] toont de afgelopen 2 maanden een [opwaartse/neerwaartse] trend van [startwaarde] naar [eindwaarde]."
 
-Herhaal dit format voor elke relevante bevinding.`,
+FORMAT Campagne-niveau (Werkwijze A — verklaring):
+"[Campagne X] & [Campagne Y] dragen sterk bij aan de [opwaartse/neerwaartse] trend van [KPI A] - [Campagne X] kent [KPI A] welke [werkelijk %] [hoger/lager] is dan het account gemiddelde en [steeg/daalde] met [werkelijk %] laatste maand ten opzichte van de maand daarvoor - Over de afgelopen 3 maanden vertoont [KPI A] een [opwaartse/neerwaartse] trend binnen [Campagne X] van [startwaarde] naar [eindwaarde] - [Er is geen terugkerende Trend geïdentificeerd / Er is een terugkerend patroon: ...]."
+
+FORMAT Campagne-niveau (Werkwijze B — evaluatie):
+"[Campagne X] presteert [bovengemiddeld/ondergemiddeld] afgelopen maand, waarbij [KPI A] [werkelijk %] [stijgt/daalt] ten opzichte van voorgaande maand en [KPI B] [werkelijk %] [stijgt/daalt] ten opzichte van voorgaande maand - In week [weeknummer of datum] is een breuklijn te identificeren, sinds dit moment presteert de campagne [werkelijk %] [meer/minder] op [KPI A] en [werkelijk %] [meer/minder] op [KPI B] dan het accountgemiddelde"
+
+FORMAT Ad group-niveau (zelfde structuur als campagne-niveau, nu één laag dieper, alleen voor ad groups binnen de campagnes die Werkwijze B als over-/underperformer aanwijst):
+"[Ad Group X] presteert [bovengemiddeld/ondergemiddeld] afgelopen maand, waarbij [KPI A] [werkelijk %] [stijgt/daalt] ten opzichte van voorgaande maand en [KPI B] [werkelijk %] [stijgt/daalt] ten opzichte van voorgaande maand - In week [weeknummer of datum] is een breuklijn te identificeren, sinds dit moment presteert de ad group [werkelijk %] [meer/minder] op [KPI A] en [werkelijk %] [meer/minder] op [KPI B] dan het campagnegemiddelde"
+
+Herhaal deze formats voor elke relevante bevinding, per niveau.`,
   2: `## VERPLICHT Log-format (format is vast, waarden zijn DYNAMISCH uit echte data)
 
 Vervang alle tekst tussen [ ] door echte waarden uit de analyse.
@@ -68,12 +81,20 @@ FORMAT SKU-niveau:
 "[X]% van de Ad Spend gaat naar 'under-index' items, terwijl [Y]% van de omzet uit 'over-index' komt - [SKU A], [SKU B], [SKU C] presteren ondermaats in [Campagne X]; deze sku's kennen een Ad Spend van €[bedrag] met een ROAS van [waarde]"
 
 Als Merchant Center data ontbreekt: schrijf EXACT "Werkwijze A (Custom Labels/Categories): data niet beschikbaar door ontbrekende Merchant Center koppeling." en ga door.`,
+  // F4 fase3: stap 7 (Demand & Search Intelligence) bundelt oud 4 (Auction) + 5 (Keyword) +
+  // 7 (Search Term) -- log-format is de unie van de drie oude formats.
   7: `## VERPLICHT Log-format (format is vast, waarden zijn DYNAMISCH uit echte data)
 
 Vervang alle tekst tussen [ ] door echte waarden.
 
-FORMAT Match Type:
+FORMAT Auction Insights:
+"In [campagne / ad group naam] is sinds [maand/datum] een [dalende/stijgende] [KPI A] zichtbaar - sinds de week van [datum] is de [KPI A] [stabiel in een range tussen X en Y / verder gedaald naar X]"
+
+FORMAT Match Type (keyword en/of search term):
 "[Match Type A] heeft afgelopen maand een [werkelijk %] [hogere/lagere] CTR, bij [werkelijk %] vertoningen [meer/minder], met [werkelijk %] klikken [meer/minder] dan [Match Type B] - de CPC is [werkelijk %] [hoger/lager] [en genereert X conversies / maar genereert geen conversies]"
+
+FORMAT Keyword bucket:
+"[Keyword A] was voorgaande maand [en de maand daarvoor] geïdentificeerd als '[bucket naam]' - in de Trend Charts is te zien dat de vertoningen sinds [datum] [scherp toeneemt/afneemt] met een [dalende/stijgende] CTR; in dezelfde periode neemt het aantal klikken [gestaag toe/af], waarbij het aantal conversies [achterblijft/meegroeit]"
 
 FORMAT Search Term bucket:
 "[Search Term A] was voorgaande maand [en de maand daarvoor] geïdentificeerd als '[bucket]' - binnen [Campagne X] spendeerde deze zoekterm €[bedrag] bij [aantal] klikken en genereerde daarbij [aantal] conversies"`,
@@ -88,14 +109,18 @@ FORMAT Ad Copy:
 Zelfde structuur als Asset maar dan voor headlines/descriptions.
 
 Analyseer per asset TYPE en vergelijk over ALLE beschikbare tijdframes.`,
+  // F4 fase4: stap 9 bundelt oud 9 (audience) + 11 (geo) -- log-format is de unie.
   9: `## VERPLICHT Log-format (format is vast, waarden zijn DYNAMISCH uit echte data)
 
 Vervang alle tekst tussen [ ] door echte waarden.
 
-FORMAT:
+FORMAT Audience:
 "[Audience segment X] presteert [bovengemiddeld/ondergemiddeld] afgelopen maand, waarbij [KPI A] en [KPI B] [werkelijk %] [hoger/lager] liggen dan het gemiddelde - sinds week [weeknummer] is er een [neerwaartse/opwaartse] trend zichtbaar waarbij [KPI A] van [startwaarde] naar [eindwaarde] [daalt/stijgt] en [KPI B] van [startwaarde] naar [eindwaarde] [daalt/stijgt]"
 
-Herhaal voor elk audience type. Als geen data beschikbaar: schrijf alleen "Audience data niet beschikbaar." en de standaard actie.`,
+Herhaal voor elk audience type. Als geen data beschikbaar: schrijf alleen "Audience data niet beschikbaar." en de standaard actie.
+
+FORMAT Geografisch:
+"Binnen [Campagne X] presteert [Geografisch gebied Y] [bovengemiddeld/ondergemiddeld] afgelopen maand - dit blijkt uit [KPI A] ([werkelijk %] [bovengemiddeld/ondergemiddeld]), [KPI B] ([werkelijk %] [bovengemiddeld/ondergemiddeld]) en [KPI C] ([werkelijk %] [bovengemiddeld/ondergemiddeld]) - deze [bovengemiddelde/ondergemiddelde] performance is waarneembaar sinds [datum] en [stijgt/daalt] sindsdien van [startwaarde] naar [eindwaarde]."`,
   10: `## VERPLICHT Log-format (format is vast, waarden zijn DYNAMISCH uit echte data)
 
 Vervang alle tekst tussen [ ] door echte waarden.
@@ -132,16 +157,20 @@ Voer ALLE drie werkwijzen uit.`,
 };
 
 export const STEP_PURITY_CONTRACTS: Record<number, string> = {
+  // F4 fase2: unie van de oude contracten 1 (account), 2 (campagne) en 3 (ad group) -- de
+  // toegestane entity-types en actiedomeinen breiden uit tot alle drie de niveaus, maar de
+  // ondergrens blijft ongewijzigd: nog steeds geen zoekterm/feed/creative/audience/device/geo/
+  // network/checkout als hoofdoorzaak. Dat hoort bij de latere pijlers.
   1: `### Step-Purity Contract
-- Doel: accountstatus, KPI-keten, target-gap en trendstatus duiden
-- Leidende databronnen: account month-data, targets, YoY/MoM, change history, benchmarks
-- Mag beoordelen: account en hooguit campagne-allocatie als accountverklaring
-- Primaire metrics: Conversies, Omzet, Spend, ROAS/CPA, CVR, CTR, CPC
-- Mag concluderen: status, target-gap, trendrichting, waarschijnlijke bottleneck in de KPI-keten
-- Mag NIET concluderen: keyword/search term/feed/creative/audience/device/geo/network als definitieve hoofdoorzaak
-- deterministic: direct zichtbaar in accountdata en targets
-- inferred/hypothesis/unknown: oorzaak buiten accountniveau of zonder voldoende historie
-- Acties: alleen accountbrede containment, pacing, tracking-check of allocatiesignaal; geen diepe domein-ingrepen`,
+- Doel: accountstatus, campagneverschillen, allocatie en ad-group-subclusters in één hiërarchische waterfall duiden (account → campagne → ad group)
+- Leidende databronnen: account month-data, campagnedata, ad-group-data, targets, YoY/MoM, change history, campaign metadata, benchmarks
+- Mag beoordelen: account, campagnes, campagneportfolio, en ad groups binnen de zelf aangewezen over-/underperformer-campagnes
+- Primaire metrics: Conversies, Omzet, Spend, ROAS/CPA, CVR, CTR, CPC, Search IS
+- Mag concluderen: status, target-gap, trendrichting, welke campagnes/ad groups het accountverschil dragen, of allocatie scheef is, waarschijnlijke bottleneck in de KPI-keten
+- Mag NIET concluderen: keyword/search term/feed/creative/audience/device/geo/network/checkout als definitieve hoofdoorzaak
+- deterministic: direct zichtbaar in account-, campagne- of ad-group-data en targets
+- inferred/hypothesis/unknown: oorzaak buiten deze drie niveaus of zonder voldoende historie
+- Acties: accountbrede containment, pacing, tracking-check, campagnebudget/targets/prioriteit, ad-group-bijsturing of -structuur; geen negatives/feedfixes/diepe domein-ingrepen`,
   2: `### Step-Purity Contract
 - Doel: campagneverschillen, allocatie en winnaar/verliezer-patronen identificeren
 - Leidende databronnen: campagnedata, budgetsignalen, target-gap, benchmarkcontext
@@ -182,14 +211,17 @@ export const STEP_PURITY_CONTRACTS: Record<number, string> = {
 - Mag concluderen: of assortiment, feed of mix de performance drijft
 - Mag NIET concluderen: audience, geo, network of schedule als hoofdverklaring
 - Acties: containment op verlieslatende SKU's en recovery via feed/mix/productstructuur`,
+  // F4 fase3: unie van de oude contracten 4 (auction), 5 (keyword) en 7 (search term) -- alle
+  // drie zijn vraag-diagnose op hetzelfde niveau. Ondergrens ongewijzigd: nog steeds geen feed/
+  // creative/audience/geo/network/checkout als hoofdverklaring.
   7: `### Step-Purity Contract
-- Doel: zoektermintentie, routing en veilige uitsluitbaarheid bepalen
-- Leidende databronnen: search term data plus context uit keyword/productstappen
-- Mag beoordelen: search terms en hun routing naar campagnes/ad groups/producten
-- Primaire metrics: Wasteful Spend, Conversies, CVR, ROAS, intentclassificatie
-- Mag concluderen: irrelevante intent, modifier mismatch, routing mismatch of veilige uitsluiting
-- Mag NIET concluderen: creative, geo, audience, network of checkout als hoofdverklaring
-- Acties: containment via veilige uitsluiting, recovery via routing/LP/feed/structuur; geen brede accountconclusies`,
+- Doel: auction pressure/impression share, keyword-kwaliteit en zoektermintentie/routing in samenhang beoordelen
+- Leidende databronnen: auction insights, impression share, keyword performance, match type verdeling, quality score, search term data, context uit productstap
+- Mag beoordelen: campagne/account vraagcapture, keywords, keywordgroepen en search terms plus hun routing naar campagnes/ad groups/producten
+- Primaire metrics: Impression Share, Lost IS (Budget/Rank), CTR, CPC, CVR, CPA, ROAS, QS, Wasteful Spend, intentclassificatie
+- Mag concluderen: of vraagverlies door competitie of budget komt, welke keywords vraagkwaliteit/efficiency verklaren, irrelevante intent, modifier mismatch, routing mismatch of veilige uitsluiting
+- Mag NIET concluderen: feed/SKU, creative, audience, device, geo, network of checkout als hoofdverklaring
+- Acties: budget/rank/bidding-richting, keyword/match type/QS-richting, containment via veilige uitsluiting, recovery via routing/LP/feed/structuur; geen brede accountconclusies`,
   8: `### Step-Purity Contract
 - Doel: creative/asset/message mismatch toetsen
 - Leidende databronnen: asset- en ad-copy performance over meerdere windows
@@ -198,14 +230,16 @@ export const STEP_PURITY_CONTRACTS: Record<number, string> = {
 - Mag concluderen: message-market mismatch of creatieve sterkte/zwakte
 - Mag NIET concluderen: keyword/search term/feed/geo/network als primaire root cause
 - Acties: creative containment of herstel via asset/copy-iteraties`,
+  // F4 fase4: unie van de oude contracten 9 (audience) en 11 (geo) -- beide zijn
+  // segmentanalyses op hetzelfde niveau.
   9: `### Step-Purity Contract
-- Doel: audience-segmenten als versterker of ontkrachter van de hoofdthread beoordelen
-- Leidende databronnen: audience-dimensies en spend share
-- Mag beoordelen: age, gender, income, in-market, affinity en gekoppelde campagnes
-- Primaire metrics: Spend share, CVR, CPA, ROAS
-- Mag concluderen: audience-inefficiency of juist ondersteunende pockets
-- Mag NIET concluderen: geo, feed, network, search term of creative als hoofdverklaring
-- Acties: audience-bijsturing of monitoring; geen feed/search term-ingrepen`,
+- Doel: audience-segmenten en geografische under-/overperformance als versterker of ontkrachter van de hoofdthread beoordelen
+- Leidende databronnen: audience-dimensies, land/regio performance, trends en spend share
+- Mag beoordelen: age, gender, income, in-market, affinity, landen/regio's en gekoppelde campagnes
+- Primaire metrics: Spend share, CVR, CPA, ROAS, Conversies, YoY/MoM
+- Mag concluderen: audience-inefficiency of ondersteunende pockets, waar geo-allocatie het account schaadt of helpt
+- Mag NIET concluderen: feed, network, search term of creative als hoofdverklaring
+- Acties: audience-bijsturing of monitoring, containment via budget/exclusie en recovery via aparte geo-setup als verdedigbaar; geen feed/search term-ingrepen`,
   10: `### Step-Purity Contract
 - Doel: device- en engagementsignalen scheiden in oorzaak, symptoom of bevestiging
 - Leidende databronnen: device KPI's en engagementmetrics
@@ -245,8 +279,103 @@ function withStepPurityContract(step: number, instruction: string): string {
   return `${instruction}\n\n${logFormat}\n\n${STEP_PURITY_CONTRACTS[step]}`;
 }
 
+// F4 fase2: gebundelde instructie voor stap 1 "Macro & Portfolio Performance" -- de oude
+// stappen 1 (Account), 2 (Campagne) en 3 (Ad Group) lopen nu in ÉÉN call, in deze volgorde,
+// zodat het model de hiërarchische waterfall (account → campagne → ad group) in één
+// samenhangende redenering aflegt in plaats van via drie losse aanroepen die elkaars output
+// als los stuk tekst moeten citeren. Elk NIVEAU-blok hieronder is de ongewijzigde inhoud van
+// de oude losse instructie; alleen de overgangszinnen ("gebruik de conclusie van stap 1") zijn
+// aangepast naar "hierboven", omdat dat nu dezelfde generatie is.
+const MONTHLY_MACRO_PORTFOLIO_INSTRUCTION = `## Stap 1: Macro & Portfolio Performance (Account → Campagne → Ad Group)
+
+Doorloop de drie niveaus hieronder in deze volgorde, binnen ÉÉN antwoord. Elk niveau bouwt voort
+op de conclusie van het niveau erboven -- behandel dit niet als drie losse analyses, maar als één
+waterfall-redenering: WAAROM bewoog de account-KPI, WELKE campagnes droegen dat, WELKE ad groups
+droegen dat weer.
+
+---
+
+### NIVEAU 1 — Account Performance
+
+${MONTHLY_STEP1_INSTRUCTION.replace(/^## Stap 1: Account Performance\n\n/, "")}
+
+---
+
+### NIVEAU 2 — Campagne Performance
+
+${MONTHLY_STEP2_INSTRUCTION
+  .replace(/^## Stap 2: Campagne Performance\n\n/, "")
+  .replace(
+    "Gebruik de conclusie van stap 1 als startpunt. Verklaar de accountbevindingen op campagneniveau.\nHerhaal de doelstellingsstatus niet opnieuw — die staat al in stap 1.",
+    "Gebruik je eigen Niveau 1-analyse hierboven als startpunt. Verklaar de accountbevindingen op\ncampagneniveau. Herhaal de doelstellingsstatus niet opnieuw — die staat al in Niveau 1."
+  )}
+
+## VERPLICHTE WERKWIJZEN (voer ALLE uit)
+
+WERKWIJZE A - Verder verklaren Account Performance:
+- Identificeer welke campagnes bijdragen aan de eerder gevonden KPI-verschuivingen
+- Toon MoM vergelijking (Last Month vs Month Before Last)
+- Bekijk Trend Charts over 3 maanden: is er een trend?
+- Bekijk wekelijkse performance: zijn er terugkerende patronen?
+- Log in het voorgeschreven format
+
+WERKWIJZE B - Campagne evaluatie:
+- Identificeer boven/ondergemiddeld presterende campagnes
+- Toon MoM vergelijking voor deze campagnes
+- Identificeer trend of breuklijn in Trend Charts
+- Bevestig in week-over-week data
+- Log in het voorgeschreven format
+
+VERBODEN in acties:
+- gebruik GEEN werkwoorden als "onderzoek", "analyseer", "optimaliseer" of "consolideer"
+- formuleer validatie als concrete Google Ads handeling, bijvoorbeeld via aparte lijst, aparte campagne, budgetrem of target-aanpassing
+
+Als data voor een werkwijze ontbreekt: schrijf EXACT "Werkwijze [A/B]: [reden]." in 1 zin en ga door.
+
+---
+
+### NIVEAU 3 — Ad Group Performance
+
+${MONTHLY_STEP3_INSTRUCTION
+  .replace(/^## Stap 3: Ad Group Performance\n\n/, "")
+  .replace(
+    "Analyseer alleen de ad groups die horen bij campagnes die in stap 2 zijn geïdentificeerd\nals over- of underperformer. Niet alle ad groups.",
+    "Analyseer alleen de ad groups die horen bij campagnes die je zelf in Niveau 2 (Werkwijze B)\nhierboven als over- of underperformer hebt geïdentificeerd. Niet alle ad groups."
+  )}
+
+## VERPLICHTE WERKWIJZEN (voer ALLE uit)
+
+WERKWIJZE A - Verder verklaren Campagne Performance:
+- Identificeer welke ad groups bijdragen aan de eerder gevonden KPI-verschuivingen
+- Toon MoM vergelijking
+- Bekijk Trend Charts over 3 maanden
+- Controleer week-over-week patronen
+- Log in het voorgeschreven format
+
+WERKWIJZE B - Ad group evaluatie:
+- Identificeer boven/ondergemiddeld presterende ad groups
+- Toon MoM vergelijking voor deze ad groups
+- Identificeer trend of breuklijn
+- Bevestig in week-over-week data
+- Log in het voorgeschreven format
+
+Als er voor Niveau 3 geen ad-group-data is meegegeven: schrijf EXACT "Niveau 3 (Ad Group Performance):
+data niet beschikbaar." in 1 zin en sluit af. Niveau 1 en 2 blijven in dat geval gewoon volledig
+uitgevoerd — ontbrekende ad-group-data is nooit een reden om de hele stap over te slaan.
+
+---
+
+### Output-discipline over alle drie niveaus heen
+
+- \`top_3_findings\`: kies de 3 belangrijkste bevindingen over de HELE waterfall (account, campagne
+  én ad group samen) — niet per niveau apart. Een goed gekozen campagne- of ad-group-bevinding die
+  de account-beweging verklaart weegt zwaarder dan drie losse, ongerelateerde observaties.
+- \`step_conclusion\`: vat de waterfall in 1-2 zinnen samen (account-status → gedragen door welke
+  campagne(s) → gedragen door welke ad group(s), voor zover van toepassing).
+- \`actions\`: maximaal 2, en mogen van elk niveau komen — kies de 2 met de grootste verwachte impact.`;
+
 export const MONTHLY_V2_STEP_INSTRUCTIONS: Record<number, string> = {
-  1: withStepPurityContract(1, MONTHLY_STEP1_INSTRUCTION),
+  1: withStepPurityContract(1, MONTHLY_MACRO_PORTFOLIO_INSTRUCTION),
   2: withStepPurityContract(2, `${MONTHLY_STEP2_INSTRUCTION}
 
 ## VERPLICHTE WERKWIJZEN (voer ALLE uit)
@@ -356,7 +485,17 @@ ${MONTHLY_CREATIVE_INSTRUCTION}
 
 ### Extra v2 instructie
 Voer zowel asset- als ad-copy analyse uit over 14d / 30d / 60d / 90d. Open expliciet met een verwijzing naar stap 7.`),
-  9: withStepPurityContract(9, `## Stap 9: Audience Performance
+  // F4 fase4: stap 9 ("Doelgroep- & Geosegmenten") bundelt oud 9 (Audience) + 11 (Geo) -- beide
+  // zijn segmentanalyses met dezelfde vorm (per segment ROAS/CPA/CVR/spend-share, alleen
+  // significante uitschieters), dus in één call.
+  9: withStepPurityContract(9, `## Stap 9: Doelgroep- & Geosegmenten (Audience + Geografisch)
+
+Doorloop de twee niveaus hieronder in dit antwoord. Beide zijn segmentanalyses op hetzelfde
+"welke slice presteert af/boven gemiddeld"-patroon, alleen langs een andere as (mensen vs. plaats).
+
+---
+
+### NIVEAU 1 — Audience
 
 ### Kritieke instructie
 Analyseer audience performance per dimensie: age, gender, income, in_market, affinity.
@@ -367,7 +506,35 @@ Als een dimensie geen materieel signaal geeft, zeg dat expliciet en ga door naar
 2. Flag alleen significante outliers.
 3. Valideer trends over 3 maanden.
 4. Cross-reference naar eerdere bevindingen: welke audience-groepen versterken of ontkrachten de hoofdthread?
-`),
+
+Als audience-data volledig ontbreekt: schrijf EXACT "Niveau 1 (Audience): data niet beschikbaar."
+in 1 zin en ga door naar Niveau 2 -- dit is nooit een reden om Niveau 2 over te slaan.
+
+---
+
+### NIVEAU 2 — Geografisch
+
+Dit is een VOLLEDIGE geografische analyse, niet slechts context. Analyseer elk land als een apart
+segment met eigen KPI's, trends en aanbevelingen. Open expliciet met een verwijzing naar Niveau 1
+hierboven en houd de focus op regio/land performance in plaats van een brede accountsamenvatting.
+
+### Werkwijze
+1. Vergelijk de prestaties per land: ROAS, CPA, CR, spend share.
+2. Bereken per land de efficiency ratio: (conversie-aandeel / spend-aandeel). >1.0 = efficiënt.
+3. Identificeer verlieslatende landen (ROAS < 1.0 of CPA > 2x account gemiddelde).
+4. Analyseer campagnes die in meerdere landen draaien: presteert dezelfde campagne anders per land?
+5. Adviseer budgetverschuivingen: van verlieslatende naar winstgevende landen.
+6. Check de YoY trend per land: groeit of krimpt een land?
+
+Als geografische data volledig ontbreekt: schrijf EXACT "Niveau 2 (Geografisch): data niet
+beschikbaar." in 1 zin en sluit af.
+
+---
+
+### Output-discipline over beide niveaus heen
+
+\`top_3_findings\`: kies de 3 belangrijkste bevindingen over audience én geo samen -- niet per
+niveau apart.`),
   10: withStepPurityContract(10, `## Stap 10: Device & Engagement Performance
 
 ### Kritieke instructie
@@ -502,17 +669,77 @@ Forceer differentiatie:
 `),
 };
 
-export const MONTHLY_STEP7_CLASSIFICATION_INSTRUCTION = `## Stap 7A: Search Term Classification
+// F4 fase3: Deel A van stap 7 ("Demand & Search Intelligence") bundelt nu ook oud stap 4
+// (Auction Insights) en oud stap 5 (Keyword Performance) -- alle drie zijn vraag-diagnose op
+// hetzelfde niveau (waarom capteert het account te weinig/te veel vraag, tegen welke prijs),
+// dus dat hoort in dezelfde generatie thuis. Deel B (acties/besparingen) blijft ongewijzigd van
+// vorm: het vertaalt gewoon wat Deel A nu breder classificeert.
+export const MONTHLY_STEP7_CLASSIFICATION_INSTRUCTION = `## Stap 7A: Demand & Search Classification (Auction Insights + Keyword + Search Term)
 
 ### Kritieke instructie
-Dit is deel A van stap 7. Focus alleen op classificatie, intent en bewijssterkte.
-Formuleer nog GEEN brede eindsynthese voor de stap.
+Dit is deel A van stap 7. Focus op DIAGNOSE over drie vraag-niveaus: auction/impression share,
+keyword-kwaliteit en zoekterm-classificatie. Formuleer nog GEEN brede eindsynthese voor de stap
+-- dat is deel B.
 
-### Taken
+---
+
+### NIVEAU A1 — Auction & Impression Share
+
+${MONTHLY_STEP4_INSTRUCTION}
+
+## VERPLICHTE WERKWIJZE
+- Bekijk Auction Insights by Month voor trend of breuklijn
+- Bekijk Auction Insights by Week voor week-over-week bevestiging
+- Log in het voorgeschreven format
+
+Als data voor deze werkwijze ontbreekt: schrijf EXACT "Niveau A1 (Auction Insights): [reden]." in
+1 zin en ga door -- dit is nooit een reden om Niveau A2 of A3 over te slaan.
+
+---
+
+### NIVEAU A2 — Keyword Performance
+
+### Kritieke instructie
+Voer ALLE werkwijzen uit:
+- Werkwijze A: match type analyse + keyword bucketing
+- Werkwijze B: verklaar eerder geïdentificeerde zwakke campagnes/ad groups via keywords
+- Werkwijze C: quality score analyse inclusief subfactoren
+
+### Werkwijze A
+1. Vergelijk EXACT, PHRASE en BROAD op impressies, CTR, CPC, conversies, CPA en ROAS.
+2. Bucket keywords als Bestseller / Bleeder / No Clicks / No Visibility.
+3. Valideer outliers over 3 maanden; benoem alleen materiële patronen.
+
+### Werkwijze B
+1. Zoom expliciet in op campagnes/ad groups die in stap 1 (Macro & Portfolio) als underperformer
+   zijn benoemd.
+2. Benoem welke keywords daar het probleem verklaren en welke juist winning pockets zijn.
+
+### Werkwijze C
+1. Rapporteer gemiddelde QS en range.
+2. Vergelijk KPI's per QS-bucket: 1-4, 5-6, 7-10.
+3. Analyseer subfactoren Expected CTR, Ad Relevance en Landing Page Experience.
+4. Benoem expliciet als QS-data ontbreekt; verzin die data niet.
+
+Als keyword-data volledig ontbreekt: schrijf EXACT "Niveau A2 (Keyword Performance): [reden]." in
+1 zin en ga door.
+
+---
+
+### NIVEAU A3 — Search Term Classification
+
 1. Classificeer zoektermen als protected_relevant, review_first, safe_to_exclude of onduidelijk.
-2. Koppel termen aan keyword- en productpatronen uit stap 5 en 6.
+2. Koppel termen aan de keyword-patronen uit Niveau A2 hierboven en aan productpatronen uit stap 6.
 3. Benoem alleen harde of zorgvuldig geïnfererde signalen.
-4. Beperk acties tot maximaal 1 tussentijdse actie als dat echt nodig is.`;
+4. Beperk acties tot maximaal 1 tussentijdse actie als dat echt nodig is.
+
+---
+
+### Output-discipline over Niveau A1-A3 heen
+
+\`top_3_findings\`: kies de 3 belangrijkste bevindingen over auction, keyword én search term samen
+-- niet per niveau apart. Een auction- of keyword-bevinding die de account-vraag verklaart weegt
+zwaarder dan drie losse, ongerelateerde observaties.`;
 
 export const MONTHLY_STEP7_ACTIONS_INSTRUCTION = `## Stap 7B: Search Term Actions & Savings
 

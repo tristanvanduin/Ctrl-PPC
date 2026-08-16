@@ -26,16 +26,25 @@ export function validateMonthlyAcceptance(opts: {
   stepValidations?: StepValidationResult[];
   finalSop?: { recommendations: FinalSopRecommendation[]; tasks: FinalSopTask[] };
   stepCount?: number;
+  // F4 fase2: expliciete stapnummer-set voor adapters waar die geen aaneengesloten 1..stepCount
+  // reeks meer is (zie ChannelAdapter.expectedStepNumbers). Ontbreekt dit, dan blijft het gedrag
+  // exact de oude aaneengesloten 1..stepCount-check.
+  expectedStepNumbers?: number[];
+  // F4 fase2: verwacht aantal checkpoints (default 3 = A/B/C, ongewijzigd gedrag). Google
+  // draait na het bundelen van stap 1-3 nog maar 2 checkpoints (B, C) -- Checkpoint A's
+  // consolidatiewerk zit nu in stap 1 zelf.
+  expectedCheckpointCount?: number;
 }): AcceptanceReport {
-  const { narrativeSteps, recommendations, tasks, coverage, findings, checkpointsRun, stepValidations = [], finalSop, stepCount = 13 } = opts;
+  const { narrativeSteps, recommendations, tasks, coverage, findings, checkpointsRun, stepValidations = [], finalSop, stepCount = 13, expectedStepNumbers, expectedCheckpointCount = 3 } = opts;
   const criteria: AcceptanceCriterionResult[] = [];
 
-  const deepDiveSteps = narrativeSteps.filter((step) => step.stepNumber >= 1 && step.stepNumber <= stepCount);
+  const stepNumberSet = expectedStepNumbers ?? Array.from({ length: stepCount }, (_, i) => i + 1);
+  const deepDiveSteps = narrativeSteps.filter((step) => stepNumberSet.includes(step.stepNumber));
   criteria.push({
     id: "AC-01",
-    label: `Alle ${stepCount} SOP-stappen aanwezig`,
-    passed: deepDiveSteps.length === stepCount,
-    detail: `${deepDiveSteps.length}/${stepCount} stappen uitgevoerd`,
+    label: `Alle ${stepNumberSet.length} SOP-stappen aanwezig`,
+    passed: deepDiveSteps.length === stepNumberSet.length,
+    detail: `${deepDiveSteps.length}/${stepNumberSet.length} stappen uitgevoerd`,
   });
 
   criteria.push({
@@ -75,9 +84,9 @@ export function validateMonthlyAcceptance(opts: {
 
   criteria.push({
     id: "AC-11",
-    label: "3 checkpoints uitgevoerd",
-    passed: checkpointsRun === 3,
-    detail: `${checkpointsRun}/3 checkpoints`,
+    label: `${expectedCheckpointCount} checkpoints uitgevoerd`,
+    passed: checkpointsRun === expectedCheckpointCount,
+    detail: `${checkpointsRun}/${expectedCheckpointCount} checkpoints`,
   });
 
   criteria.push({

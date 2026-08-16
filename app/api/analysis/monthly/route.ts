@@ -45,7 +45,7 @@ import {
   type Finding,
 } from "@/lib/schema/analysis-schema";
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
-import { computeComparisonFacts, formatComparisonFacts, computeCampaignMomFacts, computeAdGroupMomFacts } from "@/lib/analysis/comparison-facts";
+import { computeComparisonFacts, formatComparisonFacts, computeCampaignMomFacts, computeAdGroupMomFacts, computeCampaignComparisonFacts } from "@/lib/analysis/comparison-facts";
 import { computeDataReliability, type DataReliabilityAssessment } from "@/lib/analysis/data-reliability";
 import { channelGa4Context } from "@/lib/ga4/context";
 import type { Ga4SupabaseLike } from "@/lib/ga4/data-access";
@@ -212,6 +212,36 @@ export function sanitizeStepActionText(stepNumber: number, action: string): stri
       .trim();
   }
   return cleaned;
+}
+
+// F4 fase1: generieke no-data-fallback voor stappen met een optionele dimensie. Gebruikt
+// hetzelfde bewijsvrije patroon als buildStep6NoDataFallback (leeg findings-array, één
+// deterministische actie, status NIET OP SCHEMA) zodat validateStepOutput() elke variant
+// hiervan hetzelfde beoordeelt als de al geteste stap-6-fallback.
+export function buildStepNoDataFallback(input: {
+  stepNumber: number;
+  stepName: string;
+  narrative: string;
+  logEntry: string;
+  actionText: string;
+  actionImpact: string;
+  stepConclusion: string;
+}): ParsedStepOutput {
+  return {
+    stepNumber: input.stepNumber,
+    stepName: input.stepName,
+    narrative: input.narrative,
+    log_entries: [input.logEntry],
+    findings: [],
+    status: "NIET OP SCHEMA",
+    actions: [{
+      actie: input.actionText,
+      campagne: "Alle campagnes",
+      deadline: "deze_week",
+      verwachte_impact: input.actionImpact,
+    }],
+    step_conclusion: input.stepConclusion,
+  };
 }
 
 export function buildStep6NoDataFallback(): ParsedStepOutput {
@@ -877,6 +907,60 @@ async function persistMonthlyStructuredData(opts: {
   }
 }
 
+// F5 fase1.4: Meta's en LinkedIn's prepared-facts-lagen zetten voor sommige stappen al
+// `{ available: false, note: "..." }` als de onderliggende data ontbreekt (bv. Meta stap 5
+// zonder vision-data, LinkedIn stap 5 zonder demografie, stap 8 zonder campagne-metadata) --
+// maar de generieke stap-lus negeerde dat signaal en riep de LLM toch aan met een lege
+// datatabel. Deze check hergebruikt het bestaande signaal i.p.v. per stap nieuwe detectielogica
+// te bouwen.
+function isChannelStepFactsUnavailable(facts: unknown): { unavailable: boolean; note: string } {
+  if (facts != null && typeof facts === "object" && "available" in (facts as Record<string, unknown>)) {
+    const obj = facts as Record<string, unknown>;
+    if (obj.available === false) {
+      return { unavailable: true, note: typeof obj.note === "string" ? obj.note : "Data niet beschikbaar voor deze stap." };
+    }
+  }
+  return { unavailable: false, note: "" };
+}
+
+// F5 fase1.3: lichte checkpoint voor Meta/LinkedIn's generieke stap-lus (geen runningContext-
+// propagatie tussen stappen zoals Google's runCheckpoint -- die infrastructuur bestaat hier niet
+// en is voor twee kanalen zonder bundeling nog geen aantoonbare winst). Eén consolidatiepas over
+// ALLE stap-outputs, vlak vóór de synthese, is voldoende om de acceptance-check zijn werk te laten
+// doen (dedupliceren, bevestigde patronen markeren, tegenspraken signaleren) en geeft
+// checkpointsRun eindelijk een echte waarde in plaats van de hardcoded 0.
+async function runChannelCheckpoint(opts: {
+  shared: { supabase: SupabaseClient; apiKey: string; clientId: string; sopType: string; periodStart: string; periodEnd: string; runKey: string; channel: string; evalCapture: { fixtureSet: string } | null };
+  name: string;
+  clusterSteps: ParsedStepOutput[];
+}): Promise<{ checkpointStep: StepResult; success: boolean }> {
+  const checkpointStep = await runStep({
+    evalKind: "checkpoint",
+    ...opts.shared,
+    stepNumber: 200,
+    stepName: opts.name,
+    systemPrompt: buildMonthlyCheckpointPrompt(opts.name),
+    jsonMode: true,
+    userMessage: `Stap-outputs uit ${opts.name}:
+
+${JSON.stringify(opts.clusterSteps.map((step) => ({
+  stepNumber: step.stepNumber,
+  stepName: step.stepName,
+  narrative: step.narrative,
+  log_entries: step.log_entries,
+  findings: step.findings,
+  status: step.status,
+  actions: step.actions,
+  step_conclusion: step.step_conclusion,
+})), null, 2)}
+
+Vorige running context:
+Nog geen checkpoint-context beschikbaar.`,
+  });
+  const parsed = parseCheckpointOutput(checkpointStep.output);
+  return { checkpointStep, success: parsed.success };
+}
+
 async function finalizeChannelMonthlySynthesis(opts: {
   supabase: SupabaseClient;
   adapter: ChannelAdapter;
@@ -890,8 +974,13 @@ async function finalizeChannelMonthlySynthesis(opts: {
   curatedFindings: NormalizedFinding[];
   curatedClusters: IssueCluster[];
   conclusionText: string;
+  // F5 fase1.2/1.3: Meta/LinkedIn geven nu hun echte per-stap validaties en checkpoint-aantal
+  // door i.p.v. de eerdere hardcoded [] / 0 -- de acceptance-check en quality-gate hadden
+  // voor deze twee kanalen structureel geen tanden.
+  stepValidations?: StepValidationResult[];
+  checkpointsRun?: number;
 }) {
-  const { supabase, adapter, clientId, periodStart, periodEnd, analysisDate, parsedSteps, allSteps, canonical, curatedFindings, curatedClusters, conclusionText } = opts;
+  const { supabase, adapter, clientId, periodStart, periodEnd, analysisDate, parsedSteps, allSteps, canonical, curatedFindings, curatedClusters, conclusionText, stepValidations = [], checkpointsRun = 0 } = opts;
   const model = allSteps[0]?.model ?? "unknown";
   const enforcedCoverage = enforceSopCoverage(curatedClusters, {});
   const structured = buildStructuredMonthlyOutput({
@@ -911,16 +1000,18 @@ async function finalizeChannelMonthlySynthesis(opts: {
   });
   const acceptanceReport = validateMonthlyAcceptance({
     stepCount: adapter.stepCount,
+    expectedStepNumbers: adapter.expectedStepNumbers,
+    expectedCheckpointCount: adapter.expectedCheckpointCount ?? 0,
     narrativeSteps,
     recommendations: structured.recommendations,
     tasks: structured.tasks,
     finalSop: { recommendations: structured.final_sop.recommendations, tasks: structured.final_sop.tasks },
     coverage: structured.coverage,
     findings: curatedFindings,
-    checkpointsRun: 0,
-    stepValidations: [],
+    checkpointsRun,
+    stepValidations,
   });
-  const qualityGate = buildMonthlyQualityGate({ stepValidations: [], acceptance: acceptanceReport });
+  const qualityGate = buildMonthlyQualityGate({ stepValidations, acceptance: acceptanceReport });
 
   const save = (section: string, output: string) => saveAnalysisOutputSection({
     supabase,
@@ -931,7 +1022,7 @@ async function finalizeChannelMonthlySynthesis(opts: {
     analysis_date: analysisDate,
     passed: qualityGate.passed, state: qualityGate.state,
     invalid_steps: qualityGate.invalid_steps, blocking_reasons: qualityGate.blocking_reasons,
-    acceptance: acceptanceReport, step_validations: [],
+    acceptance: acceptanceReport, step_validations: stepValidations,
     candidate_counts: { findings: canonical.findings.length, curated_findings: curatedFindings.length, recommendations: structured.recommendations.length, tasks: structured.tasks.length, threads: structured.threads.length },
   }));
   await save("full", sanitizeOutput(structured.deliverable_markdown));
@@ -1018,6 +1109,8 @@ async function runMetaMonthlyAnalysis(
   const parsedSteps: ParsedStepOutput[] = [];
   const allSteps: StepResult[] = [];
   const conclusions: string[] = [];
+  const metaStepValidations: StepValidationResult[] = [];
+  let metaRepairCount = 0;
   const analysisDate = today();
 
   for (let stepNumber = 1; stepNumber <= adapter.stepCount; stepNumber++) {
@@ -1027,6 +1120,31 @@ async function runMetaMonthlyAnalysis(
       phaseKey: `run_step_${stepNumber}`,
       message: `Stap ${stepNumber} uitvoeren: ${stepName}...`,
     });
+    // F5 fase1.4: hard-skip op het bestaande available:false-signaal uit prepared-facts.ts --
+    // geen LLM-call meer op een lege datatabel.
+    const metaAvailability = isChannelStepFactsUnavailable(stepFacts[stepNumber]);
+    if (metaAvailability.unavailable) {
+      const fallback = buildStepNoDataFallback({
+        stepNumber, stepName,
+        narrative: metaAvailability.note,
+        logEntry: metaAvailability.note,
+        actionText: `Controleer databeschikbaarheid voor ${stepName}`,
+        actionImpact: `Maakt ${stepName} in de volgende cyclus weer mogelijk.`,
+        stepConclusion: `${stepName} niet uitvoerbaar: ${metaAvailability.note}`,
+      });
+      const fallbackOutput = JSON.stringify({
+        narrative: fallback.narrative, log_entries: fallback.log_entries, top_3_findings: fallback.findings,
+        status: fallback.status, actions: fallback.actions, step_conclusion: fallback.step_conclusion,
+      }, null, 2);
+      allSteps.push({ stepNumber, stepName, output: fallbackOutput, model: "runtime-fallback", tokensUsed: 0, saved: true, latencyMs: 0, retries: 0 });
+      parsedSteps.push(fallback);
+      if (fallback.step_conclusion) conclusions.push(fallback.step_conclusion);
+      await saveAnalysisOutputSection({
+        supabase,
+        row: { client_id: clientId, sop_type: adapter.sopTypeKey, analysis_date: analysisDate, period_start: periodStart, period_end: periodEnd, section: stepName, output: fallbackOutput, model_used: "runtime-fallback", tokens_used: 0, step_number: stepNumber, step_name: stepName },
+      });
+      continue;
+    }
     const systemPrompt = buildMonthlyStepPrompt(
       goalsSection,
       accountType,
@@ -1037,10 +1155,9 @@ async function runMetaMonthlyAnalysis(
     );
     const userMessage = buildMetaStepMessage(stepNumber, stepFacts[stepNumber], clientId)
       + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "");
-    const step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
-    allSteps.push(step);
+    let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
     const priorStepConclusion = conclusions.at(-1);
-    const { parsed } = parseStructuredStepOutput(
+    let { parsed, validation } = parseStructuredStepOutput(
       step,
       priorStepConclusion,
       undefined,
@@ -1048,7 +1165,30 @@ async function runMetaMonthlyAnalysis(
       undefined,
       { purityRules: adapter.purityRules, logFormatSkeletons: adapter.logFormatSkeletons }
     );
+    // F5 fase1.2: zelfde repair-retry als Google en LinkedIn.
+    if (shouldRepairStep(validation, metaRepairCount > 5)) {
+      metaRepairCount++;
+      const repairMessage = buildStepRepairUserMessage(userMessage, validation, conclusions.slice(-2).join("\n\n"));
+      const repairedStep = await runStep({ ...shared, stepNumber, stepName, jsonMode: true, systemPrompt, userMessage: repairMessage });
+      const repairedParse = parseStructuredStepOutput(
+        repairedStep, priorStepConclusion, undefined, canonicalMetricMap, undefined,
+        { purityRules: adapter.purityRules, logFormatSkeletons: adapter.logFormatSkeletons }
+      );
+      const best = pickBetterStepAttempt(
+        { step, parsed, validation },
+        { step: repairedStep, parsed: repairedParse.parsed, validation: repairedParse.validation }
+      );
+      step = best.step;
+      parsed = best.parsed;
+      validation = best.validation;
+      step.retries = (step.retries ?? 0) + 1;
+    }
+    allSteps.push(step);
     parsedSteps.push(parsed);
+    metaStepValidations.push(validation);
+    if (!validation.valid || validation.warnings.length > 0) {
+      logger.warn(`[meta-monthly] Step ${stepNumber} validation`, validation);
+    }
     if (parsed.step_conclusion) conclusions.push(parsed.step_conclusion);
     await saveAnalysisOutputSection({
       supabase,
@@ -1068,6 +1208,11 @@ async function runMetaMonthlyAnalysis(
     });
   }
 
+  // F5 fase1.3: één consolidatie-checkpoint over alle 11 stap-outputs, vlak vóór de synthese.
+  const metaCheckpoint = await runChannelCheckpoint({ shared, name: "Checkpoint Meta", clusterSteps: parsedSteps });
+  allSteps.push(metaCheckpoint.checkpointStep);
+  const metaCheckpointsRun = metaCheckpoint.success ? 1 : 0;
+
   const rawStepFindings = parsedSteps.flatMap((step) => step.findings);
   const canonical = canonicalizeFindings(rawStepFindings, {}, {
     entityAliases: adapter.entityAliases,
@@ -1081,6 +1226,8 @@ async function runMetaMonthlyAnalysis(
     supabase, adapter, clientId, periodStart, periodEnd, analysisDate,
     parsedSteps, allSteps, canonical, curatedFindings, curatedClusters,
     conclusionText: conclusions.slice(-1)[0] ?? conclusions.join("\n\n"),
+    stepValidations: metaStepValidations,
+    checkpointsRun: metaCheckpointsRun,
   });
 
   return Response.json({
@@ -1153,6 +1300,8 @@ async function runLinkedinMonthlyAnalysis(
   const parsedSteps: ParsedStepOutput[] = [];
   const allSteps: StepResult[] = [];
   const conclusions: string[] = [];
+  const linkedinStepValidations: StepValidationResult[] = [];
+  let linkedinRepairCount = 0;
   const analysisDate = today();
 
   for (let stepNumber = 1; stepNumber <= adapter.stepCount; stepNumber++) {
@@ -1162,6 +1311,30 @@ async function runLinkedinMonthlyAnalysis(
       phaseKey: `run_step_${stepNumber}`,
       message: `Stap ${stepNumber} uitvoeren: ${stepName}...`,
     });
+    // F5 fase1.4: hard-skip op het bestaande available:false-signaal uit prepared-facts.ts.
+    const linkedinAvailability = isChannelStepFactsUnavailable(stepFacts[stepNumber]);
+    if (linkedinAvailability.unavailable) {
+      const fallback = buildStepNoDataFallback({
+        stepNumber, stepName,
+        narrative: linkedinAvailability.note,
+        logEntry: linkedinAvailability.note,
+        actionText: `Controleer databeschikbaarheid voor ${stepName}`,
+        actionImpact: `Maakt ${stepName} in de volgende cyclus weer mogelijk.`,
+        stepConclusion: `${stepName} niet uitvoerbaar: ${linkedinAvailability.note}`,
+      });
+      const fallbackOutput = JSON.stringify({
+        narrative: fallback.narrative, log_entries: fallback.log_entries, top_3_findings: fallback.findings,
+        status: fallback.status, actions: fallback.actions, step_conclusion: fallback.step_conclusion,
+      }, null, 2);
+      allSteps.push({ stepNumber, stepName, output: fallbackOutput, model: "runtime-fallback", tokensUsed: 0, saved: true, latencyMs: 0, retries: 0 });
+      parsedSteps.push(fallback);
+      if (fallback.step_conclusion) conclusions.push(fallback.step_conclusion);
+      await saveAnalysisOutputSection({
+        supabase,
+        row: { client_id: clientId, sop_type: adapter.sopTypeKey, analysis_date: analysisDate, period_start: periodStart, period_end: periodEnd, section: stepName, output: fallbackOutput, model_used: "runtime-fallback", tokens_used: 0, step_number: stepNumber, step_name: stepName },
+      });
+      continue;
+    }
     const systemPrompt = buildMonthlyStepPrompt(
       goalsSection,
       accountType,
@@ -1172,10 +1345,9 @@ async function runLinkedinMonthlyAnalysis(
     );
     const userMessage = buildLinkedinStepMessage(stepNumber, stepFacts[stepNumber], clientId)
       + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "");
-    const step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
-    allSteps.push(step);
+    let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
     const priorStepConclusion = conclusions.at(-1);
-    const { parsed } = parseStructuredStepOutput(
+    let { parsed, validation } = parseStructuredStepOutput(
       step,
       priorStepConclusion,
       undefined,
@@ -1183,7 +1355,32 @@ async function runLinkedinMonthlyAnalysis(
       undefined,
       { purityRules: adapter.purityRules, logFormatSkeletons: adapter.logFormatSkeletons }
     );
+    // F5 fase1.2: het validatieresultaat werd hier eerder berekend en meteen weggegooid -- geen
+    // repair-poging bij een slechte stap, in tegenstelling tot Google's pad. Zelfde repair-retry
+    // als Google nu ook hier.
+    if (shouldRepairStep(validation, linkedinRepairCount > 5)) {
+      linkedinRepairCount++;
+      const repairMessage = buildStepRepairUserMessage(userMessage, validation, conclusions.slice(-2).join("\n\n"));
+      const repairedStep = await runStep({ ...shared, stepNumber, stepName, jsonMode: true, systemPrompt, userMessage: repairMessage });
+      const repairedParse = parseStructuredStepOutput(
+        repairedStep, priorStepConclusion, undefined, canonicalMetricMap, undefined,
+        { purityRules: adapter.purityRules, logFormatSkeletons: adapter.logFormatSkeletons }
+      );
+      const best = pickBetterStepAttempt(
+        { step, parsed, validation },
+        { step: repairedStep, parsed: repairedParse.parsed, validation: repairedParse.validation }
+      );
+      step = best.step;
+      parsed = best.parsed;
+      validation = best.validation;
+      step.retries = (step.retries ?? 0) + 1;
+    }
+    allSteps.push(step);
     parsedSteps.push(parsed);
+    linkedinStepValidations.push(validation);
+    if (!validation.valid || validation.warnings.length > 0) {
+      logger.warn(`[linkedin-monthly] Step ${stepNumber} validation`, validation);
+    }
     if (parsed.step_conclusion) conclusions.push(parsed.step_conclusion);
     await saveAnalysisOutputSection({
       supabase,
@@ -1203,6 +1400,11 @@ async function runLinkedinMonthlyAnalysis(
     });
   }
 
+  // F5 fase1.3: één consolidatie-checkpoint over alle 9 stap-outputs, vlak vóór de synthese.
+  const linkedinCheckpoint = await runChannelCheckpoint({ shared, name: "Checkpoint LinkedIn", clusterSteps: parsedSteps });
+  allSteps.push(linkedinCheckpoint.checkpointStep);
+  const linkedinCheckpointsRun = linkedinCheckpoint.success ? 1 : 0;
+
   const rawStepFindings = parsedSteps.flatMap((step) => step.findings);
   const canonical = canonicalizeFindings(rawStepFindings, {}, {
     entityAliases: adapter.entityAliases,
@@ -1216,6 +1418,8 @@ async function runLinkedinMonthlyAnalysis(
     supabase, adapter, clientId, periodStart, periodEnd, analysisDate,
     parsedSteps, allSteps, canonical, curatedFindings, curatedClusters,
     conclusionText: conclusions.slice(-1)[0] ?? conclusions.join("\n\n"),
+    stepValidations: linkedinStepValidations,
+    checkpointsRun: linkedinCheckpointsRun,
   });
 
   return Response.json({
@@ -1998,11 +2202,52 @@ ${runningContext}`,
       return step;
     };
 
+    // F4 fase1: registreert een no-data-fallback zonder LLM-call, met exact dezelfde
+    // bijwerkingen (opslag + steps/parsedSteps/conclusions) als een echte stap-run.
+    const pushNoDataFallbackStep = async (fallback: ParsedStepOutput): Promise<void> => {
+      const output = JSON.stringify({
+        narrative: fallback.narrative,
+        log_entries: fallback.log_entries,
+        top_3_findings: fallback.findings,
+        status: fallback.status,
+        actions: fallback.actions,
+        step_conclusion: fallback.step_conclusion,
+      }, null, 2);
+      await saveAnalysisOutputSection({
+        supabase,
+        row: {
+          client_id: clientId,
+          sop_type: adapter.sopTypeKey,
+          analysis_date: today(),
+          period_start: periodStart,
+          period_end: periodEnd,
+          section: fallback.stepName,
+          output,
+          model_used: "runtime-fallback",
+          tokens_used: 0,
+          step_number: fallback.stepNumber,
+          step_name: fallback.stepName,
+        },
+      });
+      steps.push({
+        stepNumber: fallback.stepNumber,
+        stepName: fallback.stepName,
+        output,
+        model: "runtime-fallback",
+        tokensUsed: 0,
+        saved: true,
+        latencyMs: 0,
+        retries: 0,
+      });
+      parsedSteps.push(fallback);
+      conclusions.push(fallback.step_conclusion);
+    };
+
     const runSplitSearchTermStep = async (baseInstruction: string) => {
       await updateProgressPhase(supabase, {
         jobId,
         phaseKey: "run_step_7a",
-        message: "Stap 7A uitvoeren: Search Term Classification...",
+        message: "Stap 7A uitvoeren: Demand & Search Classification (Auction, Keyword, Search Term)...",
       });
 
       const uniqueTermRows = (rows: AssessedSearchTermRow[]): AssessedSearchTermRow[] => {
@@ -2120,7 +2365,7 @@ ${runningContext}`,
       await updateProgressPhase(supabase, {
         jobId,
         phaseKey: "run_step_7b",
-        message: "Stap 7B uitvoeren: Search Term Actions & Savings...",
+        message: "Stap 7B uitvoeren: Demand & Search Actions & Savings...",
       });
 
       const step7b = await runStep({
@@ -2169,7 +2414,7 @@ ${runningContext}`,
         parsed7b.findings = applyStep5FindingTruth(parsed7b.findings, step5TruthMap);
       }
 
-      const mergedParsed = mergeParsedStepOutputs([parsed7a, parsed7b], 7, "Search Term Performance");
+      const mergedParsed = mergeParsedStepOutputs([parsed7a, parsed7b], 7, "Demand & Search Intelligence");
       const mergedValidation = validateStepOutput(7, {
         narrative: mergedParsed.narrative,
         log_entries: mergedParsed.log_entries,
@@ -2196,18 +2441,18 @@ ${runningContext}`,
           analysis_date: today(),
           period_start: periodStart,
           period_end: periodEnd,
-          section: "Search Term Performance",
+          section: "Demand & Search Intelligence",
           output: mergedStepOutput,
           model_used: step7b.model,
           tokens_used: step7a.tokensUsed + step7b.tokensUsed,
           step_number: 7,
-          step_name: "Search Term Performance",
+          step_name: "Demand & Search Intelligence",
         },
       });
 
       const mergedStep: StepResult = {
         stepNumber: 7,
-        stepName: "Search Term Performance",
+        stepName: "Demand & Search Intelligence",
         output: mergedStepOutput,
         model: step7b.model,
         tokensUsed: step7a.tokensUsed + step7b.tokensUsed,
@@ -2235,19 +2480,13 @@ ${runningContext}`,
       analysisYear
     );
 
-    await runNarrativeStep(1, "Account Performance", `Analyseer de account performance voor client "${clientId}".
-De analyse draait op de laatste volledige maand (${["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"][lastCompleteMonth - 1]} ${analysisYear}).${enrichment.strategicContext}${targetText}${dimAvailText}
-
-${reliabilityText}${ga4ContextText}
-
-${comparisonFactsText}
-
-${preparedContext?.binding_facts_text || ""}
-
-${preparedContext?.kpi_chain_text || ""}
-
-Gebruik de voorberekende keten en bindende actierichtingen als basis. Reken de account-keten niet opnieuw uit.${accountYoySection}${enrichment.sectorBenchmarks}${enrichment.leadingIndicators}${enrichment.changeHistory}${enrichment.geoContext}`);
-
+    // F4 fase2: oude stap 1 (Account) + 2 (Campagne) + 3 (Ad Group) lopen nu in ÉÉN call
+    // ("Macro & Portfolio Performance"). De ad-group-selectie liep voorheen via tekstmatching
+    // tegen de output van stap 2 (`steps[1]?.output.includes(name)`) -- fragiel, en sowieso niet
+    // meer mogelijk nu er geen aparte stap-2-output meer is om tegen te matchen. Vervangen door
+    // een deterministische selectie op dezelfde voorberekende MoM-feiten die de campagnesectie
+    // toch al gebruikt: significant = boven/onder het accountgemiddelde, of >20% MoM-beweging op
+    // spend/conversies (zelfde 20%-significantiedrempel als elders in de SOP).
     const allCampaignNames = campaignData.length > 0
       ? [...new Set(campaignData.map((c: Record<string, unknown>) => c.campaign_name as string))]
       : [
@@ -2256,26 +2495,25 @@ Gebruik de voorberekende keten en bindende actierichtingen als basis. Reken de a
             ...(preparedContext?.comparison_facts_campaigns ?? []).map((item) => item.campaignName),
           ]),
         ];
-    await runNarrativeStep(2, "Campaign Performance", `Analyseer de campagne performance voor client "${clientId}".${enrichment.strategicContext}
-
-${preparedContext?.binding_facts_text || ""}
-
-${preparedContext?.campaign_table_text || campaignMomText}
-
-Gebruik de voorberekende campagne-vergelijkingen als bindende feiten. Herbereken MoM-verschillen niet.${campaignMetaText}${campaignYoySection}${enrichment.portfolioAnalysis}${enrichment.pmaxContext}${enrichment.sectorBenchmarks}${enrichment.changeHistory}`);
-
-    const mentionedCampaigns = allCampaignNames.filter((name) => steps[1]?.output.includes(name));
+    const campaignComparisonFacts = computeCampaignComparisonFacts({
+      campaignData: campaignData as Array<{ campaign_name: string; month: string; impressions: number; clicks: number; cost: number; conversions: number; conversions_value: number }>,
+      lastCompleteMonth,
+      analysisYear,
+      accountType,
+      kpiTargets: {},
+    });
+    const significantCampaigns = campaignComparisonFacts
+      .filter((fact) => fact.vsAccount !== "gelijk" || Math.abs(fact.spendMomPct) > 20 || Math.abs(fact.conversionsMomPct) > 20)
+      .map((fact) => fact.campaignName);
+    const mentionedCampaigns = significantCampaigns.length > 0 ? significantCampaigns : allCampaignNames;
     const adgroupAggregation = aggregateAdGroups(adgroupData as never[], mentionedCampaigns);
     const adgroupMomText = computeAdGroupMomFacts(
       adgroupData as Array<{ ad_group_name: string; campaign_name: string; month: string; cost: number; conversions: number; conversions_value: number; clicks: number; impressions: number }>,
       lastCompleteMonth,
       analysisYear
     );
-    await runNarrativeStep(3, "Ad Group Performance", adgroupAggregation.ad_group_details.length > 0
-      ? `Analyseer de ad group performance voor client "${clientId}".
-Data is pre-geaggregeerd: ${adgroupAggregation.ad_group_details.length} ad groups over ${mentionedCampaigns.length} campagnes.
-
-${preparedContext?.campaign_table_text || ""}
+    const adgroupSection = adgroupAggregation.ad_group_details.length > 0
+      ? `## NIVEAU 3 DATA — Ad Groups (pre-geaggregeerd: ${adgroupAggregation.ad_group_details.length} ad groups over ${mentionedCampaigns.length} campagnes)
 
 ${adgroupMomText}
 
@@ -2292,31 +2530,31 @@ ${toPromptTable(adgroupAggregation.ad_group_details)}
 Lees \`null\` als "niet te meten", niet als nul. Een CPA is \`null\` wanneer er geen conversies
 waren — dat is geen goedkope CPA. Een trend is \`null\` wanneer er geen vergelijkbare vorige
 periode is. Advertentiegroepen met \`active_last_3m: false\` lagen stil: die zijn geen
-underperformer, daar valt niets over te zeggen. Baseer geen aanbeveling op een \`null\`.${enrichment.changeHistory}`
-      : `Er is geen ad group data beschikbaar voor client "${clientId}". Benoem expliciet dat deze stap data-arm is en welke verklaring hierdoor open blijft.`);
-    await runCheckpoint("Checkpoint A", [1, 2, 3]);
+underperformer, daar valt niets over te zeggen. Baseer geen aanbeveling op een \`null\`.`
+      : `## NIVEAU 3 DATA — Ad Groups\n\nGeen ad group data beschikbaar voor deze periode. Volg de instructie voor het ontbrekende Niveau 3 hierboven.`;
 
-    await runNarrativeStep(4, "Competitor & Auction Insights", isData.length > 0
-      ? `Analyseer de impression share data voor client "${clientId}".
+    await runNarrativeStep(1, "Macro & Portfolio Performance", `Analyseer de macro- en portfolio-performance (account, campagnes en ad groups) voor client "${clientId}".
+De analyse draait op de laatste volledige maand (${["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"][lastCompleteMonth - 1]} ${analysisYear}).${enrichment.strategicContext}${targetText}${dimAvailText}
+
+## NIVEAU 1 DATA — Account
+
+${reliabilityText}${ga4ContextText}
+
+${comparisonFactsText}
 
 ${preparedContext?.binding_facts_text || ""}
 
-${preparedContext?.campaign_table_text || ""}
+${preparedContext?.kpi_chain_text || ""}
 
-## Campaign Impression Share (laatste 6 maanden)
-\`\`\`
-${toPromptTable(isData)}
-\`\`\`${enrichment.changeHistory}`
-      : `Er is geen impression share data beschikbaar voor client "${clientId}". Noteer welke hypothese hierdoor onbewezen blijft.`);
+Gebruik de voorberekende keten en bindende actierichtingen als basis. Reken de account-keten niet opnieuw uit.${accountYoySection}${enrichment.sectorBenchmarks}${enrichment.leadingIndicators}${enrichment.changeHistory}${enrichment.geoContext}
 
-    await runNarrativeStep(5, "Keyword Performance", keywordData.length > 0
-      ? `Analyseer de keyword performance voor client "${clientId}".
+## NIVEAU 2 DATA — Campagnes
 
-## Keyword Performance (laatste 3 maanden)
-\`\`\`
-${toPromptTable(keywordData)}
-\`\`\`${enrichment.changeHistory}`
-      : `Er is geen keyword performance data beschikbaar voor client "${clientId}". Benoem expliciet dat werkwijze A/B/C hierdoor beperkt is.`);
+${preparedContext?.campaign_table_text || campaignMomText}
+
+Gebruik de voorberekende campagne-vergelijkingen als bindende feiten. Herbereken MoM-verschillen niet.${campaignMetaText}${campaignYoySection}${enrichment.portfolioAnalysis}${enrichment.pmaxContext}
+
+${adgroupSection}`);
 
     const hasProductDataForStep6 = (stepAvailabilityByStep.get(6)?.dimensions ?? []).some((dimension) => dimension.available);
     if (!hasProductDataForStep6) {
@@ -2379,126 +2617,141 @@ ${toPromptTable(productData)}
 \`\`\``);
     }
 
-    if (searchData.length > 0) {
-      await runSplitSearchTermStep(`Analyseer de wasteful search terms voor client "${clientId}".
+    // F4 fase3: stap 7 ("Demand & Search Intelligence") bundelt oud 4 (Auction) + 5 (Keyword) +
+    // 7 (Search Term). De split-mechaniek (71 diagnose, 72 acties) blijft ongewijzigd en draait
+    // nu altijd zodra minstens één van de drie vraag-niveaus data heeft; alleen als alle drie
+    // leeg zijn is er een harde skip (zelfde patroon als stap 3/9/6). Checkpoint B vervalt --
+    // zijn consolidatiewerk (over precies deze vier oude stappen) zit nu al in stap 7 zelf, op
+    // dezelfde manier als Checkpoint A verviel na het bundelen van stap 1-3.
+    if (isData.length === 0 && keywordData.length === 0 && searchData.length === 0) {
+      await pushNoDataFallbackStep(buildStepNoDataFallback({
+        stepNumber: 7,
+        stepName: "Demand & Search Intelligence",
+        narrative: "Geen impression share-, keyword- of search term-data beschikbaar. Vraag-diagnose (auction, keyword, search term) kan deze cyclus niet worden uitgevoerd.",
+        logEntry: "Auction/keyword/search term data niet beschikbaar.",
+        actionText: "Controleer impression-share-, keyword- en search-term-rapportage/sync in Google Ads",
+        actionImpact: "Maakt vraag-diagnose in de volgende cyclus weer mogelijk.",
+        stepConclusion: "Demand & Search Intelligence niet uitvoerbaar door ontbrekende data.",
+      }));
+    } else {
+      const auctionSection = isData.length > 0
+        ? `## NIVEAU A1 DATA — Auction & Impression Share
+
+${preparedContext?.binding_facts_text || ""}
+
+${preparedContext?.campaign_table_text || ""}
+
+## Campaign Impression Share (laatste 6 maanden)
+\`\`\`
+${toPromptTable(isData)}
+\`\`\`${enrichment.changeHistory}`
+        : `## NIVEAU A1 DATA — Auction & Impression Share\n\nGeen impression share data beschikbaar. Volg de instructie voor het ontbrekende Niveau A1 hierboven.`;
+      const keywordSection = keywordData.length > 0
+        ? `## NIVEAU A2 DATA — Keyword Performance
+
+## Keyword Performance (laatste 3 maanden)
+\`\`\`
+${toPromptTable(keywordData)}
+\`\`\``
+        : `## NIVEAU A2 DATA — Keyword Performance\n\nGeen keyword performance data beschikbaar. Volg de instructie voor het ontbrekende Niveau A2 hierboven.`;
+      const searchTermSection = searchData.length > 0
+        ? `## NIVEAU A3 DATA — Search Terms
 
 ## Wasteful Search Terms (top 30 op cost, 0 conversies)
 \`\`\`
 ${toPromptTable(searchData)}
-\`\`\`${enrichment.changeHistory}`);
-    } else {
-      await runNarrativeStep(7, "Search Term Performance", `Er zijn geen wasteful search terms gevonden voor client "${clientId}". Noteer dit als potentieel positief signaal, maar benoem ook dat de afwezigheid van wasteful termen geen bewijs is dat routing goed staat.`);
-    }
-    await runCheckpoint("Checkpoint B", [4, 5, 6, 7]);
+\`\`\``
+        : `## NIVEAU A3 DATA — Search Terms\n\nEr zijn geen wasteful search terms gevonden. Noteer dit als potentieel positief signaal, maar benoem ook dat de afwezigheid van wasteful termen geen bewijs is dat routing goed staat.`;
 
-    await runNarrativeStep(8, "Creative Performance", creativeData.length > 0
-      ? `Analyseer de creative performance voor client "${clientId}".
+      await runSplitSearchTermStep(`Analyseer de vraag- en zoektermdiagnose (auction insights, keyword performance en search terms) voor client "${clientId}".
+
+${auctionSection}
+
+${keywordSection}
+
+${searchTermSection}`);
+    }
+
+    if (creativeData.length === 0) {
+      await pushNoDataFallbackStep(buildStepNoDataFallback({
+        stepNumber: 8,
+        stepName: "Creative Performance",
+        narrative: "Geen creative performance data beschikbaar. Advertentietekst- en RSA-signalen kunnen deze cyclus niet worden gevalideerd.",
+        logEntry: "Creative performance data niet beschikbaar.",
+        actionText: "Controleer creative-rapportage/sync in Google Ads",
+        actionImpact: "Maakt creative-analyse in de volgende cyclus weer mogelijk.",
+        stepConclusion: "Creative-analyse niet uitvoerbaar door ontbrekende data.",
+      }));
+    } else {
+      await runNarrativeStep(8, "Creative Performance", `Analyseer de creative performance voor client "${clientId}".
 
 ## Creative Performance (laatste 3 maanden)
 \`\`\`
 ${toPromptTable(creativeData)}
-\`\`\``
-      : `Er is geen creative performance data beschikbaar voor client "${clientId}". Benoem dat creative-signalen niet gevalideerd kunnen worden.`);
+\`\`\``);
+    }
 
-    if (audienceData.length === 0) {
-      const audienceFallback: ParsedStepOutput = {
+    // F4 fase4: stap 9 ("Doelgroep- & Geosegmenten") bundelt oud 9 (Audience) + 11 (Geo) -- beide
+    // zijn "welke slice van mensen/waar" segmentanalyses met dezelfde analytische vorm (per
+    // segment ROAS/CPA/CVR/spend-share, alleen significante uitschieters). Harde skip alleen als
+    // BEIDE bronnen leeg zijn; is er van één van de twee wel data, dan draait de stap door met
+    // wat er is (zelfde "geen harde skip bij gedeeltelijke data"-patroon als stap 1 en 7).
+    const countryYoySectionEarly = countryYoyData.length > 0
+      ? `\n\n## Land YoY Vergelijking\n\`\`\`\n${toPromptTable(countryYoyData)}\n\`\`\``
+      : "";
+    if (audienceData.length === 0 && countryData.length === 0) {
+      await pushNoDataFallbackStep(buildStepNoDataFallback({
         stepNumber: 9,
-        stepName: "Audience Performance",
-        narrative: "Audience data niet beschikbaar. Aanbeveling: activeer observatie-modus voor In-market en Affinity segmenten in alle Search-campagnes.",
-        log_entries: ["Audience dimensies niet beschikbaar in de dataset."],
-        findings: [{
-          step: 9,
-          issue_cluster: "uncategorized",
-          entity_type: "account",
-          entity_name: "Account",
-          metric: "Data Availability",
-          current_value: null,
-          previous_value: null,
-          change_pct: null,
-          severity: "low",
-          insight_type: "risk",
-          is_seasonal: false,
-          is_structural: true,
-          cause: "Audience-segmenten niet geconfigureerd of niet beschikbaar.",
-          action_required: true,
-          evidence_level: "deterministic",
-          confidence: "high",
-          benchmark_type: undefined,
-        }],
-        status: "NIET OP SCHEMA",
-        actions: [{
-          actie: "Activeer observatie-modus voor In-market en Affinity doelgroepen in alle Search-campagnes",
-          campagne: "Alle Search campagnes",
-          deadline: "deze_week",
-          verwachte_impact: "Data-beschikbaarheid voor audience-analyse in de volgende cyclus",
-        }],
-        step_conclusion: "Audience analyse niet uitvoerbaar door ontbrekende data.",
-      };
-      const audienceFallbackOutput = JSON.stringify({
-        narrative: audienceFallback.narrative,
-        log_entries: audienceFallback.log_entries,
-        top_3_findings: audienceFallback.findings,
-        status: audienceFallback.status,
-        actions: audienceFallback.actions,
-        step_conclusion: audienceFallback.step_conclusion,
-      }, null, 2);
-      await saveAnalysisOutputSection({
-        supabase,
-        row: {
-          client_id: clientId,
-          sop_type: adapter.sopTypeKey,
-          analysis_date: today(),
-          period_start: periodStart,
-          period_end: periodEnd,
-          section: "Audience Performance",
-          output: audienceFallbackOutput,
-          model_used: "runtime-fallback",
-          tokens_used: 0,
-          step_number: 9,
-          step_name: "Audience Performance",
-        },
-      });
-      steps.push({
-        stepNumber: 9,
-        stepName: "Audience Performance",
-        output: audienceFallbackOutput,
-        model: "runtime-fallback",
-        tokensUsed: 0,
-        saved: true,
-        latencyMs: 0,
-        retries: 0,
-      });
-      parsedSteps.push(audienceFallback);
-      conclusions.push(audienceFallback.step_conclusion);
+        stepName: "Doelgroep- & Geosegmenten",
+        narrative: "Geen audience- of geografische data beschikbaar. Aanbeveling: activeer observatie-modus voor In-market en Affinity segmenten in alle Search-campagnes.",
+        logEntry: "Audience- en geo-dimensies niet beschikbaar in de dataset.",
+        actionText: "Activeer observatie-modus voor In-market en Affinity doelgroepen in alle Search-campagnes",
+        actionImpact: "Data-beschikbaarheid voor doelgroep- en geo-analyse in de volgende cyclus.",
+        stepConclusion: "Doelgroep- en geo-analyse niet uitvoerbaar door ontbrekende data.",
+      }));
     } else {
-      await runNarrativeStep(9, "Audience Performance", `Analyseer de audience performance voor client "${clientId}".
+      const audienceSection = audienceData.length > 0
+        ? `## NIVEAU 1 DATA — Audience
 
 ## Audience Performance (laatste 3 maanden)
 \`\`\`
 ${toPromptTable(audienceData)}
-\`\`\``);
-    }
-
-    await runNarrativeStep(10, "Device & Engagement Performance", deviceData.length > 0
-      ? `Analyseer de device performance voor client "${clientId}".
-
-## Device Performance (laatste 3 maanden)
-\`\`\`
-${toPromptTable(deviceData)}
 \`\`\``
-      : `Er is geen device performance data beschikbaar voor client "${clientId}". Benoem dat device-hypothesen hierdoor onbewezen blijven.`);
-
-    const countryYoySection = countryYoyData.length > 0
-      ? `\n\n## Land YoY Vergelijking\n\`\`\`\n${toPromptTable(countryYoyData)}\n\`\`\``
-      : "";
-    await runNarrativeStep(11, "Geografische Performance", countryData.length > 0
-      ? `Analyseer de geografische performance voor client "${clientId}".
+        : `## NIVEAU 1 DATA — Audience\n\nAudience data niet beschikbaar. Schrijf EXACT "Niveau 1 (Audience): data niet beschikbaar." en ga door naar Niveau 2.`;
+      const geoSection = countryData.length > 0
+        ? `## NIVEAU 2 DATA — Geografisch
 
 ## Land Performance (maandelijks, tot 6 maanden)
 \`\`\`
 ${toPromptTable(countryData)}
-\`\`\`${countryYoySection}`
-      : `Er is geen geografische performance data beschikbaar voor client "${clientId}". Benoem dat geo-allocatie hierdoor niet hard kan worden getoetst.`);
+\`\`\`${countryYoySectionEarly}`
+        : `## NIVEAU 2 DATA — Geografisch\n\nGeografische data niet beschikbaar. Schrijf EXACT "Niveau 2 (Geografisch): data niet beschikbaar." en ga door.`;
+
+      await runNarrativeStep(9, "Doelgroep- & Geosegmenten", `Analyseer de doelgroep- en geografische segmenten (audience en land/regio) voor client "${clientId}".
+
+${audienceSection}
+
+${geoSection}`);
+    }
+
+    if (deviceData.length === 0) {
+      await pushNoDataFallbackStep(buildStepNoDataFallback({
+        stepNumber: 10,
+        stepName: "Device & Engagement Performance",
+        narrative: "Geen device performance data beschikbaar. Device-hypotheses kunnen deze cyclus niet worden getoetst.",
+        logEntry: "Device performance data niet beschikbaar.",
+        actionText: "Controleer device-rapportage/sync in Google Ads",
+        actionImpact: "Maakt device-analyse in de volgende cyclus weer mogelijk.",
+        stepConclusion: "Device-analyse niet uitvoerbaar door ontbrekende data.",
+      }));
+    } else {
+      await runNarrativeStep(10, "Device & Engagement Performance", `Analyseer de device performance voor client "${clientId}".
+
+## Device Performance (laatste 3 maanden)
+\`\`\`
+${toPromptTable(deviceData)}
+\`\`\``);
+    }
 
     const networkSection = networkData.length > 0
       ? `\n\n## Network Performance (laatste 3 maanden)\n\`\`\`\n${toPromptTable(networkData)}\n\`\`\``
@@ -2512,7 +2765,7 @@ ${toPromptTable(countryData)}
     await runNarrativeStep(12, "Checkout, Schedule & Network Performance", `Analyseer checkout funnel, schedule en network performance voor client "${clientId}".${checkoutSection}${scheduleSection}${networkSection}
 
 ${buildStep12AvailabilityInstruction(stepAvailabilityByStep.get(12))}`);
-    await runCheckpoint("Checkpoint C", [8, 9, 10, 11, 12]);
+    await runCheckpoint("Checkpoint C", [8, 9, 10, 12]);
 
     await updateProgressPhase(supabase, {
       jobId,
@@ -2588,6 +2841,8 @@ ${conclusions.join("\n\n---\n\n")}`,
     const officialStepValidations = stepValidations.filter((validation) => validation.stepNumber >= 1 && validation.stepNumber <= 13);
     const acceptanceReport = validateMonthlyAcceptance({
       stepCount: adapter.stepCount,
+      expectedStepNumbers: adapter.expectedStepNumbers,
+      expectedCheckpointCount: adapter.expectedCheckpointCount,
       narrativeSteps: parsedSteps.map((step) => ({
         stepNumber: step.stepNumber,
         stepName: step.stepName,

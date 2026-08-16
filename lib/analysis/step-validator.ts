@@ -37,11 +37,14 @@ export interface StepPurityRule {
 }
 
 export const STEP_PURITY_RULES: Partial<Record<number, StepPurityRule>> = {
+  // F4 fase2: stap 1 bundelt oud 1 (account) + 2 (campagne) + 3 (ad group) -- toegestane
+  // entity-types en actiedomeinen zijn nu de unie van de drie oude regels; de forbidden-lijst
+  // (alles voorbij ad-group-niveau) blijft ongewijzigd.
   1: {
-    allowedEntityTypes: ["account", "campaign"],
-    allowedActionDomains: ["tracking", "budget", "campaign"],
+    allowedEntityTypes: ["account", "campaign", "adgroup"],
+    allowedActionDomains: ["tracking", "budget", "campaign", "adgroup"],
     forbiddenNarrativePatterns: [/zoekterm|keyword|feed|sku|creative|asset|audience|device|land|geo|network|schedule/i],
-    note: "Account status, target-gap en KPI-keten; geen diepe oorzaakclaims over latere domeinen.",
+    note: "Account → campagne → ad group waterfall; geen diepe oorzaakclaims over latere domeinen.",
   },
   2: {
     allowedEntityTypes: ["campaign", "account"],
@@ -73,11 +76,12 @@ export const STEP_PURITY_RULES: Partial<Record<number, StepPurityRule>> = {
     forbiddenNarrativePatterns: [/audience|device|land|geo|network|schedule|checkout/i],
     note: "Productmix, feed, assortiment en SKU-logica; geen audience/geo/network hoofdclaim.",
   },
+  // F4 fase3: unie van de oude regels 4 (auction), 5 (keyword) en 7 (search term).
   7: {
-    allowedEntityTypes: ["searchterm", "keyword", "campaign", "adgroup"],
-    allowedActionDomains: ["searchterm", "keyword", "campaign"],
-    forbiddenNarrativePatterns: [/creative|asset|audience|device|land|geo|network|schedule|checkout/i],
-    note: "Search term intent en routing; geen creative-, geo-, device- of network-hoofdclaim.",
+    allowedEntityTypes: ["searchterm", "keyword", "campaign", "adgroup", "account"],
+    allowedActionDomains: ["searchterm", "keyword", "campaign", "budget"],
+    forbiddenNarrativePatterns: [/feed|sku|creative|asset|audience|device|land|geo|network|schedule|checkout/i],
+    note: "Auction/impression share, keyword-kwaliteit en search term intent/routing; geen feed-, creative-, geo-, device- of network-hoofdclaim.",
   },
   8: {
     allowedEntityTypes: ["creative", "campaign", "adgroup"],
@@ -85,11 +89,13 @@ export const STEP_PURITY_RULES: Partial<Record<number, StepPurityRule>> = {
     forbiddenNarrativePatterns: [/zoekterm|keyword|feed|sku|audience|device|land|geo|network|schedule|checkout/i],
     note: "Creative en message mismatch; geen feed/search term/geo hoofdclaim.",
   },
+  // F4 fase4: unie van de oude regels 9 (audience) en 11 (geo) -- beide zijn nu toegestaan,
+  // dus "audience" en "land|geo" zijn uit de forbidden-lijst gehaald.
   9: {
-    allowedEntityTypes: ["audience", "campaign", "adgroup"],
-    allowedActionDomains: ["audience", "campaign"],
-    forbiddenNarrativePatterns: [/zoekterm|keyword|feed|sku|creative|asset|device|land|geo|network|schedule|checkout/i],
-    note: "Audience efficiency; geen geo/network/feed/search term hoofdclaim.",
+    allowedEntityTypes: ["audience", "campaign", "adgroup", "country", "account"],
+    allowedActionDomains: ["audience", "campaign", "geo", "budget"],
+    forbiddenNarrativePatterns: [/zoekterm|keyword|feed|sku|creative|asset|device|network|schedule|checkout/i],
+    note: "Audience- en geo-segmenten; geen network/feed/search term/creative hoofdclaim.",
   },
   10: {
     allowedEntityTypes: ["device", "campaign", "adgroup", "account"],
@@ -120,12 +126,21 @@ const ACTION_DOMAIN_PATTERNS: Array<[ActionDomain, RegExp]> = [
   ["searchterm", /zoekterm|search term|negative|uitsluit/i],
   ["product", /product|sku|merchant|feed|titel|image|prijs|verzend|asset group|productgroep/i],
   ["creative", /creative|asset|copy|rsa|beeld|headline|description/i],
-  ["audience", /audience|doelgroep|affinity|in-market|age|gender|income/i],
+  // Bugfix (gevonden tijdens F4 fase2 live-verificatie): "age" zonder woordgrens matchte
+  // elk Nederlands woord dat toevallig op "...age" eindigt (bv. "budgetlekkage", "engagement",
+  // "storage"), wat een vals-positieve audience-classificatie gaf voor acties die daar niets
+  // mee te maken hebben. Woordgrens toegevoegd; "age" als los woord (bv. Engelse leeftijds-
+  // bucket-labels als "Age 25-34") blijft gewoon matchen.
+  ["audience", /audience|doelgroep|affinity|in-market|\bage\b|gender|income/i],
   ["device", /device|desktop|mobile|tablet/i],
   ["geo", /geo|land|regio|duitsland|nederland|belgie|belgië|germany|netherlands|france/i],
   ["network", /network|youtube|search partners|partner/i],
   ["schedule", /schedule|uur|dagdeel|planning|weekday|weekdag/i],
-  ["checkout", /checkout|atc|add to cart|purchase|funnel/i],
+  // Bugfix (gevonden tijdens F4 fase3 live-verificatie): "atc" zonder woordgrens matchte het
+  // woord "match" (m-ATC-h) -- en "match type" komt continu voor in keyword/search-term-acties,
+  // wat een vals-positieve checkout-classificatie gaf. Woordgrens toegevoegd; de afkorting ATC
+  // (Add To Cart) blijft gewoon matchen als los woord/hoofdletters.
+  ["checkout", /checkout|\batc\b|add to cart|purchase|funnel/i],
   ["synthesis", /hypothese|sprint|executive|thread|samenvatting/i],
 ];
 
@@ -170,15 +185,20 @@ function isLowerBetterMetric(metric: string): boolean {
 // lib/prompts/monthly-v2.ts (niet verzonnen). Een log_entry die het format volgt matcht minstens
 // een van deze frasen. Stap 13 heeft geen format (synthese) en staat hier bewust niet in.
 export const LOG_FORMAT_SKELETONS: Record<number, RegExp[]> = {
-  1: [/is te verklaren door/i, /maand op maand/i],
+  // F4 fase2: stap 1 bundelt oud 1+2+3 -- de skeleton is de unie van de drie oude skeletons,
+  // want de gecombineerde output moet zinsdelen van alle drie niveaus bevatten.
+  1: [/is te verklaren door/i, /maand op maand/i, /dragen sterk bij aan/i, /breuklijn te identificeren/i, /presteert (boven|onder)gemiddeld/i],
   2: [/dragen sterk bij aan/i, /breuklijn te identificeren/i, /presteert (boven|onder)gemiddeld/i],
   3: [/dragen sterk bij aan/i, /breuklijn te identificeren/i, /presteert (boven|onder)gemiddeld/i],
   4: [/sinds de week van/i, /is sinds .{0,40}zichtbaar/i],
   5: [/geïdentificeerd als/i, /trend charts/i, /vertoningen/i],
   6: [/breuklijn te identificeren/i, /under-index/i, /over-index/i],
-  7: [/geïdentificeerd als/i, /spendeerde deze zoekterm/i],
+  // F4 fase3: stap 7 bundelt oud 4+5+7 -- unie van de drie oude skeletons ("geïdentificeerd
+  // als" komt in zowel 5 als 7 voor en telt maar één keer mee).
+  7: [/sinds de week van/i, /is sinds .{0,40}zichtbaar/i, /geïdentificeerd als/i, /trend charts/i, /vertoningen/i, /spendeerde deze zoekterm/i],
   8: [/presteert sinds tijdframe/i, /kijkende naar de asset/i],
-  9: [/presteert (boven|onder)gemiddeld/i, /trend zichtbaar/i],
+  // F4 fase4: stap 9 bundelt oud 9 (audience) + 11 (geo) -- skeleton is de unie.
+  9: [/presteert (boven|onder)gemiddeld/i, /trend zichtbaar/i, /(boven|onder)gemiddeld afgelopen maand/i, /waarneembaar sinds/i],
   10: [/presteerde afgelopen maand (boven|onder)gemiddeld/i, /bounce rate/i, /engagement rate/i],
   11: [/(boven|onder)gemiddeld afgelopen maand/i, /waarneembaar sinds/i],
   12: [/drop-off/i, /over de laatste 2 maanden/i, /blijft deze observatie in stand/i],

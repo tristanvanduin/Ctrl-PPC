@@ -16,6 +16,7 @@ import type { Finding } from "../schema/analysis-schema";
 import {
   buildCoverageDimensionAvailability,
   buildStep6NoDataFallback,
+  buildStepNoDataFallback,
   curateMonthlyStructuredFindings,
   salvageStructuredStepOutput,
   sanitizeStepActionText,
@@ -2112,6 +2113,48 @@ console.log("56. Executive recommendations stay on the primary PMAX surface in d
   assert(/conversie-effici[eë]ntie|CVR/i.test(structured.final_sop.primary_thread), `primary thread should still express the PMAX conversion problem, got "${structured.final_sop.primary_thread}"`);
   assert(structured.final_sop.recommendations.every((item) => /pmax_behandeling|PMAX_Behandeling/i.test(`${item.object} ${item.handeling}`)), "final executive recommendations should stay on the PMAX surface");
   assert(structured.final_sop.recommendations.every((item) => !/voorkeurshouding baby|connected_tv|rotterdam/i.test(item.handeling)), "narrow keyword or device tactics should not surface as executive recommendations");
+}
+
+console.log("57. Generic no-data fallback (F4 fase 1) stays validator-safe for every optional-dimension step");
+{
+  const cases: Array<{ stepNumber: number; stepName: string }> = [
+    { stepNumber: 3, stepName: "Ad Group Performance" },
+    { stepNumber: 4, stepName: "Competitor & Auction Insights" },
+    { stepNumber: 5, stepName: "Keyword Performance" },
+    { stepNumber: 8, stepName: "Creative Performance" },
+    { stepNumber: 10, stepName: "Device & Engagement Performance" },
+    { stepNumber: 11, stepName: "Geografische Performance" },
+  ];
+
+  for (const c of cases) {
+    const fallback = buildStepNoDataFallback({
+      stepNumber: c.stepNumber,
+      stepName: c.stepName,
+      narrative: "Geen data beschikbaar voor deze stap.",
+      logEntry: "Data niet beschikbaar.",
+      actionText: "Controleer de data-sync",
+      actionImpact: "Maakt de analyse in de volgende cyclus weer mogelijk.",
+      stepConclusion: "Analyse niet uitvoerbaar door ontbrekende data.",
+    });
+    const validation = validateStepOutput(c.stepNumber, {
+      narrative: fallback.narrative,
+      log_entries: fallback.log_entries,
+      top_3_findings: fallback.findings,
+      status: fallback.status,
+      actions: fallback.actions,
+      step_conclusion: fallback.step_conclusion,
+    }, "", {
+      availability: {
+        step: c.stepNumber,
+        dimensions: [{ name: c.stepName, available: false, rowCount: 0 }],
+        promptNote: `Let op: ${c.stepName} niet beschikbaar.`,
+      },
+    });
+
+    assert(validation.valid, `step ${c.stepNumber} no-data fallback should validate cleanly, got ${validation.errors.join("; ")}`);
+    assert(fallback.findings.length === 0, `step ${c.stepNumber} no-data fallback should not emit deterministic findings`);
+    assert(fallback.actions.length === 1, `step ${c.stepNumber} no-data fallback should carry exactly one remediation action`);
+  }
 }
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

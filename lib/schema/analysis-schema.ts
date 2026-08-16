@@ -131,6 +131,22 @@ export const IssueClusterEnum = z.enum([
   "attribution_gap",
   "demo_inefficiency",
   "budget_constraint",
+  // LinkedIn-specifieke clusters (L2), ontbraken hier -- gevonden via live verificatie tijdens
+  // F5 fase3: elke LinkedIn-finding met een van deze (correcte, uit LINKEDIN_ISSUE_CLUSTERS
+  // gekozen) clusters faalde stil op FindingSchema.safeParse en werd door het herstelpad
+  // weggegooid, precies de meest kanaal-eigen bevindingen. performance_winner, efficiency_gain,
+  // scaling_opportunity, volume_shortfall, uncategorized, creative_fatigue en creative_winner
+  // staan al hierboven en worden door Google/Meta/LinkedIn gedeeld.
+  "cpl_inflation",
+  "lead_quality_mismatch",
+  "icp_waste",
+  "audience_too_narrow",
+  "audience_saturation",
+  "form_dropoff",
+  "format_gap",
+  "budget_pacing_issue",
+  "bidding_inefficiency",
+  "audience_network_leakage",
 ]);
 export type IssueCluster = z.infer<typeof IssueClusterEnum>;
 
