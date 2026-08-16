@@ -9,16 +9,16 @@ function assert(condition: boolean, label: string): void {
 }
 
 const facts = { latest_month: "2026-03", target_gap: { status: "OP SCHEMA" }, pivots: [{ spendInIcpPct: 0.67 }] };
-const msg = buildLinkedinStepMessage(5, facts, "urn:li:sponsoredAccount:1");
+const msg = buildLinkedinStepMessage(4, facts, "urn:li:sponsoredAccount:1");
 
-assert(msg.includes("Demografie en ICP-fit"), "message bevat de stap-naam");
+assert(msg.includes("Doelgroep: ICP-fit & Verzadiging"), "message bevat de stap-naam");
 assert(msg.includes("urn:li:sponsoredAccount:1"), "message bevat de client");
-assert(msg.includes("stap 5"), "message benoemt het stapnummer");
+assert(msg.includes("stap 4"), "message benoemt het stapnummer");
 assert(/exacte.*getallen|reken/i.test(msg), "message instrueert met aangeleverde getallen te rekenen");
 assert(/leidt CPL/i.test(msg) && /niet ROAS/i.test(msg), "message benadrukt dat CPL leidt, niet ROAS");
 assert(msg.includes("2026-03") && msg.includes("OP SCHEMA") && msg.includes("0.67"), "message bevat de voorgerekende feiten");
 assert(linkedinStepName(1) === "Account Performance", "stapnaam 1 correct");
-assert(linkedinStepName(9) === "Hypotheses en Sprintplanning", "stapnaam 9 correct");
+assert(linkedinStepName(6) === "Hypotheses en Sprintplanning", "stapnaam 6 correct");
 assert(linkedinStepName(99).includes("99"), "onbekende stap valt terug op generieke naam");
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

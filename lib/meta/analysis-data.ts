@@ -5,7 +5,7 @@
 //      verifieren. De route roept buildMetaAnalysisData aan voor kanaal meta_ads.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildMetaStepFacts, type MetaBreakdownComputeRow, type MetaStepFacts } from "./prepared-facts";
+import { buildMetaStepFacts, type MetaBreakdownComputeRow, type MetaCreativePatternRow, type MetaStepFacts } from "./prepared-facts";
 import { buildMetaCanonicalMetricMap } from "./canonical-map";
 import type { MetaComputeRow } from "./prepared-compute";
 import type { CanonicalMetricMap } from "@/lib/analysis/claim-consistency";
@@ -40,9 +40,30 @@ export function mapMetaDailyToComputeRow(row: DbRow, name?: string): MetaCompute
     frequency: numOrNull(row.frequency),
     video_3s_views: numOrNull(row.video_3s_views),
     video_thruplays: numOrNull(row.video_thruplay),
+    // F5 fase2.1: nodig voor de gestandaardiseerde hold-rate-formule (video_p100/video_3s).
+    video_p100_views: numOrNull(row.video_p100),
     landing_page_views: numOrNull(row.landing_page_views),
     add_to_cart: numOrNull(row.add_to_cart),
     initiate_checkout: numOrNull(row.initiate_checkout),
+  };
+}
+
+// F5 fase2.4: een meta_creative_patterns-rij (al vooraf geaggregeerd door de meta-creatives
+// analyze/aggregate-pipeline) naar de vorm die buildMetaStepFacts verwacht.
+export function mapCreativePatternRow(row: DbRow): MetaCreativePatternRow {
+  return {
+    period_start: String(row.period_start ?? ""),
+    period_end: String(row.period_end ?? ""),
+    attribute: String(row.attribute ?? ""),
+    value: String(row.value ?? ""),
+    metric: String(row.metric ?? "") as MetaCreativePatternRow["metric"],
+    n_ads: num(row.n_ads),
+    impressions: num(row.impressions),
+    conversions: numOrNull(row.conversions),
+    pattern_value: num(row.pattern_value),
+    account_avg: num(row.account_avg),
+    lift_pct: num(row.lift_pct),
+    evidence_level: String(row.evidence_level ?? "") as MetaCreativePatternRow["evidence_level"],
   };
 }
 
@@ -87,6 +108,19 @@ export async function fetchDaily(supabase: SupabaseClient, clientId: string, tab
   return (data ?? []) as DbRow[];
 }
 
+// F5 fase2.4: patronen van periodes die uiterlijk op periodEnd zijn afgesloten (geen data uit de
+// toekomst t.o.v. deze analyse lekken), nieuwste periode eerst zodat de route makkelijk de
+// nieuwste groep kan selecteren.
+export async function fetchCreativePatterns(supabase: SupabaseClient, clientId: string, periodEnd: string): Promise<DbRow[]> {
+  const { data } = await supabase
+    .from("meta_creative_patterns")
+    .select("period_start, period_end, attribute, value, metric, n_ads, impressions, conversions, pattern_value, account_avg, lift_pct, evidence_level")
+    .eq("client_id", clientId)
+    .lte("period_end", periodEnd)
+    .order("period_start", { ascending: false });
+  return (data ?? []) as DbRow[];
+}
+
 export interface MetaAnalysisData {
   canonicalMetricMap: CanonicalMetricMap;
   stepFacts: MetaStepFacts;
@@ -109,12 +143,13 @@ export async function buildMetaAnalysisData(
     fetchNameMap(supabase, clientId, "meta_ads", "ad_id", "name"),
   ]);
 
-  const [accountRaw, campaignRaw, adsetRaw, adRaw, breakdownRaw] = await Promise.all([
+  const [accountRaw, campaignRaw, adsetRaw, adRaw, breakdownRaw, patternRaw] = await Promise.all([
     fetchDaily(supabase, clientId, "meta_account_daily", start, periodEnd),
     fetchDaily(supabase, clientId, "meta_campaign_daily", start, periodEnd),
     fetchDaily(supabase, clientId, "meta_adset_daily", start, periodEnd),
     fetchDaily(supabase, clientId, "meta_ad_daily", start, periodEnd),
     fetchDaily(supabase, clientId, "meta_breakdown_daily", start, periodEnd),
+    fetchCreativePatterns(supabase, clientId, periodEnd),
   ]);
 
   const account = accountRaw.map((r) => mapMetaDailyToComputeRow(r));
@@ -122,9 +157,15 @@ export async function buildMetaAnalysisData(
   const adsets = adsetRaw.map((r) => mapMetaDailyToComputeRow(r, adsetNames.get(String(r.entity_id ?? ""))));
   const ads = adRaw.map((r) => mapMetaDailyToComputeRow(r, adNames.get(String(r.entity_id ?? ""))));
   const breakdowns = breakdownRaw.map(mapMetaBreakdownToComputeRow);
+  // F5 fase2.4: alleen de nieuwste periode meenemen (patternRaw is al periodEnd-gefilterd en
+  // nieuwste-eerst gesorteerd), zodat step 5 niet meerdere periodes door elkaar aggregeert.
+  const newestPatternPeriod = patternRaw[0]?.period_start as string | undefined;
+  const creativePatterns = newestPatternPeriod
+    ? patternRaw.filter((r) => r.period_start === newestPatternPeriod).map(mapCreativePatternRow)
+    : [];
 
   const canonicalMetricMap = buildMetaCanonicalMetricMap(campaigns, account);
-  const stepFacts = buildMetaStepFacts({ account, campaigns, adsets, ads, breakdowns, targets });
+  const stepFacts = buildMetaStepFacts({ account, campaigns, adsets, ads, breakdowns, creativePatterns, targets });
 
   return { canonicalMetricMap, stepFacts };
 }

@@ -159,7 +159,10 @@ ${analysisOutput}`,
 
   // ── Apply deterministic action gating ────────────────────────────
 
-  recs = applyActionGating(findings, recs);
+  // F5 fase2.5: sopType draagt het kanaal al in de naam (meta_weekly, linkedin_biweekly, ...);
+  // alleen het kanaal-voorvoegsel is relevant voor kanaalspecifieke gating-regels.
+  const channel = sopType.startsWith("linkedin_") ? "linkedin_ads" : sopType.startsWith("meta_") ? "meta_ads" : "google_ads";
+  recs = applyActionGating(findings, recs, { channel });
 
   // W2.5 (W2): number-gate voor de korte cadans. Markeert en schrapt percentages en euro's in
   // aanbevelingen en taken die niet herleidbaar zijn tot de gegronde analyse-output. Alleen

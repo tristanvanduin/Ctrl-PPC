@@ -225,12 +225,14 @@ interface AdTotals {
   conversionValue: number;
   video3s: number;
   thruplay: number;
+  videoP100: number;
 }
 
 function metricValueOf(ad: AdTotals, metric: PatternMetric): number | null {
   if (metric === "link_ctr") return ad.impressions > 0 ? ad.linkClicks / ad.impressions : null;
   if (metric === "hook_rate") return ad.impressions > 0 ? ad.video3s / ad.impressions : null;
-  if (metric === "hold_rate") return ad.video3s > 0 ? ad.thruplay / ad.video3s : null;
+  // F5 fase2.1: gestandaardiseerd naar video_p100/video_3s (was thruplay/video_3s).
+  if (metric === "hold_rate") return ad.video3s > 0 ? ad.videoP100 / ad.video3s : null;
   if (metric === "cvr") return ad.linkClicks > 0 ? ad.conversions / ad.linkClicks : null;
   if (metric === "cpa") return ad.conversions > 0 ? ad.spend / ad.conversions : null;
   return ad.spend > 0 ? ad.conversionValue / ad.spend : null;
@@ -261,7 +263,7 @@ async function runAggregate(supabase: NonNullable<ReturnType<typeof getSupabase>
   for (const period of periods) {
     const { data: daily, error: dailyError } = await supabase
       .from("meta_ad_daily")
-      .select("entity_id, impressions, link_clicks, spend, conversions, conversion_value, video_3s_views, video_thruplay")
+      .select("entity_id, impressions, link_clicks, spend, conversions, conversion_value, video_3s_views, video_thruplay, video_p100")
       .eq("client_id", clientId)
       .gte("date", period.start)
       .lte("date", period.end);
@@ -273,7 +275,7 @@ async function runAggregate(supabase: NonNullable<ReturnType<typeof getSupabase>
     const totals = new Map<string, AdTotals>();
     for (const row of daily ?? []) {
       const adId = row.entity_id as string;
-      const t = totals.get(adId) ?? { adId, impressions: 0, linkClicks: 0, spend: 0, conversions: 0, conversionValue: 0, video3s: 0, thruplay: 0 };
+      const t = totals.get(adId) ?? { adId, impressions: 0, linkClicks: 0, spend: 0, conversions: 0, conversionValue: 0, video3s: 0, thruplay: 0, videoP100: 0 };
       t.impressions += Number(row.impressions ?? 0);
       t.linkClicks += Number(row.link_clicks ?? 0);
       t.spend += Number(row.spend ?? 0);
@@ -281,6 +283,7 @@ async function runAggregate(supabase: NonNullable<ReturnType<typeof getSupabase>
       t.conversionValue += Number(row.conversion_value ?? 0);
       t.video3s += Number(row.video_3s_views ?? 0);
       t.thruplay += Number(row.video_thruplay ?? 0);
+      t.videoP100 += Number(row.video_p100 ?? 0);
       totals.set(adId, t);
     }
 

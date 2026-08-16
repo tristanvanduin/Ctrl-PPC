@@ -1,7 +1,8 @@
 // Fixture-test voor de per-stap fact-assemblage (M2 data-laag). Deterministisch, geen IO.
+// F5 fase3: 6 pijlers (was 11 losse stappen). Zie lib/analysis/adapters/meta-ads.ts voor de mapping.
 // Draaien: npx tsx lib/meta/__meta_prepared_facts_test.ts
 
-import { buildMetaStepFacts, type MetaBreakdownComputeRow, type MetaPreparedInputs } from "./prepared-facts";
+import { buildMetaStepFacts, type MetaBreakdownComputeRow, type MetaCreativePatternRow, type MetaPreparedInputs } from "./prepared-facts";
 import type { MetaComputeRow } from "./prepared-compute";
 
 let passed = 0, failed = 0;
@@ -53,53 +54,118 @@ const breakdowns: MetaBreakdownComputeRow[] = [
 const inputs: MetaPreparedInputs = { account, campaigns, adsets, ads, breakdowns, targets: { roasTarget: 3 } };
 const facts = buildMetaStepFacts(inputs) as Record<number, any>;
 
-// 1. Alle 11 stappen aanwezig.
-eq(Object.keys(facts).length, 11, "facts heeft 11 stappen");
-for (let s = 1; s <= 11; s++) assert(facts[s] !== undefined, `stap ${s} aanwezig`);
+// 1. Alle 6 pijlers aanwezig.
+eq(Object.keys(facts).length, 6, "facts heeft 6 pijlers");
+for (let s = 1; s <= 6; s++) assert(facts[s] !== undefined, `pijler ${s} aanwezig`);
 
-// 2. Stap 1: laatste maand, MoM-keten en target-status.
-eq(facts[1].latest_month, "2026-03", "stap 1 laatste maand maart");
-eq(facts[1].previous_month, "2026-02", "stap 1 vorige maand februari");
+// 2. Pijler 1: laatste maand, MoM-keten en target-status.
+eq(facts[1].latest_month, "2026-03", "pijler 1 laatste maand maart");
+eq(facts[1].previous_month, "2026-02", "pijler 1 vorige maand februari");
 const convFact = facts[1].mom_chain.find((c: any) => c.metric === "Conversies");
-eq(convFact.delta_pct, -25, "stap 1: Conversies MoM -25%");
-eq(facts[1].target.type, "ROAS", "stap 1: ROAS-target gebruikt");
-eq(facts[1].target.status, "OP SCHEMA", "stap 1: ROAS 3,0 haalt target 3 (OP SCHEMA)");
+eq(convFact.delta_pct, -25, "pijler 1: Conversies MoM -25%");
+eq(facts[1].target.type, "ROAS", "pijler 1: ROAS-target gebruikt");
+eq(facts[1].target.status, "OP SCHEMA", "pijler 1: ROAS 3,0 haalt target 3 (OP SCHEMA)");
 
-// 3. Stap 2: camp_a boven, camp_b onder het accountgemiddelde op Link CTR.
-const campA = facts[2].entities.find((e: any) => e.entity_id === "camp_a");
-const campB = facts[2].entities.find((e: any) => e.entity_id === "camp_b");
-eq(campA.vs_average.find((v: any) => v.metric === "Link CTR").position, "boven", "stap 2: camp_a boven gemiddelde Link CTR");
-eq(campB.vs_average.find((v: any) => v.metric === "Link CTR").position, "onder", "stap 2: camp_b onder gemiddelde Link CTR");
+// 3. Pijler 2 (Structuur & Budget): camp_a boven, camp_b onder het accountgemiddelde op Link CTR.
+const campA = facts[2].campagnes.entities.find((e: any) => e.entity_id === "camp_a");
+const campB = facts[2].campagnes.entities.find((e: any) => e.entity_id === "camp_b");
+eq(campA.vs_average.find((v: any) => v.metric === "Link CTR").position, "boven", "pijler 2: camp_a boven gemiddelde Link CTR");
+eq(campB.vs_average.find((v: any) => v.metric === "Link CTR").position, "onder", "pijler 2: camp_b onder gemiddelde Link CTR");
+eq(facts[2].ad_sets.entities[0].entity_id, "as_1", "pijler 2: ad sets zitten in hetzelfde blok");
 
-// 4. Stap 4: vermoeide ad is bleeder met fatigue-flag, winnaar is winnaar.
-const adF = facts[4].ads.find((a: any) => a.entity_id === "ad_fatigue");
-const adW = facts[4].ads.find((a: any) => a.entity_id === "ad_winner");
-eq(adF.fatigue.flag, true, "stap 4: vermoeide ad fatigue true");
-eq(adF.classification, "bleeder", "stap 4: vermoeide ad geclassificeerd als bleeder");
-eq(adW.classification, "winnaar", "stap 4: hoge-ROAS ad geclassificeerd als winnaar");
+// 4. Pijler 3 (Creative & Visual): vermoeide ad is bleeder met fatigue-flag, winnaar is winnaar.
+const adF = facts[3].creative_performance.ads.find((a: any) => a.entity_id === "ad_fatigue");
+const adW = facts[3].creative_performance.ads.find((a: any) => a.entity_id === "ad_winner");
+eq(adF.fatigue.flag, true, "pijler 3: vermoeide ad fatigue true");
+eq(adF.classification, "bleeder", "pijler 3: vermoeide ad geclassificeerd als bleeder");
+eq(adW.classification, "winnaar", "pijler 3: hoge-ROAS ad geclassificeerd als winnaar");
+eq(facts[3].visual_patterns.available, false, "pijler 3: visual_patterns markeert geen vision-data zonder creativePatterns");
 
-// 5. Stap 6: audience_network heeft waste (spend zonder conversies).
-const an = facts[6].segments.find((s: any) => s.breakdown_value === "audience_network");
-eq(facts[6].available, true, "stap 6 beschikbaar");
-eq(an.waste, true, "stap 6: audience_network is waste");
+// 5. Pijler 4 (Placement & Doelgroep-segmenten): audience_network heeft waste (spend zonder conversies).
+const an = facts[4].placement.segments.find((s: any) => s.breakdown_value === "audience_network");
+eq(facts[4].placement.available, true, "pijler 4: placement beschikbaar");
+eq(an.waste, true, "pijler 4: audience_network is waste");
 
-// 6. Stap 7: 25-34 haalt volume, 18-24 niet (gate op 10 conversies).
-const seg2534 = facts[7].segments.find((s: any) => s.breakdown_value === "25-34|female");
-const seg1824 = facts[7].segments.find((s: any) => s.breakdown_value === "18-24|male");
-eq(seg2534.volume_ok, true, "stap 7: 25-34 haalt minimumvolume");
-eq(seg1824.volume_ok, false, "stap 7: 18-24 onder minimumvolume");
+// 5b. F5 fase2.3 placement-waste-detector. AN heeft 200 van de 700 publisher_platform-spend
+// (28,57%, > 15%) en 0 van de 10 conversies (0% < 28,57%) -- dus disproportioneel en flagged.
+eq(facts[4].placement.audience_network_waste.spend_share_pct, 28.57, "pijler 4: AN spend-aandeel 28,57%");
+eq(facts[4].placement.audience_network_waste.conversion_share_pct, 0, "pijler 4: AN conversie-aandeel 0%");
+eq(facts[4].placement.audience_network_waste.flagged, true, "pijler 4: AN placement-waste geflagd (>15% spend, geen evenredige conversies)");
 
-// 7. Stap 8: funnel beschikbaar, eerste fase (Impressions naar LPV) is een hoge drop-off.
-eq(facts[8].available, true, "stap 8 funnel beschikbaar");
-const firstStage = facts[8].stages[0];
-eq(firstStage.flag_high, true, "stap 8: Impressions naar LPV is hoge drop-off (>50%)");
+// 6. Pijler 4: 25-34 haalt volume, 18-24 niet (gate op 10 conversies).
+const seg2534 = facts[4].demografie_geo.segments.find((s: any) => s.breakdown_value === "25-34|female");
+const seg1824 = facts[4].demografie_geo.segments.find((s: any) => s.breakdown_value === "18-24|male");
+eq(seg2534.volume_ok, true, "pijler 4: 25-34 haalt minimumvolume");
+eq(seg1824.volume_ok, false, "pijler 4: 18-24 onder minimumvolume");
 
-// 8. Stap 5 en 11 zijn expliciete markers.
-eq(facts[5].available, false, "stap 5 markeert geen vision-data");
-assert(typeof facts[11].note === "string", "stap 11 is een synthese-marker");
+// 7. Pijler 5 (Funnel, Verzadiging & Schedule): funnel beschikbaar, eerste fase is een hoge drop-off.
+eq(facts[5].funnel.available, true, "pijler 5: funnel beschikbaar");
+const firstStage = facts[5].funnel.stages[0];
+eq(firstStage.flag_high, true, "pijler 5: Impressions naar LPV is hoge drop-off (>50%)");
 
-// 9. Stap 10: weekdagen aanwezig.
-assert(Array.isArray(facts[10].days) && facts[10].days.length >= 1, "stap 10 heeft weekdagen");
+// 8. Pijler 6 is een expliciete synthese-marker.
+assert(typeof facts[6].note === "string", "pijler 6 is een synthese-marker");
+
+// 9. Pijler 5: weekdagen aanwezig.
+assert(Array.isArray(facts[5].schedule.days) && facts[5].schedule.days.length >= 1, "pijler 5: schedule heeft weekdagen");
+
+// 10. Pijler 5: FTIR-verzadiging. Account-fixture heeft geen reach (delta reach = 0) bij groeiende
+// impressies (10000 -> 12000) en stijgende CPA (50 -> 66,67), dus FTIR = 0 (< 0,25) plus
+// stijgende CPA classificeert als audience-verzadiging.
+eq(facts[5].frequency_verzadiging.ftir, 0, "pijler 5: FTIR is 0 (geen reach-groei terwijl impressies groeien)");
+eq(facts[5].frequency_verzadiging.ftir_signal, "audience_verzadiging", "pijler 5: FTIR-signaal is audience_verzadiging");
+eq(facts[5].frequency_verzadiging.saturation_signal, true, "pijler 5: saturation_signal volgt uit FTIR-signaal");
+eq(facts[5].frequency_verzadiging.ftir_inputs.cpa_rising, true, "pijler 5: CPA stijgt (50 -> 66,67)");
+
+// 11. Bij voldoende nieuw bereik (FTIR > 0,40) en dalende CTR is het signaal creative fatigue,
+// niet verzadiging -- ook al staat frequency en CPA in dezelfde richting.
+const freshAccount: MetaComputeRow[] = [
+  { date: "2026-02-15", entity_id: "acc", impressions: 10000, spend: 1000, link_clicks: 250, conversions: 20, conversion_value: 4000, frequency: 1.8, reach: 6000 },
+  { date: "2026-03-15", entity_id: "acc", impressions: 12000, spend: 1000, link_clicks: 180, conversions: 20, conversion_value: 4000, frequency: 1.8, reach: 7200 },
+];
+const freshFacts = buildMetaStepFacts({ account: freshAccount, campaigns: [], adsets: [], ads: [], breakdowns: [] }) as Record<number, any>;
+eq(freshFacts[5].frequency_verzadiging.ftir, 0.6, "pijler 5: FTIR 0,6 bij evenredige reach-groei (1200/2000)");
+eq(freshFacts[5].frequency_verzadiging.ftir_signal, "creative_fatigue", "pijler 5: hoog FTIR + dalende CTR is creative_fatigue");
+eq(freshFacts[5].frequency_verzadiging.saturation_signal, false, "pijler 5: creative_fatigue is geen saturation_signal");
+
+// 12. Pijler 4: AN blijft ongeflagd als het spend-aandeel onder de 15%-drempel blijft, ook al
+// zijn er geen conversies.
+const lowShareBreakdowns: MetaBreakdownComputeRow[] = [
+  { date: "2026-03-15", breakdown_type: "publisher_platform", breakdown_value: "facebook_feed", impressions: 9000, spend: 900, link_clicks: 180, conversions: 18, conversion_value: 3600 },
+  { date: "2026-03-15", breakdown_type: "publisher_platform", breakdown_value: "audience_network", impressions: 1000, spend: 100, link_clicks: 5, conversions: 0, conversion_value: 0 },
+];
+const lowShareFacts = buildMetaStepFacts({ account, campaigns: [], adsets: [], ads: [], breakdowns: lowShareBreakdowns }) as Record<number, any>;
+eq(lowShareFacts[4].placement.audience_network_waste.spend_share_pct, 10, "pijler 4: AN spend-aandeel 10% (onder de drempel)");
+eq(lowShareFacts[4].placement.audience_network_waste.flagged, false, "pijler 4: AN niet geflagd onder de 15%-drempel");
+
+// 13. F5 fase2.4: pijler 3 koppelt meta_creative_patterns i.p.v. altijd te degraderen.
+// Deterministic gaat voor inferred; gesorteerd op |lift_pct|; alleen top 10.
+const creativePatterns: MetaCreativePatternRow[] = [
+  { period_start: "2026-03-01", period_end: "2026-03-31", attribute: "style", value: "ugc", metric: "hook_rate", n_ads: 12, impressions: 500000, conversions: 80, pattern_value: 0.42, account_avg: 0.31, lift_pct: 35.48, evidence_level: "deterministic" },
+  { period_start: "2026-03-01", period_end: "2026-03-31", attribute: "human_present", value: "true", metric: "link_ctr", n_ads: 9, impressions: 300000, conversions: 40, pattern_value: 0.01, account_avg: 0.015, lift_pct: -33.33, evidence_level: "deterministic" },
+  { period_start: "2026-03-01", period_end: "2026-03-31", attribute: "emotion", value: "urgentie", metric: "cvr", n_ads: 2, impressions: 5000, conversions: 3, pattern_value: 0.06, account_avg: 0.04, lift_pct: 50, evidence_level: "inferred" },
+];
+const withPatterns = buildMetaStepFacts({ ...inputs, creativePatterns }) as Record<number, any>;
+eq(withPatterns[3].visual_patterns.available, true, "pijler 3: visual_patterns beschikbaar zodra er patronen zijn");
+eq(withPatterns[3].visual_patterns.deterministic_count, 2, "pijler 3: 2 deterministic patronen");
+eq(withPatterns[3].visual_patterns.top_patterns.length, 2, "pijler 3: alleen deterministic patronen als die er zijn (inferred genegeerd)");
+eq(withPatterns[3].visual_patterns.top_patterns[0].attribute, "style", "pijler 3: hoogste |lift| eerst (35,48 > 33,33)");
+eq(withPatterns[3].visual_patterns.top_patterns[0].direction, "boven", "pijler 3: positieve lift is boven");
+eq(withPatterns[3].visual_patterns.top_patterns[1].direction, "onder", "pijler 3: negatieve lift is onder");
+
+// 14. Pijler 3 valt terug op inferred als er geen deterministic patronen zijn.
+const onlyInferred: MetaCreativePatternRow[] = [creativePatterns[2]];
+const withInferredOnly = buildMetaStepFacts({ ...inputs, creativePatterns: onlyInferred }) as Record<number, any>;
+eq(withInferredOnly[3].visual_patterns.available, true, "pijler 3: ook beschikbaar met alleen inferred patronen");
+eq(withInferredOnly[3].visual_patterns.deterministic_count, 0, "pijler 3: 0 deterministic patronen");
+eq(withInferredOnly[3].visual_patterns.top_patterns.length, 1, "pijler 3: valt terug op inferred");
+
+// 15. F5 fase3: pijler 4 hard-skipt (top-level available:false) alleen als ECHT beide subdomeinen
+// niets hebben -- niet zodra er ergens breakdown-data is.
+const noBreakdownFacts = buildMetaStepFacts({ account, campaigns: [], adsets: [], ads: [], breakdowns: [] }) as Record<number, any>;
+eq(noBreakdownFacts[4].available, false, "pijler 4: hard-skip markering zonder enige breakdown-data");
+eq(noBreakdownFacts[4].placement.available, false, "pijler 4: placement blijft ook zichtbaar als losse degradatie");
+eq(facts[4].available, undefined, "pijler 4: geen hard-skip markering zodra er wel breakdown-data is");
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

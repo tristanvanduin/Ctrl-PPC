@@ -11,6 +11,7 @@ import {
 import { buildEnrichmentContext } from "@/lib/analysis/enrichment";
 import { computeAnalysisTargets } from "@/lib/analysis/compute-targets";
 import { computeDataReliability } from "@/lib/analysis/data-reliability";
+import { computeMetaReliability, computeLinkedinReliability } from "@/lib/analysis/channel-reliability";
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { computeComparisonFacts, formatComparisonFacts } from "@/lib/analysis/comparison-facts";
@@ -299,7 +300,7 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const [
     accountRows, campaignRows, adsetRows,
     campaignNames, adsetNames,
-    monthlyOutputResult, clientCtx, targetResult,
+    monthlyOutputResult, clientCtx, targetResult, lagSettingsResult,
   ] = await Promise.all([
     fetchMetaDaily(supabase, clientId, "meta_account_daily", periodStart, periodEnd),
     fetchMetaDaily(supabase, clientId, "meta_campaign_daily", periodStart, periodEnd),
@@ -309,6 +310,7 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
     supabase.from("sop_analysis_output").select("output, analysis_date").eq("client_id", clientId).eq("sop_type", "meta_monthly").eq("section", "full").order("analysis_date", { ascending: false }).limit(1).maybeSingle(),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "meta"),
+    supabase.from("client_settings").select("conversion_lag_days").eq("client_id", clientId).maybeSingle(),
   ]);
 
   const { goalsSection, accountType } = clientCtx;
@@ -333,6 +335,16 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
 
   const systemPrompt = buildBiWeeklyPrompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads");
 
+  // F5 fase1.1: reliability-gating parity met Google.
+  const metaReliability = computeMetaReliability({
+    accountDaily: accountRows,
+    campaignDaily: campaignRows,
+    conversionLagDays: (lagSettingsResult.data?.conversion_lag_days as number) ?? 3,
+    lastCompleteMonth: currentMonth === 1 ? 12 : currentMonth - 1,
+    hasKpiTargets: !!goalsSection,
+  });
+  const reliabilityText = `\n\n${metaReliability.promptContext}`;
+
   const accountMonthly = aggregateDailyToMonthly(accountRows, META_SUM_FIELDS);
   const accountLast30 = accountRows.filter((r) => String(r.date) >= period30Start);
   const campaignMonthly = withMetaNames(aggregateMonthlyPerEntity(campaignRows, META_SUM_FIELDS), campaignNames);
@@ -340,7 +352,7 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const adsetRecent = withMetaNames(adsetRows.filter((r) => String(r.date) >= monthsAgo(1)).slice(-500), adsetNames);
 
   const userMessage = `Voer een bi-weekly check-in uit voor client "${clientId}" (Meta Ads).
-Periode: ${periodStart} t/m ${periodEnd}.${targetText}
+Periode: ${periodStart} t/m ${periodEnd}.${targetText}${reliabilityText}
 
 ## Account Performance (maandelijks, laatste 3 maanden)
 \`\`\`
@@ -384,6 +396,7 @@ Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug
     stepOffset: 4,
     analysisId: null,
     topFindings: extractTopFindings(result.output).join("\n") || undefined,
+    reliability: metaReliability,
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
   });
 
@@ -467,7 +480,7 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   const [
     accountRows, campaignRows, creativeRows,
     campaignNames, creativeFormats,
-    monthlyOutputResult, clientCtx, targetResult,
+    monthlyOutputResult, clientCtx, targetResult, lagSettingsResult,
   ] = await Promise.all([
     fetchLinkedinDaily("linkedin_account_daily"),
     fetchLinkedinDaily("linkedin_campaign_daily"),
@@ -477,6 +490,7 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
     supabase.from("sop_analysis_output").select("output, analysis_date").eq("client_id", clientId).eq("sop_type", "linkedin_monthly").eq("section", "full").order("analysis_date", { ascending: false }).limit(1).maybeSingle(),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "linkedin"),
+    supabase.from("client_settings").select("conversion_lag_days").eq("client_id", clientId).maybeSingle(),
   ]);
 
   const { goalsSection, accountType } = clientCtx;
@@ -501,13 +515,23 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
 
   const systemPrompt = buildBiWeeklyPrompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads");
 
+  // F5 fase1.1: reliability-gating parity met Google.
+  const linkedinReliability = computeLinkedinReliability({
+    accountDaily: accountRows,
+    campaignDaily: campaignRows,
+    conversionLagDays: (lagSettingsResult.data?.conversion_lag_days as number) ?? 3,
+    lastCompleteMonth: currentMonth === 1 ? 12 : currentMonth - 1,
+    hasKpiTargets: !!goalsSection,
+  });
+  const reliabilityText = `\n\n${linkedinReliability.promptContext}`;
+
   const accountMonthly = aggregateDailyToMonthly(accountRows, LINKEDIN_SUM_FIELDS);
   const accountLast30 = accountRows.filter((r) => String(r.date) >= period30Start);
   const campaignMonthly = withLinkedinNames(aggregateMonthlyPerEntity(campaignRows, LINKEDIN_SUM_FIELDS), campaignNames);
   const creativeMonthly = withLinkedinNames(aggregateMonthlyPerEntity(creativeRows, LINKEDIN_SUM_FIELDS), creativeFormats);
 
   const userMessage = `Voer een bi-weekly check-in uit voor client "${clientId}" (LinkedIn Ads).
-Periode: ${periodStart} t/m ${periodEnd}.${targetText}
+Periode: ${periodStart} t/m ${periodEnd}.${targetText}${reliabilityText}
 
 ## Account Performance (maandelijks, laatste 3 maanden)
 \`\`\`
@@ -546,6 +570,7 @@ Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug
     stepOffset: 4,
     analysisId: null,
     topFindings: extractTopFindings(result.output).join("\n") || undefined,
+    reliability: linkedinReliability,
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
   });
 

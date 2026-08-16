@@ -3,16 +3,15 @@ import { toPromptTable } from "@/lib/analysis/prompt-table";
 // voorgerekende LinkedIn-facts. Dezelfde rol als de Meta-versie: het model krijgt de exacte
 // getallen aangeleverd en rekent niet zelf. Pure functie, op fixtures te testen.
 
+// F5 fase3: 6 pijlers (was 9 stappen). Zie lib/analysis/adapters/linkedin-ads.ts voor de mapping
+// van oude stappen naar deze pijlers.
 const LINKEDIN_STEP_NAMES: Record<number, string> = {
   1: "Account Performance",
-  2: "Campaign Groups en Budget",
-  3: "Campaign Performance",
-  4: "Creative Performance",
-  5: "Demografie en ICP-fit",
-  6: "Lead Gen Funnel",
-  7: "Audience en Verzadiging",
-  8: "Bidding en Pacing",
-  9: "Hypotheses en Sprintplanning",
+  2: "Structuur, Budget & Bidding",
+  3: "Creative Performance",
+  4: "Doelgroep: ICP-fit & Verzadiging",
+  5: "Lead Gen Funnel",
+  6: "Hypotheses en Sprintplanning",
 };
 
 export function linkedinStepName(stepNumber: number): string {

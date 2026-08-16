@@ -23,6 +23,8 @@ export interface MetaComputeRow {
   // Video-numerators voor hook/hold (alleen ad-niveau relevant).
   video_3s_views?: number | null;
   video_thruplays?: number | null;
+  // F5 fase2.1: het echte 100%-kijkcijfer, nodig voor de gestandaardiseerde hold-rate-formule.
+  video_p100_views?: number | null;
   // Funnelfasen voor stap 8 (account/campaign-niveau); afwezig telt als 0.
   landing_page_views?: number | null;
   add_to_cart?: number | null;
@@ -69,7 +71,10 @@ export interface DerivedMetrics {
   cpa: number | null; // spend / conversions
   roas: number | null; // conversion value / spend
   hook_rate_pct: number | null; // 3s views / impressions
-  hold_rate_pct: number | null; // thruplays / impressions
+  hold_rate_pct: number | null; // F5 fase2.1: video_p100 / 3s views (was thruplays / impressions)
+  // F5 fase2.2: som van reach (unieke personen), nodig voor de FTIR-berekening (delta reach /
+  // delta impressions) die audience-verzadiging van creative fatigue onderscheidt.
+  reach: number;
 }
 
 export function deriveFromRows(rows: MetaComputeRow[]): DerivedMetrics {
@@ -79,7 +84,8 @@ export function deriveFromRows(rows: MetaComputeRow[]): DerivedMetrics {
   const conversions = sum(rows, "conversions");
   const conversion_value = sum(rows, "conversion_value");
   const video_3s = sum(rows, "video_3s_views");
-  const thruplays = sum(rows, "video_thruplays");
+  const video_p100 = sum(rows, "video_p100_views");
+  const reach = sum(rows, "reach");
   return {
     impressions,
     spend: round(spend) ?? 0,
@@ -92,7 +98,11 @@ export function deriveFromRows(rows: MetaComputeRow[]): DerivedMetrics {
     cpa: round(safeDiv(spend, conversions)),
     roas: round(safeDiv(conversion_value, spend)),
     hook_rate_pct: pct(safeDiv(video_3s, impressions)),
-    hold_rate_pct: pct(safeDiv(thruplays, impressions)),
+    // F5 fase2.1: gestandaardiseerd naar video_p100/video_3s (het werkelijke 100%-kijkpercentage
+    // van wie de eerste 3 seconden zag), zoals de stakeholder-brief vraagt -- was thruplays/
+    // impressions, een andere en minder specifieke ratio.
+    hold_rate_pct: pct(safeDiv(video_p100, video_3s > 0 ? video_3s : null)),
+    reach,
   };
 }
 

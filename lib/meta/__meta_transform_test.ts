@@ -34,13 +34,16 @@ const row = mapInsightsRow({
   action_values: [{ action_type: "purchase", value: "500" }],
   video_3sec_watched_actions: [{ action_type: "video_view", value: "400" }],
   video_thruplay_watched_actions: [{ action_type: "video_view", value: "100" }],
+  video_p100_watched_actions: [{ action_type: "video_view", value: "80" }],
 });
 check("ctr_link = link_clicks/impressions", row.ctrLink === 0.05, String(row.ctrLink));
 check("cpc_link = spend/link_clicks", row.cpcLink === 2, String(row.cpcLink));
 check("cpa = spend/conversions", row.cpa === 20, String(row.cpa));
 check("roas = value/spend", row.roas === 5, String(row.roas));
 check("hook_rate = 3s/impressions", row.hookRate === 0.4, String(row.hookRate));
-check("hold_rate = thruplay/3s", row.holdRate === 0.25, String(row.holdRate));
+// F5 fase2.1: hold rate is gestandaardiseerd naar video_p100/video_3s (was thruplay/video_3s).
+check("hold_rate = p100/3s", row.holdRate === 0.2, String(row.holdRate));
+check("videoP100 apart bewaard", row.videoP100 === 80, String(row.videoP100));
 check("conversies getypeerd", row.conversions === 5);
 check("conversiewaarde uit action_values", row.conversionValue === 500);
 check("entityId uit ad_id", row.entityId === "ad_1");

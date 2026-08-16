@@ -183,6 +183,57 @@ console.log("regel 4 — verschillende entiteiten worden niet samengevoegd:");
     "met een bevinding als entiteit wel: beide investigate_first");
 }
 
+// ── F5 fase2.5: LinkedIn <30-klik guardrail ────────────────────────────────
+//
+// LinkedIn heeft doorgaans een klein klikvolume; onder de 30 klikken is een direct_action-
+// conclusie statistisch te wankel. Alleen relevant voor bevindingen die zelf een kliktelling
+// zijn (niet CTR/CPC, die "click" ook in de naam dragen maar geen telling zijn), en alleen
+// wanneer het kanaal expliciet linkedin_ads is.
+
+console.log("fase2.5 — LinkedIn <30-klik guardrail:");
+{
+  const weinigKlikken = applyActionGating(
+    [finding({ metric: "clicks", current_value: 12 })],
+    [rec({ finding_index: 0 })],
+    { channel: "linkedin_ads" }
+  );
+  assert(readiness(weinigKlikken[0]) === "investigate_first", "LinkedIn, 12 klikken => investigate_first");
+
+  const genoegKlikken = applyActionGating(
+    [finding({ metric: "clicks", current_value: 45 })],
+    [rec({ finding_index: 0 })],
+    { channel: "linkedin_ads" }
+  );
+  assert(readiness(genoegKlikken[0]) === "direct_action", "LinkedIn, 45 klikken => blijft direct_action");
+
+  const metaMetWeinigKlikken = applyActionGating(
+    [finding({ metric: "clicks", current_value: 12 })],
+    [rec({ finding_index: 0 })],
+    { channel: "meta_ads" }
+  );
+  assert(readiness(metaMetWeinigKlikken[0]) === "direct_action", "Meta, 12 klikken => guardrail geldt niet buiten LinkedIn");
+
+  const zonderOpts = applyActionGating(
+    [finding({ metric: "clicks", current_value: 12 })],
+    [rec({ finding_index: 0 })]
+  );
+  assert(readiness(zonderOpts[0]) === "direct_action", "geen opts meegegeven => backward compatible, geen guardrail");
+
+  const ratioMetriek = applyActionGating(
+    [finding({ metric: "CTR", current_value: 0.5 })],
+    [rec({ finding_index: 0 })],
+    { channel: "linkedin_ads" }
+  );
+  assert(readiness(ratioMetriek[0]) === "direct_action", "LinkedIn, CTR (geen kliktelling) => guardrail niet van toepassing");
+
+  const linkClicksVariant = applyActionGating(
+    [finding({ metric: "link_clicks", current_value: 5 })],
+    [rec({ finding_index: 0 })],
+    { channel: "linkedin_ads" }
+  );
+  assert(readiness(linkClicksVariant[0]) === "investigate_first", "LinkedIn, link_clicks-veldnaam ook gedekt");
+}
+
 // ── Twee keer draaien verandert niets ──────────────────────────────────────
 
 console.log("stabiliteit:");

@@ -42,6 +42,23 @@ function isBedrag(metric: string | null | undefined): boolean {
 const KLEIN_BEDRAG_EUR = 50;
 
 /**
+ * Metrieken die een kliktelling zijn (geen ratio zoals CTR/CPC, die "click" ook in de naam
+ * kunnen dragen maar geen telling zijn). Whole-string match zoals BEDRAG_METRIEKEN hierboven.
+ */
+const KLIKTELLING_METRIEKEN = /^(clicks?|link_clicks?|unique_clicks?|klikken?)$/i;
+
+function isKliktelling(metric: string | null | undefined): boolean {
+  return typeof metric === "string" && KLIKTELLING_METRIEKEN.test(metric.trim());
+}
+
+/**
+ * F5 fase2.5: LinkedIn heeft doorgaans een klein klikvolume (vaak een fractie van Meta/Google).
+ * Onder dit aantal klikken is een direct_action-conclusie statistisch te wankel — ruis in een
+ * paar klikken verschuift een ratio-metriek al met tientallen procenten.
+ */
+const LINKEDIN_MIN_CLICKS_VOOR_DIRECT_ACTION = 30;
+
+/**
  * Apply action gating rules to recommendations based on their linked findings.
  * Mutates the recommendations in-place and returns them.
  *
@@ -52,8 +69,10 @@ const KLEIN_BEDRAG_EUR = 50;
  */
 export function applyActionGating(
   findings: Finding[],
-  recommendations: Recommendation[]
+  recommendations: Recommendation[],
+  opts?: { channel?: string }
 ): Recommendation[] {
+  const isLinkedin = opts?.channel === "linkedin_ads";
   for (const rec of recommendations) {
     const evidenceLevel = (rec as Record<string, unknown>).evidence_level as string | undefined;
     const confidence = (rec as Record<string, unknown>).confidence as string | undefined;
@@ -88,6 +107,16 @@ export function applyActionGating(
         // Low confidence finding → max investigate_first
         const findingConfidence = (finding as Record<string, unknown>).confidence as string | undefined;
         if (findingConfidence === "low" && readinessOf(rec) === "direct_action") {
+          setReadiness(rec, "investigate_first");
+        }
+
+        // F5 fase2.5: LinkedIn <30-klik guardrail. Alleen voor bevindingen die zelf een
+        // kliktelling zijn (niet CTR/CPC, die "click" ook in de naam dragen maar geen telling).
+        if (
+          isLinkedin && isKliktelling(finding.metric) &&
+          (finding.current_value ?? 0) < LINKEDIN_MIN_CLICKS_VOOR_DIRECT_ACTION &&
+          readinessOf(rec) === "direct_action"
+        ) {
           setReadiness(rec, "investigate_first");
         }
       }

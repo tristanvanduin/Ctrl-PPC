@@ -12,6 +12,7 @@ import { buildEnrichmentContext } from "@/lib/analysis/enrichment";
 import { computeAnalysisTargets } from "@/lib/analysis/compute-targets";
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { computeDataReliability } from "@/lib/analysis/data-reliability";
+import { computeMetaReliability, computeLinkedinReliability } from "@/lib/analysis/channel-reliability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
 import { today } from "@/lib/reporting-date";
@@ -226,10 +227,12 @@ async function runMetaWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, c
   const periodSpendStart = daysAgo(60);
   const periodEnd = fmt(new Date());
 
+  const periodReliabilityStart = daysAgo(90);
+
   const [
     accountResult, adsetResult, adResult, campaignResult,
     campaignNames, adsetNames, adNames,
-    clientCtx, targetResult,
+    clientCtx, targetResult, reliabilityAccountResult, lagSettingsResult,
   ] = await Promise.all([
     fetchMetaDaily(supabase, clientId, "meta_account_daily", periodStart, periodEnd),
     fetchMetaDaily(supabase, clientId, "meta_adset_daily", periodStart, periodEnd),
@@ -240,6 +243,10 @@ async function runMetaWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, c
     fetchNameMap(supabase, clientId, "meta_ads", "ad_id", "name"),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "meta"),
+    // F5 fase1.1: apart, langer venster puur voor de betrouwbaarheidscheck -- de 14-daagse
+    // accountResult hierboven is te kort om in maanden te aggregeren.
+    fetchMetaDaily(supabase, clientId, "meta_account_daily", periodReliabilityStart, periodEnd),
+    supabase.from("client_settings").select("conversion_lag_days").eq("client_id", clientId).maybeSingle(),
   ]);
 
   const { goalsSection, accountType } = clientCtx;
@@ -265,12 +272,23 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
 
   const systemPrompt = buildWeeklyPrompt(goalsSection, accountType, "meta_ads");
 
+  // F5 fase1.1: reliability-gating parity met Google -- zelfde functie, genormaliseerd naar
+  // Meta's spend/link_clicks-kolomnamen via computeMetaReliability().
+  const metaReliability = computeMetaReliability({
+    accountDaily: reliabilityAccountResult,
+    campaignDaily: campaignResult,
+    conversionLagDays: (lagSettingsResult.data?.conversion_lag_days as number) ?? 3,
+    lastCompleteMonth: amsterdamseMaand() === 1 ? 12 : amsterdamseMaand() - 1,
+    hasKpiTargets: !!goalsSection,
+  });
+  const reliabilityText = `\n\n${metaReliability.promptContext}`;
+
   const adsetRows = withMetaNames(adsetResult.filter((r) => new Date(String(r.date)) >= new Date(periodBleederStart)), adsetNames);
   const adRows = withMetaNames(adResult.filter((r) => new Date(String(r.date)) >= new Date(periodBleederStart)), adNames);
   const campaignRows = withMetaNames(campaignResult, campaignNames);
 
   const userMessage = `Voer een wekelijkse health check uit voor client "${clientId}" (Meta Ads).
-Periode: ${periodStart} t/m ${periodEnd}.${targetText}
+Periode: ${periodStart} t/m ${periodEnd}.${targetText}${reliabilityText}
 
 ## Account Performance (dagelijks, laatste 14 dagen -- gebruik voor WoW-vergelijking)
 \`\`\`
@@ -308,6 +326,7 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
     recsSystemPrompt: WEEKLY_RECS_SYSTEM,
     stepOffset: 1,
     analysisId: null,
+    reliability: metaReliability,
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
   });
 
@@ -373,10 +392,12 @@ async function runLinkedinWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     return (data ?? []) as Array<Record<string, unknown>>;
   };
 
+  const periodReliabilityStart = daysAgo(90);
+
   const [
     accountRows, campaignRowsRaw, creativeRowsRaw, campaignSpendRows,
     campaignNames, creativeFormats,
-    clientCtx, targetResult,
+    clientCtx, targetResult, reliabilityAccountRows, lagSettingsResult,
   ] = await Promise.all([
     fetchLinkedinDaily("linkedin_account_daily", periodStart),
     fetchLinkedinDaily("linkedin_campaign_daily", periodBleederStart),
@@ -386,6 +407,9 @@ async function runLinkedinWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     fetchLinkedinNameMap(supabase, clientId, "linkedin_creatives", "creative_urn", "format"),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "linkedin"),
+    // F5 fase1.1: apart, langer venster puur voor de betrouwbaarheidscheck.
+    fetchLinkedinDaily("linkedin_account_daily", periodReliabilityStart),
+    supabase.from("client_settings").select("conversion_lag_days").eq("client_id", clientId).maybeSingle(),
   ]);
 
   const { goalsSection, accountType } = clientCtx;
@@ -411,12 +435,23 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
 
   const systemPrompt = buildWeeklyPrompt(goalsSection, accountType, "linkedin_ads");
 
+  // F5 fase1.1: reliability-gating parity met Google -- genormaliseerd naar LinkedIn's
+  // spend/leads-kolomnamen via computeLinkedinReliability().
+  const linkedinReliability = computeLinkedinReliability({
+    accountDaily: reliabilityAccountRows,
+    campaignDaily: campaignSpendRows,
+    conversionLagDays: (lagSettingsResult.data?.conversion_lag_days as number) ?? 3,
+    lastCompleteMonth: amsterdamseMaand() === 1 ? 12 : amsterdamseMaand() - 1,
+    hasKpiTargets: !!goalsSection,
+  });
+  const reliabilityText = `\n\n${linkedinReliability.promptContext}`;
+
   const campaignRows = withLinkedinNames(campaignRowsRaw, campaignNames);
   const creativeRows = withLinkedinNames(creativeRowsRaw, creativeFormats);
   const campaignSpendRowsNamed = withLinkedinNames(campaignSpendRows, campaignNames);
 
   const userMessage = `Voer een wekelijkse health check uit voor client "${clientId}" (LinkedIn Ads).
-Periode: ${periodStart} t/m ${periodEnd}.${targetText}
+Periode: ${periodStart} t/m ${periodEnd}.${targetText}${reliabilityText}
 
 ## Account Performance (dagelijks, laatste 14 dagen -- gebruik voor WoW-vergelijking)
 \`\`\`
@@ -454,6 +489,7 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
     recsSystemPrompt: WEEKLY_RECS_SYSTEM,
     stepOffset: 1,
     analysisId: null,
+    reliability: linkedinReliability,
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
   });
 

@@ -1,6 +1,6 @@
-// Test van de Meta-adapter (M2). Verifieert de 11-staps-structuur, dat elke stap-instructie
-// het log-format en het purity-contract draagt, de Meta issue-clusters en entity-types, dat
-// het output-schema Meta's lijsten gebruikt, en de registry.
+// Test van de Meta-adapter (M2). Verifieert de 6-pijler-structuur (F5 fase3, was 11 stappen),
+// dat elke stap-instructie het log-format en het purity-contract draagt, de Meta issue-clusters
+// en entity-types, dat het output-schema Meta's lijsten gebruikt, en de registry.
 // Draaien: npx tsx lib/__tests__/meta-adapter.test.ts
 
 import { metaAdsAdapter } from "../analysis/adapters/meta-ads"; // registreert zichzelf
@@ -16,15 +16,15 @@ function assert(condition: boolean, label: string): void {
 // metaAdsAdapter direct gebruiken houdt de import (en dus de registratie-side-effect) levend.
 const meta = metaAdsAdapter;
 
-// 1. 11 stappen, compleet over alle per-stap velden.
-assert(meta.stepCount === 11, "stepCount is 11");
+// 1. 6 pijlers, compleet over alle per-stap velden.
+assert(meta.stepCount === 6, "stepCount is 6");
 const stepFields = ["stepInstructions", "logFormats", "purityContracts", "logFormatSkeletons", "purityRules"] as const;
 for (const field of stepFields) {
-  assert(Object.keys(meta[field]).length === 11, `${field} heeft 11 stappen`);
+  assert(Object.keys(meta[field]).length === 6, `${field} heeft 6 pijlers`);
 }
 
 // 2. Elke stap-instructie bevat het log-format en het purity-contract (de combinatie).
-for (let s = 1; s <= 11; s++) {
+for (let s = 1; s <= 6; s++) {
   assert(meta.stepInstructions[s].includes("Log-formaat"), `stap ${s}: stap-instructie bevat log-format`);
   assert(meta.stepInstructions[s].includes("Step-Purity Contract"), `stap ${s}: stap-instructie bevat purity-contract`);
 }

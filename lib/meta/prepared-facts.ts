@@ -28,12 +28,34 @@ export interface MetaBreakdownComputeRow {
   conversion_value: number;
 }
 
+// F5 fase2.4: geaggregeerde creative-patronen uit M3 (meta_creative_patterns), gevuld door de
+// aparte meta-creatives analyze+aggregate-pipeline (vision-analyse plus statistische aggregatie).
+// Al genormaliseerd op DB-niveau naar een attribuut/waarde/metric-rij; hier alleen selecteren en
+// sorteren, geen herberekening.
+export interface MetaCreativePatternRow {
+  period_start: string;
+  period_end: string;
+  attribute: string;
+  value: string;
+  metric: "link_ctr" | "hook_rate" | "hold_rate" | "cvr" | "cpa" | "roas";
+  n_ads: number;
+  impressions: number;
+  conversions: number | null;
+  pattern_value: number;
+  account_avg: number;
+  lift_pct: number;
+  evidence_level: "deterministic" | "inferred";
+}
+
 export interface MetaPreparedInputs {
   account: MetaComputeRow[]; // meta_account_daily, 13 maanden
   campaigns: MetaComputeRow[]; // meta_campaign_daily (entity_id = campagne)
   adsets: MetaComputeRow[]; // meta_adset_daily
   ads: MetaComputeRow[]; // meta_ad_daily
   breakdowns?: MetaBreakdownComputeRow[];
+  // F5 fase2.4: patronen van de nieuwste beschikbare periode (t/m periodEnd); de route selecteert
+  // die periode al voor het aanroepen van buildMetaStepFacts.
+  creativePatterns?: MetaCreativePatternRow[];
   targets?: { roasTarget?: number | null; cpaTarget?: number | null };
 }
 
@@ -164,6 +186,40 @@ function buildAdFacts(ads: MetaComputeRow[], accountBenchmark: DerivedMetrics, l
   return { account_benchmark: accountBenchmark, latest_month: latestMonth, ads: adFacts };
 }
 
+// F5 fase2.4: stap 5 (Creative Visual Deep-dive) leest de vision-patronen uit M3 in plaats van
+// altijd te degraderen naar de fallback. Voorkeur voor deterministic evidence boven inferred;
+// gesorteerd op absolute lift, zodat de sterkste afwijkingen (in beide richtingen) bovenaan staan.
+function buildCreativePatternFacts(rows: MetaCreativePatternRow[] | undefined) {
+  if (!rows || rows.length === 0) {
+    return { available: false, note: "Geen creative-patronen voor deze periode; draai eerst de meta-creatives analyse (analyze plus aggregate) zodat stap 5 met vision-data kan werken." };
+  }
+  const deterministic = rows.filter((r) => r.evidence_level === "deterministic");
+  const pool = deterministic.length > 0 ? deterministic : rows;
+  const top = [...pool]
+    .sort((a, b) => Math.abs(b.lift_pct) - Math.abs(a.lift_pct))
+    .slice(0, 10)
+    .map((r) => ({
+      attribute: r.attribute,
+      value: r.value,
+      metric: r.metric,
+      n_ads: r.n_ads,
+      impressions: r.impressions,
+      pattern_value: r.pattern_value,
+      account_avg: r.account_avg,
+      lift_pct: r.lift_pct,
+      evidence_level: r.evidence_level,
+      direction: r.lift_pct >= 0 ? "boven" : "onder",
+    }));
+  return {
+    available: true,
+    period_start: rows[0].period_start,
+    period_end: rows[0].period_end,
+    patterns_total: rows.length,
+    deterministic_count: deterministic.length,
+    top_patterns: top,
+  };
+}
+
 // Stap 6/7: breakdown-segmenten versus het accountgemiddelde, met waste- en volume-vlaggen.
 function buildBreakdownFacts(rows: MetaBreakdownComputeRow[] | undefined, types: string[], accountBenchmark: DerivedMetrics, minConversions: number) {
   if (!rows || rows.length === 0) return { available: false, segments: [] as unknown[] };
@@ -188,6 +244,30 @@ function buildBreakdownFacts(rows: MetaBreakdownComputeRow[] | undefined, types:
   });
   segments.sort((a, b) => b.spend - a.spend);
   return { available: true, segments };
+}
+
+// F5 fase2.3: placement-waste op Audience Network. Vlagt wanneer AN een onevenredig deel van de
+// publisher_platform-spend opslokt (>15%) zonder een evenredig deel van de conversies te leveren
+// -- een sterker signaal dan de generieke "spend zonder conversies"-waste in buildBreakdownFacts
+// hierboven, die AN met een klein maar disproportioneel conversievolume niet zou vangen.
+const AN_SPEND_SHARE_FLAG_PCT = 15;
+
+function buildAudienceNetworkWaste(rows: MetaBreakdownComputeRow[] | undefined) {
+  if (!rows || rows.length === 0) return null;
+  const platformRows = rows.filter((r) => r.breakdown_type === "publisher_platform");
+  if (platformRows.length === 0) return null;
+  const anRows = platformRows.filter((r) => r.breakdown_value === "audience_network");
+  if (anRows.length === 0) return null;
+  const totalSpend = sumField(platformRows, "spend");
+  const totalConversions = sumField(platformRows, "conversions");
+  const anSpend = sumField(anRows, "spend");
+  const anConversions = sumField(anRows, "conversions");
+  const spendSharePct = pct(safeDiv(anSpend, totalSpend));
+  const conversionSharePct = pct(safeDiv(anConversions, totalConversions));
+  // Onevenredig: AN's aandeel in de spend ligt boven de drempel, en het aandeel in de conversies
+  // haalt dat spend-aandeel niet (of er zijn helemaal geen conversies om aan toe te schrijven).
+  const flagged = spendSharePct !== null && spendSharePct > AN_SPEND_SHARE_FLAG_PCT && (conversionSharePct === null || conversionSharePct < spendSharePct);
+  return { spend: round(anSpend), spend_share_pct: spendSharePct, conversions: anConversions, conversion_share_pct: conversionSharePct, flagged };
 }
 
 // Stap 8: funnel-drop-offs per fase, laatste maand versus de 3-maands lijn.
@@ -235,19 +315,76 @@ function buildFunnelFacts(account: MetaComputeRow[]) {
   return { available: true, latest_month: months[months.length - 1], stages };
 }
 
-// Stap 9: frequency-trend versus CTR-trend op accountniveau.
+// F5 fase2.2: First-Time Impression Ratio. FTIR = delta reach / delta impressions tussen de
+// laatste twee maanden. Een lage ratio betekent dat de impressiegroei vooral naar mensen gaat
+// die al eerder bereikt zijn (audience/Advantage+ verzadiging); een hoge ratio betekent dat de
+// meeste nieuwe impressies bij nieuw bereik terechtkomen, dus is een dalende CTR/hold rate dan
+// eerder creative fatigue dan verzadiging. Vaste drempels uit de stakeholder-brief.
+const FTIR_SATURATION_MAX = 0.25;
+const FTIR_FATIGUE_MIN = 0.4;
+
+interface FtirPeriod {
+  ftir: number | null;
+  latest_month: string | null;
+  previous_month: string | null;
+  delta_reach: number | null;
+  delta_impressions: number | null;
+}
+
+function computeFtir(monthly: ReturnType<typeof aggregateMonthly>): FtirPeriod {
+  if (monthly.length < 2) {
+    return { ftir: null, latest_month: monthly[0]?.month ?? null, previous_month: null, delta_reach: null, delta_impressions: null };
+  }
+  const latest = monthly[monthly.length - 1];
+  const previous = monthly[monthly.length - 2];
+  const deltaReach = latest.reach - previous.reach;
+  const deltaImpressions = latest.impressions - previous.impressions;
+  // Alleen zinvol bij groeiende impressies; bij vlakke/dalende impressies zegt de ratio niets
+  // over verzadiging (de vraag is dan al beantwoord: er is geen nieuwe frequentie-druk).
+  const ftir = deltaImpressions > 0 ? round(deltaReach / deltaImpressions, 4) : null;
+  return { ftir, latest_month: latest.month, previous_month: previous.month, delta_reach: deltaReach, delta_impressions: deltaImpressions };
+}
+
+type FtirSignal = "audience_verzadiging" | "creative_fatigue" | "geen_duidelijk_signaal";
+
+function classifyFtir(ftir: number | null, cpaRising: boolean, freqRising: boolean, ctrFalling: boolean, holdRateFalling: boolean): FtirSignal {
+  if (ftir === null) return "geen_duidelijk_signaal";
+  if (ftir < FTIR_SATURATION_MAX && (cpaRising || freqRising)) return "audience_verzadiging";
+  if (ftir > FTIR_FATIGUE_MIN && (ctrFalling || holdRateFalling)) return "creative_fatigue";
+  return "geen_duidelijk_signaal";
+}
+
+// Stap 9: frequency-trend versus CTR-trend op accountniveau, plus FTIR-gebaseerde detectie die
+// audience-verzadiging onderscheidt van creative fatigue.
 function buildFrequencyFacts(account: MetaComputeRow[]) {
   const monthly = aggregateMonthly(account);
   const freqByMonth = groupBy(account, (r) => String(r.date || "").slice(0, 7));
   const freqSeries = [...freqByMonth.keys()].filter(Boolean).sort().map((m) => avgFrequency(freqByMonth.get(m) ?? []));
   const firstFreq = freqSeries.find((v) => v !== null) ?? null;
   const lastFreq = [...freqSeries].reverse().find((v) => v !== null) ?? null;
+
+  const ftirRes = computeFtir(monthly);
+  const latestMonthly = monthly.length ? monthly[monthly.length - 1] : null;
+  const previousMonthly = monthly.length >= 2 ? monthly[monthly.length - 2] : null;
+  const latestFreq = freqSeries.length ? freqSeries[freqSeries.length - 1] : null;
+  const previousFreq = freqSeries.length >= 2 ? freqSeries[freqSeries.length - 2] : null;
+
+  const cpaRising = latestMonthly?.cpa != null && previousMonthly?.cpa != null && latestMonthly.cpa > previousMonthly.cpa;
+  const freqRising = latestFreq !== null && previousFreq !== null && latestFreq > previousFreq;
+  const ctrFalling = latestMonthly?.link_ctr_pct != null && previousMonthly?.link_ctr_pct != null && latestMonthly.link_ctr_pct < previousMonthly.link_ctr_pct;
+  const holdRateFalling = latestMonthly?.hold_rate_pct != null && previousMonthly?.hold_rate_pct != null && latestMonthly.hold_rate_pct < previousMonthly.hold_rate_pct;
+  const ftir_signal = classifyFtir(ftirRes.ftir, cpaRising, freqRising, ctrFalling, holdRateFalling);
+
   return {
     frequency_first: firstFreq,
     frequency_latest: lastFreq,
     frequency_trend: trendDirection(monthly.map((m, i) => ({ ...m, link_ctr_pct: freqSeries[i] ?? null })), "link_ctr_pct", monthly.length),
     link_ctr_trend: trendDirection(monthly, "link_ctr_pct", monthly.length),
-    saturation_signal: lastFreq !== null && firstFreq !== null && lastFreq > firstFreq && trendDirection(monthly, "link_ctr_pct", monthly.length) === "daalt",
+    ftir: ftirRes.ftir,
+    ftir_period: { latest_month: ftirRes.latest_month, previous_month: ftirRes.previous_month, delta_reach: ftirRes.delta_reach, delta_impressions: ftirRes.delta_impressions },
+    ftir_inputs: { cpa_rising: cpaRising, frequency_rising: freqRising, link_ctr_falling: ctrFalling, hold_rate_falling: holdRateFalling },
+    ftir_signal,
+    saturation_signal: ftir_signal === "audience_verzadiging",
   };
 }
 
@@ -271,7 +408,28 @@ function buildScheduleFacts(account: MetaComputeRow[]) {
   return { material_signal: material, days };
 }
 
-// De volledige assemblage: facts per stap (1 tot en met 11).
+// F5 fase3: pijler 4 bundelt twee breakdown-subdomeinen die elk individueel `available: false`
+// kunnen zijn (buildBreakdownFacts) wanneer meta_breakdown_daily niet gesynct is voor dat
+// breakdown_type. De hard-skip-laag (F5 fase1.4, isChannelStepFactsUnavailable in de route) kijkt
+// naar een top-level `available`-veld; die zet deze functie alleen op false wanneer ECHT beide
+// subdomeinen niets hebben, zodat een LLM-call niet wordt overgeslagen zolang er nog iets te
+// duiden valt in het andere subdomein.
+function combinePlacementAndDemographics(
+  placement: Record<string, unknown>,
+  demografieGeo: Record<string, unknown>
+): Record<string, unknown> {
+  const placementAvailable = placement.available !== false;
+  const demografieAvailable = demografieGeo.available !== false;
+  if (!placementAvailable && !demografieAvailable) {
+    return { available: false, note: "Geen breakdown-data (placement, platform, demografie of geo) beschikbaar voor deze periode.", placement, demografie_geo: demografieGeo };
+  }
+  return { placement, demografie_geo: demografieGeo };
+}
+
+// F5 fase3: de volledige assemblage, hergegroepeerd naar 6 pijlers (was 11 losse stappen). Dit
+// is uitsluitend re-plumbing van het return-object: elke buildXFacts-functie hierboven blijft
+// ongewijzigd en wordt nog precies één keer aangeroepen; alleen de sleutel waaronder de uitkomst
+// wordt aangeboden verandert. Zie lib/analysis/adapters/meta-ads.ts voor de pijlerindeling.
 export function buildMetaStepFacts(inputs: MetaPreparedInputs): MetaStepFacts {
   const accountMonthly = aggregateMonthly(inputs.account);
   const latestMonth = latestMonthOf(inputs.account);
@@ -279,15 +437,27 @@ export function buildMetaStepFacts(inputs: MetaPreparedInputs): MetaStepFacts {
 
   return {
     1: buildAccountFacts(inputs.account, inputs.targets),
-    2: buildEntityVsAccountFacts(inputs.campaigns, accountBenchmark, latestMonth),
-    3: buildEntityVsAccountFacts(inputs.adsets, accountBenchmark, latestMonth),
-    4: buildAdFacts(inputs.ads, accountBenchmark, latestMonth),
-    5: { available: false, note: "Visuele deep-dive vereist vision-data uit M3; geen pre-compute in deze laag. Stap degradeert naar 1 regel." },
-    6: buildBreakdownFacts(inputs.breakdowns, ["publisher_platform", "platform_position", "impression_device"], accountBenchmark, 0),
-    7: buildBreakdownFacts(inputs.breakdowns, ["age_gender", "country", "region", "dma"], accountBenchmark, 10),
-    8: buildFunnelFacts(inputs.account),
-    9: buildFrequencyFacts(inputs.account),
-    10: buildScheduleFacts(inputs.account),
-    11: { note: "Synthese uit stap 1 tot en met 10 en de canonical claim-set; geen nieuwe pre-compute.", account_months: accountMonthly.length },
+    // Pijler 2: Structuur & Budget (was stap 2 campagnes + stap 3 ad sets).
+    2: {
+      campagnes: buildEntityVsAccountFacts(inputs.campaigns, accountBenchmark, latestMonth),
+      ad_sets: buildEntityVsAccountFacts(inputs.adsets, accountBenchmark, latestMonth),
+    },
+    // Pijler 3: Creative & Visual (was stap 4 kwantitatief + stap 5 visueel).
+    3: {
+      creative_performance: buildAdFacts(inputs.ads, accountBenchmark, latestMonth),
+      visual_patterns: buildCreativePatternFacts(inputs.creativePatterns),
+    },
+    // Pijler 4: Placement & Doelgroep-segmenten (was stap 6 placement + stap 7 demografie/geo).
+    4: combinePlacementAndDemographics(
+      { ...buildBreakdownFacts(inputs.breakdowns, ["publisher_platform", "platform_position", "impression_device"], accountBenchmark, 0), audience_network_waste: buildAudienceNetworkWaste(inputs.breakdowns) },
+      buildBreakdownFacts(inputs.breakdowns, ["age_gender", "country", "region", "dma"], accountBenchmark, 10)
+    ),
+    // Pijler 5: Funnel, Verzadiging & Schedule (was stap 8 funnel + stap 9 frequency + stap 10 schedule).
+    5: {
+      funnel: buildFunnelFacts(inputs.account),
+      frequency_verzadiging: buildFrequencyFacts(inputs.account),
+      schedule: buildScheduleFacts(inputs.account),
+    },
+    6: { note: "Synthese uit stap 1 tot en met 5 en de canonical claim-set; geen nieuwe pre-compute.", account_months: accountMonthly.length },
   };
 }

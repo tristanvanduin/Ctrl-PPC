@@ -16,7 +16,7 @@ assert(msg.includes("act-123"), "message bevat de client");
 assert(msg.includes("stap 1"), "message benoemt het stapnummer");
 assert(/exacte.*getallen|reken/i.test(msg), "message instrueert met aangeleverde getallen te rekenen");
 assert(msg.includes("2026-03") && msg.includes("OP SCHEMA") && msg.includes("-25"), "message bevat de voorgerekende feiten");
-assert(metaStepName(4) === "Creative Performance", "metaStepName geeft de juiste naam voor stap 4");
+assert(metaStepName(3) === "Creative & Visual", "metaStepName geeft de juiste naam voor pijler 3");
 assert(metaStepName(99).includes("99"), "metaStepName valt terug op een generieke naam");
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

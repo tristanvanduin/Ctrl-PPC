@@ -87,6 +87,7 @@ export function mapInsightsRow(row: MetaInsightsRow, opts: { round?: boolean } =
   ]) ?? 0;
   const video3s = firstActionValue(row.video_3sec_watched_actions, ["video_view"]) ?? 0;
   const thruplay = firstActionValue(row.video_thruplay_watched_actions, ["video_view"]) ?? 0;
+  const videoP100 = firstActionValue(row.video_p100_watched_actions, ["video_view"]) ?? 0;
 
   return {
     date: row.date_start ?? null,
@@ -114,10 +115,14 @@ export function mapInsightsRow(row: MetaInsightsRow, opts: { round?: boolean } =
     videoP25: firstActionValue(row.video_p25_watched_actions, ["video_view"]) ?? 0,
     videoP50: firstActionValue(row.video_p50_watched_actions, ["video_view"]) ?? 0,
     videoP75: firstActionValue(row.video_p75_watched_actions, ["video_view"]) ?? 0,
-    videoP100: firstActionValue(row.video_p100_watched_actions, ["video_view"]) ?? 0,
+    videoP100: videoP100,
     postEngagement: actions.postEngagement,
     hookRate: r(safeDiv(video3s, impressions)),
-    holdRate: r(safeDiv(thruplay, video3s > 0 ? video3s : null)),
+    // F5 fase2.1: hold rate was thruplay/video3s (thruplay = 15s-of-video-of-100%-of-korter-dan-
+    // 15s -- Meta's eigen "engaged view"-metriek, geen letterlijk 100%-kijkcijfer). Gestandaardiseerd
+    // naar video_p100/video_3s (het WERKELIJKE 100%-kijkpercentage), zoals de stakeholder-brief
+    // vraagt. video_p100 werd al binnengehaald en opgeslagen maar door geen enkele consument gebruikt.
+    holdRate: r(safeDiv(videoP100, video3s > 0 ? video3s : null)),
     qualityRanking: row.quality_ranking ?? null,
     engagementRateRanking: row.engagement_rate_ranking ?? null,
     conversionRateRanking: row.conversion_rate_ranking ?? null,

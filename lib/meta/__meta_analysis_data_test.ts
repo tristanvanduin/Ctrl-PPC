@@ -2,7 +2,7 @@
 // De fetch (laag 2) is live-ongetest en wordt hier bewust niet aangeroepen.
 // Draaien: npx tsx lib/meta/__meta_analysis_data_test.ts
 
-import { mapMetaDailyToComputeRow, mapMetaBreakdownToComputeRow, thirteenMonthStart } from "./analysis-data";
+import { mapMetaDailyToComputeRow, mapMetaBreakdownToComputeRow, mapCreativePatternRow, thirteenMonthStart } from "./analysis-data";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {
@@ -53,6 +53,22 @@ eq(mb.breakdown_type, "age_gender", "breakdown_type overgenomen");
 eq(mb.breakdown_value, "25-34|female", "breakdown_value met pipe intact");
 eq(mb.impressions, 4000, "breakdown impressions string naar getal");
 eq(mb.conversion_value, 3000, "breakdown conversion_value string naar getal");
+
+// 3b. F5 fase2.4: creative-pattern-mapping (meta_creative_patterns), getallen als string/numeric.
+const dbPattern = {
+  period_start: "2026-03-01", period_end: "2026-03-31", attribute: "style", value: "ugc",
+  metric: "hook_rate", n_ads: "12", impressions: "500000", conversions: "80.5",
+  pattern_value: "0.42", account_avg: "0.31", lift_pct: "35.48", evidence_level: "deterministic",
+};
+const mp = mapCreativePatternRow(dbPattern);
+eq(mp.attribute, "style", "pattern attribute overgenomen");
+eq(mp.metric, "hook_rate", "pattern metric overgenomen");
+eq(mp.n_ads, 12, "pattern n_ads string naar getal");
+eq(mp.lift_pct, 35.48, "pattern lift_pct string naar getal");
+eq(mp.evidence_level, "deterministic", "pattern evidence_level overgenomen");
+const mpSparse = mapCreativePatternRow({ attribute: "style", value: "ugc", metric: "hook_rate", evidence_level: "inferred" });
+eq(mpSparse.conversions, null, "pattern ontbrekende conversions naar null");
+eq(mpSparse.n_ads, 0, "pattern ontbrekende n_ads default 0");
 
 // 4. Het 13-maands venster eindigend op periodEnd.
 eq(thirteenMonthStart("2026-03-31"), "2025-03-01", "13-maands start voor maart 2026");

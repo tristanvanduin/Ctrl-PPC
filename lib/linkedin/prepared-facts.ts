@@ -191,7 +191,70 @@ function buildFunnelFacts(account: LinkedInComputeRow[]): unknown {
   };
 }
 
-// Stap 7: audience-omvang en verzadiging (CPM-trend stijgt terwijl CTR-trend daalt over 3 maanden).
+// F5 fase2.6: verzadigingsproxy via CPM-stijging + klikstagnatie over de laatste 30 dagen t.o.v.
+// de 30 dagen daarvoor. campaignMeta.audience_count (de enige audience-omvang die de API biedt)
+// is in de praktijk zo goed als altijd afwezig, dus de bestaande audience_sizes-lijst hieronder
+// is meestal leeg. Deze proxy geeft ook zonder die metadata een deterministisch verzadigingssignaal.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SATURATION_CPM_RISE_MIN_PCT = 20; // drempel voor een "sterke" CPM-stijging
+const SATURATION_CLICK_GROWTH_MAX_PCT = 5; // "stagnerend": klikgroei blijft hierbinnen (of is negatief)
+
+function toDayMs(date: string): number {
+  return new Date(`${date}T00:00:00Z`).getTime();
+}
+function rowsInWindow(rows: LinkedInComputeRow[], startMs: number, endMsExclusive: number): LinkedInComputeRow[] {
+  return rows.filter((r) => {
+    if (!r.date) return false;
+    const t = toDayMs(r.date);
+    return t >= startMs && t < endMsExclusive;
+  });
+}
+function windowDeltaPct(latest: number | null, previous: number | null): number | null {
+  if (latest === null || previous === null || previous === 0) return null;
+  return round(((latest - previous) / Math.abs(previous)) * 100);
+}
+
+function computeSaturationProxy30d(account: LinkedInComputeRow[]): Record<string, unknown> {
+  const dates = account.map((r) => r.date).filter((d): d is string => Boolean(d)).sort();
+  if (dates.length === 0) {
+    return { available: false, note: "Geen accountdata om de 30-dagen verzadigingsproxy te berekenen." };
+  }
+  // Anker op de laatste dag mét data (niet de kalenderdatum van vandaag), zodat de proxy
+  // deterministisch en op fixtures te testen is -- net als de rest van deze laag.
+  const anchorMs = toDayMs(dates[dates.length - 1]);
+  const recentStart = anchorMs - 29 * DAY_MS;
+  const recentEndExclusive = anchorMs + DAY_MS;
+  const priorStart = anchorMs - 59 * DAY_MS;
+  const priorEndExclusive = recentStart;
+
+  const recentRows = rowsInWindow(account, recentStart, recentEndExclusive);
+  const priorRows = rowsInWindow(account, priorStart, priorEndExclusive);
+  if (priorRows.length === 0) {
+    return { available: false, note: "Onvoldoende historie (voorgaande 30 dagen) voor de verzadigingsproxy." };
+  }
+
+  const recent = deriveFromRows(recentRows);
+  const prior = deriveFromRows(priorRows);
+  const cpmDeltaPct = windowDeltaPct(recent.cpm, prior.cpm);
+  const clickDeltaPct = windowDeltaPct(recent.clicks, prior.clicks);
+  const strongCpmRise = cpmDeltaPct !== null && cpmDeltaPct > SATURATION_CPM_RISE_MIN_PCT;
+  const clickStagnation = clickDeltaPct !== null && clickDeltaPct <= SATURATION_CLICK_GROWTH_MAX_PCT;
+
+  return {
+    available: true,
+    recent_window: { days: recentRows.length, cpm: recent.cpm, clicks: recent.clicks },
+    prior_window: { days: priorRows.length, cpm: prior.cpm, clicks: prior.clicks },
+    cpm_delta_pct: cpmDeltaPct,
+    click_delta_pct: clickDeltaPct,
+    strong_cpm_rise: strongCpmRise,
+    click_stagnation: clickStagnation,
+    saturation_signal_30d: strongCpmRise && clickStagnation,
+  };
+}
+
+// Stap 7: audience-omvang en verzadiging. Twee onafhankelijke signalen: de bestaande 3-maands
+// CPM/CTR-trend, en de nieuwe 30-dagen CPM+klik-proxy (F5 fase2.6) die ook zonder audience_count-
+// metadata werkt. Beide tellen mee: verzadiging is verzadiging, ongeacht welk signaal het ziet.
 function buildAudienceFacts(account: LinkedInComputeRow[], meta?: LinkedInCampaignMeta[]): unknown {
   const monthly = aggregateMonthly(account);
   const cpmTrend = trendDirection(monthly, "cpm", 3);
@@ -200,13 +263,16 @@ function buildAudienceFacts(account: LinkedInComputeRow[], meta?: LinkedInCampai
   const audienceSizes = (meta ?? [])
     .filter((m) => m.audience_count != null)
     .map((m) => ({ campaign: m.entityUrn, audience_count: m.audience_count }));
+  const proxy30d = computeSaturationProxy30d(account);
+  const trendSignal = cpmTrend === "stijgt" && ctrTrend === "daalt";
   return {
     cpm_trend_3m: cpmTrend,
     ctr_trend_3m: ctrTrend,
-    saturation_signal: cpmTrend === "stijgt" && ctrTrend === "daalt",
+    saturation_signal: trendSignal || proxy30d.saturation_signal_30d === true,
     cpm_series: last3.map((m) => ({ month: m.month, cpm: m.cpm })),
     ctr_series: last3.map((m) => ({ month: m.month, ctr: m.ctr_pct })),
     audience_sizes: audienceSizes,
+    saturation_proxy_30d: proxy30d,
   };
 }
 
@@ -221,19 +287,32 @@ function buildBiddingFacts(meta?: LinkedInCampaignMeta[]): unknown {
   };
 }
 
+// F5 fase3: de volledige assemblage, hergegroepeerd naar 6 pijlers (was 9 losse stappen). Dit is
+// uitsluitend re-plumbing van het return-object: elke buildXFacts-functie hierboven blijft
+// ongewijzigd. De oude stap 2 en 3 riepen toevallig al dezelfde buildEntityVsAccountFacts-functie
+// op dezelfde campagnedata aan (LinkedIn heeft geen apart campaign-group-niveau in de compute-
+// laag; objective/cost_type zitten al per campagne in die ene aanroep) -- de merge roept hem dus
+// nog maar één keer aan in plaats van twee keer identiek. Zie lib/analysis/adapters/linkedin-ads.ts
+// voor de pijlerindeling.
 export function buildLinkedinStepFacts(inputs: LinkedInPreparedInputs): LinkedInStepFacts {
   const latestMonth = latestMonthOf(inputs.account);
   const accountBenchmark = deriveFromRows(rowsInMonth(inputs.account, latestMonth));
 
   return {
     1: buildAccountFacts(inputs.account, inputs.targets),
-    2: buildEntityVsAccountFacts(inputs.campaigns, accountBenchmark, latestMonth, inputs.campaignMeta),
-    3: buildEntityVsAccountFacts(inputs.campaigns, accountBenchmark, latestMonth, inputs.campaignMeta),
-    4: buildCreativeFacts(inputs.creatives, accountBenchmark, latestMonth, inputs.creativeMeta),
-    5: buildIcpFacts(inputs.demographics, inputs.icp),
-    6: buildFunnelFacts(inputs.account),
-    7: buildAudienceFacts(inputs.account, inputs.campaignMeta),
-    8: buildBiddingFacts(inputs.campaignMeta),
-    9: { note: "Synthese uit stap 1 tot en met 8 en de canonical claim-set; geen nieuwe pre-compute.", account_months: aggregateMonthly(inputs.account).length },
+    // Pijler 2: Structuur, Budget & Bidding (was stap 2 campaign groups + stap 3 campagne-
+    // performance + stap 8 bidding). campagnes dekt zowel NIVEAU A als NIVEAU B.
+    2: {
+      campagnes: buildEntityVsAccountFacts(inputs.campaigns, accountBenchmark, latestMonth, inputs.campaignMeta),
+      bidding: buildBiddingFacts(inputs.campaignMeta),
+    },
+    3: buildCreativeFacts(inputs.creatives, accountBenchmark, latestMonth, inputs.creativeMeta),
+    // Pijler 4: Doelgroep: ICP-fit & Verzadiging (was stap 5 ICP-fit + stap 7 audience/verzadiging).
+    4: {
+      icp_fit: buildIcpFacts(inputs.demographics, inputs.icp),
+      audience_verzadiging: buildAudienceFacts(inputs.account, inputs.campaignMeta),
+    },
+    5: buildFunnelFacts(inputs.account),
+    6: { note: "Synthese uit stap 1 tot en met 5 en de canonical claim-set; geen nieuwe pre-compute.", account_months: aggregateMonthly(inputs.account).length },
   };
 }

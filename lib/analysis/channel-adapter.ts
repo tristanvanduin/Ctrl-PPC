@@ -21,6 +21,16 @@ export interface ChannelAdapter {
   sopTypeKey: string;
   // Aantal deep-dive stappen (Google 13). De acceptance en gate gebruiken dit ipv een hardcoded 13.
   stepCount: number;
+  // F4 fase2: expliciete set stapnummers die deze cyclus daadwerkelijk voorkomen, voor
+  // adapters waar dat GEEN aaneengesloten 1..stepCount reeks meer is (bv. Google na het
+  // bundelen van oude stap 2/3 in stap 1 -- stepCount blijft 13 voor downstream labels,
+  // maar stapnummers 2 en 3 worden niet meer los uitgevoerd). Ontbreekt dit veld, dan valt
+  // de acceptance-check terug op de aaneengesloten 1..stepCount-reeks (ongewijzigd gedrag
+  // voor Meta/LinkedIn).
+  expectedStepNumbers?: number[];
+  // F4 fase2: verwacht aantal checkpoints voor deze adapter (default 3 in de acceptance-check
+  // zelf). Google draait na het bundelen van stap 1-3 nog maar 2 checkpoints (B, C).
+  expectedCheckpointCount?: number;
   // Benchmark-tekst per accounttype, ingevoegd in de system prompt.
   benchmarks: Record<AccountType, string>;
   // De issue_cluster-lijst die in het output-schema aan de LLM wordt getoond (de prompt-lijst).

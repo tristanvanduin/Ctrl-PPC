@@ -4,18 +4,15 @@ import { toPromptTable } from "@/lib/analysis/prompt-table";
 // buildMetaStepFacts. Het model krijgt de exacte getallen aangeleverd en hoeft niet zelf te rekenen.
 // Pure functie, op fixtures te testen.
 
+// F5 fase3: 6 pijlers (was 11 stappen). Zie lib/analysis/adapters/meta-ads.ts voor de mapping
+// van oude stappen naar deze pijlers.
 const META_STEP_NAMES: Record<number, string> = {
   1: "Account Performance",
-  2: "Campagnestructuur en Budget",
-  3: "Ad Set en Doelgroep",
-  4: "Creative Performance",
-  5: "Creative Visual Deep-dive",
-  6: "Placement en Platform",
-  7: "Demografie en Geo",
-  8: "Funnel en Attributie",
-  9: "Frequency en Verzadiging",
-  10: "Schedule",
-  11: "Hypotheses en Sprintplanning",
+  2: "Structuur & Budget",
+  3: "Creative & Visual",
+  4: "Placement & Doelgroep-segmenten",
+  5: "Funnel, Verzadiging & Schedule",
+  6: "Hypotheses en Sprintplanning",
 };
 
 export function metaStepName(stepNumber: number): string {
