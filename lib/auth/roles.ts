@@ -77,7 +77,7 @@ export const CAPABILITIES = [
   "settings:write",      // client-settings, targets, events, conversie-config
   "sprint:write",        // sprint, taken, hypotheses
   "sync:run",            // handmatige syncs
-  "connection:manage",   // Google-, Meta- en LinkedIn-koppelingen
+  "connection:manage",   // Google Ads-, Meta-, LinkedIn-, GA4- en Search Console-koppelingen
   "system:ops",          // health, eval-harness, generation-jobs, scripts
   "user:manage",         // gebruikersbeheer en scope-toewijzing
 ] as const;

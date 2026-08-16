@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, XCircle, Loader2, ExternalLink, Copy, Check, Eye, EyeOff, Building2, FolderPlus, Trash2, Pencil, Plus, X, FolderOpen, Sparkles, Globe, UserRound, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgencyBrandingSection } from "@/components/dashboard/agency-branding-section";
+import { KoppelingKaart, type KoppelingWeergave } from "@/components/settings/koppeling-kaart";
+import type { Provider } from "@/lib/tenancy/koppelingen";
 import { getAllClients, saveApiClients, type Client } from "@/lib/clients";
 import { getVisibleClientIds, setVisibleClientIds } from "@/lib/visible-clients";
 import {
@@ -16,6 +18,7 @@ interface ConnectionStatus {
   googleAds: { configured: boolean; hasManagerId: boolean };
   metaAds: { configured: boolean; hasAppCredentials: boolean };
   anyConnected: boolean;
+  koppelingen: Partial<Record<Provider, KoppelingWeergave | null>>;
 }
 
 function StatusBadge({ connected }: { connected: boolean }) {
@@ -607,6 +610,14 @@ function ClientGroupsSection() {
   );
 }
 
+const OAUTH_PROVIDER_LABEL: Record<Provider, string> = {
+  google_ads: "Google Ads",
+  meta: "Meta Ads",
+  linkedin: "LinkedIn Ads",
+  google_analytics: "Google Analytics 4",
+  search_console: "Google Search Console",
+};
+
 export default function SettingsPage() {
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -614,14 +625,34 @@ export default function SettingsPage() {
   const [testingMeta, setTestingMeta] = useState(false);
   const [googleResult, setGoogleResult] = useState<string | null>(null);
   const [metaResult, setMetaResult] = useState<string | null>(null);
+  const [oauthBanner, setOauthBanner] = useState<{ soort: "ok" | "fout"; tekst: string } | null>(null);
 
-  useEffect(() => {
+  const refetchStatus = useCallback(() => {
     fetch("/api/connections")
       .then((r) => r.json())
       .then(setStatus)
       .catch(() => setStatus(null))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    refetchStatus();
+
+    // Terugkeer van de OAuth-callback: /settings?oauth_success=ga4 of ?oauth_error=meta_geweigerd.
+    const params = new URLSearchParams(window.location.search);
+    const succes = params.get("oauth_success") as Provider | null;
+    const foutParam = params.get("oauth_error");
+    if (succes && succes in OAUTH_PROVIDER_LABEL) {
+      setOauthBanner({ soort: "ok", tekst: `${OAUTH_PROVIDER_LABEL[succes]} is verbonden.` });
+    } else if (foutParam) {
+      const [provider] = foutParam.split("_");
+      const label = OAUTH_PROVIDER_LABEL[provider as Provider] ?? "De koppeling";
+      setOauthBanner({ soort: "fout", tekst: `${label}: koppelen is niet gelukt (${foutParam}). Probeer het opnieuw.` });
+    }
+    if (succes || foutParam) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [refetchStatus]);
 
   async function testGoogle() {
     setTestingGoogle(true);
@@ -673,18 +704,24 @@ export default function SettingsPage() {
     );
   }
 
-  const googleConnected = status?.googleAds.configured ?? false;
-  const metaConnected = status?.metaAds.configured ?? false;
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-page font-bold text-rm-blue-ink">Instellingen</h1>
         <p className="mt-1 text-body text-muted-foreground">
-          API koppelingen en dashboard configuratie. Credentials worden ingesteld via{" "}
+          API-koppelingen en dashboardconfiguratie. Verbind een platform met OAuth, of stel het
+          handmatig in via{" "}
           <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">.env.local</code>
         </p>
       </div>
+
+      {oauthBanner && (
+        <div className={`px-4 py-3 rounded-lg border text-sm ${
+          oauthBanner.soort === "ok" ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"
+        }`}>
+          {oauthBanner.tekst}
+        </div>
+      )}
 
       {/* Overall status */}
       {!status?.anyConnected && (
@@ -708,229 +745,149 @@ export default function SettingsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ── Google Ads ──────────────────────────────────────── */}
-        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue-ink text-title">Google Ads API</h3>
-            <StatusBadge connected={googleConnected} />
-          </div>
-
-          {googleConnected ? (
-            <div className="space-y-4">
-              <div className="px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800 font-medium">Credentials geconfigureerd</p>
-                <p className="text-xs text-green-700 mt-1">
-                  {status?.googleAds.hasManagerId
-                    ? "MCC Manager ID is ingesteld — je kunt meerdere klantaccounts benaderen."
-                    : "Geen MCC Manager ID — alleen direct gekoppelde accounts beschikbaar."}
-                </p>
-              </div>
-
-              <Button
-                onClick={testGoogle}
-                variant="outline"
-                className="w-full gap-2"
-                disabled={testingGoogle}
-              >
+        <KoppelingKaart
+          provider="google_ads"
+          label="Google Ads"
+          beschrijving="Campagnedata van het gekoppelde Google Ads-account of MCC."
+          koppeling={status?.koppelingen.google_ads ?? null}
+          onGewijzigd={refetchStatus}
+          actiefExtra={
+            <div className="mt-3 pt-3 border-t border-green-200">
+              <Button onClick={testGoogle} variant="outline" size="sm" className="w-full gap-2" disabled={testingGoogle}>
                 {testingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 Verbinding testen
               </Button>
-
-              {googleResult && (
-                <div className={`px-4 py-3 rounded-lg text-sm ${
-                  googleResult.startsWith("Verbonden")
-                    ? "bg-green-50 border border-green-200 text-green-800"
-                    : "bg-red-50 border border-red-200 text-red-800"
-                }`}>
-                  {googleResult}
+              {googleResult && <p className="text-xs text-green-800 mt-2">{googleResult}</p>}
+            </div>
+          }
+          envFallback={
+            <div className="space-y-4">
+              <p>Of voeg deze variabelen toe aan je <code className="font-mono">.env.local</code>:</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between"><EnvVar name="GOOGLE_ADS_DEVELOPER_TOKEN" /><span className="text-micro">Verplicht</span></div>
+                <div className="flex items-center justify-between"><EnvVar name="GOOGLE_ADS_CLIENT_ID" /><span className="text-micro">Verplicht</span></div>
+                <div className="flex items-center justify-between"><EnvVar name="GOOGLE_ADS_CLIENT_SECRET" /><span className="text-micro">Verplicht</span></div>
+                <div className="flex items-center justify-between"><EnvVar name="GOOGLE_ADS_REFRESH_TOKEN" /><span className="text-micro">Verplicht</span></div>
+                <div className="flex items-center justify-between"><EnvVar name="GOOGLE_ADS_MANAGER_CUSTOMER_ID" /><span className="text-micro">Optioneel (MCC)</span></div>
+              </div>
+              <ol className="space-y-1.5 list-decimal list-inside">
+                <li>Ga naar <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Google Cloud Console <ExternalLink className="w-3 h-3" /></a> en maak een OAuth2 Client ID aan (type: Web application)</li>
+                <li>Ga naar <a href="https://ads.google.com/aw/apicenter" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Google Ads API Center <ExternalLink className="w-3 h-3" /></a> voor je Developer Token</li>
+                <li>Genereer een Refresh Token via de <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">OAuth Playground <ExternalLink className="w-3 h-3" /></a> met scope <code className="font-mono text-micro">https://www.googleapis.com/auth/adwords</code></li>
+                <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
+              </ol>
+              {status?.googleAds.configured && (
+                <div className="pt-2 border-t border-border">
+                  <Button onClick={testGoogle} variant="outline" size="sm" className="w-full gap-2" disabled={testingGoogle}>
+                    {testingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Env-verbinding testen
+                  </Button>
+                  {googleResult && <p className="mt-2">{googleResult}</p>}
                 </div>
               )}
             </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-body text-muted-foreground">
-                Voeg de volgende variabelen toe aan je <code className="font-mono text-xs">.env.local</code>:
-              </p>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <EnvVar name="GOOGLE_ADS_DEVELOPER_TOKEN" />
-                  <span className="text-micro text-muted-foreground">Verplicht</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <EnvVar name="GOOGLE_ADS_CLIENT_ID" />
-                  <span className="text-micro text-muted-foreground">Verplicht</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <EnvVar name="GOOGLE_ADS_CLIENT_SECRET" />
-                  <span className="text-micro text-muted-foreground">Verplicht</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <EnvVar name="GOOGLE_ADS_REFRESH_TOKEN" />
-                  <span className="text-micro text-muted-foreground">Verplicht</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <EnvVar name="GOOGLE_ADS_MANAGER_CUSTOMER_ID" />
-                  <span className="text-micro text-muted-foreground">Optioneel (MCC)</span>
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-4 space-y-2">
-                <p className="text-xs font-semibold text-rm-gray">Hoe kom je aan deze keys?</p>
-                <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                  <li>
-                    Ga naar{" "}
-                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
-                      Google Cloud Console <ExternalLink className="w-3 h-3" />
-                    </a>{" "}
-                    en maak een OAuth2 Client ID aan (type: Web application)
-                  </li>
-                  <li>
-                    Ga naar{" "}
-                    <a href="https://ads.google.com/aw/apicenter" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
-                      Google Ads API Center <ExternalLink className="w-3 h-3" />
-                    </a>{" "}
-                    voor je Developer Token
-                  </li>
-                  <li>
-                    Genereer een Refresh Token via de{" "}
-                    <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
-                      OAuth Playground <ExternalLink className="w-3 h-3" />
-                    </a>{" "}
-                    met scope <code className="font-mono text-micro">https://www.googleapis.com/auth/adwords</code>
-                  </li>
-                  <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
-                </ol>
-              </div>
-            </div>
-          )}
-        </div>
+          }
+        />
 
         {/* ── Meta Ads ────────────────────────────────────────── */}
-        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue-ink text-title">Meta Ads API</h3>
-            <StatusBadge connected={metaConnected} />
-          </div>
-
-          {metaConnected ? (
+        <KoppelingKaart
+          provider="meta"
+          label="Meta Ads"
+          beschrijving="Campagnedata van het gekoppelde Meta-advertentieaccount."
+          koppeling={status?.koppelingen.meta ?? null}
+          onGewijzigd={refetchStatus}
+          envFallback={
             <div className="space-y-4">
-              <div className="px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800 font-medium">Access Token geconfigureerd</p>
-                <p className="text-xs text-green-700 mt-1">
-                  {status?.metaAds.hasAppCredentials
-                    ? "App ID en Secret zijn ingesteld — token kan automatisch verlengd worden."
-                    : "Geen App ID/Secret — token verloopt na ~60 dagen en moet handmatig vernieuwd worden."}
-                </p>
+              <p>Of voeg deze variabelen toe aan je <code className="font-mono">.env.local</code>:</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between"><EnvVar name="META_ADS_ACCESS_TOKEN" /><span className="text-micro">Verplicht</span></div>
+                <div className="flex items-center justify-between"><EnvVar name="META_ADS_APP_ID" /><span className="text-micro">Optioneel</span></div>
+                <div className="flex items-center justify-between"><EnvVar name="META_ADS_APP_SECRET" /><span className="text-micro">Optioneel</span></div>
               </div>
-
-              <Button
-                onClick={testMeta}
-                variant="outline"
-                className="w-full gap-2"
-                disabled={testingMeta}
-              >
-                {testingMeta ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                Verbinding testen
-              </Button>
-
-              {metaResult && (
-                <div className={`px-4 py-3 rounded-lg text-sm ${
-                  metaResult.startsWith("Verbonden")
-                    ? "bg-green-50 border border-green-200 text-green-800"
-                    : "bg-red-50 border border-red-200 text-red-800"
-                }`}>
-                  {metaResult}
+              <ol className="space-y-1.5 list-decimal list-inside">
+                <li>Ga naar <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Meta for Developers <ExternalLink className="w-3 h-3" /></a> en maak een app aan (type: Business)</li>
+                <li>Voeg de Marketing API product toe aan je app</li>
+                <li>Genereer een User Access Token via de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Graph API Explorer <ExternalLink className="w-3 h-3" /></a> met permissions: <code className="font-mono text-micro">ads_read, ads_management</code></li>
+                <li>Wissel het token om voor een long-lived token (geldig ~60 dagen)</li>
+                <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
+              </ol>
+              {status?.metaAds.configured && (
+                <div className="pt-2 border-t border-border">
+                  <Button onClick={testMeta} variant="outline" size="sm" className="w-full gap-2" disabled={testingMeta}>
+                    {testingMeta ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Env-verbinding testen
+                  </Button>
+                  {metaResult && <p className="mt-2">{metaResult}</p>}
                 </div>
               )}
             </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-body text-muted-foreground">
-                Voeg de volgende variabelen toe aan je <code className="font-mono text-xs">.env.local</code>:
-              </p>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <EnvVar name="META_ADS_ACCESS_TOKEN" />
-                  <span className="text-micro text-muted-foreground">Verplicht</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <EnvVar name="META_ADS_APP_ID" />
-                  <span className="text-micro text-muted-foreground">Optioneel (token refresh)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <EnvVar name="META_ADS_APP_SECRET" />
-                  <span className="text-micro text-muted-foreground">Optioneel (token refresh)</span>
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-4 space-y-2">
-                <p className="text-xs font-semibold text-rm-gray">Hoe kom je aan deze keys?</p>
-                <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                  <li>
-                    Ga naar{" "}
-                    <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
-                      Meta for Developers <ExternalLink className="w-3 h-3" />
-                    </a>{" "}
-                    en maak een app aan (type: Business)
-                  </li>
-                  <li>Voeg de Marketing API product toe aan je app</li>
-                  <li>
-                    Genereer een User Access Token via de{" "}
-                    <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
-                      Graph API Explorer <ExternalLink className="w-3 h-3" />
-                    </a>{" "}
-                    met permissions: <code className="font-mono text-micro">ads_read, ads_management</code>
-                  </li>
-                  <li>Wissel het token om voor een long-lived token (geldig ~60 dagen)</li>
-                  <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
-                </ol>
-              </div>
-            </div>
-          )}
-        </div>
+          }
+        />
 
         {/* ── LinkedIn Ads ────────────────────────────────────── */}
-        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-rm-blue-ink text-title">LinkedIn Ads API</h3>
-            <span className="text-meta text-muted-foreground px-2 py-0.5 rounded-full bg-gray-100">Via .env.local</span>
-          </div>
-          <div className="space-y-4">
-            <p className="text-body text-muted-foreground">
-              Het LinkedIn-datamodel en de sync-laag staan klaar. Voeg de volgende variabelen toe aan je{" "}
-              <code className="font-mono text-xs">.env.local</code> om de koppeling te activeren:
-            </p>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <EnvVar name="LINKEDIN_CLIENT_ID" />
-                <span className="text-micro text-muted-foreground">Verplicht</span>
+        <KoppelingKaart
+          provider="linkedin"
+          label="LinkedIn Ads"
+          beschrijving="Campagnedata van het gekoppelde LinkedIn-advertentieaccount."
+          koppeling={status?.koppelingen.linkedin ?? null}
+          onGewijzigd={refetchStatus}
+          envFallback={
+            <div className="space-y-4">
+              <p>Of voeg deze variabelen toe aan je <code className="font-mono">.env.local</code>:</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between"><EnvVar name="LINKEDIN_CLIENT_ID" /><span className="text-micro">Verplicht</span></div>
+                <div className="flex items-center justify-between"><EnvVar name="LINKEDIN_CLIENT_SECRET" /><span className="text-micro">Verplicht</span></div>
+                <div className="flex items-center justify-between"><EnvVar name="LINKEDIN_REFRESH_TOKEN" /><span className="text-micro">Verplicht</span></div>
               </div>
-              <div className="flex items-center justify-between">
-                <EnvVar name="LINKEDIN_CLIENT_SECRET" />
-                <span className="text-micro text-muted-foreground">Verplicht</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <EnvVar name="LINKEDIN_REFRESH_TOKEN" />
-                <span className="text-micro text-muted-foreground">Verplicht</span>
-              </div>
-            </div>
-            <div className="border-t border-border pt-4 space-y-2">
-              <p className="text-xs font-semibold text-rm-gray">Hoe kom je aan deze keys?</p>
-              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                <li>
-                  Maak een app aan in het{" "}
-                  <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">
-                    LinkedIn Developer Portal <ExternalLink className="w-3 h-3" />
-                  </a>
-                </li>
+              <ol className="space-y-1.5 list-decimal list-inside">
+                <li>Maak een app aan in het <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">LinkedIn Developer Portal <ExternalLink className="w-3 h-3" /></a></li>
                 <li>Vraag toegang aan tot de Advertising API (Marketing Developer Platform)</li>
                 <li>Genereer via OAuth2 een refresh token met scope <code className="font-mono text-micro">r_ads, r_ads_reporting</code></li>
                 <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
               </ol>
             </div>
-          </div>
-        </div>
+          }
+        />
+
+        {/* ── GA4 ─────────────────────────────────────────────── */}
+        <KoppelingKaart
+          provider="google_analytics"
+          label="Google Analytics 4"
+          beschrijving="Website-/funnelcontext die de kanaal-SOP's verrijkt (tracking, CRO, kanaal-conversiekloof). Geen los kanaal — een verklarende laag naast Google Ads/Meta/LinkedIn."
+          koppeling={status?.koppelingen.google_analytics ?? null}
+          onGewijzigd={refetchStatus}
+          envFallbackLabel="Wat is hiervoor nodig?"
+          envFallback={
+            <div className="space-y-2">
+              <p>Geen aparte env-vars — dit hergebruikt dezelfde OAuth-client als Google Ads.</p>
+              <ol className="space-y-1.5 list-decimal list-inside">
+                <li>Zorg dat <code className="font-mono text-micro">GOOGLE_ADS_CLIENT_ID</code>/<code className="font-mono text-micro">GOOGLE_ADS_CLIENT_SECRET</code> gezet zijn (zelfde Google Cloud-project)</li>
+                <li>Schakel de <a href="https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Google Analytics Data API <ExternalLink className="w-3 h-3" /></a> in voor dat project</li>
+                <li>Vul per klant de GA4-property en key events in bij de klantinstellingen</li>
+              </ol>
+            </div>
+          }
+        />
+
+        {/* ── Search Console ──────────────────────────────────── */}
+        <KoppelingKaart
+          provider="search_console"
+          label="Google Search Console"
+          beschrijving="Organisch zoekverkeer per query/pagina — verifieert merk-cannibalisatie en signaleert positieverval, onafhankelijk van de advertentieplatforms."
+          koppeling={status?.koppelingen.search_console ?? null}
+          onGewijzigd={refetchStatus}
+          envFallbackLabel="Wat is hiervoor nodig?"
+          envFallback={
+            <div className="space-y-2">
+              <p>Geen aparte env-vars — dit hergebruikt dezelfde OAuth-client als Google Ads.</p>
+              <ol className="space-y-1.5 list-decimal list-inside">
+                <li>Zorg dat <code className="font-mono text-micro">GOOGLE_ADS_CLIENT_ID</code>/<code className="font-mono text-micro">GOOGLE_ADS_CLIENT_SECRET</code> gezet zijn (zelfde Google Cloud-project)</li>
+                <li>Schakel de <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Search Console API <ExternalLink className="w-3 h-3" /></a> in voor dat project</li>
+                <li>Vul per klant de site-URL en merktermenlijst in bij de klantinstellingen</li>
+              </ol>
+            </div>
+          }
+        />
       </div>
 
       {/* Architecture info */}

@@ -2,6 +2,7 @@ import { mapRsaAssetApiRow, mapAdMetaApiRow, applyAdText, buildAdTextMap, type R
 import { recordFetchFailure } from "./fetch-failures";
 import { logger } from "@/lib/logger";
 import type { RuweRegioRij, GeoDoelLabel } from "@/lib/geo/region-rows";
+import { exchangeRefreshToken } from "./google-oauth";
 /**
  * Google Ads API client
  *
@@ -134,41 +135,15 @@ export interface GoogleAdsConversionAction {
 
 const API_VERSION = "v23";
 const BASE_URL = `https://googleads.googleapis.com/${API_VERSION}`;
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 // ── OAuth2 Token Management ──────────────────────────────────────────────────
-
-let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+//
+// Het refresh-token→access-token-blok zelf staat in lib/api/google-oauth.ts, gedeeld met GA4 en
+// Search Console (zelfde Google-OAuth-client, andere scope) en gecached per bureau in plaats van
+// in een kale module-variabele — zie de opmerking daar over waarom dat verschil ertoe doet.
 
 export async function getAccessToken(credentials: GoogleAdsCredentials): Promise<string> {
-  // Return cached token if still valid (with 60s buffer)
-  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 60_000) {
-    return cachedAccessToken.token;
-  }
-
-  const response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: credentials.clientId,
-      client_secret: credentials.clientSecret,
-      refresh_token: credentials.refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Google OAuth2 token refresh failed: ${error}`);
-  }
-
-  const data = await response.json();
-  cachedAccessToken = {
-    token: data.access_token,
-    expiresAt: Date.now() + data.expires_in * 1000,
-  };
-
-  return cachedAccessToken.token;
+  return exchangeRefreshToken(credentials.clientId, credentials.clientSecret, credentials.refreshToken);
 }
 
 // ── Campaign Metadata ───────────────────────────────────────────────────────

@@ -19,9 +19,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // SECURITY DEFINER en EXECUTE alleen voor service_role. Dat is bovendien de nauwere deur: de
 // applicatie kan één geheim zetten en één geheim ophalen, en niet de hele kluis doorzoeken.
 
-export type Provider = "google_ads" | "meta" | "linkedin";
+// "google_analytics" en niet "ga4": de vault-naamregex in migratie 063 (^oauth_[a-z_]+_...) staat
+// geen cijfers toe in het providersegment, en "ga4" bevat er een. Bewust geen migratie om die
+// regex te verruimen — een provider-naam zonder cijfer is de kleinere, veiligere wijziging. De
+// GA4-module zelf (lib/ga4/) heet ongewijzigd ga4; dit is uitsluitend de OAuth-providerwaarde.
+export type Provider = "google_ads" | "meta" | "linkedin" | "google_analytics" | "search_console";
 
-export const PROVIDERS: readonly Provider[] = ["google_ads", "meta", "linkedin"];
+export const PROVIDERS: readonly Provider[] = ["google_ads", "meta", "linkedin", "google_analytics", "search_console"];
 
 export type KoppelingStatus = "actief" | "verlopen" | "ingetrokken" | "fout";
 
