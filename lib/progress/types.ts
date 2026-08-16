@@ -4,7 +4,10 @@ export type GenerationJobType =
   | "weekly_sop"
   | "second_opinion"
   | "report_generation"
-  | "pdf_generation";
+  | "pdf_generation"
+  /** Fase 3 (migratie 089): bewijst de action-queue-mechaniek, geen echte analyse. Zie
+   *  app/api/cron/process-action-queue/route.ts. */
+  | "queue_smoke_test";
 
 export type GenerationJobStatus =
   | "queued"
@@ -42,6 +45,13 @@ export interface GenerationJobRow {
   error_message: string | null;
   partial_output_exists: boolean;
   metadata: Record<string, unknown> | null;
+  /** Migratie 004/089: mislukkingsteller voor de action queue. Telt mislukkingen, niet claims —
+   *  zie de kolomcommentaar op generation_jobs.attempts en process-action-queue/route.ts. */
+  attempts: number;
+  /** Migratie 004/089: vroegste claim-moment; null betekent "zo snel mogelijk". */
+  scheduled_for: string | null;
+  /** Migratie 004: wie/wat de job aanmaakte (nog ongebruikt buiten het schema zelf). */
+  triggered_by: string | null;
 }
 
 export interface GenerationJobEventRow {

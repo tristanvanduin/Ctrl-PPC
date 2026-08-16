@@ -72,6 +72,11 @@ export const JOB_PHASES: Record<GenerationJobType, GenerationPhaseDefinition[]> 
     { key: "store_artifact", label: "PDF opslaan..." },
     { key: "done", label: "Gereed" },
   ],
+  queue_smoke_test: [
+    { key: "init", label: "Initialiseren..." },
+    { key: "run", label: "Testaanroep via de laagroutering..." },
+    { key: "done", label: "Gereed" },
+  ],
 };
 
 export function getPhaseDefinitions(jobType: GenerationJobType): GenerationPhaseDefinition[] {
@@ -134,6 +139,9 @@ export function buildQueuedJob(input: {
     error_message: null,
     partial_output_exists: false,
     metadata: input.metadata ?? {},
+    attempts: 0,
+    scheduled_for: null,
+    triggered_by: null,
   };
 }
 

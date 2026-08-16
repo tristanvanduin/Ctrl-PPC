@@ -795,12 +795,9 @@ het product waarmaakt wat het belooft (besluit, herbevestigd 15 augustus) — ee
 nooit doorbreekt als de poort alle kanalen tegelijk eist. Zie sectie 12, die dit risico al benoemde
 voordat het zich voordeed, en fase 5 hieronder voor wat dit betekent voor "een klant die wil".
 
-### Fase 3: uitvoering en werkvoorraad
+### Fase 3: uitvoering en werkvoorraad — **KLAAR (infrastructuur), ontkoppelen van echte SOP's is een aparte, latere beslissing**
 **Poort: fase 2 groen.**
 
-- `generation_jobs` uitbreiden tot volwaardige action queue
-- Claim-logica met `FOR UPDATE SKIP LOCKED`
-- Verwerking via Vercel Scheduled Route, aangesloten op `llm-router` en `uitgavenplafond`
 - ~~**`llm-router` omzetten naar OpenRouter met meerdere modellen** (besluit 2)~~ — **gedaan**
   (`622ea81`, `7646638`). `callRouted()` draait op echt OpenRouter; ernaast staat nu `callLayer()`
   met een laagroutering (`LAYER_MODEL`: triage/narrative/reasoning) die een model kiest per soort
@@ -809,8 +806,53 @@ voordat het zich voordeed, en fase 5 hieronder voor wat dit betekent voor "een k
   `runAnalysis`), de search-terms-batches (triage) en monthly step 13 (reasoning, want dat is
   multi-hop-redeneren over stap 1-12) zijn gemigreerd. `callRouted()` blijft bestaan voor
   aanroepers die er nog op steunen — geen brede migratie in dezelfde wijziging als de laag zelf.
-  De overige drie punten van deze fase (action queue, claim-logica, scheduled route) staan nog
-  open; de fase als geheel is dus nog niet klaar.
+- ~~`generation_jobs` uitbreiden tot volwaardige action queue~~ / ~~Claim-logica met
+  `FOR UPDATE SKIP LOCKED`~~ / ~~Verwerking via Vercel Scheduled Route~~ — **gedaan, met een
+  bewuste scope-beperking.** `generation_jobs` bleek vandaag geen queue maar een SYNCHRONE
+  progress-tracker: elke SOP-route (`monthly`/`weekly`/`biweekly`/`second_opinion`/
+  `report_generation`/`pdf_generation`) schrijft de jobrij en doet het werk in dezelfde
+  HTTP-request; niets pollde ooit op `status = 'queued'` om werk te *starten*. Migratie 004 had
+  `attempts`/`scheduled_for`/`triggered_by` al klaarstaan maar ongebruikt.
+
+  Sessiebeslissing: **infrastructuur eerst, ontkoppelen later.** `claim_generation_job()`
+  (migratie 089, gefixt in 090) claimt atomisch met `FOR UPDATE SKIP LOCKED` — select en update
+  in dezelfde PL/pgSQL-functie, dus dezelfde impliciete transactie. `app/api/cron/
+  process-action-queue/route.ts` is de scheduled route (zelfde skelet als
+  `evaluate-hypotheses`/`evaluate-code-rood`: fail-closed op `CRON_SECRET`, `?dry_run=true`,
+  per-item try/catch), aangesloten op zowel `callLayer()` als `controleerPlafond()`
+  (uitgavenplafond) vóór elke verwerking. Retry-beleid is exact 004's kolomcommentaar: `attempts`
+  telt mislukkingen, eerste mislukking krijgt 30 minuten backoff, een tweede is definitief
+  (`lib/analysis/action-queue.ts`, puur en apart getest).
+
+  Bewust NOG GEEN echt job_type hierlangs: de zes bestaande SOP-routes blijven volledig
+  synchroon. Bewezen met het aparte job_type `queue_smoke_test` (migratie 089) — geen consument
+  buiten deze route en zijn verificatie. Welk echt job_type ooit ontkoppeld wordt van zijn
+  synchrone pad is een aparte beslissing; dat vergt het herschrijven van de aanroepende route zelf
+  (nu: job aanmaken + synchroon uitvoeren; straks: job aanmaken + queued laten staan).
+
+  **Twee bugs gevonden via live verificatie tegen productie, allebei gefixt in migratie 090:**
+  1. `claim_generation_job` (089) had `returns generation_jobs` (composiet) met `return null` bij
+     een lege queue — PL/pgSQL/PostgREST serialiseert dat als een rij-van-nulls, geen JSON null.
+     In JavaScript is dat object truthy, dus de stoplogica in de route sloeg nooit aan: een echte
+     testrun verwerkte 24 fantoomjobs voordat de eigen veiligheidscap (25) hem stopte. Gefixt met
+     `setof generation_jobs` (een echte lege result-set) plus een tweede, onafhankelijke check in
+     de route zelf.
+  2. **Pre-existing, niet door dit werk veroorzaakt:** `generation_job_events` had nooit een
+     unique constraint op `(job_id, phase_key)`, terwijl `lib/progress/server.ts`'s
+     `upsertEvent()` daar al sinds het bestaan van het progress-systeem van uitgaat.
+     `onConflict:"job_id,phase_key"` faalde daardoor stil (gelogd, nooit doorgegooid) bij elke
+     fase-overgang in elke echte SOP-run — de zichtbare voortgangsbalk werkt (aparte, losse
+     update), maar de fijnmazige gebeurtenissengeschiedenis is al die tijd niet weggeschreven.
+     Migratie 090 voegt de ontbrekende constraint toe (geverifieerd: 1.926 bestaande rijen, nul
+     duplicaten op dat paar — veilig additief).
+
+  Geverifieerd tegen productie met wegwerpbare `queue_smoke_test`-rijen: gelijktijdige claims op
+  twee rijen leveren gegarandeerd verschillende ids op (geen dubbele claim), een lege queue geeft
+  na de fix een echte null, een volledige run (claim → echte `callLayer`-call → `markProgress
+  Completed`, inclusief fase-events) slaagt, een kunstmatig laag uitgavenplafond blokkeert de
+  verwerking en zet de job terug naar queued zonder een mislukking te boeken, en een bekend maar
+  niet-geregistreerd job_type (`pdf_generation`) faalt expliciet in plaats van stil te blijven
+  hangen. Alles opgeruimd na de test, geen sporen achtergebleven.
 
 ### Fase 4: het geheugen
 **Poort: fase 3 groen.**
