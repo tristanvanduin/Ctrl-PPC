@@ -531,7 +531,8 @@ vastgelegd omdat sectie 0 dit document bindend maakt voor wat er staat — en di
 niet.
 
 **Wat het niet is:** de False Positive Prevention uit sectie 5.2 (betaald-vs-organisch via
-Search Console). Dat blijft een apart, open probleem. Master Synthesis werkt met wat er al is:
+Search Console). Dat blijft een apart, open probleem — uitgewerkt tot een bouwbare detector in
+sectie 5.6.2. Master Synthesis werkt met wat er al is:
 de per-kanaal monthly-SOP's van Google, Meta en LinkedIn draaien allemaal al (elk hun eigen zes
 pijlers, zie de adapter-consolidatie in Fase 3 hierboven) en leveren `sop_recommendations`/
 `sop_tasks` op. Master Synthesis leest die output terug, samen met de deterministische
@@ -569,6 +570,215 @@ catalogus-tracking. Migratie 088 gaf beide tabellen de `metadata jsonb`-kolom di
   schrijfbaar (view over `fact_core`, niet over `*_legacy` zoals voor de overige zes
   feitentabellen) — geen documentatiefout, `feitentabellen.ts` blijft correct voor waar de sync
   schrijft; de projectie via `refresh_fact_from_legacy()` (migratie 044/054) doet de rest.
+
+### 5.6 Nieuwe bronnen: het inzichtenplan op papier (16 augustus)
+
+Uitgewerkt op verzoek, tegen de officiële API-documentatie van elk platform (Google Analytics
+Data API, Google Search Console, Shopify Admin API, WooCommerce REST API, Microsoft Advertising
+API, Bing Webmaster Tools API, TikTok Ads Marketing API, TikTok Shop Partner API) — niet tegen
+aannames. Blijft documentatie: geen migratie, geen route, geen code. Live verifiëren kan pas met
+echte OAuth-toegang per platform, en die ontbreekt vandaag ("blijft open", zie sectie 6).
+
+**Dit is geen fase-6/7-poort.** Sectie 11 verbiedt bouwen voor een klant die er niet is — maar
+deze zes bronnen dienen de klant die er al is, op dezelfde manier als Google/Meta/LinkedIn dat nu
+doen. De poort hier is credentials, niet klantaantal. Waar bruikbaar wordt hieronder gebouwd op
+wat al vastligt: sectie 5.2's drie False-Positive-Prevention-regels (betaald/organisch/vraag) en
+de bestaande GA4-signalenlaag (`lib/ga4/signals.ts`).
+
+#### 5.6.0 Architectuur: drie rollen, geen nieuwe machinerie
+
+Zes bronnen, maar geen zes keer dezelfde vraag "hoe past dit in de pijplijn" — ze vallen in drie
+rollen, en de rol bepaalt waar iets landt:
+
+| Rol | Bronnen | Landt als | Voorbeeld dat al bestaat |
+|---|---|---|---|
+| **A. Verklarende/verificatielaag** | GA4, Search Console, Bing Webmaster Tools | Geen eigen kanaal — annoteert een bestaand betaald kanaal met een aparte, kleinere kanaal-union en een bewijsbasis-label | `Ga4Channel = "google"\|"meta"\|"linkedin"\|"other"` (`lib/ga4/types.ts`), losstaand van `ChannelKey` |
+| **B. Betaald kanaal** | Microsoft Ads, TikTok Ads | Een echt nieuw kanaal — synctabel, adapter, opname in `ChannelKey` en `Channel` | `Channel` (`lib/decision/types.ts:36`) heeft `"microsoft"` en `"tiktok_ads"` al gereserveerd, bewust zonder provider |
+| **C. Grondwaarheid over omzet** | Shopify, WooCommerce, TikTok Shop | Geen kanaal, geen verklaring van gedrag — een onafhankelijke check op wat een betaald kanaal zelf claimt te hebben opgeleverd | Nieuw patroon; dichtst bijstaand precedent is hoe GSC (rol A) een bestaande heuristiek verifieert, hier toegepast op omzet in plaats van ranking |
+
+Twee dingen die uit deze indeling volgen en die de rest van deze sectie aanhoudt:
+
+1. **Rol A en C breiden `ChannelKey` (`lib/cross-channel/lens-facts.ts:13`, vandaag hardcoded
+   `"google_ads"\|"meta_ads"\|"linkedin_ads"`) niet uit.** Alleen rol B doet dat, en pas zodra er
+   een synctabel is — exact de reden die `channel-provider.ts:17-21` al geeft voor waarom
+   `microsoft`/`tiktok_ads` nog geen provider hebben.
+2. **Geen van de zes heeft een nieuwe `SignalCategory` nodig.** De acht bestaande
+   (`lib/signals/types.ts:8-16`) dekken alles hieronder: cross-channel-verificatie valt onder
+   `cross_channel`, omzetwaarheid onder `conversie_meting`, videocompletion-vermoeidheid onder
+   `creative`, Quality-Score-uitsplitsing onder `kwaliteit`. Dat is zelf een signaal dat het
+   bestaande frame goed ontworpen is — het is niet gebouwd met deze zes bronnen in gedachten en
+   dekt ze toch.
+
+**Hoe een uitkomst verwerkt wordt — geen nieuwe wiring, hergebruik van wat al draait.** Elke
+detector hieronder levert `SignalStory`/`DetectionResult` op, exact het frame dat
+`lib/ga4/signals.ts` en `lib/cross-channel/funnel-overlap.ts` vandaag al gebruiken. Die stromen
+automatisch mee in `groupDefs` (`app/api/analysis/cross-channel/route.ts`) →
+`sop_analysis_output`'s `cross_channel_groups_v1` → `lib/decision/evidence/cross-channel-facts.ts`
+voor Master Synthesis → de bestaande hypothese-paden → `sprint_hypotheses` →
+`agency_memory_events`. Zodra een detector een `SignalStory` teruggeeft is er niets meer te
+bedraden — dat is precies waarom deze architectuur zo is opgezet, en waarom het antwoord op "zijn
+deze al verweven" voor rol A/B/C hetzelfde is als voor GA4 vandaag: ja, zodra de detector bestaat.
+
+**Concreet: hoe een uitkomst tot een beslissing wordt — de merk-cannibalisatie-casus.** Dit werkt
+sectie 5.2's derde regel ("betaald zoekverkeer daalt, alles stabiel: nu pas is het een
+accountprobleem") uit tot iets dat ook zonder dalend verkeer al iets zegt, met Search Console als
+onafhankelijke bron naast de bestaande `isBranded`-heuristiek in `funnel-overlap.ts`:
+
+| Search Console zegt | `isBranded`-heuristiek zegt | Uitkomst |
+|---|---|---|
+| Merkterm rankt ≤ positie 1,3, CTR op of boven de eigen baseline, ≥ 90 dagen bewijs (drempels: 5.6.2) | Campagne draait op merktermen | **Bewezen binnen platform.** Beide bronnen zijn het eens; voorstel voor een brand-pause-test als hypothese. |
+| Zelfde organische dominantie | Campagne draait NIET op merktermen | **Datakwaliteitssignaal, geen optimalisatieclaim.** De twee bronnen spreken elkaar tegen over wat dezelfde campagne is — dat gaat over campagnenaamgeving controleren, niet over budget verschuiven. |
+| Onvoldoende GSC-volume (< drempel) | Campagne draait op merktermen | **Geen wijziging.** Afwezigheid van GSC-bewijs is geen bewijs van afwezigheid; de heuristiek-only-claim blijft op zijn eigen, lagere zekerheid staan — nooit stilzwijgend opgewaardeerd, nooit afgekeurd. |
+
+Dezelfde vorm (bronnen die het eens zijn → hoge zekerheid; bronnen die botsen → datakwaliteit, niet
+een claim; te weinig bewijs → geen wijziging) is het sjabloon voor elke rol-A/C-detector hieronder,
+niet alleen deze ene casus.
+
+**Eén concrete, bijna-gratis cross-kanaal-join, gevonden tijdens dit onderzoek.** Microsoft
+Advertising's "Google Ads Import" (een bestaande, eerste-partij-functie van Microsoft zelf, geen
+iets dat Ctrl PPC bouwt) kopieert campagne-/advertentiegroep-/zoekwoordstructuur 1-op-1 van Google
+Ads naar Bing Ads, inclusief namen. Bureaus die dat gebruiken (en dat zijn de meeste die Bing
+Ads naast Google Ads draaien) geven daarmee gratis een sleutel om Google- en Bing-campagnes op
+naam te koppelen — geen fuzzy matching nodig. Dat maakt een "import-drift"-detector (5.6.4)
+ongewoon goedkoop te bouwen zodra de Bing-adapter er is.
+
+#### 5.6.1 GA4 — uitbreiding op de bestaande signalenlaag
+
+De vier bestaande detectoren (`lib/ga4/signals.ts`) dekken alleen conversieverschillen. De GA4
+Data API (`runReport`) ondersteunt veel meer: acquisitie-nieuw-vs-terugkerend, ecommerce-
+funnelstappen, geografie, retentiecohorten, en GA4's eigen geïmporteerde Ads-kosten
+(`advertiserAdCost`) — bruikbaar om een kapotte GA4↔Ads-koppeling te detecteren, een ander
+faalpatroon dan de bestaande tracking-break-detector (die sessies-versus-key-events bekijkt, niet
+de kostenimport zelf).
+
+| Inzicht | Nieuwe velden nodig | Beslissing | Drempel |
+|---|---|---|---|
+| GA4-vs-platform-conversiekloof | `sessionDefaultChannelGroup` + `keyEvents`, naast al ingelezen platformconversies | Vertrouw je de gerapporteerde CPA van dit kanaal, of zit er een trackingprobleem onder | ≥300 GA4-sessies én ≥12 GA4-key-events, én ≥12 platformconversies, in hetzelfde venster |
+| Nieuw vs. terugkerend per kanaal | `newVsReturning` + kanaal | Koopt dit kanaal nieuwe klanten of remarket het naar bestaande | 300-sessiedrempel, apart op de "nieuw"- en "terugkerend"-deelverzameling |
+| Ecommerce-funnel-lek per kanaal | bestaande `Ga4Config.funnelSteps`, `eventName`/`eventCount` per stap | Op welke exacte stap lekt een kanaal — mediaprobleem of checkout-UX | ≥12 events op de laatste stap, hogere vloer op stap 1 |
+| GA4↔Ads-koppeling-health | `advertiserAdCost` vs. eigen Ads-kosten | Kapotte cost-import onderscheiden van een echte prestatiedaling | Alleen relevant met recente Ads-spend en een actieve GA4↔Ads-koppeling; anders `insufficient_data` |
+| Kanaal×device-matrix | geen nieuw veld — fijnere uitsplitsing van wat al opgehaald wordt | Vangt bv. Meta-mobiel dat onderpresteert terwijl blended mobiel er gezond uitziet | 300-sessiedrempel per cel — zal bij kleinere accounts vaak `insufficient_data` geven, en dat is correct |
+| Retentiecohorten per kanaal | `cohortSpec`/`cohortActiveUsers` | LTV-bewuste budgetallocatie | Alleen realistisch bij grotere accounts (cohorten worden snel te dun) |
+
+**Eerlijke grenzen.** GA4-UI-only "Explorations" (padanalyse, segment-overlap, cohort-Venn's) zijn
+niet via `runReport` op te halen — dat vergt BigQuery-export (event-level, optioneel, gratis tot
+~1M events/dag), een latere, apart te gaten uitbreiding, geen dag-1-feature. Bij grote
+propertyvolumes kan GA4 zelf gaan samplen (`samplingMetadatas` in de response); elke detector moet
+dat checken en het label meegeven — een gesamplede GA4-claim die zich voordoet als exact breekt
+zonder dat expliciet de vertrouwensdoctrine.
+
+#### 5.6.2 Search Console — verifieert een bestaande gok, werkt sectie 5.2 uit
+
+De sterkste vondst van dit hele onderzoek. `funnel-overlap.ts`'s `isBranded` is vandaag een gok
+op campagnenaamgeving; Search Console geeft een onafhankelijk, query-niveau signaal — rankt dit
+merkzoekwoord al #1 organisch met hoge CTR terwijl er ook op betaald wordt geboden. De decision
+tree in 5.6.0 legt vast hoe de twee bronnen samen tot een uitkomst komen; hier de rest van de
+bouwbare inzichten.
+
+| Inzicht | Velden | Beslissing | Drempel |
+|---|---|---|---|
+| **Merk-cannibalisatie** (5.6.0) | `query` (regex tegen een expliciete, door het bureau vastgelegde merktermenlijst — nooit afgeleid uit Ads-data, anders is het dezelfde gok verplaatst), `clicks`/`impressions`/`ctr`/`position`, `dataState=final` | Brand-pause-test voorstellen | ≥1.000 impressies over 90 dagen, aanwezig in ≥8 van de laatste 12 weekbuckets |
+| Eigen-baseline CTR-anomalie | `query`/`page` gebucket op positie, 90-180 dagen | Titel/meta-rewrite-kandidaat — nooit tegen een generieke CTR-tabel, altijd tegen de eigen site-curve | ≥30 rijen per positiebucket voor de baseline, ≥500 impressies voor een individuele flag |
+| Positie-drop-alert | `page`/`query` + `date`, trailing 7d/28d vs. voorgaand venster | Proactief klantsignaal vóór het als omzetdaling binnenkomt | Baseline-venster ≥1.000 impressies, drop ≥3 posities of paginaverschuiving, aangehouden in zowel 7d als 28d |
+| Niet-merk-overlap | non-branded `query`+`page`, gejoined tegen bestaande Ads-zoektermdata | Budget verschuiven waar organisch al sterk staat, of net andersom | ≥100 impressies/90d, ≥1.000 voor een CTR-claim |
+| Nieuwe/stijgende zoektermen | `query`, laatste 28d vs. voorgaand venster | Kandidatenlijst voor nieuwe advertentiegroepen | ≥50 impressies + ≥5 clicks, afwezig in de baseline |
+
+**Eerlijke grenzen.** Search Console anonimiseert laagvolume zoekwoorden — querytotalen tellen
+structureel niet op tot paginatotalen, geen bug maar een privacymaatregel van Google zelf, en
+elke detector moet die kloof als verwacht behandelen. Data komt met 2-3 dagen vertraging; de
+laatste dagen tellen niet mee (`dataState=final`).
+
+#### 5.6.3 Ecommerce: Shopify en WooCommerce, twee aparte connectors
+
+Grootste opbrengst, maar de sessie-eerlijkheid geldt hier het hardst: dit is geen signaallaag
+boven een bestaande sync zoals GA4/GSC, maar een nieuw datadomein (orders, klanten, refunds) dat
+vandaag nergens bestaat, ook niet als kale kolom. En het zijn structureel **twee** connectors, niet
+één bullet: Shopify is een gehost platform met OAuth-app-install en een uniform GraphQL-schema
+(REST is per 1 april 2025 gesloten voor nieuwe apps — dit moet GraphQL-only); WooCommerce is
+zelf-gehost met handmatig uitgewisselde API-sleutels (geen OAuth-consent-scherm) en een schema
+waarvan de VORM per klant verschilt — of attributiedata bestaat hangt af van of de winkel
+WooCommerce ≥8.5 draait met Order Attribution aan, of een los trackingplugin gebruikt, of niets.
+
+| Inzicht | Velden | Beslissing | Drempel |
+|---|---|---|---|
+| Refund-gecorrigeerde echte ROAS | `Order.totalPriceSet` + `Refund` (Shopify); order total + `refunds[]` (Woo), gejoined via UTM/kortingscode | Budget weg van kanalen wier ROAS materieel zakt zodra refunds meegeteld worden | ≥30 orders én ≥5 refund-events per kanaal; orders jonger dan de winkel se typische refundtermijn (14-30d) uitsluiten |
+| Ad-platform-conversiereconciliatie | ordertotaal per transactie-id vs. platform-gerapporteerde conversiewaarde (GA4 draagt `transaction_id` al) | Vangt kapotte/dubbele/verkeerde-valuta trackingconfiguratie | ≥20 gematchte orders — laag, want dit is een integriteitscheck, geen trendclaim |
+| Nieuw-vs-terugkerende-klantwaarde per kanaal | Shopify `Customer.numberOfOrders` (lifetime); Woo `orders_count` gededupliceerd op factuur-e-mail (guest checkout heeft `customer_id=0`) | Ontmaskert een kanaal met "goede ROAS" dat vooral bestaande klanten heractiveert | ≥30 orders per kanaal; volledige historie nodig om cold-start-vertekening te vermijden |
+| Kortingscode-lekkage per kanaal | `discountApplications`/`coupon_lines`, gejoined per kanaal, storewide codes uitgesloten | Marge-erosie boven wat het platform se eigen ROAS toont | ≥30 orders per kanaal met kortingsdata |
+| Product-niveau-mismatch | `LineItem` per kanaal vs. catalogusbrede omzetmix | Budget geconcentreerd op SKU's die ads niet verkopen, of andersom | ≥15-20 orders per SKU-kanaal-paar |
+
+**Eerlijke grenzen — expliciet, niet verzwegen.** Marge-bewuste ROAS is meestal niet bouwbaar:
+Shopify's `unitCost` is optioneel en vaak leeg (vooral dropshipping/POD), WooCommerce heeft
+**geen** kernveld hiervoor, alleen losse plugins met elk hun eigen schema. Dit hoort achter een
+dekkingscheck (bv. ≥80% van de omzet heeft een kostprijs) met `insufficient_data` als default,
+niet als vlaggenschipfunctie. Shopify's `read_orders`-scope levert standaard maar 60 dagen
+historie; volledige historie vergt de door Shopify apart goed te keuren `read_all_orders`-scope —
+niet aannemen dat een eerste koppeling meteen alle historie geeft. Voorraadrisico-detectie
+("product X raakt over 4 dagen op terwijl het geadverteerd wordt") is voor de helft eerlijk
+bouwbaar (uitverkooptempo uit orderdata, wél deterministisch) en voor de helft niet: geen enkele
+API koppelt automatisch welke campagne welke SKU adverteert — dat vergt een handmatige
+campagne-naar-SKU-koppeling van het bureau, en de gecombineerde claim mag pas verschijnen als die
+koppeling er is.
+
+#### 5.6.4 Microsoft Advertising (Bing Ads) + Bing Webmaster Tools
+
+`Channel` (`lib/decision/types.ts:36`) heeft `"microsoft"` al gereserveerd. Microsoft Advertising
+API v13/REST spiegelt Google Ads structureel (campagne→advertentiegroep→zoekwoord→advertentie,
+plus een los Reporting-endpoint) — de bestaande adapter-vorm is dus grotendeels herbruikbaar, niet
+een nieuw patroon. Twee dingen zijn beter dan bij Google: de Quality-Score-subcomponenten
+(verwachte CTR, advertentierelevantie, landingspagina-ervaring) komen los terug in plaats van
+alleen het totaal, en de rapportagehistorie gaat 36 maanden terug tegen een genereuze, expliciet
+gedocumenteerde limiet (40 req/sec, 60.000/min, 20 miljoen/dag).
+
+| Inzicht | Velden | Beslissing | Drempel |
+|---|---|---|---|
+| Quality-Score-uitsplitsing | `QualityScore`, `ExpCtr`, `AdRelevance`, `LandingPageExperience` | Optimalisatie-inspanning routeren naar advertentietekst, landingspagina of bod | ≥100 impressies/zoekwoord over 30d, stabiel ≥7d |
+| Zoekterm-mining (negatieven) | `SearchQueryPerformanceReport` | Negatieve zoekwoorden toevoegen | ≥20 clicks of ≥€50 spend, 0 conversies, 60d venster (ruimer dan Google — lager volume) |
+| **Import-drift** (5.6.0) | Zoekwoordtekst gematcht tussen Google Ads en Bing Ads (bijna gratis dankzij Microsoft se eigen "Google Ads Import") | Signaleert wanneer een terugkerende import handmatig getunede Bing-biedingen overschrijft, of wanneer de twee platforms structureel uit elkaar zijn gegroeid | ≥80% zoekwoordtekst-overlap geldt als "geïmporteerd paar", ≥14 dagen prestatie na import op beide kanten |
+| Device-mix-mismatch | Ad Performance Report per device | Vlagt niet-triviale mobiele biedaanpassingen als vermoedelijke Google-first-overblijfselen | ≥30d, ≥100 impressies per device-segment |
+
+**Search Console-equivalent bestaat, maar is dunner — en de eerlijke uitkomst is een lagere
+drempel, niet een geschrapt idee.** Bing Webmaster Tools API heeft geen vrije datumrange
+(`GetQueryStats` geeft een vast ~6-maands blok, geen `startDate`/`endDate`) en Bing se
+zoekaandeel ligt rond 4-9% van Google's — bij Search Console se eigen drempel (≥1.000 impressies/
+90d) zou een Bing-merkterm typisch op 50-150 impressies uitkomen, ruim onder de lat. De
+merk-cannibalisatie-detector uit 5.6.2 wordt daarom voor Bing een lagere-zekerheid-variant, niet
+weggelaten: **≥150 impressies/90d, aanwezig in ≥6 van de laatste 12 weekbuckets**, en expliciet
+gepositioneerd als iets dat bij de meeste MKB-klanten eerlijk op `insufficient_data` blijft staan
+— dat is de vertrouwensdoctrine die doet wat hij moet doen, geen tekortkoming.
+
+#### 5.6.5 TikTok Ads + TikTok Shop
+
+`Channel` heeft ook `"tiktok_ads"` én, apart, `"tiktok_shop"` al gereserveerd — terecht apart:
+TikTok Ads (`business-api.tiktok.com`) en TikTok Shop (`partner.tiktokshop.com`) zijn twee
+volledig gescheiden developer-oppervlakken met eigen app-registratie en eigen goedkeuring.
+**Rekenbudget: dit is niet een integratie van dezelfde dag.** TikTok se app-review is het
+zwaarst-gepoorte van de grote advertentie-API's — reken op 3-7 dagen, langer voor
+productievolume-toegang met een businessverificatie erbij.
+
+Video is een eersteklas, servergeleverde metriek (kwartiel-completion p25/50/75/100, 2s/6s
+watched) — geen proxy zoals Meta's hold-rate, die zelf al schat vanuit `1s-plays`/impressies. De
+bestaande Meta-vermoeidheidsdetector (FTIR: vermoeidheid vs. verzadiging via
+frequentie-versus-eerste-impressie) is als VORM herbruikbaar maar niet als formule: TikTok se
+algoritmische feed-distributie maakt frequentie geen functie van budget/doelgroepgrootte zoals bij
+Meta se forced-delivery, dus de onderliggende drempel moet op completion-rate-verval gebouwd
+worden, niet op hold-rate.
+
+| Inzicht | Velden | Beslissing | Drempel |
+|---|---|---|---|
+| Completion-rate-verval (vermoeidheid) | `video_views_p100`, `video_play_actions`, per advertentie over tijd | Creative-refresh-advies | ≥7 dagen, ≥1.000 video-plays/advertentie |
+| 2s-vs-6s-hook-drop | `video_watched_2s`, `video_watched_6s` | Onderscheidt een slechte hook van een slechte opbouw halverwege — een signaaltype dat Meta niet kan leveren (geen sub-3-seconden-checkpoints) | ≥500 plays |
+| Bereik-verzadiging-vs-vermoeidheid (TikTok-variant van FTIR) | `reach`, `frequency`, `video_views_p100` over tijd | Onderscheidt "algoritme heeft geen nieuw publiek meer" van "hetzelfde publiek haakt af" | ≥14 dagen dagelijkse reach+frequency |
+| Placement-verspilling (TikTok vs. Pangle) | `placement`, spend, conversies, CPA | Pangle uitsluiten waar CPA materieel slechter is — geen in-familie-surface zoals Meta se Audience Network, dus drempels opnieuw ijken, niet overnemen | ≥100 conversies verdeeld over placements |
+| **GMV Max organische-contaminatie-vlag** (TikTok Shop) | GMV Max-geattribueerde orders vs. Shop-ordertotalen voor dezelfde SKU's | Waarschuwt dat een gerapporteerde GMV Max-ROAS organische orders meetelt (TikTok se eigen attributieregel, geen bug) — een claim die een kanttekening nodig heeft, geen volle paid-attributiezekerheid | Vergt zowel Marketing-API- als Shop-Partner-API-toegang; tot beide er zijn blijft dit bewust `insufficient_data`, geen geschat cijfer |
+
+**Eerlijke grenzen.** Spark Ads (advertenties op boosted organische content) hebben geen
+bevestigd, eenduidig booleanveld in de standaard Reporting API dat "dit is boosted organisch"
+zegt — elke Spark-inzicht zou identiteits-/autorisatiemetadata op advertentiegroepniveau moeten
+joinen, niet zomaar uit reportingdata te lezen. TikTok se standaard attributievenster (7d klik/1d
+view, GMV Max 1d klik) is korter dan wat de bestaande Meta-adapter aanhoudt — elke nieuwe
+`insufficient_data`-drempel voor TikTok moet daarom krapper staan, niet hetzelfde Meta-getal
+hergebruiken.
 
 ---
 
