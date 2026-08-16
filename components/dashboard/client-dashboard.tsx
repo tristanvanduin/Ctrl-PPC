@@ -49,6 +49,7 @@ import { BrandingView } from "./branding-view";
 import { EventSettings } from "./event-settings";
 import { GeoCloneSettingsPanel } from "./geo-clone-settings";
 import { ChannelConversionSettings } from "./channel-conversion-settings";
+import { Ga4Settings } from "./ga4-settings";
 import { ChannelStructureAnalysis } from "./channel-structure-analysis";
 import { GeoCloneScope } from "./geo-clone-scope";
 import { TrackingAlert } from "./tracking-alert";
@@ -593,6 +594,7 @@ function SettingsSections({ client }: { client: Client }) {
           <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["kpi", "conversies", "overrides", "lag"]} />
           {/* Meta/LinkedIn direct onder de Google-conversie-acties: dezelfde vraag, ander kanaal. */}
           <ChannelConversionSettings clientId={client.id} />
+          <Ga4Settings clientId={client.id} />
         </div>
       )}
 
