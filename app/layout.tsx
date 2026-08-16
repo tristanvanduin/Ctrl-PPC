@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { THEMA_INIT_SCRIPT } from "@/components/ui/thema-schakelaar";
 import { BRAND_NAME } from "@/lib/branding/brand";
@@ -21,6 +21,14 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   title: `${BRAND_NAME}: SEA Dashboard`,
   description: "Revenue & Conversie Forecasting Dashboard voor het SEA-team",
+};
+
+// Stond nergens expliciet -- Next.js valt terug op zijn eigen default (width=device-width,
+// initial-scale=1), wat toevallig al goed genoeg was, maar nooit een bewuste keuze. Nu wel:
+// gedeeld voor alle routes, marketing en dashboard, vooruitlopend op het mobile-friendly-traject.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
