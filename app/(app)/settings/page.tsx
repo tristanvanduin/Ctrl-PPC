@@ -645,8 +645,12 @@ export default function SettingsPage() {
     if (succes && succes in OAUTH_PROVIDER_LABEL) {
       setOauthBanner({ soort: "ok", tekst: `${OAUTH_PROVIDER_LABEL[succes]} is verbonden.` });
     } else if (foutParam) {
-      const [provider] = foutParam.split("_");
-      const label = OAUTH_PROVIDER_LABEL[provider as Provider] ?? "De koppeling";
+      // Niet zomaar op de eerste underscore splitsen: "google_analytics" en "search_console"
+      // bevatten er zelf een. Match tegen de langste bekende providernaam die vooraan past.
+      const provider = (Object.keys(OAUTH_PROVIDER_LABEL) as Provider[])
+        .sort((a, b) => b.length - a.length)
+        .find((p) => foutParam.startsWith(`${p}_`) || foutParam === p);
+      const label = provider ? OAUTH_PROVIDER_LABEL[provider] : "De koppeling";
       setOauthBanner({ soort: "fout", tekst: `${label}: koppelen is niet gelukt (${foutParam}). Probeer het opnieuw.` });
     }
     if (succes || foutParam) {

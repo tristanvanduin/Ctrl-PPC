@@ -627,35 +627,51 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* De zijbalkkolom over de volle documenthoogte.
-     *
-     * De zijbalk zelf staat op `position: fixed` en dekt dus altijd precies één schermhoogte.
-     * Daaronder — bij een volledige schermafdruk, bij afdrukken naar PDF, en bij het doorveren
-     * van een trackpad voorbij het einde van de pagina — komt de pagina-achtergrond tevoorschijn
-     * en houdt de groene balk halverwege op. Op een pagina van vijfduizend pixels is dat een
-     * witte strook van vierduizend.
-     *
-     * Deze verloop legt dezelfde merkkleur over de eerste 18rem van het hele document, achter de
-     * zijbalk langs. De balk loopt daarmee altijd door tot onderaan, ongeacht hoe lang de pagina
-     * is of hoe je hem vastlegt. */
-    background-image: linear-gradient(
-      to right,
-      var(--brand-primary, #08288C) 0,
-      var(--brand-primary, #08288C) 18rem,
-      transparent 18rem
-    );
-    /* `repeat-y` en niet `no-repeat`.
-     *
-     * Het `body`-element is hier 3454 pixels hoog, maar zijn achtergrond wordt door de browser
-     * doorgegeven aan het canvas — en het positioneringsvlak dáárvan is dat van het wortelelement,
-     * en `html` staat op `h-full`: precies één schermhoogte. Met `no-repeat` werd het verloop dus
-     * één keer over 1200 pixels getekend en hield de groene kolom daar op, ongeacht hoe lang de
-     * pagina was. Dat is wat er nog stond nadat ik dacht het opgelost te hebben.
-     *
-     * Verticaal herhalen lost dat op zonder naad: het verloop loopt alleen naar rechts, dus elke
-     * herhaling ziet er identiek uit. Horizontaal herhalen zou wél fout zijn — dan tegelt de
-     * groene kolom over de hele breedte. */
-    background-repeat: repeat-y;
+  }
+
+  /* De zijbalkkolom over de volle documenthoogte — ALLEEN vanaf `lg` (1024px, moet in de pas
+   * blijven met de `lg:`-klassen in sidebar.tsx/layout.tsx die daar de vaste zijbalk tonen).
+   *
+   * De zijbalk zelf staat op `position: fixed` en dekt dus altijd precies één schermhoogte.
+   * Daaronder — bij een volledige schermafdruk, bij afdrukken naar PDF, en bij het doorveren
+   * van een trackpad voorbij het einde van de pagina — komt de pagina-achtergrond tevoorschijn
+   * en houdt de groene balk halverwege op. Op een pagina van vijfduizend pixels is dat een
+   * witte strook van vierduizend.
+   *
+   * Deze verloop legt dezelfde merkkleur over de eerste 18rem van het hele document, achter de
+   * zijbalk langs. De balk loopt daarmee altijd door tot onderaan, ongeacht hoe lang de pagina
+   * is of hoe je hem vastlegt.
+   *
+   * ── WAAROM DIT NIET ONVOORWAARDELIJK MAG STAAN (16 augustus, gevonden op productie) ────────
+   *
+   * Onder `lg` is de zijbalk `display: none` (hij komt alleen als los paneel over de content
+   * zodra de hamburger-knop hem opent) — maar deze achtergrond stond ongeacht breedte altijd
+   * aan. Het resultaat: een blauwe streep van 24px (de `p-6`-marge van `<main>`) die over de
+   * volle documenthoogte door elke pagina liep op elk scherm smaller dan 1024px, zonder dat er
+   * een zijbalk was om hem te verklaren. Gemeld als "het design is niet responsive" met een
+   * screenshot op ~954px breed — geen mobiel formaat, een heel gewoon laptopscherm. */
+  @media (min-width: 1024px) {
+    body {
+      background-image: linear-gradient(
+        to right,
+        var(--brand-primary, #08288C) 0,
+        var(--brand-primary, #08288C) 18rem,
+        transparent 18rem
+      );
+      /* `repeat-y` en niet `no-repeat`.
+       *
+       * Het `body`-element is hier 3454 pixels hoog, maar zijn achtergrond wordt door de browser
+       * doorgegeven aan het canvas — en het positioneringsvlak dáárvan is dat van het
+       * wortelelement, en `html` staat op `h-full`: precies één schermhoogte. Met `no-repeat`
+       * werd het verloop dus één keer over 1200 pixels getekend en hield de groene kolom daar
+       * op, ongeacht hoe lang de pagina was. Dat is wat er nog stond nadat ik dacht het
+       * opgelost te hebben.
+       *
+       * Verticaal herhalen lost dat op zonder naad: het verloop loopt alleen naar rechts, dus
+       * elke herhaling ziet er identiek uit. Horizontaal herhalen zou wél fout zijn — dan
+       * tegelt de groene kolom over de hele breedte. */
+      background-repeat: repeat-y;
+    }
   }
   html {
     @apply font-sans;
