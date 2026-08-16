@@ -817,7 +817,7 @@ voordat het zich voordeed, en fase 5 hieronder voor wat dit betekent voor "een k
   Sessiebeslissing: **infrastructuur eerst, ontkoppelen later.** `claim_generation_job()`
   (migratie 089, gefixt in 090) claimt atomisch met `FOR UPDATE SKIP LOCKED` — select en update
   in dezelfde PL/pgSQL-functie, dus dezelfde impliciete transactie. `app/api/cron/
-  process-action-queue/route.ts` is de scheduled route (zelfde skelet als
+  process-action-queue/route.ts` is de werker (zelfde skelet als
   `evaluate-hypotheses`/`evaluate-code-rood`: fail-closed op `CRON_SECRET`, `?dry_run=true`,
   per-item try/catch), aangesloten op zowel `callLayer()` als `controleerPlafond()`
   (uitgavenplafond) vóór elke verwerking. Retry-beleid is exact 004's kolomcommentaar: `attempts`
@@ -829,6 +829,13 @@ voordat het zich voordeed, en fase 5 hieronder voor wat dit betekent voor "een k
   buiten deze route en zijn verificatie. Welk echt job_type ooit ontkoppeld wordt van zijn
   synchrone pad is een aparte beslissing; dat vergt het herschrijven van de aanroepende route zelf
   (nu: job aanmaken + synchroon uitvoeren; straks: job aanmaken + queued laten staan).
+
+  **`vercel.json` bevat bewust GEEN cron-entry voor deze route** — expliciet besluit (16 augustus):
+  geen enkele automatische planning tot het product live is. De route zelf is onschadelijk zonder
+  planning (geen enkel job_type buiten `queue_smoke_test` heeft een handler, en niets maakt
+  `queue_smoke_test`-rijen aan buiten wegwerpbare verificatiescripts), maar dat is geen reden om
+  hem al te plannen. Handmatig aanroepen (met `CRON_SECRET`) blijft mogelijk voor verificatie; een
+  cron-entry toevoegen is een aparte, expliciete stap zodra dat gewenst is.
 
   **Twee bugs gevonden via live verificatie tegen productie, allebei gefixt in migratie 090:**
   1. `claim_generation_job` (089) had `returns generation_jobs` (composiet) met `return null` bij
