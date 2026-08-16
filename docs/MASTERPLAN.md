@@ -1594,3 +1594,50 @@ gecontroleerd, niet pas aan het eind.
 5.6.3–5.6.5 (Shopify/WooCommerce, Microsoft Ads, TikTok) en de zes extra GA4-detectoren uit de
 5.6.1-tabel (nieuw-vs-terugkerend, ecommerce-funnel-lek, GA4↔Ads-koppeling-health, kanaal×device-
 matrix, retentiecohorten) — een volgende, vergelijkbaar grote bouwronde.
+
+### 13.4 Twee productiebugs, gevonden en gefixt zodra ze zichtbaar werden (16 augustus)
+
+**Aanleiding.** Direct na het draaien van de migraties (13.3) meldde de opdrachtgever twee dingen
+vanaf de live site (`ctrlppc.com/settings`): een ruwe JSON-foutmelding bij het klikken op
+"Verbinden met Meta Ads", en een algemene klacht dat het ontwerp niet responsive is, met een
+screenshot op ~954px breed — geen mobiel formaat, een heel gewoon laptopscherm.
+
+**Bug 1 — ruwe JSON i.p.v. een nette foutmelding.** De "Verbinden"-knop doet een volledige
+paginanavigatie (`window.location.href`), geen `fetch`. `app/api/oauth/[provider]/start/route.ts`
+retourneerde bij een ontbrekende OAuth-client (Meta had inderdaad geen `META_ADS_APP_ID`/`_SECRET`
+gezet) een `Response.json(...)` — die dus letterlijk als paginabron in de browser verscheen:
+`{"error":"Meta Ads: geen OAuth-client geconfigureerd..."}`. De callback-route (Fase A, 13.3)
+redirecte al netjes terug naar `/settings?oauth_error=...` bij elke fout; de start-route deed dat
+niet. Gefixt: elke foutsituatie in `start/route.ts` redirect nu terug naar de settingspagina, met
+dezelfde foutcode-conventie. Bijvangst tijdens het fixen: de foutbanner-parser in
+`settings/page.tsx` splitste op de eerste underscore om de providernaam uit de foutcode te lezen —
+fout voor `google_analytics`/`search_console`, die zelf een underscore bevatten. Nu matcht hij
+tegen de langste bekende providernaam die past.
+
+**Bug 2 — een blauwe streep van 24px liep over de volle paginahoogte onder 1024px breed.**
+Nagegaan in plaats van aangenomen: eerst gereproduceerd op 954px (exact de gemelde breedte), toen
+bleek de eerste visuele indruk ("een brede blauwe baan van ~290px") bij precieze pixelsampling
+(Python/Pillow op een 1:1-crop, niet op het oog) een 24px-brede streep te zijn — precies de
+`p-6`-marge van `<main>`, niet breder. `app/globals.css` se `body`-achtergrondverloop (de merkkleur
+achter de vaste zijbalk, `repeat-y` zodat de kleur op een lange pagina niet halverwege ophoudt —
+zie de bestaande opmerking daar) stond **onvoorwaardelijk** aan, terwijl de zijbalk zelf pas vanaf
+`lg` (1024px, `sidebar.tsx`/`layout.tsx`) getoond wordt. Op elk smaller scherm bleef die
+24px-marge de merkkleur laten doorschijnen zonder dat er een zijbalk was om hem te verklaren — een
+navrant understatement voor "niet responsive": het was verificeerbaar, herleidbaar tot één regel,
+en al die tijd zichtbaar geweest op elk laptop-/tabletformaat onder 1024px. Gefixt met
+`@media (min-width: 1024px)` om de body-achtergrond, in de pas met de `lg:`-klassen die de zijbalk
+zelf tonen. Geverifieerd vóór/na met `getComputedStyle` en pixelsampling op 954/1024/1280px, niet
+alleen visueel beoordeeld.
+
+**Wat dit zegt over de eerdere sectie-13.2-conclusie.** Sectie 13.2 concludeerde na uitgebreide
+DOM-verificatie dat er geen horizontale overflow was en dat interactieve staten op 390px (mobiel)
+werkten — dat blijft waar, en is niet wat hier fout zat. Deze bug zat op een BREDERE band
+(desktop/laptop, 700–1023px) die niet in die eerdere ronde is getest: de aanname was steeds "smal
+= mobiel = getest op 390px, breed = desktop = de zijbalk staat er gewoon" — de tussenliggende band,
+waar de zijbalk al verborgen is maar de decoratieve achtergrond nog niet, viel buiten beide
+categorieën. Geen reden om sectie 13.2's bevindingen te herzien, wel een aanwijzing dat "getest op
+390px en op ≥1024px" niet hetzelfde is als "getest over de hele breedte" — de volgende
+mobiel/responsive-check moet expliciet een paar tussenliggende breedtes (700–1023px) meenemen, niet
+alleen de twee uiterste ankerpunten.
+
+Typecheck schoon, volledige testsuite (281 bestanden) en `next build` slagen na beide fixes.
