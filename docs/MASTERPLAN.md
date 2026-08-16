@@ -1493,14 +1493,29 @@ elk scherm, niet losse per-pagina problemen. De grids die al `grid-cols-1 sm:...
 (geconstateerd in de oorspronkelijke pilot-analyse) bleken dat dus ook daadwerkelijk correct te doen
 zodra de container zelf niet meer kunstmatig te breed werd geduwd.
 
-**Wat hiermee nog niet gezegd is:** afwezigheid van horizontale overflow is geen garantie dat
-alles ook prettig bruikbaar is op een klein scherm — brede tabellen/grafieken kunnen nog steeds
-gebruik maken van hun eigen `overflow-x-auto`-wrapper (correct, geen paginabrede overflow) zonder
-dat de tabel zelf al goed leesbaar is op 390px, en geen van de interactieve staten (tabs
-doorklikken, modals, drawers per scherm) is stuk voor stuk getest. Dat is de resterende, kleinere
-categorie werk — geen sidebar/layout-probleem meer, maar per-scherm content-kwaliteit — en kan
-gericht opgepakt worden zodra dat concreet nodig blijkt, in plaats van vooraf blind Settings →
-Insights → Portfolio → Client Dashboard → Decision Terminal langs te gaan.
+**Wat hiermee nog niet gezegd was, en inmiddels wél gecontroleerd (16 augustus, vervolgronde):**
+afwezigheid van horizontale overflow is geen garantie dat alles ook prettig bruikbaar is op een
+klein scherm. Nagegaan, niet aangenomen:
+
+- **Brede tabellen.** Alle tabelcomponenten in het dashboard (20 bestanden, o.a.
+  `campaign-table.tsx`, `forecast-table.tsx`) bouwen op de gedeelde `components/dashboard/
+  data-table.tsx`, die zijn `<table>` al in een `overflow-x-auto`-vlak zet. De ene uitzondering
+  (`components/insights/sprint-planning.tsx`, een eigen `<table>` buiten die component om) bleek
+  zelf ook al correct in `overflow-x-auto` te staan. Geen enkele tabel duwt de pagina breder dan
+  het scherm.
+- **Grafieken.** Elke grafiek in `components/dashboard/` gebruikt Recharts' `ResponsiveContainer
+  width="100%"` — al vloeibaar van opzet, geen vaste pixelbreedte om op vast te lopen.
+- **Interactieve staten op 390px, live doorgeklikt:** het meldingenpaneel, het gebruikersmenu en
+  de command palette (Cmd+K) openen alle drie binnen de viewport, leesbaar en zonder overflow; de
+  hoofdtabs op een klantpagina (Prestaties/Analyse & advies/Planning & rapportage/Instellingen)
+  vouwen al netjes naar een 2×2-rooster en wisselen correct van inhoud en subtabs bij een tik.
+
+Geen van deze checks vroeg om een codewijziging — het was zuiver verificatie, en de uitkomst is
+dat de per-scherm content-kwaliteit al in orde bleek te zijn zodra de layout-grondoorzaak en de
+zijbalk waren opgelost. Resteert: dezelfde soort check op een klantaccount met echte gesynchte
+data (kon niet in deze sandbox, geen live Google Ads/Meta-credentials) — vooral relevant voor
+rijke tabellen zoals de zoektermenlijst, die met honderden echte rijen anders ogen dan de lege
+demo-staat hierboven liet zien.
 
 **Timing.** Geen fase-poort, dus geen vaste datum. Fase 1, fase 2 en de gedeelde chrome van fase 3
 (inclusief de layout-grondoorzaak) staan er nu, breed doorgemeten. Resterend werk is losse
