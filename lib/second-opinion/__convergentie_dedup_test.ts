@@ -31,13 +31,19 @@ function makeMock(cfg: { oldPending?: string[]; insertFails?: boolean } = {}) {
       };
       return b;
     },
-    insert(rows: unknown[]) {
-      return {
-        then(res: (r: { error: { message: string } | null }) => void) {
-          ops.push({ type: "insert", table, rowCount: rows.length });
-          res({ error: cfg.insertFails ? { message: "insert faalde" } : null });
-        },
+    insert(rowsOrRow: unknown[] | Record<string, unknown>) {
+      // Ondersteunt zowel het kale .insert(rows) (oude aanroepers) als .insert(rows).select("id")
+      // (findings-to-hypotheses.ts, Fase 4: heeft de gegenereerde ids nodig voor memory-events),
+      // en zowel een array (bulk) als één los object (recordMemoryEvent schrijft één event
+      // tegelijk, net als de echte supabase-js .insert()).
+      const rows = Array.isArray(rowsOrRow) ? rowsOrRow : [rowsOrRow];
+      const settle = (res: (r: { data: { id: string }[] | null; error: { message: string } | null }) => void) => {
+        ops.push({ type: "insert", table, rowCount: rows.length });
+        res(cfg.insertFails
+          ? { data: null, error: { message: "insert faalde" } }
+          : { data: rows.map((_, i) => ({ id: `mock-${table}-${i}` })), error: null });
       };
+      return { then: settle, select(_cols: string) { return { then: settle }; } };
     },
     delete() {
       const filters: Record<string, unknown> = {};
@@ -66,16 +72,23 @@ function verdict(p: Partial<SearchTermVerdictInput>): SearchTermVerdictInput {
   return { searchTerm: "term", recommendedAction: "monitor", cost: 0, conversions: 0, ...p };
 }
 
+// sprint_hypotheses is de tabel waar deze test over gaat; Fase 4 voegt een tweede,
+// onafhankelijke schrijfactie toe (agency_memory_events, één insert per nieuw voorstel, zie
+// findings-to-hypotheses.ts's recordMemoryEvent-aanroep). De volgorde-checks filteren daarom op
+// tabel, zodat ze blijven kloppen ongeacht hoeveel memory-events er onderweg bijkomen.
+const sprintHypothesesOps = (ops: Op[]) => ops.filter((o) => o.table === "sprint_hypotheses");
+
 (async () => {
   // 1. SI2 met bestaande pending en een nieuwe bevinding: veilige volgorde select, insert, delete.
   const m = makeMock({ oldPending: ["old-1", "old-2"] });
   const n = await saveAuditFindingsAsHypotheses(m.client, [finding({ score: "Onvoldoende" })], { clientId: "c1", analysisId: "run-1" });
   console.log("SI2: veilige volgorde select, insert, dan pas delete");
-  check("drie ops in de juiste volgorde", m.ops.map(o => o.type).join(",") === "select,insert,delete", JSON.stringify(m.ops.map(o => o.type)));
-  check("insert komt voor delete (geen verlies bij falen)", m.ops.findIndex(o => o.type === "insert") < m.ops.findIndex(o => o.type === "delete"));
+  check("drie ops in de juiste volgorde", sprintHypothesesOps(m.ops).map(o => o.type).join(",") === "select,insert,delete", JSON.stringify(m.ops.map(o => `${o.table}:${o.type}`)));
+  check("insert komt voor delete (geen verlies bij falen)", m.ops.findIndex(o => o.type === "insert") < m.ops.findIndex(o => o.table === "sprint_hypotheses" && o.type === "delete"));
   check("select filtert op client, bron en pending", m.ops[0].filters?.client_id === "c1" && m.ops[0].filters?.source === "second_opinion" && m.ops[0].filters?.status === "pending");
-  check("delete verwijdert exact de oude ids", Array.isArray(m.ops[2].filters?.id) && (m.ops[2].filters?.id as string[]).join(",") === "old-1,old-2");
+  check("delete verwijdert exact de oude ids", Array.isArray(sprintHypothesesOps(m.ops)[2]?.filters?.id) && (sprintHypothesesOps(m.ops)[2].filters?.id as string[]).join(",") === "old-1,old-2");
   check("aantal teruggegeven", n === 1);
+  check("Fase 4: precies één agency_memory_events-insert voor het ene nieuwe voorstel", m.ops.filter(o => o.table === "agency_memory_events" && o.type === "insert").length === 1);
 
   // 2. SI2 met een MISLUKTE insert: oude pending blijft staan, geen delete. De bug-fix.
   const mf = makeMock({ oldPending: ["old-1"], insertFails: true });
@@ -88,26 +101,26 @@ function verdict(p: Partial<SearchTermVerdictInput>): SearchTermVerdictInput {
   const m2 = makeMock({ oldPending: ["old-1"] });
   await saveAuditFindingsAsHypotheses(m2.client, [finding({ score: "Goed" })], { clientId: "c1", analysisId: "run-1" });
   console.log("\nSI2: zonder probleem de stale pending opschonen, geen insert");
-  check("select dan delete, geen insert", m2.ops.map(o => o.type).join(",") === "select,delete", JSON.stringify(m2.ops.map(o => o.type)));
+  check("select dan delete, geen insert", sprintHypothesesOps(m2.ops).map(o => o.type).join(",") === "select,delete", JSON.stringify(m2.ops.map(o => `${o.table}:${o.type}`)));
 
   // 4. SI2 eerste run zonder bestaande pending: alleen insert, geen overbodige delete.
   const m0 = makeMock({ oldPending: [] });
   await saveAuditFindingsAsHypotheses(m0.client, [finding({ score: "Onvoldoende" })], { clientId: "c1", analysisId: "run-1" });
   console.log("\nSI2: eerste run zonder oude pending, geen overbodige delete");
-  check("select dan insert, geen delete", m0.ops.map(o => o.type).join(",") === "select,insert", JSON.stringify(m0.ops.map(o => o.type)));
+  check("select dan insert, geen delete", sprintHypothesesOps(m0.ops).map(o => o.type).join(",") === "select,insert", JSON.stringify(m0.ops.map(o => `${o.table}:${o.type}`)));
 
   // 5. SI1 met negatives: dezelfde veilige volgorde en bron search_terms.
   const m3 = makeMock({ oldPending: ["old-x"] });
   await saveSearchTermVerdictsAsHypotheses(m3.client, [verdict({ recommendedAction: "negative_exact", cost: 50 })], { clientId: "c2", analysisId: null });
   console.log("\nSI1: veilige volgorde en bron search_terms");
-  check("select, insert, delete", m3.ops.map(o => o.type).join(",") === "select,insert,delete", JSON.stringify(m3.ops.map(o => o.type)));
+  check("select, insert, delete", sprintHypothesesOps(m3.ops).map(o => o.type).join(",") === "select,insert,delete", JSON.stringify(m3.ops.map(o => `${o.table}:${o.type}`)));
   check("select filtert op bron search_terms", m3.ops[0].filters?.source === "search_terms" && m3.ops[0].filters?.client_id === "c2");
 
   // 6. SI1 zonder negatives: alleen opschonen.
   const m4 = makeMock({ oldPending: ["old-x"] });
   await saveSearchTermVerdictsAsHypotheses(m4.client, [verdict({ recommendedAction: "monitor" })], { clientId: "c2", analysisId: null });
   console.log("\nSI1: zonder negatives alleen opschonen");
-  check("select dan delete, geen insert", m4.ops.map(o => o.type).join(",") === "select,delete", JSON.stringify(m4.ops.map(o => o.type)));
+  check("select dan delete, geen insert", sprintHypothesesOps(m4.ops).map(o => o.type).join(",") === "select,delete", JSON.stringify(m4.ops.map(o => `${o.table}:${o.type}`)));
 
   console.log("\nRESULTAAT: " + passed + " geslaagd, " + failed + " gefaald\n");
   if (failed > 0) process.exit(1);

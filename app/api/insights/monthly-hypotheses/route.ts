@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { decideTransition } from "@/lib/learning/hypothesis-status";
+import { recordMemoryEvent } from "@/lib/memory/agency-memory-events";
 import type { MonthlyStructuredOutput, OperatingHypothesisTrace } from "@/lib/analysis/monthly-structured";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import {
@@ -286,16 +287,31 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: rejectDecision.reason }, { status: 409 });
     }
 
+    // Fase 4-fix: eerder werd hier een handmatige update geschreven die rejectDecision.patch
+    // negeerde, waardoor decision_reason nooit gezet werd (de reden bleef verstopt in
+    // rationale's rejected_reason-veld). Nu gebruikt de update de patch die decideTransition()
+    // toch al correct berekent, zoals de accept-tak hieronder al deed.
     const { error: rejectError } = await ctx.supabase
       .from("sprint_hypotheses")
       .update({
         status: "rejected",
         rationale: metadata,
+        decision_reason: rejectDecision.patch.decision_reason,
+        decided_at: rejectDecision.patch.decided_at,
       })
       .eq("id", persisted.id);
 
     if (rejectError) {
       return Response.json({ error: rejectError.message }, { status: 500 });
+    }
+
+    // Zelfde bescherming als de accept-tak: geen dubbel event bij een idempotente herhaling
+    // van dezelfde beslissing (rejected -> rejected).
+    if (!rejectDecision.idempotent) {
+      await recordMemoryEvent(ctx.supabase, {
+        clientId, hypothesisId: persisted.id, eventType: "hypothesis_rejected",
+        reason: rejectDecision.patch.decision_reason,
+      });
     }
 
     const { error: expireError } = await ctx.supabase
@@ -473,6 +489,13 @@ export async function POST(request: NextRequest) {
 
   if (acceptError) {
     return Response.json({ error: acceptError.message, partial: true }, { status: 409 });
+  }
+
+  // Alleen bij de echte overgang, niet bij een idempotente herhaling -- anders zou een
+  // herhaalde accept (die de sprint-taken herpusht, zie het commentaar hierboven) elke keer
+  // een nieuw hypothesis_accepted-event bijschrijven voor dezelfde beslissing.
+  if (!acceptDecision.idempotent) {
+    await recordMemoryEvent(ctx.supabase, { clientId, hypothesisId: persisted.id, eventType: "hypothesis_accepted" });
   }
 
   const refreshed = await loadLatestMonthlyContext(clientId, sopType);

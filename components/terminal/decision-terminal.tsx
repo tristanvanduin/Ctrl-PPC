@@ -9,6 +9,7 @@ import type { HypothesisRecord } from "@/lib/decision-terminal/lifecycle";
 import { HypothesisBoard } from "./hypothesis-board";
 import { AttributionView } from "./attribution-view";
 import { DecisionLog } from "./decision-log";
+import { TrackrecordView } from "./trackrecord-view";
 
 // Fase 2, Task 4: de Decision Terminal. Losse, geisoleerde pagina (geen onderdeel van
 // analysis-catalog.ts of de bestaande klant-tabs) die read-only laat zien wat de Decision Core
@@ -23,7 +24,7 @@ import { DecisionLog } from "./decision-log";
 // maar een expliciete garantie -- deze pagina leest, en verandert nooit iets in een
 // advertentieplatform of in de database.
 
-type Tab = "board" | "attribution" | "log";
+type Tab = "board" | "attribution" | "log" | "trackrecord";
 
 // Zelfde vorm als verzamelHypotheses() in lib/decision/decision-skeleton.ts teruggeeft.
 interface LiveSignal { id: string; statement: string; category: string | null }
@@ -71,6 +72,7 @@ export function DecisionTerminal({ clientId }: { clientId: string }) {
     { id: "board", label: "Hypothesis Board" },
     { id: "attribution", label: "Attribution View" },
     { id: "log", label: "Decision Log" },
+    { id: "trackrecord", label: "Trackrecord" },
   ];
 
   return (
@@ -105,6 +107,7 @@ export function DecisionTerminal({ clientId }: { clientId: string }) {
       {tab === "board" && <HypothesisBoard hypotheses={hypotheses} loading={loading} />}
       {tab === "attribution" && <AttributionView hypotheses={hypotheses} loading={loading} />}
       {tab === "log" && <DecisionLog entries={timeline} loading={loading} />}
+      {tab === "trackrecord" && <TrackrecordView clientId={clientId} />}
 
       <LiveSignalsPanel clientId={clientId} />
     </div>

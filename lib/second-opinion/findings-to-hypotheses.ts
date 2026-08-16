@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditRowResult } from "./types";
 import type { Impact, Complexity } from "./template";
 import { logger } from "@/lib/logger";
+import { recordMemoryEvent } from "@/lib/memory/agency-memory-events";
 
 export interface SprintHypothesisRow {
   client_id: string;
@@ -174,12 +175,21 @@ export async function saveProposalsReplacingPending(
     return 0;
   }
 
-  // 3. Insert de nieuwe voorstellen.
-  const ins = await supabase.from("sprint_hypotheses").insert(rows);
+  // 3. Insert de nieuwe voorstellen. .select("id") is nodig om de gegenereerde ids terug te
+  // krijgen voor de memory-events hieronder -- verandert het schrijfgedrag zelf niet.
+  const ins = await supabase.from("sprint_hypotheses").insert(rows).select("id");
   if (ins.error) {
     logger.error("[" + source + "] Kon voorstellen niet opslaan, oude blijven staan:", ins.error.message);
     return 0; // insert mislukt: oude pending intact, geen verlies
   }
+
+  // Fase 4: één hypothesis_proposed-event per nieuw voorstel. Zacht falend (recordMemoryEvent
+  // logt zelf), dus een mislukt geheugen-event verliest nooit een echt opgeslagen voorstel.
+  await Promise.all(
+    ((ins.data ?? []) as { id: string }[]).map((row) =>
+      recordMemoryEvent(supabase, { clientId, hypothesisId: row.id, eventType: "hypothesis_proposed" })
+    )
+  );
 
   // 4. Insert geslaagd: verwijder nu pas de oude pending. Faalt dit, dan blijven
   // dubbelen staan die de volgende run opruimt, nog steeds geen verlies.

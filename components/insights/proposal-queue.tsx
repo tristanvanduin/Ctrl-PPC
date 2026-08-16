@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { prioritizeQueue, summarizePlan } from "@/lib/learning/prioritize-queue";
 import { channelOfSource, type InsightChannel } from "@/lib/insights/channel-of";
-import { dbUpdate } from "@/lib/data-access/client-write";
+import { dbUpdate, dbInsert } from "@/lib/data-access/client-write";
 import { ChannelBadge } from "./channel-filter";
 import { metriekLabel } from "@/lib/util/tekst";
 
@@ -124,6 +124,14 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
     const { error } = await dbUpdate("sprint_hypotheses", clientId, patch, { id: p.id, status: "pending" });
     setBusyId(null);
     if (!error) {
+      // Fase 4: het match-filter op status "pending" hierboven maakt dit al idempotent-veilig --
+      // een tweede decide() op dezelfde rij matcht niets meer (al accepted/rejected), dus dit
+      // event komt maar één keer per echte beslissing.
+      void dbInsert("agency_memory_events", clientId, {
+        hypothesis_id: p.id,
+        event_type: action === "accept" ? "hypothesis_accepted" : "hypothesis_rejected",
+        reason: action === "reject" ? reason : null,
+      });
       setProposals((prev) => prev?.filter((x) => x.id !== p.id) ?? prev);
       onWorkflowChange?.();
     }

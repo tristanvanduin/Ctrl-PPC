@@ -78,6 +78,10 @@ export const WRITABLE_TABLES: Record<string, TableWritePolicy> = {
   // ── Sprint en planning ────────────────────────────────────────────────────
   sprint_items: { capability: "sprint:write", clientColumn: "client_id", operations: CRUD },
   sprint_hypotheses: { capability: "sprint:write", clientColumn: "client_id", operations: CRUD },
+  // Fase 4 (docs/MASTERPLAN.md sectie 9): append-only geheugenlaag, zie migratie 091 -- alleen
+  // insert is hier bewust geen ontbrekende dekking maar het hele punt. update/delete worden ook
+  // op databaseniveau geweigerd (triggers in de migratie), dit is de eerste, browserzijdige poort.
+  agency_memory_events: { capability: "sprint:write", clientColumn: "client_id", operations: ["insert"] },
   sop_tasks: { capability: "sprint:write", clientColumn: "client_id", operations: ["update"] },
   sop_recommendations: { capability: "sprint:write", clientColumn: "client_id", operations: ["update"] },
   task_completions: { capability: "sprint:write", clientColumn: "client_id", operations: CRUD },

@@ -34,6 +34,7 @@ import { parseHypothesis, resolvePredicate } from "@/lib/learning/hypothesis-par
 import { evaluateHypothesisOutcome, detectExecutionAccountWide, type ChangeEvent } from "@/lib/learning/hypothesis-evaluator";
 import { classificeerChangeHistory, type RawChangeHistoryRow } from "@/lib/learning/change-history-classifier";
 import { aggregateWeeks, weeksInWindow, addDays, isDerivableMetric, type WeeklyRow } from "@/lib/learning/weekly-metrics";
+import { recordMemoryEvent, memoryEventsForVerdict } from "@/lib/memory/agency-memory-events";
 
 export const maxDuration = 300;
 
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest) {
     if (!parsed.ok) {
       const outcome = { verdict: "unmeasurable", resultMet: null, reason: `niet toetsbaar geformuleerd: ${parsed.reason}`, metrics: [] };
       results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
-      if (!dryRun) await writeVerdict(supabase, row.id, outcome, now);
+      if (!dryRun) await writeVerdict(supabase, row.id, row.client_id, outcome, now);
       continue;
     }
 
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
     if (!isDerivableMetric(metric)) {
       const outcome = { verdict: "unmeasurable", resultMet: null, reason: `de metric ${metric} zit niet in de weekdata op accountniveau, dus er is niets om tegen te meten`, metrics: [] };
       results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
-      if (!dryRun) await writeVerdict(supabase, row.id, outcome, now);
+      if (!dryRun) await writeVerdict(supabase, row.id, row.client_id, outcome, now);
       continue;
     }
 
@@ -185,7 +186,7 @@ export async function GET(request: NextRequest) {
 
     const outcome = { verdict, resultMet, reason, metrics: metrickUitkomst.metrics };
     results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
-    if (!dryRun) await writeVerdict(supabase, row.id, outcome, now);
+    if (!dryRun) await writeVerdict(supabase, row.id, row.client_id, outcome, now);
   }
 
   return Response.json({
@@ -207,10 +208,11 @@ function describeOutcome(verdict: string, metric: string, baseline: number | und
 async function writeVerdict(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   id: string,
+  clientId: string,
   outcome: { verdict: string; resultMet: boolean | null; reason: string; metrics: unknown },
   now: Date
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("sprint_hypotheses")
     .update({
       outcome: outcome.verdict,
@@ -220,6 +222,20 @@ async function writeVerdict(
       evaluated_at: now.toISOString(),
     })
     .eq("id", id)
-    .is("evaluated_at", null); // idempotent: een tweede cron-run overschrijft geen bestaand verdict
-  if (error) console.error(`[evaluate-hypotheses] schrijven van uitkomst voor ${id} mislukt: ${error.message}`);
+    .is("evaluated_at", null) // idempotent: een tweede cron-run overschrijft geen bestaand verdict
+    .select("id");
+  if (error) {
+    console.error(`[evaluate-hypotheses] schrijven van uitkomst voor ${id} mislukt: ${error.message}`);
+    return;
+  }
+  // Fase 4: alleen memory-events schrijven als DEZE aanroep het verdict daadwerkelijk zette --
+  // .select() hierboven onderscheidt dat van "een gelijktijdige run was net eerder", wat zonder
+  // deze check een dubbel event had opgeleverd voor dezelfde evaluatie.
+  if ((data ?? []).length === 0) return;
+  const metrics = (outcome.metrics ?? null) as Record<string, unknown> | null;
+  await Promise.all(
+    memoryEventsForVerdict(outcome.verdict).map((eventType) =>
+      recordMemoryEvent(supabase, { clientId, hypothesisId: id, eventType, reason: outcome.reason, metrics })
+    )
+  );
 }

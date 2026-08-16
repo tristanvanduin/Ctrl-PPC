@@ -861,17 +861,52 @@ voordat het zich voordeed, en fase 5 hieronder voor wat dit betekent voor "een k
   niet-geregistreerd job_type (`pdf_generation`) faalt expliciet in plaats van stil te blijven
   hangen. Alles opgeruimd na de test, geen sporen achtergebleven.
 
-### Fase 4: het geheugen
+### Fase 4: het geheugen — **KLAAR**
 **Poort: fase 3 groen.**
 
-- `agency_memory_events`, append-only, tien eventtypes
-- Aansluiten op de bestaande hypothese-evaluatiecron
-- Retroactief vullen vanuit de 127 rijen in `sprint_hypotheses`
-- Negatieve leermomenten expliciet uit `decision_reason`
-- **Het trackrecordscherm uit sectie 3.3**
+- ~~`agency_memory_events`, append-only, tien eventtypes~~ — **gedaan (migratie 091, gefixt in
+  092/093).** De tien eventtypes stonden nergens gespecificeerd — de negentien strategische
+  documenten die sectie 0 noemt (waaronder vermoedelijk AGENCY_MEMORY_AND_PLAYBOOK_ENGINE)
+  bestaan niet in deze repo — en zijn opnieuw ontworpen tegen wat al bestond:
+  `hypothesis_proposed/accepted/rejected/executed/not_executed/outcome_met/outcome_missed/
+  unmeasurable/expired` hebben allemaal een echte schrijver; `confidence_recalibrated` (loop 5,
+  sectie 4) bewust nog niet — dat vergt een kalibratieberekening die nog niet bestaat.
+  Append-only wordt op databaseniveau afgedwongen (triggers, niet alleen een RLS-conventie: de
+  app schrijft via de service role, die RLS omzeilt).
+- ~~Aansluiten op de bestaande hypothese-evaluatiecron~~ — **gedaan.**
+  `evaluate-hypotheses/route.ts`'s `writeVerdict()` schrijft nu ook memory-events, idempotent
+  gekoppeld aan dezelfde `.is("evaluated_at", null)`-guard als het verdict zelf.
+- ~~Retroactief vullen vanuit de 127 rijen in `sprint_hypotheses`~~ — **gedaan**
+  (`scripts/backfill-agency-memory-events.ts`, idempotent, 163 events voor de 127 rijen: 127
+  proposed, 31 accepted, 5 rejected, 0 outcome-gerelateerd — de evaluatiecron heeft in productie
+  nog niets geëvalueerd, dus dat laatste getal is eerlijk nul, geen bug).
+- ~~Negatieve leermomenten expliciet uit `decision_reason`~~ — **gedaan, met een bijvangst-fix.**
+  `monthly-hypotheses/route.ts` berekende `decision_reason` via `decideTransition()` maar
+  schreef die nooit weg (de reden bleef verstopt in `rationale`'s `rejected_reason`-veld) — nu
+  gefixt. De backfill leest voor bestaande rijen daarom beide bronnen.
+- ~~**Het trackrecordscherm uit sectie 3.3**~~ — **gedaan.** Nieuwe tab in de Decision Terminal
+  (`components/terminal/trackrecord-view.tsx`), gevoed door `/api/insights/trackrecord`.
+  Uitsplitsing "waar hadden we het vaakst mis" gebruikt `sprint_hypotheses.source`
+  (analysis/second_opinion/search_terms/...) — de fijnste indeling die vandaag echt bestaat;
+  sectie 3.3's voorbeeld ("creative fatigue op Meta") suggereert een fijnmaziger categorie die
+  nergens als apart veld is vastgelegd, en die verzinnen zou de gok zijn die de
+  vertrouwensdoctrine verbiedt.
 
-*Klaar wanneer:* het trackrecordscherm echte cijfers toont over echte hypotheses. Dit is het moment
-waarop het product demonstreerbaar wordt.
+**Twee bugs gevonden via live verificatie tegen productie, allebei uit dezelfde wortel:**
+`hypothesis_id` had `on delete cascade`, en een cascade-delete implementeert Postgres zelf als
+een DELETE tegen de kindtabel — die de append-only-trigger net zo hard weigerde als een
+handmatige delete. Eerste fix (092): `on delete set null` — een memory-event is een historisch
+feit dat niet hoort te verdwijnen omdat de bronrij later wordt opgeruimd. Bleek zelf ook een
+UPDATE te zijn (de FK zet het veld intern op null), die dezelfde trigger óók blokkeerde. Tweede
+fix (093): de trigger onderscheidt nu expliciet "alleen `hypothesis_id` wordt null, verder
+niets" (toegestaan, dat is de FK-machinerie zelf) van elke andere UPDATE (verboden). Beide keren
+rolde de transactie netjes terug bij het falen — geen corruptie, alleen een mislukte delete.
+
+*Klaar wanneer:* het trackrecordscherm echte cijfers toont over echte hypotheses. **Gehaald** —
+geverifieerd tegen een echt account (`gads-8714777147`): 48 voorgesteld, 8 geaccepteerd, correct
+uitgesplitst naar bron. Trefpercentage toont eerlijk `null` zolang de evaluatiecron nog niets
+geëvalueerd heeft, in plaats van een gegokt getal. Dit is het moment waarop het product
+demonstreerbaar wordt.
 
 ### Fase 5: launching customer
 **Poort: fase 4 groen, en een klant die wil.**
