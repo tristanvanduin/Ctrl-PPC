@@ -401,7 +401,8 @@ fout is. Dat is de reden dat GSC in fase 2 staat en niet later.
 
 `lib/cross-channel/funnel-overlap.ts` staat vandaag als wees met de reden dat `classifyFunnelRole`
 het objective niet leest, waardoor Meta en LinkedIn als onbekend uit de classificatie komen. Dat
-oplossen levert meer op dan welke nieuwe tabel dan ook.
+oplossen levert meer op dan welke nieuwe tabel dan ook. **Dit blijft open** — Master Synthesis
+(sectie 5.5) lost een ander probleem op en vervangt dit niet.
 
 ### 5.3 Forecasting: twee kolommen, geen een
 
@@ -500,6 +501,53 @@ overige factoren vanzelf op zonder codewijziging.
 PMax staat op de Campagnes-tab naast Search, met dezelfde `CampagneTypeTabs`-kiezer
 (`components/dashboard/pmax-scorecard.tsx`). Meta- en LinkedIn-scorecards blijven ongebouwd tot
 die kanalen echte data hebben.
+
+### 5.5 Master Synthesis (Pijler 6): kanaaloverstijgende synthese op al-berekende SOP-output
+
+Toegevoegd 16 augustus, buiten deze bouwvolgorde ontstaan (het is Pijler 6 van de zesdelige
+monthly-SOP-consolidatie, niet aangevraagd via een fase-poort hierboven) en hier alsnog
+vastgelegd omdat sectie 0 dit document bindend maakt voor wat er staat — en dit stond er nog
+niet.
+
+**Wat het niet is:** de False Positive Prevention uit sectie 5.2 (betaald-vs-organisch via
+Search Console). Dat blijft een apart, open probleem. Master Synthesis werkt met wat er al is:
+de per-kanaal monthly-SOP's van Google, Meta en LinkedIn draaien allemaal al (elk hun eigen zes
+pijlers, zie de adapter-consolidatie in Fase 3 hierboven) en leveren `sop_recommendations`/
+`sop_tasks` op. Master Synthesis leest die output terug, samen met de deterministische
+cross-channel-signalen die `app/api/analysis/cross-channel/route.ts` al berekent
+(`sop_analysis_output`, sectie `cross_channel_groups_v1`), en laat één LLM-call daar
+kanaaloverstijgende hypotheses en sprint-taken uit synthetiseren — een budgetverschuiving tussen
+Google en Meta verklaren, niet los per kanaal rapporteren.
+
+**Drie ontwerpkeuzes die de vertrouwensdoctrine (sectie 3) hier dwingt:**
+
+1. **Hard-skip zonder LLM-call bij een lege evidence_payload** — geen kanaaldata en geen
+   getriggerde cross-channel-signalen betekent geen aanroep, niet een gegokte synthese. Zelfde
+   regel 3 als overal elders.
+2. **Schema-validatie met een repair-lus die nooit verslechtert**: `contributing_channels` moet
+   binnen de daadwerkelijk aangeleverde kanalen blijven — een hallucinatie van een
+   niet-aangeleverd kanaal wordt afgekeurd, ook na de repair-poging als die dezelfde fout
+   teruggeeft (`pickBetterAttempt`, gelijke fouten houdt het origineel vast).
+3. **Geen halve/foute wachtrij-rijen**: blijft de validatie na de repair-poging alsnog ongeldig,
+   dan wordt er niets opgeslagen — wel het resultaat teruggegeven zodat zichtbaar is waarom.
+
+**Opslag:** `sprint_hypotheses` (`source: "master_synthesis"`, status `pending`,
+`metadata.contributing_channels`) en `sprint_items` (gekoppeld via `hypothesis_id`, metadata met
+`action_type`/`priority`/`frequency`/`due_date_days`), plus `sop_analysis_output` voor de
+catalogus-tracking. Migratie 088 gaf beide tabellen de `metadata jsonb`-kolom die dit draagt.
+
+**Geverifieerd, tweevoudig:**
+- Eind-to-end-integratietest (`lib/decision/__master_synthesis_integration_test.ts`, 28/28): de
+  échte Fase A–C-code tegen een in-memory FakeSupabase, inclusief de hallucinatie- en
+  hard-skip-paden.
+- Live tegen de productiedatabase: een wegwerpbaar, duidelijk gemarkeerd test-account gezaaid met
+  multi-channel SOP-data, de echte `/api/analysis/monthly-decision`-route aangeroepen (echte
+  OpenRouter-call, `google/gemini-3.7-flash`), de resulterende `sprint_hypotheses`/
+  `sprint_items`-rijen en de `hypothesis_id`-koppeling geverifieerd, en daarna volledig
+  opgeruimd. Onderweg bleek `ads_account_monthly`/`meta_account_daily` niet rechtstreeks
+  schrijfbaar (view over `fact_core`, niet over `*_legacy` zoals voor de overige zes
+  feitentabellen) — geen documentatiefout, `feitentabellen.ts` blijft correct voor waar de sync
+  schrijft; de projectie via `refresh_fact_from_legacy()` (migratie 044/054) doet de rest.
 
 ---
 
@@ -753,7 +801,16 @@ voordat het zich voordeed, en fase 5 hieronder voor wat dit betekent voor "een k
 - `generation_jobs` uitbreiden tot volwaardige action queue
 - Claim-logica met `FOR UPDATE SKIP LOCKED`
 - Verwerking via Vercel Scheduled Route, aangesloten op `llm-router` en `uitgavenplafond`
-- **`llm-router` omzetten naar OpenRouter met meerdere modellen** (besluit 2)
+- ~~**`llm-router` omzetten naar OpenRouter met meerdere modellen** (besluit 2)~~ — **gedaan**
+  (`622ea81`, `7646638`). `callRouted()` draait op echt OpenRouter; ernaast staat nu `callLayer()`
+  met een laagroutering (`LAYER_MODEL`: triage/narrative/reasoning) die een model kiest per soort
+  werk in plaats van per analysestap. Narrative-aanroepen (bid-strategy, budget-allocation,
+  impression-share, period-evaluation, quality-score, rsa-insights, client-reports,
+  `runAnalysis`), de search-terms-batches (triage) en monthly step 13 (reasoning, want dat is
+  multi-hop-redeneren over stap 1-12) zijn gemigreerd. `callRouted()` blijft bestaan voor
+  aanroepers die er nog op steunen — geen brede migratie in dezelfde wijziging als de laag zelf.
+  De overige drie punten van deze fase (action queue, claim-logica, scheduled route) staan nog
+  open; de fase als geheel is dus nog niet klaar.
 
 ### Fase 4: het geheugen
 **Poort: fase 3 groen.**
