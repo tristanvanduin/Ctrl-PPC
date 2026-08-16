@@ -110,8 +110,10 @@ export async function callRouted(
 export type Layer = "triage" | "reasoning" | "narrative" | "strategic";
 
 export const LAYER_MODEL: Record<Layer, { primary: string; fallback: string }> = {
-  // Snel, goedkoop filteren en categoriseren.
-  triage: { primary: "google/gemini-3.7-flash", fallback: "google/gemini-2.5-flash-lite" },
+  // Snel, goedkoop filteren en categoriseren. Fallback is het duurdere model, niet andersom:
+  // bij een fout op de goedkope route moet de sterkere Gemini het overnemen, niet nog een keer
+  // dezelfde kostenklasse.
+  triage: { primary: "google/gemini-2.5-flash-lite", fallback: "google/gemini-3.7-flash" },
   // Meerstaps redeneren en hypothesevorming.
   reasoning: { primary: "x-ai/grok-4.6", fallback: "google/gemini-3.7-flash" },
   // Klantgerichte tekst: claim-discipline en nuance wegen hier zwaarder dan snelheid.

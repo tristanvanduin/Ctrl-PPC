@@ -8,7 +8,7 @@
 
 import { NextRequest } from "next/server";
 import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callLayer } from "@/lib/analysis/llm-router";
 import { recordUsage, resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { analyzeBidStrategy, type CampaignBidInput, type BidGoal } from "@/lib/analysis/bid-strategy-facts";
 import { buildBidStrategyPrompt } from "@/lib/prompts/bid-strategy-prompt";
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
   const { campaigns: facts, summary } = analyzeBidStrategy(campaigns, goal);
   const systemPrompt = buildBidStrategyPrompt({ summary, campaigns: facts, goal, goalsSection: clientCtx.goalsSection });
 
-  const response = await callRouted({
+  const response = await callLayer("narrative", {
     apiKey,
     systemPrompt,
     userMessage: "Lever de biedstrategie-fit-analyse met concrete adviezen per mismatch.",

@@ -11,7 +11,7 @@
 
 import { NextRequest } from "next/server";
 import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callLayer } from "@/lib/analysis/llm-router";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { buildPeriodEvaluation, renderPeriodEvaluationSection, type PeriodHypothesis, type PeriodMonthRow } from "@/lib/analysis/period-evaluation";
 import { today as vandaag } from "@/lib/reporting-date";
@@ -147,7 +147,7 @@ ${factsSection}
 ## Gevraagde output
 Kort: (1) het oordeel over de periode in twee zinnen, (2) wat het plan was en wat ervan terechtkwam, (3) de ontwikkeling binnen de periode, (4) wat dit betekent voor de volgende periode, (5) wat er ontbrak om scherper te kunnen oordelen.`;
 
-  const response = await callRouted({
+  const response = await callLayer("narrative", {
     apiKey,
     systemPrompt,
     userMessage: `Schrijf de eindevaluatie voor client "${clientId}" over de periode ${evaluation.periodLabel}.`,

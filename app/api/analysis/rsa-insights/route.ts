@@ -8,7 +8,7 @@
 
 import { NextRequest } from "next/server";
 import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callLayer } from "@/lib/analysis/llm-router";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { analyzeRsaInsights, type RsaAssetRow } from "@/lib/analysis/rsa-insights-facts";
 import { saveRsaInsightsHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   const facts = analyzeRsaInsights(assetRows);
   const systemPrompt = buildRsaInsightsPrompt({ facts, goalsSection: clientCtx.goalsSection });
 
-  const response = await callRouted({
+  const response = await callLayer("narrative", {
     apiKey,
     systemPrompt,
     userMessage: "Lever de RSA-copy-analyse met de geprioriteerde schrijfopdrachten voor de content-marketeer.",

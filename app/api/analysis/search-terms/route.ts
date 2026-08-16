@@ -10,7 +10,7 @@ import {
 } from "@/lib/api/google-ads";
 import { buildSearchTermAnalysisPrompt } from "@/lib/prompts/search-term-prompts";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callLayer } from "@/lib/analysis/llm-router";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import {
   getSupabase,
@@ -42,12 +42,13 @@ import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
 
 export const maxDuration = 300; // 5 minutes for full analysis with many batches
 
-// Label voor de search_term_analysis-rij (model_used). callRouted() (regel 332) kiest het
-// werkelijke model per batch via MODEL_CATALOG, met een fallback-keten bij een storing -- dit is
-// dus de VERWACHTE waarde, niet gegarandeerd de exacte per batch. Zelfde constante als
-// MODEL_CATALOG.strong in lib/analysis/llm-router.ts; daar niet vandaan geimporteerd om dit
-// bestand niet te koppelen aan de interne vorm van de router voor één labelveld.
-const OPENROUTER_MODEL = "google/gemini-3.7-flash";
+// Label voor de search_term_analysis-rij (model_used). callLayer("triage", ...) (regel 332)
+// kiest het werkelijke model per batch via LAYER_MODEL.triage, met een fallback-keten bij een
+// storing -- dit is dus de VERWACHTE waarde, niet gegarandeerd de exacte per batch. Zelfde
+// constante als LAYER_MODEL.triage.primary in lib/analysis/llm-router.ts; daar niet vandaan
+// geimporteerd om dit bestand niet te koppelen aan de interne vorm van de router voor één
+// labelveld.
+const OPENROUTER_MODEL = "google/gemini-2.5-flash-lite";
 const BATCH_SIZE = 100; // Smaller batches = less token overflow risk with enhanced schema
 
 
@@ -334,7 +335,7 @@ ${productList || "Geen productdata beschikbaar"}`;
 ${toPromptTable(termsJson)}`;
 
       try {
-        const response = await callRouted({
+        const response = await callLayer("triage", {
           apiKey: apiKey!,
           systemPrompt,
           userMessage,
@@ -342,7 +343,7 @@ ${toPromptTable(termsJson)}`;
           label: `search-terms-batch-${batchNum}`,
         });
 
-        // W1.1(f): O2-kostenregistratie per batch-call. Elke callRouted is een echte kost
+        // W1.1(f): O2-kostenregistratie per batch-call. Elke callLayer-aanroep is een echte kost
         // (ook een retry), dus registreren we hier per call. Synthetische run-sleutel, want
         // een losse analyse heeft geen jobId. Nooit brekend: recordUsage slikt fouten zelf.
         if (supabase) {

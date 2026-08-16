@@ -8,7 +8,7 @@
 
 import { NextRequest } from "next/server";
 import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callLayer } from "@/lib/analysis/llm-router";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { saveQualityScoreHypotheses } from "@/lib/analysis/standalone-to-hypotheses";
 import { analyzeQualityScore, type KeywordQsPerformanceRow } from "@/lib/analysis/quality-score-facts";
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
   const facts = analyzeQualityScore(keywordRows);
   const systemPrompt = buildQualityScorePrompt({ facts, goalsSection: clientCtx.goalsSection });
 
-  const response = await callRouted({
+  const response = await callLayer("narrative", {
     apiKey,
     systemPrompt,
     userMessage: "Lever de quality-score-analyse met geprioriteerde acties.",

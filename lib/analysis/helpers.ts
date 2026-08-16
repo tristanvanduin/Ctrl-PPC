@@ -12,7 +12,7 @@ import {
   type AccountType,
 } from "../prompts/sop-prompts";
 import { type OpenRouterResponse } from "./openrouter-client";
-import { callRouted } from "./llm-router";
+import { callRouted, callLayer } from "./llm-router";
 import { daysAgo, today } from "../reporting-date";
 import { externAccountId } from "@/lib/tenancy/klanten";
 
@@ -292,7 +292,7 @@ export async function runAnalysis(opts: {
   const { supabase, apiKey, clientId, sopType, systemPrompt, userMessage, periodStart, periodEnd } = opts;
   const analysisDate = today();
 
-  const response = await callRouted({
+  const response = await callLayer("narrative", {
     apiKey,
     systemPrompt,
     userMessage,
@@ -383,14 +383,27 @@ export async function runStep(opts: {
     }
   }
 
-  const response = await callRouted({
-    apiKey,
-    systemPrompt,
-    userMessage,
-    maxTokens: jsonMode ? 8192 : 4096,
-    jsonMode,
-    label: `${sopType}-step-${stepNumber}-${stepName.toLowerCase().replace(/\s+/g, "-")}`,
-  });
+  const stepLabel = `${sopType}-step-${stepNumber}-${stepName.toLowerCase().replace(/\s+/g, "-")}`;
+  // Stap 13 synthetiseert de conclusies van stap 1-12 tot hypotheses/sprintplan -- multi-hop
+  // redeneren over eerder werk, geen los datapunt. Dat is precies waar de reasoning-laag (Grok)
+  // voor bedoeld is, zie LAYER_MODEL in llm-router.ts.
+  const response = stepNumber === 13
+    ? await callLayer("reasoning", {
+        apiKey,
+        systemPrompt,
+        userMessage,
+        maxTokens: jsonMode ? 8192 : 4096,
+        jsonMode,
+        label: stepLabel,
+      })
+    : await callRouted({
+        apiKey,
+        systemPrompt,
+        userMessage,
+        maxTokens: jsonMode ? 8192 : 4096,
+        jsonMode,
+        label: stepLabel,
+      });
 
   if (opts.runKey) {
     void recordUsage(supabase, {

@@ -8,7 +8,7 @@
 
 import { NextRequest } from "next/server";
 import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callLayer } from "@/lib/analysis/llm-router";
 import { recordUsage, resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { analyzeBudgetAllocation, type CampaignBudgetInput, type BudgetTarget } from "@/lib/analysis/budget-allocation-facts";
 import { buildBudgetAllocationPrompt } from "@/lib/prompts/budget-allocation-prompt";
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
   const { campaigns: facts, scaleUp, scaleDown, summary } = analyzeBudgetAllocation(campaigns, target);
   const systemPrompt = buildBudgetAllocationPrompt({ summary, scaleUp, scaleDown, target, goalsSection: clientCtx.goalsSection });
 
-  const response = await callRouted({
+  const response = await callLayer("narrative", {
     apiKey,
     systemPrompt,
     userMessage: "Lever de budgetallocatie-analyse met een concreet herallocatie-voorstel.",

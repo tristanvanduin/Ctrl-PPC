@@ -8,7 +8,7 @@
 
 import { NextRequest } from "next/server";
 import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callLayer } from "@/lib/analysis/llm-router";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import {
   analyzeCampaignImpressionShare,
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = buildImpressionSharePrompt({ summary, campaigns, geo, goalsSection: clientCtx.goalsSection });
 
-  const response = await callRouted({
+  const response = await callLayer("narrative", {
     apiKey,
     systemPrompt,
     userMessage: "Lever de impression-share-analyse met geprioriteerde acties.",

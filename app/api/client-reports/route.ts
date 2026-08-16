@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSupabase, getOpenRouterKey, fetchClientContext } from "@/lib/analysis/helpers";
-import { callRouted } from "@/lib/analysis/llm-router";
+import { callLayer } from "@/lib/analysis/llm-router";
 import { sanitizeAllStrings } from "@/lib/analysis/sanitize";
 import { computeAnalysisTargets } from "@/lib/analysis/compute-targets";
 import { countryLabel } from "@/lib/countries";
@@ -414,7 +414,7 @@ Schrijf nu het rapport. Retourneer ALLEEN valid JSON.`;
       phaseKey: "compose_sections",
       message: "Hoofdsecties van het rapport genereren...",
     });
-    const response = await callRouted({
+    const response = await callLayer("narrative", {
       apiKey,
       systemPrompt: buildReportPrompt(clientName),
       userMessage,
@@ -695,7 +695,7 @@ Retourneer ALLEEN valid JSON:
 
         let countryLlm: Record<string, { heading: string; body: string }> = {};
         try {
-          const cRes = await callRouted({
+          const cRes = await callLayer("narrative", {
             apiKey,
             systemPrompt: buildReportPrompt(clientName),
             userMessage: countryPrompt,
