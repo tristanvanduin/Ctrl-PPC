@@ -40,7 +40,7 @@ niet opnieuw ter discussie komen zonder dat iemand dit document wijzigt.
 | 5 | **De sync staat stil sinds 17 april 2026: verloren toegang tot de gekoppelde accounts, bevestigd door de opdrachtgever.** | Zie sectie 2.1. Geen codefout; blijft open tot de koppeling hersteld is (sectie 6 lost dit structureel op). |
 | 6 | **Een applicatie-koppeling, OAuth per bureau.** | Zie sectie 6 voor het volledige connectormodel en de kostenbesparing. |
 | 7 | **Sleutelkeuze: `agency_id` overal, `client_id` als bedrijfssleutel, `account_id` waar platformspecifiek.** | Zie sectie 1.1 voor de motivering. |
-| 8 | **Search Console wordt gebouwd.** | Fase 2. Zonder GSC is Demand Intelligence half en is False Positive Prevention niet te bewijzen. |
+| 8 | **Search Console wordt gebouwd.** | **Gedaan (16 augustus, zie 13.3).** Zonder GSC was Demand Intelligence half en False Positive Prevention niet te bewijzen. |
 | 9 | **Zoektermrijen zijn eindig, learnings zijn permanent.** | Zie sectie 8 voor het retentiemodel en het onderscheid tussen ruwe rijen en vastgelegde conclusies. |
 
 ### 1.1 De sleutelkeuze, met motivering
@@ -376,8 +376,8 @@ Niet gedeeld: hoe je daar komt.
 | Microsoft Ads | Intentie met professionele context | Is dit incrementeel of een duplicaat van Google? | Alleen contract, geen data |
 | Meta | Vraag creeren | Ligt het aan creative, doelgroep, aanbod, landingspagina of markt? | Adapter aanwezig, provider stub, MDP-goedkeuring blokkeert |
 | LinkedIn | B2B-vraag creeren | Bereiken we de juiste buying committee, en is de leadkwaliteit het waard? | Adapter aanwezig, demografische as deels in `fact_dimension` |
-| GA4 | Context | Veroorzaakt betaald verkeer downstream gedrag? | Modules aanwezig, koppeling niet gemodelleerd |
-| Search Console | Context | Verschuift vraag tussen betaald en organisch, of krimpt de vraag zelf? | Te bouwen, fase 2 |
+| GA4 | Context | Veroorzaakt betaald verkeer downstream gedrag? | **Gebouwd (16 augustus, zie 13.3).** OAuth-koppeling + echte Data API-aanroep + client_settings.ga4_config-kolom staan er; wacht op een bureau dat via Instellingen verbindt en een propertyId invult. |
+| Search Console | Context | Verschuift vraag tussen betaald en organisch, of krimpt de vraag zelf? | **Gebouwd (16 augustus, zie 13.3).** Vijf detectoren + de merk-cannibalisatie-beslistabel tegen `isBranded` draaien in `cross-channel/route.ts`; wacht op een bureau dat verbindt en een siteUrl/merktermen invult. |
 
 **De val die vermeden moet worden:** de Google-zoektermlogica hergebruiken voor Meta en LinkedIn
 omdat de code er staat. Meta heeft geen zoektermen maar creatives en frequentie. LinkedIn heeft
@@ -858,8 +858,8 @@ scorecard; de kolom "poort" is wat dit plan eraan toevoegt.
 | **God View Pulse** | Hoogfrequente marktverandering | God View Tactical draait **én** twaalf maanden gevulde marktsignalen **én** playbook-evaluaties/trackrecorddata (fase 4, sectie 3.3) om te zien of een signaaltype nog voorspellende waarde heeft. |
 | **Second Opinion** | Onafhankelijke accountbeoordeling | Draait al. Wordt markt-aware zodra God View er is. |
 | **AI Council** | Meerdere modellen dagen de aanbeveling uit | OpenRouter met meerdere modellen (besluit 2), plus harde rondelimiet en kostenplafond per review |
-| **Demand Flow Intelligence** | Welk kanaal creeert vraag, welk kanaal oogst | GA4-koppeling gemodelleerd, funnelrolclassificatie gerepareerd |
-| **Demand Intelligence** | Vraag, SEO, betaald of markt als oorzaak | **Search Console gebouwd.** Zonder GSC is dit niet te leveren. |
+| **Demand Flow Intelligence** | Welk kanaal creeert vraag, welk kanaal oogst | GA4-koppeling gemodelleerd én gebouwd (16 augustus); funnelrolclassificatie gerepareerd |
+| **Demand Intelligence** | Vraag, SEO, betaald of markt als oorzaak | **Search Console gebouwd (16 augustus).** Wacht op een bureau dat verbindt — zie 13.3. |
 | **Proof Engine** | Verkoopbewijs uit marktproblemen en eigen data | `agency_memory_events` met zes maanden historie |
 | **White Label Portal** | Gebrande klantomgeving | Draait deels (`agencies.whitelabel_actief`, migratie 068) |
 | **Volume Compute** | Extra verwerkingscapaciteit | Kredietgrootboek bestaat (migratie 070); zelfbedieningsflow niet |
@@ -970,7 +970,7 @@ Geen migratie nodig gebleken. Alle poorten (`hygiene`, `tsc`, `test`) groen.
 en niet met een steekproef. Gedaan voor Google en Meta (exact gelijk); voor LinkedIn bewust een
 ander (correcter) cijfer, hierboven verklaard in plaats van stilzwijgend doorgevoerd.
 
-### Fase 2: analyses waar je op kunt bouwen — **KLAAR** (Search Console bewust buiten scope, zie hieronder)
+### Fase 2: analyses waar je op kunt bouwen — **KLAAR** (Search Console inmiddels ook, zie hieronder)
 **Poort: fase 1 groen.**
 
 - ~~Het gedeelde kanaaloutputcontract als TypeScript-type, met validatietests~~ — gedaan.
@@ -987,8 +987,12 @@ ander (correcter) cijfer, hierboven verklaard in plaats van stilzwijgend doorgev
   gebruiken `conversionsAbsolute` (geen client_targets-equivalent, bewust niet aangeraakt), 1
   gebruikt alleen een boolean-vlag. De invoer-UI (bestaande CPA/ROAS-velden in de instellingenpagina)
   schrijft voortaan naar beide bronnen tegelijk.
-- **Search Console** koppeling en signalen — **blijft open.** Vergt Google Cloud OAuth-credentials
-  van de opdrachtgever; geen codewerk mogelijk zonder die stap.
+- ~~**Search Console** koppeling en signalen~~ — **gedaan (16 augustus), zie sectie 13.3.** Deze
+  regel zei eerder "geen codewerk mogelijk zonder OAuth-credentials van de opdrachtgever" — dat
+  bleek niet te kloppen. Vrijwel alles was zonder live credentials te bouwen en te testen (de vijf
+  detectoren, de API-client, de config-laag, de beslistabel tegen `isBranded`); alleen de
+  daadwerkelijke `runReport`/`searchAnalytics.query`-aanroep zelf wacht op een bureau dat via
+  Instellingen verbindt. Dezelfde correctie gold voor GA4 (sectie 13.3).
 - ~~De kwaliteitspoorten van shadow mode naar blokkerend~~ — **herzien.** Onderzocht: de negen
   poorten (`lib/decision/quality-gates.ts`) hingen nergens aan de echte, live pijplijn — alleen aan
   een admin-diagnosescherm en een niet-blootgestelde skeleton-route. Shadow mode op de live
@@ -1521,3 +1525,72 @@ demo-staat hierboven liet zien.
 (inclusief de layout-grondoorzaak) staan er nu, breed doorgemeten. Resterend werk is losse
 content-kwaliteit per scherm, geen structureel probleem meer — op te pakken zodra concreet nodig,
 met als uiterste richtpunt rond of vlak na fase 5 (launching customer).
+
+### 13.3 OAuth-koppelknoppen + GA4/Search Console van ontwerp naar code (16 augustus)
+
+**Aanleiding.** Twee losse constateringen kwamen samen. Eén: geen enkel platform had een echte
+"verbind account"-knop — ook Google Ads/Meta/LinkedIn niet, alleen env-var-instructies op de
+settingspagina, terwijl de OAuth-architectuur ervoor (`agency_connections` + Supabase Vault,
+migraties 062/063) al bestond maar dode code was zonder callback-route. Twee: GA4 had een complete
+signaal-/detectorlaag zonder echte API-koppeling (`data-access.ts` zei het zelf: "raakt de echte
+GA4-API aan (straks)"), en Search Console bestond helemaal niet in code — alleen als volledig
+uitgewerkt ontwerp op papier in sectie 5.6, tegen de officiële API-documentatie van elk platform.
+De vraag was scherp: kan de "eerste 80%" — alles behalve de daadwerkelijke live aanroep, die een
+geregistreerde OAuth-app vergt — nu al gebouwd worden, zodat er bij een launching customer geen
+"coming soon" meer hoeft te staan?
+
+**Antwoord: ja, en het meeste ervan stond al op papier klaar.** Drie fases, elk apart getypecheckt,
+getest en gecommit:
+
+- **Fase A — OAuth-koppelknoppen, alle vijf platforms.** `Provider` (`lib/tenancy/koppelingen.ts`)
+  uitgebreid met `google_analytics`/`search_console` (niet "ga4" — de vault-naamregex uit migratie
+  063 staat geen cijfers toe in het providersegment; de bestaande test ving dit meteen).
+  `lib/api/google-oauth.ts`/`meta-oauth.ts`/`linkedin-oauth.ts` voor de drie tokenwisselvormen
+  (Google: standaard refresh-token-grant, nu gecached per bureau i.p.v. in een kale
+  module-singleton die fout was zodra een tweede bureau meedraait; Meta: kortlevend→langlevend;
+  LinkedIn: standaard met refresh token). `app/api/oauth/[provider]/{start,callback,disconnect}`
+  met CSRF-state via een httpOnly-cookie — het bureau komt in de callback vers uit de ingelogde
+  sessie, nooit uit de state-parameter (zie de opmerking in die route over waarom). Settingspagina
+  kreeg een gedeelde `KoppelingKaart`-component met echte Verbinden/Ontkoppelen-knoppen; de
+  env-var-instructies blijven staan als fallback, niet als enige pad.
+- **Fase B — GA4 van mock naar live.** Migratie 094 sloot een kolom-gat dat `lib/marketing/
+  tiers.ts` al had gesignaleerd (`client_settings.ga4_config` bestond niet eens in productie).
+  `lib/ga4/api-client.ts` doet de echte `runReport`-aanroepen, in twee rapporten (sessies apart
+  van gebeurtenistellingen — anders tellen sessies dubbel over meerdere key events in dezelfde
+  sessie) en detecteert GA4's eigen sampling. De vier bestaande detectoren (`signals.ts`) en de
+  SOP-promptinjectie (`context.ts`) zijn **ongewijzigd** — ze werken al op `Ga4DailyRow[]` en
+  krijgen nu echte rijen.
+- **Fase C — Search Console vanaf nul.** `lib/search-console/` spiegelt `lib/ga4/` qua vorm: vijf
+  detectoren uit de sectie-5.6.2-tabel (merk-cannibalisatie, eigen-baseline-CTR-anomalie,
+  positie-drop, niet-merk-overlap, nieuwe zoektermen), plus `beoordeelMerkCannibalisatie` — de
+  driewegs-beslistabel uit sectie 5.6.0 die het GSC-signaal onafhankelijk naast de
+  `isBranded`-naamgevingsheuristiek (`funnel-overlap.ts`) legt en in
+  `app/api/analysis/cross-channel/route.ts` is gewired. `brandTerms` is met opzet handmatige
+  invoer, nooit afgeleid uit Ads-campagnenamen — anders is het dezelfde gok verplaatst, niet een
+  verificatie.
+
+**Wat dit concreet bewijst over de "80%"-aanname.** Klopte, met een nuance: GA4 had al
+analyselogica zónder API-koppeling, Search Console had nog geen van beide, en de connectieknoppen
+zelf ontbraken voor alle vijf kanalen — de indeling was scheef, niet de schatting. Alles behalve de
+daadwerkelijke live API-aanroep is nu gebouwd en getest zonder live credentials: 33 nieuwe checks
+voor de detectoren/beslistabel/responsparsing (mocked fetch, geen netwerk), en de demo-dataset
+(`lib/demo/search-console-demo.ts`) triggert de ontworpen detectoren aantoonbaar, niet aangenomen.
+`npm run typecheck`, de volledige testsuite (281 bestanden) en `next build` zijn na elke fase
+gecontroleerd, niet pas aan het eind.
+
+**Wat nog moet gebeuren, en door wie.** Puur mensenwerk, geen code meer:
+- Een Google Cloud-project met de Analytics Data API en de Search Console API ingeschakeld (Google
+  Ads staat er al; dezelfde OAuth-client dekt alle drie).
+- Een Meta-app en een LinkedIn-app (of uitbreiding van bestaande developer-toegang) met de juiste
+  redirect-URI.
+- De migraties 094 (`ga4_config`) en 095 (`search_console_config`) zijn als bestand gecommit maar
+  **nog niet tegen de live database gedraaid** in deze sessie — er is bewust geen migratierunner in
+  deze sandbox aangetroffen om een productie-schemawijziging autonoom door te voeren. Draaien vóór
+  een bureau de nieuwe instellingenformulieren gebruikt.
+- Per klant: GA4-propertyId + key events, Search Console-siteUrl + merktermen invullen (de
+  formulieren staan er; dit is klantspecifieke invoer, geen ontwikkelwerk).
+
+**Niet in deze ronde, expliciet niet stil laten vallen:** de zes overige bronnen uit sectie
+5.6.3–5.6.5 (Shopify/WooCommerce, Microsoft Ads, TikTok) en de zes extra GA4-detectoren uit de
+5.6.1-tabel (nieuw-vs-terugkerend, ecommerce-funnel-lek, GA4↔Ads-koppeling-health, kanaal×device-
+matrix, retentiecohorten) — een volgende, vergelijkbaar grote bouwronde.
