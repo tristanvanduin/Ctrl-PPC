@@ -17,17 +17,35 @@
 // GEBOUWD VERSUS ROADMAP: elke feature draagt `gebouwd`. Ongeveer de helft van de aangeleverde
 // featurelijst bestaat nog niet in de code -- nagemeten op 11 augustus 2026, zie de PR-discussie.
 // Gebouwd (bevestigd in de codebase): unlimited accounts/kanalen/gebruikers (agencies.licentie
-// kent geen cap), GA4-integratie (lib/ga4/), Cross-Account Portfolio-view
-// (components/terminal/agency-god-view.tsx), de creditgrootboek-infrastructuur zelf (migratie
-// 070, controleerSaldo/verbruikCredit blokkeren echt -- alleen de PRIJS per analyse staat nog
-// leeg, dat is een prijsbeslissing, geen ontbrekende feature). Niet gebouwd: de volledige
-// rapportage-aanpasbaarheid vanaf Growth (koppen/body bewerken, verbergen, 3 master-templates,
-// grafiekopties -- alleen de kale, niet-aanpasbare rapportage van Core bestaat al), Custom
-// Playbook Engine + AI SOP Extractor, Priority Queue, Business Intelligence Connect
-// (Shopify/WooCommerce/CRM/WordPress), MCP Sandbox, en alles onder Enterprise (BI/webhook-exports,
-// dedicated servers, custom SLA's). De pagina toont niet-gebouwde items met een "Coming
-// soon"-label in plaats van ze te verzwijgen of als feit te presenteren -- zie de PR-discussie
-// voor de drie opties die zijn afgewogen.
+// kent geen cap), Cross-Account Portfolio-view (components/terminal/agency-god-view.tsx), de
+// creditgrootboek-infrastructuur zelf (migratie 070, controleerSaldo/verbruikCredit blokkeren
+// echt -- alleen de PRIJS per analyse staat nog leeg, dat is een prijsbeslissing, geen
+// ontbrekende feature). Niet gebouwd: de volledige rapportage-aanpasbaarheid vanaf Growth
+// (koppen/body bewerken, verbergen, 3 master-templates, grafiekopties -- alleen de kale,
+// niet-aanpasbare rapportage van Core bestaat al), Custom Playbook Engine + AI SOP Extractor,
+// Priority Queue, Business Intelligence Connect (Shopify/WooCommerce/CRM/WordPress), MCP
+// Sandbox, en alles onder Enterprise (BI/webhook-exports, dedicated servers, custom SLA's). De
+// pagina toont niet-gebouwde items met een "Coming soon"-label in plaats van ze te verzwijgen of
+// als feit te presenteren -- zie de PR-discussie voor de drie opties die zijn afgewogen.
+//
+// GA4 EN MICROSOFT ADS GECORRIGEERD (16 augustus 2026, na een sessie die tegen de live database
+// en de officiele API-documentatie onderzocht wat er echt staat -- zie docs/MASTERPLAN.md sectie
+// 5.6). Beide stonden op gebouwd: true op grond van "de code bestaat" (lib/ga4/, de
+// kanalenbalk-tekst), niet op grond van "een klant krijgt hier vandaag echte data uit" -- precies
+// het onderscheid dat sectie 7 van het masterplan als regel stelt. Live geverifieerd: GA4's
+// data-access-laag geeft altijd "absent" terug voor een echt account (geen API-aanroep bestaat,
+// en client_settings.ga4_config bestaat niet eens in productie); Microsoft/Bing Ads heeft nul
+// code (channel-provider.ts zegt het zelf: "geen synctabel en geen rij in de database"), en
+// stond hier als true terwijl dezelfde site het in de kanalenbalk (trust-banner.tsx) al correct
+// als niet-gebouwd toonde -- een tegenspraak op een pagina.
+//
+// BI-API/WEBHOOK-EXPORTS: BLIJFT BEWUST BUITEN ELKE STANDAARD FEATURELIJST (16 augustus 2026,
+// herbevestigd na herhaalde instructie van de eigenaar). Niet "nog te bouwen voor een tier" --
+// een expliciete productbeslissing om dit NOOIT als standaard inclusie te voeren, alleen op
+// aanvraag en alleen als het genoeg oplevert. Zie ook sectie 11 van het masterplan
+// ("wat we niet bouwen"). Dit blijft daarom op de Enterprise-regel staan als "available on
+// request... not a standard inclusion" en mag niet stilzwijgend terugkomen als een
+// standaard-tier-feature in een latere wijziging.
 //
 // CODE ORANJE/CODE RED (12 augustus 2026): stond hier als "niet gebouwd", was stale. De
 // detectiejob (lib/adoptie/detecteer-code-rood.ts) draait als cron (vercel.json,
@@ -102,7 +120,8 @@ export const TIERS: readonly TierDefinitie[] = [
     vanafPerMaand: 0,
     creditsPerMaand: 0,
     features: [
-      { tekst: "Google Ads, Meta Ads, LinkedIn Ads, and Microsoft Ads", gebouwd: true },
+      { tekst: "Google Ads, Meta Ads, and LinkedIn Ads", gebouwd: true },
+      { tekst: "Microsoft (Bing) Ads", gebouwd: false },
       { tekst: "Unlimited accounts, channels, and users", gebouwd: true },
       { tekst: "Dashboarding, forecasting, and KPI monitoring", gebouwd: true },
     ],
@@ -115,7 +134,7 @@ export const TIERS: readonly TierDefinitie[] = [
     vanafPerMaand: 749,
     creditsPerMaand: 10_000,
     features: [
-      { tekst: "GA4 integration", gebouwd: true },
+      { tekst: "GA4 integration", gebouwd: false },
       { tekst: "Agency Memory: hypotheses, sprint items, and learnings that compound over time", gebouwd: true },
       { tekst: "Code Oranje & Code Red churn protocols from day one", gebouwd: true },
     ],

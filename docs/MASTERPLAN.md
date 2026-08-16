@@ -1357,6 +1357,11 @@ Even belangrijk als de rest. Dit is de lijst die voorkomt dat het plan uitdijt.
   `lib/benchmark/cel.ts` en anticipeert die verleiding letterlijk.
 - **Geen lege provider die nul signalen teruggeeft.** Dat leest als "gemeten en niets gevonden" en
   dat verschil is bewust bewaakt in de bestaande code.
+- **Geen BI-API/webhook-exports als standaard tier-inclusie.** Herhaaldelijk door de eigenaar
+  bevestigd (laatst 16 augustus 2026): dit wordt nooit een standaardfeature van een tier, alleen
+  op aanvraag en alleen als het genoeg oplevert. Staat op de Enterprise-regel in
+  `lib/marketing/tiers.ts` als "available on request... not a standard inclusion" — dat is de
+  vergrendelde tekst, geen tussenstap naar een standaard rollout.
 
 ---
 
@@ -1375,3 +1380,77 @@ want die module gaat juist over het samenspel tussen kanalen.
 maanden, dan is fase 6 realistisch. Duurt het langer, dan verschuift de waarde van dit product naar
 loop 2 en loop 5, en die staan gelukkig al vooraan in de volgorde. Dat is geen toeval: het plan is
 zo gebouwd dat het ook zonder netwerk een product oplevert dat een bureau wil hebben.
+
+---
+
+## 13. Implementatieplan: coming-soon-correcties en het mobile/huisstijl-traject (16 augustus)
+
+Geen fase-poort — dit werk dient de klant die er al is, niet een klant die er nog niet is, en heeft
+geen credential-afhankelijkheid. Het is puur ingepland werk, in twee delen.
+
+### 13.1 Marketing-copy-correcties
+
+Een audit van elke `gebouwd`-vlag op de marketing site tegen wat deze sessie live tegen de
+database en de codebase heeft vastgesteld, leverde twee echte overclaims op — dingen die als
+`gebouwd: true` stonden terwijl een klant ze vandaag niet kan gebruiken. Beide gecorrigeerd:
+
+- **`lib/marketing/tiers.ts` (Foundation-tier) en `app/(marketing)/how-it-works/page.tsx`**:
+  "Microsoft Ads" stond gebundeld met Google/Meta/LinkedIn op `gebouwd: true`, terwijl
+  `channel-provider.ts` zelf zegt dat er geen synctabel en geen rij voor bestaat — en de
+  kanalenbalk (`trust-banner.tsx`) op dezelfde site "Bing Ads" al correct als niet-gebouwd toonde.
+  Losgetrokken in een eigen regel, `gebouwd: false`.
+- **`lib/marketing/tiers.ts` (Core-tier)**: "GA4 integration" stond op `gebouwd: true` op grond van
+  "de code bestaat" (`lib/ga4/`), niet op grond van "een klant krijgt hier live data uit" — en dat
+  laatste is precies de maatstaf die sectie 7 van dit document zelf stelt. Live geverifieerd
+  tijdens sectie 5.6's onderzoek: `fetchGa4Dataset` geeft voor een echt account altijd `"absent"`
+  terug, en `client_settings.ga4_config` bestaat niet eens in productie. Gezet op `gebouwd: false`.
+
+**Bewust NIET gewijzigd, na verificatie:** de Whitelabel Portal-module (`whitelabel_actief`
+blijkt echt gewired — admin-toggle, instellingenscherm, sidebar-logo-swap draaien allemaal echt,
+zie `app/api/admin/whitelabel/route.ts` en `components/layout/sidebar-logo.tsx`) en Volume
+Compute (`credit-costs.ts`'s eigen redenering — de infrastructuur blokkeert echt, alleen de prijs
+per analyse is nog een open beslissing — is een verdedigbaar standpunt, geen overclaim, en is niet
+opnieuw opengetrokken zonder sterker bewijs dan er nu is).
+
+**BI-API/webhook-exports blijft expliciet op "alleen op aanvraag" staan** (sectie 11) — geen
+onderdeel van dit of enig ander implementatieplan als standaardfeature, ongeacht welke tier.
+
+### 13.2 Mobile-friendly en huisstijl-eenmaking
+
+**Bevinding, tegen de code onderzocht, niet aangenomen:** marketing en dashboard delen één
+`app/globals.css` maar gebruiken hem als twee losse woordenboeken die elkaar nul keer raken —
+marketing's `midnight-slate`/`off-white`/`neon-indigo`-tokens plus Plus Jakarta Sans staan naast
+het dashboard se `rm-blue`/`rm-gray`/`text-micro`-t/m-`text-hero`-schaal plus Ubuntu, met vier
+bestanden aan onbedoelde overlap. Het dashboard is bovendien architecturaal desktop-only: een
+vaste, niet-inklapbare `w-72`-sidebar die alle content permanent met `ml-72` opzijschuift, nergens
+een mobiele navigatie, en maar 40% van de bestanden met ook maar één responsive Tailwind-prefix
+(tegen 62% op marketing). Marketing heeft wél al een gedateerde, gemeten mobiele audit
+(12 augustus, `tier-grid.tsx`/`mobile-nav.tsx`) — de "toonaangevend"-status is dus geen indruk maar
+een feit. Omvang: ~113 dashboardbestanden in de plausibele scope tegen ~34 marketingbestanden,
+waarvan het merendeel al klaar is.
+
+**Richting gekozen (16 augustus):** marketing's identiteit wordt leidend. Het dashboard neemt het
+`midnight-slate`/`off-white`/`neon-indigo`-palet en Plus Jakarta Sans over, niet andersom.
+
+**Fase 1 — gedaan.** Expliciete `viewport`-export in `app/layout.tsx` (`app/layout.tsx`, deze
+sessie). Kostte niets, geen risico, onafhankelijk van de rest.
+
+**Fase 2 — tokenstelsel-migratie, eerst een pilot.** Voordat alle 113 bestanden worden aangeraakt:
+één representatief dashboardscherm (voorstel: een instellingenpagina — kleinere oppervlakte,
+minder dichte data dan de Decision Terminal, dus een veiligere eerste proef) omzetten naar
+marketing's tokens, in de browser bekijken op zowel desktop- als mobiele breedte, en pas dan de
+aanpak vastleggen voor de rest. Dat voorkomt 113 bestanden aanpassen op een aanname die bij het
+eerste echte scherm al niet blijkt te kloppen (dezelfde reden waarom dit hele traject live
+verifieert in plaats van aanneemt).
+
+**Fase 3 — informatiearchitectuur per scherm, daarna pas de brede uitrol.** De vaste sidebar wordt
+inklapbaar/een drawer onder een nog te bepalen breedte; brede grids (`grid-cols-4`/`5`/`6`) krijgen
+per scherm een eigen antwoord (stapelen, tabbladen, of een apart detailscherm) in plaats van één
+generieke regel — dat is een ontwerpbeslissing per scherm, geen zoek-en-vervang. Volgorde, van
+klein/geïsoleerd naar groot/verweven: Settings → Insights → Portfolio → Client Dashboard →
+Decision Terminal (de dichtste, laatste).
+
+**Timing.** Geen fase-poort, dus geen vaste datum — wel een richtpunt: fase 1 staat al, fase 2/3
+lopen als voorbereidend werk naast de rest van de wachtrij, met als doel klaar te zijn rond of
+vlak na fase 5 (launching customer) — het moment waarop een echte klant, mogelijk op een telefoon,
+voor het eerst het dashboard opent.

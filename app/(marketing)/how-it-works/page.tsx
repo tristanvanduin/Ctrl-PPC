@@ -90,9 +90,9 @@ export default function HowItWorksPage() {
         <div className="rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-off-white/40">Layer 1 - Foundation</p>
           <p className="mt-2 text-sm text-off-white/60">
-            Connect Google, Meta, LinkedIn, and Microsoft Ads. See what happened, dashboarding,
-            forecasting, KPI monitoring. Free and unlimited per agency, capped at 15 agencies
-            during launch.
+            Connect Google, Meta, and LinkedIn Ads (Microsoft Ads coming soon). See what happened,
+            dashboarding, forecasting, KPI monitoring. Free and unlimited per agency, capped at
+            15 agencies during launch.
           </p>
         </div>
         <div className="rounded-[6px] border border-neon-indigo/30 bg-midnight-slate-raised/50 p-5">
