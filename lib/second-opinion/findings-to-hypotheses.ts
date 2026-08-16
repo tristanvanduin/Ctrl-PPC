@@ -33,6 +33,10 @@ export interface SprintHypothesisRow {
   ice_total: number;
   status: "pending";
   source: ProposalSource;
+  // Migratie 088: structured metadata naast rationale (die de leesbare onderbouwing draagt en
+  // dus niet overschreven mag worden). Optioneel: elke bron behalve master_synthesis laat dit
+  // weg, dan blijft de kolom null -- geen bestaande schrijfweg hoeft dit veld te kennen.
+  metadata?: Record<string, unknown> | null;
 }
 
 // Impact/complexity/confidence -> ICE-schaal 1-10.
@@ -130,7 +134,8 @@ export type ProposalSource =
   | "meta_kpi"
   | "linkedin_kpi"
   | "google_video"
-  | "geo_markets";
+  | "geo_markets"
+  | "master_synthesis";
 
 /**
  * Schrijft nieuwe pending voorstellen weg en vervangt de oude van dezelfde bron,

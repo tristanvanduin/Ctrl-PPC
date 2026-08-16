@@ -57,6 +57,9 @@ export const ANALYSE_CATALOGUS: AnalyseDefinitie[] = [
   // ── Over de kanalen heen ──────────────────────────────────────────────────
   { section: "cross_channel_v1", titel: "Cross-channel-analyse", kanaal: "blended", waarover: "zaai/oogst, arbitrage, mix, doelgroep-samenhang en GA4-CRO" },
   { section: "period_evaluation_v1", titel: "Periode-evaluatie", kanaal: "blended", waarover: "wat de vorige periode opleverde tegen wat ervan verwacht werd" },
+  // Pijler 6: synthetiseert de al-berekende kanaal-aanbevelingen (Pijler 1-5) samen met de
+  // cross-channel-feiten hierboven tot kanaaloverstijgende hypotheses en sprinttaken.
+  { section: "master_synthesis_v1", titel: "Master Synthesis", kanaal: "blended", waarover: "welke hypotheses en sprinttaken alleen zichtbaar worden door kanalen samen te lezen" },
 ];
 
 export interface AnalyseStatus extends AnalyseDefinitie {

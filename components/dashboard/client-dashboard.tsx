@@ -26,6 +26,7 @@ import {
 import { MetaCreativeAnalyses } from "../insights/meta-creative-analyses";
 import { SignalAnalysisCard } from "./signal-analysis-card";
 import { CrossChannelAnalyses } from "./cross-channel-analyses";
+import { MasterSynthesisAnalysis } from "./master-synthesis-analysis";
 import { ChannelForecast } from "./channel-forecast";
 import { EventForecaster } from "./event-forecaster";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
@@ -744,6 +745,15 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
           <Section>Sub-analyses</Section>
           {/* Cross-channel als losse sub-analyse-kaarten (net als de kanalen), uit één run. */}
           <CrossChannelAnalyses clientId={clientId} />
+          {/* Master Synthesis (Pijler 6) heeft pas iets kanaaloverstijgends te zeggen bij 2+
+              kanalen -- zelfde grootheid (kanalen.length > 1) als meerdereKanalen elders op deze
+              pagina. Bij één kanaal is elke aanbeveling per definitie van dat ene kanaal. */}
+          {kanalen.length > 1 && (
+            <>
+              <Section>Pijler 6</Section>
+              <MasterSynthesisAnalysis clientId={clientId} />
+            </>
+          )}
         </>
       )}
 
