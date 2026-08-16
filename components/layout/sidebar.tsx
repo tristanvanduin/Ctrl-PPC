@@ -77,7 +77,7 @@ function TakBlok({ tak, diepte, ingeklapt, wissel, Link }: {
 
 export function Sidebar() {
   return (
-    <Suspense fallback={<aside className="fixed left-0 top-0 bottom-0 w-72 bg-rm-blue z-50" />}>
+    <Suspense fallback={<aside className="fixed left-0 top-0 bottom-0 w-72 bg-sidebar-panel z-50" />}>
       <SidebarInner />
     </Suspense>
   );
@@ -352,7 +352,7 @@ function SidebarInner() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-72 bg-rm-blue flex flex-col z-50">
+    <aside className="fixed left-0 top-0 bottom-0 w-72 bg-sidebar-panel flex flex-col z-50">
       {/* Logo.
 
           ── GEEN <h1> ─────────────────────────────────────────────────────────

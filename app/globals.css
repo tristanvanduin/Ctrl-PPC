@@ -191,6 +191,13 @@
   --color-rm-orange-ink: var(--rm-orange-ink, var(--brand-accent, #f5960b));
   --color-rm-gray: var(--rm-gray, #32373c);
   --color-rm-border: var(--rm-border, #E1E5F2);
+  /* De zijbalk zelf, los van rm-blue: een vlak van 288px effen indigo bleef in de kern hetzelfde
+     beeld als het oude effen blauw -- alleen de tint veranderde. Marketing's eigen uitstraling is
+     geen effen merkkleur maar een bijna-zwart vlak (--color-midnight-slate) met de merkkleur er
+     licht doorheen gemengd, en dat is wat hier staat: 26% merkkleur in het donker, whitelabel-
+     bewust via dezelfde --brand-primary-variabele, theoretisch constant tussen licht en donker
+     (:root only -- de zijbalk is de vaste spine, niet het wisselende inhoudsvlak). */
+  --color-sidebar-panel: var(--sidebar-panel);
 
   /* ── Blueprint v2.0: de marketingsite (Fase 7) ──────────────────────────
      Vaste kleuren, niet gekoppeld aan .dark / de licht-donker-schakelaar: de marketingsite
@@ -262,6 +269,14 @@
   --rm-gray: #32373c;
   --rm-light: #f9fafc;
   --rm-border: #E1E5F2;
+
+  /* Sectie 13.2, tweede ronde (16 augustus): een effen vlak in de merkkleur bleef "die
+     uitstraling van hiervoor" ogen, ook nadat de tint zelf veranderde -- het probleem zat in
+     EFFEN, niet in BLAUW. Marketing's zijbalk-equivalent is nooit een effen merkkleur maar een
+     bijna-zwart vlak met de merkkleur er licht doorheen; dat is dit token. Alleen in :root, niet
+     herhaald in .dark: de zijbalk is de vaste spine en verandert niet mee met de
+     licht/donker-schakelaar van het inhoudsvlak. */
+  --sidebar-panel: color-mix(in srgb, var(--brand-primary, #4f46e5) 26%, #121820);
 
   --chart-grid: #eef1f6;
   --chart-axis: #64748b;
