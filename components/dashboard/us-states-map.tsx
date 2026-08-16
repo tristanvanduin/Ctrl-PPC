@@ -36,7 +36,7 @@ const SHAPES: Shape[] = features.map((f, i) => {
 // interpolatie in de browser, zodat het omschakelen geen JavaScript kost.
 function ramp(frac: number): string {
   const f = Math.max(0, Math.min(1, frac));
-  return `color-mix(in srgb, var(--kaart-hoog, #08288C) ${Math.round(f * 100)}%, var(--kaart-laag, #e6eef8))`;
+  return `color-mix(in srgb, var(--kaart-hoog, #4f46e5) ${Math.round(f * 100)}%, var(--kaart-laag, #e6eef8))`;
 }
 
 export interface UsStatesMapProps {
@@ -67,7 +67,7 @@ export default function UsStatesMap({ values, format, metricLabel }: UsStatesMap
               key={s.key}
               d={s.d}
               fill={has ? ramp(Math.abs(v as number) / max) : "var(--kaart-leeg, #eef1f6)"}
-              stroke={isHover ? "var(--kaart-hover, #08288C)" : "var(--kaart-rand, #ffffff)"}
+              stroke={isHover ? "var(--kaart-hover, #4f46e5)" : "var(--kaart-rand, #ffffff)"}
               strokeWidth={isHover ? 1.4 : 0.5}
               style={{ cursor: has ? "pointer" : "default", opacity: hover && !isHover ? 0.9 : 1, transition: "opacity 120ms" }}
               onMouseMove={(e) => {

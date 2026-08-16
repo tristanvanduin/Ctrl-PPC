@@ -234,35 +234,44 @@
   --card-foreground: #1a1a2e;
   --popover: #ffffff;
   --popover-foreground: #1a1a2e;
-  --primary: #08288C;
+  /* PRODUCT-EIGEN FALLBACK VERVANGEN, RONDE 2 (16 augustus): sectie 13.2 verving het oude
+   * blauw-met-oranje (#08288C/#F16B37) al in de @theme-laag hierboven en in --sidebar-panel,
+   * maar dit klassieke shadcn-blok (:root) bleef letterlijk op de oude kleur staan — het was nog
+   * nooit via var(--brand-primary, ...) gaan lopen. Resultaat: elke pagina zonder
+   * BrandThemeProvider (settings, admin — alles zonder een specifieke klant/beurs-context) toonde
+   * nog steeds het ingetrokken blauw op de standaardknop (bg-primary, button.tsx se default-
+   * variant) en de zijbalk, terwijl klantpagina's er via de provider al overheen renderden. Zelfde
+   * fout als bij de body-gradient (zie de opmerking bij @media min-width:1024px verderop) --
+   * dezelfde kleur, gemist op een tweede plek. .dark hieronder had dit patroon al correct. */
+  --primary: var(--brand-primary, #4f46e5);
   --primary-foreground: #ffffff;
   --secondary: #f0f2f8;
-  --secondary-foreground: #08288C;
+  --secondary-foreground: var(--brand-primary, #4f46e5);
   --muted: #f0f2f8;
   /* Was #64748b: 4,25:1 op de lichtgrijze vlakken waar deze kleur het vaakst op staat —
      net onder de 4,5 die klein tekstwerk nodig heeft. Eén tint dieper haalt acht plekken tegelijk
      over de drempel zonder dat het "gedempt" ophoudt gedempt te zijn. */
   --muted-foreground: #55637a;
-  --accent: #F16B37;
+  --accent: var(--brand-accent, #f5960b);
   --accent-foreground: #ffffff;
   --destructive: #ef4444;
   --border: #E1E5F2;
   --input: #E1E5F2;
-  --ring: #08288C;
-  --chart-1: #08288C;
-  --chart-2: #F16B37;
+  --ring: var(--brand-primary, #4f46e5);
+  --chart-1: var(--brand-primary, #4f46e5);
+  --chart-2: var(--brand-accent, #f5960b);
   --chart-3: #6ACC50;
   --chart-4: #3b82f6;
   --chart-5: #8b5cf6;
   --radius: 0.625rem;
-  --sidebar: #08288C;
+  --sidebar: var(--brand-primary, #4f46e5);
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #F16B37;
+  --sidebar-primary: var(--brand-accent, #f5960b);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #0a35b0;
+  --sidebar-accent: color-mix(in srgb, var(--brand-primary, #4f46e5) 85%, white);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.12);
-  --sidebar-ring: #F16B37;
+  --sidebar-ring: var(--brand-accent, #f5960b);
 
   /* De grafiek-chrome als variabele in plaats van als hex in TypeScript, zodat het raster en de
      aslabels met het thema meebewegen. Dezelfde waarden als voorheen. */
@@ -306,10 +315,10 @@
   /* De kaart. `--kaart-laag` is de kleur bij nul en `--kaart-hoog` die bij het maximum; de
      landen ertussenin worden in de browser gemengd. `--kaart-leeg` is een land zonder data. */
   --kaart-laag: #e6eef8;
-  --kaart-hoog: #08288C;
+  --kaart-hoog: var(--brand-primary, #4f46e5);
   --kaart-leeg: #eef1f6;
   --kaart-rand: #ffffff;
-  --kaart-hover: #08288C;
+  --kaart-hover: var(--brand-primary, #4f46e5);
 
   /* Het vlak achter een advertentie-preview. */
   --preview-vlak: rgb(243 244 246 / 0.7);
@@ -382,7 +391,7 @@
   --secondary-foreground: #e7e9ee;
   --muted: #1f242d;
   --muted-foreground: #9aa3b2;
-  --accent: var(--brand-accent, #F16B37);
+  --accent: var(--brand-accent, #f5960b);
   --accent-foreground: #ffffff;
   --destructive: #f87171;
   --border: #262b35;
@@ -654,8 +663,8 @@
     body {
       background-image: linear-gradient(
         to right,
-        var(--brand-primary, #08288C) 0,
-        var(--brand-primary, #08288C) 18rem,
+        var(--brand-primary, #4f46e5) 0,
+        var(--brand-primary, #4f46e5) 18rem,
         transparent 18rem
       );
       /* `repeat-y` en niet `no-repeat`.
