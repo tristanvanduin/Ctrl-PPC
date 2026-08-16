@@ -34,7 +34,13 @@ export default function AppLayout({
       <div className={`${ubuntu.variable} flex min-h-screen`}>
         <Sidebar />
         <SidebarBackdrop />
-        <div className="flex min-h-screen flex-1 flex-col lg:ml-72">
+        {/* min-w-0 is niet decoratief: zonder deze regel mag een flex-item met flex-1 niet
+            krimpen onder het min-content van zijn INHOUD (browserstandaard), en duwde de
+            TopBar's eigen inhoud (titel + iconen die zelf niet meer inkrimpen) deze hele kolom
+            -- en daarmee header EN main -- breder dan de viewport. Op 390px verklaarde dat 57px
+            horizontale overflow die met losse aanpassingen aan TopBar niet wegging: de oorzaak
+            zat hier, niet daar. */}
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:ml-72">
           <TopBar />
           <SopDekkingBanner />
           <main className="flex-1 p-6">{children}</main>

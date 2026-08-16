@@ -127,7 +127,7 @@ export function TopBar() {
     // die terugval wordt hij daar half doorzichtig zónder vervaging, en loopt de tekst van de
     // pagina dwars door de titel heen.
     <header className="h-16 border-b border-border bg-card supports-[backdrop-filter]:bg-[var(--balk-vlak)] supports-[backdrop-filter]:backdrop-blur-md flex items-center justify-between gap-3 px-4 sm:px-6 sticky top-0 z-40">
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {/* Alleen zichtbaar onder `lg`: op een breed scherm staat de zijbalk altijd open en is
             er niets om open te klappen. Zie components/layout/sidebar-mobile-context.tsx. */}
         <button
@@ -140,7 +140,7 @@ export function TopBar() {
         <h2 className="truncate text-lg font-bold text-rm-blue-ink">{getTitle()}</h2>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {/* ── PLEK VOOR ACTIES VAN DE PAGINA ────────────────────────────────────
             Leeg gelaten voor knoppen die bij het huidige scherm horen maar in de chrome thuis
             zijn. Op dit moment vult alleen de sparrenknop hem, via een portal vanuit ChatDrawer.
@@ -229,7 +229,12 @@ export function TopBar() {
           </div>
         )}
 
-        <span className="text-sm text-muted-foreground">
+        {/* Verborgen onder `md`: samen met de titel, het meldingenbelletje, de thema-schakelaar
+            en het gebruikersmenu paste de volle datum nergens meer onder ~480px -- de balk liep
+            zelf al over zijn eigen breedte heen (zie sectie 13.2, docs/MASTERPLAN.md). De datum
+            is de minst functionele van de balk (staat nergens anders, maar kost ook niemand een
+            handeling als hij er even niet is), dus die gaat als eerste. */}
+        <span className="hidden text-sm text-muted-foreground md:inline">
           {mounted
             ? new Date().toLocaleDateString("nl-NL", {
                 weekday: "long",

@@ -1471,15 +1471,38 @@ screenshot-tool in deze sandbox liet bij de DICHTE stand desondanks een oude bla
 in geen enkele DOM-controle bestond (elementFromPoint vindt er niets, het element is `0×0` en
 `display:none`) — een bekende categorie renderbug in headless Chromium met `position:fixed`-
 lagen, niet een app-fout. De OPENSTAANDE stand screenshot wél correct (donkere zijbalk, sluitknop,
-verdonkerde achtergrond) en bevestigt de vorm. Losse per-scherm IA (brede grids die stapelen of
-naar tabbladen gaan) staat nog open — dat raakt niet meer de gedeelde chrome maar de inhoud van
-elk scherm apart, en is dus veiliger om apart te doen.
+verdonkerde achtergrond) en bevestigt de vorm.
 
-**Volgorde voor de resterende, per-scherm IA-ronde**, van klein/geïsoleerd naar groot/verweven:
-Settings → Insights → Portfolio → Client Dashboard → Decision Terminal (de dichtste, laatste).
+**De echte grondoorzaak van de resterende horizontale overflow bleek dieper te zitten dan de
+TopBar.** Losse aanpassingen daar (de datum verbergen onder `md`, de gap verkleinen) hielpen maar
+gedeeltelijk en de resterende overflow bleef precies even groot bij elke volgende TopBar-wijziging
+— een teken dat de oorzaak ergens anders zat. Bleek: `app/(app)/layout.tsx`'s contentkolom had
+`flex-1` maar nooit `min-w-0`, en zonder die regel mag een flex-item van de browser niet krimpen
+onder het min-content van zijn eigen inhoud — de TopBar's eigen (niet meer inkrimpende) inhoud
+duwde daardoor de hele kolom, en daarmee header ÉN main, breder dan de viewport. Eén regel
+(`min-w-0` op die kolom) loste het merendeel in één keer op; de datum-hiding en gap-verkleining
+bleven staan omdat ze op zichzelf ook juist zijn, en één laatste plek (het "Aanmaken"-inputveld
+bij klantgroepen, ontbrak zelf ook `min-w-0`) is losstaand gefixt.
 
-**Timing.** Geen fase-poort, dus geen vaste datum — wel een richtpunt: fase 1 en fase 2 en de
-gedeelde chrome van fase 3 staan er nu; de resterende per-scherm IA-ronde loopt als voorbereidend
-werk naast de rest van de wachtrij, met als doel klaar te zijn rond of vlak na fase 5 (launching
-customer) — het moment waarop een echte klant, mogelijk op een telefoon, voor het eerst het
-dashboard opent.
+**Live doorgemeten op 390px na deze fix, niet aangenomen:** `/settings`, `/vandaag`, `/portfolio`,
+`/insights`, `/decision-terminal`, `/admin`, `/scripts` en `/client/demo-greentech` (de dichtste
+pagina) geven allemaal `document.documentElement.scrollWidth === 390` — geen horizontale overflow
+meer, nul uitzonderingen. Dat is een groter deel van de geplande "per-scherm IA-ronde" dan verwacht:
+de vaste sidebar en deze ene ontbrekende `min-w-0` waren kennelijk de dominante oorzaak op vrijwel
+elk scherm, niet losse per-pagina problemen. De grids die al `grid-cols-1 sm:...`/`md:...` gebruiken
+(geconstateerd in de oorspronkelijke pilot-analyse) bleken dat dus ook daadwerkelijk correct te doen
+zodra de container zelf niet meer kunstmatig te breed werd geduwd.
+
+**Wat hiermee nog niet gezegd is:** afwezigheid van horizontale overflow is geen garantie dat
+alles ook prettig bruikbaar is op een klein scherm — brede tabellen/grafieken kunnen nog steeds
+gebruik maken van hun eigen `overflow-x-auto`-wrapper (correct, geen paginabrede overflow) zonder
+dat de tabel zelf al goed leesbaar is op 390px, en geen van de interactieve staten (tabs
+doorklikken, modals, drawers per scherm) is stuk voor stuk getest. Dat is de resterende, kleinere
+categorie werk — geen sidebar/layout-probleem meer, maar per-scherm content-kwaliteit — en kan
+gericht opgepakt worden zodra dat concreet nodig blijkt, in plaats van vooraf blind Settings →
+Insights → Portfolio → Client Dashboard → Decision Terminal langs te gaan.
+
+**Timing.** Geen fase-poort, dus geen vaste datum. Fase 1, fase 2 en de gedeelde chrome van fase 3
+(inclusief de layout-grondoorzaak) staan er nu, breed doorgemeten. Resterend werk is losse
+content-kwaliteit per scherm, geen structureel probleem meer — op te pakken zodra concreet nodig,
+met als uiterste richtpunt rond of vlak na fase 5 (launching customer).
