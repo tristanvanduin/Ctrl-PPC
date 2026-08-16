@@ -21,6 +21,9 @@ import type { SignalStory, DetectionResult } from "@/lib/signals/types";
 import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
 import { fetchGa4Dataset, type Ga4SupabaseLike } from "@/lib/ga4/data-access";
 import { buildGa4CroSignals, buildGa4DeviceCroSignals, buildGa4LandingPageCroSignals } from "@/lib/ga4/signals";
+import { fetchGscDataset, type GscSupabaseLike } from "@/lib/search-console/data-access";
+import { buildBrandCannibalizationSignals, buildPositionDropSignals } from "@/lib/search-console/signals";
+import { beoordeelMerkCannibalisatie } from "@/lib/search-console/context";
 import { buildBlendedDataGapSignals, type ChannelValueAgg } from "@/lib/signals/blended-data-gap";
 import { buildFastSaturationSignals, type SaturationPoint } from "@/lib/signals/fast-saturation";
 import { mergeDetections } from "@/lib/signals/types";
@@ -306,6 +309,25 @@ export async function POST(request: NextRequest) {
     }
   })();
 
+  // ── Search Console: merk-cannibalisatie (onafhankelijk van de isBranded-naamgevingsheuristiek
+  // hieronder) en positie-drop. Verklarende website-laag naast GA4; leeg zonder GSC-config/-
+  // koppeling → degradeert expliciet. De driewegs-beslistabel (MASTERPLAN 5.6.0) die dit signaal
+  // naast isBranded legt volgt verderop, ná funnelInputs. ──
+  const gsc = await (async () => {
+    try {
+      const dataset = await fetchGscDataset(clientId, { supabase: supabase as unknown as GscSupabaseLike });
+      if (dataset.availability === "absent") {
+        degradations.push(`Search Console: ${dataset.limitations[0] ?? "geen GSC-data"}; merk-cannibalisatie kan niet onafhankelijk van de campagnenaamgeving geverifieerd worden`);
+        return { detection: { triggered: [] as SignalStory[], checked: ["gsc_brand_cannibalization", "gsc_position_drop"] }, brandStory: null as SignalStory | null };
+      }
+      const brand = buildBrandCannibalizationSignals(dataset.rows, dataset.config?.brandTerms ?? []);
+      const drop = buildPositionDropSignals(dataset.rows);
+      return { detection: mergeDetections([brand, drop]), brandStory: brand.triggered[0] ?? null };
+    } catch {
+      return { detection: { triggered: [] as SignalStory[], checked: ["gsc_brand_cannibalization", "gsc_position_drop"] }, brandStory: null as SignalStory | null };
+    }
+  })();
+
   // ── Kanaalrollen & overlap (X4 lens 2, funnel-overlap.ts): elke campagne naar prospecting/
   // retargeting/branded_capture/onbekend, en de twee gaten die geen los kanaalrapport laat zien
   // (dubbele warme pool over kanalen heen, ontbrekende prospecting). LinkedIn krijgt een echte
@@ -354,6 +376,25 @@ export async function POST(request: NextRequest) {
     degradations.push(`kanaalrollen: ${funnelRoles.unknownCount} van ${funnelInputs.length} campagnes blijft onbekend (meestal Meta, want meta_adsets.targeting_summary wordt nog niet gesynct)`);
   }
 
+  // ── Merk-cannibalisatie: de driewegs-beslistabel (MASTERPLAN 5.6.0) die het GSC-signaal
+  // hierboven naast de isBranded-naamgevingsheuristiek van de Google-campagnes legt. "geen_
+  // wijziging" levert bewust GEEN story op — afwezigheid van GSC-bewijs is geen bevinding. ──
+  const googleHeeftMerkcampagnes = funnelInputs.some((f) => f.channel === "google_ads" && f.isBranded === true);
+  const merkVerdict = beoordeelMerkCannibalisatie(gsc.brandStory, googleHeeftMerkcampagnes);
+  const merkVerdictStory: SignalStory | null = merkVerdict.uitkomst === "geen_wijziging" ? null : {
+    id: "cross_gsc_merk_verdict",
+    category: "cross_channel",
+    scope: "Merkcampagnes (Google Ads) vs. organische merkdominantie (Search Console)",
+    story: merkVerdict.toelichting,
+    actionDirection: merkVerdict.uitkomst === "bewezen_binnen_platform"
+      ? "brand-pause-test overwegen: schakel de merkcampagne kort uit en meet of het organische verkeer de vraag opvangt"
+      : "controleer de campagnenaamgeving vóór je hierop een budgetbeslissing baseert — de twee bronnen spreken elkaar nu tegen",
+    certainty: merkVerdict.uitkomst === "bewezen_binnen_platform" ? "bewezen_binnen_platform" : "indicatie",
+    evidence: gsc.brandStory?.evidence ?? [],
+  };
+  const gscTriggered = [...gsc.detection.triggered, ...(merkVerdictStory ? [merkVerdictStory] : [])];
+  const gscChecked = [...gsc.detection.checked, "cross_gsc_merk_verdict"];
+
   // ── Detectors + samenvoegen + renderen. ──
   const detected = buildCrossChannelSignals({ channels, brand });
   // Funnel over de kanalen heen: blended totaal-funnel, fase-achterblijver en divergentie.
@@ -377,8 +418,8 @@ export async function POST(request: NextRequest) {
   ];
   const cpm = buildFastSaturationSignals(saturationPoints);
   const merged = {
-    triggered: [...detected.triggered, ...funnel.triggered, ...kpiRelations.triggered, ...audienceStories, ...ga4Cro.triggered, ...dataGap.triggered, ...cpm.triggered, ...funnelRoleStories],
-    checked: [...detected.checked, ...funnel.checked, ...kpiRelations.checked, "cross_audience_samenhang", ...ga4Cro.checked, ...dataGap.checked, ...cpm.checked, ...funnelRoleChecked],
+    triggered: [...detected.triggered, ...funnel.triggered, ...kpiRelations.triggered, ...audienceStories, ...ga4Cro.triggered, ...dataGap.triggered, ...cpm.triggered, ...funnelRoleStories, ...gscTriggered],
+    checked: [...detected.checked, ...funnel.checked, ...kpiRelations.checked, "cross_audience_samenhang", ...ga4Cro.checked, ...dataGap.checked, ...cpm.checked, ...funnelRoleChecked, ...gscChecked],
   };
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, "Cross-channel");
 
@@ -394,6 +435,7 @@ export async function POST(request: NextRequest) {
     { key: "data_gap", title: "Data-volledigheid", description: "Kanalen die wel converteren maar geen conversiewaarde meten — blended ROAS onberekenbaar.", det: dataGap },
     { key: "cpm", title: "Bereikkosten & verzadiging", description: "Vroegsignalering op dag-/weekdata: stijgende CPM of frequency, waarbij de CTR verzadiging (creative/publiek) van veilingdruk (markt) scheidt. Het venster wordt op volume gekozen, zodat een oordeel er binnen weken is in plaats van na maanden.", det: cpm },
     { key: "channel_roles", title: "Kanaalrollen & overlap", description: "Elke campagne naar prospecting/retargeting/branded_capture, met dubbele-warme-pool- en ontbrekende-prospecting-detectie over de kanalen heen.", det: { triggered: funnelRoleStories, checked: funnelRoleChecked } },
+    { key: "search_console", title: "Search Console (organisch)", description: "Merk-cannibalisatie onafhankelijk van de campagnenaamgeving geverifieerd, plus positie-drop-alerts.", det: { triggered: gscTriggered, checked: gscChecked } },
   ];
   const groups: CrossGroup[] = groupDefs.map((g) => {
     const r = renderSignalSection(g.det, g.title);
