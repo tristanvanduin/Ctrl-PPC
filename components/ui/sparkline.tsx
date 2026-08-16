@@ -74,7 +74,7 @@ export function Sparkline({
   basis = "nul",
   breedte = 80,
   hoogte = 24,
-  kleur = "var(--brand-primary, #08288C)",
+  kleur = "var(--brand-primary, #4f46e5)",
   titel,
 }: {
   /** De reeks, oud naar nieuw. `null` is een gat: geen meting, geen nul. */

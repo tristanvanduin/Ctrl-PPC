@@ -287,7 +287,7 @@ export function AandeelCel({
   // niet geladen is, en valt de achtergrond terug op transparant: dan staat er een lege grijze
   // baan naast het getal. Dat is niet zichtbaar in de code en niet in de types — alleen in de
   // schermafdruk. Op de beurs-gescopete pagina bleef die kleur in demo-modus zelfs helemaal uit.
-  kleur = "var(--brand-primary, #08288C)",
+  kleur = "var(--brand-primary, #4f46e5)",
   className = "",
 }: {
   waarde: ReactNode;

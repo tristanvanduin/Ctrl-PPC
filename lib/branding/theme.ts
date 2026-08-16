@@ -29,11 +29,13 @@ export interface EventTheme {
 }
 
 // De huismerk-tokens uit globals.css; de terugval als er geen of een onvolledige brand
-// guide is.
+// guide is. Bijgewerkt 16 augustus 2026 (sectie 13.2, docs/MASTERPLAN.md) naar hetzelfde
+// blauw-met-oranje-vrije huismerk als globals.css -- deze twee moeten gelijk blijven lopen,
+// anders schrijft BrandThemeProvider het oude blauw terug op elke pagina zonder brand guide.
 export const DEFAULT_THEME: EventTheme = {
-  primary: "#08288C",
+  primary: "#4f46e5",
   primaryForeground: "#ffffff",
-  accent: "#F16B37",
+  accent: "#f5960b",
   accentForeground: "#ffffff",
   secondary: "#f0f2f8",
   background: "#f9fafc",

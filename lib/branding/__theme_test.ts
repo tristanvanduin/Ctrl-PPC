@@ -21,7 +21,7 @@ assert(contrastForeground("nietvalide") === "#ffffff", "een ongeldige kleur valt
 
 // ── Terugval op RM bij geen identiteit ──
 const geen = resolveEventTheme(null);
-assert(geen.primary === "#08288C" && geen.accent === "#F16B37", "geen identiteit geeft het volledige RM-thema");
+assert(geen.primary === "#4f46e5" && geen.accent === "#f5960b", "geen identiteit geeft het volledige RM-thema");
 assert(geen.logoUrl === null, "geen identiteit geeft geen logo");
 
 // ── Geldige merk-kleuren overnemen, met berekende voorgrond ──

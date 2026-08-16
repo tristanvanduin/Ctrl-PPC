@@ -163,20 +163,32 @@
      De neutralen stonden hier als vaste hex, en dat is precies waarom `text-rm-gray` — de
      standaard tekstkleur van dit hele dashboard, 280 keer gebruikt — als `color:#32373c` werd
      uitgeschreven in plaats van als variabele. Nu wijzen ze naar runtime-variabelen met exact
-     dezelfde waarde, zodat de donkere modus ze kan verzetten zonder één component aan te raken. */
-  --color-rm-blue: var(--brand-primary, #08288C);
-  --color-rm-orange: var(--brand-accent, #F16B37);
+     dezelfde waarde, zodat de donkere modus ze kan verzetten zonder één component aan te raken.
+
+     PRODUCT-EIGEN FALLBACK VERVANGEN (16 augustus, sectie 13.2): het blauw-met-oranje (#08288C/
+     #F16B37) is eraf op verzoek van de eigenaar. Dit is het ENE punt waar dat gebeurt — rm-blue/
+     rm-orange worden overal in de app gebruikt (zijbalk, knoppen, koppen, actieve staten), dus
+     de wijziging hier raakt al die plekken tegelijk, niet alleen de zijbalk. Niet letterlijk
+     marketing's neon-indigo (#818cf8) als tekst-/vlakkleur: die is te licht om als lopende tekst
+     op wit te lezen (hetzelfde probleem dat rm-blue-ink hieronder al oploste voor het OUDE
+     blauw, nu voor het nieuwe). #4f46e5 is dezelfde kleurfamilie, met genoeg contrast voor tekst
+     op wit én voor witte tekst op een gevuld vlak; #818cf8 zelf verhuist naar de -light-rol, waar
+     de oude blauwtint ook al lichter was dan de basiskleur. Oranje wordt amber-waste
+     (marketing's eigen accentkleur), niet copper — copper (#f16b37) IS het oude oranje, alleen
+     onder een andere naam. */
+  --color-rm-blue: var(--brand-primary, #4f46e5);
+  --color-rm-orange: var(--brand-accent, #f5960b);
   --color-rm-light: var(--rm-light, #f9fafc);
-  --color-rm-blue-light: var(--brand-primary-light, #0a35b0);
-  --color-rm-orange-light: var(--brand-accent-light, #f4885e);
+  --color-rm-blue-light: var(--brand-primary-light, #818cf8);
+  --color-rm-orange-light: var(--brand-accent-light, #f7b955);
   /* De merkkleur als inkt, los van de merkkleur als vlak.
      Eén kleur kan die twee rollen niet allebei doen. De huisstijlkleur is gekozen om op wit te
      lezen — RAI-blauw is bijna zwart, GreenTech-groen is een diepe tint — en verdwijnt daardoor
      als tekst op een donkere kaart. Licht je hem op, dan wordt de zijbalk een lichtbak met witte
      letters erop; dat was letterlijk het beeld in de eerste donkere schermafdruk. In de lichte
      modus zijn beide tokens exact dezelfde kleur, dus daar verandert er niets. */
-  --color-rm-blue-ink: var(--rm-blue-ink, var(--brand-primary, #08288C));
-  --color-rm-orange-ink: var(--rm-orange-ink, var(--brand-accent, #F16B37));
+  --color-rm-blue-ink: var(--rm-blue-ink, var(--brand-primary, #4f46e5));
+  --color-rm-orange-ink: var(--rm-orange-ink, var(--brand-accent, #f5960b));
   --color-rm-gray: var(--rm-gray, #32373c);
   --color-rm-border: var(--rm-border, #E1E5F2);
 
@@ -375,13 +387,13 @@
      eerste donkere schermafdruk was "Prestaties" merkbaar donkerder dan het inactieve label
      ernaast. Vandaar hier dezelfde tint, maar opgelicht — de identiteit blijft, de leesbaarheid
      komt terug. De vlakken (zijbalk, gradient, balken) houden de volle merkkleur. */
-  --rm-blue-ink: color-mix(in srgb, var(--brand-primary, #08288C) 38%, #ffffff);
-  --rm-orange-ink: color-mix(in srgb, var(--brand-accent, #F16B37) 70%, #ffffff);
+  --rm-blue-ink: color-mix(in srgb, var(--brand-primary, #4f46e5) 38%, #ffffff);
+  --rm-orange-ink: color-mix(in srgb, var(--brand-accent, #f5960b) 70%, #ffffff);
 
   /* De zijbalk draagt de volle merkkleur, en dat is naast een bijna-zwart canvas een lichtbak.
      Dezelfde kleur, teruggebracht naar de helderheid die bij de rest van het scherm hoort. */
-  --sidebar: color-mix(in srgb, var(--brand-primary, #08288C) 38%, #0f1115);
-  --sidebar-accent: color-mix(in srgb, var(--brand-primary, #08288C) 52%, #0f1115);
+  --sidebar: color-mix(in srgb, var(--brand-primary, #4f46e5) 38%, #0f1115);
+  --sidebar-accent: color-mix(in srgb, var(--brand-primary, #4f46e5) 52%, #0f1115);
   --sidebar-border: rgba(255, 255, 255, 0.08);
 
   --chart-grid: #262b35;
