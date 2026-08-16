@@ -964,6 +964,80 @@ de enige fase waarvan de uitkomst het plan mag wijzigen.
 - `gv_market_signals`, een tabel met `period_type`
 - `ctrl_intersection_context`
 
+**Het datamodel, uitgewerkt op papier (16 augustus).** Op verzoek verder uitgewerkt zodat het bij
+de eerste opt-ins direct om te zetten is naar migraties. Dit blijft documentatie — er is vandaag
+geen rij, geen tabel, geen schema-wijziging, en niets hieronder wordt gebouwd voordat deze poort
+opengaat (sectie 11: "geen module die gebouwd wordt voor een klant die er niet is").
+
+De keten heeft vier stappen, bewust in aparte tabellen omdat elke stap een ander toegangsniveau
+heeft:
+
+1. **`gv_source_qualification`** — per (account, periode): mag deze rij überhaupt meedoen. Dit is
+   een poortbeslissing, geen aggregatie, en hij staat apart van `agencies.benchmark_optin_at`
+   (migratie 064, al gebouwd) omdat toestemming op bureauniveau iets anders is dan "heeft dit
+   account voor deze periode canonieke feiten die volledig genoeg zijn om mee te tellen" — een
+   bureau kan toestemming geven terwijl een specifiek account die maand `insufficient_data` staat
+   (regel 3, sectie 3.2). Voorgestelde velden: `agency_id`, `client_id`, `channel`, `period`
+   (maand), `bedrijfsmodel` en `niche` (uit `client_settings`, op het moment van kwalificeren
+   gekopieerd, niet live gejoined — een niche die later verandert mag een oude periode niet met
+   terugwerkende kracht herschrijven), `gekwalificeerd boolean`, `reden` (tekst, waarom niet als
+   dat zo is). Gevuld door een periodieke job die over `client_settings` × `fact_core` loopt, geen
+   gebruikersactie.
+2. **`gv_private_contributions`**, service-role only, geen policy — de rij per gekwalificeerd
+   account per periode met de eigen cijfers erin (de metrieken die de benchmark meet). Dit is de
+   enige tabel in de keten waar een individueel bureau zijn eigen getal in herkent, en dat is
+   precies waarom hij nul policies krijgt: geen enkele gebruiker, ook niet de eigenaar van de rij,
+   leest hem rechtstreeks. Alleen de aggregatiejob (service role) leest hem om `gv_market_signals`
+   te bouwen. Zonder deze scheiding is "geanonimiseerd" een claim in plaats van een eigenschap van
+   het systeem.
+3. **`gv_market_signals`**, een tabel met `period_type` — de uitkomst van `celoverzicht()`
+   (`lib/benchmark/cel.ts`, al gebouwd en getest, puur) toegepast op `gv_private_contributions`:
+   per `Celsleutel` (channel, model, niche) de samengevatte cijfers, maar alleen als
+   `beoordeelCel()` `deelbaar: true` teruggeeft. Een cel die de drempel niet haalt krijgt geen rij
+   — geen rij met nullen, gewoon afwezig, zodat "geen data" nooit met "slecht scorend" te
+   verwarren is. `period_type` (week/maand/kwartaal) omdat God View Pulse (sectie 7) een hogere
+   cadans nodig heeft dan Standard. Dit is de enige tabel die God View Standard rendert.
+4. **`ctrl_intersection_context`** — geen marktdata, maar de brug tussen één klantaccount en de
+   cel waar het in valt: per (account, periode) een verwijzing naar de van toepassing zijnde
+   `gv_market_signals`-rij, plus het eigen cijfer ernaast (uit `fact_core`, niet gedupliceerd uit
+   `gv_private_contributions` — twee plekken met hetzelfde getal is twee plekken die uit elkaar
+   kunnen lopen). Dit is wat sectie 10.1's "markt of jij"-demo en God View Tactical rechtstreeks
+   zouden lezen: één rij, geen live join over drie tabellen bij elke paginalaad.
+
+De volgorde waarin dit gebouwd zou worden als de poort opengaat: 1 en 2 kunnen zodra bureau twee
+is aangesloten (ze hebben geen vier bureaus nodig, alleen een tweede bron om te bewijzen dat de
+kwalificatie- en scheidingslogica standhoudt met echte, verschillende data). 3 kan pas rijen
+opleveren zodra `MIN_BUREAUS` (vier) en `MIN_ACCOUNTS` (tien) gehaald zijn — dat is letterlijk de
+poort. 4 volgt op 3, per klant, in dezelfde cadans als 1.
+
+**Agency twee: het onboardingplan (16 augustus).** Fase 6 vraagt om vier bureaus met opt-in; dat
+begint bij één, en de volgorde daarvan is waar de fouten zitten:
+
+1. **De `app_settings`-klantenlijst moet vervangen zijn vóórdat bureau twee een account aanmaakt**
+   — niet erna. De noodgreep uit migratie 087 werkt met één bureau per ongeluk goed (er is niemand
+   om mee te verwarren); zodra er een tweede is, ziet elk bureau in de zijbalk het complete
+   klantmenu van het andere. Dit is daarom de eerste stap van agency twee, niet een los werkpunt
+   dat "ooit voor fase 6" moet gebeuren.
+2. **OAuth voor bureau twee's eigen Google-account, end-to-end, met een echt tweede account** —
+   niet een tweede rij onder het eerste bureau's MCC. Dit is het eerste échte gebruik van
+   `agency_connections` (migratie 062, nul rijen vandaag) en van de vault-functies (migratie 063);
+   tot dan is die code ongebruikt in productie en kan hij subtiel stuk zijn zonder dat het opvalt.
+3. **RLS-bureaugrens narekenen, niet aannemen.** Sectie 2.3 en de migraties 057-059 leggen de
+   bureaugrens vast op basis van één bureau se data; met een tweede bureau moet bevestigd worden
+   dat niemand van bureau A een rij van bureau B kan lezen, over alle tabellen, niet alleen
+   `accounts`. Zelfde discipline als dit hele traject al gebruikte voor elke nieuwe migratie: een
+   wegwerpbaar `zztest-`-verificatiescript tegen productie, met een echte tweede `agency_id`, dat
+   expliciet probeert een grens te overtreden en verwacht dat het faalt.
+4. **`gv_source_qualification` en `gv_private_contributions` (hierboven) kunnen zodra agency
+   twee's eerste klant meedoet**, zodat de scheiding tussen "eigen data" en "marktbijdrage" met
+   twee echte bronnen getest is voordat een derde en vierde bureau volgen. Niet nodig om agency
+   twee te laten draaien, wel de goedkoopste manier om de God View-keten te bewijzen zonder op
+   vier bureaus te wachten.
+5. **Geen `gv_market_signals`-rijen tot bureau vier.** Punt 4 vult tabellen die niets naar buiten
+   brengen; met twee of drie bureaus faalt elke cel op `MIN_BUREAUS` (vier) en dat hóórt zo —
+   `beoordeelCel()` bestaat juist om dat af te dwingen, niet om na drie bureaus alsnog "even te
+   kijken hoe het eruitziet."
+
 ### Fase 7: de betaalde modules
 **Poort: module verkocht.**
 
@@ -971,6 +1045,46 @@ de enige fase waarvan de uitkomst het plan mag wijzigen.
 - Proof Engine op het patroon van `second_opinion_runs`
 - `ctrl_agency_identity` uit het geheugen
 - `gv_market_patterns` na twaalf maanden gevulde signalen
+
+**Uitgewerkt op papier (16 augustus).** Zelfde regel als bij fase 6: dit legt de vorm vast, niet
+de prijs of de limiet zelf. `lib/analysis/credit-costs.ts` laat precies zien waarom dat
+onderscheid ertoe doet — `CREDIT_COSTS` staat daar al sinds migratie 070 leeg, met de reden in het
+bestand zelf: een verzonnen getal zou "straks als een afgesproken prijs ogen terwijl niemand hem
+heeft vastgesteld." Diezelfde tucht geldt hier.
+
+- **AI Council: rondelimiet en kostenplafond.** Het mechanisme bestaat al twee keer in dit
+  product, alleen nog niet samengevoegd voor dit doel: `lib/analysis/uitgavenplafond.ts`'s
+  `controleerPlafond()` (per-bureau EUR-plafond, zacht bij 80%, hard bij 100% — hetzelfde patroon
+  dat fase 3's `process-action-queue`-route al aanroept vóór elke verwerking) en
+  `lib/analysis/llm-router.ts`'s `callLayer()` met zijn kostenschatting per laag. Een AI
+  Council-review zou een reeks `callLayer("reasoning" | "strategic", ...)`-aanroepen zijn die
+  elkaar uitdagen; de rondelimiet is dan een simpele teller die stopt bij een nog te bepalen
+  maximum, het kostenplafond is dezelfde `controleerPlafond()`-aanroep die fase 3 al gebruikt,
+  toegepast per review in plaats van per queue-run. Het getal zelf — hoeveel rondes, hoeveel euro
+  — is een productbeslissing die wacht op een verkochte module, geen technisch detail.
+- **Proof Engine op het patroon van `second_opinion_runs`.** Een Second Opinion-run (draait al,
+  RLS via migratie 065) legt per run een probleem, het bewijs en een oordeel vast. Proof Engine
+  zou dezelfde vorm toepassen op verkoop: een prospect noemt een probleem, en de engine zoekt in
+  `agency_memory_events` naar `hypothesis_outcome_met`-rijen met een vergelijkbare `reason` — niet
+  om een gegarandeerde uitkomst te beloven, maar om te laten zien wat er bij vergelijkbare
+  problemen eerder daadwerkelijk gebeurd is. Vandaar de eis van zes maanden historie (sectie 7's
+  tabel): minder dan dat is te weinig om "vergelijkbaar" nog eerlijk te kunnen zeggen. Geen nieuwe
+  tabel — een leesfunctie boven wat fase 4 al schrijft.
+- **`ctrl_agency_identity` uit het geheugen.** Geen los formulier waar een bureau zichzelf
+  beschrijft — dat is een claim, geen bewijs, en deze architectuur is gebouwd om dat verschil
+  serieus te nemen (sectie 3, de vertrouwensdoctrine). In plaats daarvan een periodieke
+  samenvatting, berekend over de `agency_memory_events` van dat ene bureau: welke `source`
+  (sectie 3.3) het vaakst een geaccepteerde hypothese oplevert, welk kanaal het vaakst een
+  `outcome_met` haalt, waar `hypothesis_rejected` clustert. Een profiel dat het bureau over
+  zichzelf ontdekt in plaats van intypt — en precies de reden dat deze module ná fase 4 staat en
+  niet ervoor: zonder geheugen is er niets om samen te vatten.
+- **`gv_market_patterns` na twaalf maanden gevulde signalen.** Bouwt op `gv_market_signals`
+  (fase 6) zoals `ctrl_agency_identity` bouwt op `agency_memory_events`: geen nieuwe databron, een
+  trendberekening over periodes van een tabel die al bestaat. Twaalf maanden is geen ronde
+  marketingclaim maar het minimum om een seizoenspatroon van een eenmalige uitschieter te kunnen
+  onderscheiden — een cel met acht maanden data kan een zomerdip niet van een structurele daling
+  onderscheiden. Dezelfde `Celsleutel`-indeling als `gv_market_signals`; de nieuwe as is de tijd,
+  niet het segment.
 
 ---
 
