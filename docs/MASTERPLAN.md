@@ -399,10 +399,31 @@ werkte. Concreet:
 Zonder Search Console kun je alleen de derde regel schrijven, en dat is de regel die het vaakst
 fout is. Dat is de reden dat GSC in fase 2 staat en niet later.
 
-`lib/cross-channel/funnel-overlap.ts` staat vandaag als wees met de reden dat `classifyFunnelRole`
-het objective niet leest, waardoor Meta en LinkedIn als onbekend uit de classificatie komen. Dat
-oplossen levert meer op dan welke nieuwe tabel dan ook. **Dit blijft open** — Master Synthesis
-(sectie 5.5) lost een ander probleem op en vervangt dit niet.
+~~`lib/cross-channel/funnel-overlap.ts` staat vandaag als wees met de reden dat
+`classifyFunnelRole` het objective niet leest, waardoor Meta en LinkedIn als onbekend uit de
+classificatie komen. Dat oplossen levert meer op dan welke nieuwe tabel dan ook.~~ — **gewired
+(16 augustus), met een eerlijke beperking.** De beschrijving hierboven was zelf niet meer
+precies: `classifyFunnelRole` las het objective al bewust niet (dat zegt wat je wilt bereiken,
+niet wie je aanspreekt) — het echte gat was dat er nergens een `audienceKind` werd afgeleid, en
+dat de hele lens nooit werd aangeroepen (alleen zijn eigen test importeerde hem). Beide zijn nu
+opgelost voor Google en LinkedIn: `app/api/analysis/cross-channel/route.ts` bouwt
+`CampaignFunnelInput[]` uit `ads_campaign_monthly` (Google, campagnetype + merknaam) en
+`linkedin_campaigns` (LinkedIn, `deriveLinkedInAudienceKind()` uit `targeting_summary` — die
+kolom wordt al gevuld door `lib/linkedin/entities.ts` bij elke sync), en toont het resultaat als
+nieuwe groep "Kanaalrollen & overlap" naast de bestaande zeven.
+
+**Meta blijft eerlijk grotendeels onbekend.** `meta_adsets.targeting_summary` bestaat als kolom
+sinds migratie 007 maar wordt door geen enkele syncroute gevuld — in tegenstelling tot LinkedIn
+is er nooit een condense-functie voor Meta-adset-targeting gebouwd. Dat bouwen vergt een nieuwe
+sync tegen de Meta Ads API, en die is vandaag niet te verifiëren zonder werkende Meta-credentials
+(dezelfde beperking als Search Console hierboven). Meta-campagnes classificeren daarom via alleen
+merknaamherkenning; zonder merknaam blijven ze `onbekend`, zichtbaar in `unknownCount`.
+
+Geverifieerd tegen een echte klant (`gads-8714777147`): de "geen prospecting"-detectie triggerde
+correct op de enige gesyncte Google-campagne. Tegen echte LinkedIn-rijen (client_id
+`demo-greentech`, niet de ingebouwde demo-modus maar echte productierijen): `targeting_summary`
+staat er op `null` (nooit gesynct, consistent met de sync-stilstand sinds april), en
+`deriveLinkedInAudienceKind()` geeft daar terecht `onbekend` op terug in plaats van te gokken.
 
 ### 5.3 Forecasting: twee kolommen, geen een
 

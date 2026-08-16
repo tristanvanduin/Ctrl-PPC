@@ -24,6 +24,8 @@ import { buildGa4CroSignals, buildGa4DeviceCroSignals, buildGa4LandingPageCroSig
 import { buildBlendedDataGapSignals, type ChannelValueAgg } from "@/lib/signals/blended-data-gap";
 import { buildFastSaturationSignals, type SaturationPoint } from "@/lib/signals/fast-saturation";
 import { mergeDetections } from "@/lib/signals/types";
+import { analyzeFunnelOverlap, deriveLinkedInAudienceKind, type CampaignFunnelInput } from "@/lib/cross-channel/funnel-overlap";
+import type { TargetingSummary } from "@/lib/linkedin/entities";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
   // zag) — de vroegste waarschuwing dat een publiek opraakt.
   const sinceFast = new Date(Date.now() - 140 * 86_400_000).toISOString().slice(0, 10);
 
-  const [blendedRes, campaignRes, demoRes, labelRes, settingsRes, metaDailyRes, liDailyRes, gWeeklyRes] = await Promise.all([
+  const [blendedRes, campaignRes, demoRes, labelRes, settingsRes, metaDailyRes, liDailyRes, gWeeklyRes, liCampaignsRes, metaCampaignsRes] = await Promise.all([
     supabase
       .from("blended_account_monthly")
       .select("month, channel, impressions, clicks, spend, conversions, conversion_value, leads")
@@ -122,7 +124,7 @@ export async function POST(request: NextRequest) {
       .lt("month", currentMonthStart),
     supabase
       .from("ads_campaign_monthly")
-      .select("campaign_name, month, clicks")
+      .select("campaign_id, campaign_name, campaign_type, month, clicks")
       .eq("client_id", clientId)
       .gte("month", sinceMonth)
       .lt("month", currentMonthStart),
@@ -148,6 +150,13 @@ export async function POST(request: NextRequest) {
       .select("week_start, impressions, clicks, cost")
       .eq("client_id", clientId)
       .gte("week_start", sinceFast),
+    // Voor de kanaalrollen-lens (funnel-overlap.ts): LinkedIn draagt targeting_summary al
+    // (gevuld door lib/linkedin/entities.ts bij elke sync), dus audienceKind is hier echt af te
+    // leiden, niet gegokt.
+    supabase.from("linkedin_campaigns").select("campaign_urn, name, targeting_summary").eq("client_id", clientId),
+    // Meta heeft geen equivalent: meta_adsets.targeting_summary bestaat als kolom maar wordt
+    // door geen enkele syncroute gevuld. Alleen naam (voor merkherkenning) is hier zinvol.
+    supabase.from("meta_campaigns").select("campaign_id, name").eq("client_id", clientId),
   ]);
 
   const n = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
@@ -297,6 +306,54 @@ export async function POST(request: NextRequest) {
     }
   })();
 
+  // ── Kanaalrollen & overlap (X4 lens 2, funnel-overlap.ts): elke campagne naar prospecting/
+  // retargeting/branded_capture/onbekend, en de twee gaten die geen los kanaalrapport laat zien
+  // (dubbele warme pool over kanalen heen, ontbrekende prospecting). LinkedIn krijgt een echte
+  // audienceKind uit targeting_summary; Meta blijft eerlijk grotendeels onbekend zolang
+  // meta_adsets.targeting_summary niet gesynct wordt (zie de kop van funnel-overlap.ts).
+  const googleCampaignMeta = new Map<string, { name: string; type: string | null }>();
+  for (const r of campaignRes.data ?? []) {
+    const id = String(r.campaign_id ?? "");
+    if (!id || googleCampaignMeta.has(id)) continue;
+    googleCampaignMeta.set(id, { name: String(r.campaign_name ?? ""), type: r.campaign_type ? String(r.campaign_type) : null });
+  }
+  const funnelInputs: CampaignFunnelInput[] = [
+    ...[...googleCampaignMeta.entries()].map(([campaignId, m]) => ({
+      channel: "google_ads" as ChannelKey, campaignId, campaignName: m.name,
+      campaignType: m.type, isBranded: BRAND_NAME_RE.test(m.name),
+    })),
+    ...(liCampaignsRes.data ?? []).map((r) => ({
+      channel: "linkedin_ads" as ChannelKey, campaignId: String(r.campaign_urn), campaignName: String(r.name ?? ""),
+      isBranded: BRAND_NAME_RE.test(String(r.name ?? "")),
+      audienceKind: deriveLinkedInAudienceKind(r.targeting_summary as TargetingSummary | null),
+    })),
+    ...(metaCampaignsRes.data ?? []).map((r) => ({
+      channel: "meta_ads" as ChannelKey, campaignId: String(r.campaign_id), campaignName: String(r.name ?? ""),
+      isBranded: BRAND_NAME_RE.test(String(r.name ?? "")),
+    })),
+  ];
+  const funnelRoles = analyzeFunnelOverlap(funnelInputs);
+  const funnelRoleStories: SignalStory[] = funnelRoles.flags.map((flag) => ({
+    id: `cross_funnel_role_${flag.kind}`,
+    category: "cross_channel",
+    scope: [...new Set(flag.campaigns.map((c) => c.channel))].join(" + "),
+    story: `${flag.detail}.`,
+    actionDirection: flag.kind === "dubbele_warme_pool"
+      ? "controleer of de retargeting-doelgroepen op de kanalen elkaar overlappen en overweeg er een leidend kanaal voor aan te wijzen"
+      : "voeg een prospecting-campagne toe op minstens één kanaal, anders stopt de groei zodra de huidige warme pool op is",
+    certainty: "indicatie",
+    evidence: [
+      { metric: "aantal campagnes", value: String(flag.campaigns.length) },
+      { metric: "kanalen", value: [...new Set(flag.campaigns.map((c) => c.channel))].join(", ") },
+    ],
+  }));
+  const funnelRoleChecked = ["cross_funnel_role_dubbele_warme_pool", "cross_funnel_role_geen_prospecting"];
+  if (funnelInputs.length > 0 && funnelRoles.unknownCount === funnelInputs.length) {
+    degradations.push("kanaalrollen: geen enkele campagne kon geclassificeerd worden (geen doelgroeptype of campagnetype bekend)");
+  } else if (funnelRoles.unknownCount > 0) {
+    degradations.push(`kanaalrollen: ${funnelRoles.unknownCount} van ${funnelInputs.length} campagnes blijft onbekend (meestal Meta, want meta_adsets.targeting_summary wordt nog niet gesynct)`);
+  }
+
   // ── Detectors + samenvoegen + renderen. ──
   const detected = buildCrossChannelSignals({ channels, brand });
   // Funnel over de kanalen heen: blended totaal-funnel, fase-achterblijver en divergentie.
@@ -320,8 +377,8 @@ export async function POST(request: NextRequest) {
   ];
   const cpm = buildFastSaturationSignals(saturationPoints);
   const merged = {
-    triggered: [...detected.triggered, ...funnel.triggered, ...kpiRelations.triggered, ...audienceStories, ...ga4Cro.triggered, ...dataGap.triggered, ...cpm.triggered],
-    checked: [...detected.checked, ...funnel.checked, ...kpiRelations.checked, "cross_audience_samenhang", ...ga4Cro.checked, ...dataGap.checked, ...cpm.checked],
+    triggered: [...detected.triggered, ...funnel.triggered, ...kpiRelations.triggered, ...audienceStories, ...ga4Cro.triggered, ...dataGap.triggered, ...cpm.triggered, ...funnelRoleStories],
+    checked: [...detected.checked, ...funnel.checked, ...kpiRelations.checked, "cross_audience_samenhang", ...ga4Cro.checked, ...dataGap.checked, ...cpm.checked, ...funnelRoleChecked],
   };
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, "Cross-channel");
 
@@ -336,6 +393,7 @@ export async function POST(request: NextRequest) {
     { key: "ga4_cro", title: "GA4 CRO (website)", description: "Kanaal-, device- en landingpage-conversiekloof op de site.", det: ga4Cro },
     { key: "data_gap", title: "Data-volledigheid", description: "Kanalen die wel converteren maar geen conversiewaarde meten — blended ROAS onberekenbaar.", det: dataGap },
     { key: "cpm", title: "Bereikkosten & verzadiging", description: "Vroegsignalering op dag-/weekdata: stijgende CPM of frequency, waarbij de CTR verzadiging (creative/publiek) van veilingdruk (markt) scheidt. Het venster wordt op volume gekozen, zodat een oordeel er binnen weken is in plaats van na maanden.", det: cpm },
+    { key: "channel_roles", title: "Kanaalrollen & overlap", description: "Elke campagne naar prospecting/retargeting/branded_capture, met dubbele-warme-pool- en ontbrekende-prospecting-detectie over de kanalen heen.", det: { triggered: funnelRoleStories, checked: funnelRoleChecked } },
   ];
   const groups: CrossGroup[] = groupDefs.map((g) => {
     const r = renderSignalSection(g.det, g.title);

@@ -1,6 +1,9 @@
 // =====================================================================
-// STATUS: GEBOUWD EN GETEST, MAAR NOG NIET GEWIRED (code-review must-fix 3).
-// prioritizeQueue wordt nog niet aangeroepen. Activeren vereist een consument die de pending wachtrij ophaalt, deze functie aanroept en het plan toont. Neem niet aan dat prioritering live is.
+// STATUS (bijgewerkt 16 augustus 2026): GEWIRED. components/insights/proposal-queue.tsx roept
+// planVoorWachtrij() aan (die op zijn beurt prioritizeQueue + summarizePlan aanroept) om de
+// pending wachtrij te rangschikken en de sprint/backlog-verdeling + bronspreiding te tonen --
+// geverifieerd via grep, niet aangenomen. De oorspronkelijke "nog niet gewired"-status hierboven
+// gold bij het schrijven van dit bestand, niet meer nu.
 // =====================================================================
 // ============================================================
 // E5: decision- en prioriteitenlaag (pure kern)

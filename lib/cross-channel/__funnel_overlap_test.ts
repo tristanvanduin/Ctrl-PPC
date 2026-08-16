@@ -1,8 +1,9 @@
 // Test voor X4 lens 2 (funnelrol en overlap). Deterministisch, geen IO.
 // Draaien: npx tsx lib/cross-channel/__funnel_overlap_test.ts
 
-import { classifyFunnelRole, analyzeFunnelOverlap, type CampaignFunnelInput } from "./funnel-overlap";
+import { classifyFunnelRole, analyzeFunnelOverlap, deriveLinkedInAudienceKind, type CampaignFunnelInput } from "./funnel-overlap";
 import { ATTRIBUTION_FOOTNOTE } from "./lens-facts";
+import type { TargetingSummary } from "@/lib/linkedin/entities";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {
@@ -105,6 +106,32 @@ console.log("\nde reden bij een onbekende rol");
     objective: "OUTCOME_AWARENESS", audienceKind: "custom_warm",
   });
   assert(metDoelgroep.role === "retargeting", "de doelgroep bepaalt de rol, niet het objective");
+}
+
+console.log("\nderiveLinkedInAudienceKind: de LinkedIn-afleiding uit targeting_summary");
+{
+  const leeg: TargetingSummary = { locations: [], functions: [], seniorities: [], industries: [], company_sizes: [], audiences: [], exclusions: [] };
+  assert(deriveLinkedInAudienceKind(null) === "onbekend", "geen summary -> onbekend");
+  assert(deriveLinkedInAudienceKind(leeg) === "onbekend", "een volledig lege summary -> onbekend, geen gok naar 'breed'");
+
+  const warm: TargetingSummary = { ...leeg, audiences: ["Website visitors 90d"] };
+  assert(deriveLinkedInAudienceKind(warm) === "custom_warm", "een gematchte audience is de warme pool, ongeacht wat er verder gezet is");
+
+  const warmMetFirmo: TargetingSummary = { ...leeg, audiences: ["Contactlijst import"], industries: ["Software"] };
+  assert(deriveLinkedInAudienceKind(warmMetFirmo) === "custom_warm", "audiences wint van firmografie als allebei gezet zijn");
+
+  const firmoAlleen: TargetingSummary = { ...leeg, industries: ["Software"], seniorities: ["Director"] };
+  assert(deriveLinkedInAudienceKind(firmoAlleen) === "broad", "alleen firmografie (geen matched audience) is brede ICP-targeting");
+
+  const alleenExclusions: TargetingSummary = { ...leeg, exclusions: ["Concurrent BV"] };
+  assert(deriveLinkedInAudienceKind(alleenExclusions) === "onbekend", "een uitsluiting alleen zegt niets over wie WEL wordt aangesproken");
+
+  // End-to-end: classifyFunnelRole met een echte, afgeleide audienceKind.
+  const gekoppeld = classifyFunnelRole({
+    channel: "linkedin_ads", campaignId: "li1", campaignName: "ABM-target",
+    audienceKind: deriveLinkedInAudienceKind(warm),
+  });
+  assert(gekoppeld.role === "retargeting", "de afgeleide audienceKind stroomt door naar een echte rolclassificatie");
 }
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

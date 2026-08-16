@@ -6,6 +6,7 @@
 // draagt elke uitkomst de onderliggende campagnelijst; geen advies zonder de lijst.
 
 import { ATTRIBUTION_FOOTNOTE, type ChannelKey } from "./lens-facts";
+import type { TargetingSummary } from "@/lib/linkedin/entities";
 
 export type FunnelRole = "prospecting" | "retargeting" | "branded_capture" | "onbekend";
 
@@ -26,13 +27,17 @@ export interface CampaignFunnelInput {
   /**
    * Meta: OUTCOME_*; LinkedIn: LEAD_GENERATION enz.
    *
-   * WORDT NOG NIET GEBRUIKT door classifyFunnelRole. Het veld staat hier omdat het de bedoeling
-   * was, maar er is geen tak die het leest — en dat is een bewuste stand van zaken, geen
-   * omissie die je even wegwerkt. Een objective zegt wat je wilt bereiken, niet wie je
-   * aanspreekt: OUTCOME_SALES kan net zo goed prospecting als retargeting zijn. De funnelrol
-   * volgt eerlijker uit de doelgroep (audienceKind), en die zit voor LinkedIn in
-   * targeting_summary en voor Meta in de adsets. Zolang die afleiding er niet is, komen
-   * Meta- en LinkedIn-campagnes als "onbekend" uit de classificatie — zichtbaar in
+   * WORDT BEWUST NIET GEBRUIKT door classifyFunnelRole — een objective zegt wat je wilt
+   * bereiken, niet wie je aanspreekt: OUTCOME_SALES kan net zo goed prospecting als retargeting
+   * zijn. De funnelrol volgt eerlijker uit de doelgroep (audienceKind).
+   *
+   * STATUS (bijgewerkt 16 augustus): voor LinkedIn is die afleiding er nu, zie
+   * deriveLinkedInAudienceKind() hieronder — targeting_summary wordt al gevuld door
+   * lib/linkedin/entities.ts's condenseTargetingCriteria() bij elke sync. Voor Meta bestaat de
+   * kolom (meta_adsets.targeting_summary) maar wordt hij door geen enkele syncroute gevuld —
+   * dat vergt nieuwe Meta-adset-targeting-sync die vandaag niet te bouwen/verifiëren is zonder
+   * werkende Meta-API-toegang. Meta-campagnes komen daarom nog altijd als "onbekend" uit de
+   * classificatie tenzij een merknaam ze als branded_capture herkent — zichtbaar in
    * unknownCount, niet stilzwijgend.
    */
   objective?: string | null;
@@ -90,6 +95,19 @@ export function classifyFunnelRole(campaign: CampaignFunnelInput): ClassifiedCam
         basis: `alleen een objective bekend (${campaign.objective}); de funnelrol volgt uit de doelgroep en die is hier niet beschikbaar`,
       }
     : { ...base, role: "onbekend", basis: "geen doelgroeptype of campagnetype bekend" };
+}
+
+// LinkedIn-specifieke afleiding: audiences (gematchte doelgroepen -- websitebezoekers,
+// contactlijsten, geuploade accounts) is precies de warme pool; firmografische facetten zonder
+// een matched audience is brede/ICP-targeting, geen retargeting. Geen van beide gezet betekent
+// dat er niets over targeting bekend is, niet dat het "breed" is -- dat zou een gok zijn.
+export function deriveLinkedInAudienceKind(summary: TargetingSummary | null | undefined): AudienceKind {
+  if (!summary) return "onbekend";
+  if (summary.audiences.length > 0) return "custom_warm";
+  const heeftFirmografie =
+    summary.locations.length > 0 || summary.functions.length > 0 || summary.seniorities.length > 0 ||
+    summary.industries.length > 0 || summary.company_sizes.length > 0;
+  return heeftFirmografie ? "broad" : "onbekend";
 }
 
 export interface FunnelGapFlag {
