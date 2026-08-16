@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Settings, Building2, Search, FileCode2, FolderOpen, FolderClosed, ChevronDown, ChevronRight, MapPin, ListChecks, LayoutGrid , ShieldCheck } from "lucide-react";
+import { Settings, Building2, Search, FileCode2, FolderOpen, FolderClosed, ChevronDown, ChevronRight, MapPin, ListChecks, LayoutGrid , ShieldCheck, X } from "lucide-react";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { getVisibleClients, loadVisibleClientIds } from "@/lib/visible-clients";
 import { loadApiClients } from "@/lib/clients";
@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { visibleGeoClones, type GeoCloneVariant } from "@/lib/rai/geo-clone-catalog";
 import { BRAND_NAME } from "@/lib/branding/brand";
 import { SidebarLogo } from "@/components/layout/sidebar-logo";
+import { useSidebarMobile } from "@/components/layout/sidebar-mobile-context";
 
 interface VisibleClient {
   id: string;
@@ -77,7 +78,9 @@ function TakBlok({ tak, diepte, ingeklapt, wissel, Link }: {
 
 export function Sidebar() {
   return (
-    <Suspense fallback={<aside className="fixed left-0 top-0 bottom-0 w-72 bg-sidebar-panel z-50" />}>
+    <Suspense fallback={
+      <aside className="fixed left-0 top-0 bottom-0 w-72 hidden bg-sidebar-panel z-50 lg:flex" />
+    }>
       <SidebarInner />
     </Suspense>
   );
@@ -89,6 +92,13 @@ function SidebarInner() {
   const activeGeo = searchParams.get("geo");
   const activeClientId = pathname.startsWith("/client/") ? pathname.replace("/client/", "") : null;
   const [geoClones, setGeoClones] = useState<GeoCloneVariant[]>([]);
+  const { open: mobielOpen, close: sluitMobiel } = useSidebarMobile();
+
+  // Elke navigatie sluit het paneel op een smal scherm -- anders blijft de zijbalk openstaan
+  // boven de nieuwe pagina en moet iemand hem apart nog eens dichttikken. Op `lg` en breder doet
+  // dit niets zichtbaars: daar staat de zijbalk toch altijd, ongeacht mobielOpen.
+  const zoekParams = searchParams.toString();
+  useEffect(() => { sluitMobiel(); }, [pathname, zoekParams, sluitMobiel]);
 
   // Geo-clones van de actieve klant detecteren uit de campagnenamen (lichte query).
   useEffect(() => {
@@ -352,7 +362,11 @@ function SidebarInner() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-72 bg-sidebar-panel flex flex-col z-50">
+    <aside
+      className={`fixed left-0 top-0 bottom-0 w-72 bg-sidebar-panel flex-col z-50 lg:flex ${
+        mobielOpen ? "flex" : "hidden"
+      }`}
+    >
       {/* Logo.
 
           ── GEEN <h1> ─────────────────────────────────────────────────────────
@@ -369,6 +383,15 @@ function SidebarInner() {
           <p className="text-xl font-bold tracking-tight text-white">
             {BRAND_NAME}
           </p>
+          {/* Alleen op een smal scherm: op `lg` en breder staat de zijbalk altijd open en zou een
+              sluitknop niets om dicht te doen hebben. */}
+          <button
+            onClick={sluitMobiel}
+            aria-label="Menu sluiten"
+            className="ml-auto rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
         <p className="mt-1 text-meta text-white/90">SEA Dashboard</p>
       </div>

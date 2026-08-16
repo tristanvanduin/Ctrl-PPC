@@ -2,11 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Bell, AlertTriangle, Info, X, Search } from "lucide-react";
+import { Bell, AlertTriangle, Info, X, Search, Menu } from "lucide-react";
 import { getAllClients } from "@/lib/clients";
 import { ThemaSchakelaar } from "@/components/ui/thema-schakelaar";
 import { CommandPalette } from "./command-palette";
 import { UserMenu } from "./user-menu";
+import { useSidebarMobile } from "./sidebar-mobile-context";
 
 interface Notification {
   clientName: string;
@@ -21,6 +22,7 @@ export function TopBar() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
+  const { toggle: toggleSidebar } = useSidebarMobile();
 
   useEffect(() => {
     setMounted(true);
@@ -124,8 +126,19 @@ export function TopBar() {
     // `supports-[backdrop-filter]` houdt de balk dicht op browsers die het niet kunnen; zonder
     // die terugval wordt hij daar half doorzichtig zónder vervaging, en loopt de tekst van de
     // pagina dwars door de titel heen.
-    <header className="h-16 border-b border-border bg-card supports-[backdrop-filter]:bg-[var(--balk-vlak)] supports-[backdrop-filter]:backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-40">
-      <h2 className="text-lg font-bold text-rm-blue-ink">{getTitle()}</h2>
+    <header className="h-16 border-b border-border bg-card supports-[backdrop-filter]:bg-[var(--balk-vlak)] supports-[backdrop-filter]:backdrop-blur-md flex items-center justify-between gap-3 px-4 sm:px-6 sticky top-0 z-40">
+      <div className="flex min-w-0 items-center gap-3">
+        {/* Alleen zichtbaar onder `lg`: op een breed scherm staat de zijbalk altijd open en is
+            er niets om open te klappen. Zie components/layout/sidebar-mobile-context.tsx. */}
+        <button
+          onClick={toggleSidebar}
+          aria-label="Menu openen"
+          className="-ml-1 shrink-0 rounded-lg p-2 text-muted-foreground hover:bg-gray-100 lg:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <h2 className="truncate text-lg font-bold text-rm-blue-ink">{getTitle()}</h2>
+      </div>
 
       <div className="flex items-center gap-4">
         {/* ── PLEK VOOR ACTIES VAN DE PAGINA ────────────────────────────────────

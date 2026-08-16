@@ -1435,22 +1435,51 @@ waarvan het merendeel al klaar is.
 **Fase 1 — gedaan.** Expliciete `viewport`-export in `app/layout.tsx` (`app/layout.tsx`, deze
 sessie). Kostte niets, geen risico, onafhankelijk van de rest.
 
-**Fase 2 — tokenstelsel-migratie, eerst een pilot.** Voordat alle 113 bestanden worden aangeraakt:
-één representatief dashboardscherm (voorstel: een instellingenpagina — kleinere oppervlakte,
-minder dichte data dan de Decision Terminal, dus een veiligere eerste proef) omzetten naar
-marketing's tokens, in de browser bekijken op zowel desktop- als mobiele breedte, en pas dan de
-aanpak vastleggen voor de rest. Dat voorkomt 113 bestanden aanpassen op een aanname die bij het
-eerste echte scherm al niet blijkt te kloppen (dezelfde reden waarom dit hele traject live
-verifieert in plaats van aanneemt).
+**Fase 2 — gedaan, twee rondes.** De pilot (op `/settings`, lokaal, niet gecommit) bevestigde snel
+dat losse componentklassen ombouwen fout is: één donker kaartje op een verder lichte pagina oogt
+als een fout, geen huisstijl. De echte hefboom bleek één punt: de `--brand-primary`/
+`--brand-accent`-fallback in `app/globals.css`, waar élk bestaand gebruik van `rm-blue`/`rm-orange`
+al naar wijst (zijbalk, koppen, knoppen, actieve staten) — whitelabel per bureau overschrijft
+dezelfde variabelen en bleef dus ongewijzigd werken. Eerste ronde verving alleen de TINT
+(`#08288C`/`#F16B37` → `#4f46e5`/`#f5960b`, contrastveilig op wit, marketing's letterlijke
+`#818cf8` is daar te licht voor). Live review daarna: de sidebar-vulling bleef een EFFEN
+merkkleurvlak, en dat was het echte probleem, niet de tint. Tweede ronde: een apart
+`--sidebar-panel`-token (alleen op de twee `<aside>`-elementen, niet op de ~50 knoppen/badges
+elders die de effen kleur wél moeten houden) — 26% merkkleur gemengd in `#121820`
+(`midnight-slate`), marketing's eigen "bijna-zwart met een accent erdoorheen" in plaats van een
+blok in de huisstijlkleur. `lib/branding/theme.ts`'s `DEFAULT_THEME` (de JS-mirror die
+`BrandThemeProvider` gebruikt zonder brand guide) en twee losse `var(--brand-primary, ...)`-
+fallbacks (`sparkline.tsx`, `data-table.tsx`) meeverhuisd, anders herintroduceren die het oude
+blauw op specifieke plekken. `__theme_test.ts` bijgewerkt. Bewust niet aangeraakt: kaartkleuren
+(aparte tokenfamilie), het avatarpalet.
 
-**Fase 3 — informatiearchitectuur per scherm, daarna pas de brede uitrol.** De vaste sidebar wordt
-inklapbaar/een drawer onder een nog te bepalen breedte; brede grids (`grid-cols-4`/`5`/`6`) krijgen
-per scherm een eigen antwoord (stapelen, tabbladen, of een apart detailscherm) in plaats van één
-generieke regel — dat is een ontwerpbeslissing per scherm, geen zoek-en-vervang. Volgorde, van
-klein/geïsoleerd naar groot/verweven: Settings → Insights → Portfolio → Client Dashboard →
-Decision Terminal (de dichtste, laatste).
+**Fase 3, de gedeelde chrome — gedaan.** De vaste `w-72`-sidebar was het scherpste mobiele
+probleem (zie de pilot-screenshot: op 390px bleef 288px aan de zijbalk hangen, tekst letterlijk
+afgekapt) en is gedeeld over élk scherm — dus eerst dít, vóór een per-scherm IA-ronde.
+`SidebarMobileProvider` (`components/layout/sidebar-mobile-context.tsx`) deelt de open/dicht-
+status tussen de hamburger-knop in de TopBar en het paneel zelf; onder `lg` is de zijbalk
+`hidden` (bewust `display:none`, niet een transform — dat haalt hem ook uit de tabvolgorde en de
+accessibility-tree als hij dicht is, iets een transform niet doet) met een sluitknop en een
+klik-wegvallende backdrop; elke navigatie sluit hem automatisch. `app/(app)/layout.tsx`'s `ml-72`
+werd `lg:ml-72` zodat er op een smal scherm niets meer opzijschuift.
 
-**Timing.** Geen fase-poort, dus geen vaste datum — wel een richtpunt: fase 1 staat al, fase 2/3
-lopen als voorbereidend werk naast de rest van de wachtrij, met als doel klaar te zijn rond of
-vlak na fase 5 (launching customer) — het moment waarop een echte klant, mogelijk op een telefoon,
-voor het eerst het dashboard opent.
+**Geverifieerd, met een kanttekening over de methode.** Getypecheckt, 276/276 tests groen, en
+gecontroleerd tegen de ruwe server-gerenderde HTML (`curl`) én de volledige DOM-stapelvolgorde
+(`document.elementsFromPoint`, niet alleen het bovenste element) op zowel de openstaande als de
+dichte stand — beide kloppen, van de eerste HTML-byte tot vijf seconden na hydratatie. De
+screenshot-tool in deze sandbox liet bij de DICHTE stand desondanks een oude blauwe balk zien die
+in geen enkele DOM-controle bestond (elementFromPoint vindt er niets, het element is `0×0` en
+`display:none`) — een bekende categorie renderbug in headless Chromium met `position:fixed`-
+lagen, niet een app-fout. De OPENSTAANDE stand screenshot wél correct (donkere zijbalk, sluitknop,
+verdonkerde achtergrond) en bevestigt de vorm. Losse per-scherm IA (brede grids die stapelen of
+naar tabbladen gaan) staat nog open — dat raakt niet meer de gedeelde chrome maar de inhoud van
+elk scherm apart, en is dus veiliger om apart te doen.
+
+**Volgorde voor de resterende, per-scherm IA-ronde**, van klein/geïsoleerd naar groot/verweven:
+Settings → Insights → Portfolio → Client Dashboard → Decision Terminal (de dichtste, laatste).
+
+**Timing.** Geen fase-poort, dus geen vaste datum — wel een richtpunt: fase 1 en fase 2 en de
+gedeelde chrome van fase 3 staan er nu; de resterende per-scherm IA-ronde loopt als voorbereidend
+werk naast de rest van de wachtrij, met als doel klaar te zijn rond of vlak na fase 5 (launching
+customer) — het moment waarop een echte klant, mogelijk op een telefoon, voor het eerst het
+dashboard opent.
