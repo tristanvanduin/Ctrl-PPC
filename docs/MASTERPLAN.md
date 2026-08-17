@@ -1039,7 +1039,12 @@ voordat het zich voordeed, en fase 5 hieronder voor wat dit betekent voor "een k
   werk in plaats van per analysestap. Narrative-aanroepen (bid-strategy, budget-allocation,
   impression-share, period-evaluation, quality-score, rsa-insights, client-reports,
   `runAnalysis`), de search-terms-batches (triage) en monthly step 13 (reasoning, want dat is
-  multi-hop-redeneren over stap 1-12) zijn gemigreerd. `callRouted()` blijft bestaan voor
+  multi-hop-redeneren over stap 1-12) zijn gemigreerd. Een vierde laag, `strategic`, is er
+  sindsdien bijgekomen (`lib/analysis/llm-router.ts:112-124`), niet apart bijgehouden in dit
+  document tot de statusaudit van 17 augustus (sectie 14.6) dat corrigeerde — zie daar voor het
+  volledige model-per-laag-overzicht en de volledige uitleg staat in `docs/
+  ARCHITECTURE-MODEL-ROUTING.md`, geverifieerd tegen de live OpenRouter-catalogus. `callRouted()`
+  blijft bestaan voor
   aanroepers die er nog op steunen — geen brede migratie in dezelfde wijziging als de laag zelf.
 - ~~`generation_jobs` uitbreiden tot volwaardige action queue~~ / ~~Claim-logica met
   `FOR UPDATE SKIP LOCKED`~~ / ~~Verwerking via Vercel Scheduled Route~~ — **gedaan, met een
@@ -1690,3 +1695,158 @@ waar diezelfde token-namen gedefinieerd staan, is geen voltooide correctie — h
 zichtbaarheidsprobleem naar de paginacategorie die toevallig niet getest werd. Bij een volgende
 merk-/kleurwijziging: zoek op de letterlijke oude hexwaarde over het HELE bestand (`:root` én
 `.dark` én elke component-eigen fallback), niet alleen in de laag waar de wijziging bedoeld was.
+
+---
+
+## 14. Statusaudit en openstaande punten (17 augustus 2026)
+
+De eigenaar vroeg een brede statuscheck ("zijn we 100% zeker... is alles al gebouwd... nog logica
+vraagstukken?") en expliciet **een single source of truth** — dus geen los rapport in de chat,
+alles hier. Onderzocht met drie parallelle, read-only research-passes tegen de codebase (niet
+tegen dit document, om cirkelredenering te voorkomen) plus een losse live-verificatie. Elke claim
+hieronder heeft een bestand:regel-bron; waar iets niet vastgesteld kon worden staat dat er
+letterlijk bij in plaats van een educated guess.
+
+### 14.1 Campagnetype-dekking per kanaal
+
+Nieuw vastgesteld, stond nog nergens: alleen **Google Ads** is per campagnetype gedifferentieerd.
+`lib/campaign-types.ts:206` en verder kennen Search/Shopping/PMax/Display/Video, elk met een eigen
+`PURPOSE_EVAL_CRITERIA`-blok; `DEMAND_GEN`/`DISCOVERY` komen apart terug in `lib/api/
+google-ads.ts` en `lib/geo/channel-matrix.ts:65`. **App-campagnes (UAC) zijn niet gevonden** —
+geen enkele match op "app_campaign"/"UAC" in `lib/`, dus niet gebouwd, niet gedocumenteerd als
+bewust weggelaten.
+
+**Meta en LinkedIn worden generiek/geblend behandeld**, niet per campagnetype:
+`lib/analysis/meta-funnel-facts.ts` en `linkedin-funnel-facts.ts` wrappen allebei dezelfde
+`funnel-core.ts` met alleen andere veldnamen — geen objective- of campagnetype-branching. Dit is
+geen bug (het is nooit als zodanig gebouwd), maar wel een reëel verschil in analysediepte tussen
+Google Ads en de andere twee kanalen dat nergens expliciet stond. Open vraag, geen actie
+ondernomen: is dit een bewuste volgorde (Google eerst, dieper) of een gat dat ooit dichtgroeit.
+
+### 14.2 Kanaaldata tegen developer-documentatie: alleen Google Ads is echt nagekeken
+
+Sectie 5.6 documenteert al uitgebreid welke NIEUWE bronnen tegen officiële API-docs zijn
+uitgewerkt (GA4, GSC, Shopify, WooCommerce, Microsoft, Bing Webmaster, TikTok). Wat daar niet
+stond: van de **drie kanalen die al draaien**, is alleen Google Ads' veldbetekenis expliciet tegen
+`developers.google.com` gecheckt (`lib/api/google-ads.ts:3257`, 5 augustus — met de eigen,
+eerlijke kanttekening: "de vorm klopt met de documentatie; dat is iets anders dan bewezen tegen
+een live account") plus de PMax-assetvereisten apart (`lib/pmax/assetdekking.ts:20`, tegen
+`developers.google.com/google-ads/api/performance-max/asset-requirements`).
+
+**Voor Meta Marketing API en LinkedIn Ads API bestaat geen vergelijkbare documentcheck.** De
+verify-scripts (`scripts/verify-channel-output-contract.ts`, `verify-pmax-scorecard.ts`,
+`verify-search-scorecard.ts`) checken interne consistentie tegen echte productie-database-rijen —
+dat bewijst dat de pijplijn intern klopt, niet dat een veld betekent wat de Meta/LinkedIn-docs
+zeggen dat het betekent. **Open punt, niet 100% zeker**, precies de vraag die de eigenaar stelde.
+
+### 14.3 Het Decision Engine-skelet en `EXECUTION_PLAN.md` — een tweede document, nu hier verankerd
+
+Dit is de belangrijkste bevinding van de audit voor "1 single source of truth": er bestaat een
+**tweede planningsdocument**, `EXECUTION_PLAN.md` (geschreven 9 augustus, voor een
+uitvoeringsagent), met zijn eigen **"Fase 1: Decision Intelligence Core"** — dat is NIET dezelfde
+Fase 1 als sectie 9 hierboven ("de canonieke laag afmaken", **KLAAR**). Zelfde naam, andere
+inhoud, geen enkele kruisverwijzing tot vandaag. Vastgelegd zodat niemand dit later nog eens
+verwarrend vindt.
+
+Wat het is: `lib/decision/channel-provider.ts` + `lib/decision/decision-skeleton.ts`, en de routes
+`weekly-decision`/`biweekly-decision`/`monthly-decision`. `EXECUTION_PLAN.md` zelf is expliciet
+over de scope: *"Raak deze bestanden niet aan: `weekly/route.ts`, `biweekly/route.ts`,
+`monthly/route.ts`... Nieuwe routes komen ernaast, met een eigen padsegment."* En
+`decision-skeleton.ts`'s eigen kop zegt wat het NIET doet: geen `createProgressJob`, geen
+`saveAnalysisOutputSection`, geen OpenRouter-aanroep, "deze routes horen nog niet in de UI."
+
+**Wat dit betekent voor de Meta/LinkedIn-stubs die in deze skeleton zitten**
+(`lib/decision/providers/meta-provider.ts`, `linkedin-provider.ts` — `collectSignals()` geeft
+altijd `[]`, met de reden in de eigen bestandskop): dit is **geen gat in de live productanalyse**.
+De echte, klant-bedienende Meta/LinkedIn-analyse loopt via de bestaande, werkende SOP-routes
+(`meta-funnel`, `meta-briefing`, `meta-creatives`, `meta-signals`, `linkedin-funnel`,
+`linkedin-signals`, `linkedin-icp-fit` — dezelfde die de SOP-cron en de handmatige knoppen al
+aanroepen) — die zijn niet gestubd en nooit aangeraakt door dit skelet.
+
+**Status: onafgemaakt, bewust geïsoleerd experiment, geen klantimpact.** Prioriteit hangt af van
+waar het naartoe moet — dat is nog niet besloten en hoort in een apart gesprek, niet stilzwijgend
+verder gebouwd vanuit deze auditregel.
+
+### 14.4 H1-evaluator vs. de trackrecord-belofte op de homepage — geverifieerd, met een correctie op mezelf
+
+De homepage (`components/marketing/why-trust.tsx`, sinds 17 augustus) claimt: elke aanbeveling
+krijgt een meetbare voorspelling, een succescriterium, een vaste reviewdatum, een gelogde uitkomst,
+en een learning die het volgende resultaat voedt. Bij het schrijven daarvan werd dit geverifieerd
+tegen `analysis_hypotheses` (migratie 005) — **fout bewijs**: die tabel heeft 0 rijen en wordt
+door niets gelezen of geschreven (dode tabel, bevestigd in `EXECUTION_PLAN.md` sectie 0).
+
+**De claim zelf klopt, via de juiste, live tabel:** `sprint_hypotheses` +
+`app/api/cron/evaluate-hypotheses/route.ts`. `writeVerdict()` (regel 208-222) schrijft
+`outcome`/`result_met`/`learning`/`evaluated_at` in productie. De "vaste reviewdatum" is
+`windowEnd = accepted_at + timeframe` (regel 122-125 van diezelfde route) — geen aparte
+`evaluate_after`-kolom, maar functioneel identiek: pas als dat venster om is telt de uitkomst mee.
+
+**Wat de verwarring veroorzaakte:** `lib/analysis/period-evaluation.ts` (SI3, een apart, nieuw
+kwartaal/campagne-niveau rapport) heeft een letterlijke comment "de H1-evaluator is nog niet
+gekoppeld" (regel 180). Dat gaat over een heel ANDERE, niet-live functie (dit specifieke rapport
+roept `evaluateHypothesisOutcome` nog niet aan) — niet over de evaluator zelf, die al sinds Fase 3
+(hierboven) draait en verifieerbaar echte verdicts schrijft. SI3 zelf is nergens op de
+marketingsite beloofd, dus dit is een openstaand, laag-urgent punt op zichzelf, geen dreiging voor
+de trackrecord-claim.
+
+### 14.5 Modules: twee kanttekeningen bovenop de tabel in sectie 7
+
+- **Proof Engine** heeft vandaag nul coderegels — geen enkele match in `lib/` of `app/` op iets
+  dat er ook maar naar verwijst. Sectie 7 noemt de poort (zes maanden `agency_memory_events`) maar
+  niet dat er letterlijk nog niets staat.
+- **Volume Compute** staat in sectie 7 als "kredietgrootboek bestaat, zelfbedieningsflow niet" —
+  klopt, met de precisering uit `lib/analysis/credit-costs.ts`: `CREDIT_COSTS` is een bewuste
+  placeholder (prijsbeslissing, geen technisch gat), `verbruikCredit()` is daardoor vandaag een
+  no-op op de 7 van de 22 deep-dive-routes waar hij wél is aangesloten. Automatische SOP's
+  (monthly/weekly/biweekly) zijn hier sinds 11 augustus bewust van uitgesloten — dat gold al,
+  alleen nu expliciet hier bevestigd.
+
+### 14.6 LLM-modelkeuze per module/deep dive — al besloten, hier pas echt vastgelegd
+
+Zie ook de aanvulling bij Fase 3 hierboven. Volledig overzicht (`lib/analysis/llm-router.ts:112-124`,
+gedetailleerd in `docs/ARCHITECTURE-MODEL-ROUTING.md`, geverifieerd tegen de live
+OpenRouter-catalogus):
+
+| Laag | Model | Fallback |
+|---|---|---|
+| triage | `google/gemini-2.5-flash-lite` | — |
+| reasoning | `x-ai/grok-4.6` | — |
+| narrative | `anthropic/claude-sonnet-5` | — |
+| strategic | `anthropic/claude-opus-5` | `openai/gpt-5.6-sol` |
+
+Eén keuze is zelf gemarkeerd als onbewezen: *"Laag 3 (Grok 4.6) is de enige keuze die nog niet
+gemeten is"* (`ARCHITECTURE-MODEL-ROUTING.md:61`) — een redelijke, niet-willekeurige keuze, maar
+nog niet in de praktijk bevestigd. Geen open beslissing verder in sectie 5/7 over modelkeuze zelf.
+
+### 14.7 Design-consistentie: geen gedeeld kaartcomponent
+
+Sectie 13.2 loste de merk-/kleurinconsistentie en de mobiele sidebar op, maar raakte dit niet:
+er bestaat geen gedeeld `Card`-component. `components/ui/` heeft geen `card.tsx`. Wel gedeeld:
+`components/ui/sectie.tsx` (`Sectie`, in 7 bestanden) voor sectieritme, `chart-chrome.tsx` (in 8
+chartcomponenten) voor grafiekchroom, en `components/ui/kerncijfer.tsx` (in 11 bestanden) voor het
+grote-metriek-primitive. Maar losse "kaart"-divs zijn grotendeels handgerold:
+`rounded-xl border border-border` komt letterlijk terug in **48 bestanden** onder
+`components/dashboard`. Geen bug, wel opgehoopte inconsistentie — een toekomstige
+kaart-stijlwijziging moet vandaag op 48 plekken los worden doorgevoerd.
+
+### 14.8 Kaartoverloop: twee bekende, nog open bugs
+
+`scripts/check-kaartoverloop.mjs` gedraaid op 17 augustus (na de homepage-wijzigingen, die zelf
+schoon zijn — dit script test alleen ingelogde paginas, niet de marketingsite). Twee bestaande,
+niet aan deze sessie gerelateerde overloopbugs gevonden en nog niet gefixt:
+
+| Scherm | Aantal | Voorbeeld |
+|---|---|---|
+| `bevindingen` | 6 | "Biedstrategie evaluatie: controleer per..." (51px onder de kaartrand) |
+| `app-instellingen` | 25 | ".env.local" (3px onder), "Verplicht" (36-116px onder) |
+
+Zelftest van het script (teruggezette testbug) werkte correct. Open actiepunt, klein qua omvang.
+
+### 14.9 Mobile: resterende verificatiegaten (herbevestiging van sectie 13.2's eigen voorbehoud)
+
+Geen nieuwe bevinding, wel expliciet hier herhaald omdat het anders makkelijk vergeten wordt: (1)
+nooit getest tegen een echt gekoppeld account met live synced data — geen credentials in de
+sandbox, met name risicovol voor brede tabellen zoals de zoektermenlijst; (2) de tussenliggende
+breedtes 700–1023px zijn nooit systematisch getest, en precies daar zat de blauwe-streep-bug uit
+13.4. Beide staan al in sectie 13.2/13.4; hier alleen samengevat zodat sectie 14 als geheel
+leesbaar is zonder terug te bladeren.
