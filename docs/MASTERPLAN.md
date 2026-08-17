@@ -2062,3 +2062,83 @@ noemt "`totalCount >= 50` én ≥5 bureaus én ≥20 accounts," de live code
 (`lib/benchmark/cel.ts`) en sectie 6/7 hierboven zeggen `MIN_BUREAUS = 4` met
 `MIN_ACCOUNTS = 10` per cel — `EXECUTION_PLAN.md` is hier de verouderde bron, dit document en de
 code kloppen.
+
+## 16. Koersbepaling: cron-beleid en "niet wachten op een klant" (17 augustus 2026)
+
+Twee besluiten van de eigenaar die eerder impliciet/losstaand waren en nu expliciet en blijvend
+vastliggen, zodat ze niet opnieuw hoeven te worden "ontdekt" of per ongeluk worden teruggedraaid.
+
+### 16.1 Cron-beleid: niets draait automatisch tenzij het expliciet in `vercel.json` staat
+
+De fix van `isCronPath()` (sectie 14 vermeldt 'm nog niet expliciet — hier alsnog vastgelegd)
+loste een echte productiebug op: `/api/cron/*` werd door de login-wall van `middleware.ts`
+geblokkeerd omdat `isCronPath()` alleen `/api/sync/cron` matchte. Bijwerking van diezelfde fix:
+zodra hij live ging, werden de al in `vercel.json` geregistreerde crons (`evaluate-hypotheses`,
+`evaluate-code-rood`) weer daadwerkelijk bereikbaar voor Vercel's scheduler.
+
+De eigenaar wees dat expliciet af: **"cron mag niet live draaien. ik wil geen api kosten maken in
+de nacht en ik wil zelf testen kunnen draaien."** Dit is dezelfde regel die eerder al gold voor de
+SOP-trigger-cron ("ik wil handmatig kunnen triggeren voor tests en niet onnodig elke nacht
+betalen") — nu bevestigd als een generiek beleid, niet een uitzondering per route.
+
+**Het beleid, concreet:** een cron-route bestaat en werkt (bereikbaar via
+`Authorization: Bearer $CRON_SECRET`, handmatig te triggeren, ook met `?dry_run=true`), maar komt
+pas in `vercel.json` te staan op het moment dat automatisch draaien bewust gewenst is. Tot die tijd
+staat er in de kop van de routefile zelf waarom hij bewust buiten `vercel.json` is gehouden.
+Uitgevoerd voor `evaluate-hypotheses/route.ts` en `evaluate-code-rood/route.ts`; `vercel.json` bevat
+nu alleen `/api/sync/cron` (05:00 dagelijks). Nieuwe crons volgen dezelfde regel: eerst bouwen en
+handmatig testen, pas registreren als automatisch draaien expliciet is afgesproken.
+
+### 16.2 Koerscorrectie: niet wachten op een echte klant om analysediepte te bouwen
+
+Eerder deze sessie is een eigen, eerder door de eigenaar gestelde regel ("Fase 5 = klant live,
+geen nieuwe bouw meer") herhaaldelijk aangehaald als reden om module-uitbreiding en
+analysediepte-werk uit te stellen. De eigenaar heeft dat expliciet en met klem afgewezen:
+
+> "waarom wachten op een klant???? [...] we kunnen toch op basis van developer documentation kijken
+> wat de api kan ophalen? dan eventueel mock data plaatsen en op basis van documentation perfecte
+> sops neerzetten en koppelen?? [...] tussentijds kunnen we extra mock data per kanaal toevoegen
+> aan het demo account."
+
+**Vastgelegd besluit, geldt vanaf nu structureel:** de "geen nieuwe bouw"-regel uit Fase 5 gaat
+over het *live zetten bij een echte, betalende klant* — niet over analysewerk in het algemeen.
+Analysediepte, nieuwe modules en kanaallogica mogen en moeten doorontwikkeld worden op basis van
+officiële developer-documentatie plus (uitgebreide) mockdata in het demo-account, zonder op een
+klantkoppeling te wachten. Verificatie tegen een echt, live account blijft een aparte, latere stap
+(zoals nu ook al met andere open punten in secties 14/15) — maar is geen blokkade om te bouwen.
+
+Twee harde randvoorwaarden die daarbij gelden, letterlijk van de eigenaar:
+
+1. **Nooit hardcoden naar een specifieke bekende klant** ("het is nooit zomaar rai of ranking
+   masters... het moet echt op basis van de klantnaam zijn"). Nieuwe logica, voorbeelden en
+   mockdata moeten generiek per klant werken, nooit een specifieke naam als aanname bevatten.
+2. **Design per kanaal moet de eigen logische structuur van dat kanaal volgen, niet blind het
+   Google-patroon kopiëren** ("design moet wel kloppen met de logische keuzes per kanaal. niet
+   blind doorvoeren"). `lib/campaign-types.ts` is de referentie om van te léren, niet een sjabloon
+   om te klonen — Meta's ODAX-objectives en LinkedIn's campagnestructuur zijn structureel anders
+   dan Google's Search/Shopping/PMax-indeling en verdienen een eigen vorm.
+
+### 16.3 Actieve roadmap: campagnetype-diepte per kanaal (Google klaar, Meta/LinkedIn in opbouw)
+
+Vervolg op de bevinding in sectie 14.1 (Meta en LinkedIn worden generiek/geblend behandeld, geen
+objective- of campagnetype-branching). Op basis van 16.2 is dit nu een actief bouwpunt, geen open
+vraag meer. Stand per 17 augustus:
+
+**Meta — ODAX-objectives geverifieerd tegen `developers.facebook.com/docs/marketing-api/reference/
+ad-campaign-group/`:** zes actuele objectives (`OUTCOME_AWARENESS`, `OUTCOME_TRAFFIC`,
+`OUTCOME_ENGAGEMENT`, `OUTCOME_LEADS`, `OUTCOME_APP_PROMOTION`, `OUTCOME_SALES`), elk met een eigen
+kernmetric (reach/CPM; CTR/CPC; thruplay/berichtgesprekken; CPL; installs/CPI; ROAS/cost-per-
+purchase). Het veld wordt al opgehaald (`lib/api/meta-ads.ts:232`, `objective` zit in de
+Insights-fields) en al opgeslagen (`scripts/migrations/007_meta.sql:13`, `objective text`), maar
+wordt nergens in `lib/meta/transform.ts` of de analyselaag gebruikt — het gat zit dus puur in de
+analyselaag, niet in de sync. Eerstvolgende stap: een Meta-equivalent van `lib/campaign-types.ts`'s
+`PURPOSE_EVAL_CRITERIA`-patroon, gevoed door de al aanwezige `objective`-kolom.
+
+**LinkedIn — nog te onderzoeken tegen `learn.microsoft.com/en-us/linkedin/marketing/`:** zelfde
+aanpak, nog niet uitgevoerd. Volgt dezelfde vorm zodra de officiële objective-taxonomie is
+opgehaald.
+
+**Nog niet gestart:** extra mockdata per kanaal in het demo-account (16.2's tweede punt), en het
+daadwerkelijke code-bestand voor Meta/LinkedIn campagnetype-classificatie. Dit document wordt
+bijgewerkt zodra die stappen zijn gezet — tot die tijd is dit de plek om op terug te vallen voor
+zowel het cron-beleid (16.1) als de bouwvolgorde (16.2/16.3).
