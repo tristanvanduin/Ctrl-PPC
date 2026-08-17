@@ -198,9 +198,23 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 // Cron-paden blijven op het bestaande CRON_SECRET-headerpatroon: de route valideert de
-// header zelf (zie app/api/sync/cron/route.ts); de middleware laat ze daarom door.
+// header zelf (zie app/api/sync/cron/route.ts en de vier routes onder app/api/cron/, allemaal
+// fail-closed op CRON_SECRET); de middleware laat ze daarom door.
+//
+// BUG GEVONDEN EN GEFIXT (17 augustus 2026, live tegen productie geverifieerd): deze functie
+// matchte alleen /api/sync/cron, niet /api/cron/*. vercel.json plant drie crons:
+// /api/sync/cron (matchte al, gaf 200) en /api/cron/evaluate-hypotheses + /api/cron/
+// evaluate-code-rood (matchten niet -- elke aanroep kreeg de inlogwal uit regel 93 van
+// middleware.ts, {"error":"Niet ingelogd"}, VOORDAT de route zijn eigen CRON_SECRET-check ooit
+// bereikte). Bevestigd met een echte curl tegen www.ctrlppc.com: /api/sync/cron gaf 200,
+// /api/cron/evaluate-code-rood gaf 401. Verklaart waarom sprint_hypotheses.evaluated_at bij
+// alle 127+ rijen leeg stond, ook bij hypotheses geaccepteerd op 7 april 2026 -- ruim buiten elk
+// meetvenster: de wekelijkse evaluatiecron heeft sindsdien nooit succesvol gedraaid.
+// app/api/cron/process-action-queue en trigger-sops (nog niet in vercel.json, zie de eigen
+// bestandskop) hadden dezelfde blokkade zodra ze wel geactiveerd worden.
 export function isCronPath(pathname: string): boolean {
-  return pathname === "/api/sync/cron" || pathname.startsWith("/api/sync/cron/");
+  return pathname === "/api/sync/cron" || pathname.startsWith("/api/sync/cron/") ||
+    pathname.startsWith("/api/cron/");
 }
 
 // Het benodigde recht per API-verzoek. Volgorde is significant: de eerste match wint, dus

@@ -164,6 +164,15 @@ assert(!isPublicPath("/api/sync/cron"), "cron is geen publiek pad (eigen secret-
 
 assert(isCronPath("/api/sync/cron") && isCronPath("/api/sync/cron/daily"), "cron-paden herkend");
 assert(!isCronPath("/api/sync") && !isCronPath("/api/sync/linkedin"), "gewone sync-routes zijn geen cron");
+// Bug van 17 augustus 2026: deze functie matchte alleen /api/sync/cron, niet /api/cron/* --
+// waardoor de middleware /api/cron/evaluate-hypotheses en /api/cron/evaluate-code-rood achter de
+// inlogwal zette in plaats van door te laten naar hun eigen CRON_SECRET-check. Live tegen
+// productie bevestigd (curl: /api/sync/cron gaf 200, /api/cron/evaluate-code-rood gaf 401).
+assert(
+  isCronPath("/api/cron/evaluate-hypotheses") && isCronPath("/api/cron/evaluate-code-rood") &&
+    isCronPath("/api/cron/process-action-queue") && isCronPath("/api/cron/trigger-sops"),
+  "alle vier de routes onder /api/cron/ zijn cron-paden",
+);
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);
