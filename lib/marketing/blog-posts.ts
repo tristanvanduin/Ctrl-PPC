@@ -1022,6 +1022,28 @@ export const BLOG_POSTS: BlogPost[] = [
     contentType: "Method",
     roadmapGebouwd: ECOMMERCE_KOPPELING_GEBOUWD,
   },
+  {
+    slug: "utm-tags-die-je-attributie-breken",
+    titel: "The UTM mistakes that quietly corrupt your channel reporting",
+    samenvatting:
+      "A UTM parameter only works if every person and every system that touches it types the same thing. Most accounts never check whether that held -- until direct traffic climbs for no reason and a channel that should report as one line splits into three.",
+    datum: "2026-08-17",
+    leesminuten: 4,
+    inhoud: [
+      "\"Direct\" traffic climbs every month for no reason anyone can point to, a paid social campaign shows almost no attributed conversions despite an obviously healthy spend, and a channel that should report as one line shows up split across three slightly different names in the same dashboard. None of these are tracking bugs. They are UTM parameters doing exactly what they were typed to do -- which is usually not what anyone intended.",
+      "## Five ways a tag breaks before it ever reaches a report",
+      "A UTM parameter is a plain text string, and plain text has no memory of what it was supposed to mean. Casing drift is the most common failure: utm_source=facebook one month, utm_source=Facebook the next, and most analytics tools treat those as two different sources rather than one. Redirects and link shorteners strip query parameters silently, so a click that carried a perfectly correct tag can arrive at the landing page with nothing left to log. The same campaign tag gets copy-pasted across unrelated placements -- an email blast, a paid social ad, and an organic post all sharing utm_campaign=spring_sale -- collapsing three different channels into one indistinguishable line. Auto-tagging built into a platform (Google Ads' own click ID, for instance) can conflict with a manually applied UTM tag on the same link, and whichever system wins determines which label the click gets, not which one is correct. And a click that happens inside an app's in-app browser, then continues in a separate mobile browser session later, loses whatever parameter was attached the first time, showing up as a second, tag-free visit.",
+      "## A worked example",
+      "Illustrative case: a paid social campaign launches tagged utm_source=facebook, utm_medium=paid, and runs for a full month with a clean, trackable line in the reporting tool. A different team member relaunches the same campaign the following month, using a template that happens to capitalize the source: utm_source=Facebook. Nothing else about the campaign changes -- same budget, same audience, same creative. The dashboard shows the channel's traffic and conversions dropping by roughly half month over month, because half of what used to be one line is now reporting as a second, unrelated one. The channel did not get worse. The tag did.",
+      "## What this actually costs",
+      "The direct cost is a bad decision made on split data: a channel that looks like it is underperforming gets its budget cut, when the truth is its own numbers are scattered across multiple labels, none of which individually clears the bar the whole channel would clear if the data were reunited. The quieter cost is to anything that compares channels against each other -- a cross-channel check meant to catch two channels quietly competing for the same audience, or one channel feeding demand another later closes, depends on every channel's own numbers meaning what they claim to mean. A UTM tag that cannot be trusted to say the same thing twice breaks that comparison before it starts.",
+      "## The tag that never lies",
+      "None of this is an argument against UTM tagging, only against trusting it blindly. The fix is unglamorous discipline: a fixed, lowercase-only taxonomy written down once, one person or one shared template owning how campaigns get tagged rather than each team member typing it from memory, and a periodic audit that checks the tag against the platform's own reporting rather than assuming last quarter's naming convention still holds. Where a UTM parameter and a platform's own record of what actually ran disagree, the platform's own record is the one to trust -- the same reason a campaign's name is not proof of what it targets, a tag someone typed six months ago is not proof of where a click came from.",
+    ],
+    gerelateerdeSlugs: ["merk-cannibalisatie-search-console-vs-ads", "kanaalsynergie-bewijzen", "attributie-zonder-trackingcode"],
+    tags: ["Cross-Channel", "Attribution", "Dashboards"],
+    contentType: "Method",
+  },
 ];
 
 export function getBlogPost(slug: string): BlogPost | undefined {
