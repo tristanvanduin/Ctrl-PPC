@@ -89,8 +89,12 @@ const META_ADS = [
 const META_CAMPAIGNS = [
   // GRT in de naam zodat de beurs-scope (Fase 3) ook op Meta demonstreerbaar is; retargeting
   // blijft generiek zodat de "hele account vs beurs"-splitsing zichtbaar wordt.
-  { id: "demo-mc-awareness", name: "GRT | Awareness EU" },
-  { id: "demo-mc-retargeting", name: "GreenTech Retargeting" },
+  // objective per campagne eerlijk gezet op wat de naam/scenario betekent (17 augustus 2026,
+  // masterplan 16.3) -- voorheen kregen beide campagnes hardcoded OUTCOME_AWARENESS, ook
+  // Retargeting, wat het nieuwe objective-gedreven lib/meta/campaign-types.ts meteen fout zou
+  // classificeren voor een campagne die converteert (add_to_cart/initiate_checkout in de data).
+  { id: "demo-mc-awareness", name: "GRT | Awareness EU", objective: "OUTCOME_AWARENESS" },
+  { id: "demo-mc-retargeting", name: "GreenTech Retargeting", objective: "OUTCOME_SALES" },
 ];
 
 function metaAdDaily(): MetaDaily[] {
@@ -286,7 +290,7 @@ export function buildAllRows(): Record<string, Row[]> {
   // status kent een check-constraint (active/expired/error/disabled); "disabled" markeert
   // eerlijk dat dit geen echte koppeling is, terwijl de currency de blended view voedt.
   tables["meta_connections"] = [{ client_id: DEMO_CLIENT, ad_account_id: "act_demo", token_ref: "demo", currency: "EUR", status: "disabled", last_sync_at: new Date().toISOString() }];
-  tables["meta_campaigns"] = META_CAMPAIGNS.map((c) => ({ campaign_id: c.id, client_id: DEMO_CLIENT, name: c.name, objective: "OUTCOME_AWARENESS", status: "ACTIVE", effective_status: "ACTIVE" }));
+  tables["meta_campaigns"] = META_CAMPAIGNS.map((c) => ({ campaign_id: c.id, client_id: DEMO_CLIENT, name: c.name, objective: c.objective, status: "ACTIVE", effective_status: "ACTIVE" }));
   tables["meta_ads"] = META_ADS.map((a) => ({ ad_id: a.id, adset_id: `${a.campaign}-as1`, campaign_id: a.campaign, client_id: DEMO_CLIENT, name: a.name, status: "ACTIVE", effective_status: "ACTIVE" }));
   // Alleen meta_ad_daily kent de ranking-kolommen; campagne- en account-niveau niet.
   const metaBase = (r: MetaDaily): Row => ({

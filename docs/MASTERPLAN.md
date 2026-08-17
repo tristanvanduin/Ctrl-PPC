@@ -2124,21 +2124,38 @@ Vervolg op de bevinding in sectie 14.1 (Meta en LinkedIn worden generiek/geblend
 objective- of campagnetype-branching). Op basis van 16.2 is dit nu een actief bouwpunt, geen open
 vraag meer. Stand per 17 augustus:
 
-**Meta — ODAX-objectives geverifieerd tegen `developers.facebook.com/docs/marketing-api/reference/
-ad-campaign-group/`:** zes actuele objectives (`OUTCOME_AWARENESS`, `OUTCOME_TRAFFIC`,
-`OUTCOME_ENGAGEMENT`, `OUTCOME_LEADS`, `OUTCOME_APP_PROMOTION`, `OUTCOME_SALES`), elk met een eigen
-kernmetric (reach/CPM; CTR/CPC; thruplay/berichtgesprekken; CPL; installs/CPI; ROAS/cost-per-
-purchase). Het veld wordt al opgehaald (`lib/api/meta-ads.ts:232`, `objective` zit in de
-Insights-fields) en al opgeslagen (`scripts/migrations/007_meta.sql:13`, `objective text`), maar
-wordt nergens in `lib/meta/transform.ts` of de analyselaag gebruikt — het gat zit dus puur in de
-analyselaag, niet in de sync. Eerstvolgende stap: een Meta-equivalent van `lib/campaign-types.ts`'s
-`PURPOSE_EVAL_CRITERIA`-patroon, gevoed door de al aanwezige `objective`-kolom.
+**Meta — gebouwd: `lib/meta/campaign-types.ts`.** ODAX-objectives geverifieerd tegen
+`developers.facebook.com/docs/marketing-api/reference/ad-campaign-group/`: zes actuele objectives
+(`OUTCOME_AWARENESS`, `OUTCOME_TRAFFIC`, `OUTCOME_ENGAGEMENT`, `OUTCOME_LEADS`,
+`OUTCOME_APP_PROMOTION`, `OUTCOME_SALES`), elk met een eval-criteria-lijst getoetst tegen de
+daadwerkelijk bestaande kolommen in `meta_campaign_daily` (niet aangenomen — nagelopen tegen
+`scripts/migrations/007_meta.sql:68-108`). App-promotie heeft daarin **geen enkele gedekte
+metric** (geen installs/CPI/in-app-events-kolom) — eerlijk vier keer `available: false` in plaats
+van gepadde criteria. `detectMetaObjective()` gebruikt in de eerste plaats het al aanwezige,
+al ingevulde `objective`-veld (`meta_campaigns.objective`) en valt alleen op campagnenaam terug als
+dat veld ontbreekt — het omgekeerde van Google Ads, waar naamdetectie de hoofdroute moet zijn
+omdat er geen equivalent apiveld bestaat. Dat verschil is met opzet: het is precies de "niet blind
+Google's patroon kopiëren"-eis uit 16.2.
 
-**LinkedIn — nog te onderzoeken tegen `learn.microsoft.com/en-us/linkedin/marketing/`:** zelfde
-aanpak, nog niet uitgevoerd. Volgt dezelfde vorm zodra de officiële objective-taxonomie is
-opgehaald.
+**LinkedIn — gebouwd: `lib/linkedin/campaign-types.ts`.** Objectives geverifieerd tegen
+`learn.microsoft.com/en-us/linkedin/marketing/integrations/ads/account-structure/
+create-and-manage-campaigns`: zeven actuele `objectiveType`-waarden (`BRAND_AWARENESS`,
+`ENGAGEMENT`, `JOB_APPLICANTS`, `LEAD_GENERATION`, `WEBSITE_CONVERSIONS`, `WEBSITE_VISITS`,
+`VIDEO_VIEWS`), getoetst tegen `linkedin_campaign_daily`
+(`scripts/migrations/008_linkedin.sql:132-165`). Job Applicants is hier het eerlijke gat
+(vergelijkbaar met Meta's App-promotie, andere oorzaak: LinkedIn's job-board-metrics komen niet
+mee via de standaard Analytics-API) — vier criteria met `available: false`, plus twee kliks-based
+proxymetrics die expliciet gelabeld zijn als "indicatief", geen vervanging.
+`detectLinkedInObjective()` volgt dezelfde regel als Meta: het al gevulde
+`linkedin_campaigns.objective_type`-veld eerst, naamdetectie alleen als terugval.
 
-**Nog niet gestart:** extra mockdata per kanaal in het demo-account (16.2's tweede punt), en het
-daadwerkelijke code-bestand voor Meta/LinkedIn campagnetype-classificatie. Dit document wordt
-bijgewerkt zodra die stappen zijn gezet — tot die tijd is dit de plek om op terug te vallen voor
-zowel het cron-beleid (16.1) als de bouwvolgorde (16.2/16.3).
+**Beide bestanden staan bewust in `TOEGESTANE_WEZEN`** (`scripts/check-hygiene.mjs`, 17 augustus):
+ze zijn de taxonomie-laag, niet de bevindingen-engine. `lib/campaign-types.ts` heeft zelf ook pas
+een consument via `lib/campaign-analysis.ts` — dat regelbestand staat om dezelfde reden al langer
+in dezelfde lijst ("gebouwd, geen consument"). De volgende stap is het Meta/LinkedIn-equivalent van
+`campaign-analysis.ts` (de eigenlijke `CampaignFinding`-generatie per objective), nog niet gebouwd.
+
+**Nog niet gestart:** extra mockdata per kanaal in het demo-account (16.2's tweede punt), en de
+bevindingen-engines die deze twee taxonomiebestanden consumeren. Dit document wordt bijgewerkt
+zodra die stappen zijn gezet — tot die tijd is dit de plek om op terug te vallen voor zowel het
+cron-beleid (16.1) als de bouwvolgorde (16.2/16.3).

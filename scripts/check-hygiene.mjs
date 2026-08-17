@@ -213,6 +213,21 @@ const TOEGESTANE_WEZEN = new Map([
     "geraakt. comparison-facts.ts is GEEN opvolger: dat rekent vergelijkingen, geen bevindingen. " +
     "De vraag is of de prepared-context-pijplijn deze bevindingen al elders produceert"],
 
+  // 17 augustus 2026, masterplan sectie 16.3: op expliciet verzoek van de eigenaar vooruitgebouwd
+  // ("niet wachten op een klant") -- de objective/eval-criteria-taxonomie per kanaal, het
+  // Meta/LinkedIn-equivalent van lib/campaign-types.ts (die WEL een consument heeft via
+  // campaign-analysis.ts hierboven). De bevindingen-engine die deze twee bestanden consumeert
+  // (het Meta/LinkedIn-equivalent van campaign-analysis.ts) is de logische vervolgstap, nog niet
+  // gebouwd in dezelfde sessie. Beide bestanden hebben al wel een eigen `objective`/`objective_type`
+  // -kolom die al gevuld wordt (meta_campaigns.objective, linkedin_campaigns.objective_type) --
+  // het is dus geen taxonomie die op iets ongebouwds wacht, alleen op de regelmachine erboven.
+  ["lib/meta/campaign-types.ts",
+    "Meta ODAX-objective-taxonomie en eval-criteria; wacht op een Meta-equivalent van " +
+    "campaign-analysis.ts als consument"],
+  ["lib/linkedin/campaign-types.ts",
+    "LinkedIn objectiveType-taxonomie en eval-criteria; wacht op een LinkedIn-equivalent van " +
+    "campaign-analysis.ts als consument"],
+
   // 11 augustus 2026: op beide homepage-plekken losgekoppeld nadat bleek dat de enige echte
   // productbeelden een Nederlandstalige UI tonen onder een Engelstalige, wereldwijd gepositioneerde
   // pagina -- tegensprekend bewijs, niet ontbrekend bewijs, en dus erger dan de fallback die hij
