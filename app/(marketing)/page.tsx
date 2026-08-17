@@ -8,6 +8,8 @@ import { GodViewCompanion } from "@/components/marketing/god-view-companion";
 import { ComparisonBlock } from "@/components/marketing/comparison-block";
 import { TrustBanner } from "@/components/marketing/trust-banner";
 import { FeaturesBlock } from "@/components/marketing/features-block";
+import { WhyTrust } from "@/components/marketing/why-trust";
+import { BuiltFor } from "@/components/marketing/built-for";
 import { PrimaryCta } from "@/components/marketing/primary-cta";
 import { foundationBeschikbaar } from "@/lib/marketing/foundation-cap";
 
@@ -142,6 +144,17 @@ export default async function HomePage() {
       </section>
 
       <TrustBanner />
+
+      {/* WhyTrust + BuiltFor (17 augustus 2026, Copilot-feedback "je vertelt wat het doet, niet
+          waarom je het moet vertrouwen of voor wie het is"): eerst direct onder de hero gezet,
+          voor Platform Pulse -- maar dat duwde Pulse van y=600 naar y=1390, bijna twee scrolls
+          verderop (gemeten, niet geschat), en brak zo een bewuste eerdere keuze die letterlijk in
+          de code stond: "Platform Pulse... het eerste bewijs (live cijfers) op de eerste scroll is
+          het gangbare patroon." Hierheen verplaatst, na Pulse en de kanalen-banner, zodat Pulse
+          zijn oorspronkelijke plek terugkrijgt en het vertrouwensargument nog steeds vroeg op de
+          pagina staat, alleen niet meer voor het eerste bewijs. */}
+      <WhyTrust />
+      <BuiltFor />
 
       {/* ROI-calculator (15 augustus 2026, op vraag van de eigenaar, "dit is een converterend
           blok, mega ver omlaag, voelt te los"): stond eerst onderaan FeaturesBlock, na Comparison
