@@ -9,7 +9,7 @@
 // DE ENIGE HARDE BRON DIE VANDAAG BESTAAT
 //
 // client_settings.rai_events (JSONB, migratie 024), met cadans annual/biennial/custom en een
-// lijst edities met datum en label. Gelezen door lib/rai/use-upcoming-edition.ts en de
+// lijst edities met datum en label. Gelezen door lib/fair/use-upcoming-edition.ts en de
 // geo-clone-route; geschreven door components/dashboard/event-settings.tsx.
 //
 // sop_client_context bestaat ook, met valid_from/valid_until/impact_on_analysis, maar heeft NUL
@@ -18,7 +18,7 @@
 // Een client_business_events-tabel met eventType, expectedImpact, confidence en createdBy vergt
 // een eigen migratie. Niet in deze stap: dit bestand leest uitsluitend wat er al is.
 
-import type { RaiEventCfg } from "@/lib/rai/fair-weeks";
+import type { FairEventCfg } from "@/lib/fair/fair-weeks";
 import type { BusinessEvent, ContextAnalysis } from "@/lib/decision/types";
 
 // Herexport, geen tweede definitie: ContextAnalysis en BusinessEvent staan in
@@ -35,12 +35,12 @@ export type { ContextAnalysis, BusinessEvent };
  * - een editie zonder datum (dezelfde seed-vorm) telt niet mee.
  */
 export function businessEventsUitRaiEvents(
-  events: RaiEventCfg[],
+  events: FairEventCfg[],
   agencyId: string,
   accountId: string
 ): BusinessEvent[] {
   return events
-    .filter((e): e is RaiEventCfg & { id: string; name: string } => Boolean(e.id) && Boolean(e.name?.trim()))
+    .filter((e): e is FairEventCfg & { id: string; name: string } => Boolean(e.id) && Boolean(e.name?.trim()))
     .map((e) => ({
       agencyId,
       accountId,

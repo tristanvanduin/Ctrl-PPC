@@ -207,8 +207,8 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          // Was "ranking-masters-dashboard.vercel.app" -- een restant van vóór de rebrand naar
-          // Ctrl PPC, gevonden 17 augustus 2026 doordat OpenRouter's eigen "Top Apps"-overzicht
+          // Was een verouderde, publieke pre-rebrand domeinnaam -- een restant van vóór de rebrand
+          // naar Ctrl PPC, gevonden 17 augustus 2026 doordat OpenRouter's eigen "Top Apps"-overzicht
           // die naam toonde na een live testrun. Deze header identificeert de aanroepende app bij
           // OpenRouter (Apps-dashboard, geen functionele invloed op de call zelf), en hoorde dus
           // al die tijd de echte merknaam te dragen, niet een oude.

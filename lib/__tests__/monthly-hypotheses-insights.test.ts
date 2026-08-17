@@ -255,7 +255,7 @@ test("5. Partial sprint push is not marked as success", () => {
     hypothesis_id: "persisted-hypothesis-1",
     task: firstLinkedTask.handeling,
     status: "todo",
-    owner: "Ranking Masters",
+    owner: "Bureau",
     metrics: firstLinkedTask.meet_via,
     review_timeframe: "Deze sprint",
   }];

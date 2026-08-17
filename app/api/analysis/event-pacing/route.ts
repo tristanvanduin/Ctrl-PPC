@@ -15,15 +15,15 @@ import {
   resolveChannelConversionConfig,
   type GoogleAccountMonthlyRow,
 } from "@/lib/events/account-event-points";
-import type { Cadence, Edition } from "@/lib/rai/geo-clone-settings";
-import { buildEditions, pickCurrentEdition } from "@/lib/rai/geo-clone-analysis";
-import { previousEditionFor } from "@/lib/rai/event-comparison";
-import type { DailyPoint } from "@/lib/rai/event-time-axis";
+import type { Cadence, Edition } from "@/lib/fair/geo-clone-settings";
+import { buildEditions, pickCurrentEdition } from "@/lib/fair/geo-clone-analysis";
+import { previousEditionFor } from "@/lib/fair/event-comparison";
+import type { DailyPoint } from "@/lib/fair/event-time-axis";
 import { buildEditionCurves, deriveCpaCurve } from "@/lib/analysis/event-curves";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 
-interface RaiEventCfg { id?: string; name?: string; abbrev?: string; cadence?: Cadence | null; editions?: Edition[] | null }
+interface FairEventCfg { id?: string; name?: string; abbrev?: string; cadence?: Cadence | null; editions?: Edition[] | null }
 
 function parseParams(clientId: string | null, eventId: string | null): { clientId: string; eventId: string } | null {
   if (!clientId || !eventId || !eventId.trim()) return null;
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     supabase.from("linkedin_account_daily").select("date, spend, one_click_leads, external_website_conversions, post_click_conversions").eq("client_id", clientId).order("date", { ascending: true }),
   ]);
 
-  const events = ((settingsRes.data?.rai_events as { events?: RaiEventCfg[] } | null)?.events ?? []);
+  const events = ((settingsRes.data?.rai_events as { events?: FairEventCfg[] } | null)?.events ?? []);
   const event = events.find((e) => e.id === eventId) ?? null;
   if (!event) return Response.json({ error: `Event ${eventId} niet gevonden bij deze klant` }, { status: 404 });
 

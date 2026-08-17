@@ -1,7 +1,7 @@
 // =====================================================================
 // Beursanalyse per geo-clone (fase 4). Deterministisch, geen LLM: de route haalt de
 // campagne-maanddata, de per-beurs-instellingen (cadans/edities/doelen met account-fallback)
-// en laat lib/rai/geo-clone-analysis de event-relatieve vergelijking en projectie doen.
+// en laat lib/fair/geo-clone-analysis de event-relatieve vergelijking en projectie doen.
 // De uitkomst wordt per beurs opgeslagen (sectie per afkorting) en een materiele achterstand
 // of gemiste doel-projectie landt als voorstel in de goedkeuringswachtrij (bron geo_clone).
 // =====================================================================
@@ -9,12 +9,12 @@
 import { NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
-import { analyzeGeoClone, type GeoCloneAnalysisResult } from "@/lib/rai/geo-clone-analysis";
-import { RAI_GEO_CLONES, matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
-import type { DailyPoint } from "@/lib/rai/event-time-axis";
+import { analyzeGeoClone, type GeoCloneAnalysisResult } from "@/lib/fair/geo-clone-analysis";
+import { FAIR_GEO_CLONES, matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
+import type { DailyPoint } from "@/lib/fair/event-time-axis";
 import { resolveChannelConversionConfig, sumSelectedConversions, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
-import { resolveEvent, resolveGoals, type Edition, type Cadence } from "@/lib/rai/geo-clone-settings";
-import type { CampaignMonthlyRow } from "@/lib/rai/geo-clone-aggregate";
+import { resolveEvent, resolveGoals, type Edition, type Cadence } from "@/lib/fair/geo-clone-settings";
+import type { CampaignMonthlyRow } from "@/lib/fair/geo-clone-aggregate";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
@@ -22,7 +22,7 @@ import { supabaseForClient } from "@/lib/demo/server-supabase";
 const SOP_TYPE = "geo_clone";
 const sectionFor = (geoClone: string) => `geo_clone_${geoClone.toLowerCase()}_v1`;
 
-interface RaiEventCfg { abbrev?: string; cadence?: Cadence; editions?: Edition[] }
+interface FairEventCfg { abbrev?: string; cadence?: Cadence; editions?: Edition[] }
 
 function parseParams(clientId: string | null, geoClone: string | null): { clientId: string; geoClone: string } | null {
   if (!clientId || !geoClone || !geoClone.trim()) return null;
@@ -54,10 +54,10 @@ async function runGeoCloneAnalysis(
   const rows = (rowsRes.data ?? []) as CampaignMonthlyRow[];
   if (rows.length === 0) return { error: "Geen campagne-maanddata voor deze klant", status: 404 };
 
-  const variant = RAI_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null;
+  const variant = FAIR_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null;
   const fairLabel = variant ? `${variant.brand} ${variant.location}` : geoClone;
 
-  const events = ((settingsRes.data?.rai_events as { events?: RaiEventCfg[] } | null)?.events ?? []);
+  const events = ((settingsRes.data?.rai_events as { events?: FairEventCfg[] } | null)?.events ?? []);
   const accountEvent = events.find((e) => (e.abbrev ?? "").trim().toUpperCase() === geoClone) ?? null;
   const kpi = (settingsRes.data?.kpi_targets ?? null) as Record<string, unknown> | null;
 

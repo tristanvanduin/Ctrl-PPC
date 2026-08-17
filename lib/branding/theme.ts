@@ -1,8 +1,8 @@
 // Brand-guide-theming: uit de visuele identiteit van een event (kleuren, logo, font uit de
-// brand guide) de complete thema-tokens maken, zodat het RAI-eventdashboard zich per event in
+// brand guide) de complete thema-tokens maken, zodat het beurs-eventdashboard zich per event in
 // de eigen huisstijl toont in plaats van in het huismerkblauw. Puur en los getest; de
 // tool zet de tokens als CSS-variabelen (shadcn) per event. Ontbreekt of klopt een veld niet,
-// dan valt het terug op de RM-tokens, zodat er altijd een geldig, leesbaar thema is.
+// dan valt het terug op de standaard merktokens, zodat er altijd een geldig, leesbaar thema is.
 
 // De thema-relevante velden van een brand guide. De creatieve velden (tone of voice, verboden
 // woorden) leven elders; dit is puur de visuele identiteit voor het dashboard.
@@ -86,7 +86,7 @@ export function contrastForeground(backgroundHex: string): string {
 
 // Resolveert het complete thema uit de visuele identiteit. Elk kleurveld wordt gevalideerd;
 // een geldige hex wordt overgenomen, anders valt dat veld terug op de default. De voorgrond-
-// kleuren worden berekend voor leesbaarheid. Geen identiteit betekent het volledige RM-thema.
+// kleuren worden berekend voor leesbaarheid. Geen identiteit betekent het volledige standaardthema.
 export function resolveEventTheme(identity: BrandVisualIdentity | null | undefined): EventTheme {
   if (!identity) return { ...DEFAULT_THEME };
 

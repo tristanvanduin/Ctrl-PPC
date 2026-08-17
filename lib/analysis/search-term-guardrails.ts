@@ -48,7 +48,7 @@ function normalizeIntent(v: TermWithData): void {
 /**
  * Op hele woorden, niet op deelstrings. "brand" zat als deelstring in Brandbeveiliging,
  * Brandstof en Brandweer — allemaal gewone Nederlandse woorden en stuk voor stuk onderwerpen
- * waar RAI beurzen over heeft. Elke zoekterm in zo'n campagne werd daardoor op "keep" gezet en
+ * waar een beursklant over kan gaan. Elke zoekterm in zo'n campagne werd daardoor op "keep" gezet en
  * kon nooit meer worden uitgesloten. Andersom miste de oude controle "merk" zelf: alleen
  * "merknaam" telde mee.
  */

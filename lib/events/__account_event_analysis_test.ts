@@ -1,5 +1,5 @@
 // Zelf-draaiende test voor de account-brede T-minus-analyse (fase 4). Draait via tsx.
-// Spiegelt lib/rai/__geo_clone_analysis_test.ts qua opzet, maar zonder geo-clone-matching:
+// Spiegelt lib/fair/__geo_clone_analysis_test.ts qua opzet, maar zonder geo-clone-matching:
 // het hele account telt mee, over meerdere kanalen tegelijk.
 
 import { analyzeAccountEvent } from "./account-event-analysis";

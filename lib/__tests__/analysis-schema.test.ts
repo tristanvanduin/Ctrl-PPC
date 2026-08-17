@@ -184,7 +184,7 @@ console.log("7. parseRecommendations — happy path");
     tasks: [{
       recommendation_index: 0, title: "tROAS verlagen van 500% naar 400%",
       description: "Pas tROAS aan in Google Ads", action_type: "bid",
-      owner: "Ranking Masters", affected_campaign: "PMax NL",
+      owner: OWNER_TEAM, affected_campaign: "PMax NL",
       affected_adgroup: null, affected_keyword: null,
       current_value: "500%", target_value: "400%",
       priority: "high", frequency: "direct", due_date_days: 7,
@@ -196,9 +196,7 @@ console.log("7. parseRecommendations — happy path");
   if (result.success) {
     assert(result.data.recommendations.length === 1, "should have 1 rec");
     assert(result.data.tasks.length === 1, "should have 1 task");
-    // Het schema normaliseert de opgeslagen eigenaar naar de ROL. Rijen van vóór een
-    // naamswijziging dragen nog een bureaunaam ("Ranking Masters", "RAI Amsterdam"); die worden
-    // geaccepteerd en omgezet, zodat ze niet ineens ongeldig zijn of als klant-taken gaan tellen.
+    // Het schema normaliseert de opgeslagen eigenaar naar de ROL, niet een naam.
     assert(result.data.tasks[0].owner === OWNER_TEAM, "task owner genormaliseerd naar de rol");
     assert(result.data.recommendations[0].cluster_id === "cluster_unknown", "recommendation cluster_id defaults");
     assert(result.data.tasks[0].thread_id === null, "task thread_id defaults to null");
@@ -217,7 +215,7 @@ console.log("8. parseRecommendations — invalid task owner with valid rec");
     tasks: [{
       recommendation_index: 0, title: "Do something",
       description: "...", action_type: "bid",
-      owner: "INVALID_OWNER", // noch RAI Amsterdam, noch de oude waarde, noch Klant
+      owner: "INVALID_OWNER", // noch de rol, noch een kantlabel, noch Klant
       affected_campaign: null, affected_adgroup: null, affected_keyword: null,
       current_value: null, target_value: null,
       priority: "high", frequency: "direct", due_date_days: 7,

@@ -152,12 +152,12 @@ interface PdfProps {
   generatedAt: string;
 }
 
-// Load RM logo as base64 data URI (cached at module level)
-let rmLogoDataUri: string | undefined;
+// Load brand logo as base64 data URI (cached at module level)
+let brandLogoDataUri: string | undefined;
 try {
   const logoPath = path.join(process.cwd(), "public", "images", BRAND_LOGO_FILE);
   if (fs.existsSync(logoPath)) {
-    rmLogoDataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
+    brandLogoDataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
   }
 } catch { /* no logo */ }
 
@@ -181,8 +181,8 @@ function SecondOpinionPdf({ clientName, mode, rows, summaries, generatedAt }: Pd
           React.createElement(Text, { style: s.subtitle }, `${clientName}  |  ${modeLabel}  |  ${dateStr}`),
         ),
         React.createElement(View, { style: { flexDirection: "row", alignItems: "center", gap: 8 } },
-          rmLogoDataUri
-            ? React.createElement(Image, { src: rmLogoDataUri, style: { height: 32, width: 32, objectFit: "contain" as const } })
+          brandLogoDataUri
+            ? React.createElement(Image, { src: brandLogoDataUri, style: { height: 32, width: 32, objectFit: "contain" as const } })
             : null,
           React.createElement(View, { style: { alignItems: "flex-end" as const } },
             React.createElement(Text, { style: s.brand }, BRAND_NAME),
@@ -276,8 +276,8 @@ function SecondOpinionPdf({ clientName, mode, rows, summaries, generatedAt }: Pd
       React.createElement(View, { style: s.footer },
         React.createElement(Text, { style: s.footerText }, `Gegenereerd: ${dateStr}`),
         React.createElement(View, { style: { flexDirection: "row", alignItems: "center", gap: 4 } },
-          rmLogoDataUri
-            ? React.createElement(Image, { src: rmLogoDataUri, style: { height: 14, width: 14, objectFit: "contain" as const } })
+          brandLogoDataUri
+            ? React.createElement(Image, { src: brandLogoDataUri, style: { height: 14, width: 14, objectFit: "contain" as const } })
             : null,
           React.createElement(Text, { style: s.footerText }, `${BRAND_NAME}  |  Second Opinion`),
         ),
@@ -338,8 +338,8 @@ function SecondOpinionPdf({ clientName, mode, rows, summaries, generatedAt }: Pd
       React.createElement(View, { style: s.footer },
         React.createElement(Text, { style: s.footerText }, `${clientName}  |  ${modeLabel}`),
         React.createElement(View, { style: { flexDirection: "row", alignItems: "center", gap: 4 } },
-          rmLogoDataUri
-            ? React.createElement(Image, { src: rmLogoDataUri, style: { height: 14, width: 14, objectFit: "contain" as const } })
+          brandLogoDataUri
+            ? React.createElement(Image, { src: brandLogoDataUri, style: { height: 14, width: 14, objectFit: "contain" as const } })
             : null,
           React.createElement(Text, { style: s.footerText }, `${BRAND_NAME}  |  Second Opinion`),
         ),

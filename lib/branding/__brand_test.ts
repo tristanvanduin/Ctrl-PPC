@@ -6,9 +6,9 @@
 // PDF die naar een klant gaat.
 //
 // De eigenaar-waarde is het lastige deel: die wordt OPGESLAGEN in sprint_items.owner. (Hier stond
-// sprint_planning.owner en sop_tasks.owner; nagekeken tegen het live schema bestaat geen van beide
-// — dezelfde fout die scripts/rename-owner-to-rai.sql bijna liet afbreken.) Rijen van vóór de
-// wijziging dragen de oude naam en mogen niet ineens ongeldig worden of als klant-taken tellen.
+// sprint_planning.owner en sop_tasks.owner; nagekeken tegen het live schema bestaat geen van
+// beide.) Rijen van vóór een naamswijziging droegen ooit de oude naam; sinds
+// scripts/migrations/097_owner_role_normalize.sql dragen ze de rol, niet meer een naam.
 
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -36,10 +36,11 @@ check("logobestand is een png", BRAND_LOGO_FILE.endsWith(".png"));
 // Het logobestand bestaat niet.
 //
 // Deze controle keek of de bestandsnaam bij de merknaam past, en dat deed hij — maar niemand keek
-// of het bestand er ook was. In public/images/ staat alleen `ranking-masters-logo.png`, van twee
-// naamswijzigingen geleden. Sinds de vorige rebranding verwijzen de PDF-renderers dus naar een
-// bestand dat er niet is, en omdat ze dat afvangen met `fs.existsSync` gebeurt er niets zichtbaars:
-// de klant krijgt een PDF met alleen het woordbeeld en niemand merkt het.
+// of het bestand er ook was. In public/images/ stond tot 17 augustus 2026 alleen het logo van een
+// eerdere productnaam; dat bestand is verwijderd (het stond als los, publiek bereikbaar bestand op
+// een echte, live URL — een groter lek dan een gemiste weergave). De PDF-renderers en de zijbalk
+// vangen een ontbrekend logobestand af met `fs.existsSync` en vallen terug op het woordbeeld, dus
+// er gebeurt niets zichtbaars kapots — maar er moet nog een echt Ctrl PPC-logo bij komen.
 //
 // Dat is precies het patroon waar deze codebase op let — een ontbrekende zaak die zich voordoet
 // als een geldige uitkomst. De controle staat er daarom bij, en hij hoort te falen tot het echte
@@ -74,22 +75,22 @@ check("logobestand volgt de merknaam", (() => {
 })(), `${BRAND_LOGO_FILE} hoort met de slug van "${BRAND_NAME}" te beginnen`);
 check("korte vorm past bij de naam", BRAND_NAME.toUpperCase().includes(BRAND_SHORT.toUpperCase()));
 
-console.log("\nElke ooit opgeslagen schrijfwijze blijft herkend");
-// Dit is de kern van het loskoppelen van naam en rol: een rebranding mag geen enkele bestaande
-// rij van eigenaar laten wisselen. Zou "RAI Amsterdam" hier niet meer als team gelden, dan telde
-// elke taak van vóór de naamswijziging ineens als klant-taak.
-for (const oud of LEGACY_OWNER_TEAM) {
-  check(`"${oud}" telt als bureau`, isTeamOwner(oud));
-  check(`"${oud}" normaliseert naar de rol`, normalizeOwner(oud) === OWNER_TEAM);
-}
-check("de rol zelf ook", isTeamOwner(OWNER_TEAM));
+console.log("\nDe rol blijft herkend, zonder een naam van een externe partij in de broncode");
+// LEGACY_OWNER_TEAM hield hier tot 17 augustus 2026 elke historische productnaam aan zodat een
+// rebranding geen bestaande rij van eigenaar liet wisselen. Die
+// namen zijn verwijderd (scripts/migrations/097_owner_role_normalize.sql normaliseert de database
+// zelf); de lijst is nu leeg en hoort leeg te blijven — zie de self-guard onderaan dit bestand, die
+// onafhankelijk van deze (nu lege) lijst controleert dat zo'n naam nergens terugkomt.
+check("de lijst is leeg", LEGACY_OWNER_TEAM.length === 0,
+  "LEGACY_OWNER_TEAM hoort na de migratie leeg te blijven, geen namen erin terug te zetten");
+check("de rol zelf telt als bureau", isTeamOwner(OWNER_TEAM));
 // De productnaam telt NIET als eigenaar, en dat is de hele reden dat deze regels er staan.
 // Ctrl PPC is het gereedschap; het voert geen taken uit. Hier stond eerder het omgekeerde.
 check("de productnaam niet", !isTeamOwner(BRAND_NAME));
 check("de korte vorm evenmin", !isTeamOwner(BRAND_SHORT));
 check("de klant niet", !isTeamOwner(OWNER_CLIENT));
 check("leeg niet", !isTeamOwner("") && !isTeamOwner(null) && !isTeamOwner(undefined));
-check("spaties eromheen storen niet", isTeamOwner(`  ${LEGACY_OWNER_TEAM[0]}  `));
+check("spaties eromheen storen niet bij de rol zelf", isTeamOwner(`  ${OWNER_TEAM}  `));
 
 // De schermtekst moet ook terug naar binnen kunnen, en dat is geen theoretisch nettigheidje.
 // De CSV-export schrijft de kolom Kant als "Intern" of "Extern" en de import leest diezelfde
@@ -117,7 +118,7 @@ check("zonder tenant valt hij terug op het kantlabel", ownerLabel(OWNER_TEAM) ==
 check("en dus nooit op de productnaam", ownerLabel(OWNER_TEAM) !== BRAND_NAME);
 check("met een tenant wint die", ownerLabel(OWNER_TEAM, "Bureau Zuid") === "Bureau Zuid");
 check("de andere kant blijft extern", ownerLabel(OWNER_CLIENT, "Bureau Zuid") === KANT_LABEL_EXTERN);
-check("een oude naam krijgt de huidige weergave", ownerLabel("Ranking Masters", "Bureau Zuid") === "Bureau Zuid");
+check("een onbekende waarde valt terug op extern (geen legacy-lijst meer)", ownerLabel("iets onbekends", "Bureau Zuid") === KANT_LABEL_EXTERN);
 
 console.log("\nDe toewijzing: wie binnen de kant");
 {
@@ -153,10 +154,11 @@ console.log("\nDe toewijzing: wie binnen de kant");
   check("de bureaunaam van de tenant wint ook hier",
     toewijzingLabel(leeg, { bureauNaam: "Bureau Zuid" }) === "Bureau Zuid");
 
-  // Een historische rij: ruwe naam in de kant, geen toewijzing. Zo staan alle 49 bestaande rijen
-  // erbij, en die moeten zonder migratie meteen goed lezen.
-  check("een oude bureaunaam leest nog als bureau",
-    toewijzingLabel({ kant: "RAI Amsterdam", soort: null, naam: null, userId: null }, { bureauNaam: "Bureau Zuid" }) === "Bureau Zuid");
+  // Een rij met de opgeslagen rol, geen toewijzing. Zo staan de meeste bestaande rijen erbij.
+  // (Vóór 097_owner_role_normalize.sql stond hier nog een test met een historische naam in de
+  // kant — verwijderd samen met LEGACY_OWNER_TEAM, zie de toelichting bovenaan dit bestand.)
+  check("een ruwe rol zonder toewijzing leest als bureau",
+    toewijzingLabel({ kant: OWNER_TEAM, soort: null, naam: null, userId: null }, { bureauNaam: "Bureau Zuid" }) === "Bureau Zuid");
 
   check("onbekende soort wordt leeg", normalizeSoort("verzonnen") === null);
   check("lege soort blijft leeg", normalizeSoort(null) === null && normalizeSoort("") === null);
@@ -171,21 +173,22 @@ console.log("\nDe toewijzing: wie binnen de kant");
     toewijzingCompleet({ kant: OWNER_TEAM, soort: "functie", naam: "Webdeveloper", userId: null }));
 }
 
-console.log("\nHet schema accepteert beide en levert één waarde");
+console.log("\nHet schema accepteert de rol en de kantlabels, en weigert onzin");
 {
-  for (const oudeNaam of LEGACY_OWNER_TEAM) {
-    const oud = OwnerEnum.safeParse(oudeNaam);
-    check(`"${oudeNaam}" wordt geaccepteerd`, oud.success, JSON.stringify(oud));
-    check(`"${oudeNaam}" komt er als de rol uit`, oud.success && oud.data === OWNER_TEAM, oud.success ? oud.data : "");
-  }
+  // Tot 17 augustus 2026 stond hier ook een lus over LEGACY_OWNER_TEAM die bewees dat elke
+  // historische naam nog geaccepteerd werd. Die namen staan nergens meer in de broncode (zie de
+  // toelichting bovenaan dit bestand), dus die lus is vervallen — het schema hoeft ze niet meer
+  // te kennen, alleen de database-migratie (097) moet de bestaande rijen bijwerken.
   const nieuw = OwnerEnum.safeParse(OWNER_TEAM);
-  check("de nieuwe waarde ook", nieuw.success && nieuw.data === OWNER_TEAM);
+  check("de rol wordt geaccepteerd", nieuw.success && nieuw.data === OWNER_TEAM);
   const klant = OwnerEnum.safeParse(OWNER_CLIENT);
   check("klant blijft klant", klant.success && klant.data === OWNER_CLIENT);
+  const intern = OwnerEnum.safeParse(KANT_LABEL_INTERN);
+  check("het interne kantlabel ook", intern.success && intern.data === OWNER_TEAM);
   check("onzin wordt geweigerd", !OwnerEnum.safeParse("Iets Anders").success);
 }
 
-console.log("\nDe oude naam staat nergens meer als weergavetekst");
+console.log("\nGeen naam van een externe partij komt terug als tekst, nergens in de broncode");
 {
   function walk(dir: string, out: string[] = []): string[] {
     for (const e of readdirSync(dir)) {
@@ -196,27 +199,31 @@ console.log("\nDe oude naam staat nergens meer als weergavetekst");
     }
     return out;
   }
-  // Toegestaan: de legacy-constante zelf, de comments die hem uitleggen, het migratiescript en
-  // de tests die de terugwaartse compatibiliteit bewijzen.
+  // Vast, onafhankelijk van LEGACY_OWNER_TEAM: die lijst is sinds 17 augustus 2026 leeg (zie
+  // boven) en zou deze controle stilzwijgend uitschakelen als hij er nog van afhing — precies het
+  // soort test-die-niets-meer-test dat de hygiënepoort probeert te vangen. Alleen volledige,
+  // meerdelige namen: "RM" en "RAI" zijn twee tot drie letters en zitten in gewone woorden
+  // (LOG_FORMAT_SKELETONS bevat "RM").
+  const verbodenNamen = ["RAI Amsterdam", "Ranking Masters"];
+  // Toegestaan: de comments hier en in brand.ts/analysis-schema.ts die de geschiedenis uitleggen,
+  // en de migraties die de daadwerkelijke, al uitgevoerde database-wijziging documenteren.
   const toegestaan = [
     "lib/branding/brand.ts", "lib/branding/__brand_test.ts",
-    "lib/schema/analysis-schema.ts", "scripts/rename-owner-to-rai.sql",
+    "lib/schema/analysis-schema.ts",
+    "scripts/migrations/097_owner_role_normalize.sql",
     "lib/__tests__/", "__tests__/",
-    // RAI Amsterdam is hier geen productnaam maar een KLANT in de demolijst. Dat is juist
-    // correct: Ctrl PPC is de naam van het gereedschap, RAI Amsterdam is een klant die erin
-    // staat. (Hier stond "het bureau heet Ctrl PPC"; dat klopte niet — Ctrl PPC is het product,
-    // het bureau is Ranking Masters. Zie de toelichting bij ownerLabel in brand.ts.)
-    "lib/clients.ts",
-    // Migratie 035 zet "Ranking Masters" in de agencies-tabel. Dat is precies waar deze hele
-    // splitsing voor bestaat: het is de naam van een TENANT, opgeslagen als data, en niet een
+    // Migratie 035 zet de naam van het eigen bureau in de agencies-tabel. Dat is precies waar deze
+    // hele splitsing voor bestaat: het is de naam van een TENANT, opgeslagen als data, en niet een
     // achtergebleven merkverwijzing in de weergave. Zou deze controle daarop blijven vallen, dan
     // kan er nooit een bureau met een eigen naam in de database staan — en dat is het doel.
     "scripts/migrations/035_bureaus_en_accounts.sql",
     // Om dezelfde reden: de merkgroepering wordt getest op de ECHTE 71 accountnamen uit de
-    // database, en "Ranking Masters" is daar één van. Dat is een ACCOUNTNAAM als testgegeven, niet
-    // een merkvermelding in de weergave. Verzonnen namen zouden hier niet werken — de fout die die
-    // test vasthoudt ("Easy Living" belandde bij "Easy-Ergonomics") ontstaat juist door hoe echte
-    // klanten hun accounts noemen, en die had ik nooit bedacht.
+    // database, en de naam van het eigen bureau staat daar ook tussen — als ACCOUNTNAAM, een
+    // klant van het bureau in de testdata, niet een merkvermelding in de weergave. Verzonnen namen
+    // zouden hier niet werken — de fout die die test vasthoudt ("Easy Living" belandde bij
+    // "Easy-Ergonomics") ontstaat juist door hoe echte klanten hun accounts noemen, en die had ik
+    // nooit bedacht. Blijft desondanks een bewuste uitzondering die de eigenaar kent: dit bestand
+    // bevat de bureaunaam letterlijk als testgegeven.
     "lib/branding/__merkgroepen_test.ts",
   ];
   const overtreders: string[] = [];
@@ -224,12 +231,7 @@ console.log("\nDe oude naam staat nergens meer als weergavetekst");
     if (toegestaan.some((t) => f.includes(t))) continue;
     const src = readFileSync(f, "utf8");
     src.split("\n").forEach((r, i) => {
-      // Alleen de volledige namen, niet de korte vormen. "RM" en "RAI" zijn twee tot drie letters
-      // en zitten in gewone woorden: LOG_FORMAT_SKELETONS bevat "RM", en die meldde deze controle
-      // als een losse merkvermelding. Waar het om gaat is de naam als weergavetekst, en die is
-      // altijd meerdelig.
-      const volledigeNamen = LEGACY_OWNER_TEAM.filter((n) => n.includes(" "));
-      if (volledigeNamen.some((oud) => r.includes(oud))) overtreders.push(`${f}:${i + 1}`);
+      if (verbodenNamen.some((oud) => r.includes(oud))) overtreders.push(`${f}:${i + 1}`);
     });
   }
   check("geen losse vermelding meer", overtreders.length === 0, overtreders.slice(0, 5).join(", "));

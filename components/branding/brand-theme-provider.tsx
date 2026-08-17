@@ -4,16 +4,16 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { resolveEventTheme, type BrandVisualIdentity, type EventTheme } from "@/lib/branding/theme";
-import { resolveBranding, type GeoCloneBranding } from "@/lib/rai/geo-clone-settings";
+import { resolveBranding, type GeoCloneBranding } from "@/lib/fair/geo-clone-settings";
 
 // BrandThemeProvider — trekt de merkidentiteit (kleuren, logo, font) van de ACTIEVE klant/beurs
 // door naar het hele dashboard. Dit is de ontbrekende schakel: het thema-systeem in
 // lib/branding/theme bestond al, maar niemand paste het toe. Hier zetten we de --brand-* (en de
 // bijhorende shadcn/sidebar) CSS-variabelen op de document-root, zodat de chrome — menu, headers,
-// knoppen, accenten — meekleurt met het merk i.p.v. het RM-blauw.
+// knoppen, accenten — meekleurt met het merk i.p.v. het standaardblauw.
 //
 // Per beurs: is er een geo-clone-branding-override, dan wint die; anders het account. Verlaat je
-// de klantpagina, dan draaien we de variabelen terug (cleanup) naar de RM-huisstijl.
+// de klantpagina, dan draaien we de variabelen terug (cleanup) naar de standaard huisstijl.
 
 interface BrandContextValue {
   theme: EventTheme;
@@ -28,7 +28,7 @@ export function useBrandTheme(): BrandContextValue {
 }
 
 // De variabelen die we op de root zetten. Merk-tokens + de shadcn/sidebar-tokens die anders het
-// RM-blauw vasthouden, zodat de héle chrome (incl. de blauwe sidebar) meekleurt.
+// standaardblauw vasthouden, zodat de héle chrome (incl. de blauwe sidebar) meekleurt.
 function brandVars(theme: EventTheme): Record<string, string> {
   const primaryLight = `color-mix(in srgb, ${theme.primary} 82%, white)`;
   const accentLight = `color-mix(in srgb, ${theme.accent} 82%, white)`;

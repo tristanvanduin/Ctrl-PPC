@@ -59,7 +59,7 @@ console.log("2. Tasks collapse on action unit");
     [],
     [
       {
-        owner: "Ranking Masters",
+        owner: "Bureau",
         action_type: "budget",
         action_intent_class: "geo_reallocation",
         action_unit_key: "geo_reallocation:de",
@@ -72,7 +72,7 @@ console.log("2. Tasks collapse on action unit");
         description: "Verplaats budget van DE naar sterkere markten.",
       },
       {
-        owner: "Ranking Masters",
+        owner: "Bureau",
         action_type: "budget",
         action_intent_class: "geo_reallocation",
         action_unit_key: "geo_reallocation:de",

@@ -12,7 +12,7 @@ import { migrateLocalStorageToSupabase } from "@/lib/migrate-to-supabase";
 import { loadClientGroups, type GroupWithMembers } from "@/lib/client-groups";
 import { bouwHierarchie, beschikbareAssen, type GroepAs, type Tak } from "@/lib/groepen/hierarchie";
 import { supabase } from "@/lib/supabase";
-import { visibleGeoClones, type GeoCloneVariant } from "@/lib/rai/geo-clone-catalog";
+import { visibleGeoClones, type GeoCloneVariant } from "@/lib/fair/geo-clone-catalog";
 import { BRAND_NAME } from "@/lib/branding/brand";
 import { SidebarLogo } from "@/components/layout/sidebar-logo";
 import { useSidebarMobile } from "@/components/layout/sidebar-mobile-context";

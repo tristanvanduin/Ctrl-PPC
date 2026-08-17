@@ -2,8 +2,8 @@
 
 import { CalendarClock } from "lucide-react";
 import { useBrandTheme } from "./brand-theme-provider";
-import { RAI_GEO_CLONES } from "@/lib/rai/geo-clone-catalog";
-import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
+import { FAIR_GEO_CLONES } from "@/lib/fair/geo-clone-catalog";
+import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { inkOn } from "@/lib/branding/chart-colors";
 import { today } from "@/lib/reporting-date";
 
@@ -15,7 +15,7 @@ import { today } from "@/lib/reporting-date";
 //
 // Nu een echte hero in de kleuren van het merk (of van de beurs, want de geo-clone kan een eigen
 // branding-override hebben): logo, naam, de beurs waarin je zit, en de aftelling. De kleuren
-// komen uit de CSS-variabelen die BrandThemeProvider zet — niet uit een vaste RM-kleur, want dit
+// komen uit de CSS-variabelen die BrandThemeProvider zet — niet uit een vaste standaardkleur, want dit
 // dashboard is bedoeld om white-label te draaien.
 
 function initials(name: string): string {
@@ -37,14 +37,14 @@ export function BrandHeaderBar({
 }) {
   const { theme, brandName } = useBrandTheme();
   const name = brandName || fallbackName || "Dashboard";
-  const variant = geoClone ? RAI_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null : null;
+  const variant = geoClone ? FAIR_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null : null;
   const beursLabel = variant ? `${variant.brand} ${variant.location}` : geoClone;
 
   const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, today()) : null;
 
   // Het verloop loopt van de primaire naar de accentkleur, en die kunnen elk om een andere
   // inktkleur vragen. Vragen ze om dezelfde, dan is de keuze eenvoudig. Verschillen ze — en dat
-  // is bij beide echte paletten het geval, want zowel RM (#08288C → #F16B37) als de GreenTech-
+  // is bij beide echte paletten het geval, want zowel het standaardpalet (#08288C → #F16B37) als de GreenTech-
   // demo (#0B7A3B → #8BC34A) zet een donkere primaire tegen een licht accent — dan is er geen
   // inkt die op beide uiteinden werkt, en gaat er een sluier over het verloop.
   //

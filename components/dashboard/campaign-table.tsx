@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { Search, Globe } from "lucide-react";
 import { useClientDataState } from "@/lib/client-data-provider";
-import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
+import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import type { AccountStructureData } from "@/lib/use-client-data";
 import { detectCountryFromName, countryLabel } from "@/lib/countries";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";

@@ -43,7 +43,7 @@ export const LOOP_STAGES: LoopStage[] = [
     pitch: "Every account, every channel, read automatically.",
     detail:
       "Google Ads, Meta, and LinkedIn sync into a single structure, alongside GA4 where it is connected. Expert layers scan what comes in for the things a standard report does not separate out: impression share lost to budget versus rank, CPA drift by segment, pacing against forecast.",
-    gegrond: "lib/api/google-ads.ts, lib/sync/orchestrator.ts, lib/analysis/expert-layers.ts, lib/rai/",
+    gegrond: "lib/api/google-ads.ts, lib/sync/orchestrator.ts, lib/analysis/expert-layers.ts, lib/fair/",
   },
   {
     id: "hypothesis",

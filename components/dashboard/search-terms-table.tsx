@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { AlertTriangle, Sparkles } from "lucide-react";
 import { useClientDataState } from "@/lib/client-data-provider";
-import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
+import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { detectSearchTermCountries } from "@/lib/countries";
 import { SearchTermAnalysisTab } from "./search-term-analysis-tab";
 import {

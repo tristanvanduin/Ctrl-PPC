@@ -36,12 +36,12 @@ export type Frequency = z.infer<typeof FrequencyEnum>;
  * Wie pakt de taak op: het eigen team of de klant.
  *
  * Deze waarde wordt OPGESLAGEN (sprint_planning.owner, sop_tasks.owner) en is dus geen loutere
- * weergavetekst. Bij de naamswijziging naar RAI Amsterdam accepteert het schema daarom ook nog de
- * oude waarde: rijen van vóór de wijziging dragen "Ranking Masters", en die mogen niet ineens
- * ongeldig worden of als klant-taken gaan tellen. De transform normaliseert alles naar de huidige
- * schrijfwijze, zodat de rest van de code maar één waarde kent.
- *
- * Zodra scripts/rename-owner-to-rai.sql is gedraaid kan de oude waarde hier weg.
+ * weergavetekst. LEGACY_OWNER_TEAM (lib/branding/brand.ts) hield hier ooit elke oude productnaam
+ * aan zodat rijen van vóór een naamswijziging niet ongeldig werden of als klant-taken gingen
+ * tellen; die lijst is inmiddels leeg (geen naam van een externe partij hoort in de broncode te
+ * staan) en wordt na scripts/migrations/097_owner_role_normalize.sql niet meer nodig zijn. De
+ * transform normaliseert alles naar de huidige schrijfwijze, zodat de rest van de code maar één
+ * waarde kent.
  */
 export type Owner = typeof OWNER_TEAM | typeof OWNER_CLIENT;
 

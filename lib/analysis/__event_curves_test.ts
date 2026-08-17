@@ -1,5 +1,5 @@
 import { buildEditionCurves, deriveCpaCurve } from "./event-curves";
-import type { Edition, DailyPoint } from "@/lib/rai/event-time-axis";
+import type { Edition, DailyPoint } from "@/lib/fair/event-time-axis";
 
 let failed = 0;
 function assert(cond: boolean, msg: string) {

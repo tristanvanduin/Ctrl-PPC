@@ -6,8 +6,8 @@
 // WAAROM DIT GEEN RANGORDE MEER IS
 //
 // De oorspronkelijke opzet was een ladder: viewer < specialist < admin, met een
-// >=-vergelijking. Een ladder kan alleen "alles van de trede eronder" uitdrukken. De RAI-
-// situatie past daar niet in:
+// >=-vergelijking. Een ladder kan alleen "alles van de trede eronder" uitdrukken. Een
+// multi-rol-organisatie past daar niet in:
 //
 //   - IT moet bij koppelingen en syncs, maar hoeft geen omzet per beurs te zien. Op een
 //     ladder is de enige trede die koppelingen geeft admin, en die geeft ook alles.

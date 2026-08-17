@@ -6,13 +6,13 @@ import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, type ForecastMetric } from "@/lib/forecast";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
-import { toFairWeeks, currentWeekIndex, type FairWeek, type UpcomingEdition } from "@/lib/rai/fair-weeks";
+import { toFairWeeks, currentWeekIndex, type FairWeek, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
 
 // De beursvariant van de prestatiekaart. Zelfde cijfers als de maandweergave, andere as: niet
 // "vorige, huidige en volgende maand" maar "nog zoveel weken tot de beurs". Voor een
 // beursorganisatie is dat de enige as die stuurt — een maandgrens betekent niets, de beursdag
-// alles. De rekenkern staat in lib/rai/fair-weeks; dit is puur de uitlezing.
+// alles. De rekenkern staat in lib/fair/fair-weeks; dit is puur de uitlezing.
 
 // Hoeveel weken de strip laat zien rond de huidige week. Zestien kolommen is ongeveer wat de
 // twaalf-maanden-strip innam; meer wordt onleesbaar smal, minder verliest de aanloop.

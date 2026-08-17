@@ -2603,3 +2603,87 @@ wélke kleur de CSS-fallback is, geen tekst die ooit rendert) en voor de testbes
 string: rendert dit ooit, direct of via een LLM die het prompt-voorbeeld overneemt, op een scherm
 dat een klant ziet? Bij twijfel de string lezen in volledige context, niet het bestand op naam
 beoordelen.
+
+### 17.10 De lat gaat nog een keer omhoog: geen enkele referentie meer, ook niet intern — IP-risico
+
+Meteen na 17.9, met klem: *"ook intern, er mag nergens een link naar ranking masters (rm) of de
+rai zijn! mocht het ooit tot een ip issue komen mag er nergens in mijn code een referentie naar
+deze partijen zijn."* Dat is een principieel andere maatstaf dan 17.6 en 17.9 — niet meer "toont
+dit aan een klant", maar "staat dit ergens in de broncode, zichtbaar of niet". Alles wat 17.9 nog
+bewust liet staan (variabelenamen, kleurcommentaar, de LEGACY_OWNER_TEAM-lijst) valt hier alsnog
+onder. Vier categorieën, in aflopende ernst:
+
+**1. Een publiek, live bereikbaar logobestand — het grootste lek van de hele sessie.**
+`public/images/ranking-masters-logo.png` bleek een echt, 159KB PNG-bestand: het volledige
+"Ranking Masters"-woordmerk met mascotte én de oude tagline ("Dé #1 SEM specialist in de
+Benelux"), rechtstreeks downloadbaar vanaf de live productie-URL, zonder login, voor iedereen. Dit
+stond niet in enige code-referentie (`BRAND_LOGO_FILE` wees er nooit naartoe) en was dus door geen
+enkele eerdere grep-op-code te vinden — alleen door het `BEKENDE_GATEN`-spoor in
+`lib/branding/__brand_test.ts` te volgen ("het logobestand ontbreekt") tot het daadwerkelijke
+bestand op schijf. Verwijderd. Er is nu geen enkel logobestand meer op die plek — een bekend,
+genoteerd gat (zie de test) totdat er een echt Ctrl PPC-logo aangeleverd wordt.
+
+**2. De module-naamgeving: `lib/rai/` → `lib/fair/`.** Een hele submap (28 bestanden, ~130
+importplekken) heette naar de reële, bestaande RAI Amsterdam-beursorganisatie waarvoor dit product
+oorspronkelijk is gebouwd — inclusief `RAI_GEO_CLONES`, `RaiEdition`, `RaiDataPoint`,
+`RaiEventCfg`, en tientallen commentaren die "RAI" met naam noemden als de echte partij achter het
+ontwerp (bijv. "is de afkorting bevestigd tegen RAI's conventie?"). Hernoemd naar het al
+aanwezige, generieke domeinwoord "beurs"/"fair" (dat woord stond al overal in dezelfde bestanden:
+`FairCadence`, `FairWeek`, `fairWeekLabel`). Twee losstaande, echte bugs gevonden tijdens het
+hernoemen: een `import()` met een relatief pad in `scripts/demo/seed-demo-client.ts` gebruikte nog
+het oude pad (zou pas bij uitvoering gefaald zijn, niet bij tsc) en `scripts/check-hygiene.mjs`'s
+`TOEGESTANE_WEZEN`-allowlist verwees nog naar de oude bestandsnamen (zou de hygiënepoort ten
+onrechte hebben laten falen). Beide gefixt vóórdat de poorten opnieuw draaiden.
+
+**3. De opgeslagen eigenaarsrol: `LEGACY_OWNER_TEAM` geleegd, met een echte, live database-
+afhankelijkheid.** Deze constante in `lib/branding/brand.ts` hield elke historische productnaam
+aan zodat 38 bestaande `sprint_items`-rijen (geteld 3 augustus 2026) bij het lezen als teamtaak
+bleven tellen. De lijst is nu leeg — geen naam van een externe partij staat nog in de broncode —
+maar dat heeft een reëel, bewust geaccepteerd gevolg: zolang de database zelf niet is bijgewerkt,
+normaliseren die 38 rijen bij het lezen naar OWNER_CLIENT ("Klant") in plaats van OWNER_TEAM,
+precies het scenario dat deze constante ooit moest voorkomen. `scripts/migrations/
+097_owner_role_normalize.sql` (nieuw, genummerd, idempotent) zet de kolom zelf om naar de rol
+("Bureau") — **nog niet gedraaid**, vereist productietoegang die deze sessie nu niet heeft. Tot die
+migratie draait tonen taken van vóór de laatste naamswijziging tijdelijk als klanttaak in plaats
+van teamtaak in de sprintplanning. Bewuste afweging, expliciet zo gekozen omdat de eigenaar
+IP-risico zwaarder liet wegen dan deze tijdelijke weergavefout. Het oude, ongenummerde
+`scripts/rename-owner-to-rai.sql` (STATUS: UITGEVOERD 28 juli 2026, bevatte de naam in zijn
+bestandsnaam) is verwijderd; zijn geschiedenis staat nu alleen nog hier.
+`lib/branding/__brand_test.ts`'s zelftest ("geen losse vermelding meer") controleerde tot nu toe
+via `LEGACY_OWNER_TEAM` zelf — een lege lijst had die controle stilzwijgend uitgeschakeld, precies
+het soort test-die-niets-meer-test waar de hygiënepoort op let. Losgekoppeld: de test heeft nu zijn
+eigen, vaste lijst verboden namen, onafhankelijk van wat LEGACY_OWNER_TEAM bevat.
+
+**4. Tientallen kleinere referenties**, gevonden via herhaalde brede greps tot er niets meer over
+was: een letterlijk zichtbare "RAI-template" in de audit-UI (`second-opinion-view.tsx`), een
+tweede demo-klantnaam met de echte locatienaam (`lib/feed/owners-mock.ts`, naast de al in 17.9
+gefixte `lib/clients.ts`), en tientallen commentaren in `lib/auth/roles.ts`,
+`lib/branding/theme.ts`, `lib/security/sanitize-llm-payload.ts`,
+`lib/analysis/search-term-guardrails.ts`, `components/dashboard/event-settings.tsx`,
+`lib/events/account-event-analysis.ts`, `app/globals.css`, en de PDF-renderers
+(`rmLogoUrl`/`rmLogoDataUri` → `brandLogoUrl`/`brandLogoDataUri`, "RM logo" → "Brand logo") die de
+oude namen als toelichting gebruikten. Overal generiek gemaakt ("beursklant", "beursorganisatie",
+"standaardblauw", "standaard huisstijl") zonder betekenis te verliezen.
+
+**Bewust nog niet aangepakt, met reden:**
+- De `--rm-`/`text-rm-*`/`bg-rm-*`-naamgeving in `app/globals.css` en Tailwind-klassen: 112
+  bestanden gebruiken deze twee-letterige prefix als kleurtoken (bijv. `text-rm-blue-ink`). Dit is
+  een interne afkorting, geen herkenbare naam op zichzelf, en zit te diep verweven (CSS-variabelen
+  + honderden losse klassenamen) om zonder een aparte, voorzichtige sessie te hernoemen zonder het
+  risico op een visuele regressie over het hele dashboard. Gerapporteerd, niet gedaan.
+- `lib/clients.ts`'s interne sleutel `id: "ranking-masters"` (de zichtbare `name` is al in 17.9
+  gefixt naar "Beursgroep Amsterdam"): dezelfde categorie risico als punt 3 hierboven — een
+  opgeslagen sleutel waar demodata mogelijk naar verwijst. Niet aangeraakt zonder een vergelijkbare,
+  gecoördineerde migratie.
+- `scripts/migrations/024_rai_events.sql` en de kolomnaam `client_settings.rai_events` die het
+  toevoegt: een al toegepaste, genummerde migratie (bijgehouden op bestandsnaam in
+  `schema_migrations`, dus niet zomaar te hernoemen) plus een echte, live productie-kolomnaam.
+  Hernoemen vereist een gecoördineerde schema-migratie (ALTER TABLE ... RENAME COLUMN) plus een
+  gelijktijdige code-wijziging op alle ~16 plekken die de kolom aanspreken — niet iets om zonder
+  productietoegang en zonder overleg te doen. Genummerde, al toegepaste migraties (`024`, `035`)
+  zijn sowieso nooit herschreven: net als git-geschiedenis zijn het onveranderlijke records van wat
+  er al tegen productie is uitgevoerd.
+- Git-geschiedenis: elke eerdere commit in deze branch bevat de oude namen nog letterlijk. Dat is
+  met normale, niet-destructieve middelen niet op te lossen — alleen een volledige
+  geschiedenis-herschrijving (force-push, breekt elke andere kloon) zou dat doen, en dat vereist
+  aparte, expliciete toestemming.

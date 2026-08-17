@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
-import type { UpcomingEdition } from "@/lib/rai/fair-weeks";
+import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { Sectie } from "@/components/ui/sectie";
 import { HealthBadge } from "./health-badge";
 import { SearchScorecard } from "./search-scorecard";

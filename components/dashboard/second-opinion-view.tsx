@@ -249,7 +249,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
             <h3 className="text-lead font-semibold text-gray-900">Nog geen audit voor deze klant</h3>
           </div>
           <p className="text-body text-muted-foreground leading-relaxed max-w-3xl">
-            Een audit loopt de controlepunten van het RAI-template langs en geeft er per punt een
+            Een audit loopt de controlepunten van het audit-template langs en geeft er per punt een
             oordeel bij — <strong className="text-rm-gray">Goed</strong>,{" "}
             <strong className="text-rm-gray">Voldoende</strong> of{" "}
             <strong className="text-rm-gray">Onvoldoende</strong> — met de reden erbij en de impact

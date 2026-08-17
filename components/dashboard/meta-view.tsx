@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Megaphone, Calendar, Globe, LayoutGrid, Sparkles } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
-import type { UpcomingEdition } from "@/lib/rai/fair-weeks";
+import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
 import { GeoBreakdown } from "./geo-breakdown";

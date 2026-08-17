@@ -26,12 +26,12 @@ import * as path from "path";
 import type { FinalSopSynthesis, OperatingDetailLayer } from "@/lib/analysis/monthly-structured";
 import { fixMojibake } from "@/lib/analysis/sanitize";
 
-// Load RM logo as base64 (cached at module level)
-let rmLogoDataUri: string | undefined;
+// Load brand logo as base64 (cached at module level)
+let brandLogoDataUri: string | undefined;
 try {
   const logoPath = path.join(process.cwd(), "public", "images", BRAND_LOGO_FILE);
   if (fs.existsSync(logoPath)) {
-    rmLogoDataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
+    brandLogoDataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
   }
 } catch { /* no logo */ }
 
@@ -510,8 +510,8 @@ function Header({
       React.createElement(
         View,
         { style: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8 } },
-        rmLogoDataUri
-          ? React.createElement(Image, { src: rmLogoDataUri, style: { height: 30, width: 30, objectFit: "contain" as const } })
+        brandLogoDataUri
+          ? React.createElement(Image, { src: brandLogoDataUri, style: { height: 30, width: 30, objectFit: "contain" as const } })
           : null,
         React.createElement(
           View,
@@ -545,8 +545,8 @@ function Footer({
         style: s.footerText,
         render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => `Pagina ${pageNumber} / ${totalPages}  `,
       }),
-      rmLogoDataUri
-        ? React.createElement(Image, { src: rmLogoDataUri, style: { height: 14, width: 14, objectFit: "contain" as const } })
+      brandLogoDataUri
+        ? React.createElement(Image, { src: brandLogoDataUri, style: { height: 14, width: 14, objectFit: "contain" as const } })
         : null,
     ),
   );

@@ -19,9 +19,9 @@ assert(contrastForeground("#000000") === "#ffffff", "op zwart hoort witte tekst"
 assert(contrastForeground("#FFFFFF") === DEFAULT_THEME.foreground, "op wit hoort donkere tekst");
 assert(contrastForeground("nietvalide") === "#ffffff", "een ongeldige kleur valt veilig terug op wit");
 
-// ── Terugval op RM bij geen identiteit ──
+// ── Terugval op het standaardthema bij geen identiteit ──
 const geen = resolveEventTheme(null);
-assert(geen.primary === "#4f46e5" && geen.accent === "#f5960b", "geen identiteit geeft het volledige RM-thema");
+assert(geen.primary === "#4f46e5" && geen.accent === "#f5960b", "geen identiteit geeft het volledige standaardthema");
 assert(geen.logoUrl === null, "geen identiteit geeft geen logo");
 
 // ── Geldige merk-kleuren overnemen, met berekende voorgrond ──

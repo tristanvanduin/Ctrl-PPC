@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { MapPin } from "lucide-react";
 import { useClientDataState } from "@/lib/client-data-provider";
-import { visibleGeoClones } from "@/lib/rai/geo-clone-catalog";
+import { visibleGeoClones } from "@/lib/fair/geo-clone-catalog";
 
 // Fase 1 van de geo-clone-projecten: detecteert de geo-clones van dit account uit de
 // campagnenamen (via de catalogus, hide-if-absent) en biedt een kiezer om de weergave te

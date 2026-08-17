@@ -54,7 +54,7 @@ export const BRAND_TAGLINE = "";
 // Ten tweede, en dat is de acute: deze waarde wordt OPGESLAGEN in sprint_items.owner. (Niet in
 // sprint_planning en niet in sop_tasks — dat stond hier eerder en klopte allebei niet; nagekeken
 // tegen het live schema, sop_tasks heeft helemaal geen owner-kolom.) Was de merknaam blijven
-// meeliften, dan had het hernoemen naar Ctrl PPC elke bestaande rij met "RAI Amsterdam"
+// meeliften, dan had het hernoemen naar Ctrl PPC elke bestaande rij met een eerdere productnaam
 // stilzwijgend als KLANT-taak laten tellen — want die naam zou dan niet meer overeenkomen met de
 // teamwaarde. Een naamswijziging in de zijbalk had zo de verdeling van het werk in de
 // sprintplanning omgegooid.
@@ -62,18 +62,20 @@ export const BRAND_TAGLINE = "";
 // Wat er wordt opgeslagen is daarom geen naam meer maar een ROL. De naam is weergave en komt van
 // de tenant; de rol is data en verandert nooit mee met een rebranding.
 //
-// Alle historische schrijfwijzen blijven gelezen worden. Daardoor is er géén databasemigratie
-// nodig: bestaande rijen worden bij het lezen genormaliseerd, en pas wat daarna wordt weggeschreven
-// draagt de rol. Die lijst hoort te krimpen, niet te groeien — hij is een geheugen van elke naam
-// die dit product ooit heeft gedragen.
+// TOT 17 augustus 2026 accepteerde het schema hier ook nog elke historische schrijfwijze
+// (LEGACY_OWNER_TEAM), zodat bestaande rijen zonder migratie bleven werken. Die lijst bevatte
+// letterlijke namen van eerdere, externe partijen — precies het soort referentie dat nooit in de
+// broncode hoort te staan, migratie of niet. Verwijderd; scripts/migrations/097_owner_role_
+// normalize.sql zet de kolom zelf om naar de rol. Zolang die migratie niet gedraaid is, vallen
+// rijen met een oude schrijfwijze terug op OWNER_CLIENT ("Klant") in plaats van OWNER_TEAM — een
+// bewuste, tijdelijke afweging: geen naam in de broncode weegt zwaarder dan de klassificatie van
+// een handvol historische taken.
 //
-// Wat er werkelijk in die kolom staat, geteld op 3 augustus 2026: 38 rijen "RAI Amsterdam", 7 rijen
-// "Minismus" (een klant van het bureau — die valt terecht door naar de klant-rol), en 4 rijen met
-// een hele hypothesetekst erin, uit een import die het verkeerde veld raakte. Dat laatste is
-// rommel, maar hij normaliseert netjes naar "Klant" en is daardoor onzichtbaar geworden.
-//
-// De kolomstandaard stond nog op "Ranking Masters" — twee namen achter. Die is inmiddels op de
-// rol gezet.
+// Wat er werkelijk in die kolom stond, geteld op 3 augustus 2026: 38 rijen met een oude
+// productnaam, 7 rijen "Minismus" (een klant van het bureau — die valt terecht door naar de
+// klant-rol), en 4 rijen met een hele hypothesetekst erin, uit een import die het verkeerde veld
+// raakte. Dat laatste is rommel, maar hij normaliseert netjes naar "Klant" en is daardoor
+// onzichtbaar geworden.
 
 /**
  * De opgeslagen waarde voor "onze kant doet dit". Een SLEUTEL, geen schermtekst.
@@ -100,11 +102,18 @@ export const KANT_LABEL_INTERN = "Intern";
 /** De weergave van de andere kant. */
 export const KANT_LABEL_EXTERN = "Extern";
 
-/** Elke schrijfwijze die ooit als teamwaarde is weggeschreven. Bij het lezen allemaal geldig. */
-export const LEGACY_OWNER_TEAM = ["RAI Amsterdam", "RAI", "Ranking Masters", "RM"] as const;
+/**
+ * Was tot 17 augustus 2026 een lijst van elke historische productnaam die ooit als teamwaarde is
+ * weggeschreven. Verwijderd: geen naam van een externe partij hoort in de broncode te staan. Zie
+ * scripts/migrations/097_owner_role_normalize.sql voor de migratie die de database zelf
+ * normaliseert, en de toelichting hierboven voor de tijdelijke afweging zolang die nog niet
+ * gedraaid is.
+ */
+export const LEGACY_OWNER_TEAM = [] as const;
 
 /**
- * Hoort deze taak bij het bureau? Herkent de rol én elke naam die ooit is opgeslagen.
+ * Hoort deze taak bij het bureau? Herkent de rol, en (tot de migratie hierboven gedraaid is)
+ * eventuele nog niet genormaliseerde historische rijen via LEGACY_OWNER_TEAM.
  *
  * De productnaam staat hier bewust NIET tussen. Ctrl PPC is het gereedschap, niet een partij die
  * werk uitvoert — het kan dus nooit de eigenaar van een taak zijn. Eerder stonden BRAND_NAME en

@@ -172,8 +172,8 @@ const TOEGESTANE_WEZEN = new Map([
   // resterende capaciteitsbeperking die de oude reden noemde (classifyFunnelRole leest het
   // objective niet, dus Meta/LinkedIn komen als onbekend zonder doelgroepdata) is geen
   // wezen-vraag meer, maar een eerlijk gedocumenteerde grens in de consumerende code zelf.
-  ["lib/rai/edition-evaluation.ts", "editie-evaluatie op de event-relatieve tijdas; wacht op een plek in de beurs-UI"],
-  ["lib/rai/event-status.ts", "stoplicht en budgetpacing per stream; zelfde plek als edition-evaluation"],
+  ["lib/fair/edition-evaluation.ts", "editie-evaluatie op de event-relatieve tijdas; wacht op een plek in de beurs-UI"],
+  ["lib/fair/event-status.ts", "stoplicht en budgetpacing per stream; zelfde plek als edition-evaluation"],
   ["lib/scheduler/pump-plan.ts", "hervatbare maandrun; wacht op runNextSteps, de IO-orkestratie"],
   ["lib/scheduler/core.ts", "hoort bij pump-plan"],
   ["lib/meta/vision/attribute-source.ts", "bewaakt dat kleurclaims uit de pixel-laag komen; wacht op de vision-pijplijn"],

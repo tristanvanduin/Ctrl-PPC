@@ -5,11 +5,11 @@ import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalR
 import { Calendar, TrendingUp, Gauge, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbSelectOne } from "@/lib/data-access/client-read";
-import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
+import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { today as vandaag } from "@/lib/reporting-date";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
-import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
+import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { useVorige } from "@/lib/use-vorige";
 import { Kerncijfer } from "@/components/ui/kerncijfer";

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
-import { matchGeoCloneByCampaignName } from "@/lib/rai/geo-clone-catalog";
+import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Sectie } from "@/components/ui/sectie";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";

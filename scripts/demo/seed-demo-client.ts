@@ -510,7 +510,7 @@ async function check() {
   const { buildMetaCreativeSignals } = await import("../../lib/signals/meta-creative");
   const { buildLinkedInSignals } = await import("../../lib/signals/linkedin-signals");
   const { buildCrossChannelSignals } = await import("../../lib/signals/cross-channel");
-  const { analyzeGeoClone } = await import("../../lib/rai/geo-clone-analysis");
+  const { analyzeGeoClone } = await import("../../lib/fair/geo-clone-analysis");
 
   const tables = buildAllRows();
   let failed = 0;

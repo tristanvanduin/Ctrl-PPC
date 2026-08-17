@@ -8,12 +8,12 @@ import { EventTminusChart, type TminusPoint } from "./event-tminus-chart";
 
 // Fase 6: de T-minus Forecaster. Consumeert uitsluitend GET /api/analysis/event-pacing (Fase 4,
 // uitgebreid met curves/perChannelForecast/blendedForecast in dezelfde route) en visualiseert wat
-// die route al berekent. Geen rekenlogica hier: alles onder "wiskunde" komt uit lib/rai en
+// die route al berekent. Geen rekenlogica hier: alles onder "wiskunde" komt uit lib/fair en
 // lib/events, ongewijzigd.
 
 type Cadence = "annual" | "biennial" | "custom";
-interface RaiEdition { date: string; label: string }
-interface RaiEventCfg { id: string; name: string; abbrev?: string; cadence?: Cadence; editions?: RaiEdition[] }
+interface FairEdition { date: string; label: string }
+interface FairEventCfg { id: string; name: string; abbrev?: string; cadence?: Cadence; editions?: FairEdition[] }
 
 type ChannelKey = "blended" | "google_ads" | "meta_ads" | "linkedin_ads";
 const CHANNEL_LABEL: Record<ChannelKey, string> = {
@@ -98,7 +98,7 @@ function cpaToTminusPoints(curve: CpaCurvePoint[] | undefined): TminusPoint[] {
 }
 
 export function EventForecaster({ clientId }: { clientId: string }) {
-  const [events, setEvents] = useState<RaiEventCfg[] | null>(null);
+  const [events, setEvents] = useState<FairEventCfg[] | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<ChannelKey>("blended");
   const [data, setData] = useState<PacingResponse | null>(null);
@@ -108,7 +108,7 @@ export function EventForecaster({ clientId }: { clientId: string }) {
     let cancelled = false;
     dbSelectOne<{ rai_events: unknown }>("client_settings", { select: "rai_events", clientId }).then(({ data: row }) => {
       if (cancelled) return;
-      const raw = (row?.rai_events as { events?: RaiEventCfg[] } | null)?.events ?? [];
+      const raw = (row?.rai_events as { events?: FairEventCfg[] } | null)?.events ?? [];
       const metEdities = raw.filter((e) => (e.editions ?? []).some((ed) => ed.date));
       setEvents(metEdities);
       if (metEdities.length > 0) setSelectedEventId((prev) => prev ?? metEdities[0].id);

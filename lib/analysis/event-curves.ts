@@ -1,15 +1,15 @@
 // Fase 6: T-minus trendlijnen voor de Forecaster-UI. Bouwt bewust op de bestaande, ongewijzigde
-// lib/rai-kern (cumulativeCurve, isWithinWindow) in plaats van er iets aan toe te voegen: die map
-// is heilig voor deze fase, dus alles wat nieuw is staat hier, in lib/analysis, en raakt lib/rai
+// lib/fair-kern (cumulativeCurve, isWithinWindow) in plaats van er iets aan toe te voegen: die map
+// is heilig voor deze fase, dus alles wat nieuw is staat hier, in lib/analysis, en raakt lib/fair
 // en lib/events alleen als lezer (import), nooit als schrijver.
 //
 // Waarom een aparte curve-berekening naast lib/events/account-event-analysis.ts: die module
 // rekent de pacing-samenvatting uit (een enkel punt op de as: "waar staan we nu"), niet de hele
-// lijn die een grafiek nodig heeft. cumulativeCurve() bestaat al in lib/rai/event-time-axis.ts en
+// lijn die een grafiek nodig heeft. cumulativeCurve() bestaat al in lib/fair/event-time-axis.ts en
 // wordt hier gewoon nogmaals aangeroepen, met dezelfde editie-objecten - geen nieuwe wiskunde,
 // alleen een andere vorm van dezelfde, al geteste optelling.
 
-import { cumulativeCurve, type Edition, type DailyPoint, type CurvePoint } from "@/lib/rai/event-time-axis";
+import { cumulativeCurve, type Edition, type DailyPoint, type CurvePoint } from "@/lib/fair/event-time-axis";
 
 export interface EditionCurves {
   current: CurvePoint[];

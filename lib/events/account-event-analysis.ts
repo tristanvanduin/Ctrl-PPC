@@ -1,27 +1,27 @@
 // Fase 4: de T-minus-X event-module, generiek over "elk event" (Black Friday, een sale-
-// periode, een beursditie) in plaats van alleen RAI-beurzen. Kalender-MoM/YoY vergelijkt
+// periode, een beursditie) in plaats van alleen beursklanten. Kalender-MoM/YoY vergelijkt
 // ongelijke momenten -- 8 dagen voor Black Friday dit jaar met 8 dagen voor Black Friday
 // vorig jaar is de eerlijke vergelijking, niet "november dit jaar vs november vorig jaar".
 //
 // GEEN nieuwe rekenkern. De T-minus-wiskunde (dagen-tot-event, editie-over-editie op gelijke
-// afstand, sjabloon-projectie, kanaal-blending) bestaat al in lib/rai/ en is daar al
+// afstand, sjabloon-projectie, kanaal-blending) bestaat al in lib/fair/ en is daar al
 // event-agnostisch: Edition/DailyPoint/alignEditionsAtEqualDaysOut/forecastStream nemen
-// nergens een RAI- of beursaanname. Alleen lib/rai/event-comparison.ts's RaiEdition voegt een
+// nergens een beursaanname. Alleen lib/fair/event-comparison.ts's FairEdition voegt een
 // geo-clone-dimensie toe (aftakkingen van dezelfde beurs in één account). Een generiek event
 // heeft geen aftakkingen -- dus geven we editionId/geoClone dezelfde waarde (de event-id) mee
 // aan de bestaande buildEditions/previousEditionFor/priorEditionsFor: die filteren dan
 // vanzelf op "hetzelfde event", zonder dat er iets nieuws bij hoeft. Wat WEL nieuw is: de
-// databron. Een geo-clone matcht per CAMPAGNE op een naam-afkorting (lib/rai/geo-clone-
+// databron. Een geo-clone matcht per CAMPAGNE op een naam-afkorting (lib/fair/geo-clone-
 // aggregate.ts); een generiek event geldt voor het HELE account, dus is er niets te matchen
 // en zijn de al bestaande, vooraf geaggregeerde account-tabellen de rechtstreekse bron (zie
 // account-event-points.ts). Puur en los getest; de route levert alleen rijen en instellingen.
 
-import { buildEditions, pickCurrentEdition } from "@/lib/rai/geo-clone-analysis";
-import { previousEditionFor, priorEditionsFor, type FairCadence } from "@/lib/rai/event-comparison";
-import { alignEditionsAtEqualDaysOut, isWithinWindow, type DailyPoint, type Edition, type EditionComparison } from "@/lib/rai/event-time-axis";
-import { forecastAllChannels, type ChannelForecastInput, type ChannelForecastResult, type BlendedForecast } from "@/lib/rai/multi-channel-forecast";
-import type { ForecastConfidence } from "@/lib/rai/event-forecast";
-import type { Edition as SettingsEdition } from "@/lib/rai/geo-clone-settings";
+import { buildEditions, pickCurrentEdition } from "@/lib/fair/geo-clone-analysis";
+import { previousEditionFor, priorEditionsFor, type FairCadence } from "@/lib/fair/event-comparison";
+import { alignEditionsAtEqualDaysOut, isWithinWindow, type DailyPoint, type Edition, type EditionComparison } from "@/lib/fair/event-time-axis";
+import { forecastAllChannels, type ChannelForecastInput, type ChannelForecastResult, type BlendedForecast } from "@/lib/fair/multi-channel-forecast";
+import type { ForecastConfidence } from "@/lib/fair/event-forecast";
+import type { Edition as SettingsEdition } from "@/lib/fair/geo-clone-settings";
 
 export interface AccountEventChannelInput {
   channel: string; // "google_ads" | "meta_ads" | "linkedin_ads"
@@ -51,7 +51,7 @@ export interface AccountEventAnalysisResult {
   conversions: EditionComparison | null;
   cost: EditionComparison | null;
   perChannelForecast: ChannelForecastResult[];
-  /** Het per-kanaal-blend zoals lib/rai/multi-channel-forecast dat berekent (zwakste-schakel-
+  /** Het per-kanaal-blend zoals lib/fair/multi-channel-forecast dat berekent (zwakste-schakel-
    *  zekerheid). target/projectedVsTargetPct staan hier NIET op: dat zijn per-kanaal-doelen die
    *  dit account-event niet heeft. Het account-brede doel zit in de velden hieronder. */
   blendedForecast: BlendedForecast | null;

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Loader2, Save, CheckCircle2, Palette, Target, CalendarClock, Plus, Trash2, CornerDownRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getClientSettings } from "@/lib/client-settings";
-import { RAI_GEO_CLONES } from "@/lib/rai/geo-clone-catalog";
+import { FAIR_GEO_CLONES } from "@/lib/fair/geo-clone-catalog";
 import { dbUpsert } from "@/lib/data-access/client-write";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import {
@@ -15,11 +15,11 @@ import {
   type GeoCloneGoals,
   type Edition,
   type Cadence,
-} from "@/lib/rai/geo-clone-settings";
+} from "@/lib/fair/geo-clone-settings";
 
 // Fase 2: per geo-clone een eigen instellingen-laag (branding, doelen, event-datums) met
 // account-fallback. Laat je een veld leeg, dan erft het van het account (client_settings). De
-// resolver (lib/rai/geo-clone-settings) bepaalt de effectieve waarde en de inherited-vlaggen;
+// resolver (lib/fair/geo-clone-settings) bepaalt de effectieve waarde en de inherited-vlaggen;
 // dit paneel toont per veld de account-terugval als placeholder/hint en slaat alleen de echte
 // afwijkingen op in geo_clone_settings (migratie 025).
 
@@ -34,7 +34,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const variant = useMemo(() => RAI_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null, [geoClone]);
+  const variant = useMemo(() => FAIR_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null, [geoClone]);
   const label = variant ? `${variant.brand} ${variant.location}` : geoClone;
 
   useEffect(() => {

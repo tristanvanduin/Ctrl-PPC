@@ -18,7 +18,7 @@ function volledig(): BrandGuide {
     toneOfVoice: { dos: ["helder en zakelijk"], donts: ["geen jargon"] },
     keyMessages: ["de toekomst van tuinbouwtechnologie"],
     forbiddenWords: ["goedkoop", "revolutionair"],
-    mandatoryElements: ["RAI-logo in de footer"],
+    mandatoryElements: ["Beurslogo in de footer"],
     audienceLanguage: "zakelijk Nederlands en Engels",
     examples: { good: ["Ontdek de nieuwste tuinbouwinnovaties"], bad: ["Goedkope deals nu!"] },
     confirmedByClient: true,
@@ -81,7 +81,7 @@ import { brandContextForBriefing } from "./brand-guide";
   a2(ctx.brandName === "GreenTech" && ctx.proposition.includes("tuinbouwtechnologie"), "adapter levert naam en propositie");
   a2(ctx.brandColors.length === 2 && ctx.brandColors[0] === "#1E7A3D", "adapter levert alleen de geldige merkkleuren (primair en accent)");
   a2(ctx.forbiddenWords.includes("goedkoop") && ctx.toneOfVoice.dos.length === 1, "adapter geeft de creatieve grenzen mee zodat een concept binnen het merk blijft");
-  a2(ctx.mandatoryElements.includes("RAI-logo in de footer"), "adapter geeft de verplichte elementen mee");
+  a2(ctx.mandatoryElements.includes("Beurslogo in de footer"), "adapter geeft de verplichte elementen mee");
 
   // Ongeldige kleur komt niet mee als brandkleur
   const metSlechteKleur = brandContextForBriefing({ ...volledig(), visual: { ...volledig().visual, secondaryColor: "geen-hex" } });

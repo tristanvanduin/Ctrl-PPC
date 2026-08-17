@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Loader2, MapPin, Info, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { aggregateCampaignMonthlyByGeoClone, type CampaignMonthlyRow } from "@/lib/rai/geo-clone-aggregate";
-import { RAI_GEO_CLONES } from "@/lib/rai/geo-clone-catalog";
+import { aggregateCampaignMonthlyByGeoClone, type CampaignMonthlyRow } from "@/lib/fair/geo-clone-aggregate";
+import { FAIR_GEO_CLONES } from "@/lib/fair/geo-clone-catalog";
 import { SignalAnalysisCard } from "./signal-analysis-card";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { maandLabel } from "./chart-chrome";
@@ -45,7 +45,7 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
   const [rows, setRows] = useState<CampaignMonthlyRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const variant = useMemo(() => RAI_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null, [geoClone]);
+  const variant = useMemo(() => FAIR_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null, [geoClone]);
   const label = variant ? `${variant.brand} ${variant.location}` : geoClone;
 
   useEffect(() => {

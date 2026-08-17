@@ -3,7 +3,7 @@
  *
  * v7→v8 changes:
  * - Line charts: SVG with thicker stroke (3pt), all attributes as strings for react-pdf compat
- * - RM logo in footer: 36px (was 24px) — clearly visible, premium
+ * - Brand logo in footer: 36px (was 24px) — clearly visible, premium
  * - Summary: KPIs 36pt, stronger visual panels
  * - Metric pages: more breathing room, chart padding refined
  * - X-axis labels: "Feb '25" format (set by API, rendered as-is)
@@ -46,7 +46,7 @@ export interface ReportPdfProps {
   actionSection: { heading: string; body: string }; planningSection: { heading: string; body: string };
   summaryHeadline?: string; summarySubtitle?: string;
   countrySections?: CountrySection[];
-  rmLogoUrl?: string; clientLogoUrl?: string; coverImageUrl?: string; closingImageUrl?: string;
+  brandLogoUrl?: string; clientLogoUrl?: string; coverImageUrl?: string; closingImageUrl?: string;
 }
 
 // ── Helpers ──
@@ -73,15 +73,15 @@ function parseActions(text: string): Array<{ title: string; body: string }> {
 }
 
 // ══════════════════════════════════════════════════════════════
-// FOOTER — RM logo 36px, clean alignment
+// FOOTER — brand logo 36px, clean alignment
 // ══════════════════════════════════════════════════════════════
 
-function Foot({ left, rmLogoUrl }: { left: string; rmLogoUrl?: string }) {
+function Foot({ left, brandLogoUrl }: { left: string; brandLogoUrl?: string }) {
   return E(View, { style: { position: "absolute", bottom: 16, left: sp.pad, right: sp.pad, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, fixed: true },
     E(Text, { style: { fontSize: 7, color: c.g400 } }, left),
     E(View, { style: { flexDirection: "row", alignItems: "center", gap: 10 } },
       E(Text, { style: { fontSize: 7, color: c.g400 }, render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => `${pageNumber} / ${totalPages}` }),
-      rmLogoUrl ? E(Image, { src: rmLogoUrl, style: { height: 70, width: 70, objectFit: "contain" as const } }) : null,
+      brandLogoUrl ? E(Image, { src: brandLogoUrl, style: { height: 70, width: 70, objectFit: "contain" as const } }) : null,
     ),
   );
 }
@@ -214,7 +214,7 @@ function Chart({ data, type, label, h }: { data: MP[]; type: "bar" | "line"; lab
 //  │                           │  │  Maart 2026             │
 //  │                           │  │                         │
 //  │                           │  │           ┌──────────┐  │
-//  │                           │  │           │ RM LOGO  │  │
+//  │                           │  │           │ BRAND LOGO│ │
 //  │                           │  │           │  50×50   │  │
 //  └───────────────────────────┴──┴───────────┴──────────┘  │
 //
@@ -230,11 +230,11 @@ try {
 
 function CoverPage(p: {
   clientName: string; reportMonth: string; reportYear: number;
-  generatedAt: string; rmLogoUrl?: string; clientLogoUrl?: string;
+  generatedAt: string; brandLogoUrl?: string; clientLogoUrl?: string;
   coverImageUrl?: string;
 }) {
   const hasClientLogo = !!p.clientLogoUrl;
-  const hasRmLogo = !!p.rmLogoUrl;
+  const hasBrandLogo = !!p.brandLogoUrl;
   const photoSrc = p.coverImageUrl || defaultCoverPhotoUri;
   const hasPhoto = !!photoSrc;
 
@@ -265,10 +265,10 @@ function CoverPage(p: {
         E(Text, { style: { fontSize: 16, color: c.g500, marginTop: sp.sm } }, `${p.reportMonth} ${p.reportYear}`),
       ),
 
-      // ── BOTTOM-RIGHT: RM logo ──
+      // ── BOTTOM-RIGHT: brand logo ──
       E(View, { style: { flexDirection: "row", justifyContent: "flex-end", alignItems: "flex-end", marginRight: -20, marginBottom: -10 } },
-        hasRmLogo
-          ? E(Image, { src: p.rmLogoUrl!, style: { height: 130, width: 130, objectFit: "contain" as const } })
+        hasBrandLogo
+          ? E(Image, { src: p.brandLogoUrl!, style: { height: 130, width: 130, objectFit: "contain" as const } })
           : null,
       ),
     ),
@@ -279,7 +279,7 @@ function CoverPage(p: {
 // EXECUTIVE SUMMARY
 // ══════════════════════════════════════════════════════════════
 
-function SummaryPage(p: { kpiCards: KpiCard[]; reportMonth: string; reportYear: number; clientName: string; rmLogoUrl?: string; summaryHeadline?: string; summarySubtitle?: string }) {
+function SummaryPage(p: { kpiCards: KpiCard[]; reportMonth: string; reportYear: number; clientName: string; brandLogoUrl?: string; summaryHeadline?: string; summarySubtitle?: string }) {
   const row1 = p.kpiCards.slice(0, 3);
   const row2 = p.kpiCards.slice(3);
   return E(Page, { size: "A4", orientation: "landscape", style: { padding: sp.pad, fontFamily: "Helvetica", fontSize: 9, color: c.dark } },
@@ -301,7 +301,7 @@ function SummaryPage(p: { kpiCards: KpiCard[]; reportMonth: string; reportYear: 
         ...Array.from({ length: Math.max(0, 3 - row2.length) }, (_, i) => E(View, { key: `f${i}`, style: { flex: 1 } })),
       ),
     ) : null,
-    Foot({ left: `${p.clientName}  |  ${p.reportMonth} ${p.reportYear}`, rmLogoUrl: p.rmLogoUrl }),
+    Foot({ left: `${p.clientName}  |  ${p.reportMonth} ${p.reportYear}`, brandLogoUrl: p.brandLogoUrl }),
   );
 }
 
@@ -323,7 +323,7 @@ function KpiBlock(kpi: KpiCard) {
 // METRIC PAGE
 // ══════════════════════════════════════════════════════════════
 
-function MetricPage(p: { section: MetricSection; clientName: string; rmLogoUrl?: string }) {
+function MetricPage(p: { section: MetricSection; clientName: string; brandLogoUrl?: string }) {
   const s = p.section;
   const dual = !!(s.chartData2 && s.chartLabel2);
   return E(Page, { size: "A4", orientation: "landscape", style: { padding: sp.pad, fontFamily: "Helvetica", fontSize: 9, color: c.dark } },
@@ -341,7 +341,7 @@ function MetricPage(p: { section: MetricSection; clientName: string; rmLogoUrl?:
         dual ? E(View, { style: { marginTop: sp.xxl } }, Chart({ data: s.chartData2!, type: s.chartType2 ?? "line", label: s.chartLabel2, h: 100 })) : null,
       ),
     ),
-    Foot({ left: `${p.clientName}  |  Maandrapportage`, rmLogoUrl: p.rmLogoUrl }),
+    Foot({ left: `${p.clientName}  |  Maandrapportage`, brandLogoUrl: p.brandLogoUrl }),
   );
 }
 
@@ -349,7 +349,7 @@ function MetricPage(p: { section: MetricSection; clientName: string; rmLogoUrl?:
 // ACTIONS + PLANNING
 // ══════════════════════════════════════════════════════════════
 
-function ActionPage(p: { actionSection: { heading: string; body: string }; planningSection: { heading: string; body: string }; clientName: string; rmLogoUrl?: string }) {
+function ActionPage(p: { actionSection: { heading: string; body: string }; planningSection: { heading: string; body: string }; clientName: string; brandLogoUrl?: string }) {
   const groups = parseActions(p.actionSection.body);
   return E(Page, { size: "A4", orientation: "landscape", style: { padding: sp.pad, fontFamily: "Helvetica", fontSize: 9, color: c.dark } },
     E(View, { style: { position: "absolute", top: 0, left: 0, right: 0, height: 4, backgroundColor: c.brand } }),
@@ -373,7 +373,7 @@ function ActionPage(p: { actionSection: { heading: string; body: string }; plann
         E(Text, { style: { fontSize: 8.5, color: c.g700, lineHeight: 1.7 } }, p.planningSection.body),
       ),
     ),
-    Foot({ left: `${p.clientName}  |  Maandrapportage`, rmLogoUrl: p.rmLogoUrl }),
+    Foot({ left: `${p.clientName}  |  Maandrapportage`, brandLogoUrl: p.brandLogoUrl }),
   );
 }
 
@@ -383,14 +383,14 @@ function ActionPage(p: { actionSection: { heading: string; body: string }; plann
 // COUNTRY DIVIDER PAGE (blue page with country name)
 // ══════════════════════════════════════════════════════════════
 
-function CountryDividerPage(p: { countryName: string; reportMonth: string; reportYear: number; rmLogoUrl?: string }) {
+function CountryDividerPage(p: { countryName: string; reportMonth: string; reportYear: number; brandLogoUrl?: string }) {
   return E(Page, { size: "A4", orientation: "landscape", style: { padding: 0, fontFamily: "Helvetica", flexDirection: "row" } },
     // Blue left half
     E(View, { style: { width: "50%", backgroundColor: c.blue, justifyContent: "center", paddingHorizontal: 60 } },
       E(Text, { style: { fontSize: 32, fontWeight: "bold", color: c.white, lineHeight: 1.2 } }, `Voortgang SEA`),
       E(Text, { style: { fontSize: 32, fontWeight: "bold", color: c.white, lineHeight: 1.2 } }, `${p.countryName}.`),
-      p.rmLogoUrl
-        ? E(Image, { src: p.rmLogoUrl, style: { width: 50, height: 50, objectFit: "contain" as const, marginTop: sp.xxl, opacity: 0.8 } })
+      p.brandLogoUrl
+        ? E(Image, { src: p.brandLogoUrl, style: { width: 50, height: 50, objectFit: "contain" as const, marginTop: sp.xxl, opacity: 0.8 } })
         : null,
     ),
     // White right half (empty, premium whitespace)
@@ -404,7 +404,7 @@ function CountryDividerPage(p: { countryName: string; reportMonth: string; repor
 // COUNTRY SUMMARY PAGE (KPIs for a specific country)
 // ══════════════════════════════════════════════════════════════
 
-function CountrySummaryPage(p: { kpiCards: KpiCard[]; countryName: string; reportMonth: string; reportYear: number; clientName: string; rmLogoUrl?: string }) {
+function CountrySummaryPage(p: { kpiCards: KpiCard[]; countryName: string; reportMonth: string; reportYear: number; clientName: string; brandLogoUrl?: string }) {
   const row1 = p.kpiCards.slice(0, 3);
   const row2 = p.kpiCards.slice(3);
   return E(Page, { size: "A4", orientation: "landscape", style: { padding: sp.pad, fontFamily: "Helvetica", fontSize: 9, color: c.dark } },
@@ -420,7 +420,7 @@ function CountrySummaryPage(p: { kpiCards: KpiCard[]; countryName: string; repor
         ...Array.from({ length: Math.max(0, 3 - row2.length) }, (_, i) => E(View, { key: `f${i}`, style: { flex: 1 } })),
       ),
     ) : null,
-    Foot({ left: `${p.clientName}  |  ${p.countryName}  |  ${p.reportMonth} ${p.reportYear}`, rmLogoUrl: p.rmLogoUrl }),
+    Foot({ left: `${p.clientName}  |  ${p.countryName}  |  ${p.reportMonth} ${p.reportYear}`, brandLogoUrl: p.brandLogoUrl }),
   );
 }
 
@@ -430,19 +430,19 @@ function CountrySummaryPage(p: { kpiCards: KpiCard[]; countryName: string; repor
 
 function Doc(p: ReportPdfProps) {
   return E(Document, {},
-    CoverPage({ clientName: p.clientName, reportMonth: p.reportMonth, reportYear: p.reportYear, generatedAt: p.generatedAt, rmLogoUrl: p.rmLogoUrl, clientLogoUrl: p.clientLogoUrl, coverImageUrl: p.coverImageUrl }),
-    SummaryPage({ kpiCards: p.kpiCards, reportMonth: p.reportMonth, reportYear: p.reportYear, clientName: p.clientName, rmLogoUrl: p.rmLogoUrl, summaryHeadline: p.summaryHeadline, summarySubtitle: p.summarySubtitle }),
+    CoverPage({ clientName: p.clientName, reportMonth: p.reportMonth, reportYear: p.reportYear, generatedAt: p.generatedAt, brandLogoUrl: p.brandLogoUrl, clientLogoUrl: p.clientLogoUrl, coverImageUrl: p.coverImageUrl }),
+    SummaryPage({ kpiCards: p.kpiCards, reportMonth: p.reportMonth, reportYear: p.reportYear, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl, summaryHeadline: p.summaryHeadline, summarySubtitle: p.summarySubtitle }),
     ...p.metricSections
       .filter((section) => section.heading && section.heading.trim().length > 0 && (section.bullets.length > 0 || section.body.trim().length > 0 || section.chartData.length > 0))
-      .map((section) => MetricPage({ section, clientName: p.clientName, rmLogoUrl: p.rmLogoUrl })),
-    ActionPage({ actionSection: p.actionSection, planningSection: p.planningSection, clientName: p.clientName, rmLogoUrl: p.rmLogoUrl }),
+      .map((section) => MetricPage({ section, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl })),
+    ActionPage({ actionSection: p.actionSection, planningSection: p.planningSection, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl }),
     // Country sections (if multi-country)
     ...(p.countrySections ?? []).flatMap((cs) => [
-      CountryDividerPage({ countryName: cs.countryName, reportMonth: p.reportMonth, reportYear: p.reportYear, rmLogoUrl: p.rmLogoUrl }),
-      CountrySummaryPage({ kpiCards: cs.kpiCards, countryName: cs.countryName, reportMonth: p.reportMonth, reportYear: p.reportYear, clientName: p.clientName, rmLogoUrl: p.rmLogoUrl }),
+      CountryDividerPage({ countryName: cs.countryName, reportMonth: p.reportMonth, reportYear: p.reportYear, brandLogoUrl: p.brandLogoUrl }),
+      CountrySummaryPage({ kpiCards: cs.kpiCards, countryName: cs.countryName, reportMonth: p.reportMonth, reportYear: p.reportYear, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl }),
       ...cs.metricSections
         .filter((section) => section.heading && section.heading.trim().length > 0 && (section.bullets.length > 0 || section.body.trim().length > 0 || section.chartData.length > 0))
-        .map((section) => MetricPage({ section, clientName: p.clientName, rmLogoUrl: p.rmLogoUrl })),
+        .map((section) => MetricPage({ section, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl })),
     ]),
   );
 }

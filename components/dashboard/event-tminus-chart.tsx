@@ -6,7 +6,7 @@ import { CHART_AXIS } from "@/lib/branding/chart-colors";
 
 // Fase 6, Task 1: de T-minus trendlijn. De x-as is GEEN kalenderdatum maar het aantal dagen tot
 // het event (uit de curves die de route levert, zelf gebouwd op cumulativeCurve() in
-// lib/rai/event-time-axis.ts, ongewijzigd). Twee edities op dezelfde as lopen daardoor synchroon:
+// lib/fair/event-time-axis.ts, ongewijzigd). Twee edities op dezelfde as lopen daardoor synchroon:
 // dag T-14 van deze editie staat recht onder dag T-14 van de vorige, ongeacht welke kalenderjaren
 // het zijn.
 

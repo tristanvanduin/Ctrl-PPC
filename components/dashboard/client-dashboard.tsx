@@ -7,7 +7,7 @@ import { SyncStatusBadge } from "./sync-status-badge";
 import { getClientSettings } from "@/lib/client-settings";
 import { SecondOpinionView } from "./second-opinion-view";
 import { AnalysisOverview } from "./analysis-overview";
-import { useUpcomingEdition } from "@/lib/rai/use-upcoming-edition";
+import { useUpcomingEdition } from "@/lib/fair/use-upcoming-edition";
 import { ClientSettingsPanel } from "./client-settings";
 import { InsightsBlock } from "../insights/insights-block";
 import { RecommendationsBlock } from "../insights/recommendations-block";

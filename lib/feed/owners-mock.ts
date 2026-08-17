@@ -44,7 +44,7 @@ export function applyMockOwners(items: FeedItem[]): FeedItem[] {
 // Vaste demo-klanten wanneer er geen echte zichtbare klanten zijn (volledig los van live data).
 const DEMO_CLIENTS = [
   { id: "demo-greentech", name: "GreenTech (demo)" },
-  { id: "demo-horeca", name: "RAI Horecava (demo)" },
+  { id: "demo-horeca", name: "Beurshal Horeca (demo)" },
   { id: "demo-fysio", name: "FIT Fysio (demo)" },
 ];
 

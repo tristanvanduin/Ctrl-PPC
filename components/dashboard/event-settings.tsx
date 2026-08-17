@@ -7,9 +7,9 @@ import { dbUpsert } from "@/lib/data-access/client-write";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { AccountEventPacing } from "./account-event-pacing";
 
-// RAI event-instellingen per klant: beurzen/geo-clones met cadans (jaarlijks/2-jaarlijks/anders)
+// Beurs-event-instellingen per klant: beurzen/geo-clones met cadans (jaarlijks/2-jaarlijks/anders)
 // en de datums van de afgelopen edities. Slaat op in client_settings.rai_events (migratie 024).
-// Deze input voedt de event-relatieve vergelijking en forecast (lib/rai): waarmee moet de
+// Deze input voedt de event-relatieve vergelijking en forecast (lib/fair): waarmee moet de
 // huidige editie vergeleken worden. Voorloper op de per-geo-clone entiteit-laag.
 
 type Cadence = "annual" | "biennial" | "custom";

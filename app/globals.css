@@ -183,7 +183,7 @@
   --color-rm-orange-light: var(--brand-accent-light, #f7b955);
   /* De merkkleur als inkt, los van de merkkleur als vlak.
      Eén kleur kan die twee rollen niet allebei doen. De huisstijlkleur is gekozen om op wit te
-     lezen — RAI-blauw is bijna zwart, GreenTech-groen is een diepe tint — en verdwijnt daardoor
+     lezen — het standaardblauw is bijna zwart, GreenTech-groen is een diepe tint — en verdwijnt daardoor
      als tekst op een donkere kaart. Licht je hem op, dan wordt de zijbalk een lichtbak met witte
      letters erop; dat was letterlijk het beeld in de eerste donkere schermafdruk. In de lichte
      modus zijn beide tokens exact dezelfde kleur, dus daar verandert er niets. */
@@ -406,7 +406,7 @@
 
   /* De merkkleur als TÉKST op een donker vlak.
      `text-rm-blue` draagt in dit dashboard de kopjes, de actieve tab en de nadruk — honderden
-     plekken. De merkkleur zelf is gekozen om op wit te lezen: het RAI-blauw is bijna zwart, en
+     plekken. De merkkleur zelf is gekozen om op wit te lezen: het standaardblauw is bijna zwart, en
      het GreenTech-groen is een diepe tint. Op een vlak van #171a21 verdwijnt zo'n kleur; in de
      eerste donkere schermafdruk was "Prestaties" merkbaar donkerder dan het inactieve label
      ernaast. Vandaar hier dezelfde tint, maar opgelicht — de identiteit blijft, de leesbaarheid

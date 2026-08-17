@@ -9,7 +9,7 @@ import { Kerncijfer } from "@/components/ui/kerncijfer";
 // afgezet tegen HETZELFDE punt vóór de vorige editie (op gelijke afstand tot de beursdag,
 // cadans-bewust). Loop je vóór of achter t.o.v. de vorige keer? Deze widget toont dat altijd-live
 // (draait de deterministische geo-clone-analyse via ?live=1), zonder dat je een knop hoeft te
-// klikken. De rekenkern zit in lib/rai; dit is puur de uitlezing.
+// klikken. De rekenkern zit in lib/fair; dit is puur de uitlezing.
 
 interface Pacing {
   geoClone: string;

@@ -89,7 +89,7 @@ export function sanitizeLLMPayload(
     if (n > 0) { hits.push({ category: "email", name: "email", count: n }); maskedEmails += n; }
   }
 
-  // 4. Optionele extra-patronen (bijv. strengere RAI-regels later).
+  // 4. Optionele extra-patronen (bijv. strengere klantspecifieke regels later).
   if (opts.extraPatterns) {
     for (const p of opts.extraPatterns) {
       let n = 0;

@@ -53,16 +53,16 @@ export async function GET(request: NextRequest) {
 
   try {
     // Fetch logo URLs
-    let rmLogoUrl: string | undefined;
+    let brandLogoUrl: string | undefined;
     let clientLogoUrl: string | undefined;
 
-    // RM logo from public directory
+    // Brand logo from public directory
     const rmLogoPath = process.cwd() + `/public/images/${BRAND_LOGO_FILE}`;
     try {
       const fs = await import("fs");
       if (fs.existsSync(rmLogoPath)) {
         const buf = fs.readFileSync(rmLogoPath);
-        rmLogoUrl = `data:image/png;base64,${buf.toString("base64")}`;
+        brandLogoUrl = `data:image/png;base64,${buf.toString("base64")}`;
       }
     } catch { /* no logo file */ }
 
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       summaryHeadline: rd.summaryHeadline as string | undefined,
       summarySubtitle: rd.summarySubtitle as string | undefined,
       countrySections: rd.countrySections as ReportPdfProps["countrySections"],
-      rmLogoUrl,
+      brandLogoUrl,
       clientLogoUrl,
     };
 

@@ -5,7 +5,7 @@ import { Clock, Target, Zap, AlertTriangle, TrendingUp, Calendar, Flag } from "l
 import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
-import { weeksToFair, type UpcomingEdition } from "@/lib/rai/fair-weeks";
+import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
 import { berekenLanding, seizoensduiding } from "@/lib/pacing/landing";
 
