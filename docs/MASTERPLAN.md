@@ -2727,3 +2727,67 @@ niet meegenomen door de eerdere identifier-rename) → `FairEvent`.
 Van de vier punten die 17.10 bewust liet staan, resteren nu alleen de twee met een echte,
 gecoördineerde database-afhankelijkheid (`lib/clients.ts`'s interne `id: "ranking-masters"` en de
 kolomnaam `client_settings.rai_events`) en git-geschiedenis zelf.
+
+## 17.12 De twee grootste openstaande punten: kanaaloverstijgende synthese + geo-clones als unieke eenheden
+
+De eigenaar, direct na 17.11: *"tijd om dit op te pakken lijkt me"* (de synthese-stap) en, over
+GreenTech's sub-accounts: *"voor nu mag je [ze] als 3 losse eenheden beschouwen (ik wil ze wel bij
+elkaar krijgen in het totaal overzicht van greentech zelf) maar de afkortingen en aparte accounts
+moeten als uniek gezien worden in deze analyses."* Beide gebouwd, getest, groen door de poorten.
+
+### 17.12.1 Kanaaloverstijgende synthese
+
+**Architectuur-onderzoek eerst.** Er bleek geen enkele plek te bestaan die "alle kanalen voor deze
+klant deze cyclus zijn klaar" bijhoudt — de cron (`trigger-sops`, niet actief) en de handmatige
+knoppen behandelen elk kanaal als een op zichzelf staande trigger. Nieuw gebouwd:
+
+- `lib/analysis/cross-channel-synthesis.ts`: haalt per kanaal de al opgeslagen
+  `structured_monthly_v2` op (dezelfde tabel/sectie als elke kanaalanalyse al schrijft), plus de
+  bestaande deterministische `cross_channel_v1`-signalen. `readyForSynthesis()` eist dat ALLE
+  beschikbare kanalen deze cyclus al klaar zijn — één ontbrekend kanaal betekent wachten, nooit een
+  synthese over een deel van de kanalen die zich als compleet presenteert. `alreadySynthesized()`
+  voorkomt een dubbele, kostbare call als meerdere kanalen dezelfde dag na elkaar afronden.
+- De LLM-call loopt via de bestaande "reasoning"-laag (Grok 4.6) — precies het gebruik waarvoor die
+  laag al bedoeld was ("redeneren over eerder werk, geen los datapunt"). De prompt eist expliciet
+  ÉÉN samenhangend verhaal (niet drie kanalen na elkaar samengevat), benoemt tegenspraken tussen
+  kanalen als die er zijn, en staat een actie alleen toe met een ECHT, aangeleverd kanaal als label
+  — een verzonnen kanaal wordt bij het parsen weggefilterd, niet vertrouwd.
+- Nieuwe route `app/api/analysis/cross-channel-synthesis` (GET voor de laatste synthese, POST om 'm
+  te draaien) — dezelfde skip-als-409-stijl als de bestaande cross-channel-route.
+- Orkestratie: zowel de handmatige knoppen (`sop-trigger-buttons.tsx`) als de cron
+  (`trigger-sops/route.ts`) triggeren de synthese nu ná de deterministische cross-channel-call, bij
+  elke afgeronde maandanalyse. De route zelf beslist of het al zover is (skip anders) — elk kanaal
+  dat afrondt mag 'm dus altijd aanroepen, alleen het laatste kanaal doet daadwerkelijk de call.
+- UI: een nieuwe kaart bovenaan `cross-channel-analyses.tsx`, boven de bestaande deterministische
+  sub-analyses.
+- Getest zonder een echte LLM-call nodig te hebben: `runCrossChannelSynthesis` accepteert een
+  injecteerbare `callFn` (zelfde patroon als `callRouted`/`callLayer` al hadden), dus zowel de
+  skip-paden als het volledige succespad zijn gedekt met een gemockte call.
+
+### 17.12.2 Geo-clones als unieke eenheden, met een accounttotaal ernaast
+
+**Bevinding, tegen de code gecontroleerd:** geen enkele plek in `app/api/analysis/monthly/route.ts`
+kende `lib/fair/geo-clone-catalog.ts` — campagnedata van een account met meerdere geo-clones (zoals
+GreenTech Amsterdam/Americas/North America) werd stilzwijgend geblend tot één accounttotaal, zonder
+dat de LLM ooit wist dat het om aparte sub-accounts ging.
+
+- `lib/fair/geo-clone-aggregate.ts`: nieuwe `aggregateAllGeoClones(rows, catalog?)` bovenop de
+  al-bestaande, ongewijzigde `aggregateCampaignMonthlyByGeoClone()`. Levert alle drie tegelijk: een
+  losse `GeoCloneSummary` per gevonden geo-clone (`perGeoClone`), campagnes die geen enkele
+  afkorting matchen apart (`unmatched`, nooit stilzwijgend meegeteld — dezelfde regel als de
+  catalogus zelf al had), en het accounttotaal (`total`, gewoon alle rijen samen) — precies de twee
+  dingen die de eigenaar allebei wilde, naast elkaar in plaats van een keuze ertussen.
+- `lib/analysis/geo-clone-context.ts`: nieuw promptblok, zelfde rol en vorm als
+  cross-channel-context.ts/god-view-context.ts. Haalt de laatste 3 maanden campagnedata op, en bij
+  GEEN geo-clone-afkortingen in de campagnenamen (verreweg de meeste klanten) — `available: false`,
+  `promptContext: ""`, nul wijziging. Bij wél geo-clones: elk sub-account met naam, afkorting en
+  kerncijfers, het accounttotaal ernaast, en een expliciete instructie om sub-accounts nooit te
+  mengen maar wel te vergelijken.
+- Gewired in Google's stap 13 (Hypotheses & Sprintplanning), zelfde injectiepunt als de
+  cross-channel- en God View-context. Alleen Google: `ads_campaign_monthly` is de tabel met
+  campagnenamen waar de geo-clone-afkortingen in staan; Meta/LinkedIn hebben vandaag geen
+  equivalente, geo-clone-getagde databron.
+- Bewust NIET gedaan: GreenTech fysiek opsplitsen in drie aparte `client_id`/accounts-rijen. De
+  eigenaar bevestigde expliciet dat de bestaande geo-clone-dimensie (campagnenaam-afkorting) de
+  juiste laag is, niet een structurele accountsplitsing — minder ingrijpend, en de sub-accounts
+  blijven zo automatisch "bij elkaar in het totaaloverzicht van GreenTech zelf".

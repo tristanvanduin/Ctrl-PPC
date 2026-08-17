@@ -51,6 +51,7 @@ import { channelGa4Context } from "@/lib/ga4/context";
 import type { Ga4SupabaseLike } from "@/lib/ga4/data-access";
 import { crossChannelContext } from "@/lib/analysis/cross-channel-context";
 import { godViewContext } from "@/lib/analysis/god-view-context";
+import { geoCloneContext } from "@/lib/analysis/geo-clone-context";
 import { checkStepDataAvailability } from "@/lib/analysis/data-availability";
 import type { StepDataAvailability } from "@/lib/analysis/data-availability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
@@ -1989,6 +1990,10 @@ ${runningContext}`,
     const crossChannelGoogleText = (await crossChannelContext(supabase, clientId, "google_ads")).promptContext;
     // God View als verklarende context (masterplan 16.7), zelfde plek, zelfde stille degradatie.
     const godViewGoogleText = (await godViewContext(supabase, clientId, "google_ads")).promptContext;
+    // Sub-accounts/geo-clones als unieke, losse eenheden (masterplan 17.12), zelfde plek, zelfde
+    // stille degradatie naar "" bij een account zonder geo-clone-afkortingen in de campagnenamen
+    // (verreweg de meeste klanten).
+    const geoCloneGoogleText = (await geoCloneContext(supabase, clientId)).promptContext;
     const preparedInputs: MonthlyPreparedInputs = {
       analysisYear,
       lastCompleteMonth,
@@ -2870,7 +2875,7 @@ ${toPromptTable(checkpointOutputs)}
 \`\`\`
 
 ## Stapconclusies
-${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannelGoogleText}` : ""}${godViewGoogleText ? `\n\n${godViewGoogleText}` : ""}`,
+${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannelGoogleText}` : ""}${godViewGoogleText ? `\n\n${godViewGoogleText}` : ""}${geoCloneGoogleText ? `\n\n${geoCloneGoogleText}` : ""}`,
     });
     steps.push(conclusion);
     const conclusionPrior = conclusions.at(-1);

@@ -197,6 +197,9 @@ export async function GET(request: NextRequest) {
             await triggerCrossChannel(origin, clientId).catch((err) => {
               console.error(`[trigger-sops] cross-channel voor ${clientId} mislukt:`, err);
             });
+            await triggerCrossChannelSynthesis(origin, clientId).catch((err) => {
+              console.error(`[trigger-sops] cross-channel-synthese voor ${clientId} mislukt:`, err);
+            });
           }
         } catch (err) {
           resultaten.push({
@@ -230,6 +233,23 @@ async function triggerCrossChannel(origin: string, clientId: string): Promise<vo
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || `cross-channel gaf ${res.status}`);
+  }
+}
+
+// Kanaaloverstijgende SYNTHESE (masterplan 17.12) -- ná de deterministische signalen hierboven,
+// zodat de synthese de vers berekende cross-channel-context kan lezen. 409 (skipped) is hier geen
+// fout: de route zelf beslist of alle beschikbare kanalen deze cyclus al klaar zijn, en met deze
+// cron-loop (limit vaak 1) is dat lang niet elke invocatie zo -- pas het laatste kanaal dat deze
+// nacht afrondt triggert daadwerkelijk een LLM-call.
+async function triggerCrossChannelSynthesis(origin: string, clientId: string): Promise<void> {
+  const res = await fetch(`${origin}/api/analysis/cross-channel-synthesis`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: clientId }),
+  });
+  if (!res.ok && res.status !== 409) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `cross-channel-synthesis gaf ${res.status}`);
   }
 }
 

@@ -1,15 +1,108 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Radar, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Loader2, Radar, Sparkles, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Cross-channel-analyse als losse sub-analyse-kaarten — net als de kanalen, maar uit ÉÉN
 // deterministische run. De route (/api/analysis/cross-channel) levert de groepen (funnel,
 // zaai/arbitrage/mix, KPI-verhoudingen, doelgroep-samenhang, GA4-CRO); deze kaart draait de run
 // en toont per groep een eigen blok. Geen aparte endpoints, geen dubbele berekening.
+//
+// Bovenaan (masterplan 17.12): de kanaaloverstijgende SYNTHESE, een apart, LLM-gedreven
+// eindresultaat (/api/analysis/cross-channel-synthesis) dat pas verschijnt zodra alle
+// beschikbare kanalen hun maandanalyse voor deze cyclus hebben afgerond. Eigen kaart, eigen
+// fetch — de sub-analyse-groepen eronder blijven puur deterministisch en draaien onafhankelijk.
 
 interface CrossGroup { key: string; title: string; description: string; section: string; triggered: number; checked: string[] }
+
+interface SynthesizedAction { channel: string; action: string; rationale: string; priority: "hoog" | "midden" | "laag" }
+interface Synthesis {
+  headline: string;
+  narrative: string;
+  contradictions: string[];
+  synthesized_actions: SynthesizedAction[];
+  channels_used: string[];
+}
+
+const CHANNEL_LABEL: Record<string, string> = { google_ads: "SEA", meta_ads: "Meta Ads", linkedin_ads: "LinkedIn Ads" };
+const PRIORITY_STYLE: Record<SynthesizedAction["priority"], string> = {
+  hoog: "bg-red-100 text-red-700",
+  midden: "bg-amber-100 text-amber-700",
+  laag: "bg-gray-100 text-muted-foreground",
+};
+
+function SynthesisCard({ clientId }: { clientId: string }) {
+  const [synthesis, setSynthesis] = useState<Synthesis | null | undefined>(undefined); // undefined = laden
+  const [analysisDate, setAnalysisDate] = useState<string | null>(null);
+
+  const fetchSynthesis = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/analysis/cross-channel-synthesis?client_id=${encodeURIComponent(clientId)}`);
+      if (!res.ok) { setSynthesis(null); return; }
+      const data = await res.json();
+      setSynthesis(data?.synthesis ?? null);
+      setAnalysisDate(data?.analysisDate ?? null);
+    } catch {
+      setSynthesis(null);
+    }
+  }, [clientId]);
+
+  useEffect(() => { setSynthesis(undefined); fetchSynthesis(); }, [fetchSynthesis]);
+
+  if (synthesis === undefined) return <Laadvlak vorm="tekst" regels={3} />;
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+        <Sparkles className="w-4.5 h-4.5 text-brand-orange-ink" />
+        <div className="flex-1">
+          <h3 className="text-title font-semibold text-brand-gray">Kanaaloverstijgende synthese</h3>
+          <p className="text-micro text-muted-foreground mt-0.5">
+            Eén samenhangend verhaal uit de afgeronde maandanalyses van alle gekoppelde kanalen — niet de kanalen los naast elkaar.
+          </p>
+        </div>
+      </div>
+      <div className="px-5 py-4 space-y-3">
+        {!synthesis ? (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-meta text-blue-800 flex gap-2">
+            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>Nog geen synthese. Die verschijnt automatisch zodra alle gekoppelde kanalen hun maandanalyse voor deze cyclus hebben afgerond.</span>
+          </div>
+        ) : (
+          <>
+            {analysisDate && <p className="text-micro text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> {analysisDate}</p>}
+            <p className="text-lead font-semibold text-brand-gray">{synthesis.headline}</p>
+            <p className="text-meta text-muted-foreground leading-relaxed">{synthesis.narrative}</p>
+
+            {synthesis.contradictions.length > 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-micro font-medium text-amber-800 mb-1">Tegenspraak tussen kanalen</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-meta text-amber-800">
+                  {synthesis.contradictions.map((c, i) => <li key={i}>{c}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {synthesis.synthesized_actions.length > 0 && (
+              <div className="space-y-2">
+                {synthesis.synthesized_actions.map((a, i) => (
+                  <div key={i} className="rounded-md border border-border px-3 py-2 flex items-start gap-2">
+                    <span className={`text-micro font-medium px-2 py-0.5 rounded-full shrink-0 ${PRIORITY_STYLE[a.priority]}`}>{a.priority}</span>
+                    <div className="flex-1">
+                      <p className="text-meta text-brand-gray"><span className="font-medium">{CHANNEL_LABEL[a.channel] ?? a.channel}:</span> {a.action}</p>
+                      <p className="text-micro text-muted-foreground mt-0.5">{a.rationale}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function GroupCard({ group }: { group: CrossGroup }) {
   const [expanded, setExpanded] = useState(false);
@@ -103,6 +196,9 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-3">
+      {/* De synthese staat bovenaan: het eindresultaat dat de sub-analyses eronder voedt. */}
+      <SynthesisCard clientId={clientId} />
+
       {/* Kop met de gedeelde run-knop: één run voedt alle sub-analyses. */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">

@@ -2,7 +2,8 @@
 // Controleert: filteren op geo-clone via de catalogus, per-maand sommeren, ratio's uit
 // maandtotalen (niet uit gemiddelde deelwaarden), totalen uit maandtotalen, en lege invoer.
 
-import { aggregateCampaignMonthlyByGeoClone, type CampaignMonthlyRow } from "./geo-clone-aggregate";
+import { aggregateCampaignMonthlyByGeoClone, aggregateAllGeoClones, type CampaignMonthlyRow } from "./geo-clone-aggregate";
+import type { GeoCloneVariant } from "./geo-clone-catalog";
 
 let failed = 0;
 function assert(cond: boolean, msg: string) {
@@ -56,6 +57,42 @@ assert(empty.totals.cpa === null && empty.totals.roas === null && empty.totals.c
 
 const noMatch = aggregateCampaignMonthlyByGeoClone(rows, "ICC");
 assert(noMatch.months.length === 0 && noMatch.campaignCount === 0, "geo-clone zonder campagnes geeft leeg resultaat");
+
+// ── aggregateAllGeoClones: losse eenheden PLUS een combinatie-totaal (masterplan 17.12) ──────
+console.log("aggregateAllGeoClones:");
+{
+  // Dezelfde vijf rijen: twee GRT-campagnes, één AQM-campagne (ook een echte, bestaande variant
+  // in de catalogus) en één campagne die geen enkele afkorting matcht ("Brand generic").
+  const breakdown = aggregateAllGeoClones(rows);
+
+  assert(breakdown.perGeoClone.length === 2, `beide voorkomende geo-clones apart (kreeg ${breakdown.perGeoClone.length})`);
+  const grtEntry = breakdown.perGeoClone.find((e) => e.geoClone === "GRT");
+  const aqmEntry = breakdown.perGeoClone.find((e) => e.geoClone === "AQM");
+  assert(!!grtEntry && grtEntry.summary.campaignCount === 2, "GRT-eenheid heeft zijn eigen twee campagnes, los van AQM");
+  assert(!!aqmEntry && aqmEntry.summary.totals.cost === 9999, "AQM-eenheid blijft een aparte, ongemengde eenheid");
+  assert(!!grtEntry && grtEntry.summary.totals.cost === 650, "GRT-cijfers blijven exact gelijk aan de losse aanroep hierboven — geen blending");
+
+  assert(breakdown.unmatched !== null && breakdown.unmatched.totals.cost === 11, "de niet-matchende campagne staat apart, niet stilzwijgend bij een variant opgeteld");
+
+  // Het totaal is het HELE account: alle vijf rijen samen, exact zoals de eigenaar vroeg
+  // ("ik wil ze wel bij elkaar krijgen in het totaal overzicht van greentech zelf").
+  const totaal = breakdown.total.totals;
+  assert(totaal.cost === 200 + 50 + 400 + 9999 + 11, `totaal-cost is de som van ALLE rijen (kreeg ${totaal.cost})`);
+  assert(totaal.conversions === 10 + 2 + 20 + 999 + 1, `totaal-conversions is de som van ALLE rijen (kreeg ${totaal.conversions})`);
+
+  // Geen enkele geo-clone-afkorting in de campagnenamen -> lege segmentatie, geen verzonnen indeling.
+  const geenGeoClones = aggregateAllGeoClones([{ campaign_name: "Generieke campagne", month: "2026-01-01", cost: 100, conversions: 1, conversions_value: 50 }]);
+  assert(geenGeoClones.perGeoClone.length === 0, "geen geo-clone-afkortingen in de data -> lege segmentatie");
+  assert(geenGeoClones.unmatched === null, "unmatched blijft null als er sowieso geen geo-clones gevonden zijn (niets om apart van te zetten)");
+  assert(geenGeoClones.total.totals.cost === 100, "total blijft wel gewoon werken zonder geo-clones");
+
+  // Een aangepaste catalogus wordt doorgegeven, niet stilzwijgend de standaardcatalogus gebruikt.
+  const kleineCatalogus: GeoCloneVariant[] = [{ brand: "GreenTech", location: "Amsterdam", abbreviation: "GRT", confirmed: true, cadence: "annual" }];
+  const metKleineCatalogus = aggregateAllGeoClones(rows, kleineCatalogus);
+  assert(metKleineCatalogus.perGeoClone.length === 1 && metKleineCatalogus.perGeoClone[0].geoClone === "GRT", "een aangepaste catalogus wordt echt gebruikt, niet de standaard");
+  // Met alleen GRT in de catalogus telt de AQM-rij nu mee als "unmatched" (geen AQM-variant meer bekend).
+  assert(metKleineCatalogus.unmatched !== null && metKleineCatalogus.unmatched.totals.cost === 9999 + 11, "met een kleinere catalogus valt AQM nu onder unmatched, niet meer apart");
+}
 
 if (failed > 0) {
   console.error(`\n${failed} assertie(s) gefaald`);

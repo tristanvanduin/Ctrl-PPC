@@ -195,12 +195,30 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
         // cross-channel-kaart. Volledig deterministisch, geen LLM-kosten -- op de achtergrond,
         // een mislukking daar mag deze (al geslaagde) kanaalanalyse niet als mislukt tonen.
         // Alleen vanaf 2 kanalen (masterplan 16.6) -- met 1 kanaal is er niets om te kruisen.
+        //
+        // Ná de deterministische signalen: de kanaaloverstijgende SYNTHESE (masterplan 17.12,
+        // lib/analysis/cross-channel-synthesis.ts) -- wél een LLM-call, dus bewust NA in plaats
+        // van naast cross-channel, zodat de synthese de vers berekende signalen kan lezen. De
+        // route zelf bepaalt of alle kanalen deze cyclus al klaar zijn (skipped:true zolang dat
+        // niet zo is) -- elk kanaal dat hier afrondt mag 'm dus altijd aanroepen, alleen de
+        // laatste doet daadwerkelijk de call.
         if (type === "monthly" && multiChannel) {
-          fetch("/api/analysis/cross-channel", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ client_id: clientId }),
-          }).catch((err) => console.error("Cross-channel-analyse (automatisch) mislukt:", err));
+          (async () => {
+            try {
+              await fetch("/api/analysis/cross-channel", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ client_id: clientId }),
+              });
+            } catch (err) {
+              console.error("Cross-channel-analyse (automatisch) mislukt:", err);
+            }
+            fetch("/api/analysis/cross-channel-synthesis", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ client_id: clientId }),
+            }).catch((err) => console.error("Cross-channel-synthese (automatisch) mislukt:", err));
+          })();
         }
 
         setStatus((prev) => ({
