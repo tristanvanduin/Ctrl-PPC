@@ -37,7 +37,11 @@ async function run() {
   if (!url || !key) { console.error("Zet NEXT_PUBLIC_SUPABASE_URL en een key in de omgeving (of gebruik --sql)."); process.exit(1); }
   const db = createClient(url, key, { auth: { persistSession: false } });
   for (const t of TABLES) {
-    const { error } = await db.from(t).delete().eq("client_id", DEMO_CLIENT);
+    // fysiekeTabel(), niet de logische naam -- printSql() hierboven deed dit al goed, deze
+    // supabase-js-tak niet. Een aantal namen in TABLES zijn views (bijv. meta_ad_daily), en
+    // "cannot delete from view" bleef hier zonder fysiekeTabel() dus altijd fout gaan (ontdekt
+    // 17 augustus 2026 bij een herseed na de Meta/LinkedIn-objective-uitbreiding).
+    const { error } = await db.from(fysiekeTabel(t)).delete().eq("client_id", DEMO_CLIENT);
     console.log(error ? `✗ ${t}: ${error.message}` : `✓ ${t}`);
   }
   await db.from("linkedin_urn_labels").delete().like("urn", "urn:li:function:demo-%");

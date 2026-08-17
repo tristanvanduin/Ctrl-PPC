@@ -180,15 +180,33 @@ const LI_CAMPAIGNS = [
   { urn: "urn:li:sponsoredCampaign:demo4", name: "GreenTech Productvideo", objective: "VIDEO_VIEWS" },
 ];
 
+// Fractionele dag-snelheden (bijv. 0,25 leads/dag) horen bij lage-volume LinkedIn-campagnes en
+// moeten desondanks als geheel getal de database in (one_click_leads/one_click_lead_form_opens/
+// external_website_conversions zijn bigint, migratie 008). Los per dag afronden zou 0,25/dag
+// STRUCTUREEL naar 0 afronden -- elke dag apart -- en zo de hele S5/S6/S8-scenario's leegtrekken
+// in plaats van ze te spreiden. Cumulatief afronden bewaart de bedoelde som exact en levert per
+// dag toch een geldig heel getal (17 augustus 2026, ontdekt bij de eerste echte insert-run: een
+// eerdere versie van dit bestand werkte alleen ooit via --check, dat gaat via JS-getallen en
+// merkt een niet-geheel-getal in een bigint-kolom nooit).
+function heelGetal(staat: { cum: number; vorig: number }, perDag: number): number {
+  staat.cum += perDag;
+  const afgerond = Math.round(staat.cum);
+  const delta = afgerond - staat.vorig;
+  staat.vorig = afgerond;
+  return delta;
+}
+
 function liCampaignDaily(): LiDaily[] {
   const rows: LiDaily[] = [];
+  const s0 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
+  const s1 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
   for (let d = 63; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     const recent = d < 28;
     // [S5]+[S6] GRT ABM: 10% form-completion op ruime opens; spend recent hoger bij gelijke leads => CPL +25%.
-    rows.push({ urn: LI_CAMPAIGNS[0].urn, date, imp: 1500, clicks: 30, spend: recent ? 125 : 100, leads: recent ? 0.25 : 0.25, opens: recent ? 2.5 : 2.2, conv: 0.3, vidStart: 40, vidDone: 22 });
+    rows.push({ urn: LI_CAMPAIGNS[0].urn, date, imp: 1500, clicks: 30, spend: recent ? 125 : 100, leads: heelGetal(s0.leads, 0.25), opens: heelGetal(s0.opens, recent ? 2.5 : 2.2), conv: heelGetal(s0.conv, 0.3), vidStart: 40, vidDone: 22 });
     // Lead Gen EU: gezond (completion ~30%, stabiele CPL) — hoort stil te blijven.
-    rows.push({ urn: LI_CAMPAIGNS[1].urn, date, imp: 1200, clicks: 26, spend: 90, leads: 0.9, opens: 3, conv: 0.5, vidStart: 35, vidDone: 20 });
+    rows.push({ urn: LI_CAMPAIGNS[1].urn, date, imp: 1200, clicks: 26, spend: 90, leads: heelGetal(s1.leads, 0.9), opens: heelGetal(s1.opens, 3), conv: heelGetal(s1.conv, 0.5), vidStart: 35, vidDone: 20 });
     // Gids Downloads (WEBSITE_VISITS): kliks dalen terwijl besteding stijgt — duurdere kliks
     // voor hetzelfde resultaat, het cpc-issue-scenario.
     rows.push({ urn: LI_CAMPAIGNS[2].urn, date, imp: 2200, clicks: recent ? 18 : 34, spend: recent ? 140 : 95, leads: 0, opens: 0, conv: 0, vidStart: 0, vidDone: 0 });
@@ -200,13 +218,14 @@ function liCampaignDaily(): LiDaily[] {
 
 function liAccountDaily(): LiDaily[] {
   const rows: LiDaily[] = [];
+  const s = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
   for (let d = 159; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     const surge = isSurgeMonth(date);
     // [S8] Golf-maand: spend x3 met evenredig meer conversies => eigen CPA stabiel (~150),
     // maar het blended gewicht verschuift naar het dure kanaal (mix-druk zichtbaar).
     // [S7] Vertoningen mee omhoog: onderdeel van de zaai-golf.
-    rows.push({ urn: "demo-li-account", date, imp: surge ? 3400 : 2400, clicks: surge ? 62 : 45, spend: surge ? 300 : 100, leads: surge ? 1.4 : 1.1, opens: 5, conv: surge ? 2.0 : 0.66, vidStart: 70, vidDone: 40 });
+    rows.push({ urn: "demo-li-account", date, imp: surge ? 3400 : 2400, clicks: surge ? 62 : 45, spend: surge ? 300 : 100, leads: heelGetal(s.leads, surge ? 1.4 : 1.1), opens: heelGetal(s.opens, 5), conv: heelGetal(s.conv, surge ? 2.0 : 0.66), vidStart: 70, vidDone: 40 });
   }
   return rows;
 }
@@ -347,10 +366,13 @@ export function buildAllRows(): Record<string, Row[]> {
   tables["linkedin_account_daily"] = liAccountDaily().map(liRow);
   tables["linkedin_urn_labels"] = LI_DEMO_FUNCTIONS.map((f) => ({ urn: f.urn, label: f.label, taxonomy: "function" }));
   const demoRows: Row[] = [];
+  // leads is bigint (linkedin_demographic_daily); zelfde cumulatieve-afronding als heelGetal()
+  // hierboven, anders rondt leadsPerDay (0,9 / 0,3) elke dag apart naar 0 af.
+  const demoLeadsStaat = new Map(LI_DEMO_FUNCTIONS.map((f) => [f.urn, { cum: 0, vorig: 0 }]));
   for (let d = 59; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     for (const f of LI_DEMO_FUNCTIONS) {
-      demoRows.push({ client_id: DEMO_CLIENT, date, level: "CAMPAIGN", entity_urn: LI_CAMPAIGNS[0].urn, pivot_type: "MEMBER_JOB_FUNCTION", pivot_value_urn: f.urn, impressions: 400, clicks: 9, spend: 30, leads: f.leadsPerDay, conversions: 0, coverage_pct: 0.9 });
+      demoRows.push({ client_id: DEMO_CLIENT, date, level: "CAMPAIGN", entity_urn: LI_CAMPAIGNS[0].urn, pivot_type: "MEMBER_JOB_FUNCTION", pivot_value_urn: f.urn, impressions: 400, clicks: 9, spend: 30, leads: heelGetal(demoLeadsStaat.get(f.urn)!, f.leadsPerDay), conversions: 0, coverage_pct: 0.9 });
     }
   }
   tables["linkedin_demographic_daily"] = demoRows;
@@ -392,11 +414,15 @@ export function buildAllRows(): Record<string, Row[]> {
   ];
   tables["linkedin_creatives"] = liCreatives.map((c) => ({ creative_urn: c.urn, campaign_urn: c.camp, client_id: DEMO_CLIENT, status: "ACTIVE", format: c.fmt, headline: c.headline, post_text: c.post, cta_label: c.cta, landing_url: "https://demo.greentech-fictief.example", image_storage_path: c.img }));
   const liCreativeDaily: Row[] = [];
+  // external_website_conversions/one_click_leads zijn bigint (linkedin_creative_daily); zelfde
+  // cumulatieve afronding als heelGetal() hierboven.
+  const c0 = { conv: { cum: 0, vorig: 0 }, leads: { cum: 0, vorig: 0 } };
+  const c1 = { conv: { cum: 0, vorig: 0 }, leads: { cum: 0, vorig: 0 } };
   for (let d = 45; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     liCreativeDaily.push(
-      { client_id: DEMO_CLIENT, date, entity_urn: liCreatives[0].urn, impressions: 800, clicks: 12, spend: 60, external_website_conversions: 0.3, one_click_leads: 0.2, ctr: 0.015 },
-      { client_id: DEMO_CLIENT, date, entity_urn: liCreatives[1].urn, impressions: 700, clicks: 16, spend: 50, external_website_conversions: 0.5, one_click_leads: 0.9, ctr: 0.023 },
+      { client_id: DEMO_CLIENT, date, entity_urn: liCreatives[0].urn, impressions: 800, clicks: 12, spend: 60, external_website_conversions: heelGetal(c0.conv, 0.3), one_click_leads: heelGetal(c0.leads, 0.2), ctr: 0.015 },
+      { client_id: DEMO_CLIENT, date, entity_urn: liCreatives[1].urn, impressions: 700, clicks: 16, spend: 50, external_website_conversions: heelGetal(c1.conv, 0.5), one_click_leads: heelGetal(c1.leads, 0.9), ctr: 0.023 },
     );
   }
   tables["linkedin_creative_daily"] = liCreativeDaily;
@@ -428,7 +454,12 @@ function printSql(tables: Record<string, Row[]>) {
   console.log(`delete from client_settings where client_id='${DEMO_CLIENT}';`);
   for (const [table, rows] of Object.entries(tables)) {
     if (rows.length === 0) continue;
-    if (table !== "linkedin_urn_labels") console.log(`delete from ${table} where client_id='${DEMO_CLIENT}';`);
+    // fysiekeTabel(), niet de logische naam: sommige tabellen (bijv. meta_ad_daily ->
+    // meta_ad_daily_legacy) zijn hernoemd en "table" is dan geen schrijfbare naam meer. Stond hier
+    // eerder als kale "table" terwijl de insert eronder al wel fysiekeTabel() gebruikte -- de
+    // delete raakte dus de verkeerde (of niet-bestaande) tabel, ontdekt toen een herseed op oude
+    // rijen in meta_ad_daily_legacy botste (masterplan 16.7-vervolg, 17 augustus).
+    if (table !== "linkedin_urn_labels") console.log(`delete from ${fysiekeTabel(table)} where client_id='${DEMO_CLIENT}';`);
     const cols = Object.keys(rows[0]);
     for (let i = 0; i < rows.length; i += 200) {
       const chunk = rows.slice(i, i + 200);
@@ -451,7 +482,11 @@ async function insertViaSupabase(tables: Record<string, Row[]>) {
   if (!url || !key) { console.error("Zet NEXT_PUBLIC_SUPABASE_URL en een key in de omgeving (of gebruik --sql)."); process.exit(1); }
   const db = createClient(url, key, { auth: { persistSession: false } });
   for (const [table, rows] of Object.entries(tables)) {
-    if (table !== "linkedin_urn_labels") await db.from(table).delete().eq("client_id", DEMO_CLIENT);
+    // fysiekeTabel(), niet de logische naam -- zie de toelichting bij printSql() hierboven.
+    if (table !== "linkedin_urn_labels") {
+      const { error: delError } = await db.from(fysiekeTabel(table)).delete().eq("client_id", DEMO_CLIENT);
+      if (delError) { console.error(`✗ ${table} (delete): ${delError.message}`); process.exit(1); }
+    }
     for (let i = 0; i < rows.length; i += 400) {
       const { error } = await db.from(fysiekeTabel(table)).upsert(rows.slice(i, i + 400));
       if (error) { console.error(`✗ ${table}: ${error.message}`); process.exit(1); }
