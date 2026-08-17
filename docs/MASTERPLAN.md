@@ -2309,3 +2309,54 @@ paginabezoek live herberekenen (16.4's constatering), geen trigger-stap, alleen 
 Niets hiervan vergt een handmatige "activeer dit voor deze klant"-stap ergens in een instellingen-
 scherm — de gates zitten in de route zelf, op basis van live data (kanalen, tier, scope), niet op
 een los te vergeten vlaggetje.
+
+### 16.7 God View-kernlaag: de echte cijfers achter de cel-beslissing
+
+Vervolg op 16.6's constatering dat het gemarkete "God View"-module (anonieme marktdata over
+bureaus heen, `lib/marketing/modules.ts`) nog `gebouwd: false` is. De eigenaar: *"laten we dit
+bouwen"* — verduidelijkt naar: alles uit 16.4-16.6 moet kloppen, én de God View-kernlaag mag
+gestart worden. Gekozen startpunt, expliciet: **kernlaag eerst**, geen UI, geen tier-gating, geen
+trend/churn/opportunity-lagen — eerst de rekenkern zelf goed en getest, dan pas een consument.
+
+**Wat al bestond, hergebruikt in plaats van herbouwd:** `lib/benchmark/cel.ts` (de
+k-anonimiteitsregel — 10 accounts EN 4 bureaus voor een los model/niche-segment, 25/8 voor de
+combinatie, bewust zonder cijfers: "alleen de beslissing") en het opt-in-mechanisme
+(`agencies.benchmark_optin_at`, migratie 064, al gebruikt door `app/api/admin/
+benchmarkdekking/route.ts`). Wat ontbrak was de stap ERNA: gegeven rijen die door de
+opt-in/k-anonimiteitspoort heen mogen, de daadwerkelijke benchmarkwaarde per cel uitrekenen.
+`app/api/platform/god-mode/route.ts`'s eigen koptekst noemde `lib/benchmark/cel.ts` al "een
+bouwsteen... nog niet klantzijdig ontsloten" — dat is precies het gat dat dit dicht.
+
+**Nieuw: `lib/benchmark/god-view.ts`.** Twee ontwerpkeuzes die de rest van dit bestand rechtvaardigen:
+
+1. **Mediaan van per-account CPA/ROAS, niet som/som.** `lib/macro/aggregate.ts` (het single-agency-
+   equivalent) telt terecht ruwe totalen op — een bureau ziet zijn eigen boek. Cross-agency niet:
+   totale spend/totale conversies over meerdere bureaus is precies het getal waarmee één
+   account met uitzonderlijke spend de hele cel domineert, én waarmee een bureau dat zijn eigen
+   cijfers kent de rest van de cel kan terugrekenen. Eerst per account een verhouding, dan de
+   mediaan van die verhoudingen — bewezen in de test met een expliciete "som/som ZOU hier wél
+   gedomineerd zijn"-vergelijking naast de mediaan-uitkomst.
+2. **Elke metric zijn eigen k-anonimiteitscheck, niet alleen de cel als geheel.** Een cel kan de
+   drempel halen (10 accounts, 4 bureaus) terwijl maar een handvol van die accounts ooit een
+   conversie had — de rest telde alleen mee voor de accounttelling, niet voor de CPA-mediaan zelf.
+   Zonder een aparte check op de subset die de mediaan daadwerkelijk voedt, zou die mediaan op een
+   kleinere, herkenbaardere groep rusten dan de celtelling belooft. Elke metric loopt daarom zelf
+   nog een keer door `beoordeelCel()` — dezelfde functie hergebruikt, geen tweede, losse drempel
+   ernaast. Getest: een cel met 10 accounts waarvan er 2 een conversie hadden geeft `medianCpa:
+   null` (subset te klein) maar wél een `medianRoas` (alle 10 hadden spend, die subset haalt de
+   drempel gewoon).
+
+**Getest (`__god_view_test.ts`):** onder de accountdrempel → geen metrics; genoeg accounts maar te
+weinig bureaus → geen metrics (een cel mag niet aan één of twee bureaus herleidbaar zijn, ook niet
+als het aantal accounts groot genoeg lijkt); op de drempel → metrics verschijnen; combinatie
+model+niche heeft een eigen, hogere drempel dan het losse model; elke rij telt mee op elk niveau
+waarop hij is afgebakend (model, niche, combinatie) — zelfde regel als `celoverzicht()`.
+
+**Bewust in `TOEGESTANE_WEZEN`** (`scripts/check-hygiene.mjs`): nog geen route, UI of tier-gating
+in dezelfde stap. Volgende stappen, geen van alle vandaag gestart: (1) de IO-laag die echte
+platform-brede rijen ophaalt (opt-in-bureaus × `client_settings.bedrijfsmodel`/`niche` ×
+`blended_account_monthly`, zelfde bronnen als `benchmarkdekking/route.ts` en
+`agency-macrotrends/route.ts` al gebruiken) en `bouwGodViewCellen()` aanroept; (2) een tier-/
+module-gate op de route zelf, zodra er een consument is — dezelfde discipline als 16.6 net
+bevestigde voor Macro en God Mode; (3) de trend/churn-risk/opportunity-lagen die de marketingtekst
+belooft, die staan op deze kernlaag maar zijn een eigen, latere beslissing.

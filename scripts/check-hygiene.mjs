@@ -242,6 +242,17 @@ const TOEGESTANE_WEZEN = new Map([
     "regelmachine met findings/manualChecks per LinkedIn-objectiveType, zelfde status als " +
     "lib/meta/campaign-analysis.ts hierboven. Wacht op consument"],
 
+  // 17 augustus 2026, masterplan 16.7: de God View-kernlaag, op expliciet verzoek van de eigenaar
+  // ("kernlaag eerst") vooruitgebouwd op lib/benchmark/cel.ts (de k-anonimiteitsregel, WEL een
+  // consument via app/api/admin/benchmarkdekking/route.ts). Bewust zonder route/UI/tier-gating in
+  // dezelfde stap -- eerst de rekenkern getest en bewezen correct (mediaan i.p.v. som/som, elke
+  // metric zijn eigen k-anonimiteitscheck), dan pas een consument. Het gemarkete "God View"-module
+  // (lib/marketing/modules.ts) staat zelf nog op gebouwd:false; dit bestand is de fundering
+  // waarop de drie tiers moeten rusten, geen tier zelf.
+  ["lib/benchmark/god-view.ts",
+    "God View-kernlaag: mediane CPA/ROAS per k-anonieme cel over alle opt-in-bureaus heen. " +
+    "Wacht op een consument (route/UI/tier-gating)"],
+
   // 11 augustus 2026: op beide homepage-plekken losgekoppeld nadat bleek dat de enige echte
   // productbeelden een Nederlandstalige UI tonen onder een Engelstalige, wereldwijd gepositioneerde
   // pagina -- tegensprekend bewijs, niet ontbrekend bewijs, en dus erger dan de fallback die hij
