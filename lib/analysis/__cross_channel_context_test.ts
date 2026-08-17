@@ -30,7 +30,7 @@ async function main() {
   // ── Nog nooit gedraaid: nul promptwijziging, geen valse zekerheid ──
   console.log("crossChannelContext: nog geen eerdere run");
   {
-    const result = await crossChannelContext(mockSupabase(null), "demo-greentech");
+    const result = await crossChannelContext(mockSupabase(null), "demo-greentech", "meta_ads");
     check("available is false", result.available === false);
     check("promptContext is leeg", result.promptContext === "", result.promptContext);
     check("analysisDate is null", result.analysisDate === null);
@@ -42,12 +42,35 @@ async function main() {
     const result = await crossChannelContext(
       mockSupabase({ output: "## Cross-channel-signalen\n\nDubbele warme pool gedetecteerd.", analysis_date: "2026-07-15" }),
       "demo-greentech",
+      "meta_ads",
     );
     check("available is true", result.available === true);
     check("analysisDate komt uit de rij, niet 'vandaag'", result.analysisDate === "2026-07-15", result.analysisDate ?? "null");
     check("promptContext bevat de datum expliciet", result.promptContext.includes("2026-07-15"));
     check("promptContext bevat de opgeslagen bevinding", result.promptContext.includes("Dubbele warme pool"));
     check("promptContext waarschuwt tegen het herschrijven van kanaalcijfers", result.promptContext.includes("Verzin geen cross-channel-cijfers"));
+  }
+
+  // ── Kanaalscope expliciet in de instructie (masterplan 16.8): een live testrun liet Meta een
+  // Google Ads-budgetactie aanbevelen; de instructie moet nu letterlijk zeggen voor welk kanaal
+  // acties wel/niet mogen, met een concreet verboden-voorbeeld. ──
+  console.log("crossChannelContext: kanaalscope expliciet per kanaal");
+  {
+    const metaResult = await crossChannelContext(
+      mockSupabase({ output: "## Cross-channel-signalen\n\ngoogle_ads presteert zwak.", analysis_date: "2026-07-15" }),
+      "demo-greentech",
+      "meta_ads",
+    );
+    check("noemt het eigen kanaal (Meta Ads) expliciet als scope", metaResult.promptContext.includes("Meta Ads"), metaResult.promptContext);
+    check("waarschuwt letterlijk tegen een Google Ads-budgetactie", metaResult.promptContext.includes("Google Ads") && metaResult.promptContext.toLowerCase().includes("budget"));
+
+    const linkedinResult = await crossChannelContext(
+      mockSupabase({ output: "## Cross-channel-signalen\n\ngoogle_ads presteert zwak.", analysis_date: "2026-07-15" }),
+      "demo-greentech",
+      "linkedin_ads",
+    );
+    check("hetzelfde blok noemt LinkedIn Ads als scope voor dat kanaal", linkedinResult.promptContext.includes("LinkedIn Ads"), linkedinResult.promptContext);
+    check("Meta- en LinkedIn-promptteksten verschillen (kanaal-specifiek, geen kopie)", metaResult.promptContext !== linkedinResult.promptContext);
   }
 
   // ── Uitzonderlijk lange output wordt afgekapt, niet integraal doorgegeven ──
@@ -57,6 +80,7 @@ async function main() {
     const result = await crossChannelContext(
       mockSupabase({ output: langeOutput, analysis_date: "2026-08-01" }),
       "demo-greentech",
+      "meta_ads",
     );
     check("promptContext is korter dan de ruwe output", result.promptContext.length < langeOutput.length);
     check("promptContext meldt de afkapping", result.promptContext.includes("afgekapt"));

@@ -1,6 +1,8 @@
-import { beoordeelCel, type Celsleutel, type Celtelling } from "./cel";
+import { beoordeelCel, type Celdrempels, type Celsleutel, type Celtelling } from "./cel";
 import { median } from "@/lib/util/stats";
 import type { Bedrijfsmodel } from "./segment";
+
+export type { Celdrempels };
 
 // ============================================================================
 // GOD VIEW-KERNLAAG: DE ECHTE CIJFERS ACHTER DE CEL-BESLISSING
@@ -81,10 +83,11 @@ function sleutelTekst(s: Celsleutel): string {
 function metricMediaan(
   sleutel: Celsleutel,
   accounts: ReadonlyArray<{ agencyId: string; waarde: number }>,
+  drempels?: Celdrempels,
 ): { mediaan: number | null; n: number } {
   if (accounts.length === 0) return { mediaan: null, n: 0 };
   const telling: Celtelling = { accounts: accounts.length, bureaus: new Set(accounts.map((a) => a.agencyId)).size };
-  if (!beoordeelCel(sleutel, telling).deelbaar) return { mediaan: null, n: 0 };
+  if (!beoordeelCel(sleutel, telling, drempels).deelbaar) return { mediaan: null, n: 0 };
   return { mediaan: median(accounts.map((a) => a.waarde)), n: accounts.length };
 }
 
@@ -94,8 +97,14 @@ function metricMediaan(
  *
  * Zelfde segmentatieregel als celoverzicht() in cel.ts: elke rij telt mee op elk niveau waarop hij
  * is afgebakend (model, niche, en de combinatie als beide aanwezig zijn).
+ *
+ * `drempels` is optioneel en bedoeld voor precies één, expliciet gelabelde aanroeper: de God
+ * View-testroute in een verlaagde-drempel-testmodus (masterplan 16.8). Zonder dit argument gelden
+ * altijd de echte k-anonimiteitsconstanten uit cel.ts — dit is dus geen manier om de functie in
+ * het algemeen te verzwakken, alleen een expliciete overschrijving die een aanroeper zelf moet
+ * kiezen.
  */
-export function bouwGodViewCellen(rijen: readonly GodViewInvoerRij[]): GodViewCel[] {
+export function bouwGodViewCellen(rijen: readonly GodViewInvoerRij[], drempels?: Celdrempels): GodViewCel[] {
   const groepen = new Map<string, { sleutel: Celsleutel; accounts: Map<string, AccountAgg> }>();
 
   const voegToe = (sleutel: Celsleutel, rij: GodViewInvoerRij) => {
@@ -125,13 +134,13 @@ export function bouwGodViewCellen(rijen: readonly GodViewInvoerRij[]): GodViewCe
     .map((g) => {
       const accountsArr = [...g.accounts.values()];
       const telling: Celtelling = { accounts: accountsArr.length, bureaus: new Set(accountsArr.map((a) => a.agencyId)).size };
-      const oordeel = beoordeelCel(g.sleutel, telling);
+      const oordeel = beoordeelCel(g.sleutel, telling, drempels);
       if (!oordeel.deelbaar) return { sleutel: g.sleutel, telling, metrics: null };
 
       const cpaAccounts = accountsArr.filter((a) => a.conversions > 0).map((a) => ({ agencyId: a.agencyId, waarde: a.spend / a.conversions }));
       const roasAccounts = accountsArr.filter((a) => a.spend > 0).map((a) => ({ agencyId: a.agencyId, waarde: a.conversionValue / a.spend }));
-      const cpa = metricMediaan(g.sleutel, cpaAccounts);
-      const roas = metricMediaan(g.sleutel, roasAccounts);
+      const cpa = metricMediaan(g.sleutel, cpaAccounts, drempels);
+      const roas = metricMediaan(g.sleutel, roasAccounts, drempels);
 
       return {
         sleutel: g.sleutel,

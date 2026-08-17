@@ -25,6 +25,7 @@
 //  - wel gedraaid -> de opgeslagen markdown-sectie plus een instructie over hoe te wegen.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { CHANNEL_CONFIG, type SopChannel } from "./sop-channel-config";
 
 export interface CrossChannelContextBlock {
   available: boolean;
@@ -38,7 +39,14 @@ const SECTION = "cross_channel_v1";
 // uitzonderlijk lange run (veel getriggerde signalen) die de promptcontext laat ontsporen.
 const MAX_CHARS = 6000;
 
-export async function crossChannelContext(supabase: SupabaseClient, clientId: string): Promise<CrossChannelContextBlock> {
+// 17 augustus 2026, live testrun (demo-greentech, masterplan 16.8): Meta's hypotheses-stap las
+// het cross-channel-blok en beval "verruiming van het budget binnen Google Ads" aan -- BINNEN de
+// Meta-analyse. LinkedIn deed het in dezelfde run wel goed: gebruikte hetzelfde blok alleen als
+// verklarende onderbouwing, acties bleven LinkedIn-eigen. `channel` is er daarom nu bij, zodat de
+// instructie expliciet kan zeggen VOOR WELK kanaal deze stap acties mag aanbevelen -- de vorige
+// versie zei alleen "gebruik dit om te verrijken", zonder te zeggen dat een ander kanaal noemen
+// nooit hetzelfde is als er een actie voor aanbevelen.
+export async function crossChannelContext(supabase: SupabaseClient, clientId: string, channel: SopChannel): Promise<CrossChannelContextBlock> {
   const { data } = await supabase
     .from("sop_analysis_output")
     .select("output, analysis_date")
@@ -58,6 +66,7 @@ export async function crossChannelContext(supabase: SupabaseClient, clientId: st
   const truncated = output.length > MAX_CHARS
     ? `${output.slice(0, MAX_CHARS)}\n\n[…afgekapt; volledige cross-channel-analyse in Bestanden > SOP's]`
     : output;
+  const channelLabel = CHANNEL_CONFIG[channel].headerLabel;
 
   const lines: string[] = [
     "## CROSS-CHANNEL-CONTEXT (tussen de kanalen — verklarende laag; vervangt de eigen bevindingen van dit kanaal NIET)",
@@ -66,10 +75,11 @@ export async function crossChannelContext(supabase: SupabaseClient, clientId: st
     "",
     truncated,
     "",
-    "INSTRUCTIE — gebruik dit uitsluitend om hypotheses te VERRIJKEN of te NUANCEREN, niet om cijfers van dit kanaal te herschrijven:",
+    `INSTRUCTIE — deze stap analyseert uitsluitend ${channelLabel}. Gebruik dit blok alleen om ${channelLabel}-hypotheses te VERRIJKEN of te NUANCEREN, nooit om een actie voor een ANDER kanaal aan te bevelen:`,
     "- Een hypothese die een patroon hierboven bevestigt of verklaart is sterker; noem de cross-channel-vinding er expliciet bij.",
     "- Een hypothese die dit blok tegenspreekt mag alsnog, maar benoem de tegenspraak — verzwijg 'm niet.",
     "- Verzin geen cross-channel-cijfers die niet hierboven staan.",
+    `- ELKE aanbevolen actie moet iets zijn dat binnen ${channelLabel} zelf wordt uitgevoerd. Noemt dit blok een ander kanaal (bijv. Google Ads, LinkedIn Ads, Meta Ads) met een eigen probleem, gebruik dat dan als VERKLARING waarom ${channelLabel} zo presteert — nooit als onderwerp van een aanbeveling. Een zin als "verhoog het budget van Google Ads" hoort hier nooit te staan, ook niet als het cross-channel-blok dat lijkt te suggereren.`,
   ];
 
   return { available: true, analysisDate, promptContext: lines.join("\n") };

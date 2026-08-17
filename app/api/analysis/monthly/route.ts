@@ -1107,7 +1107,7 @@ async function runMetaMonthlyAnalysis(
   // Cross-channel als verklarende context (masterplan 16.4/16.5): landt alleen in stap 6
   // (Hypotheses en Sprintplanning), zodat een Meta-hypothese kan weten dat LinkedIn dezelfde warme
   // pool retarget. Leeg zonder eerdere cross-channel-run → stap 6 draait ongewijzigd door.
-  const crossChannelText = (await crossChannelContext(supabase, clientId)).promptContext;
+  const crossChannelText = (await crossChannelContext(supabase, clientId, adapter.channel)).promptContext;
 
   // God View als verklarende context (masterplan 16.7): zelfde plek, stap 6. Degradeert vandaag
   // vrijwel altijd stil naar "" -- met minder dan 4 opt-in-bureaus in de pool kan geen enkele cel
@@ -1309,7 +1309,7 @@ async function runLinkedinMonthlyAnalysis(
 
   // Cross-channel als verklarende context (masterplan 16.4/16.5), zelfde plek als bij Meta: alleen
   // stap 6 (Hypotheses en Sprintplanning).
-  const crossChannelText = (await crossChannelContext(supabase, clientId)).promptContext;
+  const crossChannelText = (await crossChannelContext(supabase, clientId, adapter.channel)).promptContext;
 
   // God View als verklarende context (masterplan 16.7), zelfde plek en zelfde stille degradatie
   // als bij Meta.
@@ -1986,7 +1986,7 @@ ${runningContext}`,
     const ga4ContextText = ga4Context.promptContext ? `\n\n${ga4Context.promptContext}` : "";
     // Cross-channel als verklarende context (masterplan 16.4/16.5): landt alleen in stap 13
     // (Hypotheses & Sprintplanning), niet in de eerdere kanaal-specifieke stappen.
-    const crossChannelGoogleText = (await crossChannelContext(supabase, clientId)).promptContext;
+    const crossChannelGoogleText = (await crossChannelContext(supabase, clientId, "google_ads")).promptContext;
     // God View als verklarende context (masterplan 16.7), zelfde plek, zelfde stille degradatie.
     const godViewGoogleText = (await godViewContext(supabase, clientId, "google_ads")).promptContext;
     const preparedInputs: MonthlyPreparedInputs = {
@@ -2443,8 +2443,8 @@ ${runningContext}`,
         parsed7b.findings = applyStep5FindingTruth(parsed7b.findings, step5TruthMap);
       }
 
-      const mergedParsed = mergeParsedStepOutputs([parsed7a, parsed7b], 7, "Demand & Search Intelligence");
-      const mergedValidation = validateStepOutput(7, {
+      let mergedParsed = mergeParsedStepOutputs([parsed7a, parsed7b], 7, "Demand & Search Intelligence");
+      let mergedValidation = validateStepOutput(7, {
         narrative: mergedParsed.narrative,
         log_entries: mergedParsed.log_entries,
         top_3_findings: mergedParsed.findings,
@@ -2452,6 +2452,62 @@ ${runningContext}`,
         actions: mergedParsed.actions,
         step_conclusion: mergedParsed.step_conclusion,
       }, priorStepConclusion, { availability: stepAvailabilityByStep.get(7) });
+
+      // Stap 7a/7b hadden, anders dan elke andere stap in deze route en in de Meta/LinkedIn-
+      // routes, geen repair-tweede-kans: een geldigheidsfout op de SAMENGEVOEGDE output (7a+7b)
+      // blokkeerde de hele stap zonder dat het model ooit de kans kreeg zichzelf te corrigeren.
+      // Ontdekt 17 augustus 2026 op een live testrun (demo-greentech): "Verboden woord in actie"
+      // plus een evidence-level-mismatch ("deterministic" op een finding die het narratief zelf
+      // als niet-beschikbaar markeerde) blokkeerden stap 7 volledig. Zelfde patroon als
+      // runNarrativeStep hierboven, hier toegepast op de samengevoegde 7a+7b-output i.p.v. een
+      // los antwoord, want de validatie draait al op de merge, niet op de losse helften.
+      let step7RepairTokens = 0;
+      let step7Repaired = false;
+      if (shouldRepairStep(mergedValidation, repairCount > 5)) {
+        logger.warn("[monthly] Step 7 (merged 7a+7b) repair triggered", {
+          errors: mergedValidation.errors,
+          heavyWarnings: countHeavyWarnings(mergedValidation),
+        });
+        repairCount++;
+        const mergedForRepair = JSON.stringify({
+          narrative: mergedParsed.narrative,
+          log_entries: mergedParsed.log_entries,
+          top_3_findings: mergedParsed.findings,
+          status: mergedParsed.status,
+          actions: mergedParsed.actions,
+          step_conclusion: mergedParsed.step_conclusion,
+        }, null, 2);
+        const repairMessage = buildStepRepairUserMessage(
+          `Dit is de samengevoegde output van stap 7 (classificatie + acties), niet een los antwoord op een eigen vraag:\n\`\`\`json\n${mergedForRepair}\n\`\`\``,
+          mergedValidation,
+          runningContext,
+          stepAvailabilityByStep.get(7)?.promptNote
+        );
+        const repairedStep = await runStep({
+          ...shared,
+          stepNumber: 7,
+          stepName: "Demand & Search Intelligence",
+          jsonMode: true,
+          systemPrompt: buildMonthlyStepPrompt(
+            goalsSection,
+            accountType,
+            `${adapter.stepInstructions[7]}\n\n${MONTHLY_STEP7_CLASSIFICATION_INSTRUCTION}\n\n${MONTHLY_STEP7_ACTIONS_INSTRUCTION}`,
+            `${runningContext}\n\n${conclusions.slice(-2).join("\n\n")}`,
+            adapter,
+            geheugenMetTaken,
+            signalsSection
+          ),
+          userMessage: repairMessage,
+        });
+        const repairedResult = parseStructuredStepOutput(repairedStep, priorStepConclusion, stepAvailabilityByStep.get(7), canonicalMetricMap, liveTermSet);
+        step7RepairTokens = repairedStep.tokensUsed;
+        if (repairedResult.validation.errors.length <= mergedValidation.errors.length) {
+          machineSteps.push(repairedStep);
+          mergedParsed = repairedResult.parsed;
+          mergedValidation = repairedResult.validation;
+          step7Repaired = true;
+        }
+      }
 
       const mergedStepOutput = JSON.stringify({
         narrative: mergedParsed.narrative,
@@ -2473,7 +2529,7 @@ ${runningContext}`,
           section: "Demand & Search Intelligence",
           output: mergedStepOutput,
           model_used: step7b.model,
-          tokens_used: step7a.tokensUsed + step7b.tokensUsed,
+          tokens_used: step7a.tokensUsed + step7b.tokensUsed + step7RepairTokens,
           step_number: 7,
           step_name: "Demand & Search Intelligence",
         },
@@ -2484,10 +2540,10 @@ ${runningContext}`,
         stepName: "Demand & Search Intelligence",
         output: mergedStepOutput,
         model: step7b.model,
-        tokensUsed: step7a.tokensUsed + step7b.tokensUsed,
+        tokensUsed: step7a.tokensUsed + step7b.tokensUsed + step7RepairTokens,
         saved: !saveResult.error,
         latencyMs: step7a.latencyMs + step7b.latencyMs,
-        retries: step7a.retries + step7b.retries,
+        retries: step7a.retries + step7b.retries + (step7Repaired ? 1 : 0),
       };
 
       steps.push(mergedStep);

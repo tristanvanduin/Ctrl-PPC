@@ -51,6 +51,28 @@ export const MIN_BUREAUS = 4;
 export const MIN_ACCOUNTS_COMBINATIE = 25;
 export const MIN_BUREAUS_COMBINATIE = 8;
 
+/**
+ * De vier drempels als één object, zodat een aanroeper ze samen kan overschrijven i.p.v. los.
+ * Optioneel op elke aanroepende functie hieronder -- zonder dit argument gelden altijd de
+ * module-constanten hierboven. Bestaat uitsluitend voor een expliciet gelabelde testmodus (zie
+ * app/api/platform/god-view/route.ts, masterplan 16.8): "puur voor de testfase, ik weet dat het
+ * niet anoniem is" was de eigenaar zelf, met klem, en alleen bereikbaar achter dezelfde harde
+ * ALL_CLIENTS-gate als de rest van God View. Nooit een default die van deze constanten afwijkt.
+ */
+export interface Celdrempels {
+  minAccounts: number;
+  minBureaus: number;
+  minAccountsCombinatie: number;
+  minBureausCombinatie: number;
+}
+
+const STANDAARD_DREMPELS: Celdrempels = {
+  minAccounts: MIN_ACCOUNTS,
+  minBureaus: MIN_BUREAUS,
+  minAccountsCombinatie: MIN_ACCOUNTS_COMBINATIE,
+  minBureausCombinatie: MIN_BUREAUS_COMBINATIE,
+};
+
 /** Op welk niveau een cel is afgebakend. */
 export type Celdiepte = "model" | "niche" | "model_en_niche";
 
@@ -84,7 +106,7 @@ export function diepteVan(sleutel: Celsleutel): Celdiepte | null {
  * is -- "alle accounts samen" is juist het veiligste vakje dat er is -- maar omdat hij niets
  * zegt: een gemiddelde over e-commerce en tandartsen door elkaar is geen benchmark.
  */
-export function beoordeelCel(sleutel: Celsleutel, telling: Celtelling): Celoordeel {
+export function beoordeelCel(sleutel: Celsleutel, telling: Celtelling, drempels: Celdrempels = STANDAARD_DREMPELS): Celoordeel {
   const diepte = diepteVan(sleutel);
   if (!diepte) {
     return {
@@ -95,8 +117,8 @@ export function beoordeelCel(sleutel: Celsleutel, telling: Celtelling): Celoorde
   }
 
   const combinatie = diepte === "model_en_niche";
-  const minA = combinatie ? MIN_ACCOUNTS_COMBINATIE : MIN_ACCOUNTS;
-  const minB = combinatie ? MIN_BUREAUS_COMBINATIE : MIN_BUREAUS;
+  const minA = combinatie ? drempels.minAccountsCombinatie : drempels.minAccounts;
+  const minB = combinatie ? drempels.minBureausCombinatie : drempels.minBureaus;
 
   const tekortA = Math.max(0, minA - telling.accounts);
   const tekortB = Math.max(0, minB - telling.bureaus);

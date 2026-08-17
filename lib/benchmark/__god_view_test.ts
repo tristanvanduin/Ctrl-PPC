@@ -100,5 +100,21 @@ console.log("Meertelling per niveau");
   check("combinatiecel bestaat", namen.includes("b2b/saas"));
 }
 
+// ── Testmodus-drempels (masterplan 16.8): optioneel argument, nooit de standaard ────────────
+
+console.log("Overschreven drempels: expliciet argument nodig, standaard blijft ongewijzigd");
+{
+  // Twee accounts, één bureau -- ver onder de echte drempel (10 accounts, 4 bureaus).
+  const acc = accounts(2, 1);
+  const standaard = bouwGodViewCellen(acc);
+  const standaardCel = standaard.find((c) => c.sleutel.model === "b2b")!;
+  check("zonder argument blijft de echte drempel gelden", standaardCel.metrics === null, JSON.stringify(standaardCel));
+
+  const testmodus = bouwGodViewCellen(acc, { minAccounts: 1, minBureaus: 1, minAccountsCombinatie: 2, minBureausCombinatie: 1 });
+  const testmodusCel = testmodus.find((c) => c.sleutel.model === "b2b")!;
+  check("met expliciet verlaagde drempel wordt dezelfde cel wel deelbaar", testmodusCel.metrics !== null, JSON.stringify(testmodusCel));
+  check("de mediaan zelf blijft correct berekend in testmodus", testmodusCel.metrics?.medianCpa === 100, `${testmodusCel.metrics?.medianCpa}`);
+}
+
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);
