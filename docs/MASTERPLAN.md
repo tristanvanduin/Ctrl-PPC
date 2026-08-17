@@ -1964,17 +1964,27 @@ zes gelijke tenant-lekken — `benchmark_sectors` heeft geen `client_id`-kolom (
 branchebenchmarks, geen klantdata), dus geen tenant-lek, alleen een opgeschoonde policy-naam
 nodig.
 
-**Gedaan:** `scripts/migrations/096_rls_auth_read_opruiming.sql` dicht alle zes, met het
+**Gedaan, en inmiddels ook echt toegepast (17 augustus, later dezelfde dag).**
+`scripts/migrations/096_rls_auth_read_opruiming.sql` dicht alle zes, met het
 `app_zichtbare_klanten()`-patroon uit 065/067/081 voor de vijf echte klanttabellen. De ene
 tabel met een rechtstreekse browser-lezer (`ads_video_placements`, via
 `components/dashboard/video-placements.tsx`) is eerst omgebouwd naar
 `lib/data-access/client-read.ts` (`dbSelect`) → `GET /api/data/[table]`, en toegevoegd aan
 `READABLE_TABLES` in `lib/data-access/read-policy.ts` — dezelfde volgorde (leeskant eerst, dan de
 policy) als 065/067 zelf voorschrijven. De overige vijf hadden geen browser-lezer, dus voor die
-vijf kon de policy direct. **Net als 094/095: het SQL-bestand is klaargezet, niet toegepast** —
-deze sandbox heeft geen `SUPABASE_ACCESS_TOKEN`. Draaien met `node scripts/supabase-sql.mjs
---file scripts/migrations/096_rls_auth_read_opruiming.sql` zodra iemand met databasetoegang dat
-kan doen, met de controlequery aan het eind van het bestand om te bevestigen.
+vijf kon de policy direct.
+
+De eigenaar deelde `SUPABASE_ACCESS_TOKEN` en de project-URL later dezelfde dag. Vóór het
+toepassen eerst de live status nagekeken (niet aangenomen): alle acht tabellen uit migratie 065
+en alle negentien uit 081 bleken al écht RLS te dragen met precies één beleidsregel — bevestigt
+de correctie hierboven definitief, met een live query, niet alleen redenatie. De zes tabellen uit
+096 stonden nog op hun oude policy (`auth_read`/"Allow all for authenticated", exact zoals
+verwacht). Migratie uitgevoerd, direct erna geverifieerd met de eigen controlequery: elke tabel
+heeft nu precies de nieuwe `_zichtbaar`-policy plus (waar van toepassing) `service_role_all` — geen
+enkele tabel zonder policy. **Resultaat, met een aparte query gemeten: 127 van de 127 tabellen in
+`public` hebben nu RLS — volledige dekking.** Migraties 094 en 095 bleken bij diezelfde
+gelegenheid al eerder toegepast (`ga4_config`/`search_console_config` bestonden al als kolommen op
+`client_settings`) — niet door deze sessie gedaan, wel nu bevestigd in plaats van aangenomen.
 
 **Correctie op de correctie in sectie 7:** de eerdere versie van deze sectie corrigeerde
 `"Een Second Opinion-run (draait al, RLS via migratie 065)"` in sectie 7 als onjuist. Gegeven het
@@ -1982,10 +1992,13 @@ bewijs hierboven was die oorspronkelijke regel in sectie 7 waarschijnlijk WEL co
 blijft daarom ongewijzigd; deze sectie is de plek waar de geschiedenis van de vergissing staat,
 niet sectie 7 zelf.
 
-**Voor Bureau twee blijft gelden:** RLS-bureaugrens narekenen met een echte tweede `agency_id`
-(sectie 9) is nog steeds de juiste stap vóór een tweede bureau een klant koppelt — nu om migratie
-081's én 096's toepassingsstatus te bevestigen (met `check-rls-scheiding.mjs` of een directe
-`pg_policies`-query), niet om een gat te vrezen dat grotendeels al gesloten is of klaarstaat.
+**Voor Bureau twee blijft gelden:** RLS-dekking is nu voor alle 127 tabellen bevestigd (hierboven,
+live gemeten). Wat nog steeds ontbreekt is het functionele bewijs: `scripts/check-rls-scheiding.mjs`
+echt inloggen als twee verschillende bureaus en meten dat rijen daadwerkelijk gescheiden blijven —
+dat vraagt `NEXT_PUBLIC_SUPABASE_ANON_KEY` en `SUPABASE_SERVICE_ROLE_KEY`, die deze sessie niet
+kreeg (alleen `SUPABASE_ACCESS_TOKEN` en de project-URL, genoeg voor DDL maar niet voor een
+ingelogde sessie). Een policy die bestaat is niet hetzelfde als een policy die bewezen de juiste
+rijen tegenhoudt — dat blijft de juiste stap vóór een tweede bureau een klant koppelt.
 
 ### 15.2 Correctie op sectie 14.3: het skelet is niet overal even dood
 
