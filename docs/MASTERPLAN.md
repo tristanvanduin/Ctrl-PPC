@@ -1829,18 +1829,30 @@ grote-metriek-primitive. Maar losse "kaart"-divs zijn grotendeels handgerold:
 `components/dashboard`. Geen bug, wel opgehoopte inconsistentie — een toekomstige
 kaart-stijlwijziging moet vandaag op 48 plekken los worden doorgevoerd.
 
-### 14.8 Kaartoverloop: twee bekende, nog open bugs
+### 14.8 Kaartoverloop: de twee gemelde "bugs" waren fout-positieven in de checker, niet in het product
 
-`scripts/check-kaartoverloop.mjs` gedraaid op 17 augustus (na de homepage-wijzigingen, die zelf
-schoon zijn — dit script test alleen ingelogde paginas, niet de marketingsite). Twee bestaande,
-niet aan deze sessie gerelateerde overloopbugs gevonden en nog niet gefixt:
+**Bijgewerkt, zelfde dag.** `scripts/check-kaartoverloop.mjs` meldde op 17 augustus 6 bevindingen op
+`bevindingen` en 25 op `app-instellingen`. Voor beide eerst een screenshot en volledige
+DOM-inspectie gedaan voordat er iets aangepast werd — geen van beide bleek een echte
+kaartoverloop:
 
-| Scherm | Aantal | Voorbeeld |
-|---|---|---|
-| `bevindingen` | 6 | "Biedstrategie evaluatie: controleer per..." (51px onder de kaartrand) |
-| `app-instellingen` | 25 | ".env.local" (3px onder), "Verplicht" (36-116px onder) |
+- **`bevindingen`**: een takenlijst met `max-h-[400px] overflow-y-auto`
+  (`components/dashboard/client-dashboard.tsx`'s `TasksBlock`) knipt zijn eigen inhoud al netjes af
+  — bevestigd met `clientHeight`/`scrollHeight` én een screenshot met een schone onderrand. De
+  detector checkte alleen het `overflow` van de buitenste kaart, niet van deze tussenliggende
+  scrollcontainer.
+- **`app-instellingen`**: de env-var-instructies zitten in een gesloten `<details>`
+  (`components/settings/koppeling-kaart.tsx`, "Alternatief: handmatig via .env.local"). Chromium
+  geeft `getBoundingClientRect()` op verborgen `<details>`-inhoud een echte, niet-nul positie
+  terug — anders dan bij `display: none` — terwijl er niets te zien is (bevestigd met
+  `getComputedStyle` en een screenshot). De detector had geen uitzondering voor een gesloten
+  `<details>`-voorouder.
 
-Zelftest van het script (teruggezette testbug) werkte correct. Open actiepunt, klein qua omvang.
+**Gefixt in de detector zelf** (`scripts/check-kaartoverloop.mjs`, niet in de productcode, want
+daar zat de fout): twee nieuwe uitsluitingen — een tussenliggende voorouder met
+`overflow-y: auto/scroll` of `overflow: hidden/clip`, en een gesloten `<details>`-voorouder. Beide
+pagina's zijn nu schoon; de zelftest (de echte `h-full`-in-rastercel-bug teruggezet) vindt hem nog
+steeds. Geen productwijziging nodig — het scherm was altijd al goed.
 
 ### 14.9 Mobile: resterende verificatiegaten (herbevestiging van sectie 13.2's eigen voorbehoud)
 
