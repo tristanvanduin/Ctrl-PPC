@@ -2412,3 +2412,194 @@ de unit tests) een gevulde cel te laten tonen — dat vergt schrijfrechten op de
 zelf, een andere en groter ingreep dan de gequarantainede single-tenant demo-klant, en is bewust
 niet zonder expliciete toestemming gedaan; de trend/churn-risk/opportunity-lagen die de
 marketingtekst belooft.
+
+## 17. Live testrun tegen productie: echte bevindingen, echte fixes (17 augustus 2026)
+
+De eigenaar vroeg letterlijk een monthly SOP te draaien op de demo-klant, alle kanalen, om te
+zien hoe cross-channel/God View zich in de praktijk gedragen en hoe kwalitatief de output is. Dit
+is voor het eerst deze sessie dat de LLM-pijplijn zelf (niet alleen de deterministische lagen)
+tegen echte productie-infrastructuur is gedraaid, met echte OpenRouter- en Supabase-sleutels die
+de eigenaar zelf aanleverde (zie 17.1 voor de herkomst).
+
+### 17.1 Twee sleutels in de chat, één hergebruikt, twee routes om ze te krijgen
+
+De eigenaar gaf een OpenRouter-sleutel direct, en voor Supabase opnieuw dezelfde
+`SUPABASE_ACCESS_TOKEN` (Management API personal access token) als eerder deze sessie — al
+gemarkeerd als "moet geroteerd worden" en nu een tweede keer in de chatgeschiedenis beland. Om
+de app zelf (die een service-role JWT nodig heeft, geen Management-API-token) lokaal te kunnen
+draaien is de Management API's `GET /v1/projects/{ref}/api-keys`-endpoint gebruikt om de
+bijbehorende `anon`/`service_role`-JWT's op te halen — een legitieme, bestaande Supabase-
+mogelijkheid, geen omweg. Alles kwam in een lokale `.env.local` (gegarandeerd genegeerd door git,
+`.gitignore:34`), nooit gecommit, en na afloop verwijderd. **Beide sleutels — OpenRouter en
+Supabase — moeten geroteerd worden**, expliciet aan de eigenaar gemeld.
+
+### 17.2 Twee losstaande, echte bugs in de demo-seed gevonden tijdens de eerste échte insert-run
+
+`scripts/demo/seed-demo-client.ts` en `teardown-demo-client.ts` waren tot vandaag nooit met
+succes tegen de live database gedraaid — alleen via `--check` (in-memory, JS-getallen, ziet geen
+van beide problemen):
+
+1. **`delete` gebruikte de logische tabelnaam i.p.v. `fysiekeTabel()`.** Sommige tabellen zijn
+   hernoemd naar een fysieke `_legacy`-naam met een view eroverheen (bijv. `meta_ad_daily` ->
+   `meta_ad_daily_legacy`); de insert gebruikte al wel `fysiekeTabel()`, de delete ervoor niet.
+   Gevolg: oude rijen bleven stilzwijgend staan (seed) of de delete faalde hard ("cannot delete
+   from view", teardown). Beide bestanden gefixt; `insertViaSupabase` controleert nu ook de fout
+   van de delete zelf, die stond er niet.
+2. **Fractionele dag-snelheden (bijv. 0,25 leads/dag, voor lage-volume LinkedIn-scenario's) gingen
+   naar `bigint`-kolommen** (`one_click_leads`, `external_website_conversions`,
+   `linkedin_demographic_daily.leads`) die geen decimalen accepteren. Losse `Math.round()` per dag
+   zou zulke snelheden structureel naar 0 afronden (0,25 rondt élke dag naar 0) en de
+   S5/S6/S8/S9-scenario's leegtrekken; nieuwe `heelGetal()`-helper rondt cumulatief af
+   (Bresenham-achtig) zodat de bedoelde som exact bewaard blijft. Geverifieerd met `--check` na de
+   wijziging: alle scenario's triggeren nog identiek.
+
+Resultaat: demo-greentech staat voor het eerst volledig en correct geseed in productie.
+
+### 17.3 Cross-channel-koppeling werkt — met een echte, nu gefixte logicafout
+
+Drie monthly-SOP-runs (Meta, LinkedIn, Google) tegen demo-greentech, plus een handmatige
+cross-channel-trigger vooraf zodat stap 6/13 verse context had. Cross-channel-citaten kwamen
+expliciet terug in zowel Meta's als LinkedIn's hypotheses-stap ("Blended cross-channel signaal",
+de LinkedIn-vs-Google-conversieratiovergelijking) — de koppeling uit 16.5 werkt.
+
+**Maar Meta's stap 6 beval "verruiming van het budget binnen Google Ads" aan — bínnen de
+Meta-analyse.** LinkedIn's stap 6 gebruikte in dezelfde run hetzelfde cross-channel-blok wél
+correct: alleen als onderbouwing, acties bleven LinkedIn-eigen. **Gefixt:**
+`crossChannelContext()` (`lib/analysis/cross-channel-context.ts`) kreeg een verplicht
+`channel`-argument; de instructie noemt nu expliciet het eigen kanaal als enige toegestane
+actie-scope, met een letterlijk verboden voorbeeldzin ("verhoog het budget van Google Ads")
+zodat een ander kanaal noemen nooit meer hetzelfde is als er een actie voor aanbevelen. Getest
+(`__cross_channel_context_test.ts`): Meta- en LinkedIn-promptteksten verschillen nu aantoonbaar
+op exact dit punt.
+
+### 17.4 Google faalde de kwaliteitspoort — een echt gat in het repair-mechanisme, niet in de regel
+
+Google's run werd geblokkeerd bij stap 7 ("Demand & Search Intelligence", de samengevoegde 7a+7b
+zoektermanalyse): het model claimde `"deterministic"` bewijsniveau op findings die het narratief
+zelf al "niet beschikbaar" noemde, plus een verboden woord ("Onderzoek...") in een actiepunt. De
+kwaliteitspoort deed hier precies zijn werk — dit is geen valse-positiefbug in de regel zelf.
+
+**Het echte gat:** stap 7a/7b was, anders dan elke andere stap in zowel de Google- als de
+Meta/LinkedIn-route, de ENIGE zonder repair/retry-mechanisme. Elke andere stap krijgt bij een
+validatiefout een herkansing (`shouldRepairStep`/`buildStepRepairUserMessage`/
+`pickBetterStepAttempt`, al overal elders gebruikt); stap 7 blokkeerde in één keer, zonder dat het
+model ooit de kans kreeg zichzelf te corrigeren. Gefixt: dezelfde repair-cyclus toegepast op de
+SAMENGEVOEGDE 7a+7b-output (de validatie draait al op de merge, niet op de losse helften) — één
+extra `runStep()`-aanroep in JSON-modus met de exacte foutmeldingen als feedback, alleen
+overgenomen als het resultaat niet slechter is dan het origineel. Tokens en retries van de repair
+tellen nu mee in de opgeslagen/gerapporteerde totalen (stonden er eerst niet in).
+
+### 17.5 God View-testmodus: expliciete, gelabelde drempeloverschrijving — nooit de standaard
+
+De eigenaar, met klem: *"anonimiteit in de test fase boeit me niet... bij relevantie moet het
+gewoon getriggerd worden."* Met de huidige, kleine bureaupool is de echte drempel nooit haalbaar
+(16.6/16.7), en de vraag was niet "verzwak de regel" maar "laat de mechaniek zien werken".
+
+`lib/benchmark/cel.ts`'s `beoordeelCel()` en `lib/benchmark/god-view.ts`'s `bouwGodViewCellen()`
+kregen een optioneel `Celdrempels`-argument (`{minAccounts, minBureaus,
+minAccountsCombinatie, minBureausCombinatie}`), standaard `undefined` — zonder dit argument
+gelden altijd de echte module-constanten, voor élke bestaande aanroeper ongewijzigd, inclusief de
+live SOP-hypotheses-stap via `god-view-context.ts`. Alleen `/api/platform/god-view` (al
+`ALL_CLIENTS`-gegated) kreeg een `?testdrempel=true`-query-parameter die de drempel expliciet naar
+1 account/1 bureau zet (2/1 voor de combinatie) en de respons `testMode: true` plus een
+waarschuwing meegeeft, zodat dit nooit met een echte, k-anonieme uitkomst te verwarren is. Getest:
+dezelfde celdata is `metrics: null` zonder het argument en `metrics: {...}` mét — de standaard
+blijft aantoonbaar ongewijzigd.
+
+### 17.6 Een echte, live merknaam-lek gevonden: "Ranking Masters" in elke OpenRouter-aanroep
+
+Bij het bekijken van de OpenRouter-kostendashboard bleek "Top Apps" de aanroepende app te tonen
+als `https://ranking-masters-dashboard.vercel.app` — een naam die de eigenaar deze sessie
+herhaaldelijk en met klem heeft afgewezen als hardcoding-voorbeeld. Gevonden:
+`lib/analysis/openrouter-client.ts:210` had een hardgecodeerde `HTTP-Referer:
+"https://ranking-masters-dashboard.vercel.app"` in ELKE OpenRouter-aanroep die dit product ooit
+doet — een restant van vóór de rebrand naar Ctrl PPC, nooit meegenomen toen de rest van het
+product wél werd hernoemd. Gefixt naar `https://www.ctrlppc.com` plus een `X-Title: "Ctrl PPC"`
+-header (ontbrak, hoort er ook bij).
+
+**Breder gecheckt, de rest bleek legitiem.** Elke andere plek waar "Ranking Masters" in de
+codebase voorkomt is een BEWUSTE, al langer bestaande bescherming tegen precies dit probleem, geen
+lek: `lib/branding/brand.ts`'s `LEGACY_OWNER_TEAM` en `lib/schema/analysis-schema.ts`'s
+Owner-schema normaliseren historische databasewaarden (rijen van vóór de naamswijziging naar RAI
+Amsterdam, en daarvoor) bij het LEZEN, zodat oude rijen nooit ongeldig worden of verkeerd
+meetellen — met het expliciete voornemen dat die lijst "hoort te krimpen, niet te groeien".
+`lib/clients.ts` heeft een interne `id: "ranking-masters"` als STABIELE opslagsleutel (de comment
+zegt letterlijk waarom: "dat is een sleutel waar opgeslagen rijen naar verwijzen"), met als
+zichtbare naam al "RAI Amsterdam" — nergens toont de UI de oude naam. Niets hiervan aangepast;
+alleen de daadwerkelijke, zichtbare lek (de OpenRouter-header) was een echt gat.
+
+### 17.7 Kosten: hoger dan geschat, en waarom — de "reasoning-laag" (Grok 4.6) werd niet meegeteld
+
+Eerste schatting (louter op `tokensUsed` × Gemini 3.7 Flash-prijzen): €0,09–€0,42, realistisch
+~€0,17. Werkelijke OpenRouter-rekening over dezelfde periode: **$0,41** (na correctie van een
+eerder gedeeld, verkeerd screenshot). Verklaring gevonden: `lib/analysis/llm-router.ts` kent naast
+de tier-gebaseerde `MODEL_CATALOG` (alleen Gemini) een APARTE `LAYER_MODEL`-tabel met een
+`reasoning`-laag die `x-ai/grok-4.6` als primair model gebruikt (fallback: Gemini 3.7 Flash) —
+zichtbaar bevestigd in de OpenRouter-grafiek (Grok 4.6-balken binnen exact het testvenster) en in
+`lib/analysis/o2-targets-cost.ts`'s eigen prijstabel: Grok 4.6 kost $2,00 in / $6,00 uit per 1M
+tokens, ruim 5x zo duur als Gemini 3.7 Flash. De checkpoint-/synthese-stappen ("redeneren over
+eerder werk, geen los datapunt", `lib/analysis/helpers.ts:388`) gebruiken deze laag — mijn
+schatting nam alleen de tier-keten mee en miste deze aparte, duurdere laag volledig. Geen bug,
+een onvolledige kostenschatting van mijn kant.
+
+### 17.8 Nog niet gestart: de kwaliteitslat naar 9/10, en de kanaaloverstijgende synthese-output
+
+De eigenaar zette een harde kwaliteitslat: *"prima start, maar die 5/10 moet naar een steady 9/10
+voordat we kunnen verkopen."* En een structurele eis, herhaald en aangescherpt: cross-channel moet
+niet alleen per kanaal geïnjecteerde context zijn (16.5, nu kanaal-scoped, 17.3), maar een eigen,
+gesynthetiseerde, kanaaloverstijgende output — *"het beste van alle kanaal inzichten omgetoverd
+naar 1 concrete goede output."* Vandaag gefixt: de directe logicafout (17.3) en het repair-gat
+(17.4). Nog niet gebouwd: de eigenlijke cross-channel-synthese-stap (een nieuwe, LLM-gedreven laag
+bovenop de al-deterministische signalen) — te groot en te architectuurbepalend om er zonder
+scope-bevestiging aan te beginnen. Ook nog niet gestart: GreenTech's drie sub-accounts (Amsterdam/
+GRT, North America/GRN, Americas/GRA) als aparte eenheden behandelen in cross-account-analyse —
+vandaag bestaat die scheiding alleen als naamgevingsconventie in campagnenamen en
+`geo_clone_settings`, niet als aparte account-rijen; welke van de twee de eigenaar wil (echte
+scheiding vs. een vergelijkingslaag bovenop de bestaande geo-clone-dimensie) is nog niet
+vastgesteld.
+
+### 17.9 17.6 was te vroeg tevreden — een tweede, bredere sweep met een strengere maatstaf
+
+De eigenaar wees 17.6's conclusie expliciet af: *"zichtbare naam moet ctrl ppc zijn. niet rai,
+niet rai Amsterdam, niet ranking masters, niet rm"* — vier met naam genoemde verboden vormen, "RAI
+Amsterdam" nadrukkelijk inbegrepen. 17.6 had die naam nog als "nergens toont de UI de oude naam"
+beoordeeld; dat bleek een te lage lat. Herzocht met de brede grep uit 17.6 zelf, dit keer elke
+hit individueel gelezen in plaats van op bestandsniveau aangenomen:
+
+**Echte, zichtbare lekken gevonden en gefixt:**
+- `components/dashboard/dgm-view.tsx`: twee letterlijke, gerenderde UI-strings — "Open RM" (een
+  statkaart-label) en "...kan RM niet verder met afhankelijke taken" (een waarschuwingszin). Beide
+  verwezen naar de interne kant van een taak (tegenover "klant"), niet naar de tool. Gefixt door
+  het bestaande `ownerLabel()`/`OWNER_TEAM` uit `lib/branding/brand.ts` te gebruiken — hetzelfde
+  mechanisme dat `sprint-planning.tsx` en `eigenaar-kiezer.tsx` al gebruiken — in plaats van de
+  letterlijke afkorting. Geen nieuwe abstractie, hergebruik van wat er al stond.
+- `lib/prompts/sop-prompts.ts` (regels 225-231): de LLM-promptvoorbeelden voor
+  verantwoordelijkheidstoewijzing gebruikten "RM bouwt campagne" / "RM optimaliseert..." — zeven
+  keer — terwijl de regel direct erboven (216-217) al correct "**Bureau**" als rolnaam
+  introduceert. Dit is het gevaarlijkste type lek van de twee: een promptvoorbeeld dat het model
+  voordoet hoe het zelf mag praten, met reëel risico dat "RM" letterlijk terugkomt in een
+  gegenereerde hypothese of taak die een klant te zien krijgt. Alle zeven naar "bureau" gefixt,
+  consistent met de al-bestaande rolnaam.
+- `lib/clients.ts`: de demo-klant `id: "ranking-masters"` (sleutel blijft, zie 17.6) toonde als
+  naam "RAI Amsterdam" — een echte, bestaande, herkenbare locatie (Amsterdam RAI), en dus precies
+  het soort naam die de eigenaar nu expliciet uitsluit, los van of hij toevallig ook aan het oude
+  merk deed denken. Gewijzigd naar "Beursgroep Amsterdam": fictief, past bij de stijl van de
+  overige demo-klanten (Broedservice, Wobblez, Sabe, ...), en de onderliggende
+  beurs/geo-clone-machinery (`lib/rai/*`, `RAI_GEO_CLONES`) blijft functioneel ongewijzigd — dat is
+  interne modulenaamgeving, niet een zichtbare klantnaam.
+
+**Nagekeken en bewust ongewijzigd gelaten (geen zichtbare tekst, alleen interne naamgeving):**
+`rmLogoDataUri`/`rmLogoUrl`-variabelen en `// RM logo`-comments in de drie PDF-renderers
+(`lib/client-reports/pdf-renderer.ts`, `lib/second-opinion/pdf-renderer.ts`,
+`lib/analysis/sop-pdf-renderer.ts`, plus de route die ze aanroept) laden allemaal al correct
+`BRAND_LOGO_FILE` = `"ctrl-ppc-logo.png"` — het daadwerkelijk ingesloten logo is al goed, alleen de
+variabelenaam is verouderd. Hernoemen zou ~25 aanroepplekken raken voor nul zichtbaar effect; niet
+gedaan. Dezelfde afweging voor de "RM-blauw"/"RM-huisstijl"-comments in
+`components/branding/brand-theme-provider.tsx` en `brand-header-bar.tsx` (puur documentatie van
+wélke kleur de CSS-fallback is, geen tekst die ooit rendert) en voor de testbestanden die de
+`LEGACY_OWNER_TEAM`-normalisatie testen (interne dekking van 17.6's bewust blijvende mechanisme).
+
+**Les:** "geen van de UI-bestanden toont het" (17.6) was de verkeerde toets. De juiste toets is per
+string: rendert dit ooit, direct of via een LLM die het prompt-voorbeeld overneemt, op een scherm
+dat een klant ziet? Bij twijfel de string lezen in volledige context, niet het bestand op naam
+beoordelen.

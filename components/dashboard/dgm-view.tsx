@@ -8,7 +8,7 @@ import {
   AlertCircle, Info, ExternalLink,
 } from "lucide-react";
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
-import { isTeamOwner } from "@/lib/branding/brand";
+import { isTeamOwner, OWNER_TEAM, ownerLabel } from "@/lib/branding/brand";
 import { computeForecast, type ClientForecast, type ForecastKPI } from "@/lib/forecast";
 import { computeHealthScore, type HealthScore, type Anomaly } from "@/lib/health-score";
 import { getClientSettings } from "@/lib/client-settings";
@@ -1176,7 +1176,7 @@ export function DgmView({ clientId }: { clientId: string }) {
               </div>
               <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
                 <p className="text-lg font-bold text-rm-gray">{rmOpen}</p>
-                <p className="text-micro text-muted-foreground">Open RM</p>
+                <p className="text-micro text-muted-foreground">Open {ownerLabel(OWNER_TEAM).toLowerCase()}</p>
               </div>
               <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
                 <p className={`text-lg font-bold ${overdue > 0 ? "text-red-600" : "text-emerald-600"}`}>{overdue}</p>
@@ -1206,7 +1206,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                 {clientOpen > 2 && (
                   <div className="flex items-center gap-2 text-xs text-amber-600">
                     <Clock className="w-3.5 h-3.5 shrink-0" />
-                    <span>{clientOpen} taken wachten op de klant. Zonder deze input kan RM niet verder met afhankelijke taken.</span>
+                    <span>{clientOpen} taken wachten op de klant. Zonder deze input kan {ownerLabel(OWNER_TEAM)} niet verder met afhankelijke taken.</span>
                   </div>
                 )}
                 {pendingHyps > 0 && (

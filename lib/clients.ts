@@ -22,8 +22,10 @@ export const DEMO_CLIENTS: Client[] = [
   { id: "confidence-for-all", name: "Confidence for all", source: "demo" },
   { id: "fit-fysio", name: "FIT Fysio", source: "demo" },
   { id: "ocean-queens", name: "Ocean Queens", source: "demo" },
-  // Id blijft ongewijzigd: dat is een sleutel waar opgeslagen rijen naar verwijzen.
-  { id: "ranking-masters", name: "RAI Amsterdam", source: "demo" },
+  // Id blijft ongewijzigd: dat is een sleutel waar opgeslagen rijen naar verwijzen. Zichtbare
+  // naam mag geen echte, herkenbare organisatie noemen (masterplan 17.9) -- vandaar een fictieve
+  // beursorganisator i.p.v. de naam van de bestaande locatie.
+  { id: "ranking-masters", name: "Beursgroep Amsterdam", source: "demo" },
   { id: "wobblez", name: "Wobblez", source: "demo" },
   { id: "mobiliteitexpert", name: "Mobiliteitexpert", source: "demo" },
   { id: "mpc", name: "MPC", source: "demo" },

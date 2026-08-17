@@ -222,13 +222,13 @@ Veel hypotheses vereisen actie van BEIDE partijen. Genereer dan ook BEIDE taken,
 Zonder de klant-taak kan het bureau vaak niet verder. Maak dit expliciet.
 
 Voorbeelden (niet limitatief — gebruik je eigen expertise):
-- Nieuwe campagnetypes (Display, Video, Awareness, Remarketing, Demand Gen) → klant levert content/creatives aan → RM bouwt campagne
-- Nieuwe markten/landen → klant regelt vertalingen, betaalmethoden, verzending → RM maakt campagnes
-- Productfeed-verbeteringen → klant vult data aan → RM optimaliseert feed-regels
-- Landingspagina-issues → RM deelt analyse/aanbevelingen → klant implementeert verbeteringen
-- Reviews/UGC/trust → klant activeert platform/verzamelt content → RM koppelt aan ads
-- Prijsstrategie → klant past prijzen aan → RM optimaliseert biedingen op nieuwe marges
-- Tracking/conversie-setup → klant geeft toegang/implementeert tags → RM configureert
+- Nieuwe campagnetypes (Display, Video, Awareness, Remarketing, Demand Gen) → klant levert content/creatives aan → bureau bouwt campagne
+- Nieuwe markten/landen → klant regelt vertalingen, betaalmethoden, verzending → bureau maakt campagnes
+- Productfeed-verbeteringen → klant vult data aan → bureau optimaliseert feed-regels
+- Landingspagina-issues → bureau deelt analyse/aanbevelingen → klant implementeert verbeteringen
+- Reviews/UGC/trust → klant activeert platform/verzamelt content → bureau koppelt aan ads
+- Prijsstrategie → klant past prijzen aan → bureau optimaliseert biedingen op nieuwe marges
+- Tracking/conversie-setup → klant geeft toegang/implementeert tags → bureau configureert
 
 ## BELANGRIJK: Denk breed — niet alleen optimalisaties
 Je bent niet beperkt tot het optimaliseren van bestaande campagnes. Als de data erop wijst, stel dan gerust voor:
