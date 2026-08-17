@@ -673,7 +673,7 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
             runLabel="Analyseer markten"
           />
           <Section>Maandrapportage (SOP)</Section>
-          <SopTriggerButtons clientId={clientId} onAnalysisComplete={onComplete} onAnalysisError={onSopError} />
+          <SopTriggerButtons clientId={clientId} onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
       )}
       {analysisChannel === "meta" && (
@@ -704,7 +704,7 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
             description="Deterministische detectie: creative fatigue, frequency-saturatie, ranking-zwakte, hook/hold, plus segment-efficiëntie en budget-concentratie. Voedt de goedkeuringswachtrij."
           />
           <Section>Maandrapportage (SOP)</Section>
-          <SopTriggerButtons clientId={clientId} channel="meta_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} />
+          <SopTriggerButtons clientId={clientId} channel="meta_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
       )}
       {analysisChannel === "linkedin" && (
@@ -741,7 +741,7 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
             description="Deterministische detectie: lead-form drop-off, CPL-druk, engagement- en video-zwakte, plus demografie-efficiëntie/-drift en budget-concentratie. Voedt de goedkeuringswachtrij."
           />
           <Section>Maandrapportage (SOP)</Section>
-          <SopTriggerButtons clientId={clientId} channel="linkedin_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} />
+          <SopTriggerButtons clientId={clientId} channel="linkedin_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
       )}
       {analysisChannel === "blended" && (

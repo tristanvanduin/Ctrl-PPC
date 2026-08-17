@@ -176,6 +176,19 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Geen cross-channel maanddata (blended view leeg); minstens een kanaal moet gesynct zijn" }, { status: 404 });
   }
 
+  // Cross-channel bestaat om overlap TUSSEN kanalen te vinden (dubbele warme pool, zaai-oogst,
+  // KPI-arbitrage) -- met één kanaal is er niets om te kruisen, en de detectoren zouden alleen een
+  // lege of misleidende sub-analyse opleveren (bijv. kpiRelations vergelijkt kanalen onderling).
+  // Gate bij de bron, niet alleen bij de aanroepers (trigger-sops, sop-trigger-buttons): elke
+  // caller, ook een toekomstige, krijgt zo automatisch dezelfde regel.
+  const distinctChannels = new Set(channels.map((c) => c.channel));
+  if (distinctChannels.size < 2) {
+    return Response.json(
+      { error: `Cross-channel-analyse is pas relevant vanaf 2 gekoppelde kanalen — dit account heeft er nu ${distinctChannels.size} (${[...distinctChannels].join(", ") || "geen"}).`, skipped: true },
+      { status: 409 },
+    );
+  }
+
   // Data-volledigheid per kanaal: conversies/spend/waarde over het venster, voor de conversie-
   // waarde-gap-detector (blended ROAS onberekenbaar zonder waarde).
   const valueByChannel = new Map<string, ChannelValueAgg>();

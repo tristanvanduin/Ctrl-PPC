@@ -56,9 +56,13 @@ interface Props {
   onAnalysisError?: (error: SopError) => void;
   /** Kanaal waarvoor de SOPs draaien; bepaalt de zichtbare SOPs, de sop_type en de body-channel. */
   channel?: SopChannel;
+  /** Heeft deze klant meer dan 1 gekoppeld kanaal? Bepaalt of monthly automatisch cross-channel
+   *  meetriggert (masterplan 16.4/16.6) -- met 1 kanaal is er niets om te kruisen. De route zelf
+   *  gate't dit ook (defense-in-depth), maar hier voorkomt het al een nutteloze aanroep. */
+  multiChannel?: boolean;
 }
 
-export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisError, channel = "google_ads" }: Props) {
+export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisError, channel = "google_ads", multiChannel = false }: Props) {
   const channelCfg = CHANNEL_CONFIG[channel];
   const { startJob, isRunning: isJobRunning } = useAnalysis();
   const [status, setStatus] = useState<Record<SopType, SopStatus>>({
@@ -190,7 +194,8 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
         // basis zijn in de maandanalyse"), niet alleen bij een handmatige klik op de losse
         // cross-channel-kaart. Volledig deterministisch, geen LLM-kosten -- op de achtergrond,
         // een mislukking daar mag deze (al geslaagde) kanaalanalyse niet als mislukt tonen.
-        if (type === "monthly") {
+        // Alleen vanaf 2 kanalen (masterplan 16.6) -- met 1 kanaal is er niets om te kruisen.
+        if (type === "monthly" && multiChannel) {
           fetch("/api/analysis/cross-channel", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

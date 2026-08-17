@@ -2263,3 +2263,49 @@ campaign-analysis.ts`, `lib/linkedin/campaign-analysis.ts` — zelf nog zonder c
 dezelfde weg naar de hypotheses-stap moeten vinden als de cross-channel-laag hier. Dat is een
 aparte vraag: deze twee lagen zitten op een ander niveau (per-campagne-efficiency vs.
 tussen-kanalen-overlap) en verdienen een eigen afweging, niet automatisch dezelfde behandeling.
+
+### 16.6 Toegangscontrole voor cross-channel, cross-account en God View — nagelopen, één gat gefixt
+
+De eigenaar stelde drie harde eisen tegelijk, vóór verder bouwen: *"cross channel moet alleen
+geactiveerd worden als een account meer dan 1 kanaal heeft. cross account/portfolio alleen als de
+module is afgenomen of de juiste tier betaald wordt. God view (of een van de andere varianten) mag
+alleen als de module is afgenomen. maar allemaal moeten automatisch zijn."* Alle drie nagelopen
+tegen de live code, niet aangenomen:
+
+1. **Cross-channel bij >1 kanaal — ontbrak, nu gefixt.** `/api/analysis/cross-channel` draaide tot
+   nu toe ook op accounts met precies 1 gekoppeld kanaal, en zou daar een lege of misleidende
+   sub-analyse opleveren (`kpiRelations` bijvoorbeeld vergelijkt kanalen onderling — met één kanaal
+   is er niets om te vergelijken). Gefixt **bij de bron**, niet alleen bij de aanroepers: de POST-
+   handler zelf telt nu de distincte kanalen in de al-opgehaalde `blended_account_monthly`-rijen en
+   geeft `409` met een expliciete reden terug als dat er minder dan 2 zijn — zodat elke huidige én
+   toekomstige caller automatisch dezelfde regel krijgt, niet drie losse kopieën van dezelfde check.
+   Aanvullend kregen de twee automatische triggers uit 16.4 ook een vroege check, zodat ze niet eens de
+   nutteloze aanroep doen: `app/api/cron/trigger-sops/route.ts` hergebruikt de `kanalen`-lijst die
+   het toch al ophaalt (`laadBeschikbareKanalen`) per klant; `components/insights/
+   sop-trigger-buttons.tsx` kreeg een nieuwe `multiChannel`-prop, doorgegeven vanuit
+   `client-dashboard.tsx`'s bestaande `kanalen`-state (dezelfde die de kanaaltabbladen al stuurt,
+   zie `lib/kanalen/beschikbaar.ts`) — geen nieuwe databron, hergebruik van wat er al was.
+
+2. **Cross-account/portfolio bij tier — bleek al correct.** `app/api/platform/agency-macrotrends/
+   route.ts` (de "Macro"-view, UI-component heet verwarrend `agency-god-view.tsx` maar is dat niet
+   — zie de eigen koptekst van die route) gate't al hard op `heeftTenminste(bureau.licentie,
+   "growth")`, met een duidelijke upgrade-melding. Niets aangepast.
+
+3. **God View bij module — bleek al correct, om een striktere reden dan gevraagd.** Twee dingen
+   heten hier "God View" en geen van beide vergt een fix:
+   - `app/api/platform/god-mode/route.ts` (het echte "God Mode": ongefilterd, platform-breed) is
+     hard gegated op `auth.scope === ALL_CLIENTS` (platform-beheerders-lidmaatschap) — géén bureau
+     of klant kan hier ooit bij, op geen enkele tier of module. Strenger dan "module afgenomen",
+     want geen enkel bedrag koopt dit los; het is een intern platformtool.
+   - Het GEMARKETE "God View"-module (`lib/marketing/modules.ts`, anonieme marktdata over bureaus
+     heen) staat er expliciet met `gebouwd: false` en een koptekst die het onderscheid al vastlegt:
+     "God View as described here... is a materially bigger feature than what exists". Er is dus
+     geen route om per ongeluk ongegated te laten — de feature bestaat nog niet.
+
+**Alle drie automatisch, zoals gevraagd** ("allemaal moeten automatisch zijn zodat de inzichten
+daadwerkelijk op slimheid gebaseerd zijn"): cross-channel triggert automatisch bij elke monthly-run
+(16.4) mits >1 kanaal (hierboven); Macro en God Mode zijn gewone GET-routes die al bij elke
+paginabezoek live herberekenen (16.4's constatering), geen trigger-stap, alleen een toegangs-gate.
+Niets hiervan vergt een handmatige "activeer dit voor deze klant"-stap ergens in een instellingen-
+scherm — de gates zitten in de route zelf, op basis van live data (kanalen, tier, scope), niet op
+een los te vergeten vlaggetje.

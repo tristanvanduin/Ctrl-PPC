@@ -189,7 +189,10 @@ export async function GET(request: NextRequest) {
           // basis zijn in de maandanalyse"), niet alleen bij een handmatige klik op de losse knop
           // (components/dashboard/cross-channel-analyses.tsx). Faalt dit, dan blijft de
           // kanaalanalyse zelf een succes -- cross-channel is een aanvulling, geen voorwaarde.
-          if (cadence === "monthly" && !crossChannelGedaan.has(clientId)) {
+          // Alleen zinvol vanaf 2 kanalen (masterplan 16.6) -- met 1 kanaal is er niets om te
+          // kruisen; de route zelf gate't dit ook (defense-in-depth), maar hier voorkomt het al
+          // een nutteloze aanroep + de bijbehorende foutlog.
+          if (cadence === "monthly" && kanalen.length > 1 && !crossChannelGedaan.has(clientId)) {
             crossChannelGedaan.add(clientId);
             await triggerCrossChannel(origin, clientId).catch((err) => {
               console.error(`[trigger-sops] cross-channel voor ${clientId} mislukt:`, err);
