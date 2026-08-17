@@ -99,12 +99,22 @@ export default async function BlogArticlePage({
         </div>
       )}
 
+      {/* "## "-prefix (17 augustus 2026): optionele subkop-conventie binnen inhoud, i.p.v. het
+          BlogPost-contract te breken met een nieuwe geneste structuur. Elk bestaand artikel blijft
+          platte alinea's -- niets migreert gedwongen -- en een nieuw, langer artikel kan er echte
+          H2's mee krijgen zonder dat de types of de call-sites elders veranderen. */}
       <div className="mt-10 space-y-6">
-        {post.inhoud.map((alinea, i) => (
-          <p key={i} className="text-base leading-relaxed text-off-white/70">
-            {alinea}
-          </p>
-        ))}
+        {post.inhoud.map((alinea, i) =>
+          alinea.startsWith("## ") ? (
+            <h2 key={i} className="pt-2 font-marketing-heading text-xl font-bold text-off-white first:pt-0">
+              {alinea.slice(3)}
+            </h2>
+          ) : (
+            <p key={i} className="text-base leading-relaxed text-off-white/70">
+              {alinea}
+            </p>
+          )
+        )}
       </div>
 
       {heeftGerelateerd && (
