@@ -21,6 +21,13 @@
 //   [S13] Impression share           — GRT budget-gelimiteerd, GRA rang-gelimiteerd
 //   stil: "GreenTech | Brand" gezond => detectors horen daar te zwijgen
 //
+// Objective-dekking (17 augustus 2026, masterplan 16.3): Meta en LinkedIn hebben elk twee extra
+// campagnes met een ander objective, zodat lib/meta/campaign-analysis.ts en
+// lib/linkedin/campaign-analysis.ts over meerdere objectives getest kunnen worden, niet alleen
+// de twee/een die de scenario's hierboven al gebruikten.
+//   Meta:     OUTCOME_TRAFFIC (CTR daalt, spend stijgt), OUTCOME_LEADS (manualChecks-dekking)
+//   LinkedIn: WEBSITE_VISITS (kliks dalen, spend stijgt), VIDEO_VIEWS (voltooiing 10%)
+//
 // Draaien:
 //   npx tsx scripts/demo/seed-demo-client.ts            # insert via supabase-js (env nodig)
 //   npx tsx scripts/demo/seed-demo-client.ts --sql      # print SQL (voor de Management API)
@@ -29,6 +36,8 @@
 
 import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
 import { createClient } from "@supabase/supabase-js";
+import type { MetaObjective } from "../../lib/meta/campaign-types";
+import type { LinkedInObjective } from "../../lib/linkedin/campaign-types";
 
 export const DEMO_CLIENT = "demo-greentech";
 const DEMO_NAME = "DEMO — GreenTech (fictief)";
@@ -78,7 +87,7 @@ function googleMonthly(): GMonth[] {
 }
 
 // ── Meta: dag-data met de creative-scenario's [S1-S4, S7, S8] ─────────────
-interface MetaDaily { entity: string; date: string; imp: number; linkClicks: number; spend: number; conv: number; freq: number | null; hook: number | null; hold: number | null; qr?: string | null; er?: string | null; cr?: string | null; lpv?: number; atc?: number; ic?: number }
+interface MetaDaily { entity: string; date: string; imp: number; linkClicks: number; spend: number; conv: number; freq: number | null; hook: number | null; hold: number | null; qr?: string | null; er?: string | null; cr?: string | null; lpv?: number; atc?: number; ic?: number; leads?: number }
 
 const META_ADS = [
   { id: "demo-ad-hero-a", name: "Hero Video A", campaign: "demo-mc-awareness" },
@@ -95,6 +104,11 @@ const META_CAMPAIGNS = [
   // classificeren voor een campagne die converteert (add_to_cart/initiate_checkout in de data).
   { id: "demo-mc-awareness", name: "GRT | Awareness EU", objective: "OUTCOME_AWARENESS" },
   { id: "demo-mc-retargeting", name: "GreenTech Retargeting", objective: "OUTCOME_SALES" },
+  // 17 augustus 2026, masterplan 16.3: twee extra objectives zodat de demo-klant de nieuwe
+  // objective-gedreven analyse (lib/meta/campaign-types.ts + campaign-analysis.ts) over meer dan
+  // twee van de zes ODAX-objectives daadwerkelijk kan testen.
+  { id: "demo-mc-traffic", name: "GreenTech Blog Traffic", objective: "OUTCOME_TRAFFIC" },
+  { id: "demo-mc-leads", name: "GreenTech Demo Aanvraag", objective: "OUTCOME_LEADS" },
 ];
 
 function metaAdDaily(): MetaDaily[] {
@@ -122,6 +136,13 @@ function metaCampaignDaily(): MetaDaily[] {
     // [S2] Awareness-campagne zit recent op frequency 4.6.
     rows.push({ entity: "demo-mc-awareness", date, imp: 3000, linkClicks: 28, spend: 100, conv: 4, freq: recent ? 4.6 : 3.0, hook: null, hold: null });
     rows.push({ entity: "demo-mc-retargeting", date, imp: 2000, linkClicks: 18, spend: 55, conv: 2, freq: 2.5, hook: null, hold: null });
+    // Traffic: CTR zakt van 1,2% naar 0,6% terwijl besteding juist stijgt -- duurdere kliks voor
+    // hetzelfde resultaat, het cpc-rising-scenario voor OUTCOME_TRAFFIC.
+    rows.push({ entity: "demo-mc-traffic", date, imp: 4000, linkClicks: recent ? 24 : 48, spend: recent ? 220 : 150, conv: 3, freq: null, hook: null, hold: null });
+    // Leads: geen tweede Leads-campagne in de demo, dus geen CPL-baseline om tegen af te zetten
+    // (getest los in __meta_campaign_analysis_test.ts) -- hier gaat het om de manualChecks
+    // (form-completion, leadkwaliteit) die ook zonder baseline al relevant zijn.
+    rows.push({ entity: "demo-mc-leads", date, imp: 1800, linkClicks: 22, spend: 95, conv: 2, freq: null, hook: null, hold: null, leads: 1.6 });
   }
   return rows;
 }
@@ -150,8 +171,13 @@ function metaAccountDaily(): MetaDaily[] {
 interface LiDaily { urn: string; date: string; imp: number; clicks: number; spend: number; leads: number; opens: number; conv: number; vidStart: number; vidDone: number }
 
 const LI_CAMPAIGNS = [
-  { urn: "urn:li:sponsoredCampaign:demo1", name: "GRT ABM Benelux" },
-  { urn: "urn:li:sponsoredCampaign:demo2", name: "GreenTech Lead Gen EU" },
+  { urn: "urn:li:sponsoredCampaign:demo1", name: "GRT ABM Benelux", objective: "LEAD_GENERATION" },
+  { urn: "urn:li:sponsoredCampaign:demo2", name: "GreenTech Lead Gen EU", objective: "LEAD_GENERATION" },
+  // 17 augustus 2026, masterplan 16.3: twee extra objectives zodat de demo-klant de nieuwe
+  // objective-gedreven analyse (lib/linkedin/campaign-types.ts + campaign-analysis.ts) over meer
+  // dan één van de zeven objectiveType-waarden daadwerkelijk kan testen.
+  { urn: "urn:li:sponsoredCampaign:demo3", name: "GreenTech Gids Downloads", objective: "WEBSITE_VISITS" },
+  { urn: "urn:li:sponsoredCampaign:demo4", name: "GreenTech Productvideo", objective: "VIDEO_VIEWS" },
 ];
 
 function liCampaignDaily(): LiDaily[] {
@@ -163,6 +189,11 @@ function liCampaignDaily(): LiDaily[] {
     rows.push({ urn: LI_CAMPAIGNS[0].urn, date, imp: 1500, clicks: 30, spend: recent ? 125 : 100, leads: recent ? 0.25 : 0.25, opens: recent ? 2.5 : 2.2, conv: 0.3, vidStart: 40, vidDone: 22 });
     // Lead Gen EU: gezond (completion ~30%, stabiele CPL) — hoort stil te blijven.
     rows.push({ urn: LI_CAMPAIGNS[1].urn, date, imp: 1200, clicks: 26, spend: 90, leads: 0.9, opens: 3, conv: 0.5, vidStart: 35, vidDone: 20 });
+    // Gids Downloads (WEBSITE_VISITS): kliks dalen terwijl besteding stijgt — duurdere kliks
+    // voor hetzelfde resultaat, het cpc-issue-scenario.
+    rows.push({ urn: LI_CAMPAIGNS[2].urn, date, imp: 2200, clicks: recent ? 18 : 34, spend: recent ? 140 : 95, leads: 0, opens: 0, conv: 0, vidStart: 0, vidDone: 0 });
+    // Productvideo (VIDEO_VIEWS): lage voltooiing (10%) — de meeste kijkers haken vroeg af.
+    rows.push({ urn: LI_CAMPAIGNS[3].urn, date, imp: 3000, clicks: 12, spend: 60, leads: 0, opens: 0, conv: 0, vidStart: 200, vidDone: 20 });
   }
   return rows;
 }
@@ -296,7 +327,7 @@ export function buildAllRows(): Record<string, Row[]> {
   const metaBase = (r: MetaDaily): Row => ({
     client_id: DEMO_CLIENT, date: r.date, entity_id: r.entity, impressions: r.imp, link_clicks: r.linkClicks,
     spend: r.spend, conversions: r.conv, conversion_value: 0, frequency: r.freq, hook_rate: r.hook, hold_rate: r.hold,
-    landing_page_views: r.lpv ?? null, add_to_cart: r.atc ?? null, initiate_checkout: r.ic ?? null,
+    landing_page_views: r.lpv ?? null, add_to_cart: r.atc ?? null, initiate_checkout: r.ic ?? null, leads: r.leads ?? null,
   });
   tables["meta_ad_daily"] = metaAdDaily().map((r) => ({
     ...metaBase(r), quality_ranking: r.qr ?? null, engagement_rate_ranking: r.er ?? null, conversion_rate_ranking: r.cr ?? null,
@@ -306,7 +337,7 @@ export function buildAllRows(): Record<string, Row[]> {
 
   // LinkedIn-structuur + dagdata.
   tables["linkedin_connections"] = [{ client_id: DEMO_CLIENT, ad_account_urn: "urn:li:sponsoredAccount:demo", token_ref: "demo", status: "disabled", currency: "EUR", last_sync_at: new Date().toISOString() }];
-  tables["linkedin_campaigns"] = LI_CAMPAIGNS.map((c) => ({ campaign_urn: c.urn, client_id: DEMO_CLIENT, name: c.name, status: "ACTIVE", objective_type: "LEAD_GENERATION" }));
+  tables["linkedin_campaigns"] = LI_CAMPAIGNS.map((c) => ({ campaign_urn: c.urn, client_id: DEMO_CLIENT, name: c.name, status: "ACTIVE", objective_type: c.objective }));
   const liRow = (r: LiDaily): Row => ({
     client_id: DEMO_CLIENT, date: r.date, entity_urn: r.urn, impressions: r.imp, clicks: r.clicks, spend: r.spend,
     one_click_leads: r.leads, one_click_lead_form_opens: r.opens, external_website_conversions: r.conv,
@@ -521,6 +552,69 @@ async function check() {
     cadence: "annual", editions: RAI_EVENTS.events[1].editions, conversionsTarget: 200, asOfDate: TODAY,
   });
   expect(gra.conversions?.comparable === true, `[S11] GRA-beursanalyse vergelijkbaar (delta ${gra.conversions?.deltaPct})`);
+
+  // ── Objective-analyse: bewijs dat de nieuwe Meta/LinkedIn-bevindingen-engines draaien op de
+  // demo-klant, over meerdere objectives heen (masterplan 16.3). Maandaggregatie hier gebeurt
+  // rechtstreeks uit de dag-rijen die ook naar de DB zouden gaan -- geen aparte databron.
+  const { analyzeMetaCampaigns } = await import("../../lib/meta/campaign-analysis");
+  const { analyzeLinkedInCampaigns } = await import("../../lib/linkedin/campaign-analysis");
+  const monthOf = (date: string): number => Number(date.slice(5, 7));
+
+  const metaCampaignsForAnalysis = META_CAMPAIGNS.map((c) => {
+    const rows = (tables["meta_campaign_daily"] as AnyRow[]).filter((r) => r.entity_id === c.id);
+    const byMonth = new Map<number, { imp: number; clicks: number; spend: number; conv: number; leads: number; atc: number; ic: number; freqSum: number; freqN: number; hookSum: number; hookN: number }>();
+    for (const r of rows) {
+      const mk = monthOf(String(r.date));
+      const a = byMonth.get(mk) ?? { imp: 0, clicks: 0, spend: 0, conv: 0, leads: 0, atc: 0, ic: 0, freqSum: 0, freqN: 0, hookSum: 0, hookN: 0 };
+      a.imp += Number(r.impressions ?? 0); a.clicks += Number(r.link_clicks ?? 0); a.spend += Number(r.spend ?? 0);
+      a.conv += Number(r.conversions ?? 0); a.leads += Number(r.leads ?? 0);
+      a.atc += Number(r.add_to_cart ?? 0); a.ic += Number(r.initiate_checkout ?? 0);
+      if (r.frequency != null) { a.freqSum += Number(r.frequency); a.freqN++; }
+      if (r.hook_rate != null) { a.hookSum += Number(r.hook_rate); a.hookN++; }
+      byMonth.set(mk, a);
+    }
+    const monthly = [...byMonth.entries()].sort(([x], [y]) => x - y).map(([month, a]) => ({
+      month, impressions: a.imp, reach: 0, frequency: a.freqN > 0 ? a.freqSum / a.freqN : 0, linkClicks: a.clicks, spend: a.spend,
+      cpm: a.imp > 0 ? (a.spend / a.imp) * 1000 : 0, cpcLink: a.clicks > 0 ? a.spend / a.clicks : 0, ctrLink: a.imp > 0 ? a.clicks / a.imp : 0,
+      conversions: a.conv, conversionValue: 0, purchaseRoas: 0, cpa: a.conv > 0 ? a.spend / a.conv : 0, leads: a.leads,
+      addToCart: a.atc, initiateCheckout: a.ic, landingPageViews: 0, videoThruplay: 0,
+      hookRate: a.hookN > 0 ? a.hookSum / a.hookN : 0, holdRate: 0, postEngagement: 0,
+    }));
+    return { campaignId: c.id, campaignName: c.name, objective: c.objective as MetaObjective, status: "ACTIVE" as const, monthly };
+  });
+  const metaAnalysis = analyzeMetaCampaigns({ clientId: DEMO_CLIENT, campaigns: metaCampaignsForAnalysis });
+  const metaObjectives = new Set(metaCampaignsForAnalysis.map((c) => c.objective));
+  expect(metaAnalysis.findings.length > 0 || metaAnalysis.manualChecks.length > 0,
+    `[objective-analyse] Meta: ${metaAnalysis.findings.length} bevindingen + ${metaAnalysis.manualChecks.length} manualChecks over ${metaObjectives.size} objectives`);
+  for (const f of metaAnalysis.findings.slice(0, 3)) console.log(`  · ${f.campaignName} (${f.objectiveLabel}): ${f.description}`);
+
+  const linkedinCampaignsForAnalysis = LI_CAMPAIGNS.map((c) => {
+    const rows = (tables["linkedin_campaign_daily"] as AnyRow[]).filter((r) => r.entity_urn === c.urn);
+    const byMonth = new Map<number, { imp: number; clicks: number; spend: number; leads: number; opens: number; conv: number; vidStart: number; vidDone: number }>();
+    for (const r of rows) {
+      const mk = monthOf(String(r.date));
+      const a = byMonth.get(mk) ?? { imp: 0, clicks: 0, spend: 0, leads: 0, opens: 0, conv: 0, vidStart: 0, vidDone: 0 };
+      a.imp += Number(r.impressions ?? 0); a.clicks += Number(r.clicks ?? 0); a.spend += Number(r.spend ?? 0);
+      a.leads += Number(r.one_click_leads ?? 0); a.opens += Number(r.one_click_lead_form_opens ?? 0);
+      a.conv += Number(r.external_website_conversions ?? 0);
+      a.vidStart += Number(r.video_starts ?? 0); a.vidDone += Number(r.video_completions ?? 0);
+      byMonth.set(mk, a);
+    }
+    const monthly = [...byMonth.entries()].sort(([x], [y]) => x - y).map(([month, a]) => ({
+      month, impressions: a.imp, clicks: a.clicks, spend: a.spend,
+      ctr: a.imp > 0 ? a.clicks / a.imp : 0, cpc: a.clicks > 0 ? a.spend / a.clicks : 0, cpm: a.imp > 0 ? (a.spend / a.imp) * 1000 : 0,
+      landingPageClicks: a.clicks, oneClickLeadFormOpens: a.opens, oneClickLeads: a.leads,
+      externalWebsiteConversions: a.conv, conversionValue: 0, cpl: a.leads > 0 ? a.spend / a.leads : 0,
+      formCompletionRate: a.opens > 0 ? a.leads / a.opens : 0, videoStarts: a.vidStart, videoViews: a.vidStart,
+      videoCompletions: a.vidDone, videoCompletionRate: a.vidStart > 0 ? a.vidDone / a.vidStart : 0, totalEngagements: 0,
+    }));
+    return { campaignUrn: c.urn, campaignName: c.name, objective: c.objective as LinkedInObjective, status: "ACTIVE" as const, monthly };
+  });
+  const linkedinAnalysis = analyzeLinkedInCampaigns({ clientId: DEMO_CLIENT, campaigns: linkedinCampaignsForAnalysis });
+  const liObjectives = new Set(linkedinCampaignsForAnalysis.map((c) => c.objective));
+  expect(linkedinAnalysis.findings.length > 0 || linkedinAnalysis.manualChecks.length > 0,
+    `[objective-analyse] LinkedIn: ${linkedinAnalysis.findings.length} bevindingen + ${linkedinAnalysis.manualChecks.length} manualChecks over ${liObjectives.size} objectives`);
+  for (const f of linkedinAnalysis.findings.slice(0, 3)) console.log(`  · ${f.campaignName} (${f.objectiveLabel}): ${f.description}`);
 
   console.log(failed > 0 ? `\n${failed} scenario('s) NIET getriggerd` : "\nAlle gecontroleerde scenario's triggeren zoals ontworpen.");
   if (failed > 0) process.exit(1);
