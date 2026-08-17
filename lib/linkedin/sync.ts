@@ -23,7 +23,19 @@ import { schrijftabel } from "@/lib/data-access/feitentabellen";
 
 // Pin een recente ondersteunde versie; verifieer in de docs bij een upgrade (versies
 // verouderen na circa een jaar). Geen verspreide literals: alles via deze constante.
-export const LINKEDIN_API_VERSION = "202506";
+//
+// 202506 -> 202608 (17 augustus 2026, gevonden bij de Meta/LinkedIn-doccheck uit masterplan
+// sectie 15). 202506 stond al sinds 15 juni 2026 op "Deprecated" in LinkedIn's eigen
+// migratietabel (learn.microsoft.com/en-us/linkedin/marketing/integrations/migrations) -- elke
+// live aanroep met die header zou een foutrespons hebben gekregen ("Version Header is
+// deprecated"), niet een falende maar onopgemerkte fallback. Nagekeken vóór de bump, niet
+// aangenomen: geen breaking changes tussen 202506 en 202608 op de velden die deze module
+// aanvraagt (impressions, clicks, costInLocalCurrency, oneClickLeads,
+// externalWebsiteConversions, externalWebsitePostClickConversions, conversionValueInLocalCurrency,
+// video-/engagement-velden) of op de demografische pivot-types; het adAnalytics-endpoint zelf
+// bleef stabiel. 202608 is de nieuwste versie (sunset 17 augustus 2027), dus de langste
+// houdbaarheid tot de volgende verplichte bump.
+export const LINKEDIN_API_VERSION = "202608";
 const REST_BASE = "https://api.linkedin.com/rest";
 
 const log = logger.child("linkedin-sync");
