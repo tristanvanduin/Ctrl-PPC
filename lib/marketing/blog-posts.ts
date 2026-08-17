@@ -1044,6 +1044,73 @@ export const BLOG_POSTS: BlogPost[] = [
     tags: ["Cross-Channel", "Attribution", "Dashboards"],
     contentType: "Method",
   },
+  // HUB-artikelen (17 augustus 2026, op verzoek: "moeten er ook geen 5-10 minuten blogs komen?"):
+  // geen nieuw onderzoek, geen nieuwe claims -- alleen synthese over posts die al stuk voor stuk
+  // geverifieerd zijn. De lengte komt uit echte overlap tussen bestaande signalen (zie de "waarom
+  // dit optelt"-sectie in elk), niet uit herhaling met andere woorden.
+  {
+    slug: "pmax-vijf-blinde-vlekken-in-een-overzicht",
+    titel: "How one Performance Max campaign can be failing in five places at once",
+    samenvatting:
+      "Performance Max collapses network mix, language drift, asset-group concentration, creative coverage, and search-category dilution into one blended number. Read separately, each blind spot looks survivable. Read together, they are usually the same underlying drift.",
+    datum: "2026-08-17",
+    leesminuten: 5,
+    inhoud: [
+      "A Performance Max campaign reports one blended number, and that number is technically accurate at every level it is asked to summarize -- network, language, asset group, creative mix, search category. It is also exactly why the same campaign can be quietly failing in more than one of those five places at once, with the headline CPA still reading as healthy, because each individual drift is small enough on its own to hide inside an average built to absorb exactly that kind of variation.",
+      "## Five places to look, not one",
+      "Five separate checks catch five separate problems, and none of them share a symptom with the others. A network-level split can show spend drifting toward Display, Video, Discover, Gmail, and Maps without a matching share of conversions. A search-category breakdown can turn up scripts the account was never built to serve -- Cyrillic or Chinese characters inside a campaign targeting a Latin-script market -- with no cost figure attached to flag it, since Google does not report spend at that level. Asset-group spend can concentrate almost entirely into one group, or sit in a second group burning real budget with zero conversions, both invisible at the campaign-level total. A creative mix built entirely from images has nothing to serve well on video-first inventory, a gap that shows up as underperformance with no obvious cause. And a set of search categories, each individually too small to notice, can together account for a real share of impression volume while contributing zero conversions between them.",
+      "## A worked example that touches more than one blind spot",
+      "Illustrative case: a PMax campaign has been running for two quarters with a stable, on-target CPA. A full pass across all five checks turns up two problems at once, not one. First, Display and Discover together have grown from a fifth to nearly half of spend over the two quarters, absorbing cost without a matching share of conversions. Second, the asset group carrying most of that browse-and-discovery inventory is also the group with the fewest video assets in the account -- it is leaning on image-only creative to serve placements that reward video, which is part of why its conversion rate lags the group that still gets most of its reach on Search. Read separately, neither check alone fully explains the gap between spend and return. Read together, they are the same underlying pattern seen from two directions: budget has drifted toward inventory the campaign's own creative mix is not equipped to convert on.",
+      "## Why the five compound instead of staying separate",
+      "The five blind spots are not five unrelated risks that happen to share a campaign type. Concentration in one asset group means that group's own network mix, language drift, and creative gaps now dominate the whole campaign's blended read, since it is carrying most of the spend. A campaign quietly leaning into browse-and-discovery inventory is, by the same shift, more exposed to whatever creative or language gaps exist in that inventory specifically -- the checks are not independent, they are five angles on the same underlying question: where is this campaign's budget actually going, and is what it finds there equipped to convert it.",
+      "## The order worth checking them in",
+      "Not every check deserves equal first-look priority. Concentration and waste at the asset-group level are the fastest read, since spend and performance labels are both visible in Google's own interface without a manual cross-reference -- start there, because a concentrated or wasteful asset group changes what the other four checks even mean: a network-mix drift concentrated inside the dominant asset group is a bigger problem than the same drift spread evenly across a balanced campaign. Network mix and creative coverage follow naturally, since a concentrated asset group's placement mix and creative gaps are now, in practice, the account's placement mix and creative gaps. Language and search-category checks come last, not because they matter less, but because they need a wider data pull -- impressions and clicks with no cost figure attached to either one -- and are better run as a scheduled quarterly pass than a first-response check on a campaign that just missed its CPA target.",
+      "## When the five are actually unrelated",
+      "Not every PMax account with more than one blind spot has a single underlying cause. A campaign can have a genuinely wasteful asset group and, in a completely separate part of the same account, a language-leakage pattern that has nothing to do with the asset-group concentration -- two real problems, two different fixes, no shared root cause connecting them. Treating every combination as one compounding story risks a different mistake: fixing the wrong thing first because a plausible-sounding connection was assumed rather than checked. The compounding pattern in the worked example above is common, not universal -- each of the five checks still needs to be read on its own evidence, not assumed to trace back to whichever problem happened to be found first.",
+      "## A checking cadence that covers all five",
+      "None of the five shows up as a red flag in Google's own interface, because none of them is technically an error -- a network split, a search category, an asset group, and a creative mix are all just PMax doing what it is built to do: expand automatically and report one blended result. That is exactly why a one-time check is not enough. The drift compounds quarter over quarter, and the fix is not distrust of PMax's automation, it is a recurring pass -- network split against conversions, search-category floor for cost-free volume, asset-group balance for concentration and waste, and creative coverage for the placements the mix cannot serve -- run on a cadence the platform itself never prompts, not discovered once and assumed to hold from then on. For an agency running PMax across a whole portfolio, that repeatability matters even more than the individual checks do: a structural, repeatable pass is the only version of this that scales past one account.",
+    ],
+    gerelateerdeSlugs: [
+      "pmax-network-mix-verschuiving",
+      "pmax-taal-lekkage",
+      "pmax-asset-group-risico",
+      "pmax-creative-dekking",
+      "pmax-zoekcategorie-dilutie",
+    ],
+    tags: ["Google Ads"],
+    contentType: "Method",
+  },
+  {
+    slug: "geen-enkel-kanaalrapport-vertelt-het-hele-verhaal",
+    titel: "Why no single channel's report can tell you the whole story",
+    samenvatting:
+      "Every channel's own dashboard can read green while the portfolio pays three times for one audience, funds a competitor's own brand search, or loses the tag that would have shown any of it. None of that is visible from inside a single channel's report.",
+    datum: "2026-08-17",
+    leesminuten: 5,
+    inhoud: [
+      "A portfolio can have every channel's own dashboard reading green -- Google Ads on target, Meta on target, LinkedIn on target -- and still be quietly working against itself. That is not a contradiction. It is what happens when credit for the same outcome gets assigned to whichever channel's report happens to ask first, and no single channel's own numbers can tell you that it happened.",
+      "## Four ways credit lands in the wrong place",
+      "The mechanism differs each time, but the shape is the same: a channel's report is honest about what it measures, and wrong about what it implies. Channel-role misclassification lets two or three campaigns across different channels all retarget the same warm pool, each one individually reporting a healthy CPA while the portfolio as a whole pays three times to close one audience. A seed-and-harvest lag lets a prospecting channel create demand it gets no credit for, while a second channel captures that same demand weeks later on branded terms and takes full credit for a click the first channel actually made possible. Brand cannibalization lets a Google Ads campaign keep spending on a query the organic listing already wins for free, with nothing in either report flagging that the two are competing for the same click. And UTM drift lets the tag itself lie -- a channel's traffic silently split across two labels, or merged with an unrelated one, so the comparison starts from data that cannot be trusted to mean what it says.",
+      "## A worked example that stacks more than one",
+      "Illustrative case: a portfolio runs Meta prospecting, Google Ads branded search, and a Google Ads retargeting campaign side by side. Two to three weeks after every increase in Meta spend, Google's branded search volume rises on a consistent lag -- the seed-and-harvest pattern, invisible to anyone reading either account alone. At the same time, Search Console shows the account's own brand name already ranking first organically with a strong click-through rate, meaning part of that branded search spend is competing with a listing that did not need the help. And the Meta campaign itself has been tagged utm_source=facebook for most of its life, except for one month where a template swap capitalized it to Facebook -- a month that reads, in the cross-channel timing check, as a mysterious dip in the very signal that would have revealed the lag. Three separate problems, each invisible from inside its own channel's report, each making the other two harder to see clearly.",
+      "## Why this only shows up when channels are read together",
+      "None of the four mechanisms is visible from inside a single channel's own reporting, because none of them is a failure that channel is equipped to report on. A channel cannot flag that another channel is quietly funding its results, that organic search already owns a query it is bidding on, or that its own tracking label silently changed. Catching any of the four requires deliberately setting one channel's data against another's -- role by role, on a timing lag, against Search Console, or against the tag's own history -- not reading each channel's dashboard as a closed, self-sufficient story.",
+      "## The order worth checking them in",
+      "Role classification is the cheapest of the four to run, since it only needs each channel's own targeting data -- start there, because a portfolio's role balance changes how much weight the other three checks deserve. A portfolio already top-heavy on retargeting is more exposed to a seed-and-harvest lag it never noticed, since retargeting's healthy-looking CPA is partly propped up by demand a different channel created. Brand cannibalization and UTM integrity are worth checking next, in either order, since neither depends on the other two -- but UTM integrity is worth confirming before trusting any of the other three, since a corrupted tag can produce a false negative on all of them at once, hiding a real lag or a real overlap behind data that was never comparing what it claimed to.",
+      "## When four clean reports really are four clean reports",
+      "Not every portfolio with green dashboards across every channel is hiding a cross-channel problem. A single-channel account, or a portfolio where every channel demonstrably targets a distinct, non-overlapping audience, can have four honestly independent reports that really do add up to the whole picture. The four checks exist to catch the specific patterns that produce a false sum, not to imply that every clean-looking portfolio is secretly broken -- running the checks and finding nothing wrong is itself a legitimate, useful outcome, not a sign the check was not thorough enough.",
+      "## Building a monthly cross-channel read",
+      "A recurring pass across all four does not need to be elaborate to be worth running: classify every campaign's role across every channel, check whether a spend change on one channel lines up with a shift in another on a consistent lag, cross a strong organic ranking against paid spend on the same query, and confirm the UTM taxonomy has not drifted since the last check. None of the four questions has a single-channel answer. All four are cheaper to check monthly than to discover a quarter late, once a budget decision has already been made on a number that was never telling the whole story.",
+    ],
+    gerelateerdeSlugs: [
+      "kanaalsynergie-bewijzen",
+      "seed-and-harvest-cross-channel-budget",
+      "merk-cannibalisatie-search-console-vs-ads",
+      "utm-tags-die-je-attributie-breken",
+    ],
+    tags: ["Cross-Channel", "Attribution", "Google Ads", "Meta"],
+    contentType: "Method",
+  },
 ];
 
 export function getBlogPost(slug: string): BlogPost | undefined {
