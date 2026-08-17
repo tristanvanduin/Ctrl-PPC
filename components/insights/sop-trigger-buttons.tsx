@@ -10,19 +10,12 @@ import { useGenerationProgress } from "@/lib/use-generation-progress";
 import { dbInsert } from "@/lib/data-access/client-write";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
 import { today } from "@/lib/reporting-date";
+// Verplaatst naar lib/analysis/sop-channel-config.ts (nightly-cron-werk) zodat de cron
+// (app/api/cron/trigger-sops) dezelfde kanaal/cadans-tabel gebruikt in plaats van een tweede
+// kopie -- zie de kop van dat bestand. Gedrag van deze knoppen blijft ongewijzigd.
+import { CHANNEL_CONFIG, type SopType, type SopChannel } from "@/lib/analysis/sop-channel-config";
 
-type SopType = "weekly" | "biweekly" | "monthly";
-export type SopChannel = "google_ads" | "meta_ads" | "linkedin_ads";
-
-// Per kanaal: welke SOPs bestaan er, onder welke sop_type slaat de engine ze op, en hoe heet
-// het in de kop van het geexporteerde bestand. Meta en LinkedIn hebben nu alle drie de SOPs:
-// weekly/biweekly draaien via /api/analysis/weekly en /biweekly met channel-dispatch, monthly
-// via hun eigen adapters (11 resp. 9 stappen) op dezelfde /api/analysis/monthly.
-const CHANNEL_CONFIG: Record<SopChannel, { types: SopType[]; sopTypeKey: Record<SopType, string>; headerLabel: string }> = {
-  google_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "weekly", biweekly: "biweekly", monthly: "monthly" }, headerLabel: "SEA" },
-  meta_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "meta_weekly", biweekly: "meta_biweekly", monthly: "meta_monthly" }, headerLabel: "Meta Ads" },
-  linkedin_ads: { types: ["weekly", "biweekly", "monthly"], sopTypeKey: { weekly: "linkedin_weekly", biweekly: "linkedin_biweekly", monthly: "linkedin_monthly" }, headerLabel: "LinkedIn Ads" },
-};
+export type { SopChannel };
 
 interface SopStatus {
   running: boolean;
