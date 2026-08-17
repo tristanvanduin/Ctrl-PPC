@@ -50,6 +50,7 @@ import { computeDataReliability, type DataReliabilityAssessment } from "@/lib/an
 import { channelGa4Context } from "@/lib/ga4/context";
 import type { Ga4SupabaseLike } from "@/lib/ga4/data-access";
 import { crossChannelContext } from "@/lib/analysis/cross-channel-context";
+import { godViewContext } from "@/lib/analysis/god-view-context";
 import { checkStepDataAvailability } from "@/lib/analysis/data-availability";
 import type { StepDataAvailability } from "@/lib/analysis/data-availability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
@@ -1108,6 +1109,11 @@ async function runMetaMonthlyAnalysis(
   // pool retarget. Leeg zonder eerdere cross-channel-run → stap 6 draait ongewijzigd door.
   const crossChannelText = (await crossChannelContext(supabase, clientId)).promptContext;
 
+  // God View als verklarende context (masterplan 16.7): zelfde plek, stap 6. Degradeert vandaag
+  // vrijwel altijd stil naar "" -- met minder dan 4 opt-in-bureaus in de pool kan geen enkele cel
+  // k-anoniem gedeeld worden, en dat is de regel die precies doet waarvoor hij bestaat, geen bug.
+  const godViewText = (await godViewContext(supabase, clientId, adapter.channel)).promptContext;
+
   // E1-wiring (Meta): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
   const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
 
@@ -1161,7 +1167,8 @@ async function runMetaMonthlyAnalysis(
     );
     const userMessage = buildMetaStepMessage(stepNumber, stepFacts[stepNumber], clientId)
       + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
-      + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "");
+      + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "")
+      + (stepNumber === 6 && godViewText ? `\n\n${godViewText}` : "");
     let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
     const priorStepConclusion = conclusions.at(-1);
     let { parsed, validation } = parseStructuredStepOutput(
@@ -1304,6 +1311,10 @@ async function runLinkedinMonthlyAnalysis(
   // stap 6 (Hypotheses en Sprintplanning).
   const crossChannelText = (await crossChannelContext(supabase, clientId)).promptContext;
 
+  // God View als verklarende context (masterplan 16.7), zelfde plek en zelfde stille degradatie
+  // als bij Meta.
+  const godViewText = (await godViewContext(supabase, clientId, adapter.channel)).promptContext;
+
   // E1-wiring (LinkedIn): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
   const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
 
@@ -1356,7 +1367,8 @@ async function runLinkedinMonthlyAnalysis(
     );
     const userMessage = buildLinkedinStepMessage(stepNumber, stepFacts[stepNumber], clientId)
       + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
-      + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "");
+      + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "")
+      + (stepNumber === 6 && godViewText ? `\n\n${godViewText}` : "");
     let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
     const priorStepConclusion = conclusions.at(-1);
     let { parsed, validation } = parseStructuredStepOutput(
@@ -1975,6 +1987,8 @@ ${runningContext}`,
     // Cross-channel als verklarende context (masterplan 16.4/16.5): landt alleen in stap 13
     // (Hypotheses & Sprintplanning), niet in de eerdere kanaal-specifieke stappen.
     const crossChannelGoogleText = (await crossChannelContext(supabase, clientId)).promptContext;
+    // God View als verklarende context (masterplan 16.7), zelfde plek, zelfde stille degradatie.
+    const godViewGoogleText = (await godViewContext(supabase, clientId, "google_ads")).promptContext;
     const preparedInputs: MonthlyPreparedInputs = {
       analysisYear,
       lastCompleteMonth,
@@ -2800,7 +2814,7 @@ ${toPromptTable(checkpointOutputs)}
 \`\`\`
 
 ## Stapconclusies
-${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannelGoogleText}` : ""}`,
+${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannelGoogleText}` : ""}${godViewGoogleText ? `\n\n${godViewGoogleText}` : ""}`,
     });
     steps.push(conclusion);
     const conclusionPrior = conclusions.at(-1);

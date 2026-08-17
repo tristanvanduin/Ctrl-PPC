@@ -2352,11 +2352,63 @@ als het aantal accounts groot genoeg lijkt); op de drempel → metrics verschijn
 model+niche heeft een eigen, hogere drempel dan het losse model; elke rij telt mee op elk niveau
 waarop hij is afgebakend (model, niche, combinatie) — zelfde regel als `celoverzicht()`.
 
-**Bewust in `TOEGESTANE_WEZEN`** (`scripts/check-hygiene.mjs`): nog geen route, UI of tier-gating
-in dezelfde stap. Volgende stappen, geen van alle vandaag gestart: (1) de IO-laag die echte
-platform-brede rijen ophaalt (opt-in-bureaus × `client_settings.bedrijfsmodel`/`niche` ×
-`blended_account_monthly`, zelfde bronnen als `benchmarkdekking/route.ts` en
-`agency-macrotrends/route.ts` al gebruiken) en `bouwGodViewCellen()` aanroept; (2) een tier-/
-module-gate op de route zelf, zodra er een consument is — dezelfde discipline als 16.6 net
-bevestigde voor Macro en God Mode; (3) de trend/churn-risk/opportunity-lagen die de marketingtekst
-belooft, die staan op deze kernlaag maar zijn een eigen, latere beslissing.
+**Bijgewerkt (17 augustus, zelfde dag): de rest van de mechaniek is gebouwd.** De eigenaar, na de
+vraag waarom dit nog niet verder ging: *"waarom is de rest nog niet gebouwd?? we hebben in theorie
+2 agencies erin... in theorie kunnen we cross account/portfolio en god view doen."* Genuanceerd en
+akkoord bevonden: met 2 bureaus kan `beoordeelCel()` (≥4 bureaus) wiskundig nooit een cel
+deelbaar maken — geen "nog niet af", maar de k-anonimiteitsregel die precies doet waarvoor hij
+bestaat. De eigenaar bevestigde dat expliciet ("ik weet dat het niet anoniem is") en gaf groen
+licht om de MECHANIEK toch volledig te bouwen en te testen, puur voor de testfase: *"het kan wel
+getest worden... de werking zelf kan wel uitgevoerd worden... puur in de test fase is dit gegrond
+en goedgekeurd."*
+
+Gebouwd, in dezelfde sessie:
+
+1. **`lib/benchmark/god-view-data.ts`** — de IO-laag. Haalt opt-in-bureaus
+   (`agencies.benchmark_optin_at`), accounts, `client_settings.bedrijfsmodel`/`niche` en de
+   laatste volledige maand uit `blended_account_monthly` op, en filtert tot rijen die zowel
+   opt-in als afgebakend zijn (zonder afbakening telt een account in geen enkele cel mee — zelfde
+   regel als `bouwGodViewCellen()` zelf). Kanaal komt uit de data (`blended_account_monthly` heeft
+   al een channel-kolom), geen vaste "google"-aanname zoals `benchmarkdekking/route.ts` die om een
+   andere, daar wel geldige reden maakt (dat scherm telt alleen, heeft geen prestatiecijfers
+   nodig). Conversies en leads tellen samen als acquisitie-actie, dezelfde conventie als
+   `cross-channel/route.ts`'s KPI-verhoudingen — anders krijgt een leadgen-account stelselmatig
+   CPA "oneindig". Getest (`__god_view_data_test.ts`): opt-in én afbakening moeten allebei kloppen
+   voordat een account meetelt, los getest van elkaar.
+
+2. **`app/api/platform/god-view/route.ts`** — testroute, hard gegated op `ALL_CLIENTS`-scope
+   (zelfde gate als God Mode, geen tier-check: er is nog geen klant-tier die dit zou mogen
+   ontsluiten, en met de huidige bureaupool zou een echte agency-gebruiker hier toch nooit iets
+   zien). Retourneert de volledige celtabel plus een eerlijke stand (hoeveel bureaus, hoeveel
+   cellen deelbaar) — bewijst de mechaniek zonder te doen alsof het al een productfunctie is.
+
+3. **`lib/analysis/god-view-context.ts`** — de koppeling naar de maandanalyse, letterlijk
+   *"hoe een maandanalyse zich verhoudt tot de god view tabel... en daar inzichten van
+   vertalen"*: zoekt de diepste deelbare cel die bij de klant past (combinatie > niche > model),
+   en zet die om in een promptblok voor de hypotheses-stap — zelfde patroon en zelfde plek als
+   cross-channel (16.5): Meta/LinkedIn stap 6, Google stap 13. **Degradeert vandaag vrijwel altijd
+   stil naar `""`** — met 2 bureaus is er gewoonweg nooit een deelbare cel, en dat moet geen
+   "onvoldoende data"-ruis in elke run worden, net zomin als bij een klant zonder GA4. Getest
+   (`__god_view_context_test.ts`) met **drie** scenario's: (a) vier bureaus/tien accounts →
+   een echt promptblok met mediane CPA/ROAS en een expliciete anonimiteitsvermelding — het bewijs
+   dat de mechaniek werkt; (b) een klant zonder eigen bedrijfsmodel/niche → stil leeg, geen
+   lookup nodig; (c) de HUIDIGE realiteit (2 bureaus) → stil leeg, geen ruis — het scenario dat
+   vandaag in productie daadwerkelijk geldt.
+
+4. **Bijvangst: een echte tijdzonebug gefixt tijdens het dedupliceren.** `god-mode/route.ts` had
+   zijn eigen lokale `laatsteVolledigeMaand()` op `new Date()`/`setUTCDate` — exact de valkuil die
+   `lib/reporting-date.ts`'s eigen koptekst al documenteert (tussen 00:00 en 02:00 Amsterdamse
+   tijd op de 1e van de maand zegt UTC nog de vorige dag, dus "laatste volledige maand" wees dan
+   een maand te ver terug). Vervangen door het al bestaande, al Amsterdam-bewuste `monthsAgo(1)` —
+   geen nieuwe functie nodig, `monthsAgo` deed dit al exact goed. Hergebruikt in `god-view-data.ts`.
+
+**`lib/benchmark/god-view.ts` staat niet langer in `TOEGESTANE_WEZEN`** — heeft nu een echte
+consument (`god-view-context.ts`, en daarmee de live maandanalyse-pijplijn).
+
+**Nog steeds niet gestart, bewust:** een tier-/module-gate op de God View-route zelf (wacht op
+echte multi-bureau-dekking, zoals 16.6 al vastlegde voor Macro/God Mode); een testfixture die
+echt meerdere synthetische bureaus in de database zet om de admin-route ook live (niet alleen via
+de unit tests) een gevulde cel te laten tonen — dat vergt schrijfrechten op de `agencies`-tabel
+zelf, een andere en groter ingreep dan de gequarantainede single-tenant demo-klant, en is bewust
+niet zonder expliciete toestemming gedaan; de trend/churn-risk/opportunity-lagen die de
+marketingtekst belooft.

@@ -16,6 +16,7 @@
 import { requireCapability } from "@/lib/auth/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { ALL_CLIENTS } from "@/lib/auth/roles";
+import { monthsAgo } from "@/lib/reporting-date";
 
 export interface GodModeRow {
   clientId: string;
@@ -27,13 +28,6 @@ export interface GodModeRow {
   roas: number | null;
 }
 
-function laatsteVolledigeMaand(): string {
-  const nu = new Date();
-  nu.setUTCDate(1); // huidige maand is per definitie onvolledig
-  nu.setUTCMonth(nu.getUTCMonth() - 1);
-  return nu.toISOString().slice(0, 10);
-}
-
 export async function GET() {
   const auth = await requireCapability("client:read");
   if (auth instanceof Response) return auth;
@@ -43,7 +37,11 @@ export async function GET() {
   const admin = getSupabaseAdmin();
   if (!admin) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
-  const month = laatsteVolledigeMaand();
+  // monthsAgo(1) is Amsterdam-tijdzone-bewust (lib/reporting-date.ts); de lokale versie die hier
+  // stond gebruikte new Date()/setUTCDate rechtstreeks, exact de valkuil die dat bestand zelf
+  // documenteert -- tussen 00:00 en 02:00 Amsterdamse tijd op de 1e van de maand zegt UTC nog de
+  // vorige dag, en dan wijst "laatste volledige maand" een maand te ver terug.
+  const month = monthsAgo(1);
   const [{ data: rijen, error }, { data: accounts }] = await Promise.all([
     admin.from("blended_account_monthly")
       .select("client_id, spend, conversions, conversion_value")
