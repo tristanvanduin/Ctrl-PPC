@@ -134,6 +134,9 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const resultaten: Uitkomst[] = [];
   let getriggerd = 0;
+  // Eén keer per klant per cron-invocatie, ook als meerdere kanalen op dezelfde dag due zijn voor
+  // monthly -- geen reden om drie keer dezelfde deterministische, gratis analyse te draaien.
+  const crossChannelGedaan = new Set<string>();
 
   for (const clientId of klanten) {
     if (!(await magSopDraaien(supabase, clientId))) {
@@ -182,6 +185,16 @@ export async function GET(request: NextRequest) {
           const analysisDate = await voerSopUit(supabase, origin, clientId, channel, cadence);
           resultaten.push({ clientId, channel, cadence, status: "triggered", lastRunDate, analysisDate });
           getriggerd += 1;
+          // Cross-channel hoort bij elke maandanalyse (masterplan 16.4: "cross channel moet de
+          // basis zijn in de maandanalyse"), niet alleen bij een handmatige klik op de losse knop
+          // (components/dashboard/cross-channel-analyses.tsx). Faalt dit, dan blijft de
+          // kanaalanalyse zelf een succes -- cross-channel is een aanvulling, geen voorwaarde.
+          if (cadence === "monthly" && !crossChannelGedaan.has(clientId)) {
+            crossChannelGedaan.add(clientId);
+            await triggerCrossChannel(origin, clientId).catch((err) => {
+              console.error(`[trigger-sops] cross-channel voor ${clientId} mislukt:`, err);
+            });
+          }
         } catch (err) {
           resultaten.push({
             clientId, channel, cadence, status: "failed", lastRunDate,
@@ -199,6 +212,22 @@ export async function GET(request: NextRequest) {
     getriggerd,
     resultaten,
   });
+}
+
+// Volledig deterministisch, geen LLM-aanroep (model_used: "deterministisch", tokens_used: 0 in
+// app/api/analysis/cross-channel/route.ts) -- dus geen budgetimpact, alleen een handvol extra
+// Supabase-reads. Gooit door bij een fout; de aanroeper vangt en logt, zonder de kanaalanalyse
+// als mislukt te markeren.
+async function triggerCrossChannel(origin: string, clientId: string): Promise<void> {
+  const res = await fetch(`${origin}/api/analysis/cross-channel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: clientId }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `cross-channel gaf ${res.status}`);
+  }
 }
 
 // Draait exact wat de handmatige knop doet (runSop in sop-trigger-buttons.tsx): het endpoint

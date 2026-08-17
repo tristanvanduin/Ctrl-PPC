@@ -2171,7 +2171,56 @@ SOP-pijplijn (`app/api/analysis/monthly/route.ts`, LLM-stap-gedreven, structuree
 regelmachine) ze rechtstreeks? Die keuze raakt ook Google's al langer wachtende bestand en is dus
 groter dan alleen Meta/LinkedIn — bewust hier alleen vastgelegd, niet zelfstandig beslist.
 
-**Nog niet gestart:** bredere mockdata-variatie per kanaal in het demo-account (16.2's tweede
-punt, verder dan de eerlijkheids-fix in 16.3 hierboven). Dit document wordt bijgewerkt zodra dat
-gebeurt — tot die tijd is dit de plek om op terug te vallen voor zowel het cron-beleid (16.1) als
-de bouwvolgorde (16.2/16.3).
+**Bijgewerkt (17 augustus, mockdata):** vier demo-campagnes toegevoegd (Meta: `OUTCOME_TRAFFIC`,
+`OUTCOME_LEADS`; LinkedIn: `WEBSITE_VISITS`, `VIDEO_VIEWS`) zodat de demo-klant de nieuwe engines
+over meer dan de oorspronkelijke twee/een objective test. `scripts/demo/seed-demo-client.ts
+--check` bouwt de maandaggregatie nu rechtstreeks uit de dag-data en roept
+`analyzeMetaCampaigns`/`analyzeLinkedInCampaigns` aan — live bewijs: 10 Meta-bevindingen over 4
+objectives, 7 LinkedIn-bevindingen over 3 objectives. Losstaande constatering hierbij, niet
+veroorzaakt door deze wijziging: het `[S10]` GRT-beursanalyse-scenario faalt in de huidige
+`--check`-run (delta -0,06 i.p.v. de ontworpen ~-35%), vermoedelijk datumdrift in de
+`TODAY`-relatieve rampfunctie van `googleMonthly()` — niet Meta/LinkedIn-gerelateerd, niet
+opgelost, hier alleen vastgelegd.
+
+### 16.4 Cross-channel-analyse liep buiten de maandcyclus om — nu automatisch gekoppeld
+
+De eigenaar vroeg expliciet: *"vraag, zit hier dan ook direct de cross platform op? is dit al goed
+gewired?"* en, na het antwoord, *"cross channel moet de basis zijn in de maandanalyse."* Nagelopen
+en bevestigd: **nee, dat was het niet.** `app/api/analysis/monthly/route.ts` (de daadwerkelijke
+maandelijkse SOP-run, drie losse aanroepen — één per kanaal, `body.channel`) riep nergens
+cross-channel-code aan. `/api/analysis/cross-channel` was uitsluitend een **handmatige knop**
+(`components/dashboard/cross-channel-analyses.tsx`, "Draai cross-channel-analyse"). Niets in de
+trigger-keten (`app/api/cron/trigger-sops`, zelf nog niet actief in `vercel.json`) riep hem aan —
+`lib/analysis/sop-channel-config.ts`'s `CHANNEL_CONFIG` kent alleen google/meta/linkedin_ads ×
+weekly/biweekly/monthly, geen `cross_channel`-combinatie. Als een klant nooit zelf op die knop
+drukte, werd overlap tussen kanalen (dubbele warme pool, ontbrekende prospecting, zaai-oogst,
+KPI-arbitrage) dus nooit gecheckt, ook niet bij een reguliere maandelijkse SOP-run.
+
+**Gefixt: cross-channel draait nu automatisch mee bij elke maandanalyse**, op twee plekken —
+dezelfde logica, want de handmatige knoppen en de (nog niet actieve) cron draaien al dezelfde
+routes op dezelfde manier (zie de koptekst van `trigger-sops/route.ts`):
+
+1. `components/insights/sop-trigger-buttons.tsx`: zodra een `monthly`-knop voor een willekeurig
+   kanaal slaagt, vuurt een achtergrond-`fetch` naar `/api/analysis/cross-channel` mee. Een fout
+   daarin logt alleen naar de console — de al geslaagde kanaalanalyse blijft een succes.
+2. `app/api/cron/trigger-sops/route.ts`: dezelfde koppeling, plus een `Set` die binnen één
+   cron-invocatie voorkomt dat cross-channel drie keer draait als meerdere kanalen op dezelfde dag
+   `monthly`-due zijn voor dezelfde klant.
+
+**Waarom dit geen kostenrisico toevoegt:** `/api/analysis/cross-channel` is volledig
+deterministisch, geen LLM-aanroep (`model_used: "deterministisch"`, `tokens_used: 0`, zie de
+eigen koptekst van dat bestand) — alleen een handvol extra Supabase-reads per run. Dat is precies
+waarom er geen dedupe-logica over meerdere cron-invocaties heen nodig was: opnieuw draaien
+overschrijft dezelfde `sop_analysis_output`-rij (`sop_type "cross_channel"`) voor die dag, geen
+stapelende kosten.
+
+**Cross-account/portfolio, het tweede deel van de vraag ("kan zelfs automatisch zijn"): bleek al
+zo.** `app/api/platform/agency-macrotrends/route.ts` en `app/api/platform/god-mode/route.ts` zijn
+gewone GET-routes die live herberekenen bij elke paginabezoek (`runMacrotrends`, geen opgeslagen
+SOP-output, geen trigger-knop) — geen handmatige stap om te vergeten, geen wijziging nodig.
+
+**Nog niet gestart:** of de cross-channel-bevindingen ook rechtstreeks de per-kanaal LLM-
+promptcontext moeten voeden (bijvoorbeeld: "deze Meta-campagne is óók retargeting, weeg dat mee")
+is een aparte, grotere vraag — dat raakt de promptopbouw van elke kanaalstap en is bewust niet in
+dezelfde wijziging meegenomen. Deze fix maakt alleen dat cross-channel altijd ván nature meedraait
+en actueel blijft; het voedt de kanaalanalyses nog niet inhoudelijk terug.

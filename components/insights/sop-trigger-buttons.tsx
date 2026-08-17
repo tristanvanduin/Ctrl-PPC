@@ -186,6 +186,18 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
 
         await uploadSopFile(type, analysisDate, markdown);
 
+        // Cross-channel hoort bij elke maandanalyse (masterplan 16.4: "cross channel moet de
+        // basis zijn in de maandanalyse"), niet alleen bij een handmatige klik op de losse
+        // cross-channel-kaart. Volledig deterministisch, geen LLM-kosten -- op de achtergrond,
+        // een mislukking daar mag deze (al geslaagde) kanaalanalyse niet als mislukt tonen.
+        if (type === "monthly") {
+          fetch("/api/analysis/cross-channel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_id: clientId }),
+          }).catch((err) => console.error("Cross-channel-analyse (automatisch) mislukt:", err));
+        }
+
         setStatus((prev) => ({
           ...prev,
           [type]: { running: false, lastDate: analysisDate, error: null, success: true },
