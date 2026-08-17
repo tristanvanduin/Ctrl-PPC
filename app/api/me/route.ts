@@ -10,6 +10,29 @@
 //
 // Nu is de toestand expliciet in het antwoord in plaats van verstopt in een statuscode. Dat
 // leest ook beter: de client hoeft niet uit "401" af te leiden dat de beveiliging uit staat.
+//
+// BUREAUGRENS-FIX (docs/MASTERPLAN.md sectie 6, "voordat bureau twee aansluit"): `enforced`
+// spiegelde tot nu toe altijd de platformbrede O1_AUTH_ENFORCED-vlag, OOK wanneer er wel degelijk
+// een echte sessie was. useAccess() leest "enforced: false" als "toon alles, ongefilterd"
+// (lib/auth/use-access.ts) -- dus zolang die vlag uit staat, kreeg elke ingelogde gebruiker
+// `unrestricted: true` en zag de zijbalk (sidebar.tsx's canAccessClient-filter, die al bestond)
+// gewoon alle klanten van elk bureau. Dat is het live incident van 15 augustus: bureau A ziet
+// bureau B's klantnamen in het menu.
+//
+// De vlag hoort alleen te bepalen of INLOGGEN VERPLICHT is (blokkeert de middleware een verzoek
+// zonder sessie), niet of een BESTAANDE sessie zijn eigen bureaugrens ziet -- dat tweede moet
+// altijd, want scopen naar je eigen bureau is nooit onveilig, ook niet terwijl inloggen nog
+// optioneel is. Vandaar: zonder sessie blijft `enforced` de vlag volgen (ongewijzigd gedrag,
+// geen sessie is nog steeds normaal); mét sessie is de respons altijd gescopet, want auth.scope
+// komt al uit bepaalScope() (lib/auth/scope.ts), dezelfde, al langer bestaande en elders al
+// gebruikte afleiding die "alle klanten" reserveert voor platform_beheerders en anders het
+// bureau van de gebruiker teruggeeft -- geen nieuwe scopelogica, alleen de eerder genegeerde
+// uitkomst ervan nu daadwerkelijk doorgegeven.
+//
+// LIVE-ONGETEST tegen een echte tweede-bureau-sessie (geen tweede bureau in deze sandbox om
+// tegenaan te toetsen) -- wel getypecheckt en getest tegen de bestaande bepaalScope-tests, en
+// het gedrag zonder sessie (de vandaag overheersende staat, O1_AUTH_ENFORCED staat uit) is
+// bewust ongewijzigd gelaten.
 
 import { getAuthUser } from "@/lib/auth/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -46,7 +69,9 @@ export async function GET() {
   }
 
   return Response.json({
-    enforced: enforced(),
+    // Zie de kop hierboven: mét sessie geldt de eigen bureauscope altijd, ongeacht de
+    // platformbrede login-verplichting.
+    enforced: true,
     id: auth.id,
     email: auth.email,
     role: auth.role,
