@@ -165,9 +165,13 @@ const TOEGESTANE_WEZEN = new Map([
 
   // Gebouwd en getest, wacht op een consument. Dit is de bak waar het meeste in zit; hij hoort
   // te krimpen. Zie het gesprek van 2026-07-28 voor de beoordeling per stuk.
-  ["lib/cross-channel/funnel-overlap.ts",
-    "lens 2; classifyFunnelRole leest het objective niet, dus Meta en LinkedIn komen als " +
-    "onbekend uit de classificatie. Wacht op doelgroepdata (targeting_summary, Meta-adsets)"],
+  //
+  // lib/cross-channel/funnel-overlap.ts stond hier ("wacht op een consument") en is inmiddels
+  // wél aangesloten (app/api/analysis/cross-channel/route.ts, lib/search-console/{context,
+  // signals}.ts) -- gevonden bij een controle op 17 augustus dat de lijst nog klopte. De
+  // resterende capaciteitsbeperking die de oude reden noemde (classifyFunnelRole leest het
+  // objective niet, dus Meta/LinkedIn komen als onbekend zonder doelgroepdata) is geen
+  // wezen-vraag meer, maar een eerlijk gedocumenteerde grens in de consumerende code zelf.
   ["lib/rai/edition-evaluation.ts", "editie-evaluatie op de event-relatieve tijdas; wacht op een plek in de beurs-UI"],
   ["lib/rai/event-status.ts", "stoplicht en budgetpacing per stream; zelfde plek als edition-evaluation"],
   ["lib/scheduler/pump-plan.ts", "hervatbare maandrun; wacht op runNextSteps, de IO-orkestratie"],
