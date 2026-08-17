@@ -1862,57 +1862,86 @@ voor de naamsbotsing met de Fase 1 hierboven). Dit document (`MASTERPLAN.md`) is
 actuele; deze sectie legt vast wat `EXECUTION_PLAN.md` had dat hier nog ontbrak, na verificatie
 tegen de live code — niet klakkeloos overgenomen.
 
-### 15.1 Een reëel, vandaag nog open beveiligingsgat — niet historisch
+### 15.1 RLS-dekking: eerdere versie van deze sectie was te alarmerend, hier gecorrigeerd binnen dezelfde sessie
 
-**Dit is de belangrijkste bevinding van deze vergelijking.** `EXECUTION_PLAN.md` sectie 3 meet op 9
-augustus: *"92 van de 122 tabellen in `public` hebben geen RLS,"* met daaronder precies de
-tabellen waar de vertrouwensdoctrine (sectie 3) het hardst over is: `sprint_hypotheses`,
-`sprint_items`, `sop_analysis_output`, `sop_insights`, `sop_recommendations`, `sop_tasks`,
-`client_settings`, `llm_usage`. Dat las als een meting die inmiddels achterhaald zou kunnen zijn —
-is het niet. Geverifieerd (17 augustus): `scripts/migrations/065_rls_sop_intelligence.sql` bestaat
-wel, is geschreven om precies dit te dichten, maar draagt zelf de regel *"NIET UITGEVOERD TEGEN DE
-DATABASE... bewust niet toegepast."* Het gat staat nog open.
+**Zelfcorrectie, direct bij het uitvoeren van de eerste stap hieronder.** De eerste versie van deze
+sectie beweerde, op basis van `EXECUTION_PLAN.md` se 9-augustus-meting en de kop van
+`scripts/migrations/065_rls_sop_intelligence.sql` ("NIET UITGEVOERD TEGEN DE DATABASE"), dat het
+RLS-gat op de acht SOP/intelligence-tabellen nog volledig open stond. Dat bleek een te snelle
+conclusie: één bestandskop is aangenomen als waarheid zonder de eropvolgende migratie te lezen, en
+zonder te checken of de betrokken schermen zelf al waren omgebouwd. Beide checks weerspreken de
+oorspronkelijke claim.
 
-**Waarom hij niet zomaar toegepast kan worden — de reden staat in de migratie zelf, hier
-samengevat omdat hij anders alleen in een ongedraaid SQL-bestand leeft:**
+**Wat er echt staat, gecheckt tegen drie onafhankelijke bronnen:**
 
-Acht van de zestien tabellen in migratie 065's bereik worden **rechtstreeks door de browser
-gelezen** met de anon-sleutel (geen view-laag ertussen, zoals `fact_core` wel heeft): `sop_insights`,
-`sop_analysis_output`, `sop_recommendations`, `sop_tasks`, `sprint_hypotheses`, `sprint_items`,
-`client_settings`, `task_completions` — samen Vandaag, Analyses, Bevindingen, Sprintplanning, BMS
-en een groot deel van Instellingen. `O1_AUTH_ENFORCED` staat uit. Een RLS-policy die op
-`auth.uid()` controleert geeft bij een anonieme sessie **nul rijen** terug, geen foutmelding — die
-schermen zouden na het toepassen leeg vallen, niet zichtbaar breken. De migratie noemt zelf twee
-eerlijke oplossingen, geen van beide "gewoon uitvoeren": (1) eerst `O1_AUTH_ENFORCED` aanzetten met
-een echte inlogstroom, of (2) deze acht schermen ombouwen naar een service-role-route voor de
-leeskant (de schrijfkant loopt al deels via `app/api/data/[table]`). De overige acht tabellen in
-migratie 065 (`sop_hypothesis_tracking`, `sop_client_context`, `sop_client_config`,
-`client_targets`, `client_onboarding`, `analysis_prepared_context`, `search_term_analysis`,
-`second_opinion_runs`) hebben geen rechtstreekse browser-lezer — voor die acht is toepassen wél
-zonder dat risico.
+1. `scripts/migrations/067_rls_granulaire_kanalen_en_appdata.sql` (**TOEGEPAST op 10 augustus**,
+   dat staat letterlijk in zijn eigen kop) meet als uitgangspositie: *"Gemeten na migratie 065: 45
+   van de 122 tabellen in public hebben RLS."* Dat cijfer is alleen haalbaar als migratie 065 al
+   was toegepast op het moment dat 067 geschreven werd — 065's eigen "NIET UITGEVOERD"-regel is
+   dus zelf verouderd, nooit bijgewerkt nadat de migratie alsnog draaide. Na 067 zelf: 103 van de
+   122.
+2. Alle twintig componenten die migratie 065's eigen kop noemt als rechtstreekse browser-lezer van
+   de acht tabellen (`dgm-view.tsx`, `insights-block.tsx`, `use-today-feed.ts`,
+   `analysis-overview.tsx`, `sop-trigger-buttons.tsx`, `tasks-block.tsx`,
+   `recommendations-block.tsx`, `proposal-queue.tsx`, `sprint-planning.tsx`,
+   `brand-theme-provider.tsx`, `event-settings.tsx`, `branding-view.tsx`,
+   `geo-clone-settings.tsx`, `channel-performance.tsx`, `channel-forecast.tsx`,
+   `forecast-table.tsx`, `channel-conversion-settings.tsx`, `use-upcoming-edition.ts`,
+   `client-settings.ts`, `task-impact-reminder.tsx`) zijn nagelopen op 17 augustus: **geen enkele
+   leest de acht tabellen nog rechtstreeks.** Allemaal via `dbSelect`/`dbUpdate`
+   (`lib/data-access/client-read.ts`/`client-write.ts`) → `GET /api/data/[table]`
+   (`app/api/data/[table]/route.ts`) → service role. Die brug bestaat, is compleet aangesloten, en
+   bestaat met als expliciet doel (staat in de kop van `read-policy.ts`) migratie 065 veilig te
+   maken.
+3. Er is een **derde** RLS-migratie die nergens in dit document stond: `081_rls_negentien_tabellen.sql`
+   (commit `1fde60a`, 15 augustus) — negentien tabellen die volledig zonder policy stonden, waaronder
+   `generation_jobs`, `sync_runs`, `analysis_hypotheses`, `analysis_tasks`, `app_settings`,
+   `alerts_log`, acht `*_legacy`-brontabellen. Draagt geen "TOEGEPAST"/"NIET UITGEVOERD"-markering,
+   dus toepassingsstatus is voor déze migratie **niet met zekerheid vast te stellen zonder
+   databasetoegang** (deze sandbox heeft geen `SUPABASE_ACCESS_TOKEN`; `scripts/
+   check-rls-scheiding.mjs` — het script dat dit met een echte login zou bewijzen — slaat zichzelf
+   over zonder die sleutel, `"rls-scheiding: overgeslagen"`, en heeft dat de hele sessie gedaan
+   zonder dat een groene `gates.sh` dat liet zien).
 
-**Een tweede, apart gat, buiten het bereik van migratie 065 en nergens anders getraceerd:** zes
-tabellen dragen nog een oude, tenant-blinde policy uit migratie 012 (`auth_read`: elke ingelogde
-gebruiker ziet alles, van elk bureau) — `ads_leading_indicators`, `ads_portfolio_analysis`,
-`ads_region_monthly`, `ads_video_placements`, `benchmark_sectors`, `channel_geo_monthly`. Migratie
-065's eigen kop noemt dit expliciet "met opzet niet stilzwijgend meegenomen" — met opzet genoemd
-zodat het niet als "toevallig niet gezien" verdwijnt. Nog steeds niet gedicht.
+**Conclusie, eerlijk gegradeerd:** het gat op de acht SOP/intelligence-tabellen (migratie 065) is
+zeer waarschijnlijk gedicht — sterk bewijs uit twee onafhankelijke bronnen, geen tegenbewijs. De
+status van migratie 081's negentien tabellen is onbekend, niet "open" — dat moet iemand met
+databasetoegang bevestigen met `node scripts/check-rls-scheiding.mjs` of een directe query op
+`pg_tables`/`pg_policies`, niet aangenomen in welke richting dan ook.
 
-**Correctie op een bestaande regel in dit document:** sectie 7 noemt terloops *"Een Second
-Opinion-run (draait al, RLS via migratie 065)"* — dat suggereert dat migratie 065's bescherming al
-actief is. Dat klopt niet: de migratie zelf is nooit uitgevoerd. `second_opinion_runs` heeft geen
-rechtstreekse browser-lezer (dus geen acuut lek), maar "RLS via migratie 065" is op dit moment een
-belofte, geen feit. Regel blijft hier ongewijzigd staan zodat de fout traceerbaar blijft; de juiste
-lezing is deze sectie.
+**Wat wél overeind bleef, en inmiddels is opgelost (17 augustus, zelfde sessie):** zes tabellen
+droegen een oude, tenant-blinde policy — drie letterlijk `auth_read` uit migratie 012
+(`ads_leading_indicators`, `ads_portfolio_analysis`, `benchmark_sectors`), twee met
+"Allow all for authenticated" uit een niet-genummerd ad-hoc bestand
+(`scripts/geo-layer2-tables.sql`: `ads_region_monthly`, `channel_geo_monthly`), één uit een tweede
+zulk bestand (`scripts/video-placements.sql`: `ads_video_placements`). Geen van de drie
+RLS-migraties (065/067/081) raakte ze. **Correctie op de eigen eerdere telling:** het waren geen
+zes gelijke tenant-lekken — `benchmark_sectors` heeft geen `client_id`-kolom (generieke
+branchebenchmarks, geen klantdata), dus geen tenant-lek, alleen een opgeschoonde policy-naam
+nodig.
 
-**Wat wél al veilig is:** schrijfacties op alle zestien tabellen lopen al server-side via de
-service role (die RLS toch omzeilt) — nagemeten, geen rechtstreekse browser-schrijfactie gevonden.
-Dit is dus zuiver een leesgat, geen schrijfgat.
+**Gedaan:** `scripts/migrations/096_rls_auth_read_opruiming.sql` dicht alle zes, met het
+`app_zichtbare_klanten()`-patroon uit 065/067/081 voor de vijf echte klanttabellen. De ene
+tabel met een rechtstreekse browser-lezer (`ads_video_placements`, via
+`components/dashboard/video-placements.tsx`) is eerst omgebouwd naar
+`lib/data-access/client-read.ts` (`dbSelect`) → `GET /api/data/[table]`, en toegevoegd aan
+`READABLE_TABLES` in `lib/data-access/read-policy.ts` — dezelfde volgorde (leeskant eerst, dan de
+policy) als 065/067 zelf voorschrijven. De overige vijf hadden geen browser-lezer, dus voor die
+vijf kon de policy direct. **Net als 094/095: het SQL-bestand is klaargezet, niet toegepast** —
+deze sandbox heeft geen `SUPABASE_ACCESS_TOKEN`. Draaien met `node scripts/supabase-sql.mjs
+--file scripts/migrations/096_rls_auth_read_opruiming.sql` zodra iemand met databasetoegang dat
+kan doen, met de controlequery aan het eind van het bestand om te bevestigen.
 
-**Dit hoort als beslispunt bij Bureau twee** (sectie 9, Fase 6/7-voorbereiding, "RLS-bureaugrens
-narekenen, niet aannemen"): met één bureau is dit gat theoretisch (niemand anders om van te
-lekken), met een tweede bureau is het een echte cross-tenant blootstelling op acht schermen.
-Oplossen vóór bureau twee zijn eerste klant koppelt, niet erna.
+**Correctie op de correctie in sectie 7:** de eerdere versie van deze sectie corrigeerde
+`"Een Second Opinion-run (draait al, RLS via migratie 065)"` in sectie 7 als onjuist. Gegeven het
+bewijs hierboven was die oorspronkelijke regel in sectie 7 waarschijnlijk WEL correct. Sectie 7
+blijft daarom ongewijzigd; deze sectie is de plek waar de geschiedenis van de vergissing staat,
+niet sectie 7 zelf.
+
+**Voor Bureau twee blijft gelden:** RLS-bureaugrens narekenen met een echte tweede `agency_id`
+(sectie 9) is nog steeds de juiste stap vóór een tweede bureau een klant koppelt — nu om migratie
+081's én 096's toepassingsstatus te bevestigen (met `check-rls-scheiding.mjs` of een directe
+`pg_policies`-query), niet om een gat te vrezen dat grotendeels al gesloten is of klaarstaat.
 
 ### 15.2 Correctie op sectie 14.3: het skelet is niet overal even dood
 

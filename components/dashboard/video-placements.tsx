@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Ban, ExternalLink } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_PLACEMENTS } from "@/lib/demo/video-demo";
 import {
@@ -44,14 +44,13 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
     let cancelled = false;
     if (isDemoMode()) { setRows(DEMO_PLACEMENTS); return; }
 
-    const sb = supabase;
-    if (!sb) { setRows([]); return; }
     const since = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
-    sb.from("ads_video_placements")
-      .select("placement, display_name, placement_type, target_url, campaign_name, impressions, clicks, cost, conversions, video_views, metrics_complete, source")
-      .eq("client_id", clientId)
-      .gte("month", since)
-      .then(({ data }: { data: Record<string, unknown>[] | null }) => {
+    dbSelect<Record<string, unknown>>("ads_video_placements", {
+      select: "placement, display_name, placement_type, target_url, campaign_name, impressions, clicks, cost, conversions, video_views, metrics_complete, source",
+      clientId,
+      filters: [{ op: "gte", column: "month", value: since }],
+    })
+      .then(({ data }) => {
         if (cancelled) return;
         setRows((data ?? []).map((r) => ({
           placement: String(r.placement ?? ""),
@@ -67,7 +66,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
           metricsComplete: r.metrics_complete !== false,
           source: (r.source === "pmax" ? "pmax" : "video") as "video" | "pmax",
         })));
-      }, () => { if (!cancelled) setRows([]); });
+      });
 
     return () => { cancelled = true; };
   }, [clientId]);

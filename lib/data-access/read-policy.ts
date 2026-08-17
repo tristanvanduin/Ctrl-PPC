@@ -70,6 +70,15 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // dat moment; dit is de eerste, dus meteen via het service-role-pad en nooit via de anon-key,
   // net als de zeventien tabellen hierboven.
   ads_change_history: { capability: "client:read", clientColumn: "client_id" },
+
+  // Migratie 096: ads_video_placements droeg nog de oude, tenant-blinde auth_read-policy uit
+  // migratie 012 (elke ingelogde gebruiker ziet alles, van elk bureau) en werd rechtstreeks
+  // vanuit de browser gelezen (components/dashboard/video-placements.tsx). Zelfde patroon als
+  // hierboven: eerst de leeskant om naar het service-role-pad, dan pas de policy vervangen --
+  // anders valt het scherm leeg zolang O1_AUTH_ENFORCED uit staat. Zie scripts/migrations/
+  // 096_rls_auth_read_opruiming.sql voor de overige vijf tabellen met dezelfde oude policy, die
+  // geen van alle een browser-lezer hebben en dus zonder deze stap al veilig zijn.
+  ads_video_placements: { capability: "client:read", clientColumn: "client_id" },
 };
 
 export function isReadableTable(table: string): boolean {
