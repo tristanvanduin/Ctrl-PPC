@@ -49,6 +49,7 @@ import { computeComparisonFacts, formatComparisonFacts, computeCampaignMomFacts,
 import { computeDataReliability, type DataReliabilityAssessment } from "@/lib/analysis/data-reliability";
 import { channelGa4Context } from "@/lib/ga4/context";
 import type { Ga4SupabaseLike } from "@/lib/ga4/data-access";
+import { crossChannelContext } from "@/lib/analysis/cross-channel-context";
 import { checkStepDataAvailability } from "@/lib/analysis/data-availability";
 import type { StepDataAvailability } from "@/lib/analysis/data-availability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
@@ -1102,6 +1103,11 @@ async function runMetaMonthlyAnalysis(
   // draait ongewijzigd door. Landt in stap 1 (account performance).
   const ga4ContextText = (await channelGa4Context(clientId, adapter.channel, { supabase: supabase as unknown as Ga4SupabaseLike })).promptContext;
 
+  // Cross-channel als verklarende context (masterplan 16.4/16.5): landt alleen in stap 6
+  // (Hypotheses en Sprintplanning), zodat een Meta-hypothese kan weten dat LinkedIn dezelfde warme
+  // pool retarget. Leeg zonder eerdere cross-channel-run → stap 6 draait ongewijzigd door.
+  const crossChannelText = (await crossChannelContext(supabase, clientId)).promptContext;
+
   // E1-wiring (Meta): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
   const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
 
@@ -1154,7 +1160,8 @@ async function runMetaMonthlyAnalysis(
       clientMemorySection
     );
     const userMessage = buildMetaStepMessage(stepNumber, stepFacts[stepNumber], clientId)
-      + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "");
+      + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
+      + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "");
     let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
     const priorStepConclusion = conclusions.at(-1);
     let { parsed, validation } = parseStructuredStepOutput(
@@ -1293,6 +1300,10 @@ async function runLinkedinMonthlyAnalysis(
   // GA4 als verklarende context (LinkedIn), zelfde laag als Google/Meta. Leeg zonder GA4-config.
   const ga4ContextText = (await channelGa4Context(clientId, adapter.channel, { supabase: supabase as unknown as Ga4SupabaseLike })).promptContext;
 
+  // Cross-channel als verklarende context (masterplan 16.4/16.5), zelfde plek als bij Meta: alleen
+  // stap 6 (Hypotheses en Sprintplanning).
+  const crossChannelText = (await crossChannelContext(supabase, clientId)).promptContext;
+
   // E1-wiring (LinkedIn): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
   const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
 
@@ -1344,7 +1355,8 @@ async function runLinkedinMonthlyAnalysis(
       clientMemorySection
     );
     const userMessage = buildLinkedinStepMessage(stepNumber, stepFacts[stepNumber], clientId)
-      + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "");
+      + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
+      + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "");
     let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
     const priorStepConclusion = conclusions.at(-1);
     let { parsed, validation } = parseStructuredStepOutput(
@@ -1960,6 +1972,9 @@ ${runningContext}`,
     // Zonder GA4-config levert dit een lege string → de SOP draait volledig ongewijzigd door.
     const ga4Context = await channelGa4Context(clientId, "google_ads", { supabase: supabase as unknown as Ga4SupabaseLike });
     const ga4ContextText = ga4Context.promptContext ? `\n\n${ga4Context.promptContext}` : "";
+    // Cross-channel als verklarende context (masterplan 16.4/16.5): landt alleen in stap 13
+    // (Hypotheses & Sprintplanning), niet in de eerdere kanaal-specifieke stappen.
+    const crossChannelGoogleText = (await crossChannelContext(supabase, clientId)).promptContext;
     const preparedInputs: MonthlyPreparedInputs = {
       analysisYear,
       lastCompleteMonth,
@@ -2785,7 +2800,7 @@ ${toPromptTable(checkpointOutputs)}
 \`\`\`
 
 ## Stapconclusies
-${conclusions.join("\n\n---\n\n")}`,
+${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannelGoogleText}` : ""}`,
     });
     steps.push(conclusion);
     const conclusionPrior = conclusions.at(-1);

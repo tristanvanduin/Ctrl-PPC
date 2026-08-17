@@ -2219,8 +2219,47 @@ zo.** `app/api/platform/agency-macrotrends/route.ts` en `app/api/platform/god-mo
 gewone GET-routes die live herberekenen bij elke paginabezoek (`runMacrotrends`, geen opgeslagen
 SOP-output, geen trigger-knop) — geen handmatige stap om te vergeten, geen wijziging nodig.
 
-**Nog niet gestart:** of de cross-channel-bevindingen ook rechtstreeks de per-kanaal LLM-
-promptcontext moeten voeden (bijvoorbeeld: "deze Meta-campagne is óók retargeting, weeg dat mee")
-is een aparte, grotere vraag — dat raakt de promptopbouw van elke kanaalstap en is bewust niet in
-dezelfde wijziging meegenomen. Deze fix maakt alleen dat cross-channel altijd ván nature meedraait
-en actueel blijft; het voedt de kanaalanalyses nog niet inhoudelijk terug.
+**Nog niet gestart (in sectie 16.4's eerste versie):** of de cross-channel-bevindingen ook
+rechtstreeks de per-kanaal LLM-promptcontext moeten voeden. Zie 16.5 — dat gat is dezelfde sessie
+nog gedicht.
+
+### 16.5 Cross-channel voedt nu ook de hypotheses zelf, niet alleen de trigger
+
+Direct vervolg op 16.4. De eigenaar, na het antwoord over de automatische trigger: *"cross channel
+moet absoluut voeden. hoe kan je anders je hypotheses daadwerkelijk cross channel maken?"* — terecht.
+16.4 loste alleen op DAT cross-channel draait; niet dat een kanaal-hypothese er ook echt op rust.
+Getriggerde cross-channel-signalen landden al in de hypothese-wachtrij (`saveSignalHypotheses`),
+maar geen enkele kanaal-LLM-stap kreeg de cross-channel-bevindingen als promptcontext. Een
+Meta-hypothese werd dus gegenereerd zonder te weten dat LinkedIn dezelfde warme pool retarget —
+"cross-channel" in de trigger, niet in de redenering.
+
+**Gefixt: `lib/analysis/cross-channel-context.ts` (nieuw), zelfde vorm als `lib/ga4/context.ts`
+(`channelGa4Context`) — een call die de laatst opgeslagen cross-channel-markdown ophaalt
+(`sop_analysis_output`, `sop_type "cross_channel"`, sectie `cross_channel_v1`) en er een
+promptblok van maakt, met een expliciete analysedatum (kan van een eerdere cyclus zijn — de
+allereerste kanaal-run van een maand vindt nog geen verse cross-channel-data, want die draait pas
+ná een monthly-run, zie 16.4) en een instructie: gebruik dit om hypotheses te verrijken/nuanceren,
+niet om kanaalcijfers te herschrijven of cross-channel-cijfers te verzinnen. Degradeert net als
+GA4 stil naar `""` (nul promptwijziging) als er nog geen cross-channel-run bestaat.
+
+**Landt uitsluitend in de hypotheses-stap, niet in de eerdere stappen** — bewust smal, om de
+rest van elke kanaal-SOP ongemoeid te laten:
+- Meta (`runMetaMonthlyAnalysis`) en LinkedIn (`runLinkedinMonthlyAnalysis`): stap 6, "Hypotheses
+  en Sprintplanning" (beide `stepCount: 6`, bevestigd in `lib/analysis/adapters/{meta,linkedin}-
+  ads.ts`).
+- Google (hoofd-`POST`-handler, nog op de oudere 13-stappenstructuur): stap 13, "Hypotheses &
+  Sprintplanning" — een andere plek in de code (`runStep` direct in de handler, niet via een
+  gedeelde `buildXStepMessage`-helper), zelfde principe.
+
+Alle drie volgen exact het bestaande GA4-patroon (`ga4ContextText`, alleen naar stap 1 geschoven)
+— geen nieuw patroon uitgevonden, hetzelfde toegepast op een andere stap. Getest
+(`__cross_channel_context_test.ts`, gemockte Supabase): geen eerdere run → lege promptContext;
+wel een run → analysedatum expliciet in de tekst, nooit stilzwijgend als actueel gepresenteerd;
+een uitzonderlijk lange cross-channel-sectie (veel getriggerde signalen) wordt afgekapt in plaats
+van de prompt te laten ontsporen.
+
+**Nog niet gestart:** of de per-campagne bevindingen uit sectie 16.3 (`lib/meta/
+campaign-analysis.ts`, `lib/linkedin/campaign-analysis.ts` — zelf nog zonder consument) ooit
+dezelfde weg naar de hypotheses-stap moeten vinden als de cross-channel-laag hier. Dat is een
+aparte vraag: deze twee lagen zitten op een ander niveau (per-campagne-efficiency vs.
+tussen-kanalen-overlap) en verdienen een eigen afweging, niet automatisch dezelfde behandeling.
