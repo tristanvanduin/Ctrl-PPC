@@ -43,7 +43,21 @@ const WACHT = Number(process.env.WACHT_MS ?? 8000);
  * Overgeslagen, met reden:
  *   - kaarten met `overflow` anders dan visible: daar is afsnijden of scrollen de bedoeling;
  *   - `position: absolute/fixed`: die horen los van de stroom te staan (tooltips, badges);
- *   - een marge van 2px, want subpixel-randen en afrondingen leveren anders ruis.
+ *   - een marge van 2px, want subpixel-randen en afrondingen leveren anders ruis;
+ *   - een tussenliggende voorouder (tussen het tekstelement en de kaart zelf, dus niet de kaart
+ *     zelf) met `overflow-y: auto/scroll` of `overflow: hidden/clip`: die knipt of scrollt zijn
+ *     eigen inhoud al af, los van wat de buitenste kaart doet. Gevonden op 17 augustus 2026 op
+ *     Bevindingen: een takenlijst met `max-h-[400px] overflow-y-auto` toonde zijn 400px keurig
+ *     begrensd (bevestigd met een screenshot), maar de detector telde de erna verborgen regels
+ *     toch mee omdat hij alleen de kaart zelf op `overflow` checkte, niet de laag ertussen;
+ *   - een tekstelement binnen een GESLOTEN `<details>`: Chromium's headless renderer geeft
+ *     `getBoundingClientRect()` op verborgen `<details>`-inhoud een echte, niet-nul positie en
+ *     grootte terug (vergelijkbaar met `content-visibility: hidden`, niet met `display: none`),
+ *     ook al is er niets te zien. Ook gevonden op 17 augustus 2026, op Instellingen: 25
+ *     "bevindingen" bleken stuk voor stuk env-var-instructies binnen een dichtgeklapte
+ *     `<details><summary>Alternatief: handmatig via .env.local</summary>`, bevestigd met
+ *     `getComputedStyle` (display: block, dus geen normale display:none-onzichtbaarheid) en een
+ *     screenshot dat de kaart netjes afgesloten toont.
  */
 const DETECTOR = () => {
   const uit = [];
@@ -63,6 +77,23 @@ const DETECTOR = () => {
       if (es.position === "absolute" || es.position === "fixed") continue;
       const r = el.getBoundingClientRect();
       if (r.height === 0 || r.width === 0) continue;
+
+      const dichteDetails = el.closest("details");
+      if (dichteDetails && !dichteDetails.open) continue;
+
+      let heeftEigenAfsnijding = false;
+      for (let p = el.parentElement; p && p !== kaart; p = p.parentElement) {
+        const pcs = getComputedStyle(p);
+        if (
+          pcs.overflowY === "auto" || pcs.overflowY === "scroll" ||
+          pcs.overflow === "hidden" || pcs.overflow === "clip"
+        ) {
+          heeftEigenAfsnijding = true;
+          break;
+        }
+      }
+      if (heeftEigenAfsnijding) continue;
+
       const onder = Math.round(r.bottom - kr.bottom);
       const rechts = Math.round(r.right - kr.right);
       if (onder > 2 || rechts > 2) uit.push({ tekst: t.slice(0, 40), onder, rechts });
