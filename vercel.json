@@ -3,14 +3,6 @@
     {
       "path": "/api/sync/cron",
       "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/evaluate-hypotheses",
-      "schedule": "30 6 * * 1"
-    },
-    {
-      "path": "/api/cron/evaluate-code-rood",
-      "schedule": "0 6 * * *"
     }
   ]
 }

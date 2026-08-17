@@ -26,6 +26,15 @@
 // hypothesis-evaluator.ts zei dat al voordat dit bestand het waarmaakte.
 //
 // LIVE-ONGETEST: vergt migratie 021 en aangenomen hypotheses met een verstreken venster.
+//
+// NIET IN vercel.json (17 augustus 2026, op verzoek van de eigenaar: "ik wil geen API-kosten
+// maken in de nacht en ik wil zelf testen kunnen draaien"). Stond er kort in, samen met
+// evaluate-code-rood -- pas nadat isCronPath() (lib/auth/roles.ts) gefixt was om /api/cron/* te
+// herkennen, wat ze voor het eerst daadwerkelijk liet vuren. Beide eruit gehaald voordat de fix
+// live ging, om onbewaakt nachtelijk draaien te voorkomen. Handmatig testen:
+//   curl -H "Authorization: Bearer $CRON_SECRET" \
+//     "https://www.ctrlppc.com/api/cron/evaluate-hypotheses?dry_run=true"
+// Zelfde afweging als lib/scheduler/sop-cadence.ts/trigger-sops: klaargezet, niet actief.
 // =====================================================================
 
 import { NextRequest } from "next/server";

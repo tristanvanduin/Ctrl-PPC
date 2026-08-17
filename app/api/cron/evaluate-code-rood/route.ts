@@ -7,6 +7,12 @@
 // LIVE-ONGETEST: vergt migratie 073 (nu ook status 'opgelost') en een CRON_SECRET/vercel.json-
 // registratie. Tot die migratie draait geeft elke poging tot schrijven een foutmelding per klant
 // terug in "resultaten", zonder de rest van de run te breken.
+//
+// NIET IN vercel.json (17 augustus 2026, op verzoek van de eigenaar: "ik wil geen API-kosten
+// maken in de nacht en ik wil zelf testen kunnen draaien"). Zie de kop van evaluate-hypotheses/
+// route.ts voor de volledige toelichting -- zelfde reden, zelfde moment. Handmatig testen:
+//   curl -H "Authorization: Bearer $CRON_SECRET" \
+//     "https://www.ctrlppc.com/api/cron/evaluate-code-rood?dry_run=true"
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { synckandidaten } from "@/lib/tenancy/klanten";
