@@ -43,7 +43,7 @@ export const DEFAULT_THEME: EventTheme = {
   card: "#ffffff",
   border: "#E1E5F2",
   logoUrl: null,
-  headingFont: "Gilroy, Ubuntu, sans-serif",
+  headingFont: "Ubuntu, sans-serif",
 };
 
 const HEX_RE = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/;

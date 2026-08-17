@@ -46,7 +46,7 @@ export function MacroTrendsPreview() {
   if (data.cellen.length === 0) {
     return (
       <section className="mb-8">
-        <h2 className="mb-2 text-title font-semibold text-rm-gray">Agency macro trends</h2>
+        <h2 className="mb-2 text-title font-semibold text-brand-gray">Agency macro trends</h2>
         <p className="rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-meta text-muted-foreground">
           Nog geen cellen — geen klant heeft in het venster sinds {data.vanaf} zowel spend als een
           gekoppeld bureau.
@@ -64,7 +64,7 @@ export function MacroTrendsPreview() {
   return (
     <section className="mb-8">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h2 className="text-title font-semibold text-rm-gray">Agency macro trends</h2>
+        <h2 className="text-title font-semibold text-brand-gray">Agency macro trends</h2>
         <span className="text-meta text-muted-foreground">
           {data.aantalCellen} cellen over {data.aantalKlantenIngelezen} klanten sinds {data.vanaf}
         </span>

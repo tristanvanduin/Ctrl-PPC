@@ -70,8 +70,8 @@ export function Ga4Settings({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <LineChart className="w-5 h-5 text-rm-blue-ink" />
-        <h2 className="text-base font-semibold text-rm-blue-ink">Google Analytics 4</h2>
+        <LineChart className="w-5 h-5 text-brand-blue-ink" />
+        <h2 className="text-base font-semibold text-brand-blue-ink">Google Analytics 4</h2>
       </div>
       <p className="text-meta text-muted-foreground mb-4">
         Verrijkt de kanaal-analyses met website-/funnelcontext (tracking, CRO, kanaal-
@@ -81,7 +81,7 @@ export function Ga4Settings({ clientId }: { clientId: string }) {
 
       <div className="space-y-4">
         <label className="block">
-          <span className="text-body font-medium text-rm-gray">GA4-property</span>
+          <span className="text-body font-medium text-brand-gray">GA4-property</span>
           <input
             type="text"
             value={config.propertyId}
@@ -92,7 +92,7 @@ export function Ga4Settings({ clientId }: { clientId: string }) {
         </label>
 
         <label className="block">
-          <span className="text-body font-medium text-rm-gray">Key events</span>
+          <span className="text-body font-medium text-brand-gray">Key events</span>
           <input
             type="text"
             value={keyEventsInput}
@@ -104,7 +104,7 @@ export function Ga4Settings({ clientId }: { clientId: string }) {
         </label>
 
         <label className="block">
-          <span className="text-body font-medium text-rm-gray">Funnelstappen</span>
+          <span className="text-body font-medium text-brand-gray">Funnelstappen</span>
           <input
             type="text"
             value={funnelStepsInput}
@@ -120,7 +120,7 @@ export function Ga4Settings({ clientId }: { clientId: string }) {
       <button
         onClick={save}
         disabled={saving}
-        className="mt-5 flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all"
+        className="mt-5 flex items-center gap-2 px-4 py-2 rounded-md bg-brand-blue text-white text-body font-medium hover:bg-brand-blue/90 disabled:opacity-50 transition-all"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? "Opslaan..." : saved ? "Opgeslagen" : "GA4-configuratie opslaan"}

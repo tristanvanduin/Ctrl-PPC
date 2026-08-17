@@ -109,9 +109,9 @@ export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel
             if (!a) return null;
             return (
               <>
-                <div className="text-lead font-bold text-rm-gray leading-tight">{format(a.value)}</div>
+                <div className="text-lead font-bold text-brand-gray leading-tight">{format(a.value)}</div>
                 <div className="text-micro text-muted-foreground leading-tight">{a.label}</div>
-                <div className="text-micro font-medium text-rm-gray leading-tight">
+                <div className="text-micro font-medium text-brand-gray leading-tight">
                   {new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 1 }).format(a.share)}
                 </div>
               </>
@@ -119,7 +119,7 @@ export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel
           })()
         ) : (
           <>
-            <div className="text-lead font-bold text-rm-gray leading-tight">{centerValue}</div>
+            <div className="text-lead font-bold text-brand-gray leading-tight">{centerValue}</div>
             <div className="text-micro text-muted-foreground leading-tight">{centerLabel}</div>
           </>
         )}

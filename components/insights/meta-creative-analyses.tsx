@@ -38,7 +38,7 @@ export function MetaCreativeAnalyses({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
-        <h3 className="text-title font-semibold text-rm-gray">Creative-analyses (Meta)</h3>
+        <h3 className="text-title font-semibold text-brand-gray">Creative-analyses (Meta)</h3>
         <p className="text-micro text-muted-foreground mt-0.5">Losse creative-analyses; vereisen gesyncte Meta-data.</p>
       </div>
       <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -50,12 +50,12 @@ export function MetaCreativeAnalyses({ clientId }: { clientId: string }) {
               onClick={() => run(a)}
               disabled={running[a.key]}
               className={`w-full px-4 py-3 rounded-lg border text-left transition-all ${
-                r?.ok ? "border-emerald-300 bg-emerald-50" : r && !r.ok ? "border-red-300 bg-red-50" : "border-border hover:border-rm-blue/40 hover:bg-gray-50 cursor-pointer"
+                r?.ok ? "border-emerald-300 bg-emerald-50" : r && !r.ok ? "border-red-300 bg-red-50" : "border-border hover:border-brand-blue/40 hover:bg-gray-50 cursor-pointer"
               } ${running[a.key] ? "cursor-wait opacity-70" : ""}`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold text-rm-gray">{a.label}</span>
-                {running[a.key] && <Loader2 className="w-4 h-4 text-rm-blue-ink animate-spin" />}
+                <span className="text-sm font-semibold text-brand-gray">{a.label}</span>
+                {running[a.key] && <Loader2 className="w-4 h-4 text-brand-blue-ink animate-spin" />}
                 {r?.ok && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                 {r && !r.ok && <AlertCircle className="w-4 h-4 text-red-500" />}
               </div>

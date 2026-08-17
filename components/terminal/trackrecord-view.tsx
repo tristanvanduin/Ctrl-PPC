@@ -52,7 +52,7 @@ function formatWanneer(iso: string): string {
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="terminal rounded-lg border border-border bg-card p-3">
-      <div className="teller-waarde text-page font-bold text-rm-blue-ink">{value}</div>
+      <div className="teller-waarde text-page font-bold text-brand-blue-ink">{value}</div>
       <div className="text-micro text-muted-foreground">{label}</div>
     </div>
   );
@@ -83,7 +83,7 @@ export function TrackrecordView({ clientId }: { clientId: string }) {
   if (!data) {
     return (
       <div className="terminal flex items-center justify-center rounded-xl border border-border bg-card p-8">
-        <Loader2 className="h-4 w-4 animate-spin text-rm-blue-ink" />
+        <Loader2 className="h-4 w-4 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
@@ -100,7 +100,7 @@ export function TrackrecordView({ clientId }: { clientId: string }) {
           voorstellen gedaan, geaccepteerd en geëvalueerd worden.
         </div>
       ) : (
-        <p className="text-body text-rm-gray leading-relaxed">
+        <p className="text-body text-brand-gray leading-relaxed">
           Van de <strong>{totals.proposed}</strong> hypotheses die voorgesteld zijn, zijn er{" "}
           <strong>{totals.executed}</strong> uitgevoerd.
           {evaluated > 0 && (
@@ -121,7 +121,7 @@ export function TrackrecordView({ clientId }: { clientId: string }) {
 
       {bySource.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-4">
-          <h3 className="mb-2 text-meta font-semibold text-rm-blue-ink">Per bron</h3>
+          <h3 className="mb-2 text-meta font-semibold text-brand-blue-ink">Per bron</h3>
           <p className="mb-3 text-micro text-muted-foreground">
             Uitgesplitst naar waar de hypothese vandaan kwam — de fijnste indeling die vandaag
             echt bestaat, niet gegokt op een signaaltype.
@@ -129,7 +129,7 @@ export function TrackrecordView({ clientId }: { clientId: string }) {
           <div className="space-y-1.5">
             {bySource.map((s) => (
               <div key={s.source} className="flex items-center justify-between gap-3 text-body">
-                <span className="text-rm-gray">{s.source}</span>
+                <span className="text-brand-gray">{s.source}</span>
                 <span className="teller-waarde text-micro text-muted-foreground">
                   {s.met + s.missed > 0 ? `${s.met} van ${s.met + s.missed} raak (${pct(s.hitRate)})` : `${s.proposed} voorgesteld, nog niet geëvalueerd`}
                 </span>
@@ -141,11 +141,11 @@ export function TrackrecordView({ clientId }: { clientId: string }) {
 
       {recentRejections.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-4">
-          <h3 className="mb-2 text-meta font-semibold text-rm-blue-ink">Recent afgewezen</h3>
+          <h3 className="mb-2 text-meta font-semibold text-brand-blue-ink">Recent afgewezen</h3>
           <div className="space-y-2">
             {recentRejections.map((r, i) => (
               <div key={i} className="rounded-lg border border-border bg-muted p-2.5">
-                <p className="text-body text-rm-gray leading-snug">{r.hypothesis}</p>
+                <p className="text-body text-brand-gray leading-snug">{r.hypothesis}</p>
                 <p className="mt-1 text-micro text-muted-foreground">
                   {formatWanneer(r.createdAt)} — {r.reason}
                 </p>

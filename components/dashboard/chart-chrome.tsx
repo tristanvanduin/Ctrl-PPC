@@ -295,13 +295,13 @@ function TipInhoud({ active, payload, label, formatter }: TipProps) {
     <div className="rounded-lg border border-border bg-[var(--tip-vlak)] backdrop-blur-md shadow-lg px-3 py-2 text-meta">
       {/* Door dezelfde opmaker als de as. De as zei "mei '26" en de tooltip eronder "2026-05":
           twee schrijfwijzen voor dezelfde maand, tien pixels uit elkaar. */}
-      {label != null && <div className="font-semibold text-rm-gray mb-1">{maandLabel(String(label))}</div>}
+      {label != null && <div className="font-semibold text-brand-gray mb-1">{maandLabel(String(label))}</div>}
       <div className="space-y-0.5">
         {payload.map((p: TipDeel, i: number) => (
           <div key={`${p.name}-${i}`} className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: p.color }} aria-hidden />
             <span className="text-muted-foreground">{p.name}</span>
-            <span className="ml-auto font-semibold text-rm-gray tabular-nums">
+            <span className="ml-auto font-semibold text-brand-gray tabular-nums">
               {typeof p.value === "number" ? fmt(p.value) : String(p.value ?? "—")}
             </span>
           </div>

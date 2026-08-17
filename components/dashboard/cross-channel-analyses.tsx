@@ -18,22 +18,22 @@ function GroupCard({ group }: { group: CrossGroup }) {
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <div className="flex-1">
-          <h4 className="text-lead font-semibold text-rm-gray">{group.title}</h4>
+          <h4 className="text-lead font-semibold text-brand-gray">{group.title}</h4>
           <p className="text-micro text-muted-foreground mt-0.5">{group.description}</p>
         </div>
-        <span className={`text-micro font-medium px-2 py-0.5 rounded-full ${has ? "bg-rm-orange/10 text-rm-orange-ink" : "bg-gray-100 text-muted-foreground"}`}>
+        <span className={`text-micro font-medium px-2 py-0.5 rounded-full ${has ? "bg-brand-orange/10 text-brand-orange-ink" : "bg-gray-100 text-muted-foreground"}`}>
           {has ? `${group.triggered} signa${group.triggered === 1 ? "al" : "len"}` : "geen"}
         </span>
       </div>
       <div className="px-5 py-2.5">
         {has ? (
           <>
-            <button onClick={() => setExpanded((e) => !e)} className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline">
+            <button onClick={() => setExpanded((e) => !e)} className="flex items-center gap-1 text-meta text-brand-blue-ink hover:underline">
               {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               {expanded ? "Verberg bevindingen" : "Bekijk bevindingen"}
             </button>
             {expanded && (
-              <div className="mt-2 rounded-md border border-border bg-gray-50 px-3 py-2 text-meta text-rm-gray whitespace-pre-wrap max-h-72 overflow-y-auto">
+              <div className="mt-2 rounded-md border border-border bg-gray-50 px-3 py-2 text-meta text-brand-gray whitespace-pre-wrap max-h-72 overflow-y-auto">
                 {group.section}
               </div>
             )}
@@ -106,9 +106,9 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
       {/* Kop met de gedeelde run-knop: één run voedt alle sub-analyses. */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Radar className="w-4.5 h-4.5 text-rm-blue-ink" />
+          <Radar className="w-4.5 h-4.5 text-brand-blue-ink" />
           <div className="flex-1">
-            <h3 className="text-title font-semibold text-rm-gray">Cross-channel-analyse</h3>
+            <h3 className="text-title font-semibold text-brand-gray">Cross-channel-analyse</h3>
             <p className="text-micro text-muted-foreground mt-0.5">
               Eén deterministische run; de sub-analyses hieronder komen uit dezelfde detectie. Getriggerde signalen landen in de goedkeuringswachtrij.
             </p>
@@ -116,7 +116,7 @@ export function CrossChannelAnalyses({ clientId }: { clientId: string }) {
           <button
             onClick={run}
             disabled={running}
-            className="px-3 py-1.5 rounded-md bg-rm-blue text-white text-meta font-medium hover:bg-rm-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
+            className="px-3 py-1.5 rounded-md bg-brand-blue text-white text-meta font-medium hover:bg-brand-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
           >
             {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             {running ? "Bezig..." : "Draai cross-channel-analyse"}

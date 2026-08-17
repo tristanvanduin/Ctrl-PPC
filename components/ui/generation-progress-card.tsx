@@ -19,13 +19,13 @@ export function GenerationProgressCard({ title, job, fallbackMessage = "Voortgan
     <div className="rounded-lg border border-border bg-white/80 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-rm-gray">{title}</p>
+          <p className="text-xs font-semibold text-brand-gray">{title}</p>
           <p className="mt-1 text-meta text-muted-foreground">
             {job ? describeGenerationOutcome(job) : fallbackMessage}
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-xs font-semibold text-rm-gray">{progress}%</p>
+          <p className="text-xs font-semibold text-brand-gray">{progress}%</p>
           <p className="text-micro text-muted-foreground">
             {job?.step_index ?? 0}/{job?.total_steps ?? 0} fases
           </p>
@@ -35,7 +35,7 @@ export function GenerationProgressCard({ title, job, fallbackMessage = "Voortgan
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
         <div
           className={`h-full rounded-full transition-all ${
-            job?.status === "failed" ? "bg-red-500" : job?.status === "completed" ? "bg-emerald-500" : "bg-rm-blue"
+            job?.status === "failed" ? "bg-red-500" : job?.status === "completed" ? "bg-emerald-500" : "bg-brand-blue"
           }`}
           style={{ width: `${Math.max(6, progress)}%` }}
         />
@@ -50,14 +50,14 @@ export function GenerationProgressCard({ title, job, fallbackMessage = "Voortgan
             return (
               <div key={phase.phase_key} className="flex items-start gap-2 text-meta">
                 <span className="mt-0.5 shrink-0">
-                  {isCurrent && <Loader2 className="h-3.5 w-3.5 animate-spin text-rm-blue-ink" />}
+                  {isCurrent && <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-blue-ink" />}
                   {isDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
                   {isFailed && <AlertCircle className="h-3.5 w-3.5 text-red-500" />}
                   {!isCurrent && !isDone && !isFailed && <span className="block h-3.5 w-3.5 rounded-full border border-gray-300" />}
                 </span>
                 <div className="min-w-0">
                   <p className={`font-medium ${
-                    isFailed ? "text-red-700" : isDone ? "text-emerald-700" : isCurrent ? "text-rm-gray" : "text-muted-foreground"
+                    isFailed ? "text-red-700" : isDone ? "text-emerald-700" : isCurrent ? "text-brand-gray" : "text-muted-foreground"
                   }`}>
                     {phase.phase_label}
                   </p>

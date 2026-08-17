@@ -101,7 +101,7 @@ export function CommandPalette() {
               if (e.key === "Enter" && filtered[activeIdx]) ga(filtered[activeIdx]);
             }}
             placeholder="Zoek een pagina of klant..."
-            className="flex-1 bg-transparent text-body text-rm-gray placeholder:text-muted-foreground focus:outline-none"
+            className="flex-1 bg-transparent text-body text-brand-gray placeholder:text-muted-foreground focus:outline-none"
           />
           <kbd className="rounded border border-border px-1.5 py-0.5 text-micro text-muted-foreground">esc</kbd>
         </div>
@@ -117,7 +117,7 @@ export function CommandPalette() {
                 onClick={() => ga(item)}
                 onMouseEnter={() => setActiveIdx(i)}
                 className={`flex w-full items-center gap-3 px-4 py-2 text-left text-body transition-colors ${
-                  i === activeIdx ? "bg-rm-blue/10 text-rm-blue-ink" : "text-rm-gray"
+                  i === activeIdx ? "bg-brand-blue/10 text-brand-blue-ink" : "text-brand-gray"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

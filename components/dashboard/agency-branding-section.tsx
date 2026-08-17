@@ -55,8 +55,8 @@ export function AgencyBrandingSection() {
   return (
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <ImageIcon className="w-5 h-5 text-rm-blue-ink" />
-        <h2 className="text-title font-semibold text-rm-blue-ink">Huisstijl</h2>
+        <ImageIcon className="w-5 h-5 text-brand-blue-ink" />
+        <h2 className="text-title font-semibold text-brand-blue-ink">Huisstijl</h2>
       </div>
       <p className="text-body text-muted-foreground mb-4">
         Upload het eigen logo van je bureau. Dit vervangt het Ctrl PPC-icoon in de zijbalk voor
@@ -84,7 +84,7 @@ export function AgencyBrandingSection() {
           </button>
         )}
         {exists === false && (
-          <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed border-border hover:border-rm-blue/40 cursor-pointer transition-colors">
+          <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed border-border hover:border-brand-blue/40 cursor-pointer transition-colors">
             {uploading ? (
               <span className="text-body text-muted-foreground">Uploaden...</span>
             ) : (

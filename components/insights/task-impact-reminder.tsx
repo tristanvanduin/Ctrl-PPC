@@ -100,7 +100,7 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
             <div key={tc.id} className="bg-card rounded-lg border border-amber-100 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-rm-gray">{tc.task_text}</p>
+                  <p className="text-xs font-medium text-brand-gray">{tc.task_text}</p>
                   <p className="text-micro text-muted-foreground mt-0.5">
                     Afgevinkt {days} dagen geleden · {tc.cadence}
                   </p>
@@ -109,7 +109,7 @@ export function TaskImpactReminder({ clientId }: { clientId: string }) {
                   {!impact && (
                     <button
                       onClick={() => checkImpact(tc)}
-                      className="flex items-center gap-1 px-2.5 py-1 text-micro font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90"
+                      className="flex items-center gap-1 px-2.5 py-1 text-micro font-medium rounded-md bg-brand-blue text-white hover:bg-brand-blue/90"
                     >
                       <Eye className="w-3 h-3" /> Check impact
                     </button>

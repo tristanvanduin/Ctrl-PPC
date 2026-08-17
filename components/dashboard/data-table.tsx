@@ -164,9 +164,9 @@ export function SorteerKop({
       <button
         type="button"
         onClick={onSorteer}
-        className={`inline-flex items-center gap-1 rounded-sm text-micro font-semibold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue ${
+        className={`inline-flex items-center gap-1 rounded-sm text-micro font-semibold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
           getal ? "flex-row-reverse" : ""
-        } ${actief ? "text-rm-blue-ink" : "text-muted-foreground hover:text-rm-blue-ink"}`}
+        } ${actief ? "text-brand-blue-ink" : "text-muted-foreground hover:text-brand-blue-ink"}`}
       >
         {children}
         <Pijl className={`w-3 h-3 shrink-0 ${actief ? "" : "opacity-30"}`} aria-hidden />
@@ -193,7 +193,7 @@ export function NaamCel({ children, sub, className = "" }: { children: ReactNode
     <td className={`${TABEL_CEL} align-middle ${className}`}>
       {/* De naam wordt afgekapt: hij is een aanduiding, en een campagnenaam van honderd tekens
           duwt alle getallen uit beeld. */}
-      <div className="text-rm-gray font-medium truncate max-w-[28rem]">{children}</div>
+      <div className="text-brand-gray font-medium truncate max-w-[28rem]">{children}</div>
       {/* De tweede regel niet. Daar staat de reden — "kostte € 340 over 720 klikken zonder één
           conversie" — en die werd afgekapt tot "Klikken in apps zijn vaak onbe…". Een afgekapte
           naam kun je nog herkennen; een afgekapte verklaring is weg. */}
@@ -215,7 +215,7 @@ export function NaamCel({ children, sub, className = "" }: { children: ReactNode
  */
 export function RijKop({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <th scope="row" className={`${TABEL_CEL} text-left align-middle font-medium text-rm-gray whitespace-nowrap ${className}`}>
+    <th scope="row" className={`${TABEL_CEL} text-left align-middle font-medium text-brand-gray whitespace-nowrap ${className}`}>
       {children}
     </th>
   );
@@ -242,7 +242,7 @@ export function Cel({
   className?: string;
 }) {
   return (
-    <td colSpan={colSpan} className={`${TABEL_CEL} align-middle ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${nowrap ? "whitespace-nowrap" : ""} ${className}`}>
+    <td colSpan={colSpan} className={`${TABEL_CEL} align-middle ${zacht ? "text-muted-foreground" : "text-brand-gray"} ${nowrap ? "whitespace-nowrap" : ""} ${className}`}>
       {children}
     </td>
   );
@@ -266,7 +266,7 @@ export function GetalCel({
   className?: string;
 }) {
   return (
-    <td className={`${TABEL_CEL} text-right tabular-nums whitespace-nowrap ${zacht ? "text-muted-foreground" : "text-rm-gray"} ${className}`}>
+    <td className={`${TABEL_CEL} text-right tabular-nums whitespace-nowrap ${zacht ? "text-muted-foreground" : "text-brand-gray"} ${className}`}>
       {children}
     </td>
   );
@@ -299,7 +299,7 @@ export function AandeelCel({
   const veilig = Number.isFinite(aandeel) ? Math.max(0, Math.min(1, aandeel)) : 0;
   return (
     <td className={`${TABEL_CEL} text-right tabular-nums whitespace-nowrap ${className}`}>
-      <span className="text-rm-gray font-medium">{waarde}</span>
+      <span className="text-brand-gray font-medium">{waarde}</span>
       {/* Een dunne lijn ónder het getal, op een vaste baan.
           Eerste poging was een vlak áchter het getal, maar dat leest als een markering: de
           koploper kreeg een balk over de volle celbreedte en zag eruit als "geselecteerd",
@@ -340,7 +340,7 @@ export function VoetRij({ children, className = "" }: { children: ReactNode; cla
 export function TotaalRij({ children }: { children: ReactNode }) {
   return (
     <tfoot>
-      <tr className="border-t-2 border-border bg-gray-50/70 font-semibold text-rm-gray">{children}</tr>
+      <tr className="border-t-2 border-border bg-gray-50/70 font-semibold text-brand-gray">{children}</tr>
     </tfoot>
   );
 }

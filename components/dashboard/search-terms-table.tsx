@@ -127,7 +127,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           <button
             onClick={() => setSubtab("terms")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              subtab === "terms" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
+              subtab === "terms" ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"
             }`}
           >
             Verspilde zoektermen
@@ -140,7 +140,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           <button
             onClick={() => setSubtab("adgroups")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              subtab === "adgroups" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
+              subtab === "adgroups" ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"
             }`}
           >
             Ad group bleeders
@@ -153,7 +153,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           <button
             onClick={() => setSubtab("products")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              subtab === "products" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
+              subtab === "products" ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"
             }`}
           >
             Product bleeders
@@ -166,7 +166,7 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
           <button
             onClick={() => setSubtab("ai")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              subtab === "ai" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
+              subtab === "ai" ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"
             }`}
           >
             <span className="inline-flex items-center gap-1">

@@ -359,7 +359,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   if (loading) {
     return (
       <div className="bg-card rounded-xl border border-border p-8 shadow-sm flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" />
+        <Loader2 className="w-5 h-5 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
@@ -371,7 +371,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         <p className="text-body text-muted-foreground mb-3">Nog geen sprintplanning.</p>
         <button
           onClick={() => setShowAddHypothesis(true)}
-          className="px-4 py-2 text-xs font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 transition-colors"
+          className="px-4 py-2 text-xs font-medium rounded-lg bg-brand-blue text-white hover:bg-brand-blue/90 transition-colors"
         >
           <Plus className="w-3 h-3 inline mr-1" /> Hypothese + taak toevoegen
         </button>
@@ -384,7 +384,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
       {/* Header */}
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Sprintplanning</h3>
+          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Sprintplanning</h3>
           <p className="text-micro text-muted-foreground mt-0.5">
             {filteredItems.length} taken · Week {currentWeek} ({new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })})
           </p>
@@ -396,7 +396,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
-                  filter === f ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
+                  filter === f ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"
                 }`}
               >
                 {f === "active" ? "Actief" : f === "done" ? "Klaar" : "Alles"}
@@ -415,13 +415,13 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           </label>
           <button
             onClick={() => setShowAddHypothesis(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md bg-brand-blue text-white hover:bg-brand-blue/90 transition-colors"
           >
             <Plus className="w-3 h-3" /> Hypothese + taak
           </button>
           <button
             onClick={() => setShowAddTask("standalone")}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md border border-rm-blue/30 text-rm-blue-ink hover:bg-rm-blue/5 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-micro font-medium rounded-md border border-brand-blue/30 text-brand-blue-ink hover:bg-brand-blue/5 transition-colors"
           >
             <Plus className="w-3 h-3" /> Losse taak
           </button>
@@ -523,16 +523,16 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
       {showAddTask === "standalone" && (
         <div className="px-5 py-4 border-b border-border bg-blue-50/30 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-rm-blue-ink">Losse taak toevoegen (zonder hypothese)</p>
+            <p className="text-xs font-semibold text-brand-blue-ink">Losse taak toevoegen (zonder hypothese)</p>
             <button onClick={() => setShowAddTask(null)} className="p-1 hover:bg-blue-100 rounded"><X className="w-3.5 h-3.5 text-blue-400" /></button>
           </div>
           <div className="flex gap-3">
-            <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Taakomschrijving" className="flex-1 text-sm border border-blue-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-rm-blue" />
+            <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Taakomschrijving" className="flex-1 text-sm border border-blue-200 rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-brand-blue" />
             <select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="text-xs border border-blue-200 rounded-lg px-3 py-1.5 bg-card">
               <option value={OWNER_TEAM}>{ownerLabel(OWNER_TEAM)}</option>
               <option value={OWNER_CLIENT}>{ownerLabel(OWNER_CLIENT)}</option>
             </select>
-            <button onClick={() => addTaskToHypothesis(null)} disabled={!newTask.trim()} className="px-4 py-1.5 text-xs font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-40 transition-colors">
+            <button onClick={() => addTaskToHypothesis(null)} disabled={!newTask.trim()} className="px-4 py-1.5 text-xs font-medium rounded-lg bg-brand-blue text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors">
               Toevoegen
             </button>
           </div>
@@ -670,7 +670,7 @@ function SprintRow({ item, onUpdate, onUpdateFields, team, teamOk, currentWeek, 
             type="number"
             value={item.week_number || ""}
             onChange={(e) => onUpdate(item.id, "week_number", e.target.value)}
-            className={`w-12 text-xs text-left border rounded px-1 py-0.5 ${OP_KOP_VELD} focus:bg-card focus:border-rm-blue focus:outline-none ${
+            className={`w-12 text-xs text-left border rounded px-1 py-0.5 ${OP_KOP_VELD} focus:bg-card focus:border-brand-blue focus:outline-none ${
               isOverdue ? "border-red-300 bg-red-50 text-red-600 font-bold" :
               isCurrent ? "border-emerald-300 bg-emerald-50 text-emerald-600 font-bold" :
               "border-transparent hover:border-border bg-transparent"
@@ -680,7 +680,7 @@ function SprintRow({ item, onUpdate, onUpdateFields, team, teamOk, currentWeek, 
           {isOverdue && <span className="text-micro text-red-500 font-bold">!</span>}
         </div>
       </td>
-      <td className="px-3 py-2 text-sm text-rm-gray">{item.task}</td>
+      <td className="px-3 py-2 text-sm text-brand-gray">{item.task}</td>
       <td className="px-3 py-2"><ChannelBadge channel={channel} className={OP_KOP_BADGE} /></td>
       <td className="px-3 py-2">
         <select

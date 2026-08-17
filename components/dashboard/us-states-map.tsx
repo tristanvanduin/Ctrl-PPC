@@ -100,11 +100,11 @@ export default function UsStatesMap({ values, format, metricLabel }: UsStatesMap
           className="pointer-events-none absolute z-10 rounded-md border border-border bg-card px-2.5 py-1.5 shadow-md text-meta"
           style={{ left: Math.min(hover.x + 12, WIDTH - 120), top: hover.y + 12 }}
         >
-          <div className="font-semibold text-rm-gray">{stateLabel(hover.usps)}</div>
+          <div className="font-semibold text-brand-gray">{stateLabel(hover.usps)}</div>
           <div className="text-muted-foreground">
             {metricLabel}:{" "}
             {hoveredValue != null && Number.isFinite(hoveredValue)
-              ? <span className="font-medium text-rm-blue-ink tabular-nums">{format(hoveredValue)}</span>
+              ? <span className="font-medium text-brand-blue-ink tabular-nums">{format(hoveredValue)}</span>
               : <span className="italic">geen data voor deze staat</span>}
           </div>
         </div>

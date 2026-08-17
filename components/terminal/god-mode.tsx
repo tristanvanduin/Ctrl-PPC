@@ -23,13 +23,13 @@ interface GodModeData {
 function Ranglijst({ titel, rows }: { titel: string; rows: GodModeRow[] }) {
   return (
     <div className="terminal rounded-xl border border-border bg-card p-5">
-      <h3 className="mb-3 text-title font-semibold text-rm-gray">{titel}</h3>
+      <h3 className="mb-3 text-title font-semibold text-brand-gray">{titel}</h3>
       <div className="space-y-1">
         {rows.map((r, i) => (
           <div key={r.clientId} className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-body hover:bg-[var(--terminal-accent-soft,rgba(0,0,0,0.03))]">
             <span className="teller-waarde w-6 shrink-0 text-meta text-muted-foreground">{i + 1}</span>
-            <span className="min-w-0 flex-1 truncate text-rm-gray">{r.name}</span>
-            <span className="teller-waarde shrink-0 font-semibold" style={{ color: "var(--terminal-accent, var(--color-rm-blue-ink))" }}>
+            <span className="min-w-0 flex-1 truncate text-brand-gray">{r.name}</span>
+            <span className="teller-waarde shrink-0 font-semibold" style={{ color: "var(--terminal-accent, var(--color-brand-blue-ink))" }}>
               {compactCurrency(r.spend)}
             </span>
           </div>
@@ -53,7 +53,7 @@ function RaweTabel({ rows }: { rows: GodModeRow[] }) {
 
   return (
     <div className="terminal rounded-xl border border-border bg-card p-5">
-      <h3 className="mb-3 text-title font-semibold text-rm-gray">Alle accounts ({rows.length}), ongefilterd</h3>
+      <h3 className="mb-3 text-title font-semibold text-brand-gray">Alle accounts ({rows.length}), ongefilterd</h3>
       <div className="mb-1.5 grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 text-micro font-semibold uppercase tracking-wide text-muted-foreground">
         <span>Klant</span>
         <span className="text-right">Spend</span>
@@ -70,7 +70,7 @@ function RaweTabel({ rows }: { rows: GodModeRow[] }) {
                 className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-2 text-body"
                 style={{ position: "absolute", top: 0, left: 0, width: "100%", height: item.size, transform: `translateY(${item.start}px)` }}
               >
-                <span className="truncate text-rm-gray">{r.name}</span>
+                <span className="truncate text-brand-gray">{r.name}</span>
                 <span className="teller-waarde text-right">{compactCurrency(r.spend)}</span>
                 <span className="teller-waarde text-right">{compactNumber(r.conversions)}</span>
                 <span className="teller-waarde text-right">{r.roas != null ? `${r.roas}x` : "—"}</span>
@@ -102,7 +102,7 @@ export function GodMode() {
   if (!data) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-rm-blue-ink" />
+        <Loader2 className="h-6 w-6 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
@@ -113,8 +113,8 @@ export function GodMode() {
   return (
     <div className="terminal space-y-6">
       <div className="flex items-center gap-2">
-        <Crown className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-rm-blue-ink))" }} />
-        <h1 className="text-page font-bold text-rm-blue-ink">God Mode</h1>
+        <Crown className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-brand-blue-ink))" }} />
+        <h1 className="text-page font-bold text-brand-blue-ink">God Mode</h1>
         <span className="text-meta text-muted-foreground">platform-breed · {data.month.slice(0, 7)}</span>
       </div>
 

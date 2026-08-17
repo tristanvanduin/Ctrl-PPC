@@ -144,7 +144,7 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
   if (proposals === null) {
     return (
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm flex items-center justify-center">
-        <Loader2 className="w-4 h-4 animate-spin text-rm-blue-ink" />
+        <Loader2 className="w-4 h-4 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
@@ -153,8 +153,8 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
   return (
     <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <Inbox className="w-4 h-4 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Goedkeuringswachtrij</h3>
+        <Inbox className="w-4 h-4 text-brand-blue-ink" />
+        <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Goedkeuringswachtrij</h3>
         <span className="text-micro text-muted-foreground">{filtered.length} voorstel{filtered.length === 1 ? "" : "len"}</span>
       </div>
       <p className="text-micro text-muted-foreground mb-3">
@@ -163,7 +163,7 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
 
       {/* Het plan in één regel: wat past er in de sprint, en domineert één bron de wachtrij? */}
       <div className="flex items-center gap-2 flex-wrap mb-3 text-micro">
-        <span className="px-2 py-0.5 rounded-md bg-rm-blue/10 text-rm-blue-ink font-semibold">
+        <span className="px-2 py-0.5 rounded-md bg-brand-blue/10 text-brand-blue-ink font-semibold">
           {samenvatting.sprintCount} in de eerstvolgende sprint
         </span>
         {samenvatting.backlogCount > 0 && (
@@ -196,12 +196,12 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
                   </span>
                   <ChannelBadge channel={channelOfSource(p.source)} />
                   <span className="text-micro text-muted-foreground">{p.source ?? "onbekend"}</span>
-                  {p.ice_total != null && <span className="text-micro font-semibold text-rm-blue-ink">ICE {p.ice_total.toFixed(1)}</span>}
+                  {p.ice_total != null && <span className="text-micro font-semibold text-brand-blue-ink">ICE {p.ice_total.toFixed(1)}</span>}
                   {plaatsing.get(p.id)?.placement === "backlog" && (
                     <span className="text-micro px-1.5 py-0.5 rounded bg-gray-100 text-muted-foreground font-medium">backlog</span>
                   )}
                 </div>
-                <p className="text-body text-rm-gray font-medium mt-1">{p.hypothesis}</p>
+                <p className="text-body text-brand-gray font-medium mt-1">{p.hypothesis}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
@@ -222,17 +222,17 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
             </div>
             <button
               onClick={() => setExpanded(expanded === p.id ? null : p.id)}
-              className="flex items-center gap-1 text-micro text-rm-blue-ink hover:underline mt-1.5"
+              className="flex items-center gap-1 text-micro text-brand-blue-ink hover:underline mt-1.5"
             >
               {expanded === p.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               {expanded === p.id ? "Verberg detail" : "Detail"}
             </button>
             {expanded === p.id && (
               <div className="mt-2 space-y-1 text-meta text-muted-foreground">
-                {p.rationale && <p><span className="font-medium text-rm-gray">Onderbouwing:</span> {p.rationale}</p>}
-                {p.expected_result && <p><span className="font-medium text-rm-gray">Verwacht:</span> {p.expected_result}</p>}
-                {p.measurement_metric && <p><span className="font-medium text-rm-gray">Meting:</span> {metriekLabel(p.measurement_metric)}</p>}
-                {p.timeframe && <p><span className="font-medium text-rm-gray">Termijn:</span> {p.timeframe}</p>}
+                {p.rationale && <p><span className="font-medium text-brand-gray">Onderbouwing:</span> {p.rationale}</p>}
+                {p.expected_result && <p><span className="font-medium text-brand-gray">Verwacht:</span> {p.expected_result}</p>}
+                {p.measurement_metric && <p><span className="font-medium text-brand-gray">Meting:</span> {metriekLabel(p.measurement_metric)}</p>}
+                {p.timeframe && <p><span className="font-medium text-brand-gray">Termijn:</span> {p.timeframe}</p>}
               </div>
             )}
           </div>

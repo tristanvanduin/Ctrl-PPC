@@ -89,7 +89,7 @@ function AandeelRaster({ slices, kleur, toonConversies, conversieWoord }: {
       {slices.map((s) => (
         <div key={s.networkType} className="grid items-center gap-x-6 gap-y-1"
              style={{ gridTemplateColumns: `minmax(0,10rem) ${kolommen}` }}>
-          <span className="truncate text-body text-rm-gray" title={s.label}>{s.label}</span>
+          <span className="truncate text-body text-brand-gray" title={s.label}>{s.label}</span>
           <div className="flex items-center gap-2">
             <Streep aandeel={s.costShare} kleur={kleur(s.networkType)} label={`${s.label}: ${pct(s.costShare)} van de spend`} />
             <span className="w-10 shrink-0 text-right text-micro tabular-nums text-muted-foreground">{pct(s.costShare)}</span>
@@ -212,8 +212,8 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
       aria-busy={ververst}
     >
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <PieChart className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-title font-semibold text-rm-gray">Waar gaat het budget heen</h3>
+        <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
+        <h3 className="text-title font-semibold text-brand-gray">Waar gaat het budget heen</h3>
         <span className="text-meta text-muted-foreground">laatste 60 dagen</span>
         <div className="ml-auto flex gap-1 bg-gray-100 rounded-lg p-0.5 flex-wrap">
           {beschikbaar.map((d) => (
@@ -221,7 +221,7 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
               key={d.key}
               onClick={() => setDimensie(d.key)}
               className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
-                actief === d.key ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue-ink"
+                actief === d.key ? "bg-brand-blue text-white" : "text-muted-foreground hover:text-brand-blue-ink"
               }`}
             >
               {d.label}
@@ -234,7 +234,7 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
       {scheefheid.length > 0 && (
         <div className="px-5 py-3 border-b border-border bg-amber-50/50 space-y-1">
           {scheefheid.slice(0, 2).map(({ slice, kind }) => (
-            <p key={slice.networkType} className="text-body text-rm-gray">
+            <p key={slice.networkType} className="text-body text-brand-gray">
               <strong>{slice.label}</strong>{" "}
               {kind === "duur" ? (
                 <>krijgt {pct(slice.costShare)} van het budget maar levert {pct(slice.conversionShare)} van de {conversieWoord}
@@ -268,7 +268,7 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
               format={eur}
               ariaLabel={`Kostenverdeling: ${slices.map((s) => `${s.label} ${pct(s.costShare)}`).join(", ")}`}
             />
-            <figcaption className="text-meta font-medium text-rm-gray">Spend</figcaption>
+            <figcaption className="text-meta font-medium text-brand-gray">Spend</figcaption>
           </figure>
 
           <div className="min-w-0 flex-1">

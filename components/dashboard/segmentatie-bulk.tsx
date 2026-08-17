@@ -137,7 +137,7 @@ export function SegmentatieBulk() {
   return (
     <section className="mb-8">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h2 className="text-title font-semibold text-rm-gray">Bedrijfsmodel & niche</h2>
+        <h2 className="text-title font-semibold text-brand-gray">Bedrijfsmodel & niche</h2>
         <span className="text-meta text-muted-foreground">
           {metModel} van {rijen.length} met bedrijfsmodel · {metNiche} van {rijen.length} met niche
         </span>
@@ -148,7 +148,7 @@ export function SegmentatieBulk() {
       </p>
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-1.5 text-meta text-rm-gray">
+        <label className="flex items-center gap-1.5 text-meta text-brand-gray">
           <input
             type="checkbox"
             checked={alleenOnvolledig}
@@ -160,12 +160,12 @@ export function SegmentatieBulk() {
           type="button"
           onClick={opslaan}
           disabled={gewijzigd.length === 0 || bezigMetOpslaan}
-          className="ml-auto rounded-lg bg-rm-blue-ink px-3 py-1.5 text-meta font-medium text-white disabled:opacity-40"
+          className="ml-auto rounded-lg bg-brand-blue-ink px-3 py-1.5 text-meta font-medium text-white disabled:opacity-40"
         >
           {bezigMetOpslaan ? "Opslaan…" : `Opslaan (${gewijzigd.length})`}
         </button>
       </div>
-      {melding && <p className="mb-3 text-meta text-rm-gray">{melding}</p>}
+      {melding && <p className="mb-3 text-meta text-brand-gray">{melding}</p>}
 
       {zichtbaar.length === 0 ? (
         <p className="rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-meta text-muted-foreground">
@@ -191,7 +191,7 @@ export function SegmentatieBulk() {
                     <select
                       value={s.bedrijfsmodel}
                       onChange={(e) => zet(r.clientId, { bedrijfsmodel: e.target.value })}
-                      className="rounded border border-border bg-card px-2 py-1 text-meta focus:border-rm-blue focus:outline-none"
+                      className="rounded border border-border bg-card px-2 py-1 text-meta focus:border-brand-blue focus:outline-none"
                     >
                       <option value="">—</option>
                       {BEDRIJFSMODELLEN.map((m) => (
@@ -207,7 +207,7 @@ export function SegmentatieBulk() {
                           const waarde = e.target.value;
                           zet(r.clientId, waarde === "__vrij__" ? { niche: s.vrijeNiche || " " } : { niche: waarde });
                         }}
-                        className="rounded border border-border bg-card px-2 py-1 text-meta focus:border-rm-blue focus:outline-none"
+                        className="rounded border border-border bg-card px-2 py-1 text-meta focus:border-brand-blue focus:outline-none"
                       >
                         <option value="">— Geen niche —</option>
                         {nichesPerGroep().map((g) => (
@@ -224,7 +224,7 @@ export function SegmentatieBulk() {
                           placeholder="bijv. tandheelkunde"
                           onChange={(e) => zet(r.clientId, { vrijeNiche: e.target.value, niche: e.target.value })}
                           onBlur={(e) => zet(r.clientId, { niche: normaliseerNiche(e.target.value) ?? "" })}
-                          className="w-32 rounded border border-border px-2 py-1 text-meta focus:border-rm-blue focus:outline-none"
+                          className="w-32 rounded border border-border px-2 py-1 text-meta focus:border-brand-blue focus:outline-none"
                         />
                       )}
                     </div>

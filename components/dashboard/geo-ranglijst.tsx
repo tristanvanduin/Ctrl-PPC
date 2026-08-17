@@ -81,11 +81,11 @@ export function GeoRanglijst({
                 <span className="w-4 shrink-0 text-right text-meta tabular-nums text-muted-foreground">
                   {i + 1}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-body font-medium text-rm-gray">
+                <span className="min-w-0 flex-1 truncate text-body font-medium text-brand-gray">
                   {r.label}
                   {kanKlikken && <span className="ml-1 text-meta text-muted-foreground">&rarr;</span>}
                 </span>
-                <span className="shrink-0 text-body font-semibold tabular-nums text-rm-blue-ink">
+                <span className="shrink-0 text-body font-semibold tabular-nums text-brand-blue-ink">
                   {r.weergave}
                 </span>
               </div>
@@ -96,7 +96,7 @@ export function GeoRanglijst({
                 style={{ background: "var(--spoor, rgba(15,23,42,0.07))" }}
               >
                 <span
-                  className="absolute inset-y-0 left-0 rounded-full bg-rm-blue"
+                  className="absolute inset-y-0 left-0 rounded-full bg-brand-blue"
                   style={{
                     // Ondergrens van 1,5%: een regio met een kleine maar echte waarde hoort een
                     // streepje te krijgen. Bij een ontbrekende waarde niets -- daar is niets gemeten.
@@ -117,7 +117,7 @@ export function GeoRanglijst({
           {totalen.map((t) => (
             <div key={t.label} className="flex items-baseline justify-between gap-2">
               <dt className="text-meta text-muted-foreground">{t.label}</dt>
-              <dd className="text-body font-semibold tabular-nums text-rm-gray">{t.waarde}</dd>
+              <dd className="text-body font-semibold tabular-nums text-brand-gray">{t.waarde}</dd>
             </div>
           ))}
         </dl>

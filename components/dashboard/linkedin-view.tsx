@@ -31,7 +31,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
   return (
     <div className="space-y-6">
       <ChannelViewHeader
-        icon={<Briefcase className="w-5 h-5 text-rm-blue-ink" />}
+        icon={<Briefcase className="w-5 h-5 text-brand-blue-ink" />}
         title="LinkedIn Ads"
         geoClone={geoClone}
         status={demo ? { kind: "connected", label: "Gekoppeld (demo)" } : { kind: "warning", label: "Nog geen data" }}
@@ -62,7 +62,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
       <Sectie
-        icoon={<Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Maandprestaties"
         bijschrift="Kerncijfers, pacing en het maandverloop"
       >
@@ -71,7 +71,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
 
       {/* Geo-mapping: waar komt verkeer/conversies vandaan (per gekozen metric). */}
       <Sectie
-        icoon={<Globe className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Markten"
         bijschrift="Waar het verkeer en de conversies vandaan komen"
       >
@@ -80,7 +80,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
 
       {/* Waar het budget landt per uitsplitsing — het equivalent van de PMax-ringen bij Google. */}
       <Sectie
-        icoon={<LayoutGrid className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wie het te zien krijgt"
         bijschrift="Functie, senioriteit, sector en bedrijfsgrootte"
       >
@@ -102,7 +102,7 @@ export function LinkedInCampagnes({ clientId }: { clientId: string }) {
       {/* Quick scan: creatives + prestaties + samenvatting. */}
       <Sectie
         eerste
-        icoon={<Sparkles className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="De advertenties zelf"
         bijschrift="Creatives, hun prestaties en vermoeidheid"
       >

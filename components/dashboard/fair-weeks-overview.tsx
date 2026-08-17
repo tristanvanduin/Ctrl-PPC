@@ -39,13 +39,13 @@ function WeekCard({
   const diffColor = isPositive ? "text-green-600" : "text-red-500";
   const borderColors = {
     previous: isPositive ? "border-green-200 bg-green-50/50" : "border-red-200 bg-red-50/50",
-    current: "border-rm-blue/30 bg-rm-blue/5",
+    current: "border-brand-blue/30 bg-brand-blue/5",
     next: "border-border bg-gray-50/50",
   };
   const labels = { previous: "Vorige week", current: "Deze week", next: "Volgende week" };
   const statusIcons = {
     previous: <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />,
-    current: <Clock className="w-3.5 h-3.5 text-rm-blue-ink" />,
+    current: <Clock className="w-3.5 h-3.5 text-brand-blue-ink" />,
     next: <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />,
   };
 
@@ -63,7 +63,7 @@ function WeekCard({
         <div className="flex items-center gap-2">
           {statusIcons[variant]}
           <div>
-            <span className="text-sm font-semibold text-rm-gray">{afstand}</span>
+            <span className="text-sm font-semibold text-brand-gray">{afstand}</span>
             <span className="text-micro text-muted-foreground ml-1.5">{labels[variant]}</span>
             <p className="text-micro text-muted-foreground">
               {week.label} · week van {week.weekStart.slice(8, 10)} {week.monthLabel.toLowerCase()}
@@ -83,7 +83,7 @@ function WeekCard({
       <div className="space-y-1.5">
         <div className="flex justify-between items-baseline">
           <span className="text-meta text-muted-foreground">{isRealized ? "Gerealiseerd" : "Prognose"}</span>
-          <span className={`text-base font-bold ${variant === "current" ? "text-rm-blue-ink" : "text-rm-gray"}`}>
+          <span className={`text-base font-bold ${variant === "current" ? "text-brand-blue-ink" : "text-brand-gray"}`}>
             {format(value)}
           </span>
         </div>
@@ -147,13 +147,13 @@ export function FairWeeksOverview({
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide flex items-center gap-2">
             <CalendarClock className="w-4 h-4" />
             Weken tot {edition.eventName}
           </h3>
           <p className="text-meta text-muted-foreground mt-0.5">
             {wekenTotBeurs != null && wekenTotBeurs >= 0
-              ? <>Nog <strong className="text-rm-gray">{wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"}</strong> tot {edition.label} ({edition.fairDate})</>
+              ? <>Nog <strong className="text-brand-gray">{wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"}</strong> tot {edition.label} ({edition.fairDate})</>
               : <>{edition.label} ({edition.fairDate}) is geweest</>}
             {" · ratio geeft aan of je boven of onder verwachting zit"}
           </p>
@@ -164,7 +164,7 @@ export function FairWeeksOverview({
               key={m}
               onClick={() => setMetric(m)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                metric === m ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue-ink"
+                metric === m ? "bg-brand-blue text-white" : "text-muted-foreground hover:text-brand-blue-ink"
               }`}
             >
               {METRIC_LABELS[m]}
@@ -210,20 +210,20 @@ export function FairWeeksOverview({
                   key={w.weekStart}
                   className={`flex-1 min-w-[52px] rounded-md px-1.5 py-2 text-center transition-colors ${
                     isBeursweek
-                      ? "bg-rm-orange/10 ring-1 ring-rm-orange/40"
+                      ? "bg-brand-orange/10 ring-1 ring-brand-orange/40"
                       : isFocus
-                        ? "bg-rm-blue/8 ring-1 ring-rm-blue/20"
+                        ? "bg-brand-blue/8 ring-1 ring-brand-blue/20"
                         : isRealized
                           ? "bg-gray-50"
                           : ""
                   }`}
                 >
                   <p className={`text-micro font-medium mb-1 ${
-                    isBeursweek ? "text-rm-orange-ink font-semibold" : isFocus ? "text-rm-blue-ink font-semibold" : isRealized ? "text-rm-gray" : "text-muted-foreground"
+                    isBeursweek ? "text-brand-orange-ink font-semibold" : isFocus ? "text-brand-blue-ink font-semibold" : isRealized ? "text-brand-gray" : "text-muted-foreground"
                   }`}>
                     {w.label}
                   </p>
-                  <p className={`text-meta font-semibold ${isFocus ? "text-rm-blue-ink" : "text-rm-gray"}`}>
+                  <p className={`text-meta font-semibold ${isFocus ? "text-brand-blue-ink" : "text-brand-gray"}`}>
                     {format(value)}
                   </p>
                   <div className="mt-1.5 mx-auto w-full max-w-[36px]">

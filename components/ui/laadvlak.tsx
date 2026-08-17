@@ -85,7 +85,7 @@ export function Laadvlak({
     >
       {titel && (
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <span className="text-sm font-semibold text-rm-gray">{titel}</span>
+          <span className="text-sm font-semibold text-brand-gray">{titel}</span>
           <span className="sr-only">wordt geladen</span>
         </div>
       )}
@@ -178,7 +178,7 @@ function TraagRegel() {
       <button
         type="button"
         onClick={() => window.location.reload()}
-        className="ml-auto font-medium underline underline-offset-2 hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue rounded-sm"
+        className="ml-auto font-medium underline underline-offset-2 hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-sm"
       >
         Opnieuw laden
       </button>

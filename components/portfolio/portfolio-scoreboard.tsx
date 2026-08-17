@@ -117,7 +117,7 @@ function SummaryCard({ label, value, color, subtitle }: { label: string; value: 
   return (
     <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
       <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-      <p className={`text-lg font-bold mt-1 ${color ?? "text-rm-gray"}`}>{value}</p>
+      <p className={`text-lg font-bold mt-1 ${color ?? "text-brand-gray"}`}>{value}</p>
       {subtitle && <p className="text-micro text-muted-foreground mt-0.5">{subtitle}</p>}
     </div>
   );
@@ -141,7 +141,7 @@ function MerkKopRij({ naam, bevestigd, aantal, totaal }: {
     <Rij className="bg-muted/40">
       <NaamCel>
         <span className="inline-flex items-center gap-2">
-          <span className="text-sm font-semibold text-rm-blue-ink">{naam}</span>
+          <span className="text-sm font-semibold text-brand-blue-ink">{naam}</span>
           <span className="text-micro text-muted-foreground">{aantal}</span>
           {/* Een indeling die uit een naam is geraden hoort ook hier als voorstel te lezen. Een
               subtotaal over een geraden groep is precies zo overtuigend als een over een juiste. */}
@@ -319,7 +319,7 @@ function PortfolioScoreboardBody() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-rm-blue-ink" />
+        <Loader2 className="w-6 h-6 animate-spin text-brand-blue-ink" />
         <p className="text-sm text-muted-foreground">Klantoverzicht laden...</p>
       </div>
     );
@@ -362,7 +362,7 @@ function PortfolioScoreboardBody() {
               return (
                 <Rij key={client.id} className="group">
                   <NaamCel>
-                    <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-rm-blue-ink transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue">
+                    <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-brand-blue-ink transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
                       {/* Health dot */}
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                         !hasData ? "bg-gray-200" :
@@ -401,7 +401,7 @@ function PortfolioScoreboardBody() {
                     <Link
                       href={`/client/${client.id}`}
                       aria-label={`Open ${client.name}`}
-                      className="inline-flex opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue"
+                      className="inline-flex opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                     >
                       <ArrowRight className="w-4 h-4 text-muted-foreground" />
                     </Link>
@@ -415,7 +415,7 @@ function PortfolioScoreboardBody() {
       {/* De periodekiezer boven het bord: alle kolommen hieronder gaan over deze periode. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-body text-muted-foreground">
-          Cijfers over <span className="font-medium text-rm-gray">{formatRange(periode.range)}</span>
+          Cijfers over <span className="font-medium text-brand-gray">{formatRange(periode.range)}</span>
           {periode.compareRange && <> tegenover {formatRange(periode.compareRange)}</>}
         </p>
         <PeriodSelector
@@ -428,7 +428,7 @@ function PortfolioScoreboardBody() {
       </div>
 
       {/* Hero */}
-      <div className="bg-gradient-to-r from-rm-blue to-rm-blue/80 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-brand-blue to-brand-blue/80 rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-white/60 text-sm">{dateStr}</p>
@@ -465,7 +465,7 @@ function PortfolioScoreboardBody() {
           <SummaryCard label="Conversies" value={num(portfolioConv)} />
           <SummaryCard label="Omzet" value={fmt(portfolioRev)} />
           <SummaryCard label="Spend" value={fmt(portfolioSpend)} />
-          <SummaryCard label="ROAS" value={formatRoas(portfolioRoas)} color={portfolioRoas >= 3 ? "text-green-600" : portfolioRoas >= 1 ? "text-rm-gray" : "text-red-500"} />
+          <SummaryCard label="ROAS" value={formatRoas(portfolioRoas)} color={portfolioRoas >= 3 ? "text-green-600" : portfolioRoas >= 1 ? "text-brand-gray" : "text-red-500"} />
         </div>
       )}
 
@@ -476,8 +476,8 @@ function PortfolioScoreboardBody() {
           <button
             onClick={() => setGroepeer((v) => !v)}
             className={`rounded-lg border px-2.5 py-1 text-meta font-medium transition-colors ${
-              groepeer ? "border-rm-blue bg-rm-blue/10 text-rm-blue-ink"
-                       : "border-border text-muted-foreground hover:border-rm-blue/40"}`}
+              groepeer ? "border-brand-blue bg-brand-blue/10 text-brand-blue-ink"
+                       : "border-border text-muted-foreground hover:border-brand-blue/40"}`}
           >
             Groepeer op merk
           </button>
@@ -537,7 +537,7 @@ function PortfolioScoreboardBody() {
             </span>
             <button
               onClick={() => setShowEmpty((v) => !v)}
-              className="font-semibold text-rm-blue-ink hover:underline"
+              className="font-semibold text-brand-blue-ink hover:underline"
             >
               {showEmpty ? "Verberg lege accounts" : "Toon alles"}
             </button>

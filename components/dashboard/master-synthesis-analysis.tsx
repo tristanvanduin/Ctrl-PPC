@@ -89,9 +89,9 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
     <div className="space-y-3">
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Sparkles className="w-4.5 h-4.5 text-rm-blue-ink" />
+          <Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />
           <div className="flex-1">
-            <h3 className="text-title font-semibold text-rm-gray">Master Synthesis</h3>
+            <h3 className="text-title font-semibold text-brand-gray">Master Synthesis</h3>
             <p className="text-micro text-muted-foreground mt-0.5">
               Synthetiseert de laatste kanaal-aanbevelingen en de cross-channel-feiten tot hypotheses die alleen zichtbaar worden door kanalen samen te lezen. Landt in de goedkeuringswachtrij.
             </p>
@@ -99,7 +99,7 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
           <button
             onClick={run}
             disabled={running}
-            className="px-3 py-1.5 rounded-md bg-rm-blue text-white text-meta font-medium hover:bg-rm-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
+            className="px-3 py-1.5 rounded-md bg-brand-blue text-white text-meta font-medium hover:bg-brand-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
           >
             {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             {running ? "Bezig..." : "Draai Master Synthesis"}
@@ -114,7 +114,7 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
       </div>
 
       {lastNarrative && (
-        <div className="rounded-md border border-border bg-gray-50 px-4 py-3 text-meta text-rm-gray whitespace-pre-wrap max-h-96 overflow-y-auto">
+        <div className="rounded-md border border-border bg-gray-50 px-4 py-3 text-meta text-brand-gray whitespace-pre-wrap max-h-96 overflow-y-auto">
           {lastNarrative}
         </div>
       )}

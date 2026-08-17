@@ -103,7 +103,7 @@ function ChannelTabs({ channel, onChange, beschikbaar }: {
           key={c.id}
           onClick={() => onChange(c.id)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            channel === c.id ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+            channel === c.id ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground hover:text-brand-gray"
           }`}
         >
           {c.icon}
@@ -142,7 +142,7 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
           const showBadge = s.tabs.includes("files") && sopErrorCount > 0;
           return (
             <button key={s.id} onClick={() => onChange(s.tabs[0])}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${active ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"}`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${active ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground hover:text-brand-gray"}`}>
               {s.icon}{s.label}
               {showBadge && <span className="ml-1 px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-500 text-white">{sopErrorCount}</span>}
             </button>
@@ -156,7 +156,7 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
             const active = activeTab === t;
             return (
               <button key={t} onClick={() => onChange(t)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-lead font-medium transition-colors ${active ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-lead font-medium transition-colors ${active ? "bg-brand-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-brand-gray"}`}>
                 {TAB_LABELS[t]}
                 {t === "files" && sopErrorCount > 0 && <span className="px-1.5 py-0.5 text-micro font-bold rounded-full bg-red-500 text-white">{sopErrorCount}</span>}
               </button>
@@ -267,7 +267,7 @@ export function ClientDashboard({ client }: { client: Client }) {
               KANAALNAAM onwaar, nu het woord "live". Zelfde les, dus dezelfde behandeling. */}
           {kanalenOpsomming(kanalen ?? []) !== null && (
             demoModus ? (
-              <div className="flex items-center gap-2 text-xs text-rm-blue-ink bg-rm-blue/10 border border-rm-blue/20 rounded-lg px-3 py-1.5">
+              <div className="flex items-center gap-2 text-xs text-brand-blue-ink bg-brand-blue/10 border border-brand-blue/20 rounded-lg px-3 py-1.5">
                 <FlaskConical className="w-3.5 h-3.5" />
                 Demodata — {kanalenOpsomming(kanalen ?? [])}, geen live koppeling
               </div>
@@ -333,8 +333,8 @@ export function ClientDashboard({ client }: { client: Client }) {
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? "bg-card text-rm-blue-ink shadow-sm"
-                : "text-muted-foreground hover:text-rm-gray"
+                ? "bg-card text-brand-blue-ink shadow-sm"
+                : "text-muted-foreground hover:text-brand-gray"
             }`}
           >
             {tab.icon}
@@ -352,7 +352,7 @@ export function ClientDashboard({ client }: { client: Client }) {
       {/* Loading state */}
       {clientData.loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-rm-blue-ink" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand-blue-ink" />
           {/* Geen kanaalnaam hier: tijdens het laden is nog niet bekend wélke kanalen deze klant
               heeft, dus elke naam zou een gok zijn. "Data ophalen" klopt altijd. */}
           <p className="text-sm text-muted-foreground">Data ophalen...</p>
@@ -454,7 +454,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                     <>
                       <Sectie
                         eerste
-                        icoon={<TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />}
+                        icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
                         titel="Prognose over alle kanalen"
                         bijschrift="De blended projectie richting het einde van de periode"
                       >
@@ -581,7 +581,7 @@ function SettingsSections({ client }: { client: Client }) {
             key={g.id}
             onClick={() => setGroep(g.id)}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              g.id === groep ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+              g.id === groep ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground hover:text-brand-gray"
             }`}
           >
             {g.label}
@@ -628,7 +628,7 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
   // eronder, zodat je alle analyses ziet zonder dat een volledige SOP-uitwerking ze wegduwt.
   const Section = ({ children }: { children: React.ReactNode }) => (
     <div className="flex items-center gap-3 pt-1">
-      <span className="text-micro font-semibold text-rm-blue-ink uppercase tracking-wide whitespace-nowrap">{children}</span>
+      <span className="text-micro font-semibold text-brand-blue-ink uppercase tracking-wide whitespace-nowrap">{children}</span>
       <span className="h-px flex-1 bg-border" />
     </div>
   );
@@ -793,7 +793,7 @@ function OutcomesTab({ clientId }: { clientId: string }) {
       {/* Wat op goedkeuring wacht staat vooraan: dat is het enige op deze pagina waar direct een
           handeling van jou op zit. De rest is lezen. */}
       <Sectie
-        icoon={<ClipboardCheck className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<ClipboardCheck className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wacht op je oordeel"
         bijschrift="Voorstellen uit de analyses; accepteren zet ze in de sprintplanning"
       >
@@ -805,7 +805,7 @@ function OutcomesTab({ clientId }: { clientId: string }) {
           "Alle" staan de kanalen naast elkaar en tonen alleen de kanalen die iets te zeggen
           hebben zichzelf. */}
       <Sectie
-        icoon={<Lightbulb className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Lightbulb className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat de analyses zien"
         bijschrift="Creative-vermoeidheid per kanaal, en de inzichten die eruit volgen"
       >
@@ -822,7 +822,7 @@ function OutcomesTab({ clientId }: { clientId: string }) {
       </Sectie>
 
       <Sectie
-        icoon={<Kanban className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Kanban className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat eruit volgt"
         bijschrift="Aanbevelingen, hypotheses en de taken die eruit voortkomen"
       >

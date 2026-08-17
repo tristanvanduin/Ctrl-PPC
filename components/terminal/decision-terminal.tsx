@@ -78,8 +78,8 @@ export function DecisionTerminal({ clientId }: { clientId: string }) {
   return (
     <div className="terminal space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Radar className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-rm-blue-ink))" }} />
-        <h1 className="text-page font-bold text-rm-blue-ink">Decision Terminal</h1>
+        <Radar className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-brand-blue-ink))" }} />
+        <h1 className="text-page font-bold text-brand-blue-ink">Decision Terminal</h1>
         <span className="text-meta text-muted-foreground">{clientId}</span>
         <span className="ml-auto flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-micro font-medium text-muted-foreground">
           <Eye className="h-3 w-3" /> Observing, geen schrijfacties
@@ -96,7 +96,7 @@ export function DecisionTerminal({ clientId }: { clientId: string }) {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex-1 rounded-md px-3 py-1.5 text-meta font-medium transition-colors ${
-              tab === t.id ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+              tab === t.id ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground hover:text-brand-gray"
             }`}
           >
             {t.label}
@@ -148,13 +148,13 @@ function LiveSignalsPanel({ clientId }: { clientId: string }) {
     <div className="terminal rounded-lg border border-dashed border-border bg-card p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-meta font-semibold text-rm-gray">Live signalen (Decision Core)</h3>
+          <h3 className="text-meta font-semibold text-brand-gray">Live signalen (Decision Core)</h3>
           <p className="text-micro text-muted-foreground">Vers berekend, niet opgeslagen. Los van het Hypothesis Board hierboven.</p>
         </div>
         <button
           onClick={haalOp}
           disabled={loading}
-          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-meta font-medium text-rm-gray hover:bg-muted disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-meta font-medium text-brand-gray hover:bg-muted disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           Ververs
@@ -168,7 +168,7 @@ function LiveSignalsPanel({ clientId }: { clientId: string }) {
             <p className="text-body text-muted-foreground">Geen signalen gevonden in het huidige venster.</p>
           ) : (
             result.hypotheses.map((h) => (
-              <div key={h.id} className="rounded-md border border-border px-2.5 py-1.5 text-body text-rm-gray">
+              <div key={h.id} className="rounded-md border border-border px-2.5 py-1.5 text-body text-brand-gray">
                 {h.category && (
                   <span className="mr-1.5 text-micro font-medium uppercase tracking-wide text-muted-foreground">{h.category}</span>
                 )}

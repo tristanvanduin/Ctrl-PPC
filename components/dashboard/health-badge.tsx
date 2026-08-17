@@ -88,8 +88,8 @@ export function HealthBadgeView({
             gaten is geen vorm maar ruis die eruitziet als een meting. */}
         <div className="shrink-0">
           <div className="flex items-center gap-2 mb-3">
-            <Icoon className="w-4 h-4 text-rm-blue-ink" />
-            <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">{titel}</h3>
+            <Icoon className="w-4 h-4 text-brand-blue-ink" />
+            <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">{titel}</h3>
           </div>
           {magRadarTonen(health.factors) ? (
             <HealthRadar factoren={health.factors} kleur={radarKleur} />
@@ -100,7 +100,7 @@ export function HealthBadgeView({
                   {/* Niet-beoordeeld toont een streepje en geen 0/20: een nul-balk leest als een
                       falende score terwijl het "niet te meten" betekent. De donut ernaast zei dat
                       al goed ("—" en "3/5"); deze balkjes spraken hem tegen. */}
-                  <div className="text-xs font-semibold text-rm-gray">
+                  <div className="text-xs font-semibold text-brand-gray">
                     {f.assessed ? `${f.score}/${f.maxScore}` : "—"}
                   </div>
                   <div className="h-1.5 bg-muted rounded-full mt-1 overflow-hidden">
@@ -151,7 +151,7 @@ export function HealthBadgeView({
                       <Info className="w-3 h-3 text-blue-500 shrink-0 mt-0.5" />
                     )}
                     <span className="text-meta leading-tight">
-                      <span className="text-rm-gray font-medium">{a.title}</span>
+                      <span className="text-brand-gray font-medium">{a.title}</span>
                       <span className="text-muted-foreground"> — {a.description}</span>
                     </span>
                   </div>
@@ -170,7 +170,7 @@ export function HealthBadgeView({
             <dl className="grid gap-x-5 gap-y-1.5 sm:grid-cols-2">
               {health.factors.map((f) => (
                 <div key={f.name} className="flex min-w-0 items-baseline gap-2">
-                  <dt className={`shrink-0 text-meta font-medium ${f.assessed ? "text-rm-gray" : "text-muted-foreground/60"}`}>
+                  <dt className={`shrink-0 text-meta font-medium ${f.assessed ? "text-brand-gray" : "text-muted-foreground/60"}`}>
                     {f.name}
                   </dt>
                   <span className={`shrink-0 text-meta tabular-nums ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`}>

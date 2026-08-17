@@ -35,7 +35,7 @@ function HypothesisCard({ h }: { h: HypothesisRecord }) {
         </span>
         <span className="teller-waarde text-micro text-muted-foreground">{formatWanneer(prov.wanneer)}</span>
       </div>
-      <p className="text-body text-rm-gray leading-snug">{h.hypothesis}</p>
+      <p className="text-body text-brand-gray leading-snug">{h.hypothesis}</p>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-micro text-muted-foreground">
         <span>Bedacht door: {prov.bedenker}</span>
         {h.measurement_metric && <span>Metric: {h.measurement_metric}</span>}
@@ -56,7 +56,7 @@ export function HypothesisBoard({ hypotheses, loading }: { hypotheses: Hypothesi
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-rm-blue-ink" />
+        <Loader2 className="h-5 w-5 animate-spin text-brand-blue-ink" />
       </div>
     );
   }

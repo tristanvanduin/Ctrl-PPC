@@ -16,7 +16,7 @@ export function CodeRoodDossier({ clientId }: { clientId: string }) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 py-4">
-      <Link href={`/client/${clientId}`} className="inline-flex items-center gap-1.5 text-body text-muted-foreground hover:text-rm-gray">
+      <Link href={`/client/${clientId}`} className="inline-flex items-center gap-1.5 text-body text-muted-foreground hover:text-brand-gray">
         <ArrowLeft className="w-3.5 h-3.5" /> Terug naar het dashboard
       </Link>
 
@@ -33,7 +33,7 @@ export function CodeRoodDossier({ clientId }: { clientId: string }) {
         <>
           <div className="flex items-center gap-2.5">
             <AlertOctagon className="w-6 h-6 text-red-600" />
-            <h1 className="text-page font-bold text-rm-gray">{melding.clientNaam} &mdash; Code Rood</h1>
+            <h1 className="text-page font-bold text-brand-gray">{melding.clientNaam} &mdash; Code Rood</h1>
           </div>
           <p className="text-body text-muted-foreground">
             Gedetecteerd {new Date(melding.gedetecteerdOp).toLocaleDateString("nl-NL")}
@@ -50,12 +50,12 @@ export function CodeRoodDossier({ clientId }: { clientId: string }) {
           </section>
 
           <section className="rounded-xl border border-border bg-card p-4">
-            <h2 className="text-title font-semibold text-rm-gray mb-2">Volgende stappen</h2>
+            <h2 className="text-title font-semibold text-brand-gray mb-2">Volgende stappen</h2>
             <p className="text-body text-muted-foreground mb-3">
               Nog geen automatisch aanvalsplan &mdash; dit is een checklist, geen analyse. Een
               marktvergelijking via God View en een onderbouwde roadmap zijn nog niet gebouwd.
             </p>
-            <ul className="space-y-1.5 text-body text-rm-gray">
+            <ul className="space-y-1.5 text-body text-brand-gray">
               <li>&bull; Neem contact op met de klant &mdash; weet diegene waarom de cijfers afwijken?</li>
               <li>&bull; Controleer of de nieuwe gebruiker in de change history bekend is (intern, of een ander bureau?)</li>
               <li>&bull; Loop de forecast-afwijking na op de Prognose-tab: welke maand, welk kanaal?</li>

@@ -357,8 +357,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       {toon("kpi") && (
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
-          <BarChart3 className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-title font-semibold text-rm-blue-ink">KPI-doelstellingen</h2>
+          <BarChart3 className="w-5 h-5 text-brand-blue-ink" />
+          <h2 className="text-title font-semibold text-brand-blue-ink">KPI-doelstellingen</h2>
         </div>
         <p className="text-body text-muted-foreground mb-5">
           Activeer de KPIs waar deze klant op stuurt. Vul alleen in wat relevant is.
@@ -419,8 +419,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-rm-blue-ink" />
-            <h2 className="text-title font-semibold text-rm-blue-ink">Conversie-acties</h2>
+            <Target className="w-5 h-5 text-brand-blue-ink" />
+            <h2 className="text-title font-semibold text-brand-blue-ink">Conversie-acties</h2>
           </div>
           <span className="text-xs text-muted-foreground">
             {selectedCount} van {conversionActions.length} geselecteerd
@@ -435,7 +435,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           <div className="flex gap-2">
             <button
               onClick={selectAllConversions}
-              className="flex items-center gap-1.5 text-meta font-medium text-rm-blue-ink hover:underline"
+              className="flex items-center gap-1.5 text-meta font-medium text-brand-blue-ink hover:underline"
             >
               <CheckSquare className="w-3.5 h-3.5" />
               Alles aan
@@ -456,7 +456,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
                 placeholder="Zoek conversie-actie..."
                 value={convSearch}
                 onChange={(e) => setConvSearch(e.target.value)}
-                className="w-full text-sm border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:border-rm-blue"
+                className="w-full text-sm border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:border-brand-blue"
               />
             </div>
           )}
@@ -469,14 +469,14 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
               key={action.id}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border transition-colors ${
                 action.includedInDashboard
-                  ? "border-rm-blue/20 bg-blue-50/50"
+                  ? "border-brand-blue/20 bg-blue-50/50"
                   : "border-border bg-gray-50/50 opacity-60"
               }`}
             >
               {/* Toggle */}
               <button onClick={() => toggleConversion(action.id)} className="shrink-0">
                 {action.includedInDashboard ? (
-                  <CircleDot className="w-5 h-5 text-rm-blue-ink" />
+                  <CircleDot className="w-5 h-5 text-brand-blue-ink" />
                 ) : (
                   <CircleOff className="w-5 h-5 text-gray-400" />
                 )}
@@ -485,9 +485,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
               {/* Name + category */}
               <button onClick={() => toggleConversion(action.id)} className="flex-1 min-w-0 text-left">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-rm-gray truncate">{action.name}</span>
+                  <span className="text-sm font-medium text-brand-gray truncate">{action.name}</span>
                   <span className={`text-micro font-semibold uppercase px-1.5 py-0.5 rounded ${
-                    action.category === "primary" ? "bg-rm-blue/10 text-rm-blue-ink" : "bg-gray-200 text-gray-600"
+                    action.category === "primary" ? "bg-brand-blue/10 text-brand-blue-ink" : "bg-gray-200 text-gray-600"
                   }`}>
                     {action.category}
                   </span>
@@ -497,7 +497,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
               {/* "Only" button */}
               <button
                 onClick={() => selectOnlyConversion(action.id)}
-                className="text-micro text-muted-foreground hover:text-rm-blue-ink shrink-0 px-2 py-1 rounded hover:bg-rm-blue/5 transition-colors"
+                className="text-micro text-muted-foreground hover:text-brand-blue-ink shrink-0 px-2 py-1 rounded hover:bg-brand-blue/5 transition-colors"
                 title="Selecteer alleen deze"
               >
                 <Filter className="w-3 h-3" />
@@ -512,8 +512,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       {toon("sector") && (
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
-          <Building2 className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-title font-semibold text-rm-blue-ink">Sector & Benchmarks</h2>
+          <Building2 className="w-5 h-5 text-brand-blue-ink" />
+          <h2 className="text-title font-semibold text-brand-blue-ink">Sector & Benchmarks</h2>
         </div>
         <p className="text-body text-muted-foreground mb-5">
           Waar deze klant in valt. Bepaalt waarmee hij vergeleken wordt in de analyses.
@@ -530,7 +530,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
             een grof segment dat klopt is meer waard dan een fijn segment dat te dun is. */}
         <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-rm-gray">Bedrijfsmodel</label>
+            <label className="mb-1.5 block text-sm font-medium text-brand-gray">Bedrijfsmodel</label>
             <div className="flex gap-2">
               {BEDRIJFSMODELLEN.map((m) => (
                 <button
@@ -539,8 +539,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
                   onClick={() => { setBedrijfsmodel(bedrijfsmodel === m.waarde ? "" : m.waarde); setSaved(false); }}
                   className={`flex-1 rounded-lg border px-3 py-2 text-body transition-colors ${
                     bedrijfsmodel === m.waarde
-                      ? "border-rm-blue bg-rm-blue/10 font-medium text-rm-blue-ink"
-                      : "border-border text-muted-foreground hover:border-rm-blue"
+                      ? "border-brand-blue bg-brand-blue/10 font-medium text-brand-blue-ink"
+                      : "border-border text-muted-foreground hover:border-brand-blue"
                   }`}
                 >
                   {m.label}
@@ -556,7 +556,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           </div>
 
           <div>
-            <label htmlFor="niche-keuze" className="mb-1.5 block text-sm font-medium text-rm-gray">Niche</label>
+            <label htmlFor="niche-keuze" className="mb-1.5 block text-sm font-medium text-brand-gray">Niche</label>
             <select
               id="niche-keuze"
               value={isBekendeNiche(niche) || !niche ? niche : "__vrij__"}
@@ -564,7 +564,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
                 setNiche(e.target.value === "__vrij__" ? (vrijeNiche || " ") : e.target.value);
                 setSaved(false);
               }}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:border-rm-blue focus:outline-none"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
             >
               <option value="">— Geen niche —</option>
               {nichesPerGroep().map((g) => (
@@ -585,7 +585,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
                 placeholder="bijv. tandheelkunde"
                 onChange={(e) => { setVrijeNiche(e.target.value); setNiche(e.target.value); setSaved(false); }}
                 onBlur={(e) => { const n = normaliseerNiche(e.target.value); setNiche(n ?? ""); }}
-                className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-rm-blue focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
               />
             )}
             <p className="mt-1 text-meta text-muted-foreground">
@@ -598,11 +598,11 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Sector dropdown */}
           <div>
-            <label className="block text-sm font-medium text-rm-gray mb-1.5">Sector</label>
+            <label className="block text-sm font-medium text-brand-gray mb-1.5">Sector</label>
             <select
               value={sector}
               onChange={(e) => { setSector(e.target.value); setSaved(false); }}
-              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-rm-blue"
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-brand-blue"
             >
               <option value="">— Selecteer sector —</option>
               <optgroup label="E-commerce">
@@ -638,11 +638,11 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           {/* AOV segment dropdown — alleen bij e-commerce sectoren */}
           {sector.startsWith("ecommerce_") && (
             <div>
-              <label className="block text-sm font-medium text-rm-gray mb-1.5">AOV segment</label>
+              <label className="block text-sm font-medium text-brand-gray mb-1.5">AOV segment</label>
               <select
                 value={aovSegment}
                 onChange={(e) => { setAovSegment(e.target.value); setSaved(false); }}
-                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-rm-blue"
+                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-brand-blue"
               >
                 <option value="">— Selecteer AOV —</option>
                 <option value="low_ticket">Laag ticket (AOV &lt; €50)</option>
@@ -686,8 +686,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       {toon("overrides") && (
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
-          <AlertTriangle className="w-5 h-5 text-rm-orange-ink" />
-          <h2 className="text-title font-semibold text-rm-orange-ink">Handmatige conversiecijfers</h2>
+          <AlertTriangle className="w-5 h-5 text-brand-orange-ink" />
+          <h2 className="text-title font-semibold text-brand-orange-ink">Handmatige conversiecijfers</h2>
         </div>
         <p className="text-body text-muted-foreground mb-5">
           Voor maanden waarin de tracking stuk was. De prognose rekent dan met het getal dat je hier
@@ -715,7 +715,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
               const hasOverride = convOverrides[key] !== undefined && convOverrides[key] > 0;
               return (
                 <div key={key} className="min-w-0">
-                  <label htmlFor={`conv-override-${key}`} className="mb-1 block text-meta font-medium text-rm-gray">
+                  <label htmlFor={`conv-override-${key}`} className="mb-1 block text-meta font-medium text-brand-gray">
                     {months[i]} {currentYear}
                   </label>
                   <Input
@@ -739,7 +739,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
                     className="w-full text-body"
                   />
                   {hasOverride && (
-                    <span className="mt-1 block text-micro font-medium text-rm-orange-ink">Override actief</span>
+                    <span className="mt-1 block text-micro font-medium text-brand-orange-ink">Override actief</span>
                   )}
                 </div>
               );
@@ -758,8 +758,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       {toon("landen") && (
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
-          <Globe className="w-5 h-5 text-rm-orange-ink" />
-          <h2 className="text-title font-semibold text-rm-orange-ink">Actieve landen</h2>
+          <Globe className="w-5 h-5 text-brand-orange-ink" />
+          <h2 className="text-title font-semibold text-brand-orange-ink">Actieve landen</h2>
         </div>
         <p className="text-body text-muted-foreground mb-4">
           Selecteer de landen waarin dit account actief adverteert. Wordt gebruikt voor land-filtering en multi-country rapportages.
@@ -774,7 +774,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
                 <button
                   key={code}
                   onClick={() => { setActiveCountries([...activeCountries, code]); setSaved(false); }}
-                  className="px-2.5 py-1 text-xs rounded-md border border-dashed border-rm-orange/40 text-rm-orange-ink hover:bg-orange-50 transition-colors"
+                  className="px-2.5 py-1 text-xs rounded-md border border-dashed border-brand-orange/40 text-brand-orange-ink hover:bg-orange-50 transition-colors"
                 >
                   + {countryLabel(code)}
                 </button>
@@ -786,7 +786,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
         {/* Active countries */}
         <div className="flex flex-wrap gap-2 mb-3">
           {activeCountries.map((code) => (
-            <span key={code} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-rm-orange/10 text-rm-orange-ink border border-rm-orange/20">
+            <span key={code} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-orange/10 text-brand-orange-ink border border-brand-orange/20">
               {countryLabel(code)}
               <button onClick={() => { setActiveCountries(activeCountries.filter((c) => c !== code)); setSaved(false); }} className="hover:text-red-500">
                 <X className="w-3 h-3" />
@@ -822,8 +822,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       {toon("merchant") && (
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
-          <Globe className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-title font-semibold text-rm-blue-ink">Merchant Center</h2>
+          <Globe className="w-5 h-5 text-brand-blue-ink" />
+          <h2 className="text-title font-semibold text-brand-blue-ink">Merchant Center</h2>
         </div>
         <p className="text-body text-muted-foreground mb-5">
           Koppel hier de Merchant productbron voor deze klant. Deze instellingen worden gebruikt voor product-relevantie, Merchant snapshots en veiligere SOP-beslissingen.
@@ -831,7 +831,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-rm-gray mb-1.5">Merchant account ID</label>
+            <label className="block text-sm font-medium text-brand-gray mb-1.5">Merchant account ID</label>
             <Input
               value={merchantAccountId}
               onChange={(e) => { setMerchantAccountId(e.target.value); setSaved(false); }}
@@ -844,7 +844,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-rm-gray mb-1.5">Feed label</label>
+            <label className="block text-sm font-medium text-brand-gray mb-1.5">Feed label</label>
             <Input
               value={merchantFeedLabel}
               onChange={(e) => { setMerchantFeedLabel(e.target.value); setSaved(false); }}
@@ -854,7 +854,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-rm-gray mb-1.5">Content language</label>
+            <label className="block text-sm font-medium text-brand-gray mb-1.5">Content language</label>
             <Input
               value={merchantContentLanguage}
               onChange={(e) => { setMerchantContentLanguage(e.target.value); setSaved(false); }}
@@ -864,11 +864,11 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-rm-gray mb-1.5">Kanaal</label>
+            <label className="block text-sm font-medium text-brand-gray mb-1.5">Kanaal</label>
             <select
               value={merchantChannel}
               onChange={(e) => { setMerchantChannel(e.target.value); setSaved(false); }}
-              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-rm-blue"
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:border-brand-blue"
             >
               <option value="">— Niet filteren —</option>
               <option value="online">online</option>
@@ -883,8 +883,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       {toon("logo") && (
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
-          <ImageIcon className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-title font-semibold text-rm-blue-ink">Client Logo</h2>
+          <ImageIcon className="w-5 h-5 text-brand-blue-ink" />
+          <h2 className="text-title font-semibold text-brand-blue-ink">Client Logo</h2>
         </div>
         <p className="text-body text-muted-foreground mb-4">
           Upload het logo van de klant. Dit wordt gebruikt op de cover van maandrapportages.
@@ -902,7 +902,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
               </button>
             </div>
           ) : (
-            <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed border-border hover:border-rm-blue/40 cursor-pointer transition-colors">
+            <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed border-border hover:border-brand-blue/40 cursor-pointer transition-colors">
               {logoUploading ? (
                 <span className="text-body text-muted-foreground">Uploaden...</span>
               ) : (
@@ -920,7 +920,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
 
       {/* Save / Reset */}
       <div className="flex items-center gap-3">
-        <Button onClick={handleSave} className="bg-rm-blue hover:bg-rm-blue-light text-white gap-2">
+        <Button onClick={handleSave} className="bg-brand-blue hover:bg-brand-blue-light text-white gap-2">
           {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
           {saved ? "Opgeslagen!" : "Instellingen opslaan"}
         </Button>
@@ -965,23 +965,23 @@ function KpiCard({
   return (
     <div className={`rounded-xl border p-4 transition-colors ${
       config.enabled
-        ? "border-rm-blue/20 bg-rm-blue/5"
+        ? "border-brand-blue/20 bg-brand-blue/5"
         : "border-border bg-gray-50/30"
     }`}>
       {/* Header with toggle */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className={config.enabled ? "text-rm-blue-ink" : "text-gray-400"}>
+          <div className={config.enabled ? "text-brand-blue-ink" : "text-gray-400"}>
             {icon}
           </div>
-          <span className={`text-sm font-semibold ${config.enabled ? "text-rm-blue-ink" : "text-gray-400"}`}>
+          <span className={`text-sm font-semibold ${config.enabled ? "text-brand-blue-ink" : "text-gray-400"}`}>
             {label}
           </span>
         </div>
         <button
           onClick={() => onChange({ ...config, enabled: !config.enabled })}
           className={`w-10 h-5 rounded-full transition-colors relative ${
-            config.enabled ? "bg-rm-blue" : "bg-gray-300"
+            config.enabled ? "bg-brand-blue" : "bg-gray-300"
           }`}
         >
           <div className={`w-4 h-4 bg-card rounded-full absolute top-0.5 transition-transform ${
@@ -999,8 +999,8 @@ function KpiCard({
                 onClick={() => onChange({ ...config, inputMode: "absolute" })}
                 className={`flex-1 text-meta font-medium py-1.5 rounded-md transition-colors ${
                   config.inputMode === "absolute"
-                    ? "bg-rm-blue text-white"
-                    : "text-muted-foreground hover:text-rm-gray"
+                    ? "bg-brand-blue text-white"
+                    : "text-muted-foreground hover:text-brand-gray"
                 }`}
               >
                 Vast doel
@@ -1009,8 +1009,8 @@ function KpiCard({
                 onClick={() => onChange({ ...config, inputMode: "growth" })}
                 className={`flex-1 text-meta font-medium py-1.5 rounded-md transition-colors ${
                   config.inputMode === "growth"
-                    ? "bg-rm-blue text-white"
-                    : "text-muted-foreground hover:text-rm-gray"
+                    ? "bg-brand-blue text-white"
+                    : "text-muted-foreground hover:text-brand-gray"
                 }`}
               >
                 % Groei tov vorig jaar
@@ -1047,8 +1047,8 @@ function KpiCard({
                     onClick={() => onChange({ ...config, period: "year" })}
                     className={`flex-1 text-meta font-medium py-1.5 rounded-md transition-colors ${
                       config.period === "year"
-                        ? "bg-rm-blue text-white"
-                        : "text-muted-foreground hover:text-rm-gray"
+                        ? "bg-brand-blue text-white"
+                        : "text-muted-foreground hover:text-brand-gray"
                     }`}
                   >
                     Per jaar
@@ -1057,8 +1057,8 @@ function KpiCard({
                     onClick={() => onChange({ ...config, period: "month" })}
                     className={`flex-1 text-meta font-medium py-1.5 rounded-md transition-colors ${
                       config.period === "month"
-                        ? "bg-rm-blue text-white"
-                        : "text-muted-foreground hover:text-rm-gray"
+                        ? "bg-brand-blue text-white"
+                        : "text-muted-foreground hover:text-brand-gray"
                     }`}
                   >
                     Per maand

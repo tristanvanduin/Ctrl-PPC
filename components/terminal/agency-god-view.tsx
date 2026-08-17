@@ -49,14 +49,14 @@ export function AgencyGodView() {
   if (!data) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-rm-blue-ink" />
+        <Loader2 className="h-6 w-6 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
   if (data.cellen.length === 0) {
     return (
       <div className="terminal space-y-4">
-        <h1 className="text-page font-bold text-rm-blue-ink">Agency God View</h1>
+        <h1 className="text-page font-bold text-brand-blue-ink">Agency God View</h1>
         <CodeRoodPaneel />
         <p className="rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-body text-muted-foreground">
           Nog geen cellen — geen klant van dit bureau heeft in het venster sinds {data.vanaf} zowel
@@ -77,8 +77,8 @@ export function AgencyGodView() {
   return (
     <div className="terminal space-y-6">
       <div className="flex items-center gap-2">
-        <Building2 className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-rm-blue-ink))" }} />
-        <h1 className="text-page font-bold text-rm-blue-ink">Agency God View</h1>
+        <Building2 className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-brand-blue-ink))" }} />
+        <h1 className="text-page font-bold text-brand-blue-ink">Agency God View</h1>
         <span className="text-meta text-muted-foreground">eigen bureau · {laatsteMaand.slice(0, 7)}</span>
       </div>
 
@@ -93,7 +93,7 @@ export function AgencyGodView() {
 
       <section>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <h2 className="text-title font-semibold text-rm-gray">Portfolio per segment</h2>
+          <h2 className="text-title font-semibold text-brand-gray">Portfolio per segment</h2>
           <span className="text-meta text-muted-foreground">
             {data.aantalCellen} cellen sinds {data.vanaf}
           </span>

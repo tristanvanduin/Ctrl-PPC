@@ -43,30 +43,30 @@ function NoteCard({
     <div
       className={`group relative rounded-lg transition-all ${
         isEditing
-          ? "border border-rm-blue/20 bg-rm-blue/5"
+          ? "border border-brand-blue/20 bg-brand-blue/5"
           : "border border-border/50 hover:border-gray-300 bg-card"
       }`}
     >
       <div className="flex items-start gap-3 p-3.5">
         {/* Accent dot */}
-        <div className="w-1.5 h-1.5 rounded-full bg-rm-blue/40 mt-1.5 shrink-0" />
+        <div className="w-1.5 h-1.5 rounded-full bg-brand-blue/40 mt-1.5 shrink-0" />
 
         <div className="min-w-0 flex-1">
           {/* Title + timestamp on one line */}
           <div className="flex items-baseline gap-2 mb-1">
             {note.title && (
-              <span className="text-xs font-semibold text-rm-gray">{note.title}</span>
+              <span className="text-xs font-semibold text-brand-gray">{note.title}</span>
             )}
             <span className="text-micro text-muted-foreground ml-auto shrink-0">{timeAgo(note.created_at)}</span>
           </div>
 
           {/* Content */}
-          <p className="text-meta text-rm-gray/80 whitespace-pre-wrap leading-relaxed">{displayContent}</p>
+          <p className="text-meta text-brand-gray/80 whitespace-pre-wrap leading-relaxed">{displayContent}</p>
 
           {isLong && (
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-micro text-rm-blue-ink hover:underline mt-1"
+              className="text-micro text-brand-blue-ink hover:underline mt-1"
             >
               {expanded ? "Minder tonen" : "Meer tonen"}
             </button>
@@ -171,14 +171,14 @@ export function ClientNotes({ clientId }: { clientId: string }) {
     <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <StickyNote className="w-4 h-4 text-rm-blue-ink" />
-          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Notities</h3>
+          <StickyNote className="w-4 h-4 text-brand-blue-ink" />
+          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Notities</h3>
           <span className="text-micro text-muted-foreground">({notes.length})</span>
         </div>
         {!showNew && !editingId && (
           <button
             onClick={startNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-rm-blue/10 text-rm-blue-ink hover:bg-rm-blue/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue/10 text-brand-blue-ink hover:bg-brand-blue/20 transition-colors"
           >
             <Plus className="w-3 h-3" /> Nieuwe notitie
           </button>
@@ -187,7 +187,7 @@ export function ClientNotes({ clientId }: { clientId: string }) {
 
       {/* New/Edit form */}
       {(showNew || editingId) && (
-        <div className="mb-4 bg-rm-blue/5 rounded-lg p-4 border border-rm-blue/10">
+        <div className="mb-4 bg-brand-blue/5 rounded-lg p-4 border border-brand-blue/10">
           <input
             type="text"
             value={title}
@@ -200,17 +200,17 @@ export function ClientNotes({ clientId }: { clientId: string }) {
             onChange={(e) => setContent(e.target.value)}
             placeholder="Notitie schrijven... (afspraken, strategie, gedachtes)"
             rows={3}
-            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-rm-blue resize-y"
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue resize-y"
             autoFocus
           />
           <div className="flex justify-end gap-2 mt-2">
-            <button onClick={cancelEdit} className="px-3 py-1.5 text-meta text-muted-foreground hover:text-rm-gray">
+            <button onClick={cancelEdit} className="px-3 py-1.5 text-meta text-muted-foreground hover:text-brand-gray">
               Annuleren
             </button>
             <button
               onClick={handleSave}
               disabled={saving || !content.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-md bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-md bg-brand-blue text-white hover:bg-brand-blue/90 disabled:opacity-50"
             >
               <Save className="w-3 h-3" /> {saving ? "Opslaan..." : "Opslaan"}
             </button>
@@ -234,8 +234,8 @@ export function ClientNotes({ clientId }: { clientId: string }) {
         <p className="text-meta text-muted-foreground py-4 text-center">Laden...</p>
       ) : notes.length === 0 && !showNew ? (
         <div className="flex flex-col items-center py-8 text-center">
-          <div className="w-10 h-10 rounded-full bg-rm-blue/5 flex items-center justify-center mb-3">
-            <StickyNote className="w-5 h-5 text-rm-blue-ink/30" />
+          <div className="w-10 h-10 rounded-full bg-brand-blue/5 flex items-center justify-center mb-3">
+            <StickyNote className="w-5 h-5 text-brand-blue-ink/30" />
           </div>
           <p className="text-xs text-muted-foreground">Nog geen notities</p>
           <p className="text-micro text-muted-foreground/60 mt-0.5">Leg afspraken, strategie of gedachtes vast</p>

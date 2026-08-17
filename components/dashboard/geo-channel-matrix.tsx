@@ -109,7 +109,7 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
     id: "geo-kanaal-matrix",
     title: "Land × kanaal",
     subtitle: "hoe elke markt bediend wordt",
-    icon: <Grid3x3 className="w-4.5 h-4.5 text-rm-blue-ink" aria-hidden />,
+    icon: <Grid3x3 className="w-4.5 h-4.5 text-brand-blue-ink" aria-hidden />,
     defaultOpen: false,
   };
 

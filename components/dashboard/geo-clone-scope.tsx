@@ -21,7 +21,7 @@ export function GeoCloneScope({ value, onChange }: { value: string | null; onCha
 
   const pill = (active: boolean) =>
     `px-2.5 py-1 text-meta font-medium rounded-md transition-colors ${
-      active ? "bg-rm-blue text-white" : "bg-blue-50 text-muted-foreground hover:text-rm-gray"
+      active ? "bg-brand-blue text-white" : "bg-blue-50 text-muted-foreground hover:text-brand-gray"
     }`;
 
   // Al binnen een beurs? Dan geen redundant beurs-filter meer (je hebt al gekozen, en de
@@ -33,10 +33,10 @@ export function GeoCloneScope({ value, onChange }: { value: string | null; onCha
         <span className="text-meta text-muted-foreground flex items-center gap-1">
           <MapPin className="w-3.5 h-3.5" /> Beurs:
         </span>
-        <span className="px-2.5 py-1 text-meta font-medium rounded-md bg-rm-blue text-white">
+        <span className="px-2.5 py-1 text-meta font-medium rounded-md bg-brand-blue text-white">
           {active ? `${active.brand} ${active.location} (${active.abbreviation})` : value}
         </span>
-        <button onClick={() => onChange(null)} className="text-meta text-muted-foreground hover:text-rm-blue-ink underline underline-offset-2">
+        <button onClick={() => onChange(null)} className="text-meta text-muted-foreground hover:text-brand-blue-ink underline underline-offset-2">
           ← Hele account
         </button>
       </div>

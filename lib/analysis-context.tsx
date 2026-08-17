@@ -110,19 +110,19 @@ function AnalysisNotifications({ jobs, onDismiss }: { jobs: AnalysisJob[]; onDis
           key={job.id}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm ${
             job.status === "running"
-              ? "bg-white border-rm-blue/20"
+              ? "bg-white border-brand-blue/20"
               : job.status === "done"
               ? "bg-emerald-50 border-emerald-200"
               : "bg-red-50 border-red-200"
           }`}
         >
-          {job.status === "running" && <Loader2 className="w-4 h-4 text-rm-blue animate-spin shrink-0" />}
+          {job.status === "running" && <Loader2 className="w-4 h-4 text-brand-blue animate-spin shrink-0" />}
           {job.status === "done" && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
           {job.status === "error" && <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />}
 
           <div className="flex-1 min-w-0">
             <p className={`text-xs font-medium ${
-              job.status === "running" ? "text-rm-gray" :
+              job.status === "running" ? "text-brand-gray" :
               job.status === "done" ? "text-emerald-700" : "text-red-700"
             }`}>
               {job.label}

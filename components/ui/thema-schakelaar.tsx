@@ -79,8 +79,8 @@ export function ThemaSchakelaar({ className = "" }: { className?: string }) {
             onClick={() => setThema(o.id)}
             aria-pressed={actief}
             title={o.label}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-micro font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue ${
-              actief ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+            className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-micro font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
+              actief ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground hover:text-brand-gray"
             }`}
           >
             {o.icoon}

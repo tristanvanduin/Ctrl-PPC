@@ -84,7 +84,7 @@ const STATUS_LABEL: Record<Status, string> = {
 // in plaats van nog een tint groen. Dat is geen versiering: het is de enige status die beter is
 // dan het doel zelf, en verdient dus een eigen signaal in plaats van "extra goed groen".
 const STATUS_COLOR: Record<Status, string> = {
-  ahead: "var(--terminal-accent, var(--color-rm-blue-ink))",
+  ahead: "var(--terminal-accent, var(--color-brand-blue-ink))",
   "on-track": "#22c55e",
   behind: "#ef4444",
   "no-target": "var(--muted-foreground, #64748b)",
@@ -154,13 +154,13 @@ export function EventForecaster({ clientId }: { clientId: string }) {
   return (
     <div className="terminal space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <TrendingUp className="h-4.5 w-4.5" style={{ color: "var(--terminal-accent, var(--color-rm-blue-ink))" }} />
-        <h3 className="text-title font-semibold text-rm-gray">T-minus Forecaster</h3>
+        <TrendingUp className="h-4.5 w-4.5" style={{ color: "var(--terminal-accent, var(--color-brand-blue-ink))" }} />
+        <h3 className="text-title font-semibold text-brand-gray">T-minus Forecaster</h3>
         {events && events.length > 1 && (
           <select
             value={selectedEventId ?? ""}
             onChange={(e) => setSelectedEventId(e.target.value)}
-            className="rounded-md border border-border bg-card px-2 py-1 text-meta text-rm-gray focus:border-rm-blue/50 focus:outline-none"
+            className="rounded-md border border-border bg-card px-2 py-1 text-meta text-brand-gray focus:border-brand-blue/50 focus:outline-none"
           >
             {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
           </select>
@@ -192,8 +192,8 @@ export function EventForecaster({ clientId }: { clientId: string }) {
                   onClick={() => setSelectedChannel(k)}
                   className={`rounded-md px-3 py-1.5 text-meta font-medium transition-colors ${
                     selectedChannel === k
-                      ? "bg-rm-blue text-white"
-                      : "border border-border text-muted-foreground hover:border-rm-blue/40"
+                      ? "bg-brand-blue text-white"
+                      : "border border-border text-muted-foreground hover:border-brand-blue/40"
                   }`}
                 >
                   {CHANNEL_LABEL[k]}
@@ -210,18 +210,18 @@ export function EventForecaster({ clientId }: { clientId: string }) {
               <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
                 <div>
                   <p className="text-micro font-medium uppercase tracking-wide text-muted-foreground">Opgebouwd tot nu</p>
-                  <p className="teller-waarde mt-0.5 text-2xl font-bold text-rm-gray">{compactNumber(forecast.currentCumulative)}</p>
+                  <p className="teller-waarde mt-0.5 text-2xl font-bold text-brand-gray">{compactNumber(forecast.currentCumulative)}</p>
                 </div>
                 <div>
                   <p className="text-micro font-medium uppercase tracking-wide text-muted-foreground">Geprojecteerde eindstand</p>
-                  <p className="teller-waarde mt-0.5 text-2xl font-bold text-rm-gray">
+                  <p className="teller-waarde mt-0.5 text-2xl font-bold text-brand-gray">
                     {forecast.projectedFinal != null ? compactNumber(forecast.projectedFinal) : "geen basis"}
                   </p>
                 </div>
                 {target != null && (
                   <div>
                     <p className="text-micro font-medium uppercase tracking-wide text-muted-foreground">Doel</p>
-                    <p className="teller-waarde mt-0.5 text-2xl font-bold text-rm-gray">{compactNumber(target)}</p>
+                    <p className="teller-waarde mt-0.5 text-2xl font-bold text-brand-gray">{compactNumber(target)}</p>
                   </div>
                 )}
                 <div className="ml-auto">

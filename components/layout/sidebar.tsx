@@ -328,7 +328,7 @@ function SidebarInner() {
           href={`/client/${client.id}`}
           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
             isActive && !activeGeo
-              ? "bg-rm-orange text-white font-medium"
+              ? "bg-brand-orange text-white font-medium"
               : isActive
               ? "bg-white/10 text-white"
               : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -346,7 +346,7 @@ function SidebarInner() {
                 href={`/client/${client.id}?geo=${v.abbreviation}`}
                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-body transition-colors ${
                   activeGeo === v.abbreviation
-                    ? "bg-rm-orange text-white font-medium"
+                    ? "bg-brand-orange text-white font-medium"
                     : "text-white/80 hover:bg-white/10 hover:text-white"
                 }`}
               >
@@ -405,7 +405,7 @@ function SidebarInner() {
             placeholder="Zoek klant..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-white/10 text-white text-sm rounded-lg pl-9 pr-3 py-2 placeholder:text-white/65 border border-white/10 focus:outline-none focus:border-rm-orange"
+            className="w-full bg-white/10 text-white text-sm rounded-lg pl-9 pr-3 py-2 placeholder:text-white/65 border border-white/10 focus:outline-none focus:border-brand-orange"
           />
         </div>
       </div>
@@ -415,7 +415,7 @@ function SidebarInner() {
         <Link
           href="/vandaag"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-            pathname === "/vandaag" ? "bg-rm-orange text-white font-medium" : "text-white/70 hover:bg-white/10 hover:text-white"
+            pathname === "/vandaag" ? "bg-brand-orange text-white font-medium" : "text-white/70 hover:bg-white/10 hover:text-white"
           }`}
         >
           <ListChecks className="w-4 h-4" />
@@ -424,7 +424,7 @@ function SidebarInner() {
         <Link
           href="/portfolio"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-            pathname === "/portfolio" ? "bg-rm-orange text-white font-medium" : "text-white/70 hover:bg-white/10 hover:text-white"
+            pathname === "/portfolio" ? "bg-brand-orange text-white font-medium" : "text-white/70 hover:bg-white/10 hover:text-white"
           }`}
         >
           <LayoutGrid className="w-4 h-4" />
@@ -531,7 +531,7 @@ function SidebarInner() {
           href="/scripts"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
             pathname === "/scripts"
-              ? "bg-rm-orange text-white font-medium"
+              ? "bg-brand-orange text-white font-medium"
               : "text-white/70 hover:bg-white/10 hover:text-white"
           }`}
         >
@@ -551,7 +551,7 @@ function SidebarInner() {
             href="/admin"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
               pathname === "/admin"
-                ? "bg-rm-orange text-white font-medium"
+                ? "bg-brand-orange text-white font-medium"
                 : "text-white/70 hover:bg-white/10 hover:text-white"
             }`}
           >
@@ -563,7 +563,7 @@ function SidebarInner() {
           href="/settings"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
             pathname === "/settings"
-              ? "bg-rm-orange text-white font-medium"
+              ? "bg-brand-orange text-white font-medium"
               : "text-white/70 hover:bg-white/10 hover:text-white"
           }`}
         >

@@ -56,7 +56,7 @@ function TijdasKeuze({ value, onChange }: { value: "beurs" | "maand"; onChange: 
           key={o.id}
           onClick={() => onChange(o.id)}
           className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-            value === o.id ? "bg-rm-blue text-white" : "text-muted-foreground hover:text-rm-blue-ink"
+            value === o.id ? "bg-brand-blue text-white" : "text-muted-foreground hover:text-brand-blue-ink"
           }`}
         >
           {o.label}
@@ -107,7 +107,7 @@ export function GoogleView({
               <button
                 onClick={() => onCountryFilterChange(null)}
                 className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
-                  countryFilter === null ? "bg-rm-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-rm-gray"
+                  countryFilter === null ? "bg-brand-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-brand-gray"
                 }`}
               >
                 Alle landen
@@ -117,7 +117,7 @@ export function GoogleView({
                   key={code}
                   onClick={() => onCountryFilterChange(countryFilter === code ? null : code)}
                   className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
-                    countryFilter === code ? "bg-rm-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-rm-gray"
+                    countryFilter === code ? "bg-brand-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-brand-gray"
                   }`}
                 >
                   {countryLabel(code)}
@@ -132,7 +132,7 @@ export function GoogleView({
               niets en moet de lezer zelf uitzoeken wat bij wat hoort. */}
           <Sectie
             eerste
-            icoon={<Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />}
+            icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel={
               (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
               + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
@@ -166,7 +166,7 @@ export function GoogleView({
           </Sectie>
 
           <Sectie
-            icoon={<Target className="w-4.5 h-4.5 text-rm-blue-ink" />}
+            icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel={countryFilter ? `Jaaroverzicht 2026 — ${countryLabel(countryFilter)}` : "Jaaroverzicht 2026"}
             bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
           >
@@ -178,7 +178,7 @@ export function GoogleView({
               staat bewust naast de kaart en niet op een eigen pagina: het is de volgende vraag
               na "welke landen", en een aparte pagina zou klant en periode opnieuw laten kiezen. */}
           <Sectie
-            icoon={<Globe className="w-4.5 h-4.5 text-rm-blue-ink" />}
+            icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Markten"
             bijschrift={
               meerdereKanalen
@@ -204,7 +204,7 @@ export function GoogleView({
               "waar landt het budget en hoe ziet het eruit". Elk van deze kaarten rendert niets
               als er geen data voor is, dus de sectie kan ook helemaal leeg blijven. */}
           <Sectie
-            icoon={<LayoutGrid className="w-4.5 h-4.5 text-rm-blue-ink" />}
+            icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Waar het budget landt"
             bijschrift="Video, netwerken en placements"
           >
@@ -288,7 +288,7 @@ function CampagneTypeTabs({ type, onChange }: { type: CampagneType; onChange: (t
           key={t.id}
           onClick={() => onChange(t.id)}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            type === t.id ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground hover:text-rm-gray"
+            type === t.id ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground hover:text-brand-gray"
           }`}
         >
           {t.label}
@@ -324,7 +324,7 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
     <div>
       <Sectie
         eerste
-        icoon={<Gauge className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Gauge className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Scorecard"
         bijschrift="Hoe gezond is dit campagnetype — vijf factoren, per type verschillend"
         actie={<CampagneTypeTabs type={campagneType} onChange={setCampagneType} />}
@@ -334,7 +334,7 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
       {/* Twee vragen, twee secties. Wat draait er, en waar lekt het weg — dat laatste
           is geen detail van het eerste maar een eigen onderwerp met een eigen actie. */}
       <Sectie
-        icoon={<LayoutGrid className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat er draait"
         bijschrift="Alle campagnes van dit account over de laatste 30 dagen"
       >
@@ -346,7 +346,7 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
           expliciete signalen), dus de sectie kan leeg blijven zoals de andere kaarten hier ook
           stil zijn zonder data. */}
       <Sectie
-        icoon={<Users className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Users className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Doelgroepsignalen"
         bijschrift="Welk type doelgroep de campagnes bereikt, en wat het oplevert"
       >
@@ -360,14 +360,14 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
           advertentie is waar een campagne uit bestaat, niet waar een budget landt.
           Overzicht wordt hier een derde korter zonder dat er iets verdwijnt. */}
       <Sectie
-        icoon={<Sparkles className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="De advertenties zelf"
         bijschrift="Hoe de creatives eruitzien en wat ze opleverden"
       >
         <CreativePerformance clientId={clientId} channel="google" />
       </Sectie>
       <Sectie
-        icoon={<AlertTriangle className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<AlertTriangle className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Waar het weglekt"
         bijschrift="Zoektermen, ad groups en producten die kosten maken zonder conversie"
       >
@@ -385,14 +385,14 @@ export function GoogleForecast({ clientId }: { clientId: string }) {
           Twee onderwerpen, dus twee secties. */}
       <Sectie
         eerste
-        icoon={<TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Waar dit jaar op uitkomt"
         bijschrift="Gerealiseerd plus prognose per maand, tegen het geschatte jaardoel (vorig jaar +10%)"
       >
         <ForecastTable clientId={clientId} />
       </Sectie>
       <Sectie
-        icoon={<Target className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat een budgetwijziging zou doen"
         bijschrift="Doorrekening van een hoger of lager mediabudget op dezelfde efficiëntie"
       >

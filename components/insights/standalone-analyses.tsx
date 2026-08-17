@@ -104,7 +104,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
-        <h3 className="text-title font-semibold text-rm-gray">Losse analyses (Google)</h3>
+        <h3 className="text-title font-semibold text-brand-gray">Losse analyses (Google)</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
           Deterministisch voorgerekend, door het model verwoord. Draai los van de maandanalyse; de output wordt opgeslagen bij de analyse-uitvoer.
         </p>
@@ -119,19 +119,19 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                 disabled={anyRunning}
                 className={`w-full px-4 py-3 rounded-lg border transition-all text-left ${
                   s.running
-                    ? "border-rm-blue/30 bg-rm-blue/5 cursor-wait"
+                    ? "border-brand-blue/30 bg-brand-blue/5 cursor-wait"
                     : s.success
                     ? "border-emerald-300 bg-emerald-50"
                     : s.creditBlocked
                     ? "border-copper/40 bg-copper/5"
                     : s.error
                     ? "border-red-300 bg-red-50"
-                    : "border-border hover:border-rm-blue/40 hover:bg-gray-50 cursor-pointer"
+                    : "border-border hover:border-brand-blue/40 hover:bg-gray-50 cursor-pointer"
                 } ${anyRunning && !s.running ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-semibold text-rm-gray">{a.label}</span>
-                  {s.running && <Loader2 className="w-4 h-4 text-rm-blue-ink animate-spin" />}
+                  <span className="text-sm font-semibold text-brand-gray">{a.label}</span>
+                  {s.running && <Loader2 className="w-4 h-4 text-brand-blue-ink animate-spin" />}
                   {s.success && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                   {s.error && !s.creditBlocked && <AlertCircle className="w-4 h-4 text-red-500" />}
                 </div>
@@ -143,10 +143,10 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                   </div>
                 )}
                 {s.error && !s.creditBlocked && <p className="text-micro text-red-500 mt-1 truncate">{s.error}</p>}
-                {s.running && <p className="text-micro text-rm-blue-ink mt-1">Bezig...</p>}
+                {s.running && <p className="text-micro text-brand-blue-ink mt-1">Bezig...</p>}
               </button>
               {s.creditBlocked && (
-                <div className="rounded-md border border-copper/30 bg-copper/5 px-3 py-2 text-micro text-rm-gray">
+                <div className="rounded-md border border-copper/30 bg-copper/5 px-3 py-2 text-micro text-brand-gray">
                   <p>{s.error}</p>
                   <div className="mt-1.5 flex items-center gap-3">
                     <a href="/pricing" target="_blank" rel="noopener noreferrer" className="font-semibold text-copper hover:underline">
@@ -162,13 +162,13 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                 <>
                   <button
                     onClick={() => patch(a.key, { expanded: !s.expanded })}
-                    className="flex items-center justify-center gap-1 px-3 py-1 rounded-md border border-border text-micro text-muted-foreground hover:bg-gray-50 hover:text-rm-gray transition-all"
+                    className="flex items-center justify-center gap-1 px-3 py-1 rounded-md border border-border text-micro text-muted-foreground hover:bg-gray-50 hover:text-brand-gray transition-all"
                   >
                     {s.expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     {s.expanded ? "Verberg resultaat" : "Bekijk resultaat"}
                   </button>
                   {s.expanded && (
-                    <div className="rounded-md border border-border bg-gray-50 px-3 py-2 text-meta text-rm-gray whitespace-pre-wrap max-h-64 overflow-y-auto">
+                    <div className="rounded-md border border-border bg-gray-50 px-3 py-2 text-meta text-brand-gray whitespace-pre-wrap max-h-64 overflow-y-auto">
                       {s.output}
                     </div>
                   )}

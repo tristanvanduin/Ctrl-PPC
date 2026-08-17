@@ -72,8 +72,8 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <Target className="w-5 h-5 text-rm-blue-ink" />
-        <h2 className="text-base font-semibold text-rm-blue-ink">Conversie-selectie per kanaal</h2>
+        <Target className="w-5 h-5 text-brand-blue-ink" />
+        <h2 className="text-base font-semibold text-brand-blue-ink">Conversie-selectie per kanaal</h2>
       </div>
       <p className="text-meta text-muted-foreground mb-4">
         Kies welke conversies meetellen voor Meta en LinkedIn (zoals de conversie-acties bij Google).
@@ -86,7 +86,7 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
           const selected = new Set(config[channel]);
           return (
             <div key={channel}>
-              <h3 className="text-body font-semibold text-rm-gray mb-2">{label}</h3>
+              <h3 className="text-body font-semibold text-brand-gray mb-2">{label}</h3>
               <div className="space-y-1.5">
                 {conversionSourcesFor(channel).map((src) => (
                   <label key={src.field} className="flex items-start gap-2 cursor-pointer rounded-md px-2 py-1.5 hover:bg-gray-50">
@@ -94,10 +94,10 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
                       type="checkbox"
                       checked={selected.has(src.field)}
                       onChange={() => toggle(channel, src.field)}
-                      className="mt-0.5 accent-rm-blue"
+                      className="mt-0.5 accent-brand-blue"
                     />
                     <span className="min-w-0">
-                      <span className="text-body text-rm-gray">{src.label}</span>
+                      <span className="text-body text-brand-gray">{src.label}</span>
                       {src.hint && <span className="block text-micro text-muted-foreground">{src.hint}</span>}
                     </span>
                   </label>
@@ -115,7 +115,7 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
       <button
         onClick={save}
         disabled={saving}
-        className="mt-5 flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all"
+        className="mt-5 flex items-center gap-2 px-4 py-2 rounded-md bg-brand-blue text-white text-body font-medium hover:bg-brand-blue/90 disabled:opacity-50 transition-all"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Conversie-selectie opslaan"}

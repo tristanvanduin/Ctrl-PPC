@@ -57,7 +57,7 @@ function QuartileBar({ p25, p50, p75, p100 }: { p25: number | null; p50: number 
               stáát hij op. */}
           <div className="w-full h-6 rounded-sm relative overflow-hidden" style={{ background: "var(--spoor, rgba(15,23,42,0.07))" }}>
             <div
-              className="absolute bottom-0 left-0 right-0 bg-rm-blue/70 rounded-t-sm"
+              className="absolute bottom-0 left-0 right-0 bg-brand-blue/70 rounded-t-sm"
               style={{ height: `${Math.max(2, Math.min(100, (s.v ?? 0) * 100))}%` }}
             />
           </div>
@@ -120,7 +120,7 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
   return (
     <CollapsiblePanel
       id="video-prestaties"
-      icon={<PlayCircle className="w-4.5 h-4.5 text-rm-blue-ink" />}
+      icon={<PlayCircle className="w-4.5 h-4.5 text-brand-blue-ink" />}
       title="Video (YouTube)"
       subtitle="beoordeeld op bereik en kijkgedrag — niet op klikken of CPA"
       meta={<span className="text-micro text-muted-foreground">{aggs.length} campagne{aggs.length === 1 ? "" : "s"}</span>}

@@ -106,21 +106,21 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <Ban className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-title font-semibold text-rm-gray">Waar je video&apos;s draaien</h3>
+        <Ban className="w-4.5 h-4.5 text-brand-blue-ink" />
+        <h3 className="text-title font-semibold text-brand-gray">Waar je video&apos;s draaien</h3>
         <span className="text-meta text-muted-foreground">voorstel welke placements uit te sluiten</span>
       </div>
 
       {excluding.length > 0 && (
         <div className="px-5 py-3 border-b border-border bg-red-50/50 space-y-1">
           {withCost.length > 0 && (
-            <p className="text-body text-rm-gray">
+            <p className="text-body text-brand-gray">
               <strong>{withCost.length} placement{withCost.length === 1 ? "" : "s"}</strong> kostte{withCost.length === 1 ? "" : "n"} samen{" "}
               <strong>{eur(waste)}</strong> zonder één conversie. Uitsluiten geeft dat budget terug aan de plekken die wél werken.
             </p>
           )}
           {impressionsOnly.length > 0 && (
-            <p className="text-body text-rm-gray">
+            <p className="text-body text-brand-gray">
               Daarnaast {impressionsOnly.length === 1 ? "staat er 1 plaatsing" : `staan er ${impressionsOnly.length} plaatsingen`} uit{" "}
               <strong>Performance Max</strong> met samen {int(impressionsOnly.reduce((s, j) => s + j.agg.impressions, 0))} vertoningen.
               Google geeft daar geen kosten of conversies bij, dus wat die precies kosten is niet te zeggen.
@@ -153,7 +153,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
                 <span className="flex items-center gap-1">
                   {agg.displayName || agg.placement}
                   {agg.targetUrl && (
-                    <a href={agg.targetUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-rm-blue-ink shrink-0">
+                    <a href={agg.targetUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-brand-blue-ink shrink-0">
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}

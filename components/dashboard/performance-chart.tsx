@@ -109,14 +109,14 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
     <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
             Performance {new Date().getFullYear()}
           </h3>
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => setViewMode("weekly")}
               className={`px-2.5 py-1 text-meta font-medium rounded-md transition-colors ${
-                viewMode === "weekly" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
+                viewMode === "weekly" ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"
               }`}
             >
               Per week
@@ -124,7 +124,7 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
             <button
               onClick={() => setViewMode("monthly")}
               className={`px-2.5 py-1 text-meta font-medium rounded-md transition-colors ${
-                viewMode === "monthly" ? "bg-card text-rm-blue-ink shadow-sm" : "text-muted-foreground"
+                viewMode === "monthly" ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"
               }`}
             >
               Per maand
@@ -135,7 +135,7 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
             className={`px-2.5 py-1 text-meta font-medium rounded-md border transition-colors ${
               showYoY
                 ? "bg-purple-50 border-purple-200 text-purple-700"
-                : "bg-gray-50 border-border text-muted-foreground hover:text-rm-gray"
+                : "bg-gray-50 border-border text-muted-foreground hover:text-brand-gray"
             }`}
           >
             {showYoY ? "✓ " : ""}Vorig jaar
@@ -148,8 +148,8 @@ export function PerformanceChart({ clientId, countryFilter }: { clientId: string
               onClick={() => setMetric(m)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                 metric === m
-                  ? "bg-rm-blue text-white"
-                  : "text-muted-foreground hover:text-rm-blue-ink"
+                  ? "bg-brand-blue text-white"
+                  : "text-muted-foreground hover:text-brand-blue-ink"
               }`}
             >
               {METRIC_LABELS[m]}

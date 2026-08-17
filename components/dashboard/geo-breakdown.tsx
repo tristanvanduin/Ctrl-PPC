@@ -17,11 +17,11 @@ import { GeoRanglijst } from "./geo-ranglijst";
 // weergave rendert, en nooit tijdens SSR.
 const WorldMap = dynamic(() => import("./world-map"), {
   ssr: false,
-  loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" /></div>,
+  loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-brand-blue-ink" /></div>,
 });
 const UsStatesMap = dynamic(() => import("./us-states-map"), {
   ssr: false,
-  loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" /></div>,
+  loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-brand-blue-ink" /></div>,
 });
 
 // Geo-mapping: waar komt het verkeer / de conversies vandaan, per gekozen metric. Interactief —
@@ -153,15 +153,15 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <Globe2 className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-title font-semibold text-rm-gray">
+        <Globe2 className="w-4.5 h-4.5 text-brand-blue-ink" />
+        <h3 className="text-title font-semibold text-brand-gray">
           Waar komt het vandaan{focus === "US" ? " — Verenigde Staten" : ""}
         </h3>
         <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
         {focus === "US" && (
           <button
             onClick={() => setFocus(null)}
-            className="flex items-center gap-0.5 text-meta font-medium text-rm-blue-ink hover:underline"
+            className="flex items-center gap-0.5 text-meta font-medium text-brand-blue-ink hover:underline"
           >
             <ChevronLeft className="w-3.5 h-3.5" /> Wereld
           </button>
@@ -172,7 +172,7 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
           <select
             value={metricKey}
             onChange={(e) => setMetricKey(e.target.value as MetricKey)}
-            className="rounded-md border border-border bg-card px-2 py-1 text-body font-medium text-rm-gray focus:outline-none focus:ring-1 focus:ring-rm-blue"
+            className="rounded-md border border-border bg-card px-2 py-1 text-body font-medium text-brand-gray focus:outline-none focus:ring-1 focus:ring-brand-blue"
           >
             {METRICS.map((m) => (
               <option key={m.key} value={m.key}>{m.label}</option>

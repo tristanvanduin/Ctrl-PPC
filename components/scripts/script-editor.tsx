@@ -53,9 +53,9 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
   }
 
   return (
-    <div className="bg-card rounded-xl border border-rm-blue/20 p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-brand-blue/20 p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-title font-semibold text-rm-blue-ink">
+        <h3 className="text-title font-semibold text-brand-blue-ink">
           {isEdit ? "Script bewerken" : "Nieuw script"}
         </h3>
         <button onClick={onCancel} className="p-1 rounded-md hover:bg-gray-100">
@@ -65,53 +65,53 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
 
       <div className="space-y-3">
         <div>
-          <label className="text-meta font-medium text-rm-gray block mb-1">Titel *</label>
+          <label className="text-meta font-medium text-brand-gray block mb-1">Titel *</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Bijv. Budget Pacing Script"
-            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-rm-blue"
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue"
           />
         </div>
 
         <div>
-          <label className="text-meta font-medium text-rm-gray block mb-1">Beschrijving</label>
+          <label className="text-meta font-medium text-brand-gray block mb-1">Beschrijving</label>
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Korte beschrijving van wat het script doet"
-            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-rm-blue"
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue"
           />
         </div>
 
         <div>
-          <label className="text-meta font-medium text-rm-gray block mb-1">Tags</label>
+          <label className="text-meta font-medium text-brand-gray block mb-1">Tags</label>
           <input
             type="text"
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
             placeholder="budget, pacing, automated (komma-gescheiden)"
-            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-rm-blue"
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue"
           />
         </div>
 
         <div>
-          <label className="text-meta font-medium text-rm-gray block mb-1">Code *</label>
+          <label className="text-meta font-medium text-brand-gray block mb-1">Code *</label>
           <textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="// Plak je Google Ads script hier..."
             rows={12}
-            className="w-full text-sm font-mono border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-rm-blue resize-y bg-gray-50"
+            className="w-full text-sm font-mono border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue resize-y bg-gray-50"
           />
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-rm-gray transition-colors"
+            className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-brand-gray transition-colors"
           >
             Annuleren
           </button>
@@ -121,7 +121,7 @@ export function ScriptEditor({ script, onSaved, onCancel }: ScriptEditorProps) {
             className={`flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
               saved
                 ? "bg-green-500 text-white"
-                : "bg-rm-blue text-white hover:bg-rm-blue/90"
+                : "bg-brand-blue text-white hover:bg-brand-blue/90"
             } disabled:opacity-50`}
           >
             {saved ? (

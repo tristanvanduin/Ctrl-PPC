@@ -46,11 +46,11 @@ export function UserMenu() {
       {open && (
         <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-xl border border-border bg-card shadow-lg supports-[backdrop-filter]:bg-[var(--zweef-vlak)] supports-[backdrop-filter]:backdrop-blur-md">
           <div className="border-b border-border px-4 py-3">
-            <p className="truncate text-meta font-medium text-rm-gray">{email ?? "Niet ingelogd"}</p>
+            <p className="truncate text-meta font-medium text-brand-gray">{email ?? "Niet ingelogd"}</p>
           </div>
           <a
             href="/settings"
-            className="flex items-center gap-2 px-4 py-2.5 text-body text-rm-gray hover:bg-gray-50"
+            className="flex items-center gap-2 px-4 py-2.5 text-body text-brand-gray hover:bg-gray-50"
             onClick={() => setOpen(false)}
           >
             <Settings className="h-3.5 w-3.5 text-muted-foreground" />

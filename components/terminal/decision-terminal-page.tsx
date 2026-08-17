@@ -18,8 +18,8 @@ function ClientKiezer() {
   return (
     <div className="terminal mx-auto max-w-lg space-y-4 py-16">
       <div className="flex items-center gap-2">
-        <Radar className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-rm-blue-ink))" }} />
-        <h1 className="text-page font-bold text-rm-blue-ink">Decision Terminal</h1>
+        <Radar className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-brand-blue-ink))" }} />
+        <h1 className="text-page font-bold text-brand-blue-ink">Decision Terminal</h1>
       </div>
       <p className="text-body text-muted-foreground">Kies een klant om het Hypothesis Board, de Attribution View en het Decision Log te zien.</p>
       <div className="relative">
@@ -28,7 +28,7 @@ function ClientKiezer() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Zoek een klant..."
-          className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-body focus:border-rm-blue/50 focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-body focus:border-brand-blue/50 focus:outline-none"
           autoFocus
         />
       </div>
@@ -37,7 +37,7 @@ function ClientKiezer() {
           <button
             key={c.id}
             onClick={() => router.push(`/decision-terminal?client=${encodeURIComponent(c.id)}`)}
-            className="block w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-body text-rm-gray hover:border-rm-blue/40 hover:bg-muted"
+            className="block w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-body text-brand-gray hover:border-brand-blue/40 hover:bg-muted"
           >
             {c.name}
           </button>

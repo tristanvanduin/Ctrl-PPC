@@ -59,8 +59,8 @@ export function SearchConsoleSettings({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <Search className="w-5 h-5 text-rm-blue-ink" />
-        <h2 className="text-base font-semibold text-rm-blue-ink">Google Search Console</h2>
+        <Search className="w-5 h-5 text-brand-blue-ink" />
+        <h2 className="text-base font-semibold text-brand-blue-ink">Google Search Console</h2>
       </div>
       <p className="text-meta text-muted-foreground mb-4">
         Verifieert merk-cannibalisatie onafhankelijk van de campagnenaamgeving en signaleert
@@ -70,7 +70,7 @@ export function SearchConsoleSettings({ clientId }: { clientId: string }) {
 
       <div className="space-y-4">
         <label className="block">
-          <span className="text-body font-medium text-rm-gray">Site-URL</span>
+          <span className="text-body font-medium text-brand-gray">Site-URL</span>
           <input
             type="text"
             value={config.siteUrl}
@@ -82,7 +82,7 @@ export function SearchConsoleSettings({ clientId }: { clientId: string }) {
         </label>
 
         <label className="block">
-          <span className="text-body font-medium text-rm-gray">Merktermen</span>
+          <span className="text-body font-medium text-brand-gray">Merktermen</span>
           <input
             type="text"
             value={brandTermsInput}
@@ -101,7 +101,7 @@ export function SearchConsoleSettings({ clientId }: { clientId: string }) {
       <button
         onClick={save}
         disabled={saving}
-        className="mt-5 flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all"
+        className="mt-5 flex items-center gap-2 px-4 py-2 rounded-md bg-brand-blue text-white text-body font-medium hover:bg-brand-blue/90 disabled:opacity-50 transition-all"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Search Console-configuratie opslaan"}

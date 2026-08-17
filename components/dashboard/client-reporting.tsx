@@ -258,15 +258,15 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-rm-blue/10 flex items-center justify-center shrink-0">
-            <FileText className="w-4.5 h-4.5 text-rm-blue-ink" />
+          <div className="w-9 h-9 rounded-lg bg-brand-blue/10 flex items-center justify-center shrink-0">
+            <FileText className="w-4.5 h-4.5 text-brand-blue-ink" />
           </div>
           <div>
-            <h2 className="text-title font-bold text-rm-gray leading-tight">Rapportage</h2>
+            <h2 className="text-title font-bold text-brand-gray leading-tight">Rapportage</h2>
             <p className="text-xs text-muted-foreground">Maandrapportage — per metric, met grafieken en bewerkbare tekst</p>
           </div>
         </div>
-        <button onClick={generateReport} disabled={generating} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rm-blue text-white text-sm font-medium hover:bg-rm-blue/90 transition-colors disabled:opacity-50">
+        <button onClick={generateReport} disabled={generating} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-blue text-white text-sm font-medium hover:bg-brand-blue/90 transition-colors disabled:opacity-50">
           {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           {generating ? "Genereren..." : "Nieuw rapport"}
         </button>
@@ -301,12 +301,12 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       {/* Report list (when no active report) */}
       {!report && !generating && !loading && reports.length > 0 && (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-border"><h3 className="text-title font-semibold text-rm-gray">Eerdere rapportages</h3></div>
+          <div className="px-5 py-3 border-b border-border"><h3 className="text-title font-semibold text-brand-gray">Eerdere rapportages</h3></div>
           <div className="divide-y divide-border">
             {reports.map((r) => (
               <button key={r.id} onClick={() => loadReport(r.id)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors text-left">
                 <div>
-                  <p className="text-sm font-medium text-rm-gray">{r.title}</p>
+                  <p className="text-sm font-medium text-brand-gray">{r.title}</p>
                   <p className="text-micro text-muted-foreground mt-0.5">{MONTH_NAMES[r.report_month - 1]} {r.report_year}</p>
                 </div>
                 <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[r.status]?.bg ?? ""} ${STATUS_STYLE[r.status]?.color ?? ""}`}>{STATUS_STYLE[r.status]?.label ?? r.status}</span>
@@ -317,10 +317,10 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       )}
 
       {/* Loading / Generating */}
-      {loading && <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-rm-blue-ink" /></div>}
+      {loading && <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-brand-blue-ink" /></div>}
       {generating && (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-rm-blue-ink" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand-blue-ink" />
           <p className="text-body text-muted-foreground">Rapport wordt gegenereerd...</p>
           <p className="text-micro text-muted-foreground">Data ophalen, metrics berekenen, tekst genereren — ca. 30-60 sec</p>
         </div>
@@ -338,10 +338,10 @@ export function ClientReporting({ clientId }: { clientId: string }) {
       {!report && !generating && !loading && reports.length === 0 && (
         <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
           <div className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rm-blue/10">
-              <FileText className="h-6 w-6 text-rm-blue-ink" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue/10">
+              <FileText className="h-6 w-6 text-brand-blue-ink" />
             </div>
-            <h3 className="text-title font-semibold text-rm-gray">Nog geen rapportages</h3>
+            <h3 className="text-title font-semibold text-brand-gray">Nog geen rapportages</h3>
             <p className="mt-1.5 text-body text-muted-foreground">
               Een rapport zet de maand van deze klant op papier: de cijfers, de grafieken en de
               duiding erbij, in bewerkbare tekst die je zelf kunt aanpassen voordat je hem deelt.
@@ -353,14 +353,14 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                 ["Tekst per metric", "wat er gebeurde en waarom, door jou aan te passen"],
               ].map(([titel, wat]) => (
                 <li key={titel} className="rounded-lg border border-border bg-gray-50/70 px-3 py-2.5">
-                  <span className="block text-body font-medium text-rm-gray">{titel}</span>
+                  <span className="block text-body font-medium text-brand-gray">{titel}</span>
                   <span className="mt-0.5 block text-meta leading-snug text-muted-foreground">{wat}</span>
                 </li>
               ))}
             </ul>
             <button
               onClick={generateReport}
-              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-rm-blue px-4 py-2 text-body font-medium text-white transition-colors hover:bg-rm-blue/90"
+              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-body font-medium text-white transition-colors hover:bg-brand-blue/90"
             >
               <Plus className="h-4 w-4" /> Eerste rapport genereren
             </button>
@@ -377,14 +377,14 @@ export function ClientReporting({ clientId }: { clientId: string }) {
           {/* Actions bar */}
           <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-3 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-rm-gray">{report.title}</h2>
+              <h2 className="text-sm font-bold text-brand-gray">{report.title}</h2>
               <p className="text-micro text-muted-foreground">{report.reportMonth} {report.reportYear}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[reportStatus]?.bg ?? ""} ${STATUS_STYLE[reportStatus]?.color ?? ""}`}>{STATUS_STYLE[reportStatus]?.label ?? reportStatus}</span>
               {reportStatus === "draft" && <button onClick={() => updateStatus("final")} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-green-200 bg-green-50 text-green-600 hover:bg-green-100"><Check className="w-3 h-3" /> Definitief</button>}
               {reportStatus === "final" && <button onClick={() => updateStatus("sent")} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100"><Send className="w-3 h-3" /> Verstuurd</button>}
-              {reportId && <button onClick={downloadPdf} disabled={pdfLoading} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-rm-orange/30 bg-orange-50 text-rm-orange-ink hover:bg-orange-100 disabled:opacity-50">{pdfLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} PDF</button>}
+              {reportId && <button onClick={downloadPdf} disabled={pdfLoading} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-brand-orange/30 bg-orange-50 text-brand-orange-ink hover:bg-orange-100 disabled:opacity-50">{pdfLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} PDF</button>}
               <button onClick={copyText} className="flex items-center gap-1 text-micro font-medium px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-gray-50">{copied ? <Check className="w-3 h-3 text-green-500" /> : <Download className="w-3 h-3" />} {copied ? "Gekopieerd!" : "Tekst"}</button>
               <button onClick={() => { setReport(null); setReportId(null); fetchReports().then(setReports); }} className="text-micro font-medium px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-gray-50">Terug</button>
             </div>
@@ -408,7 +408,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                       {kpi.changePct > 0 ? "+" : ""}{kpi.changePct}%
                     </span>
                   </div>
-                  <p className="text-lg font-bold text-rm-gray">{fmtValue(kpi.current, kpi.format)}</p>
+                  <p className="text-lg font-bold text-brand-gray">{fmtValue(kpi.current, kpi.format)}</p>
                   <p className="text-micro text-muted-foreground">({fmtValue(kpi.previous, kpi.format)})</p>
                   {kpi.yoyChangePct != null && (
                     <p className="text-micro text-muted-foreground mt-1">YoY: {kpi.yoyChangePct > 0 ? "+" : ""}{kpi.yoyChangePct}%</p>
@@ -432,7 +432,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                   )}
                   {isEditing && (
                     <div className="flex items-center gap-1">
-                      <button onClick={saveEdit} disabled={saving} className="p-1 rounded-md bg-rm-blue text-white hover:bg-rm-blue/90">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}</button>
+                      <button onClick={saveEdit} disabled={saving} className="p-1 rounded-md bg-brand-blue text-white hover:bg-brand-blue/90">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}</button>
                       <button onClick={() => { setEditingId(null); setEditBuf(null); }} className="p-1 rounded-md border border-border hover:bg-gray-50"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   )}
@@ -445,19 +445,19 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                     <div>
                       {isEditing && editBuf ? (
                         <>
-                          <input type="text" value={editBuf.heading} onChange={(e) => setEditBuf({ ...editBuf, heading: e.target.value })} className="w-full text-xl font-bold text-rm-gray border border-border rounded-md px-3 py-2 mb-3 focus:outline-none focus:ring-1 focus:ring-rm-blue" />
+                          <input type="text" value={editBuf.heading} onChange={(e) => setEditBuf({ ...editBuf, heading: e.target.value })} className="w-full text-xl font-bold text-brand-gray border border-border rounded-md px-3 py-2 mb-3 focus:outline-none focus:ring-1 focus:ring-brand-blue" />
                           <div className="mb-3">
-                            {section.bullets.map((b, i) => <p key={i} className="text-sm text-rm-gray font-medium">• {b}</p>)}
+                            {section.bullets.map((b, i) => <p key={i} className="text-sm text-brand-gray font-medium">• {b}</p>)}
                           </div>
-                          <textarea value={editBuf.body} onChange={(e) => setEditBuf({ ...editBuf, body: e.target.value })} rows={6} className="w-full text-sm text-rm-gray border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-rm-blue resize-y leading-relaxed" />
+                          <textarea value={editBuf.body} onChange={(e) => setEditBuf({ ...editBuf, body: e.target.value })} rows={6} className="w-full text-sm text-brand-gray border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-brand-blue resize-y leading-relaxed" />
                         </>
                       ) : (
                         <>
-                          <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{section.heading}<span className="text-rm-orange-ink">.</span></h3>
+                          <h3 className="text-xl font-bold text-brand-gray leading-snug mb-3">{section.heading}<span className="text-brand-orange-ink">.</span></h3>
                           <div className="space-y-0.5 mb-3">
-                            {section.bullets.map((b, i) => <p key={i} className="text-sm text-rm-gray"><span className="font-semibold">•</span> {b}</p>)}
+                            {section.bullets.map((b, i) => <p key={i} className="text-sm text-brand-gray"><span className="font-semibold">•</span> {b}</p>)}
                           </div>
-                          <p className="text-sm text-rm-gray leading-relaxed">{section.body}</p>
+                          <p className="text-sm text-brand-gray leading-relaxed">{section.body}</p>
                         </>
                       )}
                     </div>
@@ -482,7 +482,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
               {editingId !== "acties" && <button onClick={() => startEdit("acties", report.actionSection.heading, report.actionSection.body)} className="p-1 rounded-md hover:bg-gray-100 text-muted-foreground"><Pencil className="w-3.5 h-3.5" /></button>}
               {editingId === "acties" && (
                 <div className="flex items-center gap-1">
-                  <button onClick={saveEdit} disabled={saving} className="p-1 rounded-md bg-rm-blue text-white">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}</button>
+                  <button onClick={saveEdit} disabled={saving} className="p-1 rounded-md bg-brand-blue text-white">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}</button>
                   <button onClick={() => { setEditingId(null); setEditBuf(null); }} className="p-1 rounded-md border border-border hover:bg-gray-50"><X className="w-3.5 h-3.5" /></button>
                 </div>
               )}
@@ -490,13 +490,13 @@ export function ClientReporting({ clientId }: { clientId: string }) {
             <div className="px-5 py-4">
               {editingId === "acties" && editBuf ? (
                 <>
-                  <input type="text" value={editBuf.heading} onChange={(e) => setEditBuf({ ...editBuf, heading: e.target.value })} className="w-full text-xl font-bold text-rm-gray border border-border rounded-md px-3 py-2 mb-3 focus:outline-none focus:ring-1 focus:ring-rm-blue" />
-                  <textarea value={editBuf.body} onChange={(e) => setEditBuf({ ...editBuf, body: e.target.value })} rows={8} className="w-full text-sm text-rm-gray border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-rm-blue resize-y leading-relaxed" />
+                  <input type="text" value={editBuf.heading} onChange={(e) => setEditBuf({ ...editBuf, heading: e.target.value })} className="w-full text-xl font-bold text-brand-gray border border-border rounded-md px-3 py-2 mb-3 focus:outline-none focus:ring-1 focus:ring-brand-blue" />
+                  <textarea value={editBuf.body} onChange={(e) => setEditBuf({ ...editBuf, body: e.target.value })} rows={8} className="w-full text-sm text-brand-gray border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-brand-blue resize-y leading-relaxed" />
                 </>
               ) : (
                 <>
-                  <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{report.actionSection.heading}<span className="text-rm-orange-ink">.</span></h3>
-                  <div className="text-sm text-rm-gray leading-relaxed whitespace-pre-line">{report.actionSection.body}</div>
+                  <h3 className="text-xl font-bold text-brand-gray leading-snug mb-3">{report.actionSection.heading}<span className="text-brand-orange-ink">.</span></h3>
+                  <div className="text-sm text-brand-gray leading-relaxed whitespace-pre-line">{report.actionSection.body}</div>
                 </>
               )}
             </div>
@@ -509,7 +509,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
               {editingId !== "planning" && <button onClick={() => startEdit("planning", report.planningSection.heading, report.planningSection.body)} className="p-1 rounded-md hover:bg-gray-100 text-muted-foreground"><Pencil className="w-3.5 h-3.5" /></button>}
               {editingId === "planning" && (
                 <div className="flex items-center gap-1">
-                  <button onClick={saveEdit} disabled={saving} className="p-1 rounded-md bg-rm-blue text-white">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}</button>
+                  <button onClick={saveEdit} disabled={saving} className="p-1 rounded-md bg-brand-blue text-white">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}</button>
                   <button onClick={() => { setEditingId(null); setEditBuf(null); }} className="p-1 rounded-md border border-border hover:bg-gray-50"><X className="w-3.5 h-3.5" /></button>
                 </div>
               )}
@@ -517,13 +517,13 @@ export function ClientReporting({ clientId }: { clientId: string }) {
             <div className="px-5 py-4">
               {editingId === "planning" && editBuf ? (
                 <>
-                  <input type="text" value={editBuf.heading} onChange={(e) => setEditBuf({ ...editBuf, heading: e.target.value })} className="w-full text-xl font-bold text-rm-gray border border-border rounded-md px-3 py-2 mb-3 focus:outline-none focus:ring-1 focus:ring-rm-blue" />
-                  <textarea value={editBuf.body} onChange={(e) => setEditBuf({ ...editBuf, body: e.target.value })} rows={8} className="w-full text-sm text-rm-gray border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-rm-blue resize-y leading-relaxed" />
+                  <input type="text" value={editBuf.heading} onChange={(e) => setEditBuf({ ...editBuf, heading: e.target.value })} className="w-full text-xl font-bold text-brand-gray border border-border rounded-md px-3 py-2 mb-3 focus:outline-none focus:ring-1 focus:ring-brand-blue" />
+                  <textarea value={editBuf.body} onChange={(e) => setEditBuf({ ...editBuf, body: e.target.value })} rows={8} className="w-full text-sm text-brand-gray border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-brand-blue resize-y leading-relaxed" />
                 </>
               ) : (
                 <>
-                  <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{report.planningSection.heading}<span className="text-rm-orange-ink">.</span></h3>
-                  <div className="text-sm text-rm-gray leading-relaxed whitespace-pre-line">{report.planningSection.body}</div>
+                  <h3 className="text-xl font-bold text-brand-gray leading-snug mb-3">{report.planningSection.heading}<span className="text-brand-orange-ink">.</span></h3>
+                  <div className="text-sm text-brand-gray leading-relaxed whitespace-pre-line">{report.planningSection.body}</div>
                 </>
               )}
             </div>
@@ -535,7 +535,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
               {report.countrySections.map((cs) => (
                 <div key={cs.countryCode}>
                   {/* Country divider */}
-                  <div className="bg-rm-blue rounded-xl p-6 mt-2">
+                  <div className="bg-brand-blue rounded-xl p-6 mt-2">
                     <h2 className="text-xl font-bold text-white">Voortgang SEA {cs.countryName}</h2>
                   </div>
 
@@ -553,7 +553,7 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                             <span className="text-micro font-medium text-muted-foreground">{kpi.label}</span>
                             <span className={`text-micro font-bold ${changeColor}`}>{kpi.changePct > 0 ? "+" : ""}{kpi.changePct}%</span>
                           </div>
-                          <p className="text-lg font-bold text-rm-gray">{fmtValue(kpi.current, kpi.format)}</p>
+                          <p className="text-lg font-bold text-brand-gray">{fmtValue(kpi.current, kpi.format)}</p>
                           <p className="text-micro text-muted-foreground">({fmtValue(kpi.previous, kpi.format)})</p>
                         </div>
                       );
@@ -569,11 +569,11 @@ export function ClientReporting({ clientId }: { clientId: string }) {
                       <div className="px-5 py-4">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <div>
-                            <h3 className="text-xl font-bold text-rm-gray leading-snug mb-3">{section.heading}<span className="text-rm-orange-ink">.</span></h3>
+                            <h3 className="text-xl font-bold text-brand-gray leading-snug mb-3">{section.heading}<span className="text-brand-orange-ink">.</span></h3>
                             <div className="space-y-0.5 mb-3">
-                              {section.bullets.map((b, i) => <p key={i} className="text-sm text-rm-gray"><span className="font-semibold">•</span> {b}</p>)}
+                              {section.bullets.map((b, i) => <p key={i} className="text-sm text-brand-gray"><span className="font-semibold">•</span> {b}</p>)}
                             </div>
-                            <p className="text-sm text-rm-gray leading-relaxed">{section.body}</p>
+                            <p className="text-sm text-brand-gray leading-relaxed">{section.body}</p>
                           </div>
                           <div className="space-y-4">
                             <MiniChart data={section.chartData} type={section.chartType} label={section.chartLabel} />

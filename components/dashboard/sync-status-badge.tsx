@@ -203,14 +203,14 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
         disabled={syncing}
         className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border transition-all ${
           syncing
-            ? "bg-rm-blue/5 border-rm-blue/20 text-rm-blue-ink cursor-wait"
+            ? "bg-brand-blue/5 border-brand-blue/20 text-brand-blue-ink cursor-wait"
             : syncResult === "success"
             ? "bg-green-50 border-green-200 text-green-600"
             : syncResult === "error"
             ? "bg-red-50 border-red-200 text-red-600"
             : needsSync
-            ? "bg-rm-orange/10 border-rm-orange/40 text-rm-orange-ink font-semibold hover:bg-rm-orange/20 cursor-pointer"
-            : "bg-card border-border text-muted-foreground hover:text-rm-gray hover:border-rm-blue/40 cursor-pointer"
+            ? "bg-brand-orange/10 border-brand-orange/40 text-brand-orange-ink font-semibold hover:bg-brand-orange/20 cursor-pointer"
+            : "bg-card border-border text-muted-foreground hover:text-brand-gray hover:border-brand-blue/40 cursor-pointer"
         }`}
         title={syncing ? "Synchroniseren..." : "Data synchroniseren met Google Ads"}
       >

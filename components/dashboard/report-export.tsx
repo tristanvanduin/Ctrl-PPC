@@ -142,15 +142,15 @@ export function ReportExport({ clientId }: { clientId: string }) {
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-rm-blue-ink" />
-          <h3 className="text-base font-semibold text-rm-blue-ink">Klantrapport</h3>
+          <FileText className="w-5 h-5 text-brand-blue-ink" />
+          <h3 className="text-base font-semibold text-brand-blue-ink">Klantrapport</h3>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5 text-xs">
             {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? "Gekopieerd!" : "Kopieer"}
           </Button>
-          <Button size="sm" onClick={handleDownload} className="gap-1.5 text-xs bg-rm-blue hover:bg-rm-blue-light text-white">
+          <Button size="sm" onClick={handleDownload} className="gap-1.5 text-xs bg-brand-blue hover:bg-brand-blue-light text-white">
             <Download className="w-3.5 h-3.5" />
             Download .md
           </Button>
@@ -159,7 +159,7 @@ export function ReportExport({ clientId }: { clientId: string }) {
 
       {/* Preview */}
       <div className="bg-gray-50 rounded-lg p-4 max-h-[400px] overflow-y-auto">
-        <pre className="text-xs text-rm-gray whitespace-pre-wrap font-mono leading-relaxed">
+        <pre className="text-xs text-brand-gray whitespace-pre-wrap font-mono leading-relaxed">
           {generateReport()}
         </pre>
       </div>

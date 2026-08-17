@@ -139,7 +139,7 @@ function Typecel({ dekking, regel }: { dekking: Typedekking; regel: Typeregel })
         className={
           dekking.tekort || gemist ? "text-body font-semibold text-amber-700"
             : leeg ? "text-body text-muted-foreground/50"
-            : "text-body text-rm-gray"
+            : "text-body text-brand-gray"
         }
       >
         {/* Een 0 en geen streepje. Het streepje stond er voor "niet aangeleverd", maar dat is
@@ -218,8 +218,8 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-        <Layers className="h-4.5 w-4.5 text-rm-blue-ink" />
-        <h3 className="text-title font-semibold text-rm-gray">Assets per groep</h3>
+        <Layers className="h-4.5 w-4.5 text-brand-blue-ink" />
+        <h3 className="text-title font-semibold text-brand-gray">Assets per groep</h3>
         {/* De drie toestanden staan er alle drie in, en niet alleen het oranje. Er stond eerst
             "een getal eronder kleurt oranje" -- dan blijft het lichtgrijs onverklaard, en een
             kleur die je zelf moet raden is geen signaal maar ruis. */}
@@ -310,7 +310,7 @@ export function PmaxAssetCoverage({ clientId }: { clientId: string }) {
                     {/* De naam krijgt de hele regel. Hij stond eerst naast de kostenbalk en werd
                         daardoor afgekapt op "Standhouders — internati…" -- de naam is waarmee je
                         de groep terugvindt in Google Ads, dus die mag als laatste inleveren. */}
-                    <div className="truncate text-body text-rm-gray" title={g.groep}>{g.groep}</div>
+                    <div className="truncate text-body text-brand-gray" title={g.groep}>{g.groep}</div>
                     <div className="flex items-start gap-3">
                       {/* De regel die zegt wat je moet doen. Alleen als er iets te doen is: bij
                           een groep zonder gebrek is de lege ruimte de betere mededeling.

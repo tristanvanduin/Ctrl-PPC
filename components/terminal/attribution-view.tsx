@@ -14,11 +14,11 @@ const eur = (v: number) => new Intl.NumberFormat("nl-NL", { maximumFractionDigit
 function MetricRij({ metric, baseline, measured, delta, met }: { metric: string; baseline: number | null; measured: number | null; delta: number | null; met: boolean | null }) {
   return (
     <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 text-body">
-      <span className="text-rm-gray">{metric}</span>
+      <span className="text-brand-gray">{metric}</span>
       <div className="flex items-center gap-1.5 text-meta text-muted-foreground">
         <span className="teller-waarde">{baseline != null ? eur(baseline) : "onbekend"}</span>
         <ArrowRight className="h-3 w-3" />
-        <span className="teller-waarde font-semibold text-rm-gray">{measured != null ? eur(measured) : "onbekend"}</span>
+        <span className="teller-waarde font-semibold text-brand-gray">{measured != null ? eur(measured) : "onbekend"}</span>
       </div>
       <span className="teller-waarde text-meta text-muted-foreground">{delta != null ? (delta > 0 ? `+${eur(delta)}` : eur(delta)) : ""}</span>
       <span className={`text-micro font-medium ${met === true ? "text-emerald-600" : met === false ? "text-red-600" : "text-muted-foreground"}`}>
@@ -36,11 +36,11 @@ function AttributionCard({ h }: { h: HypothesisRecord }) {
   return (
     <div className="terminal rounded-lg border border-border bg-card p-4">
       <div className="mb-2 flex items-start justify-between gap-3">
-        <p className="text-body font-medium text-rm-gray">{h.hypothesis}</p>
+        <p className="text-body font-medium text-brand-gray">{h.hypothesis}</p>
         <span className="shrink-0 text-micro font-medium text-muted-foreground">{lifecycle.label}</span>
       </div>
       {h.expected_result && (
-        <p className="mb-2 text-meta text-muted-foreground">Voorgesteld: <span className="text-rm-gray">{h.expected_result}</span></p>
+        <p className="mb-2 text-meta text-muted-foreground">Voorgesteld: <span className="text-brand-gray">{h.expected_result}</span></p>
       )}
       {snapshots.length > 0 && (
         <div className="mb-2 space-y-1 border-y border-border py-2">
@@ -57,7 +57,7 @@ export function AttributionView({ hypotheses, loading }: { hypotheses: Hypothesi
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-rm-blue-ink" />
+        <Loader2 className="h-5 w-5 animate-spin text-brand-blue-ink" />
       </div>
     );
   }

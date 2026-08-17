@@ -180,7 +180,7 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
           dat dit blok bestaat — maar wie het dichtklapt houdt het dicht. */}
       <CollapsiblePanel
         id={`creatives-${channel}`}
-        icon={<Sparkles className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icon={<Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />}
         title={`Creative Performance — ${CHANNEL_LABEL[channel]}`}
         subtitle="top op kosten, laatste 6 maanden"
         meta={<span className="text-micro text-muted-foreground">{cards.length} advertenties</span>}
@@ -216,16 +216,16 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
               </div>
               {/* Meta-regel */}
               <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
-                <span className="text-meta font-medium text-rm-gray truncate max-w-[60%]">{c.name}</span>
+                <span className="text-meta font-medium text-brand-gray truncate max-w-[60%]">{c.name}</span>
                 {c.format && <span className="text-micro text-muted-foreground uppercase tracking-wide">{c.format}</span>}
                 {c.cta && <span className="text-micro text-blue-700 flex items-center gap-0.5">{c.cta} <ArrowUpRight className="w-2.5 h-2.5" /></span>}
               </div>
               {/* Metrics */}
               <div className="px-3 py-2 grid grid-cols-4 gap-2 text-meta">
-                <div><div className="text-muted-foreground">Klikken</div><div className="font-semibold text-rm-gray">{fmt(c.clicks)}</div></div>
-                <div><div className="text-muted-foreground">CTR</div><div className="font-semibold text-rm-gray">{pctS(c.impressions, c.clicks)}</div></div>
-                <div><div className="text-muted-foreground">Kosten</div><div className="font-semibold text-rm-gray">{eur(c.cost)}</div></div>
-                <div><div className="text-muted-foreground">Conversies</div><div className="font-semibold text-rm-gray">{fmt(c.conversions, 1)}</div></div>
+                <div><div className="text-muted-foreground">Klikken</div><div className="font-semibold text-brand-gray">{fmt(c.clicks)}</div></div>
+                <div><div className="text-muted-foreground">CTR</div><div className="font-semibold text-brand-gray">{pctS(c.impressions, c.clicks)}</div></div>
+                <div><div className="text-muted-foreground">Kosten</div><div className="font-semibold text-brand-gray">{eur(c.cost)}</div></div>
+                <div><div className="text-muted-foreground">Conversies</div><div className="font-semibold text-brand-gray">{fmt(c.conversions, 1)}</div></div>
               </div>
             </div>
           ))}
@@ -236,10 +236,10 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
       {summary && (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border">
-            <h3 className="text-title font-semibold text-rm-gray">Samenvatting</h3>
+            <h3 className="text-title font-semibold text-brand-gray">Samenvatting</h3>
           </div>
           <div className="px-5 py-4 space-y-3">
-            <p className="text-body text-rm-gray leading-relaxed">{summary.summaryText}</p>
+            <p className="text-body text-brand-gray leading-relaxed">{summary.summaryText}</p>
             {summary.recommendations.length > 0 && (
               <div>
                 <p className="text-meta font-semibold text-muted-foreground uppercase tracking-wide mb-2">Aanbevelingen</p>

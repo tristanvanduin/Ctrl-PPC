@@ -168,7 +168,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
   if (loading) {
     return (
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <Loader2 className="w-4 h-4 animate-spin text-rm-blue-ink" />
+        <Loader2 className="w-4 h-4 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
@@ -244,7 +244,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
                     )}
                   </div>
 
-                  <p className="text-sm text-rm-gray leading-snug mt-1">{item.hypothesis}</p>
+                  <p className="text-sm text-brand-gray leading-snug mt-1">{item.hypothesis}</p>
 
                   <div className="flex items-center gap-4 mt-2 text-micro text-muted-foreground flex-wrap">
                     <span>{item.linked_findings.length} bevindingen gekoppeld</span>
@@ -268,16 +268,16 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
               {isExpanded && (
                 <div className="px-4 pb-4 pt-0 ml-12 space-y-3 text-meta text-muted-foreground border-t border-purple-100 mt-1 pt-3">
                   <div>
-                    <p><span className="font-medium text-rm-gray">Waarom denken we dit:</span> {item.why_we_think_this}</p>
-                    <p className="mt-1"><span className="font-medium text-rm-gray">Validatie / exploitatie:</span> {item.validation_or_exploitation_step}</p>
-                    <p className="mt-1"><span className="font-medium text-rm-gray">Succes volgende maand:</span> {item.success_next_month}</p>
+                    <p><span className="font-medium text-brand-gray">Waarom denken we dit:</span> {item.why_we_think_this}</p>
+                    <p className="mt-1"><span className="font-medium text-brand-gray">Validatie / exploitatie:</span> {item.validation_or_exploitation_step}</p>
+                    <p className="mt-1"><span className="font-medium text-brand-gray">Succes volgende maand:</span> {item.success_next_month}</p>
                     {item.rejected_reason && (
                       <p className="mt-1 text-red-600"><span className="font-medium">Afwijsreden:</span> {item.rejected_reason}</p>
                     )}
                   </div>
 
                   <div>
-                    <p className="font-medium text-rm-gray mb-1">Gekoppelde bevindingen</p>
+                    <p className="font-medium text-brand-gray mb-1">Gekoppelde bevindingen</p>
                     <div className="space-y-1">
                       {item.linked_findings.map((finding) => (
                         <p key={finding.id}>- {finding.title} ({finding.severity}) — {finding.summary}</p>
@@ -286,7 +286,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
                   </div>
 
                   <div>
-                    <p className="font-medium text-rm-gray mb-1">Gekoppelde recommendations</p>
+                    <p className="font-medium text-brand-gray mb-1">Gekoppelde recommendations</p>
                     <div className="space-y-1">
                       {item.linked_recommendations.map((recommendation) => (
                         <p key={recommendation.id}>- {recommendation.route}: {recommendation.handeling} ({recommendation.object})</p>
@@ -295,7 +295,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
                   </div>
 
                   <div>
-                    <p className="font-medium text-rm-gray mb-1">Gekoppelde taken</p>
+                    <p className="font-medium text-brand-gray mb-1">Gekoppelde taken</p>
                     <div className="space-y-1">
                       {item.linked_tasks.map((task) => (
                         <p key={task.id}>- {task.handeling} ({task.object}) · meet via {task.meet_via}</p>
@@ -304,7 +304,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
                   </div>
 
                   <div>
-                    <p className="font-medium text-rm-gray mb-1">Ontstane sprint-items</p>
+                    <p className="font-medium text-brand-gray mb-1">Ontstane sprint-items</p>
                     {item.sprint_items.length === 0 ? (
                       <p>Geen sprint-items aangemaakt.</p>
                     ) : (

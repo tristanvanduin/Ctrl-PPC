@@ -96,7 +96,7 @@ export function Kerncijfer({
   const maat = formaat === "groot"
     ? "text-figure font-semibold leading-none tracking-tight"
     : "text-xl font-semibold leading-none tracking-tight";
-  const kleur = toon === "waarschuwing" ? "text-red-600" : toon === "goed" ? "text-emerald-600" : "text-rm-gray";
+  const kleur = toon === "waarschuwing" ? "text-red-600" : toon === "goed" ? "text-emerald-600" : "text-brand-gray";
 
   // Uitlijnen doet het LABEL, niet het getal.
   //

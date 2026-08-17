@@ -75,7 +75,7 @@ export function CodeRoodPaneel() {
     <section>
       <div className="flex items-center gap-2.5 mb-2.5">
         <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
-        <h2 className="text-sm font-bold text-rm-gray">Code Rood / Amber &mdash; klantrisico</h2>
+        <h2 className="text-sm font-bold text-brand-gray">Code Rood / Amber &mdash; klantrisico</h2>
         <span className="text-meta font-bold rounded-full px-2 py-0.5 tabular-nums bg-red-600 text-white">{open.length}</span>
         <span className="text-meta text-muted-foreground ml-auto text-right">forecast-afwijking, nieuwe gebruiker of een kritieke health-score-anomalie</span>
       </div>

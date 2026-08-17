@@ -38,7 +38,7 @@ export function Counter({ value, label, isLive = false, format = "compact", suff
       <span
         key={tickKey}
         className={`teller-waarde block text-3xl font-bold ${isLive ? "teller-tick" : ""}`}
-        style={isLive ? { color: "var(--terminal-accent, var(--color-rm-blue-ink))" } : undefined}
+        style={isLive ? { color: "var(--terminal-accent, var(--color-brand-blue-ink))" } : undefined}
       >
         {tekst}
         {suffix}

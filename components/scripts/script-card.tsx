@@ -37,7 +37,7 @@ export function ScriptCard({
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="min-w-0">
-          <h3 className="text-title font-semibold text-rm-gray truncate">{script.title}</h3>
+          <h3 className="text-title font-semibold text-brand-gray truncate">{script.title}</h3>
           {script.description && (
             <p className="text-meta text-muted-foreground mt-0.5 line-clamp-2">
               {script.description}
@@ -78,7 +78,7 @@ export function ScriptCard({
           {script.tags.map((tag) => (
             <span
               key={tag}
-              className="text-micro font-medium px-2 py-0.5 rounded-full bg-rm-blue/10 text-rm-blue-ink"
+              className="text-micro font-medium px-2 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue-ink"
             >
               {tag}
             </span>
@@ -92,14 +92,14 @@ export function ScriptCard({
         className="w-full text-left"
       >
         <pre
-          className={`text-meta bg-gray-50 rounded-lg p-3 font-mono text-rm-gray overflow-x-auto ${
+          className={`text-meta bg-gray-50 rounded-lg p-3 font-mono text-brand-gray overflow-x-auto ${
             expanded ? "" : "max-h-[80px] overflow-hidden"
           }`}
         >
           {script.code}
         </pre>
         {!expanded && script.code.split("\n").length > 4 && (
-          <p className="text-micro text-rm-blue-ink mt-1">
+          <p className="text-micro text-brand-blue-ink mt-1">
             Klik om uit te klappen ({script.code.split("\n").length} regels)
           </p>
         )}

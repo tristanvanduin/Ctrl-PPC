@@ -73,7 +73,7 @@ export function KoppelingKaart({ provider, label, beschrijving, koppeling, onGew
   return (
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-rm-blue-ink text-title">{label}</h3>
+        <h3 className="font-semibold text-brand-blue-ink text-title">{label}</h3>
         {isActief ? (
           <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
             <CheckCircle2 className="w-4 h-4" /> Verbonden
@@ -116,7 +116,7 @@ export function KoppelingKaart({ provider, label, beschrijving, koppeling, onGew
           </Button>
           {fout && <p className="text-xs text-red-700">{fout}</p>}
           <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer font-semibold text-rm-gray">{envFallbackLabel ?? "Alternatief: handmatig via .env.local"}</summary>
+            <summary className="cursor-pointer font-semibold text-brand-gray">{envFallbackLabel ?? "Alternatief: handmatig via .env.local"}</summary>
             <div className="mt-3">{envFallback}</div>
           </details>
         </div>

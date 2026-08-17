@@ -51,8 +51,8 @@ export function MarkdownFileViewer({ title, url, onClose }: Props) {
         aria-modal="true"
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
-          <h3 className="text-title font-semibold text-rm-gray truncate">{title}</h3>
-          <button onClick={onClose} aria-label="Sluiten" className="p-1 rounded-md text-muted-foreground hover:bg-gray-100 hover:text-rm-gray">
+          <h3 className="text-title font-semibold text-brand-gray truncate">{title}</h3>
+          <button onClick={onClose} aria-label="Sluiten" className="p-1 rounded-md text-muted-foreground hover:bg-gray-100 hover:text-brand-gray">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -68,7 +68,7 @@ export function MarkdownFileViewer({ title, url, onClose }: Props) {
             </div>
           )}
           {!error && content !== null && (
-            <div className="prose prose-sm max-w-none prose-headings:text-rm-gray prose-p:text-rm-gray prose-li:text-rm-gray prose-strong:text-rm-gray">
+            <div className="prose prose-sm max-w-none prose-headings:text-brand-gray prose-p:text-brand-gray prose-li:text-brand-gray prose-strong:text-brand-gray">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
             </div>
           )}

@@ -55,7 +55,7 @@ export function ScriptLibrary() {
     return (
       <div className="bg-card rounded-xl border border-border p-8 shadow-sm text-center">
         <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-3" />
-        <p className="text-sm text-rm-gray font-medium mb-1">Supabase niet geconfigureerd</p>
+        <p className="text-sm text-brand-gray font-medium mb-1">Supabase niet geconfigureerd</p>
         <p className="text-meta text-muted-foreground">
           Voeg NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY toe aan .env.local
         </p>
@@ -70,14 +70,14 @@ export function ScriptLibrary() {
         <div>
           {/* Dit was een <h2> op text-lg terwijl elke andere pagina zijn titel in een <h1> zet.
               Voor een schermlezer begon deze pagina daarmee zonder kop. */}
-          <h1 className="text-page font-bold text-rm-blue-ink">Scriptbibliotheek</h1>
+          <h1 className="text-page font-bold text-brand-blue-ink">Scriptbibliotheek</h1>
           <p className="mt-1 text-body text-muted-foreground">
             Bewaar en organiseer je Google Ads scripts
           </p>
         </div>
         <button
           onClick={() => setEditing("new")}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg bg-brand-blue text-white hover:bg-brand-blue/90 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" /> Nieuw script
         </button>
@@ -92,7 +92,7 @@ export function ScriptLibrary() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Zoek op titel, beschrijving of tag..."
-            className="w-full text-sm border border-border rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-rm-blue"
+            className="w-full text-sm border border-border rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-brand-blue"
           />
         </div>
 
@@ -102,7 +102,7 @@ export function ScriptLibrary() {
               onClick={() => setActiveTag(null)}
               className={`text-micro font-medium px-2.5 py-1 rounded-full transition-colors ${
                 !activeTag
-                  ? "bg-rm-blue text-white"
+                  ? "bg-brand-blue text-white"
                   : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
               }`}
             >
@@ -114,7 +114,7 @@ export function ScriptLibrary() {
                 onClick={() => setActiveTag(activeTag === tag ? null : tag)}
                 className={`text-micro font-medium px-2.5 py-1 rounded-full transition-colors ${
                   activeTag === tag
-                    ? "bg-rm-blue text-white"
+                    ? "bg-brand-blue text-white"
                     : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
                 }`}
               >
@@ -141,7 +141,7 @@ export function ScriptLibrary() {
           <div className="flex gap-2">
             <button
               onClick={() => setDeleteConfirm(null)}
-              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-rm-gray"
+              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-brand-gray"
             >
               Annuleren
             </button>
@@ -173,10 +173,10 @@ export function ScriptLibrary() {
         <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
           {scripts.length === 0 ? (
             <div className="mx-auto max-w-xl text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rm-blue/10">
-                <FileCode2 className="h-6 w-6 text-rm-blue-ink" />
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue/10">
+                <FileCode2 className="h-6 w-6 text-brand-blue-ink" />
               </div>
-              <p className="text-title font-semibold text-rm-gray">Nog geen scripts opgeslagen</p>
+              <p className="text-title font-semibold text-brand-gray">Nog geen scripts opgeslagen</p>
               <p className="mt-1.5 text-body text-muted-foreground">
                 Bewaar hier de Google Ads-scripts die je bij meerdere accounts gebruikt, met een
                 beschrijving en tags erbij, zodat een collega ze terugvindt zonder te vragen.
@@ -188,14 +188,14 @@ export function ScriptLibrary() {
                   ["Linkchecker", "loopt de bestemmings-URL's na op 404's"],
                 ].map(([titel, wat]) => (
                   <li key={titel} className="rounded-lg border border-border bg-gray-50/70 px-3 py-2.5">
-                    <span className="block text-body font-medium text-rm-gray">{titel}</span>
+                    <span className="block text-body font-medium text-brand-gray">{titel}</span>
                     <span className="mt-0.5 block text-meta leading-snug text-muted-foreground">{wat}</span>
                   </li>
                 ))}
               </ul>
               <button
                 onClick={() => setEditing("new")}
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-rm-blue px-4 py-2 text-body font-medium text-white transition-colors hover:bg-rm-blue/90"
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-body font-medium text-white transition-colors hover:bg-brand-blue/90"
               >
                 <Plus className="h-3.5 w-3.5" /> Eerste script toevoegen
               </button>

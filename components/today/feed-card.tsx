@@ -16,7 +16,7 @@ const STATUS_LABEL: Record<FeedStatus, string> = { new: "Nieuw", in_progress: "I
 const STATUS_CLASS: Record<FeedStatus, string> = {
   new: "text-blue-700 bg-blue-50 border-blue-200",
   in_progress: "text-amber-700 bg-amber-50 border-amber-200",
-  awaiting_approval: "text-rm-blue-ink bg-rm-blue/10 border-rm-blue/20",
+  awaiting_approval: "text-brand-blue-ink bg-brand-blue/10 border-brand-blue/20",
   snoozed: "text-gray-500 bg-gray-100 border-gray-200",
   resolved: "text-emerald-700 bg-emerald-50 border-emerald-200",
 };
@@ -43,20 +43,20 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
   const [days, setDays] = useState(1);
 
   const impactMeasured = item.impactType === "measured";
-  const impactColor = item.impactDirection === "risk" ? "text-red-600" : item.impactDirection === "gain" ? "text-emerald-600" : "text-rm-gray";
+  const impactColor = item.impactDirection === "risk" ? "text-red-600" : item.impactDirection === "gain" ? "text-emerald-600" : "text-brand-gray";
 
   return (
     <div className={`bg-card rounded-xl border border-border border-l-[3px] ${BORDER[item.severity]} shadow-sm p-3.5`}>
       {/* Kop: klant · kanaal · type · status · mock · leeftijd */}
       <div className="flex items-center gap-2 flex-wrap mb-1.5">
-        <Link href={item.clientUrl} className="text-sm font-bold text-rm-gray hover:text-rm-blue-ink truncate max-w-[40%]">{item.clientName}</Link>
+        <Link href={item.clientUrl} className="text-sm font-bold text-brand-gray hover:text-brand-blue-ink truncate max-w-[40%]">{item.clientName}</Link>
         <span className={`text-micro font-semibold px-1.5 py-0.5 rounded-full border ${CHANNEL_BADGE_CLASS[item.channel]}`}>{CHANNEL_LABEL[item.channel]}</span>
         <span className="text-micro font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border border-border bg-gray-50 text-muted-foreground">{TYPE_LABEL[item.type]}</span>
         <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>
         {item.isMock && <span className="text-micro font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">Demo</span>}
       </div>
 
-      <p className="text-[13.5px] text-rm-gray leading-snug">{item.title}</p>
+      <p className="text-[13.5px] text-brand-gray leading-snug">{item.title}</p>
       {item.explanation && <p className="text-body text-muted-foreground leading-snug mt-0.5">{item.explanation}</p>}
 
       {/* Voetregel: impact · eigenaar · acties */}
@@ -86,14 +86,14 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
         )}
 
         <span className="flex items-center gap-1.5 ml-auto">
-          <Link href={item.actionUrl} className="text-body font-semibold text-white bg-rm-blue rounded-lg px-3 py-1.5 hover:brightness-110 inline-flex items-center gap-1">
+          <Link href={item.actionUrl} className="text-body font-semibold text-white bg-brand-blue rounded-lg px-3 py-1.5 hover:brightness-110 inline-flex items-center gap-1">
             {item.primaryAction.label}<ChevronRight className="w-3.5 h-3.5" />
           </Link>
           {item.secondaryActions.some((a) => a.kind === "assign") && item.ownerName && (
-            <button onClick={() => setMode(mode === "assign" ? null : "assign")} title="Opnieuw toewijzen" className="text-body text-muted-foreground border border-border rounded-lg px-2 py-1.5 hover:text-rm-gray"><UserPlus className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setMode(mode === "assign" ? null : "assign")} title="Opnieuw toewijzen" className="text-body text-muted-foreground border border-border rounded-lg px-2 py-1.5 hover:text-brand-gray"><UserPlus className="w-3.5 h-3.5" /></button>
           )}
           {item.secondaryActions.some((a) => a.kind === "snooze") && (
-            <button onClick={() => setMode(mode === "snooze" ? null : "snooze")} className="text-body text-muted-foreground border border-border rounded-lg px-3 py-1.5 hover:text-rm-gray">Snooze</button>
+            <button onClick={() => setMode(mode === "snooze" ? null : "snooze")} className="text-body text-muted-foreground border border-border rounded-lg px-3 py-1.5 hover:text-brand-gray">Snooze</button>
           )}
         </span>
       </div>
@@ -103,11 +103,11 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
         <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
           <div className="flex gap-1">
             {[{ d: 1, l: "morgen" }, { d: 3, l: "3 dagen" }, { d: 7, l: "volgende week" }].map((o) => (
-              <button key={o.d} onClick={() => setDays(o.d)} className={`text-meta px-2.5 py-1 rounded-md border ${days === o.d ? "bg-rm-blue text-white border-transparent" : "border-border text-muted-foreground"}`}>{o.l}</button>
+              <button key={o.d} onClick={() => setDays(o.d)} className={`text-meta px-2.5 py-1 rounded-md border ${days === o.d ? "bg-brand-blue text-white border-transparent" : "border-border text-muted-foreground"}`}>{o.l}</button>
             ))}
           </div>
-          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reden (verplicht)…" className="flex-1 min-w-[160px] text-body border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:border-rm-blue" />
-          <button disabled={!reason.trim()} onClick={() => { onSnooze(item, reason.trim(), plusDays(days)); setMode(null); setReason(""); }} className="text-body font-semibold text-white bg-rm-blue rounded-md px-3 py-1.5 disabled:opacity-40">Snooze</button>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reden (verplicht)…" className="flex-1 min-w-[160px] text-body border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:border-brand-blue" />
+          <button disabled={!reason.trim()} onClick={() => { onSnooze(item, reason.trim(), plusDays(days)); setMode(null); setReason(""); }} className="text-body font-semibold text-white bg-brand-blue rounded-md px-3 py-1.5 disabled:opacity-40">Snooze</button>
         </div>
       )}
 
@@ -116,7 +116,7 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
         <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
           <span className="text-meta text-muted-foreground">Wijs toe aan:</span>
           {MOCK_TEAM.map((name) => (
-            <button key={name} onClick={() => { onAssign(item, name); setMode(null); }} className="text-body px-2.5 py-1 rounded-md border border-border hover:border-rm-blue hover:text-rm-blue-ink">{name}</button>
+            <button key={name} onClick={() => { onAssign(item, name); setMode(null); }} className="text-body px-2.5 py-1 rounded-md border border-border hover:border-brand-blue hover:text-brand-blue-ink">{name}</button>
           ))}
           <span className="text-micro text-gray-400">· echte toewijzing (geen demo)</span>
         </div>

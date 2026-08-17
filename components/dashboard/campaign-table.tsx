@@ -269,7 +269,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                 <button
                   onClick={() => setCountryFilter(null)}
                   className={`px-2 py-1 text-micro font-medium rounded-md transition-colors ${
-                    countryFilter === null ? "bg-rm-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-rm-gray"
+                    countryFilter === null ? "bg-brand-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-brand-gray"
                   }`}
                 >
                   Alle landen
@@ -279,7 +279,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                     key={code}
                     onClick={() => setCountryFilter(countryFilter === code ? null : code)}
                     className={`px-2 py-1 text-micro font-medium rounded-md transition-colors ${
-                      countryFilter === code ? "bg-rm-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-rm-gray"
+                      countryFilter === code ? "bg-brand-orange text-white" : "bg-orange-50 text-muted-foreground hover:text-brand-gray"
                     }`}
                   >
                     {countryLabel(code)}
@@ -292,7 +292,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
               <button
                 onClick={() => setPurposeFilter(null)}
                 className={`px-2 py-1 text-micro font-medium rounded-md transition-colors ${
-                  purposeFilter === null ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
+                  purposeFilter === null ? "bg-brand-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-brand-gray"
                 }`}
               >
                 Alle
@@ -302,7 +302,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                   key={p}
                   onClick={() => setPurposeFilter(purposeFilter === p ? null : p)}
                   className={`px-2 py-1 text-micro font-medium rounded-md transition-colors ${
-                    purposeFilter === p ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
+                    purposeFilter === p ? "bg-brand-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-brand-gray"
                   }`}
                 >
                   {PURPOSE_LABELS[p] ?? leesbaar(p)}
@@ -317,7 +317,7 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
                 placeholder="Zoek..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 pr-3 py-1.5 text-xs border border-border rounded-lg w-40 focus:outline-none focus:border-rm-blue"
+                className="pl-8 pr-3 py-1.5 text-xs border border-border rounded-lg w-40 focus:outline-none focus:border-brand-blue"
               />
             </div>
           </div>

@@ -58,7 +58,7 @@ function FileIcon({ contentType, fileName }: { contentType: string | null; fileN
   if (["xls", "xlsx", "csv"].includes(ext ?? ""))
     return <FileSpreadsheet className="w-4 h-4 text-green-600" />;
   if (["doc", "docx"].includes(ext ?? ""))
-    return <FileText className="w-4 h-4 text-rm-blue-ink" />;
+    return <FileText className="w-4 h-4 text-brand-blue-ink" />;
   return <File className="w-4 h-4 text-muted-foreground" />;
 }
 
@@ -256,7 +256,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
   if (loading) {
     return (
       <div className="bg-card rounded-xl border border-border p-8 shadow-sm flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" />
+        <Loader2 className="w-5 h-5 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
@@ -311,7 +311,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 pt-5 pb-4">
-        <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Bestanden</h3>
+        <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Bestanden</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
           SOP's, rapportages en andere documenten per klant
         </p>
@@ -329,8 +329,8 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                 onClick={() => setActiveFolder(folder.name)}
                 className={`flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs transition-colors ${
                   isActive
-                    ? "bg-rm-blue text-white font-medium"
-                    : "text-rm-gray hover:bg-gray-100"
+                    ? "bg-brand-blue text-white font-medium"
+                    : "text-brand-gray hover:bg-gray-100"
                 }`}
               >
                 <FolderOpen className="w-3.5 h-3.5 shrink-0" />
@@ -353,18 +353,18 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
                 placeholder="Mapnaam..."
-                className="w-full text-meta border border-border rounded px-2 py-1.5 focus:outline-none focus:border-rm-blue"
+                className="w-full text-meta border border-border rounded px-2 py-1.5 focus:outline-none focus:border-brand-blue"
                 autoFocus
               />
               <div className="flex gap-1 mt-1">
-                <button onClick={handleCreateFolder} className="text-micro text-rm-blue-ink font-medium">Toevoegen</button>
+                <button onClick={handleCreateFolder} className="text-micro text-brand-blue-ink font-medium">Toevoegen</button>
                 <button onClick={() => setShowNewFolder(false)} className="text-micro text-muted-foreground">Annuleer</button>
               </div>
             </div>
           ) : (
             <button
               onClick={() => setShowNewFolder(true)}
-              className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-lg text-meta text-muted-foreground hover:text-rm-blue-ink hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-lg text-meta text-muted-foreground hover:text-brand-blue-ink hover:bg-gray-100 transition-colors"
             >
               <FolderPlus className="w-3 h-3" /> Nieuwe map
             </button>
@@ -375,7 +375,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
         <div className="flex-1 p-4">
           {/* Upload bar */}
           <div className="flex items-center justify-between mb-4">
-            <h4 className="text-xs font-semibold text-rm-gray">
+            <h4 className="text-xs font-semibold text-brand-gray">
               {activeFolder || "Selecteer een map"}
             </h4>
             {activeFolder && (
@@ -390,7 +390,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue text-white hover:bg-brand-blue/90 disabled:opacity-50"
                 >
                   {uploading ? (
                     <><Loader2 className="w-3 h-3 animate-spin" /> Uploaden...</>
@@ -449,7 +449,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
               {activeFolder && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-meta text-rm-blue-ink hover:underline mt-2"
+                  className="text-meta text-brand-blue-ink hover:underline mt-2"
                 >
                   Upload je eerste bestand
                 </button>
@@ -464,7 +464,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                 >
                   <FileIcon contentType={file.content_type} fileName={file.file_name} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-rm-gray truncate">{file.file_name}</p>
+                    <p className="text-xs font-medium text-brand-gray truncate">{file.file_name}</p>
                     <p className="text-micro text-muted-foreground">
                       {formatFileSize(file.file_size)} · {timeAgo(file.uploaded_at)}
                     </p>
@@ -476,7 +476,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                         className="p-1.5 rounded-md hover:bg-card hover:shadow-sm"
                         title="Bekijken"
                       >
-                        <Eye className="w-3 h-3 text-rm-blue-ink" />
+                        <Eye className="w-3 h-3 text-brand-blue-ink" />
                       </button>
                     )}
                     <button
@@ -484,7 +484,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
                       className="p-1.5 rounded-md hover:bg-card hover:shadow-sm"
                       title="Download"
                     >
-                      <Download className="w-3 h-3 text-rm-blue-ink" />
+                      <Download className="w-3 h-3 text-brand-blue-ink" />
                     </button>
                     <button
                       onClick={() => setDeleteConfirm(file.id)}

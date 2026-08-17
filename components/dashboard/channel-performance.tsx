@@ -233,8 +233,8 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
       {/* KPI-kaarten — in een getitelde kaart, zodat de opbouw rijmt met het Google-beursoverzicht. */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <BarChart3 className="w-4.5 h-4.5 text-rm-blue-ink" />
-          <h3 className="text-title font-semibold text-rm-gray">Kerncijfers (laatste 28 dagen)</h3>
+          <BarChart3 className="w-4.5 h-4.5 text-brand-blue-ink" />
+          <h3 className="text-title font-semibold text-brand-gray">Kerncijfers (laatste 28 dagen)</h3>
         </div>
         <div className="px-4 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {kpis.map((k) => (
@@ -256,14 +256,14 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
       {/* Pacing */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Gauge className="w-4.5 h-4.5 text-rm-blue-ink" />
-          <h3 className="text-title font-semibold text-rm-gray">Pacing — maand tot nu (dag {dayOfMonth})</h3>
+          <Gauge className="w-4.5 h-4.5 text-brand-blue-ink" />
+          <h3 className="text-title font-semibold text-brand-gray">Pacing — maand tot nu (dag {dayOfMonth})</h3>
           {/* Google telt inmiddels naar de beursdag; hier stond nog alleen de kalendermaand, en
               dan vertellen twee kanaaltabbladen naast elkaar een ander verhaal over dezelfde
               week. De maandvergelijking blijft staan — die voedt de cijfers hieronder — maar de
               afstand die er echt toe doet staat er nu bij. */}
           {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
-            <span className="ml-auto text-meta font-medium text-rm-blue-ink">
+            <span className="ml-auto text-meta font-medium text-brand-blue-ink">
               nog {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"} tot {edition!.label}
             </span>
           )}
@@ -271,15 +271,15 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
         <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 gap-4 text-lead">
           <div>
             <div className="text-meta text-muted-foreground">Spend deze maand</div>
-            <div className="font-semibold text-rm-gray">{eur(mtd.spend)} <span className="text-meta text-muted-foreground font-normal">(vorige maand op dag {dayOfMonth}: {eur(prevMtd.spend)})</span></div>
+            <div className="font-semibold text-brand-gray">{eur(mtd.spend)} <span className="text-meta text-muted-foreground font-normal">(vorige maand op dag {dayOfMonth}: {eur(prevMtd.spend)})</span></div>
           </div>
           <div>
             <div className="text-meta text-muted-foreground">{convLabel} deze maand</div>
-            <div className="font-semibold text-rm-gray">{fmt(mtd.conv, 1)} <span className="text-meta text-muted-foreground font-normal">(was {fmt(prevMtd.conv, 1)})</span></div>
+            <div className="font-semibold text-brand-gray">{fmt(mtd.conv, 1)} <span className="text-meta text-muted-foreground font-normal">(was {fmt(prevMtd.conv, 1)})</span></div>
           </div>
           <div>
             <div className="text-meta text-muted-foreground">Tempo vs vorige maand</div>
-            <div className={`font-semibold ${pacePct != null && pacePct > 1.15 ? "text-amber-600" : "text-rm-gray"}`}>{pace ?? "—"}{pacePct != null && pacePct > 1.15 ? " (loopt voor)" : ""}</div>
+            <div className={`font-semibold ${pacePct != null && pacePct > 1.15 ? "text-amber-600" : "text-brand-gray"}`}>{pace ?? "—"}{pacePct != null && pacePct > 1.15 ? " (loopt voor)" : ""}</div>
           </div>
         </div>
       </div>
@@ -296,8 +296,8 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
       {/* Maandtabel */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Calendar className="w-4.5 h-4.5 text-rm-blue-ink" />
-          <h3 className="text-title font-semibold text-rm-gray">Maandprestaties</h3>
+          <Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />
+          <h3 className="text-title font-semibold text-brand-gray">Maandprestaties</h3>
         </div>
         {/* De gedeelde tabelcomponenten: zelfde ritme, sorteerbare opmaak, aandeelstrepen en een
             totaalregel als bij de dertien andere schermen. Handgeschreven <table> stond hier met
@@ -364,8 +364,8 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
       {campaigns.length > 0 && (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-            <BarChart3 className="w-4.5 h-4.5 text-rm-blue-ink" />
-            <h3 className="text-title font-semibold text-rm-gray">Campagnes (laatste 28 dagen)</h3>
+            <BarChart3 className="w-4.5 h-4.5 text-brand-blue-ink" />
+            <h3 className="text-title font-semibold text-brand-gray">Campagnes (laatste 28 dagen)</h3>
           </div>
           {(() => {
             const som = campaigns.reduce((t, c) => ({

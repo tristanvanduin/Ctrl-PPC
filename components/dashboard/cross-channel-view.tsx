@@ -127,7 +127,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
       {rows && rows.length > 0 && (
         <Sectie
           eerste
-          icoon={<TrendingUp className="w-4.5 h-4.5 text-rm-blue-ink" />}
+          icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
           titel="Verdeling over de kanalen"
           bijschrift="Spend per kanaal per maand — welk kanaal draagt welk deel van het budget"
         >
@@ -137,7 +137,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
 
       {/* Data-weergave; de cross-channel-signaalanalyse draait via Analyses → Cross-channel. */}
       <Sectie
-        icoon={<Layers className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Cross-channel (blended)"
         bijschrift="Wat elk kanaal opleverde, en de maanden erachter"
         eerste={!(rows && rows.length > 0)}
@@ -312,7 +312,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
               </div>
             )}
             <div className="rounded-lg border border-border bg-gray-50/70 px-4 py-3 text-meta leading-snug text-muted-foreground">
-              <p className="mb-1 flex items-center gap-1.5 font-semibold text-rm-gray">
+              <p className="mb-1 flex items-center gap-1.5 font-semibold text-brand-gray">
                 <Info className="h-3.5 w-3.5 shrink-0" />
                 Waarom &quot;blended&quot; indicatief is
               </p>
@@ -323,7 +323,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
                 Zie de opmerking bij `heeftWaarde` hierboven. */}
             {rows && rows.length > 0 && rows.every((r) => !((r.conversion_value ?? 0) > 0)) && (
               <div className="rounded-lg border border-border bg-gray-50/70 px-4 py-3 text-meta leading-snug text-muted-foreground">
-                <p className="mb-1 flex items-center gap-1.5 font-semibold text-rm-gray">
+                <p className="mb-1 flex items-center gap-1.5 font-semibold text-brand-gray">
                   <Info className="h-3.5 w-3.5 shrink-0" />
                   Geen conversiewaarde
                 </p>
@@ -341,7 +341,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
           Meta en LinkedIn stond hij op Overzicht — dezelfde vraag, drie tabbladen verderop.
           "Waar komt het vandaan" is een overzichtsvraag, dus hier hoort hij. */}
       <Sectie
-        icoon={<Globe className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Markten"
         bijschrift="Waar het verkeer en de conversies vandaan komen, over alle kanalen samen"
       >

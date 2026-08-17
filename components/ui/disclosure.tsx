@@ -96,7 +96,7 @@ export function CollapsiblePanel({
         className="w-full px-5 py-3 flex items-center gap-2 text-left hover:bg-gray-50/70 transition-colors"
       >
         {icon}
-        <h3 className="text-title font-semibold text-rm-gray">{title}</h3>
+        <h3 className="text-title font-semibold text-brand-gray">{title}</h3>
         {subtitle && <span className="text-meta text-muted-foreground">{subtitle}</span>}
         <span className="ml-auto flex items-center gap-2">
           {meta}
@@ -146,7 +146,7 @@ export function RegioToggle({
       onClick={onToggle}
       aria-expanded={open}
       aria-controls={controls}
-      className="w-full px-5 py-2.5 text-meta font-medium text-rm-blue-ink hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
+      className="w-full px-5 py-2.5 text-meta font-medium text-brand-blue-ink hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
     >
       <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       {open ? `Verberg ${label}` : `Toon ${label}`}
@@ -194,7 +194,7 @@ export function MeerKnop({
     <button
       type="button"
       onClick={onToggle}
-      className="w-full px-5 py-2.5 text-meta font-medium text-rm-blue-ink hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
+      className="w-full px-5 py-2.5 text-meta font-medium text-brand-blue-ink hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
     >
       <ChevronDown className={`w-3.5 h-3.5 transition-transform ${uitgeklapt ? "rotate-180" : ""}`} />
       {uitgeklapt ? "Toon minder" : `Toon ${verborgen} ${eenheid} meer`}

@@ -776,7 +776,7 @@ function ForecastBar({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-rm-gray">{label}</span>
+        <span className="text-sm font-medium text-brand-gray">{label}</span>
         <span className={`text-xs font-semibold ${isOnTarget ? "text-green-600" : "text-amber-600"}`}>
           {pct(diffPctVal)} vs doel
         </span>
@@ -795,7 +795,7 @@ function ForecastBar({
         {/* Target marker */}
         {target > 0 && (
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-rm-gray/40"
+            className="absolute top-0 bottom-0 w-0.5 bg-brand-gray/40"
             style={{ left: `${Math.min(100, (target / Math.max(target, forecastVal) * 100))}%` }}
           />
         )}
@@ -919,7 +919,7 @@ export function DgmView({ clientId }: { clientId: string }) {
 
       {/* ─── 2. KPI Cards ─── */}
       <div>
-        <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
+        <h2 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide mb-3">
           Voortgang trajectdoelen
         </h2>
         {/* Vijf doelen op drie kolommen liet de zesde plek leeg, en die plek staat midden in het
@@ -983,7 +983,7 @@ export function DgmView({ clientId }: { clientId: string }) {
       {/* ─── 3. Wat betekent dit? ─── */}
       {businessImpact.length > 0 && (
         <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
+          <h2 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide mb-3">
             Wat betekent dit voor het traject?
           </h2>
           <div className="space-y-2.5">
@@ -997,7 +997,7 @@ export function DgmView({ clientId }: { clientId: string }) {
               return (
                 <div key={i} className="flex gap-2.5">
                   {iconMap[item.type]}
-                  <p className="text-sm text-rm-gray leading-relaxed">{item.text}</p>
+                  <p className="text-sm text-brand-gray leading-relaxed">{item.text}</p>
                 </div>
               );
             })}
@@ -1008,7 +1008,7 @@ export function DgmView({ clientId }: { clientId: string }) {
       {/* ─── 4. Waarom gebeurt dit? ─── */}
       {causes.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
+          <h2 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide mb-3">
             Belangrijkste oorzaken
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1019,7 +1019,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                     Impact: {cause.impact}
                   </span>
                 </div>
-                <p className="text-sm font-medium text-rm-gray mb-1">{cause.title}</p>
+                <p className="text-sm font-medium text-brand-gray mb-1">{cause.title}</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">{cause.explanation}</p>
               </div>
             ))}
@@ -1030,7 +1030,7 @@ export function DgmView({ clientId }: { clientId: string }) {
       {/* ─── 5. Lopende acties ─── */}
       {actions.length > 0 && (
         <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-3">
+          <h2 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide mb-3">
             Lopende acties en aanbevelingen
           </h2>
           <div className="space-y-3">
@@ -1044,12 +1044,12 @@ export function DgmView({ clientId }: { clientId: string }) {
                   ) : action.status === "Afgerond" ? (
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                   ) : (
-                    <CircleDot className="w-4 h-4 text-rm-blue-ink" />
+                    <CircleDot className="w-4 h-4 text-brand-blue-ink" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-medium text-rm-gray">{action.title}</p>
+                    <p className="text-sm font-medium text-brand-gray">{action.title}</p>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">{action.why}</p>
                   <div className="flex flex-wrap gap-2 mt-1.5">
@@ -1129,7 +1129,7 @@ export function DgmView({ clientId }: { clientId: string }) {
         return (
           <div className={`rounded-xl border ${ss.border} ${ss.bg} p-5 shadow-sm`}>
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
+              <h2 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
                 Sprintplanning Status
               </h2>
               <span className={`text-micro font-bold uppercase px-2 py-0.5 rounded-full ${ss.badge}`}>
@@ -1143,7 +1143,7 @@ export function DgmView({ clientId }: { clientId: string }) {
             {/* Progress bar - segmented */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-rm-gray font-medium">{progressPct}% voltooid</span>
+                <span className="text-xs text-brand-gray font-medium">{progressPct}% voltooid</span>
                 <span className="text-micro text-muted-foreground">{done} klaar · {active} actief · {expired} verlopen · {backlog} backlog</span>
               </div>
               <div className="w-full h-3 bg-card rounded-full border border-border overflow-hidden flex">
@@ -1167,15 +1167,15 @@ export function DgmView({ clientId }: { clientId: string }) {
             {/* Stats grid */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
               <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
-                <p className="text-lg font-bold text-rm-blue-ink">{active}</p>
+                <p className="text-lg font-bold text-brand-blue-ink">{active}</p>
                 <p className="text-micro text-muted-foreground">Actief</p>
               </div>
               <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
-                <p className={`text-lg font-bold ${clientOpen > 2 ? "text-amber-600" : "text-rm-gray"}`}>{clientOpen}</p>
+                <p className={`text-lg font-bold ${clientOpen > 2 ? "text-amber-600" : "text-brand-gray"}`}>{clientOpen}</p>
                 <p className="text-micro text-muted-foreground">Open klant</p>
               </div>
               <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
-                <p className="text-lg font-bold text-rm-gray">{rmOpen}</p>
+                <p className="text-lg font-bold text-brand-gray">{rmOpen}</p>
                 <p className="text-micro text-muted-foreground">Open {ownerLabel(OWNER_TEAM).toLowerCase()}</p>
               </div>
               <div className="bg-card rounded-lg border border-gray-100 p-3 text-center">
@@ -1223,7 +1223,7 @@ export function DgmView({ clientId }: { clientId: string }) {
 
       {/* ─── 6. Forecast vs Doel ─── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide mb-4">
+        <h2 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide mb-4">
           Prognose vs jaardoel
         </h2>
         <div className="space-y-5">
@@ -1282,7 +1282,7 @@ export function DgmView({ clientId }: { clientId: string }) {
                   <ArrowRight className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-semibold text-rm-gray">{item.decision}</p>
+                      <p className="text-sm font-semibold text-brand-gray">{item.decision}</p>
                       <span className={`text-micro font-bold uppercase px-1.5 py-0.5 rounded ${impactColors[item.urgency]}`}>
                         {item.urgency}
                       </span>
@@ -1320,11 +1320,11 @@ export function DgmView({ clientId }: { clientId: string }) {
           <div className="px-5 pb-5 space-y-4 border-t border-border pt-4">
             {/* Health factors */}
             <div>
-              <p className="text-xs font-semibold text-rm-gray mb-2">Health Score Factoren</p>
+              <p className="text-xs font-semibold text-brand-gray mb-2">Health Score Factoren</p>
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                 {health.factors.map((f) => (
                   <div key={f.name} className="text-center">
-                    <p className="text-lg font-bold text-rm-gray">{f.score}/{f.maxScore}</p>
+                    <p className="text-lg font-bold text-brand-gray">{f.score}/{f.maxScore}</p>
                     <p className="text-micro font-medium text-muted-foreground">{f.name}</p>
                     <p className="text-micro text-muted-foreground">{f.description}</p>
                   </div>
@@ -1335,7 +1335,7 @@ export function DgmView({ clientId }: { clientId: string }) {
             {/* Anomalies */}
             {health.anomalies.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-rm-gray mb-2">Anomalieën ({health.anomalies.length})</p>
+                <p className="text-xs font-semibold text-brand-gray mb-2">Anomalieën ({health.anomalies.length})</p>
                 <div className="space-y-1.5">
                   {health.anomalies.map((a, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs">
@@ -1357,7 +1357,7 @@ export function DgmView({ clientId }: { clientId: string }) {
 
             {/* Monthly forecast detail */}
             <div>
-              <p className="text-xs font-semibold text-rm-gray mb-2">Maandoverzicht {vocab.conversions.charAt(0).toUpperCase() + vocab.conversions.slice(1)}</p>
+              <p className="text-xs font-semibold text-brand-gray mb-2">Maandoverzicht {vocab.conversions.charAt(0).toUpperCase() + vocab.conversions.slice(1)}</p>
               <Tabel>
                 <Kop>
                   <KolomKop breed>Maand</KolomKop>
@@ -1414,7 +1414,7 @@ export function DgmView({ clientId }: { clientId: string }) {
             {/* Impression Share summary */}
             {dataState?.impressionShare && dataState.impressionShare.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-rm-gray mb-2">Impression Share per Campagne</p>
+                <p className="text-xs font-semibold text-brand-gray mb-2">Impression Share per Campagne</p>
                 {(() => {
                   const rijen = dataState.impressionShare
                     .filter((is) => is.cost > 0)
@@ -1457,7 +1457,7 @@ export function DgmView({ clientId }: { clientId: string }) {
             {/* Wasteful terms summary */}
             {dataState?.wastefulSearchTerms && dataState.wastefulSearchTerms.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-rm-gray mb-2">
+                <p className="text-xs font-semibold text-brand-gray mb-2">
                   Top verspilde zoektermen ({fmt(dataState.wastefulSearchTerms.reduce((s, t) => s + t.cost, 0))} totaal)
                 </p>
                 <div className="space-y-1">

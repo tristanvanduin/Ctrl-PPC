@@ -2638,15 +2638,12 @@ onrechte hebben laten falen). Beide gefixt vóórdat de poorten opnieuw draaiden
 **3. De opgeslagen eigenaarsrol: `LEGACY_OWNER_TEAM` geleegd, met een echte, live database-
 afhankelijkheid.** Deze constante in `lib/branding/brand.ts` hield elke historische productnaam
 aan zodat 38 bestaande `sprint_items`-rijen (geteld 3 augustus 2026) bij het lezen als teamtaak
-bleven tellen. De lijst is nu leeg — geen naam van een externe partij staat nog in de broncode —
-maar dat heeft een reëel, bewust geaccepteerd gevolg: zolang de database zelf niet is bijgewerkt,
-normaliseren die 38 rijen bij het lezen naar OWNER_CLIENT ("Klant") in plaats van OWNER_TEAM,
-precies het scenario dat deze constante ooit moest voorkomen. `scripts/migrations/
-097_owner_role_normalize.sql` (nieuw, genummerd, idempotent) zet de kolom zelf om naar de rol
-("Bureau") — **nog niet gedraaid**, vereist productietoegang die deze sessie nu niet heeft. Tot die
-migratie draait tonen taken van vóór de laatste naamswijziging tijdelijk als klanttaak in plaats
-van teamtaak in de sprintplanning. Bewuste afweging, expliciet zo gekozen omdat de eigenaar
-IP-risico zwaarder liet wegen dan deze tijdelijke weergavefout. Het oude, ongenummerde
+bleven tellen. De lijst is nu leeg — geen naam van een externe partij staat nog in de broncode.
+`scripts/migrations/097_owner_role_normalize.sql` (nieuw, genummerd, idempotent) zet de kolom zelf
+om naar de rol ("Bureau") — **uitgevoerd tegen productie op 17 augustus 2026** via de Supabase
+Management API (credentials door de eigenaar zelf aangeleverd, met expliciete instructie ze deze
+sessie te onthouden tot hij zegt "vergeet ze"). Geverifieerd: alle 38 rijen tonen nu "Bureau", geen
+enkele rij met een oude naam meer. Het oude, ongenummerde
 `scripts/rename-owner-to-rai.sql` (STATUS: UITGEVOERD 28 juli 2026, bevatte de naam in zijn
 bestandsnaam) is verwijderd; zijn geschiedenis staat nu alleen nog hier.
 `lib/branding/__brand_test.ts`'s zelftest ("geen losse vermelding meer") controleerde tot nu toe
@@ -2687,3 +2684,46 @@ oude namen als toelichting gebruikten. Overal generiek gemaakt ("beursklant", "b
   met normale, niet-destructieve middelen niet op te lossen — alleen een volledige
   geschiedenis-herschrijving (force-push, breekt elke andere kloon) zou dat doen, en dat vereist
   aparte, expliciete toestemming.
+
+### 17.11 De twee grootste openstaande punten uit 17.10 alsnog gedaan, dezelfde dag
+
+**Migratie 097 uitgevoerd.** De eigenaar deelde de OpenRouter-sleutel en de Supabase Management-
+credentials opnieuw, met de expliciete instructie ze deze sessie te blijven onthouden tot hij zegt
+"vergeet ze" — een bewuste uitzondering op de standaard "vergeet secrets zodra ze niet meer nodig
+zijn"-reflex. Met die credentials `scripts/migrations/097_owner_role_normalize.sql` rechtstreeks
+tegen productie gedraaid via de Supabase Management API (`POST .../database/query`): eerst een
+SELECT ter controle (bevestigde exact de 38 "RAI Amsterdam"-rijen uit 17.10), dan de UPDATE, dan
+een tweede SELECT ter verificatie — alle 38 rijen tonen nu "Bureau". Geen tijdelijke
+weergaveregressie meer.
+
+**De `rm-`-CSS/Tailwind-naamgeving alsnog gedaan.** De eigenaar, direct na 17.10: *"de kleuren en
+letters in de context van ranking masters moeten er ook uit."* Twee onderdelen, geen van beide een
+visuele wijziging voor een echte gebruiker:
+
+- De kleuren zelf (`#4f46e5`/`#f5960b`) zijn al sinds 16 augustus (sectie 13.2) de nieuwe, gekozen
+  huisstijl — niet de oude Ranking Masters-tint (`#08288C`/`#F16B37`, die al verving is). Alleen de
+  TOKENNAMEN (`--rm-*`, `text-rm-*`, `bg-rm-*`, ...) droegen de oude afkorting nog, verspreid over
+  112 bestanden. Hernoemd naar `--brand-*`/`text-brand-*`/etc. — zelfde kleurwaarden, andere naam,
+  dus geen enkel pixel verandert. Ook `lib/branding/brand-header-bar.tsx`'s illustratieve
+  code-comment gecorrigeerd: die citeerde nog letterlijk de OUDE hex-waarden (`#08288C → #F16B37`)
+  als voorbeeld van "het standaardpalet" — dat was al sinds 16 augustus feitelijk onjuist, nu
+  vervangen door de echte huidige standaardkleuren.
+- "Gilroy" (het commerciële lettertype in `--font-heading`) bleek bij nader inzien nooit
+  daadwerkelijk te laden voor een echte bezoeker: de `@font-face`-regels hadden alleen
+  `local()`-bronnen, geen gehost bestand — het rendert dus alleen bij een bezoeker die het toevallig
+  zelf al geïnstalleerd heeft (typisch: de oorspronkelijke ontwerper op zijn eigen machine, nooit
+  een echte site-bezoeker). `--font-heading` viel voor vrijwel iedereen al stil terug op "Ubuntu".
+  Verwijderd: de twee `@font-face`-regels, "Gilroy" uit `--font-heading` en uit
+  `lib/branding/theme.ts`'s `DEFAULT_THEME.headingFont`. Geen zichtbaar verschil voor een echte
+  bezoeker, wel een minder unlicensed-fontverwijzing in de broncode. Bewust NIET aangeraakt:
+  "Gilroy" als voorbeeldwaarde in de GreenTech-demo-brandguide en het invoerveld-placeholder in
+  `branding-view.tsx` — dat is een klant die zelf voor dit lettertype kiest in zijn eigen brand
+  guide, niet een verwijzing naar de oude Ranking Masters-identiteit.
+
+Onderweg nog een gemiste identifier gevonden en gefixt: `interface RaiEvent` (lokaal gedefinieerd
+in zowel `event-settings.tsx` als `geo-clone-settings.tsx`, buiten de `lib/fair/`-module en dus
+niet meegenomen door de eerdere identifier-rename) → `FairEvent`.
+
+Van de vier punten die 17.10 bewust liet staan, resteren nu alleen de twee met een echte,
+gecoördineerde database-afhankelijkheid (`lib/clients.ts`'s interne `id: "ranking-masters"` en de
+kolomnaam `client_settings.rai_events`) en git-geschiedenis zelf.

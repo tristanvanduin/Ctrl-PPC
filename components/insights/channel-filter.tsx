@@ -16,7 +16,7 @@ export function ChannelFilter({ value, onChange, counts }: {
 }) {
   const pill = (active: boolean) =>
     `px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
-      active ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
+      active ? "bg-brand-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-brand-gray"
     }`;
 
   return (

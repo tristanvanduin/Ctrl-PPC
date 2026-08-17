@@ -42,7 +42,7 @@ function EnvVar({ name }: { name: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="inline-flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded text-meta font-mono text-rm-gray cursor-pointer hover:bg-gray-200 transition-colors"
+      className="inline-flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded text-meta font-mono text-brand-gray cursor-pointer hover:bg-gray-200 transition-colors"
     >
       {name}
       {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
@@ -101,7 +101,7 @@ function ClientVisibilitySection() {
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-rm-blue-ink text-title">Klanten in sidebar</h3>
+          <h3 className="font-semibold text-brand-blue-ink text-title">Klanten in sidebar</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Selecteer welke klanten zichtbaar zijn in het menu. {visibleCount} van {allClients.length} zichtbaar.
             {allClients.length > 0 && allClients[0].source === "google-ads" && (
@@ -112,7 +112,7 @@ function ClientVisibilitySection() {
         <div className="flex gap-2">
           <button
             onClick={selectAll}
-            className="text-meta text-rm-blue-ink hover:underline"
+            className="text-meta text-brand-blue-ink hover:underline"
           >
             Alles aan
           </button>
@@ -134,7 +134,7 @@ function ClientVisibilitySection() {
             placeholder="Zoek klant..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-rm-blue"
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue"
           />
         </div>
       )}
@@ -148,12 +148,12 @@ function ClientVisibilitySection() {
               onClick={() => toggle(client.id)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                 isVisible
-                  ? "bg-rm-blue/5 border border-rm-blue/20 text-rm-gray"
+                  ? "bg-brand-blue/5 border border-brand-blue/20 text-brand-gray"
                   : "bg-gray-50 border border-transparent text-muted-foreground"
               }`}
             >
               {isVisible
-                ? <Eye className="w-4 h-4 text-rm-blue-ink shrink-0" />
+                ? <Eye className="w-4 h-4 text-brand-blue-ink shrink-0" />
                 : <EyeOff className="w-4 h-4 text-gray-300 shrink-0" />
               }
               <Building2 className="w-3.5 h-3.5 shrink-0" />
@@ -212,8 +212,8 @@ function SoortKeuze({ waarde, onKies, compact = false, voorgesteld = null }: {
           return (
             <button key={s.waarde} onClick={() => onKies(s.waarde)} title={s.uitleg}
               className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-micro font-medium transition-colors ${
-                actief ? "border-rm-blue bg-rm-blue/10 text-rm-blue-ink"
-                       : "border-border text-muted-foreground hover:border-rm-blue/40"}`}>
+                actief ? "border-brand-blue bg-brand-blue/10 text-brand-blue-ink"
+                       : "border-border text-muted-foreground hover:border-brand-blue/40"}`}>
               <Icoon className="h-3 w-3 shrink-0" /> {s.label}
             </button>
           );
@@ -221,10 +221,10 @@ function SoortKeuze({ waarde, onKies, compact = false, voorgesteld = null }: {
         return (
           <button key={s.waarde} onClick={() => onKies(s.waarde)}
             className={`rounded-lg border p-2.5 text-left transition-colors ${
-              actief ? "border-rm-blue bg-rm-blue/5"
-                     : gesuggereerd ? "border-dashed border-amber-300 bg-card hover:border-rm-blue/40"
-                     : "border-border hover:border-rm-blue/40"}`}>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-rm-blue-ink">
+              actief ? "border-brand-blue bg-brand-blue/5"
+                     : gesuggereerd ? "border-dashed border-amber-300 bg-card hover:border-brand-blue/40"
+                     : "border-border hover:border-brand-blue/40"}`}>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-blue-ink">
               <Icoon className="h-3.5 w-3.5 shrink-0" /> {s.label}
               {gesuggereerd && (
                 <span className="ml-auto rounded-full bg-amber-100 px-1.5 py-px text-micro font-medium text-amber-800">
@@ -362,7 +362,7 @@ function ClientGroupsSection() {
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-rm-blue-ink text-title">Klantgroepen</h3>
+          <h3 className="font-semibold text-brand-blue-ink text-title">Klantgroepen</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Bundel accounts en leg vast wat de bundel betekent. {groups.length} groep{groups.length !== 1 ? "en" : ""}
             {onbevestigd > 0 ? `, waarvan ${onbevestigd} voorgesteld` : ""}
@@ -385,12 +385,12 @@ function ClientGroupsSection() {
           onChange={(e) => setNewGroupName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleCreateGroup()}
           placeholder="Nieuwe groep naam..."
-          className="min-w-0 flex-1 text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-rm-blue"
+          className="min-w-0 flex-1 text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue"
         />
         <button
           onClick={handleCreateGroup}
           disabled={!newGroupName.trim()}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-rm-blue text-white hover:bg-rm-blue/90 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-brand-blue text-white hover:bg-brand-blue/90 disabled:opacity-50"
         >
           <FolderPlus className="w-3.5 h-3.5" /> Aanmaken
         </button>
@@ -403,7 +403,7 @@ function ClientGroupsSection() {
           value={groepZoek}
           onChange={(e) => setGroepZoek(e.target.value)}
           placeholder="Zoek een groep..."
-          className="mb-3 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-rm-blue focus:outline-none"
+          className="mb-3 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
         />
       )}
 
@@ -432,16 +432,16 @@ function ClientGroupsSection() {
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleRename(group.id)}
-                      className="flex-1 text-sm border border-border rounded px-2 py-1 focus:outline-none focus:border-rm-blue"
+                      className="flex-1 text-sm border border-border rounded px-2 py-1 focus:outline-none focus:border-brand-blue"
                       autoFocus
                     />
-                    <button onClick={() => handleRename(group.id)} className="text-meta text-rm-blue-ink font-medium">Opslaan</button>
+                    <button onClick={() => handleRename(group.id)} className="text-meta text-brand-blue-ink font-medium">Opslaan</button>
                     <button onClick={() => setEditingId(null)} className="text-meta text-muted-foreground">Annuleer</button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4 text-rm-blue-ink" />
-                    <span className="text-sm font-semibold text-rm-gray">{group.name}</span>
+                    <FolderOpen className="w-4 h-4 text-brand-blue-ink" />
+                    <span className="text-sm font-semibold text-brand-gray">{group.name}</span>
                     <span className="text-micro text-muted-foreground">({groupClients.length})</span>
                     {!group.bevestigd && (
                       <span className="flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-micro font-medium text-amber-800">
@@ -485,7 +485,7 @@ function ClientGroupsSection() {
                   {redenTekst(group.reden) && (
                     <p className="mb-2 text-meta leading-snug text-amber-900">{redenTekst(group.reden)}</p>
                   )}
-                  <p className="mb-2 text-meta font-medium text-rm-gray">Klopt dit, en wat is het?</p>
+                  <p className="mb-2 text-meta font-medium text-brand-gray">Klopt dit, en wat is het?</p>
                   <SoortKeuze waarde={null} voorgesteld={group.soort}
                     onKies={(soort) => handleSoort(group.id, soort, true)} />
                   <p className="mt-2 text-micro leading-snug text-muted-foreground">
@@ -523,7 +523,7 @@ function ClientGroupsSection() {
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <Building2 className="w-3 h-3 text-muted-foreground shrink-0" />
-                      <span className="truncate text-rm-gray">{client.name}</span>
+                      <span className="truncate text-brand-gray">{client.name}</span>
                     </div>
                     <button
                       onClick={() => handleRemoveClient(client.id, group.id)}
@@ -548,7 +548,7 @@ function ClientGroupsSection() {
                     value={clientSearch}
                     onChange={(e) => setClientSearch(e.target.value)}
                     placeholder="Zoek klant om toe te voegen..."
-                    className="w-full text-xs border border-border rounded px-2 py-1.5 mb-1 focus:outline-none focus:border-rm-blue"
+                    className="w-full text-xs border border-border rounded px-2 py-1.5 mb-1 focus:outline-none focus:border-brand-blue"
                     autoFocus
                   />
                   <div className="max-h-[150px] overflow-y-auto space-y-0.5">
@@ -562,9 +562,9 @@ function ClientGroupsSection() {
                         <button
                           key={client.id}
                           onClick={() => handleAddClient(client.id, group.id)}
-                          className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs text-rm-gray hover:bg-rm-blue/5 text-left"
+                          className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs text-brand-gray hover:bg-brand-blue/5 text-left"
                         >
-                          <Plus className="w-3 h-3 text-rm-blue-ink shrink-0" />
+                          <Plus className="w-3 h-3 text-brand-blue-ink shrink-0" />
                           <span className="truncate">{client.name}</span>
                           {assignedClientIds.has(client.id) && (
                             <span className="ml-auto text-micro text-muted-foreground shrink-0">al in groep</span>
@@ -582,7 +582,7 @@ function ClientGroupsSection() {
               ) : !group.bevestigd || open.has(group.id) ? (
                 <button
                   onClick={() => setAddingToGroup(group.id)}
-                  className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline mt-1"
+                  className="flex items-center gap-1 text-meta text-brand-blue-ink hover:underline mt-1"
                 >
                   <Plus className="w-3 h-3" /> Klant toevoegen
                 </button>
@@ -703,7 +703,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-rm-blue-ink" />
+        <Loader2 className="w-6 h-6 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
@@ -711,7 +711,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-page font-bold text-rm-blue-ink">Instellingen</h1>
+        <h1 className="text-page font-bold text-brand-blue-ink">Instellingen</h1>
         <p className="mt-1 text-body text-muted-foreground">
           API-koppelingen en dashboardconfiguratie. Verbind een platform met OAuth, of stel het
           handmatig in via{" "}
@@ -730,7 +730,7 @@ export default function SettingsPage() {
       {/* Overall status */}
       {!status?.anyConnected && (
         <div className="px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-rm-blue-ink font-medium mb-1">Dashboard draait op demo data</p>
+          <p className="text-sm text-brand-blue-ink font-medium mb-1">Dashboard draait op demo data</p>
           <p className="text-xs text-muted-foreground">
             Configureer de API keys in <code className="font-mono">.env.local</code> om live data te gebruiken.
             Kopieer <code className="font-mono">.env.example</code> als startpunt.
@@ -775,9 +775,9 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between"><EnvVar name="GOOGLE_ADS_MANAGER_CUSTOMER_ID" /><span className="text-micro">Optioneel (MCC)</span></div>
               </div>
               <ol className="space-y-1.5 list-decimal list-inside">
-                <li>Ga naar <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Google Cloud Console <ExternalLink className="w-3 h-3" /></a> en maak een OAuth2 Client ID aan (type: Web application)</li>
-                <li>Ga naar <a href="https://ads.google.com/aw/apicenter" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Google Ads API Center <ExternalLink className="w-3 h-3" /></a> voor je Developer Token</li>
-                <li>Genereer een Refresh Token via de <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">OAuth Playground <ExternalLink className="w-3 h-3" /></a> met scope <code className="font-mono text-micro">https://www.googleapis.com/auth/adwords</code></li>
+                <li>Ga naar <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Google Cloud Console <ExternalLink className="w-3 h-3" /></a> en maak een OAuth2 Client ID aan (type: Web application)</li>
+                <li>Ga naar <a href="https://ads.google.com/aw/apicenter" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Google Ads API Center <ExternalLink className="w-3 h-3" /></a> voor je Developer Token</li>
+                <li>Genereer een Refresh Token via de <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">OAuth Playground <ExternalLink className="w-3 h-3" /></a> met scope <code className="font-mono text-micro">https://www.googleapis.com/auth/adwords</code></li>
                 <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
               </ol>
               {status?.googleAds.configured && (
@@ -809,9 +809,9 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between"><EnvVar name="META_ADS_APP_SECRET" /><span className="text-micro">Optioneel</span></div>
               </div>
               <ol className="space-y-1.5 list-decimal list-inside">
-                <li>Ga naar <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Meta for Developers <ExternalLink className="w-3 h-3" /></a> en maak een app aan (type: Business)</li>
+                <li>Ga naar <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Meta for Developers <ExternalLink className="w-3 h-3" /></a> en maak een app aan (type: Business)</li>
                 <li>Voeg de Marketing API product toe aan je app</li>
-                <li>Genereer een User Access Token via de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Graph API Explorer <ExternalLink className="w-3 h-3" /></a> met permissions: <code className="font-mono text-micro">ads_read, ads_management</code></li>
+                <li>Genereer een User Access Token via de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Graph API Explorer <ExternalLink className="w-3 h-3" /></a> met permissions: <code className="font-mono text-micro">ads_read, ads_management</code></li>
                 <li>Wissel het token om voor een long-lived token (geldig ~60 dagen)</li>
                 <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
               </ol>
@@ -844,7 +844,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between"><EnvVar name="LINKEDIN_REFRESH_TOKEN" /><span className="text-micro">Verplicht</span></div>
               </div>
               <ol className="space-y-1.5 list-decimal list-inside">
-                <li>Maak een app aan in het <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">LinkedIn Developer Portal <ExternalLink className="w-3 h-3" /></a></li>
+                <li>Maak een app aan in het <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">LinkedIn Developer Portal <ExternalLink className="w-3 h-3" /></a></li>
                 <li>Vraag toegang aan tot de Advertising API (Marketing Developer Platform)</li>
                 <li>Genereer via OAuth2 een refresh token met scope <code className="font-mono text-micro">r_ads, r_ads_reporting</code></li>
                 <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
@@ -866,7 +866,7 @@ export default function SettingsPage() {
               <p>Geen aparte env-vars — dit hergebruikt dezelfde OAuth-client als Google Ads.</p>
               <ol className="space-y-1.5 list-decimal list-inside">
                 <li>Zorg dat <code className="font-mono text-micro">GOOGLE_ADS_CLIENT_ID</code>/<code className="font-mono text-micro">GOOGLE_ADS_CLIENT_SECRET</code> gezet zijn (zelfde Google Cloud-project)</li>
-                <li>Schakel de <a href="https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Google Analytics Data API <ExternalLink className="w-3 h-3" /></a> in voor dat project</li>
+                <li>Schakel de <a href="https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Google Analytics Data API <ExternalLink className="w-3 h-3" /></a> in voor dat project</li>
                 <li>Vul per klant de GA4-property en key events in bij de klantinstellingen</li>
               </ol>
             </div>
@@ -886,7 +886,7 @@ export default function SettingsPage() {
               <p>Geen aparte env-vars — dit hergebruikt dezelfde OAuth-client als Google Ads.</p>
               <ol className="space-y-1.5 list-decimal list-inside">
                 <li>Zorg dat <code className="font-mono text-micro">GOOGLE_ADS_CLIENT_ID</code>/<code className="font-mono text-micro">GOOGLE_ADS_CLIENT_SECRET</code> gezet zijn (zelfde Google Cloud-project)</li>
-                <li>Schakel de <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noopener" className="text-rm-blue-ink hover:underline inline-flex items-center gap-0.5">Search Console API <ExternalLink className="w-3 h-3" /></a> in voor dat project</li>
+                <li>Schakel de <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Search Console API <ExternalLink className="w-3 h-3" /></a> in voor dat project</li>
                 <li>Vul per klant de site-URL en merktermenlijst in bij de klantinstellingen</li>
               </ol>
             </div>
@@ -896,18 +896,18 @@ export default function SettingsPage() {
 
       {/* Architecture info */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-        <h3 className="font-semibold text-rm-blue-ink text-title mb-3">Architectuur</h3>
+        <h3 className="font-semibold text-brand-blue-ink text-title mb-3">Architectuur</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-muted-foreground">
           <div className="space-y-1">
-            <p className="font-semibold text-rm-gray">API Calls</p>
+            <p className="font-semibold text-brand-gray">API Calls</p>
             <p>Alle API calls gaan via Next.js server-side routes. Credentials verlaten nooit de server.</p>
           </div>
           <div className="space-y-1">
-            <p className="font-semibold text-rm-gray">Data Flow</p>
+            <p className="font-semibold text-brand-gray">Data Flow</p>
             <p>Google Ads + Meta → Unified Adapter → ClientHistoricalData → Forecast Engine → Dashboard</p>
           </div>
           <div className="space-y-1">
-            <p className="font-semibold text-rm-gray">Fallback</p>
+            <p className="font-semibold text-brand-gray">Fallback</p>
             <p>Zonder API keys draait het dashboard op deterministische demo data. Geen data gaat verloren.</p>
           </div>
         </div>

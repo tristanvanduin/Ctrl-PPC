@@ -5,19 +5,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@font-face {
-  font-family: "Gilroy";
-  font-weight: 700;
-  font-style: normal;
-  src: local("Gilroy-Bold");
-}
-
-@font-face {
-  font-family: "Gilroy";
-  font-weight: 800;
-  font-style: normal;
-  src: local("Gilroy-ExtraBold");
-}
+/* Tot 17 augustus 2026 stonden hier twee @font-face-regels voor "Gilroy" -- een commercieel
+   lettertype waar geen hosted bestand (url()) voor was aangeleverd, alleen local()-bronnen. Dat
+   betekent dat het alleen rendert bij een bezoeker die het toevallig al zelf geïnstalleerd heeft;
+   voor vrijwel elke echte gebruiker viel --font-heading dus altijd al stil terug op Ubuntu. Een
+   naam- en licentieverwijzing naar een lettertype dat niemand ooit echt zag, hoort niet in de
+   broncode. Verwijderd; --font-heading hieronder valt nu direct op Ubuntu, exact het lettertype
+   dat vrijwel elke bezoeker al zag.
+*/
 
 @theme inline {
   /* ── Typografische schaal ──────────────────────────────────────────────────
@@ -101,7 +96,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Gilroy", "Ubuntu", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
   /* Hier stond "Open Sans" vóór ui-monospace, en Open Sans is geen monospace-lettertype.
      Gemeten op 12px: de letterbreedtes lopen van 3,03 (i) tot 11,11 (m), een spreiding van
      8,08 — bij een echte monospace is die spreiding 0. Omdat het als eerste in de lijst stond
@@ -157,41 +152,41 @@
 
   /* Merk-tokens. Wijzen naar --brand-* variabelen die de BrandThemeProvider per beurs/klant
      zet; zonder provider vallen ze terug op de huisstijl van het product. Zo kleurt élk bestaand
-     gebruik van rm-blue/rm-orange automatisch mee met het actieve merk, zonder de componenten
-     aan te raken.
+     gebruik van text-brand-blue/text-brand-orange automatisch mee met het actieve merk, zonder
+     de componenten aan te raken.
 
-     De neutralen stonden hier als vaste hex, en dat is precies waarom `text-rm-gray` — de
+     De neutralen stonden hier als vaste hex, en dat is precies waarom `text-brand-gray` — de
      standaard tekstkleur van dit hele dashboard, 280 keer gebruikt — als `color:#32373c` werd
      uitgeschreven in plaats van als variabele. Nu wijzen ze naar runtime-variabelen met exact
      dezelfde waarde, zodat de donkere modus ze kan verzetten zonder één component aan te raken.
 
-     PRODUCT-EIGEN FALLBACK VERVANGEN (16 augustus, sectie 13.2): het blauw-met-oranje (#08288C/
-     #F16B37) is eraf op verzoek van de eigenaar. Dit is het ENE punt waar dat gebeurt — rm-blue/
-     rm-orange worden overal in de app gebruikt (zijbalk, knoppen, koppen, actieve staten), dus
-     de wijziging hier raakt al die plekken tegelijk, niet alleen de zijbalk. Niet letterlijk
-     marketing's neon-indigo (#818cf8) als tekst-/vlakkleur: die is te licht om als lopende tekst
-     op wit te lezen (hetzelfde probleem dat rm-blue-ink hieronder al oploste voor het OUDE
-     blauw, nu voor het nieuwe). #4f46e5 is dezelfde kleurfamilie, met genoeg contrast voor tekst
-     op wit én voor witte tekst op een gevuld vlak; #818cf8 zelf verhuist naar de -light-rol, waar
-     de oude blauwtint ook al lichter was dan de basiskleur. Oranje wordt amber-waste
-     (marketing's eigen accentkleur), niet copper — copper (#f16b37) IS het oude oranje, alleen
-     onder een andere naam. */
-  --color-rm-blue: var(--brand-primary, #4f46e5);
-  --color-rm-orange: var(--brand-accent, #f5960b);
-  --color-rm-light: var(--rm-light, #f9fafc);
-  --color-rm-blue-light: var(--brand-primary-light, #818cf8);
-  --color-rm-orange-light: var(--brand-accent-light, #f7b955);
+     PRODUCT-EIGEN FALLBACK VERVANGEN (16 augustus, sectie 13.2): het oude blauw-met-oranje is
+     eraf op verzoek van de eigenaar. Dit is het ENE punt waar dat gebeurt — deze kleurtokens
+     worden overal in de app gebruikt (zijbalk, knoppen, koppen, actieve staten), dus de wijziging
+     hier raakt al die plekken tegelijk, niet alleen de zijbalk. Niet letterlijk marketing's
+     neon-indigo (#818cf8) als tekst-/vlakkleur: die is te licht om als lopende tekst op wit te
+     lezen (hetzelfde probleem dat `--brand-blue-ink` hieronder al oploste voor het OUDE blauw, nu
+     voor het nieuwe). #4f46e5 is dezelfde kleurfamilie, met genoeg contrast voor tekst op wit én
+     voor witte tekst op een gevuld vlak; #818cf8 zelf verhuist naar de -light-rol, waar de oude
+     blauwtint ook al lichter was dan de basiskleur. Oranje wordt amber-waste (marketing's eigen
+     accentkleur), niet copper — copper (#f16b37) IS het oude oranje, alleen onder een andere
+     naam. */
+  --color-brand-blue: var(--brand-primary, #4f46e5);
+  --color-brand-orange: var(--brand-accent, #f5960b);
+  --color-brand-light: var(--brand-light, #f9fafc);
+  --color-brand-blue-light: var(--brand-primary-light, #818cf8);
+  --color-brand-orange-light: var(--brand-accent-light, #f7b955);
   /* De merkkleur als inkt, los van de merkkleur als vlak.
      Eén kleur kan die twee rollen niet allebei doen. De huisstijlkleur is gekozen om op wit te
      lezen — het standaardblauw is bijna zwart, GreenTech-groen is een diepe tint — en verdwijnt daardoor
      als tekst op een donkere kaart. Licht je hem op, dan wordt de zijbalk een lichtbak met witte
      letters erop; dat was letterlijk het beeld in de eerste donkere schermafdruk. In de lichte
      modus zijn beide tokens exact dezelfde kleur, dus daar verandert er niets. */
-  --color-rm-blue-ink: var(--rm-blue-ink, var(--brand-primary, #4f46e5));
-  --color-rm-orange-ink: var(--rm-orange-ink, var(--brand-accent, #f5960b));
-  --color-rm-gray: var(--rm-gray, #32373c);
-  --color-rm-border: var(--rm-border, #E1E5F2);
-  /* De zijbalk zelf, los van rm-blue: een vlak van 288px effen indigo bleef in de kern hetzelfde
+  --color-brand-blue-ink: var(--brand-blue-ink, var(--brand-primary, #4f46e5));
+  --color-brand-orange-ink: var(--brand-orange-ink, var(--brand-accent, #f5960b));
+  --color-brand-gray: var(--brand-gray, #32373c);
+  --color-brand-border: var(--brand-border, #E1E5F2);
+  /* De zijbalk zelf, los van --color-brand-blue: een vlak van 288px effen indigo bleef in de kern hetzelfde
      beeld als het oude effen blauw -- alleen de tint veranderde. Marketing's eigen uitstraling is
      geen effen merkkleur maar een bijna-zwart vlak (--color-midnight-slate) met de merkkleur er
      licht doorheen gemengd, en dat is wat hier staat: 26% merkkleur in het donker, whitelabel-
@@ -211,7 +206,7 @@
   --color-copper: #f16b37;
 
   /* Eigen lettertype-tokens, los van --font-heading/--font-mono: die twee horen bij het
-     ingelogde dashboard (Gilroy/Ubuntu, de systeem-mono-stapel) en blijven ongewijzigd. De
+     ingelogde dashboard (Ubuntu, de systeem-mono-stapel) en blijven ongewijzigd. De
      marketingsite laadt Plus Jakarta Sans en JetBrains Mono zelf in app/(marketing)/layout.tsx;
      deze tokens wijzen naar de CSS-variabelen die next/font daar blootlegt, met een leesbare
      terugval voor het korte moment vóór het lettertype geladen is. */
@@ -275,9 +270,9 @@
 
   /* De grafiek-chrome als variabele in plaats van als hex in TypeScript, zodat het raster en de
      aslabels met het thema meebewegen. Dezelfde waarden als voorheen. */
-  --rm-gray: #32373c;
-  --rm-light: #f9fafc;
-  --rm-border: #E1E5F2;
+  --brand-gray: #32373c;
+  --brand-light: #f9fafc;
+  --brand-border: #E1E5F2;
 
   /* Sectie 13.2, tweede ronde (16 augustus): een effen vlak in de merkkleur bleef "die
      uitstraling van hiervoor" ogen, ook nadat de tint zelf veranderde -- het probleem zat in
@@ -398,21 +393,21 @@
   --input: #262b35;
   --ring: #5b7cff;
 
-  /* De huisgrijzen. `text-rm-gray` is de standaard tekstkleur van dit dashboard en stond als
+  /* De huisgrijzen. `text-brand-gray` is de standaard tekstkleur van dit dashboard en stond als
      vaste hex in de theme-laag; hij leest nu uit een variabele zodat hij hier mee kan. */
-  --rm-gray: #e7e9ee;
-  --rm-light: #0f1115;
-  --rm-border: #262b35;
+  --brand-gray: #e7e9ee;
+  --brand-light: #0f1115;
+  --brand-border: #262b35;
 
   /* De merkkleur als TÉKST op een donker vlak.
-     `text-rm-blue` draagt in dit dashboard de kopjes, de actieve tab en de nadruk — honderden
+     `text-brand-blue` draagt in dit dashboard de kopjes, de actieve tab en de nadruk — honderden
      plekken. De merkkleur zelf is gekozen om op wit te lezen: het standaardblauw is bijna zwart, en
      het GreenTech-groen is een diepe tint. Op een vlak van #171a21 verdwijnt zo'n kleur; in de
      eerste donkere schermafdruk was "Prestaties" merkbaar donkerder dan het inactieve label
      ernaast. Vandaar hier dezelfde tint, maar opgelicht — de identiteit blijft, de leesbaarheid
      komt terug. De vlakken (zijbalk, gradient, balken) houden de volle merkkleur. */
-  --rm-blue-ink: color-mix(in srgb, var(--brand-primary, #4f46e5) 38%, #ffffff);
-  --rm-orange-ink: color-mix(in srgb, var(--brand-accent, #f5960b) 70%, #ffffff);
+  --brand-blue-ink: color-mix(in srgb, var(--brand-primary, #4f46e5) 38%, #ffffff);
+  --brand-orange-ink: color-mix(in srgb, var(--brand-accent, #f5960b) 70%, #ffffff);
 
   /* De zijbalk draagt de volle merkkleur, en dat is naast een bijna-zwart canvas een lichtbak.
      Dezelfde kleur, teruggebracht naar de helderheid die bij de rest van het scherm hoort. */

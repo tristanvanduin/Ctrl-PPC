@@ -137,7 +137,7 @@ export function TopBar() {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h2 className="truncate text-lg font-bold text-rm-blue-ink">{getTitle()}</h2>
+        <h2 className="truncate text-lg font-bold text-brand-blue-ink">{getTitle()}</h2>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
@@ -191,7 +191,7 @@ export function TopBar() {
             {showNotifications && (
               <div className="absolute right-0 top-12 w-80 bg-card supports-[backdrop-filter]:bg-[var(--zweef-vlak)] supports-[backdrop-filter]:backdrop-blur-md rounded-xl border border-border shadow-lg overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <span className="text-sm font-semibold text-rm-blue-ink">Meldingen</span>
+                  <span className="text-sm font-semibold text-brand-blue-ink">Meldingen</span>
                   <button onClick={() => setShowNotifications(false)}>
                     <X className="w-4 h-4 text-muted-foreground" />
                   </button>
@@ -217,7 +217,7 @@ export function TopBar() {
                           <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                         )}
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-rm-gray">{n.clientName}</p>
+                          <p className="text-sm font-medium text-brand-gray">{n.clientName}</p>
                           <p className="text-xs text-muted-foreground">{n.message}</p>
                         </div>
                       </a>

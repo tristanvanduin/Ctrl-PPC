@@ -117,11 +117,11 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
   return (
     <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
-        <Zap className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">Pacing</h3>
+        <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
+        <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing</h3>
         <span className="text-micro text-muted-foreground ml-auto">
           {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
-            <span className="font-semibold text-rm-blue-ink mr-1.5">
+            <span className="font-semibold text-brand-blue-ink mr-1.5">
               Nog {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"} tot {edition!.label} ·
             </span>
           )}
@@ -151,7 +151,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             </div>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-rm-gray">Conversies</p>
+            <p className="text-xs font-semibold text-brand-gray">Conversies</p>
             <p className="text-micro text-muted-foreground">{num(conv.ytdRealized)} / {num(conv.annualTarget)}</p>
             <p className="text-micro font-medium" style={{ color: convColor }}>{convStatus}</p>
           </div>
@@ -168,7 +168,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             </div>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-rm-gray">Budget</p>
+            <p className="text-xs font-semibold text-brand-gray">Budget</p>
             <p className="text-micro text-muted-foreground">{fmt(spend.ytdRealized)} / {fmt(spend.annualTarget)}</p>
             <p className="text-micro font-medium" style={{ color: spendColor }}>{spendStatus}</p>
           </div>
@@ -181,7 +181,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Tempo conversies</p>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-rm-gray">{num(dailyConvRate)}</span>
+            <span className="text-lg font-bold text-brand-gray">{num(dailyConvRate)}</span>
             <span className="text-micro text-muted-foreground">/dag</span>
           </div>
           {convNeededPerDay > 0 && (
@@ -198,7 +198,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Tempo spend</p>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-rm-gray">{fmt(dailySpendRate)}</span>
+            <span className="text-lg font-bold text-brand-gray">{fmt(dailySpendRate)}</span>
             <span className="text-micro text-muted-foreground">/dag</span>
           </div>
           {spendNeededPerDay > 0 && (
@@ -227,7 +227,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             <Flag className="w-3.5 h-3.5 text-muted-foreground" />
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Op dit tempo</p>
           </div>
-          <span className="text-lg font-bold text-rm-gray">{num(convLanding.opTempo)}</span>
+          <span className="text-lg font-bold text-brand-gray">{num(convLanding.opTempo)}</span>
           {convLanding.deelVanDoel !== null && (
             <p className="text-micro mt-1 text-muted-foreground">
               {Math.round(convLanding.deelVanDoel * 100)}% van geschat jaardoel
@@ -241,7 +241,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
               <Target className="w-3.5 h-3.5 text-muted-foreground" />
               <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Volgens prognose</p>
             </div>
-            <span className="text-lg font-bold text-rm-gray">{num(convLanding.volgensPrognose)}</span>
+            <span className="text-lg font-bold text-brand-gray">{num(convLanding.volgensPrognose)}</span>
             <p className="text-micro mt-1 text-muted-foreground">seizoen meegerekend</p>
           </div>
         )}

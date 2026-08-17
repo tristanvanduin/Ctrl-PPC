@@ -38,10 +38,10 @@ export function Sectie({
     <section className={eerste ? "" : "mt-10"}>
       <div className="mb-4 flex items-center gap-3">
         {icoon && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rm-blue/10">{icoon}</div>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10">{icoon}</div>
         )}
         <div className="min-w-0">
-          <h2 className="text-base font-bold text-rm-blue-ink">{titel}</h2>
+          <h2 className="text-base font-bold text-brand-blue-ink">{titel}</h2>
           {bijschrift && <p className="text-xs text-muted-foreground">{bijschrift}</p>}
         </div>
         {actie && <div className="ml-auto shrink-0">{actie}</div>}

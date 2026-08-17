@@ -82,8 +82,8 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <PieChart className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-title font-semibold text-rm-gray">Performance Max — waar gaat het budget heen</h3>
+        <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
+        <h3 className="text-title font-semibold text-brand-gray">Performance Max — waar gaat het budget heen</h3>
         <span className="text-meta text-muted-foreground">Google verdeelt zelf over de netwerken</span>
         {/* BIJGEWERKT NAAR DE STAND VAN 2026, en het onderscheid is de hele boodschap.
             Hier stond alleen "PMax laat de verdeling niet rechtstreeks sturen ... via assets,
@@ -118,7 +118,7 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
       {imbalances.length > 0 && (
         <div className="px-5 py-3 border-b border-border bg-amber-50/50 space-y-1">
           {imbalances.slice(0, 2).map(({ slice, kind }) => (
-            <p key={slice.networkType} className="text-body text-rm-gray">
+            <p key={slice.networkType} className="text-body text-brand-gray">
               <strong>{slice.label}</strong>{" "}
               {kind === "duur" ? (
                 <>krijgt {pct(slice.costShare)} van het budget maar levert {pct(slice.conversionShare)} van de conversies
@@ -147,7 +147,7 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
               format={eur}
               ariaLabel={`Kostenverdeling van Performance Max over de netwerken: ${slices.map((s) => `${s.label} ${pct(s.costShare)}`).join(", ")}`}
             />
-            <figcaption className="text-meta font-medium text-rm-gray">Kosten</figcaption>
+            <figcaption className="text-meta font-medium text-brand-gray">Kosten</figcaption>
           </figure>
 
           {totals.hasConversions && (
@@ -159,7 +159,7 @@ export function PmaxNetworkSplit({ clientId }: { clientId: string }) {
                 format={(v) => num(v, 1)}
                 ariaLabel={`Conversieverdeling van Performance Max over de netwerken: ${slices.map((s) => `${s.label} ${pct(s.conversionShare)}`).join(", ")}`}
               />
-              <figcaption className="text-meta font-medium text-rm-gray">Conversies</figcaption>
+              <figcaption className="text-meta font-medium text-brand-gray">Conversies</figcaption>
             </figure>
           )}
         </div>

@@ -90,10 +90,10 @@ export function EventTminusChart({
             <Line
               dataKey="huidig"
               name="Deze editie"
-              stroke="var(--terminal-accent, var(--color-rm-blue-ink))"
+              stroke="var(--terminal-accent, var(--color-brand-blue-ink))"
               strokeWidth={2.5}
               strokeLinecap="round"
-              dot={rows.length <= 16 ? { r: 3, strokeWidth: 0, fill: "var(--terminal-accent, var(--color-rm-blue-ink))" } : false}
+              dot={rows.length <= 16 ? { r: 3, strokeWidth: 0, fill: "var(--terminal-accent, var(--color-brand-blue-ink))" } : false}
               activeDot={{ r: 4.5 }}
               connectNulls
             />

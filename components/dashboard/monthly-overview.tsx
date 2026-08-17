@@ -40,7 +40,7 @@ function MonthCard({
 
   const borderColors = {
     previous: isPositive ? "border-green-200 bg-green-50/50" : "border-red-200 bg-red-50/50",
-    current: "border-rm-blue/30 bg-rm-blue/5",
+    current: "border-brand-blue/30 bg-brand-blue/5",
     next: "border-border bg-gray-50/50",
   };
 
@@ -52,7 +52,7 @@ function MonthCard({
 
   const statusIcons = {
     previous: <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />,
-    current: <Clock className="w-3.5 h-3.5 text-rm-blue-ink" />,
+    current: <Clock className="w-3.5 h-3.5 text-brand-blue-ink" />,
     next: <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />,
   };
 
@@ -70,7 +70,7 @@ function MonthCard({
         <div className="flex items-center gap-2">
           {statusIcons[variant]}
           <div>
-            <span className="text-sm font-semibold text-rm-gray">{pt.monthLabel} {year}</span>
+            <span className="text-sm font-semibold text-brand-gray">{pt.monthLabel} {year}</span>
             <span className="text-micro text-muted-foreground ml-1.5">{labels[variant]}</span>
           </div>
         </div>
@@ -91,7 +91,7 @@ function MonthCard({
         {hasPartial && (
           <div className="flex justify-between items-baseline">
             <span className="text-meta text-muted-foreground">Gerealiseerd</span>
-            <span className="text-base font-bold text-rm-blue-ink">
+            <span className="text-base font-bold text-brand-blue-ink">
               {format(partialRealized!)}
             </span>
           </div>
@@ -103,7 +103,7 @@ function MonthCard({
             {isRealized ? "Gerealiseerd" : "Prognose"}
           </span>
           <span className={`${hasPartial ? "text-xs" : "text-base font-bold"} ${
-            hasPartial ? "text-muted-foreground" : variant === "current" ? "text-rm-blue-ink" : "text-rm-gray"
+            hasPartial ? "text-muted-foreground" : variant === "current" ? "text-brand-blue-ink" : "text-brand-gray"
           }`}>
             {format(value)}
           </span>
@@ -143,7 +143,7 @@ function MonthCard({
             </div>
             <div className="h-1 bg-white/80 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${partialIsOnTrack ? "bg-rm-blue" : "bg-amber-400"}`}
+                className={`h-full rounded-full transition-all ${partialIsOnTrack ? "bg-brand-blue" : "bg-amber-400"}`}
                 style={{ width: `${Math.min(monthProgressPct, 100)}%` }}
               />
             </div>
@@ -226,7 +226,7 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
       {/* Header with metric tabs */}
       <div className="px-5 pt-5 pb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-rm-blue-ink uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
             Maandprestaties
           </h3>
           <p className="text-meta text-muted-foreground mt-0.5">
@@ -240,8 +240,8 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
               onClick={() => setMetric(m)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                 metric === m
-                  ? "bg-rm-blue text-white"
-                  : "text-muted-foreground hover:text-rm-blue-ink"
+                  ? "bg-brand-blue text-white"
+                  : "text-muted-foreground hover:text-brand-blue-ink"
               }`}
             >
               {METRIC_LABELS[m]}
@@ -279,18 +279,18 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
                   key={pt.month}
                   className={`flex-1 min-w-[52px] rounded-md px-1.5 py-2 text-center transition-colors ${
                     isFocus
-                      ? "bg-rm-blue/8 ring-1 ring-rm-blue/20"
+                      ? "bg-brand-blue/8 ring-1 ring-brand-blue/20"
                       : isRealized
                         ? "bg-gray-50"
                         : ""
                   }`}
                 >
                   <p className={`text-micro font-medium mb-1 ${
-                    isFocus ? "text-rm-blue-ink font-semibold" : isRealized ? "text-rm-gray" : "text-muted-foreground"
+                    isFocus ? "text-brand-blue-ink font-semibold" : isRealized ? "text-brand-gray" : "text-muted-foreground"
                   }`}>
                     {pt.monthLabel}
                   </p>
-                  <p className={`text-meta font-semibold ${isFocus ? "text-rm-blue-ink" : "text-rm-gray"}`}>
+                  <p className={`text-meta font-semibold ${isFocus ? "text-brand-blue-ink" : "text-brand-gray"}`}>
                     {format(value)}
                   </p>
                   <div className="mt-1.5 mx-auto w-full max-w-[36px]">

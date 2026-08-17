@@ -108,7 +108,7 @@ function AdoptieSectie() {
   return (
     <section className="mb-8">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h2 className="text-title font-semibold text-rm-gray">Gebruik per bureau</h2>
+        <h2 className="text-title font-semibold text-brand-gray">Gebruik per bureau</h2>
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-micro font-medium ${LICHT_STIJL[totaal].vlak} ${LICHT_STIJL[totaal].tekst}`}>
           {/* Kleur nooit alleen: het bolletje staat naast een woord, zodat het ook leesbaar is
               voor wie geen kleurverschil ziet en in een afdruk. */}
@@ -119,7 +119,7 @@ function AdoptieSectie() {
           {[7, 30, 90].map((d) => (
             <button key={d} onClick={() => setDagen(d)}
               className={`rounded-md px-2 py-0.5 text-micro font-medium transition-colors ${
-                dagen === d ? "bg-rm-blue/10 text-rm-blue-ink" : "text-muted-foreground hover:bg-gray-100"}`}>
+                dagen === d ? "bg-brand-blue/10 text-brand-blue-ink" : "text-muted-foreground hover:bg-gray-100"}`}>
               {d} dagen
             </button>
           ))}
@@ -148,11 +148,11 @@ function AdoptieSectie() {
             <div key={rij.agency_id} className={`rounded-lg border p-3 ${st.rand} ${st.vlak}`}>
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${st.punt}`} />
-                <span className="truncate text-body font-semibold text-rm-gray">{rij.bureau}</span>
+                <span className="truncate text-body font-semibold text-brand-gray">{rij.bureau}</span>
                 <span className={`ml-auto shrink-0 text-micro font-medium ${st.tekst}`}>{st.label}</span>
               </div>
               <div className="mt-1.5 flex items-baseline gap-2">
-                <span className="text-xl font-semibold tabular-nums text-rm-gray">
+                <span className="text-xl font-semibold tabular-nums text-brand-gray">
                   {rij.adoptie === null ? "—" : `${Math.round(Number(rij.adoptie))}%`}
                 </span>
                 <span className="text-meta text-muted-foreground">{oordeel.reden}</span>
@@ -228,7 +228,7 @@ function BenchmarkSectie() {
   return (
     <section className="mb-8">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h2 className="text-title font-semibold text-rm-gray">Benchmarkdekking</h2>
+        <h2 className="text-title font-semibold text-brand-gray">Benchmarkdekking</h2>
         <span className="text-meta text-muted-foreground">
           {data.deelbaar} van {data.cellen.length} segmenten haalt de drempel
         </span>
@@ -248,7 +248,7 @@ function BenchmarkSectie() {
         ].map(([kop, waarde]) => (
           <div key={kop} className="rounded-lg border border-border bg-card p-3">
             <span className="block text-micro uppercase tracking-wider text-muted-foreground">{kop}</span>
-            <span className="mt-0.5 block text-title font-semibold tabular-nums text-rm-gray">{waarde}</span>
+            <span className="mt-0.5 block text-title font-semibold tabular-nums text-brand-gray">{waarde}</span>
           </div>
         ))}
       </div>
@@ -264,7 +264,7 @@ function BenchmarkSectie() {
             <li key={label(c)} className={`rounded-lg border p-3 ${
               c.deelbaar ? "border-green-200 bg-green-50/60" : "border-border bg-card"}`}>
               <div className="flex items-baseline gap-2">
-                <span className="text-body font-medium text-rm-gray">{label(c)}</span>
+                <span className="text-body font-medium text-brand-gray">{label(c)}</span>
                 <span className="ml-auto text-meta tabular-nums text-muted-foreground">
                   {c.accounts} accounts · {c.bureaus} bureaus
                 </span>
@@ -328,7 +328,7 @@ function WhitelabelSectie() {
 
   return (
     <section className="mb-8">
-      <h2 className="mb-1 text-title font-semibold text-rm-gray">Whitelabel per bureau</h2>
+      <h2 className="mb-1 text-title font-semibold text-brand-gray">Whitelabel per bureau</h2>
       <p className="mb-3 text-meta text-muted-foreground">
         Alleen bureaus met deze schakelaar aan zien de huisstijl-sectie in hun instellingen en
         mogen een eigen logo uploaden. Standaard uit: zonder upload blijft het Ctrl PPC-icoon staan.
@@ -336,7 +336,7 @@ function WhitelabelSectie() {
       <ul className="space-y-1.5">
         {agencies.map((a) => (
           <li key={a.id} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
-            <span className="text-body text-rm-gray">{a.name}</span>
+            <span className="text-body text-brand-gray">{a.name}</span>
             <button
               onClick={() => schakel(a)}
               disabled={bezig === a.id}
@@ -465,7 +465,7 @@ export default function AdminPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="mb-1 text-page font-bold text-rm-blue-ink">Gebruikersbeheer</h1>
+      <h1 className="mb-1 text-page font-bold text-brand-blue-ink">Gebruikersbeheer</h1>
       <p className="mb-6 text-body text-muted-foreground">
         De rol bepaalt wat iemand mag, de beurzen bepalen waarover. Alleen voor admins.
       </p>
@@ -483,7 +483,7 @@ export default function AdminPage() {
       <form onSubmit={invite} className="mb-8 rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="grow">
-            <label htmlFor="invite-email" className="mb-1 block text-body font-medium text-rm-gray">
+            <label htmlFor="invite-email" className="mb-1 block text-body font-medium text-brand-gray">
               E-mail uitnodigen
             </label>
             <input
@@ -492,18 +492,18 @@ export default function AdminPage() {
               required
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              className="w-full rounded-md border border-border px-3 py-2 text-body focus:border-rm-blue focus:outline-none"
+              className="w-full rounded-md border border-border px-3 py-2 text-body focus:border-brand-blue focus:outline-none"
             />
           </div>
           <div>
-            <label htmlFor="invite-role" className="mb-1 block text-body font-medium text-rm-gray">
+            <label htmlFor="invite-role" className="mb-1 block text-body font-medium text-brand-gray">
               Rol
             </label>
             <select
               id="invite-role"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as Role)}
-              className="rounded-md border border-border px-3 py-2 text-body focus:border-rm-blue focus:outline-none"
+              className="rounded-md border border-border px-3 py-2 text-body focus:border-brand-blue focus:outline-none"
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>
@@ -515,7 +515,7 @@ export default function AdminPage() {
           <button
             type="submit"
             disabled={bezig}
-            className="rounded-md bg-rm-blue px-4 py-2 text-body font-medium text-white hover:bg-rm-blue/90 disabled:opacity-60"
+            className="rounded-md bg-brand-blue px-4 py-2 text-body font-medium text-white hover:bg-brand-blue/90 disabled:opacity-60"
           >
             {bezig ? "Bezig..." : "Uitnodigen"}
           </button>
@@ -525,7 +525,7 @@ export default function AdminPage() {
 
         <fieldset className="mt-4 border-t border-border pt-3">
           <legend className="sr-only">Beurzen</legend>
-          <p className="mb-2 text-body font-medium text-rm-gray">
+          <p className="mb-2 text-body font-medium text-brand-gray">
             Beurzen{" "}
             {inviteDektAlles && (
               <span className="font-normal text-muted-foreground">
@@ -540,7 +540,7 @@ export default function AdminPage() {
                 className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-body ${
                   inviteDektAlles
                     ? "cursor-not-allowed border-border text-muted-foreground"
-                    : "cursor-pointer border-border text-rm-gray"
+                    : "cursor-pointer border-border text-brand-gray"
                 }`}
               >
                 <input
@@ -593,7 +593,7 @@ export default function AdminPage() {
                     <select
                       value={user.role ?? ""}
                       onChange={(e) => void wijzig(user.id, e.target.value as Role, user.clients)}
-                      className="rounded-md border border-border px-2 py-1 text-body focus:border-rm-blue focus:outline-none"
+                      className="rounded-md border border-border px-2 py-1 text-body focus:border-brand-blue focus:outline-none"
                     >
                       {user.role === null && <option value="">geen rol</option>}
                       {ROLES.map((r) => (
@@ -620,7 +620,7 @@ export default function AdminPage() {
                               }
                               className={`rounded-full border px-2.5 py-0.5 text-meta ${
                                 aan
-                                  ? "border-rm-blue bg-rm-blue text-white"
+                                  ? "border-brand-blue bg-brand-blue text-white"
                                   : "border-border text-muted-foreground hover:border-gray-400"
                               }`}
                             >

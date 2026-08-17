@@ -43,7 +43,7 @@ function Regel({ a, onKies }: { a: AnalyseStatus; onKies?: (k: AnalyseKanaal) =>
         ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
         : <Circle className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />}
       <span className="min-w-0 flex-1">
-        <span className="text-body font-medium text-rm-gray">{a.titel}</span>
+        <span className="text-body font-medium text-brand-gray">{a.titel}</span>
         <span className="block text-micro text-muted-foreground truncate">{a.waarover}</span>
       </span>
       <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
@@ -103,9 +103,9 @@ export function AnalysisOverview({
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-        <Radar className="w-4.5 h-4.5 text-rm-blue-ink" />
+        <Radar className="w-4.5 h-4.5 text-brand-blue-ink" />
         <div className="flex-1">
-          <h3 className="text-title font-semibold text-rm-gray">Alle analyses</h3>
+          <h3 className="text-title font-semibold text-brand-gray">Alle analyses</h3>
           <p className="text-micro text-muted-foreground mt-0.5">
             {uitgevoerd.length} van {ANALYSE_CATALOGUS.length} gedraaid · klik een regel om naar het kanaal te gaan waar hij staat
           </p>
@@ -115,7 +115,7 @@ export function AnalysisOverview({
       {uitgevoerd.length > 0 && (
         <>
           <div className="px-5 py-1.5 bg-gray-50/70 border-b border-border">
-            <span className="text-micro font-semibold text-rm-blue-ink uppercase tracking-wide">Uitgevoerd</span>
+            <span className="text-micro font-semibold text-brand-blue-ink uppercase tracking-wide">Uitgevoerd</span>
           </div>
           <div className="divide-y divide-border/50">
             {uitgevoerd.map((a) => <Regel key={a.section} a={a} onKies={onKiesKanaal} />)}

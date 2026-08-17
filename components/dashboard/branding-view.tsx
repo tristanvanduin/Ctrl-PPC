@@ -70,17 +70,17 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
       {/* Editor */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-          <Palette className="w-5 h-5 text-rm-blue-ink" />
-          <h3 className="text-title font-semibold text-rm-gray">Merk-identiteit</h3>
+          <Palette className="w-5 h-5 text-brand-blue-ink" />
+          <h3 className="text-title font-semibold text-brand-gray">Merk-identiteit</h3>
         </div>
         <div className="px-5 py-4 space-y-4">
           <label className="block">
-            <span className="text-meta font-medium text-rm-gray">Merknaam</span>
+            <span className="text-meta font-medium text-brand-gray">Merknaam</span>
             <input
               type="text"
               value={guide.brandName ?? ""}
               onChange={(e) => { setGuide((g) => g ? { ...g, brandName: e.target.value } : g); setSaved(false); }}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-brand-blue/50 focus:outline-none"
             />
           </label>
 
@@ -88,7 +88,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
             const val = (guide.visual?.[key] as string) ?? "";
             return (
               <label key={key} className="block">
-                <span className="text-meta font-medium text-rm-gray">{label}</span>
+                <span className="text-meta font-medium text-brand-gray">{label}</span>
                 <div className="mt-1 flex items-center gap-2">
                   <input
                     type="color"
@@ -101,7 +101,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
                     value={val}
                     placeholder="#08288C"
                     onChange={(e) => setVisual(key, e.target.value)}
-                    className="flex-1 rounded-md border border-border px-3 py-2 text-lead font-mono focus:border-rm-blue/50 focus:outline-none"
+                    className="flex-1 rounded-md border border-border px-3 py-2 text-lead font-mono focus:border-brand-blue/50 focus:outline-none"
                   />
                 </div>
               </label>
@@ -109,24 +109,24 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
           })}
 
           <label className="block">
-            <span className="text-meta font-medium text-rm-gray">Logo-URL</span>
+            <span className="text-meta font-medium text-brand-gray">Logo-URL</span>
             <input
               type="text"
               value={(guide.visual?.logoUrl as string) ?? ""}
               placeholder="https://..."
               onChange={(e) => setVisual("logoUrl", e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-brand-blue/50 focus:outline-none"
             />
           </label>
 
           <label className="block">
-            <span className="text-meta font-medium text-rm-gray">Heading-font</span>
+            <span className="text-meta font-medium text-brand-gray">Heading-font</span>
             <input
               type="text"
               value={(guide.visual?.headingFont as string) ?? ""}
               placeholder="Gilroy, Ubuntu, sans-serif"
               onChange={(e) => setVisual("headingFont", e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-brand-blue/50 focus:outline-none"
             />
           </label>
 
@@ -134,7 +134,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-brand-blue text-white text-body font-medium hover:bg-brand-blue/90 disabled:opacity-50 transition-all"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Opslaan"}
@@ -149,7 +149,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
       {/* Live preview */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-title font-semibold text-rm-gray">Live preview</h3>
+          <h3 className="text-title font-semibold text-brand-gray">Live preview</h3>
         </div>
         <div className="p-5">
           <div className="rounded-xl overflow-hidden border border-border" style={{ background: theme.background, color: theme.foreground }}>

@@ -180,7 +180,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
   if (results.length === 0 && !analyzing) {
     return (
       <div className="px-5 py-10 text-center">
-        <Sparkles className="w-8 h-8 text-rm-blue-ink mx-auto mb-3 opacity-60" />
+        <Sparkles className="w-8 h-8 text-brand-blue-ink mx-auto mb-3 opacity-60" />
         <p className="text-sm text-muted-foreground mb-4">
           {error
             ? error
@@ -188,7 +188,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
         </p>
         <button
           onClick={runAnalysis}
-          className="px-4 py-2 bg-rm-blue text-white text-sm font-medium rounded-lg hover:bg-rm-blue/90 transition-colors"
+          className="px-4 py-2 bg-brand-blue text-white text-sm font-medium rounded-lg hover:bg-brand-blue/90 transition-colors"
         >
           Start Analyse
         </button>
@@ -203,8 +203,8 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
   if (analyzing) {
     return (
       <div className="px-5 py-10 text-center">
-        <Loader2 className="w-8 h-8 text-rm-blue-ink mx-auto mb-3 animate-spin" />
-        <p className="text-sm font-medium text-rm-gray mb-1">Zoektermen analyseren...</p>
+        <Loader2 className="w-8 h-8 text-brand-blue-ink mx-auto mb-3 animate-spin" />
+        <p className="text-sm font-medium text-brand-gray mb-1">Zoektermen analyseren...</p>
         <p className="text-xs text-muted-foreground">
           AI beoordeelt alle zoektermen met clicks op relevantie. Dit duurt ca. 30-120 seconden afhankelijk van het aantal termen.
         </p>
@@ -254,7 +254,7 @@ export function SearchTermAnalysisTab({ clientId }: Props) {
           <button
             onClick={runAnalysis}
             disabled={analyzing}
-            className="px-3 py-1 text-xs font-medium text-rm-blue-ink border border-rm-blue/30 rounded-md hover:bg-rm-blue/5 transition-colors"
+            className="px-3 py-1 text-xs font-medium text-brand-blue-ink border border-brand-blue/30 rounded-md hover:bg-brand-blue/5 transition-colors"
           >
             Opnieuw analyseren
           </button>

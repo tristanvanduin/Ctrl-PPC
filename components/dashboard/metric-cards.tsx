@@ -34,11 +34,11 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-rm-blue/10 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-brand-blue/10 flex items-center justify-center">
             {icon}
           </div>
           <div>
-            <h3 className="text-title font-semibold text-rm-blue-ink">{label}</h3>
+            <h3 className="text-title font-semibold text-brand-blue-ink">{label}</h3>
             {subtitle && <p className="text-micro text-muted-foreground">{subtitle}</p>}
           </div>
         </div>
@@ -58,11 +58,11 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
       <div className="space-y-2 mb-4">
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground">Jaardoel</span>
-          <span className="text-xs font-semibold text-rm-gray">{format(annualTarget)}</span>
+          <span className="text-xs font-semibold text-brand-gray">{format(annualTarget)}</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground">Jaarprognose</span>
-          <span className="text-xs font-semibold text-rm-blue-ink">{format(adjusted)}</span>
+          <span className="text-xs font-semibold text-brand-blue-ink">{format(adjusted)}</span>
         </div>
       </div>
 
@@ -77,7 +77,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
         <div className="h-2 bg-gray-100 rounded-full overflow-hidden relative">
           {/* Expected position marker */}
           <div
-            className="absolute top-0 bottom-0 w-px bg-rm-blue/30 z-10"
+            className="absolute top-0 bottom-0 w-px bg-brand-blue/30 z-10"
             style={{ left: `${yearProgress}%` }}
           />
           <div
@@ -124,7 +124,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       <KpiCard
         label="Conversies"
-        icon={<Target className="w-4 h-4 text-rm-blue-ink" />}
+        icon={<Target className="w-4 h-4 text-brand-blue-ink" />}
         annualTarget={forecast.conversions.kpi.annualTarget}
         adjusted={forecast.conversions.kpi.adjustedAnnual}
         realized={forecast.conversions.kpi.ytdRealized}
@@ -134,7 +134,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
       />
       <KpiCard
         label="Omzet"
-        icon={<DollarSign className="w-4 h-4 text-rm-blue-ink" />}
+        icon={<DollarSign className="w-4 h-4 text-brand-blue-ink" />}
         annualTarget={forecast.revenue.kpi.annualTarget}
         adjusted={forecast.revenue.kpi.adjustedAnnual}
         realized={forecast.revenue.kpi.ytdRealized}
@@ -144,7 +144,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
       />
       <KpiCard
         label="ROAS"
-        icon={<BarChart3 className="w-4 h-4 text-rm-blue-ink" />}
+        icon={<BarChart3 className="w-4 h-4 text-brand-blue-ink" />}
         annualTarget={forecast.roas.kpi.annualTarget}
         adjusted={forecast.roas.kpi.adjustedAnnual}
         realized={forecast.roas.kpi.ytdRealized}
@@ -154,7 +154,7 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
       />
       <KpiCard
         label="CPA"
-        icon={<Wallet className="w-4 h-4 text-rm-blue-ink" />}
+        icon={<Wallet className="w-4 h-4 text-brand-blue-ink" />}
         annualTarget={kpi.cpaTarget}
         adjusted={forecastedCpa}
         realized={ytdCpa}

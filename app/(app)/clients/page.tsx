@@ -50,7 +50,7 @@ export default function ClientsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-page font-bold text-rm-blue-ink">Klanten</h1>
+        <h1 className="text-page font-bold text-brand-blue-ink">Klanten</h1>
         {/* Hier stond "Overzicht van alle klantaccounts en hun prestaties." De prestaties staan
             er niet: een kaart toont een naam, initialen en of het demodata is. Een ondertitel die
             iets belooft wat het scherm eronder niet levert, is de goedkoopste manier om een
@@ -58,7 +58,7 @@ export default function ClientsPage() {
             ze wél staan. */}
         <p className="mt-1 text-body text-muted-foreground">
           Kies een account om het dashboard te openen. Cijfers naast elkaar per klant staan onder{" "}
-          <Link href="/portfolio" className="font-medium text-rm-blue-ink underline underline-offset-2">
+          <Link href="/portfolio" className="font-medium text-brand-blue-ink underline underline-offset-2">
             Portfolio
           </Link>
           .
@@ -74,7 +74,7 @@ export default function ClientsPage() {
         </div>
       ) : klanten.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <p className="text-body text-rm-gray">Er zijn nog geen klantaccounts gekoppeld.</p>
+          <p className="text-body text-brand-gray">Er zijn nog geen klantaccounts gekoppeld.</p>
           <p className="text-meta text-muted-foreground mt-1">
             Koppel een account via Instellingen, of open de demo met{" "}
             <code className="rounded bg-muted px-1 py-0.5">?demo=1</code> in de URL.
@@ -86,15 +86,15 @@ export default function ClientsPage() {
             <Link
               key={c.id}
               href={`/client/${c.id}`}
-              className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-rm-blue hover:bg-gray-50/70"
+              className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-brand-blue hover:bg-gray-50/70"
             >
               {/* Initialen in plaats van een logo: elke klant heeft een naam, niet elke klant een
                   merkbestand. Zo is de rij visueel gelijk zonder gaten. */}
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rm-blue/10 text-meta font-semibold text-rm-blue-ink">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10 text-meta font-semibold text-brand-blue-ink">
                 {c.name.slice(0, 2).toUpperCase()}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-body font-medium text-rm-gray">{c.name}</span>
+                <span className="block truncate text-body font-medium text-brand-gray">{c.name}</span>
                 {/* "demodata" staat er expliciet bij. Een demoklant die eruitziet als een echte is
                     precies het soort verwarring dat je in een demonstratie niet wilt. */}
                 {c.source === "demo" && (

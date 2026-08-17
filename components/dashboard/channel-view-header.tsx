@@ -50,7 +50,7 @@ export function ChannelViewHeader({
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center gap-2">
         {icon}
-        <h3 className="text-title font-semibold text-rm-gray">{title}</h3>
+        <h3 className="text-title font-semibold text-brand-gray">{title}</h3>
         {geoClone && <span className="text-meta text-muted-foreground">— beurs {geoClone}</span>}
         <StatusBadge status={status} />
       </div>
@@ -61,13 +61,13 @@ export function ChannelViewHeader({
           <span>{blurb}</span>
         </div>
         <details className="group">
-          <summary className="cursor-pointer text-meta text-muted-foreground hover:text-rm-gray select-none">
+          <summary className="cursor-pointer text-meta text-muted-foreground hover:text-brand-gray select-none">
             Wat dit kanaal levert
           </summary>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
             {delivers.map((s) => (
-              <li key={s} className="text-body text-rm-gray flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-rm-blue/40" /> {s}
+              <li key={s} className="text-body text-brand-gray flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-blue/40" /> {s}
               </li>
             ))}
           </ul>

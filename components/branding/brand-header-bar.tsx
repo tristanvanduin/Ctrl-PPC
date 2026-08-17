@@ -44,7 +44,7 @@ export function BrandHeaderBar({
 
   // Het verloop loopt van de primaire naar de accentkleur, en die kunnen elk om een andere
   // inktkleur vragen. Vragen ze om dezelfde, dan is de keuze eenvoudig. Verschillen ze — en dat
-  // is bij beide echte paletten het geval, want zowel het standaardpalet (#08288C → #F16B37) als de GreenTech-
+  // is bij beide echte paletten het geval, want zowel het standaardpalet (#4f46e5 → #f5960b) als de GreenTech-
   // demo (#0B7A3B → #8BC34A) zet een donkere primaire tegen een licht accent — dan is er geen
   // inkt die op beide uiteinden werkt, en gaat er een sluier over het verloop.
   //

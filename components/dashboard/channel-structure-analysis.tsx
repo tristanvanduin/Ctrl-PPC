@@ -175,13 +175,13 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-        <Layers className="w-4.5 h-4.5 text-rm-blue-ink" />
-        <h3 className="text-title font-semibold text-rm-gray">Structuur & segment-efficiëntie</h3>
+        <Layers className="w-4.5 h-4.5 text-brand-blue-ink" />
+        <h3 className="text-title font-semibold text-brand-gray">Structuur & segment-efficiëntie</h3>
         <span className="text-micro text-muted-foreground">waar landt het budget binnen {dimLabel}</span>
       </div>
       <div className="px-5 py-4">
         {stories === null ? (
-          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-rm-blue-ink" /></div>
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-brand-blue-ink" /></div>
         ) : stories.length === 0 ? (
           <p className="text-body text-muted-foreground">
             Geen materiële segment-signalen — het budget is redelijk verdeeld, of er is te weinig data per dimensie voor een eerlijk oordeel.
@@ -235,15 +235,15 @@ function StoryRow({ s }: { s: SignalStory }) {
   return (
     <div className="rounded-lg border border-border px-3 py-2.5">
       <div className="flex items-center gap-2 flex-wrap mb-1">
-        <span className="text-meta font-medium text-rm-gray">{s.scope}</span>
+        <span className="text-meta font-medium text-brand-gray">{s.scope}</span>
         <span className={`text-micro px-1.5 py-0.5 rounded border ${CERTAINTY_STYLE[s.certainty]}`}>{CERTAINTY_LABEL[s.certainty]}</span>
       </div>
-      <p className="text-body text-rm-gray leading-snug">{s.story}</p>
+      <p className="text-body text-brand-gray leading-snug">{s.story}</p>
       <p className="text-meta text-muted-foreground mt-1">→ {s.actionDirection}</p>
       {s.evidence.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {s.evidence.map((e, i) => (
-            <span key={i} className="text-micro bg-gray-100 rounded px-1.5 py-0.5 text-rm-gray">{e.metric}: <strong>{String(e.value)}</strong></span>
+            <span key={i} className="text-micro bg-gray-100 rounded px-1.5 py-0.5 text-brand-gray">{e.metric}: <strong>{String(e.value)}</strong></span>
           ))}
         </div>
       )}

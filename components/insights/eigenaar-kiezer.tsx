@@ -129,7 +129,7 @@ export function EigenaarKiezer({ waarde, team, teamOk = true, onChange, bureauNa
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-xs rounded px-1 py-0.5 border border-transparent hover:border-border focus:outline-none focus:border-rm-blue cursor-pointer max-w-full"
+        className="flex items-center gap-1 text-xs rounded px-1 py-0.5 border border-transparent hover:border-border focus:outline-none focus:border-brand-blue cursor-pointer max-w-full"
         title={`${ownerLabel(waarde.kant, bureauNaam)}${soort ? ` · ${SOORT_LABEL[soort]}` : ""}`}
       >
         <span className="truncate">{label}</span>
@@ -156,7 +156,7 @@ export function EigenaarKiezer({ waarde, team, teamOk = true, onChange, bureauNa
                   type="button"
                   onClick={() => zetKant(k)}
                   className={`px-2 py-1 rounded border text-xs transition-colors ${
-                    actief ? "border-rm-blue bg-[var(--zweef-vlak)] font-medium" : "border-border hover:bg-[var(--zweef-vlak)]"
+                    actief ? "border-brand-blue bg-[var(--zweef-vlak)] font-medium" : "border-border hover:bg-[var(--zweef-vlak)]"
                   }`}
                 >
                   {ownerLabel(k, bureauNaam)}
@@ -178,7 +178,7 @@ export function EigenaarKiezer({ waarde, team, teamOk = true, onChange, bureauNa
                   onClick={() => zetSoort(s)}
                   className="flex items-center gap-1.5 w-full px-1.5 py-1 rounded text-left hover:bg-[var(--zweef-vlak)] transition-colors"
                 >
-                  <Check className={`w-3 h-3 shrink-0 ${actief ? "text-rm-blue" : "opacity-0"}`} />
+                  <Check className={`w-3 h-3 shrink-0 ${actief ? "text-brand-blue" : "opacity-0"}`} />
                   {SOORT_LABEL[s ?? "globaal"]}
                 </button>
               );
@@ -196,7 +196,7 @@ export function EigenaarKiezer({ waarde, team, teamOk = true, onChange, bureauNa
               <select
                 value={waarde.userId ?? ""}
                 onChange={(e) => zet({ userId: e.target.value || null })}
-                className="w-full text-xs border border-border rounded px-1.5 py-1 bg-card focus:outline-none focus:border-rm-blue"
+                className="w-full text-xs border border-border rounded px-1.5 py-1 bg-card focus:outline-none focus:border-brand-blue"
               >
                 <option value="">Kies een persoon…</option>
                 {team.map((l) => <option key={l.id} value={l.id}>{l.naam}</option>)}
@@ -211,7 +211,7 @@ export function EigenaarKiezer({ waarde, team, teamOk = true, onChange, bureauNa
                 onChange={(e) => zet({ naam: e.target.value })}
                 list={soort === "functie" && bureauKant ? "ctrl-functie-suggesties" : undefined}
                 placeholder={soort === "functie" ? "bv. webdeveloper" : "bv. het bureau, of een partner"}
-                className="w-full text-xs border border-border rounded px-1.5 py-1 bg-card focus:outline-none focus:border-rm-blue"
+                className="w-full text-xs border border-border rounded px-1.5 py-1 bg-card focus:outline-none focus:border-brand-blue"
               />
               {/* De app-rollen zijn suggestie en geen keuzelijst: ze gaan over rechten in het
                   dashboard, niet over wie werk uitvoert. Aan klantzijde slaan ze nergens op,

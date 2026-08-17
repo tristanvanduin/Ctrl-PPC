@@ -84,7 +84,7 @@ function AuditKeuze({ icoon, titel, telling, randKleur, bezig, uitgeschakeld, on
       type="button"
       onClick={onStart}
       disabled={uitgeschakeld}
-      className={`group text-left bg-card rounded-lg border border-border p-4 hover:shadow-sm transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rm-blue ${randKleur}`}
+      className={`group text-left bg-card rounded-lg border border-border p-4 hover:shadow-sm transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${randKleur}`}
     >
       <div className="flex items-center gap-2 mb-1">
         {icoon}
@@ -192,7 +192,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
           als op de rest van het dashboard. */}
       <Sectie
         eerste
-        icoon={<ClipboardCheck className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<ClipboardCheck className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Second opinion"
         bijschrift={`Account-audit op het ${BRAND_NAME}-template`}
       >
@@ -250,16 +250,16 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
           </div>
           <p className="text-body text-muted-foreground leading-relaxed max-w-3xl">
             Een audit loopt de controlepunten van het audit-template langs en geeft er per punt een
-            oordeel bij — <strong className="text-rm-gray">Goed</strong>,{" "}
-            <strong className="text-rm-gray">Voldoende</strong> of{" "}
-            <strong className="text-rm-gray">Onvoldoende</strong> — met de reden erbij en de impact
+            oordeel bij — <strong className="text-brand-gray">Goed</strong>,{" "}
+            <strong className="text-brand-gray">Voldoende</strong> of{" "}
+            <strong className="text-brand-gray">Onvoldoende</strong> — met de reden erbij en de impact
             ernaast. Elk oordeel is met de hand aan te passen; de uitkomst is te downloaden als PDF.
           </p>
           <p className="text-body text-muted-foreground leading-relaxed max-w-3xl">
             {dekking.volledig.niet > 0 ? (
               <>
                 Van de {dekking.volledig.totaal} controlepunten zijn er{" "}
-                <strong className="text-rm-gray">{dekking.volledig.niet}</strong> niet uit accountdata
+                <strong className="text-brand-gray">{dekking.volledig.niet}</strong> niet uit accountdata
                 af te leiden — denk aan wat er op de website staat. Die komen terug als{" "}
                 <em>niet beoordeeld</em> en wachten op jouw oordeel; ze worden niet geraden.
               </>
@@ -277,7 +277,7 @@ export function SecondOpinionView({ clientId, clientName }: Props) {
           in de sectie hierboven het werk. */}
       {(runningMode !== null || progress.job || activeRun || runs.length > 0 || loading) && (
       <Sectie
-        icoon={<Eye className="w-4.5 h-4.5 text-rm-blue-ink" />}
+        icoon={<Eye className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="De uitkomst"
         bijschrift="Per controlepunt een oordeel met de reden erbij — met de hand aan te passen en te downloaden als PDF"
       >

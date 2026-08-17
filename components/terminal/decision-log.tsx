@@ -20,7 +20,7 @@ const KIND_LABEL: Record<TimelineEntryKind, string> = {
 };
 
 const KIND_COLOR: Record<TimelineEntryKind, string> = {
-  change: "text-rm-gray",
+  change: "text-brand-gray",
   hypothesis_accepted: "text-blue-600",
   hypothesis_evaluated: "text-emerald-600",
 };
@@ -33,7 +33,7 @@ export function DecisionLog({ entries, loading }: { entries: TimelineEntry[] | n
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-rm-blue-ink" />
+        <Loader2 className="h-5 w-5 animate-spin text-brand-blue-ink" />
       </div>
     );
   }
@@ -51,7 +51,7 @@ export function DecisionLog({ entries, loading }: { entries: TimelineEntry[] | n
               <span className="text-micro font-medium uppercase tracking-wide text-muted-foreground">{KIND_LABEL[e.kind]}</span>
               <span className="teller-waarde text-micro text-muted-foreground">{formatDag(e.date)}</span>
             </div>
-            <p className="truncate text-body text-rm-gray">{e.label}</p>
+            <p className="truncate text-body text-brand-gray">{e.label}</p>
           </div>
         </div>
       ))}

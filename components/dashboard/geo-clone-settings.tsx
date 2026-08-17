@@ -25,7 +25,7 @@ import {
 
 const CADENCE_LABEL: Record<Cadence, string> = { annual: "Jaarlijks", biennial: "2-jaarlijks", custom: "Anders" };
 
-interface RaiEvent { id?: string; name?: string; abbrev?: string; cadence?: Cadence; editions?: Edition[] }
+interface FairEvent { id?: string; name?: string; abbrev?: string; cadence?: Cadence; editions?: Edition[] }
 
 export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string; geoClone: string }) {
   const [account, setAccount] = useState<AccountSettings | null>(null);
@@ -56,7 +56,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
       // event uit de rai_events die bij deze afkorting hoort.
       const guide = (csRes.data?.brand_guide ?? {}) as { brandName?: string; visual?: GeoCloneBranding };
       const kpi = getClientSettings(clientId).kpiTargets;
-      const events = ((csRes.data?.rai_events as { events?: RaiEvent[] } | null)?.events ?? []);
+      const events = ((csRes.data?.rai_events as { events?: FairEvent[] } | null)?.events ?? []);
       const matchEvent = events.find((e) => (e.abbrev ?? "").trim().toUpperCase() === geoClone.toUpperCase());
 
       const acc: AccountSettings = {
@@ -177,8 +177,8 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
       {/* Branding */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <Palette className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-base font-semibold text-rm-blue-ink">Branding — {label}</h2>
+          <Palette className="w-5 h-5 text-brand-blue-ink" />
+          <h2 className="text-base font-semibold text-brand-blue-ink">Branding — {label}</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {brandFields.map(({ key, label: fl, color }) => {
@@ -187,7 +187,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
             const inh = resolved.branding.inherited[key];
             return (
               <label key={key} className="block">
-                <span className="text-meta font-medium text-rm-gray">{fl}</span>
+                <span className="text-meta font-medium text-brand-gray">{fl}</span>
                 <div className="mt-1 flex items-center gap-2">
                   {color && (
                     <input type="color" value={/^#([0-9a-fA-F]{6})$/.test(ovVal) ? ovVal : "#000000"}
@@ -196,7 +196,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
                   )}
                   <input type="text" value={ovVal} placeholder={accVal ? `${accVal} (account)` : "leeg = account"}
                     onChange={(e) => setBrand(key, e.target.value)}
-                    className={`flex-1 rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none ${color ? "font-mono" : ""}`} />
+                    className={`flex-1 rounded-md border border-border px-3 py-2 text-lead focus:border-brand-blue/50 focus:outline-none ${color ? "font-mono" : ""}`} />
                 </div>
                 {inheritHint(inh, accVal)}
               </label>
@@ -208,8 +208,8 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
       {/* Doelstellingen */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <Target className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-base font-semibold text-rm-blue-ink">Doelstellingen — {label}</h2>
+          <Target className="w-5 h-5 text-brand-blue-ink" />
+          <h2 className="text-base font-semibold text-brand-blue-ink">Doelstellingen — {label}</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {goalFields.map(({ key, label: fl, prefix, suffix }) => {
@@ -218,14 +218,14 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
             const inh = resolved.goals.inherited[key];
             return (
               <label key={key} className="block">
-                <span className="text-meta font-medium text-rm-gray">{fl}</span>
+                <span className="text-meta font-medium text-brand-gray">{fl}</span>
                 <div className="mt-1 flex items-center gap-2">
                   {prefix && <span className="text-sm text-muted-foreground">{prefix}</span>}
                   <input type="number" min={0} step={key === "roasTarget" ? 0.1 : 1}
                     value={ovVal != null && ovVal > 0 ? ovVal : ""}
                     placeholder={accVal != null ? `${accVal} (account)` : "leeg = account"}
                     onChange={(e) => setGoal(key, parseFloat(e.target.value) || 0)}
-                    className="flex-1 rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none" />
+                    className="flex-1 rounded-md border border-border px-3 py-2 text-lead focus:border-brand-blue/50 focus:outline-none" />
                   {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
                 </div>
                 {inheritHint(inh, accVal)}
@@ -238,15 +238,15 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
       {/* Event / datums */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <CalendarClock className="w-5 h-5 text-rm-blue-ink" />
-          <h2 className="text-base font-semibold text-rm-blue-ink">Event & edities — {label}</h2>
+          <CalendarClock className="w-5 h-5 text-brand-blue-ink" />
+          <h2 className="text-base font-semibold text-brand-blue-ink">Event & edities — {label}</h2>
         </div>
 
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-meta font-medium text-rm-gray">Cadans:</span>
+          <span className="text-meta font-medium text-brand-gray">Cadans:</span>
           {(Object.keys(CADENCE_LABEL) as Cadence[]).map((c) => (
             <button key={c} onClick={() => setCadence(c)}
-              className={`px-2.5 py-1 rounded-md text-meta font-medium transition-colors ${override.event?.cadence === c ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
+              className={`px-2.5 py-1 rounded-md text-meta font-medium transition-colors ${override.event?.cadence === c ? "bg-brand-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-brand-gray"}`}>
               {CADENCE_LABEL[c]}
             </button>
           ))}
@@ -258,7 +258,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
         </div>
 
         <div className="mt-3">
-          <span className="text-meta font-medium text-rm-gray">Afgelopen edities</span>
+          <span className="text-meta font-medium text-brand-gray">Afgelopen edities</span>
           {resolved.event.inherited.editions && (account.event.editions?.length ?? 0) > 0 && (
             <p className="text-micro text-muted-foreground flex items-center gap-1 mt-1">
               <CornerDownRight className="w-3 h-3" /> Erft van account: {(account.event.editions ?? []).map((e) => e.label || e.date).join(", ")}
@@ -268,15 +268,15 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
             {(override.event?.editions ?? []).map((ed, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <input type="date" value={ed.date} onChange={(e) => patchEdition(idx, { date: e.target.value })}
-                  className="rounded-md border border-border px-3 py-1.5 text-body focus:border-rm-blue/50 focus:outline-none" />
+                  className="rounded-md border border-border px-3 py-1.5 text-body focus:border-brand-blue/50 focus:outline-none" />
                 <input type="text" value={ed.label} placeholder="label (bijv. 2026)" onChange={(e) => patchEdition(idx, { label: e.target.value })}
-                  className="flex-1 rounded-md border border-border px-3 py-1.5 text-body focus:border-rm-blue/50 focus:outline-none" />
+                  className="flex-1 rounded-md border border-border px-3 py-1.5 text-body focus:border-brand-blue/50 focus:outline-none" />
                 <button onClick={() => removeEdition(idx)} className="text-muted-foreground hover:text-red-500" title="Editie verwijderen">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
-            <button onClick={addEdition} className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline">
+            <button onClick={addEdition} className="flex items-center gap-1 text-meta text-brand-blue-ink hover:underline">
               <Plus className="w-3 h-3" /> Editie toevoegen
             </button>
           </div>
@@ -285,7 +285,7 @@ export function GeoCloneSettingsPanel({ clientId, geoClone }: { clientId: string
 
       {error && <p className="text-meta text-red-500">{error}</p>}
       <button onClick={save} disabled={saving}
-        className="flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all">
+        className="flex items-center gap-2 px-4 py-2 rounded-md bg-brand-blue text-white text-body font-medium hover:bg-brand-blue/90 disabled:opacity-50 transition-all">
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? "Opslaan..." : saved ? "Opgeslagen" : `Instellingen ${geoClone} opslaan`}
       </button>

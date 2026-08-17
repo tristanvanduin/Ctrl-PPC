@@ -38,7 +38,7 @@ function SparKnop({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex h-9 items-center gap-2 rounded-full bg-rm-orange px-3.5 text-body font-medium text-white transition-colors hover:brightness-110"
+      className="flex h-9 items-center gap-2 rounded-full bg-brand-orange px-3.5 text-body font-medium text-white transition-colors hover:brightness-110"
       aria-label="Spar over deze klant"
     >
       <MessageSquare className="h-4 w-4 shrink-0" />
@@ -193,7 +193,7 @@ export function ChatDrawer({ clientId, klantnaam }: { clientId: string; klantnaa
           >
             <header className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="min-w-0">
-                <h2 className="truncate text-sm font-semibold text-rm-blue-ink">Sparren</h2>
+                <h2 className="truncate text-sm font-semibold text-brand-blue-ink">Sparren</h2>
                 <p className="truncate text-meta text-muted-foreground">{naam}</p>
               </div>
               <button
@@ -271,13 +271,13 @@ export function ChatDrawer({ clientId, klantnaam }: { clientId: string; klantnaa
                   }}
                   rows={2}
                   placeholder="Vraag iets over deze klant..."
-                  className="min-h-[2.5rem] flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-rm-orange"
+                  className="min-h-[2.5rem] flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand-orange"
                   disabled={bezig}
                 />
                 <button
                   onClick={() => void verstuur()}
                   disabled={bezig || invoer.trim().length === 0}
-                  className="rounded-lg bg-rm-orange p-2.5 text-white transition-opacity disabled:opacity-40"
+                  className="rounded-lg bg-brand-orange p-2.5 text-white transition-opacity disabled:opacity-40"
                   aria-label="Versturen"
                 >
                   <Send className="h-4 w-4" />

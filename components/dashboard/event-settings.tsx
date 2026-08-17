@@ -20,14 +20,14 @@ const CADENCE_LABEL: Record<Cadence, string> = {
 };
 
 interface Edition { date: string; label: string }
-interface RaiEvent { id: string; name: string; abbrev: string; cadence: Cadence; editions: Edition[] }
+interface FairEvent { id: string; name: string; abbrev: string; cadence: Cadence; editions: Edition[] }
 
-function emptyEvent(): RaiEvent {
+function emptyEvent(): FairEvent {
   return { id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())), name: "", abbrev: "", cadence: "annual", editions: [{ date: "", label: "" }] };
 }
 
 export function EventSettings({ clientId }: { clientId: string }) {
-  const [events, setEvents] = useState<RaiEvent[] | null>(null);
+  const [events, setEvents] = useState<FairEvent[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,13 +44,13 @@ export function EventSettings({ clientId }: { clientId: string }) {
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) { setError(error.message); setEvents([]); return; }
-        const raw = (data?.rai_events as { events?: RaiEvent[] } | null) ?? null;
+        const raw = (data?.rai_events as { events?: FairEvent[] } | null) ?? null;
         setEvents(Array.isArray(raw?.events) ? raw!.events : []);
       });
     return () => { cancelled = true; };
   }, [clientId]);
 
-  function patchEvent(id: string, next: Partial<RaiEvent>) {
+  function patchEvent(id: string, next: Partial<FairEvent>) {
     setEvents((evs) => evs?.map((e) => (e.id === id ? { ...e, ...next } : e)) ?? evs);
     setSaved(false);
   }
@@ -83,8 +83,8 @@ export function EventSettings({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <CalendarClock className="w-5 h-5 text-rm-blue-ink" />
-        <h2 className="text-base font-semibold text-rm-blue-ink">Beurzen & edities</h2>
+        <CalendarClock className="w-5 h-5 text-brand-blue-ink" />
+        <h2 className="text-base font-semibold text-brand-blue-ink">Beurzen & edities</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-5">
         Leg per beurs (of geo-clone) vast of hij jaarlijks of 2-jaarlijks is en wanneer de afgelopen edities plaatsvonden.
@@ -100,16 +100,16 @@ export function EventSettings({ clientId }: { clientId: string }) {
             <div className="flex items-start gap-3">
               <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <label className="block sm:col-span-2">
-                  <span className="text-meta font-medium text-rm-gray">Naam</span>
+                  <span className="text-meta font-medium text-brand-gray">Naam</span>
                   <input type="text" value={ev.name} placeholder="bijv. GreenTech Amsterdam"
                     onChange={(e) => patchEvent(ev.id, { name: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-rm-blue/50 focus:outline-none" />
+                    className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead focus:border-brand-blue/50 focus:outline-none" />
                 </label>
                 <label className="block">
-                  <span className="text-meta font-medium text-rm-gray">Afkorting (campagne)</span>
+                  <span className="text-meta font-medium text-brand-gray">Afkorting (campagne)</span>
                   <input type="text" value={ev.abbrev} placeholder="bijv. GTA"
                     onChange={(e) => patchEvent(ev.id, { abbrev: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead font-mono focus:border-rm-blue/50 focus:outline-none" />
+                    className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead font-mono focus:border-brand-blue/50 focus:outline-none" />
                 </label>
               </div>
               <button onClick={() => { setEvents((evs) => evs?.filter((e) => e.id !== ev.id) ?? evs); setSaved(false); }}
@@ -119,26 +119,26 @@ export function EventSettings({ clientId }: { clientId: string }) {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-meta font-medium text-rm-gray">Cadans:</span>
+              <span className="text-meta font-medium text-brand-gray">Cadans:</span>
               {(Object.keys(CADENCE_LABEL) as Cadence[]).map((c) => (
                 <button key={c} onClick={() => patchEvent(ev.id, { cadence: c })}
-                  className={`px-2.5 py-1 rounded-md text-meta font-medium transition-colors ${ev.cadence === c ? "bg-rm-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-rm-gray"}`}>
+                  className={`px-2.5 py-1 rounded-md text-meta font-medium transition-colors ${ev.cadence === c ? "bg-brand-blue text-white" : "bg-gray-100 text-muted-foreground hover:text-brand-gray"}`}>
                   {CADENCE_LABEL[c]}
                 </button>
               ))}
             </div>
 
             <div>
-              <span className="text-meta font-medium text-rm-gray">Afgelopen edities</span>
+              <span className="text-meta font-medium text-brand-gray">Afgelopen edities</span>
               <div className="space-y-2 mt-1">
                 {ev.editions.map((ed, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <input type="date" value={ed.date}
                       onChange={(e) => patchEdition(ev.id, idx, { date: e.target.value })}
-                      className="rounded-md border border-border px-3 py-1.5 text-body focus:border-rm-blue/50 focus:outline-none" />
+                      className="rounded-md border border-border px-3 py-1.5 text-body focus:border-brand-blue/50 focus:outline-none" />
                     <input type="text" value={ed.label} placeholder="label (bijv. 2026)"
                       onChange={(e) => patchEdition(ev.id, idx, { label: e.target.value })}
-                      className="flex-1 rounded-md border border-border px-3 py-1.5 text-body focus:border-rm-blue/50 focus:outline-none" />
+                      className="flex-1 rounded-md border border-border px-3 py-1.5 text-body focus:border-brand-blue/50 focus:outline-none" />
                     <button onClick={() => patchEvent(ev.id, { editions: ev.editions.filter((_, i) => i !== idx) })}
                       className="text-muted-foreground hover:text-red-500" title="Editie verwijderen">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -146,7 +146,7 @@ export function EventSettings({ clientId }: { clientId: string }) {
                   </div>
                 ))}
                 <button onClick={() => patchEvent(ev.id, { editions: [...ev.editions, { date: "", label: "" }] })}
-                  className="flex items-center gap-1 text-meta text-rm-blue-ink hover:underline">
+                  className="flex items-center gap-1 text-meta text-brand-blue-ink hover:underline">
                   <Plus className="w-3 h-3" /> Editie toevoegen
                 </button>
               </div>
@@ -162,14 +162,14 @@ export function EventSettings({ clientId }: { clientId: string }) {
         ))}
 
         <button onClick={() => { setEvents((evs) => [...(evs ?? []), emptyEvent()]); setSaved(false); }}
-          className="flex items-center gap-1.5 text-body text-rm-blue-ink hover:underline">
+          className="flex items-center gap-1.5 text-body text-brand-blue-ink hover:underline">
           <Plus className="w-4 h-4" /> Beurs toevoegen
         </button>
       </div>
 
       {error && <p className="text-meta text-red-500 mt-3">{error}</p>}
       <button onClick={save} disabled={saving}
-        className="mt-4 flex items-center gap-2 px-4 py-2 rounded-md bg-rm-blue text-white text-body font-medium hover:bg-rm-blue/90 disabled:opacity-50 transition-all">
+        className="mt-4 flex items-center gap-2 px-4 py-2 rounded-md bg-brand-blue text-white text-body font-medium hover:bg-brand-blue/90 disabled:opacity-50 transition-all">
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Opslaan"}
       </button>

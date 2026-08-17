@@ -58,7 +58,7 @@ export function Uitleg({
     <Tooltip>
       <TooltipTrigger
         aria-label={label}
-        className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-rm-blue-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rm-blue-ink ${className}`}
+        className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-brand-blue-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink ${className}`}
       >
         <Info className="h-3.5 w-3.5" />
       </TooltipTrigger>
@@ -88,7 +88,7 @@ export function UitlegKop({
   return (
     <Tooltip>
       <TooltipTrigger
-        className={`cursor-help underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-rm-gray focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rm-blue-ink ${className}`}
+        className={`cursor-help underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-brand-gray focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink ${className}`}
       >
         {children}
       </TooltipTrigger>

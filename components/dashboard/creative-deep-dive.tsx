@@ -153,8 +153,8 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
       {/* Creative-vermoeidheid */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <TrendingDown className="w-4 h-4 text-rm-blue-ink" />
-          <h3 className="text-title font-semibold text-rm-gray">Creative-vermoeidheid</h3>
+          <TrendingDown className="w-4 h-4 text-brand-blue-ink" />
+          <h3 className="text-title font-semibold text-brand-gray">Creative-vermoeidheid</h3>
           <KanaalMerk channel={channel} />
           <span className="text-micro text-muted-foreground">CTR-traject per creative over de maanden</span>
         </div>
@@ -171,7 +171,7 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
               {fatigue.slice(0, 15).map((f) => (
                 <div key={f.id} className="px-5 py-2.5 flex items-center gap-3">
                   <span className={`text-micro font-semibold border rounded-full px-2 py-0.5 shrink-0 ${FATIGUE_STYLE[f.status]}`}>{FATIGUE_LABEL[f.status]}</span>
-                  <span className="text-body text-rm-gray truncate flex-1 min-w-0" title={f.name}>{f.name}</span>
+                  <span className="text-body text-brand-gray truncate flex-1 min-w-0" title={f.name}>{f.name}</span>
                   <Sparkline punten={f.points.map((p) => p.ctr)} basis="bereik" breedte={72} hoogte={20} titel={`CTR-verloop van ${f.name}`} />
                   <span className="text-meta text-muted-foreground w-28 text-right shrink-0 tabular-nums">
                     {f.peakCtr != null ? `piek ${pct(f.peakCtr)} → ${pct(f.latestCtr)}` : "—"}
@@ -201,13 +201,13 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
       {heeftBreakdown && breakdown && (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-            <Layers className="w-4 h-4 text-rm-blue-ink" />
-            <h3 className="text-title font-semibold text-rm-gray">Asset-uitsplitsing (RSA)</h3>
+            <Layers className="w-4 h-4 text-brand-blue-ink" />
+            <h3 className="text-title font-semibold text-brand-gray">Asset-uitsplitsing (RSA)</h3>
             <KanaalMerk channel={channel} />
             <span className="text-micro text-muted-foreground">welke headlines/descriptions het gewicht trekken</span>
           </div>
           <div className="px-5 py-3 space-y-3">
-            <p className="text-body text-rm-gray leading-relaxed">{breakdown.summaryText}</p>
+            <p className="text-body text-brand-gray leading-relaxed">{breakdown.summaryText}</p>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <AssetColumn title="Headlines" stats={breakdown.headlines} />
               <AssetColumn title="Descriptions" stats={breakdown.descriptions} />
@@ -231,7 +231,7 @@ function AssetColumn({ title, stats }: { title: string; stats: { assetText: stri
         {stats.slice(0, 10).map((s, i) => (
           <li key={i} className="flex items-center gap-2 text-body">
             <span className={`text-micro font-semibold border rounded px-1.5 py-0.5 shrink-0 capitalize ${VERDICT_STYLE[s.verdict]}`}>{s.verdict === "te_weinig_data" ? "weinig data" : s.verdict}</span>
-            <span className="text-rm-gray truncate flex-1 min-w-0" title={s.assetText}>{s.assetText}</span>
+            <span className="text-brand-gray truncate flex-1 min-w-0" title={s.assetText}>{s.assetText}</span>
             <span className="text-muted-foreground shrink-0 w-24 text-right">{pct(s.ctr)} · {fmt(s.impressions)} imp</span>
           </li>
         ))}

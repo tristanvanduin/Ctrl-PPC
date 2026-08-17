@@ -89,8 +89,8 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
   return (
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <Calculator className="w-5 h-5 text-rm-blue-ink" />
-        <h3 className="text-title font-semibold text-rm-blue-ink">Budget Scenario Builder</h3>
+        <Calculator className="w-5 h-5 text-brand-blue-ink" />
+        <h3 className="text-title font-semibold text-brand-blue-ink">Budget Scenario Builder</h3>
       </div>
       <p className="text-body text-muted-foreground mb-5">
         Wat levert een budgetwijziging op? Berekend met constante CPA ({fmt(currentCpa)}) — de prijs per conversie verandert niet.
@@ -100,7 +100,7 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-muted-foreground">Budget wijziging</span>
-          <span className={`text-sm font-bold ${budgetChange > 0 ? "text-green-600" : budgetChange < 0 ? "text-red-500" : "text-rm-gray"}`}>
+          <span className={`text-sm font-bold ${budgetChange > 0 ? "text-green-600" : budgetChange < 0 ? "text-red-500" : "text-brand-gray"}`}>
             {budgetChange > 0 ? "+" : ""}{budgetChange}%
           </span>
         </div>
@@ -112,7 +112,7 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
             step={5}
             value={budgetChange}
             onChange={(e) => setBudgetChange(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-rm-blue"
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-blue"
           />
           {/* Headroom indicator */}
           {headroomPct > 0 && (
@@ -138,8 +138,8 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
               onClick={() => setBudgetChange(p)}
               className={`px-3 py-1 text-meta font-medium rounded-md transition-colors ${
                 budgetChange === p
-                  ? "bg-rm-blue text-white"
-                  : "bg-gray-100 text-muted-foreground hover:text-rm-gray"
+                  ? "bg-brand-blue text-white"
+                  : "bg-gray-100 text-muted-foreground hover:text-brand-gray"
               }`}
             >
               {p > 0 ? "+" : ""}{p}%
@@ -223,7 +223,7 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
                   ✓ Jaardoel van {num(convTarget)} conversies wordt gehaald ({num(newAnnualConv)} prognose).
                 </p>
               ) : convGap > 0 ? (
-                <p className="text-sm text-rm-gray">
+                <p className="text-sm text-brand-gray">
                   Nog {num(convGap)} conversies tekort. Verhoog het budget verder of verbeter de campagne-efficiency.
                 </p>
               ) : null}
@@ -271,7 +271,7 @@ function ResultCard({
       <div className="flex items-center gap-1.5 mb-1">
         <span className="text-body text-muted-foreground">{before}</span>
         <ArrowRight className="w-3 h-3 text-muted-foreground" />
-        <span className={`text-sm font-bold ${highlight ? "text-green-700" : "text-rm-blue-ink"}`}>{after}</span>
+        <span className={`text-sm font-bold ${highlight ? "text-green-700" : "text-brand-blue-ink"}`}>{after}</span>
       </div>
       <p className={`text-micro font-medium ${
         neutral ? "text-muted-foreground" :

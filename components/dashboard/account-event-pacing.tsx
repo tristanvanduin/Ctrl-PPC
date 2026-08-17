@@ -59,10 +59,10 @@ export function AccountEventPacing({ clientId, eventId, refreshKey }: { clientId
   return (
     <div className="rounded-lg border border-border bg-gray-50/60 overflow-hidden">
       <div className="px-4 py-2.5 border-b border-border flex items-center gap-2">
-        <CalendarClock className="w-4 h-4 text-rm-blue-ink" />
-        <h4 className="text-meta font-semibold text-rm-gray uppercase tracking-wide">T-minus pacing</h4>
+        <CalendarClock className="w-4 h-4 text-brand-blue-ink" />
+        <h4 className="text-meta font-semibold text-brand-gray uppercase tracking-wide">T-minus pacing</h4>
         {data.daysToFair != null && (
-          <span className="ml-auto text-meta font-medium text-rm-blue-ink">
+          <span className="ml-auto text-meta font-medium text-brand-blue-ink">
             T-{data.daysToFair} tot {data.eventName}
           </span>
         )}

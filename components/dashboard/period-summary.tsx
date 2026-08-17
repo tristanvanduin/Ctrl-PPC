@@ -67,7 +67,7 @@ export function PeriodSummary({ data, compact }: Props) {
     <div className="rounded-xl border border-border bg-card px-6 py-5 shadow-sm">
       {!compact && (
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-rm-blue-ink">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-brand-blue-ink">
             {formatRange(periode.range)}
           </h3>
           {periode.compareRange && (
