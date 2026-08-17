@@ -222,11 +222,25 @@ const TOEGESTANE_WEZEN = new Map([
   // -kolom die al gevuld wordt (meta_campaigns.objective, linkedin_campaigns.objective_type) --
   // het is dus geen taxonomie die op iets ongebouwds wacht, alleen op de regelmachine erboven.
   ["lib/meta/campaign-types.ts",
-    "Meta ODAX-objective-taxonomie en eval-criteria; wacht op een Meta-equivalent van " +
-    "campaign-analysis.ts als consument"],
+    "Meta ODAX-objective-taxonomie en eval-criteria; consument is lib/meta/campaign-analysis.ts " +
+    "hieronder, die zelf nog geen eigen consument heeft (route/UI)"],
   ["lib/linkedin/campaign-types.ts",
-    "LinkedIn objectiveType-taxonomie en eval-criteria; wacht op een LinkedIn-equivalent van " +
-    "campaign-analysis.ts als consument"],
+    "LinkedIn objectiveType-taxonomie en eval-criteria; consument is " +
+    "lib/linkedin/campaign-analysis.ts hieronder, die zelf nog geen eigen consument heeft (route/UI)"],
+
+  // 17 augustus 2026: de bevindingen-engines die de twee taxonomiebestanden hierboven
+  // daadwerkelijk consumeren, gebouwd in dezelfde sessie als vervolgstap. Beide zijn zelf nog
+  // niet aangesloten op een route of UI-component -- exact dezelfde status als
+  // lib/campaign-analysis.ts (Google) al langer heeft. Wacht op een productbeslissing: waar in
+  // de app deze bevindingen getoond worden, en of de prepared-context/SOP-pijplijn (die WEL live
+  // is, app/api/analysis/monthly/route.ts) ze rechtstreeks moet consumeren of dat dit een apart
+  // bevindingen-scherm wordt.
+  ["lib/meta/campaign-analysis.ts",
+    "regelmachine met findings/manualChecks per Meta-objective, mirrort lib/campaign-analysis.ts " +
+    "zonder het te kopieren (CPA/ROAS-baselines per objective, niet account-breed). Wacht op consument"],
+  ["lib/linkedin/campaign-analysis.ts",
+    "regelmachine met findings/manualChecks per LinkedIn-objectiveType, zelfde status als " +
+    "lib/meta/campaign-analysis.ts hierboven. Wacht op consument"],
 
   // 11 augustus 2026: op beide homepage-plekken losgekoppeld nadat bleek dat de enige echte
   // productbeelden een Nederlandstalige UI tonen onder een Engelstalige, wereldwijd gepositioneerde

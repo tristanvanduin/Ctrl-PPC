@@ -2149,13 +2149,29 @@ proxymetrics die expliciet gelabeld zijn als "indicatief", geen vervanging.
 `detectLinkedInObjective()` volgt dezelfde regel als Meta: het al gevulde
 `linkedin_campaigns.objective_type`-veld eerst, naamdetectie alleen als terugval.
 
-**Beide bestanden staan bewust in `TOEGESTANE_WEZEN`** (`scripts/check-hygiene.mjs`, 17 augustus):
-ze zijn de taxonomie-laag, niet de bevindingen-engine. `lib/campaign-types.ts` heeft zelf ook pas
-een consument via `lib/campaign-analysis.ts` — dat regelbestand staat om dezelfde reden al langer
-in dezelfde lijst ("gebouwd, geen consument"). De volgende stap is het Meta/LinkedIn-equivalent van
-`campaign-analysis.ts` (de eigenlijke `CampaignFinding`-generatie per objective), nog niet gebouwd.
+**Bevindingen-engines gebouwd: `lib/meta/campaign-analysis.ts` en
+`lib/linkedin/campaign-analysis.ts`.** Consumeren de taxonomiebestanden hierboven en produceren
+`CampaignFinding`-achtige bevindingen (severity/category/actie/impactScore), met dezelfde
+dedupe-op-hoogste-impact-logica als Google's `campaign-analysis.ts`. Eén bewust verschil, niet
+overgenomen van Google: CPA/ROAS/CPL-baselines worden alleen BINNEN hetzelfde objective berekend,
+nooit account-breed. Bij Google zijn "generic"/"category"/"shopping" onderling vergelijkbaar
+(allemaal omzet-gedreven acquisitie), maar een cost-per-lead (LinkedIn Leadgeneratie) en een
+cost-per-purchase (Meta Verkoop) zijn geen twee punten op dezelfde schaal — ze samen middelen zou
+een vals signaal opleveren. Beide bestanden hebben een eigen test
+(`__meta_campaign_analysis_test.ts`/`__linkedin_campaign_analysis_test.ts`) die dat specifieke
+scenario vastlegt: een campagne met een niet-relevante metric-waarde voor haar eigen objective mag
+de baseline van een ander objective niet beinvloeden.
 
-**Nog niet gestart:** extra mockdata per kanaal in het demo-account (16.2's tweede punt), en de
-bevindingen-engines die deze twee taxonomiebestanden consumeren. Dit document wordt bijgewerkt
-zodra die stappen zijn gezet — tot die tijd is dit de plek om op terug te vallen voor zowel het
-cron-beleid (16.1) als de bouwvolgorde (16.2/16.3).
+**Alle vier bestanden staan bewust in `TOEGESTANE_WEZEN`** (`scripts/check-hygiene.mjs`, 17
+augustus): de taxonomie- en de regel-laag zijn compleet en getest, maar hebben nog geen eigen
+consument (route/UI) — exact dezelfde status als Google's `lib/campaign-analysis.ts` al langer
+heeft. Open productbeslissing, geen automatische vervolgstap: worden deze bevindingen een los
+scherm (zoals Google's `campaign-analysis.ts` kennelijk ooit bedoeld was), of voedt de al-live
+SOP-pijplijn (`app/api/analysis/monthly/route.ts`, LLM-stap-gedreven, structureel anders dan deze
+regelmachine) ze rechtstreeks? Die keuze raakt ook Google's al langer wachtende bestand en is dus
+groter dan alleen Meta/LinkedIn — bewust hier alleen vastgelegd, niet zelfstandig beslist.
+
+**Nog niet gestart:** bredere mockdata-variatie per kanaal in het demo-account (16.2's tweede
+punt, verder dan de eerlijkheids-fix in 16.3 hierboven). Dit document wordt bijgewerkt zodra dat
+gebeurt — tot die tijd is dit de plek om op terug te vallen voor zowel het cron-beleid (16.1) als
+de bouwvolgorde (16.2/16.3).
