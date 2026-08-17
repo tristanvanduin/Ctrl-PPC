@@ -1850,3 +1850,129 @@ sandbox, met name risicovol voor brede tabellen zoals de zoektermenlijst; (2) de
 breedtes 700–1023px zijn nooit systematisch getest, en precies daar zat de blauwe-streep-bug uit
 13.4. Beide staan al in sectie 13.2/13.4; hier alleen samengevat zodat sectie 14 als geheel
 leesbaar is zonder terug te bladeren.
+
+---
+
+## 15. Vergelijking met EXECUTION_PLAN.md (17 augustus 2026)
+
+Op verzoek van de eigenaar ("ik wil 1 single source of truth"): `EXECUTION_PLAN.md` is een
+**tweede, los planningsdocument** in deze repo (draaiboek voor een uitvoeringsagent, geschreven 9
+augustus tegen commit `54072fa`, met zijn eigen "Fase 1: Decision Intelligence Core" — zie 14.3
+voor de naamsbotsing met de Fase 1 hierboven). Dit document (`MASTERPLAN.md`) is het meest
+actuele; deze sectie legt vast wat `EXECUTION_PLAN.md` had dat hier nog ontbrak, na verificatie
+tegen de live code — niet klakkeloos overgenomen.
+
+### 15.1 Een reëel, vandaag nog open beveiligingsgat — niet historisch
+
+**Dit is de belangrijkste bevinding van deze vergelijking.** `EXECUTION_PLAN.md` sectie 3 meet op 9
+augustus: *"92 van de 122 tabellen in `public` hebben geen RLS,"* met daaronder precies de
+tabellen waar de vertrouwensdoctrine (sectie 3) het hardst over is: `sprint_hypotheses`,
+`sprint_items`, `sop_analysis_output`, `sop_insights`, `sop_recommendations`, `sop_tasks`,
+`client_settings`, `llm_usage`. Dat las als een meting die inmiddels achterhaald zou kunnen zijn —
+is het niet. Geverifieerd (17 augustus): `scripts/migrations/065_rls_sop_intelligence.sql` bestaat
+wel, is geschreven om precies dit te dichten, maar draagt zelf de regel *"NIET UITGEVOERD TEGEN DE
+DATABASE... bewust niet toegepast."* Het gat staat nog open.
+
+**Waarom hij niet zomaar toegepast kan worden — de reden staat in de migratie zelf, hier
+samengevat omdat hij anders alleen in een ongedraaid SQL-bestand leeft:**
+
+Acht van de zestien tabellen in migratie 065's bereik worden **rechtstreeks door de browser
+gelezen** met de anon-sleutel (geen view-laag ertussen, zoals `fact_core` wel heeft): `sop_insights`,
+`sop_analysis_output`, `sop_recommendations`, `sop_tasks`, `sprint_hypotheses`, `sprint_items`,
+`client_settings`, `task_completions` — samen Vandaag, Analyses, Bevindingen, Sprintplanning, BMS
+en een groot deel van Instellingen. `O1_AUTH_ENFORCED` staat uit. Een RLS-policy die op
+`auth.uid()` controleert geeft bij een anonieme sessie **nul rijen** terug, geen foutmelding — die
+schermen zouden na het toepassen leeg vallen, niet zichtbaar breken. De migratie noemt zelf twee
+eerlijke oplossingen, geen van beide "gewoon uitvoeren": (1) eerst `O1_AUTH_ENFORCED` aanzetten met
+een echte inlogstroom, of (2) deze acht schermen ombouwen naar een service-role-route voor de
+leeskant (de schrijfkant loopt al deels via `app/api/data/[table]`). De overige acht tabellen in
+migratie 065 (`sop_hypothesis_tracking`, `sop_client_context`, `sop_client_config`,
+`client_targets`, `client_onboarding`, `analysis_prepared_context`, `search_term_analysis`,
+`second_opinion_runs`) hebben geen rechtstreekse browser-lezer — voor die acht is toepassen wél
+zonder dat risico.
+
+**Een tweede, apart gat, buiten het bereik van migratie 065 en nergens anders getraceerd:** zes
+tabellen dragen nog een oude, tenant-blinde policy uit migratie 012 (`auth_read`: elke ingelogde
+gebruiker ziet alles, van elk bureau) — `ads_leading_indicators`, `ads_portfolio_analysis`,
+`ads_region_monthly`, `ads_video_placements`, `benchmark_sectors`, `channel_geo_monthly`. Migratie
+065's eigen kop noemt dit expliciet "met opzet niet stilzwijgend meegenomen" — met opzet genoemd
+zodat het niet als "toevallig niet gezien" verdwijnt. Nog steeds niet gedicht.
+
+**Correctie op een bestaande regel in dit document:** sectie 7 noemt terloops *"Een Second
+Opinion-run (draait al, RLS via migratie 065)"* — dat suggereert dat migratie 065's bescherming al
+actief is. Dat klopt niet: de migratie zelf is nooit uitgevoerd. `second_opinion_runs` heeft geen
+rechtstreekse browser-lezer (dus geen acuut lek), maar "RLS via migratie 065" is op dit moment een
+belofte, geen feit. Regel blijft hier ongewijzigd staan zodat de fout traceerbaar blijft; de juiste
+lezing is deze sectie.
+
+**Wat wél al veilig is:** schrijfacties op alle zestien tabellen lopen al server-side via de
+service role (die RLS toch omzeilt) — nagemeten, geen rechtstreekse browser-schrijfactie gevonden.
+Dit is dus zuiver een leesgat, geen schrijfgat.
+
+**Dit hoort als beslispunt bij Bureau twee** (sectie 9, Fase 6/7-voorbereiding, "RLS-bureaugrens
+narekenen, niet aannemen"): met één bureau is dit gat theoretisch (niemand anders om van te
+lekken), met een tweede bureau is het een echte cross-tenant blootstelling op acht schermen.
+Oplossen vóór bureau twee zijn eerste klant koppelt, niet erna.
+
+### 15.2 Correctie op sectie 14.3: het skelet is niet overal even dood
+
+Sectie 14.3 hierboven zegt dat het Decision Engine-skelet (`channel-provider.ts`,
+`decision-skeleton.ts`, de `*-decision`-routes) volledig geïsoleerd is van de live pijplijn. Dat
+klopt voor die drie bestanden. Het klopt **niet** meer voor `lib/decision/quality-gates.ts` — ooit
+hetzelfde skelet-effort (EXECUTION_PLAN.md Stap 2, "Tien Quality Gates in shadow mode"), maar
+inmiddels gegradueerd: Fase 2 hierboven (regel ~996) documenteert dat migratie 083 +
+`monthly/route.ts` de poorten nu wél op elke echte run aanroepen, puur observerend
+(`quality_gate_observations`, fire-and-forget), geverifieerd tegen een echte klant/maand. Twee
+tellingen wijken af van elkaar, en dat is geen fout maar een evolutie: `EXECUTION_PLAN.md` stelde
+tien poorten voor (inclusief een aparte "Publish"-meta-poort en drie poorten — Rejected Cause,
+Thread Stability, Recommendation Continuity — die nooit zo gebouwd zijn); de live
+`GATES`-array in `quality-gates.ts` heeft negen, waarvan twee met een andere naam en andere logica
+dan het oorspronkelijke plan (Step Purity Gate, Coverage Gate). Het plan is dus niet 1-op-1
+uitgevoerd, het is herontworpen tijdens de bouw — de huidige negen zijn de juiste, levende
+bron, niet het tien-poorten-voorstel.
+
+### 15.3 Onopgenomen conceptwerk: Behavioral Funnel Classifier, Playbook Engine, Portfolio Trend Engine
+
+`EXECUTION_PLAN.md` Stap 1 definieert TypeScript-interfaces voor drie concepten die nergens anders
+in deze repo voorkomen: een gewogen `FunnelClassification` (vier signalen: `api_intent` 20%,
+`conversion_routing` 20%, `audience_logic` 30%, `output_reality` 30%), een `Playbook`
+("het IP van één bureau, nooit gedeeld") en een `MacroTrendCell` (portfolio-brede trends per
+bureau/kanaal/niche). Dit is **niet hetzelfde** als de al-live rolclassificatie in sectie 5.2
+(`classifyFunnelRole`/`funnel-overlap.ts`, prospecting/retargeting/branded capture) — een andere
+as, voor een ander doel (Playbook Engine, niet cross-channel-synergie).
+
+De interfaces zijn overgenomen uit "hoofdstuk 13 van de master blueprint" — een extern document
+dat, net als de negentien strategische documenten uit sectie 0, **niet in deze repo bestaat**.
+Wel echt gemeten op 9 augustus, tegen 71 accounts: API Intent-dekking 54/71
+(`ads_campaign_metadata.bidding_strategy`), Audience Logic 18/71 (`ads_audience_performance_monthly`,
+alleen Google — `meta_adsets` heeft 0 rijen), Conversion Routing 8/71 op klantniveau en 0 op
+campagneniveau, Output Reality volledig. Bij een `coverage`-drempel van 0,5 haalt de classifier dat
+vandaag niet: de twee zwakke signalen, Audience Logic (30%) en Conversion Routing (20%), tellen
+samen voor 50% van de weging en rusten op data die bij de meeste accounts ontbreekt — precies de
+helft van het oordeel hangt op wat er het minst is.
+
+**Status: geen gebouwde functionaliteit, geen geplande poort, puur gemeten voorwerk dat nergens
+anders is vastgelegd.** Of dit concept wordt overgenomen is een productbeslissing voor de
+eigenaar, geen automatische toevoeging — hier alleen vastgelegd zodat het niet nogmaals "ontdekt"
+hoeft te worden.
+
+### 15.4 Onopgenomen: Business Event Context (rai_events → BusinessEvent)
+
+`EXECUTION_PLAN.md` Stap 5 beschrijft een mapping van `client_settings.rai_events` (JSONB,
+migratie 024, al gevuld: beurzen met cadans en edities, gelezen door
+`lib/rai/use-upcoming-edition.ts` en de geo-clone-route) naar een generieke `BusinessEvent`-vorm
+voor de Decision Engine, plus de constatering dat `sop_client_context` (met precies de juiste
+kolommen: `valid_from`/`valid_until`/`impact_on_analysis`) wél bestaat maar **0 rijen** heeft —
+bruikbaar, nooit gevuld. Nergens in dit document vastgelegd. Geen actie ondernomen, alleen
+verankerd: als "waarom weet de analyse niet dat er een beurseditie aankomt" ooit een vraag wordt,
+is dit waar het antwoord al lag.
+
+### 15.5 Kleine, niet-blokkerende afwijkingen — EXECUTION_PLAN.md's cijfers zijn hier de verouderde
+
+Twee plekken waar `EXECUTION_PLAN.md` een getal noemt dat inmiddels afwijkt van de live code, en
+waar **dit document en de code gelijk lopen** (dus geen actie, alleen vastgelegd zodat niemand
+straks het verkeerde document als bron pakt): het God View-drempelgetal — `EXECUTION_PLAN.md`
+noemt "`totalCount >= 50` én ≥5 bureaus én ≥20 accounts," de live code
+(`lib/benchmark/cel.ts`) en sectie 6/7 hierboven zeggen `MIN_BUREAUS = 4` met
+`MIN_ACCOUNTS = 10` per cel — `EXECUTION_PLAN.md` is hier de verouderde bron, dit document en de
+code kloppen.
