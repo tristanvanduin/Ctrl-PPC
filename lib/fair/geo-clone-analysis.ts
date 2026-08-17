@@ -13,7 +13,7 @@
 //   met de beursdag); dat is een benadering en staat als aanname in de output.
 
 import { aggregateCampaignMonthlyByGeoClone, type CampaignMonthlyRow } from "./geo-clone-aggregate";
-import { previousEditionFor, priorEditionsFor, type RaiEdition, type FairCadence } from "./event-comparison";
+import { previousEditionFor, priorEditionsFor, type FairEdition, type FairCadence } from "./event-comparison";
 import { alignEditionsAtEqualDaysOut, isWithinWindow, type DailyPoint, type Edition as AxisEdition, type EditionComparison } from "./event-time-axis";
 import { forecastStream, type StreamForecast } from "./event-forecast";
 import { forecastAllChannels, type ChannelForecastInput, type ChannelForecastResult, type BlendedForecast } from "./multi-channel-forecast";
@@ -64,9 +64,9 @@ const ACTION_BEHIND_PCT = -0.15; // 15% achter op de vorige editie bij gelijke a
 // combinaties over drie jaar. Dat verschuift campaignStartDate en fairEndDate, waardoor een
 // dag data bij de verkeerde editie terechtkomt.
 
-/** Bouwt RaiEditions uit de geconfigureerde editie-datums: venster loopt van net na de vorige
+/** Bouwt FairEditions uit de geconfigureerde editie-datums: venster loopt van net na de vorige
  * editie tot en met de beursdag (of een cadans-lengte terug voor de eerste editie). */
-export function buildEditions(geoClone: string, cadence: FairCadence, editions: SettingsEdition[]): RaiEdition[] {
+export function buildEditions(geoClone: string, cadence: FairCadence, editions: SettingsEdition[]): FairEdition[] {
   const sorted = editions
     .filter((e) => e.date)
     .map((e) => ({ date: e.date.slice(0, 10), label: e.label || e.date.slice(0, 10) }))
@@ -89,7 +89,7 @@ export function buildEditions(geoClone: string, cadence: FairCadence, editions: 
 
 /** De editie waar we nu naartoe werken: de eerstvolgende vanaf de peildatum, anders de laatste
  * (evaluatie na afloop). */
-export function pickCurrentEdition(editions: RaiEdition[], asOfDate: string): RaiEdition | null {
+export function pickCurrentEdition(editions: FairEdition[], asOfDate: string): FairEdition | null {
   const upcoming = editions.filter((e) => e.fairStartDate >= asOfDate).sort((a, b) => a.fairStartDate.localeCompare(b.fairStartDate));
   if (upcoming.length > 0) return upcoming[0];
   const past = [...editions].sort((a, b) => b.fairStartDate.localeCompare(a.fairStartDate));
@@ -227,7 +227,7 @@ const channelLabel = (c: string): string => CHANNEL_LABEL[c] ?? c;
 
 function renderMarkdown(
   input: GeoCloneAnalysisInput,
-  current: RaiEdition,
+  current: FairEdition,
   prevId: string | null,
   gapDays: number | null,
   cadenceMatches: boolean,

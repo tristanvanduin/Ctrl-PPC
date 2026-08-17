@@ -1,4 +1,4 @@
-// RAI geo-clone-catalogus plus het campagnenaam-filter. Alle beurzen van een merk zitten in
+// Geo-clone-catalogus voor beursklanten plus het campagnenaam-filter. Alle beurzen van een merk zitten in
 // een account; het onderscheid tussen geo-clones zit in de campagnenaam via een afkorting per
 // locatie (bijv. AQM voor Aquatech Mexico, ICC voor Interclean China). Dit bestand bevat alle
 // bekende varianten en het filter dat een campagne aan een variant koppelt op die afkorting.
@@ -15,12 +15,12 @@ export interface GeoCloneVariant {
   brand: string;
   location: string;
   abbreviation: string; // de code die in de campagnenaam staat; tevens de geoClone-sleutel
-  confirmed: boolean; // is de afkorting bevestigd tegen RAI's conventie?
+  confirmed: boolean; // is de afkorting bevestigd tegen de klant-conventie?
   cadence: FairCadence;
 }
 
 // Comprehensief, voor de veiligheid. Corrigeer de afkortingen (confirmed: false) waar nodig.
-export const RAI_GEO_CLONES: GeoCloneVariant[] = [
+export const FAIR_GEO_CLONES: GeoCloneVariant[] = [
   // Aquatech (watertechnologie)
   { brand: "Aquatech", location: "Amsterdam", abbreviation: "AQA", confirmed: false, cadence: "biennial" },
   { brand: "Aquatech", location: "Mexico", abbreviation: "AQM", confirmed: true, cadence: "annual" },
@@ -60,7 +60,7 @@ export function abbreviationInName(abbreviation: string, campaignName: string): 
 
 // Koppelt een campagnenaam aan een variant op de afkorting. Bij meerdere matches wint de
 // langste afkorting (meest specifiek, bijv. GTAM boven GTA). Geen match geeft null (onbekend).
-export function matchGeoCloneByCampaignName(campaignName: string, catalog: GeoCloneVariant[] = RAI_GEO_CLONES): GeoCloneVariant | null {
+export function matchGeoCloneByCampaignName(campaignName: string, catalog: GeoCloneVariant[] = FAIR_GEO_CLONES): GeoCloneVariant | null {
   const matches = catalog
     .filter((v) => abbreviationInName(v.abbreviation, campaignName))
     .sort((a, b) => b.abbreviation.length - a.abbreviation.length);
@@ -70,7 +70,7 @@ export function matchGeoCloneByCampaignName(campaignName: string, catalog: GeoCl
 // De varianten die daadwerkelijk in de gegeven campagnenamen voorkomen. Een variant waarvan de
 // afkorting nergens matcht, wordt niet getoond. Dit is de directe invulling van de eis: geen
 // afkorting in de campagnenaam betekent de variant niet vertonen.
-export function visibleGeoClones(campaignNames: string[], catalog: GeoCloneVariant[] = RAI_GEO_CLONES): GeoCloneVariant[] {
+export function visibleGeoClones(campaignNames: string[], catalog: GeoCloneVariant[] = FAIR_GEO_CLONES): GeoCloneVariant[] {
   return catalog.filter((v) => campaignNames.some((name) => abbreviationInName(v.abbreviation, name)));
 }
 
@@ -81,6 +81,6 @@ export interface CampaignAssignment {
 
 // Wijst elke campagne toe aan zijn variant (of null = onbekend). Onbekende campagnes worden
 // nooit stilzwijgend bij een variant opgeteld; ze zijn expliciet apart te behandelen.
-export function assignCampaigns(campaignNames: string[], catalog: GeoCloneVariant[] = RAI_GEO_CLONES): CampaignAssignment[] {
+export function assignCampaigns(campaignNames: string[], catalog: GeoCloneVariant[] = FAIR_GEO_CLONES): CampaignAssignment[] {
   return campaignNames.map((campaignName) => ({ campaignName, variant: matchGeoCloneByCampaignName(campaignName, catalog) }));
 }

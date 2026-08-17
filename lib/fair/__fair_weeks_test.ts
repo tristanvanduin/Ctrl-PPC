@@ -1,5 +1,5 @@
 // Test voor de weken-tot-beurs-tijdas. Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__fair_weeks_test.ts
+// Draaien: npx tsx lib/fair/__fair_weeks_test.ts
 
 import type { WeeklyPoint } from "@/lib/forecast";
 import {
@@ -9,7 +9,7 @@ import {
   nthMondayOfMonth,
   toFairWeeks,
   currentWeekIndex,
-  type RaiEventCfg,
+  type FairEventCfg,
 } from "./fair-weeks";
 
 let passed = 0, failed = 0;
@@ -42,7 +42,7 @@ assert(nthMondayOfMonth(2026, 13, 1) === null, "een onmogelijke maand geeft null
 assert(nthMondayOfMonth(2026, 7, 0) === null, "een week-index onder 1 geeft null");
 
 // ── De eerstvolgende editie ──
-const jaarlijks: RaiEventCfg = {
+const jaarlijks: FairEventCfg = {
   id: "grt", name: "GreenTech Amsterdam", abbrev: "GRT", cadence: "annual",
   editions: [{ date: "2025-06-11", label: "2025" }, { date: "2026-06-10", label: "2026" }],
 };
@@ -58,17 +58,17 @@ assert(doorgerekend?.fairDate === "2027-06-10", "zonder toekomstige editie reken
 assert(doorgerekend?.afgeleid === true, "een doorgerekende datum is gemarkeerd als afgeleid");
 assert(doorgerekend?.previousFairDate === "2026-06-10", "de laatst gehouden editie blijft het ijkpunt");
 
-const tweejaarlijks: RaiEventCfg = { id: "x", name: "X", abbrev: "X", cadence: "biennial", editions: [{ date: "2024-03-05", label: "2024" }] };
+const tweejaarlijks: FairEventCfg = { id: "x", name: "X", abbrev: "X", cadence: "biennial", editions: [{ date: "2024-03-05", label: "2024" }] };
 assert(selectUpcomingEdition([tweejaarlijks], "2026-07-28")?.fairDate === "2028-03-05", "de 2-jaarlijkse cadans stapt met twee jaar tegelijk");
 
-const zonderCadans: RaiEventCfg = { id: "y", name: "Y", abbrev: "Y", cadence: "custom", editions: [{ date: "2024-03-05", label: "2024" }] };
+const zonderCadans: FairEventCfg = { id: "y", name: "Y", abbrev: "Y", cadence: "custom", editions: [{ date: "2024-03-05", label: "2024" }] };
 assert(selectUpcomingEdition([zonderCadans], "2026-07-28") === null, "zonder bekende cadans wordt er geen datum verzonnen");
 assert(selectUpcomingEdition([], "2026-07-28") === null, "geen beurzen geeft null");
 assert(selectUpcomingEdition([{ id: "z", name: "Z", cadence: "annual", editions: [] }], "2026-07-28") === null, "een beurs zonder edities geeft null");
 
 // Twee beurzen: de vroegste eerstvolgende wint.
-const later: RaiEventCfg = { id: "gra", name: "GreenTech Americas", abbrev: "GRA", cadence: "annual", editions: [{ date: "2026-11-04", label: "2026" }] };
-const vroeger: RaiEventCfg = { id: "grt2", name: "GreenTech Amsterdam", abbrev: "GRT", cadence: "annual", editions: [{ date: "2026-09-02", label: "2026" }] };
+const later: FairEventCfg = { id: "gra", name: "GreenTech Americas", abbrev: "GRA", cadence: "annual", editions: [{ date: "2026-11-04", label: "2026" }] };
+const vroeger: FairEventCfg = { id: "grt2", name: "GreenTech Amsterdam", abbrev: "GRT", cadence: "annual", editions: [{ date: "2026-09-02", label: "2026" }] };
 assert(selectUpcomingEdition([later, vroeger], "2026-07-28")?.abbrev === "GRT", "van twee beurzen wint de eerstvolgende");
 
 // ── Weekpunten omzetten ──

@@ -1,7 +1,7 @@
-// Test voor de RAI-comparison-laag (R1). Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__event_comparison_test.ts
+// Test voor de beurs-comparison-laag (R1). Deterministisch, geen IO.
+// Draaien: npx tsx lib/fair/__event_comparison_test.ts
 
-import { selectPoints, availableGeoClones, previousEditionFor, weekOverWeekTempo, buildEventComparison, type RaiEdition, type RaiDataPoint } from "./event-comparison";
+import { selectPoints, availableGeoClones, previousEditionFor, weekOverWeekTempo, buildEventComparison, type FairEdition, type FairDataPoint } from "./event-comparison";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {
@@ -9,7 +9,7 @@ function assert(condition: boolean, label: string): void {
 }
 
 // Beurs "ISE" met twee geo-clones (Amsterdam jaarlijks, Barcelona tweejaarlijks).
-const editions: RaiEdition[] = [
+const editions: FairEdition[] = [
   { editionId: "ise-ams-2024", fairId: "ise", geoClone: "amsterdam", cadence: "annual", campaignStartDate: "2024-03-01", fairStartDate: "2024-04-15", fairEndDate: "2024-04-17" },
   { editionId: "ise-ams-2025", fairId: "ise", geoClone: "amsterdam", cadence: "annual", campaignStartDate: "2025-03-01", fairStartDate: "2025-04-15", fairEndDate: "2025-04-17" },
   { editionId: "ise-ams-2026", fairId: "ise", geoClone: "amsterdam", cadence: "annual", campaignStartDate: "2026-03-01", fairStartDate: "2026-04-15", fairEndDate: "2026-04-17" },
@@ -32,7 +32,7 @@ assert(previousEditionFor(editions, "ise-ams-2024").edition === null, "de eerste
 assert(prevBcn.edition?.geoClone === "barcelona", "de vorige editie komt uit dezelfde geo-clone");
 
 // ── Geo-clone plus stream filter ──
-const points: RaiDataPoint[] = [
+const points: FairDataPoint[] = [
   { date: "2026-03-31", value: 30, geoClone: "amsterdam", stream: "registraties", editionId: "ise-ams-2026" },
   { date: "2026-03-31", value: 5, geoClone: "amsterdam", stream: "exposanten", editionId: "ise-ams-2026" },
   { date: "2026-03-31", value: 12, geoClone: "barcelona", stream: "registraties", editionId: "ise-bcn-2026" },
@@ -46,7 +46,7 @@ assert(availableGeoClones(points).join(",") === "amsterdam,barcelona", "de besch
 // ── Week-over-week tempo ──
 const ams2026 = editions.find((e) => e.editionId === "ise-ams-2026")!;
 // Punten op verschillende weken-tot-beurs. Beurs 15 april 2026.
-const wowPoints: RaiDataPoint[] = [
+const wowPoints: FairDataPoint[] = [
   { date: "2026-03-18", value: 10, geoClone: "amsterdam", stream: "registraties", editionId: "ise-ams-2026" }, // D-28, week 4
   { date: "2026-03-25", value: 20, geoClone: "amsterdam", stream: "registraties", editionId: "ise-ams-2026" }, // D-21, week 3
   { date: "2026-04-01", value: 40, geoClone: "amsterdam", stream: "registraties", editionId: "ise-ams-2026" }, // D-14, week 2

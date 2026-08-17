@@ -1,5 +1,5 @@
 // Test voor de universele multi-channel event-forecast. Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__multi_channel_forecast_test.ts
+// Draaien: npx tsx lib/fair/__multi_channel_forecast_test.ts
 
 import { forecastAllChannels, type ChannelForecastInput } from "./multi-channel-forecast";
 import type { Edition, DailyPoint } from "./event-time-axis";

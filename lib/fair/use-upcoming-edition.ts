@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { today } from "@/lib/reporting-date";
-import { selectUpcomingEdition, type RaiEventCfg, type UpcomingEdition } from "./fair-weeks";
+import { selectUpcomingEdition, type FairEventCfg, type UpcomingEdition } from "./fair-weeks";
 
 // Leest de beurzen van de klant (client_settings.rai_events, migratie 024) en bepaalt welke
 // editie de eerstvolgende is. Één plek, zodat de sectiekop en de prestatiekaart hetzelfde
@@ -21,7 +21,7 @@ export function useUpcomingEdition(clientId: string): UpcomingEdition | null {
     dbSelectOne<{ rai_events: unknown }>("client_settings", { select: "rai_events", clientId })
       .then(({ data }) => {
         if (cancelled) return;
-        const events = (data?.rai_events as { events?: RaiEventCfg[] } | null)?.events;
+        const events = (data?.rai_events as { events?: FairEventCfg[] } | null)?.events;
         if (!Array.isArray(events) || events.length === 0) return;
         setEdition(selectUpcomingEdition(events, today()));
       });

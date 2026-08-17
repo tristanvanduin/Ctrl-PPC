@@ -1,4 +1,4 @@
-// R1: target-resolutie voor het RAI-spoor, de pure kern. De spec is streng en dat maakt dit
+// R1: target-resolutie voor het beursspoor, de pure kern. De spec is streng en dat maakt dit
 // eenvoudig en eerlijk: targets horen bij een EDITIE (nooit een kalenderjaar), per stream
 // (registraties en exposanten los, nooit samengevoegd), en per geo-clone (elke variant is
 // een eigen event met eigen targets: de Amsterdam-targets gelden NIET voor Mexico). Er is

@@ -1,5 +1,5 @@
 // De event-prognose over MEERDERE eerdere edities.
-// Draaien: npx tsx lib/rai/__event_forecast_multi_test.ts
+// Draaien: npx tsx lib/fair/__event_forecast_multi_test.ts
 //
 // De prognose leunde op de meest recente editie alleen. Dat was op twee manieren fragiel:
 //
@@ -15,7 +15,7 @@
 // mag meeslepen.
 
 import { forecastStream } from "./event-forecast";
-import { priorEditionsFor, type RaiEdition } from "./event-comparison";
+import { priorEditionsFor, type FairEdition } from "./event-comparison";
 import type { DailyPoint, Edition } from "./event-time-axis";
 
 let passed = 0, failed = 0;
@@ -134,7 +134,7 @@ console.log("\nZonder eerdere editie");
 
 console.log("\nDe selectie van eerdere edities");
 {
-  const mk = (id: string, datum: string): RaiEdition => ({
+  const mk = (id: string, datum: string): FairEdition => ({
     ...editie(id, datum, 60), fairId: "beurs", geoClone: "beurs", cadence: "annual",
   });
   const alle = [mk("2023", "2023-06-01"), mk("2026", "2026-06-01"), mk("2024", "2024-06-01"), mk("2025", "2025-06-01")];

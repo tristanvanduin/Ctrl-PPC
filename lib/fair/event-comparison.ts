@@ -1,4 +1,4 @@
-// R1-comparison-laag voor RAI. Drie dingen die de kalender-vergelijking niet geeft:
+// R1-comparison-laag voor beursklanten. Drie dingen die de kalender-vergelijking niet geeft:
 // 1. Editie-over-editie die de ECHTE vorige editie pakt, of die nu 1 of 2 jaar terug ligt
 //    (niet elke beurs is jaarlijks), per beurs en geo-clone.
 // 2. Week-over-week tempo binnen het campagnevenster, fijner dan maand-op-maand.
@@ -19,7 +19,7 @@ export type FairCadence = "annual" | "biennial" | "custom";
 
 // Een editie hangt aan een beurs EN een geo-clone: dezelfde beurs kan in meerdere geografieen
 // draaien (aftakkingen), elk met een eigen tijdlijn, in hetzelfde account.
-export interface RaiEdition extends Edition {
+export interface FairEdition extends Edition {
   fairId: string;
   geoClone: string;
   cadence: FairCadence;
@@ -27,7 +27,7 @@ export interface RaiEdition extends Edition {
 
 export type Stream = "registraties" | "exposanten" | "onbekend";
 
-export interface RaiDataPoint extends DailyPoint {
+export interface FairDataPoint extends DailyPoint {
   geoClone: string;
   stream: Stream;
   editionId: string;
@@ -36,9 +36,9 @@ export interface RaiDataPoint extends DailyPoint {
 // De filter: scope de datapunten tot een geo-clone, stream en/of editie. Ongetagde of andere
 // punten vallen weg. Dit is de schone scheiding van aftakkingen in hetzelfde account.
 export function selectPoints(
-  points: RaiDataPoint[],
+  points: FairDataPoint[],
   filter: { geoClone?: string; stream?: Stream; editionId?: string }
-): RaiDataPoint[] {
+): FairDataPoint[] {
   return points.filter((p) => {
     if (filter.geoClone != null && p.geoClone !== filter.geoClone) return false;
     if (filter.stream != null && p.stream !== filter.stream) return false;
@@ -48,7 +48,7 @@ export function selectPoints(
 }
 
 // Alle geo-clones die in de data voorkomen, voor de filter-opties in de UI.
-export function availableGeoClones(points: RaiDataPoint[]): string[] {
+export function availableGeoClones(points: FairDataPoint[]): string[] {
   return [...new Set(points.map((p) => p.geoClone))].sort();
 }
 
@@ -60,7 +60,7 @@ function expectedGapDays(cadence: FairCadence): number | null {
 }
 
 export interface PreviousEditionResult {
-  edition: RaiEdition | null;
+  edition: FairEdition | null;
   gapDays: number | null;
   cadenceMatches: boolean; // valt de gap redelijk bij de opgegeven cadans?
 }
@@ -69,7 +69,7 @@ export interface PreviousEditionResult {
 // beursdatum die voor de huidige valt. Cadans-agnostisch in de resolutie zelf, dus een
 // tweejaarlijkse beurs pakt vanzelf de editie van twee jaar terug. De cadans dient alleen
 // voor een sanity-label (valt de gap bij wat je verwacht?).
-export function previousEditionFor(editions: RaiEdition[], currentEditionId: string): PreviousEditionResult {
+export function previousEditionFor(editions: FairEdition[], currentEditionId: string): PreviousEditionResult {
   const current = editions.find((e) => e.editionId === currentEditionId);
   if (!current) return { edition: null, gapDays: null, cadenceMatches: false };
 
@@ -115,7 +115,7 @@ export interface WeekOverWeekResult {
 // Week-over-week tempo binnen het venster, in weken-tot-beurs. De huidige, nog lopende week
 // wordt uitgesloten zodat je twee complete weken vergelijkt. Fijner dan maand-op-maand en
 // event-relatief in plaats van kalender.
-export function weekOverWeekTempo(points: RaiDataPoint[], edition: Edition, asOfDate: string): WeekOverWeekResult {
+export function weekOverWeekTempo(points: FairDataPoint[], edition: Edition, asOfDate: string): WeekOverWeekResult {
   const todayDtf = daysToFair(edition.fairStartDate, asOfDate);
   const todayWeek = todayDtf == null ? null : Math.floor(todayDtf / 7);
 
@@ -158,8 +158,8 @@ export interface EventComparison {
 // editie (cadans-bewust), en lever de editie-over-editie plus de week-over-week. Dit is de
 // event-relatieve vervanging van MoM en YoY, per aftakking.
 export function buildEventComparison(input: {
-  allPoints: RaiDataPoint[];
-  editions: RaiEdition[];
+  allPoints: FairDataPoint[];
+  editions: FairEdition[];
   currentEditionId: string;
   geoClone: string;
   stream: Stream;
@@ -207,14 +207,14 @@ export function buildEventComparison(input: {
  * Met de volledige lijst kan de aanroeper de onvergelijkbare edities overslaan in plaats van
  * op te geven, en over de rest een mediaan nemen.
  */
-export function priorEditionsFor(editions: RaiEdition[], currentEditionId: string): RaiEdition[] {
+export function priorEditionsFor(editions: FairEdition[], currentEditionId: string): FairEdition[] {
   const current = editions.find((e) => e.editionId === currentEditionId);
   if (!current) return [];
 
   return editions
     .filter((e) => e.fairId === current.fairId && e.geoClone === current.geoClone && e.editionId !== current.editionId)
     .map((e) => ({ e, gap: daysToFair(current.fairStartDate, e.fairStartDate) }))
-    .filter((x): x is { e: RaiEdition; gap: number } => x.gap != null && x.gap > 0)
+    .filter((x): x is { e: FairEdition; gap: number } => x.gap != null && x.gap > 0)
     .sort((a, b) => a.gap - b.gap) // kleinste positieve gap eerst = meest recent
     .map((x) => x.e);
 }

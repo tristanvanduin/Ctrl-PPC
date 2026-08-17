@@ -1,5 +1,5 @@
 // Test voor de R1 event-tijdas-kern. Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__event_time_axis_test.ts
+// Draaien: npx tsx lib/fair/__event_time_axis_test.ts
 
 import { daysToFair, isWithinWindow, windowLengthDays, cumulativeThroughDaysOut, cumulativeCurve, alignEditionsAtEqualDaysOut, MATERIAL_WINDOW_DIFF, type Edition, type DailyPoint } from "./event-time-axis";
 

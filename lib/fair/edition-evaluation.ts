@@ -1,4 +1,4 @@
-// SI3 voor RAI: de editie-evaluatie. Waar de agency-variant een periode tegen zijn plan
+// SI3 voor beursklanten: de editie-evaluatie. Waar de agency-variant een periode tegen zijn plan
 // afrekent op kalendermaanden, doet deze dat op de EVENT-RELATIEVE tijdas: een beurs draait
 // niet in maanden maar in dagen-tot-de-beurs, en de eerlijke vergelijking is de vorige
 // editie op HETZELFDE dagen-uit-punt.
@@ -11,7 +11,7 @@
 // er voorwaardelijke taal bij ("koerst op"); na afloop is het een FEIT ("haalde"). Een
 // evaluatie die dat verschil niet maakt, verkoopt een verwachting als een uitkomst.
 
-import { buildEventComparison, type RaiDataPoint, type RaiEdition, type Stream } from "./event-comparison";
+import { buildEventComparison, type FairDataPoint, type FairEdition, type Stream } from "./event-comparison";
 import { forecastStream, type StreamForecast } from "./event-forecast";
 import { resolveEventTargets, type EventStreamTargetRow } from "./target-resolution";
 import { daysToFair } from "./event-time-axis";
@@ -75,8 +75,8 @@ function verdictFor(forecast: StreamForecast, afgelopen: boolean): { verdict: St
 }
 
 export function buildEditionEvaluation(input: {
-  points: RaiDataPoint[];
-  editions: RaiEdition[];
+  points: FairDataPoint[];
+  editions: FairEdition[];
   targetRows: EventStreamTargetRow[];
   currentEditionId: string;
   geoClone: string;

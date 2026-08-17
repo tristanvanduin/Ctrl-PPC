@@ -1,5 +1,5 @@
 // Test voor de R1 event-forecast. Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__event_forecast_test.ts
+// Draaien: npx tsx lib/fair/__event_forecast_test.ts
 
 import { forecastStream } from "./event-forecast";
 import type { Edition, DailyPoint } from "./event-time-axis";

@@ -16,7 +16,7 @@ function assert(cond: boolean, msg: string) {
 }
 
 const account: AccountSettings = {
-  branding: { brandName: "RAI", primaryColor: "#08288C", accentColor: "#F16B37", secondaryColor: null, logoUrl: "https://acc/logo.png", headingFont: "Gilroy" },
+  branding: { brandName: "Testmerk", primaryColor: "#08288C", accentColor: "#F16B37", secondaryColor: null, logoUrl: "https://acc/logo.png", headingFont: "Gilroy" },
   goals: { conversionsAbsolute: 5000, revenueAbsolute: 150000, roasTarget: 5, cpaTarget: 20 },
   event: { cadence: "annual", editions: [{ date: "2025-06-01", label: "2025" }] },
 };
@@ -24,7 +24,7 @@ const account: AccountSettings = {
 console.log("branding: override wint als ingevuld, anders erven:");
 const b = resolveBranding(account.branding, { primaryColor: "#123456", brandName: "  ", logoUrl: null });
 assert(b.effective.primaryColor === "#123456" && b.inherited.primaryColor === false, "ingevulde primaire kleur overschrijft");
-assert(b.effective.brandName === "RAI" && b.inherited.brandName === true, "lege (whitespace) merknaam erft van account");
+assert(b.effective.brandName === "Testmerk" && b.inherited.brandName === true, "lege (whitespace) merknaam erft van account");
 assert(b.effective.logoUrl === "https://acc/logo.png" && b.inherited.logoUrl === true, "null logo erft van account");
 assert(b.effective.accentColor === "#F16B37" && b.inherited.accentColor === true, "ontbrekende accentkleur erft van account");
 
@@ -46,7 +46,7 @@ assert(e2.effective.editions!.length === 1 && e2.inherited.editions === true, "l
 
 console.log("geheel: leeg/ontbrekend override erft volledig van account:");
 const full = resolveGeoCloneSettings(account, null);
-assert(full.branding.effective.brandName === "RAI" && full.branding.inherited.brandName === true, "branding volledig geërfd bij geen override");
+assert(full.branding.effective.brandName === "Testmerk" && full.branding.inherited.brandName === true, "branding volledig geërfd bij geen override");
 assert(full.goals.effective.roasTarget === 5 && full.goals.inherited.roasTarget === true, "doelen volledig geërfd bij geen override");
 assert(full.event.effective.cadence === "annual" && full.event.inherited.cadence === true, "event volledig geërfd bij geen override");
 

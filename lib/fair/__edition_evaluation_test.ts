@@ -1,8 +1,8 @@
-// Test voor de RAI-editie-evaluatie. Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__edition_evaluation_test.ts
+// Test voor de beurs-editie-evaluatie. Deterministisch, geen IO.
+// Draaien: npx tsx lib/fair/__edition_evaluation_test.ts
 
 import { buildEditionEvaluation, renderEditionEvaluationSection } from "./edition-evaluation";
-import type { RaiDataPoint, RaiEdition } from "./event-comparison";
+import type { FairDataPoint, FairEdition } from "./event-comparison";
 import type { EventStreamTargetRow } from "./target-resolution";
 
 let passed = 0, failed = 0;
@@ -10,12 +10,12 @@ function assert(condition: boolean, label: string): void {
   if (condition) { passed += 1; } else { failed += 1; console.error(`  FAIL: ${label}`); }
 }
 
-const HUIDIG: RaiEdition = { editionId: "aqm-2026", fairId: "aqm", geoClone: "AQM", cadence: "annual", campaignStartDate: "2026-01-01", fairStartDate: "2026-06-01", fairEndDate: "2026-06-03" };
-const VORIG: RaiEdition = { editionId: "aqm-2025", fairId: "aqm", geoClone: "AQM", cadence: "annual", campaignStartDate: "2025-01-01", fairStartDate: "2025-06-01", fairEndDate: "2025-06-03" };
+const HUIDIG: FairEdition = { editionId: "aqm-2026", fairId: "aqm", geoClone: "AQM", cadence: "annual", campaignStartDate: "2026-01-01", fairStartDate: "2026-06-01", fairEndDate: "2026-06-03" };
+const VORIG: FairEdition = { editionId: "aqm-2025", fairId: "aqm", geoClone: "AQM", cadence: "annual", campaignStartDate: "2025-01-01", fairStartDate: "2025-06-01", fairEndDate: "2025-06-03" };
 
 // Dagelijkse punten: elke dag een vaste waarde, zodat de cumulatieven voorspelbaar zijn.
-function reeks(editionId: string, van: string, dagen: number, waarde: number, stream: "registraties" | "exposanten"): RaiDataPoint[] {
-  const out: RaiDataPoint[] = [];
+function reeks(editionId: string, van: string, dagen: number, waarde: number, stream: "registraties" | "exposanten"): FairDataPoint[] {
+  const out: FairDataPoint[] = [];
   const start = new Date(van);
   for (let i = 0; i < dagen; i += 1) {
     out.push({

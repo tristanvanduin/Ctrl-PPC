@@ -1,4 +1,4 @@
-// R1: de pure event-tijdas-kern voor RAI. RAI adverteert per beurs, dus kalender-MoM en YoY
+// R1: de pure event-tijdas-kern voor beursklanten. Een beursklant adverteert per beurs, dus kalender-MoM en YoY
 // vergelijken ongelijke momenten en zijn fout. Alles rekent in dagen-tot-beurs, binnen het
 // venster campagnestart-tot-beurseinde, en editie-over-editie op GELIJKE dagen-uit. IO-vrij
 // en los getest; de streams, targets, forecast, status en UI rusten op deze kern.

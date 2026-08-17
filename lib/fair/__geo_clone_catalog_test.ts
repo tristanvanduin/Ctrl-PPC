@@ -1,7 +1,7 @@
-// Test voor de RAI geo-clone-catalogus en het filter. Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__geo_clone_catalog_test.ts
+// Test voor de geo-clone-catalogus voor beursklanten en het filter. Deterministisch, geen IO.
+// Draaien: npx tsx lib/fair/__geo_clone_catalog_test.ts
 
-import { RAI_GEO_CLONES, abbreviationInName, matchGeoCloneByCampaignName, visibleGeoClones, assignCampaigns } from "./geo-clone-catalog";
+import { FAIR_GEO_CLONES, abbreviationInName, matchGeoCloneByCampaignName, visibleGeoClones, assignCampaigns } from "./geo-clone-catalog";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {
@@ -52,9 +52,9 @@ assert(toewijzing[1].variant === null, "de onbekende campagne blijft null, niet 
 assert(toewijzing[2].variant?.abbreviation === "ICC", "derde campagne toegewezen aan ICC");
 
 // ── Catalogus-compleetheid ──
-assert(RAI_GEO_CLONES.length >= 18, "de catalogus dekt alle bekende merken en geo-clones");
-assert(RAI_GEO_CLONES.filter((v) => v.confirmed).length === 6, "zes afkortingen zijn bevestigd (AQM, ICC, ICA, GRT, GRA, GRN), de rest is te verifieren");
-assert(new Set(RAI_GEO_CLONES.map((v) => v.abbreviation)).size === RAI_GEO_CLONES.length, "alle afkortingen zijn uniek, geen dubbele");
+assert(FAIR_GEO_CLONES.length >= 18, "de catalogus dekt alle bekende merken en geo-clones");
+assert(FAIR_GEO_CLONES.filter((v) => v.confirmed).length === 6, "zes afkortingen zijn bevestigd (AQM, ICC, ICA, GRT, GRA, GRN), de rest is te verifieren");
+assert(new Set(FAIR_GEO_CLONES.map((v) => v.abbreviation)).size === FAIR_GEO_CLONES.length, "alle afkortingen zijn uniek, geen dubbele");
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

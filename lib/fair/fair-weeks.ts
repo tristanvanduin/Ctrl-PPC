@@ -1,4 +1,4 @@
-// Weken tot de beurs: de tijdas waarop RAI daadwerkelijk stuurt.
+// Weken tot de beurs: de tijdas waarop een beursorganisatie daadwerkelijk stuurt.
 //
 // Het dashboard toonde "vorige, huidige en volgende maand". Voor een beursorganisatie zegt dat
 // niets: een maand is geen mijlpaal, de beursdag wel. Wat telt is "we zitten nog veertien weken
@@ -26,7 +26,7 @@ function toISO(ms: number): string {
 }
 
 /** Zoals de beurzen in client_settings.rai_events staan (migratie 024). */
-export interface RaiEventCfg {
+export interface FairEventCfg {
   id?: string;
   name?: string;
   abbrev?: string;
@@ -71,7 +71,7 @@ function plusJaren(iso: string, n: number): string | null {
 // beschermt het tegen een eindeloze lus bij onzinnige invoer.
 const MAX_CADANS_STAPPEN = 20;
 
-function eerstvolgendeVoorEvent(event: RaiEventCfg, vandaag: string): UpcomingEdition | null {
+function eerstvolgendeVoorEvent(event: FairEventCfg, vandaag: string): UpcomingEdition | null {
   const nu = parseISO(vandaag);
   if (nu == null) return null;
 
@@ -129,7 +129,7 @@ function eerstvolgendeVoorEvent(event: RaiEventCfg, vandaag: string): UpcomingEd
  * nog niet geweest is. Null als de klant geen beurzen heeft, of alleen beurzen waarvan de
  * volgende editie niet te bepalen valt.
  */
-export function selectUpcomingEdition(events: RaiEventCfg[], vandaag: string): UpcomingEdition | null {
+export function selectUpcomingEdition(events: FairEventCfg[], vandaag: string): UpcomingEdition | null {
   let beste: UpcomingEdition | null = null;
   for (const ev of events) {
     const kandidaat = eerstvolgendeVoorEvent(ev, vandaag);

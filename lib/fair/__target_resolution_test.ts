@@ -1,5 +1,5 @@
 // Test voor de R1 target-resolutie. Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__target_resolution_test.ts
+// Draaien: npx tsx lib/fair/__target_resolution_test.ts
 
 import { validateTargetRows, resolveStreamTarget, resolveEventTargets, suggestTargetsFromPreviousEdition, checkEditionCpaPlausibility, TARGET_STREAMS, TARGET_METRICS, type EventStreamTargetRow } from "./target-resolution";
 

@@ -1,5 +1,5 @@
 // Test voor de R1 status- en pacing-laag. Deterministisch, geen IO.
-// Draaien: npx tsx lib/rai/__event_status_test.ts
+// Draaien: npx tsx lib/fair/__event_status_test.ts
 
 import { streamStatusFromForecast, budgetPacing, CRITICAL_THRESHOLD, PACING_BAND } from "./event-status";
 import type { StreamForecast } from "./event-forecast";
