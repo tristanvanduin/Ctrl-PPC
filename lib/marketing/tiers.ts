@@ -109,6 +109,12 @@ export interface TierDefinitie {
   rapportage: TierFeature;
 }
 
+// Losgetrokken (17 augustus 2026) zodat lib/marketing/blog-posts.ts's e-commerce-artikel dezelfde
+// bron leest als deze pricing-regel -- een blogpost die "coming soon" noemt via een hardgecodeerde
+// zin kan stilzwijgend achterhalen raken zodra de integratie klaar is; deze vlag kan dat niet, want
+// er is nog maar één plek die "gebouwd" voor Shopify/WooCommerce beslist.
+export const ECOMMERCE_KOPPELING_GEBOUWD = false;
+
 export const TIERS: readonly TierDefinitie[] = [
   {
     // "basis" bestond al als rang-0 licentie (lib/chat/toegang.ts, SOP_DEKKING.basis = 0) --
@@ -174,7 +180,7 @@ export const TIERS: readonly TierDefinitie[] = [
     vanafPerMaand: 2_999,
     creditsPerMaand: 100_000,
     features: [
-      { tekst: "Business Intelligence Connect: Shopify, WooCommerce, WordPress", gebouwd: false },
+      { tekst: "Business Intelligence Connect: Shopify, WooCommerce, WordPress", gebouwd: ECOMMERCE_KOPPELING_GEBOUWD },
       { tekst: "MCP Sandbox: bring your own AI into a secured debate with ours", gebouwd: false },
     ],
     rapportage: { tekst: "Swap and personalize individual charts within the 3 master templates", gebouwd: false },

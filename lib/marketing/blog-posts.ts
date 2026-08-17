@@ -15,6 +15,8 @@
 // (app/(marketing)/blog/[slug]/page.tsx, blog/page.tsx), dus dit was geen interne schatting maar
 // een zichtbare, verifieerbare claim die niet klopte. Herberekend als Math.ceil(woorden / 200).
 
+import { ECOMMERCE_KOPPELING_GEBOUWD } from "./tiers";
+
 export interface RelatedPage {
   label: string;
   href: string;
@@ -47,6 +49,16 @@ export interface BlogPost {
    *  optioneel -- dit vervangt de hardcoded "Analysis"-badge op elke kaart, dus elke post
    *  (inclusief drafts) heeft er een nodig. Toegevoegd 13 augustus 2026. */
   contentType: ContentType;
+  /** Het artikel beschrijft een echt probleem, maar de automatisering ervan bij Ctrl PPC staat nog
+   *  op de roadmap (gebouwd: false op de pricing-pagina). Geef hier dezelfde geimporteerde vlag
+   *  door (bv. ECOMMERCE_KOPPELING_GEBOUWD uit lib/marketing/tiers.ts) i.p.v. een losse zin te
+   *  schrijven -- de artikelpagina rendert dan zelf de Coming Soon-melding, en die verdwijnt
+   *  vanzelf zodra de vlag op true gaat. Weglaten (undefined) betekent: dit artikel beschrijft
+   *  vandaag al werkende capaciteit, geen roadmap-melding nodig. Toegevoegd 17 augustus 2026 op
+   *  verzoek van de eigenaar: "desnoods dynamisch bouwen dat er coming soon staat... en wanneer
+   *  coming soon weggaat bij het product dit ook in de blog weggaat" -- één bron, geen twee
+   *  plekken die uit elkaar kunnen lopen. */
+  roadmapGebouwd?: boolean;
 }
 
 /** Vaste taxonomie, niet vrij per post uit te breiden -- zie het commentaar bij BlogPost.tags. */
@@ -625,6 +637,112 @@ export const BLOG_POSTS: BlogPost[] = [
     published: false,
     tags: ["Agency Ops"],
     contentType: "Capability",
+  },
+  {
+    slug: "merk-cannibalisatie-search-console-vs-ads",
+    titel: "The Google Ads brand cannibalization check most accounts skip",
+    samenvatting:
+      "Branded paid spend can look justified while organic already owns the same query. The two signals rarely get checked against each other, and when they do, they sometimes disagree -- which is itself the finding.",
+    datum: "2026-08-17",
+    leesminuten: 2,
+    inhoud: [
+      "Branded CPC creeping up, or a paid brand campaign that keeps spending while nobody can say for sure whether it is still earning its keep -- this is one of the more common blind spots in a Google Ads account, and it rarely gets checked properly because the two data sources that would settle it live in different places: Google Ads and Search Console.",
+      "The check itself is not complicated: for the same brand query, does the organic listing already rank near the top with a strong click-through rate, at the same time a paid ad is bidding on it. If organic already owns the click, the paid spend on that exact query is not creating incremental traffic, it is paying for something that would have happened anyway.",
+      "The part worth being honest about: campaign naming is a guess, not proof. A campaign labelled \"Brand\" is not the same as a campaign that is verifiably brand-dominant in the data. The two signals -- what Search Console shows and what the campaign's own targeting suggests -- can disagree, and when they do, that disagreement is the actual finding: a naming or targeting question worth checking, not a budget call to make on the spot.",
+      "The honest limitation: this only works with enough Search Console volume on that specific query to say anything with confidence. Below that, the right answer is that there is not enough data yet, not a guess dressed up as a percentage.",
+    ],
+    gerelateerdeSlugs: ["false-positive-prevention-seizoen-vs-structureel", "kanaalsynergie-bewijzen"],
+    gerelateerdePaginas: [{ label: "How do you avoid blaming the account when the real cause is the market?", href: "/faq" }],
+    tags: ["Google Ads", "Dashboards"],
+    contentType: "Signal",
+  },
+  {
+    slug: "seed-and-harvest-cross-channel-budget",
+    titel: "When cutting Google Ads budget also cuts what Meta earned",
+    samenvatting:
+      "Scale Meta up and Google's brand traffic often moves too, in the same direction. Read the two channels separately and that link disappears -- along with the return one channel was quietly generating for the other.",
+    datum: "2026-08-17",
+    leesminuten: 2,
+    inhoud: [
+      "Two channels moving in opposite directions on the same dashboard usually reads as two separate stories: Meta is doing well, Google is doing worse, act on each accordingly. Sometimes that is exactly right. Sometimes it misses that the two movements are the same story, told from two different accounts.",
+      "The pattern: one channel creates demand it never gets credit for closing, and a second channel later captures that same demand on branded terms. Scale the first channel up, and the second channel's branded volume or cost often shifts with it, on a lag. Treated as two independent accounts, that connection is invisible -- and a budget cut on the channel that looks like it is only harvesting can quietly cut off return the other channel actually earned.",
+      "The check is a timing correlation, not a guess: does a change in reach or spend on one channel line up with a shift in branded search volume or cost on the other, over a comparable window. That is a cross-channel read a single-channel dashboard structurally cannot produce, because it never has both halves of the picture in the same place.",
+      "The limitation is the same one that applies everywhere this kind of claim gets made: it needs real, connected data on both channels to say anything. One channel missing from the picture does not get a guessed relationship filled in -- it gets left as an open question.",
+    ],
+    gerelateerdeSlugs: ["kanaalsynergie-bewijzen", "merk-cannibalisatie-search-console-vs-ads"],
+    gerelateerdePaginas: [{ label: "No limit on accounts, cross-channel by default", href: "/" }],
+    tags: ["Cross-Channel", "Google Ads", "Meta"],
+    contentType: "Method",
+  },
+  {
+    slug: "waarom-adviezen-nooit-fout-kunnen-zijn",
+    titel: "Why 'consider revising your bid strategy' is not advice",
+    samenvatting:
+      "Most PPC recommendations are worded so they can never be proven wrong. That is not caution, it is the reason nobody fully trusts them.",
+    datum: "2026-08-17",
+    leesminuten: 1,
+    inhoud: [
+      "\"Consider revising your bid strategy.\" \"Reconsider your targeting.\" Recommendations like this share one property: there is no outcome that could ever prove them wrong. Vague enough to survive any result, they read as advice and function as cover.",
+      "The fix is not softer language, it is structure. A recommendation worth acting on names an expected result and a date it gets checked against reality. Without both, it is not a prediction, it is an opinion wearing a prediction's clothes.",
+      "The harder habit, and the one that actually builds trust: recording when a recommendation was wrong, not just when it was right. A system that only remembers its wins is not learning from itself, it is marketing itself -- and the two produce very different track records over time.",
+      "The same discipline shows up in a smaller, less flattering place: being willing to say there is not enough data to conclude anything, instead of forcing a confident-sounding answer. A tool that always has an answer is not more capable than one that sometimes says it does not know. It is just less honest about the difference.",
+    ],
+    gerelateerdeSlugs: ["acht-kpi-relaties-die-rapportages-missen", "agency-memory-overleeft-een-personeelswissel"],
+    tags: ["Agency Ops"],
+    contentType: "Method",
+  },
+  {
+    slug: "pmax-en-search-verschillend-scorebord",
+    titel: "Why your Performance Max and Search campaigns shouldn't share a scorecard",
+    samenvatting:
+      "Impressions, CTR, CPC, ROAS -- the same four columns, for a Search campaign and a PMax campaign sitting in the same table. Neither gets judged on what actually drives it.",
+    datum: "2026-08-17",
+    leesminuten: 2,
+    inhoud: [
+      "Open a typical account dashboard and Search, Performance Max, Meta, and LinkedIn often sit in the same table, under the same columns: impressions, CTR, CPC, ROAS. It reads as consistency. It is actually the reason a real problem in any one of them is easy to miss.",
+      "Search is an auction and intent game: someone is already looking for something, and the question is whether you win that specific moment efficiently. PMax blends inventory types with different mechanics entirely -- the campaign type itself decides where the budget goes, in ways a single blended ROAS number does not separate out. Judging both against one generic column set means neither gets evaluated on what actually determines whether it is healthy.",
+      "The fix is not a wider table, it is refusing to force one comparison. What tells you a Search campaign is working is not the same thing that tells you a PMax campaign is working, and collapsing them into the same scorecard hides both stories behind one number that describes neither well.",
+      "The honest limitation applies here too: this only holds up if the data behind each campaign type is actually complete. A PMax campaign missing feed or asset-level data does not get a guessed score to fill the gap -- it gets marked as not assessed, which is a more useful answer than a confident one built on a hole in the data.",
+    ],
+    gerelateerdeSlugs: ["pmax-network-mix-verschuiving", "rsa-asset-dubbeltelling"],
+    tags: ["Google Ads"],
+    contentType: "Method",
+  },
+  {
+    slug: "meta-doelgroep-verzadiging-vs-creative-fatigue",
+    titel: "Your Meta ad isn't tired, your audience is out of new people",
+    samenvatting:
+      "CPA climbs, CTR falls, and the reflex is always the same: refresh the creative. New creative goes live. CPA doesn't move -- because the problem was never the ad.",
+    datum: "2026-08-17",
+    leesminuten: 2,
+    inhoud: [
+      "Rising CPA and falling CTR on a Meta campaign trigger the same reflex almost every time: creative fatigue, ship new creative. Designers do the work, the new ad goes live, and the CPA barely shifts. The creative was never the constraint.",
+      "The distinction that actually matters: is the algorithm running out of new people to show the ad to, or are the same people seeing it repeatedly and simply tuning it out. Those are different problems, and refreshing creative only fixes the second one.",
+      "The check: how much of delivery is reaching people who have not seen the ad before, set against whether the people who do see it still watch or engage with it. A shrinking share of new reach alongside a steady watch-through rate points to a narrowing audience, not a tired ad -- widening the audience or holding budget steady solves it, not a new video. The reverse pattern, reach holding up while engagement drops, is when creative fatigue is the real answer.",
+      "Skipping this check has a real cost beyond the wasted design hours: it treats a budget-and-audience-size problem as a content problem, which means the actual constraint never gets addressed and the same CPA creep shows up again a few weeks later.",
+    ],
+    gerelateerdeSlugs: ["linkedin-creative-verval-zonder-frequency", "rsa-asset-dubbeltelling"],
+    tags: ["Meta"],
+    contentType: "Signal",
+  },
+  {
+    slug: "roas-illusie-refunds-kortingscodes",
+    titel: "Why your ROAS looks great and your margin doesn't",
+    samenvatting:
+      "Google and Meta both report the ROAS you asked them to report: at the moment of the click, before a single order gets refunded, discounted, or turns out to be a repeat customer you already had.",
+    datum: "2026-08-17",
+    leesminuten: 2,
+    inhoud: [
+      "Two ad platforms, both reporting a strong ROAS, and a real bank balance at the end of the month that does not agree with either of them. This is not a tracking bug. It is what the number was always going to say, because an ad platform measures conversion value at the moment of the click or view -- not what happened afterward.",
+      "What that moment misses, structurally, every time: orders that get refunded, discount codes stacked by affiliates or influencers that quietly erode margin, and purchases from customers who were already yours, credited to a channel as if it created them from nothing. None of that is visible from inside the ad platform's own reporting, because the ad platform was never the place that knew about it.",
+      "The fix is not a smarter formula inside the ad account, it is a different source of truth: the store's own order data -- refund status, discount codes applied, and whether a customer ID has bought before. Set against that, a channel's real ROAS can look meaningfully different from what it reports, sometimes worse, occasionally better once the full picture is in.",
+      "This is one of the areas Ctrl PPC is actively building toward, not something live in every account today -- store-data integrations are still on our roadmap, tracked openly on the pricing page rather than left unsaid. The honest version of the promise: connecting real order data does not add a nicer number, it replaces a hopeful one with a checkable one, and that is worth waiting to build correctly rather than shipping early with a guessed cost basis.",
+    ],
+    gerelateerdeSlugs: ["gemiddelde-cpa-verkeerde-vraag", "kanaalsynergie-bewijzen"],
+    gerelateerdePaginas: [{ label: "Pricing and what's built today", href: "/pricing" }],
+    tags: ["Attribution", "Dashboards"],
+    contentType: "Method",
+    roadmapGebouwd: ECOMMERCE_KOPPELING_GEBOUWD,
   },
 ];
 

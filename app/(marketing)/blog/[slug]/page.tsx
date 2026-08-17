@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getPublishedBlogPosts, getPublishedBlogPost } from "@/lib/marketing/blog-posts";
 import { formatBlogDate } from "@/lib/marketing/format-date";
 import { PrimaryCta } from "@/components/marketing/primary-cta";
+import { ComingSoonBadge } from "@/components/marketing/coming-soon-badge";
 
 export function generateStaticParams() {
   return getPublishedBlogPosts().map((post) => ({ slug: post.slug }));
@@ -84,6 +85,19 @@ export default async function BlogArticlePage({
       <h1 className="mt-3 font-marketing-heading text-3xl font-extrabold leading-tight text-off-white sm:text-4xl">
         {post.titel}
       </h1>
+
+      {/* roadmapGebouwd (17 augustus 2026): "Coming soon" hier is dezelfde geimporteerde vlag als
+          de pricing-pagina (bv. ECOMMERCE_KOPPELING_GEBOUWD, lib/marketing/tiers.ts), niet een
+          losse zin -- verdwijnt dus vanzelf zodra de integratie echt gebouwd is, in plaats van
+          achteraf op twee plekken bijgewerkt te moeten worden. */}
+      {post.roadmapGebouwd === false && (
+        <div className="mt-5 flex items-center gap-2.5 rounded-[6px] border border-off-white/10 bg-midnight-slate-raised/50 px-3.5 py-2.5">
+          <ComingSoonBadge />
+          <p className="text-xs text-off-white/50">
+            This describes a real problem worth understanding today. The automated version inside Ctrl PPC is still on our roadmap.
+          </p>
+        </div>
+      )}
 
       <div className="mt-10 space-y-6">
         {post.inhoud.map((alinea, i) => (
