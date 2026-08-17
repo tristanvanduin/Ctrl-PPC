@@ -1739,6 +1739,38 @@ verify-scripts (`scripts/verify-channel-output-contract.ts`, `verify-pmax-scorec
 dat bewijst dat de pijplijn intern klopt, niet dat een veld betekent wat de Meta/LinkedIn-docs
 zeggen dat het betekent. **Open punt, niet 100% zeker**, precies de vraag die de eigenaar stelde.
 
+**Bijgewerkt (17 augustus, alsnog uitgevoerd):** Meta en LinkedIn nu wél tegen hun officiële docs
+gelegd (developers.facebook.com en learn.microsoft.com/linkedin), met drie uitkomsten:
+
+1. **Een echte, urgente bug gevonden en gefixt: LinkedIn's API-versie was verlopen.**
+   `LINKEDIN_API_VERSION` stond op `202506` (juni 2025) — bevestigd in LinkedIn's eigen
+   migratietabel als **"Deprecated"** sinds 15 juni 2026, twee maanden vóór deze check. Een
+   verlopen versieheader geeft een foutrespons terug, geen stille terugval — elke live
+   LinkedIn-sync-aanroep zou hierop hebben gefaald. Gecheckt vóór het bumpen dat er geen breaking
+   changes zitten tussen 202506 en 202608 op de velden die deze module opvraagt, en gebumpt naar
+   202608 (nieuwste, sunset 17 augustus 2027). `lib/linkedin/sync.ts`. Dit is precies het lot dat
+   `lib/meta/api-version.ts` zelf al beschreef over de vorige Meta-versieveroudering ("Meta zet
+   oude Marketing API-versies hard uit") — hier gebeurde het daadwerkelijk, ongemerkt, aan de
+   LinkedIn-kant.
+2. **Meta's conversietelling (`lib/meta/transform.ts`, `mapActions`/`firstActionValue`) klopt in
+   opzet, met één genoteerde onzekerheid.** De code telt bewust maar één bron per doelveld (eerste
+   match in de API-respons, `purchase`/`omni_purchase`/`offsite_conversion.fb_pixel_purchase`
+   tellen niet samen) — expliciet ontworpen om dubbeltelling te voorkomen, en dat klopt. Volgens
+   Meta's documentatie is `omni_purchase` echter een geaggregeerd, kanaaloverstijgend signaal
+   (online + in-store), specifiek voor accounts die Meta's "Omni Ads"-campagnetype gebruiken
+   (sinds april 2025) — niet gegarandeerd hetzelfde als `purchase`/de pixel-variant voor zulke
+   accounts. De code kiest nu willekeurig welke van de drie het eerst in de API-array staat, in
+   plaats van bewust `omni_purchase` te verkiezen wanneer aanwezig. Voor de meeste klanten (geen
+   Omni Ads) maakt dit niets uit, want dan verschijnt er toch maar één van de drie. Laag risico,
+   niet urgent, wel genoteerd — mocht een klant ooit Omni Ads gaan draaien.
+3. **LinkedIn's `externalWebsiteConversions` vs. `externalWebsitePostClickConversions`: geverifieerd
+   correct, geen bug.** De officiële docs bevestigen een derde, verwant veld
+   (`externalWebsitePostViewConversions`) dat samen met de post-click-variant optelt tot het totaal
+   — exact zoals `externalWebsiteConversions` al wordt gebruikt in migratie 050's formule
+   (`conversions = one_click_leads + external_website_conversions`). De losse
+   `postClickConversions`-kolom (`lib/linkedin/transform.ts:104`) wordt nergens opgeteld bovenop
+   het totaal, dus geen dubbeltelling. Bevestiging, geen fix nodig.
+
 ### 14.3 Het Decision Engine-skelet en `EXECUTION_PLAN.md` — een tweede document, nu hier verankerd
 
 Dit is de belangrijkste bevinding van de audit voor "1 single source of truth": er bestaat een
