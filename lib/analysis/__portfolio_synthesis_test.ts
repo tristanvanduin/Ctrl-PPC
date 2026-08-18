@@ -27,6 +27,7 @@ function mockSupabase(opts: {
     const b = {
       select() { return b; },
       eq(col: string, val: string) { filters = { ...filters, [col]: val }; return b; },
+      in() { return Promise.resolve({ data: [], error: null }); },
       gte() { return b; },
       order() { return b; },
       limit() { return b; },
@@ -95,8 +96,8 @@ async function main() {
   // ── parsePortfolioSynthesisOutput ──
   console.log("parsePortfolioSynthesisOutput");
   const clients: ClientSummary[] = [
-    { clientId: "client-a", clientName: "Broedservice", analysisDate: "2026-08-01", primaryThread: "x", rootCause: "y", topRecommendations: [], fromCrossChannelSynthesis: false },
-    { clientId: "client-b", clientName: "Wobblez", analysisDate: "2026-08-01", primaryThread: "x", rootCause: "y", topRecommendations: [], fromCrossChannelSynthesis: false },
+    { clientId: "client-a", clientName: "Broedservice", analysisDate: "2026-08-01", primaryThread: "x", rootCause: "y", topRecommendations: [], bedrijfsmodel: null, niche: null, fromCrossChannelSynthesis: false },
+    { clientId: "client-b", clientName: "Wobblez", analysisDate: "2026-08-01", primaryThread: "x", rootCause: "y", topRecommendations: [], bedrijfsmodel: null, niche: null, fromCrossChannelSynthesis: false },
   ];
   {
     const geldig = JSON.stringify({
@@ -149,15 +150,18 @@ async function main() {
   console.log("buildPortfolioSynthesisPrompt");
   {
     const summaries = new Map<string, ClientSummary | null>([
-      ["client-a", { clientId: "client-a", clientName: "Broedservice", analysisDate: "2026-08-01", primaryThread: "CPA loopt op", rootCause: "verzadiging", topRecommendations: ["verhoog budget"], fromCrossChannelSynthesis: false }],
-      ["client-b", { clientId: "client-b", clientName: "Wobblez", analysisDate: "2026-08-01", primaryThread: "Frequency hoog", rootCause: "klein publiek", topRecommendations: ["verbreed doelgroep"], fromCrossChannelSynthesis: false }],
+      ["client-a", { clientId: "client-a", clientName: "Broedservice", analysisDate: "2026-08-01", primaryThread: "CPA loopt op", rootCause: "verzadiging", topRecommendations: ["verhoog budget"], bedrijfsmodel: "b2c", niche: null, fromCrossChannelSynthesis: false }],
+      ["client-b", { clientId: "client-b", clientName: "Wobblez", analysisDate: "2026-08-01", primaryThread: "Frequency hoog", rootCause: "klein publiek", topRecommendations: ["verbreed doelgroep"], bedrijfsmodel: null, niche: null, fromCrossChannelSynthesis: false }],
     ]);
     const { systemPrompt, userMessage } = buildPortfolioSynthesisPrompt(summaries);
     check("systemPrompt eist patronen bij minstens 2 klanten", systemPrompt.toLowerCase().includes("minstens twee klanten"));
     check("systemPrompt noemt de geldige clientIds expliciet", systemPrompt.includes('"client-a"') && systemPrompt.includes('"client-b"'));
     check("systemPrompt staat 'portfolio' toe als clientId", systemPrompt.includes('"portfolio"'));
+    check("systemPrompt waarschuwt tegen vergelijken over bedrijfsmodellen heen", systemPrompt.toLowerCase().includes("bedrijfsmodel"));
     check("userMessage bevat beide klantnamen", userMessage.includes("Broedservice") && userMessage.includes("Wobblez"));
     check("userMessage bevat beide hoofddraden", userMessage.includes("CPA loopt op") && userMessage.includes("Frequency hoog"));
+    check("userMessage toont bedrijfsmodel van client-a", userMessage.includes("b2c"));
+    check("userMessage toont 'onbekend' voor client-b zonder bedrijfsmodel", userMessage.includes("onbekend"));
   }
 
   // ── alreadyPortfolioSynthesized ──

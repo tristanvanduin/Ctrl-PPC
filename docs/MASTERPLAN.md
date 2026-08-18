@@ -2955,3 +2955,45 @@ productiecode nodig, dit bewees alleen dat de al-geschreven code werkt.
 **Les**: "geen geschikte data" was een te snelle conclusie. Bij twijfel eerst de database
 bevragen (agencies/accounts/sop_analysis_output) voordat een testbeperking als blokkade wordt
 gemeld.
+
+### 17.17 Bedrijfsmodel-bewustzijn: de 17.16-testselectie was zelf het probleem
+
+De testklanten in 17.16 (Broedservice, Minismus, Fit-fysiotherapie) mengden zonder dat de code of
+ikzelf dat wist e-commerce met lead-gen. De eigenaar corrigeerde dit met echte kennis: *"Minismus
+en broedserveicd zijn ecom, fit fysio is een lead gen. kijk naar mpc en mobiliteitexpert voor meer
+ecom. bruidsmode is lead gen. alles met goedeinnovatie is ecom, maar heeft tracking issues gehad."*
+Dat is geen losse testfout — een e-commerce-klant en een lead-gen-klant hebben structureel andere
+CVR-normen en KPI's; een portfolio-synthese die budget-/CPA-/CVR-patronen tussen die twee zonder
+onderscheid vergelijkt trekt een misleidende conclusie, ook als de trend toevallig hetzelfde lijkt.
+
+**Databaseonderzoek eerst.** `bedrijfsmodel` (b2b/b2c) en `ecommerce vs. lead-gen` zijn twee
+verschillende assen — er bestaat geen schoon "ecom/leadgen"-veld in `client_settings`. Het
+dichtstbijzijnde gestructureerde signaal is `niche` (17-waarden legacy-sector-enum via
+`uitOudeSector()` in `lib/benchmark/segment.ts`), en die bleek voor de meeste echte klanten
+(Broedservice, Mobiliteitexpert, MPC-UK, GoedeInnovaties-subklanten) leeg te staan — alleen
+Bruidsmode Haarlem, Fit-fysiotherapie en Minismus hadden gedeeltelijke data. Automatisch filteren
+op business-model is dus onbetrouwbaar zolang die data grotendeels ontbreekt; de robuuste fix is
+promptniveau-bewustzijn, niet stille auto-filtering die op lege data zou instorten.
+
+**Gebouwd in het product, niet alleen in de test.** `ClientSummary` kreeg twee nieuwe, verplichte
+velden (`bedrijfsmodel: Bedrijfsmodel | null`, `niche: string | null`). `fetchPortfolioSummaries`
+haalt ze nu in één gebundelde query op uit `client_settings` (i.p.v. per klant een extra query) en
+geeft ze door aan `fetchClientSummary`. `buildPortfolioSynthesisPrompt` toont per klant expliciet
+"Bedrijfsmodel: ... (niche)" of "onbekend", en de systeemprompt kreeg een expliciete regel: budget-
+/CPA-/CVR-vergelijkingen alleen rechtstreeks tussen klanten met hetzelfde of vergelijkbaar
+bedrijfsmodel; bij onbekend bedrijfsmodel moet de onzekerheid benoemd worden in plaats van
+stilzwijgend gelijk behandeld.
+
+**Herhaalde live-test, nu bedrijfsmodel-zuiver.** Vier bevestigde e-commerce-klanten van hetzelfde
+bureau (Broedservice, Minismus, MPC-UK, Mobiliteitexpert) — zelfde aanpak als 17.16 (echte,
+ongewijzigde functies, buiten het versheidsvenster om de rijen zelf opgehaald). Resultaat was
+merkbaar scherper dan de gemengde 17.16-run: een schone tweekamp-opsplitsing met bijna identieke
+cijfers tussen twee van de vier klanten (~23% gemiste vraag bij zowel Broedservice als MPC-UK),
+in plaats van drie losstaande, niet onderling vergelijkbare verhalen. Niet opgeslagen als
+productierecord (test met los script, niet via de POST-route/echte agency_id) — bevestigt alleen
+dat een homogene groep een scherpere synthese oplevert, wat de aanleiding was voor deze fix.
+
+**Testfixtures bijgewerkt**: `__portfolio_synthesis_test.ts`'s `ClientSummary`-fixtures kregen de
+nieuwe verplichte velden; nieuwe assertions bevestigen dat de systeemprompt de
+bedrijfsmodel-waarschuwing bevat en dat de userMessage het bedrijfsmodel (of "onbekend") per klant
+toont. `npx tsc --noEmit` schoon, alle 34 assertions slagen (was 31; 3 nieuwe checks toegevoegd).

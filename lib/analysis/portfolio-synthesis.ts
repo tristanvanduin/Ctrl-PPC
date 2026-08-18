@@ -26,6 +26,7 @@ import { callLayer } from "./llm-router";
 import { callOpenRouter, type OpenRouterRequest, type OpenRouterResponse } from "./openrouter-client";
 import { CHANNEL_CONFIG, ALLE_SOP_CHANNELS } from "./sop-channel-config";
 import { daysAgo } from "@/lib/reporting-date";
+import { nicheLabel, type Bedrijfsmodel } from "@/lib/benchmark/segment";
 
 export const SECTION = "portfolio_synthesis_v1";
 const FRESHNESS_DAYS = 35; // ruim boven een maandcadans, zodat een klant die een paar dagen later draait niet uit de boot valt.
@@ -38,6 +39,11 @@ export interface ClientSummary {
   primaryThread: string;
   rootCause: string;
   topRecommendations: string[];
+  /** Uit client_settings, null als onbekend (voor veel bestaande klanten het geval -- zie
+   *  masterplan 17.17). b2b/b2c is een andere as dan ecommerce/lead-gen; wel het dichtstbijzijnde
+   *  wat gestructureerd wordt vastgelegd. */
+  bedrijfsmodel: Bedrijfsmodel | null;
+  niche: string | null;
   /** true als dit uit de eigen cross-channel-synthese van de klant komt (meerdere kanalen al
    *  samengevoegd); false als het de terugval is naar het enige/beste beschikbare kanaal. */
   fromCrossChannelSynthesis: boolean;
@@ -54,8 +60,18 @@ interface CrossChannelSynthesisRow {
 
 /** Eén klant se beste beschikbare eindverhaal: bij voorkeur de eigen cross-channel-synthese
  *  (meerdere kanalen al samengevoegd), anders het meest recente kanaal se structured_monthly_v2.
- *  Null als er voor deze klant niets binnen het versheidsvenster staat. */
-async function fetchClientSummary(supabase: SupabaseClient, clientId: string, clientName: string): Promise<ClientSummary | null> {
+ *  Null als er voor deze klant niets binnen het versheidsvenster staat.
+ *
+ *  `bedrijfsmodel`/`niche` komen apart binnen (uit client_settings, één gebundelde query in
+ *  fetchPortfolioSummaries) i.p.v. hier zelf opgezocht -- anders zou elke klant een extra query
+ *  kosten voor data die toch al gebundeld beschikbaar is. */
+async function fetchClientSummary(
+  supabase: SupabaseClient,
+  clientId: string,
+  clientName: string,
+  bedrijfsmodel: Bedrijfsmodel | null,
+  niche: string | null
+): Promise<ClientSummary | null> {
   const cutoff = daysAgo(FRESHNESS_DAYS);
 
   const { data: synthRow } = await supabase
@@ -73,7 +89,7 @@ async function fetchClientSummary(supabase: SupabaseClient, clientId: string, cl
     try {
       const parsed = JSON.parse(String(synthRow.output)) as CrossChannelSynthesisRow;
       return {
-        clientId, clientName,
+        clientId, clientName, bedrijfsmodel, niche,
         analysisDate: String(synthRow.analysis_date),
         primaryThread: parsed.headline ?? "",
         rootCause: parsed.narrative ?? "",
@@ -109,7 +125,7 @@ async function fetchClientSummary(supabase: SupabaseClient, clientId: string, cl
     const parsed = JSON.parse(nieuwste.output) as StructuredMonthlyRow;
     const finalSop = parsed.final_sop ?? {};
     return {
-      clientId, clientName,
+      clientId, clientName, bedrijfsmodel, niche,
       analysisDate: nieuwste.analysisDate,
       primaryThread: finalSop.primary_thread ?? "",
       rootCause: finalSop.root_cause ?? "",
@@ -121,12 +137,32 @@ async function fetchClientSummary(supabase: SupabaseClient, clientId: string, cl
   }
 }
 
+interface ClientSettingsRow {
+  client_id: string;
+  bedrijfsmodel: Bedrijfsmodel | null;
+  niche: string | null;
+}
+
 export async function fetchPortfolioSummaries(
   supabase: SupabaseClient,
   clients: readonly { clientId: string; clientName: string }[]
 ): Promise<Map<string, ClientSummary | null>> {
+  const { data: settingsRows } = await supabase
+    .from("client_settings")
+    .select("client_id, bedrijfsmodel, niche")
+    .in("client_id", clients.map((c) => c.clientId));
+  const settingsByClient = new Map(
+    ((settingsRows ?? []) as ClientSettingsRow[]).map((r) => [r.client_id, r])
+  );
+
   const entries = await Promise.all(
-    clients.map(async (c) => [c.clientId, await fetchClientSummary(supabase, c.clientId, c.clientName)] as const)
+    clients.map(async (c) => {
+      const settings = settingsByClient.get(c.clientId);
+      return [
+        c.clientId,
+        await fetchClientSummary(supabase, c.clientId, c.clientName, settings?.bedrijfsmodel ?? null, settings?.niche ?? null),
+      ] as const;
+    })
   );
   return new Map(entries);
 }
@@ -177,14 +213,18 @@ export function buildPortfolioSynthesisPrompt(
     `- Elke synthesized_action moet een ECHTE, hierboven aangeleverde klant als 'clientId' hebben (${clientIds.map((c) => `"${c}"`).join(", ")}), OF het letterlijke woord "portfolio" voor iets dat op de hele portfolio van toepassing is (bijv. een checklist of proces, niet gebonden aan één klant). Verzin nooit een clientId die niet is aangeleverd.`,
     "- Een actie hoort hier alleen als hij de vergelijking tussen klanten nodig heeft om te bedenken — iets dat net zo goed uit één klant alleen had kunnen komen hoort niet in deze lijst.",
     "- Verzin geen cijfers die niet in de aangeleverde samenvattingen staan.",
+    "- Bij elke klant staat het bedrijfsmodel/de niche erbij (of \"onbekend\" als dat niet is vastgelegd). Vergelijk budget-, CPA- en conversieratio-patronen alleen rechtstreeks tussen klanten met hetzelfde of een vergelijkbaar bedrijfsmodel (bijv. e-commerce met e-commerce, lead-gen met lead-gen) — een e-commerce-klant en een lead-gen-klant hebben structureel andere conversieratio's en KPI-normen, dus een numerieke vergelijking daartussen is misleidend, ook al lijkt de trend hetzelfde. Bij onbekend bedrijfsmodel: benoem dat expliciet als onzekerheid in plaats van stilzwijgend gelijk te behandelen.",
     "- Antwoord uitsluitend als JSON met exact deze velden: headline (string, één zin), narrative (string, 3-6 zinnen), recurring_patterns (string[], leeg als er geen zijn), outliers (string[], leeg als er geen zijn), synthesized_actions (array van {clientId, action, rationale, priority: \"hoog\"|\"midden\"|\"laag\"}), markdown (string: een leesbare, opgemaakte weergave voor in een rapport).",
   ].join("\n");
 
   const clientBlocks = clients.map((c) => {
     const recs = c.topRecommendations.length > 0 ? c.topRecommendations.map((r) => `  - ${r}`).join("\n") : "  (geen)";
     const rootCause = c.rootCause.length > MAX_NARRATIVE_CHARS ? `${c.rootCause.slice(0, MAX_NARRATIVE_CHARS)}…` : c.rootCause;
+    const modelLabel = c.bedrijfsmodel ? c.bedrijfsmodel : "onbekend";
+    const nicheLabelText = c.niche ? nicheLabel(c.niche) : null;
     return [
       `### ${c.clientName} (${c.clientId}) — laatst geanalyseerd ${c.analysisDate}${c.fromCrossChannelSynthesis ? ", kanaaloverstijgende synthese" : ""}`,
+      `Bedrijfsmodel: ${modelLabel}${nicheLabelText ? ` (${nicheLabelText})` : ""}`,
       `Hoofddraad: ${c.primaryThread || "(niet gerapporteerd)"}`,
       `Toelichting: ${rootCause || "(niet gerapporteerd)"}`,
       `Top-acties:`,
