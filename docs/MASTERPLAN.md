@@ -3537,3 +3537,32 @@ segmentatiedekking uit": 62 van de 70 Ranking Masters-accounts hebben nog nooit 
 **Wat dit niet doet**: geen wijziging aan `god-view.ts`, `god-view-data.ts` of de testroute zelf —
 dit was uitsluitend verificatie met echte cijfers, geen enkele databaseschrijving, geen
 opt-in-vlag aangeraakt. Geen enkel bestand overgebleven na afloop.
+
+### 17.28 OpenRouter altijd leidend: GEMINI_API_KEY kon stil voorrang krijgen
+
+Vraag van de eigenaar naar aanleiding van 17.26's fallback-fix: of de Gemini-fallback via
+OpenRouter liep of via "die andere Gemini-sleutel" — met de expliciete eis "ik wil alles via
+openrouter en niet die gemini key. die gaat er gegarandeerd uitklappen bij veel aanvragen."
+
+**Gecontroleerd, niet aangenomen.** `.env.local`: `LLM_BASE_URL=https://openrouter.ai/api/v1`
+(echte OpenRouter), en alleen `OPENROUTER_API_KEY` staat gezet — `GEMINI_API_KEY` ontbreekt in de
+productie-omgeving. Zowel het primaire model als de fallback liepen dus vandaag al via OpenRouter;
+er is geen aparte, directe Gemini-aanroep gedaan.
+
+**Wel een reëel, sluimerend risico gevonden.** `getOpenRouterKey()` (`lib/analysis/helpers.ts`)
+koos `GEMINI_API_KEY` vóór `OPENROUTER_API_KEY` als beide ooit gezet zouden zijn — een restant uit
+de periode vóór de OpenRouter-migratie (15 augustus), bedoeld als noodgreep voor een omgeving
+zónder OpenRouter-sleutel (zie `.env.example`). Onschuldig zolang `GEMINI_API_KEY` niet bestaat,
+maar precies het scenario waar de eigenaar tegen waarschuwt: zou die sleutel ooit voor iets anders
+worden toegevoegd, dan verdwijnt elke LLM-aanroep stil van OpenRouter af zonder dat het ergens
+opvalt. Volgorde omgedraaid: OPENROUTER_API_KEY is nu altijd leidend zodra hij bestaat;
+GEMINI_API_KEY blijft alleen de noodgreep wanneer OpenRouter's sleutel volledig ontbreekt. Getest:
+`__helpers_test.ts`, 3 assertions (beide gezet → OpenRouter wint, alleen Gemini → werkt nog als
+noodgreep, geen van beide → `null` zonder crash). `npx tsc --noEmit` schoon, volledige
+`scripts/gates.sh` groen.
+
+**Bijvangst om te melden, niet te verzwijgen**: het lege-antwoord-gat uit 17.26 zat in dezelfde
+gedeelde code die elke SOP al sinds het bestaan van dit bestand gebruikt — niet iets nieuws van
+vandaag. Niet uit te sluiten dat er bij echte klanten in het verleden af en toe een leeg of te kort
+rapport is opgeslagen zonder signaal. Aangeboden aan de eigenaar: een audit op bestaande
+`sop_analysis_output`-rijen met verdacht korte output, nog niet uitgevoerd (wacht op akkoord).
