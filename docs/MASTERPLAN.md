@@ -3867,3 +3867,47 @@ hele pagina) om de kolomhoogtes rechtstreeks te kunnen vergelijken: donut- en st
 nu vrijwel op dezelfde regel. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de
 kaart", zelftest vindt de teruggezette bug nog. `npx tsc --noEmit` schoon, 301/301 tests groen,
 build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+### 17.35 Ranglijst onder de kaart, en waarom de gelijke-hoogte-stretch weer weg moest
+
+Een screenshot met een cirkel eromheen: de landenranglijst (`CONVERSIES PER REGIO` + de
+statistiekjes eronder) stond nog steeds NAAST de kaart, in een vaste `17rem`-kolom. In de 6/12-brede
+hero-kolom van 17.34 liet dat nog maar ~360px over voor de kaart zelf. Verzoek: "deze moet eronder.
+dan kan de geo kaart groter."
+
+**`GeoBreakdown` kreeg een `ranglijstOnder`-prop**, standaard `false`. `GeoBreakdown` wordt op vier
+plekken gebruikt (Google Overzicht, cross-channel, Meta, LinkedIn) en alleen op de eerste stond de
+kaart in een smalle kolom naast pacing+donut — op de andere drie staat hij nog steeds solo over de
+volle paginabreedte, waar "naast" nog steeds klopt. Een prop in plaats van een algehele omzetting:
+`ranglijstOnder` zet de interne grid (`grid-cols-[minmax(0,1fr)_17rem]`) om naar een gestapelde
+`flex-col`, en laat de kaart zijn `max-w-[680px]`-plafond los (dat was er om de kaart op een brede
+solo-pagina niet absurd groot te laten worden; in een 7/12-kolom bindt het toch niet). Alleen
+`google-view.tsx`'s heropener geeft `ranglijstOnder` mee.
+
+**Het gat onder de donut kwam meteen terug, met een andere oorzaak.** Een bredere/hogere kaart plus
+een ranglijst die nu zijn eigen volledige rijbreedte innam in plaats van "gratis" naast de kaart mee
+te liften, maakte de rechterkolom een stuk hoger (1086px, tegen 1056px in 17.34). De `flex-1`/`h-full`-
+stretch van de donutkaart (17.34) trok hem dus over een nog groter gat open — exact dezelfde klacht
+als in 17.34, terug via een nieuwe route. Gemeten via `getBoundingClientRect()` op `.hero-ring` en
+`.hero-kaart` om zeker te weten dat het de stretch was en niet iets anders: beide kolommen stonden
+inderdaad precies gelijk (1086px), met een dood wit vlak van ~430px binnenin de donutkaart als
+gevolg.
+
+**Fix: geen geforceerde gelijke hoogte meer.** `h-full` van `campaign-type-split.tsx`'s wortel-div
+af, de `flex-1 min-h-0`-wrapper om `CampaignTypeSplit` in `google-view.tsx` weg, en `xl:items-start`
+op de grid-container om CSS Grid's standaard stretch-gedrag expliciet uit te zetten. Twee kolommen
+met hun eigen natuurlijke hoogte naast elkaar — dat is een gewoon layoutpatroon en hoeft niet
+kunstmatig gelijk gemaakt te worden. Dit is duurzamer dan de vorige aanpak (compactere grafiek, 17.34)
+omdat het niet afhangt van hoeveel content elke kolom toevallig heeft: welke combinatie van
+pacing/donut/kaart/ranglijst er ook staat, er komt nooit meer een kunstmatig gat.
+
+**Daarna nog een keer breder op verzoek** ("nu de kaart groter"): `xl:col-span-6`/`xl:col-span-6`
+werd `xl:col-span-5`/`xl:col-span-7` — de kaartkolom een/twaalfde breder ten koste van pacing+donut.
+`PacingMonitor`'s container-query-tegels (`grid-cols-2 @2xl:3 @5xl:6`) blijven op 5/12 nog prima
+leesbaar; de kaart zelf schaalt via zijn SVG `viewBox` (`w-full h-auto`) evenredig mee, dus meer
+kolombreedte betekent ook een merkbaar grotere kaart, niet alleen breder.
+
+**Live geverifieerd, licht én donker.** `scripts/check-kaartoverloop.mjs` twee keer gedraaid — na de
+`ranglijstOnder`-wijziging en na de kolomherverdeling — beide keren alle 15 schermen "niets buiten de
+kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build
+groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).

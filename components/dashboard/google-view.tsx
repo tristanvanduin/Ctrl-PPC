@@ -147,22 +147,28 @@ export function GoogleView({
               account dat Performance Max draait, campagnetype werkt voor elke mix -- "er is
               altijd een gemene deler waar we een donut van kunnen maken die zich niet richt op 1
               specifiek campagnetype". PmaxNetworkSplit staat in "Waar het budget landt" verderop. */}
-          <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12 xl:items-start">
             {/* `.hero-ring` blijft de marker voor globals.css' ":has(> .hero-ring:empty)"-regel:
                 pas als hier écht niets in staat (geen pacing én geen campagnedata) trekt de
-                kolom rechts door naar de volle breedte. */}
-            <div className="hero-ring min-w-0 xl:col-span-6 flex flex-col gap-4">
+                kolom rechts door naar de volle breedte.
+
+                17.35: niet langer geforceerd even hoog (geen flex-1/h-full meer op de donut). De
+                ranglijst-onder-de-kaart maakte de rechterkolom een stuk hoger; gedwongen stretch
+                gaf de donutkaart daardoor een groot wit gat vanbinnen -- exact de klacht van
+                daarvoor, nu met een andere oorzaak. Twee kolommen met hun eigen natuurlijke hoogte
+                naast elkaar is een heel gewoon patroon en heeft geen kunstmatige opvulling nodig;
+                `xl:items-start` zet de grid-stretch (het standaardgedrag) expliciet uit. */}
+            <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
               <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
-              <div className="flex-1 min-h-0">
-                <CampaignTypeSplit clientId={clientId} />
-              </div>
+              <CampaignTypeSplit clientId={clientId} />
             </div>
-            <div className="hero-kaart min-w-0 xl:col-span-6 flex flex-col gap-4">
+            <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
               {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
                   landentabel met één kolom -- dat is precies wat de kaart al toont, en de matrix
                   zou een "kanaalmix" beloven die niet bestaat. */}
               <GeoBreakdown
                 clientId={clientId}
+                ranglijstOnder
                 verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
               />
               <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />

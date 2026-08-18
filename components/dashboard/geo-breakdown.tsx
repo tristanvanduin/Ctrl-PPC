@@ -51,7 +51,7 @@ const METRICS: MetricDef[] = [
 
 const CHANNEL_LABEL: Record<Channel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", blended: "Alle kanalen" };
 
-export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
+export function GeoBreakdown({ clientId, channel = "google", verdieping, ranglijstOnder = false }: {
   clientId: string;
   channel?: Channel;
   /**
@@ -62,6 +62,14 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
    * te kijken. In dezelfde kaart is het één blok met twee uitklappers.
    */
   verdieping?: ReactNode;
+  /**
+   * Ranglijst onder de kaart i.p.v. ernaast (17.35). Alleen de opener op Google Overzicht gebruikt
+   * dit: daar staat de kaart in een 6/12-kolom naast pacing+donut, en een vaste 17rem-ranglijst
+   * ernaast liet nog maar ~360px over voor de kaart zelf. Op de andere drie plekken (cross-channel,
+   * Meta, LinkedIn) staat GeoBreakdown solo over de volle breedte, waar "naast" nog steeds klopt --
+   * vandaar een prop en geen algehele omzetting.
+   */
+  ranglijstOnder?: boolean;
 }) {
   const [metricKey, setMetricKey] = useState<MetricKey>("conversions");
   const [focus, setFocus] = useState<"US" | null>(null); // null = wereld, "US" = staten-drilldown
@@ -189,8 +197,11 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
           ranglijst zegt WIE DE GROOTSTE IS en hoeveel dat scheelt. Dat tweede leest niemand van
           een projectie af -- daar wint Groenland altijd. De ruimte naast een kaart van 680px was
           op een breed scherm leeg; nu draagt hij de cijfers die anders een klik weg zaten. */}
-      <div className="grid grid-cols-1 gap-5 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_17rem]">
-      <div className="w-full max-w-[680px] mx-auto">
+      <div className={ranglijstOnder
+        ? "flex flex-col gap-5 px-3 py-3"
+        : "grid grid-cols-1 gap-5 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_17rem]"
+      }>
+      <div className={ranglijstOnder ? "w-full" : "w-full max-w-[680px] mx-auto"}>
         {ranked.length === 0 ? (
           <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
         ) : (
