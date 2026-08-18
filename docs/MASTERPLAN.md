@@ -3018,3 +3018,92 @@ Geen van deze zeven had al een niche; twee (MPC-UK, Minismus) hadden via de oude
 `bedrijfsmodel: b2c` staan, de rest kreeg het nu pas. Dit zijn precies de klanten die de 17.16/17.17
 live-tests gebruikten, dus de portfolio-synthese voor Ranking Masters ziet vanaf nu bij de
 eerstvolgende run een echt bedrijfsmodel/niche in plaats van "onbekend" voor deze zeven.
+
+### 17.18 Een echte eind-tot-eind-testrun legt een structurele stap-9-bug bloot, gefixed
+
+De eigenaar vroeg om een volledige, echte testrun: verse 13-staps maandanalyses van vandaag (niet
+de oude april-data via een omzeiling zoals 17.16), op de al bestaande, gesyncte data van 4 echte
+klanten (Broedservice, Minismus, MPC-UK, Mobiliteitexpert), gevolgd door de echte
+portfolio-synthese-functie erover heen — om te zien hoe goed de analyse werkelijk is.
+
+**Twee blokkades vóór de eerste LLM-call, beide echte productieconfiguratie, geen testartefact.**
+
+1. `sops_enabled` stond op `false` voor alle 4 klanten. `magSopDraaien()` (de gate die de route
+   echt gebruikt) checkt alleen deze vlag, niet de licentie — dus aangezet voor deze 4 klanten.
+2. De echte Ranking Masters-licentie is `basis`, en `SOP_DEKKING.basis = 0`. Dat is een aparte,
+   los-van-`sops_enabled`-staande tier-check (`controleerDekking()`, gebruikt voor een banner elders,
+   niet door `magSopDraaien()` zelf) — voor déze test dus geen blokkade, maar wel een eerlijke
+   constatering: het echte bureau zit vandaag op een tier waar automatische SOP's per
+   licentie-ontwerp niet bij horen.
+
+**De HTTP-authenticatielaag van de portfolio-synthese-route bewust niet omzeild via een
+werk-around, maar opgelost door het te benoemen.** `/api/analysis/portfolio-synthesis` checkt
+`requireCapability` + Growth-tier in de routecode zelf, en daar is geen testsessie voor. In overleg
+met de eigenaar gekozen: `runPortfolioSynthesis()` — exact dezelfde functie die de route zelf
+aanroept — rechtstreeks aanroepen. De 13-staps maandanalyses zelf liepen wél via de echte
+`/api/analysis/monthly`-route (die heeft geen routeniveau-auth, alleen `magSopDraaien()`), dus de
+kernpijplijn is zo écht getest, alleen de dunne auth-wrapper van de synthese-route niet.
+
+**Bevinding: 100% reproductie van een structurele bug, niet een LLM-hobbel.** Alle 4 klanten
+faalden bij de eerste run op exact dezelfde plek — stap 9 ("Doelgroep- & Geosegmenten") — met exact
+dezelfde foutklasse: `Evidence-level "deterministic" op finding "GB::ROAS" terwijl het narratief
+aangeeft dat data niet beschikbaar is`. Root cause: stap 9 heet zo sinds een eerdere samenvoeging
+(fase4) van oud-stap-9 (Audience) en oud-stap-11 (Geo) tot één LLM-call
+(`lib/prompts/monthly-v2.ts`), maar `lib/analysis/data-availability.ts` kende stap 9 nog maar één
+databron ("Audience data"). Audience-data ontbreekt bij vrijwel elke klant (heel gewoon); zodra dat
+zo was, viel `allUnavailable` op `true` uit voor de HELE stap, ook al was er echte, bruikbare
+geo-data — en dus werden de wél-echte, wél-deterministische geo-findings (GB/NL/DE/BE) afgekeurd.
+Zelfde bugklasse als de stap-7-fix van 17 augustus (17.14): een stap met twee databronnen, een
+check die er maar één van kende.
+
+**Fix, tweeledig.** (1) De ontbrekende "Geo data"-dimensie (`opts.countryData`, dezelfde bron als
+stap 11 al gebruikt) toegevoegd aan stap 9 in `data-availability.ts` — de daadwerkelijke oorzaak.
+(2) Bijkomend, echt gat gevonden tijdens het natrekken: de `explicitlyUnavailableScopes`-regex in
+`step-validator.ts` matchte nooit de exacte frase die de prompt zelf voorschrijft ("Niveau 1
+(Audience): data niet beschikbaar.", niet "audience data niet beschikbaar"), en er bestond
+helemaal geen "geo"-scope — dus een echt lege geo-scope kon niet worden onderscheiden van een echt
+lege audience-scope. Beide regexen gecorrigeerd naar de echte promptfrasering, plus
+`entity_type "country" → "geo"` toegevoegd. Nieuwe regressietests
+(`__data_availability_test.ts`, `__step9_geo_availability_test.ts`) reproduceren zowel het
+oorspronkelijke faalpad als de tegenproef (een écht lege geo-scope blokkeert een geo-finding nog
+steeds terecht — de fix opent de poort niet blind).
+
+**Eigen fout onderweg, meteen gevangen door de eigen hygiënepoort.** Bij het schrijven van de
+regressietest zette ik zelf per ongeluk de letterlijke merknaam in testcommentaar
+(`__data_availability_test.ts`) — precies het soort lek waar `__brand_test.ts` op let. De poort
+faalde terecht, meteen gecorrigeerd naar een generieke omschrijving. Geen falen van de controle;
+dit is exact waarom hij bestaat.
+
+**Herhaald, ditmaal 4/4 geslaagd.** Met de fix: alle 4 klanten opnieuw gedraaid tegen dezelfde,
+echte, ongewijzigde data — dit keer geen `qualityGate`-blokkade, `structured.saved: true` bij alle
+vier.
+
+### 17.19 De echte portfolio-synthese over 4 verse analyses: business-model-bewustzijn zichtbaar in de output
+
+Met 4 geslaagde, verse maandanalyses (Broedservice, Minismus, MPC-UK, Mobiliteitexpert — alle vier
+inmiddels bevestigd e-commerce, zie 17.17) de echte `runPortfolioSynthesis()` gedraaid voor het
+echte Ranking Masters-bureau, opgeslagen in `agency_analysis_output`
+(`analysis_date: 2026-08-18`, geverifieerd met een leesquery na afloop — geen aanname).
+
+**De 17.17-fix is zichtbaar aan het werk in echte modeloutput, niet alleen in een test.** Zonder
+dat er iets in de prompt naar gevraagd werd, schreef het model zelf: *"hun CPA- of ROAS-niveaus
+zijn niet onderling vergelijkbaar"* (over Minismus vs. MPC-UK, andere niche) en *"geen cross-niche
+CPA-vergelijking met elektronica, huisdieren of zorg"* — exact de waarschuwing die
+`buildPortfolioSynthesisPrompt()` sinds 17.17 meegeeft. Dit is het eerste directe bewijs dat de
+bedrijfsmodel-bewustzijn-fix niet alleen de teststructuur haalt, maar het daadwerkelijke gedrag
+van het model beïnvloedt.
+
+**Inhoudelijk een sterke, niet-triviale synthese.** Kernvinding: drie van de vier klanten
+(Minismus/DE, MPC-UK/GB, Broedservice/PMAX) delen hetzelfde onderliggende mechanisme —
+budget stroomt naar een "expansievlak" (land of PMAX) zonder rendementsmatch — terwijl
+Mobiliteitexpert het tegenovergestelde probleem heeft (ondergefinancierd, 83,71% Lost IS bij een
+€5-dagbudget). De synthese herkende dit als hetzelfde bureaubrede patroon in drie verschillende
+vermommingen, stelde een concrete, herbruikbare poort voor ("verplichte geo-expansiepoort"), én
+waarschuwde expliciet tegen het toepassen van dat recept op de uitzondering (Mobiliteitexpert) —
+precies het soort onderscheid dat losse per-klant-analyses niet kunnen maken.
+
+**Niet omzeild, wel eerlijk begrensd.** De 13-staps analyses liepen via de echte route op oude,
+al-gesyncte data (géén live Google Ads-aanroep nodig, zie 17.19's aanleiding hierboven); de
+synthese zelf via de echte, ongewijzigde `runPortfolioSynthesis()`-functie, alleen buiten de
+HTTP-auth-wrapper om waar geen testsessie voor was (zie 17.18). Kernpijplijn dus volledig echt
+getest; alleen de dunne routelaag niet.
