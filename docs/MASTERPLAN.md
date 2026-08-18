@@ -3690,3 +3690,43 @@ structured_monthly_v2-afhankelijkheid, plus de Growth+-tier-gate die intact moet
 stap, nog niet gebouwd). Geen God View-koppeling (17.27's bevinding staat: eerst opt-in en
 segmentatiedekking, dan pas een trigger). Geen wijziging aan monthly's eigen
 `cross-channel-synthesis.ts` behalve het generiek maken van `readyForSynthesis()`.
+
+### 17.31 Dashboard-onderzoek: niets verwijderd, wel een vaal geworden kaart — en een openstaande designvraag
+
+De eigenaar, gealarmeerd door een voorbeeldafbeelding (een donker, strak "Google Ads Overview"-
+scherm met KPI-rij, grafiek+donut en een gloeiende wereldkaart): "waarom zijn de views in het
+dashboard zo gigantisch aangepast, we zijn belangrijke inzichten kwijt (denk aan de geo map)".
+
+**Onderzocht in plaats van aangenomen.** Live gescreenshot (`?demo=1` op de klant-URL, zelfde
+auth-omzeiling als `scripts/check-kaartoverloop.mjs` al gebruikt) i.p.v. in code te gissen. Resultaat:
+geen enkel dashboardonderdeel is verwijderd — de wereldkaart (`world-map.tsx`), de gezondheidsscore,
+anomalieën, pacing, forecast en video/placement-tabellen staan er allemaal nog, nergens als
+ongebruikt gemarkeerd. Wat wél gebeurde: op expliciet eerder verzoek van de eigenaar ging de
+merkkleur van het oude, stevige navy (#08288C) naar een lichtere indigo (#4f46e5) — en
+`--kaart-hoog` (de kleur van het land met de meeste data) verwees rechtstreeks naar die
+merkkleurvariabele. De kaart verdunde dus automatisch mee, tegen een bijna-witte achtergrond las
+dat als leeg in plaats van als "hier zit de data" — geen verwijderd inzicht, wel verloren visuele
+impact door een bijwerking die niemand toen opmerkte.
+
+**Bijvangst: er bestaat al een donkere modus die dicht bij het voorbeeld ligt.** Niet nieuw werk —
+gewoon zichtbaar gemaakt via een screenshot. De eigenaar bevestigde dat de vraag niet over kleur/
+thema ging maar over de COMPOSITIE: een dichte rij grote cijfers, panelen naast elkaar, weinig
+tekst.
+
+**Gefixt, klein en verdiend**: `--kaart-hoog`/`--kaart-hover` in `app/globals.css` verwijzen niet
+langer rechtstreeks naar `--brand-primary`, maar mengen 22% zwart erdoorheen
+(`color-mix(in srgb, var(--brand-primary) 78%, #0f1115 22%)`) — de kaart heeft nu zijn eigen
+contrast en verdunt niet meer automatisch mee bij een volgende merkkleurwissel. Live geverifieerd
+(licht, vóór/na-screenshot): het hoogste land is weer duidelijk zichtbaar tegen de lege landen.
+`npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+**Bewust NIET blind doorgezet: de grotere compositievraag.** `MetricCards` (Conversies/Omzet/ROAS/
+CPA, elk met jaardoel, jaarprognose én een voortgangsbalk) draagt wezenlijk meer informatie dan de
+voorbeeldafbeelding se vier kale cijfers. Naast een grafiek proppen zou ze uitknijpen, niet
+verfraaien — en dat is precies het soort aanname die deze sessie herhaaldelijk fout bleek te gaan
+als hij ongecontroleerd bleef staan. Twee opties voorgelegd aan de eigenaar (bestaande kaarten
+dichter zetten + kaart hoger op de pagina, óf een nieuwe, kale samenvattingsrij toevoegen vóór de
+bestaande rijke kaarten) — antwoord nog niet binnen bij het schrijven van deze sectie. Ook nog
+niet gestart: de daadwerkelijke compositie-herbouw van GoogleView's Overzicht-tab (wacht op die
+keuze), en cross-account/God View hebben nog helemaal geen scherm (alleen backend/API) — die
+worden sowieso vanaf nul gebouwd in de uiteindelijk gekozen stijl, geen "herstel".

@@ -308,12 +308,19 @@
   --serie-8: #e34948;
 
   /* De kaart. `--kaart-laag` is de kleur bij nul en `--kaart-hoog` die bij het maximum; de
-     landen ertussenin worden in de browser gemengd. `--kaart-leeg` is een land zonder data. */
+     landen ertussenin worden in de browser gemengd. `--kaart-leeg` is een land zonder data.
+
+     `--kaart-hoog` verwees rechtstreeks naar `--brand-primary` -- dus toen die kleur van het oude,
+     stevige navy (#08288C) naar de lichtere indigo (#4f46e5) ging (17.24-huisstijlwissel, sectie
+     13.2), verdunde de kaart daar automatisch in mee: het hoogste land op een lichte achtergrond
+     werd zelf ook lichter, en tegen `--kaart-laag`/`--kaart-leeg` (allebei bijna-wit) las dat als
+     vaag in plaats van als "hier zit de meeste data". Eén niveau donkerder gemengd, zodat de kaart
+     zijn eigen contrast heeft en niet meer stilzwijgend verdunt bij de volgende merkkleurwissel. */
   --kaart-laag: #e6eef8;
-  --kaart-hoog: var(--brand-primary, #4f46e5);
+  --kaart-hoog: color-mix(in srgb, var(--brand-primary, #4f46e5) 78%, #0f1115 22%);
   --kaart-leeg: #eef1f6;
   --kaart-rand: #ffffff;
-  --kaart-hover: var(--brand-primary, #4f46e5);
+  --kaart-hover: color-mix(in srgb, var(--brand-primary, #4f46e5) 78%, #0f1115 22%);
 
   /* Het vlak achter een advertentie-preview. */
   --preview-vlak: rgb(243 244 246 / 0.7);
