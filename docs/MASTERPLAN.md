@@ -4081,3 +4081,55 @@ groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
 
 **Drie van de vier kanalen klaar** (Google, Meta, LinkedIn). Nog niet gestart: cross-channel
 (`cross-channel-view.tsx`, gebruikt `GeoBreakdown` ook nog atomair) en de "2e laag" op alle vier.
+
+### 17.40-17.42 Google Overzicht herbouwd naar een 2x2-wireframe: eigen schets, drie bijstellingen
+
+Na drie kanalen op hetzelfde hero-rij-patroon (17.34-17.39) kwam er een eigen aangeleverde
+wireframe voor Google, inclusief een letterlijke schets ("klant / menu-items / KPI-rij /
+[Account Health | Geo] / [Pacing | Graph]") en een uitgeschreven spec met concrete Tailwind-classes.
+
+**Review vooraf, zoals gevraagd, voor er iets werd gebouwd.** Drie punten teruggekoppeld en via
+`AskUserQuestion` opgelost:
+1. De spec voegde Account Health en de campagnetype-donut samen in één kaart. Teruggeduwd: "twee
+   vragen, twee vormen" is een principe dat al elders in deze codebase staat (zie de
+   `PacingMonitor`/`MonthlyOverview`-toelichting in `google-view.tsx` zelf, 17.14). Gekozen: twee
+   losse, gestapelde kaarten.
+2. De spec vroeg `items-stretch` om de kolommen geforceerd gelijk te maken. Dat patroon had deze
+   sessie al drie keer een wit gat in een kaart veroorzaakt (17.34, 17.35, 17.37) zodra de content
+   links en rechts van nature verschilt. Niet blind toegepast; alleen bijgesteld waar een
+   screenshot een echt probleem liet zien.
+3. Scope: geldt dit alleen voor Google? Bevestigd — Meta en LinkedIn missen een losse
+   Pacing-widget (die zit in het gedeelde `ChannelPerformance`-component, zie 17.38), dus die
+   blijven op hun net gebouwde hero-rij-opener staan.
+4. Hardcoded `bg-white`/`text-slate-*`-classes uit de spec: vertaald naar het bestaande
+   tokensysteem, zelfde afspraak als 17.36/17.38.
+
+**17.40 — de herbouw zelf.** `GoogleView`'s opener werd een 2-koloms grid (`xl:grid-cols-2`,
+zonder `items-stretch`): links `HealthBadge` (Account Health, voorheen los bovenaan de pagina) →
+`CampaignTypeSplit` (donut) → `PacingMonitor`; rechts de atomaire `GeoBreakdown` (kaart + ranglijst
++ statistieken in één kaart, terug van de gesplitste `GeoMapCard`/`GeoRanglijstCard` uit 17.36) →
+`MonthlyTrendBars`. De KPI-rij (`PeriodSummary`, kanaalonafhankelijk, boven de tabs) bestond al en
+hoefde niet aangepast — dat zou Meta/LinkedIn/cross-channel meegeraakt hebben.
+
+**17.41 — "als we deze in het gat plaatsen kan de geo map breder" (schets met cirkel om de
+ranglijst).** Rechts (kaart+ranglijst samen in `GeoBreakdown`) bleef ondanks de nieuwe kolommen
+langer dan links, met een wit gat als gevolg. Ranglijst en statistiekjes verhuisden naar ONDERAAN
+de rechterkolom (onder de grafiek), en de kaart werd weer de gesplitste `GeoMapCard` (alleen, dus
+breder) -- zelfde bouwstenen als de 17.36-opener, nu alleen in een andere volgorde omdat het gat
+ditmaal aan de onderkant zat i.p.v. ernaast.
+
+**17.42 — "de donut en de pacing" omgedraaid.** Een eerste lezing van de volgende schets/cirkel
+werd door de eigenaar zelf gecorrigeerd ("het ging om de linker sectie") voordat de verkeerde
+aanname gebouwd werd -- de assistent was al aan een wijziging in de rechterkolom begonnen op basis
+van de pixelpositie van de cirkel, maar de eigenaar greep in ("nee stop") en gaf de juiste lezing
+in platte tekst. Links werd `HealthBadge → PacingMonitor → CampaignTypeSplit` (pacing en donut
+omgewisseld). Het resterende hoogteverschil tussen de kolommen is klein geworden maar niet nul; een
+voorstel om dat op te vullen met "een kleine lijngrafiek" staat nog open, niet gebouwd zonder eerst
+te laten zien hoe klein het gat na deze wissel daadwerkelijk nog is.
+
+**Live geverifieerd, licht én donker**, telkens na elke van de drie stappen apart gescreenshot.
+`scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de kaart", zelftest vindt de
+teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build groen, volledige
+`scripts/gates.sh` groen (POORTEN GROEN).
+
+**Nog open**: of en waarmee het resterende kleine hoogteverschil links/rechts opgevuld wordt.
