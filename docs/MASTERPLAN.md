@@ -3724,9 +3724,41 @@ contrast en verdunt niet meer automatisch mee bij een volgende merkkleurwissel. 
 CPA, elk met jaardoel, jaarprognose én een voortgangsbalk) draagt wezenlijk meer informatie dan de
 voorbeeldafbeelding se vier kale cijfers. Naast een grafiek proppen zou ze uitknijpen, niet
 verfraaien — en dat is precies het soort aanname die deze sessie herhaaldelijk fout bleek te gaan
-als hij ongecontroleerd bleef staan. Twee opties voorgelegd aan de eigenaar (bestaande kaarten
-dichter zetten + kaart hoger op de pagina, óf een nieuwe, kale samenvattingsrij toevoegen vóór de
-bestaande rijke kaarten) — antwoord nog niet binnen bij het schrijven van deze sectie. Ook nog
-niet gestart: de daadwerkelijke compositie-herbouw van GoogleView's Overzicht-tab (wacht op die
-keuze), en cross-account/God View hebben nog helemaal geen scherm (alleen backend/API) — die
-worden sowieso vanaf nul gebouwd in de uiteindelijk gekozen stijl, geen "herstel".
+als hij ongecontroleerd bleef staan. Twee opties voorgelegd; de eigenaar koos optie 2 (kale
+samenvattingsrij toevoegen, bestaande rijke kaarten laten staan) en gaf de volgorde:
+"compacte rij, geo kaart, donut, pacing, en daaronder in dezelfde strakke stijl verder uitbouwen".
+
+**De kale samenvattingsrij bleek al te bestaan.** `PeriodSummary`
+(`components/dashboard/period-summary.tsx`) rendert precies dat — label, groot cijfer, sparkline,
+delta, via de gedeelde `Kerncijfer`-component — en staat al boven de kanaaltabs in
+`client-dashboard.tsx`, dus vóór elk kanaalscherm. Geen nieuwe bouw nodig, alleen de rest van de
+pagina eromheen ordenen. En Google bleek al een eigen "donut" te hebben: `PmaxNetworkSplit` (twee
+ringen: kosten- en conversieverdeling per PMax-netwerk), tot nu toe weggestopt diep in "Waar het
+budget landt".
+
+**`components/dashboard/google-view.tsx` herschikt** (Overzicht-tab, geen gedragswijziging aan de
+onderliggende componenten): Markten (geo-kaart) staat nu eerst, direct gevolgd door een nieuwe,
+eigen sectie "Netwerkverdeling" met `PmaxNetworkSplit`, dan "Prestaties richting de beurs/
+Maandprestaties" (pacing), en pas daarna Jaaroverzicht 2026 en de resterende video/placement-
+kaarten — dezelfde volgorde als gevraagd. De oude, zorgvuldig uitgerekende 8/4/12-rastercode voor
+"Waar het budget landt" (row-span-2 om de PMax-ringen het gat tussen video en assetdekking te
+laten vullen) is vervallen nu de ringen daar niet meer staan; die sectie is teruggebracht naar een
+simpele, gestapelde volgorde.
+
+**Live geverifieerd, licht én donker** (beide gelijkwaardig uitgewerkt, zoals gevraagd) — twee
+screenshots gestuurd. Eerlijke kanttekening: de nieuwe "Netwerkverdeling"-sectie toont niets voor
+demo-greentech, want die klant heeft geen `ads_pmax_network_breakdown`-rijen (een al bestaand gat
+in de demo-seed, niet iets van deze wijziging) — het component zelf stond al langer live elders op
+dezelfde pagina en is ongewijzigd, dus functioneel betrouwbaar, alleen niet visueel te bevestigen
+op déze klant. Bij een echt Performance Max-account verschijnt de ring gewoon.
+
+**`scripts/check-kaartoverloop.mjs` gedraaid** (verplicht na opmaakwerk aan kaarten/rasters, zie
+AGENTS.md) — alle 15 schermen "niets buiten de kaart", inclusief Google, en de ingebouwde zelftest
+(bug teruggezet) vindt hem nog steeds. `npx tsc --noEmit` schoon, volledige `scripts/gates.sh`
+groen.
+
+**Nog niet gestart**: de rest van de pagina ("daaronder in dezelfde strakke stijl") verder
+verdichten — Jaaroverzicht 2026 en "Waar het budget landt" staan nog in hun oude, stukje-voor-
+stukje-gestapelde vorm. Ook nog niet aangeraakt: de andere kanaalschermen (Meta, LinkedIn,
+cross-channel) en cross-account/God View, die nog helemaal geen scherm hebben (alleen backend/
+API) — die worden vanaf nul gebouwd in deze stijl, geen "herstel".

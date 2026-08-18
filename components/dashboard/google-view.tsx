@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge } from "lucide-react";
+import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge, PieChart } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { Sectie } from "@/components/ui/sectie";
@@ -129,9 +129,50 @@ export function GoogleView({
           {/* De pagina is in secties gegroepeerd in plaats van dertien losse kaarten onder
               elkaar. Elke sectie beantwoordt één vraag; binnen een sectie staan de kaarten
               dicht op elkaar, ertussen zit ruim het dubbele. Zonder dat verschil groepeert er
-              niets en moet de lezer zelf uitzoeken wat bij wat hoort. */}
+              niets en moet de lezer zelf uitzoeken wat bij wat hoort.
+
+              VOLGORDE (17.31, op verzoek van de eigenaar): eerst de kaart, dan de netwerkringen,
+              dan pacing, en pas daarna de rest -- dezelfde "compacte kerncijfers, kaart, ring,
+              voortgang"-flow als het aangeleverde voorbeeldscherm, met de KPI-band zelf al
+              bovenaan de pagina (client-dashboard.tsx's PeriodSummary, vóór dit component). */}
           <Sectie
             eerste
+            icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
+            titel="Markten"
+            bijschrift={
+              meerdereKanalen
+                ? "Waar het verkeer en de conversies vandaan komen, en met welke kanaalmix"
+                : "Waar het verkeer en de conversies vandaan komen"
+            }
+          >
+            {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
+                landentabel met één kolom -- dat is precies wat de kaart al toont, en het
+                bijschrift belooft een "kanaalmix" die niet bestaat.
+
+                IN dezelfde kaart en niet eronder: als losse kaart werd het een dichtgeklapte
+                strook van 60px onder een kaart van 600, en twee van die balkjes op elkaar lezen
+                als restjes. Naast de kaart geprobeerd (7 + 5) en ook teruggedraaid, om dezelfde
+                reden: een strook naast een kaart van 481px is geen compositie. */}
+            <GeoBreakdown
+              clientId={clientId}
+              verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
+            />
+          </Sectie>
+
+          {/* De netwerkringen (was onderdeel van "Waar het budget landt", verderop): dezelfde
+              vraag als de kaart hierboven -- waar komt het vandaan -- maar dan op netwerk in
+              plaats van geografie. Vandaar hier, niet bij Video/Placements/creatives, dat is een
+              ander onderwerp ("hoe ziet het eruit"). Rendert zelf niets zonder Performance
+              Max-data, dus deze sectie kan leeg blijven zonder dat er iets geks gebeurt. */}
+          <Sectie
+            icoon={<PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />}
+            titel="Netwerkverdeling"
+            bijschrift="Performance Max: waar het budget en de conversies landen, per netwerk"
+          >
+            <PmaxNetworkSplit clientId={clientId} />
+          </Sectie>
+
+          <Sectie
             icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel={
               (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
@@ -174,81 +215,18 @@ export function GoogleView({
             <PerformanceChart clientId={clientId} countryFilter={countryFilter} />
           </Sectie>
 
-          {/* Waar het vandaan komt, en hóé die markten bediend worden. De kanaalmix per land
-              staat bewust naast de kaart en niet op een eigen pagina: het is de volgende vraag
-              na "welke landen", en een aparte pagina zou klant en periode opnieuw laten kiezen. */}
-          <Sectie
-            icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
-            titel="Markten"
-            bijschrift={
-              meerdereKanalen
-                ? "Waar het verkeer en de conversies vandaan komen, en met welke kanaalmix"
-                : "Waar het verkeer en de conversies vandaan komen"
-            }
-          >
-            {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
-                landentabel met één kolom -- dat is precies wat de kaart al toont, en het
-                bijschrift belooft een "kanaalmix" die niet bestaat.
-
-                IN dezelfde kaart en niet eronder: als losse kaart werd het een dichtgeklapte
-                strook van 60px onder een kaart van 600, en twee van die balkjes op elkaar lezen
-                als restjes. Naast de kaart geprobeerd (7 + 5) en ook teruggedraaid, om dezelfde
-                reden: een strook naast een kaart van 481px is geen compositie. */}
-            <GeoBreakdown
-              clientId={clientId}
-              verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
-            />
-          </Sectie>
-
-          {/* Video, PMax-netwerken, placements en creatives horen bij elkaar: het is allemaal
-              "waar landt het budget en hoe ziet het eruit". Elk van deze kaarten rendert niets
-              als er geen data voor is, dus de sectie kan ook helemaal leeg blijven. */}
+          {/* Video en placements en creatives horen bij elkaar: het is allemaal "hoe ziet het
+              budget eruit". De netwerkringen die hier eerder stonden zijn verhuisd naar boven,
+              naast de geo-kaart -- zelfde vraag ("waar komt het vandaan"), andere dimensie. Elk
+              van deze kaarten rendert niets als er geen data voor is, dus de sectie kan ook
+              helemaal leeg blijven. */}
           <Sectie
             icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Waar het budget landt"
-            bijschrift="Video, netwerken en placements"
+            bijschrift="Video en placements"
           >
-            {/* Naast elkaar, met een DERDE blok in het gat.
-
-                Eerder geprobeerd op 8 + 4 en teruggedraaid: de videotabel paste precies
-                (835/835) maar de PMax-kaart werd 826px hoog naast een videokaart van 322px --
-                een gat van 500px. Het probleem was niet de indeling maar dat er twee blokken
-                waren voor drie plekken.
-
-                De assetdekking vult dat gat, en niet als opvulling: de PMax-kaart ernaast zegt
-                zelf dat de kanaalverdeling geen knop is en dat je stuurt via assets. Die
-                assets stonden nergens op het scherm -- een kaart die een knop noemt en hem
-                niet laat zien.
-
-                row-span-2 op de PMax-kaart en geen drie losse rijen: die kaart is met zijn
-                twee ringen ongeveer even hoog als de videotabel en de assetdekking samen, dus
-                de twee kolommen lopen gelijk uit. */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:grid-rows-[min-content_1fr]">
-              <div className="@container min-w-0 xl:col-span-8">
-                <VideoPerformance clientId={clientId} />
-              </div>
-              {/* Ook deze rekt mee, en om dezelfde reden als de assetkaart hieronder -- alleen
-                  staat de speling nu aan de andere kant. Toen de assetdekking acht kolommen
-                  kreeg in plaats van drie werd de linkerkolom 573px tegen 528 rechts, en dan
-                  hangt de PMax-kaart 45px boven de onderrand van zijn buur.
-
-                  Welke kolom de langste is, hangt af van de klant: de assetkaart groeit met
-                  het aantal groepen dat aandacht vraagt, de ringen ernaast staan vast. Daarom
-                  rekken ze allebei mee -- dan valt de speling altijd binnen een kaart en nooit
-                  ertussen, welke kant hij ook op staat. */}
-              <div className="@container min-w-0 xl:col-span-4 xl:row-span-2 xl:[&>div]:h-full">
-                <PmaxNetworkSplit clientId={clientId} />
-              </div>
-              {/* De rijhoogtes zijn min-content en 1fr, en de assetkaart rekt mee (h-full, en
-                  via [&>div] ook de kaart erbinnen). Zonder dat verdeelde het raster de
-                  overtollige hoogte van de PMax-kaart over BEIDE rijen: 61px tussen video en
-                  assets waar elders 16 staat, en de onderkanten 45px uit elkaar. Nu gaat alle
-                  speling naar de onderste kaart, waar hij als padding in een lijst leest in
-                  plaats van als een gat tussen twee kaarten. */}
-              <div className="@container min-w-0 xl:col-span-8 xl:h-full xl:[&>div]:h-full">
-                <PmaxAssetCoverage clientId={clientId} />
-              </div>
-            </div>
+            <VideoPerformance clientId={clientId} />
+            <PmaxAssetCoverage clientId={clientId} />
             <VideoPlacements clientId={clientId} />
           </Sectie>
 
