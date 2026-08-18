@@ -4133,3 +4133,34 @@ teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build groen, v
 `scripts/gates.sh` groen (POORTEN GROEN).
 
 **Nog open**: of en waarmee het resterende kleine hoogteverschil links/rechts opgevuld wordt.
+
+### 17.43 De lijngrafiek: "ik mis de lijn diagram nog" — en waarom het niet ROAS werd
+
+Antwoord op de openstaande vraag uit 17.42: de eigenaar bevestigde dat de suggestie ("misschien
+een kleine lijndiagram") geen vrijblijvend idee was maar een concreet verzoek, geschreven in de
+lege ruimte onder de donut op een nieuwe schermafbeelding.
+
+**Nieuw component `components/dashboard/monthly-trend-line.tsx` (`MonthlyTrendLine`)**, zelfde
+opzet als `MonthlyTrendBars` (`useForecast`/`computeForecast`, geen tweede
+forecast-implementatie, laatste zes maanden, ~130px). Eerste versie gebruikte `forecast.roas` --
+inhoudelijk de logische keuze naast Account Health en Pacing (beide gaan over efficiëntie/op-
+schema-zijn). Gebouwd, gescreenshot, en toen bleek de lijn bij demo-greentech vrijwel perfect
+vlak: geen bug, ROAS is voor deze klant over zes maanden nauwelijks veranderd, en een vlakke lijn
+draagt geen signaal.
+
+**Overgestapt op CPA** (`forecast.cpa`, adSpend/conversions) zonder de architectuur te wijzigen --
+alleen de metric. CPA volgt dezelfde spend- en conversieschommelingen als de staven rechts en de
+"Performance 2026"-grafiek verderop, en toont bij deze klant wél een zichtbare (bescheiden)
+golfbeweging in plaats van een rechte lijn.
+
+**Bijvangst tijdens het verifiëren: `fullPage`-screenshots renderden de grafieken leeg.**
+Playwright's `page.screenshot({ fullPage: true })` op een lange pagina liet zowel de staven van
+`MonthlyTrendBars` als de lijn van `MonthlyTrendLine` volledig verdwijnen (assen en stippen bleven
+staan, de data-vormen niet) -- een bekend soort mismatch tussen recharts' `ResponsiveContainer`
+(die op `ResizeObserver` leunt) en het stitchen dat `fullPage` doet. Geen bug in de app: dezelfde
+pagina, met losse `clip`-screenshots op vaste scrollposities in plaats van `fullPage`, toont beide
+grafieken gewoon correct. Verificatie-methode aangepast, geen code aangepast.
+
+**Live geverifieerd, licht én donker.** `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets
+buiten de kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests
+groen, build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).

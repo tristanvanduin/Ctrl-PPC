@@ -24,6 +24,7 @@ import { VideoPerformance } from "./video-performance";
 import { PmaxNetworkSplit } from "./pmax-network-split";
 import { CampaignTypeSplit } from "./campaign-type-split";
 import { MonthlyTrendBars } from "./monthly-trend-bars";
+import { MonthlyTrendLine } from "./monthly-trend-line";
 import { PmaxAssetCoverage } from "./pmax-asset-coverage";
 import { VideoPlacements } from "./video-placements";
 import { CampaignTable } from "./campaign-table";
@@ -161,6 +162,9 @@ export function GoogleView({
               {/* 17.42: donut en pacing omgedraaid op verzoek. */}
               <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
               <CampaignTypeSplit clientId={clientId} />
+              {/* 17.43: "ik mis de lijn diagram nog" -- vult het resterende hoogteverschil met de
+                  rechterkolom, en ROAS is de efficiëntievraag die bij Health/Pacing past. */}
+              <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
             </div>
             <div className="min-w-0 flex flex-col gap-4">
               {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
