@@ -4040,3 +4040,44 @@ schoon, 301/301 tests groen, build groen, volledige `scripts/gates.sh` groen (PO
 
 **Nog niet gestart: LinkedIn en cross-channel** (zelfde patroon, zelfde componenten, geen nieuwe
 architectuur nodig) en de "2e laag" op alle vier de kanalen.
+
+### 17.39 De opener naar LinkedIn: derde kanaal, dezelfde vier bouwstenen
+
+Letterlijk dezelfde ingreep als 17.38 op Meta: `useGeoBreakdown({ clientId, channel: "linkedin" })`
+één keer aangeroepen, `BreakdownDonuts` + `GeoRanglijstCard` links, `GeoMapCard` alleen rechts. De
+oude "Markten"- en "Wie het te zien krijgt"-Secties zijn vervallen. `BreakdownDonuts` toont hier
+functie/senioriteit/industrie/bedrijfsgrootte i.p.v. Meta's leeftijd/plaatsing/device/platform/
+gender — zelfde component, `BREAKDOWN_DIMENSIES["linkedin"]` regelt het verschil, geen aparte code.
+
+**Een tweede, andere databug dan bij Meta.** De donut toonde rauwe URN's
+("urn:li:function:demo-edu") in plaats van leesbare labels ("Education"). Niet dezelfde oorzaak
+als 17.38's `meta_breakdown_daily`-gat: `linkedin_demographic_daily` was al gevuld, en de
+labeltabel (`linkedin_urn_labels`) ook — alleen elk met een EIGEN, los bedachte set URN's die
+elkaar nooit raakten.
+
+`BreakdownDonuts` leest de labeltabel via een rechtstreekse `supabase.from("linkedin_urn_labels")`
+-aanroep (bewust buiten `dbSelect()` gehouden, zie de kop van die aanroep in de component: een
+gedeelde opzoektabel zonder `client_id`, buiten migratie 067's scope). Zo'n rechtstreekse aanroep
+gaat in demo-modus wél door `lib/supabase.ts`'s mock-client — anders dan `dbSelect()` (17.38's
+bevinding), die altijd de echte tabel leest. Het gevolg: de demografie-rijen zelf kwamen uit de
+ECHTE tabel (geseed door `scripts/demo/seed-demo-client.ts`'s `LI_DEMO_FUNCTIONS`, het
+[S9]-scenario "75% van de leads uit Education"), maar de labelvertaling kwam uit de MOCK
+(`lib/demo/demo-rows.ts`'s eigen, rijkere `LI_DEMO_SEGMENTS` — dertien segmenten over vier
+dimensies, met eigen URN's als `urn:li:function:8`). Twee onafhankelijke generatoren voor
+hetzelfde concept, die toevallig nooit dezelfde URN's kozen.
+
+**Bewust de mock aangepast, niet de seed.** `LI_DEMO_FUNCTIONS`'s URN's en labels dragen het
+[S9]-scenario ("Education" trekt het account, "Operations" is duurder dan het oplevert) — die
+tekst staat vermoedelijk elders getoetst (detectors/tests die op "Education" zoeken), dus die
+laat ik ongemoeid. `lib/demo/demo-rows.ts`'s `linkedinUrnLabels` kreeg twee extra regels erbij
+(`urn:li:function:demo-edu` → "Education", `urn:li:function:demo-ops` → "Operations"), naast de
+bestaande dertien — geen van beide sets verwijderd, alleen de vertaling voor de kant die er nog
+ontbrak toegevoegd.
+
+**Live geverifieerd, licht én donker** — voor en na de labelfix gescreenshot om het verschil
+zichtbaar te bevestigen. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de
+kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build
+groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+**Drie van de vier kanalen klaar** (Google, Meta, LinkedIn). Nog niet gestart: cross-channel
+(`cross-channel-view.tsx`, gebruikt `GeoBreakdown` ook nog atomair) en de "2e laag" op alle vier.

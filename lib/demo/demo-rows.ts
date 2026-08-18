@@ -397,7 +397,18 @@ const linkedinDemographicDaily: Row[] = LI_DEMO_SEGMENTS.flatMap((s) =>
     };
   })
 );
-const linkedinUrnLabels: Row[] = LI_DEMO_SEGMENTS.map((s) => ({ urn: s.urn, label: s.label }));
+// `linkedin_demographic_daily` zelf komt via dbSelect() altijd uit de ECHTE tabel (ook in
+// demo-modus, zie geo-map-card.tsx/17.38's bevinding over dbSelect); alleen deze labeltabel
+// wordt hier gemockt, want breakdown-donuts.tsx leest hem via een rechtstreekse
+// supabase.from()-aanroep, en díe gaat in demo-modus wél door de mock (lib/supabase.ts).
+// scripts/demo/seed-demo-client.ts's LI_DEMO_FUNCTIONS (het [S9]-scenario: "75% van de leads uit
+// Education") zaait de echte tabel met eigen URN's, los van LI_DEMO_SEGMENTS hierboven -- zonder
+// deze twee regels vindt de labelvertaling die URN's niet en toont de donut kale
+// "urn:li:function:demo-edu"-tekst in plaats van "Education".
+const linkedinUrnLabels: Row[] = LI_DEMO_SEGMENTS.map((s) => ({ urn: s.urn, label: s.label })).concat([
+  { urn: "urn:li:function:demo-edu", label: "Education" },
+  { urn: "urn:li:function:demo-ops", label: "Operations" },
+]);
 
 const clientNotes: Row[] = [
   { id: "demo-note-1", client_id: CID, title: "Beursweek", content: "Piek verwacht rond de beursweek — budgetten tijdig ophogen.", created_at: iso(), updated_at: iso() },
