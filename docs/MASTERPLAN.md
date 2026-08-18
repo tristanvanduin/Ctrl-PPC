@@ -3172,3 +3172,72 @@ opruim-patroon hierboven is een keer uitgevoerd, niet (nog) een herbruikbaar scr
 volgende testronde is het overwegen waard om dit als een echt, benoemd scriptpaar
 (`scripts/demo/seed-geoclone-clients.ts` + teardown) vast te leggen in plaats van elke keer
 opnieuw te schrijven en weer weg te gooien.
+
+### 17.21 Decision Brief: een compacte export naast het volledige SOP-rapport, geen vervanging
+
+De eigenaar kreeg via Gemini het voorstel om de bestaande synthese-formatter te VERVANGEN door
+een nieuwe, gestroomlijnde systeemprompt die direct een compact 2-pagina beslisdocument voor
+Head of PPC/specialisten oplevert. Voordat dat gebouwd werd: eerst gecontroleerd of dat voorstel
+zelf klopt, en dat bleek niet zo te zijn.
+
+**Waarom vervangen de verkeerde keuze was.** Elk veld dat het compacte format nodig heeft —
+primary thread, root cause, de containment/validation/recovery/controlled-scale-indeling,
+accept_if/reject_if — staat al structureel in `FinalSopSynthesis`/`OperatingDetailLayer`
+(`lib/analysis/monthly-structured.ts`), de output die de bestaande pijplijn toch al produceert en
+opslaat. Vervangen zou drie echte dingen kosten: (1) een nieuwe LLM-call voor iets dat al als
+data bestaat, (2) de evidence traces en hypotheses-met-succescriteria die de leerlus voeden
+(§3.3/§4) alleen behouden als iemand dat apart blijft opslaan, en (3) `cross-channel-synthesis.ts`
+en `portfolio-synthesis.ts` breken, die zelf rechtstreeks uit `final_sop.primary_thread`/
+`root_cause`/`recommendations` lezen.
+
+**Gebouwd: een nieuwe, pure render-transformatie, geen nieuwe analysestap.**
+`lib/analysis/decision-brief.ts` zet bestaande `final_sop`/`operating_detail`-data (en optioneel
+een portfolio-synthese) deterministisch om naar precies het gevraagde format — geen LLM-call,
+geen dataverlies aan de bron. Drie afleidingen die het waard zijn te noemen omdat ze een echt
+veld hergebruiken in plaats van iets nieuws te verzinnen:
+- **Fase** komt uit de `route` van de eerste (dus meest urgente) aanbeveling
+  (validation→"Validatie", containment→"Beperking (rem)", enz.) — het dichtstbijzijnde bestaande
+  structurele veld voor "in welke fase zit dit account".
+- **Prioriteit** komt uit `qa_self_check.why_score_estimate`/`actionability_score_estimate`
+  (al berekend door de bestaande pijplijn), gedrempeld naar Hoog/Midden/Laag — geen nieuwe scoring.
+- **Beslisregel & Falsificatie** komt rechtstreeks uit de eerste hypothese in
+  `operating_detail.hypotheses_and_next_month_proof` — die droeg `evaluation_window`/`accept_if`/
+  `reject_if` al.
+
+**Niet elk account heeft alle drie de sprint-actie-routes, en dat wordt eerlijk getoond.** Het
+GRA/GRN-scenario uit 17.20 (geen "controlled scale" zolang de meting kapot is) is het echte,
+terugkerende geval: `buildSprintActions()` laat zo'n ontbrekende route `null`, en de renderer
+toont "Niet gedefinieerd" in plaats van een verzonnen actie. Een eigen test reproduceert dit
+scenario expliciet.
+
+**Woordlimiet (max 120 per sub-account) is een echt afgedwongen grens, geen toevallige.** Elk veld
+kreeg een eigen woordbudget (som = 120), afgekapt op woordgrens met "…". Getest met opzettelijk
+lange (40+ woorden per veld) brontekst — niet met toevallig korte testfixtures — zodat de test
+ook echt bewijst dat de afkapping werkt.
+
+**Een echte bug gevonden tijdens het eerste keer echt renderen, niet in een test met verzonnen
+namen.** Campagnenamen als "GRT | Search | NL" bevatten letterlijke pipe-tekens; ongeëscaped in
+een Markdown-tabelcel splitst dat de rij in extra kolommen en breekt de tabel. Gevonden door de
+renderer tegen echte content uit de 17.20-testrun te draaien (een tijdelijk, achteraf verwijderd
+script), niet door de code te lezen. Gefixed (`escapeTableCell()`) en vastgelegd in een
+regressietest die exact deze naam gebruikt — de PDF-renderer was hier nooit gevoelig voor (echte
+layout via @react-pdf/renderer, geen tekst-delimiters), alleen de Markdown-export.
+
+**PDF-renderer volgt de bestaande conventie.** `lib/analysis/decision-brief-pdf-renderer.ts`
+hergebruikt dezelfde bibliotheek en hetzelfde merkpalet als `sop-pdf-renderer.ts`
+(`@react-pdf/renderer`, `React.createElement` in een `.ts`-bestand, geen JSX/`.tsx` — zelfde
+conventie als de rest van de PDF-laag).
+
+**Nieuwe route, geen wijziging aan bestaande.** `GET /api/analysis/decision-brief?client_ids=a,b,c
+&agency_id=xxx&format=pdf|md` — leest dezelfde `structured_monthly_v2`/`portfolio_synthesis_v1`
+die de bestaande routes ook al lezen, met dezelfde toegangscontrole
+(`requireCapability("client:read")` + `canAccessClient` per klant, onbevoegde klanten vallen
+stil weg in plaats van een verklappende 403). `/api/analysis/pdf` blijft ongewijzigd het
+volledige rapport leveren; dit is een tweede, aparte exportoptie.
+
+Getest (`__decision_brief_test.ts`, 32 assertions): woordlimiet-afkapping op opzettelijk lange
+brontekst, route-mapping voor beide echte scenario's (GRT-met-controlled-scale,
+GRA/GRN-zonder), prioriteit/fase-afleiding, geen verzonnen beslisregel zonder
+`operating_detail`, portfolio-synthese aanwezig/afwezig, markdown-structuur, en de
+pipe-escape-regressie. `npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen (294/294
+tests, inclusief deze 32).
