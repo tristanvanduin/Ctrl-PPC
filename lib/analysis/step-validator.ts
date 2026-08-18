@@ -357,9 +357,15 @@ export function validateStepOutput(
   if (/checkout(?: funnel)? data niet beschikbaar|geen checkout funnel data beschikbaar/i.test(narrativeWithLogs)) explicitlyUnavailableScopes.add("checkout");
   if (/schedule data niet beschikbaar|geen schedule data beschikbaar|geen ad schedule data beschikbaar/i.test(narrativeWithLogs)) explicitlyUnavailableScopes.add("schedule");
   if (/network data niet beschikbaar|geen network data beschikbaar/i.test(narrativeWithLogs)) explicitlyUnavailableScopes.add("network");
-  if (/audience data niet beschikbaar/i.test(narrativeWithLogs)) explicitlyUnavailableScopes.add("audience");
+  // Stap 9 ("Doelgroep- & Geosegmenten") schrijft sinds de fase4-samenvoeging de exacte frase
+  // "Niveau 1 (Audience): data niet beschikbaar." / "Niveau 2 (Geografisch): data niet
+  // beschikbaar." (lib/prompts/monthly-v2.ts) -- niet "audience data niet beschikbaar". De oude
+  // regex matchte dat nooit, dus een audience-scope werd hier nooit herkend; toegevoegd naast de
+  // oude frase, niet vervangen, voor het geval een ouder narratief nog de oude vorm gebruikt.
+  if (/audience data niet beschikbaar|niveau 1 \(audience\)[:.]?\s*data niet beschikbaar/i.test(narrativeWithLogs)) explicitlyUnavailableScopes.add("audience");
   if (/engagement kpi data niet beschikbaar/i.test(narrativeWithLogs)) explicitlyUnavailableScopes.add("engagement");
   if (/productdata niet beschikbaar|geen productdata beschikbaar|custom labels\/categories\): data niet beschikbaar door ontbrekende merchant center koppeling/i.test(narrativeWithLogs)) explicitlyUnavailableScopes.add("product");
+  if (/geo(?:grafische)? data niet beschikbaar|niveau 2 \(geografisch\)[:.]?\s*data niet beschikbaar/i.test(narrativeWithLogs)) explicitlyUnavailableScopes.add("geo");
   const allUnavailable = options?.availability?.dimensions?.length
     ? options.availability.dimensions.every((dimension) => !dimension.available)
     : false;
@@ -374,6 +380,7 @@ export function validateStepOutput(
     if (finding.entity_type === "audience") return "audience";
     if (finding.entity_type === "device") return "device";
     if (finding.entity_type === "product" || finding.issue_cluster === "product_mix") return "product";
+    if (finding.entity_type === "country") return "geo";
     return null;
   };
 

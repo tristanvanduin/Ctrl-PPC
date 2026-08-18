@@ -55,7 +55,15 @@ export function checkStepDataAvailability(opts: AvailabilityInput): StepDataAvai
     { step: 6, dimensions: [dimension("Product data", opts.productData)] },
     { step: 7, dimensions: [dimension("Keyword data", opts.keywordData), dimension("Product data", opts.productData), dimension("Search term waste data", opts.searchTermData)] },
     { step: 8, dimensions: [dimension("Creative data", opts.creativeData)] },
-    { step: 9, dimensions: [dimension("Audience data", opts.audienceData)] },
+    // Live testrun 18 augustus 2026: stap 9 heet "Doelgroep- & Geosegmenten" sinds de fase4-
+    // samenvoeging van oud-stap-9 (Audience) en oud-stap-11 (Geo) in één call
+    // (lib/prompts/monthly-v2.ts, "F4 fase4"), maar deze lijst kende alleen de audience-bron. Bij
+    // elke van de 4 echte klanten in die test ontbrak audience-data (heel gewoon) maar was
+    // geo-data er wel -- `allUnavailable` viel dan alsnog op true uit voor de HELE stap, en de
+    // validator keurde daardoor de wel-echte, wel-deterministische geo-findings (GB/NL/DE/BE) af
+    // als "data niet beschikbaar terwijl evidence deterministic is". 100% reproductie, blokkeerde
+    // elke maandanalyse. Zelfde bugklasse als de stap-7-fix van 17 augustus (masterplan 17.14).
+    { step: 9, dimensions: [dimension("Audience data", opts.audienceData), dimension("Geo data", opts.countryData)] },
     {
       step: 10,
       dimensions: [

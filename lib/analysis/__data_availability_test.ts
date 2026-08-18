@@ -42,6 +42,34 @@ console.log("checkStepDataAvailability: stap 7 zonder enige bron blijft terecht 
   check("promptNote meldt de zoektermdata er nu ook expliciet bij", step7.promptNote.toLowerCase().includes("search term waste"), step7.promptNote);
 }
 
+console.log("checkStepDataAvailability: stap 9 kent zijn tweede bron (geo) na de fase4-samenvoeging");
+{
+  // Live testrun 18 augustus 2026 (4 echte klanten van hetzelfde bureau): stap 9 heet "Doelgroep- &
+  // Geosegmenten" sinds oud-stap-9 (Audience) en oud-stap-11 (Geo) zijn samengevoegd in
+  // lib/prompts/monthly-v2.ts ("F4 fase4"), maar deze lijst kende alleen de audience-bron. Bij
+  // alle 4 klanten ontbrak audience-data (heel gewoon) maar was geo-data er wel -- vóór deze fix
+  // viel `allUnavailable` dan alsnog op true uit voor de HELE stap, en de validator keurde
+  // daardoor de wel-echte, wel-deterministische geo-findings (GB/NL/DE/BE) af. 100% reproductie,
+  // blokkeerde elke maandanalyse in die test.
+  const availability = checkStepDataAvailability({
+    ...LEGE_INPUT,
+    audienceData: [], // leeg: heel gewoon, geen audience-koppeling
+    countryData: [{ country: "NL", cost: 5549.12, conversions: 257.1 }], // wél gevuld
+  });
+  const step9 = availability.find((a) => a.step === 9)!;
+  const geoDim = step9.dimensions.find((d) => d.name === "Geo data");
+  check("stap 9 heeft nu twee dimensies", step9.dimensions.length === 2, String(step9.dimensions.length));
+  check("de geo-dimensie is gevonden en beschikbaar", geoDim?.available === true, JSON.stringify(geoDim));
+  check("niet elke dimensie is unavailable (dus geen allUnavailable meer)", !step9.dimensions.every((d) => !d.available));
+}
+
+console.log("checkStepDataAvailability: stap 9 zonder audience én geo blijft terecht 'alles ontbreekt'");
+{
+  const availability = checkStepDataAvailability(LEGE_INPUT);
+  const step9 = availability.find((a) => a.step === 9)!;
+  check("beide dimensies ontbreken", step9.dimensions.every((d) => !d.available));
+}
+
 console.log("checkStepDataAvailability: andere stappen blijven ongewijzigd door de nieuwe dimensie");
 {
   const metAlles = checkStepDataAvailability({ ...LEGE_INPUT, keywordData: [{ x: 1 }], searchTermData: [{ x: 1 }] });
