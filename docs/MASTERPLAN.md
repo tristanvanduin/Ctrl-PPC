@@ -3614,3 +3614,79 @@ boven 2000 tekens). Het gat heeft zich in de praktijk dus nooit voorgedaan in ee
 geen stille schade bij bestaande klanten gevonden. Wel een eerlijke kanttekening: met 53 rijen
 totaal is dat een klein aantal kansen geweest, dus "nooit gebeurd" leunt deels op beperkte
 blootstelling, niet alleen op geluk.
+
+### 17.30 Weekly en biweekly krijgen hun eigen cross-channel-synthese, geen hergebruik van monthly
+
+Vervolgvraag op 17.25: moet weekly kanaal-specifiek blijven, of standaard cross-channel kijken?
+De eigenaar, scherp: "een anomalie kan mogelijk verklaard worden en in perspectief geplaatst
+worden" — "je account vertoont anomalies" is zwakker dan "je account vertoont anomalies, maar dit
+is een marktbreed signaal, geen reden voor paniek". En: weekly/biweekly moeten dit ZELF triggeren
+(een verse synthese, niet de laatste monthly-synthese hergebruiken), mogelijk zelfs cross-account
+en God View.
+
+**Eerst uitgezocht, niet aangenomen: de trigger simpelweg overzetten had niets gedaan.**
+`fetchChannelSummary()` in `cross-channel-synthesis.ts` (17.12) is hardgecodeerd op
+`section: "structured_monthly_v2"` — het rijke `final_sop`-object dat UITSLUITEND monthly's
+13-stappenpijplijn produceert. Weekly/biweekly zijn one-shot analyses: platte markdown
+(`section: "full"`) plus losse findings/recommendations/tasks via `extract-structured.ts`
+(tabellen `sop_insights`/`sop_recommendations`), geen `final_sop`. `portfolio-synthesis.ts`
+(cross-account) leunt op dezelfde structured_monthly_v2, plus op deze cross-channel-synthese zelf
+— dus cross-account heeft dezelfde blokkade, dieper. God View: bewust NIET meegenomen — 17.27 liet
+al zien dat opt-in uitstaat en 62 van de 70 Ranking Masters-klanten geen segment hebben; hem aan
+elke run hangen zou vrijwel altijd `metrics: null` opleveren, geen kostenkwestie maar een
+vullingskwestie.
+
+**Model voor deze stap**: dezelfde `reasoning`-laag (Grok 4.6, fallback Gemini 3.7 Flash) als
+monthly's cross-channel-synthese — zelfde taak (meerdere kanalen tegen elkaar afwegen tot één
+verhaal), zelfde kostenklasse, al bewezen. Geen nieuwe modelkeuze nodig.
+
+**Gebouwd: `lib/analysis/cross-channel-synthesis-lite.ts`, een eigen laag over een structureel
+ander databronformaat — geen kopie van de monthly-synthese met een andere tabelnaam erin geplakt.**
+`fetchLiteChannelSummary()` leest per kanaal `sop_insights` (top 5, ernstigste severity eerst) en
+`sop_recommendations` (top 5, hoogste ice_total eerst) voor de betreffende cyclus; `null` als dat
+kanaal deze cyclus nog geen afgeronde run heeft (`section: "full"`-check). `buildLiteSynthesisPrompt()`
+vraagt expliciet om PERSPECTIEF ("is dit kanaal-specifiek of een patroon over kanalen heen") in
+plaats van monthly's root-cause-synthese-taal — weekly/biweekly doen geen root-cause-analyse, dus
+de prompt belooft dat ook niet.
+
+**Maximaal hergebruikt, niets dubbel gedefinieerd** (de hygiënepoort waakt hier expliciet over):
+`parseSynthesisOutput()`, `SynthesizedAction`, `CrossChannelSynthesisResult` en de opslaglogica
+zijn 1-op-1 overgenomen uit `cross-channel-synthesis.ts` — de LLM-uitvoervorm is namelijk wél
+identiek, alleen de invoer verschilt. `readyForSynthesis()` (minstens 2 kanalen, ELK kanaal klaar
+deze cyclus) is generiek gemaakt (`<T>`) zodat zowel monthly's `ChannelSummary` als de nieuwe
+`LiteChannelSummary` 'm ongewijzigd hergebruiken in plaats van een tweede, identieke regel elders.
+
+**Eigen opslagslot per cadence, botst nooit met monthly of met elkaar**: `cross_channel_synthesis_weekly_v1`
+en `cross_channel_synthesis_biweekly_v1` (naast monthly's bestaande `cross_channel_synthesis_v1`),
+alledrie onder `sop_type: "cross_channel"`. Weekly's "afgelopen 14 dagen, anomalies" en biweekly's
+"impact/voortgang van een aanpassing" zijn andere vragen over andere periodes dan monthly's
+diepe root-cause-analyse en horen dus niet in dezelfde "1x per dag"-deduplicatie te vallen.
+
+**Trigger**: `triggerLiteCrossChannelSynthesisIfReady()` in `auto-cross-channel-trigger.ts`,
+zelfde faalzachte vorm als de monthly-variant (17.25), aangeroepen vanaf alle 6 succes-paden
+(Google/Meta/LinkedIn × weekly/biweekly) in hun routes.
+
+**Live geverifieerd, geen mock**: alle 3 kanalen van `demo-greentech` hadden vandaag al een
+afgeronde weekly-run; één herhaalde Google-weekly-aanroep triggerde de synthese meteen (Grok 4.6,
+4906 tokens). Het resultaat is een sterke, niet-triviale synthese: het model herkende zelfstandig
+dat de losse data-integriteitsklachten in alle drie de kanalen (sync-duplicatie op Search,
+account/campagne-reconciliatiefout op Meta, conversiediscrepantie op LinkedIn) "dezelfde klasse
+probleem" zijn — headline: *"CPA-verdubbeling en conversiedip op demo-greentech zijn een
+cross-kanaal datasignaal, geen losse SEA-crisis"* — en beval expliciet aan om de biedstrategie
+niet aan te passen totdat de meting is uitgelijnd, precies het "geen reden voor paniek, dit is
+breder"-perspectief waar de eigenaar om vroeg. Biweekly hetzelfde: eigen slot, eigen run (Grok
+4.6, 7270 tokens), geen botsing met weekly's slot op dezelfde dag.
+
+**Getest**: `__cross_channel_synthesis_lite_test.ts`, 16 assertions (severity-/ice-sortering,
+null bij ontbrekend kanaal, promptinhoud, alle skip-paden, het volledige gemockte pad met een
+eigen label per cadence). `__auto_cross_channel_trigger_test.ts` uitgebreid met de lite-wrapper
+(geen sleutel, normale skip, databasefout — alledrie faalt zacht). Bestaande
+`__cross_channel_synthesis_test.ts` (35 assertions) en `__llm_router_test.ts`/`__openrouter_client_test.ts`
+nog steeds groen — de generieke `readyForSynthesis<T>()` brak niets aan monthly's eigen gedrag.
+`npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+**Wat dit niet doet, bewust**: geen cross-account-synthese voor weekly/biweekly (zelfde
+structured_monthly_v2-afhankelijkheid, plus de Growth+-tier-gate die intact moet blijven — volgende
+stap, nog niet gebouwd). Geen God View-koppeling (17.27's bevinding staat: eerst opt-in en
+segmentatiedekking, dan pas een trigger). Geen wijziging aan monthly's eigen
+`cross-channel-synthesis.ts` behalve het generiek maken van `readyForSynthesis()`.

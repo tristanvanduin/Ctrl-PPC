@@ -5,7 +5,7 @@
 // doorsijpelen naar de hoofdanalyse, en dat een ontbrekende sleutel de query's helemaal overslaat.
 // Draaien: npx tsx lib/analysis/__auto_cross_channel_trigger_test.ts
 
-import { triggerCrossChannelSynthesisIfReady } from "./auto-cross-channel-trigger";
+import { triggerCrossChannelSynthesisIfReady, triggerLiteCrossChannelSynthesisIfReady } from "./auto-cross-channel-trigger";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 let passed = 0, failed = 0;
@@ -73,6 +73,48 @@ async function main() {
       threw = true;
     }
     check("geen exception bij een databasefout (faalt zacht, zie de toelichting in het bestand)", threw === false);
+  }
+
+  console.log("\n17.30: triggerLiteCrossChannelSynthesisIfReady (weekly/biweekly) -- zonder API-sleutel geen databaseaanroep");
+  {
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    const supabase = legeSupabase({ faalOpFrom: true });
+    let threw = false;
+    try {
+      await triggerLiteCrossChannelSynthesisIfReady(supabase, "client-lite-1", "weekly", "2026-08-04", "2026-08-18");
+    } catch {
+      threw = true;
+    }
+    check("geen exception zonder sleutel (lite, weekly)", threw === false);
+  }
+
+  console.log("\n17.30: met sleutel, minder dan 2 kanalen: skipt via hetzelfde bestaande skip-pad");
+  {
+    process.env.OPENROUTER_API_KEY = "test-sleutel";
+    const supabase = legeSupabase();
+    let threwWeekly = false, threwBiweekly = false;
+    try {
+      await triggerLiteCrossChannelSynthesisIfReady(supabase, "client-lite-2", "weekly", "2026-08-04", "2026-08-18");
+    } catch { threwWeekly = true; }
+    try {
+      await triggerLiteCrossChannelSynthesisIfReady(supabase, "client-lite-2", "biweekly", "2026-05-01", "2026-08-18");
+    } catch { threwBiweekly = true; }
+    check("geen exception bij een normale skip (weekly)", threwWeekly === false);
+    check("geen exception bij een normale skip (biweekly)", threwBiweekly === false);
+  }
+
+  console.log("\n17.30: een databasefout laat de lite-wrapper nooit gooien");
+  {
+    process.env.OPENROUTER_API_KEY = "test-sleutel";
+    const supabase = legeSupabase({ faalOpFrom: true });
+    let threw = false;
+    try {
+      await triggerLiteCrossChannelSynthesisIfReady(supabase, "client-lite-3", "weekly", "2026-08-04", "2026-08-18");
+    } catch {
+      threw = true;
+    }
+    check("geen exception bij een databasefout (faalt zacht)", threw === false);
   }
 
   if (origGemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = origGemini;

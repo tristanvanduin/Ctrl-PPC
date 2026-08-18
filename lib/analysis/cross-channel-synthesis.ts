@@ -116,10 +116,12 @@ export async function fetchChannelSummaries(
 }
 
 /** Klaar voor synthese: minstens 2 kanalen, en ELK beschikbaar kanaal heeft deze cyclus al een
- *  afgeronde monthly-analyse. Eén ontbrekend kanaal betekent wachten, niet gedeeltelijk draaien —
- *  een synthese over 2 van de 3 kanalen zou zichzelf presenteren als compleet terwijl hij dat niet
- *  is, en dat is precies het "stille gokken" dat deze codebase overal elders vermijdt. */
-export function readyForSynthesis(summaries: Map<SopChannel, ChannelSummary | null>): boolean {
+ *  afgeronde analyse. Eén ontbrekend kanaal betekent wachten, niet gedeeltelijk draaien — een
+ *  synthese over 2 van de 3 kanalen zou zichzelf presenteren als compleet terwijl hij dat niet is,
+ *  en dat is precies het "stille gokken" dat deze codebase overal elders vermijdt.
+ *  Generiek over het samenvattingstype: cross-channel-synthesis-lite.ts (17.30) hergebruikt deze
+ *  exact ongewijzigde regel voor weekly/biweekly's LiteChannelSummary in plaats van 'm te kopieren. */
+export function readyForSynthesis<T>(summaries: Map<SopChannel, T | null>): boolean {
   if (summaries.size < 2) return false;
   return [...summaries.values()].every((s) => s !== null);
 }

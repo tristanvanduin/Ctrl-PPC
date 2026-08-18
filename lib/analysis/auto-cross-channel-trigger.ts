@@ -20,6 +20,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getOpenRouterKey } from "./helpers";
 import { runCrossChannelSynthesis } from "./cross-channel-synthesis";
+import { runLiteCrossChannelSynthesis, type LiteCadence } from "./cross-channel-synthesis-lite";
 import { laadBeschikbareKanalen } from "@/lib/kanalen/beschikbaar";
 import { lastCompleteMonth } from "@/lib/period/period-range";
 import { today } from "@/lib/reporting-date";
@@ -54,5 +55,35 @@ export async function triggerCrossChannelSynthesisIfReady(supabase: SupabaseClie
     }
   } catch (err) {
     logger.error(`[auto-cross-channel] mislukt voor ${clientId}, hoofdanalyse blijft ongemoeid:`, err instanceof Error ? err.message : String(err));
+  }
+}
+
+// 17.30: dezelfde onvoorwaardelijke, faalzachte aanroep als hierboven, maar voor de lichte
+// weekly/biweekly-synthese (cross-channel-synthesis-lite.ts) -- eigen periode per cadence, want
+// weekly's venster (14 dagen) en biweekly's venster (3 maanden) zijn geen van beide "de laatste
+// volledige kalendermaand" die periodBounds() hierboven berekent.
+export async function triggerLiteCrossChannelSynthesisIfReady(
+  supabase: SupabaseClient,
+  clientId: string,
+  cadence: LiteCadence,
+  periodStart: string,
+  periodEnd: string
+): Promise<void> {
+  try {
+    const apiKey = getOpenRouterKey();
+    if (!apiKey) return;
+
+    const beschikbareKanalen = await laadBeschikbareKanalen(supabase as never, clientId);
+
+    const result = await runLiteCrossChannelSynthesis({
+      supabase, apiKey, clientId, cadence, beschikbareKanalen,
+      analysisDate: today(), periodStart, periodEnd,
+    });
+
+    if (!result.skipped) {
+      logger.info(`[auto-cross-channel-lite] ${cadence}-synthese getriggerd voor ${clientId} (${result.tokensUsed} tokens, model ${result.model})`);
+    }
+  } catch (err) {
+    logger.error(`[auto-cross-channel-lite] ${cadence}-synthese mislukt voor ${clientId}, hoofdanalyse blijft ongemoeid:`, err instanceof Error ? err.message : String(err));
   }
 }
