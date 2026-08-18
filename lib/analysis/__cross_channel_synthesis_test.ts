@@ -107,6 +107,23 @@ async function main() {
     const r3 = parseSynthesisOutput(metCodeFence, ["google_ads", "meta_ads"]);
     check("code-fence wordt gestript vóór het parsen", r3.headline === "Kop");
 
+    // 17 augustus 2026, live testrun (demo-greentech): het model schreef de leesbare headerLabel
+    // ("SEA", "Meta Ads") in plaats van de interne sleutel in `channel` -- de oude, strikte check
+    // zag dat als verzonnen en filterde ALLE acties weg, terwijl de markdown ze wél toonde.
+    const metLeesbareLabels = JSON.stringify({
+      headline: "Kop", narrative: "Verhaal", contradictions: [],
+      synthesized_actions: [
+        { channel: "SEA", action: "budgetknip", rationale: "r", priority: "hoog" },
+        { channel: "Meta Ads", action: "landingspagina fixen", rationale: "r", priority: "hoog" },
+        { channel: "meta ads", action: "hoofdletterongevoelig moet ook werken", rationale: "r", priority: "laag" },
+      ],
+      markdown: "x",
+    });
+    const r5 = parseSynthesisOutput(metLeesbareLabels, ["google_ads", "meta_ads"]);
+    check("headerLabel 'SEA' wordt teruggemapt naar 'google_ads'", r5.synthesized_actions.some((a) => a.channel === "google_ads"), JSON.stringify(r5.synthesized_actions));
+    check("headerLabel 'Meta Ads' wordt teruggemapt naar 'meta_ads'", r5.synthesized_actions.filter((a) => a.channel === "meta_ads").length === 2, JSON.stringify(r5.synthesized_actions));
+    check("geen enkele actie verloren gegaan door de labelvorm", r5.synthesized_actions.length === 3, JSON.stringify(r5.synthesized_actions));
+
     // Kapotte JSON: gedegradeerde fallback, geen crash.
     const kapot = "dit is geen json { headline:";
     const r4 = parseSynthesisOutput(kapot, ["google_ads"]);

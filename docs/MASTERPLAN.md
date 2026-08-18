@@ -2791,3 +2791,48 @@ dat de LLM ooit wist dat het om aparte sub-accounts ging.
   eigenaar bevestigde expliciet dat de bestaande geo-clone-dimensie (campagnenaam-afkorting) de
   juiste laag is, niet een structurele accountsplitsing — minder ingrijpend, en de sub-accounts
   blijven zo automatisch "bij elkaar in het totaaloverzicht van GreenTech zelf".
+
+### 17.13 Live testrun tegen productie: geo-clones bevestigd werkend, één echte bug gevonden en gefixt
+
+Op verzoek van de eigenaar ("absoluut") getest tegen echte productie-infrastructuur
+(demo-greentech), zelfde patroon als de eerdere live test (17.1-17.8): lokale server tegen de
+echte Supabase/OpenRouter-credentials.
+
+**Geo-clone-segmentatie: bevestigd werkend, met bewijs in de ruwe output.** Stap 13 van Google's
+monthly-analyse citeerde letterlijk: *"Sub-account GRN (3 maanden: €2.700, 24 conversies, CPA
+€112,50) draagt de Display-lekkage; GRT (€20.400, 130 conversies, CPA €156,92) draagt de gekapte
+Search-winnaar. Overig blijft de goedkoopste pocket (CPA €27,66) en mag niet worden weggemiddeld."*
+Die laatste zin is vrijwel een citaat uit de instructie in `geo-clone-context.ts`. Sub-accounts
+worden dus daadwerkelijk als unieke eenheden behandeld, niet blind geblend.
+
+**Een echte, bestaande bug (niet van vandaag) opnieuw tegengekomen.** Google's eerste run
+blokkeerde op de kwaliteitspoort: stap 7 beweerde "deterministic" bewijsniveau op een zoekterm-
+bevinding terwijl het narratief zei dat keyword-databeschikbaarheid ontbrak — zelfde bugklasse als
+17.4, nu op een andere bevinding. De repair-poging (17.4's fix) triggerde wel, maar loste het niet
+op. Nagekeken of dit een dataprobleem was (`ads_search_terms_wasteful` had wel degelijk 5 echte
+rijen voor deze klant) — dus geen ontbrekende testdata, een echte modelinconsistentie die de poort
+terecht ving. Tweede poging: quality gate `passed: true`, geen invalid steps. Dit bevestigt dat de
+17.4-repair de faalkans verkleint maar geen garantie is — verwacht, niet een nieuwe regressie.
+
+**Cross-channel-synthese: sterke inhoud, één echte parseerbug gevonden en gefixt.** De eerste
+synthese-run leverde een oprecht gesynthetiseerd verhaal op (Google's slechtste klik→conversie
+tegenover LinkedIn's beste, tegen SEA's eigen wens voor meer budget in) met drie expliciet benoemde
+tegenstrijdigheden — precies het "1 concrete goede output" dat gevraagd was. Maar
+`synthesized_actions` kwam leeg terug terwijl de markdown wél drie acties toonde: het model schreef
+de leesbare headerLabel ("SEA", "Meta Ads") in het `channel`-veld in plaats van de interne sleutel
+("google_ads"), en de oude, strikte validatie zag dat als een verzonnen kanaal en filterde alles
+weg. Gefixt in `cross-channel-synthesis.ts`: `parseSynthesisOutput` normaliseert nu elke headerLabel
+(case-ongevoelig) terug naar zijn interne sleutel vóór de validatie, en de systeemprompt noemt nu
+expliciet de verwachte sleutels i.p.v. alleen "een echt kanaal". Beide verdedigingslagen tegelijk —
+prompt strakker én parser toleranter — in plaats van te vertrouwen op één van de twee.
+
+**Herverificatie van de fix**: rechtstreeks tegen de al opgeslagen productiedata gedraaid (niet via
+de route, die `analysisDate: today()` hardcodeert — de sessie liep inmiddels over middernacht heen,
+dus de automatische poort weigerde terecht een synthese op niet-matchende datums; zelf bewijs dat
+die datumcontrole werkt). Resultaat: alle drie `synthesized_actions` kwamen correct terug met de
+juiste interne kanaalsleutels, identiek aan de markdown. Nieuwe test toegevoegd
+(`__cross_channel_synthesis_test.ts`) die exact dit scenario dekt, zodat de bug niet terugkomt.
+
+**Niet getest vandaag**: de kanaaloverstijgende synthese mét God View- of cross-account/portfolio-
+signalen erbij — die twee blijven losstaande mechanismen, niet meegenomen in deze synthese-stap
+(zie de vraag/het antwoord hierover, 17 augustus).

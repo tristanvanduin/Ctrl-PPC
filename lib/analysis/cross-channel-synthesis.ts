@@ -156,10 +156,10 @@ export function buildSynthesisPrompt(
     "Regels:",
     "- Eén hoofdverhaal (narrative), niet drie naast elkaar. Kies het meest betekenisvolle patroon over de kanalen heen, ook als dat niet het topfinding van één los kanaal is.",
     "- Spreken de kanalen elkaar tegen (bijv. het ene kanaal ziet verzadiging, het andere groei op hetzelfde publiek)? Benoem dat expliciet in contradictions — verzwijg het niet en doe niet alsof het toeval is.",
-    "- Elke synthesized_action moet een ECHT, hierboven genoemd kanaal als 'channel' hebben. Verzin nooit een kanaal dat niet is aangeleverd.",
+    `- Elke synthesized_action moet een ECHT, hierboven genoemd kanaal als 'channel' hebben — gebruik daar de INTERNE sleutel (${channels.map(([ch]) => `"${ch}"`).join(", ")}), niet de leesbare naam uit de koppen hierboven (dus "google_ads", niet "SEA"). Verzin nooit een kanaal dat niet is aangeleverd.`,
     "- Een actie hoort hier alleen als hij de synthese van meerdere kanalen nodig heeft om te bedenken — een actie die net zo goed uit één kanaal alleen had kunnen komen hoort niet in deze lijst.",
     "- Verzin geen cijfers die niet in de aangeleverde samenvattingen of signalen staan.",
-    "- Antwoord uitsluitend als JSON met exact deze velden: headline (string, één zin), narrative (string, 3-6 zinnen), contradictions (string[], leeg als er geen zijn), synthesized_actions (array van {channel, action, rationale, priority: \"hoog\"|\"midden\"|\"laag\"}), markdown (string: een leesbare, opgemaakte weergave van headline+narrative+acties voor in een rapport).",
+    `- Antwoord uitsluitend als JSON met exact deze velden: headline (string, één zin), narrative (string, 3-6 zinnen), contradictions (string[], leeg als er geen zijn), synthesized_actions (array van {channel: een van ${channels.map(([ch]) => `"${ch}"`).join("/")}, action, rationale, priority: "hoog"|"midden"|"laag"}), markdown (string: een leesbare, opgemaakte weergave van headline+narrative+acties voor in een rapport).`,
   ].join("\n");
 
   const channelBlocks = channels.map(([ch, s]) => {
@@ -197,16 +197,37 @@ function stripCodeFence(s: string): string {
   return s.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
 }
 
+// 17 augustus 2026, live testrun (demo-greentech): de structured synthesized_actions kwamen leeg
+// terug terwijl de markdown wél drie acties bevatte -- het model schreef er "SEA"/"Meta Ads" in
+// (de headerLabel uit de prompt-context), niet de interne sleutel "google_ads". De oude, strikte
+// validSet.has(channel)-check zag dat als een verzonnen kanaal en filterde alles weg. Een LLM dat
+// de leesbare naam teruggeeft die het zelf net las is geen hallucinatie, dus normaliseren in
+// plaats van weggooien: elke headerLabel (case-ongevoelig) wordt teruggemapt naar zijn sleutel.
+const LABEL_TO_CHANNEL: Record<string, SopChannel> = Object.fromEntries(
+  (Object.entries(CHANNEL_CONFIG) as [SopChannel, typeof CHANNEL_CONFIG[SopChannel]][]).map(([ch, cfg]) => [cfg.headerLabel.toLowerCase(), ch])
+);
+function normalizeChannel(raw: unknown, validChannels: readonly SopChannel[]): SopChannel | null {
+  if (typeof raw !== "string") return null;
+  const validSet = new Set(validChannels);
+  if (validSet.has(raw as SopChannel)) return raw as SopChannel;
+  const viaLabel = LABEL_TO_CHANNEL[raw.trim().toLowerCase()];
+  return viaLabel && validSet.has(viaLabel) ? viaLabel : null;
+}
+
 /** Parseert de LLM-output. Bij een mislukte parse valt de synthese terug op de ruwe tekst als
  *  narrative met een lege actielijst — een leesbare, gedegradeerde synthese is beter dan geen
  *  synthese, en dit is een verrijkingslaag, geen kwaliteitspoort die een run mag blokkeren. */
 export function parseSynthesisOutput(raw: string, validChannels: readonly SopChannel[]): CrossChannelSynthesisResult {
   try {
     const parsed = JSON.parse(stripCodeFence(raw)) as Partial<CrossChannelSynthesisResult>;
-    const validSet = new Set(validChannels);
     const actions = Array.isArray(parsed.synthesized_actions)
-      ? parsed.synthesized_actions.filter((a): a is SynthesizedAction =>
-          !!a && typeof a === "object" && validSet.has((a as SynthesizedAction).channel) && typeof (a as SynthesizedAction).action === "string")
+      ? parsed.synthesized_actions
+          .map((a): SynthesizedAction | null => {
+            if (!a || typeof a !== "object" || typeof (a as SynthesizedAction).action !== "string") return null;
+            const channel = normalizeChannel((a as SynthesizedAction).channel, validChannels);
+            return channel ? { ...(a as SynthesizedAction), channel } : null;
+          })
+          .filter((a): a is SynthesizedAction => a !== null)
       : [];
     return {
       headline: typeof parsed.headline === "string" ? parsed.headline : "",
