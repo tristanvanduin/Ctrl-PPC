@@ -2920,3 +2920,38 @@ geen live agency met 2+ klanten en verse eindverhalen voorhanden binnen deze ses
 draaien. Unit-getest (`__portfolio_synthesis_test.ts`, 31 assertions): voorkeur voor cross-
 channel-synthese boven los kanaal, terugval-pad, versheidsvenster-gating, naam/id-normalisatie,
 skip-paden, en het volledige succespad met een gemockte LLM-call.
+
+### 17.16 Alsnog live getest — met echte, oude portfoliodata, zoals de eigenaar voorstelde
+
+De eigenaar wees de "geen geschikte data" conclusie af: *"niet zo simpel af doen als kan niet.
+graag out of the box mee denken. dus of met oude data wat oke is."* Terecht: het echte bureau
+"Ranking Masters" (agency_id `04189c5d-...`, 70 accounts) had allang bruikbare, oude
+`structured_monthly_v2`-data staan — nooit gecontroleerd voordat "geen data" werd geconcludeerd.
+
+**Opzet.** Drie echte klanten met de meeste historie (Broedservice, Fit-fysiotherapie, Minismus,
+elk 2-4 afgeronde Google-analyses, laatste rond 16-17 april 2026) rechtstreeks opgehaald —
+zonder het versheidsvenster te omzeilen in de productiecode zelf (dat blijft een terechte regel),
+maar door voor deze test buiten de gate om de rijen op te halen en vanaf daar de ECHTE,
+ongewijzigde functies aan te roepen: `buildPortfolioSynthesisPrompt`, de echte reasoning-laag-call
+(Grok 4.6), `parsePortfolioSynthesisOutput`.
+
+**Resultaat: sterk, genuine cross-account-inzicht.** Drie totaal verschillende problemen (Broedservice:
+budgetplafond houdt bewezen vraag tegen; Minismus: Duitsland trekt budget bij een efficiency van
+0,54 zonder rendement; Fit-fysiotherapie: hoge CTR maar ingestorte CVR op een creative) werden
+samengevoegd tot één niet-voor-de-hand-liggend patroon: alle drie krijgen hetzelfde "niet schalen
+tot de KPI herstelt"-herstelrecept, terwijl het onderliggende probleem per klant tegenovergesteld
+is (te weinig budget vs. te veel budget zonder rendement vs. een conversieprobleem). De synthese
+stelde zelf een triage voor (vraag>budget / budget-zonder-rendement / verkeer-zonder-conversie) en
+gaf 5 acties: 2 bureau-brede ("portfolio"), 3 per klant — geen enkele verzonnen clientId, de
+naam/id-normalisatie uit 17.15 werkte meteen goed (het model gaf zelfs consequent de echte
+clientId's terug, niet de namen, dus die normalisatie-tak werd dit keer niet eens nodig).
+
+**Opgeslagen als echt, inspecteerbaar record**: rechtstreeks in `agency_analysis_output` voor de
+echte Ranking Masters-agency (analysis_date 2026-04-17, matchend met de brondata), niet alleen in
+een testlog. Te bekijken via de bestaande GET-route/UI-kaart door iemand met Growth+ toegang tot
+dat bureau. Tijdelijke scripts (`scripts/_livetest_*.ts`) na afloop verwijderd — geen wijziging aan
+productiecode nodig, dit bewees alleen dat de al-geschreven code werkt.
+
+**Les**: "geen geschikte data" was een te snelle conclusie. Bij twijfel eerst de database
+bevragen (agencies/accounts/sop_analysis_output) voordat een testbeperking als blokkade wordt
+gemeld.
