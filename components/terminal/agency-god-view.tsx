@@ -1,11 +1,113 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, Building2 } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Loader2, Building2, Sparkles, Calendar, Info } from "lucide-react";
 import { Counter } from "@/components/ui/counter";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "@/components/dashboard/data-table";
 import { segmentLabel, magAlsTrendGelden, MIN_ACCOUNTS_VOOR_TREND } from "@/lib/macro/types";
 import { CodeRoodPaneel } from "@/components/adoptie/code-rood-paneel";
+import { Laadvlak } from "@/components/ui/laadvlak";
+
+// Portfolio-synthese (masterplan 17.15): dezelfde soort kaart als SynthesisCard in
+// cross-channel-analyses.tsx, maar tussen KLANTEN van het bureau i.p.v. tussen kanalen van 1
+// klant. Eigen fetch, eigen route (/api/analysis/portfolio-synthesis) -- de segmentcellen
+// hieronder blijven de bestaande, deterministische Macro-aggregatie en draaien onafhankelijk.
+
+interface PortfolioAction { clientId: string; clientName?: string; action: string; rationale: string; priority: "hoog" | "midden" | "laag" }
+interface PortfolioSynthesis {
+  headline: string;
+  narrative: string;
+  recurring_patterns: string[];
+  outliers: string[];
+  synthesized_actions: PortfolioAction[];
+}
+
+const PRIORITY_STYLE: Record<PortfolioAction["priority"], string> = {
+  hoog: "bg-red-100 text-red-700",
+  midden: "bg-amber-100 text-amber-700",
+  laag: "bg-gray-100 text-muted-foreground",
+};
+
+function PortfolioSynthesisCard() {
+  const [synthesis, setSynthesis] = useState<PortfolioSynthesis | null | undefined>(undefined);
+  const [analysisDate, setAnalysisDate] = useState<string | null>(null);
+
+  const fetchSynthesis = useCallback(async () => {
+    try {
+      const res = await fetch("/api/analysis/portfolio-synthesis");
+      if (!res.ok) { setSynthesis(null); return; }
+      const data = await res.json();
+      setSynthesis(data?.synthesis ?? null);
+      setAnalysisDate(data?.analysisDate ?? null);
+    } catch {
+      setSynthesis(null);
+    }
+  }, []);
+
+  useEffect(() => { fetchSynthesis(); }, [fetchSynthesis]);
+
+  if (synthesis === undefined) return <Laadvlak vorm="tekst" regels={3} />;
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+        <Sparkles className="w-4.5 h-4.5 text-brand-orange-ink" />
+        <div className="flex-1">
+          <h2 className="text-title font-semibold text-brand-gray">Portfolio-synthese</h2>
+          <p className="text-micro text-muted-foreground mt-0.5">
+            Eén samenhangend verhaal uit de meest recente eindconclusies van je klanten — patronen die bij meerdere klanten terugkomen, niet elke klant los.
+          </p>
+        </div>
+      </div>
+      <div className="px-5 py-4 space-y-3">
+        {!synthesis ? (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-meta text-blue-800 flex gap-2">
+            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>Nog geen portfolio-synthese. Draai 'm via de Portfolio-synthese-actie, of wacht tot minstens 2 klanten deze maand een vers eindverhaal hebben.</span>
+          </div>
+        ) : (
+          <>
+            {analysisDate && <p className="text-micro text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> {analysisDate}</p>}
+            <p className="text-lead font-semibold text-brand-gray">{synthesis.headline}</p>
+            <p className="text-meta text-muted-foreground leading-relaxed">{synthesis.narrative}</p>
+
+            {synthesis.recurring_patterns.length > 0 && (
+              <div className="rounded-md border border-border bg-gray-50 px-3 py-2">
+                <p className="text-micro font-medium text-brand-gray mb-1">Terugkerende patronen</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-meta text-brand-gray">
+                  {synthesis.recurring_patterns.map((p, i) => <li key={i}>{p}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {synthesis.outliers.length > 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-micro font-medium text-amber-800 mb-1">Uitschieters</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-meta text-amber-800">
+                  {synthesis.outliers.map((o, i) => <li key={i}>{o}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {synthesis.synthesized_actions.length > 0 && (
+              <div className="space-y-2">
+                {synthesis.synthesized_actions.map((a, i) => (
+                  <div key={i} className="rounded-md border border-border px-3 py-2 flex items-start gap-2">
+                    <span className={`text-micro font-medium px-2 py-0.5 rounded-full shrink-0 ${PRIORITY_STYLE[a.priority]}`}>{a.priority}</span>
+                    <div className="flex-1">
+                      <p className="text-meta text-brand-gray"><span className="font-medium">{a.clientName ?? (a.clientId === "portfolio" ? "Hele portfolio" : a.clientId)}:</span> {a.action}</p>
+                      <p className="text-micro text-muted-foreground mt-0.5">{a.rationale}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Fase 5, Task 3: Agency God View -- geaggregeerde macro-data en de eigen portfolio, voor
 // performance_marketeer (organisatiebreed maar bureau-gescoped, zie lib/auth/scope.ts). Leunt op
@@ -57,6 +159,7 @@ export function AgencyGodView() {
     return (
       <div className="terminal space-y-4">
         <h1 className="text-page font-bold text-brand-blue-ink">Agency God View</h1>
+        <PortfolioSynthesisCard />
         <CodeRoodPaneel />
         <p className="rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-body text-muted-foreground">
           Nog geen cellen — geen klant van dit bureau heeft in het venster sinds {data.vanaf} zowel
@@ -81,6 +184,8 @@ export function AgencyGodView() {
         <h1 className="text-page font-bold text-brand-blue-ink">Agency God View</h1>
         <span className="text-meta text-muted-foreground">eigen bureau · {laatsteMaand.slice(0, 7)}</span>
       </div>
+
+      <PortfolioSynthesisCard />
 
       <CodeRoodPaneel />
 

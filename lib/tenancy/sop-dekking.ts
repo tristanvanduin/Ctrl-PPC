@@ -81,6 +81,30 @@ export async function telAccountsMetSops(
 }
 
 /**
+ * De client_id's van een bureau met sops_enabled = true -- het lijst-equivalent van
+ * telAccountsMetSops hierboven. Nodig voor de portfolio-synthese (masterplan 17.15): "welke
+ * klanten horen in dit bureau's portfolio" is precies dezelfde regel als "welke klanten tellen
+ * mee voor de SOP-dekking", dus hergebruik in plaats van een tweede, licht andere definitie.
+ * Bij een leesfout: null, zelfde afweging als telAccountsMetSops.
+ */
+export async function lijstAccountsMetSops(
+  supabase: SupabaseClient,
+  agencyId: string
+): Promise<string[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from("accounts")
+      .select("client_id")
+      .eq("agency_id", agencyId)
+      .eq("sops_enabled", true);
+    if (error || !data) return null;
+    return data.map((r) => String(r.client_id));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Mag dit ene account automatische SOP's draaien? Dit is de handhaving achter sops_enabled,
  * aan te roepen in monthly/weekly/biweekly voordat een run start.
  *

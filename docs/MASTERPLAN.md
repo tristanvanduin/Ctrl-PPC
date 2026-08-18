@@ -2867,3 +2867,56 @@ Geverifieerd tegen de daadwerkelijk vastgelegde narratieftekst uit de 17.13-test
 resterende regex-route (`/geen data beschikbaar|niet uitvoerbaar/i`) niet alsnog zou triggeren.
 
 **Volgende stap, met deze afgerond**: cross-account.
+
+### 17.15 Portfolio-synthese: dezelfde synthese-stap, nu tussen klanten van hetzelfde bureau
+
+De eigenaar koos expliciet voor "portfolio-synthese (zoals cross-channel, maar tussen klanten)"
+boven het alternatief (de bestaande Macro-portfoliogating alleen verstevigen).
+
+**Nieuwe tabel, bewust niet client_id hergebruikt.** `sop_analysis_output.client_id` is
+`not null`; een portfolio-synthese gaat over meerdere klanten tegelijk en heeft geen eigen
+client_id. Nieuwe, kleine tabel `agency_analysis_output` (migratie
+`098_agency_analysis_output.sql`, **live gedraaid tegen productie** met dezelfde
+Management-API-credentials als migratie 097), agency_id als sleutel i.p.v. client_id. RLS bewust
+nog niet aangezet — exact dezelfde, al getrackte status als `sop_analysis_output` zelf (zie
+065_rls_sop_intelligence.sql's eigen "NIET UITGEVOERD"-notitie); geen nieuw gat, hetzelfde gat.
+
+**Architectuur, tegen de code gecontroleerd vóór het bouwen.** `lib/macro/aggregate.ts` (de
+bestaande portfolio-aggregatie) telt alleen ruwe metrics op — geen enkele agency-brede opslag van
+"de eindconclusie per klant" bestond al. De tier-gate bestaat wél al en is echt: Macro/Agency God
+View zit al achter `heeftTenminste(licentie, "growth")`
+(`app/api/platform/agency-macrotrends/route.ts`) — hergebruikt, geen nieuwe gate verzonnen. Een
+"welke klanten horen in de portfolio"-lijst-helper bestond niet (alleen een COUNT,
+`telAccountsMetSops`); `lijstAccountsMetSops` toegevoegd in `lib/tenancy/sop-dekking.ts` als het
+lijst-equivalent, dezelfde regel (agency_id + sops_enabled=true) hergebruikt in plaats van een
+tweede definitie.
+
+**Waarom geen exacte-datum-gate (bewust anders dan cross-channel-synthesis.ts).**
+Cross-channel-synthese eist dat alle kanalen van ÉÉN klant dezelfde analysis_date dragen — logisch
+want ze worden na elkaar in dezelfde sessie getriggerd. Klanten van een bureau draaien elk op hun
+eigen cadans; een exacte-dag-match over een hele portfolio zou vrijwel nooit halen. In plaats
+daarvan een VERSHEIDSVENSTER van 35 dagen per klant, met de eigen analysis_date altijd expliciet
+in de prompt (zelfde "kan van eerdere cyclus zijn"-discipline als cross-channel-context.ts).
+
+**Per klant het beste beschikbare eindverhaal, niet de ruwe kanaaldata.** Voor een klant met 2+
+kanalen: zijn eigen `cross_channel_synthesis_v1` (al samengevoegd). Voor een klant met 1 kanaal
+(geen cross-channel-synthese mogelijk, dat vergt 2+): het meest recente kanaal se
+`structured_monthly_v2.final_sop`. Geen k-anonimiteit nodig — anders dan God View (cross-agency)
+blijft dit binnen één bureau over zijn EIGEN klanten; er is niets te anonimiseren dat de synthese
+niet ook los al zou tonen.
+
+**Dezelfde les uit 17.13 direct toegepast.** `parsePortfolioSynthesisOutput` normaliseert
+`clientId` op zowel de echte id als de klantnaam (een model dat de leesbare naam teruggeeft die
+het zelf net las, is geen hallucinatie) — de label/sleutel-bug uit de cross-channel-synthese-live-
+test is hier dus vóór de eerste live run al voorkomen, niet er weer ingebouwd.
+
+**UI**: nieuwe `PortfolioSynthesisCard` bovenaan `components/terminal/agency-god-view.tsx` (de
+bestaande Agency God View-pagina, exacte tegenhanger van hoe `SynthesisCard` bovenaan
+`cross-channel-analyses.tsx` staat) — headline, narratief, terugkerende patronen, uitschieters, en
+per-klant (of "hele portfolio") gelabelde acties.
+
+**Niet getest tegen productie vandaag** (in tegenstelling tot cross-channel-synthese in 17.13):
+geen live agency met 2+ klanten en verse eindverhalen voorhanden binnen deze sessie om tegen te
+draaien. Unit-getest (`__portfolio_synthesis_test.ts`, 31 assertions): voorkeur voor cross-
+channel-synthese boven los kanaal, terugval-pad, versheidsvenster-gating, naam/id-normalisatie,
+skip-paden, en het volledige succespad met een gemockte LLM-call.
