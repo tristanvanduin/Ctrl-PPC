@@ -19,6 +19,7 @@ import type { AuditRowResult } from "./types";
 import type { Impact, Complexity } from "./template";
 import { logger } from "@/lib/logger";
 import { recordMemoryEvent } from "@/lib/memory/agency-memory-events";
+import { computeSourceHitRates, calibrateConfidence, type SourceHitRate } from "@/lib/learning/signal-calibration";
 
 export interface SprintHypothesisRow {
   client_id: string;
@@ -175,9 +176,37 @@ export async function saveProposalsReplacingPending(
     return 0;
   }
 
+  // Loop 5 (lib/learning/signal-calibration.ts): dit is de ene, echte schrijfplek voor alle 22
+  // bronnen, dus hier en nergens anders wordt de ice_confidence bijgesteld op basis van de
+  // historische trefzekerheid van deze bron. Zacht falend: gaat de kalibratie-query mis, dan
+  // draait de rest van deze functie gewoon door met de ongewijzigde confidence -- een kapotte
+  // kalibratie mag nooit een echt voorstel laten verdwijnen.
+  let hitRates: Map<string, SourceHitRate>;
+  try {
+    hitRates = await computeSourceHitRates(supabase);
+  } catch (err) {
+    logger.error("[" + source + "] Kalibratie ophalen mislukt, confidence blijft ongewijzigd:", err instanceof Error ? err.message : String(err));
+    hitRates = new Map();
+  }
+  const calibrations = rows.map((row) => calibrateConfidence(row.ice_confidence, hitRates.get(row.source)));
+  const calibratedRows = rows.map((row, i) => {
+    const cal = calibrations[i];
+    if (!cal.applied) return row;
+    // metadata is generiek (Record<string, unknown>, migratie 088); mergen i.p.v. overschrijven
+    // zodat een bestaande master_synthesis-metadata-sleutel op deze rij intact blijft. De UI
+    // (components/insights/proposal-queue.tsx) leest confidence_recalibration rechtstreeks uit
+    // deze kolom -- geen extra join met agency_memory_events nodig om het te tonen.
+    return {
+      ...row,
+      ice_confidence: cal.confidence,
+      ice_total: round1((row.ice_impact + cal.confidence + row.ice_ease) / 3),
+      metadata: { ...(row.metadata ?? {}), confidence_recalibration: { base: row.ice_confidence, calibrated: cal.confidence, detail: cal.detail } },
+    };
+  });
+
   // 3. Insert de nieuwe voorstellen. .select("id") is nodig om de gegenereerde ids terug te
   // krijgen voor de memory-events hieronder -- verandert het schrijfgedrag zelf niet.
-  const ins = await supabase.from("sprint_hypotheses").insert(rows).select("id");
+  const ins = await supabase.from("sprint_hypotheses").insert(calibratedRows).select("id");
   if (ins.error) {
     logger.error("[" + source + "] Kon voorstellen niet opslaan, oude blijven staan:", ins.error.message);
     return 0; // insert mislukt: oude pending intact, geen verlies
@@ -185,10 +214,22 @@ export async function saveProposalsReplacingPending(
 
   // Fase 4: één hypothesis_proposed-event per nieuw voorstel. Zacht falend (recordMemoryEvent
   // logt zelf), dus een mislukt geheugen-event verliest nooit een echt opgeslagen voorstel.
+  // .insert().select() geeft de rijen terug in insert-volgorde (PostgREST, één statement) --
+  // zelfde aanname als hierboven al gold, hier ook gebruikt om calibrations[i] bij ins.data[i]
+  // te houden voor het confidence_recalibrated-event.
+  const insertedIds = (ins.data ?? []) as { id: string }[];
   await Promise.all(
-    ((ins.data ?? []) as { id: string }[]).map((row) =>
-      recordMemoryEvent(supabase, { clientId, hypothesisId: row.id, eventType: "hypothesis_proposed" })
-    )
+    insertedIds.map((row, i) => {
+      const events: Promise<void>[] = [recordMemoryEvent(supabase, { clientId, hypothesisId: row.id, eventType: "hypothesis_proposed" })];
+      const cal = calibrations[i];
+      if (cal.applied && cal.detail) {
+        events.push(recordMemoryEvent(supabase, {
+          clientId, hypothesisId: row.id, eventType: "confidence_recalibrated", reason: cal.detail,
+          metrics: { source, base_confidence: rows[i].ice_confidence, calibrated_confidence: cal.confidence },
+        }));
+      }
+      return Promise.all(events);
+    })
   );
 
   // 4. Insert geslaagd: verwijder nu pas de oude pending. Faalt dit, dan blijven

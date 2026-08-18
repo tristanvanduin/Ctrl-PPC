@@ -33,6 +33,10 @@ export interface Proposal {
   ice_ease: number | null;
   source: string | null;
   created_at: string;
+  /** Migratie 088, generiek. lib/second-opinion/findings-to-hypotheses.ts vult
+   *  confidence_recalibration wanneer Loop 5's kalibratie de ice_confidence heeft bijgesteld op
+   *  basis van de historische trefzekerheid van deze bron -- zie lib/learning/signal-calibration.ts. */
+  metadata?: { confidence_recalibration?: { base: number; calibrated: number; detail: string | null } } | null;
 }
 
 // De maand-bron heeft zijn eigen workflow-block; hier bewust uitgesloten (geen dubbele UI).
@@ -96,7 +100,7 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
 
   const refresh = useCallback(async () => {
     const { data } = await dbSelect<Proposal>("sprint_hypotheses", {
-      select: "id, hypothesis, expected_result, measurement_metric, timeframe, rationale, ice_total, ice_impact, ice_confidence, ice_ease, source, created_at",
+      select: "id, hypothesis, expected_result, measurement_metric, timeframe, rationale, ice_total, ice_impact, ice_confidence, ice_ease, source, created_at, metadata",
       clientId,
       filters: [{ op: "eq", column: "status", value: "pending" }],
       // De database sorteert grof; de fijne volgorde en de sprint/backlog-splitsing komen uit
@@ -197,6 +201,14 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
                   <ChannelBadge channel={channelOfSource(p.source)} />
                   <span className="text-micro text-muted-foreground">{p.source ?? "onbekend"}</span>
                   {p.ice_total != null && <span className="text-micro font-semibold text-brand-blue-ink">ICE {p.ice_total.toFixed(1)}</span>}
+                  {p.metadata?.confidence_recalibration && (
+                    <span
+                      className="text-micro px-1.5 py-0.5 rounded bg-brand-blue-ink/10 text-brand-blue-ink font-medium cursor-help"
+                      title={p.metadata.confidence_recalibration.detail ?? "Confidence bijgesteld o.b.v. eerdere uitkomsten van deze bron"}
+                    >
+                      confidence bijgesteld
+                    </span>
+                  )}
                   {plaatsing.get(p.id)?.placement === "backlog" && (
                     <span className="text-micro px-1.5 py-0.5 rounded bg-gray-100 text-muted-foreground font-medium">backlog</span>
                   )}

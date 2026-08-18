@@ -3323,3 +3323,72 @@ Test bijgewerkt: het anonimiseringsbewijs is vervangen door een test die bevesti
 patroontekst nu ongewijzigd (met échte klantnamen) doorkomt, met de relevantiefilter nog intact.
 40 assertions (was 43 — de 3 puur-anonimiseringsspecifieke checks vervielen met de functie zelf).
 `npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+### 17.24 Loop 5 gebouwd: de kalibratieberekening die migratie 091 al reserveerde
+
+Op verzoek de leerlus als eerste prioriteit opgepakt. Eerst grondig uitgezocht wat er al stond
+(zie het onderzoeksverslag in deze sessie) voordat er iets gebouwd werd — de bevindingen weken op
+twee punten af van wat het masterplan zelf tot nu toe zei.
+
+**Het echte beeld, preciezer dan de oude masterplan-tekst.** Loop 2 (aanbeveling → geaccepteerd →
+uitgevoerd → gemeten → `agency_memory_event`) bleek al functioneel compleet:
+`app/api/cron/evaluate-hypotheses/route.ts` reconstrueert baseline/measured-vensters, detecteert
+uitvoering via `ads_change_history`, en schrijft correct events — maar staat níét in
+`vercel.json`'s cron-schema (bewust, eerdere instructie van de eigenaar: geen nachtelijke
+API-kosten, zelf willen testen). En `app/api/insights/trackrecord/route.ts` +
+`components/terminal/trackrecord-view.tsx` blijken een volledig werkend, al-in-de-UI-gehangen
+leesscherm — geen stub. De oude tekst "uitkomsten worden vastgelegd maar nergens teruggelezen"
+klopte dus niet meer letterlijk: ze wórden teruggelezen, door een mens.
+
+**Het echte gat zat elders**: niets — geen enkel bestand — leest `agency_memory_events` terug om
+er zelf iets mee te doen. Het event-type `confidence_recalibrated` stond al gereserveerd in
+migratie 091 met de eigen aantekening "dat vergt een kalibratieberekening die nog niet bestaat" —
+nul schrijvers, nul lezers. Dát is Loop 5's daadwerkelijk ontbrekende stuk.
+
+**Scope-beslissingen, met de eigenaar afgestemd voordat er gebouwd werd:**
+- **Geen automatische cron** — expliciet: "zolang ctrl ppc in de testfase zit geen automatische
+  crons want dan maak ik kosten op test data." De evaluator blijft handmatig triggerbaar, zoals hij
+  al was. Dit is dus bewust NIET aangepakt, niet vergeten.
+- **Kalibratie per bron, nooit gemengd** — expliciete eis van de eigenaar ("second opinions etc
+  zijn eigen modules, hou daar rekening mee"). `source` (de 22 `ProposalSource`-waarden) is de
+  enige vandaag bestaande structurele proxy voor "signaaltype" uit het masterplan.
+- **Bijstelling, geen vervanging** — de aangeleverde `ice_confidence` van één voorstel blijft het
+  vertrekpunt; de historische trefzekerheid van de bron als geheel mag dat hoogstens ±2 (op de
+  1-10-schaal) bijsturen, begrensd op wat er al staat.
+
+**`lib/learning/signal-calibration.ts`, nieuw, puur:**
+- `computeSourceHitRates()`: leest `agency_memory_events` + `sprint_hypotheses.source` (via de FK,
+  embedded-select), telt `hypothesis_outcome_met`/`hypothesis_outcome_missed` per bron op.
+  Cross-bureau, zoals het masterplan voor loop 5 zelf voorschrijft — en dat is hier al veilig
+  zonder anonimisering nodig, want een geaggregeerd percentage per bron abstraheert vanzelf al
+  weg van individuele klantdata.
+- `calibrateConfidence()`: bij minder dan 5 uitkomsten voor een bron: geen effect (te weinig
+  bewijs). Bij exact 50% trefzekerheid: geen effect (geen voorspellende waarde boven kansniveau).
+  Anders een lineaire bijstelling tot maximaal ±2, die pas bij 20+ uitkomsten voor 100% meeweegt.
+
+**Gewired op de ENE echte schrijfplek voor alle 22 bronnen**: `saveProposalsReplacingPending()`
+in `lib/second-opinion/findings-to-hypotheses.ts` (al zo geconsolideerd sinds SI6/SI7, zie de
+code-comments daar) past nu de kalibratie toe vlak vóór de insert, herberekent `ice_total`, en
+schrijft een `confidence_recalibrated`-memory-event (met bron, oude en nieuwe waarde) naast het
+bestaande `hypothesis_proposed`-event — alleen als er ook echt iets is bijgesteld, geen ruis bij
+elke run. De detail-tekst en de oude/nieuwe waarden landen ook in `metadata` op de rij zelf
+(migratie 088's generieke jsonb-kolom, gemerged, niet overschreven — een bestaande
+`master_synthesis`-metadata-sleutel op dezelfde rij blijft intact), zodat de UI het kan tonen
+zonder een extra join met `agency_memory_events`.
+
+**Zichtbaar gemaakt**: `components/insights/proposal-queue.tsx` toont een klein "confidence
+bijgesteld"-label met de reden in een tooltip, wanneer van toepassing — puur uit `metadata`, geen
+nieuwe databronnen nodig in het scherm dat al bestond.
+
+**Getest**: 16 assertions op de pure kalibratieberekening (`__signal_calibration_test.ts`,
+inclusief de neutrale 50%-grens, de begrenzing op 1 en 10, en dat verschillende bronnen nooit
+gemengd worden) + 14 op de daadwerkelijke wiring in `saveProposalsReplacingPending`
+(`__save_proposals_calibration_test.ts`, met een gemockte Supabase: de confidence wordt echt
+aangepast, het event verschijnt alleen bij een echte bijstelling, bestaande metadata blijft
+intact, en twee bronnen in dezelfde batch worden onafhankelijk beoordeeld). `npx tsc --noEmit`
+schoon, volledige `scripts/gates.sh` groen.
+
+**Wat dit niet doet, bewust**: geen drempel in decision-gating aangepast, geen prompt aangepast,
+geen automatische cron toegevoegd. Dit is de kalibratieberekening zelf en de plek waar hij
+toegepast wordt op nieuwe voorstellen — het eerste, kleinste, veiligste stuk van loop 5, niet de
+hele lus in één keer.
