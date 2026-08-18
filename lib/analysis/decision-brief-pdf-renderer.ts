@@ -1,15 +1,13 @@
-// PDF-renderer voor het Decision Brief (masterplan 17.21). Zelfde bibliotheek en merkpalet als
-// sop-pdf-renderer.ts (@react-pdf/renderer), maar een eigen, compacte layout -- dit is een apart
-// exportformaat, geen vervanging van het volledige SOP-rapport.
-//
-// React.createElement, geen JSX: zelfde conventie als sop-pdf-renderer.ts (.ts, geen .tsx).
+// PDF-renderers voor de twee Decision Brief-documenten (masterplan 17.22). Zelfde bibliotheek en
+// merkpalet als sop-pdf-renderer.ts (@react-pdf/renderer), React.createElement in een .ts-bestand
+// (geen JSX/.tsx) -- zelfde conventie als de rest van de PDF-laag.
 
 import React from "react";
 import { BRAND_LOGO_FILE, BRAND_NAME } from "@/lib/branding/brand";
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import * as fs from "fs";
 import * as path from "path";
-import type { DecisionBrief, MacroMatrixRow, ClientActionPlan } from "./decision-brief";
+import type { ClientDecisionBrief, AgencyPortfolioBrief, MacroMatrixRow } from "./decision-brief";
 
 const e = React.createElement;
 
@@ -40,6 +38,8 @@ const s = StyleSheet.create({
   subtitle: { fontSize: 8, color: gray, marginTop: 2 },
   brand: { fontSize: 11, fontWeight: "bold", color: orange },
   divider: { height: 2, backgroundColor: orange, marginBottom: 10, borderRadius: 1 },
+  metaRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  metaText: { fontSize: 8.5, color: gray },
   sectionTitle: { fontSize: 12, fontWeight: "bold", color: orange, marginTop: 10, marginBottom: 6 },
   h3: { fontSize: 10.5, fontWeight: "bold", color: dark, marginTop: 8, marginBottom: 4 },
   bold: { fontWeight: "bold" },
@@ -56,9 +56,107 @@ const s = StyleSheet.create({
   footerText: { fontSize: 6, color: gray },
 });
 
-function labeledBullet(label: string, value: string) {
-  return e(Text, { style: s.bullet }, e(Text, { style: s.bold }, `${label}: `), value);
+function labeledBullet(label: string, value: string, key?: string | number) {
+  return e(Text, { style: s.bullet, key }, e(Text, { style: s.bold }, `${label}: `), value);
 }
+
+function header(title: string, subtitle: string) {
+  return e(
+    View,
+    { style: s.header },
+    e(View, null, e(Text, { style: s.title }, title), e(Text, { style: s.subtitle }, subtitle)),
+    e(
+      View,
+      { style: { alignItems: "flex-end" } },
+      brandLogoDataUri ? e(Image, { src: brandLogoDataUri, style: { width: 70, height: 20, objectFit: "contain" } }) : null,
+      e(Text, { style: s.brand }, BRAND_NAME)
+    )
+  );
+}
+
+function footer(label: string) {
+  return e(
+    View,
+    { style: s.footer, fixed: true },
+    e(Text, { style: s.footerText }, `${BRAND_NAME} — ${label}`),
+    e(Text, { style: s.footerText, render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => `${pageNumber} / ${totalPages}` })
+  );
+}
+
+// ── DOCUMENT 1: Client Decision Brief (1 A4) ────────────────────────────────────────────────
+
+export async function renderClientDecisionBriefPdf(brief: ClientDecisionBrief): Promise<Buffer> {
+  const { sprintActions, decisionRule } = brief;
+
+  const doc = e(
+    Document,
+    { title: `Decision Brief: ${brief.clientName}`, author: BRAND_NAME },
+    e(
+      Page,
+      { size: "A4", style: s.page },
+      header(`Decision Brief: ${brief.clientName}`, ""),
+      e(View, { style: s.divider }),
+      e(
+        View,
+        { style: s.metaRow },
+        e(Text, { style: s.metaText }, e(Text, { style: s.bold }, "Periode: "), brief.period),
+        e(Text, { style: s.metaText }, e(Text, { style: s.bold }, "Fase: "), brief.phase),
+        e(
+          View,
+          null,
+          e(View, { style: { ...s.priorityBadge, backgroundColor: PRIORITY_COLOR[brief.priority] ?? gray } }, e(Text, { style: s.priorityText }, brief.priority))
+        )
+      ),
+
+      e(Text, { style: s.h3 }, "1. Diagnose"),
+      e(
+        View,
+        { style: s.card },
+        labeledBullet("Primary Thread", brief.primaryThread),
+        labeledBullet("Root Cause", brief.rootCause),
+        labeledBullet("What is NOT the problem", brief.whatIsNotTheProblem)
+      ),
+
+      e(Text, { style: s.h3 }, "2. Sprint-Acties"),
+      e(
+        View,
+        { style: s.card },
+        labeledBullet("Containment / Rem", sprintActions.containment ?? "Niet van toepassing."),
+        labeledBullet("Validation / Recovery", sprintActions.validationRecovery ?? "Niet van toepassing."),
+        labeledBullet("Controlled Scale", sprintActions.controlledScale ?? "Niet gedefinieerd.")
+      ),
+
+      e(Text, { style: s.h3 }, "3. Beslisregel & Falsificatie"),
+      e(
+        View,
+        { style: s.card },
+        decisionRule
+          ? e(
+              React.Fragment,
+              null,
+              labeledBullet("Evaluatievenster", decisionRule.evaluationWindow),
+              labeledBullet("Accept if", decisionRule.acceptIf),
+              labeledBullet("Reject / Rollback if", decisionRule.rejectIf)
+            )
+          : e(Text, { style: s.bullet }, "Geen beslisregel beschikbaar.")
+      ),
+
+      brief.portfolioContext.length > 0
+        ? e(
+            React.Fragment,
+            null,
+            e(Text, { style: s.h3 }, "Portfolio-context"),
+            e(View, { style: s.card }, ...brief.portfolioContext.map((line, i) => e(Text, { style: s.bullet, key: i }, line)))
+          )
+        : null,
+
+      footer("Decision Brief")
+    )
+  );
+  return await renderToBuffer(doc);
+}
+
+// ── DOCUMENT 2: Agency Portfolio Brief ──────────────────────────────────────────────────────
 
 function macroMatrix(rows: readonly MacroMatrixRow[]) {
   const widths = [0.2, 0.32, 0.15, 0.23, 0.1];
@@ -83,89 +181,32 @@ function macroMatrix(rows: readonly MacroMatrixRow[]) {
   return e(View, null, e(View, { style: s.tableHeader }, ...headerCells), ...rowEls);
 }
 
-function clientPlan(plan: ClientActionPlan, key: number) {
-  const { sprintActions, decisionRule } = plan;
-  return e(
-    View,
-    { wrap: false, style: { marginBottom: 10 }, key },
-    e(Text, { style: s.h3 }, plan.accountName),
-    e(
-      View,
-      { style: s.card },
-      e(Text, { style: s.cardLabel }, "1. Diagnose"),
-      labeledBullet("Primary Thread", plan.primaryThread),
-      labeledBullet("Root Cause", plan.rootCause),
-      labeledBullet("What is NOT the problem", plan.whatIsNotTheProblem)
-    ),
-    e(
-      View,
-      { style: s.card },
-      e(Text, { style: s.cardLabel }, "2. Sprint-Acties"),
-      labeledBullet("Containment / Rem", sprintActions.containment ?? "Niet van toepassing."),
-      labeledBullet("Validation / Recovery", sprintActions.validationRecovery ?? "Niet van toepassing."),
-      labeledBullet("Controlled Scale", sprintActions.controlledScale ?? "Niet gedefinieerd.")
-    ),
-    e(
-      View,
-      { style: s.card },
-      e(Text, { style: s.cardLabel }, "3. Beslisregel & Falsificatie"),
-      decisionRule
-        ? e(
-            React.Fragment,
-            null,
-            labeledBullet("Evaluatievenster", decisionRule.evaluationWindow),
-            labeledBullet("Accept if", decisionRule.acceptIf),
-            labeledBullet("Reject / Rollback if", decisionRule.rejectIf)
-          )
-        : e(Text, { style: s.bullet }, "Geen beslisregel beschikbaar.")
-    )
-  );
-}
-
-export async function renderDecisionBriefPdf(brief: DecisionBrief): Promise<Buffer> {
-  const portfolioBullets = brief.portfolioSynthese
-    ? [
-        brief.portfolioSynthese.sharedBlockage ? labeledBullet("Gedeelde Blokkade", brief.portfolioSynthese.sharedBlockage) : null,
-        brief.portfolioSynthese.exception ? labeledBullet("Uitzondering", brief.portfolioSynthese.exception) : null,
-        brief.portfolioSynthese.portfolioWarning ? labeledBullet("Portfolio Waarschuwing", brief.portfolioSynthese.portfolioWarning) : null,
-      ].filter(Boolean)
-    : [e(Text, { style: s.bullet, key: "geen" }, "Geen cross-account-synthese beschikbaar voor deze accounts.")];
+export async function renderAgencyPortfolioBriefPdf(brief: AgencyPortfolioBrief): Promise<Buffer> {
+  const syn = brief.portfolioSynthese;
+  const synBullets = [
+    syn?.sharedBlockage ? labeledBullet("Gedeelde Blokkade", syn.sharedBlockage, "shared") : null,
+    syn?.exception ? labeledBullet("Uitzondering", syn.exception, "exception") : null,
+    syn?.portfolioWarning ? labeledBullet("Portfolio Waarschuwing", syn.portfolioWarning, "warning") : null,
+  ].filter(Boolean);
 
   const doc = e(
     Document,
-    { title: "Decision Brief", author: BRAND_NAME },
+    { title: "Agency Portfolio Brief", author: BRAND_NAME },
     e(
       Page,
       { size: "A4", style: s.page },
-      e(
-        View,
-        { style: s.header },
-        e(View, null, e(Text, { style: s.title }, "Decision Brief"), e(Text, { style: s.subtitle }, `Gegenereerd ${brief.generatedAt}`)),
-        e(
-          View,
-          { style: { alignItems: "flex-end" } },
-          brandLogoDataUri ? e(Image, { src: brandLogoDataUri, style: { width: 70, height: 20, objectFit: "contain" } }) : null,
-          e(Text, { style: s.brand }, BRAND_NAME)
-        )
-      ),
+      header("Agency Portfolio Brief", `${brief.agencyName} — ${brief.generatedAt}`),
       e(View, { style: s.divider }),
 
-      e(Text, { style: s.sectionTitle }, "Deel 1: Portfolio Executive Briefing"),
-      e(Text, { style: s.h3 }, "Macro Matrix"),
+      e(Text, { style: s.sectionTitle }, "Macro Matrix"),
       macroMatrix(brief.macroMatrix),
 
-      e(Text, { style: s.h3 }, "Portfolio Synthese"),
-      ...portfolioBullets,
+      e(Text, { style: s.sectionTitle }, "Portfolio Synthese"),
+      synBullets.length > 0
+        ? e(View, { style: s.card }, ...synBullets)
+        : e(Text, { style: s.bullet }, "Geen cross-account-synthese beschikbaar voor dit bureau."),
 
-      e(Text, { style: s.sectionTitle }, "Deel 2: Klant-Actieplan"),
-      ...brief.clientActionPlans.map((plan, i) => clientPlan(plan, i)),
-
-      e(
-        View,
-        { style: s.footer, fixed: true },
-        e(Text, { style: s.footerText }, `${BRAND_NAME} — Decision Brief`),
-        e(Text, { style: s.footerText, render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => `${pageNumber} / ${totalPages}` })
-      )
+      footer("Agency Portfolio Brief")
     )
   );
   return await renderToBuffer(doc);

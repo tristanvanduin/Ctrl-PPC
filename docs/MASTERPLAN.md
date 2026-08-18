@@ -3241,3 +3241,51 @@ GRA/GRN-zonder), prioriteit/fase-afleiding, geen verzonnen beslisregel zonder
 `operating_detail`, portfolio-synthese aanwezig/afwezig, markdown-structuur, en de
 pipe-escape-regressie. `npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen (294/294
 tests, inclusief deze 32).
+
+### 17.22 Decision Brief opgesplitst: klantdocument en bureaudocument mogen niet hetzelfde type delen
+
+17.21's `DecisionBrief` combineerde Deel 1 (macro matrix + portfolio-synthese, over alle klanten)
+en Deel 2 (per-klant diagnose/acties) in één document/type. De eigenaar liet dit opsplitsen in
+twee strikt gescheiden functies: `generateClientDecisionBrief(clientId)` — precies 1 A4, veilig om
+rechtstreeks met díe klant te delen — en `generateAgencyPortfolioBrief(agencyId)` —
+bureaubreed overzicht voor Head of PPC/Agency Lead.
+
+**Waarom een gedeeld type de verkeerde keuze was.** Niet alleen stijl: een gedeeld
+`DecisionBrief`-type betekent dat een toekomstige wijziging aan het bureaudocument (bijv. een
+extra veld met klantdetails in de macro matrix) per ongeluk in het klantdocument kan lekken, dat
+juist NOOIT data van andere accounts mag tonen. Losse types (`ClientDecisionBrief`,
+`AgencyPortfolioBrief`), losse markdown-/PDF-renderers, losse generate*-functies — elk met hun
+eigen Supabase-fetch — maken die twee documenten structureel onafhankelijk in plaats van
+toevallig gelijk.
+
+**Anonimisering is echte redactie, geen parafrase.** "Injecteer portfolio-context uitsluitend
+anoniem" (bijv. "Patroon wijst op een structureel tracking-sjabloonprobleem binnen gekoppelde
+accounts") kon op twee manieren: een taalmodel de portfolio-tekst laten herschrijven (een tweede
+LLM-call, en een parafrase kan alsnog een naam laten staan als het model niet perfect is), of
+deterministisch elke bekende klantnaam/-id van het bureau vervangen door een neutrale term
+voordat de tekst het klantdocument in gaat. Gekozen voor het laatste: `anonymizePatternText()`
+kent de volledige klantroster van het bureau (nodig om uberhaupt te weten wát weg moet) en
+vervangt exact die namen, langste eerst zodat "MPC - UK" niet half blijft staan doordat "MPC"
+al elders geraakt is. Dat is verifieerbaar veilig; een parafrase is dat niet.
+
+**Een relevantiebug gevonden en gefixed vóórdat hij live ging.** De eerste versie van
+`buildPortfolioContext()` toonde een patroon aan een klant zodra het patroon een ANDER account
+noemde — precies omgekeerd van de bedoeling. Een test die expliciet controleerde dat GRT (niet
+genoemd in een GRA/GRN-patroon) géén portfolio-context te zien zou moeten krijgen, ving dit meteen
+(`__decision_brief_test.ts`, "GRT zelf ziet geen portfolio-context"). Gefixed: een patroon wordt nu
+alleen getoond als het aantoonbaar OVER dit account zelf gaat (eigen naam/id erin), niet zodra het
+toevallig een ander account noemt.
+
+**Getest, inclusief het scenario dat de eerdere bug had opgeleverd**: 43 assertions
+(`__decision_brief_test.ts`) — woordlimiet-afkapping, beide route-scenario's, prioriteit/fase,
+geen verzonnen beslisregel, de anonimiseringsketen end-to-end (een echte GRA/GRN-patroontekst,
+bewezen dat "GRN"/"North America" nergens in het gerenderde klantdocument van GRA voorkomt, ook
+niet in de uiteindelijke markdown-output), en dat het bureaudocument geen per-klant
+Diagnose/Sprint-Acties-secties bevat. Visueel geverifieerd tegen overgetypte echte content uit de
+17.20-testrun (twee PDF's, klant + bureau) vóór het committen. `npx tsc --noEmit` schoon,
+volledige `scripts/gates.sh` groen.
+
+**Routes**: `GET /api/analysis/decision-brief/client?client_id=...` (client:read + per-klant
+scope-check, `requireClientAccess` — zelfde patroon als andere klant-specifieke routes) en
+`GET /api/analysis/decision-brief/agency?agency_id=...` (client:read + eigen-bureau-check). De
+oude, gecombineerde `/api/analysis/decision-brief`-route is vervangen, niet ernaast gehouden.

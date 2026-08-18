@@ -1,30 +1,40 @@
-// Decision Brief (masterplan 17.21): een compacte, deterministische export naast het bestaande
-// volledige SOP-rapport (sop-pdf-renderer.ts) -- geen vervanging.
+// Decision Brief (masterplan 17.21, opgesplitst in 17.22): twee strikt gescheiden documenten,
+// geen vervanging van het volledige SOP-rapport en geen nieuwe LLM-call.
 //
 // ── WAAROM GEEN NIEUWE LLM-CALL, GEEN NIEUWE SYSTEEMPROMPT ──────────────────────────────────
 //
-// Elk veld dat dit document nodig heeft (primary_thread, root_cause, what_is_not_the_problem, de
-// containment/validation/recovery/controlled-scale-indeling van recommendations, en de
+// Elk veld dat deze documenten nodig hebben (primary_thread, root_cause, what_is_not_the_problem,
+// de containment/validation/recovery/controlled-scale-indeling van recommendations, en de
 // accept_if/reject_if/evaluation_window van de eerste hypothese) staat al structureel in
 // FinalSopSynthesis en OperatingDetailLayer -- de output die de bestaande pijplijn toch al
-// produceert en opslaat. Dit bestand is dus een pure RENDER-transformatie, geen analysestap. Dat
-// is bewust: een tweede LLM-call zou kosten en een tweede faalpunt toevoegen voor iets dat al
-// als gestructureerde data bestaat, en zou de rijke, herleidbare output (evidence traces,
-// hypotheses-met-succescriteria -- de basis van de leerlus, masterplan §3.3/§4) alleen behouden
-// als iemand dat apart blijft opslaan. Deze module haalt uit wat er al is; ze verwijdert niets.
+// produceert en opslaat. Dit bestand is dus een pure RENDER-transformatie, geen analysestap.
 //
-// ── WOORDLIMIET IS EEN ECHTE, AFGEDWONGEN GRENS ─────────────────────────────────────────────
+// ── WAAROM TWEE FUNCTIES EN TWEE TYPES, NIET ÉÉN GEDEELD DOCUMENT ───────────────────────────
 //
-// "Max 120 woorden per sub-account" is geen richtlijn die het brondata toevallig haalt -- de
-// brontekst (final_sop) is voor menselijke specialisten geschreven en kan makkelijk 300+ woorden
-// per veld bevatten. Elk veld krijgt daarom een eigen, opgetelde limiet (som = 120) en wordt op
-// woordgrens afgekapt met "...", nooit halverwege een woord. __decision_brief_test.ts bewijst dit
-// met opzettelijk lange brontekst, niet met toevallig korte testfixtures.
+// Het klantdocument moet veilig zijn om rechtstreeks met DIE ene klant te delen -- dus mag het
+// NOOIT namen of data van andere accounts bevatten. Het bureaudocument bestaat juist om alle
+// accounts naast elkaar te tonen. Dat is geen stijlverschil maar een harde scheiding: een gedeeld
+// type zou een toekomstige wijziging aan het bureaudocument per ongeluk in het klantdocument
+// kunnen laten lekken. Vandaar ClientDecisionBrief en AgencyPortfolioBrief als losse types, met
+// losse markdown- en PDF-renderers, en losse generate*-functies die zelf hun eigen data ophalen.
+//
+// ── ANONIMISERING IS ECHTE REDACTIE, GEEN PARAFRASE ─────────────────────────────────────────
+//
+// "Injecteer portfolio-context uitsluitend anoniem" kan op twee manieren: een taalmodel de
+// portfolio-tekst laten herschrijven (kost een call, en een parafrase kan alsnog een naam laten
+// staan als het model niet perfect is), of deterministisch elke bekende klantnaam/-id uit het
+// bureau vervangen door een neutrale term VOORDAT de tekst in het klantdocument komt. Dit bestand
+// doet het laatste: anonymizePatternText() kent de volledige klantenlijst van het bureau (nodig om
+// uberhaupt te weten wát er verwijderd moet worden) en vervangt exact die namen. Dat is
+// verifieerbaar veilig; een parafrase is dat niet. Zie __decision_brief_test.ts voor het bewijs
+// dat een sibling-naam nooit in het klantdocument terechtkomt.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FinalSopSynthesis, OperatingDetailLayer, FinalSopRoute } from "./monthly-structured";
 import type { PortfolioSynthesisResult } from "./portfolio-synthesis";
+import { lijstAccountsMetSops } from "@/lib/tenancy/sop-dekking";
 
-// ── Woordbudget per veld, som = 120 (zie toelichting hierboven) ─────────────────────────────
+// ── Woordbudget per veld (klantdocument moet op 1 A4 passen) ────────────────────────────────
 const WORD_BUDGET = {
   primaryThread: 14,
   rootCause: 20,
@@ -49,8 +59,6 @@ export function truncateWords(text: string, maxWords: number): string {
 
 export type Priority = "Hoog" | "Midden" | "Laag";
 
-/** Afgeleid uit qa_self_check (why-score + actionability-score, allebei al berekend door de
- *  bestaande pijplijn) -- geen nieuwe scoring, alleen een drempel op wat er al staat. */
 function priorityFromQaSelfCheck(finalSop: FinalSopSynthesis): Priority {
   const avg = (finalSop.qa_self_check.why_score_estimate + finalSop.qa_self_check.actionability_score_estimate) / 2;
   if (avg >= 8) return "Hoog";
@@ -65,8 +73,6 @@ const PHASE_LABEL: Record<FinalSopRoute, string> = {
   "controlled scale": "Gecontroleerde schaal",
 };
 
-/** De route van de eerste (dus meest urgente) aanbeveling bepaalt de fase-label -- `route` is het
- *  dichtstbijzijnde structurele veld dat al bestaat voor "in welke fase zit dit account". */
 function phaseFromRecommendations(finalSop: FinalSopSynthesis): string {
   const first = finalSop.recommendations[0];
   return first ? PHASE_LABEL[first.route] : "Onbekend";
@@ -76,6 +82,217 @@ function findByRoute(finalSop: FinalSopSynthesis, route: FinalSopRoute): string 
   const rec = finalSop.recommendations.find((r) => r.route === route);
   return rec ? rec.handeling : null;
 }
+
+export interface ClientSprintActions {
+  containment: string | null;
+  validationRecovery: string | null;
+  controlledScale: string | null;
+}
+
+/** Niet elk account heeft alle drie de routes -- een account zonder meetprobleem heeft
+ *  bijvoorbeeld geen "validation"-aanbeveling, en een account dat nog niet mag schalen heeft
+ *  eerlijk geen "controlled scale". Ontbrekend blijft ontbrekend (null), niet verzonnen. */
+function buildSprintActions(finalSop: FinalSopSynthesis): ClientSprintActions {
+  const containment = findByRoute(finalSop, "containment");
+  const validationRecovery = findByRoute(finalSop, "validation") ?? findByRoute(finalSop, "recovery");
+  const controlledScale = findByRoute(finalSop, "controlled scale");
+  return {
+    containment: containment ? truncateWords(containment, WORD_BUDGET.containment) : null,
+    validationRecovery: validationRecovery ? truncateWords(validationRecovery, WORD_BUDGET.validationRecovery) : null,
+    controlledScale: controlledScale ? truncateWords(controlledScale, WORD_BUDGET.controlledScale) : null,
+  };
+}
+
+export interface ClientDecisionRule {
+  evaluationWindow: string;
+  acceptIf: string;
+  rejectIf: string;
+}
+
+function buildDecisionRule(operatingDetail: OperatingDetailLayer | null | undefined): ClientDecisionRule | null {
+  const first = operatingDetail?.hypotheses_and_next_month_proof?.[0];
+  if (!first) return null;
+  return {
+    evaluationWindow: truncateWords(first.evaluation_window, WORD_BUDGET.evaluationWindow),
+    acceptIf: truncateWords(first.accept_if, WORD_BUDGET.acceptIf),
+    rejectIf: truncateWords(first.reject_if, WORD_BUDGET.rejectIf),
+  };
+}
+
+// ── Anonimisering ────────────────────────────────────────────────────────────────────────────
+
+export interface AgencyRosterEntry {
+  clientId: string;
+  accountName: string;
+}
+
+/** Vervangt elke bekende naam/id van een ANDER account in `roster` door een neutrale term.
+ *  `thisClientId` wordt bewust overgeslagen -- een klant mag zijn eigen naam wel zien. Sorteert
+ *  op lengte (langste eerst) zodat "MPC - UK" niet half blijft staan doordat "MPC" al elders
+ *  geraakt is. */
+export function anonymizePatternText(text: string, thisClientId: string, roster: readonly AgencyRosterEntry[]): string {
+  const others = roster.filter((r) => r.clientId !== thisClientId);
+  const namen = others.flatMap((r) => [r.accountName, r.clientId]).filter((n) => n.length >= 3);
+  namen.sort((a, b) => b.length - a.length);
+  let result = text;
+  for (const naam of namen) {
+    const pattern = new RegExp(naam.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    result = result.replace(pattern, "een gekoppeld account");
+  }
+  // "een gekoppeld account en een gekoppeld account" / "..., een gekoppeld account" -> "gekoppelde accounts"
+  result = result.replace(/(een gekoppeld account(,? en | en |, )){1,}een gekoppeld account/gi, "gekoppelde accounts");
+  return result;
+}
+
+// ── DOCUMENT 1: Client Decision Brief ───────────────────────────────────────────────────────
+
+export interface ClientDecisionBrief {
+  clientName: string;
+  period: string;
+  phase: string;
+  priority: Priority;
+  primaryThread: string;
+  rootCause: string;
+  whatIsNotTheProblem: string;
+  sprintActions: ClientSprintActions;
+  decisionRule: ClientDecisionRule | null;
+  /** Anonieme portfolio-/benchmarkcontext, 0-2 regels. Nooit een naam van een ander account --
+   *  zie anonymizePatternText(). Leeg als er geen portfolio-synthese is of als dit account in
+   *  geen enkel patroon voorkomt. */
+  portfolioContext: string[];
+}
+
+export interface ClientBriefInput {
+  clientId: string;
+  accountName: string;
+  finalSop: FinalSopSynthesis;
+  operatingDetail?: OperatingDetailLayer | null;
+}
+
+function buildPortfolioContext(
+  clientId: string,
+  accountName: string,
+  portfolio: PortfolioSynthesisResult | null | undefined,
+  roster: readonly AgencyRosterEntry[]
+): string[] {
+  if (!portfolio || roster.length === 0) return [];
+  const naam = accountName.toLowerCase();
+  const id = clientId.toLowerCase();
+  const lines: string[] = [];
+  for (const pattern of portfolio.recurring_patterns) {
+    const gaatOverDitAccount = pattern.toLowerCase().includes(naam) || pattern.toLowerCase().includes(id);
+    // Alleen tonen als het patroon aantoonbaar OVER dit account gaat (eigen naam/id erin) -- een
+    // patroon dat alleen ANDERE accounts noemt is niet relevant voor dit account en hoort niet
+    // generiek getoond te worden, ook niet geanonimiseerd.
+    if (!gaatOverDitAccount) continue;
+    lines.push(anonymizePatternText(pattern, clientId, roster));
+  }
+  return lines.slice(0, 2).map((l) => truncateWords(l, 24));
+}
+
+/** Pure transformatie (geen IO) -- apart geexporteerd zodat de test 'm zonder Supabase kan
+ *  aanroepen. generateClientDecisionBrief() hieronder haalt de data op en roept dit aan. */
+export function buildClientDecisionBrief(
+  input: ClientBriefInput,
+  opts: { period: string; portfolio?: PortfolioSynthesisResult | null; agencyRoster?: readonly AgencyRosterEntry[] }
+): ClientDecisionBrief {
+  const { finalSop, operatingDetail } = input;
+  return {
+    clientName: input.accountName,
+    period: opts.period,
+    phase: phaseFromRecommendations(finalSop),
+    priority: priorityFromQaSelfCheck(finalSop),
+    primaryThread: truncateWords(finalSop.primary_thread, WORD_BUDGET.primaryThread),
+    rootCause: truncateWords(finalSop.root_cause, WORD_BUDGET.rootCause),
+    whatIsNotTheProblem: truncateWords(
+      finalSop.what_is_not_the_problem[0] ?? "Geen secundair signaal genoteerd.",
+      WORD_BUDGET.whatIsNotTheProblem
+    ),
+    sprintActions: buildSprintActions(finalSop),
+    decisionRule: buildDecisionRule(operatingDetail),
+    portfolioContext: buildPortfolioContext(input.clientId, input.accountName, opts.portfolio, opts.agencyRoster ?? []),
+  };
+}
+
+function formatPeriod(periodStart: string, periodEnd: string): string {
+  try {
+    const maand = new Date(periodStart).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
+    return maand.charAt(0).toUpperCase() + maand.slice(1);
+  } catch {
+    return `${periodStart} t/m ${periodEnd}`;
+  }
+}
+
+interface StructuredMonthlyRow {
+  final_sop?: FinalSopSynthesis;
+  operating_detail?: OperatingDetailLayer;
+}
+
+/**
+ * Haalt zelf op wat er nodig is en bouwt het klantdocument: de laatste monthly
+ * structured_monthly_v2 van deze klant, plus (als het bureau er een heeft) de laatste
+ * portfolio-synthese van het bureau, alleen om er anoniem patroon-context uit te lichten.
+ *
+ * Null als deze klant geen monthly final_sop heeft -- geen verzonnen brief.
+ */
+export async function generateClientDecisionBrief(
+  supabase: SupabaseClient,
+  clientId: string
+): Promise<ClientDecisionBrief | null> {
+  const { data: accountRow } = await supabase.from("accounts").select("name, agency_id").eq("client_id", clientId).maybeSingle();
+  const accountName = accountRow?.name ? String(accountRow.name) : clientId;
+  const agencyId = accountRow?.agency_id ? String(accountRow.agency_id) : null;
+
+  const { data: sopRow } = await supabase
+    .from("sop_analysis_output")
+    .select("output, period_start, period_end")
+    .eq("client_id", clientId)
+    .eq("sop_type", "monthly")
+    .eq("section", "structured_monthly_v2")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!sopRow?.output) return null;
+
+  let parsed: StructuredMonthlyRow;
+  try {
+    parsed = (typeof sopRow.output === "string" ? JSON.parse(sopRow.output) : sopRow.output) as StructuredMonthlyRow;
+  } catch {
+    return null;
+  }
+  if (!parsed.final_sop) return null;
+
+  let portfolio: PortfolioSynthesisResult | null = null;
+  let roster: AgencyRosterEntry[] = [];
+  if (agencyId) {
+    const [portfolioRes, accountsRes] = await Promise.all([
+      supabase
+        .from("agency_analysis_output")
+        .select("output")
+        .eq("agency_id", agencyId)
+        .eq("section", "portfolio_synthesis_v1")
+        .order("analysis_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase.from("accounts").select("client_id, name").eq("agency_id", agencyId),
+    ]);
+    if (portfolioRes.data?.output) {
+      try {
+        portfolio = (typeof portfolioRes.data.output === "string" ? JSON.parse(portfolioRes.data.output) : portfolioRes.data.output) as PortfolioSynthesisResult;
+      } catch {
+        portfolio = null;
+      }
+    }
+    roster = (accountsRes.data ?? []).map((r) => ({ clientId: String(r.client_id), accountName: String(r.name ?? r.client_id) }));
+  }
+
+  return buildClientDecisionBrief(
+    { clientId, accountName, finalSop: parsed.final_sop, operatingDetail: parsed.operating_detail },
+    { period: formatPeriod(String(sopRow.period_start ?? ""), String(sopRow.period_end ?? "")), portfolio, agencyRoster: roster }
+  );
+}
+
+// ── DOCUMENT 2: Agency Portfolio Brief ──────────────────────────────────────────────────────
 
 export interface MacroMatrixRow {
   accountName: string;
@@ -91,38 +308,11 @@ export interface PortfolioSyntheseSection {
   portfolioWarning: string | null;
 }
 
-export interface ClientSprintActions {
-  containment: string | null;
-  validationRecovery: string | null;
-  controlledScale: string | null;
-}
-
-export interface ClientDecisionRule {
-  evaluationWindow: string;
-  acceptIf: string;
-  rejectIf: string;
-}
-
-export interface ClientActionPlan {
-  accountName: string;
-  primaryThread: string;
-  rootCause: string;
-  whatIsNotTheProblem: string;
-  sprintActions: ClientSprintActions;
-  decisionRule: ClientDecisionRule | null;
-}
-
-export interface DecisionBrief {
+export interface AgencyPortfolioBrief {
+  agencyName: string;
   generatedAt: string;
   macroMatrix: MacroMatrixRow[];
   portfolioSynthese: PortfolioSyntheseSection | null;
-  clientActionPlans: ClientActionPlan[];
-}
-
-export interface ClientBriefInput {
-  accountName: string;
-  finalSop: FinalSopSynthesis;
-  operatingDetail?: OperatingDetailLayer | null;
 }
 
 function buildMacroRow(input: ClientBriefInput): MacroMatrixRow {
@@ -139,119 +329,112 @@ function buildMacroRow(input: ClientBriefInput): MacroMatrixRow {
   };
 }
 
-/** Niet elk account heeft alle drie de routes (validation/containment/recovery/controlled
- *  scale) -- een account zonder meetprobleem heeft bijvoorbeeld geen "validation"-aanbeveling, en
- *  een account dat nog niet mag schalen heeft eerlijk geen "controlled scale". Ontbrekend blijft
- *  ontbrekend (null), niet verzonnen -- zie __decision_brief_test.ts voor het GRA/GRN-scenario
- *  (masterplan 17.20) waar "controlled scale" bewust nooit voorkomt zolang meting kapot is. */
-function buildSprintActions(finalSop: FinalSopSynthesis): ClientSprintActions {
-  const containment = findByRoute(finalSop, "containment");
-  // "Validation/Recovery" is één slot in het beslisdocument-format maar twee routes in de brondata
-  // -- validation weegt zwaarder (het blokkeert alles erna), dus die krijgt voorrang als beide
-  // bestaan; anders recovery.
-  const validationRecovery = findByRoute(finalSop, "validation") ?? findByRoute(finalSop, "recovery");
-  const controlledScale = findByRoute(finalSop, "controlled scale");
-  return {
-    containment: containment ? truncateWords(containment, WORD_BUDGET.containment) : null,
-    validationRecovery: validationRecovery ? truncateWords(validationRecovery, WORD_BUDGET.validationRecovery) : null,
-    controlledScale: controlledScale ? truncateWords(controlledScale, WORD_BUDGET.controlledScale) : null,
-  };
-}
-
-/** De eerste hypothese (operating_detail.hypotheses_and_next_month_proof[0]) draagt al
- *  evaluation_window/accept_if/reject_if -- exact de weddenschap die het beslisdocument vraagt.
- *  Null als operatingDetail ontbreekt of leeg is (bewust geen verzonnen beslisregel). */
-function buildDecisionRule(operatingDetail: OperatingDetailLayer | null | undefined): ClientDecisionRule | null {
-  const first = operatingDetail?.hypotheses_and_next_month_proof?.[0];
-  if (!first) return null;
-  return {
-    evaluationWindow: truncateWords(first.evaluation_window, WORD_BUDGET.evaluationWindow),
-    acceptIf: truncateWords(first.accept_if, WORD_BUDGET.acceptIf),
-    rejectIf: truncateWords(first.reject_if, WORD_BUDGET.rejectIf),
-  };
-}
-
-function buildClientActionPlan(input: ClientBriefInput): ClientActionPlan {
-  const { accountName, finalSop, operatingDetail } = input;
-  return {
-    accountName,
-    primaryThread: truncateWords(finalSop.primary_thread, WORD_BUDGET.primaryThread),
-    rootCause: truncateWords(finalSop.root_cause, WORD_BUDGET.rootCause),
-    whatIsNotTheProblem: truncateWords(
-      finalSop.what_is_not_the_problem[0] ?? "Geen secundair signaal genoteerd.",
-      WORD_BUDGET.whatIsNotTheProblem
-    ),
-    sprintActions: buildSprintActions(finalSop),
-    decisionRule: buildDecisionRule(operatingDetail),
-  };
-}
-
-/** Portfolio-synthese is optioneel: bij een los account (geen cross-account-synthese gedraaid)
- *  blijft Deel 1's portfolio-sectie leeg in plaats van verzonnen. */
 function buildPortfolioSynthese(portfolio: PortfolioSynthesisResult | null | undefined): PortfolioSyntheseSection | null {
   if (!portfolio) return null;
-  const sharedPattern = portfolio.recurring_patterns[0] ?? null;
-  const exception = portfolio.outliers[0] ?? null;
-  // Geen apart "verboden actie"-veld in PortfolioSynthesisResult; de narrative/eerste
-  // portfolio-brede actie is de dichtstbijzijnde bestaande bron voor een waarschuwing --
-  // afgeleid, niet verzonnen.
   const portfolioAction = portfolio.synthesized_actions.find((a) => a.clientId === "portfolio");
   return {
-    sharedBlockage: sharedPattern,
-    exception,
+    sharedBlockage: portfolio.recurring_patterns[0] ?? null,
+    exception: portfolio.outliers[0] ?? null,
     portfolioWarning: portfolioAction?.action ?? null,
   };
 }
 
-export function buildDecisionBrief(
+/** Pure transformatie (geen IO) -- apart geexporteerd voor de test. */
+export function buildAgencyPortfolioBrief(
+  agencyName: string,
   clients: readonly ClientBriefInput[],
   portfolio?: PortfolioSynthesisResult | null,
   generatedAt: string = new Date().toISOString().slice(0, 10)
-): DecisionBrief {
+): AgencyPortfolioBrief {
   return {
+    agencyName,
     generatedAt,
     macroMatrix: clients.map(buildMacroRow),
     portfolioSynthese: buildPortfolioSynthese(portfolio),
-    clientActionPlans: clients.map(buildClientActionPlan),
   };
+}
+
+/**
+ * Haalt zelf op wat er nodig is: alle klanten van dit bureau met SOP's aan (zelfde regel als de
+ * bestaande dekking-telling, lijstAccountsMetSops), hun laatste monthly final_sop (klanten zonder
+ * een geldige final_sop worden overgeslagen, niet als lege rij getoond), en de laatste
+ * portfolio-synthese van het bureau.
+ *
+ * Null als het bureau niet bestaat of geen enkele klant een geldige final_sop heeft.
+ */
+export async function generateAgencyPortfolioBrief(
+  supabase: SupabaseClient,
+  agencyId: string
+): Promise<AgencyPortfolioBrief | null> {
+  const { data: agencyRow } = await supabase.from("agencies").select("name").eq("id", agencyId).maybeSingle();
+  if (!agencyRow) return null;
+  const agencyName = String(agencyRow.name ?? agencyId);
+
+  const clientIds = await lijstAccountsMetSops(supabase, agencyId);
+  if (!clientIds || clientIds.length === 0) return null;
+
+  const { data: accountRows } = await supabase.from("accounts").select("client_id, name").eq("agency_id", agencyId).in("client_id", clientIds);
+  const nameByClientId = new Map((accountRows ?? []).map((r) => [String(r.client_id), String(r.name ?? r.client_id)]));
+
+  const structuredRows = await Promise.all(
+    clientIds.map(async (clientId) => {
+      const { data } = await supabase
+        .from("sop_analysis_output")
+        .select("output")
+        .eq("client_id", clientId)
+        .eq("sop_type", "monthly")
+        .eq("section", "structured_monthly_v2")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!data?.output) return null;
+      try {
+        const parsed = (typeof data.output === "string" ? JSON.parse(data.output) : data.output) as StructuredMonthlyRow;
+        if (!parsed.final_sop) return null;
+        return { clientId, finalSop: parsed.final_sop, operatingDetail: parsed.operating_detail };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const clients: ClientBriefInput[] = structuredRows
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+    .map((r) => ({ clientId: r.clientId, accountName: nameByClientId.get(r.clientId) ?? r.clientId, finalSop: r.finalSop, operatingDetail: r.operatingDetail }));
+  if (clients.length === 0) return null;
+
+  const { data: portfolioRow } = await supabase
+    .from("agency_analysis_output")
+    .select("output")
+    .eq("agency_id", agencyId)
+    .eq("section", "portfolio_synthesis_v1")
+    .order("analysis_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let portfolio: PortfolioSynthesisResult | null = null;
+  if (portfolioRow?.output) {
+    try {
+      portfolio = (typeof portfolioRow.output === "string" ? JSON.parse(portfolioRow.output) : portfolioRow.output) as PortfolioSynthesisResult;
+    } catch {
+      portfolio = null;
+    }
+  }
+
+  return buildAgencyPortfolioBrief(agencyName, clients, portfolio);
 }
 
 // ── Markdown-rendering ───────────────────────────────────────────────────────────────────────
 
-/** Campagnenamen als "GRT | Search | NL" bevatten letterlijke pipe-tekens, die in een
- *  Markdown-tabelcel de kolomscheiding zouden breken (elke extra "|" wordt een nieuwe kolom).
- *  Ontdekt bij het eerste keer echt renderen van een Macro Matrix met een campagnenaam erin --
- *  precies waarom dit tegen echte content getest moet worden, niet tegen namen zonder pipe. */
 function escapeTableCell(text: string): string {
   return text.replace(/\|/g, "\\|");
 }
 
-function renderMacroMatrix(rows: readonly MacroMatrixRow[]): string {
-  const header = "| Account / Regio | Primaire Blokkade | Fase | Directe Kernactie | Prioriteit |";
-  const sep = "|---|---|---|---|---|";
-  const body = rows.map(
-    (r) =>
-      `| ${escapeTableCell(r.accountName)} | ${escapeTableCell(r.primaryBlockage)} | ${escapeTableCell(r.phase)} | ${escapeTableCell(r.coreAction)} | ${r.priority} |`
-  );
-  return [header, sep, ...body].join("\n");
-}
-
-function renderPortfolioSynthese(section: PortfolioSyntheseSection | null): string {
-  if (!section) return "*Geen cross-account-synthese beschikbaar voor deze accounts.*";
-  const lines: string[] = [];
-  if (section.sharedBlockage) lines.push(`- **Gedeelde Blokkade:** ${section.sharedBlockage}`);
-  if (section.exception) lines.push(`- **Uitzondering:** ${section.exception}`);
-  if (section.portfolioWarning) lines.push(`- **Portfolio Waarschuwing:** ${section.portfolioWarning}`);
-  return lines.length > 0 ? lines.join("\n") : "*Geen cross-account-patronen gevonden.*";
-}
-
 function renderSprintActions(actions: ClientSprintActions): string {
-  const lines = [
+  return [
     `- **Containment / Rem:** ${actions.containment ?? "Niet van toepassing -- geen containment-route in deze analyse."}`,
     `- **Validation / Recovery:** ${actions.validationRecovery ?? "Niet van toepassing -- geen validatie- of herstelroute in deze analyse."}`,
     `- **Controlled Scale:** ${actions.controlledScale ?? "Niet gedefinieerd -- schalen is pas aan de orde nadat de voorgaande routes zijn afgerond."}`,
-  ];
-  return lines.join("\n");
+  ].join("\n");
 }
 
 function renderDecisionRule(rule: ClientDecisionRule | null): string {
@@ -263,60 +446,73 @@ function renderDecisionRule(rule: ClientDecisionRule | null): string {
   ].join("\n");
 }
 
-function renderClientActionPlan(plan: ClientActionPlan): string {
+export function renderClientDecisionBriefMarkdown(brief: ClientDecisionBrief): string {
+  const lines = [
+    `# Decision Brief: ${brief.clientName}`,
+    `**Periode:** ${brief.period} | **Fase:** ${brief.phase} | **Prioriteit:** ${brief.priority}`,
+    "",
+    "## 1. Diagnose",
+    `- **Primary Thread:** ${brief.primaryThread}`,
+    `- **Root Cause:** ${brief.rootCause}`,
+    `- **What is NOT the problem:** ${brief.whatIsNotTheProblem}`,
+    "",
+    "## 2. Sprint-Acties",
+    renderSprintActions(brief.sprintActions),
+    "",
+    "## 3. Beslisregel & Falsificatie",
+    renderDecisionRule(brief.decisionRule),
+  ];
+  if (brief.portfolioContext.length > 0) {
+    lines.push("", "## Portfolio-context", ...brief.portfolioContext.map((l) => `- ${l}`));
+  }
+  return lines.join("\n");
+}
+
+export function renderAgencyPortfolioBriefMarkdown(brief: AgencyPortfolioBrief): string {
+  const header = "| Account / Regio | Primaire Blokkage | Fase | Directe Kernactie | Prioriteit |";
+  const sep = "|---|---|---|---|---|";
+  const rows = brief.macroMatrix.map(
+    (r) =>
+      `| ${escapeTableCell(r.accountName)} | ${escapeTableCell(r.primaryBlockage)} | ${escapeTableCell(r.phase)} | ${escapeTableCell(r.coreAction)} | ${r.priority} |`
+  );
+
+  const s = brief.portfolioSynthese;
+  const synthLines: string[] = [];
+  if (s?.sharedBlockage) synthLines.push(`- **Gedeelde Blokkade:** ${s.sharedBlockage}`);
+  if (s?.exception) synthLines.push(`- **Uitzondering:** ${s.exception}`);
+  if (s?.portfolioWarning) synthLines.push(`- **Portfolio Waarschuwing:** ${s.portfolioWarning}`);
+  if (synthLines.length === 0) synthLines.push("*Geen cross-account-synthese beschikbaar voor dit bureau.*");
+
   return [
-    `### ${plan.accountName}`,
+    "# Agency Portfolio Brief",
+    `**Bureau:** ${brief.agencyName} | **Datum:** ${brief.generatedAt}`,
     "",
-    "**1. Diagnose**",
-    `- **Primary Thread:** ${plan.primaryThread}`,
-    `- **Root Cause:** ${plan.rootCause}`,
-    `- **What is NOT the problem:** ${plan.whatIsNotTheProblem}`,
+    "## Macro Matrix",
     "",
-    "**2. Sprint-Acties**",
-    renderSprintActions(plan.sprintActions),
+    header,
+    sep,
+    ...rows,
     "",
-    "**3. Beslisregel & Falsificatie**",
-    renderDecisionRule(plan.decisionRule),
+    "## Portfolio Synthese",
+    "",
+    ...synthLines,
   ].join("\n");
 }
 
-export function renderDecisionBriefMarkdown(brief: DecisionBrief): string {
-  return [
-    "# Decision Brief",
-    `*Gegenereerd ${brief.generatedAt}*`,
-    "",
-    "## DEEL 1: PORTFOLIO EXECUTIVE BRIEFING",
-    "",
-    "**Macro Matrix**",
-    "",
-    renderMacroMatrix(brief.macroMatrix),
-    "",
-    "**Portfolio Synthese**",
-    "",
-    renderPortfolioSynthese(brief.portfolioSynthese),
-    "",
-    "---",
-    "",
-    "## DEEL 2: KLANT-ACTIEPLAN",
-    "",
-    brief.clientActionPlans.map(renderClientActionPlan).join("\n\n---\n\n"),
-  ].join("\n");
-}
-
-/** Telt alleen de inhoudsvelden van Deel 2 mee (niet de kopjes/labels) -- exact de "max 120
- *  woorden per sub-account"-eis. Geëxporteerd zodat de test en een eventuele lint-stap dezelfde
- *  telling gebruiken als de renderer zelf. */
-export function wordCountForClientPlan(plan: ClientActionPlan): number {
+/** Telt alleen de inhoudsvelden mee (niet de kopjes/labels) -- de "1 A4"-eis voor het
+ *  klantdocument. Geëxporteerd zodat de test dezelfde telling gebruikt als de renderer zelf. */
+export function wordCountForClientBrief(brief: ClientDecisionBrief): number {
   const parts = [
-    plan.primaryThread,
-    plan.rootCause,
-    plan.whatIsNotTheProblem,
-    plan.sprintActions.containment,
-    plan.sprintActions.validationRecovery,
-    plan.sprintActions.controlledScale,
-    plan.decisionRule?.evaluationWindow,
-    plan.decisionRule?.acceptIf,
-    plan.decisionRule?.rejectIf,
+    brief.primaryThread,
+    brief.rootCause,
+    brief.whatIsNotTheProblem,
+    brief.sprintActions.containment,
+    brief.sprintActions.validationRecovery,
+    brief.sprintActions.controlledScale,
+    brief.decisionRule?.evaluationWindow,
+    brief.decisionRule?.acceptIf,
+    brief.decisionRule?.rejectIf,
+    ...brief.portfolioContext,
   ].filter((v): v is string => typeof v === "string");
   return parts.reduce((sum, text) => sum + countWords(text), 0);
 }
