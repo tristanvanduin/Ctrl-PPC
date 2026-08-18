@@ -93,7 +93,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
   if (slices.length === 0 || totals.cost <= 0) return null;
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden h-full">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">Spend per campagnetype</h3>

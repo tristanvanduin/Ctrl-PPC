@@ -21,6 +21,7 @@ import { GeoChannelMatrix } from "./geo-channel-matrix";
 import { VideoPerformance } from "./video-performance";
 import { PmaxNetworkSplit } from "./pmax-network-split";
 import { CampaignTypeSplit } from "./campaign-type-split";
+import { MonthlyTrendBars } from "./monthly-trend-bars";
 import { PmaxAssetCoverage } from "./pmax-asset-coverage";
 import { VideoPlacements } from "./video-placements";
 import { CampaignTable } from "./campaign-table";
@@ -127,20 +128,36 @@ export function GoogleView({
             </div>
           )}
 
-          {/* DE OPENER (17.32, op verzoek van de eigenaar: "ijzersterk", net als het aangeleverde
-              voorbeeldscherm). Geen Sectie-kop hier -- de kaart en de donut hebben allebei al hun
-              EIGEN interne kop. Nu: één dichte rij, gap-4 zoals bínnen een sectie, geen mt-10
-              ertussen. Kaart breed (het is een wereldkaart, die heeft ruimte nodig), donut smal.
+          {/* DE OPENER (17.34, derde ronde: "het gat onder de donuts is veel te groot" + "de
+              grafiek/mijn lijn is veeeel te groot" + "de pacing mag best breder zijn"). De volle
+              PerformanceChart (vier metric-knoppen, week/maand/jaar, vorig-jaar-toggle,
+              budgetadvies-banner, 320px grafiek -- ruim 500px totaal) was veel te zwaar voor deze
+              plek; hij staat weer bij "Jaaroverzicht 2026" hieronder. Hier in plaats daarvan
+              MonthlyTrendBars: dezelfde forecast-rekenkern, alleen de laatste zes maanden als kale
+              staafjes, ~180px met kop. Kleinere rechterkolom betekent ook een kleiner gat onder de
+              donut links, want de rijhoogte (die de linkerkolom via flex-1 volgt) is nu zelf
+              kleiner. Pacing-kolom van 5/12 naar 6/12: bij een bredere container-breedte springt
+              PacingMonitor's eigen grid (2/3/6 kolommen) naar meer kolommen per rij, dus lager en
+              breder in plaats van hoog en smal.
 
-              CampaignTypeSplit, niet PmaxNetworkSplit: de eigenaar wees erop dat de netwerkringen
-              alleen iets tonen bij een account dat Performance Max draait -- een puur-Search- of
-              puur-Shopping-account zou hier altijd een lege plek zien. Spend per campagnetype
-              (Search/PMax/Shopping/Display) werkt voor elk account, ongeacht de mix -- "er is
+              Geen Sectie-kop op deze rij: kaart, donut, staafjes en pacing hebben allemaal al hun
+              EIGEN interne kop.
+
+              CampaignTypeSplit, niet PmaxNetworkSplit: de netwerkringen bestaan alleen bij een
+              account dat Performance Max draait, campagnetype werkt voor elke mix -- "er is
               altijd een gemene deler waar we een donut van kunnen maken die zich niet richt op 1
-              specifiek campagnetype". PmaxNetworkSplit is verhuisd naar "Waar het budget landt"
-              hieronder, waar hij als PMax-specifieke verdieping wél op zijn plek staat. */}
+              specifiek campagnetype". PmaxNetworkSplit staat in "Waar het budget landt" verderop. */}
           <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12">
-            <div className="hero-kaart min-w-0 xl:col-span-8">
+            {/* `.hero-ring` blijft de marker voor globals.css' ":has(> .hero-ring:empty)"-regel:
+                pas als hier écht niets in staat (geen pacing én geen campagnedata) trekt de
+                kolom rechts door naar de volle breedte. */}
+            <div className="hero-ring min-w-0 xl:col-span-6 flex flex-col gap-4">
+              <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+              <div className="flex-1 min-h-0">
+                <CampaignTypeSplit clientId={clientId} />
+              </div>
+            </div>
+            <div className="hero-kaart min-w-0 xl:col-span-6 flex flex-col gap-4">
               {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
                   landentabel met één kolom -- dat is precies wat de kaart al toont, en de matrix
                   zou een "kanaalmix" beloven die niet bestaat. */}
@@ -148,13 +165,7 @@ export function GoogleView({
                 clientId={clientId}
                 verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
               />
-            </div>
-            {/* Rendert zelf niets zonder campagnedata deze periode (geen lege ring). `.hero-ring`
-                is waar globals.css' ":has(> .hero-ring:empty)"-regel op let: zonder data blijft
-                dit een lege wrapper-div, en trekt de kaart ernaast door naar de volle breedte in
-                plaats van een kaal vlak achter te laten. */}
-            <div className="hero-ring min-w-0 xl:col-span-4">
-              <CampaignTypeSplit clientId={clientId} />
+              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
             </div>
           </div>
 
@@ -169,27 +180,12 @@ export function GoogleView({
               : "Per maand: waar staan we en wat is de trend?"}
             actie={edition && <TijdasKeuze value={tijdas} onChange={onTijdasChange} />}
           >
-            {/* NAAST ELKAAR GEPROBEERD EN TERUGGEDRAAID, en niet om de uitlijning.
-
-                Beide kaarten beantwoorden "lopen we op schema", maar op een andere horizon --
-                links per week, rechts per jaar -- en ze gebruiken daarvoor dezelfde woorden.
-                "Prognose" betekent links een week en rechts een jaar; "Verwacht" links en "Op
-                dit tempo" rechts zijn allebei een verwachting. Vier termen voor hetzelfde
-                begrip op twee schalen, naast elkaar: dat nodigt uit tot een vergelijking die
-                niet klopt.
-
-                Waar naast elkaar wél werkt in deze app, gaat het om twee SOORTEN antwoord (de
-                kaart zegt waar, de ranglijst zegt hoeveel) of om dezelfde data in twee
-                duidelijk verschillende vormen (de boog en de radar op de gezondheidskaart).
-                Twee kaartvormige blokken met percentages die allebei over schema gaan, zijn
-                geen van beide.
-
-                Onder elkaar markeert de verticale sprong de wisseling van horizon, en dat is
-                precies het signaal dat naast elkaar ontbreekt. */}
+            {/* PacingMonitor staat sinds 17.33 in de opener hierboven, naast de donut -- hier
+                blijft alleen de week-/maandvisualisatie over, die te breed is voor een kolom naast
+                de donut. */}
             {beursAs
               ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} />
               : <MonthlyOverview clientId={clientId} countryFilter={countryFilter} />}
-            <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
           </Sectie>
 
           <Sectie

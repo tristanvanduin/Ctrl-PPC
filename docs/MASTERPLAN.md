@@ -3828,3 +3828,42 @@ mockdata-leemte in `lib/demo/demo-rows.ts`, geen regressie van dit werk. `npx ts
 **Nog niet gestart**: de "2e laag" die de eigenaar expliciet toestond als latere stap — Jaaroverzicht
 2026 en "Waar het budget landt" verdichten in dezelfde stijl als de opener nu heeft. Ook nog niet
 aangeraakt: dezelfde behandeling op Meta/LinkedIn/cross-channel en cross-account/God View.
+
+### 17.34 De opener, derde ronde: pacing + donut naast kaart + staafjes, geen dood gat meer
+
+Na screenshots van 17.33 reageerde de eigenaar met drie losse punten, elk met een letterlijke
+plek erbij: "doe de staafdiagram onder de geo kaart, dan kan de kaart groter", "de grafiek/mijn
+lijn is veeeel te groot", "het gat onder de donuts is veel te groot", "de pacing mag best breder
+zijn". Alle vier tegelijk aangepakt, want ze hangen samen: een kleinere grafiek rechts verkleint
+vanzelf het gat dat de flex-1-stretch links moest opvullen.
+
+**`PerformanceChart` was de eigenlijke boosdoener.** Vier metric-knoppen, een week/maand/jaar-
+omschakelaar, een vorig-jaar-toggle, een budgetadvies-banner en een 320px-grafiek — samen ruim
+500px, veel te zwaar voor een compacte kolom naast een kaart. In plaats van hem te verkleinen (wat
+zijn eigen functionaliteit zou beknotten) is hij teruggezet naar "Jaaroverzicht 2026", waar hij
+vandaan kwam en waar zijn volledige bediening op zijn plek is.
+
+**Nieuw: `components/dashboard/monthly-trend-bars.tsx` (`MonthlyTrendBars`).** Een kale
+staafdiagram, geen bediening, ~130px hoog: de laatste zes maanden conversies, gerealiseerd in de
+merkkleur, prognose bij 40% dekking. Zelfde rekenkern als `PerformanceChart`
+(`useForecast`/`computeForecast` uit `lib/forecast.ts`, dezelfde `points`-array) — geen tweede
+forecast-implementatie, alleen een kortere, kalere weergave van dezelfde maandpunten. Dit is de
+letterlijke "staafdiagram onder de geo kaart" uit het verzoek.
+
+**Het gat onder de donut kromp mee, automatisch.** De linkerkolom (`PacingMonitor` + de
+`CampaignTypeSplit`-donut in een `flex-1`-wrapper) volgt via CSS Grid's stretch-gedrag de hoogte
+van de rechterkolom (`GeoBreakdown` + nu `MonthlyTrendBars` in plaats van `PerformanceChart`).
+Rechts kleiner maken (ruim 500px minder) betekent dat de rijhoogte zelf kleiner wordt, dus ook het
+stuk dat de donut moest bijvullen — geen aparte fix nodig, alleen het gevolg van de eerste
+aanpassing.
+
+**Pacing-kolom breder.** `xl:col-span-5`/`xl:col-span-7` werd `xl:col-span-6`/`xl:col-span-6`.
+`PacingMonitor` is al container-query-responsief (`grid-cols-2 gap-4 @2xl:grid-cols-3
+@5xl:grid-cols-6`) — een bredere kolom geeft hem op termijn meer ruimte om breder/lager i.p.v.
+smal/hoog te renderen, zonder dat er iets aan het component zelf hoefde te veranderen.
+
+**Live geverifieerd, licht én donker**, exact op het `.hero-rij`-element gescreenshot (niet de
+hele pagina) om de kolomhoogtes rechtstreeks te kunnen vergelijken: donut- en staafjeskolom eindigen
+nu vrijwel op dezelfde regel. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de
+kaart", zelftest vindt de teruggezette bug nog. `npx tsc --noEmit` schoon, 301/301 tests groen,
+build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
