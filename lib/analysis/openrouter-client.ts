@@ -39,6 +39,16 @@ export interface OpenRouterRequest {
   label?: string;
   /** Override het model voor deze call (de router zet dit; default DEFAULT_MODEL) */
   model?: string;
+  /**
+   * Reserveert een apart denkbudget voor redenerende modellen (OpenRouter's `reasoning.max_tokens`,
+   * bevestigd voor de Claude-familie). MOET strikt kleiner zijn dan `maxTokens` -- OpenRouter
+   * garandeert anders geen ruimte voor het zichtbare antwoord na het denken. Zonder dit veld kan
+   * een redenerend model zijn volledige `maxTokens`-budget aan onzichtbare reasoning besteden en
+   * content "" teruggeven: precies wat er gebeurde bij de live-test van de LinkedIn weekly-SOP
+   * (54k tokens verbruikt, nul zichtbare tekst). callLayer() zet dit per laag, alleen voor lagen
+   * met een bevestigd Claude-primair model (narrative, strategic).
+   */
+  reasoningMaxTokens?: number;
 }
 
 export interface OpenRouterResponse {
@@ -158,6 +168,7 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
     jsonMode = false,
     label = "unknown",
     model = DEFAULT_MODEL,
+    reasoningMaxTokens,
   } = opts;
 
   // SEC1: weer secrets en maskeer PII voordat de payload naar de provider gaat.
@@ -190,6 +201,13 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
 
   if (jsonMode) {
     body.response_format = { type: "json_object" };
+  }
+
+  if (reasoningMaxTokens !== undefined) {
+    if (reasoningMaxTokens >= maxTokens) {
+      throw new Error(`callOpenRouter (${label}): reasoningMaxTokens (${reasoningMaxTokens}) moet strikt kleiner zijn dan maxTokens (${maxTokens}) -- anders blijft er geen ruimte over voor het zichtbare antwoord.`);
+    }
+    body.reasoning = { max_tokens: reasoningMaxTokens };
   }
 
   let lastError: Error | null = null;

@@ -3566,3 +3566,51 @@ gedeelde code die elke SOP al sinds het bestaan van dit bestand gebruikt — nie
 vandaag. Niet uit te sluiten dat er bij echte klanten in het verleden af en toe een leeg of te kort
 rapport is opgeslagen zonder signaal. Aangeboden aan de eigenaar: een audit op bestaande
 `sop_analysis_output`-rijen met verdacht korte output, nog niet uitgevoerd (wacht op akkoord).
+
+### 17.29 De echte oorzaak van het lege antwoord: geen apart reasoning-budget — en de audit
+
+Vervolgvraag van de eigenaar op 17.26/17.28: klopt de tokencap, of moet die omhoog? Uitgezocht in
+plaats van gegokt — OpenRouter's eigen documentatie over reasoning-tokens opgehaald.
+
+**De echte oorzaak, nu bevestigd.** OpenRouter kent voor de Claude-familie een apart
+`reasoning.max_tokens`-veld, los van `max_tokens` — reasoning-tokens tellen wel mee als
+outputtokens, maar `max_tokens` moet STRIKT boven het reasoning-budget liggen, anders blijft er
+geen ruimte over voor het zichtbare antwoord. Nergens in de codebase werd dit veld ooit gezet:
+elke laag liet Claude/Grok zelf bepalen hoeveel van zijn `max_tokens`-budget aan onzichtbare
+reasoning ging. Bij de narrative-laag (Claude Sonnet 5, `max_tokens: 8192`, geen reasoning-cap)
+kon dat dus het VOLLEDIGE budget aan reasoning opgaan, met content `""` als resultaat — precies
+wat er gebeurde bij de LinkedIn weekly-SOP (54k tokens verbruikt, nul zichtbare tekst). De vraag
+"cap verhogen of houden" was dus verkeerd gesteld: een hogere cap alleen had het gat niet gedicht,
+want de reasoning had net zo goed de nieuwe, hogere cap kunnen opvullen.
+
+**Fix: een expliciet gereserveerd reasoning-budget, niet zomaar een hogere cap.**
+`lib/analysis/openrouter-client.ts` kreeg een nieuw `reasoningMaxTokens`-veld op
+`OpenRouterRequest`, dat als `body.reasoning = { max_tokens: N }` wordt meegestuurd — met een
+harde validatie die meteen gooit (vóór er iets over het netwerk gaat) als `reasoningMaxTokens >=
+maxTokens`. `lib/analysis/llm-router.ts`'s `LAYER_MODEL` kreeg een `reasoningMaxTokens` per laag,
+alleen voor de twee lagen met een bevestigd Claude-primair model: `narrative` (6000) en `strategic`
+(8000, nog zonder actieve aanroeper). `callLayer()` geeft dit budget alleen mee aan het PRIMAIRE
+model van een laag, nooit aan het fallback-model (altijd Gemini/GPT, andere modelfamilie, ander
+gedrag onbevestigd). De `reasoning`- en `triage`-laag (Grok, Gemini) blijven bewust ongemoeid —
+hun OpenRouter-reasoning-gedrag is niet gecontroleerd, dus geen aanname erover.
+
+**En de cap ging wél omhoog, maar als gevolg, niet als losstaande maatregel.** `runAnalysis()`'s
+`maxTokens` voor de narrative-laag ging van 8192 naar 16000 — nodig omdat `max_tokens` na de
+6000-token reservering nog altijd ruim boven het langste ooit geziene rapport (~2100 tokens) moet
+uitkomen; 8192 liet daarvoor te weinig marge.
+
+**Live geverifieerd**: dezelfde LinkedIn weekly-SOP die eerder op `google/gemini-3.7-flash`
+terugviel, gebruikte nu het primaire model (`anthropic/claude-sonnet-5`) rechtstreeks — 0 retries,
+4991 tekens echte output in één keer. Getest: `__openrouter_client_test.ts` +4 assertions
+(reasoning-veld komt daadwerkelijk in de body terecht; een ongeldige combinatie gooit vóór elke
+netwerkaanroep), `__llm_router_test.ts` +4 assertions (het budget gaat alleen naar het primaire
+Claude-model, nooit naar de fallback of naar lagen zonder configuratie). `npx tsc --noEmit` schoon,
+volledige `scripts/gates.sh` groen.
+
+**De aangeboden audit, uitgevoerd.** Alle 53 bestaande `sop_analysis_output`-rijen met
+`section = "full"` (elke narratieve SOP-rapportage die ooit is opgeslagen, 3 april t/m 18
+augustus 2026, 9 klanten) doorgelopen: **geen enkele leeg of verdacht kort** (kortste rapport ruim
+boven 2000 tekens). Het gat heeft zich in de praktijk dus nooit voorgedaan in een bewaarde rij —
+geen stille schade bij bestaande klanten gevonden. Wel een eerlijke kanttekening: met 53 rijen
+totaal is dat een klein aantal kansen geweest, dus "nooit gebeurd" leunt deels op beperkte
+blootstelling, niet alleen op geluk.

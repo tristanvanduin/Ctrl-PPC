@@ -72,6 +72,36 @@ async function run() {
     check("geen throw in JSON-mode (bestaand gedrag: caller leest parseStatus)", result.parseStatus === "failed", result.parseStatus);
   }
 
+  console.log("\n5. reasoningMaxTokens: stuurt OpenRouter's reasoning.max_tokens daadwerkelijk mee in de body");
+  {
+    let capturedBody: Record<string, unknown> | null = null;
+    global.fetch = (async (_url: string, init: { body: string }) => {
+      capturedBody = JSON.parse(init.body);
+      return {
+        ok: true, status: 200,
+        json: async () => ({ id: "x", model: "anthropic/claude-sonnet-5", choices: [{ message: { content: "ok" } }], usage: { prompt_tokens: 100, completion_tokens: 10, total_tokens: 110 } }),
+        text: async () => "",
+      };
+    }) as unknown as typeof fetch;
+    await callOpenRouter({ apiKey: "test", systemPrompt: "sys", userMessage: "msg", label: "test-reasoning-budget", maxTokens: 16000, reasoningMaxTokens: 6000 });
+    check("body.reasoning.max_tokens staat op de gevraagde waarde", (capturedBody as unknown as { reasoning?: { max_tokens?: number } })?.reasoning?.max_tokens === 6000, JSON.stringify(capturedBody));
+  }
+
+  console.log("\n6. reasoningMaxTokens >= maxTokens: gooit meteen (geen ruimte over voor het zichtbare antwoord), geen netwerkaanroep");
+  {
+    let fetchAangeroepen = false;
+    global.fetch = (async () => { fetchAangeroepen = true; return { ok: true, status: 200, json: async () => ({}), text: async () => "" }; }) as unknown as typeof fetch;
+    let threw = false;
+    let message = "";
+    try {
+      await callOpenRouter({ apiKey: "test", systemPrompt: "sys", userMessage: "msg", label: "test-reasoning-te-groot", maxTokens: 4000, reasoningMaxTokens: 4000 });
+    } catch (e) {
+      threw = true;
+      message = e instanceof Error ? e.message : String(e);
+    }
+    check("gooit voordat er iets over het netwerk gaat", threw && !fetchAangeroepen, `threw=${threw} fetch=${fetchAangeroepen} msg=${message}`);
+  }
+
   global.fetch = origFetch;
   console.log(`\nRESULTAAT: ${passed} geslaagd, ${failed} gefaald\n`);
   if (failed > 0) process.exit(1);

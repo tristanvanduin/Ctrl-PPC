@@ -299,7 +299,12 @@ export async function runAnalysis(opts: {
     apiKey,
     systemPrompt,
     userMessage,
-    maxTokens: 8192,
+    // 16000, niet 8192: de narrative-laag reserveert 6000 tokens voor Claude's reasoning-budget
+    // (llm-router.ts's LAYER_MODEL), en OpenRouter eist dat maxTokens daar strikt boven blijft.
+    // Met 8192 kon dat na aftrek van reasoning krap worden voor de langere SOP-rapporten
+    // (masterplan 17.28); 16000 laat na de reservering nog ruim 10.000 tokens over voor de
+    // zichtbare tekst, ruim boven het langste tot nu toe geziene rapport (~2100 tokens).
+    maxTokens: 16000,
     label: `${sopType}-full`,
   });
 
