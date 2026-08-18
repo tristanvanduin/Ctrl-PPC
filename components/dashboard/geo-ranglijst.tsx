@@ -111,13 +111,18 @@ export function GeoRanglijst({
 
       {/* Het totaal onderaan, niet bovenaan: eerst wie de grootste is, dan hoeveel het samen is.
           Het vult bovendien de ruimte die anders overbleef naast een kaart die hoger is dan deze
-          lijst -- en een leeg vlak naast een kaart leest als een blok dat niet geladen is. */}
+          lijst -- en een leeg vlak naast een kaart leest als een blok dat niet geladen is.
+
+          Als 2-koloms rooster van kleine kaartjes i.p.v. een verticale lijst (17.36): een rij
+          label/getal-paren onder elkaar leest als bijschrift, een rooster van eigen kaartjes leest
+          als cijfers die het bekijken waard zijn -- zelfde `--spoor`-rand als de aandeelbalk erboven,
+          geen nieuwe kleur erbij. */}
       {totalen && totalen.length > 0 && (
-        <dl className="mt-4 space-y-1.5 border-t border-border pt-3">
+        <dl className="mt-4 grid grid-cols-2 gap-1.5 border-t border-border pt-3">
           {totalen.map((t) => (
-            <div key={t.label} className="flex items-baseline justify-between gap-2">
-              <dt className="text-meta text-muted-foreground">{t.label}</dt>
-              <dd className="text-body font-semibold tabular-nums text-brand-gray">{t.waarde}</dd>
+            <div key={t.label} className="rounded-lg border border-border/70 bg-muted/40 px-2 py-1.5">
+              <dt className="text-micro text-muted-foreground leading-tight">{t.label}</dt>
+              <dd className="text-body font-semibold tabular-nums text-brand-gray leading-tight">{t.waarde}</dd>
             </div>
           ))}
         </dl>

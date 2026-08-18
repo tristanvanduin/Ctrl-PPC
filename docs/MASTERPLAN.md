@@ -3911,3 +3911,78 @@ kolombreedte betekent ook een merkbaar grotere kaart, niet alleen breder.
 `ranglijstOnder`-wijziging en na de kolomherverdeling — beide keren alle 15 schermen "niets buiten de
 kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build
 groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+### 17.36 De ranglijst verhuist naar links: kaart en ranglijst uit elkaar getrokken
+
+Nog een schets: "dit kan toch een stuk groter binnen het blok?" met een cirkel om de kaart. De
+kaart vulde intussen al de volle kolombreedte (gemeten: 704,65px SVG in een 730,65px kaart, dus
+al 100%) — het "grotere" moest dus ergens anders vandaan komen. Bevestigd via `AskUserQuestion`:
+de landenranglijst (die nog steeds ONDER de kaart in dezelfde `GeoBreakdown`-kaart stond, sinds
+17.35) verhuist naar de lege ruimte links, onder de campagnetype-donut. De kaart staat daarna
+alleen in zijn kolom en kan groeien zonder iets te delen.
+
+**Architectuurwijziging: kaart en ranglijst waren nooit twee componenten, maar één met twee
+weergaven van dezelfde state.** Klik op de VS in de ranglijst moet de kaart naar de statenweergave
+laten omschakelen (`focus`); de gekozen metric (Conversies/Vertoningen/...) stuurt zowel de
+kaartkleuring als de ranglijst-sortering. Die twee nu in aparte grid-kolommen zetten zonder de
+state te delen zou een kaart en een lijst opleveren die uit de pas kunnen lopen. Opgelost door de
+fetch/state-logica uit te lichten naar `lib/geo/use-geo-breakdown.ts` (`useGeoBreakdown()`), en
+`GeoBreakdown`'s render op te splitsen in twee nieuwe, kleinere componenten:
+`components/dashboard/geo-map-card.tsx` (kop + kaart, geen ranglijst/tabel) en
+`geo-ranglijst-card.tsx` (ranglijst + compacte statistiek-cijfers + de "volledige tabel"-toggle).
+`GoogleView` roept `useGeoBreakdown()` nu zelf één keer aan en geeft het resultaat als `state`-prop
+aan beide kaarten door.
+
+**`GeoBreakdown` zelf blijft bestaan, ongewijzigd van buitenaf.** De drie andere plekken
+(cross-channel, Meta, LinkedIn) tonen kaart en ranglijst nog steeds samen in één kaart — daar
+klopt "naast elkaar" nog steeds, en die drie riepen nu gewoon dezelfde nieuwe hook intern aan.
+Puur een interne verhuizing van bestaande logica, geen gedragswijziging op die drie schermen. De
+inmiddels overbodige `ranglijstOnder`-prop (17.35) is weer weg.
+
+**Bijvangst, in dezelfde ronde meegenomen (vertaald naar het bestaande tokensysteem, niet als losse
+hardcoded kleuren — expliciet zo gekozen via `AskUserQuestion` nadat een uitgebreid extern
+stijlvoorstel binnenkwam met `bg-slate-900/60`-achtige Tailwind-classes, wat het licht/donker-
+evenwicht van dit hele redesign zou hebben doorbroken):**
+- `GeoRanglijst`'s statistiekenblok (Aantal landen/Vertoningen/Klikken/Conversies/CTR/CPA) van een
+  verticale `dl`-lijst naar een 2-koloms rooster van kleine kaartjes (`bg-muted/40`,
+  `border-border/70`) — geldt voor alle vier de plekken die `GeoRanglijst` gebruiken.
+- `DonutChart`'s centrale cijfer van `text-lead` naar `text-figure` (13px → 30px) — geverifieerd
+  dat dit past binnen de 104px binnengat zonder overlap, geldt voor alle donut-gebruikers
+  (`CampaignTypeSplit`, `PmaxNetworkSplit`, `BreakdownDonuts`).
+- `--kaart-leeg` (licht) van `#eef1f6` naar `#e2e8f0`: tegen het paginavlak (`#f9fafc`) vielen
+  landen zonder data bijna weg.
+
+**Live geverifieerd, licht én donker.** `scripts/check-kaartoverloop.mjs`: alle 15 schermen, incl.
+Meta/LinkedIn/overzicht (die `GeoBreakdown` nog ongewijzigd gebruiken), "niets buiten de kaart".
+`npx tsc --noEmit` schoon.
+
+### 17.37 Laatste balans: het gat rechtsonder, en 40/60 in plaats van 30/70
+
+Twee losse, gerichte punten na de vorige schermafbeeldingen. Eerst: met de ranglijst-kaart nu
+links (17.36) werd die kolom bijna altijd de langste van de twee, en bleef er rechts, onder de
+staafgrafiek, bladzij-achtergrond over — "elimineer het witte gat rechtsonder". Tweede: de
+kaartkolom was inmiddels breder dan de linkerkolom prettig kon dragen met drie kaarten erin
+(pacing, donut, ranglijst) — verzoek om terug naar een 40/60-verhouding met "ademruimte" links.
+
+**Het gat rechtsonder, anders opgelost dan de vorige keer (17.35).** Toen was het probleem een
+DONUTKAART die geforceerd moest meegroeien met een langere buurkolom — statische content, dus een
+kunstmatig wit vlak binnen een kaartrand. Nu is de langste kolom links (niet rechts), en het
+element dat kan meegroeien is een STAAFGRAFIEK, die van nature schaalt: `xl:items-start` (17.35)
+is weer weg (grid-stretch dus weer aan, het standaardgedrag), en `MonthlyTrendBars` kreeg een
+nieuwe `groeit`-prop die zijn `ResponsiveContainer` op `height="100%"` zet binnen een `flex-1`-
+wrapper, in plaats van de vaste 130px. Hogere staven in plaats van dode ruimte — dezelfde afweging
+als 17.35, alleen ditmaal is het element dat groeit er wél geschikt voor.
+
+**Kolomverhouding**: `xl:col-span-4`/`xl:col-span-8` (17.37, eerste helft van deze sectie) werd
+`xl:col-span-5`/`xl:col-span-7` — 40/60 in plaats van 33/67. De staafbreedte in `MonthlyTrendBars`
+ging van `maxBarSize={32}` naar `48` om mee te schalen met de nu bredere kolom.
+
+**Live geverifieerd, licht én donker**, telkens opnieuw gescreenshot op precies het
+`.hero-rij`-element. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de kaart",
+zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build groen,
+volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+**Vier rondes bijstelling in totaal (17.34 t/m 17.37) op dezelfde opener** — telkens op basis van
+een concrete schermafbeelding of schets, nooit een nieuwe blinde gok. Nog niet gestart: de "2e
+laag" (Jaaroverzicht 2026, Waar het budget landt) in dezelfde verdichte stijl, en dezelfde
+behandeling op Meta/LinkedIn/cross-channel/God View.

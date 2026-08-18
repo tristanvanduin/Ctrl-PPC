@@ -16,8 +16,10 @@ import { FairWeeksOverview } from "./fair-weeks-overview";
 import { PacingMonitor } from "./pacing-monitor";
 import { MetricCards } from "./metric-cards";
 import { PerformanceChart } from "./performance-chart";
-import { GeoBreakdown } from "./geo-breakdown";
 import { GeoChannelMatrix } from "./geo-channel-matrix";
+import { GeoMapCard } from "./geo-map-card";
+import { GeoRanglijstCard } from "./geo-ranglijst-card";
+import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { VideoPerformance } from "./video-performance";
 import { PmaxNetworkSplit } from "./pmax-network-split";
 import { CampaignTypeSplit } from "./campaign-type-split";
@@ -87,6 +89,11 @@ export function GoogleView({
   countryFilter, onCountryFilterChange, tijdas, onTijdasChange,
 }: GoogleViewProps) {
   const beursAs = edition !== null && tijdas === "beurs";
+  // Eén hook-aanroep voor de hele opener: GeoMapCard en GeoRanglijstCard staan straks in twee
+  // verschillende kolommen maar moeten dezelfde metric-keuze en VS-drilldown-state delen (17.36).
+  // `enabled: !geoClone` slaat de fetch over zolang de geo-kloon-weergave rendert, die deze state
+  // niet gebruikt.
+  const geo = useGeoBreakdown({ clientId, channel: "google", enabled: !geoClone });
 
   return (
     <>
@@ -128,50 +135,50 @@ export function GoogleView({
             </div>
           )}
 
-          {/* DE OPENER (17.34, derde ronde: "het gat onder de donuts is veel te groot" + "de
-              grafiek/mijn lijn is veeeel te groot" + "de pacing mag best breder zijn"). De volle
-              PerformanceChart (vier metric-knoppen, week/maand/jaar, vorig-jaar-toggle,
-              budgetadvies-banner, 320px grafiek -- ruim 500px totaal) was veel te zwaar voor deze
-              plek; hij staat weer bij "Jaaroverzicht 2026" hieronder. Hier in plaats daarvan
-              MonthlyTrendBars: dezelfde forecast-rekenkern, alleen de laatste zes maanden als kale
-              staafjes, ~180px met kop. Kleinere rechterkolom betekent ook een kleiner gat onder de
-              donut links, want de rijhoogte (die de linkerkolom via flex-1 volgt) is nu zelf
-              kleiner. Pacing-kolom van 5/12 naar 6/12: bij een bredere container-breedte springt
-              PacingMonitor's eigen grid (2/3/6 kolommen) naar meer kolommen per rij, dus lager en
-              breder in plaats van hoog en smal.
-
-              Geen Sectie-kop op deze rij: kaart, donut, staafjes en pacing hebben allemaal al hun
-              EIGEN interne kop.
-
-              CampaignTypeSplit, niet PmaxNetworkSplit: de netwerkringen bestaan alleen bij een
-              account dat Performance Max draait, campagnetype werkt voor elke mix -- "er is
-              altijd een gemene deler waar we een donut van kunnen maken die zich niet richt op 1
-              specifiek campagnetype". PmaxNetworkSplit staat in "Waar het budget landt" verderop. */}
-          <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12 xl:items-start">
+          {/* DE OPENER (17.36, vierde ronde: "dit kan toch een stuk groter binnen het blok" over
+              de kaart, met een schets erbij -- de ranglijst verhuist naar de lege ruimte onder de
+              donut, zodat de kaart ernaast helemaal alleen in zijn kolom staat. Kaart en ranglijst
+              waren tot 17.35 nog altijd samen één component/state (GeoBreakdown); ze delen nu
+              dezelfde useGeoBreakdown()-aanroep hier, éénmalig, en geven het resultaat als prop
+              door aan GeoMapCard (rechts) en GeoRanglijstCard (links, onder de donut) -- anders
+              lopen de metric-keuze en de VS-drilldown uit elkaar tussen de twee kolommen. */}
+          <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12">
             {/* `.hero-ring` blijft de marker voor globals.css' ":has(> .hero-ring:empty)"-regel:
-                pas als hier écht niets in staat (geen pacing én geen campagnedata) trekt de
-                kolom rechts door naar de volle breedte.
+                pas als hier écht niets in staat trekt de kolom rechts door naar de volle breedte.
 
-                17.35: niet langer geforceerd even hoog (geen flex-1/h-full meer op de donut). De
-                ranglijst-onder-de-kaart maakte de rechterkolom een stuk hoger; gedwongen stretch
-                gaf de donutkaart daardoor een groot wit gat vanbinnen -- exact de klacht van
-                daarvoor, nu met een andere oorzaak. Twee kolommen met hun eigen natuurlijke hoogte
-                naast elkaar is een heel gewoon patroon en heeft geen kunstmatige opvulling nodig;
-                `xl:items-start` zet de grid-stretch (het standaardgedrag) expliciet uit. */}
+                17.37: grid-stretch weer aan (het standaardgedrag, dus geen `items-start` meer
+                nodig). Sinds de ranglijst-kaart hier links bij kwam (17.36) is die kolom bijna
+                altijd de langste van de twee, en rechts bleef daardoor bladzij-achtergrond over
+                onder de staafgrafiek -- "elimineer het witte gat rechtsonder". Stretch geeft
+                `.hero-kaart` nu de rijhoogte, en de staafgrafiek erin (flex-1) vult het verschil
+                gracieus op met hogere staven. Anders dan 17.35's probleem: toen was het de
+                DONUTKAART die moest meegroeien (statische content, dus dood wit vlak); nu is het
+                een grafiek, die schaalt gewoon mee. */}
+            {/* 4/12 werd 5/12 (17.37, "40/60 i.p.v. 30/70"): met de ranglijst-kaart (17.36) staan
+                hier nu drie kaarten in plaats van twee, en die verdienen ademruimte -- de kolom
+                was er niet op berekend toen hij nog alleen pacing+donut droeg. */}
             <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
               <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
               <CampaignTypeSplit clientId={clientId} />
+              <GeoRanglijstCard state={geo} />
             </div>
             <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
               {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
                   landentabel met één kolom -- dat is precies wat de kaart al toont, en de matrix
                   zou een "kanaalmix" beloven die niet bestaat. */}
-              <GeoBreakdown
-                clientId={clientId}
-                ranglijstOnder
+              <GeoMapCard
+                state={geo}
                 verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
               />
-              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
+              {/* flex-1: de ranglijst-kaart ernaast (links) maakte die kolom meestal de langste
+                  van de twee (17.36), dus blijft hier onderaan anders bladzij-achtergrond over.
+                  Een staafgrafiek kan dat gracieus opvullen (hogere staven i.p.v. dode ruimte in
+                  een kaartrand) -- zelfde afweging als 17.35, nu de andere kant op: NIET de
+                  ranglijst-kaart laten meegroeien (die zou weer een leeg vlak onderin een lijst/
+                  tabel geven), WEL de grafiek (die schaalt gewoon mee). */}
+              <div className="flex-1 min-h-[130px]">
+                <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
+              </div>
             </div>
           </div>
 

@@ -315,10 +315,15 @@
      13.2), verdunde de kaart daar automatisch in mee: het hoogste land op een lichte achtergrond
      werd zelf ook lichter, en tegen `--kaart-laag`/`--kaart-leeg` (allebei bijna-wit) las dat als
      vaag in plaats van als "hier zit de meeste data". Eén niveau donkerder gemengd, zodat de kaart
-     zijn eigen contrast heeft en niet meer stilzwijgend verdunt bij de volgende merkkleurwissel. */
+     zijn eigen contrast heeft en niet meer stilzwijgend verdunt bij de volgende merkkleurwissel.
+
+     `--kaart-leeg` (17.37): tegen het paginavlak (#f9fafc) was #eef1f6 zo dicht dat de
+     landcontouren zonder data bijna wegvielen -- de kaart las pas als kaart zodra er iets van data
+     op stond. Eén stap donkerder (dichter bij slate-200) zodat elk land zichtbaar is, ook zonder
+     meting. */
   --kaart-laag: #e6eef8;
   --kaart-hoog: color-mix(in srgb, var(--brand-primary, #4f46e5) 78%, #0f1115 22%);
-  --kaart-leeg: #eef1f6;
+  --kaart-leeg: #e2e8f0;
   --kaart-rand: #ffffff;
   --kaart-hover: color-mix(in srgb, var(--brand-primary, #4f46e5) 78%, #0f1115 22%);
 

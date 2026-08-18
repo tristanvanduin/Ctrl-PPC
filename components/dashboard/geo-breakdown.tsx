@@ -1,17 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Globe2, Loader2, ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
-import { countryLabel } from "@/lib/countries";
-import { stateLabel } from "@/lib/geo/us-fips";
-import { isDemoMode } from "@/lib/demo/demo-mode";
-import { type GeoAgg } from "@/lib/demo/geo-demo";
 import { MapErrorBoundary } from "./map-error-boundary";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { GeoRanglijst } from "./geo-ranglijst";
+import { useGeoBreakdown, CHANNEL_LABEL, int, eur, pct, nf, type Channel } from "@/lib/geo/use-geo-breakdown";
 
 // De kaarten (SVG + geometrie + d3-geo) client-only en code-split laden: pas geladen als deze
 // weergave rendert, en nooit tijdens SSR.
@@ -29,29 +26,14 @@ const UsStatesMap = dynamic(() => import("./us-states-map"), {
 // herordenen + herkleuren ernaar. Klik op de VS om in te zoomen op de staten (drilldown).
 // Werkt per kanaal: Google toont echte landdata; Meta/LinkedIn/blended tonen demo-geo tot de sync
 // er is (Laag 2). Ratio's altijd uit de landtotalen, nooit uit een gemiddelde van maand-deelwaarden.
+//
+// De state (fetch, metric-keuze, drilldown-focus) zit sinds 17.36 in lib/geo/use-geo-breakdown.ts:
+// de opener op Google Overzicht zet kaart en ranglijst in TWEE aparte kolommen (geo-map-card.tsx +
+// geo-ranglijst-card.tsx) en heeft daarvoor dezelfde hook-aanroep nodig zonder de data twee keer op
+// te halen. Dit component blijft de ATOMAIRE kaart+ranglijst-samen-versie voor de drie plekken waar
+// dat nog klopt (cross-channel, Meta, LinkedIn) -- puur een verhuizing van bestaande logica.
 
-type Channel = "google" | "meta" | "linkedin" | "blended";
-
-type MetricKey = "impressions" | "clicks" | "ctr" | "conversions" | "conversionRate" | "cpa";
-interface MetricDef { key: MetricKey; label: string; higherIsBetter: boolean; value: (a: GeoAgg) => number | null; fmt: (v: number | null) => string }
-
-const nf = (d = 0) => new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d });
-const eur = (v: number | null) => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v));
-const pct = (v: number | null) => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 2 }).format(v));
-const int = (v: number | null) => (v == null || !Number.isFinite(v) ? "—" : nf(0).format(v));
-
-const METRICS: MetricDef[] = [
-  { key: "impressions", label: "Vertoningen", higherIsBetter: true, value: (a) => a.impressions, fmt: int },
-  { key: "clicks", label: "Klikken", higherIsBetter: true, value: (a) => a.clicks, fmt: int },
-  { key: "ctr", label: "CTR", higherIsBetter: true, value: (a) => (a.impressions > 0 ? a.clicks / a.impressions : null), fmt: pct },
-  { key: "conversions", label: "Conversies", higherIsBetter: true, value: (a) => a.conversions, fmt: (v) => (v == null ? "—" : nf(1).format(v)) },
-  { key: "conversionRate", label: "Conversieratio", higherIsBetter: true, value: (a) => (a.clicks > 0 ? a.conversions / a.clicks : null), fmt: pct },
-  { key: "cpa", label: "CPA", higherIsBetter: false, value: (a) => (a.conversions > 0 ? a.cost / a.conversions : null), fmt: eur },
-];
-
-const CHANNEL_LABEL: Record<Channel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", blended: "Alle kanalen" };
-
-export function GeoBreakdown({ clientId, channel = "google", verdieping, ranglijstOnder = false }: {
+export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
   clientId: string;
   channel?: Channel;
   /**
@@ -62,101 +44,19 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping, ranglij
    * te kijken. In dezelfde kaart is het één blok met twee uitklappers.
    */
   verdieping?: ReactNode;
-  /**
-   * Ranglijst onder de kaart i.p.v. ernaast (17.35). Alleen de opener op Google Overzicht gebruikt
-   * dit: daar staat de kaart in een 6/12-kolom naast pacing+donut, en een vaste 17rem-ranglijst
-   * ernaast liet nog maar ~360px over voor de kaart zelf. Op de andere drie plekken (cross-channel,
-   * Meta, LinkedIn) staat GeoBreakdown solo over de volle breedte, waar "naast" nog steeds klopt --
-   * vandaar een prop en geen algehele omzetting.
-   */
-  ranglijstOnder?: boolean;
 }) {
-  const [metricKey, setMetricKey] = useState<MetricKey>("conversions");
-  const [focus, setFocus] = useState<"US" | null>(null); // null = wereld, "US" = staten-drilldown
+  const { metricKey, setMetricKey, metric, focus, setFocus, countries, laden, canDrillUs, labelOf, geoWord, ranked, values, totaal, eenLandOfMinder } =
+    useGeoBreakdown({ clientId, channel });
   // De tabel begint dicht: de kaart is het antwoord op "waar komt het vandaan", de tabel is de
   // naslag erachter. Vijftig landregels tussen twee kaarten in maakt de pagina onleesbaar.
   const [tabelOpen, toggleTabel] = useRememberedOpen("geo-tabel", false);
-  const metric = METRICS.find((m) => m.key === metricKey)!;
-
-  // Beide niveaus via /api/geo, dat per (kanaal, niveau) de juiste tabel kiest — zie
-  // lib/geo/geo-source.ts. Dat lag er al, maar dit component las het niet: landen kwamen uit de
-  // client-data-provider en staten kwamen ALLEEN uit de demo-mock. Buiten demo was `states` dus
-  // altijd leeg, waardoor de klik op de VS niets deed — geen kapotte kaart, maar een dood
-  // eindpunt dat er wél uitzag als een knop.
-  //
-  // De staten worden meteen meegehaald en niet pas bij de klik: alleen zo weet de kaart óf de
-  // drilldown iets oplevert, en pas dan mag de uitnodiging "klik op de VS" er staan.
-  const [countries, setCountries] = useState<GeoAgg[]>([]);
-  const [states, setStates] = useState<GeoAgg[]>([]);
-  const [laden, setLaden] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLaden(true);
-    const demoParam = isDemoMode() ? "&demo=1" : "";
-    const haal = (level: "country" | "region") =>
-      fetch(`/api/geo?clientId=${encodeURIComponent(clientId)}&channel=${channel}&level=${level}${demoParam}`)
-        .then((r) => (r.ok ? r.json() : { rows: [] }))
-        .then((d) => (Array.isArray(d?.rows) ? (d.rows as GeoAgg[]) : []))
-        .catch(() => [] as GeoAgg[]);
-
-    Promise.all([haal("country"), haal("region")]).then(([land, staat]) => {
-      if (cancelled) return;
-      setCountries(land);
-      setStates(staat);
-      setLaden(false);
-    });
-    return () => { cancelled = true; };
-  }, [clientId, channel]);
-
-  const canDrillUs = states.length > 0 && countries.some((c) => c.code === "US");
-
-  const active = focus === "US" ? states : countries;
-  const labelOf = focus === "US" ? stateLabel : countryLabel;
-  const geoWord = focus === "US" ? "staat" : "land";
-
-  const ranked = useMemo(() => {
-    return active
-      .map((c) => ({ c, v: metric.value(c) }))
-      .filter((x) => x.v != null && Number.isFinite(x.v))
-      // Sorteer op de metric: bij "hoger is beter" aflopend, bij CPA oplopend (goedkoopst eerst).
-      .sort((a, b) => (metric.higherIsBetter ? (b.v! - a.v!) : (a.v! - b.v!)));
-  }, [active, metric]);
-
-  // Waarde per code (alpha-2-land óf USPS-staat) voor de kaart-inkleuring van de gekozen metric.
-  const values = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const { c, v } of ranked) if (v != null && Number.isFinite(v)) m.set(c.code, v);
-    return m;
-  }, [ranked]);
-
-  const totaal = useMemo(() => {
-    const t = { impressions: 0, clicks: 0, cost: 0, conversions: 0 };
-    for (const { c } of ranked) {
-      t.impressions += c.impressions; t.clicks += c.clicks;
-      t.cost += c.cost; t.conversions += c.conversions;
-    }
-    return t;
-  }, [ranked]);
-
-  // De aandeelstreep staat in de kolom die je zelf hebt gekozen — dezelfde metric die de kaart
-  // inkleurt. Zo lezen kaart en tabel hetzelfde verhaal in plaats van elk een eigen.
-  //
-  // Alleen bij optelbare grootheden. CTR, conversieratio en CPA zijn verhoudingen: daar bestaat
-  // GEEN AANDEELBALKEN IN DEZE TABEL. Ze stonden er wel, op de gekozen metric -- maar de ranglijst
-  // naast de kaart draagt precies diezelfde streep, voor dezelfde landen, in dezelfde volgorde.
-  // Twee keer hetzelfde beeld laat een lezer zoeken naar het verschil dat er niet is.
-  //
-  // De taakverdeling is nu: de LIJST toont de verhouding (rangorde + balk, één metric), de TABEL
-  // toont de cijfers naast elkaar (zes metrics, geen beeld). Dat zijn twee vragen en daarom twee
-  // vormen; hetzelfde onderscheid als tussen de kaart en de lijst.
 
   // Tijdens het laden nog niets concluderen: "één of geen land" was anders even waar voor elke
   // klant, en dan knippert de kaart weg en weer terug.
   if (laden) {
     return <Laadvlak vorm="grafiek" hoogte={220} titel="Waar komt het vandaan" />;
   }
-  if (countries.length <= 1) return null; // één (of geen) land: geen geo-verhaal
+  if (eenLandOfMinder) return null; // één (of geen) land: geen geo-verhaal
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -179,10 +79,17 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping, ranglij
           Toon
           <select
             value={metricKey}
-            onChange={(e) => setMetricKey(e.target.value as MetricKey)}
+            onChange={(e) => setMetricKey(e.target.value as typeof metricKey)}
             className="rounded-md border border-border bg-card px-2 py-1 text-body font-medium text-brand-gray focus:outline-none focus:ring-1 focus:ring-brand-blue"
           >
-            {METRICS.map((m) => (
+            {[
+              { key: "conversions", label: "Conversies" },
+              { key: "impressions", label: "Vertoningen" },
+              { key: "clicks", label: "Klikken" },
+              { key: "ctr", label: "CTR" },
+              { key: "conversionRate", label: "Conversieratio" },
+              { key: "cpa", label: "CPA" },
+            ].map((m) => (
               <option key={m.key} value={m.key}>{m.label}</option>
             ))}
           </select>
@@ -197,11 +104,8 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping, ranglij
           ranglijst zegt WIE DE GROOTSTE IS en hoeveel dat scheelt. Dat tweede leest niemand van
           een projectie af -- daar wint Groenland altijd. De ruimte naast een kaart van 680px was
           op een breed scherm leeg; nu draagt hij de cijfers die anders een klik weg zaten. */}
-      <div className={ranglijstOnder
-        ? "flex flex-col gap-5 px-3 py-3"
-        : "grid grid-cols-1 gap-5 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_17rem]"
-      }>
-      <div className={ranglijstOnder ? "w-full" : "w-full max-w-[680px] mx-auto"}>
+      <div className="grid grid-cols-1 gap-5 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="w-full max-w-[680px] mx-auto">
         {ranked.length === 0 ? (
           <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
         ) : (
