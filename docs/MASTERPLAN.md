@@ -2997,3 +2997,24 @@ dat een homogene groep een scherpere synthese oplevert, wat de aanleiding was vo
 nieuwe verplichte velden; nieuwe assertions bevestigen dat de systeemprompt de
 bedrijfsmodel-waarschuwing bevat en dat de userMessage het bedrijfsmodel (of "onbekend") per klant
 toont. `npx tsc --noEmit` schoon, alle 34 assertions slagen (was 31; 3 nieuwe checks toegevoegd).
+
+**Echte data ingevuld voor 7 klanten (18 augustus), rechtstreeks in `client_settings`, geen
+codewijziging.** De eigenaar gaf de echte bedrijfsmodellen en niches voor de klanten die in 17.16
+en hierboven getest zijn — precies het veld dat grotendeels leeg bleek te staan. Rechtstreeks
+weggeschreven via een wegwerpscript met de service-role-key (niet via de Management-API dit keer,
+gewoon een PostgREST-update — geen migratie nodig voor een databewerking):
+
+| Klant | Bedrijfsmodel | Niche | Op basis van |
+|---|---|---|---|
+| Broedservice | b2c | `huisdieren` | broedmachines (geen exacte match in de vaste lijst, dichtstbijzijnde gekozen) |
+| Minismus | b2c | `wonen` | badkamer-/huisgadgets (douchedeurafdichtingen, wc-rolhouders) |
+| MPC - UK | b2c | `elektronica` | telefoonhoesjes |
+| Mobiliteitexpert | b2c | `zorg_overig` | mobiliteitshulpmiddelen (rolstoelen, rollators, wc-verhogers) |
+| GoedeInnovaties - Confidenceforal | b2c | `mode` | anti-zweet kleding |
+| GoedeInnovaties - Zeemeerminnenfeest ("Ocean Queens") | b2c | `sport` | zeemeerminnenstaarten |
+| GoedeInnovaties - Wobblez | b2c | `wonen` | ergonomische wiebelkrukken |
+
+Geen van deze zeven had al een niche; twee (MPC-UK, Minismus) hadden via de oude `sector`-kolom al
+`bedrijfsmodel: b2c` staan, de rest kreeg het nu pas. Dit zijn precies de klanten die de 17.16/17.17
+live-tests gebruikten, dus de portfolio-synthese voor Ranking Masters ziet vanaf nu bij de
+eerstvolgende run een echt bedrijfsmodel/niche in plaats van "onbekend" voor deze zeven.
