@@ -3107,3 +3107,68 @@ al-gesyncte data (géén live Google Ads-aanroep nodig, zie 17.19's aanleiding h
 synthese zelf via de echte, ongewijzigde `runPortfolioSynthesis()`-functie, alleen buiten de
 HTTP-auth-wrapper om waar geen testsessie voor was (zie 17.18). Kernpijplijn dus volledig echt
 getest; alleen de dunne routelaag niet.
+
+### 17.20 GRT/GRA/GRN als 3 losse klanten: de sync-onafhankelijke testroute
+
+De eigenaar accepteerde de aprilse sync-stilstand als permanent ("de sync gaat nooit gefixt
+worden") en vroeg om vanaf nu op de demo/mock-data te testen in plaats van te wachten op een
+sync-herstel: de geo-clones van de bestaande demo-klant (GRT/GRA/GRN, GreenTech Amsterdam/
+Americas/North America) als 3 losse klanten door de volledige pijplijn — eigen SOP per klant,
+daarna cross-account — met de aanname dat ze in dezelfde sector/niche zitten.
+
+**GRT/GRA/GRN bestonden niet als aparte `client_id`'s.** Het zijn campagnenaam-prefixes binnen
+één demo-klant (`demo-greentech`), gedetecteerd via `lib/fair/geo-clone-catalog.ts` — precies het
+mechanisme dat `geo-clone-context.ts` (17.14) al gebruikt om ze BINNEN één klant-SOP apart te
+houden. Voor 3 losse SOP's + een echte cross-account-synthese (die op `client_id` sleutelt) was dat
+onvoldoende; er moesten 3 echte, aparte `client_id`'s komen.
+
+**Eerst de bron ververst, niet de oude rijen hergebruikt.** `scripts/demo/seed-demo-client.ts`
+bleek al te bestaan — een volwaardig, op "vandaag" verankerd seed-script voor `demo-greentech`,
+per-detector ontworpen (S1–S13, zie het bestand zelf). Opnieuw gedraaid vóór het splitsen, zodat de
+brondata voor GRT/GRA/GRN maximaal actueel is (vandaag, 18 augustus) in plaats van de dag-of-twee
+oudere rijen die al in de database stonden — direct het "zo actueel mogelijk"-verzoek.
+
+**Splitsing en de twee schrijflagen die dat blootlegde.** Een nieuw, wegwerpbaar script
+(`_seed_geoclone_clients.ts`, verwijderd na afloop) maakte 3 `accounts`-rijen aan (bureau: "Demo",
+licentie growth) met `client_settings.bedrijfsmodel: "b2b"` en `niche: "industrie"` voor alle drie
+identiek — de expliciete "zelfde sector en niche"-aanname, niet gegokt. Campagnerijen gesplitst op
+campagne-ID (GRT: Search NL + Performance Max; GRA: Search US; GRN: Search NA; de twee
+niet-geo-gebonden campagnes "GreenTech | Brand" en "GreenTech | Display | Prospecting" bewust
+buiten alle drie gehouden — die horen bij geen van de geo-clones specifiek). Twee schrijflagen
+bleken nodig, ontdekt via een eerste mislukte poging:
+1. `ads_campaign_monthly`/`ads_account_monthly` zijn views over `fact_core` (migratie 054, zie
+   `lib/data-access/feitentabellen.ts`); schrijven moet naar `*_legacy`, en de projectie naar
+   `fact_core` gebeurt via de RPC `refresh_fact_from_legacy(p_client_id)` — normaal door de sync
+   zelf aangeroepen, hier expliciet per pseudo-klant gedraaid.
+2. `checkDataFreshness()` (de preflight vóór elke analyse) eist ook `ads_account_weekly` en een
+   `client_sync_status`-rij; zonder die twee gaf de echte route terecht "Geen Google Ads data",
+   ook al stonden de campagnerijen er al. Beide alsnog gezaaid (weekrijen afgeleid uit de eigen
+   maandrijen van elke pseudo-klant, niet uit iets anders).
+
+**Resultaat: 3/3 geslaagd via de echte route, geen enkele workaround in de analysecode zelf** — de
+twee ontbrekende stukken waren allebei echte, al bestaande vereisten van de pijplijn die de test
+alsnog moest vervullen, niet iets dat omzeild is.
+
+**De cross-account-synthese vond zelf het onderscheid dat de sectoraanname mogelijk maakte.**
+`runPortfolioSynthesis()` (rechtstreeks aangeroepen, zelfde auth-beperking als 17.18/17.19) leverde
+een scherpe, niet-triviale synthese: GRA en GRN bleken een IDENTIEKE meetfout te delen
+(`conversions_value: 0` in de demo-brondata → ROAS 0,00x bij beide), terwijl GRT een heel ander,
+wél diagnosticeerbaar probleem heeft (97% dagbudgetbenutting, 28% impression share verloren op
+budget). Het model gebruikte de "zelfde sector"-aanname expliciet en correct: *"Alle drie de
+klanten zijn B2B in industrie & productie, dus de vergelijking is inhoudelijk geldig"* — en
+trok vervolgens zelf de scheidslijn niet langs sector (die was overal gelijk) maar langs
+oorzaak (meting vs. vraag), inclusief een expliciete waarschuwing om Amsterdam niet in dezelfde
+schaalstop mee te trekken als de twee Amerika-accounts.
+
+**Volledig opgeruimd na afloop**, zelfde discipline als 5.5/17.16: alle 3 pseudo-`accounts`-rijen,
+hun `client_settings`, alle campagne-/account-/weekrijen, `client_sync_status`,
+`sop_analysis_output` én de bijbehorende `agency_analysis_output`-rij verwijderd. Geen spoor
+achtergebleven; de brondata van `demo-greentech` zelf is ongemoeid (alleen ververst, niet
+gesplitst — de geo-clone-context-detectie binnen die ene klant blijft ongewijzigd werken).
+
+**Wat dit structureel oplevert**: een sync-onafhankelijke testroute voor de volledige pijplijn
+(los SOP + cross-account) die niet wacht op een echte klantkoppeling. Het seed/split/projecteer/
+opruim-patroon hierboven is een keer uitgevoerd, niet (nog) een herbruikbaar script — bij een
+volgende testronde is het overwegen waard om dit als een echt, benoemd scriptpaar
+(`scripts/demo/seed-geoclone-clients.ts` + teardown) vast te leggen in plaats van elke keer
+opnieuw te schrijven en weer weg te gooien.
