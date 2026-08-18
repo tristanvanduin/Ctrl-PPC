@@ -1,13 +1,13 @@
-// Test voor de twee Decision Brief-documenten (masterplan 17.22). Deterministisch, geen IO --
-// test de pure buildClientDecisionBrief()/buildAgencyPortfolioBrief(), niet de generate*()-
+// Test voor de twee Decision Brief-documenten (masterplan 17.22-17.23). Deterministisch, geen IO
+// -- test de pure buildClientDecisionBrief()/buildAgencyPortfolioBrief(), niet de generate*()-
 // functies die zelf Supabase aanroepen.
 // Draaien: npx tsx lib/analysis/__decision_brief_test.ts
 
 import {
   buildClientDecisionBrief, buildAgencyPortfolioBrief,
   renderClientDecisionBriefMarkdown, renderAgencyPortfolioBriefMarkdown,
-  anonymizePatternText, wordCountForClientBrief, countWords, truncateWords,
-  type ClientBriefInput, type AgencyRosterEntry,
+  wordCountForClientBrief, countWords, truncateWords,
+  type ClientBriefInput,
 } from "./decision-brief";
 import type { FinalSopSynthesis, OperatingDetailLayer } from "./monthly-structured";
 import type { PortfolioSynthesisResult } from "./portfolio-synthesis";
@@ -114,19 +114,14 @@ console.log("\nGeen beslisregel verzonnen zonder operatingDetail");
   check("markdown meldt dat eerlijk", renderClientDecisionBriefMarkdown(brief).includes("Geen beslisregel beschikbaar"));
 }
 
-console.log("\nAnonimisering: een sibling-naam komt NOOIT in het klantdocument terecht");
+console.log("\nPortfolio-context: geen anonimisering (blijft intern bij het bureau), wel relevantiefilter");
 {
-  const roster: AgencyRosterEntry[] = [
-    { clientId: "gra", accountName: "GreenTech Americas (GRA)" },
-    { clientId: "grn", accountName: "GreenTech North America (GRN)" },
-    { clientId: "grt", accountName: "GreenTech Amsterdam (GRT)" },
-  ];
+  // Masterplan 17.23: cross-account-analyse binnen ÉÉN bureau hoeft niet anoniem (zelfde besluit
+  // als portfolio-synthesis.ts zelf al vastlegt) -- Document 1 is intern naslagwerk voor de
+  // specialist, niet iets dat ongefilterd naar de eindklant gaat. Echte namen mogen dus gewoon
+  // blijven staan. De relevantiefilter (alleen tonen als het patroon over DIT account gaat)
+  // blijft wel bestaan, puur om het document gefocust te houden.
   const patroon = "GreenTech Americas (GRA) en GreenTech North America (GRN) delen dezelfde meetfout -- conversiewaarde ontbreekt.";
-  const geanonimiseerd = anonymizePatternText(patroon, "grt", roster);
-  check("geen 'GRA' meer in de tekst", !geanonimiseerd.includes("GRA"), geanonimiseerd);
-  check("geen 'GRN' meer in de tekst", !geanonimiseerd.includes("GRN"), geanonimiseerd);
-  check("de opeenvolgende vervangingen zijn samengevoegd tot 'gekoppelde accounts'", geanonimiseerd.toLowerCase().includes("gekoppelde accounts"), geanonimiseerd);
-
   const portfolio: PortfolioSynthesisResult = {
     headline: "", narrative: "",
     recurring_patterns: [patroon],
@@ -136,23 +131,23 @@ console.log("\nAnonimisering: een sibling-naam komt NOOIT in het klantdocument t
     markdown: "",
   };
   const finalSop = maakFinalSop({ routes: ["containment"] });
+
   // GRT zelf komt niet voor in het patroon (dat gaat over GRA en GRN) -- hoort dus GEEN
-  // portfolio-context te tonen, in plaats van 'm generiek te tonen voor een account waar het
-  // patroon niet aantoonbaar over gaat.
+  // portfolio-context te tonen, ongeacht anonimisering: het patroon is niet aantoonbaar over GRT.
   const briefGrt = buildClientDecisionBrief(
     { clientId: "grt", accountName: "GreenTech Amsterdam (GRT)", finalSop },
-    { period: "", portfolio, agencyRoster: roster }
+    { period: "", portfolio }
   );
   check("GRT zelf ziet geen portfolio-context (patroon gaat niet over GRT)", briefGrt.portfolioContext.length === 0, JSON.stringify(briefGrt.portfolioContext));
 
   const briefGra = buildClientDecisionBrief(
     { clientId: "gra", accountName: "GreenTech Americas (GRA)", finalSop },
-    { period: "", portfolio, agencyRoster: roster }
+    { period: "", portfolio }
   );
   check("GRA ziet wel portfolio-context (patroon gaat over GRA)", briefGra.portfolioContext.length === 1, JSON.stringify(briefGra.portfolioContext));
-  check("die context noemt GRN nergens bij naam", !briefGra.portfolioContext.some((l) => l.includes("GRN") || l.includes("North America")), JSON.stringify(briefGra.portfolioContext));
+  check("die context noemt GRN gewoon bij naam (geen anonimisering, blijft intern)", briefGra.portfolioContext.some((l) => l.includes("GRN")), JSON.stringify(briefGra.portfolioContext));
   const mdGra = renderClientDecisionBriefMarkdown(briefGra);
-  check("de gerenderde markdown van GRA bevat geen 'GRN' of 'North America'", !mdGra.includes("GRN") && !mdGra.includes("North America"), mdGra);
+  check("de gerenderde markdown van GRA toont de echte patroontekst inclusief GRN", mdGra.includes("GRN"), mdGra);
 }
 
 console.log("\nAgency Portfolio Brief: macro matrix + synthese, geen per-klant diagnose");

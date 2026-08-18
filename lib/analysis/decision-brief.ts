@@ -11,23 +11,26 @@
 //
 // ── WAAROM TWEE FUNCTIES EN TWEE TYPES, NIET ÉÉN GEDEELD DOCUMENT ───────────────────────────
 //
-// Het klantdocument moet veilig zijn om rechtstreeks met DIE ene klant te delen -- dus mag het
-// NOOIT namen of data van andere accounts bevatten. Het bureaudocument bestaat juist om alle
-// accounts naast elkaar te tonen. Dat is geen stijlverschil maar een harde scheiding: een gedeeld
-// type zou een toekomstige wijziging aan het bureaudocument per ongeluk in het klantdocument
-// kunnen laten lekken. Vandaar ClientDecisionBrief en AgencyPortfolioBrief als losse types, met
-// losse markdown- en PDF-renderers, en losse generate*-functies die zelf hun eigen data ophalen.
+// Het klantdocument (Document 1) is naslagwerk VOOR DE SPECIALIST, binnen het bureau -- het gaat
+// niet ongefilterd naar de eindklant. De eindklant krijgt zijn eigen, al bestaande
+// maandrapportage (dezelfde week, soms dezelfde dag), die al 100% klantgericht is; een los
+// klantexportformaat zou grotendeels dubbelop zijn en is bewust niet gebouwd. Mocht een bureau
+// ooit willen "pronken" met een analyse naar een klant toe, is dat een apart, later te bouwen
+// stuk werk met eigen eisen (taal zonder interne decision-engine-termen als "Primary Thread" of
+// "Containment", net als de standaardregel voor de website: nooit de echte werking, alleen
+// impact en voordelen) -- niet dit document.
 //
-// ── ANONIMISERING IS ECHTE REDACTIE, GEEN PARAFRASE ─────────────────────────────────────────
+// Twee losse types (ClientDecisionBrief, AgencyPortfolioBrief) blijft desondanks de juiste keus:
+// Document 1 gaat over ÉÉN account, Document 2 toont het hele bureau naast elkaar. Een gedeeld
+// type zou die twee vormen onnodig aan elkaar knopen.
 //
-// "Injecteer portfolio-context uitsluitend anoniem" kan op twee manieren: een taalmodel de
-// portfolio-tekst laten herschrijven (kost een call, en een parafrase kan alsnog een naam laten
-// staan als het model niet perfect is), of deterministisch elke bekende klantnaam/-id uit het
-// bureau vervangen door een neutrale term VOORDAT de tekst in het klantdocument komt. Dit bestand
-// doet het laatste: anonymizePatternText() kent de volledige klantenlijst van het bureau (nodig om
-// uberhaupt te weten wát er verwijderd moet worden) en vervangt exact die namen. Dat is
-// verifieerbaar veilig; een parafrase is dat niet. Zie __decision_brief_test.ts voor het bewijs
-// dat een sibling-naam nooit in het klantdocument terechtkomt.
+// ── GEEN ANONIMISERING NODIG -- BLIJFT BINNEN ÉÉN BUREAU ────────────────────────────────────
+//
+// Cross-account-analyse BINNEN één bureau hoeft niet anoniem (zelfde besluit als
+// portfolio-synthesis.ts zelf al vastlegt): het bureau heeft al volledige inzage in elk van zijn
+// eigen klanten. Alleen God View en eventuele toekomstige cross-BUREAU-features (die data van
+// MEERDERE bureaus combineren) hebben k-anonimiteit nodig. Beide Decision Brief-documenten blijven
+// intern bij één bureau, dus tonen ze portfolio-patronen en klantnamen gewoon, onveranderd.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FinalSopSynthesis, OperatingDetailLayer, FinalSopRoute } from "./monthly-structured";
@@ -119,31 +122,6 @@ function buildDecisionRule(operatingDetail: OperatingDetailLayer | null | undefi
   };
 }
 
-// ── Anonimisering ────────────────────────────────────────────────────────────────────────────
-
-export interface AgencyRosterEntry {
-  clientId: string;
-  accountName: string;
-}
-
-/** Vervangt elke bekende naam/id van een ANDER account in `roster` door een neutrale term.
- *  `thisClientId` wordt bewust overgeslagen -- een klant mag zijn eigen naam wel zien. Sorteert
- *  op lengte (langste eerst) zodat "MPC - UK" niet half blijft staan doordat "MPC" al elders
- *  geraakt is. */
-export function anonymizePatternText(text: string, thisClientId: string, roster: readonly AgencyRosterEntry[]): string {
-  const others = roster.filter((r) => r.clientId !== thisClientId);
-  const namen = others.flatMap((r) => [r.accountName, r.clientId]).filter((n) => n.length >= 3);
-  namen.sort((a, b) => b.length - a.length);
-  let result = text;
-  for (const naam of namen) {
-    const pattern = new RegExp(naam.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-    result = result.replace(pattern, "een gekoppeld account");
-  }
-  // "een gekoppeld account en een gekoppeld account" / "..., een gekoppeld account" -> "gekoppelde accounts"
-  result = result.replace(/(een gekoppeld account(,? en | en |, )){1,}een gekoppeld account/gi, "gekoppelde accounts");
-  return result;
-}
-
 // ── DOCUMENT 1: Client Decision Brief ───────────────────────────────────────────────────────
 
 export interface ClientDecisionBrief {
@@ -156,9 +134,10 @@ export interface ClientDecisionBrief {
   whatIsNotTheProblem: string;
   sprintActions: ClientSprintActions;
   decisionRule: ClientDecisionRule | null;
-  /** Anonieme portfolio-/benchmarkcontext, 0-2 regels. Nooit een naam van een ander account --
-   *  zie anonymizePatternText(). Leeg als er geen portfolio-synthese is of als dit account in
-   *  geen enkel patroon voorkomt. */
+  /** Portfolio-/benchmarkcontext van het bureau, 0-2 regels, alleen patronen die aantoonbaar OVER
+   *  dit account gaan (eigen naam/id in de patroontekst). Geen anonimisering -- dit document
+   *  blijft intern bij het bureau, zie de toelichting bovenaan dit bestand. Leeg als er geen
+   *  portfolio-synthese is of als dit account in geen enkel patroon voorkomt. */
   portfolioContext: string[];
 }
 
@@ -172,20 +151,19 @@ export interface ClientBriefInput {
 function buildPortfolioContext(
   clientId: string,
   accountName: string,
-  portfolio: PortfolioSynthesisResult | null | undefined,
-  roster: readonly AgencyRosterEntry[]
+  portfolio: PortfolioSynthesisResult | null | undefined
 ): string[] {
-  if (!portfolio || roster.length === 0) return [];
+  if (!portfolio) return [];
   const naam = accountName.toLowerCase();
   const id = clientId.toLowerCase();
   const lines: string[] = [];
   for (const pattern of portfolio.recurring_patterns) {
     const gaatOverDitAccount = pattern.toLowerCase().includes(naam) || pattern.toLowerCase().includes(id);
     // Alleen tonen als het patroon aantoonbaar OVER dit account gaat (eigen naam/id erin) -- een
-    // patroon dat alleen ANDERE accounts noemt is niet relevant voor dit account en hoort niet
-    // generiek getoond te worden, ook niet geanonimiseerd.
+    // patroon dat alleen ANDERE accounts noemt is niet relevant voor dit account, ook al hoeft
+    // het niet geanonimiseerd te worden.
     if (!gaatOverDitAccount) continue;
-    lines.push(anonymizePatternText(pattern, clientId, roster));
+    lines.push(pattern);
   }
   return lines.slice(0, 2).map((l) => truncateWords(l, 24));
 }
@@ -194,7 +172,7 @@ function buildPortfolioContext(
  *  aanroepen. generateClientDecisionBrief() hieronder haalt de data op en roept dit aan. */
 export function buildClientDecisionBrief(
   input: ClientBriefInput,
-  opts: { period: string; portfolio?: PortfolioSynthesisResult | null; agencyRoster?: readonly AgencyRosterEntry[] }
+  opts: { period: string; portfolio?: PortfolioSynthesisResult | null }
 ): ClientDecisionBrief {
   const { finalSop, operatingDetail } = input;
   return {
@@ -210,7 +188,7 @@ export function buildClientDecisionBrief(
     ),
     sprintActions: buildSprintActions(finalSop),
     decisionRule: buildDecisionRule(operatingDetail),
-    portfolioContext: buildPortfolioContext(input.clientId, input.accountName, opts.portfolio, opts.agencyRoster ?? []),
+    portfolioContext: buildPortfolioContext(input.clientId, input.accountName, opts.portfolio),
   };
 }
 
@@ -231,7 +209,9 @@ interface StructuredMonthlyRow {
 /**
  * Haalt zelf op wat er nodig is en bouwt het klantdocument: de laatste monthly
  * structured_monthly_v2 van deze klant, plus (als het bureau er een heeft) de laatste
- * portfolio-synthese van het bureau, alleen om er anoniem patroon-context uit te lichten.
+ * portfolio-synthese van het bureau, om er patroon-context uit te lichten die over dit account
+ * gaat. Dit document blijft intern bij het bureau (zie de toelichting bovenaan dit bestand), dus
+ * geen anonimisering en geen aparte klantenlijst-fetch nodig.
  *
  * Null als deze klant geen monthly final_sop heeft -- geen verzonnen brief.
  */
@@ -263,32 +243,27 @@ export async function generateClientDecisionBrief(
   if (!parsed.final_sop) return null;
 
   let portfolio: PortfolioSynthesisResult | null = null;
-  let roster: AgencyRosterEntry[] = [];
   if (agencyId) {
-    const [portfolioRes, accountsRes] = await Promise.all([
-      supabase
-        .from("agency_analysis_output")
-        .select("output")
-        .eq("agency_id", agencyId)
-        .eq("section", "portfolio_synthesis_v1")
-        .order("analysis_date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase.from("accounts").select("client_id, name").eq("agency_id", agencyId),
-    ]);
-    if (portfolioRes.data?.output) {
+    const { data } = await supabase
+      .from("agency_analysis_output")
+      .select("output")
+      .eq("agency_id", agencyId)
+      .eq("section", "portfolio_synthesis_v1")
+      .order("analysis_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data?.output) {
       try {
-        portfolio = (typeof portfolioRes.data.output === "string" ? JSON.parse(portfolioRes.data.output) : portfolioRes.data.output) as PortfolioSynthesisResult;
+        portfolio = (typeof data.output === "string" ? JSON.parse(data.output) : data.output) as PortfolioSynthesisResult;
       } catch {
         portfolio = null;
       }
     }
-    roster = (accountsRes.data ?? []).map((r) => ({ clientId: String(r.client_id), accountName: String(r.name ?? r.client_id) }));
   }
 
   return buildClientDecisionBrief(
     { clientId, accountName, finalSop: parsed.final_sop, operatingDetail: parsed.operating_detail },
-    { period: formatPeriod(String(sopRow.period_start ?? ""), String(sopRow.period_end ?? "")), portfolio, agencyRoster: roster }
+    { period: formatPeriod(String(sopRow.period_start ?? ""), String(sopRow.period_end ?? "")), portfolio }
   );
 }
 

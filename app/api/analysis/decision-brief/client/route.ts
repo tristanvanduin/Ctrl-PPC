@@ -1,7 +1,6 @@
-// Document 1: Client Decision Brief (masterplan 17.22). Veilig om rechtstreeks met de klant zelf
-// te delen -- bevat nooit data of namen van andere accounts (zie anonymizePatternText() in
-// lib/analysis/decision-brief.ts). Losse route van het bureaudocument, met eigen toegangscontrole
-// per klant.
+// Document 1: Client Decision Brief (masterplan 17.22-17.23). Naslagwerk voor de specialist,
+// intern bij het bureau -- gaat niet ongefilterd naar de eindklant (die krijgt de bestaande
+// maandrapportage). Losse route van het bureaudocument, met eigen toegangscontrole per klant.
 
 import { NextRequest } from "next/server";
 import { requireClientAccess } from "@/lib/auth/server";

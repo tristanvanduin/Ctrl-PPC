@@ -3289,3 +3289,37 @@ volledige `scripts/gates.sh` groen.
 scope-check, `requireClientAccess` — zelfde patroon als andere klant-specifieke routes) en
 `GET /api/analysis/decision-brief/agency?agency_id=...` (client:read + eigen-bureau-check). De
 oude, gecombineerde `/api/analysis/decision-brief`-route is vervangen, niet ernaast gehouden.
+
+### 17.23 De anonimisering uit 17.22 alsnog verwijderd: cross-account binnen één bureau hoeft niet anoniem
+
+Een vervolgvraag legde een verkeerde aanname in 17.22 bloot. Die sectie beschreef de
+anonimisering in `ClientDecisionBrief` als iets dat "andere cross-account-features (God View,
+benchmarks)" zouden moeten hergebruiken — te ruim gesteld. De echte regel, die al vastligt in
+`portfolio-synthesis.ts` zelf sinds 17.15: **cross-account-analyse BINNEN één bureau hoeft niet
+anoniem** (het bureau heeft al volledige inzage in zijn eigen klanten); **alleen God View en
+eventuele toekomstige cross-BUREAU-features hebben k-anonimiteit nodig** (die combineren data van
+meerdere, van elkaar onafhankelijke bureaus).
+
+**De vervolgvraag die dit blootlegde**: gaat Document 1 (Client Decision Brief) letterlijk naar de
+eindklant, of blijft het intern? Beantwoord: intern, naslagwerk voor de specialist. Reden,
+eigen woorden van de eigenaar: de bestaande maandrapportage is al 100% voor de klant en verschijnt
+in dezelfde week — soms dezelfde dag. Een los, extra klantexportformaat van de SOP-uitkomst zou
+grotendeels dubbelop zijn. Bijkomend punt, zelf opgeworpen tijdens het gesprek: als er ooit wél een
+rechtstreeks-naar-de-klant-variant komt, moet niet alleen de anonimisering terugkomen maar ook de
+taal zelf herschreven worden — "Primary Thread"/"Containment"/"Accept if" is interne
+decision-engine-terminologie, en dat hoort een klant net zo min te zien als de rest van "de echte
+werking" (dezelfde regel als voor de website). Dat is bewust NIET nu gebouwd: een hypothetische
+toekomstige klantvariant vraagt eigen eisen, en wordt pas gebouwd als een bureau er echt om vraagt.
+
+**Gevolg voor de code**: `anonymizePatternText()` en `AgencyRosterEntry` volledig verwijderd uit
+`lib/analysis/decision-brief.ts` — geen dode/ongebruikte anonimiseringscode achterlaten "voor
+later". `buildPortfolioContext()` toont nu de patroontekst van het bureau ongewijzigd, met alleen
+de relevantiefilter behouden (een patroon wordt alleen getoond als het aantoonbaar OVER dit
+account gaat — dat filter bestaat om het document gefocust te houden, niet om te anonimiseren).
+`generateClientDecisionBrief()` hoeft niet langer de volledige klantroster van het bureau op te
+halen — één Supabase-round-trip minder.
+
+Test bijgewerkt: het anonimiseringsbewijs is vervangen door een test die bevestigt dat de
+patroontekst nu ongewijzigd (met échte klantnamen) doorkomt, met de relevantiefilter nog intact.
+40 assertions (was 43 — de 3 puur-anonimiseringsspecifieke checks vervielen met de functie zelf).
+`npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
