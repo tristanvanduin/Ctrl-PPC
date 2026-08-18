@@ -740,6 +740,25 @@
   }
 }
 
+/* ── Een buurman die niets rendert, mag geen gat achterlaten ────────────────
+ *
+ * De Google-opener (17.32) zet de geo-kaart (breed) en de Performance Max-ringen (smal) naast
+ * elkaar in één raster. De ringen-component rendert zelf `null` zonder Performance Max-data --
+ * juist, want een lege ring is erger dan geen ring. Maar in een raster laat een lege buurman wél
+ * zijn kolom staan: de kaart bleef op 8 van de 12 kolommen hangen met een kaal vlak ernaast, exact
+ * het soort rastergat dat scripts/check-kaartoverloop.mjs voor TEKST al bewaakt, hier voor RUIMTE.
+ *
+ * `:has()` + `:empty` lossen dit op zonder dat GoogleView hoeft te weten of PmaxNetworkSplit iets
+ * gaat tonen — die kennis leeft pas na een async databasecall, diep in dat component. De regel
+ * herkent aan de DOM zelf (geen kind-elementen in `.hero-ring`) dat er niets te tonen was, en
+ * laat de kaart in dat geval de volle breedte pakken.
+ */
+@layer base {
+  .hero-rij:has(> .hero-ring:empty) > .hero-kaart {
+    grid-column: 1 / -1;
+  }
+}
+
 /* ── Tabellen ──────────────────────────────────────────────────────────────
  *
  * Zeventien tabellen, en vier ervan zetten `tabular-nums`. Zonder dat zijn

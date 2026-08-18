@@ -274,11 +274,20 @@ export function buildAllRows(): Record<string, Row[]> {
 
   const campaignIdOf = (name: string) => `demo-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const r2 = (v: number) => Math.round(v * 100) / 100;
+  // Zelfde classificatie als hierbeneden al voor ads_campaign_impression_share gebeurt (SEARCH op
+  // de campagnes die daar met de hand zijn opgegeven) -- hier afgeleid uit de campagnenaam, want
+  // ads_campaign_monthly dekt ALLE campagnes uit googleMonthly(), niet alleen de drie met
+  // impression-share-data. Zonder deze kolom (die tot 17.32 overal null bleef) kan geen enkele
+  // "spend per campagnetype"-weergave iets tonen voor deze klant, ook al bestaat de data zelf al
+  // jaren -- gevonden bij het bouwen van precies zo'n weergave voor de Google-opener.
+  const campagneType = (naam: string): "SEARCH" | "PERFORMANCE_MAX" | "SHOPPING" | "DISPLAY" =>
+    naam.includes("Performance Max") ? "PERFORMANCE_MAX" : naam.includes("Display") ? "DISPLAY" : "SEARCH";
 
   const tables: Record<string, Row[]> = {};
 
   tables["ads_campaign_monthly"] = g.map((r) => ({
     client_id: DEMO_CLIENT, campaign_id: campaignIdOf(r.campaign), campaign_name: r.campaign, campaign_status: "ENABLED",
+    campaign_type: campagneType(r.campaign),
     month: monthsBack(r.monthIdx), impressions: r.imp, clicks: r.clicks, cost: r.cost, conversions: r.conv,
     conversions_value: r.value, ctr: r2(r.clicks / r.imp), avg_cpc: r2(r.cost / r.clicks),
     cost_per_conversion: r.conv > 0 ? r2(r.cost / r.conv) : null, conversion_rate: r2(r.conv / r.clicks), roas: 0,

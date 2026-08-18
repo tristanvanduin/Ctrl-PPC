@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge, PieChart } from "lucide-react";
+import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { Sectie } from "@/components/ui/sectie";
@@ -20,6 +20,7 @@ import { GeoBreakdown } from "./geo-breakdown";
 import { GeoChannelMatrix } from "./geo-channel-matrix";
 import { VideoPerformance } from "./video-performance";
 import { PmaxNetworkSplit } from "./pmax-network-split";
+import { CampaignTypeSplit } from "./campaign-type-split";
 import { PmaxAssetCoverage } from "./pmax-asset-coverage";
 import { VideoPlacements } from "./video-placements";
 import { CampaignTable } from "./campaign-table";
@@ -126,51 +127,36 @@ export function GoogleView({
             </div>
           )}
 
-          {/* De pagina is in secties gegroepeerd in plaats van dertien losse kaarten onder
-              elkaar. Elke sectie beantwoordt één vraag; binnen een sectie staan de kaarten
-              dicht op elkaar, ertussen zit ruim het dubbele. Zonder dat verschil groepeert er
-              niets en moet de lezer zelf uitzoeken wat bij wat hoort.
+          {/* DE OPENER (17.32, op verzoek van de eigenaar: "ijzersterk", net als het aangeleverde
+              voorbeeldscherm). Geen Sectie-kop hier -- de kaart en de donut hebben allebei al hun
+              EIGEN interne kop. Nu: één dichte rij, gap-4 zoals bínnen een sectie, geen mt-10
+              ertussen. Kaart breed (het is een wereldkaart, die heeft ruimte nodig), donut smal.
 
-              VOLGORDE (17.31, op verzoek van de eigenaar): eerst de kaart, dan de netwerkringen,
-              dan pacing, en pas daarna de rest -- dezelfde "compacte kerncijfers, kaart, ring,
-              voortgang"-flow als het aangeleverde voorbeeldscherm, met de KPI-band zelf al
-              bovenaan de pagina (client-dashboard.tsx's PeriodSummary, vóór dit component). */}
-          <Sectie
-            eerste
-            icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
-            titel="Markten"
-            bijschrift={
-              meerdereKanalen
-                ? "Waar het verkeer en de conversies vandaan komen, en met welke kanaalmix"
-                : "Waar het verkeer en de conversies vandaan komen"
-            }
-          >
-            {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
-                landentabel met één kolom -- dat is precies wat de kaart al toont, en het
-                bijschrift belooft een "kanaalmix" die niet bestaat.
-
-                IN dezelfde kaart en niet eronder: als losse kaart werd het een dichtgeklapte
-                strook van 60px onder een kaart van 600, en twee van die balkjes op elkaar lezen
-                als restjes. Naast de kaart geprobeerd (7 + 5) en ook teruggedraaid, om dezelfde
-                reden: een strook naast een kaart van 481px is geen compositie. */}
-            <GeoBreakdown
-              clientId={clientId}
-              verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
-            />
-          </Sectie>
-
-          {/* De netwerkringen (was onderdeel van "Waar het budget landt", verderop): dezelfde
-              vraag als de kaart hierboven -- waar komt het vandaan -- maar dan op netwerk in
-              plaats van geografie. Vandaar hier, niet bij Video/Placements/creatives, dat is een
-              ander onderwerp ("hoe ziet het eruit"). Rendert zelf niets zonder Performance
-              Max-data, dus deze sectie kan leeg blijven zonder dat er iets geks gebeurt. */}
-          <Sectie
-            icoon={<PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />}
-            titel="Netwerkverdeling"
-            bijschrift="Performance Max: waar het budget en de conversies landen, per netwerk"
-          >
-            <PmaxNetworkSplit clientId={clientId} />
-          </Sectie>
+              CampaignTypeSplit, niet PmaxNetworkSplit: de eigenaar wees erop dat de netwerkringen
+              alleen iets tonen bij een account dat Performance Max draait -- een puur-Search- of
+              puur-Shopping-account zou hier altijd een lege plek zien. Spend per campagnetype
+              (Search/PMax/Shopping/Display) werkt voor elk account, ongeacht de mix -- "er is
+              altijd een gemene deler waar we een donut van kunnen maken die zich niet richt op 1
+              specifiek campagnetype". PmaxNetworkSplit is verhuisd naar "Waar het budget landt"
+              hieronder, waar hij als PMax-specifieke verdieping wél op zijn plek staat. */}
+          <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <div className="hero-kaart min-w-0 xl:col-span-8">
+              {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
+                  landentabel met één kolom -- dat is precies wat de kaart al toont, en de matrix
+                  zou een "kanaalmix" beloven die niet bestaat. */}
+              <GeoBreakdown
+                clientId={clientId}
+                verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
+              />
+            </div>
+            {/* Rendert zelf niets zonder campagnedata deze periode (geen lege ring). `.hero-ring`
+                is waar globals.css' ":has(> .hero-ring:empty)"-regel op let: zonder data blijft
+                dit een lege wrapper-div, en trekt de kaart ernaast door naar de volle breedte in
+                plaats van een kaal vlak achter te laten. */}
+            <div className="hero-ring min-w-0 xl:col-span-4">
+              <CampaignTypeSplit clientId={clientId} />
+            </div>
+          </div>
 
           <Sectie
             icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -215,17 +201,19 @@ export function GoogleView({
             <PerformanceChart clientId={clientId} countryFilter={countryFilter} />
           </Sectie>
 
-          {/* Video en placements en creatives horen bij elkaar: het is allemaal "hoe ziet het
-              budget eruit". De netwerkringen die hier eerder stonden zijn verhuisd naar boven,
-              naast de geo-kaart -- zelfde vraag ("waar komt het vandaan"), andere dimensie. Elk
-              van deze kaarten rendert niets als er geen data voor is, dus de sectie kan ook
-              helemaal leeg blijven. */}
+          {/* Video, PMax-netwerken en placements horen bij elkaar: het is allemaal "hoe ziet het
+              budget eruit". De netwerkringen (PmaxNetworkSplit) staan hier en niet in de opener,
+              want ze bestaan alleen bij Performance Max -- als PMax-specifieke verdieping onder
+              de universele campagnetype-donut zijn ze op hun plek, in de opener zouden ze een
+              account zonder PMax een lege plek laten zien. Elk van deze kaarten rendert niets als
+              er geen data voor is, dus de sectie kan ook helemaal leeg blijven. */}
           <Sectie
             icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Waar het budget landt"
-            bijschrift="Video en placements"
+            bijschrift="Video, netwerken en placements"
           >
             <VideoPerformance clientId={clientId} />
+            <PmaxNetworkSplit clientId={clientId} />
             <PmaxAssetCoverage clientId={clientId} />
             <VideoPlacements clientId={clientId} />
           </Sectie>

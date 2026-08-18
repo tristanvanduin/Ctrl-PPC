@@ -3762,3 +3762,69 @@ verdichten — Jaaroverzicht 2026 en "Waar het budget landt" staan nog in hun ou
 stukje-gestapelde vorm. Ook nog niet aangeraakt: de andere kanaalschermen (Meta, LinkedIn,
 cross-channel) en cross-account/God View, die nog helemaal geen scherm hebben (alleen backend/
 API) — die worden vanaf nul gebouwd in deze stijl, geen "herstel".
+
+### 17.33 Google Overzicht, de echte opener: kaart + donut in één dichte rij, geen los gestapelde secties meer
+
+17.32 herschikte alleen de vólgorde van secties; de eigenaar liet met de referentieafbeelding
+er weer naast leggen dat dat niet ver genoeg ging: "lijkt dat hier ook maar een beetje op?" — de
+pagina was 4353px lang met losse kaarten met eigen koppen, het voorbeeld is één beeldschermvullende
+compositie. Reactie: "ja, bouw het. ik vind het prima als hier een 2e laag onderzit... maar die
+eerste opener met deze view is ijzersterk" — de opener moet dicht en sterk zijn, de rest mag later.
+
+**Gebouwd**: een nieuwe rij (`hero-rij`) die de geo-kaart (`GeoBreakdown`, `xl:col-span-8`) en een
+nieuwe donut (`xl:col-span-4`) naast elkaar zet, zonder de `Sectie`-wrapper (icoon+titel+bijschrift)
+die beide componenten al zelf als kop hebben — die wrapper zou een dubbele kop hebben gegeven.
+`PmaxNetworkSplit` (de "Netwerkverdeling"-sectie uit 17.32) is terugverplaatst naar "Waar het
+budget landt", waar hij oorspronkelijk stond.
+
+**Welke donut naast de kaart, drie keer bijgestuurd.** Eerste poging was `PmaxNetworkSplit` zelf;
+de eigenaar wees dat direct af: "waarom met er pmax data in de donut???" — die ring is leeg voor
+elk account dat geen Performance Max draait. Tweede kandidaat, apparaatsplitsing
+(`ads_device_performance_monthly`), werd al afgeschoten voordat hij af was: "ik denk niet dat
+device de belangrijkste is voor de eerste donut". Voorgelegd via een vraag met concrete opties; het
+antwoord was zelf weer een open vraag terug ("of spend per campagne type of een metric die slaat
+op de wereldkaart?"). Gekozen: spend per campagnetype (`ads_campaign_monthly.campaign_type`) —
+orthogonaal aan de kaart (geen overlap met de landenlijst die `GeoBreakdown` al toont) en universeel:
+elk account heeft een verdeling over Search/Performance Max/Shopping/Display, ook een dat 100% één
+type draait. Nieuw component `components/dashboard/campaign-type-split.tsx`, met dezelfde
+rekenkern als de PMax-ringen (`buildNetworkSplit()` uit `lib/pmax/network-split.ts`, die met opzet
+dimensie-onafhankelijk is gebouwd) — geen tweede definitie van diezelfde logica, alleen gevoed met
+campagnetype in plaats van PMax-netwerk.
+
+**Twee bugs gevonden tijdens het verifiëren, niet ervoor:**
+1. `ads_campaign_monthly.campaign_type` stond op `null` voor alle rijen van demo-greentech in de
+   echte Supabase-tabel — de seedscript-mapping vergat die kolom te vullen. Gefixt in
+   `scripts/demo/seed-demo-client.ts` (een kleine `campagneType()`-afleiding uit de campagnenaam) en
+   opnieuw geseed. Een echte, op zichzelf staande fout in de backend-seedlaag — maar niet de fout
+   die de donut leeg liet zien in de browser (zie hieronder).
+2. De werkelijke blokkade: `ads_campaign_monthly` stond helemaal niet in `READABLE_TABLES`
+   (`lib/data-access/read-policy.ts`) — de allowlist die bepaalt welke tabellen `dbSelect()` (het
+   pad dat zowel `?demo=1`-mockdata als een echt account gebruikt) mag serveren. Zonder die regel
+   gaf de server stilzwijgend nul rijen terug, zonder fout — en `campaign-type-split.tsx` checkte
+   `.error` niet, dus de donut verdween gewoon zonder enig signaal. Gevonden door te vergelijken met
+   `PmaxNetworkSplit`'s werkende `ads_pmax_network_breakdown`-regel, die wél in de lijst stond.
+   Gefixt met een toegevoegde regel in `READABLE_TABLES`. Dit, niet de seed-fix, was de daadwerkelijke
+   oplossing — demo-mode rendert uit `lib/demo/demo-rows.ts`'s eigen mock-tabel, die los staat van de
+   echte Supabase-tabel en al langer correcte campagnetype-mix had.
+
+**Lege ring liet de kaart niet meegroeien.** Als de donut `null` rendert (geen data), bleef zijn
+`xl:col-span-4`-kolom als dode witruimte staan naast een kaart die op `xl:col-span-8` bleef steken.
+Opgelost met een CSS-regel in `app/globals.css` die `:has()` en `:empty()` combineert:
+```css
+.hero-rij:has(> .hero-ring:empty) > .hero-kaart { grid-column: 1 / -1; }
+```
+De kaart krijgt de volle rijbreedte zodra zijn buurkolom leeg is — zonder dat een van beide
+componenten hoeft te weten van de ander, en zonder async data-bestaan-status omhoog te tillen naar
+de pagina.
+
+**Live geverifieerd, licht én donker** — de donut toont drie ringsegmenten (Search/Performance
+Max/Display) met kosten- en conversiering, legenda, geen dubbele kop, `gap-4` net zo strak als de
+rest van de kaartenrijen. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de
+kaart", zelftest (bug teruggezet) vindt hem nog. Eerlijke kanttekening, ongewijzigd sinds 17.32:
+`PmaxNetworkSplit` toont nog niets voor demo-greentech — dat is de bestaande, losstaande
+mockdata-leemte in `lib/demo/demo-rows.ts`, geen regressie van dit werk. `npx tsc --noEmit` schoon,
+301/301 tests groen, build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+**Nog niet gestart**: de "2e laag" die de eigenaar expliciet toestond als latere stap — Jaaroverzicht
+2026 en "Waar het budget landt" verdichten in dezelfde stijl als de opener nu heeft. Ook nog niet
+aangeraakt: dezelfde behandeling op Meta/LinkedIn/cross-channel en cross-account/God View.
