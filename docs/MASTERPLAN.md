@@ -3486,3 +3486,54 @@ ongewijzigd voor callers die zelf `parseStatus` uitlezen).
 demo-greentech geverifieerd met echte, inhoudelijke output en bevestigde databaseschrijvingen
 (`sop_analysis_output`, sectie "full", alle 6 rijen met substantiële tekst, geen enkele leeg).
 `npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+### 17.27 God View live getest met de 2 echte bureaus — geen "te weinig data" excuus
+
+De eigenaar, met klem, herhaald: *"2 agencies is precies wat je nodig hebt om minimaal cross
+agency inzichten op te halen"* — een expliciete herhaling van de 17.16-les (niet te snel
+"onvoldoende data" concluderen). Eerder deze sessie werd God View afgedaan als "kan vandaag
+structureel geen enkele rij produceren" omdat er maar 2 bureaus bestaan tegenover een
+k-anonimiteitsdrempel van 4 — precies de fout die 17.16 al identificeerde, nu herhaald.
+
+**Testroute bestond al, was nog nooit tegen echte data gedraaid.** 17.5 bouwde
+`/api/platform/god-view?testdrempel=true` — een expliciet gelabelde, ALL_CLIENTS-gated
+drempelverlaging (1 account/1 bureau) speciaal voor deze situatie — maar de masterplan-tekst
+bewees destijds alleen dat het MECHANISME het argument doorgeeft (`metrics: null` zonder,
+`metrics: {...}` mét), niet dat het iets zinnigs oplevert op de 2 bureaus die vandaag echt bestaan.
+
+**Drie aparte blokkades, geen van alle "te weinig bureaus".** Bij het daadwerkelijk proberen
+bleken er drie losse, elkaar niet overlappende gaten te zijn: (1) `agencies.benchmark_optin_at`
+staat op `null` voor zowel Ranking Masters als Demo — een aparte opt-in-poort, los van de
+k-anonimiteitsdrempel; (2) Ranking Masters' laatste volledige sync-maand is april 2026 (de
+"permanente sync-stilstand" die 17.20 al accepteerde), dus een enkele kalendermaand-query vindt
+nooit data van beide bureaus tegelijk; (3) van de 70 echte Ranking Masters-accounts hebben er maar
+8 ooit een `bedrijfsmodel`/`niche` in `client_settings` gekregen, en `demo-greentech` zelf géén
+(alleen de tijdelijke GRT/GRA/GRN-pseudoklanten uit 17.20 hadden er een, en die zijn opgeruimd).
+
+**Zelfde patroon als 17.19/17.20: de echte kernfunctie rechtstreeks aangeroepen, niet de HTTP-laag
+omzeild in de analysecode zelf.** Een wegwerpscript (verwijderd na afloop, geen databaseschrijving)
+riep `bouwGodViewCellen()` — volledig ongewijzigd — aan met: de 8 echte, gesegmenteerde Ranking
+Masters-klanten en hun echte april-cijfers uit `blended_account_monthly`, plus `demo-greentech`
+met zijn echte julicijfers en het bedrijfsmodel/niche waarvoor de klant is ONTWORPEN
+(`b2b`/`industrie`, letterlijk zo gedocumenteerd in `scripts/demo/seed-demo-client.ts` sinds
+17.20) als testinvoer — niet naar de database geschreven, alleen als functieargument. Dezelfde
+testdrempel als `?testdrempel=true` (1 account/1 bureau).
+
+**Resultaat: het mechanisme werkt, bewezen op echte cijfers.** 10 van de 18 gevonden cellen
+leverden een echte mediane CPA/ROAS op — o.a. mediane CPA €26,25 over 8 echte b2c-klanten
+(Ranking Masters), en per-niche cijfers als €10,39 CPA voor "wonen" en €264,65 voor
+"retail-lokaal", stuk voor stuk uit echte spend/conversieverhoudingen, nooit uit een enkel account
+terug te rekenen (de hele reden voor mediaan-van-verhoudingen i.p.v. som/som, zie de koptekst van
+`god-view.ts`). **Eerlijke, bruikbare bijvangst**: 0 van de 18 cellen combineerden daadwerkelijk 2
+bureaus in dezelfde cel — niet omdat het mechanisme het niet zou toestaan (de testdrempel staat
+dat al bij 1 bureau toe), maar omdat Ranking Masters' 8 gesegmenteerde klanten stuk voor stuk b2c
+zijn terwijl Demo als b2b is ontworpen: er is vandaag geen natuurlijke segment-overlap tussen de
+twee bureaus. Zodra een klant bij een van beide bureaus een niche/model deelt met een klant bij de
+ander, activeert een echte cross-agency-cel zich vanzelf — dat is al aangetoond te werken op
+losse cellen. De praktische hefboom is dus niet "wacht op meer bureaus" maar "breid de
+segmentatiedekking uit": 62 van de 70 Ranking Masters-accounts hebben nog nooit een
+`bedrijfsmodel`/`niche` gekregen.
+
+**Wat dit niet doet**: geen wijziging aan `god-view.ts`, `god-view-data.ts` of de testroute zelf —
+dit was uitsluitend verificatie met echte cijfers, geen enkele databaseschrijving, geen
+opt-in-vlag aangeraakt. Geen enkel bestand overgebleven na afloop.
