@@ -278,6 +278,21 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
         continue;
       }
 
+      // Een leeg antwoord buiten JSON-mode heeft geen eigen signaal zoals parseStatus -- de
+      // aanroeper ziet alleen "gelukt" en een leeg rapport. Gevonden bij de live-test van de
+      // wekelijkse LinkedIn-SOP: 54k tokens verbruikt (waarschijnlijk vrijwel allemaal in
+      // reasoning), content "". Retry eerst zoals hierboven; blijft hij leeg, gooi dan zodat
+      // callLayer() automatisch naar het fallback-model omschakelt in plaats van een lege string
+      // stil te bewaren als "saved: true".
+      if (!jsonMode && output.trim().length === 0) {
+        if (attempt < MAX_RETRIES) {
+          retries++;
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        throw new Error(`OpenRouter (${label}): leeg antwoord na ${MAX_RETRIES + 1} pogingen (model ${response.model}, ${response.tokensUsed} tokens verbruikt).`);
+      }
+
       return response;
     } catch (err) {
       const latencyMs = Date.now() - startTime;

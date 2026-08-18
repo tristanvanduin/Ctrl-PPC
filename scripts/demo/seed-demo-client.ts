@@ -493,6 +493,18 @@ async function insertViaSupabase(tables: Record<string, Row[]>) {
     }
     console.log(`✓ ${table}: ${rows.length} rijen`);
   }
+
+  // Acht van de tabellen hierboven (zie lib/data-access/feitentabellen.ts) zijn VIEWS over
+  // fact_core -- de upserts hierboven schrijven naar hun *_legacy-tegenhanger, niet naar wat
+  // de app daadwerkelijk leest. Zonder deze projectie bleef demo-greentech na elke her-seed
+  // tot een maand stale zichtbaar in de app (ontdekt bij het live-testen van de wekelijkse SOP:
+  // meta_account_daily/linkedin_account_daily/ads_account_monthly toonden nog data van de vórige
+  // seed-run, ook al meldde deze functie hierboven "160 rijen" succesvol). Migratie 050/078
+  // riep dit destijds handmatig aan voor demo-greentech; nu hoort het bij de seed zelf.
+  const { error: refreshError } = await db.rpc("refresh_fact_from_legacy", { p_client_id: DEMO_CLIENT });
+  if (refreshError) { console.error(`✗ refresh_fact_from_legacy: ${refreshError.message}`); process.exit(1); }
+  console.log(`✓ refresh_fact_from_legacy(${DEMO_CLIENT}) -- fact_core/meta_metrics/linkedin_metrics geprojecteerd`);
+
   // Klantenlijst bijwerken.
   const { data } = await db.from("app_settings").select("value").eq("key", "api_clients").maybeSingle();
   const list = Array.isArray(data?.value) ? (data!.value as Row[]) : [];

@@ -3430,3 +3430,59 @@ wrapper voor bestaat. `npx tsc --noEmit` schoon, volledige `scripts/gates.sh` gr
 
 **Wat dit niet doet**: geen wijziging aan `runCrossChannelSynthesis()` zelf, geen nieuwe
 readiness-logica — die bestond al en wordt nu alleen daadwerkelijk bereikt.
+
+### 17.26 Weekly en biweekly live getest: drie structurele bugs gevonden en gefixt
+
+De eigenaar eiste dat weekly en biweekly net zo grondig live getest worden als monthly eerder
+deze sessie ("weekly en bi weekly moeten absoluut getest worden"). Getest tegen `demo-greentech`
+(enige klant met verse data op alle drie de kanalen) via de echte routes
+(`/api/analysis/weekly`, `/api/analysis/biweekly`), niet gemockt. Drie echte bugs gevonden,
+alledrie meteen gefixt en opnieuw live geverifieerd — niet slechts gerapporteerd.
+
+**Bug 1 — een leeg dimension-availability-profiel werd gelezen als "alles ontbreekt".**
+De allereerste weekly-run tegen demo-greentech kwam terug met alle drie de secties op "Niet
+beschikbaar — analyseer NIET", ook al was de aangeleverde data in dezelfde prompt compleet en
+vers. Oorzaak: `ads_dimension_availability` had nul rijen voor demo-greentech (die tabel wordt
+gevuld door de echte Google Ads-sync-orchestrator, en demo-accounts lopen daar nooit doorheen),
+en `buildAvailabilitySummary()` in `lib/analysis/dimension-availability.ts` las "nul rijen" als
+"elke dimensie is expliciet gecontroleerd en ontbreekt" in plaats van "onbekend". Dat is precies
+het omgekeerde van de eigen, net ernaast gedocumenteerde filosofie in `enrichment.ts`
+("ontbrekende laag ≠ niets te melden, maar moet wel benoemd worden"). Fix: bij nul rijen een
+expliciete "geen signaal, baseer je oordeel op de daadwerkelijk aangeleverde data"-melding in
+plaats van de "niet beschikbaar"-lijst. Raakt niet alleen demo-accounts — elk net gekoppeld
+account zonder eerste sync zou hetzelfde probleem hebben gehad. Getest:
+`__dimension_availability_test.ts`, 7 assertions (leeg profiel geen blokkade, `evaluateSopSections`
+zelf blijft intern ongewijzigd, een normaal profiel met echte rijen ongewijzigd gedrag).
+
+**Bug 2 — het demo-seedscript liet acht tabellen structureel stale, ook meteen na een verse run.**
+Na de fix hierboven bleven Meta en LinkedIn nog steeds op "Data is actueel" falen met een lege
+periode — de freshness-check klopte (er stond wél data, ooit), maar het venster van de laatste 14
+dagen was leeg. Onderzoek wees uit: `meta_account_daily`, `linkedin_account_daily` en zes andere
+tabellen zijn views over `fact_core` (migratie 054); `scripts/demo/seed-demo-client.ts` schrijft
+correct naar hun `*_legacy`-tegenhanger, maar riep nooit de projectie-RPC
+`refresh_fact_from_legacy()` aan. Het script meldde dus "✓ meta_account_daily: 160 rijen" terwijl
+de app een maand oude data bleef tonen — precies hetzelfde gat dat 17.20 destijds handmatig moest
+omzeilen voor de GRT/GRA/GRN-split, alleen nooit teruggebracht in het herbruikbare script zelf.
+Fix: `insertViaSupabase()` roept de RPC nu zelf aan als laatste stap, na alle upserts. Elke
+toekomstige her-seed van de demo-klant is hierdoor in één run weer volledig actueel op alle
+kanalen, zonder de handmatige RPC-aanroep die 17.20 nog apart moest onthouden.
+
+**Bug 3 — een leeg LLM-antwoord werd stilzwijgend als geslaagde analyse opgeslagen.**
+De LinkedIn weekly-run gaf `output: ""` terug — 54.188 tokens verbruikt (vermoedelijk vrijwel
+volledig in reasoning), maar nul zichtbare tekst — en toch `"saved": true`, 0 findings, geen
+foutmelding. `callOpenRouter()` (`lib/analysis/openrouter-client.ts`) retryt alleen bij een JSON-
+parsefout in JSON-mode; een leeg antwoord buiten JSON-mode (de narratieve hoofdrapportage van elke
+SOP) had geen eigen signaal en werd als elk ander geslaagd antwoord behandeld. Fix: een leeg
+antwoord buiten JSON-mode retryt nu net als de bestaande JSON-parsefout, en gooit na uitputting
+van de retries een leesbare fout in plaats van een lege string terug te geven — waardoor
+`callLayer()`'s bestaande fallback-naar-tweede-model-logica automatisch aanslaat. Meteen
+geverifieerd: de herhaalde LinkedIn weekly-run viel automatisch terug op
+`google/gemini-3.7-flash` en leverde een volwaardig rapport (3 findings, 2 aanbevelingen).
+Getest: `__openrouter_client_test.ts`, 8 assertions (normaal antwoord ongewijzigd, retry herstelt
+een leeg antwoord, blijvend leeg gooit een leesbare fout met label, JSON-mode-pad blijft
+ongewijzigd voor callers die zelf `parseStatus` uitlezen).
+
+**Resultaat**: alle 6 combinaties (weekly + biweekly × Google/Meta/LinkedIn) tegen
+demo-greentech geverifieerd met echte, inhoudelijke output en bevestigde databaseschrijvingen
+(`sop_analysis_output`, sectie "full", alle 6 rijen met substantiële tekst, geen enkele leeg).
+`npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
