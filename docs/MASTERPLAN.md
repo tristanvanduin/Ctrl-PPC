@@ -3392,3 +3392,41 @@ schoon, volledige `scripts/gates.sh` groen.
 geen automatische cron toegevoegd. Dit is de kalibratieberekening zelf en de plek waar hij
 toegepast wordt op nieuwe voorstellen — het eerste, kleinste, veiligste stuk van loop 5, niet de
 hele lus in één keer.
+
+### 17.25 Cross-channel-synthese daadwerkelijk aan de maandanalyse gekoppeld
+
+De eigenaar vroeg naar de status van monthly / cross-channel / cross-account / God View, en wees
+er scherp op dat cross-channel-synthese amper getest was — met de eis: "elke maand analyse moet
+cross channel pakken als cross channel mogelijk is."
+
+**Grondoorzaak**: `runCrossChannelSynthesis()` (masterplan 17.12) bestond en werkte, maar was
+alleen bereikbaar via een losse, handmatig aan te roepen route
+(`/api/analysis/cross-channel-synthesis`). Niets in `app/api/analysis/monthly/route.ts` — waar de
+drie kanalen (Google inline, `runMetaMonthlyAnalysis()`, `runLinkedinMonthlyAnalysis()`) hun
+maandanalyse afronden — riep die functie ooit aan. Cross-channel-synthese gebeurde dus alleen als
+iemand er expliciet aan dacht een tweede, aparte aanroep te doen — vandaar dat hij in de praktijk
+zelden liep, ook wanneer alle kanalen van een klant allang klaar waren.
+
+**Fix**: nieuw bestand `lib/analysis/auto-cross-channel-trigger.ts` met
+`triggerCrossChannelSynthesisIfReady(supabase, clientId)`, aangeroepen vanaf alle drie de
+plekken waar een kanaal zijn maandanalyse succesvol afrondt. Geen nieuwe voorwaarde toegevoegd —
+`runCrossChannelSynthesis()` controleert zelf al, goedkoop en vóór elke LLM-call: minder dan 2
+gekoppelde kanalen, al gesynthetiseerd vandaag, of nog niet alle kanalen deze cyclus klaar. Welk
+kanaal toevallig als laatste afrondt, is degene bij wie de synthese echt gebeurt; de eerdere
+kanalen krijgen een goedkope skip. Faalt zacht met eigen try/catch en logging — een mislukte of
+overgeslagen synthese mag de hoofdanalyse van het kanaal nooit blokkeren of laten falen.
+
+**Tier-gating, ter verduidelijking bij dezelfde vraag**: cross-channel-synthese loopt mee zodra
+technisch mogelijk, ongeacht licentie — dat is de resource die deze fix nu overal aanzet.
+Cross-account (portfolio-synthese, al gated op Growth+, masterplan eerder in de sessie) en God
+View komen er pas bij op een betaald/hoger niveau. Deze fix raakt alleen de gratis-beschikbare
+cross-channel-laag.
+
+**Getest**: `lib/analysis/__auto_cross_channel_trigger_test.ts`, 3 assertions — geen enkele
+databaseaanroep zonder API-sleutel (bewezen met een mock die hard faalt als `.from()` toch wordt
+aangeroepen), geen exception bij het normale skip-pad (minder dan 2 kanalen), en geen exception
+bij een gesimuleerde databasefout in `laadBeschikbareKanalen` — precies het scenario waar de
+wrapper voor bestaat. `npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+**Wat dit niet doet**: geen wijziging aan `runCrossChannelSynthesis()` zelf, geen nieuwe
+readiness-logica — die bestond al en wordt nu alleen daadwerkelijk bereikt.
