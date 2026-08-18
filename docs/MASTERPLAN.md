@@ -3986,3 +3986,57 @@ volledige `scripts/gates.sh` groen (POORTEN GROEN).
 een concrete schermafbeelding of schets, nooit een nieuwe blinde gok. Nog niet gestart: de "2e
 laag" (Jaaroverzicht 2026, Waar het budget landt) in dezelfde verdichte stijl, en dezelfde
 behandeling op Meta/LinkedIn/cross-channel/God View.
+
+### 17.38 De opener naar Meta: "moeten we dit op andere pagina's voortzetten?" — "ja"
+
+Na vier rondes op Google: "is alles hieronder nu ook in de nieuwe stijl?" (nee — alleen de
+opener) en "moeten we dit op andere pagina's voortzetten?" Geadviseerd en gekozen: eerst het nu
+uitgekristalliseerde openerpatroon naar de andere kanalen, de "2e laag" pas daarna in één ronde
+over alle pagina's — niet viermaal apart uitvinden.
+
+**Meta's opbouw verschilt fundamenteel van Google's.** Bij Google stonden KPI's, pacing, kaart en
+donut al als losse componenten naast elkaar (`PacingMonitor`, `MetricCards`, `GeoBreakdown`,
+losse donuts) — precies het materiaal om een hero uit samen te stellen. Bij Meta (en LinkedIn,
+die hetzelfde component deelt) zitten KPI's, pacing, maandgrafiek én de maand-/campagnetabel
+allemaal in één monolithisch component, `ChannelPerformance` — geen losse pacing-widget om in de
+hero te zetten zonder ook LinkedIn's weergave te raken.
+
+**Bevestigd via `AskUserQuestion`: alleen kaart + donuts in de hero, `ChannelPerformance`
+ongewijzigd.** Geen refactor van een component dat twee kanalen deelt zonder expliciete
+toestemming. `BreakdownDonuts` (spend/conversies per leeftijd, plaatsing, platform of device,
+met tab-omschakelaar) is Meta's natuurlijke equivalent van Google's campagnetype-donut — altijd
+gevuld zodra er breakdown-data is, geen kanaalspecifieke leegte.
+
+**Zelfde bouwstenen als Google, hergebruikt zonder wijziging:** `useGeoBreakdown({ clientId,
+channel: "meta" })`, `GeoMapCard` (rechts, alleen), `GeoRanglijstCard` (links, onder de donut).
+`GeoMapCard`'s `channel`-prop bestond al generiek (`"google"|"meta"|"linkedin"|"blended"`) — geen
+enkele aanpassing nodig aan de gedeelde componenten uit 17.36. De oude "Markten"- en "Waar het
+budget landt"-Secties op Meta Overzicht zijn vervallen; hun inhoud (`GeoBreakdown` resp.
+`BreakdownDonuts`) staat nu in de hero.
+
+**Bijvangst: een echte databug, niet alleen een lege demo-plek.** `BreakdownDonuts` toonde niets
+voor demo-greentech. Anders dan de eerdere aanname deze sessie ("browser-demo leest uit
+`lib/demo/demo-rows.ts`'s mock-laag") bleek `dbSelect()` (`lib/data-access/client-read.ts`) altijd
+de ECHTE Supabase-tabel te lezen via `/api/data/[table]`, ook in `?demo=1`-modus — de mock-laag
+wordt alleen gebruikt door de oudere, rechtstreekse `supabase.from(...)`-aanroepen (zoals in
+`ChannelPerformance`), niet door `dbSelect()`. `meta_breakdown_daily` had wél een mock-rij in
+`demo-rows.ts`, maar nooit een rij in de echte tabel voor `demo-greentech` — en
+`scripts/demo/seed-demo-client.ts` (dat de echte tabellen vult) genereerde die tabel nooit.
+Precies dezelfde bugklasse als 17.32's `ads_campaign_monthly`-ontdekking, nu op een ander kanaal.
+
+Gefixt: een nieuwe `metaBreakdownDaily()`-generator in `seed-demo-client.ts` (dertien segmenten
+over vijf dimensies — plaatsing, platform, device, leeftijd, gender — elk met een scheve
+verdeling zodat de donut iets te tonen heeft), niet hergebruikt uit `demo-rows.ts`'s eigen
+`META_BD_SEGMENTS` omdat de seed-generatoren en de mock-generatoren twee losse, nooit
+gekruiste systemen zijn (seed schrijft naar de echte tabel voor alle niet-demo-consumenten
+zoals `dbSelect`; de mock bedient alleen rechtstreekse `supabase.from()`-aanroepen in demo-modus).
+Seed opnieuw gedraaid: 780 rijen `meta_breakdown_daily`. Dit is een correctie voor de hele app,
+niet alleen voor deze opener — elke andere `dbSelect`-consument van deze tabel (als die ooit komt)
+profiteert mee.
+
+**Live geverifieerd, licht én donker**, `.hero-rij`-element. `scripts/check-kaartoverloop.mjs`:
+alle 15 schermen "niets buiten de kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit`
+schoon, 301/301 tests groen, build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+**Nog niet gestart: LinkedIn en cross-channel** (zelfde patroon, zelfde componenten, geen nieuwe
+architectuur nodig) en de "2e laag" op alle vier de kanalen.

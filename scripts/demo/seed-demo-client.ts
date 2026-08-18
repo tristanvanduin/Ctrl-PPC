@@ -167,6 +167,44 @@ function metaAccountDaily(): MetaDaily[] {
   return rows;
 }
 
+// Waar het budget heen gaat, per uitsplitsing (17.38: de opener op Meta Overzicht toont dit als
+// donut naast de kaart, net als CampaignTypeSplit bij Google -- die had precies dit euvel
+// (ads_campaign_monthly.campaign_type stond leeg) tot de seed het vulde). meta_breakdown_daily
+// had een client-side mock (lib/demo/demo-rows.ts) maar nooit een rij in de ECHTE tabel; dbSelect
+// (client-read.ts) leest altijd de echte tabel, ook in demo-modus -- de mock wordt daar niet
+// voor gebruikt. Vijf dimensies, elk met een scheve verdeling (één duidelijke koploper) zodat de
+// donut iets te tonen heeft.
+const META_BREAKDOWN_SEGMENTS: { type: string; value: string; spend: number; conv: number }[] = [
+  { type: "platform_position", value: "feed", spend: 18, conv: 1.4 },
+  { type: "platform_position", value: "reels", spend: 13, conv: 0.3 },
+  { type: "platform_position", value: "story", spend: 6, conv: 0.6 },
+  { type: "publisher_platform", value: "facebook", spend: 20, conv: 1.6 },
+  { type: "publisher_platform", value: "instagram", spend: 14, conv: 0.7 },
+  { type: "publisher_platform", value: "audience_network", spend: 4, conv: 0.1 },
+  { type: "device_platform", value: "mobile", spend: 26, conv: 1.9 },
+  { type: "device_platform", value: "desktop", spend: 8, conv: 0.4 },
+  { type: "age", value: "25-34", spend: 16, conv: 1.3 },
+  { type: "age", value: "35-44", spend: 12, conv: 0.6 },
+  { type: "age", value: "45-54", spend: 6, conv: 0.2 },
+  { type: "gender", value: "female", spend: 19, conv: 1.2 },
+  { type: "gender", value: "male", spend: 15, conv: 0.9 },
+];
+function metaBreakdownDaily(): Row[] {
+  const rows: Row[] = [];
+  for (let d = 59; d >= 0; d--) {
+    const date = addDays(TODAY, -d);
+    for (const s of META_BREAKDOWN_SEGMENTS) {
+      rows.push({
+        client_id: DEMO_CLIENT, date, level: "account", entity_id: "act",
+        breakdown_type: s.type, breakdown_value: s.value,
+        impressions: Math.round(s.spend * 40), clicks_all: Math.round(s.spend * 0.9), link_clicks: Math.round(s.spend * 0.8),
+        spend: s.spend, conversions: s.conv, conversion_value: Math.round(s.conv * 120),
+      });
+    }
+  }
+  return rows;
+}
+
 // ── LinkedIn: dag-data [S5, S6, S7, S8, S9] ────────────────────────────────
 interface LiDaily { urn: string; date: string; imp: number; clicks: number; spend: number; leads: number; opens: number; conv: number; vidStart: number; vidDone: number }
 
@@ -362,6 +400,7 @@ export function buildAllRows(): Record<string, Row[]> {
   }));
   tables["meta_campaign_daily"] = metaCampaignDaily().map(metaBase);
   tables["meta_account_daily"] = metaAccountDaily().map(metaBase);
+  tables["meta_breakdown_daily"] = metaBreakdownDaily();
 
   // LinkedIn-structuur + dagdata.
   tables["linkedin_connections"] = [{ client_id: DEMO_CLIENT, ad_account_urn: "urn:li:sponsoredAccount:demo", token_ref: "demo", status: "disabled", currency: "EUR", last_sync_at: new Date().toISOString() }];

@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Megaphone, Calendar, Globe, LayoutGrid, Sparkles } from "lucide-react";
+import { Megaphone, Calendar, Sparkles } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
-import { GeoBreakdown } from "./geo-breakdown";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
+import { GeoMapCard } from "./geo-map-card";
+import { GeoRanglijstCard } from "./geo-ranglijst-card";
+import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 
@@ -35,6 +37,9 @@ const SECTIONS = ["Campagnes", "Ad sets", "Advertenties & creatives", "Breakdown
 
 export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
   const [connected, setConnected] = useState<boolean | null>(null);
+  // Eén hook-aanroep voor de opener: GeoMapCard en GeoRanglijstCard delen dezelfde metric-keuze
+  // en VS-drilldown-state (zelfde reden als Google's opener, 17.36).
+  const geo = useGeoBreakdown({ clientId, channel: "meta" });
 
   useEffect(() => {
     if (isDemoMode()) { setConnected(true); return; } // demo: geen live status-call
@@ -77,6 +82,27 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
 
       <ChannelHealthBadge clientId={clientId} channel="meta" />
 
+      {/* DE OPENER (17.38, eerste kanaal na Google): "moeten we dit op andere pagina's
+          voortzetten?" -- "ja". Zelfde patroon als Google's opener (17.34-17.37): donut + ranglijst
+          links, kaart alleen rechts, gedeelde geo-state via useGeoBreakdown(). Bewust NIET pacing/
+          KPI's erbij -- die zitten hier, anders dan bij Google, in één gedeeld component
+          (ChannelPerformance) dat ook LinkedIn's weergave voedt. Dat uit elkaar trekken is een
+          grotere ingreep die LinkedIn meteen meeraakt; de eigenaar koos expliciet voor "alleen
+          kaart + donuts in de hero" en ChannelPerformance ongewijzigd laten.
+
+          BreakdownDonuts is Meta's eigen equivalent van CampaignTypeSplit: spend/conversies per
+          leeftijd, plaatsing of device (tabs), altijd gevuld zodra er breakdown-data is -- geen
+          kanaalspecifieke leegte zoals PmaxNetworkSplit bij Google had. */}
+      <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
+          <BreakdownDonuts clientId={clientId} channel="meta" />
+          <GeoRanglijstCard state={geo} />
+        </div>
+        <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
+          <GeoMapCard state={geo} channel="meta" />
+        </div>
+      </div>
+
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
       <Sectie
         icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -84,24 +110,6 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         bijschrift="Kerncijfers, pacing en het maandverloop"
       >
         <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} edition={edition} />
-      </Sectie>
-
-      {/* Geo-mapping: waar komt verkeer/conversies vandaan (per gekozen metric). */}
-      <Sectie
-        icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Markten"
-        bijschrift="Waar het verkeer en de conversies vandaan komen"
-      >
-        <GeoBreakdown clientId={clientId} channel="meta" />
-      </Sectie>
-
-      {/* Waar het budget landt per uitsplitsing — het equivalent van de PMax-ringen bij Google. */}
-      <Sectie
-        icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Waar het budget landt"
-        bijschrift="Leeftijd, plaatsing en device"
-      >
-        <BreakdownDonuts clientId={clientId} channel="meta" />
       </Sectie>
     </div>
   );
