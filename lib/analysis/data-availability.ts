@@ -19,6 +19,13 @@ interface AvailabilityInput {
   countryData: unknown[];
   networkData: unknown[];
   scheduleData: unknown[];
+  /** Live testrun 17 augustus 2026 (masterplan 17.14): stap 7 kende alleen "Keyword data"
+   *  (ads_keyword_performance_monthly) en "Product data", niet deze derde, aparte bron
+   *  (ads_search_terms_wasteful). Bij een klant met wél zoektermdata maar geen keyword-/
+   *  productdata gaf dat `allUnavailable: true` voor de hele stap -- en dus werd een
+   *  zoekterm-bevinding die WEL op echte, beschikbare data rustte alsnog als inconsistent
+   *  afgekeurd, puur omdat de validator deze bron niet kende. */
+  searchTermData: unknown[];
 }
 
 function dimension(name: string, rows: unknown[], note?: string) {
@@ -46,7 +53,7 @@ export function checkStepDataAvailability(opts: AvailabilityInput): StepDataAvai
     { step: 4, dimensions: [] },
     { step: 5, dimensions: [dimension("Keyword data", opts.keywordData)] },
     { step: 6, dimensions: [dimension("Product data", opts.productData)] },
-    { step: 7, dimensions: [dimension("Keyword data", opts.keywordData), dimension("Product data", opts.productData)] },
+    { step: 7, dimensions: [dimension("Keyword data", opts.keywordData), dimension("Product data", opts.productData), dimension("Search term waste data", opts.searchTermData)] },
     { step: 8, dimensions: [dimension("Creative data", opts.creativeData)] },
     { step: 9, dimensions: [dimension("Audience data", opts.audienceData)] },
     {

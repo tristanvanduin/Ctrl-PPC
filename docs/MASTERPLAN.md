@@ -2836,3 +2836,34 @@ juiste interne kanaalsleutels, identiek aan de markdown. Nieuwe test toegevoegd
 **Niet getest vandaag**: de kanaaloverstijgende synthese mét God View- of cross-account/portfolio-
 signalen erbij — die twee blijven losstaande mechanismen, niet meegenomen in deze synthese-stap
 (zie de vraag/het antwoord hierover, 17 augustus).
+
+### 17.14 De echte oorzaak van de stap-7-terugkerende fout gevonden en gefixt
+
+De eigenaar: *"moeten we dit voor eens en altijd fixen en daarna door naar cross account?"* Bleek
+geen vage modelgril maar een concreet te herleiden scoping-bug.
+
+**De oorzaak.** `lib/analysis/data-availability.ts`'s `checkStepDataAvailability()` kende stap 7
+maar twee databronnen: "Keyword data" (`ads_keyword_performance_monthly`) en "Product data". De
+bevinding die in 17.13 (en eerder, 17.4) telkens de kwaliteitspoort blokkeerde komt uit een
+**derde, aparte** tabel: `ads_search_terms_wasteful`. Voor demo-greentech is die derde tabel wél
+gevuld (5 echte rijen), maar de eerste twee niet. Het model zei dus terecht "Keyword Performance:
+data niet beschikbaar" en citeerde er terecht een zoekterm-bevinding naast uit de wél-beschikbare
+bron — maar de validator zag alleen `dimensions.every(d => !d.available)` (beide bekende bronnen
+leeg) en verklaarde daarmee de HELE stap "geen data", wat elke bevinding erin diskwalificeerde,
+inclusief een die prima onderbouwd was. Geen hallucinatie-detectie die faalde: een blinde vlek in
+wélke bronnen de validator van stap 7 kende.
+
+**De fix.** `AvailabilityInput` kreeg een derde veld, `searchTermData`, en stap 7's
+dimensielijst een derde `dimension("Search term waste data", opts.searchTermData)`. Zodra
+minstens één van de drie bronnen data heeft, is `allUnavailable` niet meer waar en blijft de
+diskwalificatie-cascade uit — geen aparte scope-classificatie per bevinding nodig, de simpelste
+correcte fix. Twee aanroepplekken gefixt: `app/api/analysis/monthly/route.ts`'s directe pad én
+`lib/analysis/monthly-prepared-context.ts`'s cache-opbouwpad (`preparedContext`) — de tweede werd
+bijna gemist; zonder die zou een klant die via de prepared-context-cache draait de oude bug
+gewoon behouden. Nieuwe test (`__data_availability_test.ts`) dekt: de precieze
+demo-greentech-situatie (search-termdata wél, keyword/product niet → niet meer allUnavailable),
+de echt-lege situatie (blijft terecht allUnavailable), en dat stap 5/6 ongemoeid blijven.
+Geverifieerd tegen de daadwerkelijk vastgelegde narratieftekst uit de 17.13-testrun dat de
+resterende regex-route (`/geen data beschikbaar|niet uitvoerbaar/i`) niet alsnog zou triggeren.
+
+**Volgende stap, met deze afgerond**: cross-account.

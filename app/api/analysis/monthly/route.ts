@@ -2039,6 +2039,7 @@ ${runningContext}`,
         countryData,
         networkData,
         scheduleData,
+        searchTermData: searchData,
       })).map((entry) => [entry.step, entry])
     );
 

@@ -442,6 +442,7 @@ export async function buildPreparedContextRow(
     countryData: inputs.countryData,
     networkData: inputs.networkData,
     scheduleData: inputs.scheduleData,
+    searchTermData: inputs.searchData,
   });
   // Ontbreekt een van beide maanden, dan staat hier waarom er geen keten is. Dat is iets anders
   // dan een keten vol nullen, en de lezer moet het verschil kunnen zien: onder deze kop staat
