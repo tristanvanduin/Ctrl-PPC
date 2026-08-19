@@ -72,6 +72,28 @@ console.log("\n8. callLayer: vier lagen, vier verschillende primaire modellen (g
 const primairen = new Set(Object.values(LAYER_MODEL).map((m) => m.primary));
 check("elke laag heeft een eigen primair model", primairen.size === 4, [...primairen].join(", "));
 
+console.log("\n9. callLayer: reasoningMaxTokens gaat mee voor het primaire Claude-model, niet voor de Gemini-fallback");
+{
+  const seen: { model?: string; reasoningMaxTokens?: number }[] = [];
+  const failPrimaryCaptures = async (req: { model?: string; reasoningMaxTokens?: number }) => {
+    seen.push({ model: req.model, reasoningMaxTokens: req.reasoningMaxTokens });
+    if (req.model === LAYER_MODEL.narrative.primary) throw new Error("primair model faalt (geforceerd om de fallback-aanroep te zien)");
+    return fakeResp(req.model!);
+  };
+  await callLayer("narrative", { apiKey: "x", systemPrompt: "s", userMessage: "u" }, failPrimaryCaptures as never);
+  check("het primaire Claude-model krijgt het reasoning-budget van de laag mee", seen[0]?.reasoningMaxTokens === LAYER_MODEL.narrative.reasoningMaxTokens, JSON.stringify(seen[0]));
+  check("het Gemini-fallback-model krijgt GEEN reasoning-budget mee", seen[1]?.reasoningMaxTokens === undefined, JSON.stringify(seen[1]));
+}
+
+console.log("\n10. callLayer: lagen zonder reasoningMaxTokens-config (triage, reasoning) geven nooit een budget door");
+{
+  const seen: (number | undefined)[] = [];
+  const capture = async (req: { model?: string; reasoningMaxTokens?: number }) => { seen.push(req.reasoningMaxTokens); return fakeResp(req.model!); };
+  await callLayer("triage", { apiKey: "x", systemPrompt: "s", userMessage: "u" }, capture as never);
+  await callLayer("reasoning", { apiKey: "x", systemPrompt: "s", userMessage: "u" }, capture as never);
+  check("triage en reasoning (Grok, nog niet bevestigd compatibel) sturen geen reasoning-budget mee", seen.every((v) => v === undefined), JSON.stringify(seen));
+}
+
 console.log("\nRESULTAAT: " + passed + " geslaagd, " + failed + " gefaald\n");
 if (failed > 0) process.exit(1);
 }

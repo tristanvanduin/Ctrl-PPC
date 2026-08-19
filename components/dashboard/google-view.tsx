@@ -16,10 +16,15 @@ import { FairWeeksOverview } from "./fair-weeks-overview";
 import { PacingMonitor } from "./pacing-monitor";
 import { MetricCards } from "./metric-cards";
 import { PerformanceChart } from "./performance-chart";
-import { GeoBreakdown } from "./geo-breakdown";
 import { GeoChannelMatrix } from "./geo-channel-matrix";
+import { GeoMapCard } from "./geo-map-card";
+import { GeoRanglijstCard } from "./geo-ranglijst-card";
+import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { VideoPerformance } from "./video-performance";
 import { PmaxNetworkSplit } from "./pmax-network-split";
+import { CampaignTypeSplit } from "./campaign-type-split";
+import { MonthlyTrendBars } from "./monthly-trend-bars";
+import { MonthlyTrendLine } from "./monthly-trend-line";
 import { PmaxAssetCoverage } from "./pmax-asset-coverage";
 import { VideoPlacements } from "./video-placements";
 import { CampaignTable } from "./campaign-table";
@@ -85,10 +90,14 @@ export function GoogleView({
   countryFilter, onCountryFilterChange, tijdas, onTijdasChange,
 }: GoogleViewProps) {
   const beursAs = edition !== null && tijdas === "beurs";
+  // Eén hook-aanroep: GeoMapCard en GeoRanglijstCard staan in de nieuwe 2x2-indeling niet meer
+  // naast elkaar maar boven/onder in dezelfde kolom (17.41 -- "als we deze in het gat plaatsen
+  // kan de geo map breder"), en moeten nog steeds dezelfde metric-keuze en VS-drilldown delen.
+  const geo = useGeoBreakdown({ clientId, channel: "google", enabled: !geoClone });
 
   return (
     <>
-      <HealthBadge clientId={clientId} />
+      {geoClone && <HealthBadge clientId={clientId} />}
       {geoClone ? (
         // Beurs gekozen: her-geaggregeerd beursoverzicht (uit campagnedata) i.p.v. de
         // account-brede kaarten, die niet per beurs te splitsen zijn.
@@ -126,12 +135,51 @@ export function GoogleView({
             </div>
           )}
 
-          {/* De pagina is in secties gegroepeerd in plaats van dertien losse kaarten onder
-              elkaar. Elke sectie beantwoordt één vraag; binnen een sectie staan de kaarten
-              dicht op elkaar, ertussen zit ruim het dubbele. Zonder dat verschil groepeert er
-              niets en moet de lezer zelf uitzoeken wat bij wat hoort. */}
+          {/* DE OPENER, herbouwd naar een 2x2-wireframe (17.40): de eigenaar leverde een eigen
+              schets aan ("klant / menu-items / KPI-rij / [Account Health | Geo] / [Pacing |
+              Graph]"). Bevestigd via AskUserQuestion: Account Health en de campagnetype-donut
+              blijven TWEE losse kaarten (niet samengevoegd -- "twee vragen, twee vormen", zelfde
+              principe dat elders in deze codebase al staat), en deze herindeling geldt alleen voor
+              Google (Meta/LinkedIn missen een losse Pacing-widget, zie 17.38's toelichting over
+              het gedeelde ChannelPerformance-component; die blijven op de 17.38/17.39-opener).
+
+              Bewust GEEN `items-stretch`/geforceerde gelijke hoogte: dat patroon heeft deze sessie
+              al drie keer een wit gat in een kaart veroorzaakt zodra de content links en rechts
+              van nature verschilt (17.34, 17.35, 17.37). Twee kolommen met hun eigen natuurlijke
+              hoogte is het uitgangspunt; alleen bijstellen als een screenshot een echt gat laat
+              zien.
+
+              17.41: precies dat gat verscheen ("als we deze in het gat plaatsen kan de geo map
+              breder", met een cirkel om de ranglijst) -- links (Health + donut + Pacing, drie
+              kaarten) werd de langste kolom, rechts bleef na kaart+grafiek ruimte over. Ranglijst
+              en statistiekjes (`GeoRanglijstCard`) verhuizen daarom naar ONDERAAN de rechterkolom,
+              onder de grafiek, en de kaart wordt weer de gesplitste `GeoMapCard` (alleen, dus
+              breder) -- zelfde bouwstenen als de 17.36-opener, nu alleen in een andere volgorde
+              omdat het gat aan de ONDERKANT zit i.p.v. ernaast. */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="min-w-0 flex flex-col gap-4">
+              <HealthBadge clientId={clientId} />
+              {/* 17.42: donut en pacing omgedraaid op verzoek. */}
+              <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+              <CampaignTypeSplit clientId={clientId} />
+              {/* 17.43: "ik mis de lijn diagram nog" -- vult het resterende hoogteverschil met de
+                  rechterkolom, en ROAS is de efficiëntievraag die bij Health/Pacing past. */}
+              <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+            </div>
+            <div className="min-w-0 flex flex-col gap-4">
+              {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
+                  landentabel met één kolom -- dat is precies wat de kaart al toont, en de matrix
+                  zou een "kanaalmix" beloven die niet bestaat. */}
+              <GeoMapCard
+                state={geo}
+                verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
+              />
+              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
+              <GeoRanglijstCard state={geo} />
+            </div>
+          </div>
+
           <Sectie
-            eerste
             icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel={
               (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
@@ -142,27 +190,12 @@ export function GoogleView({
               : "Per maand: waar staan we en wat is de trend?"}
             actie={edition && <TijdasKeuze value={tijdas} onChange={onTijdasChange} />}
           >
-            {/* NAAST ELKAAR GEPROBEERD EN TERUGGEDRAAID, en niet om de uitlijning.
-
-                Beide kaarten beantwoorden "lopen we op schema", maar op een andere horizon --
-                links per week, rechts per jaar -- en ze gebruiken daarvoor dezelfde woorden.
-                "Prognose" betekent links een week en rechts een jaar; "Verwacht" links en "Op
-                dit tempo" rechts zijn allebei een verwachting. Vier termen voor hetzelfde
-                begrip op twee schalen, naast elkaar: dat nodigt uit tot een vergelijking die
-                niet klopt.
-
-                Waar naast elkaar wél werkt in deze app, gaat het om twee SOORTEN antwoord (de
-                kaart zegt waar, de ranglijst zegt hoeveel) of om dezelfde data in twee
-                duidelijk verschillende vormen (de boog en de radar op de gezondheidskaart).
-                Twee kaartvormige blokken met percentages die allebei over schema gaan, zijn
-                geen van beide.
-
-                Onder elkaar markeert de verticale sprong de wisseling van horizon, en dat is
-                precies het signaal dat naast elkaar ontbreekt. */}
+            {/* PacingMonitor staat sinds 17.33 in de opener hierboven, naast de donut -- hier
+                blijft alleen de week-/maandvisualisatie over, die te breed is voor een kolom naast
+                de donut. */}
             {beursAs
               ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} />
               : <MonthlyOverview clientId={clientId} countryFilter={countryFilter} />}
-            <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
           </Sectie>
 
           <Sectie
@@ -174,81 +207,20 @@ export function GoogleView({
             <PerformanceChart clientId={clientId} countryFilter={countryFilter} />
           </Sectie>
 
-          {/* Waar het vandaan komt, en hóé die markten bediend worden. De kanaalmix per land
-              staat bewust naast de kaart en niet op een eigen pagina: het is de volgende vraag
-              na "welke landen", en een aparte pagina zou klant en periode opnieuw laten kiezen. */}
-          <Sectie
-            icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
-            titel="Markten"
-            bijschrift={
-              meerdereKanalen
-                ? "Waar het verkeer en de conversies vandaan komen, en met welke kanaalmix"
-                : "Waar het verkeer en de conversies vandaan komen"
-            }
-          >
-            {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
-                landentabel met één kolom -- dat is precies wat de kaart al toont, en het
-                bijschrift belooft een "kanaalmix" die niet bestaat.
-
-                IN dezelfde kaart en niet eronder: als losse kaart werd het een dichtgeklapte
-                strook van 60px onder een kaart van 600, en twee van die balkjes op elkaar lezen
-                als restjes. Naast de kaart geprobeerd (7 + 5) en ook teruggedraaid, om dezelfde
-                reden: een strook naast een kaart van 481px is geen compositie. */}
-            <GeoBreakdown
-              clientId={clientId}
-              verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
-            />
-          </Sectie>
-
-          {/* Video, PMax-netwerken, placements en creatives horen bij elkaar: het is allemaal
-              "waar landt het budget en hoe ziet het eruit". Elk van deze kaarten rendert niets
-              als er geen data voor is, dus de sectie kan ook helemaal leeg blijven. */}
+          {/* Video, PMax-netwerken en placements horen bij elkaar: het is allemaal "hoe ziet het
+              budget eruit". De netwerkringen (PmaxNetworkSplit) staan hier en niet in de opener,
+              want ze bestaan alleen bij Performance Max -- als PMax-specifieke verdieping onder
+              de universele campagnetype-donut zijn ze op hun plek, in de opener zouden ze een
+              account zonder PMax een lege plek laten zien. Elk van deze kaarten rendert niets als
+              er geen data voor is, dus de sectie kan ook helemaal leeg blijven. */}
           <Sectie
             icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Waar het budget landt"
             bijschrift="Video, netwerken en placements"
           >
-            {/* Naast elkaar, met een DERDE blok in het gat.
-
-                Eerder geprobeerd op 8 + 4 en teruggedraaid: de videotabel paste precies
-                (835/835) maar de PMax-kaart werd 826px hoog naast een videokaart van 322px --
-                een gat van 500px. Het probleem was niet de indeling maar dat er twee blokken
-                waren voor drie plekken.
-
-                De assetdekking vult dat gat, en niet als opvulling: de PMax-kaart ernaast zegt
-                zelf dat de kanaalverdeling geen knop is en dat je stuurt via assets. Die
-                assets stonden nergens op het scherm -- een kaart die een knop noemt en hem
-                niet laat zien.
-
-                row-span-2 op de PMax-kaart en geen drie losse rijen: die kaart is met zijn
-                twee ringen ongeveer even hoog als de videotabel en de assetdekking samen, dus
-                de twee kolommen lopen gelijk uit. */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:grid-rows-[min-content_1fr]">
-              <div className="@container min-w-0 xl:col-span-8">
-                <VideoPerformance clientId={clientId} />
-              </div>
-              {/* Ook deze rekt mee, en om dezelfde reden als de assetkaart hieronder -- alleen
-                  staat de speling nu aan de andere kant. Toen de assetdekking acht kolommen
-                  kreeg in plaats van drie werd de linkerkolom 573px tegen 528 rechts, en dan
-                  hangt de PMax-kaart 45px boven de onderrand van zijn buur.
-
-                  Welke kolom de langste is, hangt af van de klant: de assetkaart groeit met
-                  het aantal groepen dat aandacht vraagt, de ringen ernaast staan vast. Daarom
-                  rekken ze allebei mee -- dan valt de speling altijd binnen een kaart en nooit
-                  ertussen, welke kant hij ook op staat. */}
-              <div className="@container min-w-0 xl:col-span-4 xl:row-span-2 xl:[&>div]:h-full">
-                <PmaxNetworkSplit clientId={clientId} />
-              </div>
-              {/* De rijhoogtes zijn min-content en 1fr, en de assetkaart rekt mee (h-full, en
-                  via [&>div] ook de kaart erbinnen). Zonder dat verdeelde het raster de
-                  overtollige hoogte van de PMax-kaart over BEIDE rijen: 61px tussen video en
-                  assets waar elders 16 staat, en de onderkanten 45px uit elkaar. Nu gaat alle
-                  speling naar de onderste kaart, waar hij als padding in een lijst leest in
-                  plaats van als een gat tussen twee kaarten. */}
-              <div className="@container min-w-0 xl:col-span-8 xl:h-full xl:[&>div]:h-full">
-                <PmaxAssetCoverage clientId={clientId} />
-              </div>
-            </div>
+            <VideoPerformance clientId={clientId} />
+            <PmaxNetworkSplit clientId={clientId} />
+            <PmaxAssetCoverage clientId={clientId} />
             <VideoPlacements clientId={clientId} />
           </Sectie>
 

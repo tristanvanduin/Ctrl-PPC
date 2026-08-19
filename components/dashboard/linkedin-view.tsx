@@ -1,13 +1,15 @@
 "use client";
 
-import { Briefcase, Calendar, Globe, LayoutGrid, Sparkles } from "lucide-react";
+import { Briefcase, Calendar, Sparkles } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { ChannelViewHeader } from "./channel-view-header";
-import { GeoBreakdown } from "./geo-breakdown";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
+import { GeoMapCard } from "./geo-map-card";
+import { GeoRanglijstCard } from "./geo-ranglijst-card";
+import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 
@@ -28,6 +30,9 @@ const SECTIONS = [
 
 export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
   const demo = isDemoMode();
+  // Eén hook-aanroep voor de opener: GeoMapCard en GeoRanglijstCard delen dezelfde metric-keuze
+  // en VS-drilldown-state (zelfde patroon als Google 17.36 en Meta 17.38).
+  const geo = useGeoBreakdown({ clientId, channel: "linkedin" });
   return (
     <div className="space-y-6">
       <ChannelViewHeader
@@ -60,6 +65,24 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
 
       <ChannelHealthBadge clientId={clientId} channel="linkedin" />
 
+      {/* DE OPENER (17.39, derde kanaal): zelfde patroon als Google (17.34-17.37) en Meta
+          (17.38) -- BreakdownDonuts + ranglijst links, kaart alleen rechts, gedeelde geo-state
+          via useGeoBreakdown(). BreakdownDonuts toont hier functie/senioriteit/industrie/
+          bedrijfsgrootte i.p.v. Meta's leeftijd/plaatsing/device -- zelfde component, andere
+          dimensies (BREAKDOWN_DIMENSIES["linkedin"]), geen aparte code nodig.
+
+          Ook hier bewust geen pacing/KPI's in de hero: die zitten in ChannelPerformance, dat
+          Meta en LinkedIn delen (zie 17.38's toelichting). */}
+      <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
+          <BreakdownDonuts clientId={clientId} channel="linkedin" />
+          <GeoRanglijstCard state={geo} />
+        </div>
+        <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
+          <GeoMapCard state={geo} channel="linkedin" />
+        </div>
+      </div>
+
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
       <Sectie
         icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -67,24 +90,6 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         bijschrift="Kerncijfers, pacing en het maandverloop"
       >
         <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} edition={edition} />
-      </Sectie>
-
-      {/* Geo-mapping: waar komt verkeer/conversies vandaan (per gekozen metric). */}
-      <Sectie
-        icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Markten"
-        bijschrift="Waar het verkeer en de conversies vandaan komen"
-      >
-        <GeoBreakdown clientId={clientId} channel="linkedin" />
-      </Sectie>
-
-      {/* Waar het budget landt per uitsplitsing — het equivalent van de PMax-ringen bij Google. */}
-      <Sectie
-        icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Wie het te zien krijgt"
-        bijschrift="Functie, senioriteit, sector en bedrijfsgrootte"
-      >
-        <BreakdownDonuts clientId={clientId} channel="linkedin" />
       </Sectie>
     </div>
   );

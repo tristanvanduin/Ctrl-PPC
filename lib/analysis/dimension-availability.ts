@@ -288,6 +288,24 @@ export function buildAvailabilitySummary(
   profile: ClientDimensionProfile,
   sopType: "monthly" | "weekly" | "biweekly"
 ): string {
+  // Nul rijen betekent "nooit gesynchroniseerd via de reguliere Google Ads-orchestrator" (bijv.
+  // demo-accounts, waarvan de data rechtstreeks geseed wordt) -- NIET "alle dimensies ontbreken".
+  // Zonder deze afvang zag evaluateSopSections() elke vereiste dimensie als missend en werd de
+  // hele analyse als "analyseer NIET" bestempeld, ook wanneer de daadwerkelijk aangeleverde data
+  // in dezelfde prompt gewoon compleet en vers was. Gevonden bij de live-test van de wekelijkse
+  // SOP tegen demo-greentech: elke sectie kwam terug als "niet beschikbaar" terwijl
+  // ads_account_weekly/ads_campaign_monthly wél actuele rijen bevatten.
+  if (profile.dimensions.size === 0) {
+    return [
+      "## Beschikbare analysedimensies voor dit account",
+      "",
+      "Geen dimension-availability-signaal voor dit account (nog niet gesynchroniseerd via de " +
+        "reguliere pipeline -- bijvoorbeeld een demo-account of een net gekoppeld account).",
+      "Dit is GEEN bevestiging dat dimensies ontbreken. Baseer je oordeel op de data die hieronder " +
+        "daadwerkelijk is aangeleverd, niet op deze sectie.",
+    ].join("\n");
+  }
+
   const sections = evaluateSopSections(profile, sopType);
   const supported = sections.filter((s) => s.support === "supported");
   const partial = sections.filter((s) => s.support === "partial");

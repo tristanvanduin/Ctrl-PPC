@@ -200,6 +200,44 @@ function metaAccountDaily(): MetaDaily[] {
   return rows;
 }
 
+// Waar het budget heen gaat, per uitsplitsing (17.38: de opener op Meta Overzicht toont dit als
+// donut naast de kaart, net als CampaignTypeSplit bij Google -- die had precies dit euvel
+// (ads_campaign_monthly.campaign_type stond leeg) tot de seed het vulde). meta_breakdown_daily
+// had een client-side mock (lib/demo/demo-rows.ts) maar nooit een rij in de ECHTE tabel; dbSelect
+// (client-read.ts) leest altijd de echte tabel, ook in demo-modus -- de mock wordt daar niet
+// voor gebruikt. Vijf dimensies, elk met een scheve verdeling (één duidelijke koploper) zodat de
+// donut iets te tonen heeft.
+const META_BREAKDOWN_SEGMENTS: { type: string; value: string; spend: number; conv: number }[] = [
+  { type: "platform_position", value: "feed", spend: 18, conv: 1.4 },
+  { type: "platform_position", value: "reels", spend: 13, conv: 0.3 },
+  { type: "platform_position", value: "story", spend: 6, conv: 0.6 },
+  { type: "publisher_platform", value: "facebook", spend: 20, conv: 1.6 },
+  { type: "publisher_platform", value: "instagram", spend: 14, conv: 0.7 },
+  { type: "publisher_platform", value: "audience_network", spend: 4, conv: 0.1 },
+  { type: "device_platform", value: "mobile", spend: 26, conv: 1.9 },
+  { type: "device_platform", value: "desktop", spend: 8, conv: 0.4 },
+  { type: "age", value: "25-34", spend: 16, conv: 1.3 },
+  { type: "age", value: "35-44", spend: 12, conv: 0.6 },
+  { type: "age", value: "45-54", spend: 6, conv: 0.2 },
+  { type: "gender", value: "female", spend: 19, conv: 1.2 },
+  { type: "gender", value: "male", spend: 15, conv: 0.9 },
+];
+function metaBreakdownDaily(): Row[] {
+  const rows: Row[] = [];
+  for (let d = 59; d >= 0; d--) {
+    const date = addDays(TODAY, -d);
+    for (const s of META_BREAKDOWN_SEGMENTS) {
+      rows.push({
+        client_id: DEMO_CLIENT, date, level: "account", entity_id: "act",
+        breakdown_type: s.type, breakdown_value: s.value,
+        impressions: Math.round(s.spend * 40), clicks_all: Math.round(s.spend * 0.9), link_clicks: Math.round(s.spend * 0.8),
+        spend: s.spend, conversions: s.conv, conversion_value: Math.round(s.conv * 120),
+      });
+    }
+  }
+  return rows;
+}
+
 // ── LinkedIn: dag-data [S5, S6, S7, S8, S9] ────────────────────────────────
 interface LiDaily { urn: string; date: string; imp: number; clicks: number; spend: number; leads: number; opens: number; conv: number; vidStart: number; vidDone: number }
 
@@ -340,11 +378,20 @@ export function buildAllRows(): Record<string, Row[]> {
 
   const campaignIdOf = (name: string) => `demo-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const r2 = (v: number) => Math.round(v * 100) / 100;
+  // Zelfde classificatie als hierbeneden al voor ads_campaign_impression_share gebeurt (SEARCH op
+  // de campagnes die daar met de hand zijn opgegeven) -- hier afgeleid uit de campagnenaam, want
+  // ads_campaign_monthly dekt ALLE campagnes uit googleMonthly(), niet alleen de drie met
+  // impression-share-data. Zonder deze kolom (die tot 17.32 overal null bleef) kan geen enkele
+  // "spend per campagnetype"-weergave iets tonen voor deze klant, ook al bestaat de data zelf al
+  // jaren -- gevonden bij het bouwen van precies zo'n weergave voor de Google-opener.
+  const campagneType = (naam: string): "SEARCH" | "PERFORMANCE_MAX" | "SHOPPING" | "DISPLAY" =>
+    naam.includes("Performance Max") ? "PERFORMANCE_MAX" : naam.includes("Display") ? "DISPLAY" : "SEARCH";
 
   const tables: Record<string, Row[]> = {};
 
   tables["ads_campaign_monthly"] = g.map((r) => ({
     client_id: DEMO_CLIENT, campaign_id: campaignIdOf(r.campaign), campaign_name: r.campaign, campaign_status: "ENABLED",
+    campaign_type: campagneType(r.campaign),
     month: monthsBack(r.monthIdx), impressions: r.imp, clicks: r.clicks, cost: r.cost, conversions: r.conv,
     conversions_value: r.value, ctr: r2(r.clicks / r.imp), avg_cpc: r2(r.cost / r.clicks),
     cost_per_conversion: r.conv > 0 ? r2(r.cost / r.conv) : null, conversion_rate: r2(r.conv / r.clicks),
@@ -424,6 +471,7 @@ export function buildAllRows(): Record<string, Row[]> {
   }));
   tables["meta_campaign_daily"] = metaCampaignDaily().map(metaBase);
   tables["meta_account_daily"] = metaAccountDaily().map(metaBase);
+  tables["meta_breakdown_daily"] = metaBreakdownDaily();
 
   // LinkedIn-structuur + dagdata.
   tables["linkedin_connections"] = [{ client_id: DEMO_CLIENT, ad_account_urn: "urn:li:sponsoredAccount:demo", token_ref: "demo", status: "disabled", currency: "EUR", last_sync_at: new Date().toISOString() }];
@@ -564,6 +612,18 @@ async function insertViaSupabase(tables: Record<string, Row[]>) {
     }
     console.log(`✓ ${table}: ${rows.length} rijen`);
   }
+
+  // Acht van de tabellen hierboven (zie lib/data-access/feitentabellen.ts) zijn VIEWS over
+  // fact_core -- de upserts hierboven schrijven naar hun *_legacy-tegenhanger, niet naar wat
+  // de app daadwerkelijk leest. Zonder deze projectie bleef demo-greentech na elke her-seed
+  // tot een maand stale zichtbaar in de app (ontdekt bij het live-testen van de wekelijkse SOP:
+  // meta_account_daily/linkedin_account_daily/ads_account_monthly toonden nog data van de vórige
+  // seed-run, ook al meldde deze functie hierboven "160 rijen" succesvol). Migratie 050/078
+  // riep dit destijds handmatig aan voor demo-greentech; nu hoort het bij de seed zelf.
+  const { error: refreshError } = await db.rpc("refresh_fact_from_legacy", { p_client_id: DEMO_CLIENT });
+  if (refreshError) { console.error(`✗ refresh_fact_from_legacy: ${refreshError.message}`); process.exit(1); }
+  console.log(`✓ refresh_fact_from_legacy(${DEMO_CLIENT}) -- fact_core/meta_metrics/linkedin_metrics geprojecteerd`);
+
   // Klantenlijst bijwerken.
   const { data } = await db.from("app_settings").select("value").eq("key", "api_clients").maybeSingle();
   const list = Array.isArray(data?.value) ? (data!.value as Row[]) : [];

@@ -109,7 +109,7 @@ export async function callRouted(
 // Modelkeuze en prijzen: zie docs/ARCHITECTURE-MODEL-ROUTING.md.
 export type Layer = "triage" | "reasoning" | "narrative" | "strategic";
 
-export const LAYER_MODEL: Record<Layer, { primary: string; fallback: string }> = {
+export const LAYER_MODEL: Record<Layer, { primary: string; fallback: string; reasoningMaxTokens?: number }> = {
   // Snel, goedkoop filteren en categoriseren. Fallback is het duurdere model, niet andersom:
   // bij een fout op de goedkope route moet de sterkere Gemini het overnemen, niet nog een keer
   // dezelfde kostenklasse.
@@ -117,10 +117,18 @@ export const LAYER_MODEL: Record<Layer, { primary: string; fallback: string }> =
   // Meerstaps redeneren en hypothesevorming.
   reasoning: { primary: "x-ai/grok-4.6", fallback: "google/gemini-3.7-flash" },
   // Klantgerichte tekst: claim-discipline en nuance wegen hier zwaarder dan snelheid.
-  narrative: { primary: "anthropic/claude-sonnet-5", fallback: "google/gemini-3.7-flash" },
+  // reasoningMaxTokens: bevestigd via OpenRouter's docs voor de Claude-familie -- zonder dit kan
+  // Claude Sonnet 5 zijn hele maxTokens-budget aan onzichtbare reasoning besteden en content ""
+  // teruggeven (masterplan 17.26/17.28: precies dit gebeurde bij de LinkedIn weekly-SOP, 54k
+  // tokens verbruikt, nul zichtbare tekst). Elke aanroeper van deze laag MOET dus een maxTokens
+  // meegeven die hier ruim boven zit -- zie helpers.ts's runAnalysis() voor de referentiewaarde.
+  narrative: { primary: "anthropic/claude-sonnet-5", fallback: "google/gemini-3.7-flash", reasoningMaxTokens: 6000 },
   // Alleen voor de zwaarste, zeldzaamste analyses (bv. God View); vandaag zonder consument --
   // God View heeft structureel te weinig bureaus om te draaien (zie MASTERPLAN.md sectie 12).
-  strategic: { primary: "anthropic/claude-opus-5", fallback: "openai/gpt-5.6-sol" },
+  // Zelfde reasoning-risico als narrative (ook Claude); reasoningMaxTokens hier alvast gezet zodat
+  // een toekomstige aanroeper het gat niet opnieuw hoeft te ontdekken -- wel zelf een maxTokens
+  // ruim boven 8000 meegeven.
+  strategic: { primary: "anthropic/claude-opus-5", fallback: "openai/gpt-5.6-sol", reasoningMaxTokens: 8000 },
 };
 
 /**
@@ -133,11 +141,15 @@ export async function callLayer(
   opts: RoutedRequest,
   callFn: (req: OpenRouterRequest) => Promise<OpenRouterResponse> = callOpenRouter
 ): Promise<OpenRouterResponse> {
-  const { primary, fallback } = LAYER_MODEL[layer];
+  const { primary, fallback, reasoningMaxTokens } = LAYER_MODEL[layer];
   let lastError: Error | null = null;
   for (const model of [primary, fallback]) {
     try {
-      return await callFn({ ...opts, model, temperature: opts.temperature ?? 0 });
+      // reasoningMaxTokens is een Claude-specifiek OpenRouter-veld (bevestigd), alleen zinvol
+      // voor het PRIMAIRE model van deze laag -- het fallback-model (altijd Gemini/GPT hier) is
+      // niet dezelfde modelfamilie en krijgt dit veld dus niet mee.
+      const reasoningBudget = model === primary ? reasoningMaxTokens : undefined;
+      return await callFn({ ...opts, model, temperature: opts.temperature ?? 0, reasoningMaxTokens: reasoningBudget });
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
     }

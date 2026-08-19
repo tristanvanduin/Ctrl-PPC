@@ -28,11 +28,14 @@ export function getSupabase(): SupabaseClient | null {
 }
 
 // ── LLM API-key ───────────────────────────────────────────────────────────
-// Prefereert GEMINI_API_KEY (directe Gemini-endpoint); valt terug op OPENROUTER_API_KEY
-// zodat een oude configuratie blijft werken. De naam blijft getOpenRouterKey voor de
-// bestaande callsites; hij levert simpelweg de actieve LLM-sleutel.
+// Prefereert OPENROUTER_API_KEY -- dat is sinds 15 augustus de standaardroute (.env.example),
+// en de eigenaar wil expliciet alles via OpenRouter, nooit stil terugvallen op een directe
+// Gemini-sleutel. GEMINI_API_KEY is alleen nog de noodgreep voor een omgeving ZONDER
+// OpenRouter-sleutel (bijv. losse lokale dev), niet een voorkeur boven OpenRouter wanneer beide
+// toevallig gezet zijn. De naam blijft getOpenRouterKey voor de bestaande callsites; hij levert
+// simpelweg de actieve LLM-sleutel.
 export function getOpenRouterKey(): string | null {
-  return process.env.GEMINI_API_KEY ?? process.env.OPENROUTER_API_KEY ?? null;
+  return process.env.OPENROUTER_API_KEY ?? process.env.GEMINI_API_KEY ?? null;
 }
 
 // ── Goals + account type from client_settings or sop_client_config ──────────
@@ -296,7 +299,12 @@ export async function runAnalysis(opts: {
     apiKey,
     systemPrompt,
     userMessage,
-    maxTokens: 8192,
+    // 16000, niet 8192: de narrative-laag reserveert 6000 tokens voor Claude's reasoning-budget
+    // (llm-router.ts's LAYER_MODEL), en OpenRouter eist dat maxTokens daar strikt boven blijft.
+    // Met 8192 kon dat na aftrek van reasoning krap worden voor de langere SOP-rapporten
+    // (masterplan 17.28); 16000 laat na de reservering nog ruim 10.000 tokens over voor de
+    // zichtbare tekst, ruim boven het langste tot nu toe geziene rapport (~2100 tokens).
+    maxTokens: 16000,
     label: `${sopType}-full`,
   });
 

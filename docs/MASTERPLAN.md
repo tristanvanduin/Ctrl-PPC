@@ -3393,7 +3393,778 @@ geen automatische cron toegevoegd. Dit is de kalibratieberekening zelf en de ple
 toegepast wordt op nieuwe voorstellen — het eerste, kleinste, veiligste stuk van loop 5, niet de
 hele lus in één keer.
 
-### 17.25 KPI-rij kanaalafhankelijk gemaakt + GRT/GRA/GRN-demodata drie keer eerlijker
+### 17.25 Cross-channel-synthese daadwerkelijk aan de maandanalyse gekoppeld
+
+De eigenaar vroeg naar de status van monthly / cross-channel / cross-account / God View, en wees
+er scherp op dat cross-channel-synthese amper getest was — met de eis: "elke maand analyse moet
+cross channel pakken als cross channel mogelijk is."
+
+**Grondoorzaak**: `runCrossChannelSynthesis()` (masterplan 17.12) bestond en werkte, maar was
+alleen bereikbaar via een losse, handmatig aan te roepen route
+(`/api/analysis/cross-channel-synthesis`). Niets in `app/api/analysis/monthly/route.ts` — waar de
+drie kanalen (Google inline, `runMetaMonthlyAnalysis()`, `runLinkedinMonthlyAnalysis()`) hun
+maandanalyse afronden — riep die functie ooit aan. Cross-channel-synthese gebeurde dus alleen als
+iemand er expliciet aan dacht een tweede, aparte aanroep te doen — vandaar dat hij in de praktijk
+zelden liep, ook wanneer alle kanalen van een klant allang klaar waren.
+
+**Fix**: nieuw bestand `lib/analysis/auto-cross-channel-trigger.ts` met
+`triggerCrossChannelSynthesisIfReady(supabase, clientId)`, aangeroepen vanaf alle drie de
+plekken waar een kanaal zijn maandanalyse succesvol afrondt. Geen nieuwe voorwaarde toegevoegd —
+`runCrossChannelSynthesis()` controleert zelf al, goedkoop en vóór elke LLM-call: minder dan 2
+gekoppelde kanalen, al gesynthetiseerd vandaag, of nog niet alle kanalen deze cyclus klaar. Welk
+kanaal toevallig als laatste afrondt, is degene bij wie de synthese echt gebeurt; de eerdere
+kanalen krijgen een goedkope skip. Faalt zacht met eigen try/catch en logging — een mislukte of
+overgeslagen synthese mag de hoofdanalyse van het kanaal nooit blokkeren of laten falen.
+
+**Tier-gating, ter verduidelijking bij dezelfde vraag**: cross-channel-synthese loopt mee zodra
+technisch mogelijk, ongeacht licentie — dat is de resource die deze fix nu overal aanzet.
+Cross-account (portfolio-synthese, al gated op Growth+, masterplan eerder in de sessie) en God
+View komen er pas bij op een betaald/hoger niveau. Deze fix raakt alleen de gratis-beschikbare
+cross-channel-laag.
+
+**Getest**: `lib/analysis/__auto_cross_channel_trigger_test.ts`, 3 assertions — geen enkele
+databaseaanroep zonder API-sleutel (bewezen met een mock die hard faalt als `.from()` toch wordt
+aangeroepen), geen exception bij het normale skip-pad (minder dan 2 kanalen), en geen exception
+bij een gesimuleerde databasefout in `laadBeschikbareKanalen` — precies het scenario waar de
+wrapper voor bestaat. `npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+**Wat dit niet doet**: geen wijziging aan `runCrossChannelSynthesis()` zelf, geen nieuwe
+readiness-logica — die bestond al en wordt nu alleen daadwerkelijk bereikt.
+
+### 17.26 Weekly en biweekly live getest: drie structurele bugs gevonden en gefixt
+
+De eigenaar eiste dat weekly en biweekly net zo grondig live getest worden als monthly eerder
+deze sessie ("weekly en bi weekly moeten absoluut getest worden"). Getest tegen `demo-greentech`
+(enige klant met verse data op alle drie de kanalen) via de echte routes
+(`/api/analysis/weekly`, `/api/analysis/biweekly`), niet gemockt. Drie echte bugs gevonden,
+alledrie meteen gefixt en opnieuw live geverifieerd — niet slechts gerapporteerd.
+
+**Bug 1 — een leeg dimension-availability-profiel werd gelezen als "alles ontbreekt".**
+De allereerste weekly-run tegen demo-greentech kwam terug met alle drie de secties op "Niet
+beschikbaar — analyseer NIET", ook al was de aangeleverde data in dezelfde prompt compleet en
+vers. Oorzaak: `ads_dimension_availability` had nul rijen voor demo-greentech (die tabel wordt
+gevuld door de echte Google Ads-sync-orchestrator, en demo-accounts lopen daar nooit doorheen),
+en `buildAvailabilitySummary()` in `lib/analysis/dimension-availability.ts` las "nul rijen" als
+"elke dimensie is expliciet gecontroleerd en ontbreekt" in plaats van "onbekend". Dat is precies
+het omgekeerde van de eigen, net ernaast gedocumenteerde filosofie in `enrichment.ts`
+("ontbrekende laag ≠ niets te melden, maar moet wel benoemd worden"). Fix: bij nul rijen een
+expliciete "geen signaal, baseer je oordeel op de daadwerkelijk aangeleverde data"-melding in
+plaats van de "niet beschikbaar"-lijst. Raakt niet alleen demo-accounts — elk net gekoppeld
+account zonder eerste sync zou hetzelfde probleem hebben gehad. Getest:
+`__dimension_availability_test.ts`, 7 assertions (leeg profiel geen blokkade, `evaluateSopSections`
+zelf blijft intern ongewijzigd, een normaal profiel met echte rijen ongewijzigd gedrag).
+
+**Bug 2 — het demo-seedscript liet acht tabellen structureel stale, ook meteen na een verse run.**
+Na de fix hierboven bleven Meta en LinkedIn nog steeds op "Data is actueel" falen met een lege
+periode — de freshness-check klopte (er stond wél data, ooit), maar het venster van de laatste 14
+dagen was leeg. Onderzoek wees uit: `meta_account_daily`, `linkedin_account_daily` en zes andere
+tabellen zijn views over `fact_core` (migratie 054); `scripts/demo/seed-demo-client.ts` schrijft
+correct naar hun `*_legacy`-tegenhanger, maar riep nooit de projectie-RPC
+`refresh_fact_from_legacy()` aan. Het script meldde dus "✓ meta_account_daily: 160 rijen" terwijl
+de app een maand oude data bleef tonen — precies hetzelfde gat dat 17.20 destijds handmatig moest
+omzeilen voor de GRT/GRA/GRN-split, alleen nooit teruggebracht in het herbruikbare script zelf.
+Fix: `insertViaSupabase()` roept de RPC nu zelf aan als laatste stap, na alle upserts. Elke
+toekomstige her-seed van de demo-klant is hierdoor in één run weer volledig actueel op alle
+kanalen, zonder de handmatige RPC-aanroep die 17.20 nog apart moest onthouden.
+
+**Bug 3 — een leeg LLM-antwoord werd stilzwijgend als geslaagde analyse opgeslagen.**
+De LinkedIn weekly-run gaf `output: ""` terug — 54.188 tokens verbruikt (vermoedelijk vrijwel
+volledig in reasoning), maar nul zichtbare tekst — en toch `"saved": true`, 0 findings, geen
+foutmelding. `callOpenRouter()` (`lib/analysis/openrouter-client.ts`) retryt alleen bij een JSON-
+parsefout in JSON-mode; een leeg antwoord buiten JSON-mode (de narratieve hoofdrapportage van elke
+SOP) had geen eigen signaal en werd als elk ander geslaagd antwoord behandeld. Fix: een leeg
+antwoord buiten JSON-mode retryt nu net als de bestaande JSON-parsefout, en gooit na uitputting
+van de retries een leesbare fout in plaats van een lege string terug te geven — waardoor
+`callLayer()`'s bestaande fallback-naar-tweede-model-logica automatisch aanslaat. Meteen
+geverifieerd: de herhaalde LinkedIn weekly-run viel automatisch terug op
+`google/gemini-3.7-flash` en leverde een volwaardig rapport (3 findings, 2 aanbevelingen).
+Getest: `__openrouter_client_test.ts`, 8 assertions (normaal antwoord ongewijzigd, retry herstelt
+een leeg antwoord, blijvend leeg gooit een leesbare fout met label, JSON-mode-pad blijft
+ongewijzigd voor callers die zelf `parseStatus` uitlezen).
+
+**Resultaat**: alle 6 combinaties (weekly + biweekly × Google/Meta/LinkedIn) tegen
+demo-greentech geverifieerd met echte, inhoudelijke output en bevestigde databaseschrijvingen
+(`sop_analysis_output`, sectie "full", alle 6 rijen met substantiële tekst, geen enkele leeg).
+`npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+### 17.27 God View live getest met de 2 echte bureaus — geen "te weinig data" excuus
+
+De eigenaar, met klem, herhaald: *"2 agencies is precies wat je nodig hebt om minimaal cross
+agency inzichten op te halen"* — een expliciete herhaling van de 17.16-les (niet te snel
+"onvoldoende data" concluderen). Eerder deze sessie werd God View afgedaan als "kan vandaag
+structureel geen enkele rij produceren" omdat er maar 2 bureaus bestaan tegenover een
+k-anonimiteitsdrempel van 4 — precies de fout die 17.16 al identificeerde, nu herhaald.
+
+**Testroute bestond al, was nog nooit tegen echte data gedraaid.** 17.5 bouwde
+`/api/platform/god-view?testdrempel=true` — een expliciet gelabelde, ALL_CLIENTS-gated
+drempelverlaging (1 account/1 bureau) speciaal voor deze situatie — maar de masterplan-tekst
+bewees destijds alleen dat het MECHANISME het argument doorgeeft (`metrics: null` zonder,
+`metrics: {...}` mét), niet dat het iets zinnigs oplevert op de 2 bureaus die vandaag echt bestaan.
+
+**Drie aparte blokkades, geen van alle "te weinig bureaus".** Bij het daadwerkelijk proberen
+bleken er drie losse, elkaar niet overlappende gaten te zijn: (1) `agencies.benchmark_optin_at`
+staat op `null` voor zowel Ranking Masters als Demo — een aparte opt-in-poort, los van de
+k-anonimiteitsdrempel; (2) Ranking Masters' laatste volledige sync-maand is april 2026 (de
+"permanente sync-stilstand" die 17.20 al accepteerde), dus een enkele kalendermaand-query vindt
+nooit data van beide bureaus tegelijk; (3) van de 70 echte Ranking Masters-accounts hebben er maar
+8 ooit een `bedrijfsmodel`/`niche` in `client_settings` gekregen, en `demo-greentech` zelf géén
+(alleen de tijdelijke GRT/GRA/GRN-pseudoklanten uit 17.20 hadden er een, en die zijn opgeruimd).
+
+**Zelfde patroon als 17.19/17.20: de echte kernfunctie rechtstreeks aangeroepen, niet de HTTP-laag
+omzeild in de analysecode zelf.** Een wegwerpscript (verwijderd na afloop, geen databaseschrijving)
+riep `bouwGodViewCellen()` — volledig ongewijzigd — aan met: de 8 echte, gesegmenteerde Ranking
+Masters-klanten en hun echte april-cijfers uit `blended_account_monthly`, plus `demo-greentech`
+met zijn echte julicijfers en het bedrijfsmodel/niche waarvoor de klant is ONTWORPEN
+(`b2b`/`industrie`, letterlijk zo gedocumenteerd in `scripts/demo/seed-demo-client.ts` sinds
+17.20) als testinvoer — niet naar de database geschreven, alleen als functieargument. Dezelfde
+testdrempel als `?testdrempel=true` (1 account/1 bureau).
+
+**Resultaat: het mechanisme werkt, bewezen op echte cijfers.** 10 van de 18 gevonden cellen
+leverden een echte mediane CPA/ROAS op — o.a. mediane CPA €26,25 over 8 echte b2c-klanten
+(Ranking Masters), en per-niche cijfers als €10,39 CPA voor "wonen" en €264,65 voor
+"retail-lokaal", stuk voor stuk uit echte spend/conversieverhoudingen, nooit uit een enkel account
+terug te rekenen (de hele reden voor mediaan-van-verhoudingen i.p.v. som/som, zie de koptekst van
+`god-view.ts`). **Eerlijke, bruikbare bijvangst**: 0 van de 18 cellen combineerden daadwerkelijk 2
+bureaus in dezelfde cel — niet omdat het mechanisme het niet zou toestaan (de testdrempel staat
+dat al bij 1 bureau toe), maar omdat Ranking Masters' 8 gesegmenteerde klanten stuk voor stuk b2c
+zijn terwijl Demo als b2b is ontworpen: er is vandaag geen natuurlijke segment-overlap tussen de
+twee bureaus. Zodra een klant bij een van beide bureaus een niche/model deelt met een klant bij de
+ander, activeert een echte cross-agency-cel zich vanzelf — dat is al aangetoond te werken op
+losse cellen. De praktische hefboom is dus niet "wacht op meer bureaus" maar "breid de
+segmentatiedekking uit": 62 van de 70 Ranking Masters-accounts hebben nog nooit een
+`bedrijfsmodel`/`niche` gekregen.
+
+**Wat dit niet doet**: geen wijziging aan `god-view.ts`, `god-view-data.ts` of de testroute zelf —
+dit was uitsluitend verificatie met echte cijfers, geen enkele databaseschrijving, geen
+opt-in-vlag aangeraakt. Geen enkel bestand overgebleven na afloop.
+
+### 17.28 OpenRouter altijd leidend: GEMINI_API_KEY kon stil voorrang krijgen
+
+Vraag van de eigenaar naar aanleiding van 17.26's fallback-fix: of de Gemini-fallback via
+OpenRouter liep of via "die andere Gemini-sleutel" — met de expliciete eis "ik wil alles via
+openrouter en niet die gemini key. die gaat er gegarandeerd uitklappen bij veel aanvragen."
+
+**Gecontroleerd, niet aangenomen.** `.env.local`: `LLM_BASE_URL=https://openrouter.ai/api/v1`
+(echte OpenRouter), en alleen `OPENROUTER_API_KEY` staat gezet — `GEMINI_API_KEY` ontbreekt in de
+productie-omgeving. Zowel het primaire model als de fallback liepen dus vandaag al via OpenRouter;
+er is geen aparte, directe Gemini-aanroep gedaan.
+
+**Wel een reëel, sluimerend risico gevonden.** `getOpenRouterKey()` (`lib/analysis/helpers.ts`)
+koos `GEMINI_API_KEY` vóór `OPENROUTER_API_KEY` als beide ooit gezet zouden zijn — een restant uit
+de periode vóór de OpenRouter-migratie (15 augustus), bedoeld als noodgreep voor een omgeving
+zónder OpenRouter-sleutel (zie `.env.example`). Onschuldig zolang `GEMINI_API_KEY` niet bestaat,
+maar precies het scenario waar de eigenaar tegen waarschuwt: zou die sleutel ooit voor iets anders
+worden toegevoegd, dan verdwijnt elke LLM-aanroep stil van OpenRouter af zonder dat het ergens
+opvalt. Volgorde omgedraaid: OPENROUTER_API_KEY is nu altijd leidend zodra hij bestaat;
+GEMINI_API_KEY blijft alleen de noodgreep wanneer OpenRouter's sleutel volledig ontbreekt. Getest:
+`__helpers_test.ts`, 3 assertions (beide gezet → OpenRouter wint, alleen Gemini → werkt nog als
+noodgreep, geen van beide → `null` zonder crash). `npx tsc --noEmit` schoon, volledige
+`scripts/gates.sh` groen.
+
+**Bijvangst om te melden, niet te verzwijgen**: het lege-antwoord-gat uit 17.26 zat in dezelfde
+gedeelde code die elke SOP al sinds het bestaan van dit bestand gebruikt — niet iets nieuws van
+vandaag. Niet uit te sluiten dat er bij echte klanten in het verleden af en toe een leeg of te kort
+rapport is opgeslagen zonder signaal. Aangeboden aan de eigenaar: een audit op bestaande
+`sop_analysis_output`-rijen met verdacht korte output, nog niet uitgevoerd (wacht op akkoord).
+
+### 17.29 De echte oorzaak van het lege antwoord: geen apart reasoning-budget — en de audit
+
+Vervolgvraag van de eigenaar op 17.26/17.28: klopt de tokencap, of moet die omhoog? Uitgezocht in
+plaats van gegokt — OpenRouter's eigen documentatie over reasoning-tokens opgehaald.
+
+**De echte oorzaak, nu bevestigd.** OpenRouter kent voor de Claude-familie een apart
+`reasoning.max_tokens`-veld, los van `max_tokens` — reasoning-tokens tellen wel mee als
+outputtokens, maar `max_tokens` moet STRIKT boven het reasoning-budget liggen, anders blijft er
+geen ruimte over voor het zichtbare antwoord. Nergens in de codebase werd dit veld ooit gezet:
+elke laag liet Claude/Grok zelf bepalen hoeveel van zijn `max_tokens`-budget aan onzichtbare
+reasoning ging. Bij de narrative-laag (Claude Sonnet 5, `max_tokens: 8192`, geen reasoning-cap)
+kon dat dus het VOLLEDIGE budget aan reasoning opgaan, met content `""` als resultaat — precies
+wat er gebeurde bij de LinkedIn weekly-SOP (54k tokens verbruikt, nul zichtbare tekst). De vraag
+"cap verhogen of houden" was dus verkeerd gesteld: een hogere cap alleen had het gat niet gedicht,
+want de reasoning had net zo goed de nieuwe, hogere cap kunnen opvullen.
+
+**Fix: een expliciet gereserveerd reasoning-budget, niet zomaar een hogere cap.**
+`lib/analysis/openrouter-client.ts` kreeg een nieuw `reasoningMaxTokens`-veld op
+`OpenRouterRequest`, dat als `body.reasoning = { max_tokens: N }` wordt meegestuurd — met een
+harde validatie die meteen gooit (vóór er iets over het netwerk gaat) als `reasoningMaxTokens >=
+maxTokens`. `lib/analysis/llm-router.ts`'s `LAYER_MODEL` kreeg een `reasoningMaxTokens` per laag,
+alleen voor de twee lagen met een bevestigd Claude-primair model: `narrative` (6000) en `strategic`
+(8000, nog zonder actieve aanroeper). `callLayer()` geeft dit budget alleen mee aan het PRIMAIRE
+model van een laag, nooit aan het fallback-model (altijd Gemini/GPT, andere modelfamilie, ander
+gedrag onbevestigd). De `reasoning`- en `triage`-laag (Grok, Gemini) blijven bewust ongemoeid —
+hun OpenRouter-reasoning-gedrag is niet gecontroleerd, dus geen aanname erover.
+
+**En de cap ging wél omhoog, maar als gevolg, niet als losstaande maatregel.** `runAnalysis()`'s
+`maxTokens` voor de narrative-laag ging van 8192 naar 16000 — nodig omdat `max_tokens` na de
+6000-token reservering nog altijd ruim boven het langste ooit geziene rapport (~2100 tokens) moet
+uitkomen; 8192 liet daarvoor te weinig marge.
+
+**Live geverifieerd**: dezelfde LinkedIn weekly-SOP die eerder op `google/gemini-3.7-flash`
+terugviel, gebruikte nu het primaire model (`anthropic/claude-sonnet-5`) rechtstreeks — 0 retries,
+4991 tekens echte output in één keer. Getest: `__openrouter_client_test.ts` +4 assertions
+(reasoning-veld komt daadwerkelijk in de body terecht; een ongeldige combinatie gooit vóór elke
+netwerkaanroep), `__llm_router_test.ts` +4 assertions (het budget gaat alleen naar het primaire
+Claude-model, nooit naar de fallback of naar lagen zonder configuratie). `npx tsc --noEmit` schoon,
+volledige `scripts/gates.sh` groen.
+
+**De aangeboden audit, uitgevoerd.** Alle 53 bestaande `sop_analysis_output`-rijen met
+`section = "full"` (elke narratieve SOP-rapportage die ooit is opgeslagen, 3 april t/m 18
+augustus 2026, 9 klanten) doorgelopen: **geen enkele leeg of verdacht kort** (kortste rapport ruim
+boven 2000 tekens). Het gat heeft zich in de praktijk dus nooit voorgedaan in een bewaarde rij —
+geen stille schade bij bestaande klanten gevonden. Wel een eerlijke kanttekening: met 53 rijen
+totaal is dat een klein aantal kansen geweest, dus "nooit gebeurd" leunt deels op beperkte
+blootstelling, niet alleen op geluk.
+
+### 17.30 Weekly en biweekly krijgen hun eigen cross-channel-synthese, geen hergebruik van monthly
+
+Vervolgvraag op 17.25: moet weekly kanaal-specifiek blijven, of standaard cross-channel kijken?
+De eigenaar, scherp: "een anomalie kan mogelijk verklaard worden en in perspectief geplaatst
+worden" — "je account vertoont anomalies" is zwakker dan "je account vertoont anomalies, maar dit
+is een marktbreed signaal, geen reden voor paniek". En: weekly/biweekly moeten dit ZELF triggeren
+(een verse synthese, niet de laatste monthly-synthese hergebruiken), mogelijk zelfs cross-account
+en God View.
+
+**Eerst uitgezocht, niet aangenomen: de trigger simpelweg overzetten had niets gedaan.**
+`fetchChannelSummary()` in `cross-channel-synthesis.ts` (17.12) is hardgecodeerd op
+`section: "structured_monthly_v2"` — het rijke `final_sop`-object dat UITSLUITEND monthly's
+13-stappenpijplijn produceert. Weekly/biweekly zijn one-shot analyses: platte markdown
+(`section: "full"`) plus losse findings/recommendations/tasks via `extract-structured.ts`
+(tabellen `sop_insights`/`sop_recommendations`), geen `final_sop`. `portfolio-synthesis.ts`
+(cross-account) leunt op dezelfde structured_monthly_v2, plus op deze cross-channel-synthese zelf
+— dus cross-account heeft dezelfde blokkade, dieper. God View: bewust NIET meegenomen — 17.27 liet
+al zien dat opt-in uitstaat en 62 van de 70 Ranking Masters-klanten geen segment hebben; hem aan
+elke run hangen zou vrijwel altijd `metrics: null` opleveren, geen kostenkwestie maar een
+vullingskwestie.
+
+**Model voor deze stap**: dezelfde `reasoning`-laag (Grok 4.6, fallback Gemini 3.7 Flash) als
+monthly's cross-channel-synthese — zelfde taak (meerdere kanalen tegen elkaar afwegen tot één
+verhaal), zelfde kostenklasse, al bewezen. Geen nieuwe modelkeuze nodig.
+
+**Gebouwd: `lib/analysis/cross-channel-synthesis-lite.ts`, een eigen laag over een structureel
+ander databronformaat — geen kopie van de monthly-synthese met een andere tabelnaam erin geplakt.**
+`fetchLiteChannelSummary()` leest per kanaal `sop_insights` (top 5, ernstigste severity eerst) en
+`sop_recommendations` (top 5, hoogste ice_total eerst) voor de betreffende cyclus; `null` als dat
+kanaal deze cyclus nog geen afgeronde run heeft (`section: "full"`-check). `buildLiteSynthesisPrompt()`
+vraagt expliciet om PERSPECTIEF ("is dit kanaal-specifiek of een patroon over kanalen heen") in
+plaats van monthly's root-cause-synthese-taal — weekly/biweekly doen geen root-cause-analyse, dus
+de prompt belooft dat ook niet.
+
+**Maximaal hergebruikt, niets dubbel gedefinieerd** (de hygiënepoort waakt hier expliciet over):
+`parseSynthesisOutput()`, `SynthesizedAction`, `CrossChannelSynthesisResult` en de opslaglogica
+zijn 1-op-1 overgenomen uit `cross-channel-synthesis.ts` — de LLM-uitvoervorm is namelijk wél
+identiek, alleen de invoer verschilt. `readyForSynthesis()` (minstens 2 kanalen, ELK kanaal klaar
+deze cyclus) is generiek gemaakt (`<T>`) zodat zowel monthly's `ChannelSummary` als de nieuwe
+`LiteChannelSummary` 'm ongewijzigd hergebruiken in plaats van een tweede, identieke regel elders.
+
+**Eigen opslagslot per cadence, botst nooit met monthly of met elkaar**: `cross_channel_synthesis_weekly_v1`
+en `cross_channel_synthesis_biweekly_v1` (naast monthly's bestaande `cross_channel_synthesis_v1`),
+alledrie onder `sop_type: "cross_channel"`. Weekly's "afgelopen 14 dagen, anomalies" en biweekly's
+"impact/voortgang van een aanpassing" zijn andere vragen over andere periodes dan monthly's
+diepe root-cause-analyse en horen dus niet in dezelfde "1x per dag"-deduplicatie te vallen.
+
+**Trigger**: `triggerLiteCrossChannelSynthesisIfReady()` in `auto-cross-channel-trigger.ts`,
+zelfde faalzachte vorm als de monthly-variant (17.25), aangeroepen vanaf alle 6 succes-paden
+(Google/Meta/LinkedIn × weekly/biweekly) in hun routes.
+
+**Live geverifieerd, geen mock**: alle 3 kanalen van `demo-greentech` hadden vandaag al een
+afgeronde weekly-run; één herhaalde Google-weekly-aanroep triggerde de synthese meteen (Grok 4.6,
+4906 tokens). Het resultaat is een sterke, niet-triviale synthese: het model herkende zelfstandig
+dat de losse data-integriteitsklachten in alle drie de kanalen (sync-duplicatie op Search,
+account/campagne-reconciliatiefout op Meta, conversiediscrepantie op LinkedIn) "dezelfde klasse
+probleem" zijn — headline: *"CPA-verdubbeling en conversiedip op demo-greentech zijn een
+cross-kanaal datasignaal, geen losse SEA-crisis"* — en beval expliciet aan om de biedstrategie
+niet aan te passen totdat de meting is uitgelijnd, precies het "geen reden voor paniek, dit is
+breder"-perspectief waar de eigenaar om vroeg. Biweekly hetzelfde: eigen slot, eigen run (Grok
+4.6, 7270 tokens), geen botsing met weekly's slot op dezelfde dag.
+
+**Getest**: `__cross_channel_synthesis_lite_test.ts`, 16 assertions (severity-/ice-sortering,
+null bij ontbrekend kanaal, promptinhoud, alle skip-paden, het volledige gemockte pad met een
+eigen label per cadence). `__auto_cross_channel_trigger_test.ts` uitgebreid met de lite-wrapper
+(geen sleutel, normale skip, databasefout — alledrie faalt zacht). Bestaande
+`__cross_channel_synthesis_test.ts` (35 assertions) en `__llm_router_test.ts`/`__openrouter_client_test.ts`
+nog steeds groen — de generieke `readyForSynthesis<T>()` brak niets aan monthly's eigen gedrag.
+`npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+**Wat dit niet doet, bewust**: geen cross-account-synthese voor weekly/biweekly (zelfde
+structured_monthly_v2-afhankelijkheid, plus de Growth+-tier-gate die intact moet blijven — volgende
+stap, nog niet gebouwd). Geen God View-koppeling (17.27's bevinding staat: eerst opt-in en
+segmentatiedekking, dan pas een trigger). Geen wijziging aan monthly's eigen
+`cross-channel-synthesis.ts` behalve het generiek maken van `readyForSynthesis()`.
+
+### 17.31 Dashboard-onderzoek: niets verwijderd, wel een vaal geworden kaart — en een openstaande designvraag
+
+De eigenaar, gealarmeerd door een voorbeeldafbeelding (een donker, strak "Google Ads Overview"-
+scherm met KPI-rij, grafiek+donut en een gloeiende wereldkaart): "waarom zijn de views in het
+dashboard zo gigantisch aangepast, we zijn belangrijke inzichten kwijt (denk aan de geo map)".
+
+**Onderzocht in plaats van aangenomen.** Live gescreenshot (`?demo=1` op de klant-URL, zelfde
+auth-omzeiling als `scripts/check-kaartoverloop.mjs` al gebruikt) i.p.v. in code te gissen. Resultaat:
+geen enkel dashboardonderdeel is verwijderd — de wereldkaart (`world-map.tsx`), de gezondheidsscore,
+anomalieën, pacing, forecast en video/placement-tabellen staan er allemaal nog, nergens als
+ongebruikt gemarkeerd. Wat wél gebeurde: op expliciet eerder verzoek van de eigenaar ging de
+merkkleur van het oude, stevige navy (#08288C) naar een lichtere indigo (#4f46e5) — en
+`--kaart-hoog` (de kleur van het land met de meeste data) verwees rechtstreeks naar die
+merkkleurvariabele. De kaart verdunde dus automatisch mee, tegen een bijna-witte achtergrond las
+dat als leeg in plaats van als "hier zit de data" — geen verwijderd inzicht, wel verloren visuele
+impact door een bijwerking die niemand toen opmerkte.
+
+**Bijvangst: er bestaat al een donkere modus die dicht bij het voorbeeld ligt.** Niet nieuw werk —
+gewoon zichtbaar gemaakt via een screenshot. De eigenaar bevestigde dat de vraag niet over kleur/
+thema ging maar over de COMPOSITIE: een dichte rij grote cijfers, panelen naast elkaar, weinig
+tekst.
+
+**Gefixt, klein en verdiend**: `--kaart-hoog`/`--kaart-hover` in `app/globals.css` verwijzen niet
+langer rechtstreeks naar `--brand-primary`, maar mengen 22% zwart erdoorheen
+(`color-mix(in srgb, var(--brand-primary) 78%, #0f1115 22%)`) — de kaart heeft nu zijn eigen
+contrast en verdunt niet meer automatisch mee bij een volgende merkkleurwissel. Live geverifieerd
+(licht, vóór/na-screenshot): het hoogste land is weer duidelijk zichtbaar tegen de lege landen.
+`npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen.
+
+**Bewust NIET blind doorgezet: de grotere compositievraag.** `MetricCards` (Conversies/Omzet/ROAS/
+CPA, elk met jaardoel, jaarprognose én een voortgangsbalk) draagt wezenlijk meer informatie dan de
+voorbeeldafbeelding se vier kale cijfers. Naast een grafiek proppen zou ze uitknijpen, niet
+verfraaien — en dat is precies het soort aanname die deze sessie herhaaldelijk fout bleek te gaan
+als hij ongecontroleerd bleef staan. Twee opties voorgelegd; de eigenaar koos optie 2 (kale
+samenvattingsrij toevoegen, bestaande rijke kaarten laten staan) en gaf de volgorde:
+"compacte rij, geo kaart, donut, pacing, en daaronder in dezelfde strakke stijl verder uitbouwen".
+
+**De kale samenvattingsrij bleek al te bestaan.** `PeriodSummary`
+(`components/dashboard/period-summary.tsx`) rendert precies dat — label, groot cijfer, sparkline,
+delta, via de gedeelde `Kerncijfer`-component — en staat al boven de kanaaltabs in
+`client-dashboard.tsx`, dus vóór elk kanaalscherm. Geen nieuwe bouw nodig, alleen de rest van de
+pagina eromheen ordenen. En Google bleek al een eigen "donut" te hebben: `PmaxNetworkSplit` (twee
+ringen: kosten- en conversieverdeling per PMax-netwerk), tot nu toe weggestopt diep in "Waar het
+budget landt".
+
+**`components/dashboard/google-view.tsx` herschikt** (Overzicht-tab, geen gedragswijziging aan de
+onderliggende componenten): Markten (geo-kaart) staat nu eerst, direct gevolgd door een nieuwe,
+eigen sectie "Netwerkverdeling" met `PmaxNetworkSplit`, dan "Prestaties richting de beurs/
+Maandprestaties" (pacing), en pas daarna Jaaroverzicht 2026 en de resterende video/placement-
+kaarten — dezelfde volgorde als gevraagd. De oude, zorgvuldig uitgerekende 8/4/12-rastercode voor
+"Waar het budget landt" (row-span-2 om de PMax-ringen het gat tussen video en assetdekking te
+laten vullen) is vervallen nu de ringen daar niet meer staan; die sectie is teruggebracht naar een
+simpele, gestapelde volgorde.
+
+**Live geverifieerd, licht én donker** (beide gelijkwaardig uitgewerkt, zoals gevraagd) — twee
+screenshots gestuurd. Eerlijke kanttekening: de nieuwe "Netwerkverdeling"-sectie toont niets voor
+demo-greentech, want die klant heeft geen `ads_pmax_network_breakdown`-rijen (een al bestaand gat
+in de demo-seed, niet iets van deze wijziging) — het component zelf stond al langer live elders op
+dezelfde pagina en is ongewijzigd, dus functioneel betrouwbaar, alleen niet visueel te bevestigen
+op déze klant. Bij een echt Performance Max-account verschijnt de ring gewoon.
+
+**`scripts/check-kaartoverloop.mjs` gedraaid** (verplicht na opmaakwerk aan kaarten/rasters, zie
+AGENTS.md) — alle 15 schermen "niets buiten de kaart", inclusief Google, en de ingebouwde zelftest
+(bug teruggezet) vindt hem nog steeds. `npx tsc --noEmit` schoon, volledige `scripts/gates.sh`
+groen.
+
+**Nog niet gestart**: de rest van de pagina ("daaronder in dezelfde strakke stijl") verder
+verdichten — Jaaroverzicht 2026 en "Waar het budget landt" staan nog in hun oude, stukje-voor-
+stukje-gestapelde vorm. Ook nog niet aangeraakt: de andere kanaalschermen (Meta, LinkedIn,
+cross-channel) en cross-account/God View, die nog helemaal geen scherm hebben (alleen backend/
+API) — die worden vanaf nul gebouwd in deze stijl, geen "herstel".
+
+### 17.33 Google Overzicht, de echte opener: kaart + donut in één dichte rij, geen los gestapelde secties meer
+
+17.32 herschikte alleen de vólgorde van secties; de eigenaar liet met de referentieafbeelding
+er weer naast leggen dat dat niet ver genoeg ging: "lijkt dat hier ook maar een beetje op?" — de
+pagina was 4353px lang met losse kaarten met eigen koppen, het voorbeeld is één beeldschermvullende
+compositie. Reactie: "ja, bouw het. ik vind het prima als hier een 2e laag onderzit... maar die
+eerste opener met deze view is ijzersterk" — de opener moet dicht en sterk zijn, de rest mag later.
+
+**Gebouwd**: een nieuwe rij (`hero-rij`) die de geo-kaart (`GeoBreakdown`, `xl:col-span-8`) en een
+nieuwe donut (`xl:col-span-4`) naast elkaar zet, zonder de `Sectie`-wrapper (icoon+titel+bijschrift)
+die beide componenten al zelf als kop hebben — die wrapper zou een dubbele kop hebben gegeven.
+`PmaxNetworkSplit` (de "Netwerkverdeling"-sectie uit 17.32) is terugverplaatst naar "Waar het
+budget landt", waar hij oorspronkelijk stond.
+
+**Welke donut naast de kaart, drie keer bijgestuurd.** Eerste poging was `PmaxNetworkSplit` zelf;
+de eigenaar wees dat direct af: "waarom met er pmax data in de donut???" — die ring is leeg voor
+elk account dat geen Performance Max draait. Tweede kandidaat, apparaatsplitsing
+(`ads_device_performance_monthly`), werd al afgeschoten voordat hij af was: "ik denk niet dat
+device de belangrijkste is voor de eerste donut". Voorgelegd via een vraag met concrete opties; het
+antwoord was zelf weer een open vraag terug ("of spend per campagne type of een metric die slaat
+op de wereldkaart?"). Gekozen: spend per campagnetype (`ads_campaign_monthly.campaign_type`) —
+orthogonaal aan de kaart (geen overlap met de landenlijst die `GeoBreakdown` al toont) en universeel:
+elk account heeft een verdeling over Search/Performance Max/Shopping/Display, ook een dat 100% één
+type draait. Nieuw component `components/dashboard/campaign-type-split.tsx`, met dezelfde
+rekenkern als de PMax-ringen (`buildNetworkSplit()` uit `lib/pmax/network-split.ts`, die met opzet
+dimensie-onafhankelijk is gebouwd) — geen tweede definitie van diezelfde logica, alleen gevoed met
+campagnetype in plaats van PMax-netwerk.
+
+**Twee bugs gevonden tijdens het verifiëren, niet ervoor:**
+1. `ads_campaign_monthly.campaign_type` stond op `null` voor alle rijen van demo-greentech in de
+   echte Supabase-tabel — de seedscript-mapping vergat die kolom te vullen. Gefixt in
+   `scripts/demo/seed-demo-client.ts` (een kleine `campagneType()`-afleiding uit de campagnenaam) en
+   opnieuw geseed. Een echte, op zichzelf staande fout in de backend-seedlaag — maar niet de fout
+   die de donut leeg liet zien in de browser (zie hieronder).
+2. De werkelijke blokkade: `ads_campaign_monthly` stond helemaal niet in `READABLE_TABLES`
+   (`lib/data-access/read-policy.ts`) — de allowlist die bepaalt welke tabellen `dbSelect()` (het
+   pad dat zowel `?demo=1`-mockdata als een echt account gebruikt) mag serveren. Zonder die regel
+   gaf de server stilzwijgend nul rijen terug, zonder fout — en `campaign-type-split.tsx` checkte
+   `.error` niet, dus de donut verdween gewoon zonder enig signaal. Gevonden door te vergelijken met
+   `PmaxNetworkSplit`'s werkende `ads_pmax_network_breakdown`-regel, die wél in de lijst stond.
+   Gefixt met een toegevoegde regel in `READABLE_TABLES`. Dit, niet de seed-fix, was de daadwerkelijke
+   oplossing — demo-mode rendert uit `lib/demo/demo-rows.ts`'s eigen mock-tabel, die los staat van de
+   echte Supabase-tabel en al langer correcte campagnetype-mix had.
+
+**Lege ring liet de kaart niet meegroeien.** Als de donut `null` rendert (geen data), bleef zijn
+`xl:col-span-4`-kolom als dode witruimte staan naast een kaart die op `xl:col-span-8` bleef steken.
+Opgelost met een CSS-regel in `app/globals.css` die `:has()` en `:empty()` combineert:
+```css
+.hero-rij:has(> .hero-ring:empty) > .hero-kaart { grid-column: 1 / -1; }
+```
+De kaart krijgt de volle rijbreedte zodra zijn buurkolom leeg is — zonder dat een van beide
+componenten hoeft te weten van de ander, en zonder async data-bestaan-status omhoog te tillen naar
+de pagina.
+
+**Live geverifieerd, licht én donker** — de donut toont drie ringsegmenten (Search/Performance
+Max/Display) met kosten- en conversiering, legenda, geen dubbele kop, `gap-4` net zo strak als de
+rest van de kaartenrijen. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de
+kaart", zelftest (bug teruggezet) vindt hem nog. Eerlijke kanttekening, ongewijzigd sinds 17.32:
+`PmaxNetworkSplit` toont nog niets voor demo-greentech — dat is de bestaande, losstaande
+mockdata-leemte in `lib/demo/demo-rows.ts`, geen regressie van dit werk. `npx tsc --noEmit` schoon,
+301/301 tests groen, build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+**Nog niet gestart**: de "2e laag" die de eigenaar expliciet toestond als latere stap — Jaaroverzicht
+2026 en "Waar het budget landt" verdichten in dezelfde stijl als de opener nu heeft. Ook nog niet
+aangeraakt: dezelfde behandeling op Meta/LinkedIn/cross-channel en cross-account/God View.
+
+### 17.34 De opener, derde ronde: pacing + donut naast kaart + staafjes, geen dood gat meer
+
+Na screenshots van 17.33 reageerde de eigenaar met drie losse punten, elk met een letterlijke
+plek erbij: "doe de staafdiagram onder de geo kaart, dan kan de kaart groter", "de grafiek/mijn
+lijn is veeeel te groot", "het gat onder de donuts is veel te groot", "de pacing mag best breder
+zijn". Alle vier tegelijk aangepakt, want ze hangen samen: een kleinere grafiek rechts verkleint
+vanzelf het gat dat de flex-1-stretch links moest opvullen.
+
+**`PerformanceChart` was de eigenlijke boosdoener.** Vier metric-knoppen, een week/maand/jaar-
+omschakelaar, een vorig-jaar-toggle, een budgetadvies-banner en een 320px-grafiek — samen ruim
+500px, veel te zwaar voor een compacte kolom naast een kaart. In plaats van hem te verkleinen (wat
+zijn eigen functionaliteit zou beknotten) is hij teruggezet naar "Jaaroverzicht 2026", waar hij
+vandaan kwam en waar zijn volledige bediening op zijn plek is.
+
+**Nieuw: `components/dashboard/monthly-trend-bars.tsx` (`MonthlyTrendBars`).** Een kale
+staafdiagram, geen bediening, ~130px hoog: de laatste zes maanden conversies, gerealiseerd in de
+merkkleur, prognose bij 40% dekking. Zelfde rekenkern als `PerformanceChart`
+(`useForecast`/`computeForecast` uit `lib/forecast.ts`, dezelfde `points`-array) — geen tweede
+forecast-implementatie, alleen een kortere, kalere weergave van dezelfde maandpunten. Dit is de
+letterlijke "staafdiagram onder de geo kaart" uit het verzoek.
+
+**Het gat onder de donut kromp mee, automatisch.** De linkerkolom (`PacingMonitor` + de
+`CampaignTypeSplit`-donut in een `flex-1`-wrapper) volgt via CSS Grid's stretch-gedrag de hoogte
+van de rechterkolom (`GeoBreakdown` + nu `MonthlyTrendBars` in plaats van `PerformanceChart`).
+Rechts kleiner maken (ruim 500px minder) betekent dat de rijhoogte zelf kleiner wordt, dus ook het
+stuk dat de donut moest bijvullen — geen aparte fix nodig, alleen het gevolg van de eerste
+aanpassing.
+
+**Pacing-kolom breder.** `xl:col-span-5`/`xl:col-span-7` werd `xl:col-span-6`/`xl:col-span-6`.
+`PacingMonitor` is al container-query-responsief (`grid-cols-2 gap-4 @2xl:grid-cols-3
+@5xl:grid-cols-6`) — een bredere kolom geeft hem op termijn meer ruimte om breder/lager i.p.v.
+smal/hoog te renderen, zonder dat er iets aan het component zelf hoefde te veranderen.
+
+**Live geverifieerd, licht én donker**, exact op het `.hero-rij`-element gescreenshot (niet de
+hele pagina) om de kolomhoogtes rechtstreeks te kunnen vergelijken: donut- en staafjeskolom eindigen
+nu vrijwel op dezelfde regel. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de
+kaart", zelftest vindt de teruggezette bug nog. `npx tsc --noEmit` schoon, 301/301 tests groen,
+build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+### 17.35 Ranglijst onder de kaart, en waarom de gelijke-hoogte-stretch weer weg moest
+
+Een screenshot met een cirkel eromheen: de landenranglijst (`CONVERSIES PER REGIO` + de
+statistiekjes eronder) stond nog steeds NAAST de kaart, in een vaste `17rem`-kolom. In de 6/12-brede
+hero-kolom van 17.34 liet dat nog maar ~360px over voor de kaart zelf. Verzoek: "deze moet eronder.
+dan kan de geo kaart groter."
+
+**`GeoBreakdown` kreeg een `ranglijstOnder`-prop**, standaard `false`. `GeoBreakdown` wordt op vier
+plekken gebruikt (Google Overzicht, cross-channel, Meta, LinkedIn) en alleen op de eerste stond de
+kaart in een smalle kolom naast pacing+donut — op de andere drie staat hij nog steeds solo over de
+volle paginabreedte, waar "naast" nog steeds klopt. Een prop in plaats van een algehele omzetting:
+`ranglijstOnder` zet de interne grid (`grid-cols-[minmax(0,1fr)_17rem]`) om naar een gestapelde
+`flex-col`, en laat de kaart zijn `max-w-[680px]`-plafond los (dat was er om de kaart op een brede
+solo-pagina niet absurd groot te laten worden; in een 7/12-kolom bindt het toch niet). Alleen
+`google-view.tsx`'s heropener geeft `ranglijstOnder` mee.
+
+**Het gat onder de donut kwam meteen terug, met een andere oorzaak.** Een bredere/hogere kaart plus
+een ranglijst die nu zijn eigen volledige rijbreedte innam in plaats van "gratis" naast de kaart mee
+te liften, maakte de rechterkolom een stuk hoger (1086px, tegen 1056px in 17.34). De `flex-1`/`h-full`-
+stretch van de donutkaart (17.34) trok hem dus over een nog groter gat open — exact dezelfde klacht
+als in 17.34, terug via een nieuwe route. Gemeten via `getBoundingClientRect()` op `.hero-ring` en
+`.hero-kaart` om zeker te weten dat het de stretch was en niet iets anders: beide kolommen stonden
+inderdaad precies gelijk (1086px), met een dood wit vlak van ~430px binnenin de donutkaart als
+gevolg.
+
+**Fix: geen geforceerde gelijke hoogte meer.** `h-full` van `campaign-type-split.tsx`'s wortel-div
+af, de `flex-1 min-h-0`-wrapper om `CampaignTypeSplit` in `google-view.tsx` weg, en `xl:items-start`
+op de grid-container om CSS Grid's standaard stretch-gedrag expliciet uit te zetten. Twee kolommen
+met hun eigen natuurlijke hoogte naast elkaar — dat is een gewoon layoutpatroon en hoeft niet
+kunstmatig gelijk gemaakt te worden. Dit is duurzamer dan de vorige aanpak (compactere grafiek, 17.34)
+omdat het niet afhangt van hoeveel content elke kolom toevallig heeft: welke combinatie van
+pacing/donut/kaart/ranglijst er ook staat, er komt nooit meer een kunstmatig gat.
+
+**Daarna nog een keer breder op verzoek** ("nu de kaart groter"): `xl:col-span-6`/`xl:col-span-6`
+werd `xl:col-span-5`/`xl:col-span-7` — de kaartkolom een/twaalfde breder ten koste van pacing+donut.
+`PacingMonitor`'s container-query-tegels (`grid-cols-2 @2xl:3 @5xl:6`) blijven op 5/12 nog prima
+leesbaar; de kaart zelf schaalt via zijn SVG `viewBox` (`w-full h-auto`) evenredig mee, dus meer
+kolombreedte betekent ook een merkbaar grotere kaart, niet alleen breder.
+
+**Live geverifieerd, licht én donker.** `scripts/check-kaartoverloop.mjs` twee keer gedraaid — na de
+`ranglijstOnder`-wijziging en na de kolomherverdeling — beide keren alle 15 schermen "niets buiten de
+kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build
+groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+### 17.36 De ranglijst verhuist naar links: kaart en ranglijst uit elkaar getrokken
+
+Nog een schets: "dit kan toch een stuk groter binnen het blok?" met een cirkel om de kaart. De
+kaart vulde intussen al de volle kolombreedte (gemeten: 704,65px SVG in een 730,65px kaart, dus
+al 100%) — het "grotere" moest dus ergens anders vandaan komen. Bevestigd via `AskUserQuestion`:
+de landenranglijst (die nog steeds ONDER de kaart in dezelfde `GeoBreakdown`-kaart stond, sinds
+17.35) verhuist naar de lege ruimte links, onder de campagnetype-donut. De kaart staat daarna
+alleen in zijn kolom en kan groeien zonder iets te delen.
+
+**Architectuurwijziging: kaart en ranglijst waren nooit twee componenten, maar één met twee
+weergaven van dezelfde state.** Klik op de VS in de ranglijst moet de kaart naar de statenweergave
+laten omschakelen (`focus`); de gekozen metric (Conversies/Vertoningen/...) stuurt zowel de
+kaartkleuring als de ranglijst-sortering. Die twee nu in aparte grid-kolommen zetten zonder de
+state te delen zou een kaart en een lijst opleveren die uit de pas kunnen lopen. Opgelost door de
+fetch/state-logica uit te lichten naar `lib/geo/use-geo-breakdown.ts` (`useGeoBreakdown()`), en
+`GeoBreakdown`'s render op te splitsen in twee nieuwe, kleinere componenten:
+`components/dashboard/geo-map-card.tsx` (kop + kaart, geen ranglijst/tabel) en
+`geo-ranglijst-card.tsx` (ranglijst + compacte statistiek-cijfers + de "volledige tabel"-toggle).
+`GoogleView` roept `useGeoBreakdown()` nu zelf één keer aan en geeft het resultaat als `state`-prop
+aan beide kaarten door.
+
+**`GeoBreakdown` zelf blijft bestaan, ongewijzigd van buitenaf.** De drie andere plekken
+(cross-channel, Meta, LinkedIn) tonen kaart en ranglijst nog steeds samen in één kaart — daar
+klopt "naast elkaar" nog steeds, en die drie riepen nu gewoon dezelfde nieuwe hook intern aan.
+Puur een interne verhuizing van bestaande logica, geen gedragswijziging op die drie schermen. De
+inmiddels overbodige `ranglijstOnder`-prop (17.35) is weer weg.
+
+**Bijvangst, in dezelfde ronde meegenomen (vertaald naar het bestaande tokensysteem, niet als losse
+hardcoded kleuren — expliciet zo gekozen via `AskUserQuestion` nadat een uitgebreid extern
+stijlvoorstel binnenkwam met `bg-slate-900/60`-achtige Tailwind-classes, wat het licht/donker-
+evenwicht van dit hele redesign zou hebben doorbroken):**
+- `GeoRanglijst`'s statistiekenblok (Aantal landen/Vertoningen/Klikken/Conversies/CTR/CPA) van een
+  verticale `dl`-lijst naar een 2-koloms rooster van kleine kaartjes (`bg-muted/40`,
+  `border-border/70`) — geldt voor alle vier de plekken die `GeoRanglijst` gebruiken.
+- `DonutChart`'s centrale cijfer van `text-lead` naar `text-figure` (13px → 30px) — geverifieerd
+  dat dit past binnen de 104px binnengat zonder overlap, geldt voor alle donut-gebruikers
+  (`CampaignTypeSplit`, `PmaxNetworkSplit`, `BreakdownDonuts`).
+- `--kaart-leeg` (licht) van `#eef1f6` naar `#e2e8f0`: tegen het paginavlak (`#f9fafc`) vielen
+  landen zonder data bijna weg.
+
+**Live geverifieerd, licht én donker.** `scripts/check-kaartoverloop.mjs`: alle 15 schermen, incl.
+Meta/LinkedIn/overzicht (die `GeoBreakdown` nog ongewijzigd gebruiken), "niets buiten de kaart".
+`npx tsc --noEmit` schoon.
+
+### 17.37 Laatste balans: het gat rechtsonder, en 40/60 in plaats van 30/70
+
+Twee losse, gerichte punten na de vorige schermafbeeldingen. Eerst: met de ranglijst-kaart nu
+links (17.36) werd die kolom bijna altijd de langste van de twee, en bleef er rechts, onder de
+staafgrafiek, bladzij-achtergrond over — "elimineer het witte gat rechtsonder". Tweede: de
+kaartkolom was inmiddels breder dan de linkerkolom prettig kon dragen met drie kaarten erin
+(pacing, donut, ranglijst) — verzoek om terug naar een 40/60-verhouding met "ademruimte" links.
+
+**Het gat rechtsonder, anders opgelost dan de vorige keer (17.35).** Toen was het probleem een
+DONUTKAART die geforceerd moest meegroeien met een langere buurkolom — statische content, dus een
+kunstmatig wit vlak binnen een kaartrand. Nu is de langste kolom links (niet rechts), en het
+element dat kan meegroeien is een STAAFGRAFIEK, die van nature schaalt: `xl:items-start` (17.35)
+is weer weg (grid-stretch dus weer aan, het standaardgedrag), en `MonthlyTrendBars` kreeg een
+nieuwe `groeit`-prop die zijn `ResponsiveContainer` op `height="100%"` zet binnen een `flex-1`-
+wrapper, in plaats van de vaste 130px. Hogere staven in plaats van dode ruimte — dezelfde afweging
+als 17.35, alleen ditmaal is het element dat groeit er wél geschikt voor.
+
+**Kolomverhouding**: `xl:col-span-4`/`xl:col-span-8` (17.37, eerste helft van deze sectie) werd
+`xl:col-span-5`/`xl:col-span-7` — 40/60 in plaats van 33/67. De staafbreedte in `MonthlyTrendBars`
+ging van `maxBarSize={32}` naar `48` om mee te schalen met de nu bredere kolom.
+
+**Live geverifieerd, licht én donker**, telkens opnieuw gescreenshot op precies het
+`.hero-rij`-element. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de kaart",
+zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build groen,
+volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+**Vier rondes bijstelling in totaal (17.34 t/m 17.37) op dezelfde opener** — telkens op basis van
+een concrete schermafbeelding of schets, nooit een nieuwe blinde gok. Nog niet gestart: de "2e
+laag" (Jaaroverzicht 2026, Waar het budget landt) in dezelfde verdichte stijl, en dezelfde
+behandeling op Meta/LinkedIn/cross-channel/God View.
+
+### 17.38 De opener naar Meta: "moeten we dit op andere pagina's voortzetten?" — "ja"
+
+Na vier rondes op Google: "is alles hieronder nu ook in de nieuwe stijl?" (nee — alleen de
+opener) en "moeten we dit op andere pagina's voortzetten?" Geadviseerd en gekozen: eerst het nu
+uitgekristalliseerde openerpatroon naar de andere kanalen, de "2e laag" pas daarna in één ronde
+over alle pagina's — niet viermaal apart uitvinden.
+
+**Meta's opbouw verschilt fundamenteel van Google's.** Bij Google stonden KPI's, pacing, kaart en
+donut al als losse componenten naast elkaar (`PacingMonitor`, `MetricCards`, `GeoBreakdown`,
+losse donuts) — precies het materiaal om een hero uit samen te stellen. Bij Meta (en LinkedIn,
+die hetzelfde component deelt) zitten KPI's, pacing, maandgrafiek én de maand-/campagnetabel
+allemaal in één monolithisch component, `ChannelPerformance` — geen losse pacing-widget om in de
+hero te zetten zonder ook LinkedIn's weergave te raken.
+
+**Bevestigd via `AskUserQuestion`: alleen kaart + donuts in de hero, `ChannelPerformance`
+ongewijzigd.** Geen refactor van een component dat twee kanalen deelt zonder expliciete
+toestemming. `BreakdownDonuts` (spend/conversies per leeftijd, plaatsing, platform of device,
+met tab-omschakelaar) is Meta's natuurlijke equivalent van Google's campagnetype-donut — altijd
+gevuld zodra er breakdown-data is, geen kanaalspecifieke leegte.
+
+**Zelfde bouwstenen als Google, hergebruikt zonder wijziging:** `useGeoBreakdown({ clientId,
+channel: "meta" })`, `GeoMapCard` (rechts, alleen), `GeoRanglijstCard` (links, onder de donut).
+`GeoMapCard`'s `channel`-prop bestond al generiek (`"google"|"meta"|"linkedin"|"blended"`) — geen
+enkele aanpassing nodig aan de gedeelde componenten uit 17.36. De oude "Markten"- en "Waar het
+budget landt"-Secties op Meta Overzicht zijn vervallen; hun inhoud (`GeoBreakdown` resp.
+`BreakdownDonuts`) staat nu in de hero.
+
+**Bijvangst: een echte databug, niet alleen een lege demo-plek.** `BreakdownDonuts` toonde niets
+voor demo-greentech. Anders dan de eerdere aanname deze sessie ("browser-demo leest uit
+`lib/demo/demo-rows.ts`'s mock-laag") bleek `dbSelect()` (`lib/data-access/client-read.ts`) altijd
+de ECHTE Supabase-tabel te lezen via `/api/data/[table]`, ook in `?demo=1`-modus — de mock-laag
+wordt alleen gebruikt door de oudere, rechtstreekse `supabase.from(...)`-aanroepen (zoals in
+`ChannelPerformance`), niet door `dbSelect()`. `meta_breakdown_daily` had wél een mock-rij in
+`demo-rows.ts`, maar nooit een rij in de echte tabel voor `demo-greentech` — en
+`scripts/demo/seed-demo-client.ts` (dat de echte tabellen vult) genereerde die tabel nooit.
+Precies dezelfde bugklasse als 17.32's `ads_campaign_monthly`-ontdekking, nu op een ander kanaal.
+
+Gefixt: een nieuwe `metaBreakdownDaily()`-generator in `seed-demo-client.ts` (dertien segmenten
+over vijf dimensies — plaatsing, platform, device, leeftijd, gender — elk met een scheve
+verdeling zodat de donut iets te tonen heeft), niet hergebruikt uit `demo-rows.ts`'s eigen
+`META_BD_SEGMENTS` omdat de seed-generatoren en de mock-generatoren twee losse, nooit
+gekruiste systemen zijn (seed schrijft naar de echte tabel voor alle niet-demo-consumenten
+zoals `dbSelect`; de mock bedient alleen rechtstreekse `supabase.from()`-aanroepen in demo-modus).
+Seed opnieuw gedraaid: 780 rijen `meta_breakdown_daily`. Dit is een correctie voor de hele app,
+niet alleen voor deze opener — elke andere `dbSelect`-consument van deze tabel (als die ooit komt)
+profiteert mee.
+
+**Live geverifieerd, licht én donker**, `.hero-rij`-element. `scripts/check-kaartoverloop.mjs`:
+alle 15 schermen "niets buiten de kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit`
+schoon, 301/301 tests groen, build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+**Nog niet gestart: LinkedIn en cross-channel** (zelfde patroon, zelfde componenten, geen nieuwe
+architectuur nodig) en de "2e laag" op alle vier de kanalen.
+
+### 17.39 De opener naar LinkedIn: derde kanaal, dezelfde vier bouwstenen
+
+Letterlijk dezelfde ingreep als 17.38 op Meta: `useGeoBreakdown({ clientId, channel: "linkedin" })`
+één keer aangeroepen, `BreakdownDonuts` + `GeoRanglijstCard` links, `GeoMapCard` alleen rechts. De
+oude "Markten"- en "Wie het te zien krijgt"-Secties zijn vervallen. `BreakdownDonuts` toont hier
+functie/senioriteit/industrie/bedrijfsgrootte i.p.v. Meta's leeftijd/plaatsing/device/platform/
+gender — zelfde component, `BREAKDOWN_DIMENSIES["linkedin"]` regelt het verschil, geen aparte code.
+
+**Een tweede, andere databug dan bij Meta.** De donut toonde rauwe URN's
+("urn:li:function:demo-edu") in plaats van leesbare labels ("Education"). Niet dezelfde oorzaak
+als 17.38's `meta_breakdown_daily`-gat: `linkedin_demographic_daily` was al gevuld, en de
+labeltabel (`linkedin_urn_labels`) ook — alleen elk met een EIGEN, los bedachte set URN's die
+elkaar nooit raakten.
+
+`BreakdownDonuts` leest de labeltabel via een rechtstreekse `supabase.from("linkedin_urn_labels")`
+-aanroep (bewust buiten `dbSelect()` gehouden, zie de kop van die aanroep in de component: een
+gedeelde opzoektabel zonder `client_id`, buiten migratie 067's scope). Zo'n rechtstreekse aanroep
+gaat in demo-modus wél door `lib/supabase.ts`'s mock-client — anders dan `dbSelect()` (17.38's
+bevinding), die altijd de echte tabel leest. Het gevolg: de demografie-rijen zelf kwamen uit de
+ECHTE tabel (geseed door `scripts/demo/seed-demo-client.ts`'s `LI_DEMO_FUNCTIONS`, het
+[S9]-scenario "75% van de leads uit Education"), maar de labelvertaling kwam uit de MOCK
+(`lib/demo/demo-rows.ts`'s eigen, rijkere `LI_DEMO_SEGMENTS` — dertien segmenten over vier
+dimensies, met eigen URN's als `urn:li:function:8`). Twee onafhankelijke generatoren voor
+hetzelfde concept, die toevallig nooit dezelfde URN's kozen.
+
+**Bewust de mock aangepast, niet de seed.** `LI_DEMO_FUNCTIONS`'s URN's en labels dragen het
+[S9]-scenario ("Education" trekt het account, "Operations" is duurder dan het oplevert) — die
+tekst staat vermoedelijk elders getoetst (detectors/tests die op "Education" zoeken), dus die
+laat ik ongemoeid. `lib/demo/demo-rows.ts`'s `linkedinUrnLabels` kreeg twee extra regels erbij
+(`urn:li:function:demo-edu` → "Education", `urn:li:function:demo-ops` → "Operations"), naast de
+bestaande dertien — geen van beide sets verwijderd, alleen de vertaling voor de kant die er nog
+ontbrak toegevoegd.
+
+**Live geverifieerd, licht én donker** — voor en na de labelfix gescreenshot om het verschil
+zichtbaar te bevestigen. `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de
+kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build
+groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+
+**Drie van de vier kanalen klaar** (Google, Meta, LinkedIn). Nog niet gestart: cross-channel
+(`cross-channel-view.tsx`, gebruikt `GeoBreakdown` ook nog atomair) en de "2e laag" op alle vier.
+
+### 17.40-17.42 Google Overzicht herbouwd naar een 2x2-wireframe: eigen schets, drie bijstellingen
+
+Na drie kanalen op hetzelfde hero-rij-patroon (17.34-17.39) kwam er een eigen aangeleverde
+wireframe voor Google, inclusief een letterlijke schets ("klant / menu-items / KPI-rij /
+[Account Health | Geo] / [Pacing | Graph]") en een uitgeschreven spec met concrete Tailwind-classes.
+
+**Review vooraf, zoals gevraagd, voor er iets werd gebouwd.** Drie punten teruggekoppeld en via
+`AskUserQuestion` opgelost:
+1. De spec voegde Account Health en de campagnetype-donut samen in één kaart. Teruggeduwd: "twee
+   vragen, twee vormen" is een principe dat al elders in deze codebase staat (zie de
+   `PacingMonitor`/`MonthlyOverview`-toelichting in `google-view.tsx` zelf, 17.14). Gekozen: twee
+   losse, gestapelde kaarten.
+2. De spec vroeg `items-stretch` om de kolommen geforceerd gelijk te maken. Dat patroon had deze
+   sessie al drie keer een wit gat in een kaart veroorzaakt (17.34, 17.35, 17.37) zodra de content
+   links en rechts van nature verschilt. Niet blind toegepast; alleen bijgesteld waar een
+   screenshot een echt probleem liet zien.
+3. Scope: geldt dit alleen voor Google? Bevestigd — Meta en LinkedIn missen een losse
+   Pacing-widget (die zit in het gedeelde `ChannelPerformance`-component, zie 17.38), dus die
+   blijven op hun net gebouwde hero-rij-opener staan.
+4. Hardcoded `bg-white`/`text-slate-*`-classes uit de spec: vertaald naar het bestaande
+   tokensysteem, zelfde afspraak als 17.36/17.38.
+
+**17.40 — de herbouw zelf.** `GoogleView`'s opener werd een 2-koloms grid (`xl:grid-cols-2`,
+zonder `items-stretch`): links `HealthBadge` (Account Health, voorheen los bovenaan de pagina) →
+`CampaignTypeSplit` (donut) → `PacingMonitor`; rechts de atomaire `GeoBreakdown` (kaart + ranglijst
++ statistieken in één kaart, terug van de gesplitste `GeoMapCard`/`GeoRanglijstCard` uit 17.36) →
+`MonthlyTrendBars`. De KPI-rij (`PeriodSummary`, kanaalonafhankelijk, boven de tabs) bestond al en
+hoefde niet aangepast — dat zou Meta/LinkedIn/cross-channel meegeraakt hebben.
+
+**17.41 — "als we deze in het gat plaatsen kan de geo map breder" (schets met cirkel om de
+ranglijst).** Rechts (kaart+ranglijst samen in `GeoBreakdown`) bleef ondanks de nieuwe kolommen
+langer dan links, met een wit gat als gevolg. Ranglijst en statistiekjes verhuisden naar ONDERAAN
+de rechterkolom (onder de grafiek), en de kaart werd weer de gesplitste `GeoMapCard` (alleen, dus
+breder) -- zelfde bouwstenen als de 17.36-opener, nu alleen in een andere volgorde omdat het gat
+ditmaal aan de onderkant zat i.p.v. ernaast.
+
+**17.42 — "de donut en de pacing" omgedraaid.** Een eerste lezing van de volgende schets/cirkel
+werd door de eigenaar zelf gecorrigeerd ("het ging om de linker sectie") voordat de verkeerde
+aanname gebouwd werd -- de assistent was al aan een wijziging in de rechterkolom begonnen op basis
+van de pixelpositie van de cirkel, maar de eigenaar greep in ("nee stop") en gaf de juiste lezing
+in platte tekst. Links werd `HealthBadge → PacingMonitor → CampaignTypeSplit` (pacing en donut
+omgewisseld). Het resterende hoogteverschil tussen de kolommen is klein geworden maar niet nul; een
+voorstel om dat op te vullen met "een kleine lijngrafiek" staat nog open, niet gebouwd zonder eerst
+te laten zien hoe klein het gat na deze wissel daadwerkelijk nog is.
+
+**Live geverifieerd, licht én donker**, telkens na elke van de drie stappen apart gescreenshot.
+`scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets buiten de kaart", zelftest vindt de
+teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests groen, build groen, volledige
+`scripts/gates.sh` groen (POORTEN GROEN).
+
+**Nog open**: of en waarmee het resterende kleine hoogteverschil links/rechts opgevuld wordt.
+
+### 17.43 De lijngrafiek: "ik mis de lijn diagram nog" — en waarom het niet ROAS werd
+
+Antwoord op de openstaande vraag uit 17.42: de eigenaar bevestigde dat de suggestie ("misschien
+een kleine lijndiagram") geen vrijblijvend idee was maar een concreet verzoek, geschreven in de
+lege ruimte onder de donut op een nieuwe schermafbeelding.
+
+**Nieuw component `components/dashboard/monthly-trend-line.tsx` (`MonthlyTrendLine`)**, zelfde
+opzet als `MonthlyTrendBars` (`useForecast`/`computeForecast`, geen tweede
+forecast-implementatie, laatste zes maanden, ~130px). Eerste versie gebruikte `forecast.roas` --
+inhoudelijk de logische keuze naast Account Health en Pacing (beide gaan over efficiëntie/op-
+schema-zijn). Gebouwd, gescreenshot, en toen bleek de lijn bij demo-greentech vrijwel perfect
+vlak: geen bug, ROAS is voor deze klant over zes maanden nauwelijks veranderd, en een vlakke lijn
+draagt geen signaal.
+
+**Overgestapt op CPA** (`forecast.cpa`, adSpend/conversions) zonder de architectuur te wijzigen --
+alleen de metric. CPA volgt dezelfde spend- en conversieschommelingen als de staven rechts en de
+"Performance 2026"-grafiek verderop, en toont bij deze klant wél een zichtbare (bescheiden)
+golfbeweging in plaats van een rechte lijn.
+
+**Bijvangst tijdens het verifiëren: `fullPage`-screenshots renderden de grafieken leeg.**
+Playwright's `page.screenshot({ fullPage: true })` op een lange pagina liet zowel de staven van
+`MonthlyTrendBars` als de lijn van `MonthlyTrendLine` volledig verdwijnen (assen en stippen bleven
+staan, de data-vormen niet) -- een bekend soort mismatch tussen recharts' `ResponsiveContainer`
+(die op `ResizeObserver` leunt) en het stitchen dat `fullPage` doet. Geen bug in de app: dezelfde
+pagina, met losse `clip`-screenshots op vaste scrollposities in plaats van `fullPage`, toont beide
+grafieken gewoon correct. Verificatie-methode aangepast, geen code aangepast.
+
+**Live geverifieerd, licht én donker.** `scripts/check-kaartoverloop.mjs`: alle 15 schermen "niets
+buiten de kaart", zelftest vindt de teruggezette bug. `npx tsc --noEmit` schoon, 301/301 tests
+groen, build groen, volledige `scripts/gates.sh` groen (POORTEN GROEN).
+### 17.44 KPI-rij kanaalafhankelijk gemaakt + GRT/GRA/GRN-demodata drie keer eerlijker
 
 Twee vragen, allebei over hetzelfde gebrek aan kanaalbewustzijn. Eerst: *"is het niet onlogisch
 dat de kanaal filter onder de hoofd kpi rij staat? moet de hoofd kpi rij niet mee bewegen met het

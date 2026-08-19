@@ -92,6 +92,7 @@ import { callLogMark, logCacheSummary } from "@/lib/analysis/openrouter-client";
 import { buildTaskStatusGrounding } from "@/lib/tasks/task-tracking";
 import { priorTasksVoorGrounding } from "@/lib/tasks/prior-tasks";
 import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
+import { triggerCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 
 
 function normalizeText(value: string): string {
@@ -1245,6 +1246,9 @@ async function runMetaMonthlyAnalysis(
     checkpointsRun: metaCheckpointsRun,
   });
 
+  // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+  await triggerCrossChannelSynthesisIfReady(supabase, clientId);
+
   return Response.json({
     ok: true,
     channel: adapter.channel,
@@ -1446,6 +1450,9 @@ async function runLinkedinMonthlyAnalysis(
     stepValidations: linkedinStepValidations,
     checkpointsRun: linkedinCheckpointsRun,
   });
+
+  // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+  await triggerCrossChannelSynthesisIfReady(supabase, clientId);
 
   return Response.json({
     ok: true,
@@ -3267,6 +3274,12 @@ ${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannel
     });
 
     logCacheSummary(callMark, `monthly ${clientId}`);
+
+    // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+    // Als de kwaliteitspoort deze cyclus blokkeerde, vindt readyForSynthesis() hier gewoon geen
+    // geldige structured_monthly_v2 voor dit kanaal en slaat de synthese vanzelf over -- geen
+    // aparte check nodig op qualityGate.passed.
+    await triggerCrossChannelSynthesisIfReady(supabase, clientId);
 
     return Response.json({
       jobId,

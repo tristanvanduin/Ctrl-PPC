@@ -28,6 +28,7 @@ import {
   updateProgressPhase,
 } from "@/lib/progress/server";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
+import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 
 async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
   await createProgressJob(supabase, {
@@ -188,6 +189,9 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
     },
   });
 
+  // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "weekly", periodStart, periodEnd);
+
   return Response.json({
     jobId,
     ...result,
@@ -338,6 +342,9 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
       findings: extraction.findings.length, recommendations: extraction.recommendations.length, tasks: extraction.tasks.length,
     },
   });
+
+  // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "weekly", periodStart, periodEnd);
 
   return Response.json({
     jobId,
@@ -501,6 +508,9 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
       findings: extraction.findings.length, recommendations: extraction.recommendations.length, tasks: extraction.tasks.length,
     },
   });
+
+  // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "weekly", periodStart, periodEnd);
 
   return Response.json({
     jobId,

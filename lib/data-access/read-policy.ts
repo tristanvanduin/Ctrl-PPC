@@ -55,6 +55,11 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   ads_pmax_asset_performance: { capability: "client:read", clientColumn: "client_id" },
   ads_asset_group_performance_monthly: { capability: "client:read", clientColumn: "client_id" },
   ads_pmax_network_breakdown: { capability: "client:read", clientColumn: "client_id" },
+  // 17.32: de opener-donut (campaign-type-split.tsx) leest campagnetype + kosten/conversies per
+  // maand -- zelfde tabel als CampaignTable al via een eigen, breder API-pad krijgt, maar dit is
+  // de eerste rechtstreekse client-read-consument ervan, dus moet hij hier expliciet bij, net als
+  // de rij hierboven.
+  ads_campaign_monthly: { capability: "client:read", clientColumn: "client_id" },
   // Doelgroepsplitsing (components/dashboard/audience-split.tsx): dezelfde reden als de twee
   // regels hierboven om browser-side te mogen lezen, gewoon een nieuwe consument van een tabel
   // die al bestond (migratie 067) maar tot nu toe geen UI-lezer had.

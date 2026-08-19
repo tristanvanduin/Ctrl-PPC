@@ -26,6 +26,7 @@ import {
 } from "@/lib/progress/server";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
+import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Gedeeld door alle drie de kanalen: elke stap sluit af met "TOP 3 BEVINDINGEN STAP N: ...",
@@ -246,6 +247,9 @@ ${enrichment.hypothesisTracking ? "\nAls er uitgevoerde hypotheses zijn die nog 
     },
   });
 
+  // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
+
   return Response.json({
     jobId,
     ...result,
@@ -408,6 +412,9 @@ Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug
       findings: extraction.findings.length, recommendations: extraction.recommendations.length, tasks: extraction.tasks.length,
     },
   });
+
+  // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
 
   return Response.json({
     jobId,
@@ -582,6 +589,9 @@ Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug
       findings: extraction.findings.length, recommendations: extraction.recommendations.length, tasks: extraction.tasks.length,
     },
   });
+
+  // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
+  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
 
   return Response.json({
     jobId,
