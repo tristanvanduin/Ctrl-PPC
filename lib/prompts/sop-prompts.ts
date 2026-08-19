@@ -527,6 +527,96 @@ export function buildStepOutputSchema(
     .replace(GOOGLE_ENTITY_TYPE_TEXT, entityTypeText);
 }
 
+// ============================================================
+// STRUCTURELE AFDWINGING (naast buildStepOutputSchema hierboven)
+// ============================================================
+//
+// buildStepOutputSchema() hierboven blijft de menselijk leesbare, prozaïsche kant van het
+// contract -- inclusief de regels die een JSON Schema per definitie niet kan uitdrukken
+// (wiskundige-integriteitsregels, evidence-discipline, step-puurheid). Die tekst blijft
+// ongewijzigd in de prompt staan.
+//
+// Deze functie bouwt daarnaast een ECHT JSON Schema voor response_format: "json_schema" (strict
+// mode, zie openrouter-client.ts). Twee live demo-greentech-runs (19 augustus 2026) toonden
+// hetzelfde patroon op bijna elke Meta/LinkedIn-stap: "Step-output was gedegradeerd of nested
+// JSON; parse salvage toegepast" + "Verwacht 3 findings, kreeg 1". Beide zijn STRUCTURELE
+// afwijkingen (verkeerde vorm, verkeerd aantal) -- precies wat een schema afdwingt in plaats van
+// vraagt. De SEMANTISCHE fouten die in dezelfde runs voorkwamen (wiskundige inconsistenties,
+// taalvermenging) blijven bestaan; daar kan een schema niets aan doen, dat blijft het werk van de
+// validatie-/reparatielaag in monthly/route.ts.
+//
+// minItems/maxItems-afdwinging op arrays is bevestigd niet universeel gegarandeerd door elke
+// OpenRouter-provider (sommige behandelen een schema als sterke hint i.p.v. harde garantie) --
+// zie docs/ARCHITECTURE-MODEL-ROUTING.md. Dit is dus een verbetering van de kans op naleving,
+// geen absolute garantie; de bestaande validatie-/reparatielaag blijft het vangnet.
+export function buildStepOutputJsonSchema(
+  issueClusters: readonly string[],
+  entityTypes: readonly string[]
+): Record<string, unknown> {
+  const findingSchema = {
+    type: "object",
+    properties: {
+      step: { type: "number" },
+      issue_cluster: { type: "string", enum: [...issueClusters] },
+      entity_type: { type: "string", enum: [...entityTypes] },
+      entity_name: { type: "string" },
+      metric: { type: "string" },
+      current_value: { type: ["number", "null"] },
+      previous_value: { type: ["number", "null"] },
+      change_pct: { type: ["number", "null"] },
+      severity: { type: "string", enum: ["critical", "high", "medium", "low", "positive"] },
+      insight_type: { type: "string", enum: ["performance", "trend", "anomaly", "opportunity", "risk", "positive"] },
+      is_seasonal: { type: "boolean" },
+      is_structural: { type: "boolean" },
+      cause: { type: "string" },
+      action_required: { type: "boolean" },
+      evidence_level: { type: "string", enum: ["deterministic", "inferred", "hypothesis", "unknown"] },
+      confidence: { type: "string", enum: ["high", "medium", "low"] },
+      benchmark_type: {
+        type: ["string", "null"],
+        enum: ["monthly_target", "pace_target", "sector_benchmark", "account_average", "campaign_average", "previous_month", "previous_year", null],
+      },
+    },
+    required: [
+      "step", "issue_cluster", "entity_type", "entity_name", "metric", "current_value",
+      "previous_value", "change_pct", "severity", "insight_type", "is_seasonal", "is_structural",
+      "cause", "action_required", "evidence_level", "confidence", "benchmark_type",
+    ],
+    additionalProperties: false,
+  };
+
+  const actionSchema = {
+    type: "object",
+    properties: {
+      actie: { type: "string" },
+      campagne: { type: ["string", "null"] },
+      deadline: { type: "string", enum: ["direct", "deze_week", "volgende_week", "deze_maand"] },
+      verwachte_impact: { type: "string" },
+    },
+    required: ["actie", "campagne", "deadline", "verwachte_impact"],
+    additionalProperties: false,
+  };
+
+  return {
+    type: "object",
+    properties: {
+      narrative: { type: "string" },
+      log_entries: { type: "array", items: { type: "string" }, minItems: 1 },
+      // EXACT 3: de kern van deze afdwinging. Zie MONTHLY_STEP_OUTPUT_SCHEMA's REGELS voor de
+      // instructie om bij te weinig materiële bevindingen aan te vullen met severity
+      // "positive"/"low" -- dat blijft een promptregel, want een schema kan niet afdwingen WAT
+      // de aanvulling inhoudt, alleen HOEVEEL er staan.
+      top_3_findings: { type: "array", items: findingSchema, minItems: 3, maxItems: 3 },
+      status: { type: "string", enum: ["KRITIEK", "NIET OP SCHEMA", "OP SCHEMA"] },
+      actions: { type: "array", items: actionSchema, maxItems: 2 },
+      step_conclusion: { type: "string" },
+      evidence_basis: { type: "string", enum: ["platform", "ga4", "combined", "estimated"] },
+    },
+    required: ["narrative", "log_entries", "top_3_findings", "status", "actions", "step_conclusion", "evidence_basis"],
+    additionalProperties: false,
+  };
+}
+
 export const MONTHLY_FINAL_SOP_SECTIONS = [
   "Primary thread",
   "Root cause",

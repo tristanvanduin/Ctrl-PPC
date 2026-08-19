@@ -11,6 +11,7 @@ import {
 } from "@/lib/analysis/helpers";
 import {
   buildMonthlyStepPrompt,
+  buildStepOutputJsonSchema,
 } from "@/lib/prompts/sop-prompts";
 import {
   MONTHLY_STEP7_ACTIONS_INSTRUCTION,
@@ -18,6 +19,7 @@ import {
   buildMonthlyCheckpointPrompt,
 } from "@/lib/prompts/monthly-v2";
 import { getAdapter, type ChannelAdapter } from "@/lib/analysis/channel-adapter";
+import { googleAdsAdapter } from "@/lib/analysis/adapters/google-ads";
 import "@/lib/analysis/adapters/meta-ads"; // registreert de Meta-adapter zodat getAdapter("meta_ads") resolvet
 import { buildMetaAnalysisData, thirteenMonthStart } from "@/lib/meta/analysis-data";
 import { buildMetaStepMessage, metaStepName } from "@/lib/meta/step-message";
@@ -1149,7 +1151,7 @@ async function runMetaMonthlyAnalysis(
   // E1-wiring (Meta): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
   const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
 
-  const shared = { supabase, apiKey, clientId, sopType: adapter.sopTypeKey, periodStart, periodEnd, runKey: jobId, channel: adapter.channel, evalCapture };
+  const shared = { supabase, apiKey, clientId, sopType: adapter.sopTypeKey, periodStart, periodEnd, runKey: jobId, channel: adapter.channel, evalCapture, jsonSchema: { name: "monthly_step_output", schema: buildStepOutputJsonSchema(adapter.issueClusters, adapter.entityTypes) } };
   const parsedSteps: ParsedStepOutput[] = [];
   const allSteps: StepResult[] = [];
   const conclusions: string[] = [];
@@ -1201,7 +1203,7 @@ async function runMetaMonthlyAnalysis(
       + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
       + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "")
       + (stepNumber === 6 && godViewText ? `\n\n${godViewText}` : "");
-    let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
+    let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage, jsonMode: true });
     const priorStepConclusion = conclusions.at(-1);
     let { parsed, validation } = parseStructuredStepOutput(
       step,
@@ -1362,7 +1364,7 @@ async function runLinkedinMonthlyAnalysis(
   // E1-wiring (LinkedIn): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
   const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
 
-  const shared = { supabase, apiKey, clientId, sopType: adapter.sopTypeKey, periodStart, periodEnd, runKey: jobId, channel: adapter.channel, evalCapture };
+  const shared = { supabase, apiKey, clientId, sopType: adapter.sopTypeKey, periodStart, periodEnd, runKey: jobId, channel: adapter.channel, evalCapture, jsonSchema: { name: "monthly_step_output", schema: buildStepOutputJsonSchema(adapter.issueClusters, adapter.entityTypes) } };
   const parsedSteps: ParsedStepOutput[] = [];
   const allSteps: StepResult[] = [];
   const conclusions: string[] = [];
@@ -1413,7 +1415,7 @@ async function runLinkedinMonthlyAnalysis(
       + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
       + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "")
       + (stepNumber === 6 && godViewText ? `\n\n${godViewText}` : "");
-    let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage });
+    let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage, jsonMode: true });
     const priorStepConclusion = conclusions.at(-1);
     let { parsed, validation } = parseStructuredStepOutput(
       step,
@@ -1872,7 +1874,7 @@ Verwacht deze maand: ${targetResult.monthlyExpected[lastCompleteMonth - 1]?.conv
         + (pausedCampaigns.length > 0 ? `\n\nBELANGRIJK: ${pausedCampaigns.length} campagne(s) zijn GEPAUZEERD of VERWIJDERD: ${pausedCampaigns.map((c: Record<string, unknown>) => c.campaign_name).join(", ")}. Doe GEEN aanbevelingen voor gepauzeerde/verwijderde campagnes. Vermeld ze alleen als historische context.` : "")
       : "";
 
-    const shared = { supabase, apiKey, clientId, sopType: "monthly", periodStart, periodEnd, runKey: jobId, channel: "google_ads", evalCapture };
+    const shared = { supabase, apiKey, clientId, sopType: "monthly", periodStart, periodEnd, runKey: jobId, channel: "google_ads", evalCapture, jsonSchema: { name: "monthly_step_output", schema: buildStepOutputJsonSchema(googleAdsAdapter.issueClusters, googleAdsAdapter.entityTypes) } };
     const steps: StepResult[] = [];
     const machineSteps: StepResult[] = [];
     const parsedSteps: ParsedStepOutput[] = [];
@@ -2212,6 +2214,7 @@ ${runningContext}`,
           signalsSection
         ),
         userMessage: `${message}\n\n## Data beschikbaarheid voor deze stap\n${stepAvailabilityByStep.get(stepNumber)?.promptNote || "Geen extra data-opmerking."}\n\n## Running context uit laatste checkpoint\n${runningContext}`,
+        jsonMode: true,
       });
       const priorStepConclusion = conclusions.at(-1);
       let { parsed, validation } = parseStructuredStepOutput(step, priorStepConclusion, stepAvailabilityByStep.get(stepNumber), canonicalMetricMap, liveTermSet, { purityRules: adapter.purityRules, logFormatSkeletons: adapter.logFormatSkeletons });
@@ -2444,6 +2447,7 @@ ${stepAvailabilityByStep.get(7)?.promptNote || "Geen extra data-opmerking."}
 
 ## Running context uit laatste checkpoint
 ${runningContext}`,
+        jsonMode: true,
       });
       machineSteps.push(step7a);
       const parsed7aResult = parseStructuredStepOutput(step7a, priorStepConclusion, stepAvailabilityByStep.get(7), canonicalMetricMap, liveTermSet);
@@ -2496,6 +2500,7 @@ ${stepAvailabilityByStep.get(7)?.promptNote || "Geen extra data-opmerking."}
 
 ## Running context uit laatste checkpoint
 ${runningContext}`,
+        jsonMode: true,
       });
       machineSteps.push(step7b);
       const parsed7bResult = parseStructuredStepOutput(step7b, parsed7a.step_conclusion, stepAvailabilityByStep.get(7), canonicalMetricMap, liveTermSet);

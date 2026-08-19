@@ -364,6 +364,8 @@ export async function runStep(opts: {
   stepName: string;
   /** Request JSON mode for structured output steps */
   jsonMode?: boolean;
+  /** Optioneel: tilt jsonMode naar echte schema-afdwinging. Zie openrouter-client.ts. */
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
   /** W1.1: run-sleutel (jobId) voor de llm_usage-kostenregistratie; zonder runKey wordt niets gelogd. */
   runKey?: string;
   /** W1.1: kanaal voor de kostenregistratie; valt terug op channelFromSopType. */
@@ -373,7 +375,7 @@ export async function runStep(opts: {
   /** X3: de soort aanroep voor de fixture; replay speelt standaard alleen "step". */
   evalKind?: "step" | "checkpoint" | "repair";
 }): Promise<StepResult> {
-  const { supabase, apiKey, clientId, sopType, systemPrompt, userMessage, periodStart, periodEnd, stepNumber, stepName, jsonMode } = opts;
+  const { supabase, apiKey, clientId, sopType, systemPrompt, userMessage, periodStart, periodEnd, stepNumber, stepName, jsonMode, jsonSchema } = opts;
   const analysisDate = today();
 
   // X3 fixture-capture: de exacte system- en user-prompt wegschrijven VOOR de call, zodat de
@@ -402,6 +404,7 @@ export async function runStep(opts: {
         userMessage,
         maxTokens: jsonMode ? 8192 : 4096,
         jsonMode,
+        jsonSchema,
         label: stepLabel,
       })
     : await callRouted({
@@ -410,6 +413,7 @@ export async function runStep(opts: {
         userMessage,
         maxTokens: jsonMode ? 8192 : 4096,
         jsonMode,
+        jsonSchema,
         label: stepLabel,
       });
 

@@ -32,6 +32,18 @@ export interface OpenRouterRequest {
   temperature?: number;
   /** Request JSON mode from the model */
   jsonMode?: boolean;
+  /**
+   * Optioneel: een echt JSON Schema om response_format naar "json_schema" (strict) te tillen
+   * i.p.v. het losse "json_object". Alleen actief als jsonMode ook true is -- zonder jsonMode
+   * blijft het gedrag exact zoals voorheen. Structurele afdwinging (verplichte velden, vaste
+   * enums, array-lengtes zoals "exact 3 findings") in plaats van hopen dat het model de
+   * tekstinstructie ("EXACT 3 items") volgt. Bevestigd ondersteund door alle modellen in de
+   * bestaande ketens (google/gemini-3.7-flash, gemini-2.5-flash(-lite), x-ai/grok-4.6) via
+   * OpenRouter -- zie docs/ARCHITECTURE-MODEL-ROUTING.md. Semantische regels (wiskundige
+   * consistentie, evidence-discipline) blijven in de prompttekst staan; die kan een schema niet
+   * uitdrukken.
+   */
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
   /** M3: optionele afbeelding (base64) voor multimodale calls; laat het tekstpad ongemoeid. */
   imageBase64?: string;
   imageMediaType?: string;
@@ -169,6 +181,7 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
     label = "unknown",
     model = DEFAULT_MODEL,
     reasoningMaxTokens,
+    jsonSchema,
   } = opts;
 
   // SEC1: weer secrets en maskeer PII voordat de payload naar de provider gaat.
@@ -200,7 +213,9 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
   };
 
   if (jsonMode) {
-    body.response_format = { type: "json_object" };
+    body.response_format = jsonSchema
+      ? { type: "json_schema", json_schema: { name: jsonSchema.name, strict: true, schema: jsonSchema.schema } }
+      : { type: "json_object" };
   }
 
   if (reasoningMaxTokens !== undefined) {
