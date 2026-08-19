@@ -59,6 +59,7 @@ import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
 import { useClientData } from "@/lib/use-client-data";
+import { useChannelPeriodData } from "@/lib/use-channel-period-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import { Sectie } from "@/components/ui/sectie";
@@ -219,6 +220,11 @@ export function ClientDashboard({ client }: { client: Client }) {
   useEffect(() => { setGeoClone(geoParam); }, [geoParam]);
   const [sopErrors, setSopErrors] = useState<SopError[]>([]);
   const clientData = useClientData(client.id);
+  // KPI-rij bovenaan: "deze kpi header rij moet standaard alles tonen. bij filtering pas kanaal
+  // specifiek" -- op "blended" (de standaard) telt Google+Meta+LinkedIn op, op een gekozen kanaal
+  // toont hij alleen dat kanaal. Voorheen las PeriodSummary altijd clientData.data (Google), ook
+  // op de Meta/LinkedIn/Alle kanalen-tabs.
+  const periodSummaryData = useChannelPeriodData({ clientId: client.id, channel, googleData: clientData.data });
   const [lagDays, setLagDays] = useState<number>(3);
   const [refreshKey, setRefreshKey] = useState(0);
   const [countryFilter, setCountryFilter] = useState<string | null>(null);
@@ -379,10 +385,15 @@ export function ClientDashboard({ client }: { client: Client }) {
 
           {activeTab === "dashboard" && (
             <div className="space-y-6">
-              {/* De cijfers van de gekozen periode. Werkt op data die de pagina al heeft, dus
-                  ook in demo-modus. */}
-              <PeriodSummary data={clientData.data} />
+              {/* Kanaaltabs boven de KPI-rij (17.44): "is het niet onlogisch dat de kanaalfilter
+                  onder de hoofd-KPI-rij staat?" -- je kiest eerst welk kanaal je bekijkt, dan pas
+                  de cijfers ervoor. De KPI-rij zelf beweegt nu ook echt mee: op "blended" (de
+                  standaard, "Alle kanalen") telt Google+Meta+LinkedIn op via
+                  useChannelPeriodData(); op een gekozen kanaal toont hij alleen dat kanaal. Werkt
+                  op data die de pagina al heeft (Google) of apart ophaalt (Meta/LinkedIn), dus ook
+                  in demo-modus. */}
               <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
+              <PeriodSummary data={periodSummaryData} />
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "blended" && <CrossChannelView clientId={client.id} />}

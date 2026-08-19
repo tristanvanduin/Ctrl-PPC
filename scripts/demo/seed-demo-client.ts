@@ -55,6 +55,16 @@ const monthsBack = (n: number) => { const d = new Date(TODAY); d.setDate(1); d.s
 // ~35% achter op 2025 bij vrijwel gelijke spend [S10].
 interface GMonth { campaign: string; monthIdx: number; imp: number; clicks: number; cost: number; conv: number; value: number }
 
+// Gemiddelde orderwaarde per beurs/segment -- eerder stond hier overal value:0, waardoor omzet en
+// ROAS voor GRT/GRA/GRN identiek (nul) waren, ongeacht hoe de conversies liepen. Amerikaanse
+// standaanvragen (GRA) zijn gemiddeld groter dan de jonge, nog kleinschalige Canadese markt (GRN);
+// Brand is het hoogste-intent verkeer en dus de hoogste AOV.
+const GOOGLE_AOV: Record<string, number> = {
+  "GRT | Search | NL": 180, "GRT | Performance Max": 150,
+  "GRA | Search | US": 220, "GRN | Search | NA": 140,
+  "GreenTech | Brand": 200, "GreenTech | Display | Prospecting": 80,
+};
+
 // maandIdx 0 = huidige maand, 1 = vorige, ... 23 = 2 jaar terug.
 function googleMonthly(): GMonth[] {
   const rows: GMonth[] = [];
@@ -68,20 +78,23 @@ function googleMonthly(): GMonth[] {
   for (let m = 23; m >= 0; m--) {
     const thisYear = m < 12; // jongste 12 maanden = het "achterliggende" jaar [S10]
     const grtConvFactor = thisYear ? 26 : 40; // 2026-aanloop ~35% lager dan 2025
-    rows.push({ campaign: "GRT | Search | NL", monthIdx: m, imp: 42000, clicks: 2100, cost: 4150 + (m % 3) * 50, conv: grtCycle(m, grtConvFactor), value: 0 });
-    rows.push({ campaign: "GRT | Performance Max", monthIdx: m, imp: 61000, clicks: 1500, cost: 2600, conv: grtCycle(m, thisYear ? 12 : 18), value: 0 });
+    const grtConv = grtCycle(m, grtConvFactor);
+    rows.push({ campaign: "GRT | Search | NL", monthIdx: m, imp: 42000, clicks: 2100, cost: 4150 + (m % 3) * 50, conv: grtConv, value: grtConv * GOOGLE_AOV["GRT | Search | NL"] });
+    const grtPmaxConv = grtCycle(m, thisYear ? 12 : 18);
+    rows.push({ campaign: "GRT | Performance Max", monthIdx: m, imp: 61000, clicks: 1500, cost: 2600, conv: grtPmaxConv, value: grtPmaxConv * GOOGLE_AOV["GRT | Performance Max"] });
     // GRA: beurs in september, beide jaren op koers (+10% dit jaar) [S11]
     const graMonth = new Date(monthsBack(m)).getMonth() + 1;
     const graDist = Math.min(Math.abs(graMonth - 9), 12 - Math.abs(graMonth - 9));
     const graRamp = graDist <= 5 ? (6 - graDist) / 6 : 0.15;
-    rows.push({ campaign: "GRA | Search | US", monthIdx: m, imp: 30000, clicks: 1400, cost: 3000, conv: Math.round((thisYear ? 33 : 30) * (0.25 + graRamp)), value: 0 });
+    const graConv = Math.round((thisYear ? 33 : 30) * (0.25 + graRamp));
+    rows.push({ campaign: "GRA | Search | US", monthIdx: m, imp: 30000, clicks: 1400, cost: 3000, conv: graConv, value: graConv * GOOGLE_AOV["GRA | Search | US"] });
     // GRN: dunne, jonge reeks (alleen laatste 8 maanden) [S12]
-    if (m < 8) rows.push({ campaign: "GRN | Search | NA", monthIdx: m, imp: 9000, clicks: 380, cost: 900, conv: 8, value: 0 });
+    if (m < 8) rows.push({ campaign: "GRN | Search | NA", monthIdx: m, imp: 9000, clicks: 380, cost: 900, conv: 8, value: 8 * GOOGLE_AOV["GRN | Search | NA"] });
     // Brand: stabiel, +18% klikken in de golf-maanden (oogst van de social-golf) [S7].
     // m<=1: de laatste volle maand en de lopende maand (detectors sluiten de lopende uit).
     const brandClicks = m <= 1 ? 1180 : 1000;
-    rows.push({ campaign: "GreenTech | Brand", monthIdx: m, imp: 15000, clicks: brandClicks, cost: 500, conv: 45, value: 0 });
-    rows.push({ campaign: "GreenTech | Display | Prospecting", monthIdx: m, imp: 90000, clicks: 700, cost: 800, conv: 2, value: 0 });
+    rows.push({ campaign: "GreenTech | Brand", monthIdx: m, imp: 15000, clicks: brandClicks, cost: 500, conv: 45, value: 45 * GOOGLE_AOV["GreenTech | Brand"] });
+    rows.push({ campaign: "GreenTech | Display | Prospecting", monthIdx: m, imp: 90000, clicks: 700, cost: 800, conv: 2, value: 2 * GOOGLE_AOV["GreenTech | Display | Prospecting"] });
   }
   return rows;
 }
@@ -109,7 +122,22 @@ const META_CAMPAIGNS = [
   // twee van de zes ODAX-objectives daadwerkelijk kan testen.
   { id: "demo-mc-traffic", name: "GreenTech Blog Traffic", objective: "OUTCOME_TRAFFIC" },
   { id: "demo-mc-leads", name: "GreenTech Demo Aanvraag", objective: "OUTCOME_LEADS" },
+  // GRA/GRN op Meta -- voorheen bestond alleen GRT hier, waardoor de beurs-scope (campagnenaam-
+  // filter) voor GRA/GRN op Meta altijd leeg was. GRA spiegelt [S11] (gestage groei, op koers);
+  // GRN spiegelt [S12] (jonge campagne, pas de laatste weken actief).
+  { id: "demo-mc-gra-awareness", name: "GRA | Awareness US", objective: "OUTCOME_AWARENESS" },
+  { id: "demo-mc-grn-leads", name: "GRN | Lead Gen NA", objective: "OUTCOME_LEADS" },
 ];
+
+// Gemiddelde orderwaarde per Meta-entiteit -- eerder overal conversion_value:0, waardoor Meta-
+// ROAS voor elk kanaal en elke beurs identiek (nul) was. GRA (VS) heeft grotere deals dan de
+// jonge GRN-markt; de ads erven de AOV van hun campagne.
+const META_AOV: Record<string, number> = {
+  "demo-mc-awareness": 140, "demo-mc-retargeting": 150, "demo-mc-traffic": 90, "demo-mc-leads": 160,
+  "demo-mc-gra-awareness": 175, "demo-mc-grn-leads": 105, "demo-meta-account": 130,
+  "demo-ad-hero-a": 140, "demo-ad-lifestyle-b": 140, "demo-ad-banner-c": 150, "demo-ad-carousel-d": 150,
+};
+const metaAov = (entity: string): number => META_AOV[entity] ?? 130;
 
 function metaAdDaily(): MetaDaily[] {
   const rows: MetaDaily[] = [];
@@ -143,6 +171,11 @@ function metaCampaignDaily(): MetaDaily[] {
     // (getest los in __meta_campaign_analysis_test.ts) -- hier gaat het om de manualChecks
     // (form-completion, leadkwaliteit) die ook zonder baseline al relevant zijn.
     rows.push({ entity: "demo-mc-leads", date, imp: 1800, linkClicks: 22, spend: 95, conv: 2, freq: null, hook: null, hold: null, leads: 1.6 });
+    // [S11-Meta] GRA: aanloop naar september, spend/kliks lopen geleidelijk op -- spiegelt de
+    // gezonde Google-koers voor dezelfde beurs.
+    rows.push({ entity: "demo-mc-gra-awareness", date, imp: recent ? 3600 : 2200, linkClicks: recent ? 34 : 19, spend: recent ? 140 : 80, conv: recent ? 5 : 2, freq: null, hook: null, hold: null });
+    // [S12-Meta] GRN: jonge campagne, pas de laatste 3 weken actief -- "eerste editie".
+    if (d < 21) rows.push({ entity: "demo-mc-grn-leads", date, imp: 900, linkClicks: 9, spend: 45, conv: 1, freq: null, hook: null, hold: null, leads: 0.7 });
   }
   return rows;
 }
@@ -178,7 +211,22 @@ const LI_CAMPAIGNS = [
   // dan één van de zeven objectiveType-waarden daadwerkelijk kan testen.
   { urn: "urn:li:sponsoredCampaign:demo3", name: "GreenTech Gids Downloads", objective: "WEBSITE_VISITS" },
   { urn: "urn:li:sponsoredCampaign:demo4", name: "GreenTech Productvideo", objective: "VIDEO_VIEWS" },
+  // GRA/GRN op LinkedIn -- voorheen bestond alleen GRT hier, dus was de beurs-scope voor GRA/GRN
+  // op LinkedIn altijd leeg. Toegevoegd aan het EIND (niet ertussenin): liCampaignDaily/liAccountDaily
+  // en het --check-blok verwijzen naar LI_CAMPAIGNS[0..3] op index, dus invoegen zou die verschuiven.
+  { urn: "urn:li:sponsoredCampaign:demo5", name: "GRA ABM Americas", objective: "LEAD_GENERATION" },
+  { urn: "urn:li:sponsoredCampaign:demo6", name: "GRN Lead Gen NA", objective: "LEAD_GENERATION" },
 ];
+
+// Gemiddelde orderwaarde per LinkedIn-campagne -- eerder overal conversion_value:0. GRA (VS) sluit
+// grotere deals dan de jonge GRN-markt; de twee content-campagnes (Gids Downloads/Productvideo)
+// converteren per ontwerp niet (altijd conv:0 in liCampaignDaily), dus hun AOV is irrelevant.
+const LI_AOV: Record<string, number> = {
+  "urn:li:sponsoredCampaign:demo1": 260, "urn:li:sponsoredCampaign:demo2": 220,
+  "urn:li:sponsoredCampaign:demo5": 300, "urn:li:sponsoredCampaign:demo6": 190,
+  "demo-li-account": 240,
+};
+const liAov = (urn: string): number => LI_AOV[urn] ?? 240;
 
 // Fractionele dag-snelheden (bijv. 0,25 leads/dag) horen bij lage-volume LinkedIn-campagnes en
 // moeten desondanks als geheel getal de database in (one_click_leads/one_click_lead_form_opens/
@@ -200,6 +248,8 @@ function liCampaignDaily(): LiDaily[] {
   const rows: LiDaily[] = [];
   const s0 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
   const s1 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
+  const s4 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
+  const s5 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
   for (let d = 63; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     const recent = d < 28;
@@ -212,6 +262,11 @@ function liCampaignDaily(): LiDaily[] {
     rows.push({ urn: LI_CAMPAIGNS[2].urn, date, imp: 2200, clicks: recent ? 18 : 34, spend: recent ? 140 : 95, leads: 0, opens: 0, conv: 0, vidStart: 0, vidDone: 0 });
     // Productvideo (VIDEO_VIEWS): lage voltooiing (10%) — de meeste kijkers haken vroeg af.
     rows.push({ urn: LI_CAMPAIGNS[3].urn, date, imp: 3000, clicks: 12, spend: 60, leads: 0, opens: 0, conv: 0, vidStart: 200, vidDone: 20 });
+    // [S11-LinkedIn] GRA: aanloop naar september, spend/leads lopen geleidelijk op -- spiegelt
+    // dezelfde gezonde koers als Google en Meta voor deze beurs.
+    rows.push({ urn: LI_CAMPAIGNS[4].urn, date, imp: recent ? 1800 : 1100, clicks: recent ? 28 : 16, spend: recent ? 130 : 70, leads: heelGetal(s4.leads, recent ? 0.6 : 0.3), opens: heelGetal(s4.opens, recent ? 2.0 : 1.2), conv: heelGetal(s4.conv, recent ? 0.5 : 0.2), vidStart: 0, vidDone: 0 });
+    // [S12-LinkedIn] GRN: jonge campagne, pas de laatste 3 weken actief -- "eerste editie".
+    if (d < 21) rows.push({ urn: LI_CAMPAIGNS[5].urn, date, imp: 600, clicks: 7, spend: 35, leads: heelGetal(s5.leads, 0.2), opens: heelGetal(s5.opens, 0.8), conv: heelGetal(s5.conv, 0.1), vidStart: 0, vidDone: 0 });
   }
   return rows;
 }
@@ -238,11 +293,19 @@ const LI_DEMO_FUNCTIONS = [
 
 // ── Instellingen: edities, doelen, ICP ─────────────────────────────────────
 const year = Number(TODAY.slice(0, 4));
+// GRT's editiedatum (10 juni) staat los van TODAY, en googleMonthly()'s aanloop-vorm (grtCycle)
+// is kalendermaand-cyclisch en blijft dus altijd geldig -- maar de EDITIE-lijst voor de
+// event-relatieve vergelijking [S10] moet een "aanstaande" editie bevatten, anders pikt
+// pickCurrentEdition() (lib/fair/geo-clone-analysis.ts) zodra 10 juni is gepasseerd de editie van
+// dit jaar als AFGELOPEN op, en verschuift "huidig"/"vorig" een heel jaar: de aanloop-vergelijking
+// mist dan zijn basis (ontdekt via --check toen de asOfDate na 10 juni lag).
+const grtEditionPassed = `${year}-06-10` < TODAY;
+const grtCurrentYear = grtEditionPassed ? year + 1 : year;
 const RAI_EVENTS = {
   events: [
     { id: "demo-grt", name: "GreenTech Amsterdam", abbrev: "GRT", cadence: "annual", editions: [
-      { date: `${year - 1}-06-11`, label: `${year - 1}` },
-      { date: `${year}-06-10`, label: `${year}` },
+      { date: `${grtCurrentYear - 1}-06-11`, label: `${grtCurrentYear - 1}` },
+      { date: `${grtCurrentYear}-06-10`, label: `${grtCurrentYear}` },
     ] },
     { id: "demo-gra", name: "GreenTech Americas", abbrev: "GRA", cadence: "annual", editions: [
       { date: `${year - 1}-09-16`, label: `${year - 1}` },
@@ -258,6 +321,9 @@ const AUDIENCE_PROFILE = { google_ads: { job_function: ["Operations", "Grower", 
 const GEO_CLONE_SETTINGS = [
   { geo_clone: "GRT", goals: { conversionsAbsolute: 320 }, event: null, branding: { brandName: "GreenTech Amsterdam (demo)" } },
   { geo_clone: "GRA", goals: { conversionsAbsolute: 200 }, event: null, branding: null },
+  // Bescheiden doel: GRN draait pas 8 maanden (m<8 in googleMonthly, "eerste editie" [S12]) --
+  // een doel op GRT/GRA-schaal zou de projectie kunstmatig altijd laten missen.
+  { geo_clone: "GRN", goals: { conversionsAbsolute: 70 }, event: null, branding: null },
 ];
 
 // ── Rijen bouwen per tabel ─────────────────────────────────────────────────
@@ -281,13 +347,15 @@ export function buildAllRows(): Record<string, Row[]> {
     client_id: DEMO_CLIENT, campaign_id: campaignIdOf(r.campaign), campaign_name: r.campaign, campaign_status: "ENABLED",
     month: monthsBack(r.monthIdx), impressions: r.imp, clicks: r.clicks, cost: r.cost, conversions: r.conv,
     conversions_value: r.value, ctr: r2(r.clicks / r.imp), avg_cpc: r2(r.cost / r.clicks),
-    cost_per_conversion: r.conv > 0 ? r2(r.cost / r.conv) : null, conversion_rate: r2(r.conv / r.clicks), roas: 0,
+    cost_per_conversion: r.conv > 0 ? r2(r.cost / r.conv) : null, conversion_rate: r2(r.conv / r.clicks),
+    roas: r.cost > 0 ? r2(r.value / r.cost) : 0,
   }));
 
   tables["ads_account_monthly"] = [...byMonth.entries()].map(([mIdx, a]) => ({
     client_id: DEMO_CLIENT, month: monthsBack(mIdx), impressions: a.imp, clicks: a.clicks, cost: a.cost,
     conversions: a.conv, conversions_value: a.value, ctr: r2(a.clicks / a.imp), avg_cpc: r2(a.cost / a.clicks),
-    cost_per_conversion: a.conv > 0 ? r2(a.cost / a.conv) : null, conversion_rate: r2(a.conv / a.clicks), roas: 0,
+    cost_per_conversion: a.conv > 0 ? r2(a.cost / a.conv) : null, conversion_rate: r2(a.conv / a.clicks),
+    roas: a.cost > 0 ? r2(a.value / a.cost) : 0,
   }));
 
   // Weekdata: de laatste 26 weken, kwart van de maandtotalen (deterministische verdeling).
@@ -296,11 +364,13 @@ export function buildAllRows(): Record<string, Row[]> {
     const weekStart = addDays(TODAY, -7 * w - ((new Date(TODAY).getDay() + 6) % 7)); // maandagen
     const mIdx = Math.min(23, Math.max(0, Math.floor((new Date(TODAY).getTime() - new Date(weekStart).getTime()) / (30.44 * 86400000))));
     const a = byMonth.get(mIdx)!;
+    const weekValue = r2(a.value / 4.33);
+    const weekCost = r2(a.cost / 4.33);
     weekly.push({
       client_id: DEMO_CLIENT, week_start: weekStart, impressions: Math.round(a.imp / 4.33), clicks: Math.round(a.clicks / 4.33),
-      cost: r2(a.cost / 4.33), conversions: Math.round(a.conv / 4.33), conversions_value: 0,
+      cost: weekCost, conversions: Math.round(a.conv / 4.33), conversions_value: weekValue,
       ctr: r2(a.clicks / a.imp), avg_cpc: r2(a.cost / a.clicks), cost_per_conversion: a.conv > 0 ? r2(a.cost / a.conv) : null,
-      conversion_rate: r2(a.conv / a.clicks), roas: 0,
+      conversion_rate: r2(a.conv / a.clicks), roas: weekCost > 0 ? r2(weekValue / weekCost) : 0,
     });
   }
   tables["ads_account_weekly"] = weekly;
@@ -345,7 +415,8 @@ export function buildAllRows(): Record<string, Row[]> {
   // Alleen meta_ad_daily kent de ranking-kolommen; campagne- en account-niveau niet.
   const metaBase = (r: MetaDaily): Row => ({
     client_id: DEMO_CLIENT, date: r.date, entity_id: r.entity, impressions: r.imp, link_clicks: r.linkClicks,
-    spend: r.spend, conversions: r.conv, conversion_value: 0, frequency: r.freq, hook_rate: r.hook, hold_rate: r.hold,
+    spend: r.spend, conversions: r.conv, conversion_value: Math.round(r.conv * metaAov(r.entity) * 100) / 100,
+    frequency: r.freq, hook_rate: r.hook, hold_rate: r.hold,
     landing_page_views: r.lpv ?? null, add_to_cart: r.atc ?? null, initiate_checkout: r.ic ?? null, leads: r.leads ?? null,
   });
   tables["meta_ad_daily"] = metaAdDaily().map((r) => ({
@@ -360,7 +431,7 @@ export function buildAllRows(): Record<string, Row[]> {
   const liRow = (r: LiDaily): Row => ({
     client_id: DEMO_CLIENT, date: r.date, entity_urn: r.urn, impressions: r.imp, clicks: r.clicks, spend: r.spend,
     one_click_leads: r.leads, one_click_lead_form_opens: r.opens, external_website_conversions: r.conv,
-    conversion_value: 0, video_starts: r.vidStart, video_completions: r.vidDone,
+    conversion_value: Math.round(r.conv * liAov(r.urn) * 100) / 100, video_starts: r.vidStart, video_completions: r.vidDone,
   });
   tables["linkedin_campaign_daily"] = liCampaignDaily().map(liRow);
   tables["linkedin_account_daily"] = liAccountDaily().map(liRow);
@@ -576,7 +647,31 @@ async function check() {
   );
   expect(coherence.flags.length === 1 && coherence.flags[0].outsideProfileSharePct > 50, `[S9] doelgroep-tegenspraak geflagd (${coherence.flags[0]?.outsideProfileSharePct}% buiten ICP)`);
 
-  // Beursanalyse GRT: achterstand => actionNeeded; GRA: op koers.
+  // Meta/LinkedIn dagpunten per beurs, exact zoals app/api/analysis/geo-clone/route.ts ze opbouwt --
+  // bewijst dat de nieuwe GRA/GRN-campagnes op Meta/LinkedIn ook echt de blended beursprojectie
+  // voeden, niet alleen los in hun eigen kanaaltabel staan.
+  const { matchGeoCloneByCampaignName } = await import("../../lib/fair/geo-clone-catalog");
+  const channelPointsFor = (geoClone: string) => {
+    const metaIds = new Set(META_CAMPAIGNS.filter((c) => matchGeoCloneByCampaignName(c.name)?.abbreviation === geoClone).map((c) => c.id));
+    const metaByDate = new Map<string, number>();
+    for (const r of tables["meta_campaign_daily"] as AnyRow[]) {
+      if (!metaIds.has(String(gRow(r).entity_id))) continue;
+      const d = String((r as Record<string, unknown>).date); metaByDate.set(d, (metaByDate.get(d) ?? 0) + Number(gRow(r).conversions));
+    }
+    const liIds = new Set(LI_CAMPAIGNS.filter((c) => matchGeoCloneByCampaignName(c.name)?.abbreviation === geoClone).map((c) => c.urn));
+    const liByDate = new Map<string, number>();
+    for (const r of tables["linkedin_campaign_daily"] as AnyRow[]) {
+      if (!liIds.has(String(gRow(r).entity_urn))) continue;
+      const d = String((r as Record<string, unknown>).date); liByDate.set(d, (liByDate.get(d) ?? 0) + Number(gRow(r).external_website_conversions));
+    }
+    const points: { channel: string; points: { date: string; value: number }[] }[] = [];
+    if (metaByDate.size > 0) points.push({ channel: "meta_ads", points: [...metaByDate.entries()].map(([date, value]) => ({ date, value })) });
+    if (liByDate.size > 0) points.push({ channel: "linkedin_ads", points: [...liByDate.entries()].map(([date, value]) => ({ date, value })) });
+    return points;
+  };
+
+  // Beursanalyse GRT: achterstand => actionNeeded; GRA: op koers; GRN: eerste editie (geen vorige
+  // editie om tegen af te zetten, maar draait wel en blend't Meta/LinkedIn mee).
   const grt = analyzeGeoClone({
     geoClone: "GRT", fairLabel: "GreenTech Amsterdam", rows: rowsAs(tables["ads_campaign_monthly"]),
     cadence: "annual", editions: RAI_EVENTS.events[0].editions, conversionsTarget: 320, asOfDate: TODAY,
@@ -585,8 +680,17 @@ async function check() {
   const gra = analyzeGeoClone({
     geoClone: "GRA", fairLabel: "GreenTech Americas", rows: rowsAs(tables["ads_campaign_monthly"]),
     cadence: "annual", editions: RAI_EVENTS.events[1].editions, conversionsTarget: 200, asOfDate: TODAY,
+    channelConvPoints: channelPointsFor("GRA"),
   });
   expect(gra.conversions?.comparable === true, `[S11] GRA-beursanalyse vergelijkbaar (delta ${gra.conversions?.deltaPct})`);
+  expect(gra.blendedForecast !== null, `[S11] GRA blend't Meta/LinkedIn mee (${gra.perChannelForecast.length} kanalen)`);
+  const grn = analyzeGeoClone({
+    geoClone: "GRN", fairLabel: "GreenTech North America", rows: rowsAs(tables["ads_campaign_monthly"]),
+    cadence: "custom", editions: RAI_EVENTS.events[2].editions, conversionsTarget: 70, asOfDate: TODAY,
+    channelConvPoints: channelPointsFor("GRN"),
+  });
+  expect(grn.conversions !== null && grn.previousEditionId === null, `[S12] GRN-beursanalyse: eerste editie, geen vorige om tegen af te zetten`);
+  expect(grn.blendedForecast !== null, `[S12] GRN blend't Meta/LinkedIn mee (${grn.perChannelForecast.length} kanalen)`);
 
   // ── Objective-analyse: bewijs dat de nieuwe Meta/LinkedIn-bevindingen-engines draaien op de
   // demo-klant, over meerdere objectives heen (masterplan 16.3). Maandaggregatie hier gebeurt

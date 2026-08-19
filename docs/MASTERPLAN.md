@@ -3392,3 +3392,147 @@ schoon, volledige `scripts/gates.sh` groen.
 geen automatische cron toegevoegd. Dit is de kalibratieberekening zelf en de plek waar hij
 toegepast wordt op nieuwe voorstellen — het eerste, kleinste, veiligste stuk van loop 5, niet de
 hele lus in één keer.
+
+### 17.25 KPI-rij kanaalafhankelijk gemaakt + GRT/GRA/GRN-demodata drie keer eerlijker
+
+Twee vragen, allebei over hetzelfde gebrek aan kanaalbewustzijn. Eerst: *"is het niet onlogisch
+dat de kanaal filter onder de hoofd kpi rij staat? moet de hoofd kpi rij niet mee bewegen met het
+kanaal?"* Onderzoek wees uit: niet alleen stond `ChannelTabs` onder `PeriodSummary` — de KPI-rij
+las via `useClientData` altijd Google-cijfers, ook op de Meta/LinkedIn/Alle kanalen-tabs. Geen
+"beweegt niet mee", maar het verkeerde kanaal op drie van de vier tabs. Eis van de eigenaar: *"deze
+kpi header rij moet standaard alles tonen. bij filtering pas kanaal specifiek."*
+
+**`lib/use-channel-period-data.ts` (nieuw).** Haalt Meta (`meta_account_daily`) en LinkedIn
+(`linkedin_account_daily`) rechtstreeks op (dezelfde demo-bewuste `supabase.from()`-weg als
+`ChannelPerformance`, bewust ongewijzigd gelaten), telt via `resolveChannelConversionConfig`/
+`sumSelectedConversions` (dezelfde selectie als de kanaal-eigen kaart, dus nooit een ander getal
+voor dezelfde conversie) op tot een `ClientHistoricalData`. Op `"blended"` (de standaardweergave)
+Google+Meta+LinkedIn maand-voor-maand opgeteld, pas getoond zodra alle drie geladen zijn — anders
+leest een kanaal dat nog laadt als "dit kanaal presteert niet". `client-dashboard.tsx`: `ChannelTabs`
+vóór `PeriodSummary`, data komt nu uit deze hook in plaats van altijd `clientData.data`.
+
+**Waarom dat de tweede vraag blootlegde.** Bij het testen bleek Meta/LinkedIn's `conversion_value`
+overal hardcoded op 0 te staan in de demo-brondata — de nieuwe kanaalafhankelijke KPI-rij zou dus
+altijd €0 omzet/ROAS tonen op die tabs. Dat viel samen met de eigenaar's eigen, onafhankelijke
+klacht: *"waarom is de data in grt, grn en gra exact hetzelfde? mock data moet per klant anders
+zijn toch?"* — gevolgd door, na een tussenvraag over scope, de bredere eis: *"zorg mer de data
+aanpassingen in de 3 demo accounts, dat het een perfect demo account is wat interessante leuke
+analyses uit de 3 sops krijgt."* ("de 3 sops" = weekly/biweekly/monthly, bevestigd via
+`components/insights/sop-trigger-buttons.tsx`'s `SOP_CONFIG`.)
+
+**Twee gescheiden demo-systemen, allebei geraakt.** `lib/demo/greentech-mock.ts` (de
+`?demo=1`-mock achter `/api/google-ads/client-data`) en `scripts/demo/seed-demo-client.ts` (de
+échte Supabase-seed voor de losstaande `demo-greentech`-klant) zijn onafhankelijke bronnen die
+"dezelfde fictieve wereld" beschrijven — bevestigd doordat `dbSelect()`-consumenten (bijv.
+`campaigns-per-channel.tsx`) altijd de ECHTE database lezen, zelfs in `?demo=1`-modus (eerder deze
+sessie al vastgesteld), terwijl raw `supabase.from()`-consumenten in demo-modus wél via
+`lib/demo/mock-supabase.ts` op `greentech-mock.ts`/`demo-rows.ts` uitkomen.
+
+- **`greentech-mock.ts`**: `campaignRows()` gaf elke campagne een vaste `share` van ÉÉN gedeelde
+  accountcurve — andere schaal, identieke vorm. Letterlijk de klacht. Vervangen door een eigen
+  `base`/`aov`/`trend(m)` per campagne: GRT groeit tot april en zakt daarna merkbaar terug (spiegelt
+  [S10] hieronder), GRA groeit gestaag het hele jaar (spiegelt [S11]), GRN bestaat pas vanaf maand 4
+  en loopt dan snel op vanaf een lage basis (spiegelt [S12]), Brand blijft vlak. Het accounttotaal
+  (`currentYearMonthly`, `buildGreentechOverview`) is nu de SOM van de campagnereeksen in plaats van
+  een los curve — anders lopen de KPI-rij en de campagnetabel uiteen. Geverifieerd met
+  `lib/period/__period_demo_test.ts` (49/49 groen, dezelfde keten als de browser: demo-mock →
+  adapter → `ClientHistoricalData` → `slicePeriod`).
+- **`scripts/demo/seed-demo-client.ts`**: `GEO_CLONE_SETTINGS` miste een GRN-rij (toegevoegd,
+  doel 70 — GRN draait pas 8 maanden); `googleMonthly()` had `value: 0` op elke rij (nu een
+  AOV-tabel per campagne, GRA hoogste dealgrootte, GRN laagste — laat Omzet/ROAS eindelijk
+  verschillen per beurs in plaats van overal nul); Meta/LinkedIn hadden alleen GRT-campagnes, geen
+  GRA/GRN (toegevoegd: `GRA | Awareness US` / `GRN | Lead Gen NA` op Meta, `GRA ABM Americas` /
+  `GRN Lead Gen NA` op LinkedIn, LinkedIn-nieuwkomers bewust aan het EIND van `LI_CAMPAIGNS`
+  toegevoegd — `liCampaignDaily()` en het `--check`-blok verwijzen naar bestaande entries op index);
+  `conversion_value` stond hardcoded op 0 in zowel Meta (`metaBase`) als LinkedIn (`liRow`) — nu een
+  AOV-tabel per entiteit/campagne (`metaAov`/`liAov`).
+- **Kalenderdrift gevonden en gefixt**: GRT's editiedatum (10 juni) lag inmiddels ín het verleden
+  (peildatum 19 augustus), waardoor `pickCurrentEdition()` (`lib/fair/geo-clone-analysis.ts`) de
+  editie van dit jaar als AFGELOPEN behandelde en de event-relatieve vergelijking zijn basis
+  kwijtraakte ([S10] zakte van "-35% achterstand" naar een schijnbare "-6%"). Editiejaar nu dynamisch
+  (`grtEditionPassed` schuift een jaar op zodra 10 juni al voorbij is) — dezelfde klasse fout als de
+  `REALIZED_MONTH`-drift die `greentech-mock.ts` eerder al kende, nu ook hier opgelost in plaats van
+  een keer geluk te hebben met de kalender.
+- **`--check` uitgebreid**: [S12] GRN-beursanalyse (eerste editie, geen vorige om tegen af te
+  zetten, draait toch), en voor zowel GRA als GRN een assertie dat `blendedForecast` niet null is —
+  bewijst dat de nieuwe Meta/LinkedIn-campagnes ook echt de blended beursprojectie voeden
+  (`channelConvPoints`, exact zoals `app/api/analysis/geo-clone/route.ts` ze opbouwt), niet alleen
+  los in hun eigen kanaaltabel staan. Alle 15 checks groen; de echte `demo-greentech`-rijen in
+  Supabase herzaaid.
+
+**`scripts/demo/seed-geoclone-clients.ts` + `teardown-geoclone-clients.ts` (nieuw).** Vervolgvraag:
+*"kan je ook een eigen account id geven aan deze accounts zodat het voor cross account goed
+werkt?"* Masterplan 17.20 deed dit al één keer, als wegwerpscript, en ruimde het daarna volledig
+op — met de notitie dat het "overwegen waard" was om er een echt, benoemd scriptpaar van te maken.
+Dat is dit. Zelfde aanpak (Google-only, GRT/GRA/GRN op campagnenaam gesplitst uit de LIVE
+`demo-greentech`-cijfers, de twee schrijflagen uit 17.20 punt 1-2: `*_legacy` + de RPC
+`refresh_fact_from_legacy`, plus `ads_account_weekly`/`client_sync_status` voor
+`checkDataFreshness()`), maar nu idempotent (delete-dan-insert, herhaald draaien is veilig) en
+blijvend in plaats van weggegooid.
+
+Twee bugs onderweg, allebei ontdekt door na elke stap de database terug te lezen in plaats van op
+"geen foutmelding" te vertrouwen:
+1. **fact_core bleef leeg.** `refresh_fact_from_legacy()` (migratie 078) joint tegen `accounts` op
+   `client_id` om `account_id`/`agency_id` te vinden; de `accounts`-rij werd pas ná de RPC-aanroep
+   geschreven, dus matchte de join nul rijen. `ads_campaign_monthly_legacy` had 50/25/9 rijen, de
+   VIEW `ads_campaign_monthly` (waar alles buiten deze twee scripts uit leest) toonde 0. Volgorde
+   omgedraaid: de `accounts`-rij staat er nu vóór de RPC draait.
+2. **Teardown zaaide zichzelf opnieuw.** `teardown-geoclone-clients.ts` importeert `GEOCLONE_CLIENTS`
+   uit `seed-geoclone-clients.ts` voor de client-id-lijst; dat bestand voerde zijn `run()` echter
+   onvoorwaardelijk op module-top-level uit, dus de IMPORT alleen al herzaaide de data vlak vóórdat
+   teardown ze weer opruimde — zichtbaar aan interleavende log-regels van twee `run()`'s die
+   tegelijk tegen dezelfde database liepen. Gefixt met een `isMain`-guard op `process.argv[1]`.
+
+**Eigen bureau, niet het bestaande "demo"-bureau.** Portfolio-synthese
+(`lijstAccountsMetSops`) pakt ALLE `sops_enabled`-accounts van één bureau. `demo-greentech` staat
+daar met `sops_enabled: true` (moet ook, anders blokkeren `magSopDraaien()`-checks in
+`monthly`/`weekly`/`biweekly` zijn eigen SOP-knoppen — nu net deze sessie rijker gemaakt). Onder
+hetzelfde bureau zou een portfolio-run dus 4 "klanten" zien waarvan er één letterlijk de som van de
+andere drie is: geen cross-account-demo maar een dubbeltelling. Nieuw bureau `demo-portfolio`
+(licentie `growth` — de laagste tier die `/api/analysis/portfolio-synthesis` ontgrendelt, anders
+203 op elke synthese-poging), `demo-greentech` blijft ongemoeid onder het oude bureau.
+
+**Geverifieerd, niet aangenomen**: na de fix `ads_campaign_monthly`/`ads_account_monthly` (de
+VIEWS) rechtstreeks bevraagd per pseudo-klant — 50/25/9 respectievelijk 25/25/9 rijen, exact
+gelijk aan de `*_legacy`-telling. `accounts`-rijen onder het juiste bureau, `sops_enabled: true`,
+`demo-greentech` aantoonbaar nog onder zijn oude bureau. `npx tsc --noEmit` schoon, volledige
+`scripts/gates.sh` groen.
+
+**De visuele check op `?demo=1` vond drie stapelende bugs in `lib/demo/demo-rows.ts` die geen van
+de bovenstaande fixes had blootgelegd** — precies waarom AGENTS.md voorschrijft om een demo-
+wijziging ook echt in de browser te bekijken: tsc/tests/build zien alleen of de code klopt, niet of
+de cijfers kloppen. Eerste blik op "Alle kanalen": Conversies **+598,6%** t.o.v. vorig jaar. Geen
+typefout, drie echte, al langer bestaande gaten in de mockdata die de nieuwe kanaalafhankelijke
+KPI-rij voor het eerst zichtbaar maakte doordat niets eerder Meta/LinkedIn/Google in één YoY-
+vergelijking optelde:
+
+1. **Meta telde elke conversie dubbel.** `sumSelectedConversions()` (`lib/analysis/channel-
+   conversion-config.ts`) telt voor `meta_ads` standaard `conversions + leads` op. `metaAccountDaily`/
+   `metaCampaignDaily` zetten `leads: conv` — een kopie van dezelfde waarde in het andere veld, dus
+   elke Meta-conversie werd 2x geteld. Dit trof ook `ChannelPerformance`, de al langer bestaande
+   Meta-view, niet alleen de nieuwe hook. Gefixt: `leads: 0`.
+2. **Meta/LinkedIn bestonden in de mock maar 150 dagen; Google twee jaar.** Een YoY-vergelijking
+   (huidige 12 maanden tegen dezelfde 12 maanden vorig jaar) zag Meta/LinkedIn dan alleen in de
+   HUIDIGE periode verschijnen — geen eerlijke groei, maar een sprong doordat het kanaal leek "net
+   te zijn aangesloten". LinkedIn had geen dag-domein-begrensde formules en kreeg het venster simpelweg
+   verlengd naar 730 dagen. Meta's verzadigings-/frequency-formules (`metaSaturationSpend/Clicks`,
+   `metaFrequency`) zijn bewust een RECENT verhaal en gaan buiten hun 0..150-domein negatief; daar
+   kwam een apart `metaAccountDailyOlder`-blok bij (dag 150–729), vlak/licht groeiend, verankerd op
+   `metaDayAgg(150)` zodat er geen zichtbare sprong op de naad ontstaat.
+3. **`conversion_value` ontbrak vrijwel overal** (`metaAccountDaily`, `metaCampaignDaily`,
+   `linkedinAccountDaily`, `linkedinCampaignDaily`) — altijd `undefined` → `0`, dus Omzet/ROAS
+   toonden op de Meta- en LinkedIn-tabs al langer €0/0,00x. Precies de "conversions_value: 0"-vondst
+   die masterplan 17.19/17.20's cross-account-test destijds al signaleerde, nu pas gefixt. AOV per
+   kanaal/campagne bewust AFGELEID van de eigen spend/conv-CPA op zo'n 1,8-2,2x ROAS (LinkedIn het
+   duurste kanaal per lead, zoals het hoort) — eerste poging koos AOV's los van de CPA (Meta 130,
+   LinkedIn 260) en gaf 6-10x ROAS, net zo onrealistisch als €0.
+
+**Resultaat, na de fix, op "Alle kanalen"**: Conversies +56,0%, Omzet +73,8%, Advertentiekosten
++43,4%, ROAS 2,09x — een groeiverhaal dat je een klant kan laten zien in plaats van een getal dat om
+uitleg vraagt. Per kanaal ook plausibel: Google ROAS 2,22x (CPA €70, Account Health 86/A), Meta
+2,05x (CPA €15), LinkedIn 1,92x (CPA €23, met een eigen "jaardoel in gevaar"-signaal — een tweede,
+onafhankelijk gevonden verhaal, niet ontworpen). Geverifieerd met Playwright-screenshots op alle
+vier de tabs (Alle kanalen/Google/Meta/LinkedIn), in beide thema's zou de volgende stap zijn maar
+was voor deze cijfer-fix niet het punt. `scripts/check-kaartoverloop.mjs` groen (de
+`ChannelTabs`/`PeriodSummary`-omwisseling is een layoutwijziging). Volledige `scripts/gates.sh`
+opnieuw groen ná deze `demo-rows.ts`-wijzigingen.

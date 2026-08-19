@@ -223,12 +223,45 @@ const metaSaturationClicks = (daysAgo: number): number => 1 - 0.35 * (1 - daysAg
 // consistent blijven in plaats van los van elkaar verzonnen.
 const metaFrequency = (daysAgo: number): number => 1.8 + 1.4 * (1 - daysAgo / 150);
 
-const metaAccountDaily: Row[] = Array.from({ length: 150 }, (_, d) => {
+// Gemiddelde orderwaarde op accountniveau -- zelfde reden als META_CAMPAIGN_AOV verderop:
+// conversion_value ontbrak hier volledig, dus Omzet/ROAS op de Meta-tab toonde altijd €0/0,00x.
+// Gemikt op zo'n 2x ROAS bij de account-brede CPA (~€14) -- een B2B-beurscampagne op Meta is geen
+// e-commerce, dus geen 5-10x. Eerste poging (AOV 130) gaf ~9x: los van de CPA gekozen in plaats
+// van ervan afgeleid.
+const META_ACCOUNT_AOV = 30;
+const metaAccountDailyRecent: Row[] = Array.from({ length: 150 }, (_, d) => {
   const day = 149 - d; const a = metaDayAgg(day);
   const conv = a.conversions * weekdayConvPenalty(day);
   const frequency = metaFrequency(day);
-  return { client_id: CID, date: dayISO(day), impressions: a.impressions, reach: Math.round(a.impressions / frequency), frequency: Math.round(frequency * 100) / 100, link_clicks: Math.round(a.link_clicks * metaSaturationClicks(day)), spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: conv };
+  // leads:0, niet leads:conv -- sumSelectedConversions() (lib/analysis/channel-conversion-config.ts)
+  // telt voor meta_ads standaard conversions+leads op; dezelfde waarde in allebei de velden
+  // verdubbelde zo elke Meta-conversie in elke consument die de standaardselectie gebruikt
+  // (ChannelPerformance vandaag al, en de kanaalafhankelijke KPI-rij die dit ontdekte).
+  return { client_id: CID, date: dayISO(day), impressions: a.impressions, reach: Math.round(a.impressions / frequency), frequency: Math.round(frequency * 100) / 100, link_clicks: Math.round(a.link_clicks * metaSaturationClicks(day)), spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: 0, conversion_value: Math.round(conv * META_ACCOUNT_AOV) };
 });
+// Oudere geschiedenis (dag 150 t/m 729, ~19 maanden extra vóór het gedetailleerde venster
+// hierboven): vlak/licht groeiend, GEEN verzadigings-/frequency-drama (metaSaturationSpend/Clicks
+// en metaFrequency zijn bewust een RECENT verhaal -- buiten hun 0..150-domein gaan ze negatief).
+// Zonder dit blok bestond Meta in de mock maar 150 dagen, terwijl Google twee jaar teruggaat: een
+// kanaalafhankelijke blended vergelijking (lib/use-channel-period-data.ts) over "vorig jaar" zag
+// Meta dan alleen in de huidige periode verschijnen en niet in de vergelijkingsperiode -- geen
+// eerlijke YoY-delta maar een vertekende sprong doordat het kanaal "net was aangesloten". Verankerd
+// op metaDayAgg(150), de dag net vóór het gedetailleerde venster, zodat er geen zichtbare sprong
+// ontstaat op de naad.
+const metaAccountDailyOlder: Row[] = Array.from({ length: 580 }, (_, i) => {
+  const day = 729 - i; // 729 (oudst) .. 150 (grens met het gedetailleerde venster)
+  const anchor = metaDayAgg(150);
+  const groei = Math.pow(1 / 1.12, day / 365); // verder terug = iets lager, zelfde richting als de rest van het account (2024 < 2025 < 2026)
+  const impressions = Math.round(anchor.impressions * groei);
+  const frequency = 2.2; // vlak: geen verzadigingsverhaal in de oudere geschiedenis
+  const conversions = Math.round(anchor.conversions * groei * weekdayConvPenalty(day));
+  return {
+    client_id: CID, date: dayISO(day), impressions, reach: Math.round(impressions / frequency), frequency,
+    link_clicks: Math.round(anchor.link_clicks * groei), spend: Math.round(anchor.spend * groei),
+    conversions, leads: 0, conversion_value: Math.round(conversions * META_ACCOUNT_AOV),
+  };
+});
+const metaAccountDaily: Row[] = [...metaAccountDailyOlder, ...metaAccountDailyRecent];
 // meta_campaigns + meta_campaign_daily voeden de ChannelPerformance-view (KPI's, maand-/campagnetabel).
 const META_CAMPAIGNS = [
   { id: "demo-mcamp-aw", name: "GRT | Awareness EU", imp: 2500, clk: 48, spend: 117, conv: 7, seed: 0 },
@@ -240,8 +273,21 @@ const META_CAMPAIGNS = [
   { id: "demo-mcamp-gra", name: "GRA | Retargeting US", imp: 1100, clk: 26, spend: 54, conv: 4, seed: 8 },
 ];
 const metaCampaigns: Row[] = META_CAMPAIGNS.map((c) => ({ client_id: CID, campaign_id: c.id, name: c.name, status: "ACTIVE" }));
+// Gemiddelde orderwaarde per campagne -- eerder ontbrak conversion_value hier volledig (altijd
+// undefined -> 0), waardoor Meta's Omzet/ROAS overal €0/0,00x toonde: precies de "conversions_value:
+// 0"-vondst die masterplan 17.19/17.20's cross-account-test destijds al signaleerde. Per campagne
+// afgeleid van zijn EIGEN spend/conv-CPA (~2x ROAS), niet los gekozen -- anders verschilt de
+// impliciete ROAS willekeurig per campagne in plaats van een bewuste beurs-/kwaliteitsvariatie.
+const META_CAMPAIGN_AOV: Record<string, number> = {
+  "demo-mcamp-aw": 35, "demo-mcamp-rt": 15, "demo-mcamp-pro": 140, "demo-mcamp-grn": 33, "demo-mcamp-gra": 27,
+};
 const metaCampaignDaily: Row[] = META_CAMPAIGNS.flatMap((c) =>
-  Array.from({ length: 150 }, (_, d) => { const f = dayFactor(149 - d, c.seed); return { client_id: CID, entity_id: c.id, date: dayISO(149 - d), impressions: Math.round(c.imp * f), link_clicks: Math.round(c.clk * f), spend: Math.round(c.spend * f), conversions: Math.max(0, Math.round(c.conv * f)), leads: Math.max(0, Math.round(c.conv * f)) }; })
+  // leads:0 -- zelfde reden als metaAccountDaily hierboven, anders verdubbelt sumSelectedConversions().
+  Array.from({ length: 150 }, (_, d) => {
+    const f = dayFactor(149 - d, c.seed);
+    const conversions = Math.max(0, Math.round(c.conv * f));
+    return { client_id: CID, entity_id: c.id, date: dayISO(149 - d), impressions: Math.round(c.imp * f), link_clicks: Math.round(c.clk * f), spend: Math.round(c.spend * f), conversions, leads: 0, conversion_value: Math.round(conversions * META_CAMPAIGN_AOV[c.id]) };
+  })
 );
 
 // meta_breakdown_daily: plaatsing/leeftijd/device-segmenten met een dure verspiller
@@ -324,12 +370,17 @@ const linkedinCreatives: Row[] = [
   { client_id: CID, creative_urn: "urn:li:demo:cr4", headline: "Vier redenen om te exposeren", post_text: "Van leadvolume tot leveranciersnetwerk — swipe door de cijfers.", image_storage_path: "https://picsum.photos/seed/li-greentech-4/320/200", cta_label: "Stand boeken", landing_url: "https://demo.greentech-fictief.example/li-stand", format: "carousel" },
   { client_id: CID, creative_urn: "urn:li:demo:cr5", headline: "Persoonlijke uitnodiging voor uw team", post_text: "Ontvang twee vrijkaarten voor de vakbeurs.", image_storage_path: "https://picsum.photos/seed/li-greentech-5/320/200", cta_label: "Uitnodiging", landing_url: "https://demo.greentech-fictief.example/li-invite", format: "message" },
 ];
+// leads hier stonden op 3/6/2/4/3 per dag -- bij de bijbehorende spend (34/40/58/37/22) kwam dat
+// op zo'n €10-11 per lead uit, Google/Meta-territorium terwijl LinkedIn B2B-leadgen doorgaans het
+// duurste kanaal is (vaak €40-150+/lead). Verlaagd naar een realistischer CPL (~€35-45), gevonden
+// toen de kanaalafhankelijke KPI-rij (lib/use-channel-period-data.ts) LinkedIn voor het eerst
+// meetelde in een blended vergelijking en een absurde YoY-stijging liet zien.
 const LI_META = [
-  { urn: "urn:li:demo:cr1", imp: 620, clk: 11, spend: 34, leads: 3, seed: 1 },
-  { urn: "urn:li:demo:cr2", imp: 780, clk: 14, spend: 40, leads: 6, seed: 3 },
-  { urn: "urn:li:demo:cr3", imp: 2100, clk: 19, spend: 58, leads: 2, seed: 5 },
-  { urn: "urn:li:demo:cr4", imp: 940, clk: 16, spend: 37, leads: 4, seed: 7 },
-  { urn: "urn:li:demo:cr5", imp: 310, clk: 9, spend: 22, leads: 3, seed: 9 },
+  { urn: "urn:li:demo:cr1", imp: 620, clk: 11, spend: 34, leads: 1, seed: 1 },
+  { urn: "urn:li:demo:cr2", imp: 780, clk: 14, spend: 40, leads: 2, seed: 3 },
+  { urn: "urn:li:demo:cr3", imp: 2100, clk: 19, spend: 58, leads: 1, seed: 5 },
+  { urn: "urn:li:demo:cr4", imp: 940, clk: 16, spend: 37, leads: 1, seed: 7 },
+  { urn: "urn:li:demo:cr5", imp: 310, clk: 9, spend: 22, leads: 1, seed: 9 },
 ];
 const linkedinCreativeDaily: Row[] = LI_META.flatMap((c) =>
   Array.from({ length: 150 }, (_, d) => {
@@ -337,11 +388,24 @@ const linkedinCreativeDaily: Row[] = LI_META.flatMap((c) =>
     return { client_id: CID, entity_urn: c.urn, date: dayISO(149 - d), impressions: Math.round(c.imp * f), clicks: Math.round(c.clk * f), spend: Math.round(c.spend * f), external_website_conversions: Math.round(f), one_click_leads: Math.max(0, Math.round(c.leads * f)) };
   })
 );
-const linkedinAccountDaily: Row[] = Array.from({ length: 150 }, (_, d) => {
-  const day = 149 - d;
+// 730 dagen (~2 jaar), niet 150: LinkedIn heeft -- anders dan Meta -- geen dag-domein-begrensde
+// verzadigingsformule (dayFactor blijft positief tot ver voorbij dag 730), dus hier volstaat het
+// venster gewoon te verlengen. Nodig zodat een kanaalafhankelijke blended vergelijking over "vorig
+// jaar" (lib/use-channel-period-data.ts) LinkedIn ook in de vergelijkingsperiode ziet, niet alleen
+// in de huidige -- anders leest elke YoY-delta op "Alle kanalen" als een vertekende sprong doordat
+// het kanaal daar leek "net te zijn aangesloten".
+// Gemiddelde dealgrootte per LinkedIn-conversie ("conversie" = one_click_leads +
+// external_website_conversions samen, dezelfde optelling als sumSelectedConversions() voor
+// linkedin_ads default gebruikt) -- conversion_value ontbrak hier volledig (altijd undefined -> 0),
+// zelfde gat als bij Meta hierboven. Gemikt op zo'n 1,8x ROAS bij de account-brede CPA (~€25):
+// LinkedIn is B2B's duurste kanaal per lead, dus een lagere ROAS dan Meta is het punt, niet een bug.
+const LI_ACCOUNT_AOV = 45;
+const linkedinAccountDaily: Row[] = Array.from({ length: 730 }, (_, d) => {
+  const day = 729 - d;
   const agg = LI_META.reduce((s, c) => { const f = dayFactor(day, c.seed); s.impressions += Math.round(c.imp * f); s.clicks += Math.round(c.clk * f); s.spend += Math.round(c.spend * f); s.leads += Math.max(0, Math.round(c.leads * f)); return s; }, { impressions: 0, clicks: 0, spend: 0, leads: 0 });
   const leads = agg.leads * weekdayConvPenalty(day);
-  return { client_id: CID, date: dayISO(day), impressions: agg.impressions, clicks: agg.clicks, spend: Math.round(agg.spend * recentSpendBump(day)), external_website_conversions: Math.round(leads * 0.3), one_click_leads: leads };
+  const conversions = Math.round(leads * 0.3);
+  return { client_id: CID, date: dayISO(day), impressions: agg.impressions, clicks: agg.clicks, spend: Math.round(agg.spend * recentSpendBump(day)), external_website_conversions: conversions, one_click_leads: leads, conversion_value: Math.round((conversions + leads) * LI_ACCOUNT_AOV) };
 });
 // linkedin_campaign_daily voedt de ChannelPerformance-view (per campagne).
 // Expliciet i.p.v. formule: 'Brede awareness' domineert de spend maar levert weinig leads,
@@ -354,7 +418,12 @@ const LI_CAMP_DEFS = [
   { urn: "urn:li:demo:5", imp: 1500, clk: 22, spend: 36, leads: 4, seed: 8 },
 ];
 const linkedinCampaignDaily: Row[] = LI_CAMP_DEFS.flatMap((c) =>
-  Array.from({ length: 150 }, (_, d) => { const f = dayFactor(149 - d, c.seed); return { client_id: CID, entity_urn: c.urn, date: dayISO(149 - d), impressions: Math.round(c.imp * f), clicks: Math.round(c.clk * f), spend: Math.round(c.spend * f), external_website_conversions: Math.round(f), one_click_leads: Math.max(0, Math.round(c.leads * f)) }; })
+  Array.from({ length: 150 }, (_, d) => {
+    const f = dayFactor(149 - d, c.seed);
+    const oneClickLeads = Math.max(0, Math.round(c.leads * f));
+    const externalConv = Math.round(f);
+    return { client_id: CID, entity_urn: c.urn, date: dayISO(149 - d), impressions: Math.round(c.imp * f), clicks: Math.round(c.clk * f), spend: Math.round(c.spend * f), external_website_conversions: externalConv, one_click_leads: oneClickLeads, conversion_value: Math.round((oneClickLeads + externalConv) * LI_ACCOUNT_AOV) };
+  })
 );
 
 // linkedin_demographic_daily + labels: functie/seniority-segmenten met een dure verspiller
