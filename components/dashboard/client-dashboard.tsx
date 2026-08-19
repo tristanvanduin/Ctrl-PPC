@@ -31,7 +31,6 @@ import { ChannelForecast } from "./channel-forecast";
 import { EventForecaster } from "./event-forecaster";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
-import { DEMO_GREENTECH_ID } from "@/lib/demo/greentech-mock";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { GodViewDemo } from "@/components/terminal/god-view-demo";
 import type { InsightChannel } from "@/lib/insights/channel-of";
@@ -317,8 +316,11 @@ export function ClientDashboard({ client }: { client: Client }) {
         </div>
       )}
 
-      {/* Tab navigation — demo-greentech krijgt de nieuwe gegroepeerde IA (voorproefje) */}
-      {client.id === DEMO_GREENTECH_ID ? (
+      {/* Tab navigation — de demo-accounts krijgen de nieuwe gegroepeerde IA (voorproefje).
+        Eerst alleen demo-greentech; demo-grt/demo-gra/demo-grn (scripts/demo/seed-geoclone-
+        clients.ts) volgden dezelfde "demo-"-naamconventie maar niet deze check, waardoor ze de
+        oude platte tabbalk lieten zien -- inconsistent binnen dezelfde demo-omgeving. */}
+      {client.id.startsWith("demo-") ? (
         <GroupedTabNav activeTab={activeTab} onChange={setActiveTab} sopErrorCount={sopErrors.length} />
       ) : (
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
