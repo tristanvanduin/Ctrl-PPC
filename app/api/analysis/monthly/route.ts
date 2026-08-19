@@ -1027,9 +1027,15 @@ async function finalizeChannelMonthlySynthesis(opts: {
   });
   const qualityGate = buildMonthlyQualityGate({ stepValidations, acceptance: acceptanceReport });
 
+  // refreshCreatedAt: true -- zonder dit stempelt een upsert op een bestaande rij (zelfde klant/
+  // sop_type/analysis_date/section, bv. een herhaalde run dezelfde dag) NIET een vers created_at,
+  // ook al is de inhoud zojuist vervangen. Google's eigen pad (verderop in dit bestand) doet dit al
+  // wel; dit gedeelde pad -- Meta EN LinkedIn -- deed dat niet, waardoor "wanneer liep dit voor het
+  // laatst" voor die twee kanalen niet op created_at te beantwoorden was, alleen op de inhoud zelf.
   const save = (section: string, output: string) => saveAnalysisOutputSection({
     supabase,
     row: { client_id: clientId, sop_type: adapter.sopTypeKey, analysis_date: analysisDate, period_start: periodStart, period_end: periodEnd, section, output, model_used: model, tokens_used: 0, step_number: 0, step_name: section },
+    refreshCreatedAt: true,
   });
 
   await save("quality_gate_monthly_v2", JSON.stringify({
