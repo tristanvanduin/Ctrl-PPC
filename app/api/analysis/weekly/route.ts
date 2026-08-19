@@ -30,6 +30,12 @@ import {
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 
+// Zelfde reden als app/api/analysis/monthly/route.ts: zonder dit valt de route terug op Vercel's
+// (veel kortere) platformdefault en breekt een lange analyse af met een platte foutpagina i.p.v.
+// JSON, wat de client als "Unexpected token... is not valid JSON" laat zien in plaats van een
+// bruikbare foutmelding.
+export const maxDuration = 300;
+
 async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
   await createProgressJob(supabase, {
     jobId,

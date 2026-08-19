@@ -95,6 +95,15 @@ import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 import { triggerCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 import { triggerPortfolioSynthesisIfReady } from "@/lib/analysis/auto-portfolio-synthesis-trigger";
 
+// Zonder dit valt de route terug op Vercel's platformdefault (veel korter dan wat deze route
+// nodig heeft) en breekt Vercel de functie halverwege af met een platte foutpagina in plaats van
+// JSON -- de client se `res.json()` struikelt dan over "An error occurred..." in plaats van een
+// bruikbare foutmelding te tonen. app/api/cron/trigger-sops/route.ts noemt zelf al 300s als de
+// grens die "maar net past" voor ÉÉN monthly-run (2-3 minuten volgens de knoppen-UI); deze route
+// draait nu ook de cross-channel- en cross-account-synthese inline mee ná de hoofdanalyse
+// (triggerCrossChannelSynthesisIfReady/triggerPortfolioSynthesisIfReady hierboven), dus die marge
+// is kleiner geworden dan toen die opmerking geschreven werd, niet groter.
+export const maxDuration = 300;
 
 function normalizeText(value: string): string {
   return value

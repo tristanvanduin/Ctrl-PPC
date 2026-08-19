@@ -29,6 +29,12 @@ import { resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// Zelfde reden als app/api/analysis/monthly/route.ts: zonder dit valt de route terug op Vercel's
+// (veel kortere) platformdefault en breekt een lange analyse af met een platte foutpagina i.p.v.
+// JSON, wat de client als "Unexpected token... is not valid JSON" laat zien in plaats van een
+// bruikbare foutmelding.
+export const maxDuration = 300;
+
 // Gedeeld door alle drie de kanalen: elke stap sluit af met "TOP 3 BEVINDINGEN STAP N: ...",
 // en die worden als beknopte samenvatting doorgegeven aan de extractie-stap (i.p.v. de volledige
 // narratieve tekst nog eens te laten lezen).

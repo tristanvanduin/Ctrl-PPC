@@ -14,6 +14,12 @@ import { getOpenRouterKey } from "@/lib/analysis/helpers";
 import { lastCompleteMonth } from "@/lib/period/period-range";
 import { today } from "@/lib/reporting-date";
 
+// Zelfde reden als app/api/analysis/monthly/route.ts: zonder dit valt de route terug op Vercel's
+// (veel kortere) platformdefault en breekt een lange analyse af met een platte foutpagina i.p.v.
+// JSON, wat de client als "Unexpected token... is not valid JSON" laat zien in plaats van een
+// bruikbare foutmelding.
+export const maxDuration = 300;
+
 function periodBounds(): { start: string; end: string } {
   const month = lastCompleteMonth();
   const [y, m] = month.split("-").map(Number);

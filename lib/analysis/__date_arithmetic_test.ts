@@ -15,16 +15,25 @@
 // niets: die zit in dezelfde blinde vlek als de code.
 
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { addDays, addYears, fmt, monthsAgo, daysAgo, today, REPORTING_TIMEZONE } from "./helpers";
 
 const ZONES = ["UTC", "Europe/Amsterdam"];
 
 // De ouderprocesrun start de kinderen en telt de uitkomsten op. Via tsx en niet via
 // process.execPath: dit bestand is TypeScript, en kale node kan het niet laden.
+//
+// fileURLToPath(import.meta.url) i.p.v. import.meta.filename: dat laatste bleek undefined
+// wanneer dit bestand draait via scripts/run-tests.mjs (dat het tsx-binary rechtstreeks aanroept
+// i.p.v. via `npx tsx`, zie dat bestand) -- de spawnSync hieronder kreeg dan letterlijk de string
+// "undefined" als pad mee ("Cannot find module '.../undefined'"), zichtbaar als "2 van de 2
+// tijdzones faalde" ook al was er geen enkele echte assertie mislukt. import.meta.url is de
+// oudere, overal ondersteunde vorm en levert in beide invocatiepaden hetzelfde pad.
 if (!process.env.__TZ_CHILD) {
+  const eigenPad = fileURLToPath(import.meta.url);
   let mislukt = 0;
   for (const zone of ZONES) {
-    const res = spawnSync("npx", ["tsx", import.meta.filename], {
+    const res = spawnSync("npx", ["tsx", eigenPad], {
       env: { ...process.env, TZ: zone, __TZ_CHILD: "1" },
       encoding: "utf8",
       stdio: "inherit",

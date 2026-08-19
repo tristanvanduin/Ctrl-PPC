@@ -15,6 +15,12 @@ import { supabaseForClient } from "@/lib/demo/server-supabase";
 const SOP_TYPE = "cross_channel";
 const SECTION = "cross_channel_synthesis_v1";
 
+// Zelfde reden als app/api/analysis/monthly/route.ts: zonder dit valt de route terug op Vercel's
+// (veel kortere) platformdefault en breekt een lange analyse af met een platte foutpagina i.p.v.
+// JSON, wat de client als "Unexpected token... is not valid JSON" laat zien in plaats van een
+// bruikbare foutmelding.
+export const maxDuration = 300;
+
 function periodBounds(): { start: string; end: string } {
   const month = lastCompleteMonth(); // "YYYY-MM"
   const [y, m] = month.split("-").map(Number);
