@@ -131,5 +131,38 @@ console.log("6. canonicalizeFindings() keeps Meta/LinkedIn findings instead of s
   assert(canonical.findings.length === 2, `both channel-specific findings should survive canonicalization, got ${canonical.findings.length}`);
 }
 
+console.log("7. Waarde-gebaseerde dedup vangt een mislabelde entity_type (LinkedIn AC-14, live gevonden 19 aug 2026)");
+{
+  // Live gevonden: LinkedIn stap 4 labelde een "audience"-bevinding per ongeluk als entity_type
+  // "account", waardoor de scope-bewuste dedup_key niet matchte met stap 6's correct gelabelde
+  // herhaling van diezelfde CPC=88,24-bevinding. AC-14 (monthly-acceptance.ts, entity+metric,
+  // scope-onbewust) ving het wel als duplicaat, maar canonicalizeFindings had ze allebei al laten
+  // overleven -- blokkeerde de kwaliteitspoort in plaats van gewoon te mergen.
+  const raw = [
+    finding({ step: 4, entity_type: "account", entity_name: "audience", entity_scope: undefined, metric: "CPC", current_value: 88.24, issue_cluster: "uncategorized" }),
+    finding({ step: 6, entity_type: "audience", entity_name: "audience", entity_scope: undefined, metric: "CPC", current_value: 88.24, issue_cluster: "uncategorized" }),
+  ];
+  const canonical = canonicalizeFindings(raw, {});
+  assert(canonical.findings.length === 1, `identical entity_name+metric+current_value across a mislabeled entity_type should merge into 1, got ${canonical.findings.length}`);
+  if (canonical.findings.length === 1) {
+    assert(/Bevestigd in stap 4, 6/.test(canonical.findings[0].cause || ""), `merged finding should reference both steps, got: ${canonical.findings[0].cause}`);
+  }
+}
+
+console.log("8. Zelfde naam+metric maar verschillende current_value mergen NIET (regressiewaakhond)");
+{
+  // Tegenovergestelde controle van test 7: de waarde-gebaseerde pas mag alleen mergen bij een
+  // EXACTE current_value-match. Twee verschillende entity_types met dezelfde naam+metric maar
+  // een andere waarde zijn waarschijnlijk echt twee verschillende dingen, geen dubbele
+  // vermelding van hetzelfde feit -- moeten dus apart blijven, net als de scope-disambiguatie
+  // uit test 1/2 al deed.
+  const raw = [
+    finding({ step: 4, entity_type: "account", entity_name: "audience", entity_scope: undefined, metric: "CPC", current_value: 88.24, issue_cluster: "uncategorized" }),
+    finding({ step: 6, entity_type: "audience", entity_name: "audience", entity_scope: undefined, metric: "CPC", current_value: 42.10, issue_cluster: "uncategorized" }),
+  ];
+  const canonical = canonicalizeFindings(raw, {});
+  assert(canonical.findings.length === 2, `same name+metric with different current_value should stay separate, got ${canonical.findings.length}`);
+}
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

@@ -2941,6 +2941,23 @@ ${toPromptTable(deviceData)}
 \`\`\``);
     }
 
+    // Live gevonden (19 aug 2026): checkout/schedule/network data ontbrak voor alle geteste demo-
+    // accounts, maar stap 12 riep runNarrativeStep altijd aan -- de LLM schreef dan volle prosa
+    // over drie lege databronnen, wat consequent "Verwacht 3 findings, kreeg 0" opleverde (ook ná
+    // reparatie, want reconcileStep12Output filtert findings over onbeschikbare scopes er sowieso
+    // uit). Zelfde harde-skip-patroon als stappen 6/8/9/10 hierboven: bij ALLE drie leeg, geen
+    // LLM-call, meteen de bewijsvrije fallback.
+    if (checkoutData.length === 0 && scheduleData.length === 0 && networkData.length === 0) {
+      await pushNoDataFallbackStep(buildStepNoDataFallback({
+        stepNumber: 12,
+        stepName: "Checkout, Schedule & Network Performance",
+        narrative: "Geen checkout-, schedule- of network-data beschikbaar. Deze stap kan deze cyclus niet worden uitgevoerd.",
+        logEntry: "Checkout-, schedule- en network-data niet beschikbaar.",
+        actionText: "Controleer checkout-funnel-, schedule- en network-rapportage/sync in Google Ads",
+        actionImpact: "Maakt checkout/schedule/network-analyse in de volgende cyclus weer mogelijk.",
+        stepConclusion: "Checkout-, schedule- en network-analyse niet uitvoerbaar door ontbrekende data.",
+      }));
+    } else {
     const networkSection = networkData.length > 0
       ? `\n\n## Network Performance (laatste 3 maanden)\n\`\`\`\n${toPromptTable(networkData)}\n\`\`\``
       : "\n\nGeen network data beschikbaar.";
@@ -2953,6 +2970,7 @@ ${toPromptTable(deviceData)}
     await runNarrativeStep(12, "Checkout, Schedule & Network Performance", `Analyseer checkout funnel, schedule en network performance voor client "${clientId}".${checkoutSection}${scheduleSection}${networkSection}
 
 ${buildStep12AvailabilityInstruction(stepAvailabilityByStep.get(12))}`);
+    }
     await runCheckpoint("Checkpoint C", [8, 9, 10, 12]);
 
     await updateProgressPhase(supabase, {

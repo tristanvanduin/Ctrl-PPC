@@ -2124,6 +2124,12 @@ console.log("57. Generic no-data fallback (F4 fase 1) stays validator-safe for e
     { stepNumber: 8, stepName: "Creative Performance" },
     { stepNumber: 10, stepName: "Device & Engagement Performance" },
     { stepNumber: 11, stepName: "Geografische Performance" },
+    // Live gevonden (19 aug 2026): checkout/schedule/network-data ontbrak voor alle geteste demo-
+    // accounts, maar stap 12 riep altijd de echte LLM-call aan i.p.v. deze fallback -- gaf consequent
+    // "Verwacht 3 findings, kreeg 0" (ook na reparatie, want reconcileStep12Output filtert
+    // findings over onbeschikbare scopes er sowieso uit). Nu hetzelfde harde-skip-patroon als de
+    // andere optionele stappen hierboven.
+    { stepNumber: 12, stepName: "Checkout, Schedule & Network Performance" },
   ];
 
   for (const c of cases) {

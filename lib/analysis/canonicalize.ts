@@ -492,59 +492,94 @@ function mergeCauseTexts(primary: string, secondary: string): string {
   return `${primary}; ${secondary}`;
 }
 
+// Combineert twee findings die op dezelfde dedup-as botsen: houdt de sterkste (severity ->
+// evidence -> |change_pct|) als basis en voegt de oorzaaktekst van de andere samen, met een
+// "[Bevestigd in stap X, Y]"-referentie.
+function mergeFindingPair(a: NormalizedFinding, b: NormalizedFinding): NormalizedFinding {
+  const aRank = SEVERITY_RANK[a.severity];
+  const bRank = SEVERITY_RANK[b.severity];
+  const bWins =
+    bRank > aRank ||
+    (
+      bRank === aRank &&
+      (
+        EVIDENCE_RANK[clampEvidence(b.evidence_level)] > EVIDENCE_RANK[clampEvidence(a.evidence_level)] ||
+        (
+          EVIDENCE_RANK[clampEvidence(b.evidence_level)] === EVIDENCE_RANK[clampEvidence(a.evidence_level)] &&
+          Math.abs(b.change_pct ?? 0) > Math.abs(a.change_pct ?? 0)
+        )
+      )
+    );
+
+  const [base, other] = bWins ? [b, a] : [a, b];
+  const steps = Array.from(new Set([base.step, other.step])).sort((x, y) => x - y);
+  const mergedCause = mergeCauseTexts(base.cause || "", other.cause || "");
+  return {
+    ...base,
+    cause: /\[Bevestigd in stap /.test(mergedCause)
+      ? mergedCause
+      : `${mergedCause} [Bevestigd in stap ${steps.join(", ")}]`.trim(),
+    current_value: base.current_value ?? other.current_value,
+    previous_value: base.previous_value ?? other.previous_value,
+    change_pct: base.change_pct ?? other.change_pct,
+    action_required: base.action_required || other.action_required,
+    is_structural: base.is_structural || other.is_structural,
+    is_seasonal: base.is_seasonal || other.is_seasonal,
+    confidence: CONFIDENCE_RANK[clampConfidence(other.confidence)] > CONFIDENCE_RANK[clampConfidence(base.confidence)] ? other.confidence : base.confidence,
+    evidence_level: EVIDENCE_RANK[clampEvidence(other.evidence_level)] > EVIDENCE_RANK[clampEvidence(base.evidence_level)] ? other.evidence_level : base.evidence_level,
+  };
+}
+
 export function deduplicateFindings(findings: NormalizedFinding[]): NormalizedFinding[] {
   const byKey = new Map<string, NormalizedFinding>();
 
   for (const finding of findings) {
     const existing = byKey.get(finding.dedup_key);
-    if (!existing) {
-      byKey.set(finding.dedup_key, finding);
-      continue;
-    }
-
-    const currentRank = SEVERITY_RANK[finding.severity];
-    const existingRank = SEVERITY_RANK[existing.severity];
-    const keepCurrent =
-      currentRank > existingRank ||
-      (
-        currentRank === existingRank &&
-        (
-          EVIDENCE_RANK[clampEvidence(finding.evidence_level)] > EVIDENCE_RANK[clampEvidence(existing.evidence_level)] ||
-          (
-            EVIDENCE_RANK[clampEvidence(finding.evidence_level)] === EVIDENCE_RANK[clampEvidence(existing.evidence_level)] &&
-            Math.abs(finding.change_pct ?? 0) > Math.abs(existing.change_pct ?? 0)
-          )
-        )
-      );
-
-    if (keepCurrent) {
-      const steps = Array.from(new Set([existing.step, finding.step])).sort((a, b) => a - b);
-      byKey.set(finding.dedup_key, {
-        ...finding,
-        cause: `${mergeCauseTexts(finding.cause || "", existing.cause || "")} [Bevestigd in stap ${steps.join(", ")}]`,
-        current_value: finding.current_value ?? existing.current_value,
-        previous_value: finding.previous_value ?? existing.previous_value,
-        change_pct: finding.change_pct ?? existing.change_pct,
-      });
-    } else {
-      const steps = Array.from(new Set([existing.step, finding.step])).sort((a, b) => a - b);
-      existing.cause = mergeCauseTexts(existing.cause || "", finding.cause || "");
-      if (!/\[Bevestigd in stap /.test(existing.cause)) {
-        existing.cause = `${existing.cause} [Bevestigd in stap ${steps.join(", ")}]`.trim();
-      }
-      existing.action_required = existing.action_required || finding.action_required;
-      existing.is_structural = existing.is_structural || finding.is_structural;
-      existing.is_seasonal = existing.is_seasonal || finding.is_seasonal;
-      if (CONFIDENCE_RANK[clampConfidence(finding.confidence)] > CONFIDENCE_RANK[clampConfidence(existing.confidence)]) {
-        existing.confidence = finding.confidence;
-      }
-      if (EVIDENCE_RANK[clampEvidence(finding.evidence_level)] > EVIDENCE_RANK[clampEvidence(existing.evidence_level)]) {
-        existing.evidence_level = finding.evidence_level;
-      }
-    }
+    byKey.set(finding.dedup_key, existing ? mergeFindingPair(existing, finding) : finding);
   }
 
-  return Array.from(byKey.values()).sort((a, b) => {
+  // Tweede, waarde-gebaseerde pas -- ENG afgebakend, niet "zelfde naam+metric+waarde is nooit
+  // toeval": entity_scope hoort verschillende entiteiten met dezelfde naam bewust uit elkaar te
+  // houden (Duitsland-het-land vs Duitsland-de-adgroup, of "Belgie" als land/campagne/adgroup --
+  // zie het bijbehorende testbestand), en dat moet deze pas niet ongedaan maken. Wat wel een
+  // sterke aanwijzing voor een labelfout is: entity_type "account" is de generieke vangnet-
+  // waarde, en als de andere kant van een naam+metric+waarde-match een SPECIFIEK type heeft
+  // (bv. "audience"), is "account" waarschijnlijk een verkeerde gok van het model geweest, geen
+  // bewuste keuze voor een echt account-brede metric. Live gevonden op AC-14 (monthly-
+  // acceptance.ts) op 19 augustus 2026: LinkedIn stap 4 labelde een "audience"-bevinding per
+  // ongeluk als entity_type "account", waardoor de scope-bewuste dedup_key hierboven niet
+  // matchte met stap 6's correct gelabelde herhaling van diezelfde CPC=88,24-bevinding. AC-14's
+  // eigen check (entity+metric, scope-onbewust) ving het wel, maar te laat om nog te MERGEN in
+  // plaats van de kwaliteitspoort te blokkeren.
+  //
+  // Alleen mergen als een groep op naam+metric+waarde EXACT één niet-"account"-gelabeld lid heeft
+  // en de rest "account": dat is het mislabel-patroon. Twee findings die allebei "account" zijn
+  // (een genuine account-brede metric-coincidentie) of twee findings die allebei een ANDER,
+  // specifiek type delen (zoals "Belgie" als land EN als campagne), blijven bewust apart.
+  const groups = new Map<string, NormalizedFinding[]>();
+  const soloFindings: NormalizedFinding[] = [];
+  for (const finding of byKey.values()) {
+    if (finding.current_value == null) {
+      soloFindings.push(finding);
+      continue;
+    }
+    const valueKey = `${finding.canonical_entity_key}::${finding.canonical_metric_key}::${finding.current_value}`;
+    const group = groups.get(valueKey);
+    if (group) group.push(finding);
+    else groups.set(valueKey, [finding]);
+  }
+
+  const merged: NormalizedFinding[] = [];
+  for (const group of groups.values()) {
+    const nonAccount = group.filter((f) => f.entity_type !== "account");
+    if (group.length === 1 || nonAccount.length !== 1) {
+      merged.push(...group);
+      continue;
+    }
+    merged.push(group.reduce((acc, f) => (f === nonAccount[0] ? acc : mergeFindingPair(acc, f)), nonAccount[0]));
+  }
+
+  return [...merged, ...soloFindings].sort((a, b) => {
     const severityDiff = SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity];
     if (severityDiff !== 0) return severityDiff;
     const changeDiff = Math.abs(b.change_pct ?? 0) - Math.abs(a.change_pct ?? 0);
