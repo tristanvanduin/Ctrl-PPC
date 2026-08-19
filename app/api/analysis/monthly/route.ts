@@ -56,7 +56,7 @@ import { checkStepDataAvailability } from "@/lib/analysis/data-availability";
 import type { StepDataAvailability } from "@/lib/analysis/data-availability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { canonicalizeFindings, clusterFindings, type CoverageDimension, type NormalizedFinding, type IssueCluster } from "@/lib/analysis/canonicalize";
-import { enforceSopCoverage } from "@/lib/analysis/coverage-enforcer";
+import { enforceSopCoverage, deriveDimensionAvailabilityFromClusters } from "@/lib/analysis/coverage-enforcer";
 import { buildStructuredMonthlyOutput, type ParsedStepOutput } from "@/lib/analysis/monthly-structured";
 import {
   buildPreparedContextRow,
@@ -996,7 +996,11 @@ async function finalizeChannelMonthlySynthesis(opts: {
 }) {
   const { supabase, adapter, clientId, periodStart, periodEnd, analysisDate, parsedSteps, allSteps, canonical, curatedFindings, curatedClusters, conclusionText, stepValidations = [], checkpointsRun = 0 } = opts;
   const model = allSteps[0]?.model ?? "unknown";
-  const enforcedCoverage = enforceSopCoverage(curatedClusters, {});
+  // Stopgap voor Meta/LinkedIn: zie deriveDimensionAvailabilityFromClusters() in
+  // lib/analysis/coverage-enforcer.ts voor de volledige uitleg. Een lege {} liet ELKE dimensie
+  // altijd op "data_unavailable" staan, ook als er wel degelijk clusters op die dimensie waren
+  // gevonden (bv. "account": data_unavailable met findings_surfaced: 7) -- actief misleidend.
+  const enforcedCoverage = enforceSopCoverage(curatedClusters, deriveDimensionAvailabilityFromClusters(curatedClusters));
   const structured = buildStructuredMonthlyOutput({
     parsedSteps,
     findings: curatedFindings,

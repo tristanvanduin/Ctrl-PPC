@@ -13,6 +13,29 @@ export interface CoverageEnforcementResult {
   traceabilityOk: boolean;
 }
 
+/**
+ * Stopgap voor kanalen zonder een eigen, kloppende dimensielijst (vandaag: Meta, LinkedIn --
+ * COVERAGE_DIMENSION_DEFINITIONS in canonicalize.ts is één gedeelde, Google-vormige lijst, geen
+ * van beide heeft daar een eigen equivalent voor). Zonder een echte per-kanaal dataherkenning
+ * (zoals buildCoverageDimensionAvailability() dat voor Google doet) bleef elke dimensie op
+ * "data_unavailable" staan -- ook als er wél clusters op die dimensie waren gevonden, wat een
+ * concrete tegenstrijdigheid opleverde ("account": data_unavailable met findings_surfaced: 7).
+ *
+ * Leidt beschikbaarheid af uit wat de clusters zelf al aantoonbaar raakten. Geen vervanging voor
+ * een echte per-kanaal dimensielijst -- een dimensie zonder enig cluster blijft "data_unavailable"
+ * staan, ook als er in werkelijkheid wel data was maar er niets noemenswaardigs uit kwam. Voorkomt
+ * wel de concrete leugen: nooit meer "geen data" naast een reeks bevindingen op diezelfde dimensie.
+ */
+export function deriveDimensionAvailabilityFromClusters(
+  clusters: IssueCluster[]
+): Partial<Record<CoverageDimension, boolean>> {
+  const availability: Partial<Record<CoverageDimension, boolean>> = {};
+  for (const cluster of clusters) {
+    for (const dimension of cluster.coverage_dimensions) availability[dimension] = true;
+  }
+  return availability;
+}
+
 export function enforceSopCoverage(
   clusters: IssueCluster[],
   dimensionAvailability: Partial<Record<CoverageDimension, boolean>>
