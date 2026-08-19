@@ -22,7 +22,11 @@ export type CoverageDimension =
   | "network"
   | "schedule"
   | "pmax_product_asset_groups"
-  | "hypotheses_sprint_plan";
+  | "hypotheses_sprint_plan"
+  // Meta-only: plaatsing/distributie (feed, stories, reels, audience network) en platform
+  // (Facebook/Instagram/Messenger) hebben geen Google- of LinkedIn-equivalent, vandaar een eigen
+  // dimensie i.p.v. geforceerd op een van de bovenstaande passen.
+  | "placement";
 
 export interface NormalizedFinding extends Finding {
   finding_id: string;
@@ -406,6 +410,39 @@ function findingCoverageDimensions(finding: Finding, family: string): CoverageDi
     case "schedule":
       dims.add("schedule");
       break;
+    // Meta-specifiek (M2). Ontbraken hier tot 19 augustus 2026 -- zie de comment bij
+    // EntityTypeEnum (analysis-schema.ts) voor de volledige uitleg: deze waarden werden al
+    // langer aan het model voorgeschreven via ChannelAdapter.entityTypes, maar findings die ze
+    // gebruikten vielen stil weg vóórdat ze hier ooit aankwamen.
+    case "adset":
+      dims.add("adgroup");
+      break;
+    case "ad":
+      dims.add("creative");
+      break;
+    case "placement":
+    case "platform":
+      dims.add("placement");
+      break;
+    case "age_gender":
+      dims.add("audience");
+      break;
+    // LinkedIn-specifiek (L2), zelfde reden.
+    case "campaign_group":
+      dims.add("campaign");
+      break;
+    case "format":
+      dims.add("creative");
+      break;
+    case "job_function":
+    case "seniority":
+    case "industry":
+    case "company_size":
+      dims.add("audience");
+      break;
+    case "region":
+      dims.add("geography");
+      break;
   }
 
   if (family === "search_budget_cap" || family === "brand_leakage") dims.add("competitor");
@@ -628,6 +665,8 @@ const COVERAGE_DIMENSION_DEFINITIONS: Array<{
   { dimension: "schedule", note: "Dag/uur performance." },
   { dimension: "pmax_product_asset_groups", note: "PMax, productmix en asset groups." },
   { dimension: "hypotheses_sprint_plan", note: "Sprint-hypotheses en follow-up acties." },
+  // Meta-only, zie de comment bij CoverageDimension hierboven.
+  { dimension: "placement", note: "Meta plaatsing/distributie (feed, stories, reels, audience network) en platform." },
 ];
 
 export function checkSopCoverage(

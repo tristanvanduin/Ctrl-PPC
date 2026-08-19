@@ -4,7 +4,8 @@
  */
 
 import { canonicalizeFindings } from "../analysis/canonicalize";
-import { buildDisplayLabel, deriveEntityIdentity } from "../analysis/entity-identity";
+import { buildDisplayLabel, defaultEntityScope, deriveEntityIdentity } from "../analysis/entity-identity";
+import { FindingSchema } from "../schema/analysis-schema";
 import type { Finding } from "../schema/analysis-schema";
 
 let passed = 0;
@@ -91,6 +92,43 @@ console.log("3. User-facing labels disambiguate ambiguous entities");
   assert(buildDisplayLabel({ entity_type: "campaign", canonical_entity_name: "Duitsland Prospecting" }) === "Campagne: Duitsland Prospecting", "campaign label explicit");
   assert(country.canonical_geo_id === "de", `country canonical_geo_id should be de, got ${country.canonical_geo_id}`);
   assert(adgroup.canonical_geo_id === "de", `adgroup canonical_geo_id should be de, got ${adgroup.canonical_geo_id}`);
+}
+
+console.log("4. Meta/LinkedIn entity types (M2/L2) no longer fail FindingSchema.safeParse");
+{
+  // Regression test for de bug die live runs raakte: EntityTypeEnum was een Google-only 12-
+  // waardenunie, dus elke Meta/LinkedIn-finding met een kanaal-eigen entity_type (bv. "adset",
+  // "job_function") faalde stil op FindingSchema.safeParse() en werd door het recovery-pad
+  // gedropt -- een sterke kandidaat-oorzaak voor "Verwacht 3 findings, kreeg 1" op live runs.
+  const metaFinding = finding({ entity_type: "adset", entity_name: "Prospecting - Lookalike 1%", entity_scope: undefined, issue_cluster: "uncategorized" });
+  const linkedinFinding = finding({ entity_type: "job_function", entity_name: "IT Decision Makers", entity_scope: undefined, issue_cluster: "uncategorized" });
+
+  assert(FindingSchema.safeParse(metaFinding).success, "Meta 'adset' finding should pass FindingSchema validation");
+  assert(FindingSchema.safeParse(linkedinFinding).success, "LinkedIn 'job_function' finding should pass FindingSchema validation");
+}
+
+console.log("5. defaultEntityScope() and buildDisplayLabel() cover all M2/L2 entity types");
+{
+  const newTypes: Finding["entity_type"][] = [
+    "adset", "ad", "placement", "platform", "age_gender",
+    "campaign_group", "format", "job_function", "seniority", "industry", "company_size", "region",
+  ];
+  for (const t of newTypes) {
+    const scope = defaultEntityScope(t);
+    assert(scope === t, `defaultEntityScope('${t}') should be 1:1, got '${scope}'`);
+    const label = buildDisplayLabel({ entity_type: t, canonical_entity_name: "Test" });
+    assert(label.includes("Test") && label !== "Test", `buildDisplayLabel('${t}') should produce a labeled string, got '${label}'`);
+  }
+}
+
+console.log("6. canonicalizeFindings() keeps Meta/LinkedIn findings instead of silently dropping them");
+{
+  const raw = [
+    finding({ entity_type: "adset", entity_name: "Prospecting - Lookalike 1%", entity_scope: undefined, issue_cluster: "uncategorized", metric: "CPA" }),
+    finding({ entity_type: "job_function", entity_name: "IT Decision Makers", entity_scope: undefined, issue_cluster: "uncategorized", metric: "CPA" }),
+  ];
+  const canonical = canonicalizeFindings(raw, {});
+  assert(canonical.findings.length === 2, `both channel-specific findings should survive canonicalization, got ${canonical.findings.length}`);
 }
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

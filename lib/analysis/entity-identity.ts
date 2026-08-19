@@ -12,7 +12,22 @@ export type EntityScope =
   | "device"
   | "country"
   | "network"
-  | "schedule";
+  | "schedule"
+  // Meta-specifiek (M2) -- zelfde reden als EntityTypeEnum in analysis-schema.ts:
+  // dit was een Google-only unie die findings van andere kanalen liet crashen op scope-bepaling.
+  | "adset"
+  | "ad"
+  | "placement"
+  | "platform"
+  | "age_gender"
+  // LinkedIn-specifiek (L2)
+  | "campaign_group"
+  | "format"
+  | "job_function"
+  | "seniority"
+  | "industry"
+  | "company_size"
+  | "region";
 
 export interface EntityIdentity {
   entity_type: Finding["entity_type"];
@@ -108,6 +123,30 @@ export function defaultEntityScope(entityType: Finding["entity_type"]): EntitySc
       return "network";
     case "schedule":
       return "schedule";
+    case "adset":
+      return "adset";
+    case "ad":
+      return "ad";
+    case "placement":
+      return "placement";
+    case "platform":
+      return "platform";
+    case "age_gender":
+      return "age_gender";
+    case "campaign_group":
+      return "campaign_group";
+    case "format":
+      return "format";
+    case "job_function":
+      return "job_function";
+    case "seniority":
+      return "seniority";
+    case "industry":
+      return "industry";
+    case "company_size":
+      return "company_size";
+    case "region":
+      return "region";
   }
 }
 
@@ -151,6 +190,34 @@ export function buildDisplayLabel(identity: {
       return `Planning: ${canonical_entity_name}`;
     case "account":
       return `Account: ${canonical_entity_name}`;
+    case "adset":
+      return parent_campaign
+        ? `Adset: ${canonical_entity_name} (Campagne: ${parent_campaign})`
+        : `Adset: ${canonical_entity_name}`;
+    case "ad":
+      return parent_adgroup
+        ? `Advertentie: ${canonical_entity_name} (Adset: ${parent_adgroup})`
+        : `Advertentie: ${canonical_entity_name}`;
+    case "placement":
+      return `Plaatsing: ${canonical_entity_name}`;
+    case "platform":
+      return `Platform: ${canonical_entity_name}`;
+    case "age_gender":
+      return `Leeftijd/geslacht: ${canonical_entity_name}`;
+    case "campaign_group":
+      return `Campagnegroep: ${canonical_entity_name}`;
+    case "format":
+      return `Formaat: ${canonical_entity_name}`;
+    case "job_function":
+      return `Functie: ${canonical_entity_name}`;
+    case "seniority":
+      return `Senioriteit: ${canonical_entity_name}`;
+    case "industry":
+      return `Branche: ${canonical_entity_name}`;
+    case "company_size":
+      return `Bedrijfsgrootte: ${canonical_entity_name}`;
+    case "region":
+      return `Regio: ${canonical_entity_name}`;
     default:
       return canonical_entity_name;
   }

@@ -14,7 +14,24 @@ import { OWNER_TEAM, OWNER_CLIENT, LEGACY_OWNER_TEAM, KANT_LABEL_INTERN, KANT_LA
 export const SeverityEnum = z.enum(["critical", "high", "medium", "low", "positive"]);
 export type Severity = z.infer<typeof SeverityEnum>;
 
-export const EntityTypeEnum = z.enum(["account", "campaign", "adgroup", "keyword", "product", "searchterm", "creative", "audience", "device", "country", "network", "schedule"]);
+// Superset over kanalen, zelfde reden en zelfde patroon als IssueClusterEnum hieronder: dit stond
+// tot 19 augustus 2026 als de kale Google-lijst (de eerste 12 waarden), terwijl
+// lib/analysis/adapters/meta-ads.ts / linkedin-ads.ts hun eigen ChannelAdapter.entityTypes al
+// langer "adset"/"placement"/"job_function" e.d. aan het model voorschreven -- de LLM volgde die
+// instructie, en elke finding met zo'n entity_type faalde vervolgens stil op
+// FindingSchema.safeParse() en werd door het herstelpad weggegooid. Precies de meest
+// kanaal-eigen bevindingen, en precies zichtbaar als "Verwacht 3 findings, kreeg 1" op bijna elke
+// Meta/LinkedIn-stap in twee onafhankelijke live demo-greentech-runs. Google-findings gebruiken
+// de kanaalspecifieke waarden niet; de prompt per kanaal bepaalt (via ChannelAdapter.entityTypes)
+// welke subset het model daadwerkelijk aangeboden krijgt.
+export const EntityTypeEnum = z.enum([
+  // Google
+  "account", "campaign", "adgroup", "keyword", "product", "searchterm", "creative", "audience", "device", "country", "network", "schedule",
+  // Meta-specifiek (M2)
+  "adset", "ad", "placement", "platform", "age_gender",
+  // LinkedIn-specifiek (L2)
+  "campaign_group", "format", "job_function", "seniority", "industry", "company_size", "region",
+]);
 export type EntityType = z.infer<typeof EntityTypeEnum>;
 
 export const InsightTypeEnum = z.enum(["performance", "trend", "anomaly", "opportunity", "risk", "positive"]);

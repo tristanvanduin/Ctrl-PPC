@@ -4899,6 +4899,9 @@ const COVERAGE_DIMENSION_STEPS: Record<CoverageDimension, number[]> = {
   schedule: [12],
   pmax_product_asset_groups: [6, 8],
   hypotheses_sprint_plan: [13],
+  // Meta-only dimensie (M2), geen equivalent Google-stapnummer -- Meta/LinkedIn gebruiken de
+  // 6-pijler-architectuur, niet deze legacy Google-stapnummering.
+  placement: [],
 };
 
 export function buildCoverageMarkdown(coverage: SopCoverage[], parsedSteps: ParsedStepOutput[] = []): string {
