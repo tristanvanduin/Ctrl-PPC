@@ -33,6 +33,7 @@ import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
 import { DEMO_GREENTECH_ID } from "@/lib/demo/greentech-mock";
 import { isDemoMode } from "@/lib/demo/demo-mode";
+import { GodViewDemo } from "@/components/terminal/god-view-demo";
 import type { InsightChannel } from "@/lib/insights/channel-of";
 import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
 import { PeriodSelector } from "./period-selector";
@@ -630,6 +631,11 @@ function SettingsSections({ client }: { client: Client }) {
 function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSopError?: (error: SopError) => void; kanalen: readonly Kanaal[] }) {
   const [, setRefreshKey] = useState(0);
   const [analysisChannel, setAnalysisChannel] = useState<Channel>("blended");
+  // isDemoMode() leest window.location, dus in een effect en niet in de eerste render -- anders
+  // rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde reden als
+  // demoModus in ClientDashboard zelf, hierboven in dit bestand).
+  const [demoModus, setDemoModus] = useState(false);
+  useEffect(() => { setDemoModus(isDemoMode()); }, []);
 
   // Het kanaal-subtabje kiest alleen WELKE analyses je draait; het uitkomsten-filter blijft
   // standaard op "Alle kanalen" (geen kanaal is belangrijker) en wisselt alleen op eigen klik.
@@ -767,6 +773,19 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
             <>
               <Section>Pijler 6</Section>
               <MasterSynthesisAnalysis clientId={clientId} />
+            </>
+          )}
+          {/* God View en cross-account (portfolio-synthese) zijn platform-/bureaubreed, geen
+              klant-eigen data -- ze horen normaal op /vandaag, niet op een klantpagina. Maar
+              "in het demo-account" is precies waar een demo-bezoeker ze wil kunnen laten zien
+              zonder eerst weg te navigeren. Zelfde componenten, zelfde statische demo-data
+              (lib/demo/god-view-demo.ts, GEEN echte sessie of LLM-aanroep nodig) als op
+              /vandaag?demo=1 -- puur hier ook ingesloten. Alleen in demo-modus: buiten demo
+              is dit geen klant-eigen data en hoort het hier niet te staan. */}
+          {demoModus && (
+            <>
+              <Section>Cross-account &amp; God View (demo)</Section>
+              <GodViewDemo />
             </>
           )}
         </>
