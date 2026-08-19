@@ -7,6 +7,8 @@ import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "@/compo
 import { segmentLabel, magAlsTrendGelden, MIN_ACCOUNTS_VOOR_TREND } from "@/lib/macro/types";
 import { CodeRoodPaneel } from "@/components/adoptie/code-rood-paneel";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { isDemoMode } from "@/lib/demo/demo-mode";
+import { DEMO_PORTFOLIO_SYNTHESIS } from "@/lib/demo/god-view-demo";
 
 // Portfolio-synthese (masterplan 17.15): dezelfde soort kaart als SynthesisCard in
 // cross-channel-analyses.tsx, maar tussen KLANTEN van het bureau i.p.v. tussen kanalen van 1
@@ -28,11 +30,20 @@ const PRIORITY_STYLE: Record<PortfolioAction["priority"], string> = {
   laag: "bg-gray-100 text-muted-foreground",
 };
 
-function PortfolioSynthesisCard() {
+export function PortfolioSynthesisCard() {
   const [synthesis, setSynthesis] = useState<PortfolioSynthesis | null | undefined>(undefined);
   const [analysisDate, setAnalysisDate] = useState<string | null>(null);
 
   const fetchSynthesis = useCallback(async () => {
+    // Demo-modus: geen echte sessie/bureau, dus /api/analysis/portfolio-synthesis zou altijd
+    // 401/403 geven (die route leest echte Supabase-auth-cookies) en roept normaal een echte
+    // LLM aan -- geen van beide gewenst voor een demo-bezoeker. Statische, veilige demo-data i.p.v.
+    // de fetch, zie lib/demo/god-view-demo.ts voor de reden en het GRT/GRA/GRN-verhaal erachter.
+    if (isDemoMode()) {
+      setSynthesis(DEMO_PORTFOLIO_SYNTHESIS);
+      setAnalysisDate(new Date().toISOString().slice(0, 10));
+      return;
+    }
     try {
       const res = await fetch("/api/analysis/portfolio-synthesis");
       if (!res.ok) { setSynthesis(null); return; }
@@ -60,6 +71,11 @@ function PortfolioSynthesisCard() {
         </div>
       </div>
       <div className="px-5 py-4 space-y-3">
+        {isDemoMode() && (
+          <div className="flex items-center gap-2 text-xs text-brand-blue-ink bg-brand-blue/10 border border-brand-blue/20 rounded-lg px-3 py-1.5">
+            Demodata — GreenTech Amsterdam/Americas/North America, geen live LLM-aanroep
+          </div>
+        )}
         {!synthesis ? (
           <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-meta text-blue-800 flex gap-2">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />

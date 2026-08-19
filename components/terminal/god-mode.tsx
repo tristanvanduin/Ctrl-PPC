@@ -6,6 +6,8 @@ import { Loader2, Crown } from "lucide-react";
 import { Counter } from "@/components/ui/counter";
 import { compactCurrency, compactNumber } from "@/lib/format/compact-number";
 import type { GodModeRow } from "@/app/api/platform/god-mode/route";
+import { isDemoMode } from "@/lib/demo/demo-mode";
+import { DEMO_GOD_MODE_DATA } from "@/lib/demo/god-view-demo";
 
 // Fase 5, Task 3: God Mode -- de startpagina voor platform-brede scope (zie app/vandaag/page.tsx
 // voor de rolcheck; deze component doet zelf GEEN autorisatie, dat is /api/admin/god-mode's
@@ -88,6 +90,10 @@ export function GodMode() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Demo-modus: geen echte sessie, dus /api/platform/god-mode zou altijd 401/403 geven (die
+    // route leest echte Supabase-auth-cookies, geen ?demo=1). Statische, veilige demo-data
+    // i.p.v. de fetch -- zie lib/demo/god-view-demo.ts voor de reden.
+    if (isDemoMode()) { setData(DEMO_GOD_MODE_DATA); return; }
     let cancelled = false;
     fetch("/api/platform/god-mode")
       .then((r) => r.json())
@@ -112,6 +118,11 @@ export function GodMode() {
 
   return (
     <div className="terminal space-y-6">
+      {isDemoMode() && (
+        <div className="flex items-center gap-2 text-xs text-brand-blue-ink bg-brand-blue/10 border border-brand-blue/20 rounded-lg px-3 py-1.5">
+          Demodata — fictieve accounts, geen live koppeling
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Crown className="h-5 w-5" style={{ color: "var(--terminal-accent, var(--color-brand-blue-ink))" }} />
         <h1 className="text-page font-bold text-brand-blue-ink">God Mode</h1>

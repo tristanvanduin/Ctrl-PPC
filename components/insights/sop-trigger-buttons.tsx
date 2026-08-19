@@ -14,6 +14,7 @@ import { today } from "@/lib/reporting-date";
 // (app/api/cron/trigger-sops) dezelfde kanaal/cadans-tabel gebruikt in plaats van een tweede
 // kopie -- zie de kop van dat bestand. Gedrag van deze knoppen blijft ongewijzigd.
 import { CHANNEL_CONFIG, type SopType, type SopChannel } from "@/lib/analysis/sop-channel-config";
+import { isDemoMode } from "@/lib/demo/demo-mode";
 
 export type { SopChannel };
 
@@ -65,6 +66,13 @@ interface Props {
 export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisError, channel = "google_ads", multiChannel = false }: Props) {
   const channelCfg = CHANNEL_CONFIG[channel];
   const { startJob, isRunning: isJobRunning } = useAnalysis();
+  // isDemoMode() leest window.location, dus in een effect en niet in de eerste render -- anders
+  // rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde reden als
+  // demoModus in client-dashboard.tsx). SOP's roepen een echte LLM aan (OpenRouter/Gemini,
+  // reasoning-budget) -- in demo-modus zou een bezoeker anders op een publieke link telkens een
+  // echte, kostende run tegen demo-greentech kunnen starten.
+  const [demoModus, setDemoModus] = useState(false);
+  useEffect(() => { setDemoModus(isDemoMode()); }, []);
   const [status, setStatus] = useState<Record<SopType, SopStatus>>({
     weekly: { running: false, lastDate: null, error: null, success: false },
     biweekly: { running: false, lastDate: null, error: null, success: false },
@@ -157,6 +165,9 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
   }
 
   function runSop(type: SopType) {
+    // Geen live SOP's in demo-modus, ook niet als iemand de knop toch bereikt -- zie de
+    // toelichting bij demoModus hierboven.
+    if (demoModus) return;
     const config = SOP_CONFIG[type];
     const jobId = `sop-${channelCfg.sopTypeKey[type]}-${clientId}`;
     const progressJobId = crypto.randomUUID();
@@ -305,7 +316,9 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
       <div className="px-5 py-3 border-b border-border">
         <h3 className="text-title font-semibold text-brand-gray">SOP Analyse — {channelCfg.headerLabel}</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
-          Klik op een analyse om deze handmatig uit te voeren. Output wordt opgeslagen bij Bestanden &gt; SOP&apos;s.
+          {demoModus
+            ? "In demo-modus kun je geen live SOP's starten -- dit zou een echte LLM-aanroep zijn."
+            : <>Klik op een analyse om deze handmatig uit te voeren. Output wordt opgeslagen bij Bestanden &gt; SOP&apos;s.</>}
         </p>
       </div>
       <div className="px-5 py-4 flex gap-3 flex-wrap">
@@ -320,7 +333,8 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
             <div key={type} className="flex-1 min-w-[160px] flex flex-col gap-1.5">
               <button
                 onClick={() => runSop(type)}
-                disabled={anyRunning}
+                disabled={anyRunning || demoModus}
+                title={demoModus ? "Niet beschikbaar in demo-modus" : undefined}
                 className={`w-full px-4 py-3 rounded-lg border transition-all text-left ${
                   s.running
                     ? "border-brand-blue/30 bg-brand-blue/5 cursor-wait"
@@ -329,7 +343,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
                     : s.error
                     ? "border-red-300 bg-red-50"
                     : "border-border hover:border-brand-blue/40 hover:bg-gray-50 cursor-pointer"
-                } ${anyRunning && !s.running ? "opacity-50 cursor-not-allowed" : ""}`}
+                } ${(anyRunning && !s.running) || demoModus ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-brand-gray">{config.label}</span>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Sparkles, Calendar, AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { isDemoMode } from "@/lib/demo/demo-mode";
 
 // Master Synthesis (Pijler 6): kanaaloverstijgende hypotheses uit de al-berekende
 // kanaal-aanbevelingen (Pijler 1-5) plus de cross-channel-feiten (zie CrossChannelAnalyses
@@ -33,6 +34,11 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
   const [lastDate, setLastDate] = useState<string | null>(null);
   const [lastNarrative, setLastNarrative] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // isDemoMode() leest window.location, dus in een effect en niet in de eerste render --
+  // anders rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde
+  // reden als demoModus in client-dashboard.tsx).
+  const [demoModus, setDemoModus] = useState(false);
+  useEffect(() => { setDemoModus(isDemoMode()); }, []);
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -57,6 +63,9 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
   }, [fetchLatest]);
 
   async function run() {
+    // Master Synthesis roept een echte LLM aan (masterplan Pijler 6) -- geen live analyses
+    // starten in demo-modus, ook niet als iemand de knop toch bereikt.
+    if (demoModus) return;
     setRunning(true); setError(null); setStatusMessage(null);
     try {
       const res = await fetch("/api/analysis/monthly-decision", {
@@ -98,7 +107,8 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
           </div>
           <button
             onClick={run}
-            disabled={running}
+            disabled={running || demoModus}
+            title={demoModus ? "Niet beschikbaar in demo-modus: dit start een echte LLM-aanroep." : undefined}
             className="px-3 py-1.5 rounded-md bg-brand-blue text-white text-meta font-medium hover:bg-brand-blue/90 disabled:opacity-50 flex items-center gap-1.5 transition-all"
           >
             {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
@@ -106,10 +116,11 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
           </button>
         </div>
         <div className="px-5 py-3 flex items-center gap-3 text-meta">
+          {demoModus && <span className="text-muted-foreground">In demo-modus kun je geen live analyses starten.</span>}
           {lastDate && <span className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-3 h-3" /> Laatst: {lastDate}</span>}
           {statusMessage && <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" /> {statusMessage}</span>}
           {error && <span className="flex items-center gap-1 text-red-500"><AlertCircle className="w-3.5 h-3.5" /> {error}</span>}
-          {loaded && !lastDate && !statusMessage && !error && <span className="text-muted-foreground">Nog niet gedraaid.</span>}
+          {loaded && !demoModus && !lastDate && !statusMessage && !error && <span className="text-muted-foreground">Nog niet gedraaid.</span>}
         </div>
       </div>
 
