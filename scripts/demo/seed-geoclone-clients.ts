@@ -37,26 +37,11 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
+import { GEOCLONE_CLIENTS } from "../../lib/demo/geoclone-clients";
 
 type Row = Record<string, unknown>;
 
-export const GEOCLONE_CLIENTS = [
-  {
-    clientId: "demo-grt", name: "DEMO — GreenTech Amsterdam (GRT)",
-    campaigns: ["GRT | Search | NL", "GRT | Performance Max"],
-    conversionsTarget: 320,
-  },
-  {
-    clientId: "demo-gra", name: "DEMO — GreenTech Americas (GRA)",
-    campaigns: ["GRA | Search | US"],
-    conversionsTarget: 200,
-  },
-  {
-    clientId: "demo-grn", name: "DEMO — GreenTech North America (GRN)",
-    campaigns: ["GRN | Search | NA"],
-    conversionsTarget: 70,
-  },
-] as const;
+export { GEOCLONE_CLIENTS };
 
 const DEMO_GREENTECH = "demo-greentech";
 // EIGEN bureau, niet het bestaande "demo"-bureau waar demo-greentech zelf onder hangt. Portfolio-
@@ -227,11 +212,11 @@ async function run(check: boolean) {
   console.log("\nKlaar. Opruimen kan met: npx tsx scripts/demo/teardown-geoclone-clients.ts");
 }
 
-// Guard: teardown-geoclone-clients.ts importeert GEOCLONE_CLIENTS hierboven. Zonder deze guard
-// voert Node/tsx bij die import ALSNOG de module top-level uit, dus ook run() -- en teardown zou
-// zichzelf dan bij elke run stiekem opnieuw laten zaaien vlak voordat het opruimt (ontdekt toen
-// een "opgeruimd"-run daarna weer volle rijen bleek te hebben: twee run()'s liepen tegelijk tegen
-// dezelfde database).
+// Guard: GEOCLONE_CLIENTS zelf komt nu uit lib/demo/geoclone-clients.ts, maar een import van DIT
+// bestand voert Node/tsx nog steeds top-level uit. Zonder deze guard zou zo'n import ook run()
+// laten draaien -- ontdekt toen teardown (destijds nog importerend vanuit dit bestand) zichzelf
+// bij elke run stiekem opnieuw liet zaaien vlak voordat het opruimde, en een "opgeruimd"-run
+// daarna weer volle rijen bleek te hebben omdat twee run()'s tegelijk tegen dezelfde database liepen.
 const isMain = typeof process.argv[1] === "string" && /seed-geoclone-clients\.(ts|js)$/.test(process.argv[1]);
 if (isMain) {
   const mode = process.argv[2];

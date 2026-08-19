@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isGreentechDemo, buildGreentechClientData } from "@/lib/demo/greentech-mock";
+import { isGeocloneDemo, buildGeocloneClientData } from "@/lib/demo/geoclone-demo-data";
 import { today } from "@/lib/reporting-date";
 import {
   getAccountMetricsByMonth,
@@ -42,6 +43,13 @@ export async function GET(request: NextRequest) {
   if (!demoCid) return Response.json({ error: "customerId is verplicht" }, { status: 400 });
   if (isGreentechDemo(demoCid)) {
     return Response.json(buildGreentechClientData(demoCid));
+  }
+  if (isGeocloneDemo(demoCid)) {
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!sbUrl || !sbKey) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
+    const sb = createClient(sbUrl, sbKey);
+    return Response.json(await buildGeocloneClientData(sb, demoCid));
   }
 
   const credentials = credentialsUitOmgeving();

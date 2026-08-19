@@ -5,7 +5,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
-import { GEOCLONE_CLIENTS } from "./seed-geoclone-clients";
+import { GEOCLONE_CLIENTS } from "../../lib/demo/geoclone-clients";
 
 // Alles wat de seed zelf schrijft, plus wat een SOP-run erbij zou genereren (zelfde discipline
 // als teardown-demo-client.ts). agency_analysis_output hoort er NIET bij: die tabel is
