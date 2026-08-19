@@ -33,7 +33,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // (veel kortere) platformdefault en breekt een lange analyse af met een platte foutpagina i.p.v.
 // JSON, wat de client als "Unexpected token... is not valid JSON" laat zien in plaats van een
 // bruikbare foutmelding.
-export const maxDuration = 300;
+// 600s sinds de upgrade naar Vercel Pro (mag in code tot 1800s) -- zelfde marge-redenering
+// als app/api/analysis/monthly/route.ts, waar de kale Google-hoofdanalyse al 284-313s bleek
+// te duren op de oude 300s-grens.
+export const maxDuration = 600;
 
 // Gedeeld door alle drie de kanalen: elke stap sluit af met "TOP 3 BEVINDINGEN STAP N: ...",
 // en die worden als beknopte samenvatting doorgegeven aan de extractie-stap (i.p.v. de volledige

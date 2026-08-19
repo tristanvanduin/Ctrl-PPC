@@ -19,7 +19,10 @@ const SECTION = "cross_channel_synthesis_v1";
 // (veel kortere) platformdefault en breekt een lange analyse af met een platte foutpagina i.p.v.
 // JSON, wat de client als "Unexpected token... is not valid JSON" laat zien in plaats van een
 // bruikbare foutmelding.
-export const maxDuration = 300;
+// 600s sinds de upgrade naar Vercel Pro (mag in code tot 1800s) -- zelfde marge-redenering
+// als app/api/analysis/monthly/route.ts, waar de kale Google-hoofdanalyse al 284-313s bleek
+// te duren op de oude 300s-grens.
+export const maxDuration = 600;
 
 function periodBounds(): { start: string; end: string } {
   const month = lastCompleteMonth(); // "YYYY-MM"

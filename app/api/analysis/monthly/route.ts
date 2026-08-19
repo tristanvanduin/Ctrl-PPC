@@ -98,12 +98,12 @@ import { triggerPortfolioSynthesisIfReady } from "@/lib/analysis/auto-portfolio-
 // Zonder dit valt de route terug op Vercel's platformdefault (veel korter dan wat deze route
 // nodig heeft) en breekt Vercel de functie halverwege af met een platte foutpagina in plaats van
 // JSON -- de client se `res.json()` struikelt dan over "An error occurred..." in plaats van een
-// bruikbare foutmelding te tonen. app/api/cron/trigger-sops/route.ts noemt zelf al 300s als de
-// grens die "maar net past" voor ÉÉN monthly-run (2-3 minuten volgens de knoppen-UI); deze route
-// draait nu ook de cross-channel- en cross-account-synthese inline mee ná de hoofdanalyse
-// (triggerCrossChannelSynthesisIfReady/triggerPortfolioSynthesisIfReady hierboven), dus die marge
-// is kleiner geworden dan toen die opmerking geschreven werd, niet groter.
-export const maxDuration = 300;
+// bruikbare foutmelding te tonen. 600s: live gemeten op demo-greentech (19 augustus 2026) duurde
+// alleen de Google-hoofdanalyse al 4m44s-5m13s (284-313s) -- 300s liet dus al geen marge meer
+// over, ook los van de cross-channel/cross-account-cascade die inmiddels via after() ontkoppeld
+// is (zie hieronder). Sinds de upgrade naar Vercel Pro mag een functie in code tot 1800s; 600s is
+// bewust ruim 2x de gemeten worst case, niet het maximum.
+export const maxDuration = 600;
 
 function normalizeText(value: string): string {
   return value
