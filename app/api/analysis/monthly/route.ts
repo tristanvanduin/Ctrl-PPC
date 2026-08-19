@@ -12,6 +12,7 @@ import {
 import {
   buildMonthlyStepPrompt,
   buildStepOutputJsonSchema,
+  buildCheckpointJsonSchema,
 } from "@/lib/prompts/sop-prompts";
 import {
   MONTHLY_STEP7_ACTIONS_INSTRUCTION,
@@ -955,11 +956,30 @@ function isChannelStepFactsUnavailable(facts: unknown): { unavailable: boolean; 
 // ALLE stap-outputs, vlak vóór de synthese, is voldoende om de acceptance-check zijn werk te laten
 // doen (dedupliceren, bevestigde patronen markeren, tegenspraken signaleren) en geeft
 // checkpointsRun eindelijk een echte waarde in plaats van de hardcoded 0.
+// F5 fase3 (19 aug 2026, live getest): opts.shared draagt via de aanroeper zijn eigen
+// jsonSchema mee ("monthly_step_output", voor narrative/top_3_findings/etc.) -- die schema-vorm
+// is fundamenteel onverenigbaar met wat een checkpoint teruggeeft (consolidated_findings/
+// primary_thread/running_context). Zonder expliciete override hierbeneden dwingt strict:true de
+// checkpoint-call naar de VERKEERDE vorm af, waardoor parseCheckpointOutput altijd faalt (alle
+// checkpoint-velden "undefined") -- niet een incidentele modelfout maar een gegarandeerde mismatch.
+const CHECKPOINT_JSON_SCHEMA = { name: "monthly_checkpoint_output", schema: buildCheckpointJsonSchema() };
+
 async function runChannelCheckpoint(opts: {
   shared: { supabase: SupabaseClient; apiKey: string; clientId: string; sopType: string; periodStart: string; periodEnd: string; runKey: string; channel: string; evalCapture: { fixtureSet: string } | null };
   name: string;
   clusterSteps: ParsedStepOutput[];
 }): Promise<{ checkpointStep: StepResult; success: boolean }> {
+  const clusterStepsPayload = JSON.stringify(opts.clusterSteps.map((step) => ({
+    stepNumber: step.stepNumber,
+    stepName: step.stepName,
+    narrative: step.narrative,
+    log_entries: step.log_entries,
+    findings: step.findings,
+    status: step.status,
+    actions: step.actions,
+    step_conclusion: step.step_conclusion,
+  })), null, 2);
+
   const checkpointStep = await runStep({
     evalKind: "checkpoint",
     ...opts.shared,
@@ -967,24 +987,39 @@ async function runChannelCheckpoint(opts: {
     stepName: opts.name,
     systemPrompt: buildMonthlyCheckpointPrompt(opts.name),
     jsonMode: true,
+    jsonSchema: CHECKPOINT_JSON_SCHEMA,
     userMessage: `Stap-outputs uit ${opts.name}:
 
-${JSON.stringify(opts.clusterSteps.map((step) => ({
-  stepNumber: step.stepNumber,
-  stepName: step.stepName,
-  narrative: step.narrative,
-  log_entries: step.log_entries,
-  findings: step.findings,
-  status: step.status,
-  actions: step.actions,
-  step_conclusion: step.step_conclusion,
-})), null, 2)}
+${clusterStepsPayload}
 
 Vorige running context:
 Nog geen checkpoint-context beschikbaar.`,
   });
-  const parsed = parseCheckpointOutput(checkpointStep.output);
-  return { checkpointStep, success: parsed.success };
+  let parsed = parseCheckpointOutput(checkpointStep.output);
+  if (parsed.success) return { checkpointStep, success: true };
+
+  // Zelfde eenmalige jsonMode-repair als Google's runCheckpoint (route.ts, iets verderop):
+  // zonder dit had Meta/LinkedIn geen reparatiepad en faalde checkpointsRun permanent op één
+  // enkele parse-fout, terwijl Google die al wel automatisch herstelt.
+  const repairStep = await runStep({
+    evalKind: "repair",
+    ...opts.shared,
+    stepNumber: 200,
+    stepName: opts.name,
+    systemPrompt: buildMonthlyCheckpointPrompt(opts.name),
+    jsonMode: true,
+    jsonSchema: CHECKPOINT_JSON_SCHEMA,
+    userMessage: `Je vorige checkpoint-output voor ${opts.name} kon niet als JSON worden geparsed (${parsed.error}). Antwoord nu met EXACT een JSON-object conform het checkpoint-schema, zonder markdown code fence en zonder toelichting buiten JSON.
+
+Stap-outputs uit ${opts.name}:
+
+${clusterStepsPayload}
+
+Vorige running context:
+Nog geen checkpoint-context beschikbaar.`,
+  });
+  parsed = parseCheckpointOutput(repairStep.output);
+  return { checkpointStep: parsed.success ? repairStep : checkpointStep, success: parsed.success };
 }
 
 async function finalizeChannelMonthlySynthesis(opts: {
@@ -1897,6 +1932,7 @@ Verwacht deze maand: ${targetResult.monthlyExpected[lastCompleteMonth - 1]?.conv
         stepName: name,
         systemPrompt: buildMonthlyCheckpointPrompt(name),
         jsonMode: true,
+        jsonSchema: CHECKPOINT_JSON_SCHEMA,
         userMessage: `Stap-outputs uit ${name}:
 
 ${JSON.stringify(clusterSteps.map((step) => ({
@@ -1927,6 +1963,7 @@ ${runningContext}`,
           stepName: name,
           systemPrompt: buildMonthlyCheckpointPrompt(name),
           jsonMode: true,
+          jsonSchema: CHECKPOINT_JSON_SCHEMA,
           userMessage: `Je vorige checkpoint-output voor ${name} kon niet als JSON worden geparsed (${parsed.error}). Antwoord nu met EXACT een JSON-object conform het checkpoint-schema, zonder markdown code fence en zonder toelichting buiten JSON.
 
 Stap-outputs uit ${name}:
@@ -3009,7 +3046,14 @@ ${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannel
       finalSop: { recommendations: structured.final_sop.recommendations, tasks: structured.final_sop.tasks },
       coverage: structured.coverage,
       findings: curatedFindings,
-      checkpointsRun: checkpointSteps.length,
+      // F5 fase3: checkpointOutputs.length telt hoeveel checkpoints daadwerkelijk zijn
+      // GESLAAGD (één push per checkpointnaam, uitsluitend bij een geslaagde parse -- zie
+      // hierboven). checkpointSteps.length telde in plaats daarvan elke LLM-aanroep, dus ook een
+      // geslaagde reparatiepoging bovenop de gefaalde primaire poging (1 checkpoint -> 2 pushes),
+      // waardoor AC-11 zelfs een correct herstelde checkpoint liet falen. LIVE bevestigd op 19
+      // augustus 2026: 5 van de 5 Google-runs faalden op "2/1 checkpoints" terwijl de checkpoint
+      // zelf, na reparatie, gewoon geslaagd was.
+      checkpointsRun: checkpointOutputs.length,
       stepValidations: officialStepValidations,
     });
     const qualityGate = buildMonthlyQualityGate({

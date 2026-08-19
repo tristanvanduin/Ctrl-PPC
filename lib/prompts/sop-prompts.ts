@@ -617,6 +617,63 @@ export function buildStepOutputJsonSchema(
   };
 }
 
+// Structurele afdwinging voor checkpoint-calls (Google's "Checkpoint C" en Meta/LinkedIn's
+// gedeelde runChannelCheckpoint), analoog aan buildStepOutputJsonSchema hierboven. Checkpoints
+// draaiden tot nu toe alleen op jsonMode zonder schema, terwijl ze exact hetzelfde "geneste of
+// gedegradeerde JSON"-risico lopen als de gewone stappen -- live getest op 19 augustus 2026 faalde
+// de primaire checkpoint-poging daardoor structureel (5 van 5 Google-runs), wat via de
+// reparatie-telling AC-11 permanent liet falen, wat op zijn beurt Google's structured_monthly_v2/
+// full-save volledig blokkeerde (die save staat ná de qualityGate-check). Spiegelt
+// CheckpointOutputSchema in lib/schema/monthly-pipeline-schema.ts.
+export function buildCheckpointJsonSchema(): Record<string, unknown> {
+  const findingSchema = {
+    type: "object",
+    properties: {
+      entiteit: { type: "string" },
+      metric: { type: "string" },
+      ernst: { type: "string", enum: ["critical", "high", "medium", "low", "positive"] },
+      samenvatting: { type: "string" },
+      bevestigd_door: { type: "array", items: { type: "string" } },
+    },
+    required: ["entiteit", "metric", "ernst", "samenvatting", "bevestigd_door"],
+    additionalProperties: false,
+  };
+
+  const patternSchema = {
+    type: "object",
+    properties: {
+      pattern: { type: "string" },
+      confirmed_by: { type: "array", items: { type: "string" }, minItems: 1 },
+    },
+    required: ["pattern", "confirmed_by"],
+    additionalProperties: false,
+  };
+
+  const contradictionSchema = {
+    type: "object",
+    properties: {
+      finding_a: { type: "string" },
+      finding_b: { type: "string" },
+      resolution_needed: { type: "string" },
+    },
+    required: ["finding_a", "finding_b", "resolution_needed"],
+    additionalProperties: false,
+  };
+
+  return {
+    type: "object",
+    properties: {
+      consolidated_findings: { type: "array", items: findingSchema, maxItems: 15 },
+      primary_thread: { type: "string" },
+      confirmed_patterns: { type: "array", items: patternSchema },
+      contradictions: { type: "array", items: contradictionSchema },
+      running_context: { type: "string" },
+    },
+    required: ["consolidated_findings", "primary_thread", "confirmed_patterns", "contradictions", "running_context"],
+    additionalProperties: false,
+  };
+}
+
 export const MONTHLY_FINAL_SOP_SECTIONS = [
   "Primary thread",
   "Root cause",
