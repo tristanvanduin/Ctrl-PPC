@@ -9,6 +9,8 @@ const HEAVY_WARNING_MATCHERS = [
   "Narratief bevat geen concrete cijfers",
   "AC-08",
   "Claim-consistentie",
+  "Wereldkennis",
+  "gedegradeerd of nested JSON",
 ];
 type Validation = { stepNumber: number; valid: boolean; warnings: string[]; errors: string[] };
 
@@ -48,6 +50,14 @@ check("twee zware warnings -> repair", shouldRepairStep(V([], ["Verwacht 3 findi
 check("een zware warning alleen -> geen repair", !shouldRepairStep(V([], ["Verwacht 3 findings, kreeg 2"]), false));
 check("een lichte warning -> geen repair", !shouldRepairStep(V([], ["Cross-reference context ontbreekt vanuit vorige stapconclusie"]), false));
 check("OUD gedrag (alleen stap 12) ving deze 2 zware warnings NIET, NIEUW wel", shouldRepairStep(V([], ["Wiskundige inconsistentie: X", "Verwacht 3 findings, kreeg 1"]), false));
+check(
+  "de echte, herhaalde Meta/LinkedIn-combo (nested JSON + te weinig findings) triggert nu repair",
+  shouldRepairStep(V([], ["Step-output was gedegradeerd of nested JSON; parse salvage toegepast.", "Verwacht 3 findings, kreeg 1"]), false)
+);
+check(
+  "OUD gat: 'gedegradeerd of nested JSON' alleen (zonder findings-tekort) blijft onder de drempel",
+  !shouldRepairStep(V([], ["Step-output was gedegradeerd of nested JSON; parse salvage toegepast."]), false)
+);
 
 console.log("\n2. Kostenrem (errorsOnly na 5 repairs)");
 check("errorsOnly: drie zware warnings -> geen repair meer", !shouldRepairStep(V([], ["Wiskundige inconsistentie: X", "Verwacht 3 findings, kreeg 1", "Narratief bevat geen concrete cijfers"]), true));

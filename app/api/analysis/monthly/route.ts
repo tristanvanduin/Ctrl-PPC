@@ -405,6 +405,16 @@ const HEAVY_WARNING_MATCHERS = [
   "AC-08",
   "Claim-consistentie",
   "Wereldkennis",
+  // Gevonden op twee onafhankelijke live Meta/LinkedIn-runs (19 augustus 2026): "gedegradeerd of
+  // nested JSON" + "Verwacht 3 findings" komen structureel SAMEN voor, op bijna elke pijler-stap.
+  // "Verwacht 3 findings" alleen was al zwaar genoeg, maar "gedegradeerd of nested JSON" stond er
+  // niet bij -- dus die combinatie haalde maar 1 zware waarschuwing, net onder de >=2-drempel van
+  // shouldRepairStep(), en repareerde zichzelf dus NOOIT ondanks dat het repair-mechanisme allang
+  // bestaat en al bewezen werkt (zie de Google-7B-fout die in run 2 wel echt repareerde). Dit is
+  // geen prompt- of schemawijziging: het bestaande "verplicht output format" is al zo strikt als
+  // tekst kan zijn ("EXACT 3 items"), het model volgt het soms gewoon niet op -- precies waarvoor
+  // deze reparatielaag bestaat. Dit dicht alleen het gat waardoor hij niet aansloeg.
+  "gedegradeerd of nested JSON",
 ];
 
 function countHeavyWarnings(validation: StepValidationResult): number {
