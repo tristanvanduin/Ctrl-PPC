@@ -328,6 +328,36 @@ function iceColor(score: number): string {
   return red;
 }
 
+// Klant-PDF-tekst mag geen interne stap-/taaknummering bevatten (feedback op de eerste versie:
+// "Steps 1, 6, 7, 13" / "Tasks 1, 2" zijn werkbenaming van de AI-pijplijn, geen informatie die
+// een specialist iets zegt). Sommige al opgeslagen markdown (bv. coverage_markdown, dat "uit stap
+// X, Y" in de tekst bakt) is van vóór deze opschoning; deze scrub vangt dat ook voor bestaande
+// analyses, niet alleen nieuwe.
+export function stripInternalRefs(text: string): string {
+  return text
+    .replace(/\s*(?:uit|via|in|op)?\s*stap(?:pen)?\s+\d+(?:\s*(?:,|en)\s*\d+)*/gi, "")
+    .replace(/\s*\bsteps?\s+\d+(?:\s*(?:,|en|&)\s*\d+)*/gi, "")
+    .replace(/\s*\btasks?\s+\d+(?:\s*(?:,|en|&)\s*\d+)*/gi, "")
+    .replace(/\(\s*\)/g, "")
+    .replace(/\s+([.,;:)])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+const ROUTE_LABEL: Record<string, string> = {
+  validation: "Valideer",
+  containment: "Beperk",
+  recovery: "Herstel",
+  "controlled scale": "Schaal",
+};
+
+const ROUTE_COLOR: Record<string, string> = {
+  validation: blueDark,
+  containment: amber,
+  recovery: green,
+  "controlled scale": orange,
+};
+
 /**
  * Parse markdown output into sections (split on ## headings).
  * Returns array of { heading, content } objects.
@@ -677,12 +707,12 @@ function SopAnalysisPdf(props: SopPdfProps) {
           React.createElement(
             Text,
             { style: { ...s.statNumber, color: green } },
-            String(monthlyView?.usesOperatingDetail ? monthlyView.stepBackedCount : positiveCount)
+            String(positiveCount)
           ),
           React.createElement(
             Text,
             { style: s.statLabel },
-            monthlyView?.usesOperatingDetail ? "Step refs" : "Positief"
+            "Positief"
           )
         ),
         React.createElement(
@@ -729,32 +759,70 @@ function SopAnalysisPdf(props: SopPdfProps) {
           React.createElement(
             Text,
             { style: { ...s.infoText, color: dark } },
-            `${finalSop.primary_thread} ${finalSop.root_cause}`
-          ),
-          operatingDetail
-            ? React.createElement(
-                Text,
-                { style: { ...s.infoText, marginTop: 6 } },
-                `Operating layer: ${operatingDetail.route_task_map.length} route-mappings, ${operatingDetail.execution_detail.length} execution items, ${operatingDetail.step_backed_rationale.length} step-backed checks.`
-              )
-            : null
+            stripInternalRefs(`${finalSop.primary_thread} ${finalSop.root_cause}`)
+          )
         )
       );
     }
 
-    if (monthlyView?.usesFinalSop && operatingDetail) {
+    // Prioriteiten-actietabel: bovenaan, direct onder de executive focus (feedback op de eerste
+    // versie -- dit is het deel waar een specialist als eerste naar kijkt). Rechtstreeks uit
+    // finalSop.recommendations, geen operatingDetail-tekst: die droeg "Tasks 1, 2 | Steps 1, 6, 7,
+    // 13" mee, interne pijplijn-nummering die voor een klant niets betekent.
+    if (monthlyView?.usesFinalSop && finalSop && finalSop.recommendations.length > 0) {
       coverChildren.push(
         React.createElement(
           View,
-          { key: "operating-summary", style: { ...s.infoCard, backgroundColor: blueLight } },
-          React.createElement(Text, { style: s.infoTitle }, "Execution layer"),
-          ...operatingDetail.route_task_map.slice(0, 3).map((entry) =>
+          { key: "priority-actions", style: { ...s.infoCard, backgroundColor: blueLight, padding: 0 } },
+          React.createElement(
+            View,
+            { style: { padding: 12, paddingBottom: 0 } },
+            React.createElement(Text, { style: s.infoTitle }, "Prioriteiten")
+          ),
+          React.createElement(
+            View,
+            { style: { ...s.tableHeader, marginHorizontal: 12, marginTop: 6 }, fixed: true },
+            React.createElement(Text, { style: { width: "13%", ...s.tableHeaderText } }, "Route"),
+            React.createElement(Text, { style: { width: "44%", ...s.tableHeaderText, paddingRight: 6 } }, "Actie"),
+            React.createElement(Text, { style: { width: "43%", ...s.tableHeaderText } }, "Stoppen/doorgaan als")
+          ),
+          ...finalSop.recommendations.map((rec, i) =>
             React.createElement(
-              Text,
-              { key: `route-${entry.recommendation_number}`, style: { ...s.infoText, marginBottom: 4 } },
-              `R${entry.recommendation_number} ${entry.route}: ${entry.recommendation_summary} | Tasks ${entry.linked_task_numbers.join(", ")} | Steps ${entry.source_steps.join(", ")}`
+              View,
+              {
+                key: `prio-${i}`,
+                style: { ...s.tableRow, marginHorizontal: 12, backgroundColor: i % 2 === 1 ? "white" : blueLight },
+                wrap: false,
+              },
+              React.createElement(
+                View,
+                { style: { width: "13%" } },
+                React.createElement(
+                  Text,
+                  {
+                    style: {
+                      fontSize: 7,
+                      fontWeight: "bold",
+                      color: "white",
+                      backgroundColor: ROUTE_COLOR[rec.route] ?? gray,
+                      paddingHorizontal: 4,
+                      paddingVertical: 2,
+                      borderRadius: 3,
+                      alignSelf: "flex-start",
+                    },
+                  },
+                  ROUTE_LABEL[rec.route] ?? rec.route
+                )
+              ),
+              React.createElement(
+                Text,
+                { style: { width: "44%", ...s.cellText, fontWeight: "bold", paddingRight: 6 } },
+                `[ ] ${stripInternalRefs(rec.handeling)}`
+              ),
+              React.createElement(Text, { style: { width: "43%", ...s.cellText, color: gray } }, stripInternalRefs(rec.beslisregel))
             )
-          )
+          ),
+          React.createElement(View, { style: { height: 8 } })
         )
       );
     } else if (criticalFindings.length > 0 || highFindings.length > 0) {
@@ -939,147 +1007,116 @@ function SopAnalysisPdf(props: SopPdfProps) {
     )
   );
 
-  if (sopType === "monthly" && monthlyView?.usesFinalSop) {
-    const finalGroups = [executiveSections.slice(0, 3), executiveSections.slice(3, 5), executiveSections.slice(5, 7)].filter((group) => group.length > 0);
-    finalGroups.forEach((group, groupIndex) => {
+  if (sopType === "monthly" && monthlyView?.usesFinalSop && finalSop) {
+    // Herontworpen na klantfeedback (19 aug 2026): de vorige versie dumpte de Operating Detail
+    // Layer (interne evidence-traces/route-to-task-mapping/hypotheses-bewijs) en een ruw
+    // stap-voor-stap-transcript (met letterlijke pijplijn-syntax als "A | executive_layer |
+    // status KRITIEK | ...") in de klant-PDF -- 18 pagina's, grotendeels een datadump. Dit
+    // vervangt beide door twee compacte pagina's op de al-gestructureerde finalSop-velden.
+    const evidenceBullets = finalSop.supporting_evidence.slice(0, 6);
+    const notProblemBullets = finalSop.what_is_not_the_problem.slice(0, 6);
+
+    pages.push(
+      React.createElement(
+        Page,
+        { key: "diagnose", size: "A4", orientation: "landscape", style: s.page, wrap: true },
+        React.createElement(Text, { style: s.sectionTitle }, "Diagnose"),
+        evidenceBullets.length > 0
+          ? React.createElement(
+              View,
+              { key: "evidence", style: s.infoCard },
+              React.createElement(Text, { style: s.infoTitle }, "Onderbouwing"),
+              ...evidenceBullets.map((line, i) =>
+                React.createElement(
+                  View,
+                  { key: `ev-${i}`, style: { flexDirection: "row", marginBottom: 3 } },
+                  React.createElement(Text, { style: { ...s.infoText, marginRight: 4 } }, "•"),
+                  React.createElement(Text, { style: { ...s.infoText, color: dark, flex: 1 } }, stripInternalRefs(line))
+                )
+              )
+            )
+          : null,
+        notProblemBullets.length > 0
+          ? React.createElement(
+              View,
+              { key: "not-problem", style: { ...s.infoCard, backgroundColor: grayLight } },
+              React.createElement(Text, { style: s.infoTitle }, "Dit is NIET het probleem"),
+              ...notProblemBullets.map((line, i) =>
+                React.createElement(
+                  View,
+                  { key: `np-${i}`, style: { flexDirection: "row", marginBottom: 3 } },
+                  React.createElement(Text, { style: { ...s.infoText, marginRight: 4 } }, "•"),
+                  React.createElement(Text, { style: { ...s.infoText, color: dark, flex: 1 } }, stripInternalRefs(line))
+                )
+              )
+            )
+          : null,
+        Footer({ clientName, sopType })
+      )
+    );
+
+    if (finalSop.tasks.length > 0) {
       pages.push(
         React.createElement(
           Page,
-          {
-            key: `executive-${groupIndex}`,
-            size: "A4",
-            orientation: "landscape",
-            style: s.page,
-            wrap: true,
-          },
+          { key: "tasks", size: "A4", orientation: "landscape", style: s.page, wrap: true },
+          React.createElement(Text, { style: s.sectionTitle }, "Taken"),
           React.createElement(
             Text,
-            { style: s.sectionTitle },
-            groupIndex === 0 ? "Finale SOP" : groupIndex === 1 ? "Aanbevelingen" : "Taken & QA"
+            { style: s.sectionSubtitle },
+            `${finalSop.tasks.length} taken, gekoppeld aan de prioriteiten op pagina 1.`
           ),
-          ...group.map((sec, index) =>
+          ...finalSop.tasks.map((task, i) =>
             React.createElement(
               View,
               {
-                key: `exec-${groupIndex}-${index}`,
-                style: {
-                  ...s.infoCard,
-                  marginBottom: 10,
-                  borderLeftWidth: 3,
-                  borderColor: orange,
-                  backgroundColor: index % 2 === 0 ? grayLight : blueLight,
-                },
+                key: `task-${i}`,
+                style: { ...s.infoCard, marginBottom: 8, backgroundColor: i % 2 === 0 ? grayLight : "white" },
+                wrap: false,
               },
-              React.createElement(Text, { style: s.infoTitle }, sec.heading),
-              React.createElement(Text, { style: { ...s.infoText, color: dark } }, cleanMarkdown(sec.content).slice(0, 4000))
+              React.createElement(Text, { style: { ...s.infoTitle, fontSize: 9 } }, `[ ] ${stripInternalRefs(task.handeling)}`),
+              React.createElement(
+                Text,
+                { style: { ...s.infoText, marginTop: 2 } },
+                [task.object, task.meet_via].filter(Boolean).join("  •  ")
+              ),
+              task.beslisregel
+                ? React.createElement(
+                    Text,
+                    { style: { ...s.infoText, marginTop: 2, color: dark } },
+                    `Stoppen/doorgaan: ${stripInternalRefs(task.beslisregel)}`
+                  )
+                : null
             )
           ),
           Footer({ clientName, sopType })
         )
       );
-    });
-
-    operatingSections.forEach((sec, index) => {
-      pages.push(
-        React.createElement(
-          Page,
-          {
-            key: `operating-${index}`,
-            size: "A4",
-            orientation: "landscape",
-            style: s.page,
-            wrap: true,
-          },
-          React.createElement(Text, { style: s.sectionTitle }, index === 0 ? "Operating Detail Layer" : sec.heading),
-          index === 0
-            ? React.createElement(
-                Text,
-                { style: s.sectionSubtitle },
-                "Compacte uitvoeringslaag met evidence, route-to-task mapping en step-backed rationale."
-              )
-            : null,
-          React.createElement(
-            View,
-            {
-              style: {
-                ...s.infoCard,
-                borderLeftWidth: 3,
-                borderColor: blueDark,
-                backgroundColor: index % 2 === 0 ? blueLight : grayLight,
-              },
-            },
-            React.createElement(Text, { style: s.infoTitle }, sec.heading),
-            React.createElement(Text, { style: { ...s.infoText, color: dark } }, cleanMarkdown(sec.content).slice(0, 5000))
-          ),
-          Footer({ clientName, sopType })
-        )
-      );
-    });
+    }
 
     const coverageAppendixSections = appendixSections.filter((sec) => !sec.heading.startsWith("Stap "));
-    const stepAppendixSections = appendixSections.filter((sec) => sec.heading.startsWith("Stap "));
-
     coverageAppendixSections.forEach((sec, index) => {
       pages.push(
         React.createElement(
           Page,
-          {
-            key: `appendix-coverage-${index}`,
-            size: "A4",
-            orientation: "landscape",
-            style: s.page,
-            wrap: true,
-          },
-          React.createElement(Text, { style: s.sectionTitle }, sec.heading),
+          { key: `appendix-coverage-${index}`, size: "A4", orientation: "landscape", style: s.page, wrap: true },
+          React.createElement(Text, { style: s.sectionTitle }, "Data-dekking"),
           React.createElement(
             View,
             { style: { ...s.infoCard, backgroundColor: grayLight } },
-            React.createElement(Text, { style: s.infoTitle }, sec.heading),
-            React.createElement(Text, { style: { ...s.infoText, color: dark } }, cleanMarkdown(sec.content).slice(0, 6000))
-          ),
-          Footer({ clientName, sopType })
-        )
-      );
-    });
-
-    const groupedAppendixPages = groupAppendixSections(stepAppendixSections, 4000);
-    groupedAppendixPages.forEach((group, pageIndex) => {
-      pages.push(
-        React.createElement(
-          Page,
-          {
-            key: `appendix-page-${pageIndex}`,
-            size: "A4",
-            orientation: "landscape",
-            style: s.page,
-            wrap: true,
-          },
-          ...(pageIndex === 0
-            ? [React.createElement(Text, { style: s.sectionTitle }, "SOP Analyse per Stap")]
-            : []),
-          ...group.map((sec, secIndex) =>
             React.createElement(
-              View,
-              {
-                key: `appendix-sec-${pageIndex}-${secIndex}`,
-                style: {
-                  ...s.infoCard,
-                  backgroundColor: secIndex % 2 === 0 ? grayLight : blueLight,
-                  marginBottom: 8,
-                },
-              },
-              React.createElement(Text, { style: s.infoTitle }, sec.heading),
-              React.createElement(
-                Text,
-                { style: { ...s.infoText, color: dark } },
-                cleanMarkdown(sec.content).slice(0, 6000)
-              )
+              Text,
+              { style: { ...s.infoText, color: dark } },
+              stripInternalRefs(cleanMarkdown(sec.content)).slice(0, 6000)
             )
           ),
           Footer({ clientName, sopType })
         )
       );
     });
+    // Operating Detail Layer (evidence-trace/route-to-task-mapping/hypotheses-bewijs) en het ruwe
+    // stap-voor-stap-transcript zijn hier bewust NIET gerenderd: interne AI-validatielogica,
+    // geen informatie die een specialist nodig heeft om te handelen.
   }
 
   // ══════════════════════════════════════════════════════════════════
