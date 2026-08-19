@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import {
   getSupabase,
   getOpenRouterKey,
@@ -1257,9 +1257,16 @@ async function runMetaMonthlyAnalysis(
   });
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
-  await triggerCrossChannelSynthesisIfReady(supabase, clientId);
-  // Idem voor cross-account: zie lib/analysis/auto-portfolio-synthesis-trigger.ts.
-  await triggerPortfolioSynthesisIfReady(supabase, clientId);
+  // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
+  // client op dit fetch-antwoord wacht. Stond hier eerst als blokkerende await vóór de return --
+  // dat telde wel mee in maxDuration, en op een zware analyse kon de opgetelde tijd de client's
+  // kant van de wachttijd over de 300s heen duwen, met Vercel's platte foutpagina i.p.v. JSON als
+  // gevolg ("Unexpected token 'A'...", live gezien op demo-greentech).
+  after(async () => {
+    await triggerCrossChannelSynthesisIfReady(supabase, clientId);
+    // Idem voor cross-account: zie lib/analysis/auto-portfolio-synthesis-trigger.ts.
+    await triggerPortfolioSynthesisIfReady(supabase, clientId);
+  });
 
   return Response.json({
     ok: true,
@@ -1464,9 +1471,16 @@ async function runLinkedinMonthlyAnalysis(
   });
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
-  await triggerCrossChannelSynthesisIfReady(supabase, clientId);
-  // Idem voor cross-account: zie lib/analysis/auto-portfolio-synthesis-trigger.ts.
-  await triggerPortfolioSynthesisIfReady(supabase, clientId);
+  // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
+  // client op dit fetch-antwoord wacht. Stond hier eerst als blokkerende await vóór de return --
+  // dat telde wel mee in maxDuration, en op een zware analyse kon de opgetelde tijd de client's
+  // kant van de wachttijd over de 300s heen duwen, met Vercel's platte foutpagina i.p.v. JSON als
+  // gevolg ("Unexpected token 'A'...", live gezien op demo-greentech).
+  after(async () => {
+    await triggerCrossChannelSynthesisIfReady(supabase, clientId);
+    // Idem voor cross-account: zie lib/analysis/auto-portfolio-synthesis-trigger.ts.
+    await triggerPortfolioSynthesisIfReady(supabase, clientId);
+  });
 
   return Response.json({
     ok: true,
@@ -3293,9 +3307,17 @@ ${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannel
     // Als de kwaliteitspoort deze cyclus blokkeerde, vindt readyForSynthesis() hier gewoon geen
     // geldige structured_monthly_v2 voor dit kanaal en slaat de synthese vanzelf over -- geen
     // aparte check nodig op qualityGate.passed.
-    await triggerCrossChannelSynthesisIfReady(supabase, clientId);
-    // Idem voor cross-account: zie lib/analysis/auto-portfolio-synthesis-trigger.ts.
-    await triggerPortfolioSynthesisIfReady(supabase, clientId);
+    // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die
+    // de client op dit fetch-antwoord wacht. Stond hier eerst als blokkerende await vóór de
+    // return -- dat telde wel mee in maxDuration, en op Google (de zwaarste van de drie kanalen,
+    // met zijn eigen extra 7A/7B-stap) duwde de opgetelde tijd de client's kant van de wachttijd
+    // over de 300s heen, met Vercel's platte foutpagina i.p.v. JSON als gevolg ("Unexpected token
+    // 'A'...", live gezien op demo-greentech).
+    after(async () => {
+      await triggerCrossChannelSynthesisIfReady(supabase, clientId);
+      // Idem voor cross-account: zie lib/analysis/auto-portfolio-synthesis-trigger.ts.
+      await triggerPortfolioSynthesisIfReady(supabase, clientId);
+    });
 
     return Response.json({
       jobId,

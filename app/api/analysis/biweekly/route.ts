@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { buildBiWeeklyPrompt, BIWEEKLY_FINDINGS_SYSTEM, BIWEEKLY_RECS_SYSTEM } from "@/lib/prompts/sop-prompts";
 import {
   getSupabase,
@@ -254,7 +254,12 @@ ${enrichment.hypothesisTracking ? "\nAls er uitgevoerde hypotheses zijn die nog 
   });
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
-  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
+  // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
+  // client op dit fetch-antwoord wacht -- zelfde reden als de after()-wijziging in
+  // app/api/analysis/monthly/route.ts.
+  after(async () => {
+    await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
+  });
 
   return Response.json({
     jobId,
@@ -420,7 +425,12 @@ Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug
   });
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
-  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
+  // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
+  // client op dit fetch-antwoord wacht -- zelfde reden als de after()-wijziging in
+  // app/api/analysis/monthly/route.ts.
+  after(async () => {
+    await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
+  });
 
   return Response.json({
     jobId,
@@ -597,7 +607,12 @@ Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug
   });
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
-  await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
+  // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
+  // client op dit fetch-antwoord wacht -- zelfde reden als de after()-wijziging in
+  // app/api/analysis/monthly/route.ts.
+  after(async () => {
+    await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "biweekly", periodStart, periodEnd);
+  });
 
   return Response.json({
     jobId,
