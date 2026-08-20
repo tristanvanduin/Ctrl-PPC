@@ -27,18 +27,19 @@ Dit statement beschrijft beide rollen. Waar relevant, is aangegeven in welke hoe
 
 ### 2.2 Gegevens verwerkt namens Opdrachtgever (wij: verwerker)
 
-Via de door Opdrachtgever gekoppelde advertentieaccounts halen wij, met de door Opdrachtgever verstrekte API-autorisatie, campagne- en accountdata op bij **Google Ads, Meta (Facebook/Instagram) Ads en LinkedIn Ads**. Dit betreft in de kern **geaggregeerde, campagnegerichte prestatiedata**: vertoningen, klikken, kosten, conversies, doelgroep­segmenten (bijvoorbeeld op functieniveau of branche, zoals aangeleverd door het advertentieplatform zelf) en vergelijkbare statistieken.
+Via de door Opdrachtgever gekoppelde advertentieaccounts halen wij, met de door Opdrachtgever verstrekte API-autorisatie, campagne- en accountdata op bij **Google Ads, Meta (Facebook/Instagram) Ads en LinkedIn Ads**. Dit betreft in de kern **geaggregeerde, campagnegerichte prestatiedata**: vertoningen, klikken, kosten, conversies, doelgroep­segmenten (bijvoorbeeld op functieniveau of senioriteit, zoals aangeleverd door het advertentieplatform zelf, altijd op segment- en nooit op individueel niveau) en vergelijkbare statistieken.
 
-* Deze data betreft in de regel **geen tot individuele consumenten herleidbare persoonsgegevens**: advertentieplatformen leveren doorgaans geaggregeerde cijfers op campagne-, advertentiegroep- of doelgroepsegmentniveau, niet op het niveau van een geïdentificeerd of identificeerbaar natuurlijk persoon.
+* Deze data betreft in de regel **geen tot individuele consumenten herleidbare persoonsgegevens**: advertentieplatformen leveren doorgaans geaggregeerde cijfers op campagne-, advertentiegroep- of doelgroepsegmentniveau, niet op het niveau van een geïdentificeerd of identificeerbaar natuurlijk persoon. Dit geldt ook voor leadformulier-data van LinkedIn: wij lezen uitsluitend het aantal openingen en inzendingen per formulier, geen namen of contactgegevens van individuele leads.
 * Voor zover in specifieke gevallen toch persoonsgegevens onderdeel zijn van deze dataset (bijvoorbeeld een contactpersoon vermeld in klantnotities die Opdrachtgever zelf invoert), verwerken wij deze **uitsluitend in opdracht van en volgens instructies van Opdrachtgever**, als verwerker. De grondslag voor deze verwerking berust bij Opdrachtgever als verwerkingsverantwoordelijke.
 * Wij gebruiken deze data uitsluitend om de Dienst aan Opdrachtgever te leveren, en niet voor eigen doeleinden, behoudens geaggregeerde en/of geanonimiseerde statistiek zoals toegelicht in paragraaf 2.4.
+* De autorisatie (koppeling) die Opdrachtgever aan ons verleent, wordt niet als leesbare tekst opgeslagen: het toegangstoken zelf staat in een aparte, versleutelde kluis (zie paragraaf 7), niet in dezelfde tabel als de campagnedata.
 
 ### 2.3 Gebruik van AI-modellen bij analyse en advisering
 
 Het Platform gebruikt taalmodellen om op basis van de in 2.2 genoemde geaggregeerde prestatiedata analyses, samenvattingen, hypotheses en aanbevelingen te genereren. Deze modellen worden ontsloten via **OpenRouter**, dat als routeringslaag fungeert naar onderliggende modelaanbieders (afhankelijk van de taak, onder meer aanbieders van Claude-, Gemini- en Grok-achtige modellen).
 
 * Aan deze modellen wordt de geaggregeerde campagnedata, en géén los daarvan bewaarde consumentidentiteit, ter beschikking gesteld ten behoeve van het genereren van de analyse.
-* Voor zover een AI-modelprovider daarbij optreedt als (sub)verwerker in de zin van de AVG, is dit opgenomen in ons subverwerkersoverzicht (paragraaf 5). Wij maken uitsluitend gebruik van providers die contractueel toezeggen klantdata niet te gebruiken voor het trainen van hun modellen, dan wel bieden wij deze instelling actief aan; dit wordt per provider bevestigd en op verzoek toegelicht.
+* Voor zover een AI-modelprovider daarbij optreedt als (sub)verwerker in de zin van de AVG, is dit opgenomen in ons subverwerkersoverzicht (paragraaf 5). Wij streven ernaar uitsluitend providers in te schakelen die contractueel toezeggen klantdata niet te gebruiken voor het trainen van hun modellen; dit wordt per daadwerkelijk actieve provider bevestigd en is op verzoek in te zien, in plaats van hier als vaststaand gegeven te worden gepresenteerd.
 * Door AI gegenereerde output is per definitie een geautomatiseerd gegenereerd advies. Er wordt geen besluit met rechtsgevolg of vergelijkbaar wezenlijk gevolg voor een natuurlijk persoon (in de zin van art. 22 AVG) op louter geautomatiseerde wijze genomen: de output betreft campagne-/marketingadvies aan een onderneming (Opdrachtgever), niet een geautomatiseerd besluit over een individuele betrokkene.
 
 ### 2.4 Product- en dienstverbetering
@@ -65,32 +66,48 @@ Voor de uitvoering van de Dienst maken wij gebruik van de volgende categorieën 
 
 | Subverwerker (categorie) | Functie | Locatie / doorgiftemechanisme |
 |---|---|---|
-| Database- en hostinginfrastructuur (Supabase) | Opslag van accountgegevens, campagnedata en gegenereerde analyses | [REGIO BEVESTIGEN — EU-regio indien geconfigureerd; zo niet: doorgifte buiten de EER op basis van Standard Contractual Clauses] |
-| Hostingplatform webapplicatie (Vercel) | Hosten en uitleveren van het Platform | [REGIO/SCC'S BEVESTIGEN] |
-| AI-modelrouteringsdienst (OpenRouter) en onderliggende modelaanbieders | Genereren van analyses, samenvattingen en aanbevelingen op basis van geaggregeerde campagnedata | Verwerking (mogelijk) buiten de EER; doorgifte op basis van Standard Contractual Clauses c.q. een passend beschermingsniveau, per provider te bevestigen |
-| Google Ads, Meta Ads, LinkedIn Ads | Bron van de campagne- en advertentieprestatiedata die Opdrachtgever laat koppelen | Optreden hier niet als onze subverwerker, maar als platform waarop Opdrachtgever (of diens klant) zelf verwerkingsverantwoordelijke is; wij lezen deze data uit met de door Opdrachtgever verleende autorisatie |
+| Database-, authenticatie- en opslaginfrastructuur (Supabase) | Opslag van accountgegevens, campagnedata, gegenereerde analyses en bestanden; beheer van inloggegevens; versleutelde opslag van API-toegangstokens | [REGIO BEVESTIGEN — EU-regio indien geconfigureerd; zo niet: doorgifte buiten de EER op basis van Standard Contractual Clauses] |
+| Hostingplatform webapplicatie (Vercel) | Hosten en uitleveren van het Platform, uitvoeren van de dagelijkse synchronisatie | [REGIO/SCC'S BEVESTIGEN] |
+| AI-modelrouteringsdienst (OpenRouter) | Routeert analysetaken naar het voor die taak geschikte model | Verwerking (mogelijk) buiten de EER; doorgifte op basis van Standard Contractual Clauses c.q. een passend beschermingsniveau, te bevestigen |
+| Onderliggende modelaanbieders, geraadpleegd via OpenRouter (o.a. Anthropic-, Google- en xAI-modellen, afhankelijk van de aard van de analysetaak) | Genereren van analysetekst, samenvattingen en gestructureerde bevindingen op basis van geaggregeerde campagnedata | Verwerking (mogelijk) buiten de EER, per aanbieder te bevestigen |
+| Google Ads, Meta Ads, LinkedIn Ads | Bron van de campagne- en advertentieprestatiedata die Opdrachtgever laat koppelen | Treden hier niet op als onze subverwerker, maar als platform waarop Opdrachtgever (of diens klant) zelf verwerkingsverantwoordelijke is; wij lezen deze data uit met de door Opdrachtgever verleende autorisatie. Voor Google Ads geldt dat de leestoegang loopt via één technische koppeling op accountniveau van Ctrl PPC (een "manageraccount"), niet via een los token per Opdrachtgever |
 
-Met alle subverwerkers die persoonsgegevens buiten de Europese Economische Ruimte verwerken, zijn passende waarborgen overeengekomen (zoals de Standard Contractual Clauses van de Europese Commissie). Een actueel, volledig overzicht van subverwerkers is op verzoek beschikbaar via [E-MAILADRES].
+Met alle subverwerkers die persoonsgegevens buiten de Europese Economische Ruimte verwerken, zijn passende waarborgen overeengekomen (zoals de Standard Contractual Clauses van de Europese Commissie). Een actueel, volledig overzicht van subverwerkers, inclusief de op dat moment daadwerkelijk actieve modelaanbieders, is op verzoek beschikbaar via [E-MAILADRES].
 
 ## 6. Bewaartermijnen
 
-Wij bewaren persoonsgegevens niet langer dan noodzakelijk voor de doeleinden waarvoor zij zijn verzameld:
+Wij bewaren persoonsgegevens niet langer dan noodzakelijk voor de doeleinden waarvoor zij zijn verzameld. Hieronder staat zowel wat automatisch is ingeregeld als wat op dit moment nog op aanvraag verloopt — wij beloven hier niet meer dan wat het Platform daadwerkelijk doet.
 
-* **Accountgegevens en campagnedata**: bewaard gedurende de looptijd van de overeenkomst met Opdrachtgever, zodat historische analyses, trends en jaar-op-jaar-vergelijkingen beschikbaar blijven. Na beëindiging van de overeenkomst worden deze gegevens binnen [TERMIJN, bijv. 90 dagen] verwijderd of geanonimiseerd, tenzij Opdrachtgever eerder om verwijdering verzoekt of een langere bewaring wettelijk verplicht is.
+* **Zoektermdata (Google Ads)**: enige categorie met een **automatische, doorlopende bewaartermijn**: maximaal twee maanden, gerekend vanaf de meest recente maand waarvan Opdrachtgever data heeft (niet vanaf een vaste kalenderdatum, zodat een tijdelijk stilstaande koppeling niet leidt tot het verlies van de enige nog beschikbare data). Oudere zoektermregels worden automatisch verwijderd bij elke nieuwe synchronisatie.
+* **Overige campagne- en accountdata, gegenereerde analyses en rapportages**: bewaard gedurende de looptijd van de overeenkomst met Opdrachtgever, zodat historische trends en jaar-op-jaar-vergelijkingen beschikbaar blijven. Voor deze categorieën bestaat vandaag **geen geautomatiseerde verwijdering na afloop van de overeenkomst**; verwijdering vindt plaats op verzoek van Opdrachtgever, en in elk geval bij formele beëindiging van de overeenkomst binnen een door Partijen af te spreken termijn.
+* **Wijzigingsgeschiedenis van hypotheses en trackrecord-events**: bewust **niet** onderworpen aan verwijdering of wijziging zolang de overeenkomst loopt — dit is een append-only geschiedenis die de betrouwbaarheid van eerdere adviezen aantoonbaar maakt, technisch afgedwongen zodat ook per ongeluk overschrijven niet mogelijk is. Bevat geen persoonsgegevens van individuen; is gekoppeld aan klant-/campagneniveau.
 * **Facturatie- en administratieve gegevens**: bewaard gedurende de wettelijke fiscale bewaartermijn van zeven jaar (artikel 52 Algemene wet inzake rijksbelastingen).
-* **Logging- en beveiligingsgegevens**: bewaard voor een beperkte periode van [TERMIJN, bijv. 12 maanden], ten behoeve van beveiliging en foutopsporing.
+* **Gebruiksstatistieken van AI-modelaanroepen** (welk model, aantal tokens, kosten): bewaard voor kostenanalyse en verbetering van de Dienst. Bevat geen prompttekst of gegenereerde inhoud, uitsluitend telmetingen.
 * **Gegevens van proef-/demo-accounts**: uitsluitend fictieve, niet tot bestaande personen herleidbare gegevens; geen bewaartermijn van persoonsgegevens van toepassing.
 
-Na het verstrijken van de toepasselijke bewaartermijn worden de gegevens verwijderd of onomkeerbaar geanonimiseerd.
+Na het verstrijken van de toepasselijke bewaartermijn, of na een geldig verwijderingsverzoek, worden de gegevens verwijderd of onomkeerbaar geanonimiseerd. Wij werken toe naar bredere automatisering van bewaartermijnen voor de categorieën waar dat vandaag nog niet is ingeregeld.
 
 ## 7. Beveiliging
 
-Wij nemen passende technische en organisatorische maatregelen om persoonsgegevens te beschermen tegen verlies of onrechtmatige verwerking, waaronder:
+Wij nemen passende technische en organisatorische maatregelen om persoonsgegevens te beschermen tegen verlies of onrechtmatige verwerking. Hieronder staat concreet wat daadwerkelijk is ingericht, per beveiligingsdomein — en, waar van toepassing, wat nog in ontwikkeling is. Wij kiezen ervoor hier specifiek en verifieerbaar te zijn in plaats van algemene geruststellingen te geven.
 
-* toegang tot klantdata is technisch afgeschermd per bureau/organisatie, zodat gebruikers uitsluitend toegang hebben tot de eigen gegevens en de gegevens van de eigen klanten;
-* versleutelde verbindingen (TLS) voor gegevensverkeer;
-* beperkte, rolgebonden toegang tot productiedata voor medewerkers en beheerders;
-* logging en monitoring ten behoeve van misbruikdetectie.
+**Toegangsbeheer.** Toegang tot klantdata is op databaseniveau afgeschermd per bureau/organisatie (row-level security): een gebruiker kan uitsluitend rijen opvragen die aan zijn eigen organisatie zijn gekoppeld, afgedwongen door de database zelf en niet alleen door de applicatielaag. Dit is functioneel getest met twee afzonderlijke, daadwerkelijk ingelogde gebruikers van verschillende organisaties. Toegang binnen een organisatie is bovendien rolgebonden (beheerder, specialist, viewer, met elk een eigen rechtenset).
+
+**Verplichte authenticatie.** Het Platform wordt uitgebreid met verplichte sessie-authenticatie voor elke pagina en API-aanroep die klantdata ontsluit; deze functionaliteit is gebouwd en getest en wordt gefaseerd geactiveerd.
+
+**Geheimenbeheer.** Toegangstokens naar gekoppelde advertentieplatformen worden niet als leesbare tekst in de reguliere database opgeslagen. Zij staan in een aparte, versleutelde kluis, benaderbaar via een streng afgebakende technische functie die uitsluitend het opslaan en ophalen van één specifiek geheim toestaat — niet het doorzoeken van de kluis als geheel.
+
+**Versleuteling in transit.** Al het dataverkeer tussen het Platform, de database en de gekoppelde diensten loopt via versleutelde verbindingen (TLS).
+
+**Onveranderlijke audittrail.** Voor de geschiedenis van hypotheses en aanbevelingen wordt op databaseniveau afgedwongen dat eenmaal vastgelegde events nooit gewijzigd of verwijderd kunnen worden, ook niet per ongeluk door de applicatie zelf.
+
+**Wat op dit moment (nog) geen formeel, gedocumenteerd proces is:**
+
+* een vastgelegd incidentresponsplan met vaste meldingstermijnen bij een eventueel datalek;
+* een periodieke, gedocumenteerde risicoanalyse van de architectuur;
+* een formele, herhaalde beoordeling van subverwerkers op hun beveiligingsniveau (vandaag: vertrouwen op de eigen certificeringen en voorwaarden van de ingeschakelde partijen, niet op een eigen audit).
+
+Wij vermelden dit bewust in plaats van het weg te laten: onze technische maatregelen zijn concreet en verifieerbaar, maar vormen nog geen gecertificeerd managementsysteem. Opdrachtgevers voor wie dat een vereiste is, kunnen hierover contact opnemen via [E-MAILADRES].
 
 ## 8. Uw rechten
 
@@ -129,4 +146,4 @@ KvK-nummer: [KVK-NUMMER]
 
 ---
 
-*[PLACEHOLDER — te bevestigen voor gebruik: hostingregio's van Supabase/Vercel en of doorgifte buiten de EER daadwerkelijk plaatsvindt, de daadwerkelijk gebruikte AI-modelproviders en hun contractuele trainingsuitsluiting, exacte bewaartermijnen (deze moeten overeenkomen met wat technisch daadwerkelijk wordt geïmplementeerd), en het daadwerkelijke cookiegebruik op de website.]*
+*[PLACEHOLDER — nog te bevestigen voor gebruik: hostingregio's van Supabase/Vercel en of doorgifte buiten de EER daadwerkelijk plaatsvindt; per daadwerkelijk actieve AI-modelprovider de contractuele trainingsuitsluiting; het daadwerkelijke cookiegebruik op de website. De overige technische beweringen in dit document (rolscheiding, geheimenkluis, zoektermretentie, audittrail) zijn geverifieerd tegen de actuele codebase en database op 20 augustus 2026 — bij een volgende materiële architectuurwijziging moet dit statement opnieuw tegen de code worden gelegd, niet stilzwijgend als nog kloppend worden aangenomen.]*
