@@ -299,17 +299,13 @@ export function ClientNotes({ clientId }: { clientId: string }) {
       {/* Lijst */}
       {loading ? (
         <p className="text-meta text-muted-foreground py-4 text-center">Laden...</p>
-      ) : notes.length === 0 && !showNew ? (
-        <div className="flex flex-col items-center py-8 text-center">
-          <div className="w-10 h-10 rounded-full bg-brand-blue/5 flex items-center justify-center mb-3">
-            <StickyNote className="w-5 h-5 text-brand-blue-ink/30" />
-          </div>
-          <p className="text-xs text-muted-foreground">Nog geen notities of to-do&apos;s</p>
-          <p className="text-micro text-muted-foreground/60 mt-0.5">Leg afspraken, strategie of taken vast</p>
-        </div>
       ) : (
-        // Twee kolommen, 50/50 over de volle breedte -- notities en to-do's zijn geen
-        // hoofd/detail-relatie maar twee gelijkwaardige lijsten, dus geen boven-elkaar-stapeling.
+        // Twee kolommen, 50/50 over de volle breedte, ALTIJD -- ook als er nog niets in staat.
+        // Stond hier eerder een gecombineerde lege-staat ("nog geen notities of to-do's") die
+        // vóór de tweekoloms-grid werd getoond zodra notes.length === 0: dan zag een klant zonder
+        // data één blok i.p.v. de 50/50-indeling, en de eigenaar las de twee knoppen erboven toen
+        // als "eerst een filter kiezen" i.p.v. "voeg iets toe". Elke kolom toont zijn eigen lege
+        // tekst hieronder al; de layout hoeft dus niet te wisselen op basis van of er data is.
         // Op smal (mobiel) valt het terug op één kolom, anders verdwijnt de kaart onder een
         // horizontale scrollbalk.
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
