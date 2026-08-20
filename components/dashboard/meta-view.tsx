@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Megaphone, Calendar, Sparkles } from "lucide-react";
+import { Megaphone, Calendar, Sparkles, Target } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
@@ -13,6 +13,10 @@ import { GeoRanglijstCard } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoMode } from "@/lib/demo/demo-mode";
+import { supabase } from "@/lib/supabase";
+import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/meta/campaign-types";
+import { buildMetaObjectiveBreakdown, type MetaObjectiveDailyRow } from "@/lib/meta/objective-breakdown";
+import { ObjectiveInsights, type ObjectiveGroupLike } from "./objective-insights";
 
 // Meta Ads-tab: DATA-weergave (connectiestatus + wat het kanaal levert). Zelfde opbouw als de
 // Google-weergave via de gedeelde ChannelViewHeader. De analyses (maand-SOP, creative vision,
@@ -115,19 +119,87 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
   );
 }
 
+const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
 /**
- * Het campagne-deel van Meta: de advertenties zelf.
+ * Feedback punt 29+31: per objective welke campagnes daaronder hangen en welke cijfers daar het
+ * meest toe doen. Rekenkern in lib/meta/objective-breakdown.ts; dit haalt alleen de twee bronnen
+ * op (campagnes met hun `objective`-veld, en de dagcijfers over een venster van 90 dagen -- lang
+ * genoeg voor representatieve totalen, kort genoeg om niet jaren oude, gepauzeerde campagnes mee
+ * te tellen).
+ */
+function useMetaObjectiveGroups(clientId: string): ObjectiveGroupLike[] | null {
+  const [groups, setGroups] = useState<ObjectiveGroupLike[] | null>(null);
+
+  useEffect(() => {
+    const sb = supabase;
+    if (!sb) { setGroups([]); return; }
+    let cancelled = false;
+    setGroups(null);
+    const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    const DAILY_SELECT = "entity_id, spend, impressions, reach, frequency, link_clicks, cpm, cpc_link, ctr_link, conversions, conversion_value, purchase_roas, cpa, roas, leads, add_to_cart, initiate_checkout, landing_page_views, video_thruplay, post_engagement, hook_rate, hold_rate";
+
+    Promise.all([
+      sb.from("meta_campaigns").select("campaign_id, name, objective").eq("client_id", clientId),
+      sb.from("meta_campaign_daily").select(DAILY_SELECT).eq("client_id", clientId).gte("date", since),
+    ]).then(([campRes, dailyRes]) => {
+      if (cancelled) return;
+      const campaigns = ((campRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
+        id: String(r.campaign_id ?? ""), name: String(r.name ?? ""), objective: (r.objective as string | null) ?? null,
+      }));
+      const daily = ((dailyRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
+        campaignId: String(r.entity_id ?? ""), entityId: String(r.entity_id ?? ""),
+        spend: num(r.spend), impressions: num(r.impressions), reach: num(r.reach), frequency: num(r.frequency),
+        linkClicks: num(r.link_clicks), cpm: num(r.cpm), cpcLink: num(r.cpc_link), ctrLink: num(r.ctr_link),
+        conversions: num(r.conversions), conversionValue: num(r.conversion_value), purchaseRoas: num(r.purchase_roas),
+        cpa: num(r.cpa), roas: num(r.roas), leads: num(r.leads), addToCart: num(r.add_to_cart),
+        initiateCheckout: num(r.initiate_checkout), landingPageViews: num(r.landing_page_views),
+        videoThruplay: num(r.video_thruplay), postEngagement: num(r.post_engagement), hookRate: num(r.hook_rate), holdRate: num(r.hold_rate),
+      }));
+      const built = buildMetaObjectiveBreakdown(campaigns, daily);
+      setGroups(built.map((g) => ({
+        objective: g.objective, label: g.label, spend: g.spend,
+        campaigns: g.campaigns.map((c) => ({ key: c.id, name: c.name, spend: c.spend, primaryValue: c.primaryValue })),
+        metrics: g.metrics,
+      })));
+    });
+    return () => { cancelled = true; };
+  }, [clientId]);
+
+  return groups;
+}
+
+/**
+ * Het campagne-deel van Meta: welk objective drijft welke campagnes, en de advertenties zelf.
  *
  * Geen ChannelViewHeader hier, en dat is bewust. Google's Campagnes-tab begint ook meteen bij
  * "Wat er draait" — de koppelingsstatus van een kanaal is een overzichtsvraag en hoort niet op
  * elk tabblad herhaald te worden.
  */
 export function MetaCampagnes({ clientId }: { clientId: string }) {
+  const objectiveGroups = useMetaObjectiveGroups(clientId);
+
   return (
     <div className="space-y-6">
-      {/* Quick scan: creatives + prestaties + samenvatting. */}
       <Sectie
         eerste
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Per objective"
+        bijschrift="Welke campagnes bij welk doel horen, en welke cijfers daar het meest toe doen"
+      >
+        {objectiveGroups === null ? (
+          <div className="h-40 animate-pulse rounded-lg bg-gray-100" />
+        ) : (
+          <ObjectiveInsights
+            groups={objectiveGroups}
+            criteria={OBJECTIVE_EVAL_CRITERIA}
+            emptyLabel="Geen campagnes met een herkend objective in de laatste 90 dagen."
+          />
+        )}
+      </Sectie>
+
+      {/* Quick scan: creatives + prestaties + samenvatting. */}
+      <Sectie
         icoon={<Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="De advertenties zelf"
         bijschrift="Creatives, hun prestaties en vermoeidheid"

@@ -263,16 +263,21 @@ const metaAccountDailyOlder: Row[] = Array.from({ length: 580 }, (_, i) => {
 });
 const metaAccountDaily: Row[] = [...metaAccountDailyOlder, ...metaAccountDailyRecent];
 // meta_campaigns + meta_campaign_daily voeden de ChannelPerformance-view (KPI's, maand-/campagnetabel).
+// `objective` per campagne: zonder dit veld valt lib/meta/campaign-types.ts's detectMetaObjective
+// terug op naamdetectie, en "Prospecting breed"/"Retargeting NL" matchen geen van de herkende
+// trefwoorden (awareness/traffic/engagement/lead/app/sales) -- dan zou de objective-uitsplitsing
+// op de Campagnes-tab (feedback punt 29+31) in demo-modus bijna leeg blijven. Echte waarden,
+// zodat de demo hetzelfde ODAX-veld gebruikt als een live account.
 const META_CAMPAIGNS = [
-  { id: "demo-mcamp-aw", name: "GRT | Awareness EU", imp: 2500, clk: 48, spend: 117, conv: 7, seed: 0 },
-  { id: "demo-mcamp-rt", name: "GRT | Retargeting NL", imp: 800, clk: 30, spend: 44, conv: 6, seed: 4 },
+  { id: "demo-mcamp-aw", name: "GRT | Awareness EU", objective: "OUTCOME_AWARENESS", imp: 2500, clk: 48, spend: 117, conv: 7, seed: 0 },
+  { id: "demo-mcamp-rt", name: "GRT | Retargeting NL", objective: "OUTCOME_SALES", imp: 800, clk: 30, spend: 44, conv: 6, seed: 4 },
   // Dominante, slecht converterende campagne: voedt de budget-concentratie-detector.
-  { id: "demo-mcamp-pro", name: "GRT | Prospecting breed", imp: 6000, clk: 55, spend: 210, conv: 3, seed: 6 },
+  { id: "demo-mcamp-pro", name: "GRT | Prospecting breed", objective: "OUTCOME_LEADS", imp: 6000, clk: 55, spend: 210, conv: 3, seed: 6 },
   // Ook op de andere beurzen actief, zodat Meta binnen GRN/GRA niet leeg is.
-  { id: "demo-mcamp-grn", name: "GRN | Awareness NA", imp: 1800, clk: 34, spend: 82, conv: 5, seed: 7 },
-  { id: "demo-mcamp-gra", name: "GRA | Retargeting US", imp: 1100, clk: 26, spend: 54, conv: 4, seed: 8 },
+  { id: "demo-mcamp-grn", name: "GRN | Awareness NA", objective: "OUTCOME_AWARENESS", imp: 1800, clk: 34, spend: 82, conv: 5, seed: 7 },
+  { id: "demo-mcamp-gra", name: "GRA | Retargeting US", objective: "OUTCOME_SALES", imp: 1100, clk: 26, spend: 54, conv: 4, seed: 8 },
 ];
-const metaCampaigns: Row[] = META_CAMPAIGNS.map((c) => ({ client_id: CID, campaign_id: c.id, name: c.name, status: "ACTIVE" }));
+const metaCampaigns: Row[] = META_CAMPAIGNS.map((c) => ({ client_id: CID, campaign_id: c.id, name: c.name, objective: c.objective, status: "ACTIVE" }));
 // Gemiddelde orderwaarde per campagne -- eerder ontbrak conversion_value hier volledig (altijd
 // undefined -> 0), waardoor Meta's Omzet/ROAS overal €0/0,00x toonde: precies de "conversions_value:
 // 0"-vondst die masterplan 17.19/17.20's cross-account-test destijds al signaleerde. Per campagne

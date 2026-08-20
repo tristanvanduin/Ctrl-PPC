@@ -1,6 +1,7 @@
 "use client";
 
-import { Briefcase, Calendar, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Briefcase, Calendar, Sparkles, Target } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
@@ -12,6 +13,10 @@ import { GeoRanglijstCard } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoMode } from "@/lib/demo/demo-mode";
+import { supabase } from "@/lib/supabase";
+import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/linkedin/campaign-types";
+import { buildLinkedInObjectiveBreakdown } from "@/lib/linkedin/objective-breakdown";
+import { ObjectiveInsights, type ObjectiveGroupLike } from "./objective-insights";
 
 // LinkedIn Ads-tab. Zelfde opbouw als de Google- en Meta-weergave via de gedeelde
 // ChannelViewHeader. Buiten demo is er nog geen gesyncte data; dan toont de header een eerlijke
@@ -95,18 +100,86 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
   );
 }
 
+const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
 /**
- * Het campagne-deel van LinkedIn: de advertenties zelf.
+ * Feedback punt 29+31: zelfde behandeling als Meta (zie meta-view.tsx's toelichting) --
+ * per objective welke campagnes daaronder hangen en welke cijfers daar het meest toe doen.
+ * Rekenkern in lib/linkedin/objective-breakdown.ts.
+ */
+function useLinkedInObjectiveGroups(clientId: string): ObjectiveGroupLike[] | null {
+  const [groups, setGroups] = useState<ObjectiveGroupLike[] | null>(null);
+
+  useEffect(() => {
+    const sb = supabase;
+    if (!sb) { setGroups([]); return; }
+    let cancelled = false;
+    setGroups(null);
+    const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    const DAILY_SELECT = "entity_urn, spend, impressions, clicks, ctr, cpc, cpm, landing_page_clicks, one_click_lead_form_opens, one_click_leads, external_website_conversions, post_click_conversions, conversion_value, cpl, form_completion_rate, video_starts, video_views, video_completions, video_completion_rate, total_engagements, follows, reactions, comments, shares";
+
+    Promise.all([
+      sb.from("linkedin_campaigns").select("campaign_urn, name, objective_type").eq("client_id", clientId),
+      sb.from("linkedin_campaign_daily").select(DAILY_SELECT).eq("client_id", clientId).gte("date", since),
+    ]).then(([campRes, dailyRes]) => {
+      if (cancelled) return;
+      const campaigns = ((campRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
+        urn: String(r.campaign_urn ?? ""), name: String(r.name ?? ""), objectiveType: (r.objective_type as string | null) ?? null,
+      }));
+      const daily = ((dailyRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
+        campaignUrn: String(r.entity_urn ?? ""), entityUrn: String(r.entity_urn ?? ""),
+        spend: num(r.spend), impressions: num(r.impressions), clicks: num(r.clicks), ctr: num(r.ctr),
+        cpc: num(r.cpc), cpm: num(r.cpm), landingPageClicks: num(r.landing_page_clicks),
+        oneClickLeadFormOpens: num(r.one_click_lead_form_opens), oneClickLeads: num(r.one_click_leads),
+        externalWebsiteConversions: num(r.external_website_conversions), postClickConversions: num(r.post_click_conversions),
+        conversionValue: num(r.conversion_value), cpl: num(r.cpl), formCompletionRate: num(r.form_completion_rate),
+        videoStarts: num(r.video_starts), videoViews: num(r.video_views), videoCompletions: num(r.video_completions),
+        videoCompletionRate: num(r.video_completion_rate), totalEngagements: num(r.total_engagements),
+        follows: num(r.follows), reactions: num(r.reactions), comments: num(r.comments), shares: num(r.shares),
+      }));
+      const built = buildLinkedInObjectiveBreakdown(campaigns, daily);
+      setGroups(built.map((g) => ({
+        objective: g.objective, label: g.label, spend: g.spend,
+        campaigns: g.campaigns.map((c) => ({ key: c.urn, name: c.name, spend: c.spend, primaryValue: c.primaryValue })),
+        metrics: g.metrics,
+      })));
+    });
+    return () => { cancelled = true; };
+  }, [clientId]);
+
+  return groups;
+}
+
+/**
+ * Het campagne-deel van LinkedIn: welk objective drijft welke campagnes, en de advertenties zelf.
  *
  * Geen ChannelViewHeader, net als bij Meta en Google: de koppelingsstatus is een overzichtsvraag
  * en hoort niet op elk tabblad herhaald te worden.
  */
 export function LinkedInCampagnes({ clientId }: { clientId: string }) {
+  const objectiveGroups = useLinkedInObjectiveGroups(clientId);
+
   return (
     <div className="space-y-6">
-      {/* Quick scan: creatives + prestaties + samenvatting. */}
       <Sectie
         eerste
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Per objective"
+        bijschrift="Welke campagnes bij welk doel horen, en welke cijfers daar het meest toe doen"
+      >
+        {objectiveGroups === null ? (
+          <div className="h-40 animate-pulse rounded-lg bg-gray-100" />
+        ) : (
+          <ObjectiveInsights
+            groups={objectiveGroups}
+            criteria={OBJECTIVE_EVAL_CRITERIA}
+            emptyLabel="Geen campagnes met een herkend objective in de laatste 90 dagen."
+          />
+        )}
+      </Sectie>
+
+      {/* Quick scan: creatives + prestaties + samenvatting. */}
+      <Sectie
         icoon={<Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="De advertenties zelf"
         bijschrift="Creatives, hun prestaties en vermoeidheid"
