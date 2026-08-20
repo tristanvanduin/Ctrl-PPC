@@ -1992,13 +1992,8 @@ bewijs hierboven was die oorspronkelijke regel in sectie 7 waarschijnlijk WEL co
 blijft daarom ongewijzigd; deze sectie is de plek waar de geschiedenis van de vergissing staat,
 niet sectie 7 zelf.
 
-**Voor Bureau twee blijft gelden:** RLS-dekking is nu voor alle 127 tabellen bevestigd (hierboven,
-live gemeten). Wat nog steeds ontbreekt is het functionele bewijs: `scripts/check-rls-scheiding.mjs`
-echt inloggen als twee verschillende bureaus en meten dat rijen daadwerkelijk gescheiden blijven —
-dat vraagt `NEXT_PUBLIC_SUPABASE_ANON_KEY` en `SUPABASE_SERVICE_ROLE_KEY`, die deze sessie niet
-kreeg (alleen `SUPABASE_ACCESS_TOKEN` en de project-URL, genoeg voor DDL maar niet voor een
-ingelogde sessie). Een policy die bestaat is niet hetzelfde als een policy die bewezen de juiste
-rijen tegenhoudt — dat blijft de juiste stap vóór een tweede bureau een klant koppelt.
+**Voor Bureau twee gold tot 20 augustus:** RLS-dekking is voor alle 127 tabellen bevestigd
+(hierboven, live gemeten), maar het functionele bewijs ontbrak. Zie 15.6 — dat bewijs is er nu.
 
 ### 15.2 Correctie op sectie 14.3: het skelet is niet overal even dood
 
@@ -2062,6 +2057,49 @@ noemt "`totalCount >= 50` én ≥5 bureaus én ≥20 accounts," de live code
 (`lib/benchmark/cel.ts`) en sectie 6/7 hierboven zeggen `MIN_BUREAUS = 4` met
 `MIN_ACCOUNTS = 10` per cel — `EXECUTION_PLAN.md` is hier de verouderde bron, dit document en de
 code kloppen.
+
+### 15.6 Het functionele RLS-bewijs uit 15.1, eindelijk geleverd — en een vals-negatief in de poort zelf gevonden
+
+15.1 sloot af met "een policy die bestaat is niet hetzelfde als een policy die bewezen de juiste
+rijen tegenhoudt" en een ontbrekende sleutel (`SUPABASE_ACCESS_TOKEN`, een Management API personal
+access token — iets anders dan de `NEXT_PUBLIC_SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` die
+al wel in `.env.local` stonden). De eigenaar gaf hem alsnog, rechtstreeks in de chat — zelfde
+patroon als 17.1/17.54, dus zelfde advies: rotatie na afloop is verstandig.
+
+**`scripts/check-rls-scheiding.mjs` gedraaid tegen de echte database**, met twee echte bureaus:
+"Demo" (1 account) en "Demo — Cross-account portfolio" (3 accounts). Twee tijdelijke testgebruikers
+aangemaakt, echt ingelogd, echte `access_token`'s gebruikt om via PostgREST rijen op te vragen —
+niet de functie getest, maar wat een browser daadwerkelijk terugkrijgt. Resultaat op de tabellen:
+bureau A ziet precies zijn eigen account en 2.258 `fact_core`-rijen, bureau B precies zijn eigen 3
+accounts en 155 rijen, een anonieme sessie ziet nul van beide. **De bureauscheiding houdt op de
+tabellen** — het bewijs dat 15.1 miste, is er nu.
+
+**Bijvangst: de poort zelf gaf een vals-negatief op de views.** De laatste stap vergelijkt hoeveel
+rijen een anonieme sessie via de view `ads_campaign_monthly` te zien krijgt met het totaal in
+`ads_campaign_monthly_legacy` (4.791 rijen) — bij gelijkheid: bypass, anders: "doet mee aan RLS".
+Anoniem kreeg **4.797** rijen: net ongelijk aan 4.791, dus meldde de poort "de views doen mee aan
+RLS". Maar `pg_get_viewdef` laat zien dat `ads_campaign_monthly` helemaal niet van
+`..._legacy` afgeleid is — het is een eigen view direct op `fact_core`+`accounts`+`google_metrics`,
+en `select count(*) from ads_campaign_monthly` (via service role, dus zonder RLS-filter) geeft
+exact **4.797** — hetzelfde getal dat anoniem kreeg. Volledige bypass, verkeerd gecategoriseerd
+door de verkeerde tabel als noemer te gebruiken. `reloptions` op de view bevestigt het rechtstreeks:
+`security_invoker` staat uit, precies zoals het scriptcommentaar bovenin al zei dat te verwachten
+was — de poort mat het alleen niet goed.
+
+**Fix**: de vergelijking gebruikt nu `count(*) from ads_campaign_monthly` (de view's eigen ware
+totaal, opgehaald via service role) in plaats van de losstaande `_legacy`-tabel. Opnieuw gedraaid:
+de poort meldt nu correct "LET OP de views lezen nog om RLS heen" — geen nieuwe bug in de app, wel
+een net onopgemerkt gebleven zwakte in de detector die het al langer bekende, bewust nog niet
+afgedwongen gat (zie het scriptcommentaar bovenin, "de scheiding is pas afgedwongen na
+`security_invoker = true` + inloggen afdwingen") voortaan ook echt laat zien in plaats van hem
+per ongeluk toe te dekken.
+
+**Wat dit niet doet**: de views zelf zijn niet aangepast — dat vraagt `security_invoker = true` per
+view plus een dwingende inlog-eis in de app (de app leest vandaag bewust zonder sessie via de
+anon-sleutel), een grotere, aparte wijziging die hier niet is aangepakt. tsc groen op de rest van
+de repo; dit is een los `.mjs`-script buiten `scripts/gates.sh` (heeft live databasetoegang nodig,
+net als `check-kaartoverloop.mjs`), dus de verificatie is de voor-en-na-vergelijking hierboven, niet
+een aparte unittest.
 
 ## 16. Koersbepaling: cron-beleid en "niet wachten op een klant" (17 augustus 2026)
 

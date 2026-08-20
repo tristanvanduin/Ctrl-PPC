@@ -154,8 +154,16 @@ try {
     `A=${fA.rijen} B=${fB.rijen}`);
 
   // ── De views, die er (nog) omheen lezen ─────────────────────────────────
+  // Vergelijk tegen het WERKELIJKE totaal van de view zelf (via service role, die RLS toch al
+  // omzeilt), niet tegen `ads_campaign_monthly_legacy`. Die tabel lijkt de fysieke naam achter de
+  // view (zie het `fysiekeTabel()`-patroon uit de demo-seeder), maar `ads_campaign_monthly` is
+  // hier een losse view direct op `fact_core`+`accounts`+`google_metrics` -- de _legacy-tabel is
+  // een andere, licht afwijkende bron (4791 rijen tegen de view's eigen 4797 op 20 augustus 2026).
+  // Met de oude, verkeerde noemer meldde deze poort "de views doen mee aan RLS" terwijl anon in
+  // werkelijkheid het volledige, eigen totaal van de view kreeg -- een bevestigde, volledige
+  // bypass die de poort zelf wegschreef als een vals-negatief "OK".
   const vAnon = await telRijen(anon, "ads_campaign_monthly", "client_id");
-  const [{ n: totaalCamp }] = await sql("select count(*) as n from ads_campaign_monthly_legacy");
+  const [{ n: totaalCamp }] = await sql("select count(*) as n from ads_campaign_monthly");
   const viewLeestErOmheen = vAnon.rijen === Number(totaalCamp);
 
   console.log("");
