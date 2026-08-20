@@ -308,15 +308,20 @@ export function ClientNotes({ clientId }: { clientId: string }) {
           <p className="text-micro text-muted-foreground/60 mt-0.5">Leg afspraken, strategie of taken vast</p>
         </div>
       ) : (
-        <div className="space-y-4 max-h-[480px] overflow-y-auto">
-          {/* To-do's eerst -- open werk vraagt eerder om een blik dan een vrije notitie. Open
-              boven gedaan, zodat afvinken een taak niet meteen laat verdwijnen uit het zicht. */}
-          {todos.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">
-                To-do&apos;s ({openTodos.length} open{gedaneTodos.length > 0 ? `, ${gedaneTodos.length} afgerond` : ""})
-              </p>
-              {[...openTodos, ...gedaneTodos].map((note) => (
+        // Twee kolommen, 50/50 over de volle breedte -- notities en to-do's zijn geen
+        // hoofd/detail-relatie maar twee gelijkwaardige lijsten, dus geen boven-elkaar-stapeling.
+        // Op smal (mobiel) valt het terug op één kolom, anders verdwijnt de kaart onder een
+        // horizontale scrollbalk.
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="space-y-2 max-h-[480px] overflow-y-auto">
+            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <ListChecks className="w-3 h-3" /> To-do&apos;s ({openTodos.length} open{gedaneTodos.length > 0 ? `, ${gedaneTodos.length} afgerond` : ""})
+            </p>
+            {todos.length === 0 ? (
+              <p className="text-micro text-muted-foreground/60 py-2">Nog geen to-do&apos;s.</p>
+            ) : (
+              // Open boven gedaan, zodat afvinken een taak niet meteen laat verdwijnen uit het zicht.
+              [...openTodos, ...gedaneTodos].map((note) => (
                 <NoteCard
                   key={note.id}
                   note={note}
@@ -325,16 +330,18 @@ export function ClientNotes({ clientId }: { clientId: string }) {
                   onDelete={() => setDeleteConfirm(note.id)}
                   onToggleDone={() => handleToggleDone(note)}
                 />
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
 
-          {vrijeNotities.length > 0 && (
-            <div className="space-y-2">
-              {todos.length > 0 && (
-                <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Notities</p>
-              )}
-              {vrijeNotities.map((note) => (
+          <div className="space-y-2 max-h-[480px] overflow-y-auto">
+            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <StickyNote className="w-3 h-3" /> Notities ({vrijeNotities.length})
+            </p>
+            {vrijeNotities.length === 0 ? (
+              <p className="text-micro text-muted-foreground/60 py-2">Nog geen notities.</p>
+            ) : (
+              vrijeNotities.map((note) => (
                 <NoteCard
                   key={note.id}
                   note={note}
@@ -342,9 +349,9 @@ export function ClientNotes({ clientId }: { clientId: string }) {
                   onEdit={() => startEdit(note)}
                   onDelete={() => setDeleteConfirm(note.id)}
                 />
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
