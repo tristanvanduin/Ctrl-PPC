@@ -8,6 +8,9 @@ import { computeForecast, type ForecastMetric } from "@/lib/forecast";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 import { toFairWeeks, currentWeekIndex, type FairWeek, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
+import { PeriodPopover } from "@/components/ui/period-popover";
+
+const ALLE_METRICS: ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"];
 
 // De beursvariant van de prestatiekaart. Zelfde cijfers als de maandweergave, andere as: niet
 // "vorige, huidige en volgende maand" maar "nog zoveel weken tot de beurs". Voor een
@@ -119,6 +122,7 @@ export function FairWeeksOverview({
   edition: UpcomingEdition;
 }) {
   const [metric, setMetric] = useState<ForecastMetric>("conversions");
+  const [openWeekStart, setOpenWeekStart] = useState<string | null>(null);
 
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
@@ -133,6 +137,17 @@ export function FairWeeksOverview({
     const w = toFairWeeks(result.weeklyPoints, data.currentYear, edition.fairDate);
     return { weken: w, nu: currentWeekIndex(w, vandaag) };
   }, [result.weeklyPoints, data.currentYear, edition.fairDate, vandaag]);
+
+  // Voor de klik-popover: per metric de weekreeks, zodat één week-cel de cijfers van alle
+  // vier de metrics kan tonen (net als de maandpopover in monthly-overview.tsx). Elke metric
+  // heeft zijn eigen weeklyPoints-reeks, dus koppelen gebeurt via weekStart, niet via index.
+  const wekenPerMetric = useMemo(() => {
+    const out = {} as Record<ForecastMetric, FairWeek[]>;
+    for (const m of ALLE_METRICS) {
+      out[m] = toFairWeeks(forecast[m].weeklyPoints, data.currentYear, edition.fairDate);
+    }
+    return out;
+  }, [forecast, data.currentYear, edition.fairDate]);
 
   if (nu < 0) return null;
 
@@ -206,9 +221,11 @@ export function FairWeeksOverview({
               const barColor = isPositive ? "bg-green-400" : "bg-red-400";
 
               return (
-                <div
+                <button
+                  type="button"
                   key={w.weekStart}
-                  className={`flex-1 min-w-[52px] rounded-md px-1.5 py-2 text-center transition-colors ${
+                  onClick={() => setOpenWeekStart(w.weekStart)}
+                  className={`flex-1 min-w-[52px] rounded-md px-1.5 py-2 text-center transition-colors cursor-pointer hover:ring-1 hover:ring-brand-blue/30 ${
                     isBeursweek
                       ? "bg-brand-orange/10 ring-1 ring-brand-orange/40"
                       : isFocus
@@ -232,7 +249,7 @@ export function FairWeeksOverview({
                     </div>
                   </div>
                   <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>{formatPercent(ratio, 0)}</p>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -242,6 +259,47 @@ export function FairWeeksOverview({
           </p>
         </div>
       </div>
+
+      {openWeekStart !== null && (() => {
+        const refWeek = wekenPerMetric[metric].find((w) => w.weekStart === openWeekStart);
+        if (!refWeek) return null;
+        const titel = refWeek.weeksOut === 0
+          ? "Beursweek"
+          : refWeek.weeksOut > 0
+            ? `Nog ${refWeek.weeksOut} ${refWeek.weeksOut === 1 ? "week" : "weken"} tot ${edition.eventName}`
+            : `${-refWeek.weeksOut} ${-refWeek.weeksOut === 1 ? "week" : "weken"} na ${edition.eventName}`;
+        return (
+          <PeriodPopover
+            title={titel}
+            subtitle={`${refWeek.label} · week van ${refWeek.weekStart.slice(8, 10)} ${refWeek.monthLabel.toLowerCase()} · alle vier de metrics`}
+            onClose={() => setOpenWeekStart(null)}
+          >
+            <div className="space-y-3">
+              {ALLE_METRICS.map((m) => {
+                const w = wekenPerMetric[m].find((wk) => wk.weekStart === openWeekStart);
+                if (!w) return null;
+                const mVal = w.realized ?? w.forecast ?? 0;
+                const mFormat = formatterFor(m);
+                const mInverted = isLowerBetter(m);
+                const mRatio = w.expected > 0 ? mVal / w.expected : 0;
+                const mPositive = mInverted ? mRatio <= 1 : mRatio >= 1;
+                return (
+                  <div key={m} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
+                    <div>
+                      <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
+                      <p className="text-micro text-muted-foreground">{w.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(w.expected)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lead font-bold text-brand-gray">{mFormat(mVal)}</p>
+                      <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>{formatPercent(mRatio, 0)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </PeriodPopover>
+        );
+      })()}
     </div>
   );
 }

@@ -6,6 +6,9 @@ import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, ForecastMetric, ForecastPoint } from "@/lib/forecast";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
+import { PeriodPopover } from "@/components/ui/period-popover";
+
+const ALLE_METRICS: ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"];
 
 function MonthCard({
   pt,
@@ -156,6 +159,10 @@ function MonthCard({
 
 export function MonthlyOverview({ clientId, countryFilter }: { clientId: string; countryFilter?: string | null }) {
   const [metric, setMetric] = useState<ForecastMetric>("conversions");
+  // Feedback: "weken/maanden klikbaar bij maandprestaties" -- een klik op een maand in de strip
+  // opent een layover met alle vier de metrics voor die maand, in plaats van de pagina te
+  // verlaten of te verversen.
+  const [openMonthIdx, setOpenMonthIdx] = useState<number | null>(null);
 
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
@@ -275,9 +282,11 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
               const barColor = isPositive ? "bg-green-400" : "bg-red-400";
 
               return (
-                <div
+                <button
                   key={pt.month}
-                  className={`flex-1 min-w-[52px] rounded-md px-1.5 py-2 text-center transition-colors ${
+                  type="button"
+                  onClick={() => setOpenMonthIdx(i)}
+                  className={`flex-1 min-w-[52px] rounded-md px-1.5 py-2 text-center transition-colors cursor-pointer hover:ring-1 hover:ring-brand-blue/30 ${
                     isFocus
                       ? "bg-brand-blue/8 ring-1 ring-brand-blue/20"
                       : isRealized
@@ -304,12 +313,51 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
                   <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>
                     {formatPercent(ratio, 0)}
                   </p>
-                </div>
+                </button>
               );
             })}
           </div>
         </div>
       </div>
+
+      {openMonthIdx !== null && (() => {
+        const idx = openMonthIdx;
+        const label = result.points[idx]?.monthLabel ?? "";
+        return (
+          <PeriodPopover
+            title={`${label} ${data.currentYear}`}
+            subtitle="Alle vier de metrics voor deze maand"
+            onClose={() => setOpenMonthIdx(null)}
+          >
+            <div className="space-y-3">
+              {ALLE_METRICS.map((m) => {
+                const p = forecast[m].points[idx];
+                if (!p) return null;
+                const mVal = p.realized ?? p.forecast ?? 0;
+                const mFormat = formatterFor(m);
+                const mInverted = isLowerBetter(m);
+                const mPositive = mInverted ? p.monthRatio <= 1 : p.monthRatio >= 1;
+                return (
+                  <div key={m} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
+                    <div>
+                      <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
+                      <p className="text-micro text-muted-foreground">
+                        {p.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(p.expected)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lead font-bold text-brand-gray">{mFormat(mVal)}</p>
+                      <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>
+                        {formatPercent(p.monthRatio, 0)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </PeriodPopover>
+        );
+      })()}
     </div>
   );
 }
