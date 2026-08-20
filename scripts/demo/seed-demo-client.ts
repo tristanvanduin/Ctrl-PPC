@@ -337,7 +337,20 @@ const year = Number(TODAY.slice(0, 4));
 // pickCurrentEdition() (lib/fair/geo-clone-analysis.ts) zodra 10 juni is gepasseerd de editie van
 // dit jaar als AFGELOPEN op, en verschuift "huidig"/"vorig" een heel jaar: de aanloop-vergelijking
 // mist dan zijn basis (ontdekt via --check toen de asOfDate na 10 juni lag).
-const grtEditionPassed = `${year}-06-10` < TODAY;
+//
+// De +35 dagen respijt hieronder is zelf ook een fix, niet cosmetisch: zonder respijt springt
+// "huidige editie" (zie pickCurrentEdition) de OCHTEND na 10 juni al een vol jaar vooruit. Het
+// nieuwe venster (campaignStartDate = editiedatum + FAIR_DURATION_DAYS + 1) begint dan pas net,
+// en de enige beschikbare maandpunten liggen op de 1e van de maand -- allebei net buiten het
+// "gelijke-dagen-uit"-venster van alignEditionsAtEqualDaysOut(). Resultaat: [S10] faalde 19 van
+// de 365 dagen per jaar (11-29 juni) met een lege "0 vs 0"-vergelijking i.p.v. de ontworpen
+// ~-35%, gevonden via een dagsweep van scripts/demo/seed-demo-client.ts --check over een heel
+// jaar TODAY-waarden nadat de masterplan-notitie "delta -0,06 i.p.v. -35%" op 17 augustus meldde
+// dat dit datumafhankelijk was. Met dit respijt blijft `pickCurrentEdition` tot 15 juli
+// terugvallen op de editie die net is geweest (bijna een vol jaar opgebouwde data, een eerlijke
+// terugblik), en pas daarna schuift de vergelijking vooruit naar de volgende editie -- op dat
+// moment staat er al minstens één maandpunt in het nieuwe venster.
+const grtEditionPassed = addDays(`${year}-06-10`, 35) < TODAY;
 const grtCurrentYear = grtEditionPassed ? year + 1 : year;
 const RAI_EVENTS = {
   events: [

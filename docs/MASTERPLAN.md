@@ -4567,3 +4567,70 @@ net geschreven fix tijdelijk verloren ging. Bleek bij het herstellen bovendien d
 (leeg-antwoord-detectie) — een tweede, los testbestand op dezelfde naam was bijna per ongeluk
 ontstaan. Hersteld door de fix opnieuw (en ditmaal correct, bovenop de echte bestaande code) toe
 te passen en de nieuwe tests als sectie 7 in het bestaande bestand te zetten.
+
+### 17.52 De geo-kaart die stil verdween: `return null` bij één land, in de nieuwe opener
+
+Op "wat mis ik nog in mijn overzichten" volgde een concrete klacht: de geo-kaart ontbreekt.
+Grondoorzaak zat in `components/dashboard/geo-map-card.tsx` en `geo-breakdown.tsx`: beide gaven
+`if (eenLandOfMinder) return null;` (`lib/geo/use-geo-breakdown.ts`, `countries.length <= 1`).
+Voor een Benelux-bureau met veel NL-only klanten is één land de norm, niet de uitzondering — en
+`GeoMapCard` zit specifiek in de nieuwe 2x2 Overzicht-opener (17.36+), dus juist daar viel de kaart
+weg zonder kop, zonder melding, niets dat zegt waarom.
+
+**Fix**: nieuwe gedeelde component `components/dashboard/geo-empty-state.tsx`
+(`GeoEnkelLandKaart`) toont bij één land het land zelf plus de kerncijfers
+(vertoningen/klikken/conversies) in plaats van niets. Gedeeld tussen `GeoBreakdown` en
+`GeoMapCard`; `GeoRanglijstCard` laat een enkel land bewust wél stil vallen — een ranglijst van
+één rij heeft niets om te ranken en zou naast deze kaart pure herhaling zijn.
+
+**Geverifieerd**: single- en multi-country case op de nieuwe opener-locatie via screenshots (geen
+regressie voor multi-country klanten), `scripts/check-kaartoverloop.mjs` schoon op alle 15
+pagina's inclusief zijn zelftest, `grep -rn eenLandOfMinder` bevestigt geen 4e stille consument,
+tsc/tests/build groen via `scripts/gates.sh`.
+
+### 17.53 De [S10] GRT-beursanalyse faalde 19 van de 365 dagen per jaar — datumdrift, nu root-cause
+
+17.51 legde de bevinding uit 16.3 vast zonder hem op te lossen: "[S10] faalt in de huidige
+`--check`-run (delta -0,06 i.p.v. de ontworpen ~-35%), vermoedelijk datumdrift ... niet opgelost."
+Op "zeker uitzoeken" volgde toen alleen het `finish_reason`-gat; deze sectie lost het GRT-gat zelf
+op, met een echte grondoorzaak in plaats van de eerdere gok.
+
+**Reproductie**: een standalone dagsweep (`analyzeGeoClone` rechtstreeks aangeroepen met elke
+`TODAY`-waarde over een heel jaar, exact dezelfde opbouw als `seed-demo-client.ts`) toont het gat
+scherp: 19 van de 365 dagen (11-29 juni) geven `actionNeeded: false` met een lege "0 vs 0"-
+vergelijking, i.p.v. de ontworpen `-35%`. Op 17 augustus zelf viel dit niet in dat venster — de
+"-0,06"-waarde die toen genoteerd werd is dus een ander symptoom van dezelfde onderliggende
+broosheid, niet ditzelfde 19-dagenvenster; met de huidige code en TODAY op de dag van dit schrijven
+(20 augustus) gaf `--check` juist de volledig correcte `-0.35` terug — precies waarom dit een
+datumdrift-bug is: hij faalt niet consistent, hij faalt op SOMMIGE dagen, en "het werkt vandaag"
+bewijst niets over morgen.
+
+**Grondoorzaak**: `grtEditionPassed` (regel ~340) laat de editie-lijst voor GRT DIRECT de dag na
+10 juni een vol jaar vooruit springen (`pickCurrentEdition` in `lib/fair/geo-clone-analysis.ts`
+kiest dan meteen de editie van volgend jaar als "huidig"). Het nieuwe vergelijkingsvenster
+(`campaignStartDate` = editiedatum + `FAIR_DURATION_DAYS` + 1) begint dan nog maar enkele dagen
+terug, en de enige beschikbare maandpunten staan op de 1e van de maand — buiten het
+"gelijke-dagen-uit"-venster van `alignEditionsAtEqualDaysOut()` tot het eerstvolgende maandpunt
+daadwerkelijk bereikt is. Zowel de nieuwe "huidige" editie als het equivalente punt in de "vorige"
+editie tellen dan `0` op, dus `deltaPct` wordt `null` (of de vergelijking valt zelfs helemaal weg)
+in plaats van de opgebouwde `-35%` te tonen. Dit is geen bug in `lib/fair/geo-clone-analysis.ts`
+zelf — die rekent correct "gelijke afstand tot de beurs" uit — maar in hoe de demo-editielijst
+bepaalt WANNEER ze naar de volgende editie omschakelt.
+
+**Fix**: 35 dagen respijt toegevoegd voordat de editie-lijst omschakelt
+(`addDays(`\${year}-06-10`, 35) < TODAY` i.p.v. `` `\${year}-06-10` < TODAY``). Tot 15 juli blijft
+`pickCurrentEdition` daardoor terugvallen op de editie die net is geweest — bijna een vol jaar
+opgebouwde data, een eerlijke terugblik — en pas daarna schuift de vergelijking vooruit naar de
+volgende editie, op een moment dat er al minstens één maandpunt in het nieuwe venster staat.
+
+**Geverifieerd**: dezelfde dagsweep opnieuw gedraaid met de fix, nu over 3 jaar (incl. het
+schrikkeljaar 2024) i.p.v. 1: 0 van de 1095 dagen wijkt nog af. `seed-demo-client.ts --check` op de
+dag van schrijven blijft `-0.35` geven, alle overige scenario's (S1-S13) ongewijzigd groen.
+tsc/tests/build groen via `scripts/gates.sh`.
+
+**Wat dit niet doet**: geen nieuwe permanente geautomatiseerde datumsweep-test toegevoegd aan de
+testsuite — dit is mock-datagegeneratie voor de demo-klant, geen productiepad, en de sweep zelf
+(365-1095 losse `analyzeGeoClone`-aanroepen) hoort niet thuis in de dagelijkse testrun. De
+verificatie staat hier vastgelegd zodat ze niet nogmaals losstaand hoeft te worden bewezen; een
+toekomstige wijziging aan `grtEditionPassed`/de editielijst-opbouw moet dezelfde sweep opnieuw
+draaien voor hij verandert.
