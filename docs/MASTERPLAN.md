@@ -4634,3 +4634,43 @@ testsuite — dit is mock-datagegeneratie voor de demo-klant, geen productiepad,
 verificatie staat hier vastgelegd zodat ze niet nogmaals losstaand hoeft te worden bewezen; een
 toekomstige wijziging aan `grtEditionPassed`/de editielijst-opbouw moet dezelfde sweep opnieuw
 draaien voor hij verandert.
+
+### 17.54 De afgekapte biweekly-analyse alsnog geregenereerd — en een lokale-cache-incident onderweg
+
+17.51's laatste open punt ("het opnieuw genereren van die ene analyse kost een echte, betaalde
+LLM-call en stond nog open") is nu gedaan. Bevestigd via een directe DB-query welke rij precies
+kapot was: de Google `biweekly` van demo-greentech (18 augustus, 1369 tekens, brak af op "Dit
+lig[t]") — Meta- en LinkedIn-biweekly waren al intact.
+
+**De OpenRouter-sleutel uit 17.1 bleek inmiddels ingetrokken** (`401: "User not found"` — het
+eigen antwoord van OpenRouter voor een sleutel die niet meer aan een account hangt, geen
+netwerk- of proxyfout), precies zoals 17.1 destijds al aanraadde ("moet geroteerd worden"). De
+eigenaar gaf een nieuwe sleutel, rechtstreeks in de chat — geverifieerd tegen
+`GET /api/v1/auth/key` (`expires_at: null`, $26,75 van $30 resterend) voor er iets mee gedraaid
+werd.
+
+**Onderweg, eigen fout, met opzet niet weggelaten**: de eerste regeneratiepoging met de nieuwe
+sleutel leverde een output van 0 tekens op — 32.430 tokens verbruikt, niks opgeslagen. Verklaring
+bleek geen nieuwe bug maar een lokale-cache-incident: `git log` toonde de werkkopie vast op
+`ab6bc44` ("masterplan 17.24"), een commit van RUIM voor 17.45-17.53 — inclusief de
+`finish_reason`-check uit 17.51 zelf. Bevestigd met `git fetch` + `origin/...` rechtstreeks
+bekijken dat GitHub wél op de juiste stand stond (t/m 7449217, sectie 17.53's [S10]-fix incluis);
+alleen de lokale checkout was teruggevallen, vermoedelijk door dezelfde sandbox-hik die deze
+sessie al vaker trof. Gevolg: de regeneratie draaide zonder het te weten tegen code van vóór de
+`finish_reason`-fix, en herhaalde dus exact het 17.51-gedrag (een afgekapte respons stil als
+succesvol opslaan) op een gloednieuwe call. Hersteld met `git reset --hard origin/...` (geen
+ongecommit werk verloren; `.env.local` staat buiten git) en een schone `next build` vóór de
+tweede poging.
+
+**Tweede poging, tegen de echte code**: het primaire model (`anthropic/claude-sonnet-5`) liep
+kennelijk weer tegen `finish_reason: "length"` — precies waarvoor de fix bestaat: i.p.v. dat stil
+te accepteren gooide de call door, `callLayer()` viel terug op het laagspecifieke fallback-model
+(`google/gemini-3.7-flash`), en dat leverde een volledige, correct afgesloten analyse (10.260
+tekens, 9 bevindingen, 8 aanbevelingen, 10 taken, `saved: true`). De 17.51-fix werkt dus niet
+alleen in theorie: hij heeft binnen dezelfde sessie een tweede, verse afkapping daadwerkelijk
+opgevangen in plaats van opnieuw stil te falen.
+
+**Wat dit niet doet**: de oude, kapotte 18-augustus-rij is niet verwijderd — hij staat historisch
+nog in `sop_analysis_output`, maar wordt door geen enkele "laatste analyse"-query meer opgepikt
+(andere `analysis_date`, de nieuwe 20-augustus-rij is recenter). Opruimen kan, is hier bewust niet
+gedaan zonder het te vragen.
