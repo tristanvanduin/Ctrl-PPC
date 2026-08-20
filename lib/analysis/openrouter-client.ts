@@ -86,7 +86,7 @@ export interface OpenRouterResponse {
 interface RawApiResponse {
   id: string;
   model: string;
-  choices: { message: { content: string } }[];
+  choices: { message: { content: string }; finish_reason?: string }[];
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -263,6 +263,20 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
       const rawOutput = data.choices?.[0]?.message?.content ?? "";
       const output = fixMojibake(rawOutput);
       const latencyMs = Date.now() - startTime;
+      // "length" = de provider brak de completion af op max_tokens, geen inhoudelijk einde.
+      // Ontdekt 20 augustus 2026: demo-greentech's biweekly-analyse ("...CPA ontwikkelt zich
+      // afwijkend... Dit lig[t]") stond al maanden zo in de database omdat niets deze waarde ooit
+      // controleerde -- een afgekapte respons werd hier stilzwijgend als succesvol behandeld en
+      // opgeslagen, precies zoals elke andere complete analyse.
+      const finishReason = data.choices?.[0]?.finish_reason;
+      // Gooi door i.p.v. hier al iets terug te geven: dit valt in de bestaande catch-hieronder,
+      // die "onbekende" fouten (geen match op timeout/4xx/5xx/netwerk) al als retrybaar
+      // classificeert (classifyLLMError) en met dezelfde backoff opnieuw probeert. Geen losse
+      // retry-tak nodig, en op de laatste poging faalt de call dan ook ECHT -- geen halve
+      // analyse die als "success: true" wordt gelogd en opgeslagen.
+      if (finishReason === "length") {
+        throw new Error(`OpenRouter-respons afgekapt op max_tokens (label: ${label}, ${output.length} tekens ontvangen)`);
+      }
 
       // Determine parse status
       let parseStatus: OpenRouterResponse["parseStatus"] = "not_json_mode";

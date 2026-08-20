@@ -102,6 +102,49 @@ async function run() {
     check("gooit voordat er iets over het netwerk gaat", threw && !fetchAangeroepen, `threw=${threw} fetch=${fetchAangeroepen} msg=${message}`);
   }
 
+  // 20 augustus 2026: een AANGRENZEND, maar apart gat in dezelfde functie -- niet leeg, wel
+  // afgekapt. finish_reason "length" betekent dat de provider de completion afbrak op max_tokens,
+  // geen inhoudelijk einde. Zonder deze check kwam zo'n halve tekst er gewoon doorheen als
+  // "success: true": demo-greentech's biweekly-analyse eindigde letterlijk midden in een zin
+  // ("...CPA ontwikkelt zich afwijkend... Dit lig[t]") en niets had dat ooit opgemerkt.
+  console.log("\n7. finish_reason 'length': gooit door i.p.v. de afgekapte tekst als succes terug te geven");
+  {
+    function mockFinishReason(content: string, finishReason: string) {
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          id: "x", model: "anthropic/claude-sonnet-5",
+          choices: [{ message: { content }, finish_reason: finishReason }],
+          usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
+        }),
+        text: async () => "",
+      };
+    }
+
+    global.fetch = (async () => mockFinishReason("Alles compleet.", "stop")) as unknown as typeof fetch;
+    const okResult = await callOpenRouter({ apiKey: "test", systemPrompt: "sys", userMessage: "msg", label: "test-finish-stop" });
+    check("finish_reason 'stop': output komt gewoon door", okResult.output === "Alles compleet.", okResult.output);
+
+    global.fetch = (async () => mockFinishReason("Halverwege afgeka", "length")) as unknown as typeof fetch;
+    let threw = false, message = "";
+    try {
+      await callOpenRouter({ apiKey: "test", systemPrompt: "sys", userMessage: "msg", label: "test-finish-length" });
+    } catch (e) {
+      threw = true;
+      message = e instanceof Error ? e.message : String(e);
+    }
+    check("finish_reason 'length': gooit een fout i.p.v. de afgekapte tekst terug te geven", threw);
+    check("de foutmelding noemt de afkapping", /afgekapt|max_tokens/i.test(message), message);
+
+    let call = 0;
+    global.fetch = (async () => {
+      call += 1;
+      return call === 1 ? mockFinishReason("Afgekapt op poging 1", "length") : mockFinishReason("Complete tekst op poging 2.", "stop");
+    }) as unknown as typeof fetch;
+    const retryResult = await callOpenRouter({ apiKey: "test", systemPrompt: "sys", userMessage: "msg", label: "test-finish-length-retry-herstelt" });
+    check("een afgekapte eerste poging herstelt via retry", retryResult.output === "Complete tekst op poging 2.", retryResult.output);
+  }
+
   global.fetch = origFetch;
   console.log(`\nRESULTAAT: ${passed} geslaagd, ${failed} gefaald\n`);
   if (failed > 0) process.exit(1);
