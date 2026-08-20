@@ -11,6 +11,7 @@ import {
 import type { CrossChannelSynthesisResult } from "@/lib/analysis/cross-channel-synthesis";
 import type { PortfolioSynthesisResult } from "@/lib/analysis/portfolio-synthesis";
 import { fetchGodViewComparison } from "@/lib/analysis/god-view-context";
+import type { SopChannel } from "@/lib/analysis/sop-channel-config";
 import {
   createProgressJob,
   markProgressCompleted,
@@ -35,9 +36,11 @@ function parseJsonOutput<T>(raw: unknown): T | null {
 
 // De negen sop_type-waarden die de analyse-routes daadwerkelijk schrijven: Google's drie
 // kale namen, en Meta/LinkedIn's kanaal-voorvoegsel-varianten (zie sop-trigger-buttons.tsx
-// CHANNEL_CONFIG). Alleen "monthly" (Google) krijgt hieronder de verrijkte structured-data-tak;
-// meta_monthly/linkedin_monthly draaien via dezelfde finalizeChannelMonthlySynthesis en hebben dus
-// ook een geldige "full"-sectie.
+// CHANNEL_CONFIG). Elke maandvariant (monthly/meta_monthly/linkedin_monthly) krijgt hieronder de
+// verrijkte structured-data-tak: alle drie draaien via dezelfde finalizeChannelMonthlySynthesis en
+// hebben dus een geldige "full"-sectie mét final_sop (geverifieerd 20 augustus, zie de toelichting
+// bij "if (baseType === "monthly")" hieronder -- stond eerst op de letterlijke string "monthly",
+// dus alleen Google, terwijl Meta/LinkedIn's data allang klaarstond).
 // Live gevonden (20 aug 2026): sop_insights/sop_recommendations HEBBEN allebei al een sop_type-
 // kolom, maar de queries hieronder filterden er niet op -- alleen op client_id + analysis_date.
 // Met meerdere kanalen/testruns op dezelfde dag (persistMonthlyStructuredData() schrijft naar
@@ -51,6 +54,15 @@ const VALID_SOP_TYPES = [
   "linkedin_weekly", "linkedin_biweekly", "linkedin_monthly",
 ] as const;
 type PdfSopType = typeof VALID_SOP_TYPES[number];
+
+// Welk kanaal bij welke maand-sopType hoort, voor de God View-marktbenchmark (fetchGodViewComparison
+// vraagt een expliciet SopChannel). Alleen de drie maandvarianten hebben een entry -- weekly/
+// biweekly krijgen sowieso geen marktbenchmark, dus hoeven hier niet in te staan.
+const MONTHLY_SOP_TYPE_TO_CHANNEL: Partial<Record<PdfSopType, SopChannel>> = {
+  monthly: "google_ads",
+  meta_monthly: "meta_ads",
+  linkedin_monthly: "linkedin_ads",
+};
 
 /**
  * GET /api/analysis/pdf?client_id=xxx&sop_type=weekly|biweekly|monthly|meta_weekly|...&client_name=yyy
@@ -156,8 +168,16 @@ export async function GET(request: NextRequest) {
       fullOutput: analysis.output || "",
     };
 
-    // For monthly: also fetch structured data (findings, recommendations, tasks)
-    if (sopType === "monthly") {
+    // Voor elke maandvariant (Google's kale "monthly", en meta_monthly/linkedin_monthly): ook de
+    // gestructureerde data ophalen (findings, recommendations, tasks, final_sop). Stond eerst op
+    // sopType === "monthly" -- alleen Google dus -- terwijl meta_monthly/linkedin_monthly dezelfde
+    // finalizeChannelMonthlySynthesis draaien en dus dezelfde structured_monthly_v2-sectie met een
+    // geldige final_sop hebben (geverifieerd 20 augustus: 99 resp. 125 sop_insights-rijen voor
+    // demo-greentech, gewoon nooit opgehaald). Zonder deze fix viel de PDF voor die twee kanalen
+    // terug op het lege legacy-pad: alle stat-tegels op 0 (findings/recommendations/tasks bleven
+    // undefined) en 22 pagina's met rauwe Engelse veldnamen ("Primary thread") -- exact het defect
+    // waar de hele redesign voor bedoeld was.
+    if (baseType === "monthly") {
       const [structuredRes, findingsRes, recsRes, tasksRes] = await Promise.all([
         supabase
           .from("sop_analysis_output")
@@ -268,7 +288,7 @@ export async function GET(request: NextRequest) {
               .limit(1)
               .maybeSingle()
           : Promise.resolve({ data: null }),
-        fetchGodViewComparison(supabase, clientId, "google_ads").catch(() => null),
+        fetchGodViewComparison(supabase, clientId, MONTHLY_SOP_TYPE_TO_CHANNEL[sopType] ?? "google_ads").catch(() => null),
       ]);
 
       pdfProps.crossChannel = parseJsonOutput<CrossChannelSynthesisResult>(crossChannelRow.data?.output);
