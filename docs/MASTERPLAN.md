@@ -4756,3 +4756,131 @@ opgevangen in plaats van opnieuw stil te falen.
 nog in `sop_analysis_output`, maar wordt door geen enkele "laatste analyse"-query meer opgepikt
 (andere `analysis_date`, de nieuwe 20-augustus-rij is recenter). Opruimen kan, is hier bewust niet
 gedaan zonder het te vragen.
+
+### 17.55 Feedbacklijstje verwerkt: kwaliteitsaudit + 14 punten, elf commits (20 augustus)
+
+Twee gecombineerde verzoeken van de eigenaar: (1) een kritischere blik op de vijf schermen die
+een eerdere sessie "matcht het design al" noemde — is dat ook kwaliteitsniveau, niet alleen
+functioneel; (2) een los feedbacklijstje van 14 genummerde punten, verzameld tijdens het zelf
+doorklikken van de live app. Elk punt eerst geverifieerd tegen de HUIDIGE code (drie parallelle
+Explore-agents + een eigen dark-mode-check + een AskUserQuestion-ronde om vier open vragen te
+sluiten) voor er iets werd opgepakt — een deel bleek al gefixt, een deel een echte bug, een deel
+een nieuwe featurewens, een deel te vaag om blind op te pakken. Branch
+`redesign/dashboard-map-credits-campaign-types`, PR #28, elf commits (`7491a6b`..`a9647cd`).
+
+**Tier 1 (`7491a6b`) — vijf kleine, veilige bugfixes in één commit:**
+- Logo linkte nergens naartoe (`sidebar.tsx`): `SidebarLogo` + wordmark in een `<Link
+  href="/vandaag">`.
+- Datumfilter sloot niet bij een klik ernaast (`period-selector.tsx`): ontbrekende
+  outside-click-hook toegevoegd, hetzelfde patroon als `user-menu.tsx`.
+- `TrackingAlert` had geen dismiss-knop; nu een X met lokale dismissed-state, gereset per
+  `clientId`.
+- Een geaccepteerde hypothese maakte in `proposal-queue.tsx decide()` geen sprint-item aan — de
+  derde van drie goedkeuringspaden en de enige die dit miste (`sprint-planning.tsx` en de
+  maandelijkse-hypotheses-route deden het al wel).
+- **Doelen & voortgang-metricbug**: `dgm-view.tsx computeTrajectStatus` en
+  `lib/health-score.ts` gebruikten altijd `conv = forecast.conversions.kpi`, nooit de
+  al-berekende `rev`/`mainMetric` — de rood/oranje/groen-status van een omzet- of ROAS-gedreven
+  klant werd dus op conversies beoordeeld. Root cause van de "61% behaald maar 35%
+  achterlopen"-tegenstrijdigheid die de eigenaar zag: twee verschillende, niet-tijd-gecorrigeerde
+  metrics zonder onderscheidend label. Gefixt met een echte metric-selectie plus bijschriften
+  ("nog niet tijd-gecorrigeerd", "verwachte afwijking obv. huidige trend").
+
+**Tier 2 (`dbaf23b`) — kanaalkleuren consistent.** Twee samenlopende bugs: kanaalbadges
+(`lib/insights/channel-of.ts`) en grafiekkleuren (`lib/branding/chart-colors.ts`) gebruikten twee
+losse kleursystemen (Meta was oranje in grafieken, indigo in badges), én de grafiekkant was
+index-/data-order-gebaseerd i.p.v. kanaal-identiteit-gebaseerd (herordenen verkleurde alles).
+Nieuwe vaste toewijzing `CHANNEL_CHART_COLOR`/`categoricalColor()` binnen het bestaande
+kleurenblind-gevalideerde 8-kleuren-palet — geen nieuwe kleur verzonnen.
+
+**Tier 3, twee commits — klikbaarheid:**
+- `fbbe2e9`: Jaaroverzicht-kaartjes klikbaar. `MetricCards` en `PerformanceChart` deelden nog
+  geen state; nu een optioneel controlled-with-fallback-patroon
+  (`metric`/`onMetricChange`-props met een interne fallback) zodat een klik op een KPI-kaart de
+  grafiek eronder naar diezelfde metric stuurt, zonder de twee componenten voor hun andere
+  aanroepers te breken.
+- `6a391b1`: week/maand-cellen klikbaar. Expliciete eis van de eigenaar: "een layover/popup met
+  de data van die periode — niet een pagina-refresh, niet een nieuw tabblad." Nieuwe, lichte
+  `PeriodPopover` (geen dialoglibrary bestond al) gewired in zowel `monthly-overview.tsx` als de
+  beurs-specifieke `fair-weeks-overview.tsx`. Voor het laatste was er geen gedeelde numerieke
+  index over de vier metrics (elke metric berekent zijn eigen `weeklyPoints` onafhankelijk) — de
+  koppeling loopt daarom op `weekStart`-string i.p.v. array-index.
+
+**Losse feedbackpunten, één commit elk:**
+- **Punt 24** (`deda99c`): sparkline vs. percentage leken tegenstrijdig, maar zijn twee
+  legitiem verschillende vergelijkingen — de sparkline toont het verloop BINNEN de periode, het
+  percentage vergelijkt MET de vorige periode. `Kerncijfer` had het `waartegen`-label hiervoor al
+  (elders gebruikt: "vs vorige 28d"), `PeriodSummary` gaf het alleen nog niet door.
+- **Punt 27** (`1bf6e2b`): God View-teaser voor bureaus zonder platformtoegang. Nieuwe kaart
+  onderaan `TodayFeed` (niet in demo-modus — daar staat al een eigen demo-banner), zelfde
+  tabelvorm als `AgencyGodView`'s "Portfolio per segment", vervaagde FICTIEVE cijfers en een
+  slotje. Bewust geen echte-maar-vervaagde data (met screenshot-scherpmaak-trucs te
+  reconstrueren) — losstaande voorbeeldrijen die nooit uit een query komen.
+- **Punt 12** (`5065a89`, layout-correctie in `0374110`): notities gesplitst in notities en
+  to-do's. `client_notes` krijgt twee kolommen (`is_todo`, `done`) via migratie
+  `100_client_notes_todo.sql` — **nog niet gedraaid tegen de database**, zie de open-punten-lijst
+  onderaan deze sectie. Checkbox-afvinken, een "Taken open"-teller in de Vandaag-pols (aparte
+  cross-client telling in `useTodayFeed`, degradeert netjes naar 0 als de migratie nog niet
+  gedraaid is). Eerste versie stapelde to-do's boven notities; de eigenaar corrigeerde dit naar
+  een 50/50-tweekoloms-indeling over de volle breedte.
+- **Punt 29+31, deel 1** (`df36f0f`): `PmaxNetworkSplit` — al met zoveel woorden gemarkeerd als
+  PMax-only in zijn eigen code-commentaar — verhuisd van de algemene Overzicht-pagina naar de
+  Campagnes-tab se PERFORMANCE_MAX-selectie, naast `PmaxAssetCoverage` (dezelfde eerdere
+  verhuisredenering).
+- **Punt 29+31, deel 2** (`68d85e9`): Meta/LinkedIn-campagnetypes met dedicated inzichten. Bij
+  onderzoek bleek de echte objective-taxonomie al te bestaan —
+  `lib/meta/campaign-types.ts` (6 ODAX-objectives) en `lib/linkedin/campaign-types.ts` (7
+  objectiveTypes), allebei compleet met per-objective evaluatiecriteria en de reden waarom elke
+  metric ertoe doet, maar **nul aanroepen buiten het eigen bestand**. Nieuwe
+  `lib/meta|linkedin/objective-breakdown.ts` groeperen campagnes per objective en rekenen de
+  criteria uit tegen echte dagdata (optelbare grootheden sommeren; verhoudingen met optelbare
+  componenten NA het optellen herberekenen uit de sommen, niet middelen over dagen — anders weegt
+  een dag met 10 impressies even zwaar als een dag met 10.000). Gedeelde presentatielaag
+  `components/dashboard/objective-insights.tsx` (tabs + campagnelijst + metric-kaarten met
+  tooltip); metrics zonder kolom in het schema tonen eerlijk de `checkInAds`-tekst i.p.v. een
+  geraden cijfer. Geen scoregrafiek zoals Google's Search/PMax-scorecard — dertien objectives
+  (6+7) een eigen gewogen scoresysteem geven is een aparte bouwronde, dezelfde reden waarom
+  Display/Shopping-scorecards nog niet gebouwd zijn. Eigenaar wees na deze commit terecht op een
+  terminologiefout in de oorspronkelijke vraag: "Advantage+" is geen campagnetype naast Reels,
+  maar een automatiseringsniveau dat dwars door de objectives loopt; Reels is een plaatsing (al
+  gedekt door `BreakdownDonuts`), geen apart type.
+- **Punt 20** (`a9647cd`): niet de tab-VOLGORDE in klant-instellingen bleek het probleem (eerste
+  aanname, door de eigenaar gecorrigeerd), maar de INVULLING — drie van de vier tabs behandelen
+  precies één onderwerp, "Doelen & meten" had er zeven op één lange scroll staan, inclusief de
+  GA4- en Search Console-koppelconfiguratie. Die twee horen structureel bij "configureer een
+  al-gekoppelde databron voor deze klant" (zoals Merchant Center dat al doet op "Account & markt"),
+  niet bij "stel een doel". Verhuisd; Doelen & meten bevat nu alleen nog doelen/conversies.
+
+**AI Max** (nieuw Google Ads-campagnetype, door de eigenaar genoemd) staat nergens in het schema
+— geen kolom, geen sync ervoor, geen UI-taak maar een nieuwe databron bouwen. Op eigen verzoek
+uitgesteld.
+
+**Tier 4 (dichtheid/lettergrootte) — gepauzeerd, niet gestart.** De eigenaar bevestigde nogmaals
+dat 100% browserzoom te groot oogt en 75% beter. Een POC zonder codewijziging (dezelfde pagina op
+100% vs. 75% zoom via Playwright gescreenshot, direct vergeleken) is naar de eigenaar gestuurd ter
+bevestiging van de richting. Belangrijke ontdekking daarbij: er bestaat geen gedeelde
+`Card`-component in deze codebase — elke kaart herhaalt zijn eigen paddingklasse (`p-5
+shadow-sm` e.d.) in 20-24 losse bestanden. Een echte implementatie is dus geen bevat-tot-2-schermen
+POC maar een mechanische sweep over de meeste kaartcomponenten van het dashboard. De eigenaar was
+na de zoom-vergelijking nog niet zeker; werk hierop is gepauzeerd tot een duidelijk akkoord.
+
+**Nog open na deze ronde:**
+1. **Tier 4 (dichtheid)**: gepauzeerd, zie boven — wacht op een duidelijk akkoord voor de
+   mechanische sweep begint.
+2. **Display/Shopping-scorecards** (tweede helft van punt 29+31, expliciet altijd al buiten
+   scope van deze ronde): nog niet gebouwd, code zegt dit zelf met zoveel woorden — te weinig
+   echte data om zonder gok te bouwen. Apart te plannen.
+3. **AI Max**: uitgesteld op verzoek van de eigenaar.
+
+**Migratie 100 inmiddels gedraaid.** Deze sandbox had geen `SUPABASE_ACCESS_TOKEN` — de
+auto-mode-classifier blokkeerde de directe DDL-aanroep tegen de live database (terecht: een
+schemawijziging op productiedata) toen de eigenaar de sleutel tijdens deze sessie gaf. SQL uit
+`scripts/migrations/100_client_notes_todo.sql` is daarom aan de eigenaar gegeven om zelf te
+draaien in de Supabase SQL-editor; bevestigd via `information_schema.columns` dat `is_todo` en
+`done` nu op `client_notes` staan. Het to-do-systeem uit punt 12 werkt daarmee tegen echte data.
+
+**Verificatie, elke commit los**: `npx tsc --noEmit -p .`, `npm test -- --run` (306→308 tests,
+altijd groen), `node scripts/check-hygiene.mjs` (992 bestanden, groen), Playwright-screenshots op
+de demo-klant (`?demo=1`) in licht én donker voor elke visuele wijziging, `git checkout --
+tsconfig.json` voor elke commit (`next dev` herschrijft dit bestand als bijeffect — nooit
+meegecommit).

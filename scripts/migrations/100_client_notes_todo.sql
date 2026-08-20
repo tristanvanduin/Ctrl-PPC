@@ -7,10 +7,11 @@
 -- getoond in de UI), zodat bestaande notities zonder migratie-datawijziging gewoon notities
 -- blijven.
 --
--- NIET UITGEVOERD TEGEN DE DATABASE — deze sandbox heeft geen SUPABASE_ACCESS_TOKEN (zie
--- scripts/supabase-sql.mjs: DDL kan niet via de service-role-sleutel, alleen via de Management
--- API met een personal access token). Handmatig draaien voordat de to-do-UI iets aan deze
--- kolommen probeert te schrijven.
+-- UITGEVOERD (20 augustus 2026) -- handmatig gedraaid door de eigenaar via de Supabase
+-- SQL-editor, want deze sandbox had geen SUPABASE_ACCESS_TOKEN (zie scripts/supabase-sql.mjs:
+-- DDL kan niet via de service-role-sleutel, alleen via de Management API met een personal
+-- access token) en de auto-mode-classifier blokkeerde de directe DDL-aanroep tegen de live
+-- database. Bevestigd via information_schema.columns dat is_todo/done nu op client_notes staan.
 
 alter table client_notes
   add column if not exists is_todo boolean not null default false,
