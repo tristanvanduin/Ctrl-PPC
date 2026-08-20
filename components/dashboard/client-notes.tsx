@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { StickyNote, Plus, Pencil, Trash2, X, Save, Check } from "lucide-react";
+import { StickyNote, ListChecks, Plus, Pencil, Trash2, Save } from "lucide-react";
 import { supabase, type ClientNote } from "@/lib/supabase";
 import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
 import { dbSelect } from "@/lib/data-access/client-read";
@@ -26,11 +26,14 @@ function NoteCard({
   isEditing,
   onEdit,
   onDelete,
+  onToggleDone,
 }: {
   note: ClientNote;
   isEditing: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  /** Alleen aanwezig voor to-do's (note.is_todo). */
+  onToggleDone?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const lines = note.content.split("\n");
@@ -48,20 +51,33 @@ function NoteCard({
       }`}
     >
       <div className="flex items-start gap-3 p-3.5">
-        {/* Accent dot */}
-        <div className="w-1.5 h-1.5 rounded-full bg-brand-blue/40 mt-1.5 shrink-0" />
+        {/* Voor een to-do: het afvinkvakje zelf. Voor een vrije notitie: dezelfde accent-stip
+            als voorheen, puur decoratief. */}
+        {note.is_todo ? (
+          <button
+            onClick={onToggleDone}
+            aria-label={note.done ? "Markeer als niet afgerond" : "Markeer als afgerond"}
+            className={`mt-0.5 w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-colors ${
+              note.done ? "bg-brand-blue border-brand-blue" : "border-border hover:border-brand-blue"
+            }`}
+          >
+            {note.done && <ListChecks className="w-3 h-3 text-white" strokeWidth={3} />}
+          </button>
+        ) : (
+          <div className="w-1.5 h-1.5 rounded-full bg-brand-blue/40 mt-1.5 shrink-0" />
+        )}
 
         <div className="min-w-0 flex-1">
           {/* Title + timestamp on one line */}
           <div className="flex items-baseline gap-2 mb-1">
             {note.title && (
-              <span className="text-xs font-semibold text-brand-gray">{note.title}</span>
+              <span className={`text-xs font-semibold ${note.done ? "text-muted-foreground line-through" : "text-brand-gray"}`}>{note.title}</span>
             )}
             <span className="text-micro text-muted-foreground ml-auto shrink-0">{timeAgo(note.created_at)}</span>
           </div>
 
           {/* Content */}
-          <p className="text-meta text-brand-gray/80 whitespace-pre-wrap leading-relaxed">{displayContent}</p>
+          <p className={`text-meta whitespace-pre-wrap leading-relaxed ${note.done ? "text-muted-foreground line-through" : "text-brand-gray/80"}`}>{displayContent}</p>
 
           {isLong && (
             <button
@@ -94,6 +110,9 @@ export function ClientNotes({ clientId }: { clientId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  // Alleen relevant bij het aanmaken: het type staat vast zodra een to-do eenmaal bestaat,
+  // wisselen zou de done-status van context ontdoen. Bij bewerken blijft het type van de rij.
+  const [isTodo, setIsTodo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -118,14 +137,16 @@ export function ClientNotes({ clientId }: { clientId: string }) {
     setEditingId(note.id);
     setTitle(note.title ?? "");
     setContent(note.content);
+    setIsTodo(note.is_todo);
     setShowNew(false);
   }
 
-  function startNew() {
+  function startNew(todo: boolean) {
     setShowNew(true);
     setEditingId(null);
     setTitle("");
     setContent("");
+    setIsTodo(todo);
   }
 
   function cancelEdit() {
@@ -133,6 +154,7 @@ export function ClientNotes({ clientId }: { clientId: string }) {
     setEditingId(null);
     setTitle("");
     setContent("");
+    setIsTodo(false);
   }
 
   async function handleSave() {
@@ -150,12 +172,21 @@ export function ClientNotes({ clientId }: { clientId: string }) {
       await dbInsert("client_notes", clientId, {
         title: title.trim() || null,
         content: content.trim(),
+        is_todo: isTodo,
+        done: false,
       });
     }
 
     setSaving(false);
     cancelEdit();
     fetchNotes();
+  }
+
+  async function handleToggleDone(note: ClientNote) {
+    if (!supabase) return;
+    // Optimistisch: de lijst voelt anders traag aan voor iets dat zo vaak wordt aangeklikt.
+    setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, done: !n.done } : n)));
+    await dbUpdate("client_notes", clientId, { done: !note.done }, { id: note.id });
   }
 
   async function handleDelete(id: string) {
@@ -167,27 +198,63 @@ export function ClientNotes({ clientId }: { clientId: string }) {
 
   if (!supabase) return null;
 
+  const vrijeNotities = notes.filter((n) => !n.is_todo);
+  const todos = notes.filter((n) => n.is_todo);
+  const openTodos = todos.filter((n) => !n.done);
+  const gedaneTodos = todos.filter((n) => n.done);
+
   return (
     <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <StickyNote className="w-4 h-4 text-brand-blue-ink" />
-          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Notities</h3>
+          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Notities &amp; to-do&apos;s</h3>
           <span className="text-micro text-muted-foreground">({notes.length})</span>
+          {openTodos.length > 0 && (
+            <span className="text-micro font-semibold text-brand-blue-ink bg-brand-blue/10 rounded-full px-2 py-0.5">
+              {openTodos.length} open
+            </span>
+          )}
         </div>
         {!showNew && !editingId && (
-          <button
-            onClick={startNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue/10 text-brand-blue-ink hover:bg-brand-blue/20 transition-colors"
-          >
-            <Plus className="w-3 h-3" /> Nieuwe notitie
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => startNew(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue/10 text-brand-blue-ink hover:bg-brand-blue/20 transition-colors"
+            >
+              <Plus className="w-3 h-3" /> Notitie
+            </button>
+            <button
+              onClick={() => startNew(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue/10 text-brand-blue-ink hover:bg-brand-blue/20 transition-colors"
+            >
+              <ListChecks className="w-3 h-3" /> To-do
+            </button>
+          </div>
         )}
       </div>
 
       {/* New/Edit form */}
       {(showNew || editingId) && (
         <div className="mb-4 bg-brand-blue/5 rounded-lg p-4 border border-brand-blue/10">
+          {/* Het type staat alleen bij aanmaken open -- wisselen tijdens bewerken zou de
+              done-status van een bestaande to-do van context ontdoen. */}
+          {!editingId && (
+            <div className="inline-flex bg-gray-100 border border-border rounded-lg p-0.5 gap-0.5 mb-2.5">
+              <button
+                onClick={() => setIsTodo(false)}
+                className={`text-micro font-medium px-2.5 py-1 rounded-md transition-colors ${!isTodo ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"}`}
+              >
+                Notitie
+              </button>
+              <button
+                onClick={() => setIsTodo(true)}
+                className={`text-micro font-medium px-2.5 py-1 rounded-md transition-colors ${isTodo ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"}`}
+              >
+                To-do
+              </button>
+            </div>
+          )}
           <input
             type="text"
             value={title}
@@ -198,7 +265,7 @@ export function ClientNotes({ clientId }: { clientId: string }) {
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Notitie schrijven... (afspraken, strategie, gedachtes)"
+            placeholder={isTodo ? "Wat moet er gebeuren..." : "Notitie schrijven... (afspraken, strategie, gedachtes)"}
             rows={3}
             className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue resize-y"
             autoFocus
@@ -229,7 +296,7 @@ export function ClientNotes({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      {/* Notes list */}
+      {/* Lijst */}
       {loading ? (
         <p className="text-meta text-muted-foreground py-4 text-center">Laden...</p>
       ) : notes.length === 0 && !showNew ? (
@@ -237,20 +304,47 @@ export function ClientNotes({ clientId }: { clientId: string }) {
           <div className="w-10 h-10 rounded-full bg-brand-blue/5 flex items-center justify-center mb-3">
             <StickyNote className="w-5 h-5 text-brand-blue-ink/30" />
           </div>
-          <p className="text-xs text-muted-foreground">Nog geen notities</p>
-          <p className="text-micro text-muted-foreground/60 mt-0.5">Leg afspraken, strategie of gedachtes vast</p>
+          <p className="text-xs text-muted-foreground">Nog geen notities of to-do&apos;s</p>
+          <p className="text-micro text-muted-foreground/60 mt-0.5">Leg afspraken, strategie of taken vast</p>
         </div>
       ) : (
-        <div className="space-y-2 max-h-[400px] overflow-y-auto">
-          {notes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              isEditing={editingId === note.id}
-              onEdit={() => startEdit(note)}
-              onDelete={() => setDeleteConfirm(note.id)}
-            />
-          ))}
+        <div className="space-y-4 max-h-[480px] overflow-y-auto">
+          {/* To-do's eerst -- open werk vraagt eerder om een blik dan een vrije notitie. Open
+              boven gedaan, zodat afvinken een taak niet meteen laat verdwijnen uit het zicht. */}
+          {todos.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">
+                To-do&apos;s ({openTodos.length} open{gedaneTodos.length > 0 ? `, ${gedaneTodos.length} afgerond` : ""})
+              </p>
+              {[...openTodos, ...gedaneTodos].map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  isEditing={editingId === note.id}
+                  onEdit={() => startEdit(note)}
+                  onDelete={() => setDeleteConfirm(note.id)}
+                  onToggleDone={() => handleToggleDone(note)}
+                />
+              ))}
+            </div>
+          )}
+
+          {vrijeNotities.length > 0 && (
+            <div className="space-y-2">
+              {todos.length > 0 && (
+                <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Notities</p>
+              )}
+              {vrijeNotities.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  isEditing={editingId === note.id}
+                  onEdit={() => startEdit(note)}
+                  onDelete={() => setDeleteConfirm(note.id)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -115,6 +115,7 @@ export function TodayFeed() {
           <Pulse label="Op koers" value={String(feed.pulse.onTrack)} tone="ok" />
           <Pulse label="Risico open (gemeten)" value={feed.pulse.measuredRisk > 0 ? eur(feed.pulse.measuredRisk) : "€0"} tone={feed.pulse.measuredRisk > 0 ? "warn" : undefined} />
           <Pulse label="Niet toegewezen" value={String(feed.pulse.unassigned)} tone={feed.pulse.unassigned > 0 ? "warn" : undefined} />
+          {feed.pulse.openTodos > 0 && <Pulse label="Taken open" value={String(feed.pulse.openTodos)} />}
         </div>
       </div>
 
