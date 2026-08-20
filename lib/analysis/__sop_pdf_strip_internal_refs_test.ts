@@ -34,6 +34,14 @@ console.log("1. 'uit stap N, M' wordt verwijderd zonder een weeswoord of dubbele
   check("leest nog grammaticaal correct", out === "account: gedekt (4 signalen). Account- of doelstellingsanalyse.", out);
 }
 
+console.log("\n1b. Een kop die met 'Stap N: ' begint verliest nummer EN dubbele punt in één keer");
+{
+  const out = stripInternalRefs("Stap 1: Account Health Check & Tracking");
+  check("geen 'Stap' meer", !/stap/i.test(out), out);
+  check("geen hangende dubbele punt vooraan", !out.startsWith(":"), out);
+  check("titel blijft intact", out === "Account Health Check & Tracking", out);
+}
+
 console.log("\n2. 'Steps X, Y' en 'Tasks X, Y' (Engelse operatingDetail-vorm) worden verwijderd");
 {
   const out = stripInternalRefs("R1 validation: Valideer de oorzaak | Tasks 1, 2 | Steps 1, 6, 7, 13");

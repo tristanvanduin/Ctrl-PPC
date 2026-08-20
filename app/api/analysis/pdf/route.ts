@@ -335,6 +335,27 @@ export async function GET(request: NextRequest) {
       await supabase.from("client_folders").insert({ client_id: clientId, name: "SOP's" });
     }
 
+    // Een herdownload dezelfde dag (dezelfde clientId/folder/filename, want die is
+    // analysis_date-gekeyd) hoort de bestaande rij te VERVANGEN, niet er een tweede naast te
+    // zetten -- zonder dit groeide Bestanden bij elke klik op "Download PDF" met een extra,
+    // identiek genummerd bestand (gevonden 20 augustus 2026: 9 dubbele rijen voor eenzelfde dag
+    // bij een demo-account). Eerst de oude storage-objecten opruimen, dan de oude rijen
+    // verwijderen, dan de nieuwe inserten -- in die volgorde faalt een storage-fout niet de
+    // insert van de nieuwe rij.
+    const { data: verouderdeBestanden } = await supabase
+      .from("client_files")
+      .select("id, storage_path")
+      .eq("client_id", clientId)
+      .eq("folder", "SOP's")
+      .eq("file_name", filename);
+    if (verouderdeBestanden && verouderdeBestanden.length > 0) {
+      const oudePaden = verouderdeBestanden.map((f) => f.storage_path).filter((p): p is string => Boolean(p));
+      if (oudePaden.length > 0) {
+        await supabase.storage.from("client-files").remove(oudePaden).catch(() => {});
+      }
+      await supabase.from("client_files").delete().in("id", verouderdeBestanden.map((f) => f.id));
+    }
+
     // Insert file reference
     await supabase.from("client_files").insert({
       client_id: clientId,

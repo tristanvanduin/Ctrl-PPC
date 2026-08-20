@@ -347,6 +347,14 @@ function iceColor(score: number): string {
 // analyses, niet alleen nieuwe.
 export function stripInternalRefs(text: string): string {
   return text
+    // Een KOP die letterlijk met "Stap N: " begint (bv. "Stap 1: Account Health Check &
+    // Tracking") -- ontdekt 20 augustus 2026 in de wekelijkse PDF's legacy contentSections-pad,
+    // waar sec.heading rechtstreeks gerenderd wordt zonder door cleanMarkdown te gaan. Los van de
+    // algemene mid-zin-regel hieronder: die strip alleen "stap N" en laat de dubbele punt
+    // hangen ("Stap 1: Titel" -> ": Titel"), terwijl een kop de nummer-EN-dubbelepunt in één keer
+    // kwijt moet. Zelfde regex als deduplicateHeadings (lib/analysis/sanitize.ts) al gebruikt om
+    // koppen te vergelijken -- hier ook toegepast om ze daadwerkelijk te tonen.
+    .replace(/^stap\s+\d+\s*:\s*/i, "")
     .replace(/\s*(?:uit|via|in|op)?\s*stap(?:pen)?\s+\d+(?:\s*(?:,|en)\s*\d+)*/gi, "")
     .replace(/\s*\bsteps?\s+\d+(?:\s*(?:,|en|&)\s*\d+)*/gi, "")
     .replace(/\s*\btasks?\s+\d+(?:\s*(?:,|en|&)\s*\d+)*/gi, "")
@@ -1957,7 +1965,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
             React.createElement(
               Text,
               { style: s.contentHeading },
-              sec.heading
+              stripInternalRefs(sec.heading)
             ),
             React.createElement(
               Text,

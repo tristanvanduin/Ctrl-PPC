@@ -46,6 +46,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "jest": "^30.3.0",
+    "pdf-parse": "^2.4.5",
     "playwright-core": "^1.62.1",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.9",

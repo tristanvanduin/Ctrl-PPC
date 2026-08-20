@@ -36,6 +36,13 @@ const MOJIBAKE_MAP: [RegExp, string][] = [
   [/\u00a0/g, " "],   // actual non-breaking space → normal space
   [/\ufeff/g, ""],    // BOM character
   [/[—–]/g, " - "],   // literal em/en dash -> " - " (no-em-dash policy, every path fixMojibake runs)
+  // Pijltjes: buiten de WinAnsi-tekenset van de PDF-basisfont (Helvetica) -- pdfkit rendert ze
+  // niet als leesteken maar als een los, onherkenbaar glyph (gevonden 20 augustus 2026: "CPA-
+  // target €45 → +110,8%" werd in een gerenderde PDF een losstaand apostrofteken). Zelfde
+  // no-em-dash-redenering als hierboven: één keer bij de bron fixen i.p.v. per renderpad.
+  [/→/g, " -> "],
+  [/←/g, " <- "],
+  [/↔/g, " <-> "],
 ];
 
 /**
