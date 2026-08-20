@@ -2101,6 +2101,50 @@ de repo; dit is een los `.mjs`-script buiten `scripts/gates.sh` (heeft live data
 net als `check-kaartoverloop.mjs`), dus de verificatie is de voor-en-na-vergelijking hierboven, niet
 een aparte unittest.
 
+### 15.7 De "LIVE-ONGETEST"-middleware alsnog getest, en de views-fix klaargezet (niet gedraaid)
+
+Op "ja" (het gevonden gat uit 15.6 daadwerkelijk dichten) volgde eerst een herkadering: dat gat
+dichten betekent `O1_AUTH_ENFORCED=true` afdwingen, en die vlag bewaakt de login voor de HELE
+productie-app — inclusief de eigenaar zelf. `middleware.ts` en `app/(marketing)/login/page.tsx`
+dragen allebei letterlijk `LIVE-ONGETEST` in hun kopcommentaar. Dat blind aanzetten in productie
+was niet verantwoord; eerst testen, dan pas een aanbeveling doen.
+
+**Getest, lokaal, tegen de echte Supabase-omgeving:**
+- Publieke paden (`/pricing`, `/blog`, `/faq`, `/`) blijven 200 zonder sessie, geen redirect.
+- Beveiligde paden (`/vandaag`, `/client/[id]`) redirecten zonder sessie naar `/login?next=...`.
+- API-routes geven zonder sessie `401 {"error":"Niet ingelogd"}`.
+- **Met een echte sessie** (tijdelijke testgebruiker, echte wachtwoord-login, opgeruimd na
+  afloop): eigen-bureau-klant (`demo-greentech`) → 200, toegelaten. Klant van een ANDER bureau
+  (`demo-grt`, bureau "Demo — Cross-account portfolio") → 307 naar `/vandaag`, geweigerd.
+  `/api/me` herkent rol, rechten, scope en bureau-id correct.
+
+**Hoe getest zonder een browser**: een headless Chromium in deze sandbox kan de externe
+Supabase-host niet bereiken zonder de sandbox's eigen agent-proxy, en die correct optuigen
+(bypass voor `localhost`, CA-vertrouwen) kostte meer tijd dan het waard was voor iets dat in
+productie sowieso niet relevant is — een echte gebruikersbrowser heeft deze proxy niet. In
+plaats daarvan: een echte login via `fetch` (bewezen werkend, dezelfde route als de rest van
+deze sessie's OpenRouter/Supabase-aanroepen), de sessie in het exacte `@supabase/ssr`-
+cookieformaat gebouwd (`sb-<project-ref>-auth-token`, base64url met `base64-`-prefix, zoals
+`node_modules/@supabase/ssr/dist/module/cookies.js` het verwacht) en met een kaal `fetch` naar
+de lokale server gestuurd. Dat test precies de middleware-laag die risico droeg (cookie parsen,
+sessie herkennen, scope-check), zonder de browser-proxy-omweg.
+
+**Wat dit niet doet — en waarom niet**: `O1_AUTH_ENFORCED=true` staat NIET in productie. Dat is
+een Vercel-environment-variabele; deze sessie heeft geen Vercel-toegang en kan hem niet zetten.
+Migratie 099 (`security_invoker = true` op de negen legacy views uit 15.6) is wél geschreven
+(`scripts/migrations/099_views_security_invoker.sql`), maar BEWUST niet gedraaid — anders dan
+094/095/096 niet omdat de sleutel ontbreekt (die is er deze keer wel), maar omdat de volgorde
+dwingend is: draai je 099 vóór stap 3, dan gaat elke productielezing die vandaag nog zonder
+sessie via deze negen views gaat onmiddellijk NUL rijen terugkrijgen — een live, stil dashboard
+voor iedereen zonder sessie, exact het scenario waar `check-rls-scheiding.mjs`'s eigen
+kopcommentaar al voor waarschuwde. `scripts/migrations/README_MIGRATIES.md` is bijgewerkt met de
+volledige, actuele volgorde (stappen 1, 2 en 4 zijn inmiddels gedaan via latere migraties; stap 3
+is de enige echte blokkade, stap 5 is 099).
+
+**Volgende stap, aan de eigenaar**: `O1_AUTH_ENFORCED=true` zetten in Vercel, redeployen, zelf
+inloggen op de live site om te bevestigen dat het werkt zoals hier lokaal getest — en pas dan
+migratie 099 draaien.
+
 ## 16. Koersbepaling: cron-beleid en "niet wachten op een klant" (17 augustus 2026)
 
 Twee besluiten van de eigenaar die eerder impliciet/losstaand waren en nu expliciet en blijvend

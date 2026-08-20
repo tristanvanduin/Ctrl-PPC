@@ -50,14 +50,25 @@ stap cosmetisch of brekend.
    de browser lopen nu via `/api/data/[table]` met de service role; het beleid staat in
    `lib/data-access/write-policy.ts`. Zolang O1_AUTH_ENFORCED uit staat gedraagt die route
    zich als voorheen (geen rechtencheck), zodat er vandaag niets verandert.
-2. 001 en 032 draaien, eerste admin seeden (scripts/seed-first-admin.mjs), rollen en
-   beurzen toewijzen via /admin.
-3. O1_AUTH_ENFORCED=true. Inloggen, de API-guards en de beurs-scope worden actief.
-4. 017 draaien, plus per tabel `using (app_can_read_client(client_id))` waar een
-   client_id-kolom bestaat. Pas hier is de data daadwerkelijk gescheiden.
+2. ~~001 en 032 draaien, eerste admin seeden, rollen en beurzen toewijzen.~~ GEDAAN. Bevestigd
+   20 augustus 2026 (masterplan 15.6): 1 admin, 1 bureau, echte login vandaag.
+3. **O1_AUTH_ENFORCED=true.** NOG NIET GEZET. Dit is een Vercel-environment-variabele, geen
+   databasewijziging -- alleen te zetten door wie toegang heeft tot het Vercel-project, niet
+   vanuit een sandbox-sessie. De middleware die deze vlag activeert is inmiddels wél
+   functioneel geverifieerd (masterplan 15.6-vervolg): een echte tijdelijke testgebruiker,
+   een echte wachtwoord-login, de sessiecookie in het exacte @supabase/ssr-formaat rechtstreeks
+   getest tegen de productie-Supabase -- publieke paden blijven publiek, beveiligde paden
+   redirecten correct, eigen-bureau-toegang wordt toegelaten, andere-bureau-toegang geweigerd.
+   Zet de vlag, redeploy, en bevestig zelf door in te loggen op de live site voordat stap 5 draait.
+4. ~~017 draaien, RLS-policies per tabel.~~ GEDAAN (via de latere, hernummerde migraties --
+   o.a. 081, 096 -- RLS-dekking voor alle 127 tabellen bevestigd, masterplan 15.1).
+5. **099 draaien** (`security_invoker = true` op de negen legacy views die nu nog om RLS
+   heenlezen -- masterplan 15.6). PAS na bevestiging van stap 3, nooit ervoor: zie de kop van
+   099 voor waarom eerder draaien een leeg live dashboard oplevert voor elke sessieloze lezing.
 
-Stap 1 was de blokkade: 017 geeft bewust geen write-policies, dus elke schrijfactie die nog
+Stap 1 was ooit de blokkade: 017 gaf bewust geen write-policies, dus elke schrijfactie die nog
 vanuit de browser liep zou op dat moment stil zijn gaan falen. Dat kan nu niet meer gebeuren.
+Stap 3 is nu de enige echte blokkade tussen hier en een volledig afgedwongen scheiding.
 
 ## Consolidatie-beslissingen (uit ANALYSE_VOOR_MASTERPLAN_V2, sectie 2a)
 
