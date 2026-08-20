@@ -93,7 +93,7 @@ export function TodayFeed() {
           <p className="text-title font-semibold text-brand-gray">Geen live data beschikbaar voor de Vandaag-feed.</p>
           <p className="text-lead text-muted-foreground mt-1.5">Koppel databronnen of bekijk een demo van de triagecockpit.</p>
           <div className="flex gap-2.5 justify-center mt-5">
-            <Link href="/?demo=1" className="text-lead font-semibold text-white bg-brand-blue rounded-lg px-4 py-2 hover:brightness-110">Bekijk demo</Link>
+            <Link href="/vandaag?demo=1" className="text-lead font-semibold text-white bg-brand-blue rounded-lg px-4 py-2 hover:brightness-110">Bekijk demo</Link>
             <Link href="/portfolio" className="text-lead font-semibold text-brand-gray border border-border rounded-lg px-4 py-2 hover:border-brand-blue hover:text-brand-blue-ink">Ga naar portfolio</Link>
           </div>
         </div>

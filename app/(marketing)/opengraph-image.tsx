@@ -44,7 +44,7 @@ export default function OpengraphImage() {
           />
           <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -2 }}>
             <span style={{ color: "#f4f3ef" }}>CTRL</span>
-            <span style={{ color: "#f16b37" }}>&nbsp;PPC</span>
+            <span style={{ color: "#f5960b" }}>&nbsp;PPC</span>
           </div>
         </div>
         <div style={{ display: "flex", marginTop: 28, fontSize: 32, color: "#818cf8", fontWeight: 600 }}>
