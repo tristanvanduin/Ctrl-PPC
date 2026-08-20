@@ -8,6 +8,7 @@ import type { FeedItem, FeedSeverity, FeedChannel } from "@/lib/feed/feed-item";
 import { FeedCard } from "./feed-card";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { CodeRoodPaneel } from "@/components/adoptie/code-rood-paneel";
+import { GodViewTeaser } from "@/components/terminal/god-view-teaser";
 
 // De "Vandaag"-cockpit: cross-client triage. Beantwoordt in één blik — is er iets kapot,
 // welke beslissingen wachten, wat moet vandaag, wat is nieuw, en wie is veilig buiten beeld.
@@ -192,6 +193,11 @@ export function TodayFeed() {
               </div>
             </section>
           )}
+
+          {/* Feedback: "tease god mode" voor bureaus zonder platformtoegang -- TodayFeed is precies
+              die doelgroep (zie app/(app)/vandaag/page.tsx: God Mode en Agency God View takken eerder
+              af). Onderaan, na de echte content, niet ervoor. */}
+          {!feed.demoMode && <GodViewTeaser />}
         </div>
 
         {/* Rechterkolom */}
