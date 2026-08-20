@@ -32,6 +32,33 @@ export const CHART_CATEGORICAL = [
   "var(--serie-8, #e34948)", // rood
 ] as const;
 
+// Feedback: "kleuren niet consistent" -- Google/Meta/LinkedIn hebben een vaste kleur op hun
+// badges (bg-blue/indigo/sky, lib/insights/channel-of.ts) maar kregen in grafieken de kleur op
+// hun POSITIE in CHART_CATEGORICAL, niet op hun identiteit (zie bv. de oude `kleurVan(i)` in
+// monthly-trend-chart.tsx). Twee bugs in één: (1) badges en grafieken gebruikten al twee losse
+// systemen, en (2) omdat de positie afhing van de volgorde waarin een kanaal toevallig het
+// eerst in de data voorkwam, kon Meta op de ene grafiek blauw zijn en op de andere oranje.
+//
+// Vaste toewijzing binnen het al-gevalideerde palet lost beide op: elk kanaal claimt altijd
+// dezelfde index, ongeacht data-volgorde. Google krijgt de kleur die zijn badge al had
+// (blauw); Meta en LinkedIn krijgen de dichtstbijzijnde gevalideerde tint bij hun eigen
+// (indigo/sky) badge -- violet resp. aqua zijn de enige twee overige blauw-aangrenzende tinten
+// in het palet. lib/insights/channel-of.ts se CHANNEL_BADGE_CLASS is bijgewerkt om dezelfde
+// kleurfamilies te tonen, zodat een kanaal er overal hetzelfde uitziet.
+export const CHANNEL_CHART_COLOR: Record<"Google" | "Meta" | "LinkedIn" | "Cross-channel", string> = {
+  Google: CHART_CATEGORICAL[0],       // blauw
+  Meta: CHART_CATEGORICAL[6],         // violet — dichtst bij de indigo-badge
+  LinkedIn: CHART_CATEGORICAL[2],     // aqua — dichtst bij de sky-badge
+  "Cross-channel": CHART_CATEGORICAL[3], // geel/amber, zelfde familie als de amber-badge
+};
+
+/** Kleur voor een categorische serie: vaste kanaalkleur als de naam een bekend kanaal is,
+ *  anders terugval op de positie in het palet (bestaand gedrag voor niet-kanaal-series). */
+export function categoricalColor(seriesName: string, index: number): string {
+  return CHANNEL_CHART_COLOR[seriesName as keyof typeof CHANNEL_CHART_COLOR]
+    ?? CHART_CATEGORICAL[index % CHART_CATEGORICAL.length];
+}
+
 // Recessieve chrome voor grafieken (raster + as-tekst), consistent over alle charts.
 /**
  * Raster en aslabels lezen uit een CSS-variabele in plaats van een vaste hex, zodat ze met het
