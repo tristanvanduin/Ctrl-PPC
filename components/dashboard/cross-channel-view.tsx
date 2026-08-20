@@ -120,13 +120,27 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
 
   return (
     <div>
+      {/* "Markten" stond hier lange tijd als laatste sectie, onder de volle cross-channel-tabel --
+          op Google/Meta/LinkedIn's eigen Overzicht staat dezelfde kaart wél bovenaan, in de opener.
+          Voor een klant met >1 kanaal (waar "Alle kanalen" de standaardweergave is) betekende dat:
+          de kaart bestond en werkte, maar wie hem zocht moest eerst door de hele tabel scrollen --
+          precies het "ik mis de wereldkaart"-effect, zonder dat er iets ontbrak. Nu vooraan, zelfde
+          plek als bij de losse kanalen. */}
+      <Sectie
+        eerste
+        icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Markten"
+        bijschrift="Waar het verkeer en de conversies vandaan komen, over alle kanalen samen"
+      >
+        <GeoBreakdown clientId={clientId} channel="blended" />
+      </Sectie>
+
       {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
           vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
           binnen zichzelf, terwijl het twee antwoorden op twee vragen zijn — "hoe verhouden de
           kanalen zich over de maanden" en "wat leverde elk kanaal op". */}
       {rows && rows.length > 0 && (
         <Sectie
-          eerste
           icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
           titel="Verdeling over de kanalen"
           bijschrift="Spend per kanaal per maand — welk kanaal draagt welk deel van het budget"
@@ -140,7 +154,6 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
         icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Cross-channel (blended)"
         bijschrift="Wat elk kanaal opleverde, en de maanden erachter"
-        eerste={!(rows && rows.length > 0)}
       >
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
 
@@ -335,17 +348,6 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
           </aside>
         </div>
       </div>
-      </Sectie>
-
-      {/* De wereldkaart stond op het Campagnes-tabblad, en alleen bij Alle kanalen. Op Google,
-          Meta en LinkedIn stond hij op Overzicht — dezelfde vraag, drie tabbladen verderop.
-          "Waar komt het vandaan" is een overzichtsvraag, dus hier hoort hij. */}
-      <Sectie
-        icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Markten"
-        bijschrift="Waar het verkeer en de conversies vandaan komen, over alle kanalen samen"
-      >
-        <GeoBreakdown clientId={clientId} channel="blended" />
       </Sectie>
     </div>
   );

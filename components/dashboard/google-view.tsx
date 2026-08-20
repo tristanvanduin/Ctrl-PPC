@@ -212,7 +212,11 @@ export function GoogleView({
               want ze bestaan alleen bij Performance Max -- als PMax-specifieke verdieping onder
               de universele campagnetype-donut zijn ze op hun plek, in de opener zouden ze een
               account zonder PMax een lege plek laten zien. Elk van deze kaarten rendert niets als
-              er geen data voor is, dus de sectie kan ook helemaal leeg blijven. */}
+              er geen data voor is, dus de sectie kan ook helemaal leeg blijven.
+              PmaxAssetCoverage stond hier ook tot deze wijziging -- verhuisd naar de
+              Campagnes-tab, in de Scorecard-sectie naast de PMax-scorecard zelf: assetdekking is
+              een vraag over de STRUCTUUR van het campagnetype, niet over waar het budget landt,
+              en hoort dus bij de andere structuurvraag i.p.v. ernaast te staan als losse kaart. */}
           <Sectie
             icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Waar het budget landt"
@@ -220,7 +224,6 @@ export function GoogleView({
           >
             <VideoPerformance clientId={clientId} />
             <PmaxNetworkSplit clientId={clientId} />
-            <PmaxAssetCoverage clientId={clientId} />
             <VideoPlacements clientId={clientId} />
           </Sectie>
 
@@ -302,6 +305,10 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
         actie={<CampagneTypeTabs type={campagneType} onChange={setCampagneType} />}
       >
         <CampagneScorecard clientId={clientId} type={campagneType} />
+        {/* Assetdekking is een PMax-eigen structuurvraag ("wat heb je aangeleverd, en wat vindt
+            Google ervan") en hoort dus bij de PMax-scorecard, niet bij Search. Verhuisd hierheen
+            vanuit "Waar het budget landt" op Overzicht -- zie de toelichting daar. */}
+        {campagneType === "PERFORMANCE_MAX" && <PmaxAssetCoverage clientId={clientId} />}
       </Sectie>
       {/* Twee vragen, twee secties. Wat draait er, en waar lekt het weg — dat laatste
           is geen detail van het eerste maar een eigen onderwerp met een eigen actie. */}

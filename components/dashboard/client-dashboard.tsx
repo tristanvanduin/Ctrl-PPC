@@ -15,6 +15,7 @@ import { TasksBlock } from "../insights/tasks-block";
 import { TaskImpactReminder } from "../insights/task-impact-reminder";
 import { SopTriggerButtons, type SopError } from "../insights/sop-trigger-buttons";
 import { StandaloneAnalyses } from "../insights/standalone-analyses";
+import { CreditBalanceBadge } from "../insights/credit-balance-badge";
 import { HypothesesBlock } from "../insights/hypotheses-block";
 import { ProposalQueue } from "../insights/proposal-queue";
 import { supabase } from "@/lib/supabase";
@@ -645,10 +646,13 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
 
   // Sectiekop: scheidt de losse (deterministische) analyses bovenaan van de zware maand-SOP
   // eronder, zodat je alle analyses ziet zonder dat een volledige SOP-uitwerking ze wegduwt.
-  const Section = ({ children }: { children: React.ReactNode }) => (
+  // Optionele `extra` rechts in dezelfde regel -- alleen gebruikt bij "Losse analyses" (Google),
+  // want alleen dáár verbruiken de analyses credits (lib/analysis/credit-costs.ts).
+  const Section = ({ children, extra }: { children: React.ReactNode; extra?: React.ReactNode }) => (
     <div className="flex items-center gap-3 pt-1">
       <span className="text-micro font-semibold text-brand-blue-ink uppercase tracking-wide whitespace-nowrap">{children}</span>
       <span className="h-px flex-1 bg-border" />
+      {extra}
     </div>
   );
 
@@ -659,7 +663,7 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
 
       {analysisChannel === "google" && (
         <>
-          <Section>Losse analyses</Section>
+          <Section extra={<CreditBalanceBadge />}>Losse analyses</Section>
           <StandaloneAnalyses clientId={clientId} />
           <SignalAnalysisCard
             clientId={clientId}
