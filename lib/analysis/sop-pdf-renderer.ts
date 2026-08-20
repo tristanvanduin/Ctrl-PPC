@@ -39,7 +39,7 @@ try {
 
 type SopType = "weekly" | "biweekly" | "monthly";
 
-interface SopFinding {
+export interface SopFinding {
   title: string;
   description: string;
   severity: string;
@@ -357,6 +357,90 @@ const ROUTE_COLOR: Record<string, string> = {
   recovery: green,
   "controlled scale": orange,
 };
+
+// Kleine pill-badge voor entiteit/metric onder een taak, i.p.v. platte aan-elkaar-geplakte tekst
+// ("GRT | Search | NL  •  Search Lost IS (Budget)"). Puur presentatie, geen datalogica.
+function pillBadge(text: string, key: string): React.ReactElement {
+  return React.createElement(
+    Text,
+    {
+      key,
+      style: {
+        fontSize: 6.8,
+        color: dark,
+        backgroundColor: grayLight,
+        borderWidth: 0.5,
+        borderColor: grayBorder,
+        borderRadius: 3,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+        marginRight: 5,
+        marginBottom: 3,
+      },
+    },
+    text
+  );
+}
+
+// Formatteert een finding-waarde met een eenheid, alleen voor de metric-namen waar de eenheid
+// ondubbelzinnig is (Spend/CPA/CPC = euro, ROAS = "x") -- geen gok bij metrics als "Search Lost
+// IS" waar dezelfde data soms als 28 en soms als 0.28 is opgeslagen (twee testrondes, twee
+// schaalconventies); daar toont het gewoon het ruwe getal i.p.v. een verzonnen eenheid.
+export function formatEvidenceValue(metric: string, value: number): string {
+  const m = metric.toLowerCase();
+  if (m === "spend" || m === "cpa" || m === "cpc") return `€${value.toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
+  if (m === "roas") return `${value}x`;
+  return String(value);
+}
+
+// Koppelt een taak aan de meest ernstige finding op dezelfde entiteit, zodat de taakkaart een
+// echt cijfer kan tonen (bv. "Spend: €550") i.p.v. alleen de abstracte beslisregel te herhalen.
+// Puur tekst-matching op wat al is opgeslagen -- geen nieuwe LLM-call, geen fabricage: als er geen
+// entiteit-match is, blijft de badge leeg in plaats van een geraden cijfer te tonen.
+export function findConcreteEvidence(
+  task: { object: string; meet_via: string },
+  findings: SopFinding[]
+): SopFinding | null {
+  if (!task.object || !findings.length) return null;
+  const objectLower = task.object.toLowerCase();
+  const meetViaTerms = task.meet_via.split(",").map((m) => m.trim().toLowerCase()).filter(Boolean);
+  const severityRank: Record<string, number> = { critical: 5, high: 4, medium: 3, low: 2, positive: 1 };
+  const candidates = findings.filter((f) => f.affected_entity?.toLowerCase().includes(objectLower));
+  if (candidates.length === 0) return null;
+  return candidates.sort((a, b) => {
+    const aMeetVia = meetViaTerms.some((m) => a.metric?.toLowerCase().includes(m)) ? 1 : 0;
+    const bMeetVia = meetViaTerms.some((m) => b.metric?.toLowerCase().includes(m)) ? 1 : 0;
+    if (aMeetVia !== bMeetVia) return bMeetVia - aMeetVia;
+    return (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0);
+  })[0];
+}
+
+const COVERAGE_STATUS_COLOR: Record<string, string> = {
+  "gedekt": green,
+  "geen materieel signaal": amber,
+  "data niet beschikbaar": gray,
+};
+
+const COVERAGE_STATUS_BG: Record<string, string> = {
+  "gedekt": greenLight,
+  "geen materieel signaal": amberLight,
+  "data niet beschikbaar": grayLight,
+};
+
+const COVERAGE_STATUS_SHORT: Record<string, string> = {
+  "gedekt": "Gedekt",
+  "geen materieel signaal": "Geen signaal",
+  "data niet beschikbaar": "Geen data",
+};
+
+// Parseert een regel uit buildCoverageMarkdown() ("- dimension: status (N signalen...). note.")
+// terug naar velden, zodat pagina 4 dit als een compacte grid kan renderen i.p.v. de rauwe
+// bullet-tekst als één lopend tekstblok.
+export function parseCoverageLine(line: string): { dimension: string; statusLabel: string; detail: string; note: string } | null {
+  const m = line.match(/^-\s*([a-z_]+):\s*(gedekt|geen materieel signaal|data niet beschikbaar)([^.]*)\.\s*(.*)$/i);
+  if (!m) return null;
+  return { dimension: m[1], statusLabel: m[2].toLowerCase(), detail: m[3].trim(), note: m[4].trim() };
+}
 
 /**
  * Parse markdown output into sections (split on ## headings).
@@ -712,7 +796,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
           React.createElement(
             Text,
             { style: s.statLabel },
-            "Positief"
+            "Gezonde Signalen"
           )
         ),
         React.createElement(
@@ -1020,7 +1104,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
       React.createElement(
         Page,
         { key: "diagnose", size: "A4", orientation: "landscape", style: s.page, wrap: true },
-        React.createElement(Text, { style: s.sectionTitle }, "Diagnose"),
+        React.createElement(Text, { style: s.sectionTitle, minPresenceAhead: 60 }, "Diagnose"),
         evidenceBullets.length > 0
           ? React.createElement(
               View,
@@ -1060,14 +1144,23 @@ function SopAnalysisPdf(props: SopPdfProps) {
         React.createElement(
           Page,
           { key: "tasks", size: "A4", orientation: "landscape", style: s.page, wrap: true },
-          React.createElement(Text, { style: s.sectionTitle }, "Taken"),
+          React.createElement(Text, { style: s.sectionTitle, minPresenceAhead: 60 }, "Taken"),
           React.createElement(
             Text,
             { style: s.sectionSubtitle },
             `${finalSop.tasks.length} taken, gekoppeld aan de prioriteiten op pagina 1.`
           ),
-          ...finalSop.tasks.map((task, i) =>
-            React.createElement(
+          ...finalSop.tasks.map((task, i) => {
+            const evidence = findConcreteEvidence(task, findings);
+            const badges: React.ReactElement[] = [];
+            if (evidence) {
+              badges.push(pillBadge(evidence.affected_entity, `obj-${i}`));
+              badges.push(pillBadge(`${evidence.metric}: ${formatEvidenceValue(evidence.metric, evidence.current_value ?? 0)}`, `met-${i}`));
+            } else {
+              if (task.object) badges.push(pillBadge(task.object, `obj-${i}`));
+              if (task.meet_via) badges.push(pillBadge(task.meet_via, `met-${i}`));
+            }
+            return React.createElement(
               View,
               {
                 key: `task-${i}`,
@@ -1075,20 +1168,18 @@ function SopAnalysisPdf(props: SopPdfProps) {
                 wrap: false,
               },
               React.createElement(Text, { style: { ...s.infoTitle, fontSize: 9 } }, `[ ] ${stripInternalRefs(task.handeling)}`),
-              React.createElement(
-                Text,
-                { style: { ...s.infoText, marginTop: 2 } },
-                [task.object, task.meet_via].filter(Boolean).join("  •  ")
-              ),
+              badges.length > 0
+                ? React.createElement(View, { style: { flexDirection: "row", flexWrap: "wrap", marginTop: 3 } }, ...badges)
+                : null,
               task.beslisregel
                 ? React.createElement(
                     Text,
-                    { style: { ...s.infoText, marginTop: 2, color: dark } },
+                    { style: { ...s.infoText, marginTop: 3, color: dark } },
                     `Stoppen/doorgaan: ${stripInternalRefs(task.beslisregel)}`
                   )
                 : null
-            )
-          ),
+            );
+          }),
           Footer({ clientName, sopType })
         )
       );
@@ -1096,12 +1187,61 @@ function SopAnalysisPdf(props: SopPdfProps) {
 
     const coverageAppendixSections = appendixSections.filter((sec) => !sec.heading.startsWith("Stap "));
     coverageAppendixSections.forEach((sec, index) => {
-      pages.push(
-        React.createElement(
-          Page,
-          { key: `appendix-coverage-${index}`, size: "A4", orientation: "landscape", style: s.page, wrap: true },
-          React.createElement(Text, { style: s.sectionTitle }, "Data-dekking"),
-          React.createElement(
+      const rows = sec.content
+        .split("\n")
+        .map((line) => parseCoverageLine(line))
+        .filter((row): row is NonNullable<typeof row> => row !== null);
+
+      const grid = rows.length > 0
+        ? React.createElement(
+            View,
+            { style: { flexDirection: "row", flexWrap: "wrap" } },
+            ...rows.map((row, i) =>
+              React.createElement(
+                View,
+                {
+                  key: `cov-${i}`,
+                  style: {
+                    width: "49%",
+                    marginRight: i % 2 === 0 ? "2%" : 0,
+                    marginBottom: 8,
+                    padding: 8,
+                    borderRadius: 4,
+                    borderWidth: 0.5,
+                    borderColor: grayBorder,
+                    backgroundColor: "white",
+                  },
+                },
+                React.createElement(
+                  View,
+                  { style: { flexDirection: "row", alignItems: "center", marginBottom: 3 } },
+                  React.createElement(Text, { style: { fontSize: 8.5, fontWeight: "bold", color: dark, flex: 1 } }, row.dimension.replace(/_/g, " ")),
+                  React.createElement(
+                    Text,
+                    {
+                      style: {
+                        fontSize: 6.8,
+                        fontWeight: "bold",
+                        color: "white",
+                        backgroundColor: COVERAGE_STATUS_COLOR[row.statusLabel] ?? gray,
+                        paddingHorizontal: 5,
+                        paddingVertical: 2,
+                        borderRadius: 3,
+                      },
+                    },
+                    COVERAGE_STATUS_SHORT[row.statusLabel] ?? row.statusLabel
+                  )
+                ),
+                row.detail
+                  ? React.createElement(Text, { style: { fontSize: 7, color: gray, marginBottom: 2 } }, stripInternalRefs(row.detail))
+                  : null,
+                row.note
+                  ? React.createElement(Text, { style: { fontSize: 7.3, color: dark } }, stripInternalRefs(row.note))
+                  : null
+              )
+            )
+          )
+        : React.createElement(
             View,
             { style: { ...s.infoCard, backgroundColor: grayLight } },
             React.createElement(
@@ -1109,7 +1249,14 @@ function SopAnalysisPdf(props: SopPdfProps) {
               { style: { ...s.infoText, color: dark } },
               stripInternalRefs(cleanMarkdown(sec.content)).slice(0, 6000)
             )
-          ),
+          );
+
+      pages.push(
+        React.createElement(
+          Page,
+          { key: `appendix-coverage-${index}`, size: "A4", orientation: "landscape", style: s.page, wrap: true },
+          React.createElement(Text, { style: s.sectionTitle, minPresenceAhead: 60 }, "Data-dekking"),
+          grid,
           Footer({ clientName, sopType })
         )
       );

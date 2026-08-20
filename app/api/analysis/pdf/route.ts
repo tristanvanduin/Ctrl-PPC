@@ -20,10 +20,14 @@ import { logger } from "@/lib/logger";
 // kale namen, en Meta/LinkedIn's kanaal-voorvoegsel-varianten (zie sop-trigger-buttons.tsx
 // CHANNEL_CONFIG). Alleen "monthly" (Google) krijgt hieronder de verrijkte structured-data-tak;
 // meta_monthly/linkedin_monthly draaien via dezelfde finalizeChannelMonthlySynthesis en hebben dus
-// ook een geldige "full"-sectie, maar sop_insights/sop_recommendations/sop_tasks zijn niet op
-// kanaal gescheiden (alleen client_id + analysis_date) -- die tak zou bij een Google- en
-// Meta-maandanalyse op dezelfde datum de verkeerde bevindingen kunnen tonen. Bewust overgeslagen
-// tot die tabellen een sop_type-kolom hebben.
+// ook een geldige "full"-sectie.
+// Live gevonden (20 aug 2026): sop_insights/sop_recommendations HEBBEN allebei al een sop_type-
+// kolom, maar de queries hieronder filterden er niet op -- alleen op client_id + analysis_date.
+// Met meerdere kanalen/testruns op dezelfde dag (persistMonthlyStructuredData() schrijft naar
+// sop_insights voor alle drie kanalen) leverde dat voor demo-greentech 258 samengevoegde rijen
+// op, incl. LinkedIn-content ("Lead Gen Form Completion") in wat een Google-PDF hoorde te zijn --
+// de "Positief"-tegel op pagina 1 telde die hele pool, niet alleen deze analyse. Nu .eq("sop_type",
+// sopType) op beide queries.
 const VALID_SOP_TYPES = [
   "weekly", "biweekly", "monthly",
   "meta_weekly", "meta_biweekly", "meta_monthly",
@@ -151,12 +155,14 @@ export async function GET(request: NextRequest) {
           .from("sop_insights")
           .select("title, description, severity, insight_type, affected_entity, affected_entity_type, metric, current_value, previous_value, change_pct, action_required")
           .eq("client_id", clientId)
+          .eq("sop_type", sopType)
           .eq("analysis_date", analysis.analysis_date)
           .order("severity"),
         supabase
           .from("sop_recommendations")
           .select("hypothesis, expected_result, measurement_metric, timeframe, rationale, ice_impact, ice_confidence, ice_ease, ice_total, status")
           .eq("client_id", clientId)
+          .eq("sop_type", sopType)
           .eq("analysis_date", analysis.analysis_date)
           .order("ice_total", { ascending: false }),
         supabase
