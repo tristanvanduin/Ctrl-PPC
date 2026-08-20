@@ -1125,12 +1125,16 @@ function SopAnalysisPdf(props: SopPdfProps) {
 
   // For weekly/biweekly: show first section as summary on cover
   if (sopType !== "monthly" && sections.length > 0) {
-    const summaryText = cleanMarkdown(
+    // scrub() i.p.v. alleen cleanMarkdown(): zelfde reden als bij de content pages hieronder --
+    // een ### middenin de eerste twee secties (bv. "Stap 1: Account Performance") lekt anders
+    // ongefilterd de samenvattingskaart op pagina 1 in. Gevonden 20 augustus 2026, meta_biweekly
+    // en linkedin_biweekly.
+    const summaryText = scrub(cleanMarkdown(
       sections
         .slice(0, 2)
         .map((sec) => sec.content)
         .join("\n\n")
-    );
+    ));
     const truncated =
       summaryText.length > 1500
         ? summaryText.slice(0, 1500) + "..."
@@ -1959,7 +1963,14 @@ function SopAnalysisPdf(props: SopPdfProps) {
     // Each analysis step gets its own page(s) to prevent truncation
     for (let i = 0; i < contentSections.length; i++) {
       const sec = contentSections[i];
-      const cleaned = cleanMarkdown(sec.content);
+      // scrub() i.p.v. alleen cleanMarkdown(): parseMarkdownSections splitst alleen op ##
+      // (H2) -- een ### (H3) als "Stap 1: Account Performance" middenin de tekst blijft dus
+      // gewoon in sec.content staan, en cleanMarkdown() zelf haalt geen "Stap N"-referenties
+      // weg (dat doet stripInternalRefs). Zonder scrub() lekt zo'n H3, of een losse regel als
+      // "TOP 3 BEVINDINGEN STAP 1:", alsnog als rauwe pijplijntekst -- gevonden 20 augustus 2026
+      // specifiek in meta_biweekly/linkedin_biweekly (de enige twee combinaties die dit pad
+      // met dit soort brontekst raken).
+      const cleaned = scrub(cleanMarkdown(sec.content));
       // Allow up to 8000 chars per section (was 3000 — fits on 2 landscape pages)
       const text =
         cleaned.length > 8000

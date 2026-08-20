@@ -52,6 +52,14 @@ const COMBINATIES = [
   { clientId: "demo-greentech", sopType: "linkedin_monthly", clientName: "GreenTech", baseType: "monthly" },
   { clientId: "demo-greentech", sopType: "weekly", clientName: "GreenTech", baseType: "weekly" },
   { clientId: "demo-greentech", sopType: "biweekly", clientName: "GreenTech", baseType: "biweekly" },
+  // De vier vergeten combinaties (20 augustus 2026): Meta/LinkedIn weekly/biweekly liepen nooit
+  // door deze poort en ook nooit door mijn eigen ogen -- precies daar vond ik de derde plek waar
+  // stripInternalRefs niet werd toegepast ("TOP 3 BEVINDINGEN STAP 1" in de body-tekst,
+  // sop-pdf-renderer.ts's contentSections-pad).
+  { clientId: "demo-greentech", sopType: "meta_weekly", clientName: "GreenTech", baseType: "weekly" },
+  { clientId: "demo-greentech", sopType: "meta_biweekly", clientName: "GreenTech", baseType: "biweekly" },
+  { clientId: "demo-greentech", sopType: "linkedin_weekly", clientName: "GreenTech", baseType: "weekly" },
+  { clientId: "demo-greentech", sopType: "linkedin_biweekly", clientName: "GreenTech", baseType: "biweekly" },
   { clientId: "demo-grt", sopType: "monthly", clientName: "GRT", baseType: "monthly" },
   { clientId: "demo-gra", sopType: "monthly", clientName: "GRA", baseType: "monthly" },
   { clientId: "demo-grn", sopType: "monthly", clientName: "GRN", baseType: "monthly" },
