@@ -8,7 +8,7 @@
 //   2-koloms data-dekkingsgrid i.p.v. een lopend tekstblok.
 // Draaien: npx tsx lib/analysis/__sop_pdf_strip_internal_refs_test.ts
 
-import { stripInternalRefs, findConcreteEvidence, formatEvidenceValue, parseCoverageLine, type SopFinding } from "./sop-pdf-renderer";
+import { stripInternalRefs, replaceRawClientId, findConcreteEvidence, formatEvidenceValue, parseCoverageLine, type SopFinding } from "./sop-pdf-renderer";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -40,6 +40,15 @@ console.log("\n1b. Een kop die met 'Stap N: ' begint verliest nummer EN dubbele 
   check("geen 'Stap' meer", !/stap/i.test(out), out);
   check("geen hangende dubbele punt vooraan", !out.startsWith(":"), out);
   check("titel blijft intact", out === "Account Health Check & Tracking", out);
+}
+
+console.log("\n1c. replaceRawClientId() vervangt de ruwe clientId door de leesbare klantnaam");
+{
+  check("prefix-vorm", replaceRawClientId("demo-greentech Account blijft relatief gezond.", "demo-greentech", "GreenTech") === "GreenTech Account blijft relatief gezond.");
+  check("na een dubbele punt", replaceRawClientId("Account: demo-greentech wordt te duur.", "demo-greentech", "GreenTech") === "Account: GreenTech wordt te duur.");
+  check("geen valse match op een substring", replaceRawClientId("demo-greentech2 blijft ongemoeid.", "demo-greentech", "GreenTech") === "demo-greentech2 blijft ongemoeid.");
+  check("clientId gelijk aan clientName: geen wijziging nodig", replaceRawClientId("GreenTech is gezond.", "GreenTech", "GreenTech") === "GreenTech is gezond.");
+  check("lege clientName laat de tekst met rust (geen kapotte substitutie)", replaceRawClientId("demo-greentech is gezond.", "demo-greentech", "") === "demo-greentech is gezond.");
 }
 
 console.log("\n2. 'Steps X, Y' en 'Tasks X, Y' (Engelse operatingDetail-vorm) worden verwijderd");

@@ -7,7 +7,7 @@ import { dbSelect } from "@/lib/data-access/client-read";
 import { useAnalysis } from "@/lib/analysis-context";
 import { getAllClients } from "@/lib/clients";
 import { useGenerationProgress } from "@/lib/use-generation-progress";
-import { dbInsert } from "@/lib/data-access/client-write";
+import { dbInsert, dbDelete } from "@/lib/data-access/client-write";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
 import { today } from "@/lib/reporting-date";
 // Verplaatst naar lib/analysis/sop-channel-config.ts (nightly-cron-werk) zodat de cron
@@ -153,6 +153,25 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
     if (storageErr) {
       console.error("SOP upload error:", storageErr.message);
       return;
+    }
+
+    // Zelfde dedup als de PDF-route en de cron-tegenhanger van deze functie (voerSopUit in
+    // app/api/cron/trigger-sops/route.ts, 20 augustus 2026): handmatig twee keer dezelfde
+    // analyse dezelfde dag draaien maakte tot nu toe een tweede, identiek genummerd bestand
+    // -- de bestaande rij (en zijn storage-object) hoort vervangen te worden, niet verdubbeld.
+    const { data: verouderdeBestanden } = await dbSelect<{ id: string; storage_path: string }>("client_files", {
+      select: "id, storage_path", clientId,
+      filters: [
+        { op: "eq", column: "folder", value: "SOP's" },
+        { op: "eq", column: "file_name", value: fileName },
+      ],
+    });
+    if (verouderdeBestanden.length > 0) {
+      const oudePaden = verouderdeBestanden.map((f) => f.storage_path).filter(Boolean);
+      if (oudePaden.length > 0) {
+        await sb.storage.from("client-files").remove(oudePaden).catch(() => {});
+      }
+      await dbDelete("client_files", clientId, { folder: "SOP's", file_name: fileName });
     }
 
     await dbInsert("client_files", clientId, {

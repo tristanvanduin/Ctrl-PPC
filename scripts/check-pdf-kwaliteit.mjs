@@ -42,13 +42,19 @@ import { PDFParse } from "pdf-parse";
 const BASIS = process.env.BASIS_URL ?? "http://localhost:3190";
 
 // De combinaties die live gecontroleerd worden: alle drie de kanalen op monthly (waar de
-// stat-tegels en de rijke laag zitten -- precies waar het Meta/LinkedIn-defect zat) plus één
-// weekly (waar het →-pijltjes-defect zat, zie lib/analysis/sanitize.ts).
+// stat-tegels en de rijke laag zitten -- precies waar het Meta/LinkedIn-defect zat), weekly en
+// biweekly (waar het →-pijltjes-/"Stap N"-defect zat, zie lib/analysis/sanitize.ts), en de drie
+// single-channel demo-klanten (demo-grt/gra/grn -- alleen Google, geen cross-channel-synthese
+// mogelijk) zodat de poort niet blind is voor de meest voorkomende klantvorm: één kanaal.
 const COMBINATIES = [
   { clientId: "demo-greentech", sopType: "monthly", clientName: "GreenTech", baseType: "monthly" },
   { clientId: "demo-greentech", sopType: "meta_monthly", clientName: "GreenTech", baseType: "monthly" },
   { clientId: "demo-greentech", sopType: "linkedin_monthly", clientName: "GreenTech", baseType: "monthly" },
   { clientId: "demo-greentech", sopType: "weekly", clientName: "GreenTech", baseType: "weekly" },
+  { clientId: "demo-greentech", sopType: "biweekly", clientName: "GreenTech", baseType: "biweekly" },
+  { clientId: "demo-grt", sopType: "monthly", clientName: "GRT", baseType: "monthly" },
+  { clientId: "demo-gra", sopType: "monthly", clientName: "GRA", baseType: "monthly" },
+  { clientId: "demo-grn", sopType: "monthly", clientName: "GRN", baseType: "monthly" },
 ];
 
 const MAX_PAGINAS = { monthly: 8, biweekly: 10, weekly: 10 };

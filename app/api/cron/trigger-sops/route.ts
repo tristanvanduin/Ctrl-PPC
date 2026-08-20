@@ -406,6 +406,24 @@ async function voerSopUit(
     .upload(storagePath, markdown, { contentType: "text/markdown" });
   if (storageErr) throw new Error(`upload mislukt: ${storageErr.message}`);
 
+  // Zelfde dedup als de PDF-route (app/api/analysis/pdf/route.ts, 20 augustus 2026): een
+  // herdraaide analyse dezelfde dag (bestandsnaam is analysisDate-gekeyd) hoort de bestaande rij
+  // te VERVANGEN, niet er een tweede naast te zetten. .limit(1) i.p.v. .maybeSingle() om dezelfde
+  // reden als daar -- bij al bestaande dubbelen faalt .maybeSingle() stil op "meerdere rijen".
+  const { data: verouderdeBestanden } = await supabase
+    .from("client_files")
+    .select("id, storage_path")
+    .eq("client_id", clientId)
+    .eq("folder", "SOP's")
+    .eq("file_name", fileName);
+  if (verouderdeBestanden && verouderdeBestanden.length > 0) {
+    const oudePaden = verouderdeBestanden.map((f) => f.storage_path).filter((p): p is string => Boolean(p));
+    if (oudePaden.length > 0) {
+      await supabase.storage.from("client-files").remove(oudePaden).catch(() => {});
+    }
+    await supabase.from("client_files").delete().in("id", verouderdeBestanden.map((f) => f.id));
+  }
+
   const { error: insertErr } = await supabase.from("client_files").insert({
     client_id: clientId,
     folder: "SOP's",

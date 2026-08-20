@@ -340,6 +340,20 @@ function iceColor(score: number): string {
   return red;
 }
 
+// De LLM krijgt in de analyse-prompt (app/api/analysis/monthly/route.ts) alleen de ruwe
+// clientId mee, nooit een leesbare naam -- dus als het model voor een account-scope finding
+// iets nodig heeft om het account te NOEMEN, gebruikt het soms letterlijk "demo-greentech" i.p.v.
+// "GreenTech" (gevonden 20 augustus 2026 in de Meta/LinkedIn-PDF's: "demo-greentech Account
+// blijft relatief gezond..."). De echte fix zit in de promptlaag (een klantnaam meegeven), maar
+// dat is een aparte, grotere wijziging over een 3000+ regel pijplijn; dit is de verdedigingslaag
+// hier aan de renderkant -- zelfde filosofie als stripInternalRefs/fixMojibake: garandeer dat het
+// bekende foutpatroon de lezer nooit bereikt, ongeacht via welk generatiepad het ontstond.
+export function replaceRawClientId(text: string, clientId: string, clientName: string): string {
+  if (!text || !clientId || !clientName || clientId === clientName) return text;
+  const escaped = clientId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(`\\b${escaped}\\b`, "gi"), clientName);
+}
+
 // Klant-PDF-tekst mag geen interne stap-/taaknummering bevatten (feedback op de eerste versie:
 // "Steps 1, 6, 7, 13" / "Tasks 1, 2" zijn werkbenaming van de AI-pijplijn, geen informatie die
 // een specialist iets zegt). Sommige al opgeslagen markdown (bv. coverage_markdown, dat "uit stap
@@ -690,6 +704,7 @@ function Footer({
 
 function SopAnalysisPdf(props: SopPdfProps) {
   const {
+    clientId,
     clientName,
     sopType,
     analysisDate,
@@ -706,6 +721,11 @@ function SopAnalysisPdf(props: SopPdfProps) {
     crossAccount,
     marketBenchmark,
   } = props;
+
+  // Eén doorgang voor elke stuk LLM-tekst die op deze PDF terechtkomt: eerst de ruwe clientId
+  // vervangen door de leesbare naam (zie replaceRawClientId hierboven), dan de interne stap-/
+  // taakverwijzingen weg. Vervangt stripInternalRefs(...) op alle 13 aanroepplekken hieronder.
+  const scrub = (text: string) => stripInternalRefs(replaceRawClientId(text, clientId, clientName));
 
   const dateStr = formatDate(analysisDate);
   const monthlyView = sopType === "monthly" ? buildMonthlyPdfViewModel(props) : null;
@@ -903,7 +923,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
           React.createElement(
             Text,
             { style: { ...s.infoText, color: dark } },
-            stripInternalRefs(`${finalSop.primary_thread} ${finalSop.root_cause}`)
+            scrub(`${finalSop.primary_thread} ${finalSop.root_cause}`)
           )
         )
       );
@@ -961,9 +981,9 @@ function SopAnalysisPdf(props: SopPdfProps) {
               React.createElement(
                 Text,
                 { style: { width: "44%", ...s.cellText, fontWeight: "bold", paddingRight: 6 } },
-                `[ ] ${stripInternalRefs(rec.handeling)}`
+                `[ ] ${scrub(rec.handeling)}`
               ),
-              React.createElement(Text, { style: { width: "43%", ...s.cellText, color: gray } }, stripInternalRefs(rec.beslisregel))
+              React.createElement(Text, { style: { width: "43%", ...s.cellText, color: gray } }, scrub(rec.beslisregel))
             )
           ),
           React.createElement(View, { style: { height: 8 } })
@@ -1175,7 +1195,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
                   View,
                   { key: `ev-${i}`, style: { flexDirection: "row", marginBottom: 3 } },
                   React.createElement(Text, { style: { ...s.infoText, marginRight: 4 } }, "•"),
-                  React.createElement(Text, { style: { ...s.infoText, color: dark, flex: 1 } }, stripInternalRefs(line))
+                  React.createElement(Text, { style: { ...s.infoText, color: dark, flex: 1 } }, scrub(line))
                 )
               )
             )
@@ -1190,7 +1210,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
                   View,
                   { key: `np-${i}`, style: { flexDirection: "row", marginBottom: 3 } },
                   React.createElement(Text, { style: { ...s.infoText, marginRight: 4 } }, "•"),
-                  React.createElement(Text, { style: { ...s.infoText, color: dark, flex: 1 } }, stripInternalRefs(line))
+                  React.createElement(Text, { style: { ...s.infoText, color: dark, flex: 1 } }, scrub(line))
                 )
               )
             )
@@ -1205,7 +1225,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
                     View,
                     { key: "wc-channel", style: { marginBottom: 6 } },
                     React.createElement(Text, { style: { ...s.infoText, fontWeight: "bold", color: dark } }, "Cross-channel (dit account, andere kanalen)"),
-                    React.createElement(Text, { style: { ...s.infoText, color: dark } }, stripInternalRefs(crossChannel.headline))
+                    React.createElement(Text, { style: { ...s.infoText, color: dark } }, scrub(crossChannel.headline))
                   )
                 : null,
               crossAccount
@@ -1213,7 +1233,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
                     View,
                     { key: "wc-account", style: { marginBottom: 6 } },
                     React.createElement(Text, { style: { ...s.infoText, fontWeight: "bold", color: dark } }, "Cross-account (dit bureau, andere klanten)"),
-                    React.createElement(Text, { style: { ...s.infoText, color: dark } }, stripInternalRefs(crossAccount.headline))
+                    React.createElement(Text, { style: { ...s.infoText, color: dark } }, scrub(crossAccount.headline))
                   )
                 : null,
               marketBenchmark?.available
@@ -1276,7 +1296,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
                 style: { ...s.infoCard, marginBottom: 8, backgroundColor: i % 2 === 0 ? grayLight : "white" },
                 wrap: false,
               },
-              React.createElement(Text, { style: { ...s.infoTitle, fontSize: 9 } }, `[ ] ${stripInternalRefs(task.handeling)}`),
+              React.createElement(Text, { style: { ...s.infoTitle, fontSize: 9 } }, `[ ] ${scrub(task.handeling)}`),
               badges.length > 0
                 ? React.createElement(View, { style: { flexDirection: "row", flexWrap: "wrap", marginTop: 3 } }, ...badges)
                 : null,
@@ -1284,7 +1304,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
                 ? React.createElement(
                     Text,
                     { style: { ...s.infoText, marginTop: 3, color: dark } },
-                    `Stoppen/doorgaan: ${stripInternalRefs(task.beslisregel)}`
+                    `Stoppen/doorgaan: ${scrub(task.beslisregel)}`
                   )
                 : null
             );
@@ -1342,10 +1362,10 @@ function SopAnalysisPdf(props: SopPdfProps) {
                   )
                 ),
                 row.detail
-                  ? React.createElement(Text, { style: { fontSize: 7, color: gray, marginBottom: 2 } }, stripInternalRefs(row.detail))
+                  ? React.createElement(Text, { style: { fontSize: 7, color: gray, marginBottom: 2 } }, scrub(row.detail))
                   : null,
                 row.note
-                  ? React.createElement(Text, { style: { fontSize: 7.3, color: dark } }, stripInternalRefs(row.note))
+                  ? React.createElement(Text, { style: { fontSize: 7.3, color: dark } }, scrub(row.note))
                   : null
               )
             )
@@ -1356,7 +1376,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
             React.createElement(
               Text,
               { style: { ...s.infoText, color: dark } },
-              stripInternalRefs(cleanMarkdown(sec.content)).slice(0, 6000)
+              scrub(cleanMarkdown(sec.content)).slice(0, 6000)
             )
           );
 
@@ -1965,7 +1985,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
             React.createElement(
               Text,
               { style: s.contentHeading },
-              stripInternalRefs(sec.heading)
+              scrub(sec.heading)
             ),
             React.createElement(
               Text,
