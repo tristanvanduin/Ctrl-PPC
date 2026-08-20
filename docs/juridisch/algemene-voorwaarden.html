@@ -1,0 +1,489 @@
+<title>Algemene Voorwaarden</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #F7F7FB;
+    --surface: #FFFFFF;
+    --surface-2: #FBFBFE;
+    --text: #191D2E;
+    --text-muted: #4A4F66;
+    --text-faint: #7B8098;
+    --border: #E1E3ED;
+    --border-strong: #C7CBDC;
+    --accent: #4F46E5;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #EEF0FD;
+    --ph-bg: #FFF6E0;
+    --ph-border: #D98F2B;
+    --ph-text: #7A4F0F;
+    --shadow: 0 1px 2px rgba(25,29,46,0.04), 0 8px 24px rgba(25,29,46,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0D1224;
+      --surface: #151C34;
+      --surface-2: #121A30;
+      --text: #F1F0EC;
+      --text-muted: #ACB1C9;
+      --text-faint: #7B82A0;
+      --border: #2A324F;
+      --border-strong: #3A436A;
+      --accent: #8B92F8;
+      --accent-ink: #10142A;
+      --accent-soft: #232B4D;
+      --ph-bg: #33290F;
+      --ph-border: #C98A2E;
+      --ph-text: #F0C77E;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1224;
+    --surface: #151C34;
+    --surface-2: #121A30;
+    --text: #F1F0EC;
+    --text-muted: #ACB1C9;
+    --text-faint: #7B82A0;
+    --border: #2A324F;
+    --border-strong: #3A436A;
+    --accent: #8B92F8;
+    --accent-ink: #10142A;
+    --accent-soft: #232B4D;
+    --ph-bg: #33290F;
+    --ph-border: #C98A2E;
+    --ph-text: #F0C77E;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .wrap {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin: 0 0 1rem;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 0.55em;
+    height: 0.55em;
+    border-radius: 2px;
+    background: var(--accent);
+    display: inline-block;
+  }
+  h1 {
+    font-size: clamp(2rem, 4vw, 2.6rem);
+    line-height: 1.12;
+    font-weight: 600;
+    margin: 0 0 0.9rem;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem;
+    font-size: 0.85rem;
+    color: var(--text-faint);
+    margin-bottom: 2rem;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.28em 0.75em;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+    border: 1px solid var(--ph-border);
+    background: var(--ph-bg);
+    color: var(--ph-text);
+  }
+  .intro {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    max-width: 66ch;
+    margin: 0 0 2.5rem;
+  }
+  .intro strong { color: var(--text); }
+  hr.rule {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0;
+  }
+  nav.toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem 1.75rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 3rem;
+  }
+  nav.toc h2 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 600;
+    margin: 0 0 1rem;
+  }
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    columns: 2;
+    column-gap: 2rem;
+  }
+  nav.toc li { break-inside: avoid; margin-bottom: 0.55rem; }
+  nav.toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.92rem;
+    display: block;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); }
+  nav.toc .num { font-family: "IBM Plex Mono", monospace; color: var(--accent); margin-right: 0.5em; font-size: 0.82em; }
+
+  article.artikel {
+    margin-bottom: 2.6rem;
+    padding-top: 0.5rem;
+    scroll-margin-top: 2rem;
+  }
+  article.artikel h2 {
+    font-size: 1.32rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  article.artikel h2 .artnum {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 0.15em 0.55em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  article.artikel p { margin: 0 0 1rem; max-width: 68ch; }
+  article.artikel ol.leden {
+    list-style: none;
+    counter-reset: lid;
+    margin: 0;
+    padding: 0;
+    max-width: 68ch;
+  }
+  article.artikel ol.leden > li {
+    counter-increment: lid;
+    position: relative;
+    padding-left: 2.1em;
+    margin-bottom: 1.1rem;
+  }
+  article.artikel ol.leden > li::before {
+    content: counter(lid) ".";
+    position: absolute;
+    left: 0;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.82rem;
+    color: var(--text-faint);
+    top: 0.15em;
+  }
+  article.artikel ul.sub {
+    margin: 0.6rem 0 0;
+    padding-left: 1.3em;
+  }
+  article.artikel ul.sub li { margin-bottom: 0.45rem; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); }
+
+  .ph {
+    background: var(--ph-bg);
+    border: 1px dashed var(--ph-border);
+    color: var(--ph-text);
+    padding: 0.05em 0.4em;
+    border-radius: 5px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.88em;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  footer.closing {
+    margin-top: 3.5rem;
+    padding: 1.5rem 1.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--ph-border);
+    border-radius: 0 10px 10px 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  footer.closing .label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ph-text);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.6rem;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 2.5rem 1.25rem 4rem; }
+    nav.toc ol { columns: 1; }
+    article.artikel h2 { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow mono">Ctrl PPC · Juridisch document</p>
+  <h1>Algemene Voorwaarden</h1>
+  <div class="meta-row mono">
+    <span>Versie <span class="ph">[VERSIENUMMER]</span></span>
+    <span>·</span>
+    <span>laatst gewijzigd op <span class="ph">[DATUM]</span></span>
+    <span class="pill">Concept — nog niet definitief</span>
+  </div>
+  <p class="intro">Deze algemene voorwaarden zijn van toepassing op alle overeenkomsten tussen <span class="ph">[HANDELSNAAM/EENMANSZAAK]</span>, statutair gevestigd te <span class="ph">[VESTIGINGSPLAATS]</span>, ingeschreven bij de Kamer van Koophandel onder nummer <span class="ph">[KVK-NUMMER]</span>, BTW-identificatienummer <span class="ph">[BTW-NUMMER]</span> (hierna: <strong>"Ctrl PPC"</strong>), en de opdrachtgever die met Ctrl PPC een overeenkomst aangaat (hierna: <strong>"Opdrachtgever"</strong>), met betrekking tot het gebruik van het platform Ctrl PPC.</p>
+
+  <nav class="toc">
+    <h2>Artikelen</h2>
+    <ol>
+      <li><a href="#art1"><span class="num">01</span>Definities</a></li>
+      <li><a href="#art2"><span class="num">02</span>Toepasselijkheid en aard van de overeenkomst</a></li>
+      <li><a href="#art3"><span class="num">03</span>Totstandkoming van de overeenkomst</a></li>
+      <li><a href="#art4"><span class="num">04</span>De Dienst</a></li>
+      <li><a href="#art5"><span class="num">05</span>Verplichtingen van Opdrachtgever</a></li>
+      <li><a href="#art6"><span class="num">06</span>Geen garantie op resultaat of rendement (ROI)</a></li>
+      <li><a href="#art7"><span class="num">07</span>Afhankelijkheid van derden</a></li>
+      <li><a href="#art8"><span class="num">08</span>Intellectueel eigendom</a></li>
+      <li><a href="#art9"><span class="num">09</span>Vertrouwelijkheid</a></li>
+      <li><a href="#art10"><span class="num">10</span>Verwerking van persoonsgegevens</a></li>
+      <li><a href="#art11"><span class="num">11</span>Prijzen en betaling</a></li>
+      <li><a href="#art12"><span class="num">12</span>Duur en beëindiging</a></li>
+      <li><a href="#art13"><span class="num">13</span>Aansprakelijkheid</a></li>
+      <li><a href="#art14"><span class="num">14</span>Overmacht</a></li>
+      <li><a href="#art15"><span class="num">15</span>Wijziging van deze voorwaarden</a></li>
+      <li><a href="#art16"><span class="num">16</span>Toepasselijk recht en geschillen</a></li>
+      <li><a href="#art17"><span class="num">17</span>Slotbepalingen</a></li>
+    </ol>
+  </nav>
+
+  <article class="artikel" id="art1">
+    <h2><span class="artnum">ART. 1</span>Definities</h2>
+    <p>In deze algemene voorwaarden wordt verstaan onder:</p>
+    <ul class="sub">
+      <li><strong>Platform</strong>: de door Ctrl PPC ontwikkelde en beheerde performance-marketing-analyse-engine, inclusief de bijbehorende webapplicatie, API-koppelingen en gegenereerde rapportages, adviezen en hypotheses.</li>
+      <li><strong>Dienst</strong>: het geheel van diensten dat Ctrl PPC via het Platform aan Opdrachtgever levert, waaronder het ophalen, verwerken, analyseren en presenteren van advertentiedata, en het genereren van AI-ondersteunde inzichten, hypotheses en aanbevelingen.</li>
+      <li><strong>Gekoppelde Platformen</strong>: externe advertentie- en marketingplatformen waarmee Opdrachtgever het Platform laat koppelen, waaronder in elk geval Google Ads, Meta (Facebook/Instagram) Ads en LinkedIn Ads.</li>
+      <li><strong>AI-modelproviders</strong>: externe aanbieders van taalmodellen die door het Platform worden geraadpleegd voor data-synthese, samenvatting en adviesgeneratie, waaronder in elk geval de dienst OpenRouter en de daarachter liggende modelaanbieders.</li>
+      <li><strong>Overeenkomst</strong>: iedere overeenkomst tussen Ctrl PPC en Opdrachtgever waarop deze algemene voorwaarden van toepassing zijn.</li>
+      <li><strong>Partijen</strong>: Ctrl PPC en Opdrachtgever gezamenlijk.</li>
+      <li><strong>Schriftelijk</strong>: per brief, e-mail, of via een functionaliteit van het Platform, tenzij anders bepaald.</li>
+    </ul>
+  </article>
+
+  <article class="artikel" id="art2">
+    <h2><span class="artnum">ART. 2</span>Toepasselijkheid en aard van de overeenkomst</h2>
+    <ol class="leden">
+      <li>Deze voorwaarden zijn van toepassing op elk aanbod van Ctrl PPC en op elke Overeenkomst tussen Ctrl PPC en Opdrachtgever.</li>
+      <li><strong>Ctrl PPC contracteert uitsluitend met ondernemingen die handelen in de uitoefening van een beroep of bedrijf.</strong> De Overeenkomst is nadrukkelijk geen consumentenovereenkomst. Opdrachtgever verklaart bij het aangaan van de Overeenkomst dat hij handelt in de uitoefening van een beroep of bedrijf. De wettelijke (afdwingbare) bepalingen ter bescherming van consumenten, waaronder titel 5, afdeling 3 van Boek 6 van het Burgerlijk Wetboek (algemene voorwaarden) voor zover deze uitsluitend voor consumenten gelden, zijn op de Overeenkomst niet van toepassing.</li>
+      <li>Eventuele inkoop- of andere voorwaarden van Opdrachtgever worden uitdrukkelijk van de hand gewezen en zijn niet van toepassing, ook niet indien Ctrl PPC daar niet uitdrukkelijk tegen protesteert.</li>
+      <li>Afwijkingen van deze voorwaarden zijn slechts geldig indien deze uitdrukkelijk Schriftelijk tussen Partijen zijn overeengekomen.</li>
+      <li>Indien enige bepaling van deze voorwaarden nietig is of vernietigd wordt, blijven de overige bepalingen onverminderd van kracht. Partijen treden in dat geval in overleg om de nietige of vernietigde bepaling te vervangen door een bepaling die de strekking van de oorspronkelijke bepaling zo dicht mogelijk benadert.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art3">
+    <h2><span class="artnum">ART. 3</span>Totstandkoming van de overeenkomst</h2>
+    <ol class="leden">
+      <li>Alle aanbiedingen en offertes van Ctrl PPC zijn vrijblijvend, tenzij daarin uitdrukkelijk anders is aangegeven.</li>
+      <li>De Overeenkomst komt tot stand op het moment dat Opdrachtgever een aanbod van Ctrl PPC Schriftelijk aanvaardt, dan wel op het moment dat Ctrl PPC met instemming van Opdrachtgever met de uitvoering van de Dienst begint, bijvoorbeeld door het aanmaken van een account op het Platform.</li>
+      <li>Ctrl PPC is gerechtigd om, alvorens de Overeenkomst uit te voeren, zich te vergewissen van de identiteit en kredietwaardigheid van Opdrachtgever.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art4">
+    <h2><span class="artnum">ART. 4</span>De Dienst</h2>
+    <ol class="leden">
+      <li>Ctrl PPC biedt Opdrachtgever toegang tot het Platform, waarmee campagnedata van Gekoppelde Platformen wordt opgehaald, geaggregeerd en geanalyseerd, en waarmee met behulp van AI-modelproviders hypotheses, bevindingen en aanbevelingen worden gegenereerd ten behoeve van de advertentiestrategie van Opdrachtgever of diens klanten.</li>
+      <li>De door het Platform gegenereerde output — waaronder analyses, hypotheses, aanbevelingen, prognoses en scores — is <strong>adviserend en ondersteunend van aard</strong>. De output is (mede) gebaseerd op geautomatiseerde verwerking van data via AI-modellen en vormt geen garantie, toezegging of resultaatsverplichting van Ctrl PPC.</li>
+      <li>Ctrl PPC spant zich in om het Platform met zorg en naar beste kunnen beschikbaar te stellen en te onderhouden, maar verbindt zich niet tot een bepaald percentage beschikbaarheid (uptime), tenzij Partijen dit Schriftelijk anders zijn overeengekomen in een Service Level Agreement.</li>
+      <li>Ctrl PPC is gerechtigd het Platform, de functionaliteiten en de gehanteerde AI-modellen te wijzigen, uit te breiden of te beperken, mits de kernfunctionaliteit van de Dienst daardoor niet wezenlijk wordt aangetast.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art5">
+    <h2><span class="artnum">ART. 5</span>Verplichtingen van Opdrachtgever</h2>
+    <ol class="leden">
+      <li>Opdrachtgever is verantwoordelijk voor het verlenen van de benodigde (API-)toegang tot de Gekoppelde Platformen, en staat ervoor in dat hij daartoe gerechtigd is, onder meer doordat hij zelf rechthebbende is op de betreffende advertentieaccounts of daartoe rechtsgeldig is gemachtigd door de betreffende klant.</li>
+      <li>Opdrachtgever is verantwoordelijk voor de juistheid en volledigheid van de door hem aangeleverde gegevens, instellingen, doelstellingen en targets binnen het Platform. Onjuiste of onvolledige invoer kan leiden tot onjuiste of onbruikbare analyses en adviezen; Ctrl PPC is daarvoor niet aansprakelijk.</li>
+      <li><strong>Opdrachtgever blijft te allen tijde zelf verantwoordelijk voor:</strong>
+        <ul class="sub">
+          <li>de daadwerkelijke inrichting, uitvoering en het beheer van advertentiecampagnes;</li>
+          <li>beslissingen omtrent de besteding, verhoging, verlaging of stopzetting van advertentiebudgetten;</li>
+          <li>de beoordeling of, en op welke wijze, een door het Platform gegenereerde hypothese, bevinding of aanbeveling wordt opgevolgd.</li>
+        </ul>
+      </li>
+      <li>Het Platform en de daarin vervatte adviezen zijn een hulpmiddel bij de besluitvorming van Opdrachtgever, en vervangen niet het eigen professionele oordeel van Opdrachtgever of diens medewerkers.</li>
+      <li>Opdrachtgever zal de inloggegevens tot het Platform vertrouwelijk behandelen en niet aan onbevoegde derden verstrekken, en is aansprakelijk voor handelingen die via zijn account worden verricht.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art6">
+    <h2><span class="artnum">ART. 6</span>Geen garantie op resultaat of rendement (ROI)</h2>
+    <ol class="leden">
+      <li><strong>Ctrl PPC geeft geen enkele garantie, toezegging of prognose ten aanzien van het financiële resultaat, rendement, return on investment (ROI), omzet, conversieratio's, kostenbesparing of enig ander commercieel resultaat</strong> dat Opdrachtgever met behulp van het Platform, de daarin gegenereerde analyses of adviezen zou kunnen behalen.</li>
+      <li>Door het Platform gepresenteerde prognoses, forecasts, doelstellingsstatussen en benchmarkvergelijkingen zijn statistische inschattingen op basis van historische data en modelmatige aannames. Zij vormen geen garantie voor toekomstige prestaties en kunnen afwijken van de daadwerkelijke uitkomsten.</li>
+      <li>Resultaten van advertentiecampagnes zijn afhankelijk van een groot aantal factoren buiten de invloedssfeer van Ctrl PPC, waaronder marktomstandigheden, concurrentiegedrag, wijzigingen in advertentieplatformen, de kwaliteit van de aangeboden producten of diensten van Opdrachtgever, en de wijze waarop Opdrachtgever of diens klant de gegeven adviezen al dan niet opvolgt.</li>
+      <li>Elke aansprakelijkheid van Ctrl PPC voor gederfde omzet, gemiste besparingen, verminderde ROI of andere vormen van (gevolg)schade die voortvloeit uit of verband houdt met de inhoud van analyses, hypotheses of aanbevelingen, is uitgesloten, onverminderd het bepaalde in artikel 13.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art7">
+    <h2><span class="artnum">ART. 7</span>Afhankelijkheid van derden: Gekoppelde Platformen en AI-modelproviders</h2>
+    <ol class="leden">
+      <li>Het Platform is voor het functioneren afhankelijk van de beschikbaarheid, werking en voorwaarden van Gekoppelde Platformen (waaronder Google Ads, Meta en LinkedIn) en AI-modelproviders (waaronder OpenRouter en de daarachter liggende modelaanbieders). Deze derde partijen zijn niet door Ctrl PPC gecontroleerde partijen.</li>
+      <li><strong>Ctrl PPC is niet aansprakelijk voor schade, uitval, vertraging of onjuiste of onvolledige werking van de Dienst voor zover deze het gevolg is van:</strong>
+        <ul class="sub">
+          <li>storingen, onderhoud of downtime bij Gekoppelde Platformen of AI-modelproviders;</li>
+          <li>wijzigingen, beperkingen, deprecatie of stopzetting van API's, endpoints of functionaliteiten door Gekoppelde Platformen of AI-modelproviders;</li>
+          <li>rate limits, quota, throttling of andere toegangsbeperkingen die door Gekoppelde Platformen of AI-modelproviders worden opgelegd;</li>
+          <li>wijzigingen in het beleid, de voorwaarden of de tarieven van Gekoppelde Platformen of AI-modelproviders;</li>
+          <li>het (tijdelijk of blijvend) intrekken van API-toegang door Opdrachtgever, diens klant, of het Gekoppelde Platform zelf;</li>
+          <li>onjuistheden, vertekeningen of hiaten in de brondata die door Gekoppelde Platformen wordt aangeleverd;</li>
+          <li>fouten, onnauwkeurigheden, "hallucinaties" of onverwachte output van AI-modellen die door AI-modelproviders worden geleverd.</li>
+        </ul>
+      </li>
+      <li>Indien een Gekoppeld Platform of AI-modelprovider zijn dienstverlening wijzigt op een wijze die redelijkerwijs noodzaakt tot aanpassing van het Platform, spant Ctrl PPC zich in om deze aanpassing binnen een redelijke termijn door te voeren, zonder dat hieraan een resultaatsverplichting of termijngarantie is verbonden.</li>
+      <li>Opdrachtgever erkent dat door AI-modellen gegenereerde tekst en analyses een probabilistisch karakter hebben en fouten kunnen bevatten. Opdrachtgever dient de output van het Platform te allen tijde op aannemelijkheid te (laten) beoordelen alvorens daarop te handelen.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art8">
+    <h2><span class="artnum">ART. 8</span>Intellectueel eigendom</h2>
+    <ol class="leden">
+      <li>Alle rechten van intellectuele eigendom op het Platform, de onderliggende software, algoritmen, prompts, modellen, documentatie en het uiterlijk van het Platform, berusten uitsluitend bij Ctrl PPC of diens licentiegevers.</li>
+      <li>Opdrachtgever verkrijgt uitsluitend een niet-exclusief, niet-overdraagbaar gebruiksrecht op het Platform voor de duur van de Overeenkomst en ten behoeve van zijn eigen bedrijfsvoering.</li>
+      <li>De door het Platform gegenereerde rapportages, analyses en exportbestanden die specifiek betrekking hebben op de data van Opdrachtgever, mogen door Opdrachtgever vrij worden gebruikt binnen zijn eigen onderneming en jegens diens eigen klanten.</li>
+      <li>Het is Opdrachtgever niet toegestaan het Platform te decompileren, te reverse-engineeren, of de onderliggende prompts, promptstructuren of modelconfiguraties te extraheren of te reproduceren, behoudens voor zover dwingend Nederlands recht dit toestaat.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art9">
+    <h2><span class="artnum">ART. 9</span>Vertrouwelijkheid</h2>
+    <ol class="leden">
+      <li>Partijen zullen alle informatie die zij van elkaar ontvangen en waarvan zij weten of redelijkerwijs behoren te weten dat deze vertrouwelijk is, geheimhouden, tenzij een wettelijke plicht tot openbaarmaking dwingt.</li>
+      <li>Deze verplichting geldt niet voor informatie die reeds openbaar was, die de ontvangende partij al rechtmatig bezat, of die zelfstandig door de ontvangende partij is ontwikkeld.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art10">
+    <h2><span class="artnum">ART. 10</span>Verwerking van persoonsgegevens</h2>
+    <ol class="leden">
+      <li>Voor zover Ctrl PPC bij de uitvoering van de Overeenkomst persoonsgegevens verwerkt ten behoeve van Opdrachtgever, doet zij dit als verwerker in de zin van de Algemene Verordening Gegevensbescherming (AVG), overeenkomstig het Privacy Statement en een tussen Partijen te sluiten verwerkersovereenkomst.</li>
+      <li>Voor zover Ctrl PPC persoonsgegevens verwerkt over Opdrachtgever zelf en diens gebruikers (bijvoorbeeld accountgegevens en facturatiegegevens), doet zij dit als zelfstandig verwerkingsverantwoordelijke, zoals nader toegelicht in het Privacy Statement.</li>
+      <li>Opdrachtgever staat ervoor in dat hij gerechtigd is de persoonsgegevens die hij via het Platform (doet) verwerken aan Ctrl PPC te verstrekken, en dat hij ten aanzien van betrokkenen aan diens eigen AVG-verplichtingen heeft voldaan.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art11">
+    <h2><span class="artnum">ART. 11</span>Prijzen en betaling</h2>
+    <ol class="leden">
+      <li>Alle prijzen zijn exclusief BTW en andere heffingen van overheidswege, tenzij anders vermeld.</li>
+      <li>Facturatie vindt plaats overeenkomstig de in het aanbod of de Overeenkomst vermelde termijn, bij gebreke waarvan maandelijks vooraf wordt gefactureerd.</li>
+      <li>Betaling dient te geschieden binnen <span class="ph">[BETALINGSTERMIJN, bijv. 14]</span> dagen na factuurdatum, zonder recht op verrekening of opschorting door Opdrachtgever, tenzij dwingend recht anders bepaalt.</li>
+      <li>Bij niet-tijdige betaling is Opdrachtgever van rechtswege in verzuim en is de wettelijke handelsrente (artikel 6:119a BW) verschuldigd, onverminderd het recht van Ctrl PPC om de toegang tot het Platform op te schorten.</li>
+      <li>Ctrl PPC is gerechtigd haar tarieven jaarlijks te indexeren, dan wel te wijzigen met inachtneming van een redelijke aankondigingstermijn van ten minste <span class="ph">[TERMIJN, bijv. 30]</span> dagen.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art12">
+    <h2><span class="artnum">ART. 12</span>Duur en beëindiging</h2>
+    <ol class="leden">
+      <li>De Overeenkomst wordt aangegaan voor de in het aanbod vermelde duur, en wordt bij gebreke van een uitdrukkelijke opzegging telkens stilzwijgend verlengd met dezelfde periode, tenzij anders overeengekomen.</li>
+      <li>Elk der Partijen kan de Overeenkomst Schriftelijk opzeggen met inachtneming van een opzegtermijn van <span class="ph">[OPZEGTERMIJN, bijv. één kalendermaand]</span> tegen het einde van de dan lopende contractperiode.</li>
+      <li>Ctrl PPC is gerechtigd de Overeenkomst met onmiddellijke ingang, zonder ingebrekestelling en zonder tot enige schadevergoeding gehouden te zijn, geheel of gedeeltelijk op te schorten of te ontbinden, indien Opdrachtgever in staat van faillissement wordt verklaard, surseance van betaling aanvraagt, of anderszins de vrije beschikking over zijn vermogen verliest, dan wel indien Opdrachtgever een wezenlijke verplichting uit de Overeenkomst niet nakomt en dit verzuim niet binnen een redelijke termijn na Schriftelijke ingebrekestelling herstelt.</li>
+      <li>Na beëindiging van de Overeenkomst wordt de toegang tot het Platform beëindigd. Ctrl PPC bewaart de data van Opdrachtgever gedurende de in het Privacy Statement genoemde termijn, waarna deze wordt verwijderd, tenzij een wettelijke bewaarplicht (zoals de fiscale bewaarplicht voor facturatiegegevens) anders vereist.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art13">
+    <h2><span class="artnum">ART. 13</span>Aansprakelijkheid</h2>
+    <ol class="leden">
+      <li>De totale aansprakelijkheid van Ctrl PPC jegens Opdrachtgever, uit welke hoofde dan ook — contractueel, uit onrechtmatige daad of anderszins — is per gebeurtenis (waarbij een reeks samenhangende gebeurtenissen als één gebeurtenis geldt) <strong>beperkt tot het totaalbedrag dat Opdrachtgever aan Ctrl PPC heeft betaald voor de Dienst gedurende de <span class="ph">[AANTAL] maanden</span> onmiddellijk voorafgaand aan de gebeurtenis waaruit de aansprakelijkheid voortvloeit</strong>, met een absoluut maximum van € <span class="ph">[MAXIMUMBEDRAG, optioneel]</span> per kalenderjaar.</li>
+      <li>In geen geval is Ctrl PPC aansprakelijk voor <strong>indirecte schade</strong>, waaronder in elk geval begrepen: gevolgschade, gederfde winst, gemiste besparingen, gederfde omzet, verminderde goodwill, schade door bedrijfsstagnatie, en schade als gevolg van door AI-modelproviders of Gekoppelde Platformen geleverde onjuiste of onvolledige data of output.</li>
+      <li>De uitsluitingen en beperkingen van dit artikel gelden niet voor zover de schade het gevolg is van opzet of bewuste roekeloosheid van Ctrl PPC of haar leidinggevenden.</li>
+      <li>Iedere vordering tot schadevergoeding jegens Ctrl PPC vervalt indien deze niet binnen twaalf (12) maanden nadat Opdrachtgever bekend werd of redelijkerwijs bekend had kunnen zijn met de schade en de mogelijke aansprakelijkheid van Ctrl PPC, in rechte aanhangig is gemaakt.</li>
+      <li>Opdrachtgever vrijwaart Ctrl PPC voor aanspraken van derden (waaronder diens eigen klanten) die verband houden met of voortvloeien uit het gebruik van het Platform door Opdrachtgever, waaronder begrepen aanspraken die verband houden met advertentiebeslissingen die (mede) op basis van de output van het Platform zijn genomen.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art14">
+    <h2><span class="artnum">ART. 14</span>Overmacht</h2>
+    <ol class="leden">
+      <li>Geen van de Partijen is gehouden tot nakoming van enige verplichting indien zij daartoe verhinderd is als gevolg van overmacht. Onder overmacht wordt in elk geval mede verstaan: storingen bij Gekoppelde Platformen of AI-modelproviders, internet- of energiestoringen, cyberaanvallen, overheidsmaatregelen, en storingen bij door Ctrl PPC ingeschakelde hostingpartijen.</li>
+      <li>Indien de overmachtsituatie langer dan <span class="ph">[TERMIJN, bijv. 60]</span> dagen voortduurt, is elk der Partijen gerechtigd de Overeenkomst Schriftelijk te ontbinden, zonder gehoudenheid tot enige schadevergoeding.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art15">
+    <h2><span class="artnum">ART. 15</span>Wijziging van deze voorwaarden</h2>
+    <ol class="leden">
+      <li>Ctrl PPC is gerechtigd deze algemene voorwaarden te wijzigen. Gewijzigde voorwaarden worden ten minste <span class="ph">[TERMIJN, bijv. 30]</span> dagen voor inwerkingtreding Schriftelijk aan Opdrachtgever bekendgemaakt.</li>
+      <li>Indien Opdrachtgever niet instemt met een wezenlijke wijziging, is hij gerechtigd de Overeenkomst op te zeggen tegen de datum waarop de wijziging in werking treedt.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art16">
+    <h2><span class="artnum">ART. 16</span>Toepasselijk recht en geschillen</h2>
+    <ol class="leden">
+      <li>Op de Overeenkomst en deze algemene voorwaarden is uitsluitend <strong>Nederlands recht</strong> van toepassing. De toepasselijkheid van het Weens Koopverdrag is uitgesloten.</li>
+      <li>Geschillen die voortvloeien uit of verband houden met de Overeenkomst worden bij uitsluiting voorgelegd aan de bevoegde rechter te <span class="ph">[ARRONDISSEMENT/VESTIGINGSPLAATS]</span>, onverminderd het recht van Ctrl PPC om een geschil voor te leggen aan de volgens de wet bevoegde rechter.</li>
+    </ol>
+  </article>
+
+  <article class="artikel" id="art17">
+    <h2><span class="artnum">ART. 17</span>Slotbepalingen</h2>
+    <ol class="leden">
+      <li>Ctrl PPC is gerechtigd haar rechten en verplichtingen uit de Overeenkomst over te dragen aan een derde in het kader van een overdracht van (een deel van) haar onderneming, zonder voorafgaande toestemming van Opdrachtgever.</li>
+      <li>Opdrachtgever is niet gerechtigd rechten of verplichtingen uit de Overeenkomst zonder voorafgaande Schriftelijke toestemming van Ctrl PPC aan een derde over te dragen.</li>
+    </ol>
+  </article>
+
+  <footer class="closing">
+    <span class="label">Nog te vervangen/controleren voor gebruik</span>
+    Handelsnaam / KvK-nummer / BTW-nummer / vestigingsadres, betalingstermijn, opzegtermijn, aansprakelijkheidscap-periode (aantal maanden) en eventueel absoluut maximumbedrag, bevoegde rechtbank. Laat dit door een Nederlandse ICT-jurist toetsen voordat het als bindende overeenkomst wordt gebruikt.
+  </footer>
+</div>

@@ -1,0 +1,360 @@
+<title>Privacy Statement</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #F7F7FB;
+    --surface: #FFFFFF;
+    --surface-2: #FBFBFE;
+    --text: #191D2E;
+    --text-muted: #4A4F66;
+    --text-faint: #7B8098;
+    --border: #E1E3ED;
+    --border-strong: #C7CBDC;
+    --accent: #4F46E5;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #EEF0FD;
+    --ph-bg: #FFF6E0;
+    --ph-border: #D98F2B;
+    --ph-text: #7A4F0F;
+    --good-bg: #E9F7EF;
+    --good-border: #34A369;
+    --good-text: #1E6B44;
+    --gap-bg: #FDEEEE;
+    --gap-border: #D9564F;
+    --gap-text: #8C2E29;
+    --shadow: 0 1px 2px rgba(25,29,46,0.04), 0 8px 24px rgba(25,29,46,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0D1224;
+      --surface: #151C34;
+      --surface-2: #121A30;
+      --text: #F1F0EC;
+      --text-muted: #ACB1C9;
+      --text-faint: #7B82A0;
+      --border: #2A324F;
+      --border-strong: #3A436A;
+      --accent: #8B92F8;
+      --accent-ink: #10142A;
+      --accent-soft: #232B4D;
+      --ph-bg: #33290F;
+      --ph-border: #C98A2E;
+      --ph-text: #F0C77E;
+      --good-bg: #123125;
+      --good-border: #3FBF80;
+      --good-text: #8FE0B6;
+      --gap-bg: #331615;
+      --gap-border: #E06A63;
+      --gap-text: #F3A9A4;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1224;
+    --surface: #151C34;
+    --surface-2: #121A30;
+    --text: #F1F0EC;
+    --text-muted: #ACB1C9;
+    --text-faint: #7B82A0;
+    --border: #2A324F;
+    --border-strong: #3A436A;
+    --accent: #8B92F8;
+    --accent-ink: #10142A;
+    --accent-soft: #232B4D;
+    --ph-bg: #33290F;
+    --ph-border: #C98A2E;
+    --ph-text: #F0C77E;
+    --good-bg: #123125;
+    --good-border: #3FBF80;
+    --good-text: #8FE0B6;
+    --gap-bg: #331615;
+    --gap-border: #E06A63;
+    --gap-text: #F3A9A4;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 0.5em;
+    font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin: 0 0 1rem;
+  }
+  .eyebrow::before { content: ""; width: 0.55em; height: 0.55em; border-radius: 2px; background: var(--accent); display: inline-block; }
+  h1 { font-size: clamp(2rem, 4vw, 2.6rem); line-height: 1.12; font-weight: 600; margin: 0 0 0.9rem; text-wrap: balance; letter-spacing: -0.01em; }
+  .meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem; font-size: 0.85rem; color: var(--text-faint); margin-bottom: 2rem; }
+  .pill { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.28em 0.75em; border-radius: 999px; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; border: 1px solid var(--ph-border); background: var(--ph-bg); color: var(--ph-text); }
+  .intro { font-size: 1.05rem; color: var(--text-muted); max-width: 66ch; margin: 0 0 2.5rem; }
+  .intro strong { color: var(--text); }
+  hr.rule { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+  nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem 1.75rem; box-shadow: var(--shadow); margin-bottom: 3rem; }
+  nav.toc h2 { font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; margin: 0 0 1rem; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 2rem; }
+  nav.toc li { break-inside: avoid; margin-bottom: 0.55rem; }
+  nav.toc a { color: var(--text-muted); text-decoration: none; font-size: 0.92rem; display: block; }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); }
+  nav.toc .num { font-family: "IBM Plex Mono", monospace; color: var(--accent); margin-right: 0.5em; font-size: 0.82em; }
+
+  section.par { margin-bottom: 2.6rem; scroll-margin-top: 2rem; }
+  section.par h2 { font-size: 1.32rem; font-weight: 600; line-height: 1.3; margin: 0 0 1rem; text-wrap: balance; display: flex; align-items: baseline; gap: 0.6rem; }
+  section.par h2 .parnum { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 0.15em 0.55em; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; }
+  section.par h3 { font-size: 1.06rem; font-weight: 600; margin: 1.6rem 0 0.7rem; }
+  section.par p { margin: 0 0 1rem; max-width: 68ch; }
+  section.par ul.plain { margin: 0 0 1rem; padding-left: 1.3em; max-width: 68ch; }
+  section.par ul.plain li { margin-bottom: 0.55rem; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); }
+
+  .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 0 0 1.3rem; }
+  .role-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem 1.35rem; box-shadow: var(--shadow); }
+  .role-card .tag { font-family: "IBM Plex Mono", monospace; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 600; display: block; margin-bottom: 0.5rem; }
+  .role-card p { margin: 0; font-size: 0.95rem; }
+  @media (max-width: 640px) { .roles { grid-template-columns: 1fr; } }
+
+  table.datatable { width: 100%; border-collapse: collapse; margin: 0 0 1.3rem; font-size: 0.94rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+  table.datatable th, table.datatable td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.datatable th { font-family: "IBM Plex Mono", monospace; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; background: var(--surface-2); }
+  table.datatable tr:last-child td { border-bottom: none; }
+  .table-scroll { overflow-x: auto; margin-bottom: 1.3rem; }
+  .table-scroll table.datatable { margin-bottom: 0; }
+
+  .secgrid { display: grid; gap: 1rem; margin: 0 0 1.5rem; }
+  .seccard { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.15rem 1.35rem; box-shadow: var(--shadow); }
+  .seccard .domain { font-family: "IBM Plex Mono", monospace; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--good-text); font-weight: 600; display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.55rem; }
+  .seccard .domain::before { content: "✓"; display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em; border-radius: 50%; background: var(--good-bg); border: 1px solid var(--good-border); color: var(--good-text); font-size: 0.85em; }
+  .seccard p { margin: 0; font-size: 0.95rem; }
+
+  .gapbox { background: var(--gap-bg); border: 1px solid var(--gap-border); border-radius: 10px; padding: 1.2rem 1.35rem; margin: 0 0 1rem; }
+  .gapbox .domain { font-family: "IBM Plex Mono", monospace; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gap-text); font-weight: 600; display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.7rem; }
+  .gapbox .domain::before { content: "!"; display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em; border-radius: 50%; background: var(--surface); border: 1px solid var(--gap-border); color: var(--gap-text); font-size: 0.85em; font-weight: 700; }
+  .gapbox ul { margin: 0; padding-left: 1.2em; }
+  .gapbox li { margin-bottom: 0.5rem; font-size: 0.95rem; }
+  .gapbox li:last-child { margin-bottom: 0; }
+
+  .ph { background: var(--ph-bg); border: 1px dashed var(--ph-border); color: var(--ph-text); padding: 0.05em 0.4em; border-radius: 5px; font-family: "IBM Plex Mono", monospace; font-size: 0.88em; font-weight: 500; }
+
+  footer.closing { margin-top: 3.5rem; padding: 1.5rem 1.75rem; background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid var(--ph-border); border-radius: 0 10px 10px 0; font-size: 0.9rem; color: var(--text-muted); }
+  footer.closing .label { font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ph-text); font-weight: 600; display: block; margin-bottom: 0.6rem; }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 2.5rem 1.25rem 4rem; }
+    nav.toc ol { columns: 1; }
+    section.par h2 { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow mono">Ctrl PPC · Juridisch document</p>
+  <h1>Privacy Statement</h1>
+  <div class="meta-row mono">
+    <span>Versie <span class="ph">[VERSIENUMMER]</span></span>
+    <span>·</span>
+    <span>laatst gewijzigd op <span class="ph">[DATUM]</span></span>
+    <span class="pill">Concept — nog niet definitief</span>
+  </div>
+  <p class="intro">Dit Privacy Statement legt uit hoe <span class="ph">[HANDELSNAAM/EENMANSZAAK]</span>, gevestigd te <span class="ph">[VESTIGINGSPLAATS]</span>, KvK-nummer <span class="ph">[KVK-NUMMER]</span> (hierna: <strong>"Ctrl PPC"</strong>, "wij"), omgaat met persoonsgegevens in het kader van het platform Ctrl PPC. Vragen over dit statement of over de verwerking van uw gegevens kunt u richten aan <span class="ph">[E-MAILADRES]</span>.</p>
+
+  <nav class="toc">
+    <h2>Paragrafen</h2>
+    <ol>
+      <li><a href="#p1"><span class="num">01</span>Twee rollen: verwerker of verwerkingsverantwoordelijke</a></li>
+      <li><a href="#p2"><span class="num">02</span>Welke gegevens, en op welke grondslag</a></li>
+      <li><a href="#p3"><span class="num">03</span>Herkomst van de gegevens</a></li>
+      <li><a href="#p4"><span class="num">04</span>Geen verkoop van gegevens</a></li>
+      <li><a href="#p5"><span class="num">05</span>Subverwerkers en doorgifte buiten de EER</a></li>
+      <li><a href="#p6"><span class="num">06</span>Bewaartermijnen</a></li>
+      <li><a href="#p7"><span class="num">07</span>Beveiliging</a></li>
+      <li><a href="#p8"><span class="num">08</span>Uw rechten</a></li>
+      <li><a href="#p9"><span class="num">09</span>Cookies</a></li>
+      <li><a href="#p10"><span class="num">10</span>Wijzigingen in dit statement</a></li>
+      <li><a href="#p11"><span class="num">11</span>Contact</a></li>
+    </ol>
+  </nav>
+
+  <section class="par" id="p1">
+    <h2><span class="parnum">§1</span>Twee rollen: wanneer zijn wij verwerker, wanneer verwerkingsverantwoordelijke</h2>
+    <p>Ctrl PPC is een B2B-platform dat wordt gebruikt door marketingbureaus en adverteerders ("Opdrachtgevers") om advertentiedata te analyseren. Voor de AVG is het onderscheid tussen onze twee rollen essentieel:</p>
+    <div class="roles">
+      <div class="role-card">
+        <span class="tag">Als verwerker</span>
+        <p>Voor de advertentie- en campagnedata die via Google Ads, Meta en LinkedIn wordt opgehaald en geanalyseerd ten behoeve van Opdrachtgever. Opdrachtgever (of diens eigen klant) is en blijft <strong>verwerkingsverantwoordelijke</strong> voor deze data, vastgelegd in een verwerkersovereenkomst die onlosmakelijk onderdeel uitmaakt van de dienstverleningsovereenkomst.</p>
+      </div>
+      <div class="role-card">
+        <span class="tag">Als verwerkingsverantwoordelijke</span>
+        <p>Voor de gegevens die wij verzamelen over Opdrachtgever zelf en diens gebruikers (accountgegevens, facturatiegegevens, gebruik van het Platform) en over bezoekers van onze website.</p>
+      </div>
+    </div>
+    <p>Dit statement beschrijft beide rollen. Waar relevant, is aangegeven in welke hoedanigheid wij optreden.</p>
+  </section>
+
+  <section class="par" id="p2">
+    <h2><span class="parnum">§2</span>Welke gegevens verwerken wij, en op welke grondslag</h2>
+
+    <h3>2.1 Accountgegevens van Opdrachtgever en diens gebruikers</h3>
+    <div class="table-scroll">
+    <table class="datatable">
+      <tr><th>Gegevens</th><th>Doel</th><th>Grondslag</th></tr>
+      <tr><td>Naam, e-mailadres, rol/functie van gebruikers binnen het account</td><td>Aanmaken en beheren van accounts, authenticatie, toegangscontrole per bureau/klant</td><td>Uitvoering van de overeenkomst (art. 6 lid 1 sub b AVG)</td></tr>
+      <tr><td>Inlog- en sessiegegevens</td><td>Beveiliging, voorkomen van misbruik, foutopsporing</td><td>Gerechtvaardigd belang (art. 6 lid 1 sub f AVG): een werkend en veilig platform</td></tr>
+      <tr><td>Bedrijfsgegevens (bedrijfsnaam, adres, KvK, BTW-nummer)</td><td>Facturatie en fiscale/administratieve verplichtingen</td><td>Uitvoering van de overeenkomst en wettelijke verplichting (art. 6 lid 1 sub b en c AVG)</td></tr>
+    </table>
+    </div>
+
+    <h3>2.2 Gegevens verwerkt namens Opdrachtgever (wij: verwerker)</h3>
+    <p>Via de door Opdrachtgever gekoppelde advertentieaccounts halen wij, met de door Opdrachtgever verstrekte API-autorisatie, campagne- en accountdata op bij <strong>Google Ads, Meta (Facebook/Instagram) Ads en LinkedIn Ads</strong>. Dit betreft in de kern <strong>geaggregeerde, campagnegerichte prestatiedata</strong>: vertoningen, klikken, kosten, conversies, doelgroepsegmenten (bijvoorbeeld op functieniveau of senioriteit, zoals aangeleverd door het advertentieplatform zelf, altijd op segment- en nooit op individueel niveau) en vergelijkbare statistieken.</p>
+    <ul class="plain">
+      <li>Deze data betreft in de regel <strong>geen tot individuele consumenten herleidbare persoonsgegevens</strong>: advertentieplatformen leveren doorgaans geaggregeerde cijfers op campagne-, advertentiegroep- of doelgroepsegmentniveau, niet op het niveau van een geïdentificeerd of identificeerbaar natuurlijk persoon. Dit geldt ook voor leadformulier-data van LinkedIn: wij lezen uitsluitend het aantal openingen en inzendingen per formulier, geen namen of contactgegevens van individuele leads.</li>
+      <li>Voor zover in specifieke gevallen toch persoonsgegevens onderdeel zijn van deze dataset (bijvoorbeeld een contactpersoon vermeld in klantnotities die Opdrachtgever zelf invoert), verwerken wij deze <strong>uitsluitend in opdracht van en volgens instructies van Opdrachtgever</strong>, als verwerker. De grondslag voor deze verwerking berust bij Opdrachtgever als verwerkingsverantwoordelijke.</li>
+      <li>Wij gebruiken deze data uitsluitend om de Dienst aan Opdrachtgever te leveren, en niet voor eigen doeleinden, behoudens geaggregeerde en/of geanonimiseerde statistiek zoals toegelicht in paragraaf 2.4.</li>
+      <li>De autorisatie (koppeling) die Opdrachtgever aan ons verleent, wordt niet als leesbare tekst opgeslagen: het toegangstoken zelf staat in een aparte, versleutelde kluis (zie paragraaf 7), niet in dezelfde tabel als de campagnedata.</li>
+    </ul>
+
+    <h3>2.3 Gebruik van AI-modellen bij analyse en advisering</h3>
+    <p>Het Platform gebruikt taalmodellen om op basis van de in 2.2 genoemde geaggregeerde prestatiedata analyses, samenvattingen, hypotheses en aanbevelingen te genereren. Deze modellen worden ontsloten via <strong>OpenRouter</strong>, dat als routeringslaag fungeert naar onderliggende modelaanbieders (afhankelijk van de taak, onder meer aanbieders van Claude-, Gemini- en Grok-achtige modellen).</p>
+    <ul class="plain">
+      <li>Aan deze modellen wordt de geaggregeerde campagnedata, en géén los daarvan bewaarde consumentidentiteit, ter beschikking gesteld ten behoeve van het genereren van de analyse.</li>
+      <li>Voor zover een AI-modelprovider daarbij optreedt als (sub)verwerker in de zin van de AVG, is dit opgenomen in ons subverwerkersoverzicht (paragraaf 5). Wij streven ernaar uitsluitend providers in te schakelen die contractueel toezeggen klantdata niet te gebruiken voor het trainen van hun modellen; dit wordt per daadwerkelijk actieve provider bevestigd en is op verzoek in te zien, in plaats van hier als vaststaand gegeven te worden gepresenteerd.</li>
+      <li>Door AI gegenereerde output is per definitie een geautomatiseerd gegenereerd advies. Er wordt geen besluit met rechtsgevolg of vergelijkbaar wezenlijk gevolg voor een natuurlijk persoon (in de zin van art. 22 AVG) op louter geautomatiseerde wijze genomen: de output betreft campagne-/marketingadvies aan een onderneming (Opdrachtgever), niet een geautomatiseerd besluit over een individuele betrokkene.</li>
+    </ul>
+
+    <h3>2.4 Product- en dienstverbetering</h3>
+    <p>Wij kunnen geaggregeerde en waar mogelijk geanonimiseerde gebruiksstatistieken (bijvoorbeeld: welke onderdelen van het Platform worden gebruikt, foutmeldingen, prestatiemetingen van het Platform zelf) gebruiken om de Dienst te verbeteren, op grond van ons gerechtvaardigd belang (art. 6 lid 1 sub f AVG) bij een goed functionerend product. Dit betreft geen analyse van de inhoud van klantcampagnes voor doeleinden buiten de dienstverlening aan de betreffende Opdrachtgever.</p>
+
+    <h3>2.5 Websitebezoekers</h3>
+    <p>Voor de publieke website (bijvoorbeeld de pagina's over prijzen, blog en contact) verwerken wij beperkte technische en analytische gegevens (zoals IP-adres, browsertype en bezochte pagina's), voor zover van toepassing via cookies zoals toegelicht in paragraaf 9. Grondslag: toestemming (voor niet-noodzakelijke cookies) respectievelijk gerechtvaardigd belang (voor strikt noodzakelijke, functionele cookies).</p>
+  </section>
+
+  <section class="par" id="p3">
+    <h2><span class="parnum">§3</span>Herkomst van de gegevens</h2>
+    <ul class="plain">
+      <li>Accountgegevens: rechtstreeks verstrekt door Opdrachtgever bij aanmelding en gebruik van het Platform.</li>
+      <li>Campagne- en prestatiedata: opgehaald bij Google Ads, Meta en LinkedIn, op basis van de autorisatie (OAuth-koppeling) die Opdrachtgever aan Ctrl PPC verleent.</li>
+      <li>Facturatiegegevens: rechtstreeks verstrekt door Opdrachtgever.</li>
+    </ul>
+  </section>
+
+  <section class="par" id="p4">
+    <h2><span class="parnum">§4</span>Geen verkoop van gegevens</h2>
+    <p>Wij verkopen persoonsgegevens niet aan derden en gebruiken de via het Platform verwerkte campagnedata niet voor advertentiedoeleinden van onszelf of van andere klanten.</p>
+  </section>
+
+  <section class="par" id="p5">
+    <h2><span class="parnum">§5</span>Subverwerkers en doorgifte buiten de EER</h2>
+    <p>Voor de uitvoering van de Dienst maken wij gebruik van de volgende categorieën subverwerkers:</p>
+    <div class="table-scroll">
+    <table class="datatable">
+      <tr><th>Subverwerker</th><th>Functie</th><th>Locatie / doorgiftemechanisme</th></tr>
+      <tr><td>Database-, authenticatie- en opslaginfrastructuur (Supabase)</td><td>Opslag van accountgegevens, campagnedata, gegenereerde analyses en bestanden; beheer van inloggegevens; versleutelde opslag van API-toegangstokens</td><td><span class="ph">REGIO BEVESTIGEN</span> — EU-regio indien geconfigureerd; zo niet: doorgifte buiten de EER op basis van Standard Contractual Clauses</td></tr>
+      <tr><td>Hostingplatform webapplicatie (Vercel)</td><td>Hosten en uitleveren van het Platform, uitvoeren van de dagelijkse synchronisatie</td><td><span class="ph">REGIO/SCC'S BEVESTIGEN</span></td></tr>
+      <tr><td>AI-modelrouteringsdienst (OpenRouter)</td><td>Routeert analysetaken naar het voor die taak geschikte model</td><td>Verwerking (mogelijk) buiten de EER; doorgifte op basis van Standard Contractual Clauses c.q. een passend beschermingsniveau, te bevestigen</td></tr>
+      <tr><td>Onderliggende modelaanbieders via OpenRouter (o.a. Anthropic-, Google- en xAI-modellen, afhankelijk van de analysetaak)</td><td>Genereren van analysetekst, samenvattingen en gestructureerde bevindingen op basis van geaggregeerde campagnedata</td><td>Verwerking (mogelijk) buiten de EER, per aanbieder te bevestigen</td></tr>
+      <tr><td>Google Ads, Meta Ads, LinkedIn Ads</td><td>Bron van de campagne- en advertentieprestatiedata die Opdrachtgever laat koppelen</td><td>Treden hier niet op als onze subverwerker, maar als platform waarop Opdrachtgever (of diens klant) zelf verwerkingsverantwoordelijke is. Voor Google Ads loopt de leestoegang via één technische koppeling op accountniveau van Ctrl PPC (een "manageraccount"), niet via een los token per Opdrachtgever</td></tr>
+    </table>
+    </div>
+    <p>Met alle subverwerkers die persoonsgegevens buiten de Europese Economische Ruimte verwerken, zijn passende waarborgen overeengekomen (zoals de Standard Contractual Clauses van de Europese Commissie). Een actueel, volledig overzicht van subverwerkers, inclusief de op dat moment daadwerkelijk actieve modelaanbieders, is op verzoek beschikbaar via <span class="ph">[E-MAILADRES]</span>.</p>
+  </section>
+
+  <section class="par" id="p6">
+    <h2><span class="parnum">§6</span>Bewaartermijnen</h2>
+    <p>Wij bewaren persoonsgegevens niet langer dan noodzakelijk voor de doeleinden waarvoor zij zijn verzameld. Hieronder staat zowel wat automatisch is ingeregeld als wat op dit moment nog op aanvraag verloopt — wij beloven hier niet meer dan wat het Platform daadwerkelijk doet.</p>
+    <ul class="plain">
+      <li><strong>Zoektermdata (Google Ads)</strong>: enige categorie met een automatische, doorlopende bewaartermijn: maximaal twee maanden, gerekend vanaf de meest recente maand waarvan Opdrachtgever data heeft (niet vanaf een vaste kalenderdatum, zodat een tijdelijk stilstaande koppeling niet leidt tot het verlies van de enige nog beschikbare data). Oudere zoektermregels worden automatisch verwijderd bij elke nieuwe synchronisatie.</li>
+      <li><strong>Overige campagne- en accountdata, gegenereerde analyses en rapportages</strong>: bewaard gedurende de looptijd van de overeenkomst met Opdrachtgever, zodat historische trends en jaar-op-jaar-vergelijkingen beschikbaar blijven. Voor deze categorieën bestaat vandaag geen geautomatiseerde verwijdering na afloop van de overeenkomst; verwijdering vindt plaats op verzoek van Opdrachtgever, en in elk geval bij formele beëindiging van de overeenkomst binnen een door Partijen af te spreken termijn.</li>
+      <li><strong>Wijzigingsgeschiedenis van hypotheses en trackrecord-events</strong>: bewust niet onderworpen aan verwijdering of wijziging zolang de overeenkomst loopt — een append-only geschiedenis die de betrouwbaarheid van eerdere adviezen aantoonbaar maakt, technisch afgedwongen zodat ook per ongeluk overschrijven niet mogelijk is. Bevat geen persoonsgegevens van individuen; is gekoppeld aan klant-/campagneniveau.</li>
+      <li><strong>Facturatie- en administratieve gegevens</strong>: bewaard gedurende de wettelijke fiscale bewaartermijn van zeven jaar (artikel 52 Algemene wet inzake rijksbelastingen).</li>
+      <li><strong>Gebruiksstatistieken van AI-modelaanroepen</strong> (welk model, aantal tokens, kosten): bewaard voor kostenanalyse en verbetering van de Dienst. Bevat geen prompttekst of gegenereerde inhoud, uitsluitend telmetingen.</li>
+      <li><strong>Gegevens van proef-/demo-accounts</strong>: uitsluitend fictieve, niet tot bestaande personen herleidbare gegevens; geen bewaartermijn van persoonsgegevens van toepassing.</li>
+    </ul>
+    <p>Na het verstrijken van de toepasselijke bewaartermijn, of na een geldig verwijderingsverzoek, worden de gegevens verwijderd of onomkeerbaar geanonimiseerd. Wij werken toe naar bredere automatisering van bewaartermijnen voor de categorieën waar dat vandaag nog niet is ingeregeld.</p>
+  </section>
+
+  <section class="par" id="p7">
+    <h2><span class="parnum">§7</span>Beveiliging</h2>
+    <p>Wij nemen passende technische en organisatorische maatregelen om persoonsgegevens te beschermen tegen verlies of onrechtmatige verwerking. Hieronder staat concreet wat daadwerkelijk is ingericht, per beveiligingsdomein — en, waar van toepassing, wat nog in ontwikkeling is. Wij kiezen ervoor hier specifiek en verifieerbaar te zijn in plaats van algemene geruststellingen te geven.</p>
+
+    <div class="secgrid">
+      <div class="seccard">
+        <span class="domain">Toegangsbeheer</span>
+        <p>Toegang tot klantdata is op databaseniveau afgeschermd per bureau/organisatie (row-level security): een gebruiker kan uitsluitend rijen opvragen die aan zijn eigen organisatie zijn gekoppeld, afgedwongen door de database zelf en niet alleen door de applicatielaag. Functioneel getest met twee afzonderlijke, daadwerkelijk ingelogde gebruikers van verschillende organisaties. Toegang binnen een organisatie is bovendien rolgebonden (beheerder, specialist, viewer, met elk een eigen rechtenset).</p>
+      </div>
+      <div class="seccard">
+        <span class="domain">Verplichte authenticatie</span>
+        <p>Het Platform wordt uitgebreid met verplichte sessie-authenticatie voor elke pagina en API-aanroep die klantdata ontsluit; deze functionaliteit is gebouwd en getest en wordt gefaseerd geactiveerd.</p>
+      </div>
+      <div class="seccard">
+        <span class="domain">Geheimenbeheer</span>
+        <p>Toegangstokens naar gekoppelde advertentieplatformen worden niet als leesbare tekst in de reguliere database opgeslagen. Zij staan in een aparte, versleutelde kluis, benaderbaar via een streng afgebakende technische functie die uitsluitend het opslaan en ophalen van één specifiek geheim toestaat — niet het doorzoeken van de kluis als geheel.</p>
+      </div>
+      <div class="seccard">
+        <span class="domain">Versleuteling in transit</span>
+        <p>Al het dataverkeer tussen het Platform, de database en de gekoppelde diensten loopt via versleutelde verbindingen (TLS).</p>
+      </div>
+      <div class="seccard">
+        <span class="domain">Onveranderlijke audittrail</span>
+        <p>Voor de geschiedenis van hypotheses en aanbevelingen wordt op databaseniveau afgedwongen dat eenmaal vastgelegde events nooit gewijzigd of verwijderd kunnen worden, ook niet per ongeluk door de applicatie zelf.</p>
+      </div>
+    </div>
+
+    <div class="gapbox">
+      <span class="domain">Wat op dit moment (nog) geen formeel, gedocumenteerd proces is</span>
+      <ul>
+        <li>een vastgelegd incidentresponsplan met vaste meldingstermijnen bij een eventueel datalek;</li>
+        <li>een periodieke, gedocumenteerde risicoanalyse van de architectuur;</li>
+        <li>een formele, herhaalde beoordeling van subverwerkers op hun beveiligingsniveau (vandaag: vertrouwen op de eigen certificeringen en voorwaarden van de ingeschakelde partijen, niet op een eigen audit).</li>
+      </ul>
+    </div>
+    <p>Wij vermelden dit bewust in plaats van het weg te laten: onze technische maatregelen zijn concreet en verifieerbaar, maar vormen nog geen gecertificeerd managementsysteem. Opdrachtgevers voor wie dat een vereiste is, kunnen hierover contact opnemen via <span class="ph">[E-MAILADRES]</span>.</p>
+  </section>
+
+  <section class="par" id="p8">
+    <h2><span class="parnum">§8</span>Uw rechten</h2>
+    <p>Voor zover Ctrl PPC ten aanzien van uw gegevens optreedt als verwerkingsverantwoordelijke (zie paragraaf 1), heeft u op grond van de AVG de volgende rechten:</p>
+    <ul class="plain">
+      <li><strong>Inzage</strong> in de persoonsgegevens die wij van u verwerken;</li>
+      <li><strong>Rectificatie</strong> van onjuiste gegevens;</li>
+      <li><strong>Verwijdering</strong> van uw gegevens, voor zover geen wettelijke bewaarplicht of ander gerechtvaardigd belang zich daartegen verzet;</li>
+      <li><strong>Beperking</strong> van de verwerking;</li>
+      <li><strong>Overdraagbaarheid</strong> van gegevens die u zelf aan ons heeft verstrekt;</li>
+      <li><strong>Bezwaar</strong> tegen verwerking op grond van gerechtvaardigd belang;</li>
+      <li><strong>Intrekking van toestemming</strong>, voor zover een verwerking op toestemming berust, zonder gevolgen voor de rechtmatigheid van de verwerking vóór de intrekking.</li>
+    </ul>
+    <p>U kunt deze rechten uitoefenen door contact op te nemen via <span class="ph">[E-MAILADRES]</span>. Wij reageren binnen de wettelijke termijn van één maand.</p>
+    <p>Bent u gebruiker van het Platform via een Opdrachtgever (bijvoorbeeld als medewerker van een marketingbureau of als klant van dat bureau) en betreft uw verzoek gegevens waarvoor Opdrachtgever verwerkingsverantwoordelijke is? Dan verzoeken wij u zich in eerste instantie te wenden tot Opdrachtgever; wij ondersteunen Opdrachtgever desgevraagd bij de afhandeling van uw verzoek.</p>
+    <p>Bent u van mening dat wij niet op de juiste wijze met uw persoonsgegevens omgaan? Dan heeft u het recht een klacht in te dienen bij de Autoriteit Persoonsgegevens (autoriteitpersoonsgegevens.nl).</p>
+  </section>
+
+  <section class="par" id="p9">
+    <h2><span class="parnum">§9</span>Cookies</h2>
+    <p>Onze website maakt gebruik van <span class="ph">functionele/analytische/marketing — AANVULLEN</span> cookies. Strikt noodzakelijke cookies (bijvoorbeeld voor het functioneren van de inlogsessie) worden geplaatst op grond van ons gerechtvaardigd belang; overige cookies worden alleen geplaatst na uw toestemming, die u te allen tijde kunt intrekken via <span class="ph">[COOKIEBANNER/INSTELLINGEN]</span>.</p>
+  </section>
+
+  <section class="par" id="p10">
+    <h2><span class="parnum">§10</span>Wijzigingen in dit Privacy Statement</h2>
+    <p>Wij kunnen dit Privacy Statement van tijd tot tijd aanpassen, bijvoorbeeld naar aanleiding van wijzigingen in de Dienst, in de ingeschakelde subverwerkers, of in de toepasselijke regelgeving. De actuele versie is steeds via het Platform en de website raadpleegbaar. Bij wezenlijke wijzigingen stellen wij Opdrachtgever daarvan Schriftelijk op de hoogte.</p>
+  </section>
+
+  <section class="par" id="p11">
+    <h2><span class="parnum">§11</span>Contact</h2>
+    <p>Voor vragen over dit Privacy Statement of de verwerking van uw persoonsgegevens:</p>
+    <p><strong><span class="ph">[HANDELSNAAM/EENMANSZAAK]</span></strong><br>
+    <span class="ph">[VESTIGINGSADRES]</span><br>
+    <span class="ph">[E-MAILADRES]</span><br>
+    KvK-nummer: <span class="ph">[KVK-NUMMER]</span></p>
+  </section>
+
+  <footer class="closing">
+    <span class="label">Nog te bevestigen voor gebruik</span>
+    Hostingregio's van Supabase/Vercel en of doorgifte buiten de EER daadwerkelijk plaatsvindt; per daadwerkelijk actieve AI-modelprovider de contractuele trainingsuitsluiting; het daadwerkelijke cookiegebruik op de website. De overige technische beweringen in dit document (rolscheiding, geheimenkluis, zoektermretentie, audittrail) zijn geverifieerd tegen de actuele codebase en database op 20 augustus 2026 — bij een volgende materiële architectuurwijziging moet dit statement opnieuw tegen de code worden gelegd, niet stilzwijgend als nog kloppend worden aangenomen.
+  </footer>
+</div>
