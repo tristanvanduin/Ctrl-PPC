@@ -579,7 +579,7 @@ const SETTINGS_GROEPEN = [
   { id: "meten", label: "Doelen & meten", uitleg: "Waar stuurt deze klant op, en wat telt als conversie — per kanaal." },
   { id: "merk", label: "Merk & uiterlijk", uitleg: "Huisstijl, kleuren en logo; wat je terugziet in het dashboard en de rapporten." },
   { id: "beurzen", label: "Beurzen", uitleg: "Cadans en editie-datums. Voeden de weken-tot-beurs-weergave en de beursanalyse." },
-  { id: "account", label: "Account & markt", uitleg: "Sector en benchmarks, actieve landen, Merchant Center." },
+  { id: "account", label: "Account & markt", uitleg: "Sector en benchmarks, actieve landen, Merchant Center, GA4 en Search Console." },
 ] as const;
 
 type SettingsGroep = (typeof SETTINGS_GROEPEN)[number]["id"];
@@ -610,8 +610,6 @@ function SettingsSections({ client }: { client: Client }) {
           <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["kpi", "conversies", "overrides", "lag"]} />
           {/* Meta/LinkedIn direct onder de Google-conversie-acties: dezelfde vraag, ander kanaal. */}
           <ChannelConversionSettings clientId={client.id} />
-          <Ga4Settings clientId={client.id} />
-          <SearchConsoleSettings clientId={client.id} />
         </div>
       )}
 
@@ -625,7 +623,16 @@ function SettingsSections({ client }: { client: Client }) {
       {groep === "beurzen" && <EventSettings clientId={client.id} />}
 
       {groep === "account" && (
-        <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["sector", "landen", "merchant"]} />
+        <div className="space-y-6">
+          <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["sector", "landen", "merchant"]} />
+          {/* Feedback punt 20: stonden hiervoor onder "Doelen & meten", dat daardoor zeven
+              verschillende dingen op één lange scroll bevatte terwijl elke andere tab er één
+              had. GA4/Search Console zijn net als Merchant Center hierboven "vul in hoe een
+              al-gekoppelde databron voor DEZE klant werkt" -- geen doel, geen conversie, maar
+              accountcontext. Ze horen dus bij elkaar, niet bij de doelen. */}
+          <Ga4Settings clientId={client.id} />
+          <SearchConsoleSettings clientId={client.id} />
+        </div>
       )}
     </div>
   );
