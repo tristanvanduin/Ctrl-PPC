@@ -137,6 +137,9 @@ export async function GET(request: NextRequest) {
   // Eén keer per klant per cron-invocatie, ook als meerdere kanalen op dezelfde dag due zijn voor
   // monthly -- geen reden om drie keer dezelfde deterministische, gratis analyse te draaien.
   const crossChannelGedaan = new Set<string>();
+  // Zelfde soort dedup, voor de PDF-gereedheidscheck hieronder -- die query't zelf de database
+  // opnieuw (dus goedkoop om vaker te draaien), maar hoeft niet meermaals per klant per invocatie.
+  const pdfGecheckt = new Set<string>();
 
   for (const clientId of klanten) {
     if (!(await magSopDraaien(supabase, clientId))) {
@@ -209,6 +212,20 @@ export async function GET(request: NextRequest) {
         }
       }
     }
+
+    // Losstaand van welk kanaal hierboven (als er uberhaupt iets) getriggerd is: de PDF-
+    // gereedheid hangt af van de STAND VAN ZAKEN in de database, niet van "is er deze invocatie
+    // iets nieuws gedraaid". Een klant wiens laatste kanaal al gisteren klaar kwam -- zonder dat
+    // deze invocatie daar iets aan hoefde te triggeren -- moet zijn PDF alsnog krijgen; die zou
+    // hem anders nooit krijgen als hij toevallig geen nieuwe combo meer due heeft. Query't zelf
+    // opnieuw of alles klaar is (geen aanname op basis van wat hierboven gebeurde), dus altijd
+    // veilig om te draaien, ook als er niets getriggerd is.
+    if (!dryRun && (!cadenceFilter || cadenceFilter === "monthly") && !pdfGecheckt.has(clientId)) {
+      pdfGecheckt.add(clientId);
+      await triggerMonthlyPdfIfComplete(supabase, origin, clientId, kanalen).catch((err) => {
+        console.error(`[trigger-sops] PDF-gereedheidscheck voor ${clientId} mislukt:`, err);
+      });
+    }
   }
 
   return Response.json({
@@ -251,6 +268,106 @@ async function triggerCrossChannelSynthesis(origin: string, clientId: string): P
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || `cross-channel-synthesis gaf ${res.status}`);
   }
+}
+
+// De agency-facing maand-PDF als losse, zelf-gatende stap (masterplan 17.x) -- zelfde vorm als
+// triggerCrossChannelSynthesis hierboven, nu toegepast op het renderen in plaats van op de
+// synthese. Waarom een aparte functie en niet "render de PDF zodra het kanaal dat 'm nodig heeft
+// klaar is": de PDF-route (app/api/analysis/pdf) rendert de rijke cross-channel/cross-account/
+// God View-laag alleen voor sop_type "monthly" (Google), en die laag is precies waar de PDF
+// eerder onvolledig-maar-niet-zichtbaar-onvolledig werd als hij te vroeg gegenereerd werd: vlak
+// na Google's eigen run, voordat een ander kanaal of de cross-channel-synthese uberhaupt had
+// kunnen draaien. Een op Storage opgeslagen PDF wordt niet later herrenderd -- dus "te vroeg" is
+// hier niet "een paar minuten trager", maar "voorgoed het verkeerde antwoord".
+//
+// Blokkeert daarom alleen op wat deterministisch EINDIG is voor DEZE klant: haar eigen actieve
+// kanalen, en (bij >1 kanaal) de cross-channel-synthese. Cross-account (bureau-breed, hangt af
+// van ALLE klanten van dat bureau) en God View (een live lookup, geen taak die "klaar" wordt)
+// blijven wat de renderer daar toch al mee doet: best-effort met een grijs badge, nooit
+// blokkerend -- anders houdt een kapotte sync bij een andere klant van hetzelfde bureau deze PDF
+// voor altijd tegen.
+//
+// Freshness i.p.v. exacte datum-gelijkheid: isSopDue (dezelfde functie als de rest van dit
+// bestand) vraagt "is dit kanaal deze cyclus al gedraaid", niet "is de analysis_date letterlijk
+// gelijk aan die van de andere kanalen". Met de standaard limit=1-batching van deze cron landen
+// verschillende kanalen van dezelfde klant vaak op verschillende dagen -- een exacte match zou
+// deze stap dan nooit laten vuren.
+async function triggerMonthlyPdfIfComplete(
+  supabase: SupabaseClient,
+  origin: string,
+  clientId: string,
+  kanalen: readonly Kanaal[],
+): Promise<void> {
+  // Geen Google, geen rijke maand-PDF-vorm om te renderen -- bestaande beperking van de PDF-
+  // route zelf (zie het kopcommentaar van app/api/analysis/pdf/route.ts), niet iets wat deze
+  // functie oplost of moet omzeilen.
+  if (!kanalen.includes("google")) return;
+
+  const now = new Date();
+  for (const kanaal of kanalen) {
+    const channel = KANAAL_NAAR_SOPCHANNEL[kanaal];
+    const sopTypeKey = CHANNEL_CONFIG[channel].sopTypeKey.monthly;
+    const { data } = await supabase
+      .from("sop_analysis_output")
+      .select("analysis_date")
+      .eq("client_id", clientId)
+      .eq("sop_type", sopTypeKey)
+      .order("analysis_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const lastRunDate = (data as { analysis_date?: string } | null)?.analysis_date ?? null;
+    if (isSopDue("monthly", lastRunDate, now)) return; // dit kanaal is nog niet klaar deze cyclus
+  }
+
+  if (kanalen.length > 1) {
+    const { data } = await supabase
+      .from("sop_analysis_output")
+      .select("analysis_date")
+      .eq("client_id", clientId)
+      .eq("sop_type", "cross_channel")
+      .eq("section", "cross_channel_synthesis_v1")
+      .order("analysis_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const lastSynthDate = (data as { analysis_date?: string } | null)?.analysis_date ?? null;
+    if (isSopDue("monthly", lastSynthDate, now)) return; // synthese nog niet klaar deze cyclus
+  }
+
+  // Alles binnen. De bestandsnaam die de PDF-route zelf kiest (SOP-Maandelijks-<analysis_date>)
+  // is de dedupsleutel -- al gegenereerd deze cyclus? Dan niets doen, geen tweede upload.
+  const { data: googleRow } = await supabase
+    .from("sop_analysis_output")
+    .select("analysis_date")
+    .eq("client_id", clientId)
+    .eq("sop_type", "monthly")
+    .order("analysis_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const analysisDate = (googleRow as { analysis_date?: string } | null)?.analysis_date;
+  if (!analysisDate) return;
+
+  // .limit(1) i.p.v. .maybeSingle(): een handmatige herdownload (dezelfde knop, dezelfde dag)
+  // maakt vandaag al een tweede rij met exact dezelfde bestandsnaam aan (upsert:true geldt alleen
+  // voor de storage-upload, niet voor deze insert) -- .maybeSingle() faalt dan stil op "meerdere
+  // rijen" en levert data:null, waardoor deze check "geen bestaand bestand" concludeert en gewoon
+  // een derde uploadt. Ontdekt tijdens het testen van deze functie zelf (20 augustus 2026).
+  const { data: bestaandeFiles } = await supabase
+    .from("client_files")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("folder", "SOP's")
+    .eq("file_name", `SOP-Maandelijks-${analysisDate}.pdf`)
+    .limit(1);
+  if (bestaandeFiles && bestaandeFiles.length > 0) return;
+
+  const res = await fetch(
+    `${origin}/api/analysis/pdf?${new URLSearchParams({ client_id: clientId, sop_type: "monthly" })}`
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `pdf-generatie gaf ${res.status}`);
+  }
+  console.log(`[trigger-sops] maand-PDF gegenereerd voor ${clientId} (${analysisDate})`);
 }
 
 // Draait exact wat de handmatige knop doet (runSop in sop-trigger-buttons.tsx): het endpoint
