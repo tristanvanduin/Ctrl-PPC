@@ -214,23 +214,26 @@ export function GoogleView({
             <PerformanceChart clientId={clientId} countryFilter={countryFilter} metric={jaaroverzichtMetric} onMetricChange={setJaaroverzichtMetric} />
           </Sectie>
 
-          {/* Video, PMax-netwerken en placements horen bij elkaar: het is allemaal "hoe ziet het
-              budget eruit". De netwerkringen (PmaxNetworkSplit) staan hier en niet in de opener,
-              want ze bestaan alleen bij Performance Max -- als PMax-specifieke verdieping onder
-              de universele campagnetype-donut zijn ze op hun plek, in de opener zouden ze een
-              account zonder PMax een lege plek laten zien. Elk van deze kaarten rendert niets als
-              er geen data voor is, dus de sectie kan ook helemaal leeg blijven.
-              PmaxAssetCoverage stond hier ook tot deze wijziging -- verhuisd naar de
-              Campagnes-tab, in de Scorecard-sectie naast de PMax-scorecard zelf: assetdekking is
-              een vraag over de STRUCTUUR van het campagnetype, niet over waar het budget landt,
-              en hoort dus bij de andere structuurvraag i.p.v. ernaast te staan als losse kaart. */}
+          {/* Feedback punt 29+31: PmaxNetworkSplit was hier al gemarkeerd als PMax-only ("ze
+              bestaan alleen bij Performance Max"), maar stond toch op Overzicht i.p.v. onder de
+              Campagnes-tab se PERFORMANCE_MAX-selectie. Verhuisd naar GoogleCampagnes, in de
+              Scorecard-sectie naast PmaxAssetCoverage -- exact hetzelfde argument dat destijds al
+              voor PmaxAssetCoverage gold: een PMax-specifieke structuurvraag hoort bij de andere
+              PMax-structuurvraag, niet als losse kaart op de algemene Overzicht-pagina.
+
+              Video (VideoPerformance/VideoPlacements) blijft bewust hier staan: video-/Demand
+              Gen-campagnes hebben in de echte data een eigen campaign_type ("VIDEO") dat niet
+              voorkomt in CAMPAGNE_TYPES hieronder (die vier zijn gemeten tegen
+              ads_campaign_impression_share, een andere tabel, en dekken alleen SEARCH/
+              PERFORMANCE_MAX/SHOPPING/DISPLAY). Een vijfde tab toevoegen voor uitsluitend video
+              is een eigen ontwerpvraag -- welke tabs verder nog meeveranderen (Scorecard,
+              CampaignTable-filter, Zoektermen) -- die niet stilzwijgend hier meegenomen wordt. */}
           <Sectie
             icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Waar het budget landt"
-            bijschrift="Video, netwerken en placements"
+            bijschrift="Video en placements"
           >
             <VideoPerformance clientId={clientId} />
-            <PmaxNetworkSplit clientId={clientId} />
             <VideoPlacements clientId={clientId} />
           </Sectie>
 
@@ -312,10 +315,16 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
         actie={<CampagneTypeTabs type={campagneType} onChange={setCampagneType} />}
       >
         <CampagneScorecard clientId={clientId} type={campagneType} />
-        {/* Assetdekking is een PMax-eigen structuurvraag ("wat heb je aangeleverd, en wat vindt
-            Google ervan") en hoort dus bij de PMax-scorecard, niet bij Search. Verhuisd hierheen
-            vanuit "Waar het budget landt" op Overzicht -- zie de toelichting daar. */}
-        {campagneType === "PERFORMANCE_MAX" && <PmaxAssetCoverage clientId={clientId} />}
+        {/* Assetdekking en netwerkverdeling zijn allebei PMax-eigen structuurvragen ("wat heb je
+            aangeleverd", "waar draait het") en horen dus bij de PMax-scorecard, niet bij Search.
+            Allebei verhuisd hierheen vanuit "Waar het budget landt" op Overzicht -- zie de
+            toelichting daar. */}
+        {campagneType === "PERFORMANCE_MAX" && (
+          <>
+            <PmaxAssetCoverage clientId={clientId} />
+            <PmaxNetworkSplit clientId={clientId} />
+          </>
+        )}
       </Sectie>
       {/* Twee vragen, twee secties. Wat draait er, en waar lekt het weg — dat laatste
           is geen detail van het eerste maar een eigen onderwerp met een eigen actie. */}
