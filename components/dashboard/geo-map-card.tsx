@@ -4,6 +4,7 @@ import { Globe2, Loader2, ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
 import { MapErrorBoundary } from "./map-error-boundary";
 import { CHANNEL_LABEL, type GeoBreakdownState } from "@/lib/geo/use-geo-breakdown";
+import { GeoEnkelLandKaart } from "./geo-empty-state";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import type { ReactNode } from "react";
 
@@ -30,7 +31,12 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
   const { metricKey, setMetricKey, metric, focus, setFocus, countries, laden, canDrillUs, geoWord, values, ranked, eenLandOfMinder } = state;
 
   if (laden) return <Laadvlak vorm="grafiek" hoogte={220} titel="Waar komt het vandaan" />;
-  if (eenLandOfMinder) return null;
+  // Was tot 20 augustus 2026 een stille `return null` -- zie geo-empty-state.tsx voor waarom dat
+  // de verkeerde uitvoering was van een verder juiste aanname. Precies deze kaart, in precies de
+  // nieuwe 2x2-opener (17.36-17.43), was waar "ik mis de geo-kaart in al mijn overzichten" op
+  // sloeg: voor een single-country klant (de norm, niet de uitzondering) verdween hij hier het
+  // vaakst.
+  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} />;
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">

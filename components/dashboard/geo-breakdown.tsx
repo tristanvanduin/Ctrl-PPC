@@ -8,6 +8,7 @@ import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { GeoRanglijst } from "./geo-ranglijst";
+import { GeoEnkelLandKaart } from "./geo-empty-state";
 import { useGeoBreakdown, CHANNEL_LABEL, int, eur, pct, nf, type Channel } from "@/lib/geo/use-geo-breakdown";
 
 // De kaarten (SVG + geometrie + d3-geo) client-only en code-split laden: pas geladen als deze
@@ -56,7 +57,9 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
   if (laden) {
     return <Laadvlak vorm="grafiek" hoogte={220} titel="Waar komt het vandaan" />;
   }
-  if (eenLandOfMinder) return null; // één (of geen) land: geen geo-verhaal
+  // Was tot 20 augustus 2026 een stille `return null` -- zie geo-empty-state.tsx voor waarom dat
+  // de verkeerde uitvoering was van een verder juiste aanname.
+  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} />;
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
