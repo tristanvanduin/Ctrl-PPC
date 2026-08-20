@@ -7,6 +7,7 @@
 import {
   beoordeelCel, celoverzicht, diepteVan, magVerdiepen,
   MIN_ACCOUNTS, MIN_BUREAUS, MIN_ACCOUNTS_COMBINATIE, MIN_BUREAUS_COMBINATIE,
+  TEST_DREMPELS,
 } from "./cel";
 import type { Bedrijfsmodel } from "./segment";
 
@@ -116,6 +117,27 @@ check("twee kanalen geven twee cellen, geen samengevoegde",
   gemengd.map((c) => `${c.sleutel.channel}:${c.telling.accounts}`).join(","));
 check("en elk met zijn eigen telling",
   gemengd.every((c) => c.telling.accounts === 10));
+
+console.log("\nTEST_DREMPELS — de testmodus-override (demo-clientId's, 20 augustus 2026)");
+// Precies de situatie die de testmodus moet oplossen: één bureau, drie accounts -- ver onder de
+// STANDAARD-drempel (10 accounts / 4 bureaus), maar met TEST_DREMPELS (1/1) wel deelbaar. Geen
+// echte klant-clientId komt hier ooit: dit bewijst alleen dat het mechanisme zelf werkt zodra het
+// wordt aangeroepen, niet wanneer dat gebeurt (dat beslist isDemoClientId in god-view-context.ts).
+const kleinePool = { accounts: 3, bureaus: 1 };
+check("standaarddrempel wijst een kleine demo-pool af",
+  beoordeelCel({ channel: G, model: "b2b", niche: null }, kleinePool).deelbaar === false);
+check("TEST_DREMPELS staat dezelfde pool wel toe",
+  beoordeelCel({ channel: G, model: "b2b", niche: null }, kleinePool, TEST_DREMPELS).deelbaar === true);
+check("TEST_DREMPELS wijkt af van de standaardconstanten (geen toevallige gelijkenis)",
+  TEST_DREMPELS.minAccounts !== MIN_ACCOUNTS && TEST_DREMPELS.minBureaus !== MIN_BUREAUS);
+
+// Ook de combinatiecel (model + niche, normaal 25/8) moet met een kleine demo-pool lukken --
+// anders blijft de "verdiep"-weergave in de PDF ook in testmodus op "te weinig dekking" staan.
+const combiKlein = { channel: G, model: "b2b" as Bedrijfsmodel, niche: "software" };
+check("standaarddrempel wijst de combinatiecel af bij een kleine demo-pool",
+  beoordeelCel(combiKlein, kleinePool).deelbaar === false);
+check("TEST_DREMPELS staat de combinatiecel toe bij dezelfde kleine pool",
+  beoordeelCel(combiKlein, { accounts: 2, bureaus: 1 }, TEST_DREMPELS).deelbaar === true);
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

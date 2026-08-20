@@ -5,7 +5,7 @@ import { ALL_CLIENTS } from "@/lib/auth/roles";
 import { fetchGodViewInvoerRijen } from "@/lib/benchmark/god-view-data";
 import { bouwGodViewCellen } from "@/lib/benchmark/god-view";
 import { nicheLabel } from "@/lib/benchmark/segment";
-import { MIN_ACCOUNTS, MIN_BUREAUS } from "@/lib/benchmark/cel";
+import { MIN_ACCOUNTS, MIN_BUREAUS, TEST_DREMPELS } from "@/lib/benchmark/cel";
 
 // God View-testroute (masterplan 16.7/16.8): bewijst dat de mechaniek werkt (IO -> k-anonieme
 // cellen -> mediane CPA/ROAS), NIET de klantzijdige, tier-gated route die het gemarkete module
@@ -41,9 +41,7 @@ export async function GET(request: NextRequest) {
   if (!admin) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const testMode = new URL(request.url).searchParams.get("testdrempel") === "true";
-  const drempels = testMode
-    ? { minAccounts: 1, minBureaus: 1, minAccountsCombinatie: 2, minBureausCombinatie: 1 }
-    : undefined;
+  const drempels = testMode ? TEST_DREMPELS : undefined;
 
   const rijen = await fetchGodViewInvoerRijen(admin);
   const cellen = bouwGodViewCellen(rijen, drempels);

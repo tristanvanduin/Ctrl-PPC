@@ -858,7 +858,7 @@ function SopAnalysisPdf(props: SopPdfProps) {
         { label: "Dit kanaal", active: true },
         { label: "Cross-channel", active: Boolean(crossChannel) },
         { label: "Cross-account", active: Boolean(crossAccount) },
-        { label: "Markt (God View)", active: Boolean(marketBenchmark?.available) },
+        { label: marketBenchmark?.available && marketBenchmark.testMode ? "Markt (God View, test)" : "Markt (God View)", active: Boolean(marketBenchmark?.available) },
       ];
       coverChildren.push(
         React.createElement(
@@ -1212,7 +1212,11 @@ function SopAnalysisPdf(props: SopPdfProps) {
                 ? React.createElement(
                     View,
                     { key: "wc-market" },
-                    React.createElement(Text, { style: { ...s.infoText, fontWeight: "bold", color: dark } }, `Markt (God View, anoniem — ${marketBenchmark.segmentLabel}, n=${marketBenchmark.accountsCount} accounts / ${marketBenchmark.bureausCount} bureaus)`),
+                    React.createElement(
+                      Text,
+                      { style: { ...s.infoText, fontWeight: "bold", color: dark } },
+                      `Markt (God View${marketBenchmark.testMode ? ", TESTMODUS — niet k-anoniem" : ", anoniem"} — ${marketBenchmark.segmentLabel}, n=${marketBenchmark.accountsCount} accounts / ${marketBenchmark.bureausCount} bureaus)`
+                    ),
                     React.createElement(
                       Text,
                       { style: { ...s.infoText, color: dark } },
@@ -1220,7 +1224,14 @@ function SopAnalysisPdf(props: SopPdfProps) {
                         marketBenchmark.medianCpa != null ? `Mediane CPA in dit segment: €${marketBenchmark.medianCpa.toFixed(2)}.` : null,
                         marketBenchmark.medianRoas != null ? `Mediane ROAS in dit segment: ${marketBenchmark.medianRoas.toFixed(2)}.` : null,
                       ].filter(Boolean).join(" ")
-                    )
+                    ),
+                    marketBenchmark.testMode
+                      ? React.createElement(
+                          Text,
+                          { style: { ...s.infoText, color: amber, marginTop: 2 } },
+                          "Testmodus: drempel verlaagd voor demo-data. Deze cijfers zijn NIET k-anoniem en mogen nooit als echte God View-marktuitspraak aan een klant of bureau getoond worden."
+                        )
+                      : null
                   )
                 : null
             )

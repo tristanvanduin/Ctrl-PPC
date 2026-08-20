@@ -73,6 +73,23 @@ const STANDAARD_DREMPELS: Celdrempels = {
   minBureausCombinatie: MIN_BUREAUS_COMBINATIE,
 };
 
+/**
+ * De testmodus-drempels uit app/api/platform/god-view/route.ts (?testdrempel=true), nu ook
+ * gedeeld met lib/analysis/god-view-context.ts's demo-clientId-override (20 aug 2026) -- was
+ * eerst twee keer los als hetzelfde object geschreven. Zelfde herkomst en regel als daar: de
+ * eigenaar, 17 augustus 2026, met klem: "anonimiteit in de test fase boeit me niet... bij
+ * relevantie moet het gewoon getriggerd worden." Uitsluitend voor demo-/test-clientId's of
+ * expliciet gelabelde testroutes -- nooit de default voor een echte klant, en de aanroeper moet
+ * het resultaat altijd als testMode:true markeren zodat dit nooit met een echte, k-anonieme
+ * uitkomst te verwarren is.
+ */
+export const TEST_DREMPELS: Celdrempels = {
+  minAccounts: 1,
+  minBureaus: 1,
+  minAccountsCombinatie: 2,
+  minBureausCombinatie: 1,
+};
+
 /** Op welk niveau een cel is afgebakend. */
 export type Celdiepte = "model" | "niche" | "model_en_niche";
 
