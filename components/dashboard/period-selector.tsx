@@ -10,7 +10,7 @@
 // toont laat je niet zien dat de lopende maand er niet in zit. Bij een halve maand naast drie
 // hele maanden lijkt elke trend te dalen, en niets in de interface zou dat verraden.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Calendar, ChevronDown, TriangleAlert } from "lucide-react";
 import {
   PERIOD_PRESETS, COMPARISON_MODES, PRESET_LABEL, COMPARISON_LABEL,
@@ -47,7 +47,19 @@ interface Props {
 
 export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   const waarschuwing = comparisonWarning(value.range, value.comparison, { jaarlijkseEditie });
+
+  // Zelfde patroon als components/layout/user-menu.tsx: zonder dit sloot het paneel alleen via
+  // de trigger-knop zelf, niet door ergens anders op de pagina te klikken -- inconsistent met
+  // elke andere dropdown in de app (gebruikersmenu, command palette, meldingen-bel).
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
 
   function zet(preset: PeriodPreset, custom: PeriodRange | null, comparison: ComparisonMode) {
     onChange(resolveSelection(preset, custom, comparison));
@@ -62,7 +74,7 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={panelRef}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

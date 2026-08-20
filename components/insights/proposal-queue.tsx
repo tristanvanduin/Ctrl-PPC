@@ -9,6 +9,7 @@ import { channelOfSource, type InsightChannel } from "@/lib/insights/channel-of"
 import { dbUpdate, dbInsert } from "@/lib/data-access/client-write";
 import { ChannelBadge } from "./channel-filter";
 import { metriekLabel } from "@/lib/util/tekst";
+import { OWNER_TEAM } from "@/lib/branding/brand";
 
 // De goedkeuringswachtrij: ALLE pending voorstellen uit sprint_hypotheses, ongeacht bron
 // (zoektermen, losse analyses, second opinion, Meta/LinkedIn/cross-signalen). De maand-
@@ -136,6 +137,25 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
         event_type: action === "accept" ? "hypothesis_accepted" : "hypothesis_rejected",
         reason: action === "reject" ? reason : null,
       });
+      // Feedback: "Hypothese goedkeuren maakt niet een sprintplanning aan als die nog niet
+      // bestaat." Klopte -- dit was de enige van de drie goedkeuringspaden (naast
+      // sprint-planning.tsx's addHypothesisWithTask en de maand-structured-output-route) die de
+      // hypothese wel accepteerde maar nooit een sprint_items-rij aanmaakte. Zonder gekoppelde
+      // taken (deze voorstellen hebben geen linked_task_ids, in tegenstelling tot de
+      // maand-workflow) is de hypothesetekst zelf de taak -- zelfde aanname als
+      // addHypothesisWithTask maakt voor een handmatig aangemaakte hypothese.
+      if (action === "accept") {
+        const currentWeek = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+        void dbInsert("sprint_items", clientId, {
+          hypothesis_id: p.id,
+          week_number: currentWeek,
+          task: p.hypothesis,
+          status: "todo",
+          owner: OWNER_TEAM,
+          metrics: p.measurement_metric,
+          review_timeframe: p.timeframe,
+        });
+      }
       setProposals((prev) => prev?.filter((x) => x.id !== p.id) ?? prev);
       onWorkflowChange?.();
     }

@@ -379,10 +379,12 @@ function SidebarInner() {
           bij de titel van de pagina zelf. */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-2.5">
-          <SidebarLogo className="h-7 w-auto shrink-0" />
-          <p className="text-xl font-bold tracking-tight text-white">
-            {BRAND_NAME}
-          </p>
+          <Link href="/vandaag" className="flex items-center gap-2.5 hover:opacity-90">
+            <SidebarLogo className="h-7 w-auto shrink-0" />
+            <p className="text-xl font-bold tracking-tight text-white">
+              {BRAND_NAME}
+            </p>
+          </Link>
           {/* Alleen op een smal scherm: op `lg` en breder staat de zijbalk altijd open en zou een
               sluitknop niets om dicht te doen hebben. */}
           <button
