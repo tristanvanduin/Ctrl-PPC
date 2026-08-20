@@ -4307,3 +4307,263 @@ vier de tabs (Alle kanalen/Google/Meta/LinkedIn), in beide thema's zou de volgen
 was voor deze cijfer-fix niet het punt. `scripts/check-kaartoverloop.mjs` groen (de
 `ChannelTabs`/`PeriodSummary`-omwisseling is een layoutwijziging). Volledige `scripts/gates.sh`
 opnieuw groen ná deze `demo-rows.ts`-wijzigingen.
+
+### 17.45 De klant-SOP-PDF herontworpen: van 18-22 pagina's naar 4, geen interne pijplijn-mechaniek meer
+
+Feedback op de bestaande maand-PDF (gestructureerd doorgegeven, met de opmerking dat een tweede
+model — Gemini — meelas): herhaling tussen pagina's, de interne "Operating Detail Layer" (de
+AI-pijplijn se eigen traceerbaarheidslaag: `route_task_map`, `hypotheses_and_next_month_proof`,
+"Tasks 1, 2 | Steps 1, 6, 7, 13") zichtbaar in een document dat een specialist opent, en lege of
+kapotte pagina's. Expliciete instructie: geen nieuwe run, de al opgeslagen, al betaalde data
+hergebruiken en alleen de PDF herbouwen.
+
+**Grondoorzaak**: `lib/analysis/sop-pdf-renderer.ts` rendert de volledige gestructureerde
+`FinalSopSynthesis`/`OperatingDetailLayer`-uitvoer als een reeks losse markdown-secties, één (of
+meer) pagina per sectie "om afkapping te voorkomen" — precies de aanpak die van interne
+werkbenaming een zichtbaar PDF-hoofdstuk maakt. De rijke, al-beschikbare velden
+(`recommendations[]`, `tasks[]`, `supporting_evidence[]`) werden nergens direct gebruikt; de PDF
+was een tekstdump van de synthese, niet een weergave ervan.
+
+**Herontwerp naar 4 vaste pagina's**: Executive focus + een "Prioriteiten"-tabel (Route-badge/
+Actie/Stoppen-doorgaan-als, rechtstreeks uit `finalSop.recommendations[]`) op pagina 1; Diagnose
+(Onderbouwing/"Dit is NIET het probleem") op pagina 2; Taken met concrete evidence-badges op
+pagina 3; een 2-koloms data-dekkingsgrid op pagina 4. De Operating Detail Layer wordt niet meer
+gerenderd (blijft een ongebruikte prop voor eventueel later intern gebruik). `stripInternalRefs()`
+(nieuw, geëxporteerd en getest) scrubt elke "stap N"/"Steps N"/"Tasks N"-referentie uit elk stuk
+tekst dat de PDF in gaat — ook uit al opgeslagen, oudere analyses, niet alleen nieuwe runs.
+
+**Twee vervolgrondes op dezelfde live PDF, dezelfde dag**: een KPI-scope-bug (de "Positief"-tegel
+op pagina 1 telde 258 samengevoegde rijen — alle kanalen/testruns van die dag door elkaar, in
+plaats van de 8 die bij déze analyse hoorden, want `sop_insights`/`sop_recommendations` hebben wél
+een `sop_type`-kolom maar de query filterde er niet op); taakkaarten die de abstracte beslisregel
+herhaalden i.p.v. een concreet cijfer te tonen (`findConcreteEvidence()`, nieuw: koppelt een taak
+aan de meest ernstige finding op dezelfde entiteit voor een echt cijfer op de badge — geen match,
+dan blijft de badge leeg, nooit een verzonnen getal); de data-dekkingsappendix werd een lopend
+tekstblok i.p.v. een compact grid (`parseCoverageLine()`, nieuw, parseert een coverage-regel terug
+naar velden voor een 2-koloms raster met statusbadge).
+
+**Getest**: `__sop_pdf_strip_internal_refs_test.ts` (nieuw, groeide deze en de volgende sessies
+mee — zie 17.46-17.50). `npx tsc --noEmit` schoon, volledige `scripts/gates.sh` groen, PDF's
+handmatig met PyMuPDF gerenderd en met het blote oog bekeken vóór elke commit — niet alleen de
+build, ook het document zelf.
+
+### 17.46 Cross-channel, cross-account en God View zichtbaar gemaakt in de PDF — en een conceptuele fout onderweg
+
+Vervolgvraag na 17.45: *"heb je hier de godview en cross account/channel ook in verwerkt?"* Eerste
+antwoord was fout en werd door de eigenaar met klem gecorrigeerd: de aanname dat God View
+agency-scoped is en dus niet in een klantdocument thuishoort. Dat was een verwarring van God View
+(anonieme cross-AGENCY marktbenchmark, `lib/benchmark/god-view.ts`) met portfolio-synthese
+(cross-account BINNEN één bureau, `lib/analysis/portfolio-synthesis.ts`) — twee losse concepten.
+De echte reden dat God View hoort: *"de monthly sop moeten zich afzetten tegen de grote god view
+tabel om de cijfers in perspectief van de markt te plaatsen... hoe kan ik anders voorsprong op de
+markt beloven als onze hypotheses en taken voor de accounts niet naar deze zaken kijken."* Ook
+bevestigd: dit document gaat nooit naar de klant, het is volledig bureau-intern — dat maakt de
+drempel voor wat wél getoond mag worden anders dan bij een klantdocument.
+
+**Ontdekking bij het uitzoeken**: God View was al stil verweven in elke maand-SOP's
+hypotheses-stap (`godViewContext()`), alleen nooit als zichtbare PDF-uitvoer. De vraag was dus niet
+"moeten we dit toevoegen" maar "hoe surfacen we wat al berekend wordt."
+
+**Ontwerp, na een korte iteratie met de eigenaar over waar (pagina 2 met dekkingsnotitie, of
+verweven in de hypotheses — eigen input gevraagd)**: een coverage-badgerij direct onder de
+KPI-tegels op pagina 1 (`Dit kanaal` / `Cross-channel` / `Cross-account` / `Markt (God View)`, elk
+groen als actief of grijs met een "–" als niet), en een "Bevestigd op meerdere niveaus"-kaart op
+pagina 2 die alleen secties toont voor wat daadwerkelijk beschikbaar is — nooit een lege of
+verzonnen regel. `SopPdfProps` uitgebreid met `crossChannel`/`crossAccount`/`marketBenchmark`;
+`app/api/analysis/pdf/route.ts` haalt ze best-effort op (geen van de drie mag de hoofdexport
+blokkeren of vertragen bij een fout).
+
+**Getest**: uitbreiding van `__sop_pdf_strip_internal_refs_test.ts`. `npx tsc --noEmit` schoon,
+volledige `scripts/gates.sh` groen, live PDF's bekeken.
+
+### 17.47 God View-testmodus consequent doorgevoerd tot in de PDF, en het datagat er meteen achteraan
+
+De echte k-anonimiteitsdrempel is met de huidige bureaupool nooit haalbaar (zie 17.27) — de nieuwe
+markt-badge uit 17.46 zou voor elke demo-PDF dus permanent grijs blijven, zonder ooit te bewijzen
+dat het mechanisme werkt. De eigenaar, met klem herhaald (had dit al eerder gezegd, zie de
+`?testdrempel=true`-route uit 17.5/17.27): *"HOEVAAK MOET IK NOG ZEGGEN IN TEST MODE MAAKT HET
+AANTAL BUREAUS NIET UIT / altijd god view triggeren in een test."*
+
+**`TEST_DREMPELS`** (voorheen alleen inline in `god-view/route.ts`'s `?testdrempel=true`) verhuisd
+naar een gedeelde, geëxporteerde constante in `lib/benchmark/cel.ts`.
+`lib/analysis/god-view-context.ts` krijgt een `isDemoClientId(clientId)`-check (het `"demo-"`
+-voorvoegsel, dezelfde conventie als elders in de codebase) en gebruikt `TEST_DREMPELS` in plaats
+van de echte constanten zodra die waar is — zowel in de LLM-prompttekst (`godViewContext()`) als
+in de nieuwe, gestructureerde PDF-vergelijking (`fetchGodViewComparison()`). Elke plek die het
+resultaat toont, labelt het zichtbaar als **TESTMODUS — niet k-anoniem**, inclusief een amber
+waarschuwingszin in de PDF zelf: nooit met een echte marktuitspraak te verwarren.
+
+**Het datagat dat meteen zichtbaar werd**: drempelverlaging alleen loste niets op zolang
+`agencies.benchmark_optin_at` op `null` stond (beide demo-bureaus) én zolang `demo-greentech` zelf
+geen `bedrijfsmodel`/`niche` had — precies het gat dat 17.27 al signaleerde ("het ONTWORPEN
+segment b2b/industrie stond nooit echt in de database, alleen als los functieargument in een
+wegwerpscript"). Rechtstreeks in de database opgelost: beide demo-bureaus opt-in gezet, en
+`demo-greentech`'s niche dit keer wél echt geschreven — maar niet als het generieke "industrie"
+uit 17.27's testscript. De campagne-inhoud (conversieactie "Stand-aanvraag", advertentietekst
+"Boek uw stand nu", "GreenTech Amsterdam 2026") wijst ondubbelzinnig op een B2B-vakbeursorganisator
+in tuinbouwtechnologie, niet op een industriële fabrikant — dus `bedrijfsmodel: "b2b"`,
+`niche: "vakbeurzen"`, evidence-based op de mockdata zelf in plaats van het eerdere,
+nooit-geschreven ontwerp herhaald. Op expliciet verzoek ook `demo-grt`/`demo-gra`/`demo-grn` (de
+regionale beurseditie-accounts uit 17.20, tot dan toe op "industrie") naar hetzelfde
+`vakbeurzen`-segment gezet, zodat alle vier de demo-accounts in dezelfde pool vallen — bevestigd
+via een herhaalde PDF-render: het segment ging van "n=1 accounts/1 bureau" naar "n=4 accounts/2
+bureaus" zodra alle vier consistent geclassificeerd waren.
+
+**Getest**: `lib/benchmark/__cel_test.ts` uitgebreid met een aparte sectie voor `TEST_DREMPELS`
+(een kleine demo-pool die de standaarddrempel afwijst maar de testdrempel doorlaat, voor zowel de
+gewone als de strengere combinatiecel). `npx tsc --noEmit` schoon, volledige `scripts/gates.sh`
+groen. Live geverifieerd met echte PDF-renders voor en na, niet alleen met de teststand.
+
+### 17.48 PDF-rendering als losse, voltooiing-gatende stap — en een extern geoptimaliseerd prompt afgewezen
+
+Vervolgvraag: PDF-generatie gebeurde tot dan toe altijd meteen bij het klikken op "Download PDF",
+met wat er op dát moment toevallig al in de database stond — geen fabricage (de grijze badges uit
+17.46 zijn eerlijk), maar wel een race: een klik vlak na Google's maandanalyse, vóór
+cross-channel-synthese heeft kunnen draaien, levert een PDF op die **permanent** onvolledig blijft
+(hij wordt opgeslagen, nooit live herrenderd bij een volgende view). Eigen voorstel, met
+onderbouwing: *"PDF render moet een losse stap zijn... zodra alles binnen is gaat de PDF
+renderen."*
+
+**Bewezen patroon, niet nieuw uitgevonden**: 17.25's `triggerCrossChannelSynthesisIfReady()` doet
+precies dit al voor de synthese-stap — self-gating, ongeacht welk kanaal als laatste klaar is.
+`triggerMonthlyPdfIfComplete()` (nieuw, in `app/api/cron/trigger-sops/route.ts`, nog niet actief
+want die cron staat zelf nog niet in `vercel.json`) mirrort dat exact voor de PDF: elke klant-
+iteratie checkt zelf of alles voor DIE klant deze cyclus binnen is (eigen actieve kanalen, en bij
+meer dan 1 kanaal de cross-channel-synthese) — freshness via `isSopDue()`, niet een exacte
+datum-match (die zou breken zodra kanalen op verschillende dagen due worden, heel normaal bij de
+cron se standaard `limit=1`-batching). Cross-account (bureau-breed) en God View (een live lookup,
+geen taak die "klaar" wordt) blijven best-effort zoals de renderer daar al mee omgaat — hard
+blokkeren daarop zou betekenen dat een kapotte sync bij één klant van een bureau de PDF van alle
+andere klanten voor altijd tegenhoudt. Bestandsnaam (`SOP-Maandelijks-<analysis_date>`) is de
+dedupsleutel tegen dubbel genereren; draait ook los van welk kanaal deze cron-invocatie triggerde,
+zodat een klant die gisteren al compleet werd zijn PDF alsnog krijgt.
+
+**De handmatige "Download PDF"-knop blijft bewust ongemoeid** — expliciet bevestigd: *"de knop is
+nu om te testen. later is dit een cron die het automatisch naar bestanden moet pushen."* Precies
+zo gebouwd: dezelfde `client_files`/"SOP's"-map, geen ander gedrag nodig zodra de cron ooit
+geactiveerd wordt.
+
+**Een aangeboden, extern (Gemini+Copilot) "optimalisatieprompt" voor dezelfde PDF-laag afgewezen**,
+met concrete onderbouwing in plaats van alleen een gevoel: de prompt was in Tailwind/CSS-Grid-
+syntax geschreven terwijl deze PDF's met `@react-pdf/renderer` gebouwd worden (Flexbox-only,
+CSS Grid bestaat daar niet) — een sterke aanwijzing dat de code nooit was ingezien. De klacht over
+"cijfers los boven labels" was al opgelost (zichtbaar in de net verstuurde PDF's); de gevraagde
+harde paginalimiet (weekly exact 2, monthly exact 3 pagina's, via 2-koloms cramming) zou precies
+de dichtheid terugbrengen die de 17.45-redesign had weggehaald; en de enige concrete, checkbare
+bugclaim ("percentage-formatter in de renderer") bleek bij natrekken niet te bestaan —
+`formatEvidenceValue()` doet nergens een `*100`-schaling, het genoemde cijfer kwam uit vrije
+LLM-tekst, niet uit renderer-logica. Wel overgenomen: de sloganwissel (triviaal) en het idee van
+een groene "geverifieerde marktreferentie"-badge zodra God View ooit met echte, niet-testdata
+draait (nu nog niet bouwbaar, die situatie is nog nooit voorgekomen).
+
+**Getest**: live tegen de vier demo-accounts (dry_run en een echte aanroep met `CRON_SECRET`,
+lokaal gezet). Onderweg een genuine `.maybeSingle()`-bug in de dedup-check zelf gevonden: die
+faalt stil (`data: null`) zodra er al meerdere bestanden met dezelfde naam bestaan — precies de
+rommel van het eigen testen — en genereerde daardoor een derde duplicaat i.p.v. te herkennen dat
+er al een bestond. Vervangen door `.limit(1)` + lengtecheck. `npx tsc --noEmit` schoon, volledige
+`scripts/gates.sh` groen.
+
+### 17.49 Meta en LinkedIn's maand-PDF bleek al die tijd stuk: de poort stond dicht voor data die al klaarstond
+
+Op de vraag *"voldoen we aan de standaard die we willen leveren in de analyses en de presentatie
+in de PDF?"* volgde een echte audit i.p.v. een geruststelling: alle negen kanaal/cadans-
+combinaties live gerenderd en met het blote oog bekeken. Google's monthly (17.45-17.48) bleek
+solide. Meta en LinkedIn's `monthly`-PDF bleken **erger dan de oude, pre-17.45-staat**: 22
+pagina's, alle vijf stat-tegels op "0" ondanks dat de database wél echte data had (99 resp. 125
+`sop_insights`-rijen voor demo-greentech), en rauwe Engelse veldnamen ("Primary thread") die
+17.45 net had weggehaald.
+
+**Grondoorzaak**: `app/api/analysis/pdf/route.ts`'s verrijkingsblok (dat `finalSop`/`findings`/
+`recommendations` ophaalt) stond op `sopType === "monthly"` — een letterlijke stringcheck, dus
+alleen Google. Meta en LinkedIn's maandanalyses draaien dezelfde `finalizeChannelMonthlySynthesis`
+en hadden dus exact dezelfde `structured_monthly_v2`-sectie met een geldige `final_sop` allang
+klaarstaan — de route vroeg hem alleen nooit op. Zonder die verrijking viel de PDF terug op het
+lege legacy-renderpad (`contentSections`, één sectie per pagina) dat 17.45 voor Google al had
+vervangen maar dat voor de andere twee kanalen nooit werd bereikt.
+
+**Fix**: gate op `baseType === "monthly"` (dekt `monthly`/`meta_monthly`/`linkedin_monthly`) i.p.v.
+de letterlijke Google-string. De God View-marktbenchmark bleek hetzelfde euvel te hebben —
+hardgecodeerd op `"google_ads"`, dus een Meta-PDF zou Google's marktcijfers hebben getoond. Een
+kleine `MONTHLY_SOP_TYPE_TO_CHANNEL`-map lost dat op.
+
+**Getest**: live voor/na-renders van alle drie de kanalen (niet alleen tsc/build) — Meta en
+LinkedIn gaan van 22 pagina's/overal "0" naar de correcte 4-pagina-vorm, met een kanaal-eigen
+marktvergelijking die aantoonbaar andere cijfers toont dan Google voor dezelfde klant (Meta CPA
+€25/ROAS 5,20 vs. Google's andere waarden). `npx tsc --noEmit` schoon, volledige
+`scripts/gates.sh` groen.
+
+### 17.50 Een nieuwe, zelftestende PDF-kwaliteitspoort — en drie herhalende bugklassen die hij meteen ving
+
+17.49's audit legde ook drie kleinere, herhalende bugklassen bloot, en de vraag *"welke
+verbeterkansen zie jij, iets waar je wel achter staat?"* leverde er nog drie op. Alle zes gefixt,
+en vastgelegd in een nieuw `scripts/check-pdf-kwaliteit.mjs` — naar het voorbeeld van
+`scripts/check-kaartoverloop.mjs`: bewust niet in `scripts/gates.sh` (heeft een draaiende server en
+genereert meerdere PDF's, te traag voor de snelle poorten), wel met dezelfde zelftest-eis (een
+bewust foute PDF, rechtstreeks met `@react-pdf/renderer` gebouwd, moet door de detector gemarkeerd
+worden — anders controleert hij iets anders dan hij beweert).
+
+1. **Dubbele bestanden in Bestanden.** Elke herdownload/herrun schreef een nieuwe `client_files`-
+   rij zonder de bestaande (zelfde naam, analysis_date-gekeyd) op te ruimen — `upsert:true` gold
+   alleen voor de storage-upload, nooit voor de databaserij. Gefixt op alle drie de schrijfpaden:
+   de PDF-route, `voerSopUit()` (cron) en de handmatige knop se `uploadSopFile()`.
+2. **Een `→` werd een los apostrofteken.** Helvetica (de PDF-basisfont) kent geen WinAnsi-glyph
+   voor U+2192. Toegevoegd aan `lib/analysis/sanitize.ts`'s al bestaande `MOJIBAKE_MAP`, naast de
+   al bestaande no-em-dash-regel — `fixMojibake()` draait bij elke LLM-aanroep aan de bron, dus dit
+   werkt met terugwerkende kracht op al opgeslagen tekst.
+3. **Een ruwe clientId in LLM-tekst** ("demo-greentech Account blijft relatief gezond"). De
+   analyse-prompt geeft de LLM nooit een leesbare klantnaam mee, alleen de ruwe `clientId` — een
+   fix in de promptlaag raakt een 3000+ regel pijplijn, dus i.p.v. daarvan een verdedigingslaag aan
+   de renderkant: `replaceRawClientId()` vervangt elke letterlijke match, toegepast via een nieuwe
+   `scrub()`-wrapper op alle plekken waar LLM-tekst de PDF ingaat.
+
+**De poort zelf vond meteen een vierde, nog onbekende bug** toen hij werd uitgebreid met de vier
+nooit-geteste combinaties (Meta/LinkedIn weekly + biweekly, op uitdrukkelijk verzoek nagelopen):
+de "Stap N"-scrub van punt hierboven dekte alleen de afgesplitste `##`-kop, niet een `###`
+middenin de BODY-tekst of een losse regel als "TOP 3 BEVINDINGEN STAP 1:" — `cleanMarkdown()`
+zelf verwijdert geen stapreferenties. Twee plekken hadden dit gat (de `contentSections`-renderloop
+en de "Samenvatting"-kaart op pagina 1), allebei nu ook via `scrub()`. Poort uitgebreid van 4 naar
+12 combinaties (alle 3 kanalen × monthly/weekly/biweekly, plus de drie single-channel
+demo-klanten demo-grt/gra/grn — de meest voorkomende klantvorm, die tot dan toe buiten beeld
+bleef).
+
+**Getest**: alle 12 combinaties + de zelftest groen, met een volledige tekst-scan (alle matches,
+niet alleen de eerste) — 0 bevindingen. `npx tsc --noEmit` schoon, volledige `scripts/gates.sh`
+groen.
+
+### 17.51 De afgekapte biweekly-analyse: finish_reason werd nergens gecontroleerd
+
+Bijvangst van 17.50's grondige controle: `demo-greentech`'s opgeslagen biweekly-analyse eindigde
+letterlijk midden in een zin ("...CPA ontwikkelt zich afwijkend... Dit lig[t]", 1369 tekens
+totaal) — zowel op de samenvattingskaart als op de volledige-analysepagina, dus geen renderfout
+maar een brontekst die al onvolledig was vóórdat de PDF hem ooit zag. Op de vraag "zeker
+uitzoeken" volgde een echte grondoorzaak, geen aanname.
+
+**Grondoorzaak**: `callOpenRouter()` (`lib/analysis/openrouter-client.ts`) haalde alleen
+`data.choices[0].message.content` op en behandelde elke HTTP-200-respons als geslaagd — ongeacht
+`finish_reason`. Een provider die de completion afbreekt op `max_tokens` (`finish_reason:
+"length"`, geen inhoudelijk einde) werd dus stilzwijgend als succesvolle, complete analyse
+opgeslagen. Precies zo kon deze biweekly-rij ontstaan, waarschijnlijk maanden geleden, zonder dat
+er ooit een foutmelding was blijven staan.
+
+**Fix**: bij `finish_reason === "length"` gooit de call door i.p.v. de afgekapte tekst terug te
+geven. Dat valt in de al bestaande catch-hieronder, die onbekende fouten al als retrybaar
+classificeert (`classifyLLMError`) en met dezelfde backoff opnieuw probeert — geen aparte
+retrytak nodig, en op de laatste poging faalt de aanroep dan ook ECHT i.p.v. een halve analyse als
+geslaagd te loggen. Zelfde functie, zelfde bestand als een al bestaand, aangrenzend gat (leeg
+antwoord i.p.v. afgekapt antwoord — zie de reasoning-budget-toelichting bij `reasoningMaxTokens`
+in ditzelfde bestand): nieuwe testsectie toegevoegd aan het bestaande testbestand i.p.v. een los
+bestand te schrijven, 4 nieuwe assertions, 14 totaal, allemaal groen.
+
+**Wat dit niet doet**: het al opgeslagen, kapotte demo-record zelf blijft ongewijzigd staan — dit
+fixt het mechanisme voor toekomstige runs, niet met terugwerkende kracht bestaande rijen. Het
+opnieuw genereren van die ene analyse kost een echte, betaalde LLM-call en stond bij het schrijven
+van deze sectie nog open.
+
+**Onderweg, eigen fout, met opzet niet weggelaten**: bij het herstellen van een stale-git-cache
+(dit hele deel van de sessie, meerdere keren — zie de bekende `git fetch --prune` +
+`git reset --hard`-procedure) werd de reset een keer gedraaid zonder eerst te stashen, waardoor de
+net geschreven fix tijdelijk verloren ging. Bleek bij het herstellen bovendien dat
+`__openrouter_client_test.ts` al bestond met een verwant maar ander, eerder gefixt gat
+(leeg-antwoord-detectie) — een tweede, los testbestand op dezelfde naam was bijna per ongeluk
+ontstaan. Hersteld door de fix opnieuw (en ditmaal correct, bovenop de echte bestaande code) toe
+te passen en de nieuwe tests als sectie 7 in het bestaande bestand te zetten.
