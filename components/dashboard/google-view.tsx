@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
+import type { ForecastMetric } from "@/lib/forecast";
 import { Sectie } from "@/components/ui/sectie";
 import { HealthBadge } from "./health-badge";
 import { SearchScorecard } from "./search-scorecard";
@@ -94,6 +95,12 @@ export function GoogleView({
   // naast elkaar maar boven/onder in dezelfde kolom (17.41 -- "als we deze in het gat plaatsen
   // kan de geo map breder"), en moeten nog steeds dezelfde metric-keuze en VS-drilldown delen.
   const geo = useGeoBreakdown({ clientId, channel: "google", enabled: !geoClone });
+  // Feedback: "Jaaroverzicht-kaartjes klikbaar maken, dan de maandresultaten van dat element
+  // tonen." MetricCards en PerformanceChart tonen al dezelfde vier metrics (Conversies/Omzet/
+  // ROAS/CPA) naast elkaar; PerformanceChart had zijn metric-keuze als eigen interne state, dus
+  // een klik op een kaartje kon 'm niet aansturen. Hier opgetild zodat beide dezelfde selectie
+  // delen -- geen nieuwe grafiek nodig, alleen een gedeelde staat.
+  const [jaaroverzichtMetric, setJaaroverzichtMetric] = useState<ForecastMetric>("conversions");
 
   return (
     <>
@@ -203,8 +210,8 @@ export function GoogleView({
             titel={countryFilter ? `Jaaroverzicht 2026 — ${countryLabel(countryFilter)}` : "Jaaroverzicht 2026"}
             bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
           >
-            <MetricCards clientId={clientId} countryFilter={countryFilter} />
-            <PerformanceChart clientId={clientId} countryFilter={countryFilter} />
+            <MetricCards clientId={clientId} countryFilter={countryFilter} selected={jaaroverzichtMetric} onSelect={setJaaroverzichtMetric} />
+            <PerformanceChart clientId={clientId} countryFilter={countryFilter} metric={jaaroverzichtMetric} onMetricChange={setJaaroverzichtMetric} />
           </Sectie>
 
           {/* Video, PMax-netwerken en placements horen bij elkaar: het is allemaal "hoe ziet het
