@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchGodViewInvoerRijen } from "../benchmark/god-view-data";
-import { bouwGodViewCellen } from "../benchmark/god-view";
+import { bouwGodViewCellen, type GodViewCel } from "../benchmark/god-view";
 import { nicheLabel, type Bedrijfsmodel } from "../benchmark/segment";
 import type { SopChannel } from "./sop-channel-config";
 
@@ -20,19 +20,24 @@ export interface GodViewContextBlock {
   promptContext: string;
 }
 
-export async function godViewContext(supabase: SupabaseClient, clientId: string, channel: SopChannel): Promise<GodViewContextBlock> {
+interface GodViewMatch {
+  label: string;
+  cel: GodViewCel;
+}
+
+// Gedeelde celselectie tussen godViewContext() (prompt-tekst voor de LLM) en
+// fetchGodViewComparison() (gestructureerde vergelijking voor de PDF) -- zelfde voorkeursvolgorde
+// (combinatie eerst, dan niche, dan model), niet twee keer los onderhouden.
+async function findBestGodViewCell(supabase: SupabaseClient, clientId: string, channel: SopChannel): Promise<GodViewMatch | null> {
   const { data: settings } = await supabase.from("client_settings").select("bedrijfsmodel, niche").eq("client_id", clientId).maybeSingle();
   const s = settings as { bedrijfsmodel: string | null; niche: string | null } | null;
   const bedrijfsmodel = (s?.bedrijfsmodel as Bedrijfsmodel | null) ?? null;
   const niche = s?.niche ?? null;
-  if (!bedrijfsmodel && !niche) return { available: false, promptContext: "" };
+  if (!bedrijfsmodel && !niche) return null;
 
   const rijen = await fetchGodViewInvoerRijen(supabase);
   const cellen = bouwGodViewCellen(rijen);
 
-  // Voorkeur voor de diepste deelbare cel die bij deze klant past: combinatie eerst, dan niche,
-  // dan model -- specifieker is waardevoller zodra het mag (zelfde volgorde als de
-  // "verdiepen"-gedachte in cel.ts).
   const kandidaten: { model: Bedrijfsmodel | null; niche: string | null }[] = [
     ...(bedrijfsmodel && niche ? [{ model: bedrijfsmodel, niche }] : []),
     ...(niche ? [{ model: null, niche }] : []),
@@ -48,22 +53,60 @@ export async function godViewContext(supabase: SupabaseClient, clientId: string,
       ? `${kandidaat.model.toUpperCase()} + ${nicheLabel(kandidaat.niche)}`
       : kandidaat.niche ? (nicheLabel(kandidaat.niche) ?? kandidaat.niche) : kandidaat.model!.toUpperCase();
 
-    const lines: string[] = [
-      "## GOD VIEW-CONTEXT (anonieme cross-agency benchmark — verklarende laag; vervangt de eigen cijfers van dit account NIET)",
-      "",
-      `Segment: ${label}, kanaal ${channel}. Gebaseerd op ${cel.telling.accounts} accounts bij ${cel.telling.bureaus} verschillende bureaus (anoniem — geen enkel account is hieruit individueel te herleiden).`,
-      "",
-    ];
-    if (cel.metrics.medianCpa !== null) lines.push(`- Mediane CPA in dit segment: €${cel.metrics.medianCpa.toFixed(2)} (n=${cel.metrics.accountsMetCpa} accounts).`);
-    if (cel.metrics.medianRoas !== null) lines.push(`- Mediane ROAS in dit segment: ${cel.metrics.medianRoas.toFixed(2)} (n=${cel.metrics.accountsMetRoas} accounts).`);
-    lines.push(
-      "",
-      "INSTRUCTIE: gebruik dit alleen om te DUIDEN of dit account beter of slechter presteert dan de markt in hetzelfde segment.",
-      "- Verzin geen cross-agency-cijfers die hier niet staan.",
-      "- Claim nooit dat een los account uit dit getal te herleiden is — dat is precies wat de anonimisering voorkomt.",
-    );
-    return { available: true, promptContext: lines.join("\n") };
+    return { label, cel };
   }
+  return null;
+}
 
-  return { available: false, promptContext: "" };
+export async function godViewContext(supabase: SupabaseClient, clientId: string, channel: SopChannel): Promise<GodViewContextBlock> {
+  const match = await findBestGodViewCell(supabase, clientId, channel);
+  if (!match) return { available: false, promptContext: "" };
+  const { label, cel } = match;
+  if (!cel.metrics) return { available: false, promptContext: "" };
+  const metrics = cel.metrics;
+
+  const lines: string[] = [
+    "## GOD VIEW-CONTEXT (anonieme cross-agency benchmark — verklarende laag; vervangt de eigen cijfers van dit account NIET)",
+    "",
+    `Segment: ${label}, kanaal ${channel}. Gebaseerd op ${cel.telling.accounts} accounts bij ${cel.telling.bureaus} verschillende bureaus (anoniem — geen enkel account is hieruit individueel te herleiden).`,
+    "",
+  ];
+  if (metrics.medianCpa !== null) lines.push(`- Mediane CPA in dit segment: €${metrics.medianCpa.toFixed(2)} (n=${metrics.accountsMetCpa} accounts).`);
+  if (metrics.medianRoas !== null) lines.push(`- Mediane ROAS in dit segment: ${metrics.medianRoas.toFixed(2)} (n=${metrics.accountsMetRoas} accounts).`);
+  lines.push(
+    "",
+    "INSTRUCTIE: gebruik dit alleen om te DUIDEN of dit account beter of slechter presteert dan de markt in hetzelfde segment.",
+    "- Verzin geen cross-agency-cijfers die hier niet staan.",
+    "- Claim nooit dat een los account uit dit getal te herleiden is — dat is precies wat de anonimisering voorkomt.",
+  );
+  return { available: true, promptContext: lines.join("\n") };
+}
+
+export interface GodViewComparison {
+  available: boolean;
+  segmentLabel: string | null;
+  channel: SopChannel | null;
+  accountsCount: number | null;
+  bureausCount: number | null;
+  medianCpa: number | null;
+  medianRoas: number | null;
+}
+
+// Gestructureerde variant van godViewContext() voor de PDF-export -- geen prompt-tekst voor een
+// LLM, maar velden om als vergelijkingskaart te renderen. Zelfde k-anonimiteitsgrens, zelfde
+// stille degradatie naar available:false (geen "onvoldoende data"-ruis).
+export async function fetchGodViewComparison(supabase: SupabaseClient, clientId: string, channel: SopChannel): Promise<GodViewComparison> {
+  const match = await findBestGodViewCell(supabase, clientId, channel);
+  if (!match || !match.cel.metrics) {
+    return { available: false, segmentLabel: null, channel: null, accountsCount: null, bureausCount: null, medianCpa: null, medianRoas: null };
+  }
+  return {
+    available: true,
+    segmentLabel: match.label,
+    channel,
+    accountsCount: match.cel.telling.accounts,
+    bureausCount: match.cel.telling.bureaus,
+    medianCpa: match.cel.metrics.medianCpa,
+    medianRoas: match.cel.metrics.medianRoas,
+  };
 }

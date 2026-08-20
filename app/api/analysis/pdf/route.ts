@@ -8,6 +8,9 @@ import {
   type FinalSopSynthesis,
   type OperatingDetailLayer,
 } from "@/lib/analysis/monthly-structured";
+import type { CrossChannelSynthesisResult } from "@/lib/analysis/cross-channel-synthesis";
+import type { PortfolioSynthesisResult } from "@/lib/analysis/portfolio-synthesis";
+import { fetchGodViewComparison } from "@/lib/analysis/god-view-context";
 import {
   createProgressJob,
   markProgressCompleted,
@@ -15,6 +18,20 @@ import {
   updateProgressPhase,
 } from "@/lib/progress/server";
 import { logger } from "@/lib/logger";
+
+// sop_analysis_output/agency_analysis_output slaan "output" op als tekst (soms al als object
+// terugkomend via de Supabase-client, afhankelijk van de kolomconfiguratie) -- zelfde
+// dubbelvorm als parsedStructuredOutput hieronder, nu als kleine herbruikbare helper voor de
+// twee nieuwe externe-context-fetches.
+function parseJsonOutput<T>(raw: unknown): T | null {
+  if (raw == null) return null;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return parsed && typeof parsed === "object" ? (parsed as T) : null;
+  } catch {
+    return null;
+  }
+}
 
 // De negen sop_type-waarden die de analyse-routes daadwerkelijk schrijven: Google's drie
 // kale namen, en Meta/LinkedIn's kanaal-voorvoegsel-varianten (zie sop-trigger-buttons.tsx
@@ -223,6 +240,40 @@ export async function GET(request: NextRequest) {
       pdfProps.findings = (findingsRes.data ?? []) as SopPdfProps["findings"];
       pdfProps.recommendations = (recsRes.data ?? []) as SopPdfProps["recommendations"];
       pdfProps.tasks = (tasksRes.data ?? []) as SopPdfProps["tasks"];
+
+      // Drie externe context-lagen, want dit document gaat nooit naar de klant (bureau-intern):
+      // cross-channel (dezelfde klant, andere kanalen), cross-account (hetzelfde bureau, andere
+      // klanten) en de anonieme cross-agency marktbenchmark ("God View"). Alle drie best-effort --
+      // geen van de drie mag de hoofdexport blokkeren of vertragen bij een fout.
+      const { data: accountRow } = await supabase.from("accounts").select("agency_id").eq("client_id", clientId).maybeSingle();
+      const agencyId = accountRow?.agency_id ? String(accountRow.agency_id) : null;
+
+      const [crossChannelRow, portfolioRow, marketComparison] = await Promise.all([
+        supabase
+          .from("sop_analysis_output")
+          .select("output")
+          .eq("client_id", clientId)
+          .eq("sop_type", "cross_channel")
+          .eq("section", "cross_channel_synthesis_v1")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        agencyId
+          ? supabase
+              .from("agency_analysis_output")
+              .select("output")
+              .eq("agency_id", agencyId)
+              .eq("section", "portfolio_synthesis_v1")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        fetchGodViewComparison(supabase, clientId, "google_ads").catch(() => null),
+      ]);
+
+      pdfProps.crossChannel = parseJsonOutput<CrossChannelSynthesisResult>(crossChannelRow.data?.output);
+      pdfProps.crossAccount = parseJsonOutput<PortfolioSynthesisResult>(portfolioRow.data?.output);
+      pdfProps.marketBenchmark = marketComparison?.available ? marketComparison : null;
     }
 
     // Generate PDF

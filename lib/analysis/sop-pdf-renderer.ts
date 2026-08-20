@@ -24,6 +24,9 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 import type { FinalSopSynthesis, OperatingDetailLayer } from "@/lib/analysis/monthly-structured";
+import type { CrossChannelSynthesisResult } from "@/lib/analysis/cross-channel-synthesis";
+import type { PortfolioSynthesisResult } from "@/lib/analysis/portfolio-synthesis";
+import type { GodViewComparison } from "@/lib/analysis/god-view-context";
 import { fixMojibake } from "@/lib/analysis/sanitize";
 
 // Load brand logo as base64 (cached at module level)
@@ -104,6 +107,15 @@ export interface SopPdfProps {
   /** Monthly only: compact support appendices */
   coverageMarkdown?: string;
   appendixMarkdown?: string;
+  /** Monthly only: cross-channel synthese van dezelfde klant (null als er geen is, of de klant
+   *  maar 1 kanaal heeft) -- bureau-interne context, dit document gaat nooit naar de klant. */
+  crossChannel?: CrossChannelSynthesisResult | null;
+  /** Monthly only: portfolio-synthese van hetzelfde bureau, andere klanten (null als het bureau
+   *  maar 1 klant heeft of nog geen portfolio-synthese draaide). */
+  crossAccount?: PortfolioSynthesisResult | null;
+  /** Monthly only: anonieme cross-agency marktbenchmark voor dit segment+kanaal (null onder de
+   *  k-anonimiteitsdrempel -- zelfde stille degradatie als de LLM-prompt-versie). */
+  marketBenchmark?: GodViewComparison | null;
 }
 
 // ── Colors ─────────────────────────────────────────────────────────────────
@@ -682,6 +694,9 @@ function SopAnalysisPdf(props: SopPdfProps) {
     finalSop,
     operatingDetail,
     executiveCounts,
+    crossChannel,
+    crossAccount,
+    marketBenchmark,
   } = props;
 
   const dateStr = formatDate(analysisDate);
@@ -833,6 +848,43 @@ function SopAnalysisPdf(props: SopPdfProps) {
     const highFindings = findings.filter(
       (f) => f.severity === "high" && f.action_required
     );
+
+    if (monthlyView?.usesFinalSop) {
+      // Dekkingsbadges: dit document gaat nooit naar de klant (bureau-intern), dus in één
+      // oogopslag zichtbaar op welke van de vier analyselagen dit rapport leunt -- zonder dit
+      // ergens te verzinnen als een laag niet beschikbaar is (bv. marktbenchmark onder de
+      // k-anonimiteitsdrempel, of een bureau met maar 1 klant voor cross-account).
+      const coverageBadges: Array<{ label: string; active: boolean }> = [
+        { label: "Dit kanaal", active: true },
+        { label: "Cross-channel", active: Boolean(crossChannel) },
+        { label: "Cross-account", active: Boolean(crossAccount) },
+        { label: "Markt (God View)", active: Boolean(marketBenchmark?.available) },
+      ];
+      coverChildren.push(
+        React.createElement(
+          View,
+          { key: "coverage-badges", style: { flexDirection: "row", gap: 6, marginBottom: 12 } },
+          ...coverageBadges.map((b, i) =>
+            React.createElement(
+              Text,
+              {
+                key: `covbadge-${i}`,
+                style: {
+                  fontSize: 7.5,
+                  fontWeight: "bold",
+                  color: "white",
+                  backgroundColor: b.active ? green : gray,
+                  paddingHorizontal: 6,
+                  paddingVertical: 3,
+                  borderRadius: 3,
+                },
+              },
+              `${b.active ? "✓" : "–"} ${b.label}`
+            )
+          )
+        )
+      );
+    }
 
     if (monthlyView?.usesFinalSop && finalSop) {
       coverChildren.push(
@@ -1133,6 +1185,44 @@ function SopAnalysisPdf(props: SopPdfProps) {
                   React.createElement(Text, { style: { ...s.infoText, color: dark, flex: 1 } }, stripInternalRefs(line))
                 )
               )
+            )
+          : null,
+        (crossChannel || crossAccount || marketBenchmark?.available)
+          ? React.createElement(
+              View,
+              { key: "wider-context", style: { ...s.infoCard, backgroundColor: blueLight } },
+              React.createElement(Text, { style: s.infoTitle }, "Bevestigd op meerdere niveaus"),
+              crossChannel
+                ? React.createElement(
+                    View,
+                    { key: "wc-channel", style: { marginBottom: 6 } },
+                    React.createElement(Text, { style: { ...s.infoText, fontWeight: "bold", color: dark } }, "Cross-channel (dit account, andere kanalen)"),
+                    React.createElement(Text, { style: { ...s.infoText, color: dark } }, stripInternalRefs(crossChannel.headline))
+                  )
+                : null,
+              crossAccount
+                ? React.createElement(
+                    View,
+                    { key: "wc-account", style: { marginBottom: 6 } },
+                    React.createElement(Text, { style: { ...s.infoText, fontWeight: "bold", color: dark } }, "Cross-account (dit bureau, andere klanten)"),
+                    React.createElement(Text, { style: { ...s.infoText, color: dark } }, stripInternalRefs(crossAccount.headline))
+                  )
+                : null,
+              marketBenchmark?.available
+                ? React.createElement(
+                    View,
+                    { key: "wc-market" },
+                    React.createElement(Text, { style: { ...s.infoText, fontWeight: "bold", color: dark } }, `Markt (God View, anoniem — ${marketBenchmark.segmentLabel}, n=${marketBenchmark.accountsCount} accounts / ${marketBenchmark.bureausCount} bureaus)`),
+                    React.createElement(
+                      Text,
+                      { style: { ...s.infoText, color: dark } },
+                      [
+                        marketBenchmark.medianCpa != null ? `Mediane CPA in dit segment: €${marketBenchmark.medianCpa.toFixed(2)}.` : null,
+                        marketBenchmark.medianRoas != null ? `Mediane ROAS in dit segment: ${marketBenchmark.medianRoas.toFixed(2)}.` : null,
+                      ].filter(Boolean).join(" ")
+                    )
+                  )
+                : null
             )
           : null,
         Footer({ clientName, sopType })
