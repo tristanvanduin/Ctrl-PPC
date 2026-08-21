@@ -5798,3 +5798,14 @@ percentage-kaart zoals beschreven — kan niet gelokaliseerd worden zonder een s
 
 **Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
 groen, voor beide gebouwde punten apart. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
+
+**"X nodig???" opgelost (`4a7a334`)** — bleek geen ontbrekende knop maar het letterlijke ✗-teken
+vóór "Nodig: €363/dag" in de Pacing-kaart, dat onduidelijk rendert (leest als een losse letter X,
+niet als een kruisje). De eigenaar bevestigde met een schermafbeelding: het zat in beide
+tempo-regels (conversies én spend) van dezelfde kaart. Zelfde patroon ook gevonden en gefixt in
+`insights-block.tsx`'s maand-voor-maand-tekst, die rechtstreeks in de UI rendert. Beide nu woorden
+("Op tempo"/"Nog niet op tempo", "op schema"/"onder schema") i.p.v. een dubbelzinnig glyph — kleur
+blijft de tweede, niet de enige drager van de status.
+
+**Nog open, wacht op de eigenaar**: de checkbox-uitlijningsklacht — nog steeds geen scherm-
+/paginanaam ontvangen om 'm te lokaliseren.
