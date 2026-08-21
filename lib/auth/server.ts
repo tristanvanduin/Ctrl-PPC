@@ -22,6 +22,8 @@ export interface AuthUser {
   capabilities: readonly Capability[];
   /** De bureaus waar deze gebruiker lid van is. Meestal precies één. */
   agencyIds: string[];
+  /** Staat in platform_beheerders? Het enige recht dat de bureaugrens opheft (migratie 057). */
+  isPlatform: boolean;
 }
 
 // Leest de ingelogde gebruiker plus rol en beurs-scope uit de sessie-cookies. Null zonder
@@ -52,7 +54,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   // De scope is BUREAU-GEBONDEN, en de afleiding staat in lib/auth/scope.ts — één plek, gedeeld
   // met middleware.ts. Die twee liepen uit elkaar: hier was de bureaugrens wél doorgevoerd en in
   // de middleware niet, waardoor de poortwachter ruimer stond dan de routes erachter.
-  const { role, scope, agencyIds } = await bepaalScope(supabase as never, user.id);
+  const { role, scope, agencyIds, isPlatform } = await bepaalScope(supabase as never, user.id);
 
   return {
     id: user.id,
@@ -61,6 +63,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     scope,
     capabilities: capabilitiesOf(role),
     agencyIds,
+    isPlatform,
   };
 }
 

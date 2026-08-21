@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ALL_CLIENTS, ROLES, ROL_LABEL, scopeFor, type Role } from "@/lib/auth/roles";
+import { useAccess } from "@/lib/auth/use-access";
 import { beoordeel, zwaarste, type Licht } from "@/lib/adoptie/stoplicht";
 import { getAllClients, type Client } from "@/lib/clients";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel } from "@/components/dashboard/data-table";
@@ -21,9 +22,14 @@ interface AdminUser {
   role: Role | null;
   clients: string[];
   seesAllClients: boolean;
-  hasAgency: boolean;
+  agencyIds: string[];
   deactivated: boolean;
   lastSignIn: string | null;
+}
+
+interface Agency {
+  id: string;
+  name: string;
 }
 
 const ROL_UITLEG: Record<Role, string> = {
@@ -357,8 +363,10 @@ function WhitelabelSectie() {
 }
 
 export default function AdminPage() {
+  const access = useAccess();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [beurzen, setBeurzen] = useState<Client[]>([]);
+  const [agencies, setAgencies] = useState<Agency[]>([]);
   const [laden, setLaden] = useState(true);
   const [melding, setMelding] = useState<string | null>(null);
   // Zie de opmerking bij AdoptieSectie: 401 is een stand, geen storing, en hoort dus niet rood.
@@ -366,7 +374,16 @@ export default function AdminPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("performance_marketeer");
   const [inviteClients, setInviteClients] = useState<string[]>([]);
+  const [inviteAgencyId, setInviteAgencyId] = useState("");
   const [bezig, setBezig] = useState(false);
+
+  // Rollen die deze kijker mag toekennen: admin alleen voor een platformbeheerder (zie
+  // magAdminToekennen in app/api/admin/users/route.ts -- dit verbergt de optie alleen, de
+  // server weigert hem sowieso voor wie geen platformbeheerder is).
+  const toekenbareRollen = useMemo<readonly Role[]>(
+    () => (access.isPlatform ? ROLES : ROLES.filter((r) => r !== "admin")),
+    [access.isPlatform],
+  );
 
   const laad = useCallback(async () => {
     setLaden(true);
@@ -393,7 +410,17 @@ export default function AdminPage() {
   useEffect(() => {
     void laad();
     setBeurzen(getAllClients());
+    fetch("/api/admin/agencies")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { agencies?: Agency[] } | null) => setAgencies(data?.agencies ?? []))
+      .catch(() => undefined);
   }, [laad]);
+
+  // Voorinvullen met het eigen bureau van de kijker, zodra dat bekend is -- maar alleen als er
+  // nog niets gekozen is, anders overschrijft dit een bewuste keuze zodra useAccess() ververst.
+  useEffect(() => {
+    if (access.agencyId && !inviteAgencyId) setInviteAgencyId(access.agencyId);
+  }, [access.agencyId, inviteAgencyId]);
 
   // Beurzen die aan iemand zijn toegewezen maar niet (meer) in de lijst staan, blijven
   // zichtbaar. Anders verdwijnt een toewijzing stilletjes uit beeld terwijl hij nog geldt.
@@ -409,11 +436,17 @@ export default function AdminPage() {
 
   async function invite(e: React.FormEvent) {
     e.preventDefault();
+    if (!inviteAgencyId) {
+      setMelding("Kies eerst een bureau.");
+      return;
+    }
     setBezig(true);
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: inviteEmail, role: inviteRole, clients: inviteClients }),
+      body: JSON.stringify({
+        email: inviteEmail, role: inviteRole, clients: inviteClients, agencyId: inviteAgencyId,
+      }),
     });
     const data = (await res.json().catch(() => null)) as { error?: string } | null;
     setBezig(false);
@@ -427,13 +460,13 @@ export default function AdminPage() {
     void laad();
   }
 
-  // Rol en beurzen lopen via dezelfde PATCH: een rolwijziging kan de beurs-eis raken, dus
+  // Rol, bureau en beurzen lopen via dezelfde PATCH: een rolwijziging kan de beurs-eis raken, dus
   // ze horen in een verzoek thuis en niet in twee die elkaar kunnen kruisen.
-  async function wijzig(userId: string, role: Role, clients: string[]) {
+  async function wijzig(userId: string, role: Role, clients: string[], agencyId: string) {
     const res = await fetch("/api/admin/users", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, role, clients }),
+      body: JSON.stringify({ userId, role, clients, agencyId }),
     });
     const data = (await res.json().catch(() => null)) as { error?: string } | null;
     if (!res.ok) {
@@ -506,9 +539,28 @@ export default function AdminPage() {
               onChange={(e) => setInviteRole(e.target.value as Role)}
               className="rounded-md border border-border px-3 py-2 text-body focus:border-brand-blue focus:outline-none"
             >
-              {ROLES.map((r) => (
+              {toekenbareRollen.map((r) => (
                 <option key={r} value={r}>
                   {ROL_LABEL[r]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="invite-agency" className="mb-1 block text-body font-medium text-brand-gray">
+              Bureau
+            </label>
+            <select
+              id="invite-agency"
+              required
+              value={inviteAgencyId}
+              onChange={(e) => setInviteAgencyId(e.target.value)}
+              className="rounded-md border border-border px-3 py-2 text-body focus:border-brand-blue focus:outline-none"
+            >
+              <option value="" disabled>Kies een bureau</option>
+              {agencies.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
                 </option>
               ))}
             </select>
@@ -582,22 +634,31 @@ export default function AdminPage() {
             <Kop>
               <KolomKop breed>E-mail</KolomKop>
               <KolomKop>Rol</KolomKop>
+              <KolomKop>Bureau</KolomKop>
               <KolomKop>Beurzen</KolomKop>
               <KolomKop>Status</KolomKop>
               <KolomKop><span className="sr-only">Acties</span></KolomKop>
             </Kop>
             <Body>
-              {users.map((user) => (
+              {users.map((user) => {
+                const agencyId = user.agencyIds[0] ?? "";
+                return (
                 <Rij key={user.id} className="align-top">
                   <NaamCel>{user.email ?? user.id}</NaamCel>
                   <Cel>
                     <select
                       value={user.role ?? ""}
-                      onChange={(e) => void wijzig(user.id, e.target.value as Role, user.clients)}
+                      onChange={(e) => void wijzig(user.id, e.target.value as Role, user.clients, agencyId)}
                       className="rounded-md border border-border px-2 py-1 text-body focus:border-brand-blue focus:outline-none"
                     >
                       {user.role === null && <option value="">geen rol</option>}
-                      {ROLES.map((r) => (
+                      {/* De huidige rol blijft in de lijst staan ook als de kijker hem zelf niet
+                          meer zou mogen toekennen -- anders verdwijnt "Admin" uit een admin-rij
+                          voor een niet-platformbeheerder en lijkt het net of de rol weg is. */}
+                      {(user.role && !toekenbareRollen.includes(user.role)
+                        ? [user.role, ...toekenbareRollen]
+                        : toekenbareRollen
+                      ).map((r) => (
                         <option key={r} value={r}>
                           {ROL_LABEL[r]}
                         </option>
@@ -605,8 +666,22 @@ export default function AdminPage() {
                     </select>
                   </Cel>
                   <Cel>
+                    <select
+                      value={agencyId}
+                      onChange={(e) => user.role && void wijzig(user.id, user.role, user.clients, e.target.value)}
+                      className="rounded-md border border-border px-2 py-1 text-body focus:border-brand-blue focus:outline-none"
+                    >
+                      <option value="" disabled>geen bureau</option>
+                      {agencies.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Cel>
+                  <Cel>
                     {user.seesAllClients ? (
-                      user.hasAgency ? (
+                      agencyId ? (
                         <span className="text-muted-foreground">alle beurzen</span>
                       ) : (
                         <span className="text-meta text-amber-700">
@@ -623,7 +698,7 @@ export default function AdminPage() {
                               type="button"
                               onClick={() =>
                                 user.role &&
-                                void wijzig(user.id, user.role, toggleBeurs(user.clients, beurs.id))
+                                void wijzig(user.id, user.role, toggleBeurs(user.clients, beurs.id), agencyId)
                               }
                               className={`rounded-full border px-2.5 py-0.5 text-meta ${
                                 aan
@@ -656,10 +731,11 @@ export default function AdminPage() {
                     )}
                   </Cel>
                 </Rij>
-              ))}
+                );
+              })}
               {users.length === 0 && (
                 <Rij>
-                  <Cel colSpan={5} className="text-center" zacht>
+                  <Cel colSpan={6} className="text-center" zacht>
                     <span className="block py-2">Geen gebruikers zichtbaar.</span>
                   </Cel>
                 </Rij>

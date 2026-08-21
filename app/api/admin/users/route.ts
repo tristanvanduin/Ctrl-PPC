@@ -36,7 +36,7 @@ export async function GET() {
   const [{ data: roleRows }, { data: clientRows }, { data: agencyRows }] = await Promise.all([
     admin.from("user_roles").select("user_id, role"),
     admin.from("user_clients").select("user_id, client_id"),
-    admin.from("user_agencies").select("user_id"),
+    admin.from("user_agencies").select("user_id, agency_id"),
   ]);
   const roleByUser = new Map((roleRows ?? []).map((row) => [String(row.user_id), String(row.role)]));
   const clientsByUser = new Map<string, string[]>();
@@ -44,7 +44,11 @@ export async function GET() {
     const key = String(row.user_id);
     clientsByUser.set(key, [...(clientsByUser.get(key) ?? []), String(row.client_id)]);
   }
-  const usersWithAgency = new Set((agencyRows ?? []).map((row) => String(row.user_id)));
+  const agenciesByUser = new Map<string, string[]>();
+  for (const row of agencyRows ?? []) {
+    const key = String(row.user_id);
+    agenciesByUser.set(key, [...(agenciesByUser.get(key) ?? []), String(row.agency_id)]);
+  }
 
   const users = data.users.map((user) => {
     const role = normalizeRole(roleByUser.get(user.id));
@@ -58,8 +62,8 @@ export async function GET() {
       seesAllClients: scopeFor(role, []) === ALL_CLIENTS,
       // Een organisatiebrede rol ZONDER user_agencies-koppeling ziet in werkelijkheid niets
       // (bepaalScope() in lib/auth/scope.ts valt terug op scope: [] zonder bureau) -- dus
-      // "alle beurzen" hierboven is dan een leugen. Zie de uitleg bij ensureAgencyLink.
-      hasAgency: usersWithAgency.has(user.id),
+      // "alle beurzen" hierboven is dan een leugen zonder deze lijst. Leeg is dat geval.
+      agencyIds: agenciesByUser.get(user.id) ?? [],
       deactivated: Boolean((user as { banned_until?: string | null }).banned_until),
       lastSignIn: user.last_sign_in_at ?? null,
     };
@@ -110,6 +114,42 @@ async function ensureAgencyLink(
   return error?.message ?? null;
 }
 
+// Vervangt de bureaus van de gebruiker door precies dit ene bureau. Voor de expliciete
+// bureau-kiezer in het scherm: in tegenstelling tot ensureAgencyLink (puur additief, alleen de
+// stille val-terug-op-eigen-bureau hierboven) is dit een bewuste keuze van de handelende
+// beheerder, dus mag hij ook een foute koppeling herstellen -- niet alleen een ontbrekende
+// aanvullen. "Meestal precies één" bureau per gebruiker (zie AuthUser.agencyIds), dus vervangen
+// in plaats van toevoegen.
+async function setAgency(
+  admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  userId: string,
+  agencyId: string,
+): Promise<string | null> {
+  const { error: delError } = await admin.from("user_agencies").delete().eq("user_id", userId);
+  if (delError) return delError.message;
+  const { error } = await admin.from("user_agencies").insert({ user_id: userId, agency_id: agencyId });
+  return error?.message ?? null;
+}
+
+// Adminrechten TOEKENNEN is het enige recht dat je gelijkwaardig maakt aan wie je toewees -- een
+// admin kan zelf weer andere admins maken. Elke andere capability (settings:write, sync:run, ...)
+// blijft binnen de eigen bureaugrens en is dus veilig aan elke admin te laten; deze ene stap niet.
+// Alleen een platformbeheerder (platform_beheerders, migratie 057 -- zelf bewust NIET via een
+// API te zetten, zie die migratie) mag daarom over de admin-drempel heen tillen.
+//
+// huidigeRol is null bij een uitnodiging (POST): een nieuwe gebruiker heeft nog geen rol, dus
+// "wordt admin" is dan altijd een toekenning. Bij een PATCH is het pas een toekenning als de rol
+// ECHT verandert -- anders zou een gewone admin een bestaande collega-admin niet eens meer van
+// bureau kunnen laten wisselen zonder zelf platformbeheerder te zijn, en dat is een andere,
+// grovere restrictie dan gevraagd.
+function magAdminToekennen(
+  auth: { isPlatform: boolean },
+  gevraagdeRol: string,
+  huidigeRol: string | null,
+): boolean {
+  return gevraagdeRol !== "admin" || huidigeRol === "admin" || auth.isPlatform;
+}
+
 export async function POST(request: Request) {
   const auth = await requireCapability("user:manage");
   if (auth instanceof Response) return auth;
@@ -117,12 +157,15 @@ export async function POST(request: Request) {
   if (!admin) return adminUnavailable();
 
   const body = (await request.json().catch(() => null)) as
-    | { email?: string; role?: string; clients?: string[] }
+    | { email?: string; role?: string; clients?: string[]; agencyId?: string }
     | null;
   const email = body?.email?.trim();
   const role = body?.role;
   if (!email || !isRole(role)) {
     return Response.json({ error: `email en een geldige rol (${ROLES.join(", ")}) zijn verplicht` }, { status: 400 });
+  }
+  if (!magAdminToekennen(auth, role, null)) {
+    return Response.json({ error: "Alleen een platformbeheerder mag adminrechten toekennen" }, { status: 403 });
   }
   // Een rol met een eigen beurs-scope zonder beurzen ziet niets. Dat is bijna nooit de
   // bedoeling, dus het is een fout en geen stilzwijgend lege toegang.
@@ -146,7 +189,10 @@ export async function POST(request: Request) {
     if (roleError) return Response.json({ error: roleError.message }, { status: 500 });
     const clientError = await replaceClients(admin, userId, clients);
     if (clientError) return Response.json({ error: clientError }, { status: 500 });
-    const agencyError = await ensureAgencyLink(admin, userId, auth.agencyIds);
+    const agencyId = body?.agencyId?.trim();
+    const agencyError = agencyId
+      ? await setAgency(admin, userId, agencyId)
+      : await ensureAgencyLink(admin, userId, auth.agencyIds);
     if (agencyError) return Response.json({ error: agencyError }, { status: 500 });
   }
   return Response.json({ ok: true, userId });
@@ -159,7 +205,7 @@ export async function PATCH(request: Request) {
   if (!admin) return adminUnavailable();
 
   const body = (await request.json().catch(() => null)) as
-    | { userId?: string; role?: string; clients?: string[] }
+    | { userId?: string; role?: string; clients?: string[]; agencyId?: string }
     | null;
   const userId = body?.userId;
   const role = body?.role;
@@ -167,18 +213,31 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "userId en een geldige rol zijn verplicht" }, { status: 400 });
   }
 
-  if (role !== "admin") {
-    const { data: current } = await admin.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
-    if (current?.role === "admin" && (await countAdmins(admin)) <= 1) {
-      return Response.json({ error: "De laatste admin kan niet gedegradeerd worden" }, { status: 400 });
-    }
+  const { data: current } = await admin.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
+  const huidigeRol = current?.role ?? null;
+
+  if (!magAdminToekennen(auth, role, huidigeRol)) {
+    return Response.json({ error: "Alleen een platformbeheerder mag adminrechten toekennen" }, { status: 403 });
+  }
+
+  if (role !== "admin" && huidigeRol === "admin" && (await countAdmins(admin)) <= 1) {
+    return Response.json({ error: "De laatste admin kan niet gedegradeerd worden" }, { status: 400 });
   }
 
   const { error } = await admin.from("user_roles").upsert({ user_id: userId, role });
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
-  const agencyError = await ensureAgencyLink(admin, userId, auth.agencyIds);
-  if (agencyError) return Response.json({ error: agencyError }, { status: 500 });
+  // Het bureau alleen aanraken als het is meegestuurd -- zelfde principe als clients hieronder.
+  // De kiezer in het scherm stuurt hem altijd mee (ook ongewijzigd), dus dit raakt in de praktijk
+  // alleen callers buiten die UI om.
+  const agencyId = body?.agencyId?.trim();
+  if (agencyId) {
+    const agencyError = await setAgency(admin, userId, agencyId);
+    if (agencyError) return Response.json({ error: agencyError }, { status: 500 });
+  } else {
+    const agencyError = await ensureAgencyLink(admin, userId, auth.agencyIds);
+    if (agencyError) return Response.json({ error: agencyError }, { status: 500 });
+  }
 
   // De scope alleen aanraken als hij is meegestuurd: een rolwijziging zonder clients-veld
   // hoort de bestaande beurs-toewijzing niet weg te gooien.

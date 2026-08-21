@@ -31,6 +31,8 @@ export interface Access {
   agencyId: string | null;
   /** Mag dit bureau een eigen logo tonen in de app-shell? Door een platformbeheerder gezet. */
   whitelabelActief: boolean;
+  /** Staat deze gebruiker in platform_beheerders? Bepaalt o.a. of hij adminrechten mag toekennen. */
+  isPlatform: boolean;
 }
 
 interface MeResponse {
@@ -41,6 +43,7 @@ interface MeResponse {
   scope?: ClientScope;
   agencyId?: string | null;
   whitelabelActief?: boolean;
+  isPlatform?: boolean;
 }
 
 export function useAccess(): Access {
@@ -51,6 +54,7 @@ export function useAccess(): Access {
   const [loading, setLoading] = useState(true);
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [whitelabelActief, setWhitelabelActief] = useState(false);
+  const [isPlatform, setIsPlatform] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -60,6 +64,7 @@ export function useAccess(): Access {
         if (!live || !data) return;
         setAgencyId(data.agencyId ?? null);
         setWhitelabelActief(data.whitelabelActief ?? false);
+        setIsPlatform(data.isPlatform ?? false);
         // De server zegt nu expliciet of er gehandhaafd wordt, in plaats van dat we het uit een
         // 401 moeten afleiden. Staat de handhaving uit, dan blijft alles zichtbaar.
         if (data.enforced === false) return;
@@ -84,6 +89,7 @@ export function useAccess(): Access {
     unrestricted,
     agencyId,
     whitelabelActief,
+    isPlatform,
     can: (capability) => unrestricted || capabilities.includes(capability),
     canAccessClient: (clientId) => unrestricted || canAccessClient(scope, clientId),
   };

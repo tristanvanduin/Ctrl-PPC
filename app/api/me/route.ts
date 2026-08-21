@@ -62,7 +62,7 @@ export async function GET() {
     if (!enforced()) {
       return Response.json({
         enforced: false, id: null, email: null, role: null, capabilities: [], scope: [],
-        agencyId: null, whitelabelActief: false,
+        agencyId: null, whitelabelActief: false, isPlatform: false,
       });
     }
     return Response.json({ enforced: true, error: "Niet ingelogd" }, { status: 401 });
@@ -83,5 +83,9 @@ export async function GET() {
     // wint het eerste -- in de praktijk heeft een gebruiker er precies één.
     agencyId: auth.agencyIds[0] ?? null,
     whitelabelActief: await whitelabelActief(auth.agencyIds),
+    // Voor de gebruikersbeheer-UI: alleen een platformbeheerder mag iemand tot admin maken
+    // (zie app/api/admin/users/route.ts). Geen gevoelige data — alleen of DIT de platformbeheerder
+    // zelf is, niet wie er allemaal in platform_beheerders staat.
+    isPlatform: auth.isPlatform,
   });
 }
