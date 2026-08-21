@@ -5185,3 +5185,33 @@ punten bleken al opgelost in eerdere rondes deze sessie.
 scripts/check-hygiene.mjs` (1012 bestanden, groen), Playwright-screenshots op de demo-klant (licht
 + donker voor de kaart, Bevindingen- en Analyseren-tab voor de verplaatsing, ingezoomd op de
 donut-sectie om de tekstgrootte te bevestigen).
+
+### 17.60 Notities/to-do's gesplitst in twee onafhankelijke secties + globale sync (21 augustus, vervolg)
+
+Vervolg op de triage in 17.59: notities en to-do's stonden in één kaart met gedeelde grid/form-
+state, en `client-notes.tsx` werd los per tabblad gemount (o.a. dubbel in `google-view.tsx`) in
+plaats van één keer globaal — waardoor een to-do die op het Overzicht-tabblad werd aangemaakt niet
+zichtbaar leek op Campagnes.
+
+Gedaan:
+- `components/dashboard/client-notes.tsx` herschreven: twee volledig onafhankelijke kaarten
+  ("To-do's" / "Notities") in een `grid grid-cols-1 md:grid-cols-2`-wrapper, elk met een eigen
+  teller, eigen "+"-knop en eigen inline formulier (`newOpen: null | "note" | "todo"`). Onderliggende
+  fetch/save/delete-logica gedeeld, rendering niet. Delete-bevestiging gedeeld state (`deleteConfirm`)
+  correct per kaart gefilterd op `is_todo` — een eigen introductiebug (per ongeluk gegate op
+  `editingId` i.p.v. `deleteConfirm`) tijdens het bouwen zelf opgemerkt en gecorrigeerd vóór commit.
+- De twee losse `<ClientNotes clientId={clientId} />`-mounts in `google-view.tsx` verwijderd
+  (inclusief de nu ongebruikte import).
+- Eén globale mount toegevoegd in `client-dashboard.tsx`, direct na de laatste tabblad-conditional,
+  gegate op `activeTab !== "settings" && activeTab !== "files"` — zichtbaar op elk inhoudelijk
+  tabblad, niet meer per kanaal-component gedupliceerd.
+
+**Verificatie**: Playwright tegen `demo-greentech` — twee onafhankelijke kaarten op het Overzicht-
+tabblad bevestigd (het openen van het to-do-formulier laat de Notities-kaart ongemoeid); dezelfde
+kaarten ook onderaan Campagnes bevestigd. Een echte to-do opgeslagen op Overzicht en na navigeren
+naar Campagnes zichtbaar bevonden onder "TO-DO'S · 1 open" — cross-tabblad-sync bevestigd. Omdat
+`/api/data/[table]` zonder demo-onderscheid altijd de service-role-Supabase gebruikt (geen mock-
+laag voor schrijfacties), is de testrij ("Sync-test: deze to-do moet op elk tabblad zichtbaar
+zijn", client_id `demo-greentech`) na verificatie weer verwijderd uit de echte database, conform de
+staande testdata-hygiëneregel. `npx tsc --noEmit -p .`, `npm test -- --run` (312/312) en `node
+scripts/check-hygiene.mjs` (1012 bestanden) opnieuw groen na de opruiming.

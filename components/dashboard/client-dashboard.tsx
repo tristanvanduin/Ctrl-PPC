@@ -57,6 +57,7 @@ import { ChannelStructureAnalysis } from "./channel-structure-analysis";
 import { GeoCloneScope } from "./geo-clone-scope";
 import { TrackingAlert } from "./tracking-alert";
 import { CodeRoodBanner } from "./code-rood-banner";
+import { ClientNotes } from "./client-notes";
 import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
@@ -550,6 +551,15 @@ export function ClientDashboard({ client }: { client: Client }) {
               ) : (
                 <SettingsSections client={client} />
               )}
+            </div>
+          )}
+
+          {/* Notities & to-do's onderaan elke "werk"-pagina, gesynchroniseerd (zelfde tabel/
+              client-scope overal): niet op Instellingen of Bestanden, dat zijn pure
+              configuratieschermen waar een notitieblok niet hoort (feedbackronde 21 augustus). */}
+          {activeTab !== "settings" && activeTab !== "files" && (
+            <div className="mt-10">
+              <ClientNotes clientId={client.id} />
             </div>
           )}
         </AnalysisProvider>

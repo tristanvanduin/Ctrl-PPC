@@ -103,16 +103,23 @@ function NoteCard({
   );
 }
 
+// ── Waarom twee losse kaarten en niet één kaart met een interne 50/50-grid ─────────────────────
+//
+// Stond eerder als één kaart met gedeelde "Notitie"/"To-do"-knoppen bovenaan die allebei hetzelfde
+// formulier openden (alleen het type-toggle verschilde). Feedback: "ik wil 2 losse secties die
+// allebei 50/50 zijn en elk blok zijn eigen toevoegoptie" — dus geen gedeeld formulier met een
+// keuzeknop, maar twee zelfstandige kaarten die er ook zo uitzien. De onderliggende data (fetch,
+// opslaan, verwijderen) blijft gedeeld: één tabel, één client_id-scope, dus de twee kaarten zijn
+// altijd gesynchroniseerd met elkaar en met elke andere plek die dezelfde klant leest (o.a.
+// lib/feed/use-today-feed.ts's open-to-do-teller).
 export function ClientNotes({ clientId }: { clientId: string }) {
   const [notes, setNotes] = useState<ClientNote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showNew, setShowNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Welke kaart een open toevoeg-formulier toont -- null als geen van beide.
+  const [newOpen, setNewOpen] = useState<null | "note" | "todo">(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  // Alleen relevant bij het aanmaken: het type staat vast zodra een to-do eenmaal bestaat,
-  // wisselen zou de done-status van context ontdoen. Bij bewerken blijft het type van de rij.
-  const [isTodo, setIsTodo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -133,31 +140,31 @@ export function ClientNotes({ clientId }: { clientId: string }) {
 
   useEffect(() => { fetchNotes(); }, [fetchNotes]);
 
+  const editingNote = editingId ? notes.find((n) => n.id === editingId) ?? null : null;
+  const noteToDelete = deleteConfirm ? notes.find((n) => n.id === deleteConfirm) ?? null : null;
+
   function startEdit(note: ClientNote) {
     setEditingId(note.id);
     setTitle(note.title ?? "");
     setContent(note.content);
-    setIsTodo(note.is_todo);
-    setShowNew(false);
+    setNewOpen(null);
   }
 
-  function startNew(todo: boolean) {
-    setShowNew(true);
+  function startNew(section: "note" | "todo") {
+    setNewOpen(section);
     setEditingId(null);
     setTitle("");
     setContent("");
-    setIsTodo(todo);
   }
 
   function cancelEdit() {
-    setShowNew(false);
+    setNewOpen(null);
     setEditingId(null);
     setTitle("");
     setContent("");
-    setIsTodo(false);
   }
 
-  async function handleSave() {
+  async function handleSave(isTodo: boolean) {
     if (!supabase || !content.trim()) return;
     setSaving(true);
 
@@ -203,116 +210,87 @@ export function ClientNotes({ clientId }: { clientId: string }) {
   const openTodos = todos.filter((n) => !n.done);
   const gedaneTodos = todos.filter((n) => n.done);
 
-  return (
-    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <StickyNote className="w-4 h-4 text-brand-blue-ink" />
-          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Notities &amp; to-do&apos;s</h3>
-          <span className="text-micro text-muted-foreground">({notes.length})</span>
-          {openTodos.length > 0 && (
-            <span className="text-micro font-semibold text-brand-blue-ink bg-brand-blue/10 rounded-full px-2 py-0.5">
-              {openTodos.length} open
-            </span>
-          )}
+  const todoFormOpen = newOpen === "todo" || (editingNote?.is_todo === true);
+  const noteFormOpen = newOpen === "note" || (editingNote?.is_todo === false);
+
+  function renderForm(isTodo: boolean, onSave: () => void) {
+    return (
+      <div className="mb-3 bg-brand-blue/5 rounded-lg p-3.5 border border-brand-blue/10">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Titel (optioneel)"
+          className="w-full text-sm font-medium border-0 bg-transparent focus:outline-none placeholder:text-muted-foreground mb-2"
+        />
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder={isTodo ? "Wat moet er gebeuren..." : "Notitie schrijven... (afspraken, strategie, gedachtes)"}
+          rows={3}
+          className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue resize-y"
+          autoFocus
+        />
+        <div className="flex justify-end gap-2 mt-2">
+          <button onClick={cancelEdit} className="px-3 py-1.5 text-meta text-muted-foreground hover:text-brand-gray">
+            Annuleren
+          </button>
+          <button
+            onClick={onSave}
+            disabled={saving || !content.trim()}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-md bg-brand-blue text-white hover:bg-brand-blue/90 disabled:opacity-50"
+          >
+            <Save className="w-3 h-3" /> {saving ? "Opslaan..." : "Opslaan"}
+          </button>
         </div>
-        {!showNew && !editingId && (
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => startNew(false)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue/10 text-brand-blue-ink hover:bg-brand-blue/20 transition-colors"
-            >
-              <Plus className="w-3 h-3" /> Notitie
-            </button>
-            <button
-              onClick={() => startNew(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue/10 text-brand-blue-ink hover:bg-brand-blue/20 transition-colors"
-            >
-              <ListChecks className="w-3 h-3" /> To-do
-            </button>
-          </div>
-        )}
       </div>
+    );
+  }
 
-      {/* New/Edit form */}
-      {(showNew || editingId) && (
-        <div className="mb-4 bg-brand-blue/5 rounded-lg p-4 border border-brand-blue/10">
-          {/* Het type staat alleen bij aanmaken open -- wisselen tijdens bewerken zou de
-              done-status van een bestaande to-do van context ontdoen. */}
-          {!editingId && (
-            <div className="inline-flex bg-gray-100 border border-border rounded-lg p-0.5 gap-0.5 mb-2.5">
-              <button
-                onClick={() => setIsTodo(false)}
-                className={`text-micro font-medium px-2.5 py-1 rounded-md transition-colors ${!isTodo ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"}`}
-              >
-                Notitie
-              </button>
-              <button
-                onClick={() => setIsTodo(true)}
-                className={`text-micro font-medium px-2.5 py-1 rounded-md transition-colors ${isTodo ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"}`}
-              >
-                To-do
-              </button>
-            </div>
-          )}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Titel (optioneel)"
-            className="w-full text-sm font-medium border-0 bg-transparent focus:outline-none placeholder:text-muted-foreground mb-2"
-          />
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder={isTodo ? "Wat moet er gebeuren..." : "Notitie schrijven... (afspraken, strategie, gedachtes)"}
-            rows={3}
-            className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue resize-y"
-            autoFocus
-          />
-          <div className="flex justify-end gap-2 mt-2">
-            <button onClick={cancelEdit} className="px-3 py-1.5 text-meta text-muted-foreground hover:text-brand-gray">
-              Annuleren
-            </button>
+  function renderDeleteConfirm() {
+    if (!deleteConfirm) return null;
+    return (
+      <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
+        <p className="text-meta text-red-700">Verwijderen?</p>
+        <div className="flex gap-2">
+          <button onClick={() => setDeleteConfirm(null)} className="text-meta text-muted-foreground">Annuleren</button>
+          <button onClick={() => handleDelete(deleteConfirm)} className="text-meta text-red-600 font-medium">Verwijder</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {/* Sectie 1: to-do's -- eigen kaart, eigen toevoegknop. */}
+      <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ListChecks className="w-4 h-4 text-brand-blue-ink" />
+            <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">To-do&apos;s</h3>
+            {openTodos.length > 0 && (
+              <span className="text-micro font-semibold text-brand-blue-ink bg-brand-blue/10 rounded-full px-2 py-0.5">
+                {openTodos.length} open
+              </span>
+            )}
+          </div>
+          {!todoFormOpen && (
             <button
-              onClick={handleSave}
-              disabled={saving || !content.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-md bg-brand-blue text-white hover:bg-brand-blue/90 disabled:opacity-50"
+              onClick={() => startNew("todo")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue/10 text-brand-blue-ink hover:bg-brand-blue/20 transition-colors"
             >
-              <Save className="w-3 h-3" /> {saving ? "Opslaan..." : "Opslaan"}
+              <Plus className="w-3 h-3" /> To-do
             </button>
-          </div>
+          )}
         </div>
-      )}
 
-      {/* Delete confirmation */}
-      {deleteConfirm && (
-        <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
-          <p className="text-meta text-red-700">Notitie verwijderen?</p>
-          <div className="flex gap-2">
-            <button onClick={() => setDeleteConfirm(null)} className="text-meta text-muted-foreground">Annuleren</button>
-            <button onClick={() => handleDelete(deleteConfirm)} className="text-meta text-red-600 font-medium">Verwijder</button>
-          </div>
-        </div>
-      )}
+        {todoFormOpen && renderForm(true, () => handleSave(true))}
+        {noteToDelete?.is_todo === true && renderDeleteConfirm()}
 
-      {/* Lijst */}
-      {loading ? (
-        <p className="text-meta text-muted-foreground py-4 text-center">Laden...</p>
-      ) : (
-        // Twee kolommen, 50/50 over de volle breedte, ALTIJD -- ook als er nog niets in staat.
-        // Stond hier eerder een gecombineerde lege-staat ("nog geen notities of to-do's") die
-        // vóór de tweekoloms-grid werd getoond zodra notes.length === 0: dan zag een klant zonder
-        // data één blok i.p.v. de 50/50-indeling, en de eigenaar las de twee knoppen erboven toen
-        // als "eerst een filter kiezen" i.p.v. "voeg iets toe". Elke kolom toont zijn eigen lege
-        // tekst hieronder al; de layout hoeft dus niet te wisselen op basis van of er data is.
-        // Op smal (mobiel) valt het terug op één kolom, anders verdwijnt de kaart onder een
-        // horizontale scrollbalk.
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {loading ? (
+          <p className="text-meta text-muted-foreground py-4 text-center">Laden...</p>
+        ) : (
           <div className="space-y-2 max-h-[480px] overflow-y-auto">
-            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <ListChecks className="w-3 h-3" /> To-do&apos;s ({openTodos.length} open{gedaneTodos.length > 0 ? `, ${gedaneTodos.length} afgerond` : ""})
-            </p>
             {todos.length === 0 ? (
               <p className="text-micro text-muted-foreground/60 py-2">Nog geen to-do&apos;s.</p>
             ) : (
@@ -329,11 +307,34 @@ export function ClientNotes({ clientId }: { clientId: string }) {
               ))
             )}
           </div>
+        )}
+      </div>
 
+      {/* Sectie 2: vrije notities -- eigen kaart, eigen toevoegknop. */}
+      <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <StickyNote className="w-4 h-4 text-brand-blue-ink" />
+            <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Notities</h3>
+            <span className="text-micro text-muted-foreground">({vrijeNotities.length})</span>
+          </div>
+          {!noteFormOpen && (
+            <button
+              onClick={() => startNew("note")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-meta font-medium rounded-lg bg-brand-blue/10 text-brand-blue-ink hover:bg-brand-blue/20 transition-colors"
+            >
+              <Plus className="w-3 h-3" /> Notitie
+            </button>
+          )}
+        </div>
+
+        {noteFormOpen && renderForm(false, () => handleSave(false))}
+        {noteToDelete?.is_todo === false && renderDeleteConfirm()}
+
+        {loading ? (
+          <p className="text-meta text-muted-foreground py-4 text-center">Laden...</p>
+        ) : (
           <div className="space-y-2 max-h-[480px] overflow-y-auto">
-            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <StickyNote className="w-3 h-3" /> Notities ({vrijeNotities.length})
-            </p>
             {vrijeNotities.length === 0 ? (
               <p className="text-micro text-muted-foreground/60 py-2">Nog geen notities.</p>
             ) : (
@@ -348,8 +349,8 @@ export function ClientNotes({ clientId }: { clientId: string }) {
               ))
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

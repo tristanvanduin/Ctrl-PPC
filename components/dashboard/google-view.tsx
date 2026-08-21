@@ -13,7 +13,6 @@ import { DisplayScorecard } from "./display-scorecard";
 import { ShoppingScorecard } from "./shopping-scorecard";
 import { EventPacing } from "./event-pacing";
 import { GeoCloneOverview } from "./geo-clone-overview";
-import { ClientNotes } from "./client-notes";
 import { MonthlyOverview } from "./monthly-overview";
 import { FairWeeksOverview } from "./fair-weeks-overview";
 import { PacingMonitor } from "./pacing-monitor";
@@ -114,7 +113,6 @@ export function GoogleView({
           {/* Event-relatieve pacing: opbouw tot nu vs dezelfde afstand tot de vorige editie. */}
           <EventPacing clientId={clientId} geoClone={geoClone} />
           <GeoCloneOverview clientId={clientId} geoClone={geoClone} />
-          <ClientNotes clientId={clientId} />
         </>
       ) : (
         <>
@@ -238,10 +236,6 @@ export function GoogleView({
             <VideoPerformance clientId={clientId} />
             <VideoPlacements clientId={clientId} />
           </Sectie>
-
-          <div className="mt-10">
-            <ClientNotes clientId={clientId} />
-          </div>
         </>
       )}
     </>
