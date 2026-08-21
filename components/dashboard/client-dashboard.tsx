@@ -30,6 +30,7 @@ import { CrossChannelAnalyses } from "./cross-channel-analyses";
 import { MasterSynthesisAnalysis } from "./master-synthesis-analysis";
 import { ChannelForecast } from "./channel-forecast";
 import { ChannelForecastSections } from "./channel-forecast-sections";
+import { ChannelBudgetScenario } from "./channel-budget-scenario";
 import { EventForecaster } from "./event-forecaster";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
@@ -476,6 +477,18 @@ export function ClientDashboard({ client }: { client: Client }) {
                         bijschrift="De blended projectie richting het einde van de periode"
                       >
                         <ChannelForecast clientId={client.id} channel="blended" />
+                      </Sectie>
+                      {/* Ontbrak hier: Google en Meta/LinkedIn hebben allebei al een
+                          budgetscenario naast hun samenvatting (GoogleForecast resp.
+                          ChannelForecastSections) -- blended miste dat element helemaal, terwijl
+                          ChannelBudgetScenario "blended" al als kanaal ondersteunt (dezelfde
+                          run-rate-hook als hierboven). Puur bedrading, geen nieuw component. */}
+                      <Sectie
+                        icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+                        titel="Wat een budgetwijziging zou doen"
+                        bijschrift="Over alle kanalen samen"
+                      >
+                        <ChannelBudgetScenario clientId={client.id} channel="blended" />
                       </Sectie>
                       <CrossChannelView clientId={client.id} />
                     </>
