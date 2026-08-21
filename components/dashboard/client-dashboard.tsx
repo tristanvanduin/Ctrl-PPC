@@ -244,7 +244,7 @@ export function ClientDashboard({ client }: { client: Client }) {
     <BrandThemeProvider clientId={client.id} geoClone={geoClone}>
     <div className="space-y-6">
       {/* Merk-header: logo + merk-/beursnaam, in de huisstijl van de actieve klant/beurs. */}
-      <BrandHeaderBar geoClone={geoClone} fallbackName={client.name} edition={upcomingEdition} />
+      <BrandHeaderBar clientId={client.id} geoClone={geoClone} fallbackName={client.name} edition={upcomingEdition} />
       {/* De periodekiezer staat in de kop en niet per tabblad: hij geldt voor de hele
           klantweergave, en per tabblad een eigen periode zou betekenen dat twee getallen
           op hetzelfde scherm over verschillende maanden gaan. Onder de hero i.p.v. ernaast:

@@ -101,16 +101,24 @@ export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel
         })}
       </svg>
 
-      {/* Het gat draagt het totaal, of de waarde van het segment waar de muis op staat. */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
+      {/* Het gat draagt het totaal, of de waarde van het segment waar de muis op staat.
+          Begrensd tot de binnenring (2*R_INNER) en niet tot het hele SVG-vlak: de tekst moet
+          niet buiten de middencirkel op de segmenten zelf komen te staan. Een lang getal krijgt
+          bovendien een kleiner lettertype, want een vaste `text-figure` past niet gegarandeerd
+          binnen een cirkel van 104px. */}
+      <div
+        className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center pointer-events-none text-center px-1"
+        style={{ width: R_INNER * 2 - 12 }}
+      >
         {hover ? (
           (() => {
             const a = arcs.find((x) => x.key === hover);
             if (!a) return null;
+            const waarde = format(a.value);
             return (
               <>
-                <div className="text-figure font-bold text-brand-gray leading-tight">{format(a.value)}</div>
-                <div className="text-micro font-medium text-muted-foreground leading-tight mt-0.5">{a.label}</div>
+                <div className={`${centerFigureClass(waarde)} font-bold text-brand-gray leading-tight`}>{waarde}</div>
+                <div className="text-micro font-medium text-muted-foreground leading-tight mt-0.5 truncate w-full">{a.label}</div>
                 <div className="text-micro font-medium text-brand-gray leading-tight">
                   {new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 1 }).format(a.share)}
                 </div>
@@ -119,11 +127,20 @@ export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel
           })()
         ) : (
           <>
-            <div className="text-figure font-bold text-brand-gray leading-tight">{centerValue}</div>
-            <div className="text-micro font-medium text-muted-foreground leading-tight mt-0.5">{centerLabel}</div>
+            <div className={`${centerFigureClass(centerValue)} font-bold text-brand-gray leading-tight`}>{centerValue}</div>
+            <div className="text-micro font-medium text-muted-foreground leading-tight mt-0.5 truncate w-full">{centerLabel}</div>
           </>
         )}
       </div>
     </div>
   );
+}
+
+// `text-figure` (30px) past niet gegarandeerd binnen de 104px-binnenring zodra de waarde lang
+// wordt (bv. "€ 182.234"). Geen ResizeObserver voor een cirkel van vaste afmeting -- een
+// lengte-heuristiek op de geformatteerde string is hier genoeg en blijft server-renderbaar.
+function centerFigureClass(waarde: string): string {
+  if (waarde.length > 9) return "text-meta";
+  if (waarde.length > 6) return "text-lead";
+  return "text-figure";
 }

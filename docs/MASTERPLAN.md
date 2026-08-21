@@ -4907,3 +4907,52 @@ betreft, net als bij 17.56.
 achterhaald: de app draait inmiddels op een Vercel-deploy. Niet hier opgelost — dit is een
 Supabase-configuratie-wijziging (twee velden: Site URL en de Redirect URLs-lijst), geen code, en
 wacht op bevestiging van de eigenaar welk domein nu canoniek is.
+
+### 17.58 Vijf kleine, ondubbelzinnige feedback-fixes; en een belangrijke waarschuwing over ongeteste aannames (21 augustus 2026)
+
+Vijf van de bevestigde-maar-niet-gefixte punten uit 17.56/17.57 zijn nu wél doorgevoerd, elk klein
+en losstaand genoeg om zonder ontwerpvraag te fixen:
+
+- **Logo als home-link** (`components/layout/sidebar.tsx`): `SidebarLogo` + merknaam staan nu in
+  een `<Link href="/vandaag">` in plaats van een kale `<div>`.
+- **Hero banner wegklikbaar** (`components/branding/brand-header-bar.tsx`): een sluitknop,
+  onthouden per klant + beurs-scope via het bestaande `useRememberedOpen`-mechanisme (dezelfde
+  opslaglogica als `CollapsiblePanel`, hier zonder de kaartchrome). `BrandHeaderBar` kreeg een
+  nieuwe, optionele `clientId`-prop voor de sleutel.
+- **Donuttekst buiten de middencirkel** (`components/dashboard/donut-chart.tsx`): de centrumtekst
+  staat niet langer los in het volledige SVG-vlak maar begrensd tot `2×R_INNER` (104px), gecentreerd
+  met `translate`. Een lengte-heuristiek op de geformatteerde waarde (`centerFigureClass()`) schaalt
+  het lettertype terug bij een lange waarde in plaats van een vaste `text-figure` te forceren.
+- **PMax/Search-scorecard te breed/leeg** (`components/dashboard/health-badge.tsx`): de
+  anomalieën-kolom (voorheen kaal `flex-1`) heeft nu `max-w-2xl` — rekt nog steeds mee met een
+  brede kaart, maar niet verder dan waar de inhoud op uitkomt.
+- **Wereldkaart: dynamisch inzoomen op actieve landen** (`components/dashboard/world-map.tsx`): de
+  projectie (voorheen eenmalig op module-niveau met `fitSize` op de hele wereld) is verplaatst naar
+  een `useMemo` in de component die `fitExtent` toepast op alleen de landen die in `values`
+  voorkomen, met 32px marge. Zonder actieve landen valt hij terug op de volledige wereld — het oude
+  gedrag blijft de eerlijke standaard.
+
+Alle vijf: `scripts/gates.sh` groen (`tsc`, 306/306 tests, `build`) — één tussentijdse run faalde
+op `Cannot find name 'SHAPES'` doordat de wereldkaart-bewerking nog liep terwijl een eerder
+gestarte build-poort al las; dat is precies de valkuil die `AGENTS.md` beschrijft ("bouw nooit
+onder een draaiende server", hier de variant "bewerk niet onder een lopende build") en geen echte
+regressie — bevestigd door de herhaalde, schone run erna.
+
+**De belangrijkere vondst van deze sessie: geen van bovenstaande, of van de eerdere 17.56/17.57-
+bevindingen, is ooit tegen de live site getest.** Op de vraag "heb je dit tegen de meest actuele
+deploy getest?" moest het eerlijke antwoord nee zijn — alles kwam uit statische code-lezing op deze
+branch. Bevestigd: `origin/main` is een strikte voorouder van deze branch (geen divergerende
+commits), dus de code-lezing dekt tenminste correct wat er vóór deze sessie op `main` stond. Of dat
+ook is wat er live draait, is een aparte vraag — Vercel-preview-deploys zitten achter een eigen
+SSO-portaal (los van de app-login), en `/client/demo-greentech` op de productiesite zelf zit achter
+de gewone inlogpagina. Een poging om met een door de eigenaar aangeleverd app-account via een
+headless browser (Playwright, `playwright-core` + de lokale Chromium-install) in te loggen liep
+vast op `ERR_CONNECTION_RESET` — de sandbox-proxy die deze sessie's overige netwerkverkeer draagt
+wordt niet automatisch door Chromium gebruikt. Nog niet opgelost bij het schrijven van deze sectie;
+de eigenaar zet inmiddels een Vercel "Protection Bypass for Automation"-secret klaar zodat de
+preview-deploy ook rechtstreeks (zonder browser-login) bereikbaar wordt.
+
+**Wat dit betekent voor de status van 17.56/17.57's tabel:** die bevindingen blijven staan, maar
+moeten gelezen worden als "bevestigd in de code van vóór vandaag", niet als "bevestigd in wat een
+gebruiker nu ziet". Zodra live-verificatie werkt, is dat de volgende stap voordat verder blind
+gefixt wordt op basis van alleen code-lezing.

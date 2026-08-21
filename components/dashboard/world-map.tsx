@@ -10,24 +10,47 @@ import { countryLabel } from "@/lib/countries";
 
 // Interactieve choropleth-wereldkaart: kleurt elk land naar de gekozen metric en licht op met een
 // tooltip bij hover. Puur SVG (d3-geo voor de projectie + paden), geen zware kaart-library — dus
-// geen React-versieconflict. De landgeometrie wordt één keer geprojecteerd op module-niveau.
+// geen React-versieconflict.
 
 const WIDTH = 760;
 const HEIGHT = 380;
+// Marge rond de landen-met-data bij het inzoomen, zodat een geselecteerd land niet tegen de
+// kaartrand aan plakt en zijn buren nog net zichtbaar blijven voor context.
+const ZOOM_PADDING = 32;
 
-// Eénmalig: topojson → geojson → NaturalEarth-projectie → SVG-pad per land.
+// Eénmalig: topojson → geojson. Dit deel verandert nooit, dus wél op module-niveau.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const topo = worldTopo as any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const collection = feature(topo, topo.objects.countries) as any;
 const features = (collection.features ?? []) as Array<{ id?: string | number; properties?: { name?: string } }>;
-const projection = geoNaturalEarth1().fitSize([WIDTH, HEIGHT], collection as GeoPermissibleObjects);
-const pathGen = geoPath(projection);
 interface Shape { key: string; alpha2: string | null; d: string }
-const SHAPES: Shape[] = features.map((f, i) => {
-  const numeric = f.id != null ? String(Number(f.id)) : "";
-  return { key: `${numeric}-${i}`, alpha2: NUMERIC_TO_ALPHA2[numeric] ?? null, d: pathGen(f as GeoPermissibleObjects) ?? "" };
-});
+
+// De projectie zelf verplaatste naar de component: ze moet inzoomen op de landen die data
+// hebben (`values`) in plaats van altijd de hele wereld te tonen. Zonder data valt hij terug op
+// de volledige wereld -- exact het oude gedrag.
+function buildShapes(values: Map<string, number>): Shape[] {
+  const actieveCodes = new Set([...values.keys()].filter((c) => Number.isFinite(values.get(c))));
+  const actieveFeatures = actieveCodes.size > 0
+    ? features.filter((f) => {
+        const numeric = f.id != null ? String(Number(f.id)) : "";
+        const alpha2 = NUMERIC_TO_ALPHA2[numeric];
+        return alpha2 != null && actieveCodes.has(alpha2);
+      })
+    : [];
+  const fitTarget: GeoPermissibleObjects = actieveFeatures.length > 0
+    ? ({ type: "FeatureCollection", features: actieveFeatures } as unknown as GeoPermissibleObjects)
+    : (collection as GeoPermissibleObjects);
+  const projection = geoNaturalEarth1().fitExtent(
+    [[ZOOM_PADDING, ZOOM_PADDING], [WIDTH - ZOOM_PADDING, HEIGHT - ZOOM_PADDING]],
+    fitTarget,
+  );
+  const pathGen = geoPath(projection);
+  return features.map((f, i) => {
+    const numeric = f.id != null ? String(Number(f.id)) : "";
+    return { key: `${numeric}-${i}`, alpha2: NUMERIC_TO_ALPHA2[numeric] ?? null, d: pathGen(f as GeoPermissibleObjects) ?? "" };
+  });
+}
 
 // Sequentiële ramp op waarde-intensiteit; merk-onafhankelijk en leesbaar.
 //
@@ -57,12 +80,16 @@ export default function WorldMap({ values, format, metricLabel, onCountryClick }
 
   const max = useMemo(() => Math.max(1, ...[...values.values()].map((v) => Math.abs(v))), [values]);
   const hoveredValue = hover ? values.get(hover.alpha2) : undefined;
+  // Herberekend zodra de dataset verandert (niet bij elke render): zoomt in op de landen met
+  // data. Nederland-alleen betekent dus niet langer een stipje op een wereldkaart, maar een
+  // Nederland dat het beeld vult.
+  const shapes = useMemo(() => buildShapes(values), [values]);
 
   return (
     <div className="relative w-full">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto" role="img" aria-label={`Wereldkaart: ${metricLabel} per land`}>
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="transparent" onMouseMove={() => setHover(null)} />
-        {SHAPES.map((s) => {
+        {shapes.map((s) => {
           const v = s.alpha2 ? values.get(s.alpha2) : undefined;
           const has = v != null && Number.isFinite(v);
           const isHover = !!hover && hover.alpha2 === s.alpha2;

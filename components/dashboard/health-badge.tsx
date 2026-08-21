@@ -134,7 +134,12 @@ export function HealthBadgeView({
 
             Niet-beoordeelde assen staan er gedempt bij en met een streepje in plaats van een nul,
             om dezelfde reden als bij de staafjes hierboven. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {/* `max-w-2xl` en niet kaal `flex-1`: bij weinig anomalieën en korte omschrijvingen (bv.
+            PMax, dat vaak minder te melden heeft dan Search) rekte deze kolom tot de volle
+            kaartbreedte en bleef rechts een leeg vlak over. De kolom groeit nog steeds mee met
+            een brede kaart, maar niet verder dan waar de inhoud (twee kolommen `dl`) al op
+            uitkomt. */}
+        <div className="flex min-w-0 flex-1 max-w-2xl flex-col gap-4">
           {health.anomalies.length > 0 && (
             <div className="min-w-0">
               <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">

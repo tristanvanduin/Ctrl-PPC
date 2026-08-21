@@ -1,11 +1,12 @@
 "use client";
 
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, X } from "lucide-react";
 import { useBrandTheme } from "./brand-theme-provider";
 import { FAIR_GEO_CLONES } from "@/lib/fair/geo-clone-catalog";
 import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { inkOn } from "@/lib/branding/chart-colors";
 import { today } from "@/lib/reporting-date";
+import { useRememberedOpen } from "@/components/ui/disclosure";
 
 // De hero bovenaan de klantweergave.
 //
@@ -26,10 +27,13 @@ function initials(name: string): string {
 }
 
 export function BrandHeaderBar({
+  clientId,
   geoClone,
   fallbackName,
   edition,
 }: {
+  /** Stabiele sleutel voor het onthouden of deze hero is weggeklikt (per klant + beurs-scope). */
+  clientId?: string;
   geoClone?: string | null;
   fallbackName?: string;
   /** De eerstvolgende beurs, als de klant er een heeft. Voedt de aftelling rechts. */
@@ -41,6 +45,11 @@ export function BrandHeaderBar({
   const beursLabel = variant ? `${variant.brand} ${variant.location}` : geoClone;
 
   const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, today()) : null;
+
+  // Weggeklikt onthouden per klant + beurs-scope, niet globaal: een hero die je voor GRT wegklikt
+  // hoort niet ook voor GRA te verdwijnen, en andersom.
+  const [open, sluit] = useRememberedOpen(`hero-${clientId ?? "onbekend"}-${geoClone ?? "geen-beurs"}`, true);
+  if (!open) return null;
 
   // Het verloop loopt van de primaire naar de accentkleur, en die kunnen elk om een andere
   // inktkleur vragen. Vragen ze om dezelfde, dan is de keuze eenvoudig. Verschillen ze — en dat
@@ -115,6 +124,15 @@ export function BrandHeaderBar({
             </div>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={sluit}
+          aria-label="Hero sluiten"
+          className={`shrink-0 rounded-lg p-1.5 opacity-70 transition-opacity hover:opacity-100 ${chipVulling}`}
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
