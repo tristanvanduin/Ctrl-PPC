@@ -4977,3 +4977,70 @@ zoals in 17.55 vermeld.
 **Verificatie, elke commit los**: `npx tsc --noEmit -p .`, `npm test -- --run` (308→309 tests,
 altijd groen), `node scripts/check-hygiene.mjs` (997 bestanden, groen), Playwright-screenshots op
 de demo-klant in licht én donker, `git checkout -- tsconfig.json` voor elke commit.
+
+### 17.57 Churn per segment (single-bureau), Display/Shopping-scorecards, demo-datagaten gedicht (21 augustus, vervolg)
+
+Vervolg op 17.56, dezelfde sessie. Twee resterende punten van de zes-punten-feedback opgepakt,
+plus een nieuwe, staande instructie van de eigenaar: "als je data mist in een mock/demo klant,
+vul het dan aan" — voortaan toegepast zodra een gat wordt gevonden, niet alleen op verzoek.
+
+**Churn-concentratie per segment, single-bureau (Agency God View)**
+
+Tegenhanger van de cross-agency versie uit God View Premium (17.56), nu voor de eigen portfolio
+van één bureau — geen k-anonimiteit nodig, dezelfde bureaugrens als de bestaande "Portfolio per
+segment"-tabel:
+- `lib/macro/churn-aggregate.ts` (+test): pure aggregator, telt rood/amber/groen/onbekend per
+  bedrijfsmodel/niche-segment.
+- `lib/macro/run-macro-churn.ts`: berekent het licht live via `beoordeelKlant()` voor elke klant
+  binnen de eigen bureaus van de aanroeper.
+- `app/api/platform/agency-churn/route.ts`: zelfde capability/tier-gate als agency-macrotrends.
+- Nieuwe sectie "Churn-concentratie per segment" in `agency-god-view.tsx`, naast de bestaande
+  segmenttabel.
+
+**Twee geo-databugs gedicht (bij het zoeken naar wat de geo-kaart mist)**
+
+- `lib/demo/geoclone-demo-data.ts`: `countryMonthlyData` stond hardcoded op `[]` voor de drie
+  losse geo-clone-demoklanten (demo-grt/gra/grn) — de landfilter-knop verscheen wel, maar elke
+  selectie gaf een lege maand terug. Nu afgeleid uit de al-geseede campagnerijen.
+- `lib/geo/geo-source.ts`: dezelfde drie klanten vielen voor de wereldkaart terug op lege echte
+  tabellen (`ads_country_monthly` is nooit voor hen geseed). Nu afgeleid uit `ads_campaign_monthly`
+  voor deze specifieke klanten i.p.v. de gedeelde GreenTech-mock (ander landenpalet) of stil leeg.
+
+**Display- en Shopping-scorecards (masterplan sectie 5.4, laatste twee campagnetypes)**
+
+Zelfde vorm als Search/PMax (`HealthScore`, vijf factoren, eerlijk "niet beoordeeld" i.p.v. een
+gegokte score), eigen opbouw per type:
+- `lib/display-scorecard.ts` (+test): Conversion Efficiency (CPA-trend), Engagement-trend
+  (CTR-trend), CPM-trend, Doelgroep-mix (audience_type-imbalans t.o.v. gemiddelde ROAS),
+  Viewability (geen kolom in dit schema — altijd niet-beoordeeld, zelfde regel als PMax' Feed
+  Health).
+- `lib/shopping-scorecard.ts` (+test): Conversion Efficiency, Demand Capture (CTR), Auction
+  Pressure (CPC), Product-efficiëntie (waste via de gedeelde `aggregateByEntity()`), Feed Health
+  (Merchant Center — zelfde altijd-lege tabel als PMax, dus zelfde eerlijke gat).
+- Beide bedraad in `CampagneScorecard` (google-view.tsx), naast Search/PMax i.p.v. de "nog niet
+  gebouwd"-placeholder.
+
+De eerdere blokkade ("te weinig echte data om zonder gok te bouwen") was juist voor productie,
+maar loste zich op voor de demo-klant door 'm aan te vullen: Display had al één campagne +
+doelgroepdata (twee extra segmenten toegevoegd zodat Doelgroep-mix iets te vergelijken heeft);
+Shopping had HELEMAAL geen demo-campagne (bewust — "een vakbeurs verkoopt niets via een
+productfeed"). Daar een kleine, narratief-plausibele nevenstroom aan toegevoegd
+("GreenTech | Shopping | Merchandise", een exposant-merchandise-webshop — geen omkering van het
+kernverhaal) plus een nieuwe `productPerformanceRows()`-generator, afgeleid uit de campagnetotalen
+("afleiden, niet verzinnen", zelfde discipline als de rest van `lib/demo/`), met één duidelijk
+zwak product zodat Product-efficiëntie iets te detecteren heeft. Beide scorecards geverifieerd
+met een live screenshot op de demo-klant (Display: 75/B, Shopping: 68/C, beide met hun eerlijke
+niet-beoordeelde factor zichtbaar als gestreepte as in de radar).
+
+**Nog open:** de grotere, onderliggende bevinding dat er drie los van elkaar onderhouden
+demo-databronnen bestaan voor demo-greentech (`lib/demo/demo-rows.ts`+`google-sop-demo.ts`,
+`scripts/demo/seed-demo-client.ts`, `lib/demo/greentech-mock.ts`) die elkaar op campagnetype-vlak
+tegenspreken — geen quick fix, apart te plannen. Single-bureau churn was de laatste van de
+zes-punten-lijst; Display/Shopping-scorecards en Tier 4-dichtheidspas uit 17.55 waren de laatste
+twee open punten van de oorspronkelijke 14-puntenlijst en zijn nu (het eerste) ook gedaan.
+
+**Verificatie**: `npx tsc --noEmit -p .`, `npm test -- --run` (310→312→312 tests, één regressie
+onderweg gevonden en gefixt — de nieuwe Shopping-campagne verschoof de account-brede
+nacht/dag-CPA-ratio net onder de testdrempel, opgelost door de campagne iets minder efficiënt te
+maken i.p.v. de test te verzwakken), `node scripts/check-hygiene.mjs` (1012 bestanden, groen),
+Playwright-screenshots op de demo-klant.
