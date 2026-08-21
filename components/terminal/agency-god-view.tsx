@@ -9,6 +9,7 @@ import { CodeRoodPaneel } from "@/components/adoptie/code-rood-paneel";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_PORTFOLIO_SYNTHESIS } from "@/lib/demo/god-view-demo";
+import { GodViewPremiumTeaser } from "./god-view-premium-teaser";
 
 // Portfolio-synthese (masterplan 17.15): dezelfde soort kaart als SynthesisCard in
 // cross-channel-analyses.tsx, maar tussen KLANTEN van het bureau i.p.v. tussen kanalen van 1
@@ -262,6 +263,7 @@ export function AgencyGodView() {
           Nog geen cellen — geen klant van dit bureau heeft in het venster sinds {data.vanaf} zowel
           spend als een gekoppeld segment.
         </p>
+        <GodViewPremiumTeaser />
       </div>
     );
   }
@@ -334,6 +336,8 @@ export function AgencyGodView() {
           </Body>
         </Tabel>
       </section>
+
+      <GodViewPremiumTeaser />
     </div>
   );
 }
