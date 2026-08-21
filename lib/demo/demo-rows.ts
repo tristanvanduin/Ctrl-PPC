@@ -16,7 +16,7 @@ import { uspsToEnglishName } from "@/lib/geo/us-fips";
 import {
   accountWeeklyRows, adgroupMonthlyRows, wastefulSearchTermRows, accountYoyRows, campaignYoyRows,
   campaignMetadataRows, devicePerformanceRows, networkPerformanceRows, adScheduleRows,
-  keywordPerformanceRows, audiencePerformanceRows, geoCampaignRows,
+  keywordPerformanceRows, audiencePerformanceRows, geoCampaignRows, productPerformanceRows,
 } from "./google-sop-demo";
 import {
   PMAX_CAMPAIGN, VIDEO_CAMPAIGN, videoMetricsFor, assetGroupRows, pmaxNetworkRows,
@@ -64,9 +64,12 @@ const recentSpendBump = (daysAgo: number): number => (daysAgo < 6 ? 1.7 : 1);
 const weekdayConvPenalty = (daysAgo: number): number => (new Date(Date.now() - daysAgo * 86_400_000).getUTCDay() === 0 ? 0.4 : 1);
 
 // ── ads_campaign_monthly: per campagne × 13 maanden (voedt o.a. het beurs/geo-clone-overzicht) ──
-// Het kanaalpalet van dit account: Search, Display, Video en Performance Max. Géén Shopping — een
-// vakbeurs verkoopt niets via een productfeed, dus PMax draait hier op asset groups met tekst,
-// beeld en video, gestuurd op standaanvragen.
+// Het kanaalpalet van dit account: Search, Display, Video en Performance Max — GreenTech zelf
+// verkoopt niets via een productfeed, dus PMax draait hier op asset groups met tekst, beeld en
+// video, gestuurd op standaanvragen. Eén uitzondering, klein en bewust: een beursorganisator die
+// ook exposant-merchandise via een webshop verkoopt is een plausibele, aparte nevenstroom, geen
+// omkering van het kernverhaal — toegevoegd zodat de Shopping-scorecard (lib/shopping-
+// scorecard.ts) een echte demo-cel heeft in plaats van eerlijk "geen Shopping-campagnes" te tonen.
 const CAMPAIGNS = [
   { id: "demo-c-grt", name: "GRT | Search | NL", type: "SEARCH", imp: 42000, clk: 2100, cost: 4200, conv: 60, aov: 130, seed: 0 },
   { id: "demo-c-gra", name: "GRA | Search | US", type: "SEARCH", imp: 30000, clk: 1400, cost: 3000, conv: 42, aov: 110, seed: 1 },
@@ -77,6 +80,8 @@ const CAMPAIGNS = [
   { id: PMAX_CAMPAIGN.id, name: PMAX_CAMPAIGN.name, type: "PERFORMANCE_MAX", imp: 78000, clk: 1500, cost: 3200, conv: 34, aov: 180, seed: 7 },
   // Video: awareness — veel vertoningen, weinig klikken, weinig directe conversies.
   { id: VIDEO_CAMPAIGN.id, name: VIDEO_CAMPAIGN.name, type: "VIDEO", imp: 240000, clk: 900, cost: 1800, conv: 12, aov: 110, seed: 9 },
+  // Shopping: klein, merchandise-webshop naast de kern-leadgen — zie de toelichting hierboven.
+  { id: "demo-c-shop", name: "GreenTech | Shopping | Merchandise", type: "SHOPPING", imp: 9000, clk: 380, cost: 420, conv: 6, aov: 45, seed: 11 },
 ];
 const adsCampaignMonthly: Row[] = CAMPAIGNS.flatMap((c) =>
   Array.from({ length: N_MONTHS }, (_, i) => {
@@ -580,6 +585,12 @@ const adsNetworkPerformanceMonthly: Row[] = networkPerformanceRows(CID, adsAccou
 const adsAdSchedulePerformance: Row[] = adScheduleRows(CID, adsAccountMonthly, dayISO(31), dayISO(1), iso());
 const adsKeywordPerformanceMonthly: Row[] = keywordPerformanceRows(CID, adsAdgroupMonthly, DIM_MONTHS, iso());
 const adsAudiencePerformanceMonthly: Row[] = audiencePerformanceRows(CID, adsAccountMonthly, DIM_MONTHS, iso());
+// Alleen de Shopping-campagne (afleiden, niet verzinnen): productPerformanceRows splitst per
+// product uit exact déze campagnetotalen, niet uit het accounttotaal zoals de doelgroep-/
+// netwerkrijen hierboven -- een productfeed bestaat alleen binnen zijn eigen campagne.
+const adsProductPerformanceMonthly: Row[] = productPerformanceRows(
+  CID, adsCampaignMonthly.filter((r) => r.campaign_id === "demo-c-shop"), iso()
+);
 
 // ── PMax en Video ──────────────────────────────────────────────────────────
 // Asset groups, netwerkverdeling, assets, plaatsingen en zoekcategorieën. Deze tabellen voedden de
@@ -675,6 +686,7 @@ export function demoRows(): Record<string, Row[]> {
     ads_ad_schedule_performance: adsAdSchedulePerformance,
     ads_keyword_performance_monthly: adsKeywordPerformanceMonthly,
     ads_audience_performance_monthly: adsAudiencePerformanceMonthly,
+    ads_product_performance_monthly: adsProductPerformanceMonthly,
     ads_asset_group_performance_monthly: adsAssetGroupPerformanceMonthly,
     ads_pmax_network_breakdown: adsPmaxNetworkBreakdown,
     ads_pmax_asset_performance: adsPmaxAssetPerformance,

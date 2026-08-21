@@ -9,6 +9,8 @@ import { Sectie } from "@/components/ui/sectie";
 import { HealthBadge } from "./health-badge";
 import { SearchScorecard } from "./search-scorecard";
 import { PmaxScorecard } from "./pmax-scorecard";
+import { DisplayScorecard } from "./display-scorecard";
+import { ShoppingScorecard } from "./shopping-scorecard";
 import { EventPacing } from "./event-pacing";
 import { GeoCloneOverview } from "./geo-clone-overview";
 import { ClientNotes } from "./client-notes";
@@ -285,18 +287,19 @@ function CampagneTypeTabs({ type, onChange }: { type: CampagneType; onChange: (t
 
 /**
  * Sectie 5.4 (Campaign Type Intelligence): per campagnetype zijn eigen scorecard. Search en PMax
- * hebben er vandaag een -- de twee met genoeg echte data om zonder gok te bouwen (zie de koppen
- * van lib/search-scorecard.ts en lib/pmax-scorecard.ts). Shopping en Display tonen eerlijk dat ze
- * nog niet gebouwd zijn in plaats van een score te verzinnen -- dezelfde regel 3 uit de
- * vertrouwensdoctrine als overal elders in dit contract.
+ * waren de eerste twee; Shopping en Display zijn hier bijgekomen, elk met een eigen opbouw (zie
+ * de koppen van lib/display-scorecard.ts en lib/shopping-scorecard.ts) en een factor die eerlijk
+ * "niet beoordeeld" blijft waar de data ontbreekt (viewability resp. Merchant Center-feedkwaliteit)
+ * -- regel 3 van de vertrouwensdoctrine, geen gegokte score.
  */
 function CampagneScorecard({ clientId, type }: { clientId: string; type: CampagneType }) {
   if (type === "SEARCH") return <SearchScorecard clientId={clientId} />;
   if (type === "PERFORMANCE_MAX") return <PmaxScorecard clientId={clientId} />;
+  if (type === "DISPLAY") return <DisplayScorecard clientId={clientId} />;
+  if (type === "SHOPPING") return <ShoppingScorecard clientId={clientId} />;
   return (
     <div className="rounded-xl border border-dashed border-border p-5 text-meta text-muted-foreground">
-      Nog geen scorecard voor {CAMPAGNE_TYPES.find((t) => t.id === type)?.label} — alleen Search en
-      Performance Max zijn vandaag gebouwd (masterplan sectie 5.4).
+      Nog geen scorecard voor {CAMPAGNE_TYPES.find((t) => t.id === type)?.label} (masterplan sectie 5.4).
     </div>
   );
 }
