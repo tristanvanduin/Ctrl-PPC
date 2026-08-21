@@ -115,7 +115,10 @@ export function GodViewPremium() {
   const nietDeelbaar = ratio.stand.cellenTotaal === 0;
 
   return (
-    <div className="space-y-5 rounded-2xl border-2 border-indigo-300/50 bg-card p-6 shadow-md relative overflow-hidden">
+    // max-w-5xl: zelfde reden als de telwaarden-rij in god-mode.tsx hierboven -- zonder een eigen
+    // breedtegrens rekt deze kaart mee met main's volle breedte, en dan lezen twee tabellen naast
+    // elkaar met dezelfde padding als leeg i.p.v. gevuld.
+    <div className="max-w-5xl space-y-5 rounded-2xl border-2 border-indigo-300/50 bg-card p-6 shadow-md relative overflow-hidden">
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500" />
       <div className="flex flex-wrap items-center gap-2">
         <Gem className="h-5 w-5 text-indigo-600" />

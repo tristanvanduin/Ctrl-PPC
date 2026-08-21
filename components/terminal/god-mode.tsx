@@ -147,7 +147,11 @@ export function GodMode() {
         <span className="text-meta text-muted-foreground">platform-breed · {data.month.slice(0, 7)}</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-5 sm:grid-cols-4">
+      {/* Feedback (tweede ronde): "witruimtes gigantisch" -- vier telwaarden op de volle
+          paginabreedte (main is p-6, geen eigen max-breedte) trekt op een brede monitor zo ver
+          uit elkaar dat het als leegte leest. Zelfde oplossing als branding-view.tsx eerder kreeg
+          voor dezelfde klacht: een max-breedte i.p.v. de kaart zelf compacter proppen. */}
+      <div className="max-w-3xl grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-5 sm:grid-cols-4">
         <Counter value={totalSpend} label="Totale spend" format="currency" isLive />
         <Counter value={totalConversions} label="Conversies" isLive />
         <Counter value={data.accountCount} label="Actieve accounts" isLive />
