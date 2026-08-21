@@ -68,16 +68,24 @@ function NoteCard({
         )}
 
         <div className="min-w-0 flex-1">
-          {/* Title + timestamp on one line */}
-          <div className="flex items-baseline gap-2 mb-1">
-            {note.title && (
+          {/* Titel + tijd op een eigen regel -- maar alleen als er een titel is. Zonder titel stond
+              hier altijd toch een regel (alleen de tijd, rechts uitgelijnd), en de checkbox lijnt uit
+              op de EERSTE regel van dit blok (zie mt-0.5 hierboven). Bij een to-do zonder titel ("test
+              1") betekende dat: checkbox tegen die lege titelregel, de eigenlijke tekst een hele regel
+              lager -- de checkbox stond dus zichtbaar los van waar hij bij hoorde. Nu is de eerste
+              regel altijd de regel waar ook echt iets op staat. */}
+          {note.title && (
+            <div className="flex items-baseline gap-2 mb-1">
               <span className={`text-xs font-semibold ${note.done ? "text-muted-foreground line-through" : "text-brand-gray"}`}>{note.title}</span>
-            )}
-            <span className="text-micro text-muted-foreground ml-auto shrink-0">{timeAgo(note.created_at)}</span>
-          </div>
+              <span className="text-micro text-muted-foreground ml-auto shrink-0">{timeAgo(note.created_at)}</span>
+            </div>
+          )}
 
           {/* Content */}
-          <p className={`text-meta whitespace-pre-wrap leading-relaxed ${note.done ? "text-muted-foreground line-through" : "text-brand-gray/80"}`}>{displayContent}</p>
+          <div className="flex items-baseline gap-2">
+            <p className={`text-meta whitespace-pre-wrap leading-relaxed flex-1 ${note.done ? "text-muted-foreground line-through" : "text-brand-gray/80"}`}>{displayContent}</p>
+            {!note.title && <span className="text-micro text-muted-foreground shrink-0">{timeAgo(note.created_at)}</span>}
+          </div>
 
           {isLong && (
             <button

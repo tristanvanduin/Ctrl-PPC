@@ -107,7 +107,12 @@ export function GeoBreakdown({ clientId, channel = "google", verdieping }: {
           ranglijst zegt WIE DE GROOTSTE IS en hoeveel dat scheelt. Dat tweede leest niemand van
           een projectie af -- daar wint Groenland altijd. De ruimte naast een kaart van 680px was
           op een breed scherm leeg; nu draagt hij de cijfers die anders een klik weg zaten. */}
-      <div className="grid grid-cols-1 gap-5 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_17rem]">
+      {/* xl:items-start: zonder deze guard rekt de grid de ranglijst-kolom uit tot de hoogte van de
+          kaart (default stretch), en GeoRanglijst's eigen `h-full` volgt daarin mee. Bij weinig
+          landen (twee, drie) is de lijst + totalenblok samen veel korter dan een volle wereldkaart,
+          en bleef daaronder een leeg stuk kolom over dat nergens bij hoort -- een gat, niet marge,
+          want er staat geen rand of achtergrond omheen die het als "einde van het blok" markeert. */}
+      <div className="grid grid-cols-1 gap-5 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_17rem] xl:items-start">
       <div className="w-full max-w-[680px] mx-auto">
         {ranked.length === 0 ? (
           <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
