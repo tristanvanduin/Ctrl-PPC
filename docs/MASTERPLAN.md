@@ -4884,3 +4884,96 @@ altijd groen), `node scripts/check-hygiene.mjs` (992 bestanden, groen), Playwrig
 de demo-klant (`?demo=1`) in licht én donker voor elke visuele wijziging, `git checkout --
 tsconfig.json` voor elke commit (`next dev` herschrijft dit bestand als bijeffect — nooit
 meegecommit).
+
+### 17.56 God View Premium, Prognose-pariteit Meta/LinkedIn, Bevindingen 4x ingekort (21 augustus)
+
+Vervolg op 17.55: de eigenaar deed zelf een testronde op de live preview en stuurde een tweede,
+grote feedbacklijst (6 genummerde punten) plus een verzoek om fictieve bureaus in de
+productiedatabase te zetten om de God View k-anonimiteitsgate tijdens de bouwfase te omzeilen.
+Dat laatste is tweemaal afgewezen (contaminatie van live sessies tijdens het venster vóór
+opruiming, en een directe schending van de vertrouwensdoctrine — nergens gefabriceerde cijfers
+als echt presenteren), met een concreet, gelijkwaardig alternatief in de plaats.
+
+**God View Premium (punt 2 — churn-indicator + cross-agency ratio's, "premium voor C-level/sales")**
+
+Bij onderzoek bleek een groot deel van de gevraagde infrastructuur al te bestaan, alleen zonder UI:
+
+- `lib/benchmark/cel.ts` heeft al `TEST_DREMPELS` (1 account/1 bureau) en
+  `/api/platform/god-view?testdrempel=true` bestond al als test-route — beide expliciet door de
+  eigenaar goedgekeurd op 17 augustus ("anonimiteit in de testfase boeit me niet"). Dit is de
+  eigen, eerder afgesproken uitweg voor precies dit scenario, en een stuk beter dan fictieve
+  bureaus: ECHTE data, verlaagde drempel, altijd zichtbaar gelabeld als TESTMODUS.
+- Nieuw: `lib/benchmark/god-view-churn.ts` (+test) — pure functie, telt rood/amber/groen-oordelen
+  (`lib/adoptie/code-rood.ts`) per k-anonieme cel. Channel is altijd `"account"`: churn is een
+  oordeel over het account, niet per kanaal (in tegenstelling tot god-view.ts's CPA/ROAS).
+- Nieuw: `lib/benchmark/god-view-churn-data.ts` — berekent het licht LIVE via `beoordeelKlant()`
+  (dezelfde functie als de cron-detectiejob), dus onafhankelijk van of migratie 073 al gedraaid is.
+- Nieuw: `app/api/platform/god-view-churn/route.ts` — zelfde ALL_CLIENTS-gate en testdrempel-
+  afspraak als de bestaande God View-route.
+- Nieuw: `components/terminal/god-view-premium.tsx` — nieuwe sectie in God Mode, twee tabellen
+  naast elkaar ("Hoe verhoud je je tot andere bureaus" / "Churn-concentratie per branche"), premium
+  gestyled (indigo accent, "PREMIUM"-badge). In demo-modus (`?demo=1`, geen sessie) toont het
+  fictieve data op platformschaal (6 bureaus, `DEMO_GOD_VIEW_CELLEN`/`DEMO_GOD_VIEW_CHURN_CELLEN`
+  in `lib/demo/god-view-demo.ts`) zodat de module ook zonder genoeg echte bureaus volledig gestyled
+  en getest kan worden — geen productiedata gefabriceerd, zelfde patroon als de bestaande
+  `DEMO_GOD_MODE_DATA`.
+
+**Migratie-audit (op verzoek: "check welke sql gerund moet zijn")**
+
+Alle 100 migraties gecontroleerd tegen de live database (read-only `information_schema`/
+`pg_policies`, niet op basis van de kop-commentaren). Resultaat: 057, 065, 073, 094, 095, 096, 098
+bleken ALLEMAAL al toegepast — de koppen van 065/073/096 waren simpelweg nooit bijgewerkt na het
+handmatig draaien en zijn nu gecorrigeerd. Voor 073 specifiek: de `code_rood_meldingen`-tabel
+bestaat en werkt, maar staat leeg omdat de detectiecron (`evaluate-code-rood`) bewust niet in
+`vercel.json` staat (eigenaar, 17 augustus: geen nachtelijke API-kosten, zelf willen testen) — geen
+ontbrekende migratie. Enige migratie die NIET gedraaid mag worden: 099 (`security_invoker` op 9
+legacy views), want die mag pas ná `O1_AUTH_ENFORCED=true` in Vercel-productie (nog niet gezet
+volgens `README_MIGRATIES.md`) — eerder draaien geeft een leeg live dashboard voor elke
+sessieloze bezoeker. De eigenaar hield de cron desondanks bewust uit ("geen automatische analyses
+zonder mijn weet") — gerespecteerd, niet verder op aangedrongen.
+
+**Item 3 — Meta/LinkedIn Prognose-pariteit + galerij-verdichting losse analyses**
+
+Google's Prognose-tab heeft twee secties (ForecastTable + BudgetScenario, kalenderjaar-YoY-model);
+Meta/LinkedIn hadden alleen de kale `ChannelForecast` (run-rate, geen seizoenscorrectie). Een echte
+jaarprognose bouwen voor Meta/LinkedIn zou de vertrouwensdoctrine breken (geen meerjarige historie
+om seizoen tegen af te zetten), dus:
+
+- `lib/analysis/use-channel-run-rate.ts`: data/model uit `ChannelForecast` geëxtraheerd naar een
+  gedeelde hook.
+- `components/dashboard/channel-budget-scenario.tsx`: budgetscenario-equivalent (zelfde slider-UX
+  als Google's BudgetScenario), op de volgende-maand-run-rate als basis, expliciet gelabeld als
+  tempo-indicatie.
+- `components/dashboard/channel-forecast-sections.tsx`: dezelfde twee-Sectie-structuur als
+  `GoogleForecast`, nu ook voor Meta/LinkedIn.
+- Losse-analyses-secties (Analyses-tab): de `SignalAnalysisCard`-instanties van Google/Meta/
+  LinkedIn stonden vol-breedte gestapeld; nu in een responsive 2-koloms grid — dichter bij
+  Google's `StandaloneAnalyses`-galerij zonder de rijkere componenten (ChannelStructureAnalysis,
+  MetaCreativeAnalyses) in datzelfde stramien te persen.
+
+**Item 4 — Bevindingen-pagina: 12.751px → 3.007px demo-hoogte (-76%)**
+
+Root cause: `TasksBlock`'s "AI Analyse taken"-lijst had geen limiet en geen scroll-container (in
+tegenstelling tot de legacy-takenlijst eronder) — bij 140 demo-taken was dat alleen al bijna de
+hele paginalengte. Nu `useTruncatedList`/`MeerKnop` (`components/ui/disclosure.tsx`), 6 zichtbaar
+standaard. `HypothesesBlock` rendert onder "Alle kanalen" tot 3 volledig uitgeklapte kaarten
+(Google/Meta/LinkedIn) na elkaar; elke kaart is nu een `CollapsiblePanel`, dicht tenzij er pending
+hypotheses in zitten. Bijvangst: de "outcomes"-tab heette "Inzichten" in de vlakke tab-nav maar
+"Bevindingen" in de gegroepeerde nav — nu overal consistent.
+
+**Item 5 — KPI-banner alleen op Prestaties (Overzicht)**
+
+`PeriodSummary` stond ook op de "insights"/"outcomes"-tabs met ongescopeerde (Google/blended)
+data, terwijl de instantie op "dashboard" al langer correct kanaalgescoped is via
+`useChannelPeriodData` (regel 224-227's commentaar: "bij filtering pas kanaal specifiek"). De twee
+losse, ongescopeerde instanties zijn verwijderd — de banner staat nu alleen op Overzicht, en daar
+toont hij bij een gekozen kanaal al uitsluitend dat kanaal's eigen data.
+
+**Nog open:** losstaande, single-bureau churn-concentratie-per-niche binnen `AgencyGodView` (voor
+`performance_marketeer`-gebruikers, die God Mode/God View Premium niet zien) — niet opgepakt deze
+ronde, cross-agency-stuk had prioriteit. Display/Shopping-scorecards en Tier 4-dichtheidspas blijven
+zoals in 17.55 vermeld.
+
+**Verificatie, elke commit los**: `npx tsc --noEmit -p .`, `npm test -- --run` (308→309 tests,
+altijd groen), `node scripts/check-hygiene.mjs` (997 bestanden, groen), Playwright-screenshots op
+de demo-klant in licht én donker, `git checkout -- tsconfig.json` voor elke commit.
