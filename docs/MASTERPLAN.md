@@ -5679,3 +5679,25 @@ God View/God Mode + AI-tekstlogica, en de resterende kleine bugs/SOP-download/na
 
 **Nog niet geverifieerd**: dit is een validatie- en planningsronde, nog geen bouwronde. Zodra de
 bovenstaande punten zijn opgepakt volgt `scripts/gates.sh` zoals gebruikelijk vóór elke push.
+
+**Update, zelfde dag**: de eigenaar koos op alle vier de productbeslissingen de aanbevolen optie —
+campagnetype-tabs voor Meta/LinkedIn bouwen, Creative Performance aansluiten op campagnetype,
+Code Rood tempert bij een sterk positieve andere KPI, God Mode's pseudonimisering blijft staan
+(geen sector/niche-aggregatie erbij). De 13 kleine, ondubbelzinnige punten zijn direct gebouwd en
+gepusht (`c09c8b8`): kleurinconsistentie in God Mode, de `breed`-anti-pattern in twee tabellen
+(Kanaal/Segment), ontbrekende Y-assen op de twee mini-grafiekjes in de opener (de platte CPA-lijn
+was Recharts' domein dat zonder expliciete `YAxis` op nul vastpint), het gereserveerde-maar-lege
+zesde grid-vak in Pacing, het ontbrekende `items-start` op Meta/LinkedIn's hero-rij (Google had die
+guard al), de onopgemaakte ISO-maandsleutel in de maandtabel, de center/left-wisseling in de
+campagnetype-donuts, de feitelijk omgekeerde "groeiplafond"-conclusie in de God View-demotekst, een
+gedeelde `CHURN_KLEUR`-constante voor de rood/amber-tinten op lichte vs. donkere kaarten, en een
+generieke "Weken tot event"-label i.p.v. beurs-specifiek. Plus `scripts/cleanup-orphaned-sop-
+files.mjs`: een eenmalig opruimscript voor de oude, al-kapotte `client_files`-rijen van vóór de
+upload-foutafhandeling (17.47-17.50) — vereist `SUPABASE_SERVICE_ROLE_KEY` en moet dus door de
+eigenaar gedraaid worden, deze sandbox heeft geen live databasetoegang.
+
+**Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
+groen. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
+
+De drie resterende, grotere punten (campagnetype-tabs, Display-creatives, Code Rood-nuance) volgen
+in een vervolgsectie.
