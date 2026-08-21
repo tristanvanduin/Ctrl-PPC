@@ -5701,3 +5701,58 @@ groen. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
 
 De drie resterende, grotere punten (campagnetype-tabs, Display-creatives, Code Rood-nuance) volgen
 in een vervolgsectie.
+
+### 17.69 De drie resterende grote punten: één nuance, één al-gebouwde herontdekking, één LIVE-ONGETEST sync (21 augustus 2026)
+
+**Code Rood-nuance (`6be065`)** — `components/dashboard/dgm-view.tsx`'s `computeTrajectStatus()`
+kiest één gevolgde KPI (conversies, of omzet voor ROAS-accounts) voor de status. Feedback: "omzet
+ruimschoots behaald, achter op conversies — is dit echt een donkerrode melding waard?" Precies de
+spiegel van een eerdere fix in hetzelfde bestand (regel 128-131, "status gebruikte altijd
+conversies"). Nu: als status "rood" zou zijn omdat het GEVOLGDE KPI structureel achterloopt, maar
+het ANDERE getraceerde KPI ligt ≥15% boven zijn eigen doel, tempert de melding naar "oranje" met
+een tekst die de nuance benoemt — nooit helemaal naar groen, een reëel gat blijft de moeite van
+bekijken waard. Drempel spiegelt de bestaande oranje/rood-grenzen in dezelfde functie.
+
+**Campagnetype-tabs voor Meta/LinkedIn — al gebouwd, geen nieuw werk.** Het onderzoek dat aan deze
+sectie voorafging (§17.68) karakteriseerde Meta/LinkedIn's "per objective"-weergave als "geen
+tabs, één doorlopende lijst" — bij het daadwerkelijk lezen van `components/dashboard/objective-
+insights.tsx` bleek dat onjuist/verouderd: dat bestand implementeert al exact hetzelfde tab-
+patroon als Google's `CampagneTypeTabs` (klikbare pil-knoppen, `useState`-gestuurde actieve
+tab), gebouwd in een eerdere ronde vandaag (verwijst zelf naar "Feedback punt 29+31") en al
+gewired in zowel `MetaCampagnes` als `LinkedInCampagnes`. Enige bewust nog ontbrekende stuk (al
+gedocumenteerd, niet nieuw): een Google-stijl gewogen scorecard/radar per objective — expliciet
+buiten scope gehouden ("dertien objectives samen is te groot voor deze ronde"). Les: een
+onderzoeksagent se conclusie is een aanwijzing, geen garantie — bij twijfel de code zelf lezen
+vóór te bouwen wat er al staat.
+
+**Display-afbeeldingen in Creative Performance (`63b35a1`) — LIVE-ONGETEST, expliciet zo gekozen.**
+Eerste bevinding: er bestond GEEN ENKELE databron voor Google Display-afbeeldingen, alleen
+`google_ads_rsa_assets` (tekst-only). Een echte fix is dus geen frontend-wijziging maar een
+nieuwe Google Ads API-sync — voorgelegd aan de eigenaar met de waarschuwing dat dit blind gebeurt
+(geen live Google Ads-credentials in deze sandbox); besluit: toch bouwen.
+
+- `lib/api/google-ads.ts`: `getDisplayImageAssets()`, GAQL op `ad_group_ad_asset_view` (dezelfde
+  resource als `getRsaAssetMetricsByMonth`, al bewezen) gefilterd op de vier Display-beeld-
+  `field_type`-waarden (MARKETING_IMAGE/SQUARE_MARKETING_IMAGE/LOGO/LANDSCAPE_LOGO — de enige
+  écht ongeverifieerde aanname), met `asset.image_asset.full_size.url` — dat exacte veld staat
+  al, bewezen tegen een echte omgeving, in `getPmaxAssetPerformanceByMonth` (andere resource,
+  zelfde veld). Eigen `try/catch` die `[]` teruggeeft: een verkeerde waarde breekt hoogstens deze
+  ene dataset, nooit de rest van een klant se sync (zelfde patroon als de negatives-queries).
+- `lib/api/google-ads-rsa-transform.ts`: `mapDisplayImageAssetApiRow`/`displayImageAssetToDbRow`,
+  zelfde vorm als de RSA-mappers ernaast.
+- **Migratie 102** (`scripts/migrations/102_google_ads_image_assets.sql`): nieuwe tabel +
+  RLS-policy, zelfde vorm als migratie 085 (`google_ads_rsa_assets`/`google_ads_ad_meta`) —
+  **nog niet gedraaid tegen de live database**, deze sandbox heeft geen `SUPABASE_ACCESS_TOKEN`.
+  Moet de eigenaar draaien (`node scripts/supabase-sql.mjs --file scripts/migrations/
+  102_google_ads_image_assets.sql`) vóórdat de sync-write iets anders doet dan falen.
+- `lib/sync/orchestrator.ts`: gewired in de bestaande Promise.all en sync-dataset-map.
+- `components/dashboard/creative-performance.tsx`: haalt `google_ads_image_assets` op naast de
+  bestaande RSA/ad-meta-verrijking, vult `imageUrl` voor Google-advertenties.
+
+**Nog niet gedaan, expliciet**: de migratie draaien, en daarna verifiëren tegen een echt account
+met Display-campagnes — pas dan is bekend of de vier `field_type`-waarden kloppen. Tot die
+verificatie blijft dit "gebouwd, niet bevestigd correct".
+
+**Geverifieerd (code-niveau)**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests
+groen, `build` groen (geen enkele test raakt de nieuwe GAQL-query zelf, die kan alleen tegen een
+echte Google Ads-omgeving getest worden). Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
