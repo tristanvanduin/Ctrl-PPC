@@ -104,6 +104,18 @@ export function divergingColor(t: number, dark = false): string {
   return hex(mid.map((m, i) => m + (pole[i] - m) * f));
 }
 
+// ── Churn-status (rood/amber) ──────────────────────────────────────────────
+//
+// Feedback (21 augustus): de churn-tellingen in god-view-premium.tsx (donkere kaart) en
+// agency-god-view.tsx (lichte kaart) kozen elk hun eigen Tailwind-tint voor hetzelfde concept
+// (rood-400/amber-400 vs. rood-600/amber-600) -- geen bug in de gekozen tinten zelf (die zijn
+// terecht verschillend: -600 op een donkere kaart is bijna onleesbaar, -400 op een lichte kaart
+// te zwak), maar wel drie losse beslissingen zonder gedeelde bron. Hier één plek voor beide.
+export const CHURN_KLEUR = {
+  licht: { rood: "text-red-600", amber: "text-amber-600" },
+  donker: { rood: "text-red-400", amber: "text-amber-400" },
+} as const;
+
 /** Relatieve luminantie (WCAG), zodat tekst op een gevulde cel altijd leesbaar blijft. */
 function luminance(h: string): number {
   const n = h.replace("#", "");

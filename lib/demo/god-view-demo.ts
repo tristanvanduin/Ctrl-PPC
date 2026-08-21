@@ -169,10 +169,10 @@ export const DEMO_PORTFOLIO_SYNTHESIS: DemoPortfolioSynthesis = {
     "Meta en LinkedIn dragen op alle drie accounts een meetbaar deel van de conversies bij, niet alleen Google Search.",
   ],
   outliers: [
-    "GRT: 97% dagbudgetbenutting en 28% impression share verloren op budget — een duidelijk te herkennen groeiplafond, in tegenstelling tot GRA en GRN.",
+    "GRT: 97% dagbudgetbenutting en 28% impression share verloren op budget — een duidelijk te herkennen opschalingskans, in tegenstelling tot GRA en GRN.",
   ],
   synthesized_actions: [
-    { clientId: "demo-grt", clientName: "GreenTech Amsterdam (GRT)", action: "Dagbudget verhogen op de Search-campagne vóór de volgende editie", rationale: "97% benutting en 28% IS-verlies op budget wijzen op een plafond, niet op een creative- of biedingsprobleem.", priority: "hoog" },
+    { clientId: "demo-grt", clientName: "GreenTech Amsterdam (GRT)", action: "Dagbudget verhogen op de Search-campagne vóór de volgende editie", rationale: "97% benutting en 28% IS-verlies op budget betekent dat de markt groter is dan het budget: onbenutte opschalingsruimte, geen creative- of biedingsprobleem.", priority: "hoog" },
     { clientId: "demo-gra", clientName: "GreenTech Americas (GRA)", action: "Huidige koers aanhouden, geen ingreep nodig", rationale: "Aanloop ligt voor op dezelfde afstand tot de vorige editie; een ingreep zou een gezonde trend onderbreken.", priority: "laag" },
     { clientId: "demo-grn", clientName: "GreenTech North America (GRN)", action: "Nog geen editie-vergelijking trekken, wel het datavenster laten opbouwen", rationale: "Eerste editie: er is simpelweg nog geen vorige editie om tegen af te zetten.", priority: "midden" },
   ],

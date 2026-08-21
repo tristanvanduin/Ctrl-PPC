@@ -6,7 +6,7 @@ import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
-import { Tip } from "./chart-chrome";
+import { Tip, AsY, Raster, asSchaal, kortGetal } from "./chart-chrome";
 
 // Compacte staafdiagram voor de opener (17.34): de eigenaar vond de volledige PerformanceChart
 // hier "veeeel te groot" -- die heeft vier metric-knoppen, een week/maand/jaar-omschakelaar, een
@@ -39,6 +39,7 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
   }));
 
   const num = (v: number) => new Intl.NumberFormat("nl-NL", { notation: "compact" }).format(v);
+  const { domain, tickCount } = asSchaal(Math.max(...data.map((d) => d.waarde), 0));
 
   return (
     <div className={`bg-card rounded-xl border border-border p-4 shadow-sm ${groeit ? "h-full flex flex-col" : ""}`}>
@@ -51,6 +52,7 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
       <div className={groeit ? "flex-1 min-h-[110px]" : ""}>
       <ResponsiveContainer width="100%" height={groeit ? "100%" : 130}>
         <BarChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+          <Raster />
           <XAxis
             dataKey="label"
             tick={{ fontSize: 10, fill: CHART_AXIS }}
@@ -58,6 +60,7 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
             axisLine={false}
             tickMargin={6}
           />
+          <AsY formatter={kortGetal} width={36} domain={domain} tickCount={tickCount} />
           <Tip formatter={num} />
           <Bar dataKey="waarde" radius={[3, 3, 0, 0]} maxBarSize={48}>
             {data.map((d, i) => (

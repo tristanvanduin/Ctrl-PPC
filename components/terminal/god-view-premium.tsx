@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Gem, ShieldAlert, ShieldQuestion, TrendingUp, AlertTriangle, Loader2 } from "lucide-react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "@/components/dashboard/data-table";
+import { CHURN_KLEUR } from "@/lib/branding/chart-colors";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_GOD_VIEW_CELLEN, DEMO_GOD_VIEW_CHURN_CELLEN } from "@/lib/demo/god-view-demo";
 
@@ -157,7 +158,7 @@ export function GodViewPremium() {
             <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-950/40">
               <Tabel>
                 <Kop>
-                  <KolomKop breed>Segment</KolomKop>
+                  <KolomKop>Segment</KolomKop>
                   <KolomKop getal>Accounts</KolomKop>
                   <KolomKop getal>Bureaus</KolomKop>
                   <KolomKop getal>Mediane CPA</KolomKop>
@@ -189,7 +190,7 @@ export function GodViewPremium() {
             <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-950/40">
               <Tabel>
                 <Kop>
-                  <KolomKop breed>Segment</KolomKop>
+                  <KolomKop>Segment</KolomKop>
                   <KolomKop getal>Accounts</KolomKop>
                   <KolomKop getal>Rood</KolomKop>
                   <KolomKop getal>Amber</KolomKop>
@@ -200,8 +201,8 @@ export function GodViewPremium() {
                     <Rij key={i}>
                       <NaamCel>{segmentTekst(c.model, c.niche, c.nicheLabel)}</NaamCel>
                       <GetalCel>{c.accounts}</GetalCel>
-                      <GetalCel><span className={c.churn!.rood > 0 ? "font-semibold text-red-400" : ""}>{c.churn!.rood}</span></GetalCel>
-                      <GetalCel><span className={c.churn!.amber > 0 ? "font-semibold text-amber-400" : ""}>{c.churn!.amber}</span></GetalCel>
+                      <GetalCel><span className={c.churn!.rood > 0 ? `font-semibold ${CHURN_KLEUR.donker.rood}` : ""}>{c.churn!.rood}</span></GetalCel>
+                      <GetalCel><span className={c.churn!.amber > 0 ? `font-semibold ${CHURN_KLEUR.donker.amber}` : ""}>{c.churn!.amber}</span></GetalCel>
                       <GetalCel>{c.churn!.groen}</GetalCel>
                     </Rij>
                   ))}

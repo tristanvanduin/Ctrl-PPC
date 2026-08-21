@@ -138,8 +138,14 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
           de rest leeg -- hetzelfde gat als elders, alleen binnen een kaart.
 
           @2xl en niet lg: op een breedte waar zes blokken niet passen vallen ze terug op twee
-          kolommen. lg: kijkt naar het venster en ziet die kaartbreedte niet. */}
-      <div className="grid grid-cols-2 gap-4 @2xl:grid-cols-3 @5xl:grid-cols-6">
+          kolommen. lg: kijkt naar het venster en ziet die kaartbreedte niet.
+
+          Vijf kolommen i.p.v. zes zonder "volgens prognose" (geen seizoensmodel voor dit account):
+          met een vaste zes-koloms grid en maar vijf blokken bleef de laatste kolom leeg -- geen
+          witruimte maar een gat, precies waar de eigen comment hierboven al voor waarschuwt. */}
+      <div className={`grid grid-cols-2 gap-4 @2xl:grid-cols-3 ${
+        convLanding.volgensPrognose !== null ? "@5xl:grid-cols-6" : "@5xl:grid-cols-5"
+      }`}>
         {/* Conversions pacing */}
         <div className="flex items-center gap-3">
           <div className="relative">

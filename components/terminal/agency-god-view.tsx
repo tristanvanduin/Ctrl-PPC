@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Loader2, Building2, Sparkles, Calendar, Info, ShieldAlert } from "lucide-react";
 import { Counter } from "@/components/ui/counter";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "@/components/dashboard/data-table";
+import { CHURN_KLEUR } from "@/lib/branding/chart-colors";
 import { segmentLabel, magAlsTrendGelden, MIN_ACCOUNTS_VOOR_TREND } from "@/lib/macro/types";
 import { CodeRoodPaneel } from "@/components/adoptie/code-rood-paneel";
 import { Laadvlak } from "@/components/ui/laadvlak";
@@ -213,8 +214,8 @@ function AgencyChurnPerSegment() {
             <Rij key={i}>
               <NaamCel>{segmentLabel(c.sleutel)}</NaamCel>
               <GetalCel>{c.accounts}</GetalCel>
-              <GetalCel><span className={c.telling.rood > 0 ? "font-semibold text-red-600" : ""}>{c.telling.rood}</span></GetalCel>
-              <GetalCel><span className={c.telling.amber > 0 ? "font-semibold text-amber-600" : ""}>{c.telling.amber}</span></GetalCel>
+              <GetalCel><span className={c.telling.rood > 0 ? `font-semibold ${CHURN_KLEUR.licht.rood}` : ""}>{c.telling.rood}</span></GetalCel>
+              <GetalCel><span className={c.telling.amber > 0 ? `font-semibold ${CHURN_KLEUR.licht.amber}` : ""}>{c.telling.amber}</span></GetalCel>
               <GetalCel>{c.telling.groen}</GetalCel>
             </Rij>
           ))}

@@ -151,7 +151,7 @@ export function GodMode() {
         <Counter value={totalSpend} label="Totale spend" format="currency" isLive />
         <Counter value={totalConversions} label="Conversies" isLive />
         <Counter value={data.accountCount} label="Actieve accounts" isLive />
-        <Counter value={data.top10[0]?.roas ?? 0} label="Hoogste ROAS" suffix="x" />
+        <Counter value={data.top10[0]?.roas ?? 0} label="Hoogste ROAS" suffix="x" isLive />
       </div>
 
       <GodViewPremium />

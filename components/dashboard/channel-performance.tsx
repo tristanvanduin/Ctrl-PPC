@@ -20,6 +20,19 @@ import { Kerncijfer } from "@/components/ui/kerncijfer";
 // maand-tot-nu tegen dezelfde dag-telling van de vorige maand: geen doel nodig, wel eerlijk
 // tempo-inzicht. De analyses draaien elders (Analyses-tab); dit is de data-weergave.
 
+// De maandtabel is de enige plek in dit bestand die de maand als eigen kolom toont (de
+// mini-grafiek en de kaartenrij ernaast gebruiken de korte vorm uit chart-chrome.tsx, waar
+// ruimte wél schaars is) -- hier is ruimte geen probleem en "2026-07" onvertaald is geen label.
+const VOLLEDIGE_MAANDEN = [
+  "januari", "februari", "maart", "april", "mei", "juni",
+  "juli", "augustus", "september", "oktober", "november", "december",
+];
+function maandVoluit(isoMaand: string): string {
+  const [jaar, maand] = isoMaand.split("-");
+  const naam = VOLLEDIGE_MAANDEN[Number(maand) - 1];
+  return naam ? `${naam} ${jaar}` : isoMaand;
+}
+
 type ChannelKind = "meta" | "linkedin";
 
 interface DailyRow {
@@ -336,7 +349,7 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
               <Body>
                 {rijen.map(([m, a]) => (
                   <Rij key={m}>
-                    <NaamCel>{m}</NaamCel>
+                    <NaamCel>{maandVoluit(m)}</NaamCel>
                     <AandeelCel waarde={eur(a.spend)} aandeel={deel(a.spend, grootste.spend)} />
                     <AandeelCel waarde={fmt(a.impressions)} aandeel={deel(a.impressions, grootste.impressions)} />
                     <AandeelCel waarde={fmt(a.clicks)} aandeel={deel(a.clicks, grootste.clicks)} />

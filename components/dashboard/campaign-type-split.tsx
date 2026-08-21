@@ -101,7 +101,10 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
       </div>
 
       <div className="px-3 py-5 @2xl:px-5">
-        <div className="flex flex-wrap items-start justify-center gap-4 @2xl:gap-10">
+        {/* justify-start, niet -center: de titel erboven en de tabel eronder lijnen links uit,
+            en gecentreerde donuts (met name als er maar één rendert, zonder conversies) lazen
+            als een losstaand element in plaats van bij de rest van de kaart te horen. */}
+        <div className="flex flex-wrap items-start justify-start gap-4 @2xl:gap-10">
           <figure className="flex flex-col items-center gap-2">
             <DonutChart
               slices={costSlices}
@@ -129,7 +132,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
 
         <Legenda
           items={slices.map((s) => ({ label: s.label, kleur: colorFor(s.networkType, order) })) as LegendaItem[]}
-          className="justify-center mt-4"
+          className="justify-start mt-4"
         />
 
         {!totals.hasConversions && (

@@ -234,7 +234,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
               <>
                 <Tabel>
                   <Kop>
-                    <KolomKop breed>Kanaal</KolomKop>
+                    <KolomKop>Kanaal</KolomKop>
                     <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
                     <KolomKop getal>Klikken</KolomKop>
                     <KolomKop getal bijschrift="aandeel">Conversies</KolomKop>
@@ -281,7 +281,7 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
                   <Tabel>
                     <Kop>
                       <KolomKop>Maand</KolomKop>
-                      <KolomKop breed>Kanaal</KolomKop>
+                      <KolomKop>Kanaal</KolomKop>
                       <KolomKop getal>Spend</KolomKop>
                       <KolomKop getal>Klikken</KolomKop>
                       <KolomKop getal>Conversies</KolomKop>

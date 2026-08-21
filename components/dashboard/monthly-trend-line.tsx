@@ -6,7 +6,7 @@ import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast } from "@/lib/forecast";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
-import { Tip } from "./chart-chrome";
+import { Tip, AsY, Raster, asSchaalLijn, kortEuro } from "./chart-chrome";
 
 // Compacte lijngrafiek voor de linkerkolom van de opener (17.43): "ik mis de lijn diagram nog" --
 // het kleine resterende hoogteverschil met de rechterkolom (kaart+grafiek+ranglijst) vult zich nu
@@ -34,6 +34,8 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
   }));
 
   const eur = (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  const waarden = data.map((d) => d.waarde).filter((w): w is number => w !== null);
+  const { domain, tickCount } = asSchaalLijn(Math.max(...waarden, 0));
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
@@ -45,6 +47,7 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
       </div>
       <ResponsiveContainer width="100%" height={130}>
         <LineChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+          <Raster />
           <XAxis
             dataKey="label"
             tick={{ fontSize: 10, fill: CHART_AXIS }}
@@ -52,6 +55,7 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
             axisLine={false}
             tickMargin={6}
           />
+          <AsY formatter={kortEuro} width={44} domain={domain} tickCount={tickCount} />
           <Tip formatter={eur} />
           <Line
             type="monotone"

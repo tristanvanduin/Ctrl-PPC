@@ -52,8 +52,13 @@ import { AudienceSplit } from "./audience-split";
 // een aankomende editie). Stond als losse functie in client-dashboard.tsx; had daar maar één
 // aanroeper en die aanroeper verhuist nu mee.
 function TijdasKeuze({ value, onChange }: { value: "beurs" | "maand"; onChange: (v: "beurs" | "maand") => void }) {
+  // Label generiek ("event" i.p.v. "beurs"): de onderliggende data (client_settings.rai_events,
+  // lib/events/standard-b2c-events.ts) ondersteunt al elk type moment (beurs, Black Friday, ...),
+  // alleen deze knoptekst was nog beurs-specifiek getaald. Interne waarden ("beurs"/"maand")
+  // blijven ongewijzigd -- dat raakt client-dashboard.tsx en de props hieronder, puur een
+  // implementatiedetail zonder zichtbare betekenis.
   const opties: { id: "beurs" | "maand"; label: string }[] = [
-    { id: "beurs", label: "Weken tot beurs" },
+    { id: "beurs", label: "Weken tot event" },
     { id: "maand", label: "Maanden" },
   ];
   return (

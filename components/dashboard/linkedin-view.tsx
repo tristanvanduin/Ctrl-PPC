@@ -78,7 +78,10 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
 
           Ook hier bewust geen pacing/KPI's in de hero: die zitten in ChannelPerformance, dat
           Meta en LinkedIn delen (zie 17.38's toelichting). */}
-      <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12">
+      {/* items-start: zelfde reden als meta-view.tsx -- zonder deze guard rekt Grid's default
+          stretch-gedrag de kortste kolom uit tot de hoogte van de langste en blijft er een leeg
+          vlak staan. */}
+      <div className="hero-rij grid grid-cols-1 gap-4 items-start xl:grid-cols-12">
         <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
           <BreakdownDonuts clientId={clientId} channel="linkedin" />
           <GeoRanglijstCard state={geo} />

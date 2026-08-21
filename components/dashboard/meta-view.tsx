@@ -97,7 +97,10 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
           BreakdownDonuts is Meta's eigen equivalent van CampaignTypeSplit: spend/conversies per
           leeftijd, plaatsing of device (tabs), altijd gevuld zodra er breakdown-data is -- geen
           kanaalspecifieke leegte zoals PmaxNetworkSplit bij Google had. */}
-      <div className="hero-rij grid grid-cols-1 gap-4 xl:grid-cols-12">
+      {/* items-start: zonder deze guard rekt Grid's default stretch-gedrag de kortste kolom uit tot
+          de hoogte van de langste (hier meestal de kaart) en blijft er een leeg vlak onderin de
+          andere kolom staan -- exact het patroon dat Google's hero-grid al bewust vermijdt. */}
+      <div className="hero-rij grid grid-cols-1 gap-4 items-start xl:grid-cols-12">
         <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
           <BreakdownDonuts clientId={clientId} channel="meta" />
           <GeoRanglijstCard state={geo} />
