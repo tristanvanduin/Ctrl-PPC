@@ -19,12 +19,16 @@ interface BrandContextValue {
   theme: EventTheme;
   brandName: string | null;
   loaded: boolean;
+  /** Kleurt het hele dashboard-chrome mee (zijbalk, knoppen, accenten), of alleen de
+   *  klant-eigen widgets die `theme` rechtstreeks lezen (bv. BrandHeaderBar)? Zie migratie 101:
+   *  alleen waar een platformbeheerder dit expliciet aanzette, of het bureau whitelabel afneemt. */
+  fullBranding: boolean;
 }
 
 const BrandContext = createContext<BrandContextValue | null>(null);
 
 export function useBrandTheme(): BrandContextValue {
-  return useContext(BrandContext) ?? { theme: resolveEventTheme(null), brandName: null, loaded: false };
+  return useContext(BrandContext) ?? { theme: resolveEventTheme(null), brandName: null, loaded: false, fullBranding: false };
 }
 
 // De variabelen die we op de root zetten. Merk-tokens + de shadcn/sidebar-tokens die anders het
@@ -70,6 +74,7 @@ export function BrandThemeProvider({
   const [identity, setIdentity] = useState<BrandVisualIdentity | null>(null);
   const [brandName, setBrandName] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [fullBranding, setFullBranding] = useState(false);
 
   useEffect(() => {
     const sb = supabase;
@@ -78,8 +83,12 @@ export function BrandThemeProvider({
     setLoaded(false);
 
     (async () => {
-      // Account-branding uit de brand guide.
-      const { data: cs } = await dbSelectOne<{ brand_guide: unknown }>("client_settings", { select: "brand_guide", clientId });
+      // Account-branding uit de brand guide, en of het chrome mee mag kleuren (migratie 101) --
+      // parallel, want geen van beide hangt van de ander af.
+      const [{ data: cs }, scopeRes] = await Promise.all([
+        dbSelectOne<{ brand_guide: unknown }>("client_settings", { select: "brand_guide", clientId }),
+        fetch(`/api/branding/scope?clientId=${encodeURIComponent(clientId)}`).then((r) => r.json()).catch(() => null),
+      ]);
       const guide = (cs?.brand_guide ?? {}) as { brandName?: string; visual?: BrandVisualIdentity };
       const accountBranding: GeoCloneBranding = { brandName: guide.brandName ?? null, ...(guide.visual ?? {}) };
 
@@ -98,6 +107,7 @@ export function BrandThemeProvider({
       const resolved = resolveBranding(accountBranding, override).effective;
       setIdentity(resolved);
       setBrandName(resolved.brandName ?? guide.brandName ?? null);
+      setFullBranding(Boolean((scopeRes as { fullBrandingEnabled?: boolean } | null)?.fullBrandingEnabled));
       setLoaded(true);
     })().catch(() => { if (!cancelled) setLoaded(true); });
 
@@ -106,15 +116,19 @@ export function BrandThemeProvider({
 
   const theme = useMemo(() => resolveEventTheme(identity), [identity]);
 
-  // Zet de variabelen op de document-root en draai ze bij het verlaten weer terug.
+  // Zet de variabelen op de document-root en draai ze bij het verlaten weer terug -- alleen als
+  // het hele chrome mee mag kleuren (migratie 101). Zonder fullBranding blijft de root op de
+  // standaard Ctrl PPC-huisstijl staan; `theme`/`brandName` blijven wel via de context
+  // beschikbaar voor widgets die een klant altijd al herkenbaar tonen (bv. BrandHeaderBar, die
+  // zijn eigen gradient rechtstreeks uit `theme` leest, niet uit deze CSS-variabelen).
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !fullBranding) return;
     const root = document.documentElement;
     const vars = brandVars(theme);
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
     return () => { for (const k of Object.keys(vars)) root.style.removeProperty(k); };
-  }, [theme, loaded]);
+  }, [theme, loaded, fullBranding]);
 
-  const value = useMemo<BrandContextValue>(() => ({ theme, brandName, loaded }), [theme, brandName, loaded]);
+  const value = useMemo<BrandContextValue>(() => ({ theme, brandName, loaded, fullBranding }), [theme, brandName, loaded, fullBranding]);
   return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
 }

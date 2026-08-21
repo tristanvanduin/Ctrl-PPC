@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Lock, Sparkles } from "lucide-react";
+import { Building2, Lock, Sparkles, TrendingUp } from "lucide-react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "@/components/dashboard/data-table";
 
 // Feedback: "tease god mode" -- voor bureaus zonder platformtoegang (dus precies de gebruikers
@@ -18,6 +18,17 @@ const VOORBEELD_RIJEN = [
   { segment: "Lokale dienstverlening", kanaal: "Meta", accounts: 9, spend: 52300, conversions: 1875 },
 ] as const;
 
+// Eén regel blijft scherp tussen de vervaagde: puur vervagen liet niets concreets zien om naar te
+// verlangen ("wat ontgrendel ik precies?"). Dit is nog steeds een voorbeeldrij (zelfde
+// VOORBEELD_RIJEN-bron valt hier niet uit te lezen, dus geen echt cijfer lekt), maar één scherpe
+// regel naast vijf vervaagde communiceert "dit soort inzicht" in plaats van alleen "iets is
+// verborgen" -- de eigenaar vroeg expliciet om urgentie, niet alleen nieuwsgierigheid.
+const SCHERPE_HIGHLIGHT = {
+  segment: "B2B SaaS · Scale-up",
+  kanaal: "LinkedIn",
+  signaal: "+34% conversies deze maand t.o.v. het segmentgemiddelde",
+};
+
 export function GodViewTeaser() {
   return (
     <section className="relative overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -34,7 +45,17 @@ export function GodViewTeaser() {
         </span>
       </div>
 
-      <div className="px-5 py-4">
+      <div className="px-5 py-4 space-y-3">
+        {/* Scherp, niet vervaagd: één concreet signaal dat laat zien WAT er te vinden is, niet
+            alleen DAT er iets verborgen is. Urgentie i.p.v. alleen nieuwsgierigheid. */}
+        <div className="flex items-start gap-2.5 rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-3.5 py-2.5">
+          <TrendingUp className="w-4 h-4 text-brand-blue-ink shrink-0 mt-0.5" />
+          <p className="text-meta text-brand-gray">
+            <span className="font-semibold">{SCHERPE_HIGHLIGHT.segment} ({SCHERPE_HIGHLIGHT.kanaal}):</span>{" "}
+            {SCHERPE_HIGHLIGHT.signaal}. Dit soort segmentbrede signalen zie je pas met platformtoegang.
+          </p>
+        </div>
+
         <div className="relative">
           <div aria-hidden className="blur-[3px] select-none pointer-events-none opacity-70">
             <Tabel>
@@ -64,11 +85,13 @@ export function GodViewTeaser() {
               <Lock className="w-4.5 h-4.5 text-muted-foreground" />
             </div>
             <p className="text-body font-semibold text-brand-gray">
-              Voorbeeldcijfers — geen echte data
+              Dit ziet je bureau vandaag niet
             </p>
             <p className="text-meta text-muted-foreground max-w-sm">
               Agency God View bundelt je hele portfolio per segment en signaleert wanneer een heel
-              segment beweegt, niet alleen één account. Vraag je bureau-eigenaar om platformtoegang.
+              segment beweegt — vaak eerder dan je het per account zou zien. Voorbeeldcijfers hierboven,
+              geen echte data. <span className="font-medium text-brand-blue-ink">Vraag je bureau-eigenaar
+              om platformtoegang.</span>
             </p>
           </div>
         </div>

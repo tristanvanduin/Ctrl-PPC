@@ -49,6 +49,7 @@ import { GoogleView, GoogleCampagnes, GoogleForecast } from "./google-view";
 import { CrossChannelView } from "./cross-channel-view";
 import { CampaignsPerChannel } from "./campaigns-per-channel";
 import { BrandingView } from "./branding-view";
+import { FullBrandingToggle } from "./full-branding-toggle";
 import { EventSettings } from "./event-settings";
 import { GeoCloneSettingsPanel } from "./geo-clone-settings";
 import { ChannelConversionSettings } from "./channel-conversion-settings";
@@ -639,6 +640,7 @@ function SettingsSections({ client }: { client: Client }) {
         <div className="space-y-6">
           <BrandingView clientId={client.id} clientName={client.name} />
           <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["logo"]} />
+          <FullBrandingToggle clientId={client.id} />
         </div>
       )}
 
