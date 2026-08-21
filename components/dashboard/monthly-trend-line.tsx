@@ -1,12 +1,15 @@
 "use client";
 
-import { LineChart, Line, XAxis, ResponsiveContainer } from "recharts";
+import { useState } from "react";
+import { LineChart, Line, XAxis, ResponsiveContainer, type DotItemDotProps } from "recharts";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast } from "@/lib/forecast";
+import { ALLE_FORECAST_METRICS, computeForecast } from "@/lib/forecast";
+import { METRIC_LABELS, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Tip, AsY, Raster, asSchaalLijn, kortEuro } from "./chart-chrome";
+import { PeriodPopover } from "@/components/ui/period-popover";
 
 // Compacte lijngrafiek voor de linkerkolom van de opener (17.43): "ik mis de lijn diagram nog" --
 // het kleine resterende hoogteverschil met de rechterkolom (kaart+grafiek+ranglijst) vult zich nu
@@ -22,11 +25,16 @@ import { Tip, AsY, Raster, asSchaalLijn, kortEuro } from "./chart-chrome";
 // i.p.v. forecast.conversions.
 export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string; countryFilter?: string | null }) {
   const { theme } = useBrandTheme();
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
   const fullData = useClientHistoricalData(clientId);
   const clientData = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
   const gedeeld = useForecast();
   const forecast = gedeeld ?? computeForecast(clientData);
-  const points = forecast.cpa.points.slice(-6);
+  const alleCpaPunten = forecast.cpa.points;
+  const points = alleCpaPunten.slice(-6);
+  // Zie monthly-trend-bars.tsx voor dezelfde redenering: de popover leest de andere metrics op
+  // via het volle, ongesnoeide array, dus moet de lokale 0..5-index eerst terug omgerekend.
+  const offset = alleCpaPunten.length - points.length;
 
   const data = points.map((pt) => ({
     label: pt.monthLabel,
@@ -62,11 +70,64 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
             dataKey="waarde"
             stroke={theme.primary}
             strokeWidth={2.5}
-            dot={{ r: 3, fill: theme.primary }}
+            dot={(props: DotItemDotProps) => {
+              const { cx, cy, index, key } = props;
+              if (cx == null || cy == null) return <g key={key} />;
+              return (
+                <circle
+                  key={key}
+                  cx={cx}
+                  cy={cy}
+                  r={4}
+                  fill={theme.primary}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setOpenIdx(index)}
+                />
+              );
+            }}
             connectNulls
           />
         </LineChart>
       </ResponsiveContainer>
+
+      {openIdx !== null && (() => {
+        const idx = offset + openIdx;
+        const label = points[openIdx]?.monthLabel ?? "";
+        return (
+          <PeriodPopover
+            title={label}
+            subtitle="Alle vier de metrics voor deze maand"
+            onClose={() => setOpenIdx(null)}
+          >
+            <div className="space-y-3">
+              {ALLE_FORECAST_METRICS.map((m) => {
+                const p = forecast[m].points[idx];
+                if (!p) return null;
+                const mVal = p.realized ?? p.forecast ?? 0;
+                const mFormat = formatterFor(m);
+                const mInverted = isLowerBetter(m);
+                const mPositive = mInverted ? p.monthRatio <= 1 : p.monthRatio >= 1;
+                return (
+                  <div key={m} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
+                    <div>
+                      <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
+                      <p className="text-micro text-muted-foreground">
+                        {p.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(p.expected)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lead font-bold text-brand-gray">{mFormat(mVal)}</p>
+                      <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>
+                        {formatPercent(p.monthRatio, 0)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </PeriodPopover>
+        );
+      })()}
     </div>
   );
 }

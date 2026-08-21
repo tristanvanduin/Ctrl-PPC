@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from "recharts";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast } from "@/lib/forecast";
+import { ALLE_FORECAST_METRICS, computeForecast } from "@/lib/forecast";
+import { METRIC_LABELS, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Tip, AsY, Raster, asSchaal, kortGetal } from "./chart-chrome";
+import { PeriodPopover } from "@/components/ui/period-popover";
 
 // Compacte staafdiagram voor de opener (17.34): de eigenaar vond de volledige PerformanceChart
 // hier "veeeel te groot" -- die heeft vier metric-knoppen, een week/maand/jaar-omschakelaar, een
@@ -26,11 +29,16 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
   groeit?: boolean;
 }) {
   const { theme } = useBrandTheme();
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
   const fullData = useClientHistoricalData(clientId);
   const clientData = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
   const gedeeld = useForecast();
   const forecast = gedeeld ?? computeForecast(clientData);
-  const points = forecast.conversions.points.slice(-6);
+  const alleConversiePunten = forecast.conversions.points;
+  const points = alleConversiePunten.slice(-6);
+  // Index in `points` (0..5) → index in het volle, ongesnoeide array, want de popover leest
+  // dezelfde maand bij de andere drie metrics op, en die arrays lopen 1-op-1 met dit array.
+  const offset = alleConversiePunten.length - points.length;
 
   const data = points.map((pt) => ({
     label: pt.monthLabel,
@@ -62,7 +70,7 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
           />
           <AsY formatter={kortGetal} width={36} domain={domain} tickCount={tickCount} />
           <Tip formatter={num} />
-          <Bar dataKey="waarde" radius={[3, 3, 0, 0]} maxBarSize={48}>
+          <Bar dataKey="waarde" radius={[3, 3, 0, 0]} maxBarSize={48} onClick={(_, i) => setOpenIdx(i)} cursor="pointer">
             {data.map((d, i) => (
               <Cell key={i} fill={theme.primary} opacity={d.prognose ? 0.4 : 1} />
             ))}
@@ -70,6 +78,45 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
         </BarChart>
       </ResponsiveContainer>
       </div>
+
+      {openIdx !== null && (() => {
+        const idx = offset + openIdx;
+        const label = points[openIdx]?.monthLabel ?? "";
+        return (
+          <PeriodPopover
+            title={label}
+            subtitle="Alle vier de metrics voor deze maand"
+            onClose={() => setOpenIdx(null)}
+          >
+            <div className="space-y-3">
+              {ALLE_FORECAST_METRICS.map((m) => {
+                const p = forecast[m].points[idx];
+                if (!p) return null;
+                const mVal = p.realized ?? p.forecast ?? 0;
+                const mFormat = formatterFor(m);
+                const mInverted = isLowerBetter(m);
+                const mPositive = mInverted ? p.monthRatio <= 1 : p.monthRatio >= 1;
+                return (
+                  <div key={m} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
+                    <div>
+                      <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
+                      <p className="text-micro text-muted-foreground">
+                        {p.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(p.expected)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lead font-bold text-brand-gray">{mFormat(mVal)}</p>
+                      <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>
+                        {formatPercent(p.monthRatio, 0)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </PeriodPopover>
+        );
+      })()}
     </div>
   );
 }

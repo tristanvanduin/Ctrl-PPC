@@ -27,11 +27,13 @@ function WeekCard({
   format,
   variant,
   inverted,
+  onOpen,
 }: {
   week: FairWeek;
   format: (v: number) => string;
   variant: "previous" | "current" | "next";
   inverted: boolean;
+  onOpen: () => void;
 }) {
   const value = week.realized ?? week.forecast ?? 0;
   const diff = week.expected > 0 ? ((value - week.expected) / week.expected) * 100 : 0;
@@ -61,7 +63,11 @@ function WeekCard({
       : `${-week.weeksOut} ${week.weeksOut === -1 ? "week" : "weken"} na de beurs`;
 
   return (
-    <div className={`rounded-lg border p-4 ${borderColors[variant]}`}>
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`flex h-full w-full flex-col rounded-lg border p-4 text-left transition-colors hover:ring-1 hover:ring-brand-blue/30 ${borderColors[variant]}`}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           {statusIcons[variant]}
@@ -83,7 +89,10 @@ function WeekCard({
         </div>
       </div>
 
-      <div className="space-y-1.5">
+      {/* flex-1: de kopregel wisselt in hoogte per kaart ("nog 8 weken" vs "beursweek" vs
+          "3 weken na de beurs"), dus zonder deze duwer staat de ratio-balk in elke kaart op een
+          andere hoogte en lijken de drie blokken onderling niet uitgelijnd. */}
+      <div className="flex-1 space-y-1.5">
         <div className="flex justify-between items-baseline">
           <span className="text-meta text-muted-foreground">{isRealized ? "Gerealiseerd" : "Prognose"}</span>
           <span className={`text-base font-bold ${variant === "current" ? "text-brand-blue-ink" : "text-brand-gray"}`}>
@@ -108,7 +117,7 @@ function WeekCard({
           />
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -201,10 +210,10 @@ export function FairWeeksOverview({
       )}
 
       <div className="px-5 pb-2">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {vorige && <WeekCard week={vorige} format={format} variant="previous" inverted={inverted} />}
-          {huidige && <WeekCard week={huidige} format={format} variant="current" inverted={inverted} />}
-          {volgende && <WeekCard week={volgende} format={format} variant="next" inverted={inverted} />}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
+          {vorige && <WeekCard week={vorige} format={format} variant="previous" inverted={inverted} onOpen={() => setOpenWeekStart(vorige.weekStart)} />}
+          {huidige && <WeekCard week={huidige} format={format} variant="current" inverted={inverted} onOpen={() => setOpenWeekStart(huidige.weekStart)} />}
+          {volgende && <WeekCard week={volgende} format={format} variant="next" inverted={inverted} onOpen={() => setOpenWeekStart(volgende.weekStart)} />}
         </div>
       </div>
 

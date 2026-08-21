@@ -336,7 +336,11 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
         </ResponsiveContainer>
       </div>
 
-      <div className="hidden shrink-0 flex-col justify-center gap-5 border-l border-border px-6 py-4 lg:flex" style={{ width: 230 }}>
+      {/* ml-auto: zonder plafond duwt de plot deze kolom zelf tegen de rechterrand, maar met
+          plotBreedte() erop (zie hierboven) kan de plot smaller uitvallen dan de rij breed is —
+          en dan bleef deze kolom los van de plot staan met de echte lege ruimte ná zich, tegen de
+          kaartrand. ml-auto duwt hem altijd naar de rechterrand, ongeacht hoe smal de plot is. */}
+      <div className="hidden shrink-0 flex-col justify-center gap-5 border-l border-border px-6 py-4 ml-auto lg:flex" style={{ width: 230 }}>
         <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
           Totaal over {data.length} {data.length === 1 ? "maand" : "maanden"}
         </p>
