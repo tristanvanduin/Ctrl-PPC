@@ -36,6 +36,7 @@ import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
 import { isDemoClient } from "@/lib/demo/demo-mode";
 import { GodViewDemo } from "@/components/terminal/god-view-demo";
+import { ChannelGapCard } from "./channel-gap-card";
 import type { InsightChannel } from "@/lib/insights/channel-of";
 import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
 import { PeriodSelector } from "./period-selector";
@@ -896,6 +897,12 @@ function OutcomesTab({ clientId }: { clientId: string }) {
       >
         <ProposalQueue clientId={clientId} refreshKey={refreshKey} channel={channelFilter} onWorkflowChange={() => setRefreshKey((k) => k + 1)} />
       </Sectie>
+
+      {/* Geen demo-gate, in tegenstelling tot het God View-blok hierboven: dit is de echte,
+          niet-fictieve God View-laag, alleen (nog) vrijwel altijd insufficient_data bij minder
+          dan 4 bureaus in het segment. ChannelGapCard rendert zichzelf weg (return null) zolang
+          er niets deelbaars is -- geen "onvoldoende data"-ruis, gewoon stilte. */}
+      <ChannelGapCard clientId={clientId} />
 
       {/* Creative-vermoeidheid stond bij de analyses, maar er valt niets te draaien: het is een
           aflezing van data die er al is, dus een bevinding. Hij volgt het kanaalfilter; op
