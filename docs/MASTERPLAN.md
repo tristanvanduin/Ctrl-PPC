@@ -5243,3 +5243,112 @@ scripts/check-hygiene.mjs` (1014 bestanden). Visueel geverifieerd met Playwright
 onderscheppen en `bedrijfsmodel`/`rai_events` alleen client-side te vervalsen naar b2c/leeg — geen
 enkele echte databaserij aangeraakt. Screenshot bevestigt: vier vooringevulde momenten met correcte
 2025/2026/2027-datums, de hint-banner, en volledig bewerkbare/verwijderbare velden vóór opslaan.
+
+### 17.62 Twee branches samengevoegd — een parallelle sessie deed hetzelfde feedback-document, grondiger
+
+**Wat er gebeurde.** Een aparte sessie werkte, onafhankelijk en zonder dat de twee sessies van
+elkaar wisten, al sinds 20 augustus aan **hetzelfde** feedback-document op de branch
+`redesign/dashboard-map-credits-campaign-types` — 32 commits, eigen testbestanden
+(`__display_scorecard_test.ts`, `__shopping_scorecard_test.ts`, `__god_view_churn_test.ts`,
+`__standard_b2c_events_test.ts`, twee keer `__objective_breakdown_test.ts`), een eigen migratie
+(`100_client_notes_todo.sql`), en Playwright-verificatie tegen een lokale `next dev`/`next start`
+in plaats van de live deploy. Die branch had zijn eigen doorlopende `docs/MASTERPLAN.md`-sectie
+17.55 t/m 17.61 — vanaf hetzelfde vertrekpunt (17.54) maar met totaal andere inhoud dan wat deze
+sessie onder dezelfde nummers vastlegde. Twee bronnen van waarheid voor hetzelfde document, allebei
+"main" verondersteld te zijn.
+
+Ontdekt doordat de eigenaar een Vercel-deploymentlijst deelde met commit-berichten die letterlijk
+dezelfde feedbackpunten noemden als waar deze sessie op dat moment blind aan aan het werken was
+("Bevindingen-pagina drastisch inkorten", "Notities/to-do's splitsen" — allebei al af, terwijl deze
+sessie er zojuist een eigen, andere implementatie van had zitten bouwen). Losstaand bevestigd: geen
+enkele bevinding uit deze sessie was ooit tegen een live deploy getest (zie 17.58) — een
+Vercel-preview zit achter Vercel's eigen SSO, de productiesite achter de normale inlogpagina, en een
+poging om met een headless browser in te loggen liep vast op een sandbox-netwerkprobleem
+(`ERR_CONNECTION_RESET`, nooit opgelost — de andere sessie omzeilde dit probleem domweg door tegen
+een lokaal gebouwde instantie te testen in plaats van tegen een publiek domein).
+
+**Besluit van de eigenaar:** `redesign/dashboard-map-credits-campaign-types` is de volwassener,
+beter geverifieerde lijn. Samengevoegd in `main` (`0ae73fe`, geverifieerd conflictvrij met
+`git merge-tree` vóór de daadwerkelijke merge) in plaats van andersom. Reden om nu te mergen in
+plaats van eerst af te wachten: geen live gebruikers vandaag, dus geen risico — en hoe langer twee
+branches naast elkaar leven, hoe groter de kans op een derde afwijkende kopie. Vanaf hier wordt
+**rechtstreeks op `main`** doorgewerkt, geen nieuwe langlevende feature-branch voor dit traject.
+
+**Wat van deze sessie's eigen werk is overgenomen** (de rest is bewust losgelaten — overbodig naast
+of botsend met wat de andere sessie al deed): de domain/auth-documentatie
+(`docs/DOMEIN_en_auth_instellingen.md` — `ctrlppc.com` nu live, de `.nl`/`www`-redirect verhuisd
+naar Vercel, de Supabase-SMTP-rate-limit-vondst; door de andere branch niet aangeraakt) en het
+lettertypebesluit hieronder. **Losgelaten:** de eigen versies van wereldkaart-zoom, donuttekst-fix,
+logo-link, Bevindingen-inklapbaarheid en de God-View-verplaatsing (de andere sessie loste elk van
+deze al op, met eigen — vaak grondiger geverifieerde — implementaties); de PMax/Search-scorecard-
+breedtefix (`health-badge.tsx`) is losgelaten en dus **nog steeds open**, zie de lijst hieronder.
+
+**Lettertypebesluit, overgenomen (oorspronkelijk vastgelegd als 17.55 op de losgelaten branch):**
+Plus Jakarta Sans is het definitieve lettertype voor het product, expliciet als onherroepelijk
+geformuleerd door de opdrachtgever. De marketingsite (`app/(marketing)/layout.tsx`) gebruikt het al
+sinds fase 7, tot nu toe uitdrukkelijk als tijdelijke vervanger voor Satoshi — dat voorbehoud
+vervalt, er komt geen Satoshi-migratie meer. De ingelogde dashboard-app gebruikt nog Ubuntu
+(`app/(app)/layout.tsx`, `--font-ubuntu` in `app/globals.css`). Scope nog niet uitgevoerd: er komt
+een nieuw brandbook; pas dan wordt gecodeerd of Ubuntu blijft naast Jakarta bestaan of het hele
+product overgaat. Geen regel lettertype-code is hierdoor gewijzigd.
+
+**Geverifieerd**: `scripts/gates.sh` op de samengevoegde stand (zie hierna); geen conflicten bij de
+merge zelf, geen conflicten bij het overzetten van de domain-doc.
+
+### 17.63 De definitieve, afvinkbare lijst — alles gevalideerd tegen het feedback-document en de samengevoegde code (21 augustus 2026)
+
+Op verzoek van de eigenaar: elk punt uit het oorspronkelijke feedback-document nagelopen tegen de
+code zoals die nu, ná de merge van 17.62, op `main` staat — niet tegen aannames, niet tegen wat een
+van de twee losstaande sessies eerder dacht dat de status was. Dit vervangt de eerdere, voorlopige
+overzichten in 17.56-17.58 (die waren tegen een branch die inmiddels is losgelaten).
+
+**Opgelost, bevestigd in de samengevoegde code:**
+
+| # | Punt | Bewijs |
+|---|---|---|
+| 1 | Wereldkaart: dark/light-contrast | `--kaart-laag` verder van `--kaart-leeg` gezet (was Δ≈5-11, niet te onderscheiden) |
+| 2 | Wereldkaart: dynamisch inzoomen op actieve landen | `world-map.tsx`, `fitExtent` op de landen met data |
+| 3 | Hero/SopDekkingBanner: dark-mode contrast | eerder al correct, plus een `dark:`-override-bug uit dezelfde familie gevonden en gefixt (17.58 op de overgenomen branch) |
+| 4 | Hero: dynamische "x tot eerstvolgende beurs" | `useUpcomingEdition`, al aanwezig |
+| 5 | Hero/SopDekkingBanner: wegklikbaar | gefixt |
+| 6 | Logo als home-link | gefixt ("Tier 1 feedback") |
+| 7 | Donuttekst buiten de middencirkel | `text-[1.05rem]`, past binnen de 104px-ring |
+| 8 | SOP-PDF-download ("bestand bestaat niet") | root cause: drie PDF-routes negeerden `.error` van `storage.upload()`; ontbrekende bucket zelf ook door de eigenaar aangemaakt |
+| 9 | Notities/to-do's: 2 losse 50/50-secties + globale sync | herschreven, migratie 100, cross-tabblad geverifieerd |
+| 10 | Beurzen: generieke tabnaam | "Beurzen & momenten" |
+| 11 | Beurzen: standaard ecom-events (Black Friday e.d.) | `standard-b2c-events.ts`, met tests |
+| 12 | God Mode: cross-agency klantnamen zichtbaar | geanonimiseerd naar stabiele pseudoniemen |
+| 13 | Analyses-pagina: "mega god mode-tabel" hoort daar niet | verplaatst naar Bevindingen, eigen `Sectie` |
+| 14 | AI-chat: kostenplafond-koppeling | `controleerPlafond()` wordt aangeroepen, bevestigd nogmaals na de merge |
+| 15 | Meta/LinkedIn: advertentietypes ontbreken | `objective-breakdown.ts` (Meta + LinkedIn) met dedicated inzichten |
+| 16 | Shopping/Display Campaign Type Intelligence (masterplan-fase-2-gat) | `shopping-scorecard.ts`/`display-scorecard.ts`, met tests |
+| 17 | PMax video-verloop "ontbreekt" | bleek al aanwezig (`VideoPerformance`, verschijnt alleen bij echte videocampagnes) — geen bug |
+| 18 | Bevindingen-tab "extreem lang" | 4x ingekort (12.751px → 3.007px demo-hoogte), gemeten |
+
+**Bevestigd open, nog te doen:**
+
+| # | Punt | Status en waar |
+|---|---|---|
+| 19 | Conversieselectie: 2 losse, ongekoppelde secties | `client-settings.tsx` (`conversionActions`) én `channel-conversion-settings.tsx` (`channel_conversion_config`) bestaan allebei nog, na de merge herbevestigd |
+| 20 | PMax/Search-scorecard te breed/leeg | `health-badge.tsx:137`, anomalieën-kolom nog kaal `flex-1` — mijn eigen fix hiervoor is bewust losgelaten (17.62), dus dit is niet per ongeluk blijven staan |
+| 21 | Forecasting: geen uniforme opbouw | drie patronen bevestigd: Google (`ForecastTable`, tabel+bandbreedte, geen grafiek), Meta/LinkedIn/blended (`ChannelForecast`, run-rate-kaarten, geen jaartabel — en "blended" sluit Google's eigen cijfers zelfs uit), beurs-context (losse LLM-narratieve kaart). Twee onafhankelijke onderzoeken (de overgenomen branch en deze sessie) komen tot dezelfde conclusie |
+| 22 | Settings "merk & uiterlijk": hele dashboard kleurt mee | `BrandThemeProvider` zet globale CSS-variabelen (`--sidebar`, `--primary`, `--accent`, niet alleen `--brand-*`), zonder tier- of scope-gate — precies wat de feedback afraadde voor productie |
+| 23 | Whitelabel: alleen het zijbalk-logo, niet de kleuren | `agencies.whitelabel_actief` bestaat en is bureau-niveau, maar dekt uitsluitend het logo (migratie 068's eigen commentaar bevestigt dit); kleuren blijven per-klant |
+| 24 | Settings-pagina: witruimte | geen `max-width` gevonden in `app/(app)/layout.tsx` of de merk/uiterlijk-flow |
+| 25 | Tabel-leesbaarheid "letter onder 65" | met redelijk vertrouwen `health-badge.tsx` (cijfer+lettergrade in dezelfde cirkel, `dl`-uitleg met variabele kolombreedte) — niet zeker genoeg om als vaststaand te noemen; te bevestigen met de eigenaar |
+| 26 | Adviserende laag: kanaalaanbeveling op basis van God View/portfolio | **niet gebouwd** — en actief tegengehouden door een guardrail in `lib/decision/master-synthesis-prompt.ts` ("noem geen kanaal dat niet is aangeleverd"), die bewust zou moeten worden versoepeld voor precies deze functie als hij ooit gebouwd wordt |
+| 27 | Prestaties-kanalen: instelbare KPI's per klant | deels — welke conversies meetellen is instelbaar, welke KPI's zichtbaar zijn in topbar/grafiek niet |
+| 28 | GodViewPremium: blur/lock-overlay | expliciete open vraag bij de eigenaar, geen bug: (A) interne preview voor de platformeigenaar zelf, geen actie nodig, of (B) een betaalde bureau-tier die tier-gating nodig heeft voor niet-abonnees (groter werk) |
+
+**OpenRouter-kostentraject (`MODEL_ROUTING_AND_COST_OPTIMIZATION_V2`):** beoordeeld, niet gebouwd.
+Advies (ongewijzigd sinds de overgenomen branch, hier bevestigd): niet de volle 20 fases in één
+keer — een model-registry met automatische discount-discovery is zware infrastructuur voor een
+workload die $1,52 kostte in het eigen auditlog. Wel doen: een verse Fase 1+2-audit op actuele
+logs, en Fase 12+13 (kleinere outputlimieten per workflow, evidence-payload-compressie) — die
+repareren de architectuurfout zelf, ongeacht welk model er ooit bij komt. De rest pas bouwen als
+gemeten volume het rechtvaardigt. **Dit is zelf nog een openstaand punt**, geen uitgevoerde actie.
+
+**Wat dit niet doet:** dit is de status meteen ná de merge, niet een garantie dat elk "opgelost"-
+punt ook al tegen een live deploy is bekeken (zie 17.58/17.62 — live-verificatie bleef deze hele
+sessie onbereikbaar). De 28 punten hierboven zijn de volledige dekking van het oorspronkelijke
+dashboard-feedback-document; niets is overgeslagen of aangenomen zonder code-bewijs.
