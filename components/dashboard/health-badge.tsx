@@ -67,13 +67,19 @@ export function HealthBadgeView({
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             {/* Een getal tonen naast een "?" suggereert precisie die er niet is: bij te
-                weinig beoordeelde factoren is de score geen lage score maar een onbekende. */}
-            <span className={`text-xl font-bold ${health.color}`}>
+                weinig beoordeelde factoren is de score geen lage score maar een onbekende.
+                De lettergrade (A-F) stond hier ook, naast het cijfer -- twee schalen voor
+                dezelfde score. Weg: het cijfer staat nu alleen, gecentreerd. Bij "?" blijft de
+                assessedCount-aanduiding staan (geen grade, een eerlijk "hoeveel is er wél
+                gemeten" -- dat signaal verdwijnt niet, regel 3 van de vertrouwensdoctrine). */}
+            <span className={`text-2xl font-bold ${health.color}`}>
               {health.grade === "?" ? "—" : health.total}
             </span>
-            <span className="text-micro font-semibold text-muted-foreground">
-              {health.grade === "?" ? `${health.assessedCount}/5` : health.grade}
-            </span>
+            {health.grade === "?" && (
+              <span className="text-micro font-semibold text-muted-foreground">
+                {health.assessedCount}/5
+              </span>
+            )}
           </div>
         </div>
 
