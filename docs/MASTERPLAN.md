@@ -5763,3 +5763,38 @@ bevestigd correct".
 **Geverifieerd (code-niveau)**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests
 groen, `build` groen (geen enkele test raakt de nieuwe GAQL-query zelf, die kan alleen tegen een
 echte Google Ads-omgeving getest worden). Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
+
+### 17.70 Nog drie losse eindjes: witruimte, #27 KPI-instelling, PDF-kleuren blijft uitgesteld (21 augustus 2026)
+
+Eigenaar: "Ga verder met de rest van de openstaande punten." Drie dingen stonden nog open uit
+17.68/17.69 en de allereerste feedbackronde (17.63/17.64); elk voorgelegd, twee opgepakt, één
+bevestigd uitgesteld.
+
+**God Mode/God View Premium-witruimte (`e11381e`)** — geen coded bug, gewoon geen eigen
+breedtegrens op een pagina zonder container-max (`main` is `p-6`, verder niets). Zelfde fix als
+`branding-view.tsx` eerder kreeg voor dezelfde klacht: `max-w-3xl` op de telwaarden-rij,
+`max-w-5xl` op de God View Premium-kaart (breder, want twee tabellen naast elkaar).
+
+**#27 "Instelbare KPI's per klant" (`e34f499`)** — bleek bij onderzoek al voor de helft te bestaan.
+`client-settings.tsx`'s KPI-doelstellingen-kaart heeft al een "activeer deze KPI"-schakelaar
+per metric (Conversies/Omzet/ROAS/CPA), alleen afgeleid uit "staat er een doel > 0" — geen apart
+opgeslagen veld. Vijf plekken (MetricCards, PerformanceChart, MonthlyOverview, ForecastTable,
+FairWeeksOverview) toonden desondanks altijd alle vier de metrics als keuze, ook zonder doel. Geen
+nieuwe instellingen-UI dus: één gedeelde `actieveMetrics()`-helper in `lib/forecast.ts`, gebaseerd
+op dezelfde `annualTarget`-velden die deze componenten al berekenen, met terugval naar alle vier
+als niets is ingevuld (een lege selector is erger dan een ongefilterde). Twee "alle vier in één
+detail-popover"-plekken (monthly-overview.tsx, fair-weeks-overview.tsx) bewust met rust gelaten —
+die zijn doelbewust volledig, geen selector die dezelfde inconsistentie herhaalt.
+
+**Rapportage-kleuren (PDF's)** — voor de derde keer voorgelegd, voor de derde keer bevestigd
+uitgesteld. Geen nieuwe informatie; blijft een eigen sessie verdienen (zie 17.65's "wat dit niet
+doet").
+
+**Nog open, wacht op de eigenaar**: twee punten uit het feedbackdocument konden niet worden
+opgepakt zonder verduidelijking — "Weken tot beurs / Maanden"-toggle met de losse aantekening
+"X nodig???" (geen context in de code te vinden voor wat dat "X" zou moeten zijn), en de
+checkbox-uitlijningsklacht (geen enkele checkbox-component in de code combineert met een
+percentage-kaart zoals beschreven — kan niet gelokaliseerd worden zonder een scherm-/paginanaam).
+
+**Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
+groen, voor beide gebouwde punten apart. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
