@@ -13,6 +13,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { demoGeoCountries, demoGeoStates, type GeoAgg } from "@/lib/demo/geo-demo";
 import { isDemoClientValue } from "@/lib/demo/mock-supabase";
+import { isGeocloneDemo } from "@/lib/demo/geoclone-demo-data";
+import { detectCountryFromName } from "@/lib/countries";
 import { regionNameToUsps } from "./us-fips";
 
 export type GeoChannel = "google" | "meta" | "linkedin" | "blended";
@@ -129,6 +131,25 @@ export async function resolveGeo({ clientId, channel, level, demo }: ResolveGeoA
   }
   const sb = makeClient();
   if (!sb) return [];
+  // De losse geo-clone-demoklanten (demo-grt/gra/grn, scripts/demo/seed-geoclone-clients.ts) zijn
+  // ECHT geseed in ads_campaign_monthly, maar nooit in ads_country_monthly/ads_region_monthly --
+  // readForChannel zou hier altijd leeg teruggeven, of (bij een demo-vlag die alsnog waar staat)
+  // per ongeluk de gedeelde GreenTech-mock tonen, die een ander landenpalet heeft dan deze
+  // single-market klant. Afgeleid uit de eigen, al-geseede campagnedata (zelfde detectie als
+  // geoclone-demo-data.ts), niet uit een gedeelde mock die niet bij dit account hoort.
+  if (isGeocloneDemo(clientId) && channel === "google" && level === "country") {
+    try {
+      const { data } = await sb.from("ads_campaign_monthly")
+        .select("campaign_name, impressions, clicks, cost, conversions, conversions_value")
+        .eq("client_id", clientId);
+      const land = aggregate(
+        (data ?? [])
+          .map((r) => ({ ...r, code: detectCountryFromName(String(r.campaign_name ?? "")) }))
+          .filter((r) => r.code)
+      );
+      if (land.length > 0) return land;
+    } catch { /* val terug op de normale route hieronder */ }
+  }
   try {
     if (channel === "blended") {
       const parts = await Promise.all([

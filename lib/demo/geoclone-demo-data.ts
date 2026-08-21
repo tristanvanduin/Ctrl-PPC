@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { GEOCLONE_DEMO_IDS } from "./geoclone-clients";
 import { detectCountriesFromCampaigns, detectCountryFromName } from "@/lib/countries";
 import type { ApiMonthlyData, ApiWeeklyData, YearDataInput } from "@/lib/api/adapter";
+import type { CountryMonthlyRow } from "@/lib/use-client-data";
 
 export function isGeocloneDemo(customerId: string | null | undefined): boolean {
   if (!customerId) return false;
@@ -76,6 +77,55 @@ function toApiWeekly(rows: AccountWeeklyRow[]): ApiWeeklyData[] {
     });
   }
   return out;
+}
+
+/**
+ * countryMonthlyData afgeleid uit de campagnerijen, niet verzonnen: elke campagne heeft al een
+ * gedetecteerd land (campaignCountryMap, uit de campagnenaam) met aandeel 1 -- deze klanten zijn
+ * single-market (GRT=NL, GRA=US, GRN=CA/NA), dus "per land" is hier vrijwel altijd "per campagne".
+ * Zonder deze afleiding bleef countryMonthlyData hardcoded leeg: de landfilter-knop verscheen wel
+ * (detectedCountries wordt wél gevuld), maar elke selectie gaf een lege maand terug.
+ */
+function deriveCountryMonthlyData(
+  campaigns: CampaignMonthlyRow[],
+  campaignCountryMap: Record<string, string>,
+): CountryMonthlyRow[] {
+  const perMaandLand = new Map<string, { impressions: number; clicks: number; cost: number; conversions: number; conversionsValue: number; campagnes: Set<string> }>();
+  const spendPerMaand = new Map<string, number>();
+
+  for (const c of campaigns) {
+    const land = campaignCountryMap[c.campaign_name];
+    if (!land) continue;
+    const sleutel = `${land}|${c.month}`;
+    const bestaand = perMaandLand.get(sleutel) ?? { impressions: 0, clicks: 0, cost: 0, conversions: 0, conversionsValue: 0, campagnes: new Set<string>() };
+    bestaand.impressions += c.impressions;
+    bestaand.clicks += c.clicks;
+    bestaand.cost += c.cost;
+    bestaand.conversions += c.conversions;
+    bestaand.conversionsValue += c.conversions_value;
+    bestaand.campagnes.add(c.campaign_id);
+    perMaandLand.set(sleutel, bestaand);
+    spendPerMaand.set(c.month, (spendPerMaand.get(c.month) ?? 0) + c.cost);
+  }
+
+  const rijen: CountryMonthlyRow[] = [];
+  for (const [sleutel, t] of perMaandLand) {
+    const [countryCode, month] = sleutel.split("|");
+    const totaalSpendMaand = spendPerMaand.get(month) ?? 0;
+    rijen.push({
+      countryCode, month,
+      impressions: t.impressions, clicks: t.clicks, cost: t.cost,
+      conversions: t.conversions, conversionsValue: t.conversionsValue,
+      ctr: t.impressions > 0 ? t.clicks / t.impressions : 0,
+      avgCpc: t.clicks > 0 ? t.cost / t.clicks : 0,
+      costPerConversion: t.conversions > 0 ? t.cost / t.conversions : 0,
+      conversionRate: t.clicks > 0 ? t.conversions / t.clicks : 0,
+      roas: t.cost > 0 ? t.conversionsValue / t.cost : 0,
+      campaignCount: t.campagnes.size,
+      spendShare: totaalSpendMaand > 0 ? t.cost / totaalSpendMaand : 0,
+    });
+  }
+  return rijen.sort((a, b) => a.month.localeCompare(b.month) || a.countryCode.localeCompare(b.countryCode));
 }
 
 function mapCampaign(c: CampaignMonthlyRow) {
@@ -185,7 +235,7 @@ export async function buildGeocloneClientData(supabase: SupabaseClient, clientId
     campaignCountryMap,
     campaignCountryShares,
     detectedCountries,
-    countryMonthlyData: [],
+    countryMonthlyData: deriveCountryMonthlyData(campaigns, campaignCountryMap),
     adGroupBleeders: [],
     adGroupPerformance: [],
     productBleeders: [],
