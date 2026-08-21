@@ -191,8 +191,11 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             <span className="text-micro text-muted-foreground">/dag</span>
           </div>
           {convNeededPerDay > 0 && (
+            // Feedback: "X nodig???" -- het ✗-teken vóór "Nodig" rendert onduidelijk (leest als
+            // een losse letter X, niet als een kruisje). Woorden i.p.v. een dubbelzinnig
+            // glyph -- kleur blijft de tweede, niet de enige drager van de status.
             <p className={`text-micro mt-1 ${dailyConvRate >= convNeededPerDay ? "text-green-600" : "text-red-500"}`}>
-              {dailyConvRate >= convNeededPerDay ? "✓" : "✗"} Nodig: {num(convNeededPerDay)}/dag
+              {dailyConvRate >= convNeededPerDay ? "Op tempo" : "Nog niet op tempo"} — nodig: {num(convNeededPerDay)}/dag
             </p>
           )}
         </div>
@@ -209,7 +212,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
           </div>
           {spendNeededPerDay > 0 && (
             <p className={`text-micro mt-1 ${dailySpendRate >= spendNeededPerDay * 0.9 ? "text-green-600" : "text-red-500"}`}>
-              {dailySpendRate >= spendNeededPerDay * 0.9 ? "✓" : "✗"} Nodig: {fmt(spendNeededPerDay)}/dag
+              {dailySpendRate >= spendNeededPerDay * 0.9 ? "Op tempo" : "Nog niet op tempo"} — nodig: {fmt(spendNeededPerDay)}/dag
             </p>
           )}
         </div>

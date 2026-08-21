@@ -314,9 +314,11 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
   // ── 8. MoM Performance Breakdown ──
 
   if (realizedMonths.length >= 2) {
+    // Feedback: hetzelfde "X nodig???"-punt als pacing-monitor.tsx -- een los ✗-teken rendert
+    // onduidelijk (leest als een letter X). Woorden i.p.v. glyph.
     const monthBreakdown = realizedMonths.map((m) => {
-      const status = m.monthRatio >= 1 ? "✓" : "✗";
-      return `${m.monthLabel}: ${(m.monthRatio * 100).toFixed(0)}% ${status}`;
+      const status = m.monthRatio >= 1 ? "op schema" : "onder schema";
+      return `${m.monthLabel}: ${(m.monthRatio * 100).toFixed(0)}% (${status})`;
     }).join(" · ");
 
     insights.push({
