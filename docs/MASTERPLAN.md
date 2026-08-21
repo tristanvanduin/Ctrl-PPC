@@ -4850,3 +4850,60 @@ advertentietypes, Analyses-pagina, Settings whitelabel-scope, adviserende laag/k
 AI-chat-kostenplafond-koppeling, conversieselectie-dubbeling, tabel-leesbaarheid) — vervolgwerk,
 niet aangenomen als "in orde". Het aparte `MODEL_ROUTING_AND_COST_OPTIMIZATION_V2`-traject (20
 fases, OpenRouter-kostenoptimalisatie) is nog niet gestart en evenmin hier verder uitgewerkt.
+
+### 17.57 Vervolg op 17.56: meer feedbackpunten geverifieerd, twee UX-fixes doorgevoerd (21 augustus 2026)
+
+Verificatie van het feedback-document voortgezet. Nieuw bevestigd, tegen de code:
+
+| Punt | Status | Bewijs |
+|---|---|---|
+| PMax video-verloop ontbreekt | Opgelost | `VideoPerformance` staat al in `google-view.tsx`, toont zichzelf alleen als er echt videocampagnes draaien (bewuste lege staat) |
+| PMax scorecard te breed/leeg | Open | `health-badge.tsx`: de anomalieën-kolom (`flex-1`) rekt altijd tot de volle kaartbreedte; geldt ook voor Search's scorecard (zelfde component) |
+| Donuttekst buiten middencirkel | Open | `donut-chart.tsx`: centrumtekst staat in een `absolute inset-0`-vlak (180px), niet begrensd tot de 104px binnenring |
+| Instelbare KPI's per klant | Deels — conversie-selectie bestaat (`channel_conversion_config`), welke KPI's zichtbaar zijn niet |
+| Meta/LinkedIn advertentietypes | Open — `BreakdownDonuts` splitst naar leeftijd/plaatsing/device, niet naar objective/advertentietype. Bevestigt §16.3: campagnetype-diepte Meta/LinkedIn nog in opbouw |
+| AI-chat kostenplafond-koppeling | Opgelost | `app/api/chat/route.ts:237` roept `controleerPlafond()` daadwerkelijk aan vóór elke call |
+| Conversieselectie dubbele sectie | Bevestigd, echte bug | Twee losse, ongekoppelde UI's: `client-settings.tsx` (`conversionActions`) én `channel-conversion-settings.tsx` (`channel_conversion_config`), allebei gerenderd in `client-dashboard.tsx` — nog niet gefixt, alleen bevestigd |
+
+**God View-plaatsing gefixt.** De eigenaar liet via de live UI zien waar de "mega god mode-tabel"
+uit de oorspronkelijke feedback zat: op de klant-pagina, tab **Analyseren**, verstopt als
+sub-blok onder de kanaalkeuze "Alle kanalen" (`analysisChannel === "blended"`). De code had zelf
+al de juiste intentie vastgelegd (alleen in demo-modus, want God View is platform-/bureaubreed en
+hoort normaal op `/vandaag`), maar de plek conflateerde twee verschillende dingen: "welk kanaal
+van déze klant" (een echte tabkeuze) versus "toon platformbrede data die niets met déze klant te
+maken heeft". Gefixt in `components/dashboard/client-dashboard.tsx`: het blok staat nu
+losgekoppeld van `analysisChannel`, als een eigen, duidelijk gelabeld blok ("Demo"-badge, stippellijnrand)
+onderaan de Analyseren-tab, zichtbaar ongeacht welk kanaal er gekozen is.
+
+**Bevindingen-tab (Inzichten/Outcomes) ingekort.** Bevestigd: de tab stapelt "Wacht op je
+oordeel" (ProposalQueue), "Wat de analyses zien" (3x creative-vermoeidheid + tot 20 inzichten) en
+"Wat eruit volgt" (tot 20 aanbevelingen + hypotheses + tot 141 taken) allemaal volledig open onder
+elkaar — precies het "extreem lang"-punt. De twee zware secties zijn nu inklapbaar gemaakt.
+
+Aanpak: `components/ui/sectie.tsx` (de gedeelde `Sectie`-wrapper, tot nu toe altijd volledig open)
+kreeg een optionele `inklapbaarId`/`standaardOpen`-prop, die hergebruikt wat al bestond
+(`useRememberedOpen` uit `components/ui/disclosure.tsx` — dezelfde onthoud-per-gebruiker-logica
+als `CollapsiblePanel`, hier zonder eigen kaartchrome omdat `Sectie` dat toch al niet had). Geen
+nieuw patroon, geen dubbele opslag-logica. In `OutcomesTab` (`client-dashboard.tsx`) kregen "Wat
+de analyses zien" en "Wat eruit volgt" een `inklapbaarId` met `standaardOpen={false}`; "Wacht op
+je oordeel" blijft bewust altijd open, want dat is het enige onderdeel van deze tab waar direct
+een handeling op zit.
+
+**Geverifieerd**: `scripts/gates.sh` — `tsc`, `tests` (306/306) en `build` groen. Dezelfde vier
+DB-credential-poorten falen nog steeds op de bekende 401 (geen service-role-sleutel voor die
+scripts in deze sandbox), ongewijzigd sinds 17.56 en niet aan deze wijziging te wijten.
+
+**Wat dit niet doet:** de PMax-scorecard-breedte, donuttekst-overflow en de dubbele
+conversieselectie zijn bevestigd maar nog niet gefixt. De overige, nog niet gelokaliseerde
+feedbackpunten (Settings-witruimte/whitelabel-scope, adviserende laag, forecasting-uniformiteit,
+tabel-leesbaarheid "letter onder 65") wachten op een aanwijzing van de eigenaar welke pagina het
+betreft, net als bij 17.56.
+
+**Buiten deze wijziging, apart gevonden:** de uitnodigingslink voor een nieuwe collega wees naar
+`localhost`. Root cause zit niet in de code — `app/api/admin/users/route.ts` berekent de
+`redirectTo` correct uit het verzoek zelf — maar in Supabase's eigen Auth-instelling **Site URL**
+(Authentication → URL Configuration), die volgens `docs/DOMEIN_en_auth_instellingen.md` bewust op
+`http://localhost:3000` stond zolang de app nergens anders draaide. Dat document is zelf
+achterhaald: de app draait inmiddels op een Vercel-deploy. Niet hier opgelost — dit is een
+Supabase-configuratie-wijziging (twee velden: Site URL en de Redirect URLs-lijst), geen code, en
+wacht op bevestiging van de eigenaar welk domein nu canoniek is.

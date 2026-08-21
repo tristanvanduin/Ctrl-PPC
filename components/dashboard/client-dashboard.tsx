@@ -777,19 +777,6 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
               <MasterSynthesisAnalysis clientId={clientId} />
             </>
           )}
-          {/* God View en cross-account (portfolio-synthese) zijn platform-/bureaubreed, geen
-              klant-eigen data -- ze horen normaal op /vandaag, niet op een klantpagina. Maar
-              "in het demo-account" is precies waar een demo-bezoeker ze wil kunnen laten zien
-              zonder eerst weg te navigeren. Zelfde componenten, zelfde statische demo-data
-              (lib/demo/god-view-demo.ts, GEEN echte sessie of LLM-aanroep nodig) als op
-              /vandaag?demo=1 -- puur hier ook ingesloten. Alleen in demo-modus: buiten demo
-              is dit geen klant-eigen data en hoort het hier niet te staan. */}
-          {demoModus && (
-            <>
-              <Section>Cross-account &amp; God View (demo)</Section>
-              <GodViewDemo />
-            </>
-          )}
         </>
       )}
 
@@ -797,6 +784,36 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
           kanaalgebonden. Op "Alle kanalen" is het het hoofdgerecht: daar stond eerst één kaart. */}
       <Section>Wat er klaarstaat</Section>
       <AnalysisOverview clientId={clientId} onKiesKanaal={setAnalysisChannel} />
+
+      {/* God View en cross-account (portfolio-synthese) zijn platform-/bureaubreed, geen
+          klant-eigen data -- ze horen normaal op /vandaag, niet op een klantpagina. Maar "in het
+          demo-account" is precies waar een demo-bezoeker ze wil kunnen laten zien zonder eerst weg
+          te navigeren. Zelfde componenten, zelfde statische demo-data (lib/demo/god-view-demo.ts,
+          GEEN echte sessie of LLM-aanroep nodig) als op /vandaag?demo=1 -- puur hier ook
+          ingesloten. Alleen in demo-modus: buiten demo is dit geen klant-eigen data en hoort het
+          hier niet te staan.
+
+          Stond eerder VERSTOPT als sub-blok onder de "Alle kanalen"-keuze in de kanaal-tabs --
+          dat conflateerde twee heel verschillende dingen: "welk kanaal van déze klant" (een echte
+          keuze in de tabs hierboven) versus "toon platformbrede data die niets met déze klant te
+          maken heeft". Nu een eigen, expliciet gelabeld blok onderaan de tab, losstaand van welk
+          kanaal er gekozen is -- zichtbaar ongeacht analysisChannel, met eigen omkadering zodat
+          het niet leest als onderdeel van de analyseflow hierboven. */}
+      {demoModus && (
+        <div className="mt-10 rounded-xl border-2 border-dashed border-brand-blue/30 bg-brand-blue/5 p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="rounded-full bg-brand-blue/15 px-2 py-0.5 text-micro font-bold uppercase tracking-wide text-brand-blue-ink">
+              Demo
+            </span>
+            <h2 className="text-base font-bold text-brand-blue-ink">Cross-account &amp; God View</h2>
+          </div>
+          <p className="mb-4 text-meta text-muted-foreground">
+            Platform-/bureaubreed voorbeeld — hoort normaal op Vandaag, hier alleen zichtbaar in
+            demo-modus zodat je het zonder wegnavigeren kunt laten zien.
+          </p>
+          <GodViewDemo />
+        </div>
+      )}
 
       <p className="text-meta text-muted-foreground pt-2">
         De uitkomsten (wachtrij, inzichten, aanbevelingen, hypotheses, taken) landen in het tabblad <strong>Bevindingen</strong>;
@@ -840,6 +857,8 @@ function OutcomesTab({ clientId }: { clientId: string }) {
         icoon={<Lightbulb className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat de analyses zien"
         bijschrift="Creative-vermoeidheid per kanaal, en de inzichten die eruit volgen"
+        inklapbaarId="bevindingen-wat-analyses-zien"
+        standaardOpen={false}
       >
         {(channelFilter === null ? (["google", "meta", "linkedin"] as const) : channelFilter === "cross" ? [] : [channelFilter]).map((c) => (
           <CreativeDeepDive key={c} clientId={clientId} channel={c} />
@@ -857,6 +876,8 @@ function OutcomesTab({ clientId }: { clientId: string }) {
         icoon={<Kanban className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat eruit volgt"
         bijschrift="Aanbevelingen, hypotheses en de taken die eruit voortkomen"
+        inklapbaarId="bevindingen-wat-eruit-volgt"
+        standaardOpen={false}
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <div className="space-y-4">

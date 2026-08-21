@@ -16,6 +16,8 @@
 // sectie. Genoeg om als scheiding te lezen, niet zoveel dat de pagina uit elkaar valt.
 
 import type { ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import { useRememberedOpen } from "./disclosure";
 
 export function Sectie({
   icoon,
@@ -24,6 +26,8 @@ export function Sectie({
   actie,
   children,
   eerste = false,
+  inklapbaarId,
+  standaardOpen = true,
 }: {
   icoon?: ReactNode;
   titel: string;
@@ -33,10 +37,28 @@ export function Sectie({
   children: ReactNode;
   /** De eerste sectie van een pagina krijgt geen extra ruimte erboven. */
   eerste?: boolean;
+  /**
+   * Stabiele sleutel om deze sectie inklapbaar te maken, onthouden per gebruiker (net als
+   * CollapsiblePanel). Zonder deze prop is een sectie altijd volledig open, zoals voorheen — een
+   * sectie die zelf al het antwoord op een directe vraag is (bv. "wat wacht op je oordeel") hoort
+   * dat te blijven.
+   */
+  inklapbaarId?: string;
+  /** Alleen relevant met `inklapbaarId`: begint de sectie open of dicht. */
+  standaardOpen?: boolean;
 }) {
+  const [open, toggle] = useRememberedOpen(inklapbaarId ?? titel, standaardOpen);
+  const magInklappen = inklapbaarId != null;
+  const isOpen = !magInklappen || open;
+
   return (
     <section className={eerste ? "" : "mt-10"}>
-      <div className="mb-4 flex items-center gap-3">
+      <div
+        className={`mb-4 flex items-center gap-3 ${magInklappen ? "cursor-pointer select-none" : ""}`}
+        onClick={magInklappen ? toggle : undefined}
+        role={magInklappen ? "button" : undefined}
+        aria-expanded={magInklappen ? isOpen : undefined}
+      >
         {icoon && (
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10">{icoon}</div>
         )}
@@ -44,14 +66,17 @@ export function Sectie({
           <h2 className="text-base font-bold text-brand-blue-ink">{titel}</h2>
           {bijschrift && <p className="text-xs text-muted-foreground">{bijschrift}</p>}
         </div>
-        {actie && <div className="ml-auto shrink-0">{actie}</div>}
+        {actie && <div className="ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>{actie}</div>}
+        {magInklappen && (
+          <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${actie ? "" : "ml-auto"} ${isOpen ? "rotate-180" : ""}`} />
+        )}
       </div>
       {/* Binnen een sectie staan de kaarten dichter op elkaar dan de secties onderling — én ze
           wegen niet allemaal even zwaar. De eerste kaart is het antwoord op de vraag die de
           sectiekop stelt; wat erna komt is de onderbouwing. `sectie-kaarten` zet daarom vanaf de
           tweede kaart een rustiger schaduw (zie globals.css). Dat werkt via een variabele, dus het
           erft ook door naar kaarten die dieper in een kind zitten. */}
-      <div className="space-y-4 sectie-kaarten">{children}</div>
+      {isOpen && <div className="space-y-4 sectie-kaarten">{children}</div>}
     </section>
   );
 }
