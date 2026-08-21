@@ -73,12 +73,13 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
         <Target className="w-5 h-5 text-brand-blue-ink" />
-        <h2 className="text-base font-semibold text-brand-blue-ink">Conversie-selectie per kanaal</h2>
+        <h2 className="text-base font-semibold text-brand-blue-ink">Conversie-selectie (Meta &amp; LinkedIn)</h2>
       </div>
       <p className="text-meta text-muted-foreground mb-4">
-        Kies welke conversies meetellen voor Meta en LinkedIn (zoals de conversie-acties bij Google).
-        De selectie werkt door in de KPI&apos;s, pacing en forecasts. Laat je alles uit, dan valt het
-        kanaal terug op de standaard (de conversie wordt nooit 0).
+        Google heeft zijn eigen conversie-acties hierboven; Meta en LinkedIn hebben geen vergelijkbare
+        actielijst, alleen een vaste set velden om uit te kiezen. Deze selectie werkt door in de
+        KPI&apos;s, pacing en forecasts. Laat je alles uit, dan valt het kanaal terug op de standaard
+        (de conversie wordt nooit 0).
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

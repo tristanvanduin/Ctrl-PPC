@@ -421,14 +421,15 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <Target className="w-5 h-5 text-brand-blue-ink" />
-            <h2 className="text-title font-semibold text-brand-blue-ink">Conversie-acties</h2>
+            <h2 className="text-title font-semibold text-brand-blue-ink">Conversie-acties (Google)</h2>
           </div>
           <span className="text-xs text-muted-foreground">
             {selectedCount} van {conversionActions.length} geselecteerd
           </span>
         </div>
         <p className="text-body text-muted-foreground mb-4">
-          Selecteer welke conversie-acties meegenomen worden in het dashboard.
+          Selecteer welke Google Ads-conversie-acties meegenomen worden in het dashboard. Meta en
+          LinkedIn hebben hun eigen selectie hieronder — andere platforms, andere conversielijst.
         </p>
 
         {/* Bulk actions + search */}

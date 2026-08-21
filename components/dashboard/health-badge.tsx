@@ -134,7 +134,12 @@ export function HealthBadgeView({
 
             Niet-beoordeelde assen staan er gedempt bij en met een streepje in plaats van een nul,
             om dezelfde reden als bij de staafjes hierboven. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {/* `max-w-2xl` en niet kaal `flex-1`: bij weinig anomalieën en korte omschrijvingen (bv.
+            PMax, dat vaak minder te melden heeft dan Search) rekte deze kolom tot de volle
+            kaartbreedte en bleef rechts een leeg vlak over. De kolom groeit nog steeds mee met
+            een brede kaart, maar niet verder dan waar de inhoud (twee kolommen `dl`) al op
+            uitkomt. */}
+        <div className="flex min-w-0 flex-1 max-w-2xl flex-col gap-4">
           {health.anomalies.length > 0 && (
             <div className="min-w-0">
               <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">
@@ -167,16 +172,26 @@ export function HealthBadgeView({
             <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Waaruit de score bestaat
             </p>
-            <dl className="grid gap-x-5 gap-y-1.5 sm:grid-cols-2">
+            {/* Naam + uitleg op één regel, met de naam op een vaste breedte om de kolommen te
+                laten uitlijnen, brak op de spreiding in factornamen ("Trend" naast
+                "Cannibalisatie met Search/Shopping" bij PMax) -- elke vaste breedte was te smal
+                voor de een of te breed voor de ander, en de uitleg werd hoe dan ook afgekapt
+                (title-only, niet klikbaar/hooverbaar, en "oogt druk/vol"). Nu twee regels per
+                factor: naam+score blijven kort en lijnen zelf al uit (justify-between binnen hun
+                eigen regel), de uitleg krijgt een eigen regel eronder en wordt niet meer
+                afgekapt -- geen kolom om uit te lijnen, dus niets meer om uit te lijnen. */}
+            <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
               {health.factors.map((f) => (
-                <div key={f.name} className="flex min-w-0 items-baseline gap-2">
-                  <dt className={`shrink-0 text-meta font-medium ${f.assessed ? "text-brand-gray" : "text-muted-foreground/60"}`}>
-                    {f.name}
-                  </dt>
-                  <span className={`shrink-0 text-meta tabular-nums ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
-                    {f.assessed ? `${f.score}/${f.maxScore}` : "—"}
-                  </span>
-                  <dd className={`min-w-0 flex-1 truncate text-micro ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`} title={f.description}>
+                <div key={f.name} className="min-w-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <dt className={`text-meta font-medium ${f.assessed ? "text-brand-gray" : "text-muted-foreground/60"}`}>
+                      {f.name}
+                    </dt>
+                    <span className={`shrink-0 text-meta tabular-nums ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+                      {f.assessed ? `${f.score}/${f.maxScore}` : "—"}
+                    </span>
+                  </div>
+                  <dd className={`text-micro leading-snug ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
                     {f.description}
                   </dd>
                 </div>

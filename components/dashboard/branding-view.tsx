@@ -66,7 +66,10 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
   const theme = resolveEventTheme(guide.visual ?? {});
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    // max-w-5xl: zonder begrenzing rekte deze 2-koloms editor+preview edge-to-edge uit op een
+    // brede monitor -- enorme witruimte binnen elke kolom (formuliervelden, kleurvakjes) zonder
+    // dat er meer te zien viel. Andere pagina's/tabs raakt dit niet.
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
       {/* Editor */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
