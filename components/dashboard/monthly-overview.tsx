@@ -4,7 +4,7 @@ import { useState } from "react";
 import { TrendingUp, TrendingDown, CheckCircle2, Clock, ArrowRight } from "lucide-react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast, ForecastMetric, ForecastPoint } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, ForecastMetric, ForecastPoint } from "@/lib/forecast";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 import { PeriodPopover } from "@/components/ui/period-popover";
 
@@ -241,7 +241,8 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
           </p>
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
-          {(["conversions", "revenue", "roas", "cpa"] as ForecastMetric[]).map((m) => (
+          {/* Feedback #27: alleen de KPI's met een doel voor deze klant, niet altijd alle vier. */}
+          {actieveMetrics(forecast).map((m) => (
             <button
               key={m}
               onClick={() => setMetric(m)}

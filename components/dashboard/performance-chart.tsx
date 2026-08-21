@@ -12,7 +12,7 @@ import {
 import { useState } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast, ForecastMetric, MONTH_LABELS } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, ForecastMetric, MONTH_LABELS } from "@/lib/forecast";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
@@ -151,7 +151,9 @@ export function PerformanceChart({ clientId, countryFilter, metric: metricProp, 
           </button>
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
-          {(["conversions", "revenue", "roas", "cpa"] as ForecastMetric[]).map((m) => (
+          {/* Feedback #27: alleen de KPI's tonen die deze klant een doel heeft gegeven (client-
+              settings.tsx's "activeer deze KPI"), niet altijd alle vier. */}
+          {actieveMetrics(forecast).map((m) => (
             <button
               key={m}
               onClick={() => setMetric(m)}

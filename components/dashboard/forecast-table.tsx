@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
-import { computeForecast, MONTH_LABELS, type ForecastMetric } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, MONTH_LABELS, type ForecastMetric } from "@/lib/forecast";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalVoet, VoetRij, TotaalCel } from "./data-table";
@@ -37,6 +37,10 @@ export function ForecastTable({ clientId }: { clientId: string }) {
   const metric = METRICS.find((m) => m.id === selectedMetric)!;
   const result = forecast[selectedMetric];
   const fmt = metric.format;
+  // Feedback #27: alleen de KPI's met een doel voor deze klant als knop tonen, niet altijd alle
+  // vier -- METRICS zelf blijft de volledige lijst (voor label/format-opzoek van de al
+  // geselecteerde metric, ook als die zelf inmiddels niet meer "actief" is).
+  const zichtbareMetrics = METRICS.filter((m) => actieveMetrics(forecast).includes(m.id));
 
   // CPA: lower is better
   const isInverted = selectedMetric === "cpa";
@@ -71,7 +75,7 @@ export function ForecastTable({ clientId }: { clientId: string }) {
           Maandelijkse uitsplitsing — {metric.label}
         </h3>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
-          {METRICS.map((m) => (
+          {zichtbareMetrics.map((m) => (
             <button
               key={m.id}
               onClick={() => setSelectedMetric(m.id)}

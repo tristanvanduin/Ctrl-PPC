@@ -362,7 +362,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           <h2 className="text-title font-semibold text-brand-blue-ink">KPI-doelstellingen</h2>
         </div>
         <p className="text-body text-muted-foreground mb-5">
-          Activeer de KPIs waar deze klant op stuurt. Vul alleen in wat relevant is.
+          Activeer de KPIs waar deze klant op stuurt. Vul alleen in wat relevant is — een KPI
+          zonder doel verschijnt ook niet als keuze in de topbar en grafieken van het dashboard.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

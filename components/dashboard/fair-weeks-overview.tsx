@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { TrendingUp, TrendingDown, CheckCircle2, Clock, ArrowRight, CalendarClock, Info } from "lucide-react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast, type ForecastMetric } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, type ForecastMetric } from "@/lib/forecast";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 import { toFairWeeks, currentWeekIndex, type FairWeek, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
@@ -174,7 +174,8 @@ export function FairWeeksOverview({
           </p>
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 shrink-0">
-          {(["conversions", "revenue", "roas", "cpa"] as ForecastMetric[]).map((m) => (
+          {/* Feedback #27: alleen de KPI's met een doel voor deze klant, niet altijd alle vier. */}
+          {actieveMetrics(forecast).map((m) => (
             <button
               key={m}
               onClick={() => setMetric(m)}

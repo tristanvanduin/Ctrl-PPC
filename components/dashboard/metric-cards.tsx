@@ -3,7 +3,7 @@
 import { TrendingUp, TrendingDown, Target, DollarSign, BarChart3, Wallet } from "lucide-react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast, type ForecastMetric } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, type ForecastMetric } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas } from "@/lib/forecast-format";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
@@ -141,62 +141,75 @@ export function MetricCards({ clientId, countryFilter, selected, onSelect }: {
     ? ((kpi.cpaTarget - forecastedCpa) / kpi.cpaTarget) * 100  // inverted: lower CPA = better
     : 0;
 
+  // Feedback #27: alleen de KPI's tonen die deze klant een doel heeft gegeven (client-
+  // settings.tsx's "activeer deze KPI"), niet altijd alle vier -- een lege "ROAS: €0"-kaart voor
+  // een klant die nooit op ROAS stuurt is ruis, geen inzicht.
+  const actief = actieveMetrics(forecast);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-      <KpiCard
-        label="Conversies"
-        icon={<Target className="w-4 h-4 text-brand-blue-ink" />}
-        annualTarget={forecast.conversions.kpi.annualTarget}
-        adjusted={forecast.conversions.kpi.adjustedAnnual}
-        realized={forecast.conversions.kpi.ytdRealized}
-        diffPct={forecast.conversions.kpi.diffPct}
-        format={formatNumber}
-        subtitle="Totaal aantal"
-        metricKey="conversions"
-        selected={selected === "conversions"}
-        onSelect={onSelect}
-      />
-      <KpiCard
-        label="Omzet"
-        icon={<DollarSign className="w-4 h-4 text-brand-blue-ink" />}
-        annualTarget={forecast.revenue.kpi.annualTarget}
-        adjusted={forecast.revenue.kpi.adjustedAnnual}
-        realized={forecast.revenue.kpi.ytdRealized}
-        diffPct={forecast.revenue.kpi.diffPct}
-        format={formatCurrency}
-        subtitle="Conversiewaarde"
-        metricKey="revenue"
-        selected={selected === "revenue"}
-        onSelect={onSelect}
-      />
-      <KpiCard
-        label="ROAS"
-        icon={<BarChart3 className="w-4 h-4 text-brand-blue-ink" />}
-        annualTarget={forecast.roas.kpi.annualTarget}
-        adjusted={forecast.roas.kpi.adjustedAnnual}
-        realized={forecast.roas.kpi.ytdRealized}
-        diffPct={forecast.roas.kpi.diffPct}
-        format={formatRoas}
-        subtitle="Return on ad spend"
-        metricKey="roas"
-        selected={selected === "roas"}
-        onSelect={onSelect}
-      />
-      <KpiCard
-        label="CPA"
-        icon={<Wallet className="w-4 h-4 text-brand-blue-ink" />}
-        annualTarget={kpi.cpaTarget}
-        adjusted={forecastedCpa}
-        realized={ytdCpa}
-        diffPct={cpaDiffPct}
-        // Was `€${v.toFixed(2)}`: "€76.00", zonder spatie en met een punt, terwijl de kaart
-        // ernaast "€ 143.520" schrijft. Dezelfde grootheid hoort er hetzelfde uit te zien.
-        format={formatCurrency}
-        subtitle="Kosten per conversie"
-        metricKey="cpa"
-        selected={selected === "cpa"}
-        onSelect={onSelect}
-      />
+      {actief.includes("conversions") && (
+        <KpiCard
+          label="Conversies"
+          icon={<Target className="w-4 h-4 text-brand-blue-ink" />}
+          annualTarget={forecast.conversions.kpi.annualTarget}
+          adjusted={forecast.conversions.kpi.adjustedAnnual}
+          realized={forecast.conversions.kpi.ytdRealized}
+          diffPct={forecast.conversions.kpi.diffPct}
+          format={formatNumber}
+          subtitle="Totaal aantal"
+          metricKey="conversions"
+          selected={selected === "conversions"}
+          onSelect={onSelect}
+        />
+      )}
+      {actief.includes("revenue") && (
+        <KpiCard
+          label="Omzet"
+          icon={<DollarSign className="w-4 h-4 text-brand-blue-ink" />}
+          annualTarget={forecast.revenue.kpi.annualTarget}
+          adjusted={forecast.revenue.kpi.adjustedAnnual}
+          realized={forecast.revenue.kpi.ytdRealized}
+          diffPct={forecast.revenue.kpi.diffPct}
+          format={formatCurrency}
+          subtitle="Conversiewaarde"
+          metricKey="revenue"
+          selected={selected === "revenue"}
+          onSelect={onSelect}
+        />
+      )}
+      {actief.includes("roas") && (
+        <KpiCard
+          label="ROAS"
+          icon={<BarChart3 className="w-4 h-4 text-brand-blue-ink" />}
+          annualTarget={forecast.roas.kpi.annualTarget}
+          adjusted={forecast.roas.kpi.adjustedAnnual}
+          realized={forecast.roas.kpi.ytdRealized}
+          diffPct={forecast.roas.kpi.diffPct}
+          format={formatRoas}
+          subtitle="Return on ad spend"
+          metricKey="roas"
+          selected={selected === "roas"}
+          onSelect={onSelect}
+        />
+      )}
+      {actief.includes("cpa") && (
+        <KpiCard
+          label="CPA"
+          icon={<Wallet className="w-4 h-4 text-brand-blue-ink" />}
+          annualTarget={kpi.cpaTarget}
+          adjusted={forecastedCpa}
+          realized={ytdCpa}
+          diffPct={cpaDiffPct}
+          // Was `€${v.toFixed(2)}`: "€76.00", zonder spatie en met een punt, terwijl de kaart
+          // ernaast "€ 143.520" schrijft. Dezelfde grootheid hoort er hetzelfde uit te zien.
+          format={formatCurrency}
+          subtitle="Kosten per conversie"
+          metricKey="cpa"
+          selected={selected === "cpa"}
+          onSelect={onSelect}
+        />
+      )}
     </div>
   );
 }

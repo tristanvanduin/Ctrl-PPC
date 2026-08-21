@@ -149,6 +149,35 @@ export interface ClientForecast {
   dataMaturity: DataMaturity;
 }
 
+export const ALLE_FORECAST_METRICS: readonly ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"];
+
+/**
+ * Welke van de vier metrics relevant zijn voor deze klant, voor de topbar/grafiek-selectors.
+ *
+ * Feedback (tweede ronde, #27): "instelbare KPI's per klant" stond als eigen, nog te scopen punt
+ * open naast de al bestaande conversieselectie. Bleek bij het bekijken van client-settings.tsx
+ * al voor de helft te bestaan: de KPI-doelstellingen-kaart heeft al een "activeer deze KPI"-
+ * schakelaar per metric (KpiCard's `enabled`), maar die schakelaar is puur AFGELEID uit "staat
+ * er een doel > 0" — geen apart opgeslagen veld. Vijf plekken (MetricCards, PerformanceChart,
+ * MonthlyOverview, ForecastTable, FairWeeksOverview) toonden desondanks altijd alle vier de
+ * knoppen/kaarten, ook voor een metric zonder doel — een lege "ROAS: €0, 0%"-kaart voor een
+ * leadgen-klant die nooit op ROAS stuurt. Geen nieuwe instellingen-UI nodig: alleen deze ene
+ * afleiding centraliseren en overal toepassen waar de vier metrics als keuze worden getoond.
+ *
+ * Valt terug op alle vier als GEEN ENKEL doel is ingevuld (een verse klant): een lege selector is
+ * erger dan vier ongefilterde kaarten, en "niks ingevuld" is niet hetzelfde als "niks relevant".
+ */
+export function actieveMetrics(forecast: ClientForecast): readonly ForecastMetric[] {
+  const doelen: Record<ForecastMetric, number> = {
+    conversions: forecast.conversions.kpi.annualTarget,
+    revenue: forecast.revenue.kpi.annualTarget,
+    roas: forecast.roas.kpi.annualTarget,
+    cpa: forecast.cpa.kpi.annualTarget,
+  };
+  const actief = ALLE_FORECAST_METRICS.filter((m) => doelen[m] > 0);
+  return actief.length > 0 ? actief : ALLE_FORECAST_METRICS;
+}
+
 // ── Fallback & data quality constants ───────────────────────────────────────
 
 /** Performance factor is clamped to this range to prevent runaway projections */
