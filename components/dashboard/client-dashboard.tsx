@@ -623,15 +623,33 @@ function SettingsSections({ client }: { client: Client }) {
       {groep === "beurzen" && <EventSettings clientId={client.id} />}
 
       {groep === "account" && (
-        <div className="space-y-6">
-          <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["sector", "landen", "merchant"]} />
-          {/* Feedback punt 20: stonden hiervoor onder "Doelen & meten", dat daardoor zeven
-              verschillende dingen op één lange scroll bevatte terwijl elke andere tab er één
-              had. GA4/Search Console zijn net als Merchant Center hierboven "vul in hoe een
-              al-gekoppelde databron voor DEZE klant werkt" -- geen doel, geen conversie, maar
-              accountcontext. Ze horen dus bij elkaar, niet bij de doelen. */}
-          <Ga4Settings clientId={client.id} />
-          <SearchConsoleSettings clientId={client.id} />
+        <div className="space-y-8">
+          {/* Feedback: "heel Account & markt is puur integraties en settings, dus misschien niet
+              verkeerd -- maar de opmaak kan beter." Eén koppentekst i.p.v. geen enkel onderscheid
+              tussen WIE de klant is (sector, landen, Merchant Center -- context die de analyses
+              gebruiken) en WAAR externe data vandaan komt (GA4, Search Console).
+
+              Bewust GEEN twee losse <ClientSettingsPanel>-aanroepen (bv. kaarten={["sector","landen"]}
+              apart van kaarten={["merchant"]}): handleSave() daarin slaat altijd het VOLLEDIGE
+              settings-object op uit zijn eigen lokale state, ongeacht welke kaarten zichtbaar zijn.
+              Twee instanties zijn dus twee onafhankelijke "Opslaan"-knoppen die elkaars ongesaved
+              velden bij het opslaan stil terugzetten naar de waarde van bij het laden -- een
+              last-write-wins-bug, niet een cosmetische kwestie. Eén aanroep, één kop erboven. */}
+          <div>
+            <h3 className="text-meta font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              Accountcontext
+            </h3>
+            <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["sector", "landen", "merchant"]} />
+          </div>
+          <div>
+            <h3 className="text-meta font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              Externe databronnen
+            </h3>
+            <div className="space-y-6">
+              <Ga4Settings clientId={client.id} />
+              <SearchConsoleSettings clientId={client.id} />
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -679,6 +679,17 @@ function SprintBoard({
   hypotheses: Map<string, HypothesisRef>;
   onUpdateStatus: (id: string, status: string) => void;
 }) {
+  // Feedback: de hypothese hoort niet standaard op de kaart -- dat is precies waarom het bord
+  // per taak i.p.v. per hypothese is opgebouwd (zie de toelichting bij het kaartje hieronder).
+  // Een klein pijltje per kaart klapt hem open, zodat de taak de hoofdregel blijft en de "waarom"
+  // een bewuste, goedkope handeling is in plaats van verplichte tekst op elke kaart.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
   return (
     <div className="px-5 py-4 overflow-x-auto">
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(6, minmax(180px, 1fr))" }}>
@@ -707,11 +718,33 @@ function SprintBoard({
                       className="rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm"
                       style={{ borderLeft: `3px solid ${BOARD_BORDER[status]}` }}
                     >
-                      <p className={`text-body font-semibold text-brand-blue-ink ${item.status === "done" ? "line-through decoration-muted-foreground/60" : ""}`}>
-                        {item.task}
-                      </p>
+                      <div className="flex items-start justify-between gap-1.5">
+                        <p className={`text-body font-semibold text-brand-blue-ink ${item.status === "done" ? "line-through decoration-muted-foreground/60" : ""}`}>
+                          {item.task}
+                        </p>
+                        {/* Feedback: het bord toont het uitvoerbare -- de taak -- als hoofdregel,
+                            geen hypothese tien keer herhaald over tien kaarten in verschillende
+                            kolommen. De "waarom" is daarom een bewuste, goedkope uitklap i.p.v.
+                            verplichte tekst op elke kaart. */}
+                        {hyp && (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(item.id)}
+                            aria-label={expanded.has(item.id) ? "Hypothese verbergen" : "Hypothese tonen"}
+                            aria-expanded={expanded.has(item.id)}
+                            className="shrink-0 mt-0.5 text-muted-foreground hover:text-brand-blue-ink"
+                          >
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded.has(item.id) ? "rotate-180" : ""}`} />
+                          </button>
+                        )}
+                      </div>
                       {item.metrics && (
                         <p className="text-micro text-muted-foreground mt-0.5">{item.metrics}</p>
+                      )}
+                      {hyp && expanded.has(item.id) && (
+                        <p className="text-micro text-muted-foreground/80 mt-1 italic">
+                          hoort bij: {hyp.hypothesis}
+                        </p>
                       )}
                       <div className="flex items-center justify-between gap-2 mt-2">
                         <span className={`text-micro font-semibold rounded px-1.5 py-0.5 ${
