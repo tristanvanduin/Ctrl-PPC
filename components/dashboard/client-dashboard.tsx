@@ -29,6 +29,7 @@ import { SignalAnalysisCard } from "./signal-analysis-card";
 import { CrossChannelAnalyses } from "./cross-channel-analyses";
 import { MasterSynthesisAnalysis } from "./master-synthesis-analysis";
 import { ChannelForecast } from "./channel-forecast";
+import { ChannelForecastSections } from "./channel-forecast-sections";
 import { EventForecaster } from "./event-forecaster";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
@@ -479,7 +480,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                     </>
                   )}
                   {(channel === "meta" || channel === "linkedin") && (
-                    <ChannelForecast clientId={client.id} channel={channel} />
+                    <ChannelForecastSections clientId={client.id} channel={channel} />
                   )}
                 </>
               )}
@@ -488,7 +489,6 @@ export function ClientDashboard({ client }: { client: Client }) {
 
           {activeTab === "insights" && (
             <div className="space-y-6">
-              <PeriodSummary data={clientData.data} />
               <InsightsTab
                 kanalen={kanalen ?? []}
                 clientId={client.id}
@@ -499,7 +499,6 @@ export function ClientDashboard({ client }: { client: Client }) {
 
           {activeTab === "outcomes" && (
             <div className="space-y-6">
-              <PeriodSummary data={clientData.data} />
               <OutcomesTab clientId={client.id} />
             </div>
           )}
@@ -690,36 +689,38 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
         <>
           <Section extra={<CreditBalanceBadge />}>Losse analyses</Section>
           <StandaloneAnalyses clientId={clientId} />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/google-funnel"
-            title="Funnel-drop-off"
-            description="Vertoning → klik → conversie over de recente 4 weken vs de 4 weken ervoor; een verslechterde fase landt in de wachtrij."
-            runLabel="Draai funnel-analyse"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/kpi-relations"
-            extra={{ channel: "google" }}
-            title="KPI-verhoudingen"
-            description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-            runLabel="Analyseer verhoudingen"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/google-video"
-            title="Video & Performance Max"
-            description="Kijkdiepte van de videocampagnes, placements die budget kosten zonder conversie, en netwerken binnen PMax die naar verhouding meer kosten dan ze opleveren. Bevindingen landen in de wachtrij."
-            runLabel="Analyseer video & PMax"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/geo-markets"
-            extra={{ channel: "google" }}
-            title="Landen & staten"
-            description="Welke markten kosten zonder te converteren, zijn structureel duurder, of trekken wel verkeer maar haken ná de klik af. Binnen de VS ook per staat, tegen een eigen norm."
-            runLabel="Analyseer markten"
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/google-funnel"
+              title="Funnel-drop-off"
+              description="Vertoning → klik → conversie over de recente 4 weken vs de 4 weken ervoor; een verslechterde fase landt in de wachtrij."
+              runLabel="Draai funnel-analyse"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/kpi-relations"
+              extra={{ channel: "google" }}
+              title="KPI-verhoudingen"
+              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+              runLabel="Analyseer verhoudingen"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/google-video"
+              title="Video & Performance Max"
+              description="Kijkdiepte van de videocampagnes, placements die budget kosten zonder conversie, en netwerken binnen PMax die naar verhouding meer kosten dan ze opleveren. Bevindingen landen in de wachtrij."
+              runLabel="Analyseer video & PMax"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/geo-markets"
+              extra={{ channel: "google" }}
+              title="Landen & staten"
+              description="Welke markten kosten zonder te converteren, zijn structureel duurder, of trekken wel verkeer maar haken ná de klik af. Binnen de VS ook per staat, tegen een eigen norm."
+              runLabel="Analyseer markten"
+            />
+          </div>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
@@ -730,27 +731,29 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
           <MetaCreativeAnalyses clientId={clientId} />
           {/* Deterministische structuur-analyse (plaatsing/leeftijd/device), direct uit de data. */}
           <ChannelStructureAnalysis clientId={clientId} channel="meta" />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/meta-funnel"
-            title="Funnel-drop-off"
-            description="Fase-overgangen (klik → landing → winkelwagen → checkout → conversie) recent vs prior venster; de verslechterde fase landt in de wachtrij."
-            runLabel="Draai funnel-analyse"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/kpi-relations"
-            extra={{ channel: "meta" }}
-            title="KPI-verhoudingen"
-            description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-            runLabel="Analyseer verhoudingen"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/meta-signals"
-            title="Meta-signalen"
-            description="Deterministische detectie: creative fatigue, frequency-saturatie, ranking-zwakte, hook/hold, plus segment-efficiëntie en budget-concentratie. Voedt de goedkeuringswachtrij."
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/meta-funnel"
+              title="Funnel-drop-off"
+              description="Fase-overgangen (klik → landing → winkelwagen → checkout → conversie) recent vs prior venster; de verslechterde fase landt in de wachtrij."
+              runLabel="Draai funnel-analyse"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/kpi-relations"
+              extra={{ channel: "meta" }}
+              title="KPI-verhoudingen"
+              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+              runLabel="Analyseer verhoudingen"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/meta-signals"
+              title="Meta-signalen"
+              description="Deterministische detectie: creative fatigue, frequency-saturatie, ranking-zwakte, hook/hold, plus segment-efficiëntie en budget-concentratie. Voedt de goedkeuringswachtrij."
+            />
+          </div>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} channel="meta_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
@@ -760,34 +763,36 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
           <Section>Losse analyses</Section>
           {/* Deterministische structuur-analyse (functie/seniority/industrie/bedrijfsgrootte), direct uit de data. */}
           <ChannelStructureAnalysis clientId={clientId} channel="linkedin" />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/linkedin-icp-fit"
-            title="ICP-fit"
-            description="Welk deel van de spend en leads valt binnen het ideale klantprofiel, wat is de waste en wat kost een ICP-lead vs een niet-ICP-lead."
-            runLabel="Draai ICP-fit"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/linkedin-funnel"
-            title="Funnel-drop-off"
-            description="Vertoning → klik → landingspagina → form-open → lead over twee 28-dagen-vensters; een verslechterde fase landt in de wachtrij."
-            runLabel="Draai funnel-analyse"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/kpi-relations"
-            extra={{ channel: "linkedin" }}
-            title="KPI-verhoudingen"
-            description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-            runLabel="Analyseer verhoudingen"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/linkedin-signals"
-            title="LinkedIn-signalen"
-            description="Deterministische detectie: lead-form drop-off, CPL-druk, engagement- en video-zwakte, plus demografie-efficiëntie/-drift en budget-concentratie. Voedt de goedkeuringswachtrij."
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/linkedin-icp-fit"
+              title="ICP-fit"
+              description="Welk deel van de spend en leads valt binnen het ideale klantprofiel, wat is de waste en wat kost een ICP-lead vs een niet-ICP-lead."
+              runLabel="Draai ICP-fit"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/linkedin-funnel"
+              title="Funnel-drop-off"
+              description="Vertoning → klik → landingspagina → form-open → lead over twee 28-dagen-vensters; een verslechterde fase landt in de wachtrij."
+              runLabel="Draai funnel-analyse"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/kpi-relations"
+              extra={{ channel: "linkedin" }}
+              title="KPI-verhoudingen"
+              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+              runLabel="Analyseer verhoudingen"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/linkedin-signals"
+              title="LinkedIn-signalen"
+              description="Deterministische detectie: lead-form drop-off, CPL-druk, engagement- en video-zwakte, plus demografie-efficiëntie/-drift en budget-concentratie. Voedt de goedkeuringswachtrij."
+            />
+          </div>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} channel="linkedin_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
