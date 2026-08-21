@@ -5809,3 +5809,56 @@ blijft de tweede, niet de enige drager van de status.
 
 **Nog open, wacht op de eigenaar**: de checkbox-uitlijningsklacht — nog steeds geen scherm-
 /paginanaam ontvangen om 'm te lokaliseren.
+
+### 17.71 Live productie-check: kaart, klikbaarheid, uitlijning en witruimte alsnog gebouwd (21 augustus 2026)
+
+Eigenaar stuurde 6 schermafbeeldingen rechtstreeks van `ctrlppc.com/client/demo-greentech` en
+constateerde dat meerdere eerder onderzochte punten daar nog steeds zichtbaar waren, met de
+terechte vraag of alles wel naar `main`/de branch gepusht was. Geverifieerd via `git log`: dat
+was zo — het probleem was niet een ontbrekende push, maar twee punten die wél onderzocht en
+gecatalogiseerd waren, maar waarvan de code-fix zelf nooit is geschreven (dezelfde fout als bij
+17.68's `4f7065c`-analyse: onderzoek gedaan, conclusie genoteerd, bouwstap stilletjes weggevallen).
+Eén ding kwam boven op wat al gepland stond.
+
+1. **Wereldkaart weer ingezoomd (`da6bea2`)** — `4f7065c` liet de projectie inzoomen op alleen de
+   landen met data (`fitExtent` i.p.v. de vaste `fitSize`); dit was in een eerdere sessie al
+   volledig getraceerd tot de root cause, maar de daadwerkelijke revert was nooit geschreven.
+   Teruggedraaid naar de vaste, module-niveau projectie op de hele wereld.
+
+2. **Grote weekkaarten niet klikbaar + onderlinge uitlijning (`93ccacd`)** — `fair-weeks-overview.tsx`'s
+   drie grote kaarten (vorige/deze/volgende week) hadden nooit een `onClick`, terwijl de kleine
+   W-8..W+8-strip eronder al jaren dezelfde week-popover opent. Nu delen ze die popover. Tegelijk
+   opgelost: de kop van elke kaart wisselt in hoogte ("nog 8 weken" vs. "beursweek" vs. "3 weken na
+   de beurs"), waardoor de ratio-balk onderin op drie verschillende hoogtes stond — de kaart is nu
+   `flex flex-col` met een groeiende middensectie, zodat de ratio-balk in alle drie op dezelfde
+   hoogte blijft ongeacht de koplengte.
+
+3. **"Spend per kanaal per maand" nog steeds te breed (`93ccacd`)** — 17.68 noteerde dit als "al
+   opgelost, alleen visueel te verifiëren" op basis van code-comments (`plotBreedte()`-cap +
+   totalensidebar). De cap zelf werkt, maar de sidebar stond zonder `ml-auto` direct ná de
+   (gekrompen) plot, niet tegen de kaartrand — bij weinig maanden bleef de resterende ruimte dus
+   ná de sidebar staan, kaal, i.p.v. ervoor als bedoelde marge. Dat visuele-verificatie-punt was
+   dus fout: het was geen bevestigde fix, maar een aanname die nooit tegen een schermafbeelding is
+   gehouden.
+
+4. **Mini-grafieken "Conversies per maand"/"CPA per maand" nog niet klikbaar (`93ccacd`)** — stond in
+   17.68's eigen tabel als "#3, direct te fixen, geen productbeslissing nodig", maar de beschrijving
+   noemde zowel de ontbrekende as als "niet klikbaar"; alleen de as is toen gebouwd (`AsY`/`Raster`
+   toevoegen), de klikbaarheid is stilzwijgend blijven liggen. Nu klikbaar: staven (`Bar onClick`)
+   en lijnpunten (custom `dot`-render met `onClick`) openen dezelfde vier-metrics-popover als de
+   maand/weekstrips elders in het dashboard.
+
+5. **CPA-lijn "bijna plat" (geen actie, mogelijk deploy-lag)** — `monthly-trend-line.tsx` gebruikt al
+   `asSchaalLijn()` (17.68 #4, eerder gebouwd). Als de live schermafbeelding nog een 0/25/50/75-as
+   toont, is dat ofwel nog niet gedeployed, ofwel is de onderliggende data bij deze klant echt
+   vlak — geen van beide is met code-onderzoek vanuit deze sandbox te onderscheiden zonder de
+   live pagina te zien ná een bevestigde deploy.
+
+**Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
+groen, voor beide commits apart. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
+
+**Les, nogmaals**: twee van de vier punten hierboven waren al eerder "gevonden en begrepen" in de
+masterplan-tekst voordat de eigenaar ze live opnieuw tegenkwam. Onderzoek zonder bouwstap is geen
+voltooid punt — een regel in dit document die zegt "root cause bekend" moet in dezelfde sessie ook
+een commit-hash krijgen, anders staat hij er volgende keer weer, alleen dan als klacht van de
+eigenaar in plaats van als aantekening van mezelf.
