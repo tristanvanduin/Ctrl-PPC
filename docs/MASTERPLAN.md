@@ -5742,16 +5742,18 @@ nieuwe Google Ads API-sync — voorgelegd aan de eigenaar met de waarschuwing da
   zelfde vorm als de RSA-mappers ernaast.
 - **Migratie 102** (`scripts/migrations/102_google_ads_image_assets.sql`): nieuwe tabel +
   RLS-policy, zelfde vorm als migratie 085 (`google_ads_rsa_assets`/`google_ads_ad_meta`) —
-  **nog niet gedraaid tegen de live database**, deze sandbox heeft geen `SUPABASE_ACCESS_TOKEN`.
-  Moet de eigenaar draaien (`node scripts/supabase-sql.mjs --file scripts/migrations/
-  102_google_ads_image_assets.sql`) vóórdat de sync-write iets anders doet dan falen.
+  **gedraaid tegen de live database** (eigenaar, rechtstreeks via de Supabase SQL-editor, deze
+  sandbox had zelf geen `SUPABASE_ACCESS_TOKEN`). Bevestigd geslaagd.
 - `lib/sync/orchestrator.ts`: gewired in de bestaande Promise.all en sync-dataset-map.
 - `components/dashboard/creative-performance.tsx`: haalt `google_ads_image_assets` op naast de
   bestaande RSA/ad-meta-verrijking, vult `imageUrl` voor Google-advertenties.
 
-**Nog niet gedaan, expliciet**: de migratie draaien, en daarna verifiëren tegen een echt account
-met Display-campagnes — pas dan is bekend of de vier `field_type`-waarden kloppen. Tot die
-verificatie blijft dit "gebouwd, niet bevestigd correct".
+**Nog niet gedaan, expliciet**: verifiëren tegen een echt account met Display-campagnes — pas dan
+is bekend of de vier `field_type`-waarden (MARKETING_IMAGE/SQUARE_MARKETING_IMAGE/LOGO/
+LANDSCAPE_LOGO) kloppen. De eerstvolgende reguliere sync van zo'n account pakt de nieuwe fetch
+automatisch mee (geen aparte trigger nodig, al gewired in de bestaande Promise.all); iemand moet
+daarna Creative Performance voor dat account bekijken. Tot die verificatie blijft dit "gebouwd en
+live in de database, niet bevestigd correct".
 
 **Geverifieerd (code-niveau)**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests
 groen, `build` groen (geen enkele test raakt de nieuwe GAQL-query zelf, die kan alleen tegen een
