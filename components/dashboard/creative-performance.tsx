@@ -37,6 +37,16 @@ const eur = (v: number | null): string => (v == null || !Number.isFinite(v) ? "�
 const fmt = (v: number, d = 0): string => new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d }).format(v);
 const pctS = (imp: number, clk: number): string => (imp > 0 ? new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 2 }).format(clk / imp) : "—");
 
+// `format` is hier al `ad_type` lowercased met underscores vervangen door spaties (zie de Google-
+// tak hieronder). Google Ads' AdTypeEnum-waarden voor Display bevatten allemaal "display" of
+// "image" (RESPONSIVE_DISPLAY_AD, IMAGE_AD, HTML5_UPLOAD_AD is de uitzondering maar zeldzaam
+// genoeg om niet apart te matchen) -- een losse substring-check is hier voldoende, geen volledige
+// enum-lijst nodig voor uitsluitend een foutmelding-tekst.
+function isDisplayFormat(format: string | null): boolean {
+  if (!format) return false;
+  return /display|image/.test(format);
+}
+
 const CHANNEL_LABEL: Record<ChannelKind, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn" };
 const REC_STYLE: Record<string, string> = {
   pauzeer: "text-red-700 bg-red-50 border-red-200",
@@ -210,7 +220,17 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-meta text-muted-foreground">
-                    <ImageOff className="w-4 h-4" /> Creative-tekst/visual niet gesynct — alleen prestaties beschikbaar.
+                    <ImageOff className="w-4 h-4" />
+                    {/* Feedback: "Display heeft visuals, geen tekst ads" -- een Display-advertentie
+                        zonder RSA-tekst viel hier terug op dezelfde "niet gesynct"-tekst als een
+                        echt sync-gat, terwijl de eerlijke reden anders is: er bestaat vandaag geen
+                        enkele databron voor Google Display-afbeeldingen (alleen google_ads_rsa_
+                        assets, tekst-only) -- geen sync die nog moet lopen, maar een pijplijn die
+                        nog niet gebouwd is. Dat verschil hoort de gebruiker te zien, ook al is de
+                        echte fix (een nieuwe Google Ads-asset-sync) hier niet gebouwd. */}
+                    {isDisplayFormat(c.format)
+                      ? "Display-advertentie: beeldsync bestaat nog niet — alleen prestaties beschikbaar."
+                      : "Creative-tekst/visual niet gesynct — alleen prestaties beschikbaar."}
                   </div>
                 )}
               </div>
