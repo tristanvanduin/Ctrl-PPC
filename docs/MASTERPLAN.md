@@ -4756,3 +4756,31 @@ opgevangen in plaats van opnieuw stil te falen.
 nog in `sop_analysis_output`, maar wordt door geen enkele "laatste analyse"-query meer opgepikt
 (andere `analysis_date`, de nieuwe 20-augustus-rij is recenter). Opruimen kan, is hier bewust niet
 gedaan zonder het te vragen.
+
+### 17.55 Lettertypebesluit: Plus Jakarta Sans is definitief (21 augustus 2026)
+
+**Besluit, expliciet als onherroepelijk geformuleerd door de opdrachtgever:** Plus Jakarta Sans is
+het lettertype voor het product. Geen vervolgdiscussie hierover zonder dat dit document opnieuw
+wordt herzien.
+
+**Waar dit vandaan komt en wat het nu al is.** De marketingsite (`app/(marketing)/layout.tsx`)
+gebruikt Plus Jakarta Sans al sinds fase 7, maar tot vandaag uitdrukkelijk als **tijdelijke**
+vervanger voor Satoshi ("Satoshi staat niet op Google Fonts en er zijn geen gelicenseerde
+bestanden beschikbaar... tot echte Satoshi-bestanden er zijn voor `next/font/local`", zie de
+koptekst daar). Dat voorbehoud vervalt hiermee: er komt geen Satoshi-migratie meer. De ingelogde
+dashboard-app (`app/(app)/layout.tsx`, `--font-ubuntu` in `app/globals.css`) gebruikt vandaag nog
+Ubuntu.
+
+**Scope van dit besluit, expliciet afgebakend door de opdrachtgever:** dit is nu alleen een
+vastgelegd besluit, geen uitgevoerde wijziging. Er komt een nieuw brandbook aan; de daadwerkelijke
+toepassing (blijft Ubuntu in de dashboard-app bestaan naast Jakarta op de marketingsite, of wordt
+het hele product Jakarta, en welke gewichten/koppen/lopende tekst) wordt pas gecodeerd zodra dat
+brandbook er is. Tot die tijd blijft de code ongewijzigd: `app/(marketing)/layout.tsx`'s
+Satoshi-vervanger-commentaar is dus zelf al achterhaald (er komt geen Satoshi meer) maar wordt hier
+bewust nog niet aangepast om niet twee keer aan hetzelfde stuk tekst te hoeven schrijven — dat
+gebeurt in dezelfde beurt als de brandbook-toepassing.
+
+**Wat dit niet doet:** geen regel code aangeraakt. Geen font-import, geen CSS-variabele, geen
+`--font-sans`/`--font-heading`-token in `app/globals.css` gewijzigd. De volgende sessie die het
+brandbook verwerkt, moet zowel de dashboard-app als de marketingsite langs deze sectie leggen
+voordat er lettertype-code wijzigt.
