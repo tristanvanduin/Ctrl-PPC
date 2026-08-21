@@ -4956,3 +4956,11 @@ preview-deploy ook rechtstreeks (zonder browser-login) bereikbaar wordt.
 moeten gelezen worden als "bevestigd in de code van vóór vandaag", niet als "bevestigd in wat een
 gebruiker nu ziet". Zodra live-verificatie werkt, is dat de volgende stap voordat verder blind
 gefixt wordt op basis van alleen code-lezing.
+
+**Vervolgbesluit, dezelfde dag:** de eigenaar koos ervoor de live-deploy-poging niet verder na te
+jagen ("puur naar de nieuwste branche kijken, anders doen we dingen dubbel") — deze branch is de
+bron van waarheid, niet een los te verifiëren productie-staat. De Vercel-bypass-secret en de
+Playwright-connectiviteitsvraag staan hiermee niet meer open als blokkade voor verder werk; het
+`ERR_CONNECTION_RESET`-probleem is niet verder onderzocht. Het `origin/main`-ancestorschap
+hierboven blijft de geldende garantie dat code-lezing op deze branch niet iets mist dat elders al
+gefixt is.
