@@ -5391,3 +5391,75 @@ verdere scoping-vraag te fixen:
 
 **Geverifieerd**: `scripts/gates.sh` — `tsc`, 313/313 tests, `build`, allemaal groen. Gepusht naar
 `main` (`9b2f88e`).
+
+### 17.65 Vier grote punten van 17.64's lijst: forecasting, whitelabel-kleuren, branding-scope, GodView-teaser (21 augustus 2026)
+
+De eigenaar besliste alle zes resterende punten uit 17.64 in één keer, met concrete richting per
+punt. Vier zijn nu gebouwd; twee (kanaalaanbeveling, GodView-tier-teaser) volgen in een
+vervolgsectie.
+
+**#21 Forecasting-uniformiteit — kleiner dan gedacht.** Onderzoek wees uit dat Google en
+Meta/LinkedIn al hetzelfde 2-delige patroon hadden (samenvatting + budgetscenario, elk in zijn
+eigen vorm — Google's tabel kan niet voor Meta/LinkedIn omdat die geen multi-jaar-historie
+hebben). Het enige echte gat: **"Alle kanalen" (blended) miste het budgetscenario-element
+volledig**, terwijl `ChannelBudgetScenario` `channel="blended"` al ondersteunde via dezelfde
+run-rate-hook. Puur bedrading: een tweede `Sectie` met `ChannelBudgetScenario channel="blended"`
+toegevoegd naast de bestaande samenvatting in `client-dashboard.tsx`. Geen nieuw component.
+
+**#22/#23 Branding-scope + whitelabel-kleuren.** Besluit: het hele dashboard-chrome (zijbalk,
+knoppen, accenten) mag alleen meekleuren met een klant se merk (a) als een platformbeheerder dat
+expliciet aanzet voor die klant, of (b) als het bureau whitelabel afneemt. Klantkleuren moeten wél
+in rapportages komen (zie "wat dit niet doet" hieronder — nog niet gedaan). Whitelabel zelf
+uitgebreid van alleen-het-logo naar echte bureaubrede kleuren, met de expliciete reactie van de
+eigenaar op mijn eerdere terughoudendheid: *"Hoe kan een bureau het afnemen als het nog niet
+gebouwd is?"* — terecht; #11 ("geen module bouwen voor een klant die er niet is") gaat over
+klant-specifieke features, niet over infrastructuur die een bestaande, al-bestaande schakelaar
+(`whitelabel_actief`) pas echt bruikbaar maakt.
+
+Geen bestaand veld identificeert een specifieke klant uniek voor (a) — met opzet, na de
+IP-schoning in 17.9-17.11. Gekozen (eigenaar bevestigde): een generieke, naamloze vlag
+(`client_settings.full_branding_enabled`), alleen door een platformbeheerder te zetten, nooit een
+klantnaam in de code.
+
+- **Migratie 101**: `agencies.brand_guide` (jsonb, zelfde vorm als `client_settings.brand_guide` —
+  hergebruikt `resolveEventTheme()` ongewijzigd) en `client_settings.full_branding_enabled`
+  (boolean, default false).
+- **`app/api/branding/scope/route.ts`** (nieuw): berekent server-side, met één join
+  (`accounts.agency_id` → `agencies.whitelabel_actief`), of een klant `fullBrandingEnabled` mag
+  zijn — precies de vraag die `BrandThemeProvider` op elke klantpaginalaad nodig heeft.
+- **`BrandThemeProvider`**: de CSS-variabele-injectie (`--sidebar`, `--primary`, `--accent`, etc.
+  op `document.documentElement`) is nu gegated op die vlag. `theme`/`brandName` blijven wél altijd
+  via de context beschikbaar — widgets die een klant rechtstreeks uit `theme` tekenen (zoals
+  `BrandHeaderBar`, die zijn eigen gradient niet uit CSS-variabelen leest) blijven dus gewoon
+  klant-gekleurd, ook zonder volledige branding. Dat is bewust: de hero "dit is wiens data je
+  bekijkt" is iets anders dan het hele chrome laten meekleuren.
+- **`app/api/agency/branding/route.ts`** (nieuw): zelfbediening voor het eigen bureau zodra
+  `whitelabel_actief` staat — zelfde voorwaarde als de bestaande logo-upload. `agencies` staat met
+  opzet niet in de generieke `/api/data/[table]`-lijst (bureau-brede kleuren zijn geen tabel die
+  elke ingelogde gebruiker zou moeten kunnen lezen/schrijven), vandaar een eigen, smalle route.
+- **`agency-branding-section.tsx`**: kleureditor naast de bestaande logo-upload, zelfde
+  hex-kleurenvelden als de per-klant `BrandingView`.
+- **`app/api/admin/full-branding/route.ts`** + **`full-branding-toggle.tsx`** (nieuw): de
+  platformbeheerder-only aan/uit-knop per klant, zelfde vorm als `/api/admin/whitelabel`.
+
+**#28 (deel 1 van "allebei") — GodView-rolteaser aangescherpt.** `god-view-teaser.tsx` was al
+~90% wat gevraagd werd (vervaagde voorbeeldtabel, slotje, CTA). Toegevoegd: één scherpe,
+niet-vervaagde highlight-regel tussen de vervaagde rijen ("+34% conversies... t.o.v. het
+segmentgemiddelde") — puur vervagen liet zien DAT er iets verborgen is, niet WAT voor soort
+inzicht er te vinden is. CTA-tekst herschreven naar "Dit ziet je bureau vandaag niet" met een
+sterker uitgelichte call-to-action-zin, voor meer urgentie zoals gevraagd.
+
+**Geverifieerd**: `scripts/gates.sh` — `tsc`, 313/313 tests, `build` (135 routes, incl. de drie
+nieuwe API-routes), allemaal groen. Gepusht naar `main` (`0d60720`).
+
+**Wat dit niet doet**: **rapportage-kleuren (PDF's) zijn nog niet gekoppeld**, ondanks de expliciete
+eis van de eigenaar. Root cause: beide PDF-renderers (`lib/analysis/sop-pdf-renderer.ts`, 2021
+regels; `lib/client-reports/pdf-renderer.ts`, 452 regels) zijn één module-brede `StyleSheet`/
+kleurenobject, gedeeld via sluiting door tientallen losse hulpcomponenten — precies het patroon
+waar deze twee bestanden al een lange, zorgvuldige iteratiegeschiedenis hebben (§17.45-17.54). Een
+module-niveau kleurvariabele herbruikbaar maken per klant zonder een race tussen gelijktijdige
+PDF-aanvragen (twee bureaus die tegelijk een rapport genereren op dezelfde warme serverless-
+instantie) is niet veilig; de correcte fix (React Context door de hulpcomponenten heen, of de
+stylesheet per aanroep opnieuw opbouwen) raakt beide bestanden in de breedte en verdient een eigen,
+losse sessie met visuele verificatie — niet iets om blind in dezelfde beurt als de rest hierboven
+te doen. Nog open, expliciet niet vergeten.
