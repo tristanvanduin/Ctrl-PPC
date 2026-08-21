@@ -5215,3 +5215,31 @@ laag voor schrijfacties), is de testrij ("Sync-test: deze to-do moet op elk tabb
 zijn", client_id `demo-greentech`) na verificatie weer verwijderd uit de echte database, conform de
 staande testdata-hygiëneregel. `npx tsc --noEmit -p .`, `npm test -- --run` (312/312) en `node
 scripts/check-hygiene.mjs` (1012 bestanden) opnieuw groen na de opruiming.
+
+### 17.61 Standaard ecom-momenten auto-suggereren voor b2c-klanten (21 augustus, vervolg)
+
+Taak #75 uit de feedback-backlog: Black Friday/Cyber Monday/Kerst/Valentijnsdag automatisch
+aanbieden in "Beurzen & momenten" (`event-settings.tsx`) voor klanten met `bedrijfsmodel === "b2c"`
+(`client_settings.bedrijfsmodel`), met echte datums, en verwijderbaar/aanpasbaar.
+
+Gedaan:
+- Nieuwe, pure module `lib/events/standard-b2c-events.ts`: berekent Black Friday (vrijdag na de 4e
+  donderdag van november), Cyber Monday (+4 dagen), Kerst (25 december) en Valentijnsdag
+  (14 februari) t.o.v. het huidige jaar — geen hardgecodeerde jaartallen, dus geen jaarlijks
+  onderhoud. Elk event krijgt 3 edities (vorig/huidig/volgend jaar) zodat er altijd zowel een net-
+  verstreken als een aankomende editie in staat, wat aansluit op hoe `AccountEventPacing`/
+  `lib/fair` de "huidige" en "vorige" editie bepaalt (dichtstbijzijnde datums t.o.v. nu).
+  Test: `lib/events/__standard_b2c_events_test.ts` (weekdag-invarianten + de exacte 2026-datums).
+- `event-settings.tsx`: de load-`useEffect` leest nu ook `bedrijfsmodel` mee (was alleen
+  `rai_events`). Is de opgeslagen event-lijst helemaal leeg én is de klant b2c, dan wordt de lijst
+  voorgevuld met de vier standaardmomenten — puur in lokale formstate, niet automatisch
+  opgeslagen. Een korte hint-banner legt uit wat er gebeurd is; die verdwijnt zodra de klant iets
+  bewerkt of opslaat. Zodra er ooit iets is opgeslagen (ook een bewust lege lijst), komt de
+  suggestie niet meer terug — geen aparte "suggested/dismissed"-vlag in de database nodig.
+
+**Verificatie**: `npx tsc --noEmit -p .`, `npm test -- --run` (313/313), `node
+scripts/check-hygiene.mjs` (1014 bestanden). Visueel geverifieerd met Playwright tegen
+`demo-greentech` (een b2b-demoklant) door de `client_settings`-netwerkrespons in de browser te
+onderscheppen en `bedrijfsmodel`/`rai_events` alleen client-side te vervalsen naar b2c/leeg — geen
+enkele echte databaserij aangeraakt. Screenshot bevestigt: vier vooringevulde momenten met correcte
+2025/2026/2027-datums, de hint-banner, en volledig bewerkbare/verwijderbare velden vóór opslaan.
