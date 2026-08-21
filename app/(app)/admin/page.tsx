@@ -21,6 +21,7 @@ interface AdminUser {
   role: Role | null;
   clients: string[];
   seesAllClients: boolean;
+  hasAgency: boolean;
   deactivated: boolean;
   lastSignIn: string | null;
 }
@@ -605,7 +606,13 @@ export default function AdminPage() {
                   </Cel>
                   <Cel>
                     {user.seesAllClients ? (
-                      <span className="text-muted-foreground">alle beurzen</span>
+                      user.hasAgency ? (
+                        <span className="text-muted-foreground">alle beurzen</span>
+                      ) : (
+                        <span className="text-meta text-amber-700">
+                          geen bureau gekoppeld — ziet niets
+                        </span>
+                      )
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {beursOpties.map((beurs) => {
