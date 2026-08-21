@@ -84,16 +84,17 @@ export function EventSettings({ clientId }: { clientId: string }) {
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
         <CalendarClock className="w-5 h-5 text-brand-blue-ink" />
-        <h2 className="text-base font-semibold text-brand-blue-ink">Beurzen & edities</h2>
+        <h2 className="text-base font-semibold text-brand-blue-ink">Beurzen & momenten</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-5">
-        Leg per beurs (of geo-clone) vast of hij jaarlijks of 2-jaarlijks is en wanneer de afgelopen edities plaatsvonden.
-        Dit bepaalt met welke vorige editie de huidige data vergeleken wordt, en voedt de event-prognose.
+        Leg per beurs, geo-clone of ander terugkerend moment (bijv. Black Friday) vast of het jaarlijks of
+        2-jaarlijks is en wanneer de afgelopen edities plaatsvonden. Dit bepaalt met welke vorige editie de
+        huidige data vergeleken wordt, en voedt de event-prognose.
       </p>
 
       <div className="space-y-4">
         {events.length === 0 && (
-          <p className="text-body text-muted-foreground">Nog geen beurzen ingesteld. Voeg er een toe.</p>
+          <p className="text-body text-muted-foreground">Nog geen beurzen of momenten ingesteld. Voeg er een toe.</p>
         )}
         {events.map((ev) => (
           <div key={ev.id} className="rounded-lg border border-border p-4 space-y-3">
@@ -113,7 +114,7 @@ export function EventSettings({ clientId }: { clientId: string }) {
                 </label>
               </div>
               <button onClick={() => { setEvents((evs) => evs?.filter((e) => e.id !== ev.id) ?? evs); setSaved(false); }}
-                className="mt-6 text-muted-foreground hover:text-red-500 transition-colors" title="Beurs verwijderen">
+                className="mt-6 text-muted-foreground hover:text-red-500 transition-colors" title="Verwijderen">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -163,7 +164,7 @@ export function EventSettings({ clientId }: { clientId: string }) {
 
         <button onClick={() => { setEvents((evs) => [...(evs ?? []), emptyEvent()]); setSaved(false); }}
           className="flex items-center gap-1.5 text-body text-brand-blue-ink hover:underline">
-          <Plus className="w-4 h-4" /> Beurs toevoegen
+          <Plus className="w-4 h-4" /> Beurs of moment toevoegen
         </button>
       </div>
 

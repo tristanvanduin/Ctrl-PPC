@@ -5112,3 +5112,76 @@ uit 17.57 blijft ook nog open.
 scripts/check-hygiene.mjs` (1012 bestanden, groen), Playwright tegen zowel `next dev` (voor de
 demo-detectiefix) als een production build via `next start` (voor de bannerfix, licht én donker,
 open/dicht/dismissed).
+
+### 17.59 Tweede feedbackronde: 30 punten getrieerd tegen de code + OpenRouter-cost-prompt beoordeeld
+(21 augustus, vervolg)
+
+De eigenaar leverde een tweede feedbacklijst (30 punten + 14 screenshots, verzameld tijdens eigen
+gebruik) en een uitgewerkte Copilot-prompt (`MODEL_ROUTING_AND_COST_OPTIMIZATION_V2`) voor LLM-
+kostenoptimalisatie, met de vraag: check de feedback tegen de huidige code, en geef mijn mening
+over de Copilot-prompt.
+
+**OpenRouter-prompt — mening gegeven, geen code gewijzigd.** Principes onderschreven (kwaliteit
+voor prijs, workflow-specifieke kwalificatie, cost-per-accepted-output, nooit automatisch op een
+korting routeren) — die staan al de facto in deze codebase: `lib/analysis/llm-router.ts`'s
+laag-systeem (triage/reasoning/narrative/strategic via `LAYER_MODEL`) is een kleinere versie van
+de voorgestelde routeringshypothese; de root cause "Sonnet raakt de outputlimiet" (Fase 2) is al
+gevonden en deels gefixt (17.7/17.26/17.28, `reasoningMaxTokens`); prompt-caching (Fase 14) wordt
+al gemeten (`__prompt_cache_test.ts`, 50% gedeeld promptbegin); een per-bureau uitgavenplafond
+(Fase 18) bestaat al (`uitgavenplafond.ts`). Advies: niet de volle 20-fase-bouw in één keer (een
+model-registry met automatische discount-discovery is zware infrastructuur voor een workload die
+$1,52 kostte in het eigen auditlog) — wel een verse Fase 1+2-audit op echte actuele logs, en
+Fase 12+13 (kleinere outputlimieten, evidence-payload-compressie) die de architectuurfout zelf
+repareert ongeacht modelkeuze. Rest pas bouwen als gemeten volume het rechtvaardigt.
+
+**Feedback getrieerd via 5 parallelle Explore-agents** tegen de huidige code (niet aangenomen).
+Belangrijkste bevestigde bugs, nu gefixt:
+- Wereldkaart: `--kaart-laag`/`--kaart-leeg` lagen in donker bijna op elkaar (Δ≈5-11) — een land
+  met weinig data was niet te onderscheiden van een land zonder data. `--kaart-laag` een duidelijke
+  stap lichter/blauwer gezet (`app/globals.css`).
+- Donut-tekst (`donut-chart.tsx`): `text-figure` (30px) paste niet in het 104px-gat bij een bedrag
+  als "€ 230.130" — teruggebracht naar `text-[1.05rem]` (~17px), geverifieerd dat "€ 36.000" en
+  "380" nu ruim binnen de ring passen.
+- SOP-PDF-download ("bestand bestaat niet"): alle drie PDF-routes
+  (`analysis/pdf`, `second-opinion/pdf`, `client-reports/pdf`) negeerden de `.error` van
+  `supabase.storage.upload()` en maakten alsnog een `client_files`-rij aan die naar een
+  niet-bestaand object wees. Nu: bij een mislukte upload geen rij, wel de PDF direct teruggeven
+  (de eerste download werkte altijd al) plus een gelogde fout.
+- Tabblad "Beurzen" hernoemd naar "Beurzen & momenten" (+ koppen/knoppen in `event-settings.tsx`)
+  — te specifiek voor een pure ecom-klant zonder beurzen; het onderliggende model was al generiek
+  genoeg.
+- God Mode (`components/terminal/god-mode.tsx`): klantnamen waren cross-agency (dus van ANDERE
+  bureaus) in leesbare tekst zichtbaar. Eigenaar koos: anonimiseren — een stabiele, van clientId
+  afgeleide pseudoniem ("Account #1234") i.p.v. een volgnummer dat bij elke herlaad verandert. Ook
+  de 4 losse KPI-tellers (los, geen kader) alsnog in een kaart gezet, consistent met de rest van
+  het scherm.
+- Het platformbrede God Mode/God View-blok stond (alleen in demo-modus) op het "Analyseren"-
+  tabblad, terwijl het inhoudelijk een inzicht is, geen analyse. Eigenaar koos: verplaatst naar
+  "Bevindingen" (`OutcomesTab`), met een eigen `Sectie` en dezelfde demo-only-voorwaarde als eerst.
+
+**Bevestigd, maar bewust NIET blind gefixt — GodViewPremium (image3 uit de feedback).** Onderzoek
+wees uit dat dit scherm NIET is wat het leek: `components/terminal/god-view-premium.tsx` toont
+ECHTE (bewust verlaagde testdrempel) geaggregeerde cijfers, alleen ooit zichtbaar voor de
+platform-eigenaar zelf (binnen `GodMode`, zelf al scope-gated op `ALL_CLIENTS`). Een blur/lock-
+overlay hierover zou de eigenaar blinderen voor precies de data die bedoeld is om te valideren of
+de functie genoeg kwalificerende cellen oplevert — het tegenovergestelde van wat gevraagd werd.
+Nog open: is dit (A) een interne preview zonder verdere actie nodig, of (B) bedoeld als een
+bureau-brede betaalde tier die voor niet-abonnees geblurd moet worden (dan ontbreekt nog
+tier-gating, groter werk)? Ligt bij de eigenaar.
+
+**Overige 20+ punten getrieerd, niet allemaal in deze ronde opgepakt** (grotere features of
+bevestigde designkeuzes, geen bugs): dynamisch inzoomen op de wereldkaart naar actieve landen,
+notities/to-do's splitsen in 2x 50/50 met sync over alle pagina's, standaard ecom-events (Black
+Friday e.d.) automatisch inladen bij een b2c-bedrijfsmodel, forecast-opbouw uniform maken over
+Google/Meta/LinkedIn/blended (bevestigd inconsistent: Google gebruikt een tabel, Meta/LinkedIn
+kaarten+grafiek, blended mist het budget-scenario-element helemaal), whitelabel bureau-breed voor
+volledige huisstijlkleuren (bestaat nu alleen voor het zijbalk-logo), een kanaal-advieslaag die op
+basis van portfolio-inzichten een nieuw kanaal aanbeveelt (bestaat niet), en het creditsysteem voor
+losse AI-deep-dives (wél overal aangesloten, maar `CREDIT_COSTS` staat leeg — een prijsbeslissing
+van de eigenaar, geen technisch gat). Logo-als-home-button en de meeste dark-mode/donut-achtige
+punten bleken al opgelost in eerdere rondes deze sessie.
+
+**Verificatie**: `npx tsc --noEmit -p .`, `npm test -- --run` (312/312 groen), `node
+scripts/check-hygiene.mjs` (1012 bestanden, groen), Playwright-screenshots op de demo-klant (licht
++ donker voor de kaart, Bevindingen- en Analyseren-tab voor de verplaatsing, ingezoomd op de
+donut-sectie om de tekstgrootte te bevestigen).

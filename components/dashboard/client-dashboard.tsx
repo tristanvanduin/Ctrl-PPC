@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, Settings, Target, Loader2, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers } from "lucide-react";
+import { BarChart3, Settings, Target, Loader2, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown } from "lucide-react";
 import { SyncStatusBadge } from "./sync-status-badge";
 import { getClientSettings } from "@/lib/client-settings";
 import { SecondOpinionView } from "./second-opinion-view";
@@ -577,7 +577,7 @@ export function ClientDashboard({ client }: { client: Client }) {
 const SETTINGS_GROEPEN = [
   { id: "meten", label: "Doelen & meten", uitleg: "Waar stuurt deze klant op, en wat telt als conversie — per kanaal." },
   { id: "merk", label: "Merk & uiterlijk", uitleg: "Huisstijl, kleuren en logo; wat je terugziet in het dashboard en de rapporten." },
-  { id: "beurzen", label: "Beurzen", uitleg: "Cadans en editie-datums. Voeden de weken-tot-beurs-weergave en de beursanalyse." },
+  { id: "beurzen", label: "Beurzen & momenten", uitleg: "Cadans en editie-datums van beurzen of andere terugkerende momenten. Voeden de weken-tot-event-weergave en de eventanalyse." },
   { id: "account", label: "Account & markt", uitleg: "Sector en benchmarks, actieve landen, Merchant Center, GA4 en Search Console." },
 ] as const;
 
@@ -658,11 +658,6 @@ function SettingsSections({ client }: { client: Client }) {
 function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSopError?: (error: SopError) => void; kanalen: readonly Kanaal[] }) {
   const [, setRefreshKey] = useState(0);
   const [analysisChannel, setAnalysisChannel] = useState<Channel>("blended");
-  // isDemoMode() leest window.location, dus in een effect en niet in de eerste render -- anders
-  // rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde reden als
-  // demoModus in ClientDashboard zelf, hierboven in dit bestand).
-  const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
 
   // Het kanaal-subtabje kiest alleen WELKE analyses je draait; het uitkomsten-filter blijft
   // standaard op "Alle kanalen" (geen kanaal is belangrijker) en wisselt alleen op eigen klik.
@@ -811,19 +806,6 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
               <MasterSynthesisAnalysis clientId={clientId} />
             </>
           )}
-          {/* God View en cross-account (portfolio-synthese) zijn platform-/bureaubreed, geen
-              klant-eigen data -- ze horen normaal op /vandaag, niet op een klantpagina. Maar
-              "in het demo-account" is precies waar een demo-bezoeker ze wil kunnen laten zien
-              zonder eerst weg te navigeren. Zelfde componenten, zelfde statische demo-data
-              (lib/demo/god-view-demo.ts, GEEN echte sessie of LLM-aanroep nodig) als op
-              /vandaag?demo=1 -- puur hier ook ingesloten. Alleen in demo-modus: buiten demo
-              is dit geen klant-eigen data en hoort het hier niet te staan. */}
-          {demoModus && (
-            <>
-              <Section>Cross-account &amp; God View (demo)</Section>
-              <GodViewDemo />
-            </>
-          )}
         </>
       )}
 
@@ -847,6 +829,11 @@ function OutcomesTab({ clientId }: { clientId: string }) {
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [channelFilter, setChannelFilter] = useState<InsightChannel | null>(null);
+  // isDemoMode() leest window.location, dus in een effect en niet in de eerste render -- anders
+  // rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde reden als
+  // demoModus elders in dit bestand).
+  const [demoModus, setDemoModus] = useState(false);
+  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
 
   return (
     <div>
@@ -855,6 +842,25 @@ function OutcomesTab({ clientId }: { clientId: string }) {
         {/* Kanaal-filter over inzichten, aanbevelingen, hypotheses, wachtrij en taken. */}
         <ChannelFilter value={channelFilter} onChange={setChannelFilter} />
       </div>
+
+      {/* God View en cross-account (portfolio-synthese) zijn platform-/bureaubreed, geen
+          klant-eigen data -- ze horen normaal op /vandaag, niet op een klantpagina. Maar
+          "in het demo-account" is precies waar een demo-bezoeker ze wil kunnen laten zien zonder
+          eerst weg te navigeren. Zelfde componenten, zelfde statische demo-data
+          (lib/demo/god-view-demo.ts, GEEN echte sessie of LLM-aanroep nodig) als op
+          /vandaag?demo=1 -- puur hier ook ingesloten. Alleen in demo-modus: buiten demo is dit
+          geen klant-eigen data en hoort het hier niet te staan.
+          Verplaatst van Analyseren naar Bevindingen (feedbackronde 21 augustus): dit is een
+          uitkomst/inzicht, geen analyse die je zelf draait. */}
+      {demoModus && (
+        <Sectie
+          icoon={<Crown className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Cross-account & God View (demo)"
+          bijschrift="Platform-/bureaubreed voorbeeld — hoort normaal op Vandaag, hier alleen zichtbaar in demo-modus"
+        >
+          <GodViewDemo />
+        </Sectie>
+      )}
 
       {/* Wat op goedkeuring wacht staat vooraan: dat is het enige op deze pagina waar direct een
           handeling van jou op zit. De rest is lezen. */}

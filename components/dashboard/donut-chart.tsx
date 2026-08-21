@@ -101,15 +101,20 @@ export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel
         })}
       </svg>
 
-      {/* Het gat draagt het totaal, of de waarde van het segment waar de muis op staat. */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
+      {/* Het gat draagt het totaal, of de waarde van het segment waar de muis op staat.
+          Het gat is 2*R_INNER = 104px breed -- `text-figure` (30px) is de maat van de KPI-kaarten,
+          waar geen zo'n harde breedtegrens geldt. Een bedrag als "€ 230.130" past daar bij 30px
+          niet ruim in en raakt/overschrijdt de binnenring. text-[1.05rem] (~17px) past een
+          realistisch bedrag van 8-9 tekens wél ruim binnen de 104px, met minimale padding zodat
+          de volle breedte van het gat benut wordt. */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-2">
         {hover ? (
           (() => {
             const a = arcs.find((x) => x.key === hover);
             if (!a) return null;
             return (
               <>
-                <div className="text-figure font-bold text-brand-gray leading-tight">{format(a.value)}</div>
+                <div className="text-[1.05rem] font-bold text-brand-gray leading-tight">{format(a.value)}</div>
                 <div className="text-micro font-medium text-muted-foreground leading-tight mt-0.5">{a.label}</div>
                 <div className="text-micro font-medium text-brand-gray leading-tight">
                   {new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 1 }).format(a.share)}
@@ -119,7 +124,7 @@ export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel
           })()
         ) : (
           <>
-            <div className="text-figure font-bold text-brand-gray leading-tight">{centerValue}</div>
+            <div className="text-[1.05rem] font-bold text-brand-gray leading-tight">{centerValue}</div>
             <div className="text-micro font-medium text-muted-foreground leading-tight mt-0.5">{centerLabel}</div>
           </>
         )}

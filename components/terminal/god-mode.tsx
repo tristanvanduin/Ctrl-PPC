@@ -14,6 +14,23 @@ import { GodViewPremium } from "./god-view-premium";
 // voor de rolcheck; deze component doet zelf GEEN autorisatie, dat is /api/admin/god-mode's
 // server-side taak). Ongefilterde top10/bottom10 en de volledige rauwe lijst, gevirtualiseerd
 // zodat een groeiend platform (5000+ accounts) evengoed 60fps blijft scrollen.
+//
+// ── WAAROM DE KLANTNAMEN HIER NIET STAAN (feedbackronde 21 augustus) ────────────────────────
+//
+// Dit scherm is platform-breed en cross-agency: het toont klanten van ANDERE bureaus, niet
+// alleen het eigen bureau. De enige die dit scherm ooit ziet is de platform-eigenaar zelf, en die
+// kan de echte naam sowieso via elke klant-pagina vinden -- anonimiseren beschermt dus niet tegen
+// de kijker zelf. Het beschermt tegen het MOMENT dat dit scherm gedeeld wordt: een schermdeling
+// tijdens een sales-gesprek of demo met een concurrent-bureau's klantnaam zichtbaar in beeld is
+// precies het lek waar dit tegen helpt. Het label is een stabiele, van clientId afgeleide
+// pseudoniem -- geen doorlopend volgnummer dat bij elke herlaad/sortering verandert, want dan is
+// "diezelfde klant staat weer bovenaan" niet meer te zien.
+
+function pseudoniem(clientId: string): string {
+  let h = 0;
+  for (let i = 0; i < clientId.length; i++) h = (h * 31 + clientId.charCodeAt(i)) >>> 0;
+  return `Account #${(h % 9000) + 1000}`;
+}
 
 interface GodModeData {
   month: string;
@@ -31,7 +48,7 @@ function Ranglijst({ titel, rows }: { titel: string; rows: GodModeRow[] }) {
         {rows.map((r, i) => (
           <div key={r.clientId} className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-body hover:bg-[var(--terminal-accent-soft,rgba(0,0,0,0.03))]">
             <span className="teller-waarde w-6 shrink-0 text-meta text-muted-foreground">{i + 1}</span>
-            <span className="min-w-0 flex-1 truncate text-brand-gray">{r.name}</span>
+            <span className="min-w-0 flex-1 truncate text-brand-gray">{pseudoniem(r.clientId)}</span>
             <span className="teller-waarde shrink-0 font-semibold" style={{ color: "var(--terminal-accent, var(--color-brand-blue-ink))" }}>
               {compactCurrency(r.spend)}
             </span>
@@ -73,7 +90,7 @@ function RaweTabel({ rows }: { rows: GodModeRow[] }) {
                 className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-2 text-body"
                 style={{ position: "absolute", top: 0, left: 0, width: "100%", height: item.size, transform: `translateY(${item.start}px)` }}
               >
-                <span className="truncate text-brand-gray">{r.name}</span>
+                <span className="truncate text-brand-gray">{pseudoniem(r.clientId)}</span>
                 <span className="teller-waarde text-right">{compactCurrency(r.spend)}</span>
                 <span className="teller-waarde text-right">{compactNumber(r.conversions)}</span>
                 <span className="teller-waarde text-right">{r.roas != null ? `${r.roas}x` : "—"}</span>
@@ -130,7 +147,7 @@ export function GodMode() {
         <span className="text-meta text-muted-foreground">platform-breed · {data.month.slice(0, 7)}</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-5 sm:grid-cols-4">
         <Counter value={totalSpend} label="Totale spend" format="currency" isLive />
         <Counter value={totalConversions} label="Conversies" isLive />
         <Counter value={data.accountCount} label="Actieve accounts" isLive />
