@@ -5613,6 +5613,21 @@ schoon, `tsc` schoon, 314/314 tests groen, `build` groen. Dezelfde 4 bekende san
 faalden (DB-auth 401's, ongewijzigd sinds eerder deze sessie). Twee commits naar `main`:
 `3984613` (eerste, onvolledige fix) en `6457541` (bureau-kiezer + admin-toekennen-grens).
 
-**Nog open**: Jesse's eigen rij moet nog met de bureau-kiezer op het juiste bureau gezet worden —
-dat kan de eigenaar nu direct in `/admin` doen, geen verdere code nodig.
+**Jesse's eigen situatie, opgelost — niet via de bureau-kiezer.** Navraag ("welk bureau heeft alle
+adminrechten om alle klanten te zien?") legde bloot dat het antwoord "geen enkel bureau" is: dat is
+precies het punt van `platform_beheerders` hierboven, een persoonsgebonden en geen bureaugebonden
+recht. "Zelfde niveau als ik" bleek dus letterlijk bedoeld: platformbreed, niet "volledige admin
+binnen één bureau". De eigenaar heeft rechtstreeks in Supabase een rij voor Jesse toegevoegd:
+
+```sql
+insert into platform_beheerders (user_id, reden)
+values (
+  (select id from auth.users where email = 'jesse@ctrlppc.com'),
+  'Zelfde toegangsniveau als eigenaar -- mede-eigenaar/beheerder Ctrl PPC'
+);
+```
+
+Bevestigd geslaagd. Jesse ziet nu, net als de eigenaar, elke klant van elk bureau — de bureau-kiezer
+uit deze sectie blijft relevant voor bureaugebonden gebruikers (zoals de meeste toekomstige
+uitnodigingen), maar was voor Jesse's eigen geval niet de juiste knop.
   herbevestiging dat dit niet stilzwijgend is meegenomen.
