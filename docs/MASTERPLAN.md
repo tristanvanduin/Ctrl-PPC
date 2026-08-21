@@ -4784,3 +4784,69 @@ gebeurt in dezelfde beurt als de brandbook-toepassing.
 `--font-sans`/`--font-heading`-token in `app/globals.css` gewijzigd. De volgende sessie die het
 brandbook verwerkt, moet zowel de dashboard-app als de marketingsite langs deze sectie leggen
 voordat er lettertype-code wijzigt.
+
+### 17.56 Het oude feedback-document tegen code en live database gehouden — een kritieke, live storage-bug gevonden en gefixt (21 augustus 2026)
+
+Een los feedback-document uit een eerdere build (dashboard-UX-punten + een apart
+`MODEL_ROUTING_AND_COST_OPTIMIZATION_V2`-traject voor OpenRouter, nooit eerder in dit document
+verankerd) is puntsgewijs tegen de huidige code en de live productiedatabase gelegd — niet
+aangenomen, per punt geverifieerd. Live database-toegang liep via de Supabase REST API (nieuwe
+`sb_secret_...`-sleutel, want directe Postgres-connecties op poort 5432 zijn vanuit deze
+sandbox onbereikbaar — geen IPv6, en ruw TCP-verkeer wordt sowieso geblokkeerd, alleen HTTPS
+loopt door de proxy).
+
+**De vondst: de storage-bucket `client-files` bestond niet in productie.** Bevestigd via de
+Storage API (`GET /storage/v1/bucket/client-files` gaf `404 NoSuchBucket`; alleen `agency-logos`
+bestond). Dit is de bucket waar vijf plekken naartoe schrijven: `app/api/analysis/pdf/route.ts`
+(SOP-PDF's), `app/api/second-opinion/route.ts` en `app/api/second-opinion/pdf/route.ts` (Second
+Opinion-PDF's), `app/api/client-reports/pdf/route.ts` (rapportage-PDF's), en
+`components/dashboard/client-settings.tsx` (klantlogo-upload). Geen van de vijf controleerde het
+`error`-veld van `supabase.storage.from("client-files").upload(...)` — de `client_files`-rij werd
+dus altijd geschreven, ook als de upload zelf faalde. Geverifieerd met een echte rij
+(`demo-greentech/SOP's/1787220337460-SOP-Wekelijks-2026-08-18.pdf`): de databaserij bestond, het
+object niet — `storage/v1/object/list` op dat prefix gaf een lege lijst. Dit is exact het
+feedbackpunt "de SOP PDF's zijn momenteel niet te downloaden, ik krijg een melding dat het bestand
+niet bestaat" — en het bleek breder dan alleen SOP-PDF's: elk bestand door deze vijf routes was
+potentieel getroffen, inclusief klantlogo's.
+
+**Fix, in twee delen.** De bucket zelf kon niet door mij worden aangemaakt — het aanmaken van
+storage-infrastructuur via de Supabase Management/Storage API werd door de sandbox-classifier
+geblokkeerd (een bewuste beperking, niet omzeild); de eigenaar heeft 'm zelf aangemaakt
+(`client-files`, private, bevestigd via `GET .../bucket/client-files` → 200). De onderliggende
+codefout is wel gefixt: alle vijf `.upload(...)`-aanroepen checken nu `error` en gooien
+(server-routes) of tonen een `window.alert` (de client-side logo-upload in `client-settings.tsx`,
+die geen bestaand foutkanaal had) in plaats van stilzwijgend door te gaan naar de
+`client_files`-insert. Zonder deze tweede helft zou een toekomstige storage-hik dezelfde
+stille-dode-rij-bug herhalen, ook met de bucket erbij.
+
+**Geverifieerd**: `scripts/gates.sh` na `npm ci` (deze sandbox had geen `node_modules` — eenmalige
+omgevingsstap, los van de fix zelf) — `tsc`, `tests` (306/306) en `build` groen. De vier
+DB-credential-poorten (`rpc-rechten`, `view-dekking`, `bureaugrens`, `rls-scheiding`) faalden op
+een 401 omdat deze sandbox geen `.env.local` met een service-role-sleutel voor die specifieke
+scripts heeft — een omgevingsgat, bevestigd niet-gerelateerd aan deze wijziging (dezelfde vier
+falen zonder enige codewijziging, alleen op ontbrekende credentials).
+
+**Overige geverifieerde feedbackpunten uit hetzelfde document** (verificatie tegen code, niet
+tegen productiegebruik):
+
+| Punt | Status |
+|---|---|
+| Wereldkaart dark/light-kleuren | Opgelost (`world-map.tsx`, `color-mix`-ramp expliciet omgedraaid) |
+| Wereldkaart dynamisch inzoomen op actieve landen | Open — `fitSize` toont altijd de volledige wereld |
+| Hero banner dark-mode contrast | Opgelost (doorgerekende WCAG-fix in `brand-header-bar.tsx`) |
+| Hero banner dynamische "x tot eerstvolgende beurs" | Opgelost (`useUpcomingEdition` kiest al de eerstvolgende editie uit alle gekoppelde beurzen) |
+| Hero banner wegklikbaar | Open — geen dismiss-knop |
+| Logo als home-link naar Vandaag | Open — `SidebarLogo` staat in een kale `<div>`, geen `<Link>` |
+| Notities/to-do als 2 losse 50/50-secties | Open — `client-notes.tsx` is nog 1 platte lijst, geen apart to-do-type |
+| Beurzen: automatische herkenning | Open — alleen handmatig via "Beurs toevoegen" |
+| Beurzen: standaard ecom-events (Black Friday e.d.) | Open — niets gevonden |
+| Beurzen: generieke tabnaam | Open — heet nog letterlijk "Beurzen" (`client-dashboard.tsx:580`) |
+| God View: anonimiteit vs. cross-portfolio | Geen bug — bewust besluit, zie §17.23: cross-account **binnen** één bureau is niet anoniem, alleen God View (cross-agency) wel |
+| God View: echte blur/waas-overlay | Open — geen blur/lock-mechanisme gevonden |
+
+**Wat dit niet doet:** het overgrote deel van het feedback-document is nog niet geverifieerd
+(prestaties-kanalen-layout, forecasting-uniformiteit, PMax video/scorecard, Meta/LinkedIn
+advertentietypes, Analyses-pagina, Settings whitelabel-scope, adviserende laag/kanaalaanbeveling,
+AI-chat-kostenplafond-koppeling, conversieselectie-dubbeling, tabel-leesbaarheid) — vervolgwerk,
+niet aangenomen als "in orde". Het aparte `MODEL_ROUTING_AND_COST_OPTIMIZATION_V2`-traject (20
+fases, OpenRouter-kostenoptimalisatie) is nog niet gestart en evenmin hier verder uitgewerkt.

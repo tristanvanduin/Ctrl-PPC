@@ -330,7 +330,11 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
     setLogoUploading(true);
     try {
       const path = `${clientId}/logo.png`;
-      await supabase.storage.from("client-files").upload(path, file, { contentType: file.type, upsert: true });
+      const { error: uploadError } = await supabase.storage.from("client-files").upload(path, file, { contentType: file.type, upsert: true });
+      if (uploadError) {
+        window.alert(`Logo-upload mislukt: ${uploadError.message}`);
+        return;
+      }
       const { data } = await supabase.storage.from("client-files").createSignedUrl(path, 3600);
       if (data?.signedUrl) setLogoUrl(data.signedUrl);
     } finally {

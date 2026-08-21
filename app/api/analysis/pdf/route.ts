@@ -318,10 +318,13 @@ export async function GET(request: NextRequest) {
       phaseKey: "store_artifact",
       message: "SOP PDF opslaan...",
     });
-    await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
+    const { error: uploadError } = await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
       contentType: "application/pdf",
       upsert: true,
     });
+    if (uploadError) {
+      throw new Error(`SOP PDF-upload naar storage mislukt: ${uploadError.message}`);
+    }
 
     // Ensure SOP's folder exists
     const { data: existingFolder } = await supabase

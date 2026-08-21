@@ -130,10 +130,13 @@ export async function POST(request: NextRequest) {
         generatedAt: result.completedAt ?? new Date().toISOString(),
       });
 
-      await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
+      const { error: uploadError } = await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
       });
+      if (uploadError) {
+        throw new Error(`Second opinion PDF-upload naar storage mislukt: ${uploadError.message}`);
+      }
 
       const { data: fileRow } = await supabase
         .from("client_files")

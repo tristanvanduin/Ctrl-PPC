@@ -74,10 +74,13 @@ export async function GET(request: NextRequest) {
       phaseKey: "store_artifact",
       message: "Second opinion PDF opslaan...",
     });
-    await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
+    const { error: uploadError } = await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
       contentType: "application/pdf",
       upsert: true,
     });
+    if (uploadError) {
+      throw new Error(`Second opinion PDF-upload naar storage mislukt: ${uploadError.message}`);
+    }
 
     // Ensure Second Opinion folder exists
     const { data: existingFolder } = await supabase
