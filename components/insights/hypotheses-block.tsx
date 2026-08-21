@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Beaker, Check, ChevronDown, ChevronUp, Loader2, Link2, X } from "lucide-react";
 import type { InsightChannel } from "@/lib/insights/channel-of";
+import { CollapsiblePanel } from "@/components/ui/disclosure";
 
 interface LinkedFinding {
   id: string;
@@ -177,18 +178,22 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
 
   const pendingCount = hypotheses.filter((item) => item.status === "pending").length;
 
+  // Ingeklapt tenzij er iets op je te wachten staat: onder "Alle kanalen" stonden hier tot drie
+  // volledig uitgeklapte kaarten (Google/Meta/LinkedIn) achter elkaar, ook als er allang niets
+  // meer open stond -- dat was de belangrijkste reden dat de Bevindingen-pagina immens lang werd.
   return (
-    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
-        <Beaker className="w-4 h-4 text-purple-500" />
-        <h3 className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
-          Hypotheses workflow — {WF_LABEL[workflowChannel]}
-        </h3>
-        <span className="ml-auto px-2 py-0.5 text-micro font-bold rounded-full bg-purple-100 text-purple-600">
+    <CollapsiblePanel
+      id={`hypotheses-${clientId}-${workflowChannel}`}
+      icon={<Beaker className="w-4 h-4 text-purple-500" />}
+      title={`Hypotheses workflow — ${WF_LABEL[workflowChannel]}`}
+      defaultOpen={pendingCount > 0}
+      meta={
+        <span className={`px-2 py-0.5 text-micro font-bold rounded-full ${pendingCount > 0 ? "bg-purple-100 text-purple-600" : "bg-gray-100 text-muted-foreground"}`}>
           {pendingCount} pending / {hypotheses.length} totaal
         </span>
-      </div>
-
+      }
+    >
+      <div className="p-5">
       <p className="text-micro text-muted-foreground mb-4">
         Bron: laatste `structured_monthly_v2` output. Accepteren zet alle gekoppelde taken door naar sprintplanning.
       </p>
@@ -321,6 +326,7 @@ function HypothesesWorkflow({ clientId, refreshKey, onWorkflowChange, workflowCh
           );
         })}
       </div>
-    </div>
+      </div>
+    </CollapsiblePanel>
   );
 }
