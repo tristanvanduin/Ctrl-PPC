@@ -1,4 +1,7 @@
-import { mapRsaAssetApiRow, mapAdMetaApiRow, applyAdText, buildAdTextMap, type RsaAssetApiResult, type AdMetaApiResult } from "./google-ads-rsa-transform";
+import {
+  mapRsaAssetApiRow, mapAdMetaApiRow, mapDisplayImageAssetApiRow, applyAdText, buildAdTextMap,
+  type RsaAssetApiResult, type AdMetaApiResult, type DisplayImageAssetApiResult,
+} from "./google-ads-rsa-transform";
 import { recordFetchFailure } from "./fetch-failures";
 import { logger } from "@/lib/logger";
 import type { RuweRegioRij, GeoDoelLabel } from "@/lib/geo/region-rows";
@@ -3366,6 +3369,43 @@ export async function getAdMeta(credentials: GoogleAdsCredentials, customerId: s
     WHERE ad_group_ad.status != 'REMOVED'
   `);
   return rows.map((row) => mapAdMetaApiRow(row as Record<string, unknown>)).filter((r): r is AdMetaApiResult => r !== null);
+}
+
+// ── Display-afbeeldingen (migratie 102) ─────────────────────────────────────
+//
+// Feedback (21 augustus, tweede ronde): "Display heeft visuals, geen tekst ads" -- Creative
+// Performance had voor Google's Display-advertenties geen enkele afbeeldingsbron, alleen
+// google_ads_rsa_assets (tekst-only). Dezelfde resource als de RSA-tekst hierboven
+// (ad_group_ad_asset_view), maar op de beeld-veldtypes i.p.v. HEADLINE/DESCRIPTION, en met
+// asset.image_asset.full_size.url -- dat exacte veld staat al, geverifieerd tegen een echte
+// Google Ads-omgeving, in getPmaxAssetPerformanceByMonth hierboven (asset_group_asset i.p.v.
+// ad_group_ad_asset_view, maar hetzelfde asset.image_asset.full_size.url-veld). De resource
+// (ad_group_ad_asset_view) is zelf ook al bewezen in getRsaAssetMetricsByMonth.
+//
+// LIVE-ONGETEST blijft de combinatie van de twee EN de exacte field_type-waarden voor
+// Display-beelden (MARKETING_IMAGE/SQUARE_MARKETING_IMAGE/LOGO/LANDSCAPE_LOGO -- de bekende
+// AssetFieldTypeEnum-namen voor Responsive Display Ads). Vandaar de eigen try/catch: een
+// verkeerde waarde breekt hoogstens deze ene dataset, nooit de rest van de sync.
+const DISPLAY_IMAGE_FIELD_TYPES = ["MARKETING_IMAGE", "SQUARE_MARKETING_IMAGE", "LOGO", "LANDSCAPE_LOGO"];
+
+export async function getDisplayImageAssets(
+  credentials: GoogleAdsCredentials,
+  customerId: string
+): Promise<DisplayImageAssetApiResult[]> {
+  try {
+    const rows = await queryGoogleAds(credentials, customerId, `
+      SELECT
+        campaign.name,
+        ad_group.name,
+        ad_group_ad.ad.id,
+        asset.id,
+        asset.image_asset.full_size.url,
+        ad_group_ad_asset_view.field_type
+      FROM ad_group_ad_asset_view
+      WHERE ad_group_ad_asset_view.field_type IN (${DISPLAY_IMAGE_FIELD_TYPES.map((t) => `'${t}'`).join(", ")})
+    `);
+    return rows.map((row) => mapDisplayImageAssetApiRow(row as Record<string, unknown>)).filter((r): r is DisplayImageAssetApiResult => r !== null);
+  } catch (e) { recordFetchFailure("getDisplayImageAssets", e); return []; }
 }
 
 // ── Negative Keywords (categorie G: de conflictchecker) ────────────────────

@@ -93,12 +93,14 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
           if (!cur.description && descs[0]) cur.description = descs[0];
           byAd.set(id, cur);
         }
-        // Verrijk tekst uit google_ads_rsa_assets waar de arrays leeg waren.
+        // Verrijk tekst uit google_ads_rsa_assets, en (migratie 102) beeld uit
+        // google_ads_image_assets waar de arrays leeg waren.
         const ids = [...byAd.keys()];
         if (ids.length > 0) {
-          const [{ data: assets }, { data: meta }] = await Promise.all([
+          const [{ data: assets }, { data: meta }, { data: images }] = await Promise.all([
             sb!.from("google_ads_rsa_assets").select("ad_id, field_type, asset_text, impressions").eq("client_id", clientId).in("ad_id", ids),
             sb!.from("google_ads_ad_meta").select("ad_id, final_url").eq("client_id", clientId).in("ad_id", ids),
+            sb!.from("google_ads_image_assets").select("ad_id, image_url").eq("client_id", clientId).in("ad_id", ids),
           ]);
           const pick = (adId: string, field: string) => (assets ?? [])
             .filter((a) => String(a.ad_id) === adId && a.field_type === field)
@@ -106,6 +108,7 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
           for (const [id, card] of byAd) {
             if (!card.headline) card.headline = pick(id, "HEADLINE") ?? null;
             if (!card.description) card.description = pick(id, "DESCRIPTION") ?? null;
+            if (!card.imageUrl) card.imageUrl = (images ?? []).find((i) => String(i.ad_id) === id)?.image_url as string ?? null;
             const url = (meta ?? []).find((m) => String(m.ad_id) === id)?.final_url as string | undefined;
             if (!card.displayUrl && url) card.displayUrl = url.replace(/^https?:\/\//, "").split("/")[0];
           }

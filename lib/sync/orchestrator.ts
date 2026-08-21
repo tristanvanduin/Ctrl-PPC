@@ -38,6 +38,7 @@ import {
   getCheckoutFunnelByMonth,
   getRsaAssetMetricsByMonth,
   getAdMeta,
+  getDisplayImageAssets,
   getAdGroupNegatives,
   getCampaignNegatives,
   getSharedSetNegatives,
@@ -50,7 +51,7 @@ import {
   type GoogleAdsCredentials,
 } from "../api/google-ads";
 import { addYears } from "../analysis/helpers";
-import { rsaAssetToDbRow, adMetaToDbRow } from "../api/google-ads-rsa-transform";
+import { rsaAssetToDbRow, adMetaToDbRow, displayImageAssetToDbRow } from "../api/google-ads-rsa-transform";
 // De zoekterm-query splitst rijen per match-type (segments.search_term_match_type); de
 // dedup verderop kent dat segment niet en zou een van de rijen weggooien MET zijn metrics.
 // Eerst optellen, dan pas dedupliceren.
@@ -309,6 +310,7 @@ const FETCH_SOURCE_BY_DATASET: Record<string, string[]> = {
   ads_country_impression_share: ["getGeoPerformanceByMonth"],
   google_ads_rsa_assets: ["getRsaAssetMetricsByMonth"],
   google_ads_ad_meta: ["getAdMeta"],
+  google_ads_image_assets: ["getDisplayImageAssets"],
   ads_negative_keywords: ["getAdGroupNegatives", "getCampaignNegatives", "getSharedSetNegatives"],
 };
 
@@ -401,6 +403,7 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
   let pmaxPlacementViewRaw: Awaited<ReturnType<typeof getPmaxPlacementViewByMonth>> = [];
   let rsaAssetsRaw: Awaited<ReturnType<typeof getRsaAssetMetricsByMonth>> = [];
   let adMetaRaw: Awaited<ReturnType<typeof getAdMeta>> = [];
+  let imageAssetsRaw: Awaited<ReturnType<typeof getDisplayImageAssets>> = [];
   let adGroupNegRaw: Awaited<ReturnType<typeof getAdGroupNegatives>> = [];
   let campaignNegRaw: Awaited<ReturnType<typeof getCampaignNegatives>> = [];
   let sharedNegRaw: Awaited<ReturnType<typeof getSharedSetNegatives>> = [];
@@ -415,7 +418,7 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
       checkoutRaw,
       pmaxAssetsRaw, pmaxNetworkRaw, pmaxPlacementsRaw, pmaxSearchCatsRaw,
       videoPlacementsRaw, pmaxPlacementViewRaw,
-      rsaAssetsRaw, adMetaRaw,
+      rsaAssetsRaw, adMetaRaw, imageAssetsRaw,
       adGroupNegRaw, campaignNegRaw, sharedNegRaw,
     ] = await Promise.all([
       getAccountMetricsByMonth(credentials, customerId, startDate, endDate, convActionIds),
@@ -449,6 +452,9 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
       // RSA-assets plus ad-meta (migratie 020, het RSA/W1-duo)
       getRsaAssetMetricsByMonth(credentials, customerId, startDate, endDate),
       getAdMeta(credentials, customerId),
+      // Display-afbeeldingen (migratie 102) -- eigen try/catch in getDisplayImageAssets zelf,
+      // dus een verkeerd GAQL-veld breekt hoogstens deze ene dataset.
+      getDisplayImageAssets(credentials, customerId),
       // Negatives (migratie 022, categorie G). Drie niveaus, want een checker die er een
       // mist geeft valse geruststelling. Elke fetch heeft zijn eigen catch die [] geeft,
       // dus een veld dat niet bestaat maakt hooguit deze dataset leeg.
@@ -881,6 +887,9 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     syncDataset("google_ads_rsa_assets", () => upsertBatch(supabase, "google_ads_rsa_assets",
       rsaAssetsRaw.map((r) => rsaAssetToDbRow(r, clientId)),
       "client_id,month,ad_id,asset_id")),
+    syncDataset("google_ads_image_assets", () => upsertBatch(supabase, "google_ads_image_assets",
+      imageAssetsRaw.map((r) => displayImageAssetToDbRow(r, clientId)),
+      "client_id,ad_id,asset_id")),
     syncDataset("ads_negative_keywords", () => replaceBatch(supabase, "ads_negative_keywords",
       negativesToDbRows([...adGroupNegRaw, ...campaignNegRaw, ...sharedNegRaw], clientId, now) as unknown as Record<string, unknown>[],
       clientId)),

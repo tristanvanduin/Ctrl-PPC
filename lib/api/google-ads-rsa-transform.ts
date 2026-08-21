@@ -140,6 +140,58 @@ export function adMetaToDbRow(result: AdMetaApiResult, clientId: string): Record
   };
 }
 
+// ── Display-afbeeldingen (migratie 102) ─────────────────────────────────────
+//
+// Zelfde resource als de RSA-mapper hierboven (ad_group_ad_asset_view), nu op de beeld-
+// veldtypes i.p.v. HEADLINE/DESCRIPTION. asset.image_asset.full_size.url is het veld dat
+// getPmaxAssetPerformanceByMonth (google-ads.ts) al bewezen gebruikt, alleen daar via
+// asset_group_asset i.p.v. deze resource.
+
+export interface DisplayImageAssetApiResult {
+  campaignName: string | null;
+  adGroupName: string | null;
+  adId: string;
+  assetId: string;
+  fieldType: string;
+  imageUrl: string;
+}
+
+export function mapDisplayImageAssetApiRow(row: ApiRow): DisplayImageAssetApiResult | null {
+  const view = (field(row, "adGroupAdAssetView", "ad_group_ad_asset_view") ?? {}) as ApiRow;
+  const asset = (row.asset ?? {}) as ApiRow;
+  const adGroupAd = (field(row, "adGroupAd", "ad_group_ad") ?? {}) as ApiRow;
+  const ad = (adGroupAd.ad ?? {}) as ApiRow;
+  const imageAsset = (field(asset, "imageAsset", "image_asset") ?? {}) as ApiRow;
+  const fullSize = (field(imageAsset, "fullSize", "full_size") ?? {}) as ApiRow;
+
+  const imageUrl = asString(fullSize.url);
+  const adId = asString(ad.id) ?? String(ad.id ?? "");
+  const assetId = asString(asset.id) ?? String(asset.id ?? "");
+  if (!imageUrl || !adId || !assetId) return null;
+
+  return {
+    campaignName: asString((row.campaign as ApiRow | undefined)?.name),
+    adGroupName: asString((field(row, "adGroup", "ad_group") as ApiRow | undefined)?.name),
+    adId,
+    assetId,
+    fieldType: asString(field(view, "fieldType", "field_type")) ?? "",
+    imageUrl,
+  };
+}
+
+export function displayImageAssetToDbRow(result: DisplayImageAssetApiResult, clientId: string): Record<string, unknown> {
+  return {
+    client_id: clientId,
+    ad_id: result.adId,
+    asset_id: result.assetId,
+    campaign_name: result.campaignName,
+    ad_group_name: result.adGroupName,
+    field_type: result.fieldType,
+    image_url: result.imageUrl,
+    synced_at: new Date().toISOString(),
+  };
+}
+
 // ── RSA-tekstverrijking (bekende Google Ads API-beperking) ────────────────────────────────
 // Google geeft ad_group_ad.ad.responsive_search_ad.headlines vaak LEEG terug zodra de query op
 // segments.month + metrics segmenteert. De betrouwbare oplossing is een APARTE, niet-
