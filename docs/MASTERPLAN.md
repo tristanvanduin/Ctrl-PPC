@@ -5862,3 +5862,61 @@ masterplan-tekst voordat de eigenaar ze live opnieuw tegenkwam. Onderzoek zonder
 voltooid punt — een regel in dit document die zegt "root cause bekend" moet in dezelfde sessie ook
 een commit-hash krijgen, anders staat hij er volgende keer weer, alleen dan als klacht van de
 eigenaar in plaats van als aantekening van mezelf.
+
+### 17.72 Origineel feedback-PDF nogmaals doorgenomen: checkbox gelokaliseerd, gat in geo-kolom, rest geverifieerd (21 augustus 2026)
+
+Eigenaar stuurde het originele PDF (`c7cbeda9-Feedback.pdf`, 11 pagina's tekst+schermafbeeldingen)
+met het verzoek om nogmaals te checken of alles keurig geanalyseerd en verwerkt is. Dit bleek
+hetzelfde brondocument als 17.68's `f51d6ec6-Feedback_1.md` — dus grotendeels al verwerkt — maar
+met de screenshots zelf erbij kon één langlopend open punt eindelijk gelokaliseerd worden, en een
+tweede, nieuw punt kwam boven water.
+
+**Nieuw gebouwd:**
+- **Checkbox-uitlijning (`cc20416`)** — eindelijk gelokaliseerd: het TO-DO's-paneel
+  (`client-notes.tsx`), een to-do zonder titel ("test 1"). De checkbox lijnt uit op de eerste
+  regel van het blok, en dat was altijd de titel/tijd-regel, ook als de titel leeg is en er dus
+  alleen een tijdstempel rechts stond — de eigenlijke tekst kwam een hele regel later. Tijd
+  verhuist nu naar de contentregel zelf wanneer er geen titel is.
+- **Gat in de landen-tabel-kolom (`cc20416`)** — `geo-breakdown.tsx`: de ranglijst naast de
+  wereldkaart rekte (grid-stretch) altijd mee tot de kaarthoogte. Bij weinig landen (het
+  voorbeeld in het document: Canada + Frankrijk) is ranglijst+totalenblok samen veel korter dan
+  een volle kaart, en bleef daaronder een kaal stuk kolom over — `xl:items-start` laat de kolom
+  zijn eigen hoogte aanhouden.
+
+**Geverifieerd als al gebouwd (agent + eigen code-inspectie, geen actie nodig):**
+- Code Rood-nuance (#30) — `dgm-view.tsx`'s `computeTrajectStatus()`: tempert "rood" naar "oranje"
+  als de andere gevolgde KPI ≥15% boven doel ligt. Exact de gekozen productbeslissing.
+- Creative Performance × campagnetype (#20) — `creative-performance.tsx` + `getDisplayImageAssets()`:
+  Display-campagnes krijgen een eigen "beeldsync bestaat nog niet"-bericht i.p.v. de generieke
+  fallback. Live-ongetest (geen echte Google Ads-koppeling in deze sandbox), maar code-compleet.
+- Cross-channel-tabel witruimte kanaal/resultaten — bevestigd: `breed`-prop al verwijderd
+  (onderdeel van `c09c8b8`).
+- Doelgroepsignalen-donuts (`audience-split.tsx`) — beide ringen gebruiken consistent
+  `flex flex-col items-center`, geen center/left-wisseling zoals bij de eerder gefixte
+  campagnetype-donuts. Geen bug gevonden.
+- PMax Scorecard "krap + wit vlak" — deelt component met Account Health (`HealthBadgeView`), en
+  dat component draagt al uitgebreide fixes voor precies deze klacht (max-w-2xl kolombreedte, de
+  derde-laag "waaruit de score bestaat"-lijst tegen het lege vlak). Geen nieuwe bug gevonden in de
+  code; als dit live nog krap oogt is een verse schermafbeelding nodig om verder te zoeken.
+
+**Genuinely onduidelijk, terugvraag nodig:**
+- **"Prognose klopt nog steeds niet"** (bij de Prognose-tab) — geen enkel concreet getal, verwachte
+  waarde of vergelijking genoemd; zonder een voorbeeld ("X zou Y moeten zijn, dashboard toont Z")
+  is dit niet in code te herleiden tot een specifieke regel. Nieuw punt, niet eerder gezien.
+- **God View "eigen filter tabje"** — feature-verzoek, geen bug; vraagt om scoping (welke filters?
+  los van de bestaande bureau-kiezer of ernaast?).
+- **"Extreem lange pagina, is dit aanraad?"** (bij Master Synthesis/analyse-overzicht) en **"moet
+  hier een analyse-optie staan of hoort alles in de analyse-tab"** — structurele/product-vragen
+  over informatiearchitectuur, geen implementatiepunt zonder een gekozen richting.
+- **"Waar het budget landt" (video/placement-tabellen) witruimte** en **Meta/LinkedIn analyse-tab
+  layoutverschil met Google** — beide vallen onder de al aan de eigenaar voorgelegde
+  productbeslissing over kanaalpariteit (17.68's `#6/#21/#25/#26`); geen nieuwe actie totdat daar
+  een keuze in valt buiten de al gekozen campagnetype-tabs.
+
+**Al beantwoord, geen actie**: "Weken tot beurs" generiek maken (onderliggende logica al generiek,
+17.68 #12), God Mode account-benoeming (bewuste pseudonimisering, 17.69's decision), SOP-cleanup
+(script staat klaar, vereist `SUPABASE_SERVICE_ROLE_KEY` — moet door de eigenaar zelf gedraaid
+worden, geen sandbox-toegang), Beurzen/momenten-naam (al "Beurzen & momenten").
+
+**Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
+groen. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
