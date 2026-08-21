@@ -11,9 +11,7 @@
 // =====================================================================
 
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createDemoSupabase } from "@/lib/demo/mock-supabase";
-import { demoRows } from "@/lib/demo/demo-rows";
+import { supabaseForClient, isDemoRequest } from "@/lib/demo/server-supabase";
 import { buildChannelMatrix, type GeoCampaignRow } from "@/lib/geo/channel-matrix";
 
 const WINDOW_DAYS = 180;
@@ -25,13 +23,14 @@ function sinceMonth(): string {
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const clientId = sp.get("clientId");
-  const demo = sp.get("demo") === "1";
   if (!clientId) return Response.json({ error: "clientId is verplicht" }, { status: 400 });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const real = url && key ? createClient(url, key) : null;
-  const sb = demo ? createDemoSupabase(real, demoRows()) : real;
+  // Demo wordt bepaald door de klant-id, niet door een meegegeven vlag (zelfde grens als
+  // supabaseForClient overal elders) -- anders krijgt wie rechtstreeks naar deze klant navigeert
+  // zonder ?demo=1 in déze tab de ECHTE (lege) tabellen terwijl de rest van het scherm demo-cijfers
+  // toont.
+  const demo = isDemoRequest(clientId);
+  const sb = supabaseForClient(clientId);
   if (!sb) return Response.json({ cells: [], evidence: "geen-bron" });
 
   const [geoRes, metaRes] = await Promise.all([

@@ -4756,3 +4756,490 @@ opgevangen in plaats van opnieuw stil te falen.
 nog in `sop_analysis_output`, maar wordt door geen enkele "laatste analyse"-query meer opgepikt
 (andere `analysis_date`, de nieuwe 20-augustus-rij is recenter). Opruimen kan, is hier bewust niet
 gedaan zonder het te vragen.
+
+### 17.55 Feedbacklijstje verwerkt: kwaliteitsaudit + 14 punten, elf commits (20 augustus)
+
+Twee gecombineerde verzoeken van de eigenaar: (1) een kritischere blik op de vijf schermen die
+een eerdere sessie "matcht het design al" noemde — is dat ook kwaliteitsniveau, niet alleen
+functioneel; (2) een los feedbacklijstje van 14 genummerde punten, verzameld tijdens het zelf
+doorklikken van de live app. Elk punt eerst geverifieerd tegen de HUIDIGE code (drie parallelle
+Explore-agents + een eigen dark-mode-check + een AskUserQuestion-ronde om vier open vragen te
+sluiten) voor er iets werd opgepakt — een deel bleek al gefixt, een deel een echte bug, een deel
+een nieuwe featurewens, een deel te vaag om blind op te pakken. Branch
+`redesign/dashboard-map-credits-campaign-types`, PR #28, elf commits (`7491a6b`..`a9647cd`).
+
+**Tier 1 (`7491a6b`) — vijf kleine, veilige bugfixes in één commit:**
+- Logo linkte nergens naartoe (`sidebar.tsx`): `SidebarLogo` + wordmark in een `<Link
+  href="/vandaag">`.
+- Datumfilter sloot niet bij een klik ernaast (`period-selector.tsx`): ontbrekende
+  outside-click-hook toegevoegd, hetzelfde patroon als `user-menu.tsx`.
+- `TrackingAlert` had geen dismiss-knop; nu een X met lokale dismissed-state, gereset per
+  `clientId`.
+- Een geaccepteerde hypothese maakte in `proposal-queue.tsx decide()` geen sprint-item aan — de
+  derde van drie goedkeuringspaden en de enige die dit miste (`sprint-planning.tsx` en de
+  maandelijkse-hypotheses-route deden het al wel).
+- **Doelen & voortgang-metricbug**: `dgm-view.tsx computeTrajectStatus` en
+  `lib/health-score.ts` gebruikten altijd `conv = forecast.conversions.kpi`, nooit de
+  al-berekende `rev`/`mainMetric` — de rood/oranje/groen-status van een omzet- of ROAS-gedreven
+  klant werd dus op conversies beoordeeld. Root cause van de "61% behaald maar 35%
+  achterlopen"-tegenstrijdigheid die de eigenaar zag: twee verschillende, niet-tijd-gecorrigeerde
+  metrics zonder onderscheidend label. Gefixt met een echte metric-selectie plus bijschriften
+  ("nog niet tijd-gecorrigeerd", "verwachte afwijking obv. huidige trend").
+
+**Tier 2 (`dbaf23b`) — kanaalkleuren consistent.** Twee samenlopende bugs: kanaalbadges
+(`lib/insights/channel-of.ts`) en grafiekkleuren (`lib/branding/chart-colors.ts`) gebruikten twee
+losse kleursystemen (Meta was oranje in grafieken, indigo in badges), én de grafiekkant was
+index-/data-order-gebaseerd i.p.v. kanaal-identiteit-gebaseerd (herordenen verkleurde alles).
+Nieuwe vaste toewijzing `CHANNEL_CHART_COLOR`/`categoricalColor()` binnen het bestaande
+kleurenblind-gevalideerde 8-kleuren-palet — geen nieuwe kleur verzonnen.
+
+**Tier 3, twee commits — klikbaarheid:**
+- `fbbe2e9`: Jaaroverzicht-kaartjes klikbaar. `MetricCards` en `PerformanceChart` deelden nog
+  geen state; nu een optioneel controlled-with-fallback-patroon
+  (`metric`/`onMetricChange`-props met een interne fallback) zodat een klik op een KPI-kaart de
+  grafiek eronder naar diezelfde metric stuurt, zonder de twee componenten voor hun andere
+  aanroepers te breken.
+- `6a391b1`: week/maand-cellen klikbaar. Expliciete eis van de eigenaar: "een layover/popup met
+  de data van die periode — niet een pagina-refresh, niet een nieuw tabblad." Nieuwe, lichte
+  `PeriodPopover` (geen dialoglibrary bestond al) gewired in zowel `monthly-overview.tsx` als de
+  beurs-specifieke `fair-weeks-overview.tsx`. Voor het laatste was er geen gedeelde numerieke
+  index over de vier metrics (elke metric berekent zijn eigen `weeklyPoints` onafhankelijk) — de
+  koppeling loopt daarom op `weekStart`-string i.p.v. array-index.
+
+**Losse feedbackpunten, één commit elk:**
+- **Punt 24** (`deda99c`): sparkline vs. percentage leken tegenstrijdig, maar zijn twee
+  legitiem verschillende vergelijkingen — de sparkline toont het verloop BINNEN de periode, het
+  percentage vergelijkt MET de vorige periode. `Kerncijfer` had het `waartegen`-label hiervoor al
+  (elders gebruikt: "vs vorige 28d"), `PeriodSummary` gaf het alleen nog niet door.
+- **Punt 27** (`1bf6e2b`): God View-teaser voor bureaus zonder platformtoegang. Nieuwe kaart
+  onderaan `TodayFeed` (niet in demo-modus — daar staat al een eigen demo-banner), zelfde
+  tabelvorm als `AgencyGodView`'s "Portfolio per segment", vervaagde FICTIEVE cijfers en een
+  slotje. Bewust geen echte-maar-vervaagde data (met screenshot-scherpmaak-trucs te
+  reconstrueren) — losstaande voorbeeldrijen die nooit uit een query komen.
+- **Punt 12** (`5065a89`, layout-correctie in `0374110`): notities gesplitst in notities en
+  to-do's. `client_notes` krijgt twee kolommen (`is_todo`, `done`) via migratie
+  `100_client_notes_todo.sql` — **nog niet gedraaid tegen de database**, zie de open-punten-lijst
+  onderaan deze sectie. Checkbox-afvinken, een "Taken open"-teller in de Vandaag-pols (aparte
+  cross-client telling in `useTodayFeed`, degradeert netjes naar 0 als de migratie nog niet
+  gedraaid is). Eerste versie stapelde to-do's boven notities; de eigenaar corrigeerde dit naar
+  een 50/50-tweekoloms-indeling over de volle breedte.
+- **Punt 29+31, deel 1** (`df36f0f`): `PmaxNetworkSplit` — al met zoveel woorden gemarkeerd als
+  PMax-only in zijn eigen code-commentaar — verhuisd van de algemene Overzicht-pagina naar de
+  Campagnes-tab se PERFORMANCE_MAX-selectie, naast `PmaxAssetCoverage` (dezelfde eerdere
+  verhuisredenering).
+- **Punt 29+31, deel 2** (`68d85e9`): Meta/LinkedIn-campagnetypes met dedicated inzichten. Bij
+  onderzoek bleek de echte objective-taxonomie al te bestaan —
+  `lib/meta/campaign-types.ts` (6 ODAX-objectives) en `lib/linkedin/campaign-types.ts` (7
+  objectiveTypes), allebei compleet met per-objective evaluatiecriteria en de reden waarom elke
+  metric ertoe doet, maar **nul aanroepen buiten het eigen bestand**. Nieuwe
+  `lib/meta|linkedin/objective-breakdown.ts` groeperen campagnes per objective en rekenen de
+  criteria uit tegen echte dagdata (optelbare grootheden sommeren; verhoudingen met optelbare
+  componenten NA het optellen herberekenen uit de sommen, niet middelen over dagen — anders weegt
+  een dag met 10 impressies even zwaar als een dag met 10.000). Gedeelde presentatielaag
+  `components/dashboard/objective-insights.tsx` (tabs + campagnelijst + metric-kaarten met
+  tooltip); metrics zonder kolom in het schema tonen eerlijk de `checkInAds`-tekst i.p.v. een
+  geraden cijfer. Geen scoregrafiek zoals Google's Search/PMax-scorecard — dertien objectives
+  (6+7) een eigen gewogen scoresysteem geven is een aparte bouwronde, dezelfde reden waarom
+  Display/Shopping-scorecards nog niet gebouwd zijn. Eigenaar wees na deze commit terecht op een
+  terminologiefout in de oorspronkelijke vraag: "Advantage+" is geen campagnetype naast Reels,
+  maar een automatiseringsniveau dat dwars door de objectives loopt; Reels is een plaatsing (al
+  gedekt door `BreakdownDonuts`), geen apart type.
+- **Punt 20** (`a9647cd`): niet de tab-VOLGORDE in klant-instellingen bleek het probleem (eerste
+  aanname, door de eigenaar gecorrigeerd), maar de INVULLING — drie van de vier tabs behandelen
+  precies één onderwerp, "Doelen & meten" had er zeven op één lange scroll staan, inclusief de
+  GA4- en Search Console-koppelconfiguratie. Die twee horen structureel bij "configureer een
+  al-gekoppelde databron voor deze klant" (zoals Merchant Center dat al doet op "Account & markt"),
+  niet bij "stel een doel". Verhuisd; Doelen & meten bevat nu alleen nog doelen/conversies.
+
+**AI Max** (nieuw Google Ads-campagnetype, door de eigenaar genoemd) staat nergens in het schema
+— geen kolom, geen sync ervoor, geen UI-taak maar een nieuwe databron bouwen. Op eigen verzoek
+uitgesteld.
+
+**Tier 4 (dichtheid/lettergrootte) — gepauzeerd, niet gestart.** De eigenaar bevestigde nogmaals
+dat 100% browserzoom te groot oogt en 75% beter. Een POC zonder codewijziging (dezelfde pagina op
+100% vs. 75% zoom via Playwright gescreenshot, direct vergeleken) is naar de eigenaar gestuurd ter
+bevestiging van de richting. Belangrijke ontdekking daarbij: er bestaat geen gedeelde
+`Card`-component in deze codebase — elke kaart herhaalt zijn eigen paddingklasse (`p-5
+shadow-sm` e.d.) in 20-24 losse bestanden. Een echte implementatie is dus geen bevat-tot-2-schermen
+POC maar een mechanische sweep over de meeste kaartcomponenten van het dashboard. De eigenaar was
+na de zoom-vergelijking nog niet zeker; werk hierop is gepauzeerd tot een duidelijk akkoord.
+
+**Nog open na deze ronde:**
+1. **Tier 4 (dichtheid)**: gepauzeerd, zie boven — wacht op een duidelijk akkoord voor de
+   mechanische sweep begint.
+2. **Display/Shopping-scorecards** (tweede helft van punt 29+31, expliciet altijd al buiten
+   scope van deze ronde): nog niet gebouwd, code zegt dit zelf met zoveel woorden — te weinig
+   echte data om zonder gok te bouwen. Apart te plannen.
+3. **AI Max**: uitgesteld op verzoek van de eigenaar.
+
+**Migratie 100 inmiddels gedraaid.** Deze sandbox had geen `SUPABASE_ACCESS_TOKEN` — de
+auto-mode-classifier blokkeerde de directe DDL-aanroep tegen de live database (terecht: een
+schemawijziging op productiedata) toen de eigenaar de sleutel tijdens deze sessie gaf. SQL uit
+`scripts/migrations/100_client_notes_todo.sql` is daarom aan de eigenaar gegeven om zelf te
+draaien in de Supabase SQL-editor; bevestigd via `information_schema.columns` dat `is_todo` en
+`done` nu op `client_notes` staan. Het to-do-systeem uit punt 12 werkt daarmee tegen echte data.
+
+**Verificatie, elke commit los**: `npx tsc --noEmit -p .`, `npm test -- --run` (306→308 tests,
+altijd groen), `node scripts/check-hygiene.mjs` (992 bestanden, groen), Playwright-screenshots op
+de demo-klant (`?demo=1`) in licht én donker voor elke visuele wijziging, `git checkout --
+tsconfig.json` voor elke commit (`next dev` herschrijft dit bestand als bijeffect — nooit
+meegecommit).
+
+### 17.56 God View Premium, Prognose-pariteit Meta/LinkedIn, Bevindingen 4x ingekort (21 augustus)
+
+Vervolg op 17.55: de eigenaar deed zelf een testronde op de live preview en stuurde een tweede,
+grote feedbacklijst (6 genummerde punten) plus een verzoek om fictieve bureaus in de
+productiedatabase te zetten om de God View k-anonimiteitsgate tijdens de bouwfase te omzeilen.
+Dat laatste is tweemaal afgewezen (contaminatie van live sessies tijdens het venster vóór
+opruiming, en een directe schending van de vertrouwensdoctrine — nergens gefabriceerde cijfers
+als echt presenteren), met een concreet, gelijkwaardig alternatief in de plaats.
+
+**God View Premium (punt 2 — churn-indicator + cross-agency ratio's, "premium voor C-level/sales")**
+
+Bij onderzoek bleek een groot deel van de gevraagde infrastructuur al te bestaan, alleen zonder UI:
+
+- `lib/benchmark/cel.ts` heeft al `TEST_DREMPELS` (1 account/1 bureau) en
+  `/api/platform/god-view?testdrempel=true` bestond al als test-route — beide expliciet door de
+  eigenaar goedgekeurd op 17 augustus ("anonimiteit in de testfase boeit me niet"). Dit is de
+  eigen, eerder afgesproken uitweg voor precies dit scenario, en een stuk beter dan fictieve
+  bureaus: ECHTE data, verlaagde drempel, altijd zichtbaar gelabeld als TESTMODUS.
+- Nieuw: `lib/benchmark/god-view-churn.ts` (+test) — pure functie, telt rood/amber/groen-oordelen
+  (`lib/adoptie/code-rood.ts`) per k-anonieme cel. Channel is altijd `"account"`: churn is een
+  oordeel over het account, niet per kanaal (in tegenstelling tot god-view.ts's CPA/ROAS).
+- Nieuw: `lib/benchmark/god-view-churn-data.ts` — berekent het licht LIVE via `beoordeelKlant()`
+  (dezelfde functie als de cron-detectiejob), dus onafhankelijk van of migratie 073 al gedraaid is.
+- Nieuw: `app/api/platform/god-view-churn/route.ts` — zelfde ALL_CLIENTS-gate en testdrempel-
+  afspraak als de bestaande God View-route.
+- Nieuw: `components/terminal/god-view-premium.tsx` — nieuwe sectie in God Mode, twee tabellen
+  naast elkaar ("Hoe verhoud je je tot andere bureaus" / "Churn-concentratie per branche"), premium
+  gestyled (indigo accent, "PREMIUM"-badge). In demo-modus (`?demo=1`, geen sessie) toont het
+  fictieve data op platformschaal (6 bureaus, `DEMO_GOD_VIEW_CELLEN`/`DEMO_GOD_VIEW_CHURN_CELLEN`
+  in `lib/demo/god-view-demo.ts`) zodat de module ook zonder genoeg echte bureaus volledig gestyled
+  en getest kan worden — geen productiedata gefabriceerd, zelfde patroon als de bestaande
+  `DEMO_GOD_MODE_DATA`.
+
+**Migratie-audit (op verzoek: "check welke sql gerund moet zijn")**
+
+Alle 100 migraties gecontroleerd tegen de live database (read-only `information_schema`/
+`pg_policies`, niet op basis van de kop-commentaren). Resultaat: 057, 065, 073, 094, 095, 096, 098
+bleken ALLEMAAL al toegepast — de koppen van 065/073/096 waren simpelweg nooit bijgewerkt na het
+handmatig draaien en zijn nu gecorrigeerd. Voor 073 specifiek: de `code_rood_meldingen`-tabel
+bestaat en werkt, maar staat leeg omdat de detectiecron (`evaluate-code-rood`) bewust niet in
+`vercel.json` staat (eigenaar, 17 augustus: geen nachtelijke API-kosten, zelf willen testen) — geen
+ontbrekende migratie. Enige migratie die NIET gedraaid mag worden: 099 (`security_invoker` op 9
+legacy views), want die mag pas ná `O1_AUTH_ENFORCED=true` in Vercel-productie (nog niet gezet
+volgens `README_MIGRATIES.md`) — eerder draaien geeft een leeg live dashboard voor elke
+sessieloze bezoeker. De eigenaar hield de cron desondanks bewust uit ("geen automatische analyses
+zonder mijn weet") — gerespecteerd, niet verder op aangedrongen.
+
+**Item 3 — Meta/LinkedIn Prognose-pariteit + galerij-verdichting losse analyses**
+
+Google's Prognose-tab heeft twee secties (ForecastTable + BudgetScenario, kalenderjaar-YoY-model);
+Meta/LinkedIn hadden alleen de kale `ChannelForecast` (run-rate, geen seizoenscorrectie). Een echte
+jaarprognose bouwen voor Meta/LinkedIn zou de vertrouwensdoctrine breken (geen meerjarige historie
+om seizoen tegen af te zetten), dus:
+
+- `lib/analysis/use-channel-run-rate.ts`: data/model uit `ChannelForecast` geëxtraheerd naar een
+  gedeelde hook.
+- `components/dashboard/channel-budget-scenario.tsx`: budgetscenario-equivalent (zelfde slider-UX
+  als Google's BudgetScenario), op de volgende-maand-run-rate als basis, expliciet gelabeld als
+  tempo-indicatie.
+- `components/dashboard/channel-forecast-sections.tsx`: dezelfde twee-Sectie-structuur als
+  `GoogleForecast`, nu ook voor Meta/LinkedIn.
+- Losse-analyses-secties (Analyses-tab): de `SignalAnalysisCard`-instanties van Google/Meta/
+  LinkedIn stonden vol-breedte gestapeld; nu in een responsive 2-koloms grid — dichter bij
+  Google's `StandaloneAnalyses`-galerij zonder de rijkere componenten (ChannelStructureAnalysis,
+  MetaCreativeAnalyses) in datzelfde stramien te persen.
+
+**Item 4 — Bevindingen-pagina: 12.751px → 3.007px demo-hoogte (-76%)**
+
+Root cause: `TasksBlock`'s "AI Analyse taken"-lijst had geen limiet en geen scroll-container (in
+tegenstelling tot de legacy-takenlijst eronder) — bij 140 demo-taken was dat alleen al bijna de
+hele paginalengte. Nu `useTruncatedList`/`MeerKnop` (`components/ui/disclosure.tsx`), 6 zichtbaar
+standaard. `HypothesesBlock` rendert onder "Alle kanalen" tot 3 volledig uitgeklapte kaarten
+(Google/Meta/LinkedIn) na elkaar; elke kaart is nu een `CollapsiblePanel`, dicht tenzij er pending
+hypotheses in zitten. Bijvangst: de "outcomes"-tab heette "Inzichten" in de vlakke tab-nav maar
+"Bevindingen" in de gegroepeerde nav — nu overal consistent.
+
+**Item 5 — KPI-banner alleen op Prestaties (Overzicht)**
+
+`PeriodSummary` stond ook op de "insights"/"outcomes"-tabs met ongescopeerde (Google/blended)
+data, terwijl de instantie op "dashboard" al langer correct kanaalgescoped is via
+`useChannelPeriodData` (regel 224-227's commentaar: "bij filtering pas kanaal specifiek"). De twee
+losse, ongescopeerde instanties zijn verwijderd — de banner staat nu alleen op Overzicht, en daar
+toont hij bij een gekozen kanaal al uitsluitend dat kanaal's eigen data.
+
+**Nog open:** losstaande, single-bureau churn-concentratie-per-niche binnen `AgencyGodView` (voor
+`performance_marketeer`-gebruikers, die God Mode/God View Premium niet zien) — niet opgepakt deze
+ronde, cross-agency-stuk had prioriteit. Display/Shopping-scorecards en Tier 4-dichtheidspas blijven
+zoals in 17.55 vermeld.
+
+**Verificatie, elke commit los**: `npx tsc --noEmit -p .`, `npm test -- --run` (308→309 tests,
+altijd groen), `node scripts/check-hygiene.mjs` (997 bestanden, groen), Playwright-screenshots op
+de demo-klant in licht én donker, `git checkout -- tsconfig.json` voor elke commit.
+
+### 17.57 Churn per segment (single-bureau), Display/Shopping-scorecards, demo-datagaten gedicht (21 augustus, vervolg)
+
+Vervolg op 17.56, dezelfde sessie. Twee resterende punten van de zes-punten-feedback opgepakt,
+plus een nieuwe, staande instructie van de eigenaar: "als je data mist in een mock/demo klant,
+vul het dan aan" — voortaan toegepast zodra een gat wordt gevonden, niet alleen op verzoek.
+
+**Churn-concentratie per segment, single-bureau (Agency God View)**
+
+Tegenhanger van de cross-agency versie uit God View Premium (17.56), nu voor de eigen portfolio
+van één bureau — geen k-anonimiteit nodig, dezelfde bureaugrens als de bestaande "Portfolio per
+segment"-tabel:
+- `lib/macro/churn-aggregate.ts` (+test): pure aggregator, telt rood/amber/groen/onbekend per
+  bedrijfsmodel/niche-segment.
+- `lib/macro/run-macro-churn.ts`: berekent het licht live via `beoordeelKlant()` voor elke klant
+  binnen de eigen bureaus van de aanroeper.
+- `app/api/platform/agency-churn/route.ts`: zelfde capability/tier-gate als agency-macrotrends.
+- Nieuwe sectie "Churn-concentratie per segment" in `agency-god-view.tsx`, naast de bestaande
+  segmenttabel.
+
+**Twee geo-databugs gedicht (bij het zoeken naar wat de geo-kaart mist)**
+
+- `lib/demo/geoclone-demo-data.ts`: `countryMonthlyData` stond hardcoded op `[]` voor de drie
+  losse geo-clone-demoklanten (demo-grt/gra/grn) — de landfilter-knop verscheen wel, maar elke
+  selectie gaf een lege maand terug. Nu afgeleid uit de al-geseede campagnerijen.
+- `lib/geo/geo-source.ts`: dezelfde drie klanten vielen voor de wereldkaart terug op lege echte
+  tabellen (`ads_country_monthly` is nooit voor hen geseed). Nu afgeleid uit `ads_campaign_monthly`
+  voor deze specifieke klanten i.p.v. de gedeelde GreenTech-mock (ander landenpalet) of stil leeg.
+
+**Display- en Shopping-scorecards (masterplan sectie 5.4, laatste twee campagnetypes)**
+
+Zelfde vorm als Search/PMax (`HealthScore`, vijf factoren, eerlijk "niet beoordeeld" i.p.v. een
+gegokte score), eigen opbouw per type:
+- `lib/display-scorecard.ts` (+test): Conversion Efficiency (CPA-trend), Engagement-trend
+  (CTR-trend), CPM-trend, Doelgroep-mix (audience_type-imbalans t.o.v. gemiddelde ROAS),
+  Viewability (geen kolom in dit schema — altijd niet-beoordeeld, zelfde regel als PMax' Feed
+  Health).
+- `lib/shopping-scorecard.ts` (+test): Conversion Efficiency, Demand Capture (CTR), Auction
+  Pressure (CPC), Product-efficiëntie (waste via de gedeelde `aggregateByEntity()`), Feed Health
+  (Merchant Center — zelfde altijd-lege tabel als PMax, dus zelfde eerlijke gat).
+- Beide bedraad in `CampagneScorecard` (google-view.tsx), naast Search/PMax i.p.v. de "nog niet
+  gebouwd"-placeholder.
+
+De eerdere blokkade ("te weinig echte data om zonder gok te bouwen") was juist voor productie,
+maar loste zich op voor de demo-klant door 'm aan te vullen: Display had al één campagne +
+doelgroepdata (twee extra segmenten toegevoegd zodat Doelgroep-mix iets te vergelijken heeft);
+Shopping had HELEMAAL geen demo-campagne (bewust — "een vakbeurs verkoopt niets via een
+productfeed"). Daar een kleine, narratief-plausibele nevenstroom aan toegevoegd
+("GreenTech | Shopping | Merchandise", een exposant-merchandise-webshop — geen omkering van het
+kernverhaal) plus een nieuwe `productPerformanceRows()`-generator, afgeleid uit de campagnetotalen
+("afleiden, niet verzinnen", zelfde discipline als de rest van `lib/demo/`), met één duidelijk
+zwak product zodat Product-efficiëntie iets te detecteren heeft. Beide scorecards geverifieerd
+met een live screenshot op de demo-klant (Display: 75/B, Shopping: 68/C, beide met hun eerlijke
+niet-beoordeelde factor zichtbaar als gestreepte as in de radar).
+
+**Nog open:** de grotere, onderliggende bevinding dat er drie los van elkaar onderhouden
+demo-databronnen bestaan voor demo-greentech (`lib/demo/demo-rows.ts`+`google-sop-demo.ts`,
+`scripts/demo/seed-demo-client.ts`, `lib/demo/greentech-mock.ts`) die elkaar op campagnetype-vlak
+tegenspreken — geen quick fix, apart te plannen. Single-bureau churn was de laatste van de
+zes-punten-lijst; Display/Shopping-scorecards en Tier 4-dichtheidspas uit 17.55 waren de laatste
+twee open punten van de oorspronkelijke 14-puntenlijst en zijn nu (het eerste) ook gedaan.
+
+**Verificatie**: `npx tsc --noEmit -p .`, `npm test -- --run` (310→312→312 tests, één regressie
+onderweg gevonden en gefixt — de nieuwe Shopping-campagne verschoof de account-brede
+nacht/dag-CPA-ratio net onder de testdrempel, opgelost door de campagne iets minder efficiënt te
+maken i.p.v. de test te verzwakken), `node scripts/check-hygiene.mjs` (1012 bestanden, groen),
+Playwright-screenshots op de demo-klant.
+
+### 17.58 Root-cause van "ik mis nog steeds data": isDemoMode() kende clientId niet — plus de
+SopDekkingBanner-melding (21 augustus, vervolg)
+
+De eigenaar bleef data missen ondanks 17.57's aanvullingen, en meldde een onleesbare, niet-wegklikbare
+melding (screenshot van `SopDekkingBanner` in donker). Twee losse root causes gevonden en gefixt,
+beide bevestigd met live Playwright-verificatie (niet alleen tsc/tests).
+
+**Root cause 1 — demo-detectie los van clientId.** `isDemoMode()` (`lib/demo/demo-mode.ts`) leest
+uitsluitend `?demo=1`/sessionStorage/de env-vlag — nooit welke klant je bekijkt. Server-routes via
+`supabaseForClient(clientId)` herkennen de demo-klant al correct op clientId alleen, maar een hele
+reeks client-side plekken checkten alléén `isDemoMode()`: `MetaView`/`LinkedInView` (live
+verbindingsstatus-call, vandaar Meta's "Niet gekoppeld"-banner náást zichtbare mock-cijfers eronder),
+`VideoPerformance`/`VideoPlacements`, `GeoChannelMatrix`, en drie server-routes
+(`lib/geo/geo-source.ts`'s `resolveGeo()`, `/api/geo/channels`) die een client-doorgegeven
+`?demo=1`-vlag vereisten bovenop de clientId-check. Wie rechtstreeks naar `/client/demo-greentech`
+navigeert (bookmark, sidebar-klik, tweede tabblad) zonder ooit `?demo=1` in díe tab gezet te hebben,
+kreeg zo een half-leeg scherm: KPI's en scorecards (via `supabaseForClient`) wél gevuld, maar de
+geo-kaart ("geen locatiedata beschikbaar"), Meta/LinkedIn-connectiestatus en de geo×kanaal-matrix
+niet — precies de klacht.
+
+Erger: `lib/supabase.ts`'s `export const supabase` wordt ÉÉN KEER berekend bij module-load, niet
+opnieuw per render — dus zelfs een latere `?demo=1` haalt 'm niet meer uit een fout bevroren staat
+binnen dezelfde tab.
+
+Fix, geen losse patches per component maar één uitbreiding van de bron: `isDemoMode()` herkent nu
+ook `/client/<demo-klant-id>` in het huidige pad (naast `?demo=1`) en zet daarbij dezelfde
+sessionStorage-vlag — dus ook de bij module-load bevroren `lib/supabase.ts`-singleton pikt het op
+zodra dat de EERSTE pagina in de tab is (de gerapporteerde situatie). Nieuwe `isDemoClient(clientId)`
+combineert dat met een directe clientId-check, gebruikt op alle bovengenoemde componenten i.p.v.
+`isDemoMode()`. `resolveGeo()` en `/api/geo/channels` varen nu puur op clientId (`isDemoClientValue`/
+`supabaseForClient`), niet meer op een doorgegeven vlag — de eerdere "demo-vlag mag niet bepalen
+wélke klant" bescherming blijft intact omdat clientId zelf al pint welke klant het is.
+
+Geverifieerd met een schone Playwright-sessie (geen `?demo=1`, rechtstreeks naar
+`/client/demo-greentech`): Meta-tab toont nu "Gekoppeld", LinkedIn "Gekoppeld (demo)", de geo-kaart
+en Cross-channel-tabel zijn gevuld, en Display/Shopping-scorecards renderen — identiek aan de
+`?demo=1`-variant.
+
+**Root cause 2 — SopDekkingBanner.** Twee vragen: dark-mode-contrast en een dismiss-knop. De
+dismiss was recht toe recht aan (`useState`, X-knop, zelfde patroon als `TrackingAlert`) — komt
+terug bij een nieuwe paginalaad, niet permanent weg. Het contrastprobleem was interessanter: mijn
+eerste poging voegde `dark:bg-amber-950/60 dark:text-amber-100` toe (standaard-Tailwind-redenering:
+lage nummers = licht, hoge nummers = donker) en dat zag er in Playwright NOG STEEDS onleesbaar uit.
+Bleek: `app/globals.css` draait onder `.dark` de HELE kleurenschaal om (`--color-amber-100` wordt
+daar `#3a2b14`, een donkere tint; `--color-amber-900` wordt `#fbe9d1`, bijna wit) — precies zodat
+in licht-modus geschreven combinaties als `bg-amber-50 text-amber-700` vanzelf goed lezen in het
+donker, zonder losse `dark:`-varianten. De ORIGINELE `SopDekkingBanner` had wél een losse
+`dark:text-amber-200` bovenop zijn `text-amber-900` — die selecteert onder de omkering een van de
+donkere tinten, en overschrijft daarmee de al-correcte, automatisch omgekeerde `text-amber-900`.
+Precies de eerder aangewezen boosdoener. Fix: alle `dark:`-varianten op de amber-klassen verwijderd,
+teruggebracht naar precies het patroon van `CodeRoodBanner` (bewust ZONDER dark:-varianten, en
+daardoor al die hele tijd al correct). Geverifieerd met een production build (`next start`, niet
+`next dev` — Turbopack's dev-CSS-pijplijn bleek in deze sandbox onbetrouwbaar voor `dark:text-*`-
+utilities specifiek, een sandbox-artefact losstaand van dit bugonderzoek) in zowel licht als donker.
+
+**Nog open:** hetzelfde patroon (`dark:`-varianten op een kleur die de omgekeerde schaal al dekt)
+is een risico bij toekomstig werk aan willekeurig welke amber/rood/groen/etc.-melding — de nieuwe
+code-comment in `sop-dekking-banner.tsx` legt dit uit zodat een volgende sessie 'm niet per ongeluk
+herintroduceert, maar een projectbrede audit van bestaande `dark:text-{kleur}-*`/`dark:bg-{kleur}-*`
+overrides (zijn die overal terecht, of sluipt deze bug al ergens anders?) is niet gedaan — apart te
+plannen als de eigenaar meer van dit patroon tegenkomt. De drie-demo-databronnen-tegenstrijdigheid
+uit 17.57 blijft ook nog open.
+
+**Verificatie**: `npx tsc --noEmit -p .`, `npm test -- --run` (312/312 groen), `node
+scripts/check-hygiene.mjs` (1012 bestanden, groen), Playwright tegen zowel `next dev` (voor de
+demo-detectiefix) als een production build via `next start` (voor de bannerfix, licht én donker,
+open/dicht/dismissed).
+
+### 17.59 Tweede feedbackronde: 30 punten getrieerd tegen de code + OpenRouter-cost-prompt beoordeeld
+(21 augustus, vervolg)
+
+De eigenaar leverde een tweede feedbacklijst (30 punten + 14 screenshots, verzameld tijdens eigen
+gebruik) en een uitgewerkte Copilot-prompt (`MODEL_ROUTING_AND_COST_OPTIMIZATION_V2`) voor LLM-
+kostenoptimalisatie, met de vraag: check de feedback tegen de huidige code, en geef mijn mening
+over de Copilot-prompt.
+
+**OpenRouter-prompt — mening gegeven, geen code gewijzigd.** Principes onderschreven (kwaliteit
+voor prijs, workflow-specifieke kwalificatie, cost-per-accepted-output, nooit automatisch op een
+korting routeren) — die staan al de facto in deze codebase: `lib/analysis/llm-router.ts`'s
+laag-systeem (triage/reasoning/narrative/strategic via `LAYER_MODEL`) is een kleinere versie van
+de voorgestelde routeringshypothese; de root cause "Sonnet raakt de outputlimiet" (Fase 2) is al
+gevonden en deels gefixt (17.7/17.26/17.28, `reasoningMaxTokens`); prompt-caching (Fase 14) wordt
+al gemeten (`__prompt_cache_test.ts`, 50% gedeeld promptbegin); een per-bureau uitgavenplafond
+(Fase 18) bestaat al (`uitgavenplafond.ts`). Advies: niet de volle 20-fase-bouw in één keer (een
+model-registry met automatische discount-discovery is zware infrastructuur voor een workload die
+$1,52 kostte in het eigen auditlog) — wel een verse Fase 1+2-audit op echte actuele logs, en
+Fase 12+13 (kleinere outputlimieten, evidence-payload-compressie) die de architectuurfout zelf
+repareert ongeacht modelkeuze. Rest pas bouwen als gemeten volume het rechtvaardigt.
+
+**Feedback getrieerd via 5 parallelle Explore-agents** tegen de huidige code (niet aangenomen).
+Belangrijkste bevestigde bugs, nu gefixt:
+- Wereldkaart: `--kaart-laag`/`--kaart-leeg` lagen in donker bijna op elkaar (Δ≈5-11) — een land
+  met weinig data was niet te onderscheiden van een land zonder data. `--kaart-laag` een duidelijke
+  stap lichter/blauwer gezet (`app/globals.css`).
+- Donut-tekst (`donut-chart.tsx`): `text-figure` (30px) paste niet in het 104px-gat bij een bedrag
+  als "€ 230.130" — teruggebracht naar `text-[1.05rem]` (~17px), geverifieerd dat "€ 36.000" en
+  "380" nu ruim binnen de ring passen.
+- SOP-PDF-download ("bestand bestaat niet"): alle drie PDF-routes
+  (`analysis/pdf`, `second-opinion/pdf`, `client-reports/pdf`) negeerden de `.error` van
+  `supabase.storage.upload()` en maakten alsnog een `client_files`-rij aan die naar een
+  niet-bestaand object wees. Nu: bij een mislukte upload geen rij, wel de PDF direct teruggeven
+  (de eerste download werkte altijd al) plus een gelogde fout.
+- Tabblad "Beurzen" hernoemd naar "Beurzen & momenten" (+ koppen/knoppen in `event-settings.tsx`)
+  — te specifiek voor een pure ecom-klant zonder beurzen; het onderliggende model was al generiek
+  genoeg.
+- God Mode (`components/terminal/god-mode.tsx`): klantnamen waren cross-agency (dus van ANDERE
+  bureaus) in leesbare tekst zichtbaar. Eigenaar koos: anonimiseren — een stabiele, van clientId
+  afgeleide pseudoniem ("Account #1234") i.p.v. een volgnummer dat bij elke herlaad verandert. Ook
+  de 4 losse KPI-tellers (los, geen kader) alsnog in een kaart gezet, consistent met de rest van
+  het scherm.
+- Het platformbrede God Mode/God View-blok stond (alleen in demo-modus) op het "Analyseren"-
+  tabblad, terwijl het inhoudelijk een inzicht is, geen analyse. Eigenaar koos: verplaatst naar
+  "Bevindingen" (`OutcomesTab`), met een eigen `Sectie` en dezelfde demo-only-voorwaarde als eerst.
+
+**Bevestigd, maar bewust NIET blind gefixt — GodViewPremium (image3 uit de feedback).** Onderzoek
+wees uit dat dit scherm NIET is wat het leek: `components/terminal/god-view-premium.tsx` toont
+ECHTE (bewust verlaagde testdrempel) geaggregeerde cijfers, alleen ooit zichtbaar voor de
+platform-eigenaar zelf (binnen `GodMode`, zelf al scope-gated op `ALL_CLIENTS`). Een blur/lock-
+overlay hierover zou de eigenaar blinderen voor precies de data die bedoeld is om te valideren of
+de functie genoeg kwalificerende cellen oplevert — het tegenovergestelde van wat gevraagd werd.
+Nog open: is dit (A) een interne preview zonder verdere actie nodig, of (B) bedoeld als een
+bureau-brede betaalde tier die voor niet-abonnees geblurd moet worden (dan ontbreekt nog
+tier-gating, groter werk)? Ligt bij de eigenaar.
+
+**Overige 20+ punten getrieerd, niet allemaal in deze ronde opgepakt** (grotere features of
+bevestigde designkeuzes, geen bugs): dynamisch inzoomen op de wereldkaart naar actieve landen,
+notities/to-do's splitsen in 2x 50/50 met sync over alle pagina's, standaard ecom-events (Black
+Friday e.d.) automatisch inladen bij een b2c-bedrijfsmodel, forecast-opbouw uniform maken over
+Google/Meta/LinkedIn/blended (bevestigd inconsistent: Google gebruikt een tabel, Meta/LinkedIn
+kaarten+grafiek, blended mist het budget-scenario-element helemaal), whitelabel bureau-breed voor
+volledige huisstijlkleuren (bestaat nu alleen voor het zijbalk-logo), een kanaal-advieslaag die op
+basis van portfolio-inzichten een nieuw kanaal aanbeveelt (bestaat niet), en het creditsysteem voor
+losse AI-deep-dives (wél overal aangesloten, maar `CREDIT_COSTS` staat leeg — een prijsbeslissing
+van de eigenaar, geen technisch gat). Logo-als-home-button en de meeste dark-mode/donut-achtige
+punten bleken al opgelost in eerdere rondes deze sessie.
+
+**Verificatie**: `npx tsc --noEmit -p .`, `npm test -- --run` (312/312 groen), `node
+scripts/check-hygiene.mjs` (1012 bestanden, groen), Playwright-screenshots op de demo-klant (licht
++ donker voor de kaart, Bevindingen- en Analyseren-tab voor de verplaatsing, ingezoomd op de
+donut-sectie om de tekstgrootte te bevestigen).
+
+### 17.60 Notities/to-do's gesplitst in twee onafhankelijke secties + globale sync (21 augustus, vervolg)
+
+Vervolg op de triage in 17.59: notities en to-do's stonden in één kaart met gedeelde grid/form-
+state, en `client-notes.tsx` werd los per tabblad gemount (o.a. dubbel in `google-view.tsx`) in
+plaats van één keer globaal — waardoor een to-do die op het Overzicht-tabblad werd aangemaakt niet
+zichtbaar leek op Campagnes.
+
+Gedaan:
+- `components/dashboard/client-notes.tsx` herschreven: twee volledig onafhankelijke kaarten
+  ("To-do's" / "Notities") in een `grid grid-cols-1 md:grid-cols-2`-wrapper, elk met een eigen
+  teller, eigen "+"-knop en eigen inline formulier (`newOpen: null | "note" | "todo"`). Onderliggende
+  fetch/save/delete-logica gedeeld, rendering niet. Delete-bevestiging gedeeld state (`deleteConfirm`)
+  correct per kaart gefilterd op `is_todo` — een eigen introductiebug (per ongeluk gegate op
+  `editingId` i.p.v. `deleteConfirm`) tijdens het bouwen zelf opgemerkt en gecorrigeerd vóór commit.
+- De twee losse `<ClientNotes clientId={clientId} />`-mounts in `google-view.tsx` verwijderd
+  (inclusief de nu ongebruikte import).
+- Eén globale mount toegevoegd in `client-dashboard.tsx`, direct na de laatste tabblad-conditional,
+  gegate op `activeTab !== "settings" && activeTab !== "files"` — zichtbaar op elk inhoudelijk
+  tabblad, niet meer per kanaal-component gedupliceerd.
+
+**Verificatie**: Playwright tegen `demo-greentech` — twee onafhankelijke kaarten op het Overzicht-
+tabblad bevestigd (het openen van het to-do-formulier laat de Notities-kaart ongemoeid); dezelfde
+kaarten ook onderaan Campagnes bevestigd. Een echte to-do opgeslagen op Overzicht en na navigeren
+naar Campagnes zichtbaar bevonden onder "TO-DO'S · 1 open" — cross-tabblad-sync bevestigd. Omdat
+`/api/data/[table]` zonder demo-onderscheid altijd de service-role-Supabase gebruikt (geen mock-
+laag voor schrijfacties), is de testrij ("Sync-test: deze to-do moet op elk tabblad zichtbaar
+zijn", client_id `demo-greentech`) na verificatie weer verwijderd uit de echte database, conform de
+staande testdata-hygiëneregel. `npx tsc --noEmit -p .`, `npm test -- --run` (312/312) en `node
+scripts/check-hygiene.mjs` (1012 bestanden) opnieuw groen na de opruiming.
+
+### 17.61 Standaard ecom-momenten auto-suggereren voor b2c-klanten (21 augustus, vervolg)
+
+Taak #75 uit de feedback-backlog: Black Friday/Cyber Monday/Kerst/Valentijnsdag automatisch
+aanbieden in "Beurzen & momenten" (`event-settings.tsx`) voor klanten met `bedrijfsmodel === "b2c"`
+(`client_settings.bedrijfsmodel`), met echte datums, en verwijderbaar/aanpasbaar.
+
+Gedaan:
+- Nieuwe, pure module `lib/events/standard-b2c-events.ts`: berekent Black Friday (vrijdag na de 4e
+  donderdag van november), Cyber Monday (+4 dagen), Kerst (25 december) en Valentijnsdag
+  (14 februari) t.o.v. het huidige jaar — geen hardgecodeerde jaartallen, dus geen jaarlijks
+  onderhoud. Elk event krijgt 3 edities (vorig/huidig/volgend jaar) zodat er altijd zowel een net-
+  verstreken als een aankomende editie in staat, wat aansluit op hoe `AccountEventPacing`/
+  `lib/fair` de "huidige" en "vorige" editie bepaalt (dichtstbijzijnde datums t.o.v. nu).
+  Test: `lib/events/__standard_b2c_events_test.ts` (weekdag-invarianten + de exacte 2026-datums).
+- `event-settings.tsx`: de load-`useEffect` leest nu ook `bedrijfsmodel` mee (was alleen
+  `rai_events`). Is de opgeslagen event-lijst helemaal leeg én is de klant b2c, dan wordt de lijst
+  voorgevuld met de vier standaardmomenten — puur in lokale formstate, niet automatisch
+  opgeslagen. Een korte hint-banner legt uit wat er gebeurd is; die verdwijnt zodra de klant iets
+  bewerkt of opslaat. Zodra er ooit iets is opgeslagen (ook een bewust lege lijst), komt de
+  suggestie niet meer terug — geen aparte "suggested/dismissed"-vlag in de database nodig.
+
+**Verificatie**: `npx tsc --noEmit -p .`, `npm test -- --run` (313/313), `node
+scripts/check-hygiene.mjs` (1014 bestanden). Visueel geverifieerd met Playwright tegen
+`demo-greentech` (een b2b-demoklant) door de `client_settings`-netwerkrespons in de browser te
+onderscheppen en `bedrijfsmodel`/`rai_events` alleen client-side te vervalsen naar b2c/leeg — geen
+enkele echte databaserij aangeraakt. Screenshot bevestigt: vier vooringevulde momenten met correcte
+2025/2026/2027-datums, de hint-banner, en volledig bewerkbare/verwijderbare velden vóór opslaan.

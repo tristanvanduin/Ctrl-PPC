@@ -8,6 +8,7 @@ import type { FeedItem, FeedSeverity, FeedChannel } from "@/lib/feed/feed-item";
 import { FeedCard } from "./feed-card";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { CodeRoodPaneel } from "@/components/adoptie/code-rood-paneel";
+import { GodViewTeaser } from "@/components/terminal/god-view-teaser";
 
 // De "Vandaag"-cockpit: cross-client triage. Beantwoordt in één blik — is er iets kapot,
 // welke beslissingen wachten, wat moet vandaag, wat is nieuw, en wie is veilig buiten beeld.
@@ -93,7 +94,7 @@ export function TodayFeed() {
           <p className="text-title font-semibold text-brand-gray">Geen live data beschikbaar voor de Vandaag-feed.</p>
           <p className="text-lead text-muted-foreground mt-1.5">Koppel databronnen of bekijk een demo van de triagecockpit.</p>
           <div className="flex gap-2.5 justify-center mt-5">
-            <Link href="/?demo=1" className="text-lead font-semibold text-white bg-brand-blue rounded-lg px-4 py-2 hover:brightness-110">Bekijk demo</Link>
+            <Link href="/vandaag?demo=1" className="text-lead font-semibold text-white bg-brand-blue rounded-lg px-4 py-2 hover:brightness-110">Bekijk demo</Link>
             <Link href="/portfolio" className="text-lead font-semibold text-brand-gray border border-border rounded-lg px-4 py-2 hover:border-brand-blue hover:text-brand-blue-ink">Ga naar portfolio</Link>
           </div>
         </div>
@@ -114,6 +115,7 @@ export function TodayFeed() {
           <Pulse label="Op koers" value={String(feed.pulse.onTrack)} tone="ok" />
           <Pulse label="Risico open (gemeten)" value={feed.pulse.measuredRisk > 0 ? eur(feed.pulse.measuredRisk) : "€0"} tone={feed.pulse.measuredRisk > 0 ? "warn" : undefined} />
           <Pulse label="Niet toegewezen" value={String(feed.pulse.unassigned)} tone={feed.pulse.unassigned > 0 ? "warn" : undefined} />
+          {feed.pulse.openTodos > 0 && <Pulse label="Taken open" value={String(feed.pulse.openTodos)} />}
         </div>
       </div>
 
@@ -192,6 +194,11 @@ export function TodayFeed() {
               </div>
             </section>
           )}
+
+          {/* Feedback: "tease god mode" voor bureaus zonder platformtoegang -- TodayFeed is precies
+              die doelgroep (zie app/(app)/vandaag/page.tsx: God Mode en Agency God View takken eerder
+              af). Onderaan, na de echte content, niet ervoor. */}
+          {!feed.demoMode && <GodViewTeaser />}
         </div>
 
         {/* Rechterkolom */}

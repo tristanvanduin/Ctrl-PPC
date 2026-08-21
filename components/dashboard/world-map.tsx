@@ -10,24 +10,61 @@ import { countryLabel } from "@/lib/countries";
 
 // Interactieve choropleth-wereldkaart: kleurt elk land naar de gekozen metric en licht op met een
 // tooltip bij hover. Puur SVG (d3-geo voor de projectie + paden), geen zware kaart-library — dus
-// geen React-versieconflict. De landgeometrie wordt één keer geprojecteerd op module-niveau.
+// geen React-versieconflict.
+//
+// ── DYNAMISCH INZOOMEN OP DE ACTIEVE LANDEN (feedbackronde 21 augustus) ─────────────────────
+//
+// De projectie stond op module-niveau vast: altijd de hele wereld, ongeacht welke landen data
+// hebben. Voor een klant die alleen in Nederland/EU adverteert werd Nederland dan een stipje --
+// "we zien de hele wereld" was precies het probleem, niet de oplossing. De projectie/SHAPES
+// hangen daarom nu af van de actieve landenset (via useMemo): fitExtent op alleen de landen MET
+// data, met een marge zodat een klein land niet strak tegen de rand plakt. Landen zonder data
+// blijven wel getekend (dezelfde SHAPES, dezelfde projectie) zodat de kaart nog steeds als kaart
+// leest en niet als een geïsoleerd continent-fragment -- alleen het zoomniveau past zich aan.
+// Zelfbeperkend: adverteert een klant zowel in Europa als Azië, dan omvat de bounding box van de
+// actieve landen toch al bijna de hele kaart, en zoomt hij dus terecht niet extreem in.
 
 const WIDTH = 760;
 const HEIGHT = 380;
+const ZOOM_PADDING_PX = 28;
 
-// Eénmalig: topojson → geojson → NaturalEarth-projectie → SVG-pad per land.
+// Eénmalig: topojson → geojson. De projectie zelf hangt af van de actieve landen, zie hieronder.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const topo = worldTopo as any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const collection = feature(topo, topo.objects.countries) as any;
-const features = (collection.features ?? []) as Array<{ id?: string | number; properties?: { name?: string } }>;
-const projection = geoNaturalEarth1().fitSize([WIDTH, HEIGHT], collection as GeoPermissibleObjects);
-const pathGen = geoPath(projection);
-interface Shape { key: string; alpha2: string | null; d: string }
-const SHAPES: Shape[] = features.map((f, i) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const features = (collection.features ?? []) as any[];
+const FEATURE_ALPHA2: (string | null)[] = features.map((f) => {
   const numeric = f.id != null ? String(Number(f.id)) : "";
-  return { key: `${numeric}-${i}`, alpha2: NUMERIC_TO_ALPHA2[numeric] ?? null, d: pathGen(f as GeoPermissibleObjects) ?? "" };
+  return NUMERIC_TO_ALPHA2[numeric] ?? null;
 });
+
+interface Shape { key: string; alpha2: string | null; d: string }
+
+/** Projectie + paden voor de gegeven set actieve landcodes (leeg = de hele wereld). */
+function buildShapes(activeAlpha2: ReadonlySet<string>): { pathGen: ReturnType<typeof geoPath>; shapes: Shape[] } {
+  let proj = geoNaturalEarth1();
+  const activeFeatures = activeAlpha2.size > 0
+    ? features.filter((_, i) => { const a2 = FEATURE_ALPHA2[i]; return a2 && activeAlpha2.has(a2); })
+    : [];
+  if (activeFeatures.length > 0) {
+    const activeCollection = { type: "FeatureCollection", features: activeFeatures };
+    proj = proj.fitExtent(
+      [[ZOOM_PADDING_PX, ZOOM_PADDING_PX], [WIDTH - ZOOM_PADDING_PX, HEIGHT - ZOOM_PADDING_PX]],
+      activeCollection as GeoPermissibleObjects
+    );
+  } else {
+    proj = proj.fitSize([WIDTH, HEIGHT], collection as GeoPermissibleObjects);
+  }
+  const pathGen = geoPath(proj);
+  const shapes: Shape[] = features.map((f, i) => ({
+    key: `${f.id != null ? String(Number(f.id)) : ""}-${i}`,
+    alpha2: FEATURE_ALPHA2[i],
+    d: pathGen(f as GeoPermissibleObjects) ?? "",
+  }));
+  return { pathGen, shapes };
+}
 
 // Sequentiële ramp op waarde-intensiteit; merk-onafhankelijk en leesbaar.
 //
@@ -57,6 +94,20 @@ export default function WorldMap({ values, format, metricLabel, onCountryClick }
 
   const max = useMemo(() => Math.max(1, ...[...values.values()].map((v) => Math.abs(v))), [values]);
   const hoveredValue = hover ? values.get(hover.alpha2) : undefined;
+
+  // Stabiele sleutel voor de actieve landenset: alleen WELKE landen data hebben bepaalt het
+  // zoomniveau, niet de exacte waarden -- anders herberekent elke metric-wissel (zelfde landen,
+  // andere cijfers) onnodig de hele projectie.
+  const activeKey = useMemo(() => {
+    const codes: string[] = [];
+    for (const [code, v] of values) { if (v != null && Number.isFinite(v)) codes.push(code); }
+    return codes.sort().join(",");
+  }, [values]);
+
+  const { shapes: SHAPES } = useMemo(
+    () => buildShapes(new Set(activeKey ? activeKey.split(",") : [])),
+    [activeKey]
+  );
 
   return (
     <div className="relative w-full">

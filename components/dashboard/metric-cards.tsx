@@ -3,7 +3,7 @@
 import { TrendingUp, TrendingDown, Target, DollarSign, BarChart3, Wallet } from "lucide-react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast } from "@/lib/forecast";
+import { computeForecast, type ForecastMetric } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas } from "@/lib/forecast-format";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
@@ -18,9 +18,14 @@ interface KpiCardProps {
   format: (v: number) => string;
   /** Subtitle shown below the label */
   subtitle?: string;
+  /** Feedback: "jaaroverzicht-kaartjes klikbaar, laat de maandresultaten van die metric zien."
+   *  Optioneel zodat een kale <KpiCard> zonder klik-gedrag blijft werken als dat ooit nodig is. */
+  metricKey?: ForecastMetric;
+  selected?: boolean;
+  onSelect?: (metric: ForecastMetric) => void;
 }
 
-function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, format, subtitle }: KpiCardProps) {
+function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, format, subtitle, metricKey, selected, onSelect }: KpiCardProps) {
   const yearProgress = 25; // end of Q1
   const realizedPct = annualTarget > 0 ? (realized / annualTarget) * 100 : 0;
 
@@ -28,9 +33,18 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
   const StatusIcon = isPositive ? TrendingUp : TrendingDown;
   const statusColor = isPositive ? "text-green-600" : "text-red-500";
   const statusBg = isPositive ? "bg-green-50" : "bg-red-50";
+  const clickable = metricKey !== undefined && onSelect !== undefined;
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+    <div
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onSelect(metricKey) : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(metricKey); } } : undefined}
+      className={`bg-card rounded-xl border p-5 shadow-sm transition-colors ${
+        clickable ? "cursor-pointer hover:border-brand-blue/40" : ""
+      } ${selected ? "border-brand-blue ring-1 ring-brand-blue/30" : "border-border"}`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
@@ -97,7 +111,14 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
   );
 }
 
-export function MetricCards({ clientId, countryFilter }: { clientId: string; countryFilter?: string | null }) {
+export function MetricCards({ clientId, countryFilter, selected, onSelect }: {
+  clientId: string;
+  countryFilter?: string | null;
+  /** Optioneel: welk kaartje visueel als actief toont en waar een klik op landt. Zonder deze
+   *  props zijn de kaartjes niet klikbaar, zoals voorheen. */
+  selected?: ForecastMetric;
+  onSelect?: (metric: ForecastMetric) => void;
+}) {
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
   // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
@@ -131,6 +152,9 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
         diffPct={forecast.conversions.kpi.diffPct}
         format={formatNumber}
         subtitle="Totaal aantal"
+        metricKey="conversions"
+        selected={selected === "conversions"}
+        onSelect={onSelect}
       />
       <KpiCard
         label="Omzet"
@@ -141,6 +165,9 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
         diffPct={forecast.revenue.kpi.diffPct}
         format={formatCurrency}
         subtitle="Conversiewaarde"
+        metricKey="revenue"
+        selected={selected === "revenue"}
+        onSelect={onSelect}
       />
       <KpiCard
         label="ROAS"
@@ -151,6 +178,9 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
         diffPct={forecast.roas.kpi.diffPct}
         format={formatRoas}
         subtitle="Return on ad spend"
+        metricKey="roas"
+        selected={selected === "roas"}
+        onSelect={onSelect}
       />
       <KpiCard
         label="CPA"
@@ -163,6 +193,9 @@ export function MetricCards({ clientId, countryFilter }: { clientId: string; cou
         // ernaast "€ 143.520" schrijft. Dezelfde grootheid hoort er hetzelfde uit te zien.
         format={formatCurrency}
         subtitle="Kosten per conversie"
+        metricKey="cpa"
+        selected={selected === "cpa"}
+        onSelect={onSelect}
       />
     </div>
   );

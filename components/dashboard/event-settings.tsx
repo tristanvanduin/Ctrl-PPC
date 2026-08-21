@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { AccountEventPacing } from "./account-event-pacing";
+import { standardB2cEvents } from "@/lib/events/standard-b2c-events";
 
 // Beurs-event-instellingen per klant: beurzen/geo-clones met cadans (jaarlijks/2-jaarlijks/anders)
 // en de datums van de afgelopen edities. Slaat op in client_settings.rai_events (migratie 024).
@@ -34,29 +35,40 @@ export function EventSettings({ clientId }: { clientId: string }) {
   // Bumpt na een geslaagde save zodat de T-minus-pacing hieronder de net opgeslagen edities
   // leest i.p.v. de vorige stand (de pacing-route leest server-side, niet de lokale formstate).
   const [savedTick, setSavedTick] = useState(0);
+  // Alleen true direct na het automatisch invullen van de b2c-suggestie, tot de eerste bewerking
+  // of save -- puur voor de hint hieronder, geen server-state.
+  const [suggested, setSuggested] = useState(false);
 
   useEffect(() => {
     const sb = supabase;
     if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
-    setEvents(null); setError(null); setSaved(false);
-    dbSelectOne<{ rai_events: unknown }>("client_settings", { select: "rai_events", clientId })
+    setEvents(null); setError(null); setSaved(false); setSuggested(false);
+    dbSelectOne<{ rai_events: unknown; bedrijfsmodel: string | null }>("client_settings", { select: "rai_events, bedrijfsmodel", clientId })
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) { setError(error.message); setEvents([]); return; }
         const raw = (data?.rai_events as { events?: FairEvent[] } | null) ?? null;
-        setEvents(Array.isArray(raw?.events) ? raw!.events : []);
+        const saved = Array.isArray(raw?.events) ? raw!.events : [];
+        // Suggestie alleen bij een helemaal lege lijst -- zodra er iets opgeslagen is (ook een
+        // lege lijst na bewust verwijderen), niet opnieuw opdringen.
+        if (saved.length === 0 && data?.bedrijfsmodel === "b2c") {
+          setEvents(standardB2cEvents());
+          setSuggested(true);
+        } else {
+          setEvents(saved);
+        }
       });
     return () => { cancelled = true; };
   }, [clientId]);
 
   function patchEvent(id: string, next: Partial<FairEvent>) {
     setEvents((evs) => evs?.map((e) => (e.id === id ? { ...e, ...next } : e)) ?? evs);
-    setSaved(false);
+    setSaved(false); setSuggested(false);
   }
   function patchEdition(eventId: string, idx: number, next: Partial<Edition>) {
     setEvents((evs) => evs?.map((e) => e.id === eventId ? { ...e, editions: e.editions.map((ed, i) => i === idx ? { ...ed, ...next } : ed) } : e) ?? evs);
-    setSaved(false);
+    setSaved(false); setSuggested(false);
   }
 
   async function save() {
@@ -84,16 +96,24 @@ export function EventSettings({ clientId }: { clientId: string }) {
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
         <CalendarClock className="w-5 h-5 text-brand-blue-ink" />
-        <h2 className="text-base font-semibold text-brand-blue-ink">Beurzen & edities</h2>
+        <h2 className="text-base font-semibold text-brand-blue-ink">Beurzen & momenten</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-5">
-        Leg per beurs (of geo-clone) vast of hij jaarlijks of 2-jaarlijks is en wanneer de afgelopen edities plaatsvonden.
-        Dit bepaalt met welke vorige editie de huidige data vergeleken wordt, en voedt de event-prognose.
+        Leg per beurs, geo-clone of ander terugkerend moment (bijv. Black Friday) vast of het jaarlijks of
+        2-jaarlijks is en wanneer de afgelopen edities plaatsvonden. Dit bepaalt met welke vorige editie de
+        huidige data vergeleken wordt, en voedt de event-prognose.
       </p>
 
+      {suggested && (
+        <div className="mb-4 rounded-md border border-brand-blue/20 bg-brand-blue/5 px-3 py-2 text-meta text-brand-blue-ink">
+          Alvast ingevuld op basis van het bedrijfsmodel (b2c): Black Friday, Cyber Monday, Kerst en
+          Valentijnsdag. Pas de data aan of verwijder wat niet van toepassing is, en klik daarna op
+          Opslaan.
+        </div>
+      )}
       <div className="space-y-4">
         {events.length === 0 && (
-          <p className="text-body text-muted-foreground">Nog geen beurzen ingesteld. Voeg er een toe.</p>
+          <p className="text-body text-muted-foreground">Nog geen beurzen of momenten ingesteld. Voeg er een toe.</p>
         )}
         {events.map((ev) => (
           <div key={ev.id} className="rounded-lg border border-border p-4 space-y-3">
@@ -112,8 +132,8 @@ export function EventSettings({ clientId }: { clientId: string }) {
                     className="mt-1 w-full rounded-md border border-border px-3 py-2 text-lead font-mono focus:border-brand-blue/50 focus:outline-none" />
                 </label>
               </div>
-              <button onClick={() => { setEvents((evs) => evs?.filter((e) => e.id !== ev.id) ?? evs); setSaved(false); }}
-                className="mt-6 text-muted-foreground hover:text-red-500 transition-colors" title="Beurs verwijderen">
+              <button onClick={() => { setEvents((evs) => evs?.filter((e) => e.id !== ev.id) ?? evs); setSaved(false); setSuggested(false); }}
+                className="mt-6 text-muted-foreground hover:text-red-500 transition-colors" title="Verwijderen">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -161,9 +181,9 @@ export function EventSettings({ clientId }: { clientId: string }) {
           </div>
         ))}
 
-        <button onClick={() => { setEvents((evs) => [...(evs ?? []), emptyEvent()]); setSaved(false); }}
+        <button onClick={() => { setEvents((evs) => [...(evs ?? []), emptyEvent()]); setSaved(false); setSuggested(false); }}
           className="flex items-center gap-1.5 text-body text-brand-blue-ink hover:underline">
-          <Plus className="w-4 h-4" /> Beurs toevoegen
+          <Plus className="w-4 h-4" /> Beurs of moment toevoegen
         </button>
       </div>
 

@@ -42,6 +42,7 @@ export interface TodayPulse {
   autoResolved: number;  // door de data automatisch opgeloste (eerder aangeraakte) items
   clientCount: number;
   hasMock: boolean;      // of er demo-kaarten/mock-eigenaren in beeld zijn
+  openTodos: number;     // open to-do's uit client_notes (feedback punt 12), altijd echt
 }
 
 export interface TodayFeed {
@@ -70,6 +71,7 @@ export function useTodayFeed(): TodayFeed {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
   const [hasRealData, setHasRealData] = useState(false);
+  const [openTodos, setOpenTodos] = useState(0);
   const [tick, setTick] = useState(0);
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
@@ -166,6 +168,17 @@ export function useTodayFeed(): TodayFeed {
           }
         } catch { /* GA4 optioneel; feed werkt zonder */ }
         if (cancelled) return;
+
+        // Open to-do's uit de notities (feedback punt 12) -- geen feed-item, gewoon een teller.
+        // is_todo/done kunnen nog ontbreken als migratie 100 niet gedraaid is; degradeer dan
+        // netjes naar 0 in plaats van de hele feed te breken (zelfde patroon als feed_item_state
+        // hierboven).
+        const todosRes = await dbSelect<{ id: string }>("client_notes", {
+          select: "id", clientIds: ids,
+          filters: [{ op: "eq", column: "is_todo", value: true }, { op: "eq", column: "done", value: false }],
+        });
+        if (cancelled) return;
+        setOpenTodos(todosRes.error ? 0 : todosRes.data.length);
       }
 
       // hasRealData wordt bepaald door de ECHTE bronnen, vóór enige demo-injectie.
@@ -220,9 +233,10 @@ export function useTodayFeed(): TodayFeed {
       autoResolved,
       clientCount,
       hasMock: active.some((i) => i.isMock || i.ownerIsMock),
+      openTodos,
     };
     return { bands, myActions, snoozed, pulse, newByBand };
-  }, [rawItems, currentUser, clientCount, autoResolved]);
+  }, [rawItems, currentUser, clientCount, autoResolved, openTodos]);
 
   const upsertState = useCallback(async (item: FeedItem, patch: Partial<FeedStateRow>) => {
     const sb = supabase;

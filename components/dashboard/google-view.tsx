@@ -4,13 +4,15 @@ import { useState } from "react";
 import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
+import type { ForecastMetric } from "@/lib/forecast";
 import { Sectie } from "@/components/ui/sectie";
 import { HealthBadge } from "./health-badge";
 import { SearchScorecard } from "./search-scorecard";
 import { PmaxScorecard } from "./pmax-scorecard";
+import { DisplayScorecard } from "./display-scorecard";
+import { ShoppingScorecard } from "./shopping-scorecard";
 import { EventPacing } from "./event-pacing";
 import { GeoCloneOverview } from "./geo-clone-overview";
-import { ClientNotes } from "./client-notes";
 import { MonthlyOverview } from "./monthly-overview";
 import { FairWeeksOverview } from "./fair-weeks-overview";
 import { PacingMonitor } from "./pacing-monitor";
@@ -94,6 +96,12 @@ export function GoogleView({
   // naast elkaar maar boven/onder in dezelfde kolom (17.41 -- "als we deze in het gat plaatsen
   // kan de geo map breder"), en moeten nog steeds dezelfde metric-keuze en VS-drilldown delen.
   const geo = useGeoBreakdown({ clientId, channel: "google", enabled: !geoClone });
+  // Feedback: "Jaaroverzicht-kaartjes klikbaar maken, dan de maandresultaten van dat element
+  // tonen." MetricCards en PerformanceChart tonen al dezelfde vier metrics (Conversies/Omzet/
+  // ROAS/CPA) naast elkaar; PerformanceChart had zijn metric-keuze als eigen interne state, dus
+  // een klik op een kaartje kon 'm niet aansturen. Hier opgetild zodat beide dezelfde selectie
+  // delen -- geen nieuwe grafiek nodig, alleen een gedeelde staat.
+  const [jaaroverzichtMetric, setJaaroverzichtMetric] = useState<ForecastMetric>("conversions");
 
   return (
     <>
@@ -105,7 +113,6 @@ export function GoogleView({
           {/* Event-relatieve pacing: opbouw tot nu vs dezelfde afstand tot de vorige editie. */}
           <EventPacing clientId={clientId} geoClone={geoClone} />
           <GeoCloneOverview clientId={clientId} geoClone={geoClone} />
-          <ClientNotes clientId={clientId} />
         </>
       ) : (
         <>
@@ -203,30 +210,32 @@ export function GoogleView({
             titel={countryFilter ? `Jaaroverzicht 2026 — ${countryLabel(countryFilter)}` : "Jaaroverzicht 2026"}
             bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
           >
-            <MetricCards clientId={clientId} countryFilter={countryFilter} />
-            <PerformanceChart clientId={clientId} countryFilter={countryFilter} />
+            <MetricCards clientId={clientId} countryFilter={countryFilter} selected={jaaroverzichtMetric} onSelect={setJaaroverzichtMetric} />
+            <PerformanceChart clientId={clientId} countryFilter={countryFilter} metric={jaaroverzichtMetric} onMetricChange={setJaaroverzichtMetric} />
           </Sectie>
 
-          {/* Video, PMax-netwerken en placements horen bij elkaar: het is allemaal "hoe ziet het
-              budget eruit". De netwerkringen (PmaxNetworkSplit) staan hier en niet in de opener,
-              want ze bestaan alleen bij Performance Max -- als PMax-specifieke verdieping onder
-              de universele campagnetype-donut zijn ze op hun plek, in de opener zouden ze een
-              account zonder PMax een lege plek laten zien. Elk van deze kaarten rendert niets als
-              er geen data voor is, dus de sectie kan ook helemaal leeg blijven. */}
+          {/* Feedback punt 29+31: PmaxNetworkSplit was hier al gemarkeerd als PMax-only ("ze
+              bestaan alleen bij Performance Max"), maar stond toch op Overzicht i.p.v. onder de
+              Campagnes-tab se PERFORMANCE_MAX-selectie. Verhuisd naar GoogleCampagnes, in de
+              Scorecard-sectie naast PmaxAssetCoverage -- exact hetzelfde argument dat destijds al
+              voor PmaxAssetCoverage gold: een PMax-specifieke structuurvraag hoort bij de andere
+              PMax-structuurvraag, niet als losse kaart op de algemene Overzicht-pagina.
+
+              Video (VideoPerformance/VideoPlacements) blijft bewust hier staan: video-/Demand
+              Gen-campagnes hebben in de echte data een eigen campaign_type ("VIDEO") dat niet
+              voorkomt in CAMPAGNE_TYPES hieronder (die vier zijn gemeten tegen
+              ads_campaign_impression_share, een andere tabel, en dekken alleen SEARCH/
+              PERFORMANCE_MAX/SHOPPING/DISPLAY). Een vijfde tab toevoegen voor uitsluitend video
+              is een eigen ontwerpvraag -- welke tabs verder nog meeveranderen (Scorecard,
+              CampaignTable-filter, Zoektermen) -- die niet stilzwijgend hier meegenomen wordt. */}
           <Sectie
             icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Waar het budget landt"
-            bijschrift="Video, netwerken en placements"
+            bijschrift="Video en placements"
           >
             <VideoPerformance clientId={clientId} />
-            <PmaxNetworkSplit clientId={clientId} />
-            <PmaxAssetCoverage clientId={clientId} />
             <VideoPlacements clientId={clientId} />
           </Sectie>
-
-          <div className="mt-10">
-            <ClientNotes clientId={clientId} />
-          </div>
         </>
       )}
     </>
@@ -272,18 +281,19 @@ function CampagneTypeTabs({ type, onChange }: { type: CampagneType; onChange: (t
 
 /**
  * Sectie 5.4 (Campaign Type Intelligence): per campagnetype zijn eigen scorecard. Search en PMax
- * hebben er vandaag een -- de twee met genoeg echte data om zonder gok te bouwen (zie de koppen
- * van lib/search-scorecard.ts en lib/pmax-scorecard.ts). Shopping en Display tonen eerlijk dat ze
- * nog niet gebouwd zijn in plaats van een score te verzinnen -- dezelfde regel 3 uit de
- * vertrouwensdoctrine als overal elders in dit contract.
+ * waren de eerste twee; Shopping en Display zijn hier bijgekomen, elk met een eigen opbouw (zie
+ * de koppen van lib/display-scorecard.ts en lib/shopping-scorecard.ts) en een factor die eerlijk
+ * "niet beoordeeld" blijft waar de data ontbreekt (viewability resp. Merchant Center-feedkwaliteit)
+ * -- regel 3 van de vertrouwensdoctrine, geen gegokte score.
  */
 function CampagneScorecard({ clientId, type }: { clientId: string; type: CampagneType }) {
   if (type === "SEARCH") return <SearchScorecard clientId={clientId} />;
   if (type === "PERFORMANCE_MAX") return <PmaxScorecard clientId={clientId} />;
+  if (type === "DISPLAY") return <DisplayScorecard clientId={clientId} />;
+  if (type === "SHOPPING") return <ShoppingScorecard clientId={clientId} />;
   return (
     <div className="rounded-xl border border-dashed border-border p-5 text-meta text-muted-foreground">
-      Nog geen scorecard voor {CAMPAGNE_TYPES.find((t) => t.id === type)?.label} — alleen Search en
-      Performance Max zijn vandaag gebouwd (masterplan sectie 5.4).
+      Nog geen scorecard voor {CAMPAGNE_TYPES.find((t) => t.id === type)?.label} (masterplan sectie 5.4).
     </div>
   );
 }
@@ -302,6 +312,16 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
         actie={<CampagneTypeTabs type={campagneType} onChange={setCampagneType} />}
       >
         <CampagneScorecard clientId={clientId} type={campagneType} />
+        {/* Assetdekking en netwerkverdeling zijn allebei PMax-eigen structuurvragen ("wat heb je
+            aangeleverd", "waar draait het") en horen dus bij de PMax-scorecard, niet bij Search.
+            Allebei verhuisd hierheen vanuit "Waar het budget landt" op Overzicht -- zie de
+            toelichting daar. */}
+        {campagneType === "PERFORMANCE_MAX" && (
+          <>
+            <PmaxAssetCoverage clientId={clientId} />
+            <PmaxNetworkSplit clientId={clientId} />
+          </>
+        )}
       </Sectie>
       {/* Twee vragen, twee secties. Wat draait er, en waar lekt het weg — dat laatste
           is geen detail van het eerste maar een eigen onderwerp met een eigen actie. */}

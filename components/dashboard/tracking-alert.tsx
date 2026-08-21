@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, ExternalLink, X } from "lucide-react";
 import { useClientDataState } from "@/lib/client-data-provider";
 import type { MonthlyRecord } from "@/lib/types";
 
@@ -14,7 +15,14 @@ export function TrackingAlert({ clientId, onNavigateToSettings }: {
   onNavigateToSettings?: () => void;
 }) {
   const dataState = useClientDataState();
+  // Alleen sessie-lokaal wegklikbaar (geen tabel, geen "afwijzen"-workflow zoals CodeRoodBanner
+  // die heeft) -- dit is een heuristische detector die elke keer opnieuw herrekent, dus een
+  // permanente dismiss zou een écht terugkerend probleem stil kunnen verbergen. Reset bij
+  // klantwissel, anders blijft de melding dicht voor een klant die hem nog nooit zag.
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => setDismissed(false), [clientId]);
 
+  if (dismissed) return null;
   if (!dataState?.data) return null;
 
   const currentData = dataState.data.currentYearData;
@@ -78,9 +86,18 @@ export function TrackingAlert({ clientId, onNavigateToSettings }: {
       <div className="flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
         <div className="flex-1">
-          <h3 className="text-title font-semibold text-red-700">
-            Mogelijke tracking anomalie gedetecteerd
-          </h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-title font-semibold text-red-700">
+              Mogelijke tracking anomalie gedetecteerd
+            </h3>
+            <button
+              onClick={() => setDismissed(true)}
+              aria-label="Melding sluiten"
+              className="shrink-0 rounded p-0.5 text-red-400 hover:bg-red-100 hover:text-red-600"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <p className="text-xs text-red-600 mt-1">
             In {monthLabel} is de conversie-efficiëntie {efficiencyDrop}% lager dan het historisch gemiddelde
             ({lastMonth.conversions} conversies bij €{Math.round(lastMonth.adSpend)} spend).

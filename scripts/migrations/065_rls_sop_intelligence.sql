@@ -1,8 +1,9 @@
 -- 065: het 059-patroon doorgetrokken naar de SOP- en intelligence-tabellen.
 --
--- NIET UITGEVOERD TEGEN DE DATABASE. Dit bestand is geschreven en klaargezet op verzoek, maar
--- bewust niet toegepast -- zie de sectie "WAAROM DIT NOG NIET DRAAIT" hieronder. Draai hem pas na
--- die afweging, met scripts/supabase-sql.mjs --file scripts/migrations/065_rls_sop_intelligence.sql.
+-- UITGEVOERD. Bevestigd 21 augustus 2026 via information_schema/pg_policies: alle zeventien
+-- tabellen hieronder hebben rowsecurity=true en hun eigen "<tabel>_zichtbaar"-policy, exact zoals
+-- deze migratie ze aanmaakt. Deze kop zei eerder "NIET UITGEVOERD TEGEN DE DATABASE" -- dat was
+-- verouderd, niet meer waar.
 -- Terugdraaien: `alter table <naam> disable row level security` per tabel in deze migratie.
 --
 -- ── WAT ER ONTBRAK ───────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Sparkles, Calendar, AlertCircle, CheckCircle2, Info } from "lucide-react";
-import { isDemoMode } from "@/lib/demo/demo-mode";
+import { isDemoClient } from "@/lib/demo/demo-mode";
 
 // Master Synthesis (Pijler 6): kanaaloverstijgende hypotheses uit de al-berekende
 // kanaal-aanbevelingen (Pijler 1-5) plus de cross-channel-feiten (zie CrossChannelAnalyses
@@ -38,7 +38,7 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
   // anders rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde
   // reden als demoModus in client-dashboard.tsx).
   const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoMode()); }, []);
+  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
 
   const fetchLatest = useCallback(async () => {
     try {

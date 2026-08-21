@@ -12,9 +12,9 @@
 // Het is de ontbrekende SCHAKEL: de klanten die de zijbalk al kent, als klikbare kaarten. Zonder
 // dit is een klantdashboard alleen bereikbaar door de URL in te typen.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import { getVisibleClients, loadVisibleClientIds } from "@/lib/visible-clients";
 import { loadApiClients } from "@/lib/clients";
 
@@ -26,6 +26,15 @@ interface Rij {
 
 export default function ClientsPage() {
   const [klanten, setKlanten] = useState<Rij[] | null>(null);
+  // Puur cliëntzijdig filter op de al-geladen lijst -- geen nieuwe databron, dus geen risico op
+  // een tweede, afwijkende telling naast wat de zijbalk al toont.
+  const [zoekterm, setZoekterm] = useState("");
+  const gefilterd = useMemo(() => {
+    if (!klanten) return klanten;
+    const q = zoekterm.trim().toLowerCase();
+    if (!q) return klanten;
+    return klanten.filter((c) => c.name.toLowerCase().includes(q));
+  }, [klanten, zoekterm]);
 
   useEffect(() => {
     let afgebroken = false;
@@ -49,20 +58,38 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-page font-bold text-brand-blue-ink">Klanten</h1>
-        {/* Hier stond "Overzicht van alle klantaccounts en hun prestaties." De prestaties staan
-            er niet: een kaart toont een naam, initialen en of het demodata is. Een ondertitel die
-            iets belooft wat het scherm eronder niet levert, is de goedkoopste manier om een
-            product minder te vertrouwen. Wie de cijfers per klant wil, hoort hier te lezen waar
-            ze wél staan. */}
-        <p className="mt-1 text-body text-muted-foreground">
-          Kies een account om het dashboard te openen. Cijfers naast elkaar per klant staan onder{" "}
-          <Link href="/portfolio" className="font-medium text-brand-blue-ink underline underline-offset-2">
-            Portfolio
-          </Link>
-          .
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-page font-bold text-brand-blue-ink">
+            Klanten{klanten && klanten.length > 0 && (
+              <span className="ml-2 align-middle text-title font-semibold text-muted-foreground">({klanten.length})</span>
+            )}
+          </h1>
+          {/* Hier stond "Overzicht van alle klantaccounts en hun prestaties." De prestaties staan
+              er niet: een kaart toont een naam, initialen en of het demodata is. Een ondertitel die
+              iets belooft wat het scherm eronder niet levert, is de goedkoopste manier om een
+              product minder te vertrouwen. Wie de cijfers per klant wil, hoort hier te lezen waar
+              ze wél staan. */}
+          <p className="mt-1 text-body text-muted-foreground">
+            Kies een account om het dashboard te openen. Cijfers naast elkaar per klant staan onder{" "}
+            <Link href="/portfolio" className="font-medium text-brand-blue-ink underline underline-offset-2">
+              Portfolio
+            </Link>
+            .
+          </p>
+        </div>
+        {klanten && klanten.length > 5 && (
+          <div className="relative w-full max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={zoekterm}
+              onChange={(e) => setZoekterm(e.target.value)}
+              placeholder="Zoek een klant..."
+              className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-body text-brand-gray shadow-sm outline-none focus:border-brand-blue"
+            />
+          </div>
+        )}
       </div>
 
       {klanten === null ? (
@@ -80,17 +107,19 @@ export default function ClientsPage() {
             <code className="rounded bg-muted px-1 py-0.5">?demo=1</code> in de URL.
           </p>
         </div>
+      ) : gefilterd && gefilterd.length === 0 ? (
+        <p className="text-body text-muted-foreground">Geen klant gevonden voor &quot;{zoekterm}&quot;.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {klanten.map((c) => (
+          {(gefilterd ?? klanten).map((c) => (
             <Link
               key={c.id}
               href={`/client/${c.id}`}
-              className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-brand-blue hover:bg-gray-50/70"
+              className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-blue hover:shadow-md"
             >
               {/* Initialen in plaats van een logo: elke klant heeft een naam, niet elke klant een
                   merkbestand. Zo is de rij visueel gelijk zonder gaten. */}
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10 text-meta font-semibold text-brand-blue-ink">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10 text-meta font-semibold text-brand-blue-ink">
                 {c.name.slice(0, 2).toUpperCase()}
               </span>
               <span className="min-w-0 flex-1">

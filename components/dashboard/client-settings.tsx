@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Save, RotateCcw, Check, CircleDot, CircleOff, Target, TrendingUp, DollarSign, BarChart3, CheckSquare, Square, Filter, Building2, AlertTriangle, Clock, ImageIcon, Upload, Trash2, Globe, X } from "lucide-react";
 import { COUNTRY_MAP, countryLabel, detectCountriesFromCampaigns } from "@/lib/countries";
+import { CollapsiblePanel } from "@/components/ui/disclosure";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -659,36 +660,50 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       )}
 
       {/* ── Conversielag ── */}
+      {/* Feedback: staat minder vaak aan te passen dan de kaarten erboven, mag dus lager in
+          aandacht -- dichtgeklapt met de huidige waarde zichtbaar in de kop, zodat "3 dagen" nog
+          te zien is zonder open te klappen. */}
       {toon("lag") && (
-      <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-        <div className="flex items-center gap-2 mb-1">
-          <Clock className="w-5 h-5 text-amber-500" />
-          <h2 className="text-title font-semibold text-amber-600">Conversielag</h2>
+      <CollapsiblePanel
+        id="doelen-conversielag"
+        title="Conversielag"
+        subtitle="Aantal dagen dat conversies vertraagd binnenkomen"
+        icon={<Clock className="w-5 h-5 text-amber-500" />}
+        meta={<span className="text-meta text-muted-foreground">{conversionLagDays} dagen</span>}
+        defaultOpen={false}
+      >
+        <div className="p-6 pt-5">
+          <p className="text-body text-muted-foreground mb-5">
+            Aantal dagen dat conversies vertraagd binnenkomen. Voorkomt valse waarschuwingen in recente periodes.
+          </p>
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              min={0}
+              max={30}
+              value={conversionLagDays}
+              onChange={(e) => { setConversionLagDays(Math.max(0, Math.min(30, parseInt(e.target.value) || 0))); setSaved(false); }}
+              className="w-24 text-sm"
+            />
+            <span className="text-body text-muted-foreground">dagen (standaard: 3)</span>
+          </div>
         </div>
-        <p className="text-body text-muted-foreground mb-5">
-          Aantal dagen dat conversies vertraagd binnenkomen. Voorkomt valse waarschuwingen in recente periodes.
-        </p>
-        <div className="flex items-center gap-3">
-          <Input
-            type="number"
-            min={0}
-            max={30}
-            value={conversionLagDays}
-            onChange={(e) => { setConversionLagDays(Math.max(0, Math.min(30, parseInt(e.target.value) || 0))); setSaved(false); }}
-            className="w-24 text-sm"
-          />
-          <span className="text-body text-muted-foreground">dagen (standaard: 3)</span>
-        </div>
-      </div>
+      </CollapsiblePanel>
       )}
 
       {/* ── Conversion Overrides ── */}
       {toon("overrides") && (
-      <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-        <div className="flex items-center gap-2 mb-1">
-          <AlertTriangle className="w-5 h-5 text-brand-orange-ink" />
-          <h2 className="text-title font-semibold text-brand-orange-ink">Handmatige conversiecijfers</h2>
-        </div>
+      <CollapsiblePanel
+        id="doelen-handmatige-conversies"
+        title="Handmatige conversiecijfers"
+        subtitle="Voor maanden waarin de tracking stuk was"
+        icon={<AlertTriangle className="w-5 h-5 text-brand-orange-ink" />}
+        meta={Object.keys(convOverrides).length > 0
+          ? <span className="text-meta text-brand-orange-ink font-medium">{Object.keys(convOverrides).length} override(s) actief</span>
+          : undefined}
+        defaultOpen={false}
+      >
+        <div className="p-6 pt-5">
         <p className="text-body text-muted-foreground mb-5">
           Voor maanden waarin de tracking stuk was. De prognose rekent dan met het getal dat je hier
           invult in plaats van met de gemeten nul — een nul door kapotte meting is geen nul in de markt,
@@ -751,7 +766,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
             {Object.keys(convOverrides).length} override(s) actief. De forecast gebruikt deze waarden i.p.v. de echte tracking data.
           </p>
         )}
-      </div>
+        </div>
+      </CollapsiblePanel>
       )}
 
       {/* ── Landen configuratie ── */}

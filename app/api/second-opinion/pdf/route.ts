@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { renderSecondOpinionPdf } from "@/lib/second-opinion/pdf-renderer";
 import { today } from "@/lib/reporting-date";
+import { logger } from "@/lib/logger";
 import {
   createProgressJob,
   markProgressCompleted,
@@ -74,10 +75,28 @@ export async function GET(request: NextRequest) {
       phaseKey: "store_artifact",
       message: "Second opinion PDF opslaan...",
     });
-    await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
+    const { error: uploadError } = await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
       contentType: "application/pdf",
       upsert: true,
     });
+
+    if (uploadError) {
+      // Upload mislukt: geen client_files-rij en geen pdf_storage_path aanmaken die naar een
+      // niet-bestaand storage-object wijst -- dat gaf eerder "bestand bestaat niet" bij een
+      // latere download via het Bestanden-tabblad. Deze download (hieronder) werkt nog wel.
+      logger.error("[second-opinion-pdf] Storage-upload mislukt, client_files-rij overgeslagen:", uploadError);
+      await markProgressCompleted(supabase, {
+        jobId,
+        message: "Second opinion PDF gereed (niet blijvend opgeslagen: upload mislukt).",
+        metadata: { run_id: runId, storage_error: uploadError.message },
+      });
+      return new Response(new Uint8Array(pdfBuffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      });
+    }
 
     // Ensure Second Opinion folder exists
     const { data: existingFolder } = await supabase

@@ -1,11 +1,14 @@
 -- 073: persistentie voor Code Rood/Amber-meldingen per account.
 --
--- Idempotent, puur additief. GESCHREVEN, NIET TOEGEPAST -- zelfde status als migratie 065:
--- draai hem samen met de eerste keer dat de detectiejob (lib/adoptie/detecteer-code-rood.ts,
--- aangeroepen vanuit app/api/cron/evaluate-code-rood, geregistreerd in vercel.json) daadwerkelijk
--- moet kunnen schrijven. Een tabel zonder schrijver is een wees; die schrijver bestaat nu wel,
--- alleen de migratie zelf moet nog handmatig gedraaid worden (node scripts/supabase-sql.mjs).
--- Draaien: node scripts/supabase-sql.mjs --file scripts/migrations/073_code_rood_meldingen.sql
+-- Idempotent, puur additief. UITGEVOERD -- bevestigd 21 augustus 2026 via information_schema/
+-- pg_policies: de tabel bestaat, RLS staat aan, en code_rood_meldingen_lezen/_reageren staan
+-- er precies zoals hieronder. 0 rijen op het moment van controle, en dat is geen restrisico van
+-- deze migratie: de detectiejob (lib/adoptie/detecteer-code-rood.ts, aangeroepen vanuit
+-- app/api/cron/evaluate-code-rood) staat BEWUST niet in vercel.json (zie de kop van die route,
+-- 17 augustus 2026, op verzoek van de eigenaar: "ik wil geen API-kosten maken in de nacht en ik
+-- wil zelf testen kunnen draaien") en heeft dus nog nooit geschreven. Deze kop zei eerder
+-- "GESCHREVEN, NIET TOEGEPAST" -- dat sloeg op de tabel, niet meer waar; de lege tabel komt van
+-- de nog-niet-getriggerde cron, niet van een ontbrekende migratie.
 -- Terugdraaien: de policies droppen, `drop table code_rood_meldingen`.
 --
 -- ── WAAROM ────────────────────────────────────────────────────────────────

@@ -91,13 +91,21 @@ export function computeHealthScore(
   const anomalies: Anomaly[] = [];
 
   const conv = forecast.conversions.kpi;
+  const rev = forecast.revenue.kpi;
   const spend = forecast.adSpend.kpi;
   const realizedMonths = forecast.conversions.points.filter((p) => p.realized !== null);
 
   // ── 1. TARGET TRACKING (20pt) ──
   // How close is the adjusted annual to the target?
-  const heeftDoel = conv.annualTarget > 0;
-  const targetRatio = heeftDoel ? conv.adjustedAnnual / conv.annualTarget : 0;
+  //
+  // Was: uitsluitend conv.annualTarget. Een omzet/ROAS-gedreven klant heeft doorgaans geen
+  // conversiedoel maar wel een omzetdoel (zelfde onderscheid als getVocab in dgm-view.tsx) --
+  // die kreeg deze factor dus altijd als "niet beoordeeld" (assessed: false), en scoorde
+  // daardoor op maar 4 van de 5 factoren, ook al was er wel degelijk een doel om tegen af te
+  // rekenen. Val terug op omzet zodra er geen conversiedoel is.
+  const doelKpi = conv.annualTarget > 0 ? conv : rev;
+  const heeftDoel = doelKpi.annualTarget > 0;
+  const targetRatio = heeftDoel ? doelKpi.adjustedAnnual / doelKpi.annualTarget : 0;
   const targetScore = heeftDoel ? clamp(Math.round(targetRatio * 20), 0, 20) : 0;
   factors.push({
     name: "Doelstelling",
@@ -115,7 +123,7 @@ export function computeHealthScore(
     assessed: heeftDoel,
   });
 
-  if (targetRatio < 0.5 && conv.annualTarget > 0) {
+  if (targetRatio < 0.5 && heeftDoel) {
     anomalies.push({
       severity: "critical",
       title: "Geschat jaardoel in gevaar",

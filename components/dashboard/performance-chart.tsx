@@ -39,8 +39,17 @@ function formatYAxis(metric: ForecastMetric) {
 type ViewMode = "weekly" | "monthly";
 type CoreMetric = "conversions" | "revenue" | "adSpend";
 
-export function PerformanceChart({ clientId, countryFilter }: { clientId: string; countryFilter?: string | null }) {
-  const [metric, setMetric] = useState<ForecastMetric>("conversions");
+export function PerformanceChart({ clientId, countryFilter, metric: metricProp, onMetricChange }: {
+  clientId: string;
+  countryFilter?: string | null;
+  /** Optioneel: laat een ouder (bv. de klikbare Jaaroverzicht-kaartjes) de metric-keuze delen.
+   *  Zonder deze props beheert de grafiek zijn eigen selectie, zoals voorheen. */
+  metric?: ForecastMetric;
+  onMetricChange?: (metric: ForecastMetric) => void;
+}) {
+  const [internalMetric, setInternalMetric] = useState<ForecastMetric>("conversions");
+  const metric = metricProp ?? internalMetric;
+  const setMetric = onMetricChange ?? setInternalMetric;
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [showYoY, setShowYoY] = useState(false);
   const { theme } = useBrandTheme();

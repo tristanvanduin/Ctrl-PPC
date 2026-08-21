@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, Settings, Target, Loader2, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers } from "lucide-react";
+import { BarChart3, Settings, Target, Loader2, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown } from "lucide-react";
 import { SyncStatusBadge } from "./sync-status-badge";
 import { getClientSettings } from "@/lib/client-settings";
 import { SecondOpinionView } from "./second-opinion-view";
@@ -15,6 +15,7 @@ import { TasksBlock } from "../insights/tasks-block";
 import { TaskImpactReminder } from "../insights/task-impact-reminder";
 import { SopTriggerButtons, type SopError } from "../insights/sop-trigger-buttons";
 import { StandaloneAnalyses } from "../insights/standalone-analyses";
+import { CreditBalanceBadge } from "../insights/credit-balance-badge";
 import { HypothesesBlock } from "../insights/hypotheses-block";
 import { ProposalQueue } from "../insights/proposal-queue";
 import { supabase } from "@/lib/supabase";
@@ -28,10 +29,11 @@ import { SignalAnalysisCard } from "./signal-analysis-card";
 import { CrossChannelAnalyses } from "./cross-channel-analyses";
 import { MasterSynthesisAnalysis } from "./master-synthesis-analysis";
 import { ChannelForecast } from "./channel-forecast";
+import { ChannelForecastSections } from "./channel-forecast-sections";
 import { EventForecaster } from "./event-forecaster";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
-import { isDemoMode } from "@/lib/demo/demo-mode";
+import { isDemoClient } from "@/lib/demo/demo-mode";
 import { GodViewDemo } from "@/components/terminal/god-view-demo";
 import type { InsightChannel } from "@/lib/insights/channel-of";
 import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
@@ -55,6 +57,7 @@ import { ChannelStructureAnalysis } from "./channel-structure-analysis";
 import { GeoCloneScope } from "./geo-clone-scope";
 import { TrackingAlert } from "./tracking-alert";
 import { CodeRoodBanner } from "./code-rood-banner";
+import { ClientNotes } from "./client-notes";
 import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
@@ -194,7 +197,7 @@ export function ClientDashboard({ client }: { client: Client }) {
   // hoort in een effect en niet in de eerste render -- anders rendert de server iets anders dan de
   // client en klapt de hydratie eruit.
   const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoMode()); }, []);
+  useEffect(() => { setDemoModus(isDemoClient(client.id)); }, [client.id]);
 
   useEffect(() => {
     let levend = true;
@@ -328,8 +331,8 @@ export function ClientDashboard({ client }: { client: Client }) {
           { id: "dashboard", label: "Overzicht", icon: <BarChart3 className="w-4 h-4" /> },
           { id: "campaigns", label: "Campagnes", icon: <LayoutGrid className="w-4 h-4" /> },
           { id: "forecast", label: "Prognose", icon: <TrendingUp className="w-4 h-4" /> },
-          { id: "insights", label: "Analyses", icon: <Lightbulb className="w-4 h-4" /> },
-          { id: "outcomes", label: "Inzichten", icon: <Target className="w-4 h-4" /> },
+          { id: "insights", label: "Analyseren", icon: <Lightbulb className="w-4 h-4" /> },
+          { id: "outcomes", label: "Bevindingen", icon: <Target className="w-4 h-4" /> },
           { id: "sprint", label: "Sprintplanning", icon: <Kanban className="w-4 h-4" /> },
           { id: "reporting", label: "Rapportage", icon: <FileText className="w-4 h-4" /> },
           { id: "dgm", label: "BMS", icon: <Users className="w-4 h-4" /> },
@@ -478,7 +481,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                     </>
                   )}
                   {(channel === "meta" || channel === "linkedin") && (
-                    <ChannelForecast clientId={client.id} channel={channel} />
+                    <ChannelForecastSections clientId={client.id} channel={channel} />
                   )}
                 </>
               )}
@@ -487,7 +490,6 @@ export function ClientDashboard({ client }: { client: Client }) {
 
           {activeTab === "insights" && (
             <div className="space-y-6">
-              <PeriodSummary data={clientData.data} />
               <InsightsTab
                 kanalen={kanalen ?? []}
                 clientId={client.id}
@@ -498,7 +500,6 @@ export function ClientDashboard({ client }: { client: Client }) {
 
           {activeTab === "outcomes" && (
             <div className="space-y-6">
-              <PeriodSummary data={clientData.data} />
               <OutcomesTab clientId={client.id} />
             </div>
           )}
@@ -552,6 +553,15 @@ export function ClientDashboard({ client }: { client: Client }) {
               )}
             </div>
           )}
+
+          {/* Notities & to-do's onderaan elke "werk"-pagina, gesynchroniseerd (zelfde tabel/
+              client-scope overal): niet op Instellingen of Bestanden, dat zijn pure
+              configuratieschermen waar een notitieblok niet hoort (feedbackronde 21 augustus). */}
+          {activeTab !== "settings" && activeTab !== "files" && (
+            <div className="mt-10">
+              <ClientNotes clientId={client.id} />
+            </div>
+          )}
         </AnalysisProvider>
         </ClientDataProvider>
       )}
@@ -577,8 +587,8 @@ export function ClientDashboard({ client }: { client: Client }) {
 const SETTINGS_GROEPEN = [
   { id: "meten", label: "Doelen & meten", uitleg: "Waar stuurt deze klant op, en wat telt als conversie — per kanaal." },
   { id: "merk", label: "Merk & uiterlijk", uitleg: "Huisstijl, kleuren en logo; wat je terugziet in het dashboard en de rapporten." },
-  { id: "beurzen", label: "Beurzen", uitleg: "Cadans en editie-datums. Voeden de weken-tot-beurs-weergave en de beursanalyse." },
-  { id: "account", label: "Account & markt", uitleg: "Sector en benchmarks, actieve landen, Merchant Center." },
+  { id: "beurzen", label: "Beurzen & momenten", uitleg: "Cadans en editie-datums van beurzen of andere terugkerende momenten. Voeden de weken-tot-event-weergave en de eventanalyse." },
+  { id: "account", label: "Account & markt", uitleg: "Sector en benchmarks, actieve landen, Merchant Center, GA4 en Search Console." },
 ] as const;
 
 type SettingsGroep = (typeof SETTINGS_GROEPEN)[number]["id"];
@@ -609,8 +619,6 @@ function SettingsSections({ client }: { client: Client }) {
           <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["kpi", "conversies", "overrides", "lag"]} />
           {/* Meta/LinkedIn direct onder de Google-conversie-acties: dezelfde vraag, ander kanaal. */}
           <ChannelConversionSettings clientId={client.id} />
-          <Ga4Settings clientId={client.id} />
-          <SearchConsoleSettings clientId={client.id} />
         </div>
       )}
 
@@ -624,7 +632,34 @@ function SettingsSections({ client }: { client: Client }) {
       {groep === "beurzen" && <EventSettings clientId={client.id} />}
 
       {groep === "account" && (
-        <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["sector", "landen", "merchant"]} />
+        <div className="space-y-8">
+          {/* Feedback: "heel Account & markt is puur integraties en settings, dus misschien niet
+              verkeerd -- maar de opmaak kan beter." Eén koppentekst i.p.v. geen enkel onderscheid
+              tussen WIE de klant is (sector, landen, Merchant Center -- context die de analyses
+              gebruiken) en WAAR externe data vandaan komt (GA4, Search Console).
+
+              Bewust GEEN twee losse <ClientSettingsPanel>-aanroepen (bv. kaarten={["sector","landen"]}
+              apart van kaarten={["merchant"]}): handleSave() daarin slaat altijd het VOLLEDIGE
+              settings-object op uit zijn eigen lokale state, ongeacht welke kaarten zichtbaar zijn.
+              Twee instanties zijn dus twee onafhankelijke "Opslaan"-knoppen die elkaars ongesaved
+              velden bij het opslaan stil terugzetten naar de waarde van bij het laden -- een
+              last-write-wins-bug, niet een cosmetische kwestie. Eén aanroep, één kop erboven. */}
+          <div>
+            <h3 className="text-meta font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              Accountcontext
+            </h3>
+            <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["sector", "landen", "merchant"]} />
+          </div>
+          <div>
+            <h3 className="text-meta font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              Externe databronnen
+            </h3>
+            <div className="space-y-6">
+              <Ga4Settings clientId={client.id} />
+              <SearchConsoleSettings clientId={client.id} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -633,11 +668,6 @@ function SettingsSections({ client }: { client: Client }) {
 function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSopError?: (error: SopError) => void; kanalen: readonly Kanaal[] }) {
   const [, setRefreshKey] = useState(0);
   const [analysisChannel, setAnalysisChannel] = useState<Channel>("blended");
-  // isDemoMode() leest window.location, dus in een effect en niet in de eerste render -- anders
-  // rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde reden als
-  // demoModus in ClientDashboard zelf, hierboven in dit bestand).
-  const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoMode()); }, []);
 
   // Het kanaal-subtabje kiest alleen WELKE analyses je draait; het uitkomsten-filter blijft
   // standaard op "Alle kanalen" (geen kanaal is belangrijker) en wisselt alleen op eigen klik.
@@ -645,10 +675,13 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
 
   // Sectiekop: scheidt de losse (deterministische) analyses bovenaan van de zware maand-SOP
   // eronder, zodat je alle analyses ziet zonder dat een volledige SOP-uitwerking ze wegduwt.
-  const Section = ({ children }: { children: React.ReactNode }) => (
+  // Optionele `extra` rechts in dezelfde regel -- alleen gebruikt bij "Losse analyses" (Google),
+  // want alleen dáár verbruiken de analyses credits (lib/analysis/credit-costs.ts).
+  const Section = ({ children, extra }: { children: React.ReactNode; extra?: React.ReactNode }) => (
     <div className="flex items-center gap-3 pt-1">
       <span className="text-micro font-semibold text-brand-blue-ink uppercase tracking-wide whitespace-nowrap">{children}</span>
       <span className="h-px flex-1 bg-border" />
+      {extra}
     </div>
   );
 
@@ -659,38 +692,40 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
 
       {analysisChannel === "google" && (
         <>
-          <Section>Losse analyses</Section>
+          <Section extra={<CreditBalanceBadge />}>Losse analyses</Section>
           <StandaloneAnalyses clientId={clientId} />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/google-funnel"
-            title="Funnel-drop-off"
-            description="Vertoning → klik → conversie over de recente 4 weken vs de 4 weken ervoor; een verslechterde fase landt in de wachtrij."
-            runLabel="Draai funnel-analyse"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/kpi-relations"
-            extra={{ channel: "google" }}
-            title="KPI-verhoudingen"
-            description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-            runLabel="Analyseer verhoudingen"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/google-video"
-            title="Video & Performance Max"
-            description="Kijkdiepte van de videocampagnes, placements die budget kosten zonder conversie, en netwerken binnen PMax die naar verhouding meer kosten dan ze opleveren. Bevindingen landen in de wachtrij."
-            runLabel="Analyseer video & PMax"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/geo-markets"
-            extra={{ channel: "google" }}
-            title="Landen & staten"
-            description="Welke markten kosten zonder te converteren, zijn structureel duurder, of trekken wel verkeer maar haken ná de klik af. Binnen de VS ook per staat, tegen een eigen norm."
-            runLabel="Analyseer markten"
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/google-funnel"
+              title="Funnel-drop-off"
+              description="Vertoning → klik → conversie over de recente 4 weken vs de 4 weken ervoor; een verslechterde fase landt in de wachtrij."
+              runLabel="Draai funnel-analyse"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/kpi-relations"
+              extra={{ channel: "google" }}
+              title="KPI-verhoudingen"
+              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+              runLabel="Analyseer verhoudingen"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/google-video"
+              title="Video & Performance Max"
+              description="Kijkdiepte van de videocampagnes, placements die budget kosten zonder conversie, en netwerken binnen PMax die naar verhouding meer kosten dan ze opleveren. Bevindingen landen in de wachtrij."
+              runLabel="Analyseer video & PMax"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/geo-markets"
+              extra={{ channel: "google" }}
+              title="Landen & staten"
+              description="Welke markten kosten zonder te converteren, zijn structureel duurder, of trekken wel verkeer maar haken ná de klik af. Binnen de VS ook per staat, tegen een eigen norm."
+              runLabel="Analyseer markten"
+            />
+          </div>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
@@ -701,27 +736,29 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
           <MetaCreativeAnalyses clientId={clientId} />
           {/* Deterministische structuur-analyse (plaatsing/leeftijd/device), direct uit de data. */}
           <ChannelStructureAnalysis clientId={clientId} channel="meta" />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/meta-funnel"
-            title="Funnel-drop-off"
-            description="Fase-overgangen (klik → landing → winkelwagen → checkout → conversie) recent vs prior venster; de verslechterde fase landt in de wachtrij."
-            runLabel="Draai funnel-analyse"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/kpi-relations"
-            extra={{ channel: "meta" }}
-            title="KPI-verhoudingen"
-            description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-            runLabel="Analyseer verhoudingen"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/meta-signals"
-            title="Meta-signalen"
-            description="Deterministische detectie: creative fatigue, frequency-saturatie, ranking-zwakte, hook/hold, plus segment-efficiëntie en budget-concentratie. Voedt de goedkeuringswachtrij."
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/meta-funnel"
+              title="Funnel-drop-off"
+              description="Fase-overgangen (klik → landing → winkelwagen → checkout → conversie) recent vs prior venster; de verslechterde fase landt in de wachtrij."
+              runLabel="Draai funnel-analyse"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/kpi-relations"
+              extra={{ channel: "meta" }}
+              title="KPI-verhoudingen"
+              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+              runLabel="Analyseer verhoudingen"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/meta-signals"
+              title="Meta-signalen"
+              description="Deterministische detectie: creative fatigue, frequency-saturatie, ranking-zwakte, hook/hold, plus segment-efficiëntie en budget-concentratie. Voedt de goedkeuringswachtrij."
+            />
+          </div>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} channel="meta_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
@@ -731,34 +768,36 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
           <Section>Losse analyses</Section>
           {/* Deterministische structuur-analyse (functie/seniority/industrie/bedrijfsgrootte), direct uit de data. */}
           <ChannelStructureAnalysis clientId={clientId} channel="linkedin" />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/linkedin-icp-fit"
-            title="ICP-fit"
-            description="Welk deel van de spend en leads valt binnen het ideale klantprofiel, wat is de waste en wat kost een ICP-lead vs een niet-ICP-lead."
-            runLabel="Draai ICP-fit"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/linkedin-funnel"
-            title="Funnel-drop-off"
-            description="Vertoning → klik → landingspagina → form-open → lead over twee 28-dagen-vensters; een verslechterde fase landt in de wachtrij."
-            runLabel="Draai funnel-analyse"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/kpi-relations"
-            extra={{ channel: "linkedin" }}
-            title="KPI-verhoudingen"
-            description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-            runLabel="Analyseer verhoudingen"
-          />
-          <SignalAnalysisCard
-            clientId={clientId}
-            endpoint="/api/analysis/linkedin-signals"
-            title="LinkedIn-signalen"
-            description="Deterministische detectie: lead-form drop-off, CPL-druk, engagement- en video-zwakte, plus demografie-efficiëntie/-drift en budget-concentratie. Voedt de goedkeuringswachtrij."
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/linkedin-icp-fit"
+              title="ICP-fit"
+              description="Welk deel van de spend en leads valt binnen het ideale klantprofiel, wat is de waste en wat kost een ICP-lead vs een niet-ICP-lead."
+              runLabel="Draai ICP-fit"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/linkedin-funnel"
+              title="Funnel-drop-off"
+              description="Vertoning → klik → landingspagina → form-open → lead over twee 28-dagen-vensters; een verslechterde fase landt in de wachtrij."
+              runLabel="Draai funnel-analyse"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/kpi-relations"
+              extra={{ channel: "linkedin" }}
+              title="KPI-verhoudingen"
+              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+              runLabel="Analyseer verhoudingen"
+            />
+            <SignalAnalysisCard
+              clientId={clientId}
+              endpoint="/api/analysis/linkedin-signals"
+              title="LinkedIn-signalen"
+              description="Deterministische detectie: lead-form drop-off, CPL-druk, engagement- en video-zwakte, plus demografie-efficiëntie/-drift en budget-concentratie. Voedt de goedkeuringswachtrij."
+            />
+          </div>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} channel="linkedin_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
@@ -775,19 +814,6 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
             <>
               <Section>Pijler 6</Section>
               <MasterSynthesisAnalysis clientId={clientId} />
-            </>
-          )}
-          {/* God View en cross-account (portfolio-synthese) zijn platform-/bureaubreed, geen
-              klant-eigen data -- ze horen normaal op /vandaag, niet op een klantpagina. Maar
-              "in het demo-account" is precies waar een demo-bezoeker ze wil kunnen laten zien
-              zonder eerst weg te navigeren. Zelfde componenten, zelfde statische demo-data
-              (lib/demo/god-view-demo.ts, GEEN echte sessie of LLM-aanroep nodig) als op
-              /vandaag?demo=1 -- puur hier ook ingesloten. Alleen in demo-modus: buiten demo
-              is dit geen klant-eigen data en hoort het hier niet te staan. */}
-          {demoModus && (
-            <>
-              <Section>Cross-account &amp; God View (demo)</Section>
-              <GodViewDemo />
             </>
           )}
         </>
@@ -813,6 +839,11 @@ function OutcomesTab({ clientId }: { clientId: string }) {
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [channelFilter, setChannelFilter] = useState<InsightChannel | null>(null);
+  // isDemoMode() leest window.location, dus in een effect en niet in de eerste render -- anders
+  // rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde reden als
+  // demoModus elders in dit bestand).
+  const [demoModus, setDemoModus] = useState(false);
+  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
 
   return (
     <div>
@@ -821,6 +852,25 @@ function OutcomesTab({ clientId }: { clientId: string }) {
         {/* Kanaal-filter over inzichten, aanbevelingen, hypotheses, wachtrij en taken. */}
         <ChannelFilter value={channelFilter} onChange={setChannelFilter} />
       </div>
+
+      {/* God View en cross-account (portfolio-synthese) zijn platform-/bureaubreed, geen
+          klant-eigen data -- ze horen normaal op /vandaag, niet op een klantpagina. Maar
+          "in het demo-account" is precies waar een demo-bezoeker ze wil kunnen laten zien zonder
+          eerst weg te navigeren. Zelfde componenten, zelfde statische demo-data
+          (lib/demo/god-view-demo.ts, GEEN echte sessie of LLM-aanroep nodig) als op
+          /vandaag?demo=1 -- puur hier ook ingesloten. Alleen in demo-modus: buiten demo is dit
+          geen klant-eigen data en hoort het hier niet te staan.
+          Verplaatst van Analyseren naar Bevindingen (feedbackronde 21 augustus): dit is een
+          uitkomst/inzicht, geen analyse die je zelf draait. */}
+      {demoModus && (
+        <Sectie
+          icoon={<Crown className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Cross-account & God View (demo)"
+          bijschrift="Platform-/bureaubreed voorbeeld — hoort normaal op Vandaag, hier alleen zichtbaar in demo-modus"
+        >
+          <GodViewDemo />
+        </Sectie>
+      )}
 
       {/* Wat op goedkeuring wacht staat vooraan: dat is het enige op deze pagina waar direct een
           handeling van jou op zit. De rest is lezen. */}

@@ -99,7 +99,7 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
                   <input
                     type="text"
                     value={val}
-                    placeholder="#08288C"
+                    placeholder="#2563EB"
                     onChange={(e) => setVisual(key, e.target.value)}
                     className="flex-1 rounded-md border border-border px-3 py-2 text-lead font-mono focus:border-brand-blue/50 focus:outline-none"
                   />

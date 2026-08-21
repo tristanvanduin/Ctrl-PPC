@@ -14,7 +14,7 @@ import { today } from "@/lib/reporting-date";
 // (app/api/cron/trigger-sops) dezelfde kanaal/cadans-tabel gebruikt in plaats van een tweede
 // kopie -- zie de kop van dat bestand. Gedrag van deze knoppen blijft ongewijzigd.
 import { CHANNEL_CONFIG, type SopType, type SopChannel } from "@/lib/analysis/sop-channel-config";
-import { isDemoMode } from "@/lib/demo/demo-mode";
+import { isDemoClient } from "@/lib/demo/demo-mode";
 
 export type { SopChannel };
 
@@ -72,7 +72,7 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
   // reasoning-budget) -- in demo-modus zou een bezoeker anders op een publieke link telkens een
   // echte, kostende run tegen demo-greentech kunnen starten.
   const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoMode()); }, []);
+  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
   const [status, setStatus] = useState<Record<SopType, SopStatus>>({
     weekly: { running: false, lastDate: null, error: null, success: false },
     biweekly: { running: false, lastDate: null, error: null, success: false },

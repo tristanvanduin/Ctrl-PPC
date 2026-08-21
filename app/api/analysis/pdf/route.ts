@@ -318,10 +318,29 @@ export async function GET(request: NextRequest) {
       phaseKey: "store_artifact",
       message: "SOP PDF opslaan...",
     });
-    await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
+    const { error: uploadError } = await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
       contentType: "application/pdf",
       upsert: true,
     });
+    if (uploadError) {
+      // Upload mislukt (quota/rechten/netwerk): geen client_files-rij aanmaken die naar een
+      // niet-bestaand storage-object wijst -- dat gaf eerder "bestand bestaat niet" bij een
+      // latere download via het Bestanden-tabblad, terwijl DEZE download (hieronder, rechtstreeks
+      // uit het geheugen) altijd al werkte. De gebruiker krijgt de PDF nu dus wel, maar zonder een
+      // (kapotte) permanente downloadlink erbij.
+      logger.error("[sop-pdf] Storage-upload mislukt, client_files-rij overgeslagen:", uploadError);
+      await markProgressCompleted(supabase, {
+        jobId,
+        message: "SOP PDF gereed (niet blijvend opgeslagen: upload mislukt).",
+        metadata: { sop_type: sopType, storage_error: uploadError.message },
+      });
+      return new Response(new Uint8Array(pdfBuffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      });
+    }
 
     // Ensure SOP's folder exists
     const { data: existingFolder } = await supabase

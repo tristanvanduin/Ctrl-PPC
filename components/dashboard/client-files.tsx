@@ -80,6 +80,7 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [fileActionError, setFileActionError] = useState<string | null>(null);
   const [sprintImportSummary, setSprintImportSummary] = useState<SprintCsvImportSummary | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Onthoudt voor welke klant we de standaardmappen al hebben aangemaakt, zodat een snelle
@@ -204,13 +205,19 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
 
   async function handleDownload(file: ClientFile) {
     if (!supabase) return;
-    const { data } = await supabase.storage
+    // Faalde eerder stil: als createSignedUrl een error teruggeeft (storage-bucket ontbreekt,
+    // het bestand is nooit echt geüpload, rechten kloppen niet) gebeurde er zichtbaar niets --
+    // geen foutmelding, geen download, geen aanwijzing waarom. Nu zichtbaar in dezelfde
+    // foutmelding-balk als een mislukte upload.
+    const { data, error } = await supabase.storage
       .from("client-files")
       .createSignedUrl(file.storage_path, 60);
 
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, "_blank");
+    if (error || !data?.signedUrl) {
+      setFileActionError(`${file.file_name}: ${error?.message ?? "kon geen downloadlink maken"}`);
+      return;
     }
+    window.open(data.signedUrl, "_blank");
   }
 
   const [viewingFile, setViewingFile] = useState<ClientFile | null>(null);
@@ -423,6 +430,16 @@ export function ClientFiles({ clientId, sopErrors, onDismissError, onDismissAllE
             <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
               <p className="text-meta text-red-700">Upload mislukt: {uploadError}</p>
               <button onClick={() => setUploadError(null)} className="text-meta text-muted-foreground ml-2">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Download/view error -- zie de toelichting bij handleDownload. */}
+          {fileActionError && (
+            <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
+              <p className="text-meta text-red-700">Downloaden mislukt: {fileActionError}</p>
+              <button onClick={() => setFileActionError(null)} className="text-meta text-muted-foreground ml-2">
                 <X className="w-3 h-3" />
               </button>
             </div>

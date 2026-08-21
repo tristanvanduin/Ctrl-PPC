@@ -109,10 +109,28 @@ export async function GET(request: NextRequest) {
       phaseKey: "store_artifact",
       message: "Rapport PDF opslaan...",
     });
-    await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
+    const { error: uploadError } = await supabase.storage.from("client-files").upload(storagePath, pdfBuffer, {
       contentType: "application/pdf",
       upsert: true,
     });
+
+    if (uploadError) {
+      // Upload mislukt: geen client_files-rij aanmaken die naar een niet-bestaand storage-object
+      // wijst -- dat gaf eerder "bestand bestaat niet" bij een latere download via het
+      // Bestanden-tabblad. Deze download (hieronder) werkt nog wel.
+      logger.error("[client-reports-pdf] Storage-upload mislukt, client_files-rij overgeslagen:", uploadError);
+      await markProgressCompleted(supabase, {
+        jobId,
+        message: "Rapport PDF gereed (niet blijvend opgeslagen: upload mislukt).",
+        metadata: { report_id: reportId, storage_error: uploadError.message },
+      });
+      return new Response(new Uint8Array(pdfBuffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      });
+    }
 
     // Ensure folder exists
     const { data: existingFolder } = await supabase

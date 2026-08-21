@@ -437,8 +437,14 @@
 
   /* De ramp draait om: bij nul net boven het kaartvlak, bij het maximum een heldere tint. De
      landgrenzen krijgen de canvaskleur in plaats van wit — witte lijnen op een donkere kaart
-     lezen als een net, niet als grenzen. */
-  --kaart-laag: #1d2430;
+     lezen als een net, niet als grenzen.
+
+     `--kaart-laag` (feedbackronde 21 augustus): stond op #1d2430, nog geen 10 punten per kanaal
+     verwijderd van zowel `--kaart-leeg` (#191d25) als het paginavlak (#0f1115) -- een land met
+     wat data en een land zonder data waren in het donker vrijwel niet te onderscheiden ("donker
+     valt weg"). Een duidelijke stap lichter/blauwer gezet, zodat de eerste trede van de ramp
+     zichtbaar begint waar hij hoort te beginnen: net boven het kaartvlak, niet erin verstopt. */
+  --kaart-laag: #2a3348;
   --kaart-hoog: #7ba6ff;
   --kaart-leeg: #191d25;
   --kaart-rand: #0f1115;

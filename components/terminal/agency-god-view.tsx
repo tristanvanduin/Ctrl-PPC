@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, Building2, Sparkles, Calendar, Info } from "lucide-react";
+import { Loader2, Building2, Sparkles, Calendar, Info, ShieldAlert } from "lucide-react";
 import { Counter } from "@/components/ui/counter";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "@/components/dashboard/data-table";
 import { segmentLabel, magAlsTrendGelden, MIN_ACCOUNTS_VOOR_TREND } from "@/lib/macro/types";
@@ -148,6 +148,86 @@ interface Antwoord {
   cellen: Cel_[];
 }
 
+// Churn-tegenhanger van de segmenttabel hierboven: /api/platform/agency-churn (zelfde
+// bureaugrens/tier-gate als agency-macrotrends, lib/macro/run-macro-churn.ts). Losse fetch, eigen
+// route -- de segmentcellen hierboven blijven de bestaande, deterministische Macro-aggregatie en
+// draaien onafhankelijk, zelfde patroon als PortfolioSynthesisCard hierboven.
+
+interface ChurnCel_ {
+  sleutel: { agencyId: string; bedrijfsmodel: string | null; niche: string | null };
+  telling: { rood: number; amber: number; groen: number; onbekend: number };
+  accounts: number;
+}
+
+interface ChurnAntwoord {
+  aantalCellen: number;
+  aantalKlantenIngelezen: number;
+  cellen: ChurnCel_[];
+}
+
+function AgencyChurnPerSegment() {
+  const [data, setData] = useState<ChurnAntwoord | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/platform/agency-churn")
+      .then((r) => r.json())
+      .then((d) => { if (cancelled) return; if (d?.error) setError(d.error); else setData(d as ChurnAntwoord); })
+      .catch((e) => { if (!cancelled) setError(String(e)); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (error) return <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-body text-amber-800">{error}</div>;
+  if (data === undefined) return <Laadvlak vorm="tabel" regels={4} />;
+  if (!data) return null;
+
+  const gesorteerd = data.cellen
+    .filter((c) => c.sleutel.bedrijfsmodel || c.sleutel.niche)
+    .filter((c) => c.telling.rood + c.telling.amber > 0)
+    .slice(0, 15);
+
+  return (
+    <section>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <ShieldAlert className="h-4 w-4 text-red-500" />
+        <h2 className="text-title font-semibold text-brand-gray">Churn-concentratie per segment</h2>
+        <span className="text-meta text-muted-foreground">{data.aantalKlantenIngelezen} klanten met een segment</span>
+      </div>
+      <p className="mb-3 text-meta text-muted-foreground">
+        Eigen portfolio, waar zit het churnrisico (Code Rood/Amber) geconcentreerd — geen benchmark
+        tussen bureaus, wel het verschil tussen &ldquo;deze ene klant staat rood&rdquo; en &ldquo;dit
+        hele segment loopt risico&rdquo;.
+      </p>
+      <Tabel>
+        <Kop>
+          <KolomKop breed>Segment</KolomKop>
+          <KolomKop getal>Accounts</KolomKop>
+          <KolomKop getal>Rood</KolomKop>
+          <KolomKop getal>Amber</KolomKop>
+          <KolomKop getal>Groen</KolomKop>
+        </Kop>
+        <Body>
+          {gesorteerd.map((c, i) => (
+            <Rij key={i}>
+              <NaamCel>{segmentLabel(c.sleutel)}</NaamCel>
+              <GetalCel>{c.accounts}</GetalCel>
+              <GetalCel><span className={c.telling.rood > 0 ? "font-semibold text-red-600" : ""}>{c.telling.rood}</span></GetalCel>
+              <GetalCel><span className={c.telling.amber > 0 ? "font-semibold text-amber-600" : ""}>{c.telling.amber}</span></GetalCel>
+              <GetalCel>{c.telling.groen}</GetalCel>
+            </Rij>
+          ))}
+          {gesorteerd.length === 0 && (
+            <Rij>
+              <Cel>Geen segment met rood/amber-concentratie op dit moment.</Cel>
+            </Rij>
+          )}
+        </Body>
+      </Tabel>
+    </section>
+  );
+}
+
 export function AgencyGodView() {
   const [data, setData] = useState<Antwoord | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -177,6 +257,7 @@ export function AgencyGodView() {
         <h1 className="text-page font-bold text-brand-blue-ink">Agency God View</h1>
         <PortfolioSynthesisCard />
         <CodeRoodPaneel />
+        <AgencyChurnPerSegment />
         <p className="rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-body text-muted-foreground">
           Nog geen cellen — geen klant van dit bureau heeft in het venster sinds {data.vanaf} zowel
           spend als een gekoppeld segment.
@@ -204,6 +285,8 @@ export function AgencyGodView() {
       <PortfolioSynthesisCard />
 
       <CodeRoodPaneel />
+
+      <AgencyChurnPerSegment />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Counter value={totaalSegment?.metrics.spend ?? 0} label="Spend deze maand" format="currency" isLive />

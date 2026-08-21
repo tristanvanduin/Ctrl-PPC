@@ -54,6 +54,9 @@ export interface ClientNote {
   client_id: string;
   title: string | null;
   content: string;
+  /** true = to-do met afvinkstatus, false = vrije notitie (`done` is dan betekenisloos). */
+  is_todo: boolean;
+  done: boolean;
   created_at: string;
   updated_at: string;
 }

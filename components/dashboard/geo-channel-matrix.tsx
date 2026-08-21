@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Tabel, Kop, KolomKop, Body, Rij, RijKop, TotaalRij, TotaalCel } from "./data-table";
 import { Loader2, Grid3x3 } from "lucide-react";
-import { isDemoMode } from "@/lib/demo/demo-mode";
 import { divergingColor, inkOn } from "@/lib/branding/chart-colors";
 import { stateLabel } from "@/lib/geo/us-fips";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
@@ -48,8 +47,9 @@ export function GeoChannelMatrix({ clientId }: { clientId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    const demo = isDemoMode();
-    fetch(`/api/geo/channels?clientId=${encodeURIComponent(clientId)}${demo ? "&demo=1" : ""}`)
+    // Demo wordt server-side bepaald door de klant-id (zie app/api/geo/channels/route.ts), geen
+    // vlag hier nodig.
+    fetch(`/api/geo/channels?clientId=${encodeURIComponent(clientId)}`)
       .then((r) => r.json())
       .then((d) => { if (!cancelled) setCells(d.cells ?? []); })
       .catch(() => { if (!cancelled) setCells([]); });

@@ -100,6 +100,11 @@ export function PeriodSummary({ data, compact }: Props) {
               // Van niets naar iets is geen percentage; "+100%" zou een precisie suggereren die
               // er niet is.
               leegTekst: k.d.vorig === 0 && k.d.huidig > 0 ? "nieuw in deze periode" : undefined,
+              // Feedback: het percentage en de sparkline erboven lijken tegenstrijdig, maar zijn
+              // twee verschillende vergelijkingen — de lijn is het verloop BINNEN deze periode, dit
+              // percentage is de vergelijking MET de vorige periode. Zonder "waartegen" oogt dat als
+              // dezelfde claim twee keer verteld; met "waartegen" is het duidelijk twee metingen.
+              waartegen: periode.compareRange ? `vs ${formatRange(periode.compareRange)}` : undefined,
             } : undefined}
           />
         ))}

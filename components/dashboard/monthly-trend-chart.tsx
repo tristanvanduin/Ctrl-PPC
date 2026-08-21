@@ -3,7 +3,7 @@
 import { ResponsiveContainer, ComposedChart, Bar, Area, AreaChart, LabelList } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { useBrandTheme } from "../branding/brand-theme-provider";
-import { CHART_CATEGORICAL, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
+import { categoricalColor, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
 import {
   Raster, AsX, AsY, Tip, Legenda, PLOT_MARGE,
   BALK_RADIUS, BALK_GAP, GROEP_GAP,
@@ -245,8 +245,11 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
   if (months.length < 1 || series.length === 0) return null;
 
   // Kleur volgt de serie op zijn vaste plek in het palet, niet zijn rang in deze grafiek: valt er
-  // een kanaal weg, dan houden de overige hun kleur.
-  const kleurVan = (i: number) => CHART_CATEGORICAL[i % CHART_CATEGORICAL.length];
+  // een kanaal weg, dan houden de overige hun kleur. Was hier zelf nooit waar: de "vaste plek"
+  // was gewoon de array-index, en die hing af van welk kanaal toevallig het eerst in de data
+  // stond -- Meta kon zo op de ene grafiek blauw zijn en op de andere oranje. categoricalColor()
+  // kent Google/Meta/LinkedIn/Cross-channel nu een echte vaste kleur toe, ongeacht volgorde.
+  const kleurVan = (i: number) => categoricalColor(series[i], i);
   // De laatste maand waarin déze serie iets heeft, en niet simpelweg de laatste maand van de
   // grafiek. Meta en LinkedIn beginnen hier pas in maart, dus recharts geeft hun labels een index
   // van 0 tot 4 terwijl Google er zes heeft: vergelijken met `data.length - 1` liet twee van de

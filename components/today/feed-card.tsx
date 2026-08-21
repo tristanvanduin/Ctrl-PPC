@@ -22,7 +22,7 @@ const STATUS_CLASS: Record<FeedStatus, string> = {
 };
 const BORDER: Record<FeedItem["severity"], string> = { critical: "border-l-red-400", decision: "border-l-amber-400", watch: "border-l-gray-300" };
 
-const AV_COLORS = ["bg-[#b8562f]", "bg-[#2f7d5b]", "bg-[#08288C]", "bg-[#7b3fe4]"];
+const AV_COLORS = ["bg-[#b8562f]", "bg-[#2f7d5b]", "bg-[var(--brand-primary,#4f46e5)]", "bg-[#7b3fe4]"];
 function avatarColor(name: string): string {
   let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return AV_COLORS[h % AV_COLORS.length];

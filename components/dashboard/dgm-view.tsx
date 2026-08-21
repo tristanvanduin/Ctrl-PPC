@@ -125,7 +125,13 @@ function computeTrajectStatus(
 ): TrajectInfo {
   const conv = forecast.conversions.kpi;
   const rev = forecast.revenue.kpi;
-  const diffPct = conv.diffPct;
+  // Feedback: "omzet doel is 61% gehaald, tegelijk een donkerrode melding dat we 35% achterlopen"
+  // -- de oorzaak was dat deze functie altijd op conversies rekende, ook voor een omzet/ROAS-
+  // gedreven klant (`mainMetric` werd al berekend maar nooit gebruikt, hieronder wel). Nu volgt
+  // de status/samenvatting dezelfde metric als de rest van de pagina voor zo'n klant: omzet.
+  const mainMetric = conv.annualTarget > 0 ? "conversions" : "omzet";
+  const kpi = mainMetric === "conversions" ? conv : rev;
+  const diffPct = kpi.diffPct;
   const criticalAnomalies = health.anomalies.filter((a) => a.severity === "critical").length;
   const warningAnomalies = health.anomalies.filter((a) => a.severity === "warning").length;
 
@@ -141,7 +147,6 @@ function computeTrajectStatus(
 
   // Build summary in business language
   let summary: string;
-  const mainMetric = conv.annualTarget > 0 ? "conversions" : "omzet";
 
   if (status === "groen") {
     if (diffPct > 5) {
@@ -746,7 +751,8 @@ function KpiCard({
       <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${barPct}%` }} />
       </div>
-      <div className="flex items-center justify-between mt-2">
+      <p className="text-micro text-muted-foreground/70 mt-1">Voortgang tot nu toe — nog niet tijd-gecorrigeerd</p>
+      <div className="flex items-center justify-between mt-1">
         <span className="text-micro text-muted-foreground">Doel: {fmtVal(target)}</span>
         <span className={`text-micro font-semibold ${statusColor}`}>
           Prognose: {fmtVal(forecastVal)} ({pct(diffPct)})
@@ -911,6 +917,16 @@ export function DgmView({ clientId }: { clientId: string }) {
               <p className={`text-title font-medium ${sc.text}`}>{traject.summary}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Stand per {dateLabel()} · {traject.confidence}
+              </p>
+              {/* Feedback: "omzet doel is 61% gehaald, tegelijk een donkerrode melding dat we 35%
+                  achterlopen -- hier moeten nuances komen." De twee cijfers zijn geen tegenspraak:
+                  de kaarten hieronder tonen de ruwe voortgang dit jaar (niet tijd-gecorrigeerd,
+                  logisch onder 100% zolang het jaar niet om is), deze regel toont de verwáchte
+                  afwijking op basis van de huidige trend. Zonder dit label lezen ze als
+                  tegenstrijdig i.p.v. aanvullend. */}
+              <p className="text-micro text-muted-foreground mt-0.5">
+                Verwachte afwijking op het jaardoel, op basis van de huidige trend — de kaarten
+                hieronder tonen de ruwe voortgang tot nu toe (nog niet tijd-gecorrigeerd).
               </p>
             </div>
           </div>

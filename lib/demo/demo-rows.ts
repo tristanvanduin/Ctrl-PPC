@@ -16,7 +16,7 @@ import { uspsToEnglishName } from "@/lib/geo/us-fips";
 import {
   accountWeeklyRows, adgroupMonthlyRows, wastefulSearchTermRows, accountYoyRows, campaignYoyRows,
   campaignMetadataRows, devicePerformanceRows, networkPerformanceRows, adScheduleRows,
-  keywordPerformanceRows, audiencePerformanceRows, geoCampaignRows,
+  keywordPerformanceRows, audiencePerformanceRows, geoCampaignRows, productPerformanceRows,
 } from "./google-sop-demo";
 import {
   PMAX_CAMPAIGN, VIDEO_CAMPAIGN, videoMetricsFor, assetGroupRows, pmaxNetworkRows,
@@ -64,9 +64,12 @@ const recentSpendBump = (daysAgo: number): number => (daysAgo < 6 ? 1.7 : 1);
 const weekdayConvPenalty = (daysAgo: number): number => (new Date(Date.now() - daysAgo * 86_400_000).getUTCDay() === 0 ? 0.4 : 1);
 
 // ── ads_campaign_monthly: per campagne × 13 maanden (voedt o.a. het beurs/geo-clone-overzicht) ──
-// Het kanaalpalet van dit account: Search, Display, Video en Performance Max. Géén Shopping — een
-// vakbeurs verkoopt niets via een productfeed, dus PMax draait hier op asset groups met tekst,
-// beeld en video, gestuurd op standaanvragen.
+// Het kanaalpalet van dit account: Search, Display, Video en Performance Max — GreenTech zelf
+// verkoopt niets via een productfeed, dus PMax draait hier op asset groups met tekst, beeld en
+// video, gestuurd op standaanvragen. Eén uitzondering, klein en bewust: een beursorganisator die
+// ook exposant-merchandise via een webshop verkoopt is een plausibele, aparte nevenstroom, geen
+// omkering van het kernverhaal — toegevoegd zodat de Shopping-scorecard (lib/shopping-
+// scorecard.ts) een echte demo-cel heeft in plaats van eerlijk "geen Shopping-campagnes" te tonen.
 const CAMPAIGNS = [
   { id: "demo-c-grt", name: "GRT | Search | NL", type: "SEARCH", imp: 42000, clk: 2100, cost: 4200, conv: 60, aov: 130, seed: 0 },
   { id: "demo-c-gra", name: "GRA | Search | US", type: "SEARCH", imp: 30000, clk: 1400, cost: 3000, conv: 42, aov: 110, seed: 1 },
@@ -77,6 +80,8 @@ const CAMPAIGNS = [
   { id: PMAX_CAMPAIGN.id, name: PMAX_CAMPAIGN.name, type: "PERFORMANCE_MAX", imp: 78000, clk: 1500, cost: 3200, conv: 34, aov: 180, seed: 7 },
   // Video: awareness — veel vertoningen, weinig klikken, weinig directe conversies.
   { id: VIDEO_CAMPAIGN.id, name: VIDEO_CAMPAIGN.name, type: "VIDEO", imp: 240000, clk: 900, cost: 1800, conv: 12, aov: 110, seed: 9 },
+  // Shopping: klein, merchandise-webshop naast de kern-leadgen — zie de toelichting hierboven.
+  { id: "demo-c-shop", name: "GreenTech | Shopping | Merchandise", type: "SHOPPING", imp: 9000, clk: 380, cost: 420, conv: 6, aov: 45, seed: 11 },
 ];
 const adsCampaignMonthly: Row[] = CAMPAIGNS.flatMap((c) =>
   Array.from({ length: N_MONTHS }, (_, i) => {
@@ -263,16 +268,21 @@ const metaAccountDailyOlder: Row[] = Array.from({ length: 580 }, (_, i) => {
 });
 const metaAccountDaily: Row[] = [...metaAccountDailyOlder, ...metaAccountDailyRecent];
 // meta_campaigns + meta_campaign_daily voeden de ChannelPerformance-view (KPI's, maand-/campagnetabel).
+// `objective` per campagne: zonder dit veld valt lib/meta/campaign-types.ts's detectMetaObjective
+// terug op naamdetectie, en "Prospecting breed"/"Retargeting NL" matchen geen van de herkende
+// trefwoorden (awareness/traffic/engagement/lead/app/sales) -- dan zou de objective-uitsplitsing
+// op de Campagnes-tab (feedback punt 29+31) in demo-modus bijna leeg blijven. Echte waarden,
+// zodat de demo hetzelfde ODAX-veld gebruikt als een live account.
 const META_CAMPAIGNS = [
-  { id: "demo-mcamp-aw", name: "GRT | Awareness EU", imp: 2500, clk: 48, spend: 117, conv: 7, seed: 0 },
-  { id: "demo-mcamp-rt", name: "GRT | Retargeting NL", imp: 800, clk: 30, spend: 44, conv: 6, seed: 4 },
+  { id: "demo-mcamp-aw", name: "GRT | Awareness EU", objective: "OUTCOME_AWARENESS", imp: 2500, clk: 48, spend: 117, conv: 7, seed: 0 },
+  { id: "demo-mcamp-rt", name: "GRT | Retargeting NL", objective: "OUTCOME_SALES", imp: 800, clk: 30, spend: 44, conv: 6, seed: 4 },
   // Dominante, slecht converterende campagne: voedt de budget-concentratie-detector.
-  { id: "demo-mcamp-pro", name: "GRT | Prospecting breed", imp: 6000, clk: 55, spend: 210, conv: 3, seed: 6 },
+  { id: "demo-mcamp-pro", name: "GRT | Prospecting breed", objective: "OUTCOME_LEADS", imp: 6000, clk: 55, spend: 210, conv: 3, seed: 6 },
   // Ook op de andere beurzen actief, zodat Meta binnen GRN/GRA niet leeg is.
-  { id: "demo-mcamp-grn", name: "GRN | Awareness NA", imp: 1800, clk: 34, spend: 82, conv: 5, seed: 7 },
-  { id: "demo-mcamp-gra", name: "GRA | Retargeting US", imp: 1100, clk: 26, spend: 54, conv: 4, seed: 8 },
+  { id: "demo-mcamp-grn", name: "GRN | Awareness NA", objective: "OUTCOME_AWARENESS", imp: 1800, clk: 34, spend: 82, conv: 5, seed: 7 },
+  { id: "demo-mcamp-gra", name: "GRA | Retargeting US", objective: "OUTCOME_SALES", imp: 1100, clk: 26, spend: 54, conv: 4, seed: 8 },
 ];
-const metaCampaigns: Row[] = META_CAMPAIGNS.map((c) => ({ client_id: CID, campaign_id: c.id, name: c.name, status: "ACTIVE" }));
+const metaCampaigns: Row[] = META_CAMPAIGNS.map((c) => ({ client_id: CID, campaign_id: c.id, name: c.name, objective: c.objective, status: "ACTIVE" }));
 // Gemiddelde orderwaarde per campagne -- eerder ontbrak conversion_value hier volledig (altijd
 // undefined -> 0), waardoor Meta's Omzet/ROAS overal €0/0,00x toonde: precies de "conversions_value:
 // 0"-vondst die masterplan 17.19/17.20's cross-account-test destijds al signaleerde. Per campagne
@@ -575,6 +585,12 @@ const adsNetworkPerformanceMonthly: Row[] = networkPerformanceRows(CID, adsAccou
 const adsAdSchedulePerformance: Row[] = adScheduleRows(CID, adsAccountMonthly, dayISO(31), dayISO(1), iso());
 const adsKeywordPerformanceMonthly: Row[] = keywordPerformanceRows(CID, adsAdgroupMonthly, DIM_MONTHS, iso());
 const adsAudiencePerformanceMonthly: Row[] = audiencePerformanceRows(CID, adsAccountMonthly, DIM_MONTHS, iso());
+// Alleen de Shopping-campagne (afleiden, niet verzinnen): productPerformanceRows splitst per
+// product uit exact déze campagnetotalen, niet uit het accounttotaal zoals de doelgroep-/
+// netwerkrijen hierboven -- een productfeed bestaat alleen binnen zijn eigen campagne.
+const adsProductPerformanceMonthly: Row[] = productPerformanceRows(
+  CID, adsCampaignMonthly.filter((r) => r.campaign_id === "demo-c-shop"), iso()
+);
 
 // ── PMax en Video ──────────────────────────────────────────────────────────
 // Asset groups, netwerkverdeling, assets, plaatsingen en zoekcategorieën. Deze tabellen voedden de
@@ -670,6 +686,7 @@ export function demoRows(): Record<string, Row[]> {
     ads_ad_schedule_performance: adsAdSchedulePerformance,
     ads_keyword_performance_monthly: adsKeywordPerformanceMonthly,
     ads_audience_performance_monthly: adsAudiencePerformanceMonthly,
+    ads_product_performance_monthly: adsProductPerformanceMonthly,
     ads_asset_group_performance_monthly: adsAssetGroupPerformanceMonthly,
     ads_pmax_network_breakdown: adsPmaxNetworkBreakdown,
     ads_pmax_asset_performance: adsPmaxAssetPerformance,

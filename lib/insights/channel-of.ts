@@ -15,10 +15,17 @@ export const CHANNEL_LABEL: Record<InsightChannel, string> = {
 };
 
 // Kleuraccenten per kanaal voor de badges (Tailwind-klassen).
+//
+// Feedback: "kleuren niet consistent" -- deze badges en de grafiekkleuren
+// (lib/branding/chart-colors.ts CHANNEL_CHART_COLOR) kwamen uit twee losse, nooit op elkaar
+// afgestemde systemen. LinkedIn stond hier op sky (lichtblauw), maar het dichtstbijzijnde
+// gevalideerde palet-slot voor zijn grafiekkleur is aqua/teal (blauw was al aan Google
+// toegewezen) -- vandaar teal in plaats van sky. Google (blauw) en Meta (indigo, dicht bij het
+// palet se violet) matchten hun grafiekkleur al.
 export const CHANNEL_BADGE_CLASS: Record<InsightChannel, string> = {
   google: "bg-blue-50 text-blue-700 border-blue-200",
   meta: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  linkedin: "bg-sky-50 text-sky-700 border-sky-200",
+  linkedin: "bg-teal-50 text-teal-700 border-teal-200",
   cross: "bg-amber-50 text-amber-700 border-amber-200",
 };
 

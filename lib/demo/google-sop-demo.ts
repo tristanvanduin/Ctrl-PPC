@@ -309,6 +309,7 @@ const CAMPAIGN_META: Array<{ id: string; name: string; type: string; strategy: s
   { id: "demo-c-brand", name: "GreenTech | Brand", type: "SEARCH", strategy: "TARGET_IMPRESSION_SHARE", target: 0.95, budget: 20 },
   { id: "demo-c-pmax", name: "GreenTech | PMax | Standhouders", type: "PERFORMANCE_MAX", strategy: "MAXIMIZE_CONVERSIONS", target: null, budget: 105 },
   { id: "demo-c-video", name: "GRT | Video | YouTube awareness", type: "VIDEO", strategy: "TARGET_CPM", target: 8, budget: 60 },
+  { id: "demo-c-shop", name: "GreenTech | Shopping | Merchandise", type: "SHOPPING", strategy: "MAXIMIZE_CONVERSION_VALUE", target: null, budget: 15 },
 ];
 
 export function campaignMetadataRows(clientId: string, updatedAt: string): Row[] {
@@ -580,6 +581,12 @@ const AUDIENCES: Array<{ id: string; name: string; type: string; campaign: strin
   { id: "demo-aud-custom", name: "Custom: bezoekers concurrerende beurzen", type: "CUSTOM", campaign: "GRA | Search | US", costShare: 0.11, convShare: 0.12 },
   { id: "demo-aud-similar", name: "Vergelijkbaar: standhouders 2025", type: "SIMILAR", campaign: "GRT | Search | NL", costShare: 0.09, convShare: 0.08 },
   { id: "demo-aud-affinity", name: "Affiniteit: groene technologie", type: "AFFINITY", campaign: "GRN | Display | Canada", costShare: 0.19, convShare: 0.05 },
+  // Twee extra Display-segmenten (naast affiniteit hierboven), zodat de Doelgroep-mix-factor van
+  // de Display-scorecard iets te vergelijken heeft -- één sterk (in-market), één zwak
+  // (remarketing, weinig conversie op relatief veel kosten), in plaats van één segment dat nooit
+  // "naar verhouding meer kost dan oplevert" kán zijn omdat het zijn eigen enige referentiepunt is.
+  { id: "demo-aud-inmarket-display", name: "In-market: tuinbouwapparatuur", type: "IN_MARKET", campaign: "GRN | Display | Canada", costShare: 0.04, convShare: 0.05 },
+  { id: "demo-aud-remarketing-display", name: "Remarketing: sitebezoekers zonder aanvraag", type: "REMARKETING", campaign: "GRN | Display | Canada", costShare: 0.05, convShare: 0.005 },
 ];
 
 export function audiencePerformanceRows(clientId: string, accountMonthly: Row[], months: string[], syncedAt: string): Row[] {
@@ -603,6 +610,42 @@ export function audiencePerformanceRows(clientId: string, accountMonthly: Row[],
         synced_at: syncedAt,
       });
     }
+  }
+  return rows.sort((a, b) => Number(b.cost) - Number(a.cost));
+}
+
+// ── ads_product_performance_monthly (Shopping) ──────────────────────────────
+// Voedt de Shopping-scorecard (lib/shopping-scorecard.ts). GreenTech verkoopt zelf niets via een
+// productfeed (zie de kop bij CAMPAIGNS in demo-rows.ts) -- maar een beursorganisator die ook
+// exposant-merchandise via een webshop verkoopt, is een aparte, kleine en op zichzelf plausibele
+// nevenstroom, niet een omkering van de kernnarratief. Vier producten, gesplitst uit de Shopping-
+// campagnetotalen (afleiden, niet verzinnen): drie gezonde, één duidelijk zwak (hoge kosten,
+// nauwelijks conversie) zodat de Product-efficiëntie-factor iets te vinden heeft.
+const PRODUCTS: Array<{ title: string; costShare: number; clickShare: number; convShare: number }> = [
+  { title: "GreenTech T-shirt Editie 2026", costShare: 0.30, clickShare: 0.34, convShare: 0.46 },
+  { title: "Exposant-badge lanyard", costShare: 0.20, clickShare: 0.22, convShare: 0.32 },
+  { title: "Duurzame drinkfles", costShare: 0.18, clickShare: 0.16, convShare: 0.20 },
+  { title: "Beursposter (gelimiteerd)", costShare: 0.32, clickShare: 0.28, convShare: 0.02 },
+];
+
+export function productPerformanceRows(clientId: string, shoppingCampaignMonthly: Row[], syncedAt: string): Row[] {
+  const rows: Row[] = [];
+  for (const raw of shoppingCampaignMonthly) {
+    const t = totals(raw);
+    const imp = splitInt(t.impressions, PRODUCTS.map((p) => p.clickShare));
+    const clk = splitInt(t.clicks, PRODUCTS.map((p) => p.clickShare));
+    const cost = splitInt(t.cost, PRODUCTS.map((p) => p.costShare));
+    const conv = splitInt(t.conversions, PRODUCTS.map((p) => p.convShare));
+    const val = splitAlong(t.conversions_value, conv, PRODUCTS.map((p) => p.convShare));
+    PRODUCTS.forEach((p, i) => {
+      const part = { impressions: imp[i], clicks: clk[i], cost: cost[i], conversions: conv[i], conversions_value: val[i] };
+      const der = derived(part);
+      rows.push({
+        client_id: clientId, month: t.month, campaign_name: "GreenTech | Shopping | Merchandise",
+        campaign_type: "SHOPPING", product_title: p.title, product_id: null,
+        ...part, ctr: der.ctr, roas: der.roas, cost_per_conversion: der.cost_per_conversion, synced_at: syncedAt,
+      });
+    });
   }
   return rows.sort((a, b) => Number(b.cost) - Number(a.cost));
 }

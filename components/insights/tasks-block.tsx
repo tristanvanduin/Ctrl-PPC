@@ -11,6 +11,13 @@ import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of
 import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
 import { BRAND_NAME } from "@/lib/branding/brand";
+import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
+
+/** Hoeveel AI-taken standaard zichtbaar zijn voordat "Toon N meer" verschijnt -- zonder limiet
+ *  liep deze lijst (ongefilterd, geen scroll-container zoals de legacy-takenlijst eronder wel
+ *  heeft) tot honderden pixels door en was die vaak de belangrijkste reden dat de Bevindingen-
+ *  pagina immens lang werd. */
+const AI_TAKEN_ZICHTBAAR = 6;
 
 type Cadence = "actions" | "weekly" | "biweekly" | "monthly";
 
@@ -290,6 +297,18 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
   // Kanaal per aanbeveling (uit de sop_type): taken erven het kanaal van hun aanbeveling.
   const [recChannelMap, setRecChannelMap] = useState<Map<string, InsightChannel>>(new Map());
 
+  // Kanaal-filter: het kanaal van de taak volgt uit zijn aanbeveling; zonder aanbeveling is de
+  // taak uit de Google-pijplijn (de enige die losse taken schrijft).
+  const filteredAiTasks = useMemo(() => {
+    const channelTasks = channel
+      ? aiTasks.filter((t) => (t.recommendation_id ? recChannelMap.get(t.recommendation_id) ?? "google" : "google") === channel)
+      : aiTasks;
+    return selectedInsightId
+      ? channelTasks.filter((t) => t.recommendation_id && recInsightMap.get(t.recommendation_id) === selectedInsightId)
+      : channelTasks;
+  }, [aiTasks, channel, recChannelMap, selectedInsightId, recInsightMap]);
+  const aiTakenLijst = useTruncatedList(filteredAiTasks, AI_TAKEN_ZICHTBAAR);
+
   useEffect(() => {
     if (!supabase) return;
     setAiTasksLoading(true);
@@ -430,27 +449,13 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
       </div>
 
       {/* AI-generated tasks from analysis */}
-      {!aiTasksLoading && aiTasks.length > 0 && (() => {
-        // Kanaal-filter: het kanaal van de taak volgt uit zijn aanbeveling; zonder
-        // aanbeveling is de taak uit de Google-pijplijn (de enige die losse taken schrijft).
-        const channelTasks = channel
-          ? aiTasks.filter((t) => (t.recommendation_id ? recChannelMap.get(t.recommendation_id) ?? "google" : "google") === channel)
-          : aiTasks;
-        // Filter AI tasks by selectedInsightId via recommendation chain
-        const filteredAiTasks = selectedInsightId
-          ? channelTasks.filter((t) => {
-              if (!t.recommendation_id) return false;
-              return recInsightMap.get(t.recommendation_id) === selectedInsightId;
-            })
-          : channelTasks;
-
-        return filteredAiTasks.length > 0 ? (
+      {!aiTasksLoading && filteredAiTasks.length > 0 && (
         <div className="mb-4">
           <p className="text-micro font-semibold text-brand-blue-ink uppercase tracking-wide mb-2">
             AI Analyse taken ({filteredAiTasks.length}{selectedInsightId ? " gefilterd" : ""})
           </p>
           <div className="space-y-1.5">
-            {filteredAiTasks.map((at) => {
+            {aiTakenLijst.zichtbaar.map((at) => {
               const isOpen = expandedTasks.has(at.id);
               return (
               <div
@@ -491,9 +496,9 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
               );
             })}
           </div>
+          <MeerKnop verborgen={aiTakenLijst.verborgen} uitgeklapt={aiTakenLijst.uitgeklapt} onToggle={aiTakenLijst.toggle} eenheid="taken" />
         </div>
-        ) : null;
-      })()}
+      )}
 
       {/* Fallback message when no AI tasks on Acties tab */}
       {cadence === "actions" && !aiTasksLoading && aiTasks.length === 0 && (

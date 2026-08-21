@@ -56,6 +56,20 @@ const STATUS_OPTIONS = [
 const STATUS_COLOR = (status: string) =>
   STATUS_OPTIONS.find((s) => s.value === status)?.color || "bg-gray-100 text-gray-600";
 
+// Bordweergave: dezelfde zes statussen, in de volgorde waarin werk ze doorloopt (STATUS_OPTIONS
+// zelf staat in een andere volgorde, gekozen voor de statuskiezer in de tabel — niet voor een
+// bord). "Verlopen" staat als laatste, smallere kolom i.p.v. verborgen: een auto-verlopen taak is
+// nog steeds een taak, en dit dashboard verzint nooit stilzwijgend "geen data" waar iets staat.
+const BOARD_COLUMNS = ["backlog", "todo", "in_planning", "ongoing", "done", "expired"] as const;
+const BOARD_BORDER: Record<string, string> = {
+  backlog: "transparent",
+  todo: "#2563eb",
+  in_planning: "#ca8a04",
+  ongoing: "#7c3aed",
+  done: "#059669",
+  expired: "#dc2626",
+};
+
 interface Props {
   clientId: string;
   refreshKey?: number;
@@ -67,6 +81,7 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
   const [loading, setLoading] = useState(true);
   const [fout, setFout] = useState<string | null>(null);
   const [filter, setFilter] = useState<"active" | "done" | "all">("all");
+  const [view, setView] = useState<"bord" | "tabel">("bord");
   const [channelFilter, setChannelFilter] = useState<InsightChannel | null>(null);
   const [collapsedHypotheses, setCollapsedHypotheses] = useState<Set<string>>(new Set());
   const [showAddHypothesis, setShowAddHypothesis] = useState(false);
@@ -364,21 +379,6 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
     );
   }
 
-  if (items.length === 0 && !showAddHypothesis && !showAddTask) {
-    return (
-      <div className="bg-card rounded-xl border border-border p-8 shadow-sm text-center">
-        <Calendar className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
-        <p className="text-body text-muted-foreground mb-3">Nog geen sprintplanning.</p>
-        <button
-          onClick={() => setShowAddHypothesis(true)}
-          className="px-4 py-2 text-xs font-medium rounded-lg bg-brand-blue text-white hover:bg-brand-blue/90 transition-colors"
-        >
-          <Plus className="w-3 h-3 inline mr-1" /> Hypothese + taak toevoegen
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header */}
@@ -390,6 +390,19 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex gap-0.5 bg-gray-100 rounded-md p-0.5">
+            {(["bord", "tabel"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-2.5 py-1 text-micro font-medium rounded-md transition-colors ${
+                  view === v ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                {v === "bord" ? "Bord" : "Tabel"}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-0.5 bg-gray-100 rounded-md p-0.5">
             {(["active", "done", "all"] as const).map((f) => (
               <button
@@ -539,7 +552,19 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
         </div>
       )}
 
+      {/* Bord: de standaardweergave (masterplan-redesign) -- toont alle zes kolommen altijd, ook
+          leeg. Een leeg bord is nog steeds de structuur van het proces; het verdwijnt niet totdat
+          er iets in zit, zoals de oude "nog geen sprintplanning"-melding hierboven deed. */}
+      {view === "bord" && (
+        <SprintBoard
+          items={filteredItems}
+          hypotheses={hypotheses}
+          onUpdateStatus={(id, status) => updateItem(id, "status", status)}
+        />
+      )}
+
       {/* Table */}
+      {view === "tabel" && (
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50/50 border-b border-border">
@@ -637,6 +662,116 @@ export function SprintPlanning({ clientId, refreshKey }: Props) {
             ))}
           </tbody>
         </table>
+      </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Kanban-bord voor de sprintplanning. Gedeelde bron met SprintRow (status, eigenaar, hypothese-
+ * ICE-score) -- geen tweede databron, alleen een tweede weergave op dezelfde `items`.
+ */
+function SprintBoard({
+  items, hypotheses, onUpdateStatus,
+}: {
+  items: SprintItem[];
+  hypotheses: Map<string, HypothesisRef>;
+  onUpdateStatus: (id: string, status: string) => void;
+}) {
+  // Feedback: de hypothese hoort niet standaard op de kaart -- dat is precies waarom het bord
+  // per taak i.p.v. per hypothese is opgebouwd (zie de toelichting bij het kaartje hieronder).
+  // Een klein pijltje per kaart klapt hem open, zodat de taak de hoofdregel blijft en de "waarom"
+  // een bewuste, goedkope handeling is in plaats van verplichte tekst op elke kaart.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  return (
+    <div className="px-5 py-4 overflow-x-auto">
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(6, minmax(180px, 1fr))" }}>
+        {BOARD_COLUMNS.map((status) => {
+          const optie = STATUS_OPTIONS.find((s) => s.value === status)!;
+          const kolomItems = items.filter((i) => i.status === status);
+          const verlopen = status === "expired";
+          return (
+            <div key={status} className={`flex flex-col gap-2 rounded-xl bg-gray-50/60 p-2.5 ${verlopen ? "opacity-70" : ""}`}>
+              <div className="flex items-center gap-1.5 px-1">
+                <span className="text-micro font-semibold text-muted-foreground uppercase tracking-wide">{optie.label}</span>
+                <span className="text-micro text-muted-foreground font-mono">{kolomItems.length}</span>
+              </div>
+
+              {kolomItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border px-2 py-5 text-center">
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground opacity-40" />
+                  <span className="text-micro text-muted-foreground">Geen taken</span>
+                </div>
+              ) : (
+                kolomItems.map((item) => {
+                  const hyp = item.hypothesis_id ? hypotheses.get(item.hypothesis_id) : null;
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm"
+                      style={{ borderLeft: `3px solid ${BOARD_BORDER[status]}` }}
+                    >
+                      <div className="flex items-start justify-between gap-1.5">
+                        <p className={`text-body font-semibold text-brand-blue-ink ${item.status === "done" ? "line-through decoration-muted-foreground/60" : ""}`}>
+                          {item.task}
+                        </p>
+                        {/* Feedback: het bord toont het uitvoerbare -- de taak -- als hoofdregel,
+                            geen hypothese tien keer herhaald over tien kaarten in verschillende
+                            kolommen. De "waarom" is daarom een bewuste, goedkope uitklap i.p.v.
+                            verplichte tekst op elke kaart. */}
+                        {hyp && (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(item.id)}
+                            aria-label={expanded.has(item.id) ? "Hypothese verbergen" : "Hypothese tonen"}
+                            aria-expanded={expanded.has(item.id)}
+                            className="shrink-0 mt-0.5 text-muted-foreground hover:text-brand-blue-ink"
+                          >
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded.has(item.id) ? "rotate-180" : ""}`} />
+                          </button>
+                        )}
+                      </div>
+                      {item.metrics && (
+                        <p className="text-micro text-muted-foreground mt-0.5">{item.metrics}</p>
+                      )}
+                      {hyp && expanded.has(item.id) && (
+                        <p className="text-micro text-muted-foreground/80 mt-1 italic">
+                          hoort bij: {hyp.hypothesis}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between gap-2 mt-2">
+                        <span className={`text-micro font-semibold rounded px-1.5 py-0.5 ${
+                          item.owner === OWNER_TEAM ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-700"
+                        }`}>
+                          {ownerLabel(item.owner)}
+                        </span>
+                        <span className="text-micro font-mono text-muted-foreground">
+                          {hyp ? `ICE ${hyp.ice_total}` : item.week_number ? `week ${item.week_number}` : ""}
+                        </span>
+                      </div>
+                      <select
+                        value={item.status}
+                        onChange={(e) => onUpdateStatus(item.id, e.target.value)}
+                        className="mt-2 w-full text-micro rounded border border-border bg-gray-50/60 px-1.5 py-1 text-muted-foreground"
+                      >
+                        {STATUS_OPTIONS.map((s) => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
