@@ -5463,3 +5463,74 @@ instantie) is niet veilig; de correcte fix (React Context door de hulpcomponente
 stylesheet per aanroep opnieuw opbouwen) raakt beide bestanden in de breedte en verdient een eigen,
 losse sessie met visuele verificatie — niet iets om blind in dezelfde beurt als de rest hierboven
 te doen. Nog open, expliciet niet vergeten.
+
+### 17.66 De laatste twee punten van 17.64's lijst: kanaalaanbeveling + GodView-tier-teaser — de lijst is dicht (21 augustus 2026)
+
+**#26 Kanaalaanbeveling/adviserende laag.** De eigenaar vroeg expliciet om mijn eigen oordeel voor
+dit bouwen ("Waarom zouden we niet indicatoren en signalen bouwen die kunnen spotten dat een klant
+klaar is voor een ander kanaal? [...] Is dat een vraag of je er wel of niet mee eens bent"), en
+bevestigde na een eens-antwoord om door te gaan. Dit draait 17.64 #26 om: niet meer "bestaat niet,
+tegengehouden door de guardrail in `master-synthesis-prompt.ts`", maar bewust buiten die guardrail
+gebouwd — de guardrail verbiedt de LLM om zelf kanaaladvies te verzinnen, niet een deterministieke
+databerekening die er een signaleert. Zelfde vertrouwensdoctrine als de rest van God View: "SQL
+berekent de waarheid", geen taalmodel in de weg.
+
+`lib/benchmark/god-view-channel-gaps.ts` (`findChannelGaps()`) hergebruikt `bouwGodViewCellen()`
+en keert `findBestGodViewCell`'s kanaal-gelijkheidsfilter om: in plaats van "beste cel voor dit
+kanaal" wordt het "cellen voor kanalen die deze klant zelf nog niet actief voert". Zelfde
+k-anonimiteitsdrempel (`MIN_ACCOUNTS`/`MIN_BUREAUS`) als de rest van de God View-laag, dus
+degradeert stil naar een lege lijst eronder — met vandaag 2 echte bureaus in het systeem is een
+lege lijst voor echte klanten de eerlijke, verwachte staat, geen bug. `channel-gap-card.tsx`
+verbergt zichzelf dan ook volledig (`return null`) in plaats van een placeholder te tonen.
+`app/api/analysis/channel-gaps/route.ts` is de IO-laag: haalt de eigen actieve kanalen van de
+klant op uit `blended_account_monthly` (laatste 3 maanden) en levert die aan `findChannelGaps()`.
+Gewired in de Bevindingen-tab.
+
+Gepusht als eigen commit (`d7993ef`), vóór het schrijven van deze sectie — hierbij alsnog in het
+masterplan geboekt.
+
+**#28 (deel 2 van "allebei") — GodView-tier-teaser, nieuw component.** Waar 17.65 de bestaande
+*rol*-teaser (`god-view-teaser.tsx`, voor bureaus zonder de juiste rol/platformtoegang) aanscherpte,
+ontbrak nog de *tier*-teaser: een bureau met platformtoegang (rol `performance_marketeer`, al in
+`AgencyGodView`) maar zonder de licentie die het cross-agency God View Premium/Tactical/Pulse-
+product ontgrendelt. Twee losse componenten voor twee losse blokkades, per de AskUserQuestion die
+hierover liep — "allebei" betekende dus letterlijk: allebei bouwen, niet één van de twee kiezen.
+
+- **`lib/benchmark/god-view-tier.ts`** (nieuw): `magGodViewPremium()`. Er bestaat vandaag geen
+  eigen God-View-specifiek entitlement-veld, alleen `agencies.licentie` — dezelfde basisladder die
+  ook `magChatten()` gebruikt (`lib/chat/toegang.ts`). Grens gezet op `'scale'`, één stap boven
+  chat's `'growth'`, expliciet als **placeholder** becommentarieerd: God View Premium heeft in
+  `lib/marketing/modules.ts` al eigen prijzen (Standard/Tactical/Pulse) staan die niets met de
+  basisladder te maken hebben, maar een echt eigen abonnementsveld is nieuwe infrastructuur die
+  voor geen enkele module vandaag bestaat (zelfde blinde vlek als `CREDIT_COSTS` in
+  `lib/analysis/credit-costs.ts`, leeg om dezelfde reden). Herijken zodra dat een eigen
+  afnamebeslissing wordt.
+- **`app/api/agency/god-view-tier/route.ts`** (nieuw): geeft alleen een boolean (`hasPremium`)
+  voor het eigen bureau van de ingelogde gebruiker terug. Voedt de teaser, is geen
+  toegangscontrole — de echte cross-agency cijfers staan sowieso uitsluitend in
+  `god-view-premium.tsx`, platformbeheerder-only, ongewijzigd.
+- **`components/terminal/god-view-premium-teaser.tsx`** (nieuw): zelfde regel als de rolteaser —
+  fictieve, duidelijk gelabelde voorbeeldsegmenten achter een blur, nooit een echt-maar-vervaagd
+  getal. Toont de drie tiers (Standard €750, Tactical €1.250, Pulse €2.500/mnd) met hun tagline en
+  uitleg eronder. `return null` zolang de tier-check laadt of het bureau al Premium heeft (faalt
+  veilig dicht bij een netwerkfout: geen upgrade-ruis tonen aan wie mogelijk al betaalt) — geen
+  "upgrade nu"-banner voorschotelen aan een klant die al betaalt.
+- **`agency-god-view.tsx`**: `<GodViewPremiumTeaser />` gerenderd in zowel de lege-staat- als de
+  volle-inhoud-return — verschijnt dus ongeacht of het bureau zelf al God View-cellen heeft.
+
+**Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
+groen (137 routes). Dezelfde 4 bekende sandbox-gates faalden (`rpc-rechten`, `view-dekking`,
+`bureaugrens`, `rls-scheiding` — allemaal `401 Format is Authorization: Bearer [token]` op
+`scripts/supabase-sql.mjs`, een sandbox-credentialbeperking, geen echte regressie; ongewijzigd
+sinds eerdere secties in deze sessie). Gepusht naar `main` (`358c3aa`).
+
+**Daarmee is 17.64's lijst van zes dicht — met twee uitzonderingen, geen van beide stilzwijgend:**
+
+- **#27 "Instelbare KPI's per klant"** is in het beslissingsbericht van de eigenaar nooit genoemd
+  en dus ook nooit gebouwd. Stond in 17.64 als open punt met een reden ("welke KPI's, per kanaal
+  of globaal, wie mag dit instellen — een grotere vraag dan conversieselectie, die al bestaat");
+  die vraag staat nog steeds open. Blijft open tot de eigenaar hem expliciet oppakt.
+- **Rapportage-kleuren (onderdeel van #22)** blijven bewust ongedaan, zoals al vastgelegd in
+  17.65's "wat dit niet doet" — de twee PDF-renderers zijn niet veilig aan te passen zonder een
+  React-Context-refactor die zijn eigen sessie verdient. Geen nieuwe informatie hier, alleen een
+  herbevestiging dat dit niet stilzwijgend is meegenomen.
