@@ -5352,3 +5352,42 @@ gemeten volume het rechtvaardigt. **Dit is zelf nog een openstaand punt**, geen 
 punt ook al tegen een live deploy is bekeken (zie 17.58/17.62 — live-verificatie bleef deze hele
 sessie onbereikbaar). De 28 punten hierboven zijn de volledige dekking van het oorspronkelijke
 dashboard-feedback-document; niets is overgeslagen of aangenomen zonder code-bewijs.
+
+### 17.64 Vier punten van 17.63's open-lijst afgewerkt, direct op `main`
+
+Op verzoek van de eigenaar de lijst afgewerkt, rechtstreeks op `main` (geen nieuwe branch, per het
+besluit in 17.62). Vier van de tien open punten waren klein en ondubbelzinnig genoeg om zonder
+verdere scoping-vraag te fixen:
+
+- **#19 conversieselectie dubbele sectie** — niet samengevoegd (Google's conversie-acties en
+  Meta/LinkedIn's veldselectie zijn structureel verschillende datamodellen; samenvoegen was de
+  verkeerde abstractie), wel herlabeld: "Conversie-acties **(Google)**" en "Conversie-selectie
+  **(Meta & LinkedIn)**", met uitleg in de subtekst waarom het er twee zijn. Lost de verwarring op
+  zonder een valse eenheid te suggereren.
+- **#20 PMax/Search-scorecard te breed/leeg** — `health-badge.tsx`'s anomalieën-kolom van kaal
+  `flex-1` naar `max-w-2xl`.
+- **#24 Settings-pagina witruimte** — `branding-view.tsx`'s editor+preview-grid van edge-to-edge
+  naar `max-w-5xl`, gecentreerd.
+- **#25 Tabel-leesbaarheid "letter onder 65"** — met de kanttekening dat de locatie nooit 100%
+  zeker was vastgesteld (zie 17.63): `health-badge.tsx`'s "waaruit de score bestaat"-lijst had een
+  echt, verifieerbaar uitlijningsprobleem (de naam-kolom was `shrink-0` op eigen breedte, en
+  factornamen lopen uiteen van "Trend" (5 tekens) tot "Cannibalisatie met Search/Shopping" (34
+  tekens) — geen vaste kolombreedte kon dat voor beide uitersten goed doen zonder te verspillen of
+  af te kappen). Herbouwd naar twee regels per factor (naam+score, dan de volledige omschrijving
+  eronder) in plaats van één afgekapte regel met een `title`-attribuut — geen kolom meer om uit te
+  lijnen, en de uitleg is niet langer alleen bij hover (dus ook toetsenbord/aanraking-bereikbaar,
+  zelfde principe als de bestaande `Tooltip`-component elders in de codebase al toepast).
+
+**Resterend, elk met een reden waarom dit geen blinde implementatie moet worden:**
+
+| # | Punt | Waarom dit een keuze van de eigenaar is |
+|---|---|---|
+| 21 | Forecasting-uniformiteit | Vereist het samenvoegen van drie bestaande, functionerende componenten (`ForecastTable`, `ChannelForecast`, de beurs-narratieve kaart) tot één opbouw — een echte herontwerp-vraag, geen bugfix. Welke vorm wint (tabel, kaarten, of iets nieuws) is een productbeslissing |
+| 22 | Settings: hele dashboard kleurt mee met klantmerk | De feedback zelf impliceert een antwoord ("hoeft niet voor productie... zou wel kunnen zodat de rapportage de belangrijkste klant details heeft") maar dat is een gok totdat bevestigd: moet dit per-tier/per-vlag uit, of blijft het zo voor de RAI-praktijk die juist wél volledige branding wil? Een globale gedragswijziging zonder bevestiging is precies wat sectie "Executing actions with care" afraadt |
+| 23 | Whitelabel bureau-breed voor kleuren (nu alleen het logo) | Een nieuwe feature — schema-uitbreiding op `agencies` plus UI — geen bugfix |
+| 26 | Adviserende laag / kanaalaanbeveling | Bestaat niet, en wordt actief tegengehouden door een guardrail in `master-synthesis-prompt.ts`. Masterplan sectie 11 ("wat we niet bouwen") is hier direct van toepassing: een nieuwe analytische module bouwen zonder klant die hem nodig heeft, is precies het patroon dat dat sectie afraadt |
+| 27 | Instelbare KPI's per klant in topbar/grafiek | Nieuwe settings-feature; conversie-selectie bestaat al, KPI-zichtbaarheid is een andere, grotere vraag (welke KPI's, per kanaal of globaal, wie mag dit instellen) |
+| 28 | GodViewPremium blur/lock | Al expliciet als open vraag bij de eigenaar gelegd in 17.59 (interne preview zonder actie, of een tier-gated betaalfeature) — geen nieuwe informatie hierover |
+
+**Geverifieerd**: `scripts/gates.sh` — `tsc`, 313/313 tests, `build`, allemaal groen. Gepusht naar
+`main` (`9b2f88e`).
