@@ -8,6 +8,7 @@ import { compactCurrency, compactNumber } from "@/lib/format/compact-number";
 import type { GodModeRow } from "@/app/api/platform/god-mode/route";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_GOD_MODE_DATA } from "@/lib/demo/god-view-demo";
+import { GodViewPremium } from "./god-view-premium";
 
 // Fase 5, Task 3: God Mode -- de startpagina voor platform-brede scope (zie app/vandaag/page.tsx
 // voor de rolcheck; deze component doet zelf GEEN autorisatie, dat is /api/admin/god-mode's
@@ -135,6 +136,8 @@ export function GodMode() {
         <Counter value={data.accountCount} label="Actieve accounts" isLive />
         <Counter value={data.top10[0]?.roas ?? 0} label="Hoogste ROAS" suffix="x" />
       </div>
+
+      <GodViewPremium />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Ranglijst titel="Top 10 · spend" rows={data.top10} />
