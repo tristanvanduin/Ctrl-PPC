@@ -5748,12 +5748,17 @@ nieuwe Google Ads API-sync — voorgelegd aan de eigenaar met de waarschuwing da
 - `components/dashboard/creative-performance.tsx`: haalt `google_ads_image_assets` op naast de
   bestaande RSA/ad-meta-verrijking, vult `imageUrl` voor Google-advertenties.
 
-**Nog niet gedaan, expliciet**: verifiëren tegen een echt account met Display-campagnes — pas dan
-is bekend of de vier `field_type`-waarden (MARKETING_IMAGE/SQUARE_MARKETING_IMAGE/LOGO/
-LANDSCAPE_LOGO) kloppen. De eerstvolgende reguliere sync van zo'n account pakt de nieuwe fetch
-automatisch mee (geen aparte trigger nodig, al gewired in de bestaande Promise.all); iemand moet
-daarna Creative Performance voor dat account bekijken. Tot die verificatie blijft dit "gebouwd en
-live in de database, niet bevestigd correct".
+**Nog niet gedaan, en dat wacht op iets buiten deze sessie om**: verifiëren tegen een echt account
+met Display-campagnes — pas dan is bekend of de vier `field_type`-waarden (MARKETING_IMAGE/
+SQUARE_MARKETING_IMAGE/LOGO/LANDSCAPE_LOGO) kloppen. Geen actiepunt voor de eigenaar op dit moment:
+er zijn momenteel geen echte, live gekoppelde klanten om tegen te draaien (bevestigd 21 augustus).
+Dit is dus geen open taak maar een wachtstand — zodra de eerste echte klant met Display-campagnes
+gekoppeld is en zijn eerste reguliere sync draait (geen aparte trigger nodig, al gewired in de
+bestaande Promise.all), zelf-verifieert dit: ofwel Creative Performance toont dan echte
+Display-beelden, ofwel de `try/catch` in `getDisplayImageAssets` degradeert stil naar `[]` en de
+"beeldsync bestaat nog niet"-melding uit 17.68 blijft gewoon staan — geen van beide breekt iets
+anders in de sync. Tot die eerste echte sync blijft dit "gebouwd en live in de database, niet
+bevestigd correct".
 
 **Geverifieerd (code-niveau)**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests
 groen, `build` groen (geen enkele test raakt de nieuwe GAQL-query zelf, die kan alleen tegen een
