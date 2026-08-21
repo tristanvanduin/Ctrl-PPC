@@ -5630,4 +5630,52 @@ values (
 Bevestigd geslaagd. Jesse ziet nu, net als de eigenaar, elke klant van elk bureau — de bureau-kiezer
 uit deze sectie blijft relevant voor bureaugebonden gebruikers (zoals de meeste toekomstige
 uitnodigingen), maar was voor Jesse's eigen geval niet de juiste knop.
-  herbevestiging dat dit niet stilzwijgend is meegenomen.
+
+### 17.68 Tweede feedbackronde (30 screenshots): gevalideerd tegen de code, vier agents parallel (21 augustus 2026)
+
+Nieuw feedbackdocument (`f51d6ec6-Feedback_1.md`, 30 ingesloten screenshots + losse tekstpunten),
+elk punt tegen de daadwerkelijke code gecontroleerd voordat er iets gebouwd wordt — zelfde discipline
+als 17.63. Vier onderzoeksagents parallel: kanaalpariteit (Google/Meta/LinkedIn), grafiek-gebreken,
+God View/God Mode + AI-tekstlogica, en de resterende kleine bugs/SOP-download/naamgeving.
+
+**Direct te fixen — klein, geen productbeslissing nodig:**
+
+| # | Punt | Bestand | Fix |
+|---|---|---|---|
+| 1 | "2x" ROAS zwart i.p.v. gekleurd | `components/terminal/god-mode.tsx` | vierde `Counter` mist `isLive`-prop — 1 regel |
+| 2 | Cross-channel/God View-tabellen: gat tussen naam en getallen | `cross-channel-view.tsx`, `god-view-premium.tsx` | `breed` op `KolomKop` verwijderen — `data-table.tsx`'s eigen doc-comment waarschuwt hier al expliciet voor bij korte labels |
+| 3 | "Conversies per maand" geen as, niet klikbaar | `monthly-trend-bars.tsx` | mist `AsY`/`Raster` uit `chart-chrome.tsx`, die sibling-grafieken al gebruiken |
+| 4 | "CPA per maand" bijna platte lijn | `monthly-trend-line.tsx` | Recharts' as-domein pint minimum op 0 zonder `YAxis`; bestaande `asSchaalLijn()`-helper lost dit al elders op |
+| 5 | Wit gat in Pacing-kaart | `pacing-monitor.tsx` | 6-koloms grid reserveert een cel voor een voorwaardelijk element dat soms niet rendert |
+| 6 | Groot leeg vlak bij Meta (niet bij Google) | `meta-view.tsx`/`linkedin-view.tsx` hero-rij | mist de `items-start`-guard die Google's view al wél heeft (eigen comment: "3x eerder een wit gat veroorzaakt") |
+| 7 | Maanden afgekort i.p.v. voluit | `lib/forecast.ts` (`MONTH_LABELS`, 3x gedupliceerd) | een voluit-Nederlandse formatter bestaat al op 5 andere plekken (`toLocaleDateString("nl-NL",{month:"long"})`); hergebruiken i.p.v. dupliceren |
+| 8 | Gekke uitlijning donut-paar (Google) | `campaign-type-split.tsx` | wisselt tussen center- en left-alignment binnen dezelfde kaart |
+| 9 | "Groeiplafond"-conclusie is inhoudelijk fout | `lib/demo/god-view-demo.ts` | **eens met de eigenaar** — 97% dagbudget + 28% IS-verlies op budget is tekstboek een opschalingskans, geen plafond (klassieke lost-IS-budget-lezing); is bovendien gescripte demotekst, geen LLM-prompt, en spreekt zichzelf al tegen met de bijbehorende actie ("dagbudget verhogen") |
+| 10 | Oude SOP's nog steeds niet downloadbaar | — | root cause (silent upload-errors) was al gefixt in 17.47-17.50, maar oude, al-kapotte `client_files`-rijen van vóór die fix zijn nooit schoongemaakt — dit is dezelfde bug, niet een nieuwe |
+| 11 | "Beurzen en momenten" hernoemen | `event-settings.tsx` | al hernoemd naar "Beurzen & momenten" (17.x eerder) — vermoedelijk hetzelfde punt, andere spelling door de reviewer |
+| 12 | Beurs-aftelling generiek maken (ook Black Friday) | `google-view.tsx`, `lib/fair/` | onderliggende data/logica is al generiek (`client_settings.rai_events`, `standard-b2c-events.ts`); alleen de UI-labels ("Weken tot beurs") zijn nog beurs-specifiek getaald |
+| 13 | Churn-kleuren (rood/amber) niet gelijk tussen tabellen | `agency-god-view.tsx`, `god-view-premium.tsx` | drie plekken kiezen elk eigen Tailwind-tinten voor hetzelfde concept, geen gedeelde kleur-constante |
+
+**Al opgelost of bewuste keuze — geen actie nodig:**
+
+- Health Score paginabreed bij Google vs Meta/LinkedIn (#12 in het document) — al pagina-breed bij alle drie, alleen het omliggende grid verschilt nog.
+- Google's "Spend per campagnetype" zonder filters (#13) — bewust: Google heeft één dimensie (campagnetype), Meta/LinkedIn hebben er meerdere (leeftijd/plaatsing/device etc.) en daarom wél tabs.
+- Pacing-element niet bij elk kanaal (#15) — bewust gedocumenteerd: zit bij Meta/LinkedIn verweven in `ChannelPerformance` i.p.v. als los element; loskoppelen raakt een gedeeld component.
+- "Spend per kanaal per maand" te breed (#3 in het document) — code-comments tonen dat dit exact deze klacht al oploste (`plotBreedte()`-cap + `Kerncijfer`-totalensidebar); alleen visueel nog te verifiëren.
+- God Mode account-lijst (#28) — **al vandaag aangepast** (comment gedateerd "feedbackronde 21 augustus"): namen zijn nu client-side gepseudonimiseerd via een stabiele hash op `clientId`, reden: scherm-deel-veiligheid tijdens een salesgesprek, niet geheimhouding voor de kijker zelf (die toch alles mag zien). De sector/niche-aggregatie-suggestie uit het document is dus NIET geïmplementeerd — alleen de anonimisering.
+
+**Nodig productbeslissing — hieronder aan de eigenaar voorgelegd:**
+
+- Meta/LinkedIn campagnetype-tabs gelijktrekken met Google's tab-interactiepatroon (#6, #21, #25, #26)
+- Creative Performance die geen rekening houdt met campagnetype (#20) — Display toont een "niet gesynct"-fallback i.p.v. een beeld, omdat Google's databron nooit `imageUrl` vult voor Display
+- Code Rood: geen multi-KPI-nuance, vuurt puur op de ene gevolgde metric (#30)
+- Sector/niche i.p.v. account-anonimisering in God Mode alsnog bouwen, of blijft de huidige pseudonimisering volstaan (#28)
+
+**Genuinely onduidelijk, terugvraag nodig:**
+
+- "Weken tot beurs / Maanden"-toggle, "X nodig???" (#6 in het document) — geen enkele dismiss/close-context gevonden in de code eromheen; kan niet zonder verduidelijking worden opgepakt.
+- Checkbox-uitlijning (#4 in het document) — geen enkele checkbox-component in de code combineert met een percentage-kaart zoals beschreven; kan niet worden gelokaliseerd zonder een scherm-/paginanaam.
+- God Mode/God View Premium-witruimte (#11) — geen coded-afwijking gevonden (padding is in lijn met de rest van de app); dit is een visuele dichtheidsvraag, geen bug.
+
+**Nog niet geverifieerd**: dit is een validatie- en planningsronde, nog geen bouwronde. Zodra de
+bovenstaande punten zijn opgepakt volgt `scripts/gates.sh` zoals gebruikelijk vóór elke push.
