@@ -4,9 +4,10 @@
 -- (masterplan sectie 15.1), buiten het bereik van migraties 065/067/081 gelaten met opzet, hier
 -- alsnog gedicht.
 --
--- NIET UITGEVOERD TEGEN DE DATABASE. Zelfde reden als bij 094/095: deze sandbox heeft geen
--- SUPABASE_ACCESS_TOKEN. Klaargezet, niet toegepast. Draaien met
--- node scripts/supabase-sql.mjs --file scripts/migrations/096_rls_auth_read_opruiming.sql
+-- UITGEVOERD. Bevestigd 21 augustus 2026 via pg_policies: alle zes tabellen dragen nu hun
+-- "<tabel>_zichtbaar"-policy en de oude auth_read/"Allow all for authenticated"-policies zijn
+-- weg. Deze kop zei eerder "NIET UITGEVOERD TEGEN DE DATABASE" (SUPABASE_ACCESS_TOKEN ontbrak in
+-- die sandbox) -- inmiddels achterhaald.
 -- Terugdraaien: de oorspronkelijke policy staat er per tabel als commentaar bij.
 --
 -- ── WAT ER MIS WAS, PER TABEL ────────────────────────────────────────────────
