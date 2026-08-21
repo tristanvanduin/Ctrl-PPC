@@ -5044,3 +5044,71 @@ onderweg gevonden en gefixt — de nieuwe Shopping-campagne verschoof de account
 nacht/dag-CPA-ratio net onder de testdrempel, opgelost door de campagne iets minder efficiënt te
 maken i.p.v. de test te verzwakken), `node scripts/check-hygiene.mjs` (1012 bestanden, groen),
 Playwright-screenshots op de demo-klant.
+
+### 17.58 Root-cause van "ik mis nog steeds data": isDemoMode() kende clientId niet — plus de
+SopDekkingBanner-melding (21 augustus, vervolg)
+
+De eigenaar bleef data missen ondanks 17.57's aanvullingen, en meldde een onleesbare, niet-wegklikbare
+melding (screenshot van `SopDekkingBanner` in donker). Twee losse root causes gevonden en gefixt,
+beide bevestigd met live Playwright-verificatie (niet alleen tsc/tests).
+
+**Root cause 1 — demo-detectie los van clientId.** `isDemoMode()` (`lib/demo/demo-mode.ts`) leest
+uitsluitend `?demo=1`/sessionStorage/de env-vlag — nooit welke klant je bekijkt. Server-routes via
+`supabaseForClient(clientId)` herkennen de demo-klant al correct op clientId alleen, maar een hele
+reeks client-side plekken checkten alléén `isDemoMode()`: `MetaView`/`LinkedInView` (live
+verbindingsstatus-call, vandaar Meta's "Niet gekoppeld"-banner náást zichtbare mock-cijfers eronder),
+`VideoPerformance`/`VideoPlacements`, `GeoChannelMatrix`, en drie server-routes
+(`lib/geo/geo-source.ts`'s `resolveGeo()`, `/api/geo/channels`) die een client-doorgegeven
+`?demo=1`-vlag vereisten bovenop de clientId-check. Wie rechtstreeks naar `/client/demo-greentech`
+navigeert (bookmark, sidebar-klik, tweede tabblad) zonder ooit `?demo=1` in díe tab gezet te hebben,
+kreeg zo een half-leeg scherm: KPI's en scorecards (via `supabaseForClient`) wél gevuld, maar de
+geo-kaart ("geen locatiedata beschikbaar"), Meta/LinkedIn-connectiestatus en de geo×kanaal-matrix
+niet — precies de klacht.
+
+Erger: `lib/supabase.ts`'s `export const supabase` wordt ÉÉN KEER berekend bij module-load, niet
+opnieuw per render — dus zelfs een latere `?demo=1` haalt 'm niet meer uit een fout bevroren staat
+binnen dezelfde tab.
+
+Fix, geen losse patches per component maar één uitbreiding van de bron: `isDemoMode()` herkent nu
+ook `/client/<demo-klant-id>` in het huidige pad (naast `?demo=1`) en zet daarbij dezelfde
+sessionStorage-vlag — dus ook de bij module-load bevroren `lib/supabase.ts`-singleton pikt het op
+zodra dat de EERSTE pagina in de tab is (de gerapporteerde situatie). Nieuwe `isDemoClient(clientId)`
+combineert dat met een directe clientId-check, gebruikt op alle bovengenoemde componenten i.p.v.
+`isDemoMode()`. `resolveGeo()` en `/api/geo/channels` varen nu puur op clientId (`isDemoClientValue`/
+`supabaseForClient`), niet meer op een doorgegeven vlag — de eerdere "demo-vlag mag niet bepalen
+wélke klant" bescherming blijft intact omdat clientId zelf al pint welke klant het is.
+
+Geverifieerd met een schone Playwright-sessie (geen `?demo=1`, rechtstreeks naar
+`/client/demo-greentech`): Meta-tab toont nu "Gekoppeld", LinkedIn "Gekoppeld (demo)", de geo-kaart
+en Cross-channel-tabel zijn gevuld, en Display/Shopping-scorecards renderen — identiek aan de
+`?demo=1`-variant.
+
+**Root cause 2 — SopDekkingBanner.** Twee vragen: dark-mode-contrast en een dismiss-knop. De
+dismiss was recht toe recht aan (`useState`, X-knop, zelfde patroon als `TrackingAlert`) — komt
+terug bij een nieuwe paginalaad, niet permanent weg. Het contrastprobleem was interessanter: mijn
+eerste poging voegde `dark:bg-amber-950/60 dark:text-amber-100` toe (standaard-Tailwind-redenering:
+lage nummers = licht, hoge nummers = donker) en dat zag er in Playwright NOG STEEDS onleesbaar uit.
+Bleek: `app/globals.css` draait onder `.dark` de HELE kleurenschaal om (`--color-amber-100` wordt
+daar `#3a2b14`, een donkere tint; `--color-amber-900` wordt `#fbe9d1`, bijna wit) — precies zodat
+in licht-modus geschreven combinaties als `bg-amber-50 text-amber-700` vanzelf goed lezen in het
+donker, zonder losse `dark:`-varianten. De ORIGINELE `SopDekkingBanner` had wél een losse
+`dark:text-amber-200` bovenop zijn `text-amber-900` — die selecteert onder de omkering een van de
+donkere tinten, en overschrijft daarmee de al-correcte, automatisch omgekeerde `text-amber-900`.
+Precies de eerder aangewezen boosdoener. Fix: alle `dark:`-varianten op de amber-klassen verwijderd,
+teruggebracht naar precies het patroon van `CodeRoodBanner` (bewust ZONDER dark:-varianten, en
+daardoor al die hele tijd al correct). Geverifieerd met een production build (`next start`, niet
+`next dev` — Turbopack's dev-CSS-pijplijn bleek in deze sandbox onbetrouwbaar voor `dark:text-*`-
+utilities specifiek, een sandbox-artefact losstaand van dit bugonderzoek) in zowel licht als donker.
+
+**Nog open:** hetzelfde patroon (`dark:`-varianten op een kleur die de omgekeerde schaal al dekt)
+is een risico bij toekomstig werk aan willekeurig welke amber/rood/groen/etc.-melding — de nieuwe
+code-comment in `sop-dekking-banner.tsx` legt dit uit zodat een volgende sessie 'm niet per ongeluk
+herintroduceert, maar een projectbrede audit van bestaande `dark:text-{kleur}-*`/`dark:bg-{kleur}-*`
+overrides (zijn die overal terecht, of sluipt deze bug al ergens anders?) is niet gedaan — apart te
+plannen als de eigenaar meer van dit patroon tegenkomt. De drie-demo-databronnen-tegenstrijdigheid
+uit 17.57 blijft ook nog open.
+
+**Verificatie**: `npx tsc --noEmit -p .`, `npm test -- --run` (312/312 groen), `node
+scripts/check-hygiene.mjs` (1012 bestanden, groen), Playwright tegen zowel `next dev` (voor de
+demo-detectiefix) als een production build via `next start` (voor de bannerfix, licht én donker,
+open/dicht/dismissed).

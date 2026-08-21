@@ -14,6 +14,7 @@
 
 import { NextRequest } from "next/server";
 import { resolveGeo, type GeoChannel, type GeoLevel } from "@/lib/geo/geo-source";
+import { isDemoRequest } from "@/lib/demo/server-supabase";
 
 const CHANNELS: GeoChannel[] = ["google", "meta", "linkedin", "blended"];
 const LEVELS: GeoLevel[] = ["country", "region"];
@@ -23,7 +24,6 @@ export async function GET(req: NextRequest) {
   const clientId = sp.get("clientId");
   const channel = (sp.get("channel") ?? "google") as GeoChannel;
   const level = (sp.get("level") ?? "country") as GeoLevel;
-  const demo = sp.get("demo") === "1";
 
   if (!clientId) {
     return Response.json({ error: "clientId is verplicht" }, { status: 400 });
@@ -35,12 +35,13 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: `onbekend niveau: ${level}` }, { status: 400 });
   }
 
-  const rows = await resolveGeo({ clientId, channel, level, demo });
-  // evidence: waar komt dit vandaan? De UI kan hiermee eerlijk labelen (demo vs echte sync).
+  const rows = await resolveGeo({ clientId, channel, level });
+  // evidence: waar komt dit vandaan? Bepaald door de klant-id (zie resolveGeo), niet door een
+  // losse vlag -- zodat directe navigatie naar de demo-klant hetzelfde eerlijke label krijgt.
   return Response.json({
     channel,
     level,
-    evidence: demo ? "demo" : "platform",
+    evidence: isDemoRequest(clientId) ? "demo" : "platform",
     rows,
   });
 }

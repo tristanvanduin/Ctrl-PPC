@@ -115,18 +115,19 @@ export interface ResolveGeoArgs {
   clientId: string;
   channel: GeoChannel;
   level: GeoLevel;
-  demo: boolean;
 }
 
 // Levert de geo-rijen voor de gevraagde (kanaal, niveau). Nooit een throw: bij ontbrekende config
 // of lege tabellen komt er gewoon [] terug, wat de kaart eerlijk laat verdwijnen.
-export async function resolveGeo({ clientId, channel, level, demo }: ResolveGeoArgs): Promise<GeoAgg[]> {
-  // De demo-vlag komt van de client, dus hij mag alleen bepalen ÓF je de demo ziet — niet wélke
-  // klant de demo is. Hij werd hier eerder toegepast vóór de klantcontrole, waardoor
-  // ?clientId=<echte-klant>&demo=1 de verzonnen GreenTech-cijfers teruggaf onder de naam van die
-  // klant. Geen datalek, maar in een gedeelde rapportlink wel een verhaal dat nergens op slaat.
-  // De zusterroute /api/geo/channels deed het al goed, via de client_id-scoping van de mock.
-  if (demo && isDemoClientValue(clientId)) {
+export async function resolveGeo({ clientId, channel, level }: ResolveGeoArgs): Promise<GeoAgg[]> {
+  // De demo-status wordt bepaald door de klant-id, niet door een apart meegegeven vlag — dat gaf
+  // eerder twee kapotte varianten: (1) ?clientId=<echte-klant>&demo=1 gaf de verzonnen
+  // GreenTech-cijfers terug onder de naam van een echte klant, en (2) wie rechtstreeks naar
+  // /client/demo-greentech navigeerde zonder ?demo=1 in díe tab gezet te hebben (geen vlag dus)
+  // kreeg de ECHTE, lege tabellen terwijl de rest van het scherm demo-cijfers toonde. Beide gaten
+  // sluiten door alleen op clientId te varen: geen risico op vermenging (isDemoClientValue herkent
+  // uitsluitend de letterlijke demo-id), en werkt ook bij directe navigatie.
+  if (isDemoClientValue(clientId)) {
     return level === "region" ? demoGeoStates(channel) : demoGeoCountries(channel);
   }
   const sb = makeClient();

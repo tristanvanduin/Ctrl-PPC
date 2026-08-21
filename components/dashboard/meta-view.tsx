@@ -12,7 +12,7 @@ import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
-import { isDemoMode } from "@/lib/demo/demo-mode";
+import { isDemoClient } from "@/lib/demo/demo-mode";
 import { supabase } from "@/lib/supabase";
 import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/meta/campaign-types";
 import { buildMetaObjectiveBreakdown, type MetaObjectiveDailyRow } from "@/lib/meta/objective-breakdown";
@@ -46,7 +46,7 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
   const geo = useGeoBreakdown({ clientId, channel: "meta" });
 
   useEffect(() => {
-    if (isDemoMode()) { setConnected(true); return; } // demo: geen live status-call
+    if (isDemoClient(clientId)) { setConnected(true); return; } // demo: geen live status-call
     let cancelled = false;
     fetch("/api/meta-ads?action=status")
       .then((r) => r.json())

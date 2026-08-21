@@ -33,7 +33,7 @@ import { ChannelForecastSections } from "./channel-forecast-sections";
 import { EventForecaster } from "./event-forecaster";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
-import { isDemoMode } from "@/lib/demo/demo-mode";
+import { isDemoClient } from "@/lib/demo/demo-mode";
 import { GodViewDemo } from "@/components/terminal/god-view-demo";
 import type { InsightChannel } from "@/lib/insights/channel-of";
 import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
@@ -196,7 +196,7 @@ export function ClientDashboard({ client }: { client: Client }) {
   // hoort in een effect en niet in de eerste render -- anders rendert de server iets anders dan de
   // client en klapt de hydratie eruit.
   const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoMode()); }, []);
+  useEffect(() => { setDemoModus(isDemoClient(client.id)); }, [client.id]);
 
   useEffect(() => {
     let levend = true;
@@ -662,7 +662,7 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
   // rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde reden als
   // demoModus in ClientDashboard zelf, hierboven in dit bestand).
   const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoMode()); }, []);
+  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
 
   // Het kanaal-subtabje kiest alleen WELKE analyses je draait; het uitkomsten-filter blijft
   // standaard op "Alle kanalen" (geen kanaal is belangrijker) en wisselt alleen op eigen klik.

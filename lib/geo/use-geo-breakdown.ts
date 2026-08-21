@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { countryLabel } from "@/lib/countries";
 import { stateLabel } from "@/lib/geo/us-fips";
-import { isDemoMode } from "@/lib/demo/demo-mode";
 import { type GeoAgg } from "@/lib/demo/geo-demo";
 
 // De gedeelde state achter GeoBreakdown, uitgelicht (17.36) zodat de opener op Google Overzicht de
@@ -52,9 +51,10 @@ export function useGeoBreakdown({ clientId, channel = "google", enabled = true }
     if (!enabled) return;
     let cancelled = false;
     setLaden(true);
-    const demoParam = isDemoMode() ? "&demo=1" : "";
+    // /api/geo bepaalt demo vs. echt zelf aan de hand van clientId (lib/geo/geo-source.ts), dus
+    // hier is geen aparte demo-vlag meer nodig.
     const haal = (level: "country" | "region") =>
-      fetch(`/api/geo?clientId=${encodeURIComponent(clientId)}&channel=${channel}&level=${level}${demoParam}`)
+      fetch(`/api/geo?clientId=${encodeURIComponent(clientId)}&channel=${channel}&level=${level}`)
         .then((r) => (r.ok ? r.json() : { rows: [] }))
         .then((d) => (Array.isArray(d?.rows) ? (d.rows as GeoAgg[]) : []))
         .catch(() => [] as GeoAgg[]);

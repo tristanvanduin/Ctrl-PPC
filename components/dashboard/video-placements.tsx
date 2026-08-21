@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Ban, ExternalLink } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
-import { isDemoMode } from "@/lib/demo/demo-mode";
+import { isDemoClient } from "@/lib/demo/demo-mode";
 import { DEMO_PLACEMENTS } from "@/lib/demo/video-demo";
 import {
   aggregatePlacements, judgePlacements, wastedSpend, placementTypeLabel,
@@ -42,7 +42,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    if (isDemoMode()) { setRows(DEMO_PLACEMENTS); return; }
+    if (isDemoClient(clientId)) { setRows(DEMO_PLACEMENTS); return; }
 
     const since = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
     dbSelect<Record<string, unknown>>("ads_video_placements", {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PlayCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isDemoMode } from "@/lib/demo/demo-mode";
+import { isDemoClient } from "@/lib/demo/demo-mode";
 import { DEMO_VIDEO_ROWS } from "@/lib/demo/video-demo";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
@@ -73,7 +73,7 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    if (isDemoMode()) { setRows(DEMO_VIDEO_ROWS); return; }
+    if (isDemoClient(clientId)) { setRows(DEMO_VIDEO_ROWS); return; }
 
     const sb = supabase;
     if (!sb) { setRows([]); return; }

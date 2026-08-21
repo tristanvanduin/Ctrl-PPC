@@ -12,7 +12,7 @@ import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
-import { isDemoMode } from "@/lib/demo/demo-mode";
+import { isDemoClient } from "@/lib/demo/demo-mode";
 import { supabase } from "@/lib/supabase";
 import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/linkedin/campaign-types";
 import { buildLinkedInObjectiveBreakdown } from "@/lib/linkedin/objective-breakdown";
@@ -34,7 +34,7 @@ const SECTIONS = [
 ];
 
 export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
-  const demo = isDemoMode();
+  const demo = isDemoClient(clientId);
   // Eén hook-aanroep voor de opener: GeoMapCard en GeoRanglijstCard delen dezelfde metric-keuze
   // en VS-drilldown-state (zelfde patroon als Google 17.36 en Meta 17.38).
   const geo = useGeoBreakdown({ clientId, channel: "linkedin" });

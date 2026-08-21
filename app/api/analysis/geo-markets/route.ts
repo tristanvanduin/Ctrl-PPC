@@ -56,17 +56,15 @@ export async function POST(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
   const channel = parseChannel(request.nextUrl.searchParams.get("channel"));
-  // Demo mag expliciet worden meegegeven; anders volgt de route de env-vlag, zodat een
-  // demo-omgeving dezelfde mock ziet als de kaart en analyse en scherm niet uiteenlopen.
-  const demoParam = request.nextUrl.searchParams.get("demo");
-  const demo = demoParam === "1" || (demoParam == null && process.env.NEXT_PUBLIC_DEMO_MODE === "true");
   const supabase = getSupabase();
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
+  // resolveGeo bepaalt zelf demo vs. echt aan de hand van clientId (zie lib/geo/geo-source.ts),
+  // dus hier is geen aparte demo-vlag meer nodig.
   const label = CHANNEL_LABEL[channel];
   const [countries, states] = await Promise.all([
-    resolveGeo({ clientId, channel, level: "country", demo }),
-    resolveGeo({ clientId, channel, level: "region", demo }),
+    resolveGeo({ clientId, channel, level: "country" }),
+    resolveGeo({ clientId, channel, level: "region" }),
   ]);
 
   if (countries.length === 0 && states.length === 0) {
