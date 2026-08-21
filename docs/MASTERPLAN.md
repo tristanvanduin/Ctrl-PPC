@@ -5534,3 +5534,85 @@ sinds eerdere secties in deze sessie). Gepusht naar `main` (`358c3aa`).
   17.65's "wat dit niet doet" — de twee PDF-renderers zijn niet veilig aan te passen zonder een
   React-Context-refactor die zijn eigen sessie verdient. Geen nieuwe informatie hier, alleen een
   herbevestiging dat dit niet stilzwijgend is meegenomen.
+
+### 17.67 Jesse zag geen klanten, toen wel klanten maar geen kliks — het echte lek en twee besluiten (21 augustus 2026)
+
+**Het eerste signaal.** Jesse (`admin`-rol, zelfde niveau als de eigenaar bedoeld) zag "onvoldoende
+rechten" op de klantenlijst. Root cause #1: `bepaalScope()` (`lib/auth/scope.ts`) geeft een
+organisatiebrede rol zonder rij in `user_agencies` een lege scope — met opzet, staat letterlijk in
+het bestand: "geen bureau betekent geen klanten... dan hoort iemand nog ergens aan gekoppeld te
+worden." Jesse's account was buiten de normale flow om aangemaakt (via de Admin API, zie de
+sessie-samenvatting) en kreeg die koppeling nooit. Onderzoek wees uit dat dit **geen eenmalige
+fout was maar een gat in `/api/admin/users` zelf**: zowel de uitnodig- als de bewerk-route
+schreven altijd al naar `user_roles` en `user_clients`, nooit naar `user_agencies` — elke
+toekomstige collega uitgenodigd via het beheerscherm zou hetzelfde overkomen. Het scherm toonde
+bovendien "alle beurzen" voor zo iemand, puur op de rolnaam, ongeacht of de koppeling echt bestond.
+
+Eerste fix (`3984613`): beide routes koppelen de nieuwe/bewerkte gebruiker automatisch aan **de
+bureaus van de handelende beheerder**, puur additief.
+
+**Het tweede signaal, en waarom de eerste fix niet volstond.** Na die fix: "de klanten verschijnen,
+maar als hij erop wil klikken gaan ze weer weg." Onderzoek wees uit dat dit twee aparte dingen
+blootlegde:
+
+1. **Het klantenmenu in de zijbalk is nooit toegangsgescoped geweest.** `lib/clients.ts`/
+   `getAllClients()` is een globale lijst uit `app_settings`, met opzet gedeeld: "all users see the
+   same set." Dat klanten "verschenen" zei dus niets over of de eerste fix werkte — die lijst zag
+   iedereen altijd, los van rechten.
+2. **De echte poort zit in `middleware.ts`**: bij navigeren naar `/client/[clientId]` draait
+   `bepaalScope()` opnieuw en stuurt `canAccessClient(scope, clientId) === false` terug naar
+   `/vandaag` — precies het "verdwijnen" dat gerapporteerd werd. En de eerste fix se aanname ("de
+   bureaus van de handelende beheerder") heeft een blinde vlek: die beheerder is zeer
+   waarschijnlijk zelf platformbeheerder (`platform_beheerders`, migratie 057 — kijkt over elk
+   bureau heen, `isPlatform` in `bepaalScope()`), wat betekent dat die persoon zelf **nooit een
+   eigen `user_agencies`-rij hoeft te hebben**. `auth.agencyIds` was dus vermoedelijk leeg op het
+   moment dat de eigenaar Jesse's rol via het scherm opsloeg, en de additieve koppeling deed
+   stilzwijgend niets.
+
+**De echte fix: giswerk vervangen door een expliciete keuze.** In plaats van te blijven raden welk
+bureau "waarschijnlijk" bedoeld is, krijgt gebruikersbeheer nu een bureau-kiezer — bij uitnodigen
+en per rij. `POST`/`PATCH` accepteren een `agencyId`; is die meegestuurd, dan **vervangt**
+`setAgency()` de koppeling (in tegenstelling tot de oude, puur additieve val-terug-optie kan dit
+ook een foute koppeling herstellen, niet alleen een ontbrekende aanvullen). De oude
+bureau-van-de-beheerder-aanname blijft alleen nog bestaan als fallback voor callers die het veld
+weglaten. Nieuw: `app/api/admin/agencies` (kleine, eigen route — bewust niet `/api/admin/whitelabel`
+hergebruikt, want dat gaat over een ander besluit dat toevallig dezelfde velden teruggeeft).
+
+**Het tweede besluit: wie mag admin toekennen.** Losstaande vraag van de eigenaar, tijdens
+hetzelfde onderzoek: "Admin heeft standaard alle functies" **bestond al** —
+`ROLE_CAPABILITIES.admin = CAPABILITIES`, bewaakt door een bestaande test
+(`lib/auth/__auth_roles_test.ts`: "admin heeft elk recht"). Wat ontbrak: een grens op wie admin mag
+*toekennen*. Elke bestaande admin kon via `/api/admin/users` zichzelf of een ander tot admin maken
+— geen bijzondere drempel tussen "operationeel beheer" en "de hoogste rechten uitdelen".
+
+Gekozen (eigenaar bevestigde, met eigen afweging gevraagd en gegeven: een goede, gangbare
+scheiding, mits het duidelijk is dat dit alleen de promotie-route afsluit, niet elke andere
+adminhandeling): koppel het toekennen van `admin` aan `platform_beheerders` — dezelfde tabel die
+al de bureau-overstijgende toegang van de eigenaar regelt, met opzet nooit via een API te zetten
+(migratie 057: alleen rechtstreeks in de database, met een verplichte reden). `AuthUser` draagt nu
+`isPlatform` (vanuit `bepaalScope()`, eerder wel berekend maar nooit doorgegeven); `magAdminToekennen()`
+in `app/api/admin/users/route.ts` blokkeert alleen een echte **promotie** (rol wordt admin, was het
+nog niet) voor wie geen platformbeheerder is — een niet-platformbeheerder-admin kan een bestaande
+collega-admin dus nog gewoon van bureau laten wisselen of beurzen aanpassen, alleen het "iemand
+nieuw tot admin maken" is dicht. Client-side gespiegeld via `/api/me` → `useAccess().isPlatform`,
+om de Admin-optie te verbergen in de rol-kiezers — puur UX, de server-check is de echte grens.
+
+**Onderweg fout gegaan en teruggedraaid**: op verzoek van de eigenaar de lokale git-remote
+bijgewerkt naar de hernoemde `tristanvanduin/Ctrl-PPC.git`. Dat brak pushen: deze sessie se
+GitHub-autorisatie is gekoppeld aan de letterlijke naam `tristanvanduin/Dashboard`, los van
+GitHub's eigen doorverwijzing. Teruggedraaid; pushen werkt weer probleemloos via de oude naam
+(GitHub volgt zijn eigen redirect stil, alleen de informatieve melding blijft staan). De hernoemde
+naam volledig in scope brengen zou een aparte clone-locatie vergen — niet de moeite waard voor een
+cosmetische melding zolang pushen al werkt.
+
+**Geverifieerd**: `scripts/gates.sh` liep twee keer raak op een echte fout onderweg (een
+tsc-fout, `useMemo`'s return-type liep uiteen tussen de twee ternary-takken van
+`toekenbareRollen` — geen sandboxbeperking maar een echte typefout, gefixt met een expliciete
+`useMemo<readonly Role[]>`-annotatie) — precies waarom dit script bestaat. Na de fix: hygiëne
+schoon, `tsc` schoon, 314/314 tests groen, `build` groen. Dezelfde 4 bekende sandbox-gates
+faalden (DB-auth 401's, ongewijzigd sinds eerder deze sessie). Twee commits naar `main`:
+`3984613` (eerste, onvolledige fix) en `6457541` (bureau-kiezer + admin-toekennen-grens).
+
+**Nog open**: Jesse's eigen rij moet nog met de bureau-kiezer op het juiste bureau gezet worden —
+dat kan de eigenaar nu direct in `/admin` doen, geen verdere code nodig.
+  herbevestiging dat dit niet stilzwijgend is meegenomen.
