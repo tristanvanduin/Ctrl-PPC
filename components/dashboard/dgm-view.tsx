@@ -135,6 +135,17 @@ function computeTrajectStatus(
   const criticalAnomalies = health.anomalies.filter((a) => a.severity === "critical").length;
   const warningAnomalies = health.anomalies.filter((a) => a.severity === "warning").length;
 
+  // Feedback: "omzet ruimschoots behaald, achter op conversies -- is dit echt een donkerrode
+  // melding waard?" -- dezelfde onderliggende spanning als de fix hierboven (128-131), nu van de
+  // andere kant: het GEVOLGDE KPI mag structureel achterlopen terwijl het ANDERE getraceerde KPI
+  // ruim voorloopt, en dat verdient een gedempte melding, geen "alle hands on deck". Alleen
+  // rood -> oranje, nooit helemaal weg: een reëel gat in het gevolgde KPI blijft de moeite van
+  // bekijken waard, alleen niet op het zwaarste niveau als de andere KPI het tegenspreekt.
+  const ander = mainMetric === "conversions" ? rev : conv;
+  const anderLabel = mainMetric === "conversions" ? "omzet" : "conversies";
+  const hoofdLabel = mainMetric === "conversions" ? "conversies" : "omzet";
+  const ANDERE_KPI_STERK_POSITIEF_PCT = 15;
+
   // Determine status
   let status: TrajectStatus;
   if (diffPct >= -3 && criticalAnomalies === 0) {
@@ -144,11 +155,16 @@ function computeTrajectStatus(
   } else {
     status = "rood";
   }
+  const getemperd = status === "rood" && ander.annualTarget > 0 && ander.diffPct >= ANDERE_KPI_STERK_POSITIEF_PCT;
+  if (getemperd) status = "oranje";
 
   // Build summary in business language
   let summary: string;
 
-  if (status === "groen") {
+  if (getemperd) {
+    const behindBy = Math.abs(Math.round(diffPct));
+    summary = `${hoofdLabel === "conversies" ? "Conversies lopen" : "Omzet loopt"} ${behindBy}% achter op doel, maar ${anderLabel} ligt ruim boven doel (${pct(ander.diffPct)}) -- een nuance, geen crisis. Wel de moeite waard om te bekijken waarom dat niet doorwerkt in ${hoofdLabel}.`;
+  } else if (status === "groen") {
     if (diffPct > 5) {
       summary = `Het traject presteert boven verwachting. De prognose ligt ${Math.round(diffPct)}% boven het jaardoel.`;
     } else {
