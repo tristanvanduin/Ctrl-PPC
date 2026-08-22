@@ -57,9 +57,16 @@ export interface DonutChartProps {
   format: (v: number) => string;
   /** Toegankelijke omschrijving van wat de ring toont. */
   ariaLabel: string;
+  /**
+   * Selectie van buitenaf (bv. een aangeklikte legendaregel, of de andere donut in hetzelfde
+   * paar) -- onafhankelijk van hover, zodat een klik blijft staan nadat de muis wegbeweegt.
+   * Weggelaten: geen klikbare ring.
+   */
+  selected?: string | null;
+  onSliceClick?: (key: string) => void;
 }
 
-export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel }: DonutChartProps) {
+export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel, selected, onSliceClick }: DonutChartProps) {
   const [hover, setHover] = useState<string | null>(null);
 
   const total = useMemo(() => slices.reduce((s, x) => s + Math.max(0, x.value), 0), [slices]);
@@ -87,30 +94,35 @@ export function DonutChart({ slices, centerValue, centerLabel, format, ariaLabel
     <div className="relative" style={{ width: SIZE, height: SIZE }}>
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={ariaLabel}>
         {arcs.map((a) => {
-          const dim = hover !== null && hover !== a.key;
+          // Hover wint van een klik-selectie: wie met de muis over een ander segment beweegt wil
+          // dát segment zien, ook als er elders al een klik-selectie staat.
+          const dim = hover !== null ? hover !== a.key : selected != null && selected !== a.key;
           return (
             <path
               key={a.key}
               d={a.d}
               fill={a.color}
-              style={{ opacity: dim ? 0.35 : 1, transition: "opacity 120ms", cursor: "default" }}
+              style={{ opacity: dim ? 0.35 : 1, transition: "opacity 120ms", cursor: onSliceClick ? "pointer" : "default" }}
               onMouseEnter={() => setHover(a.key)}
               onMouseLeave={() => setHover(null)}
+              onClick={onSliceClick ? () => onSliceClick(a.key) : undefined}
             />
           );
         })}
       </svg>
 
-      {/* Het gat draagt het totaal, of de waarde van het segment waar de muis op staat.
-          Het gat is 2*R_INNER = 104px breed -- `text-figure` (30px) is de maat van de KPI-kaarten,
-          waar geen zo'n harde breedtegrens geldt. Een bedrag als "€ 230.130" past daar bij 30px
-          niet ruim in en raakt/overschrijdt de binnenring. text-[1.05rem] (~17px) past een
-          realistisch bedrag van 8-9 tekens wél ruim binnen de 104px, met minimale padding zodat
-          de volle breedte van het gat benut wordt. */}
+      {/* Het gat draagt het totaal, de waarde van het segment waar de muis op staat, of -- als er
+          geklikt is en de muis is weer weg -- de waarde van dat geklikte segment. Hover wint
+          altijd (zelfde reden als de dim-logica hierboven). Het gat is 2*R_INNER = 104px breed --
+          `text-figure` (30px) is de maat van de KPI-kaarten, waar geen zo'n harde breedtegrens
+          geldt. Een bedrag als "€ 230.130" past daar bij 30px niet ruim in en raakt/overschrijdt
+          de binnenring. text-[1.05rem] (~17px) past een realistisch bedrag van 8-9 tekens wél
+          ruim binnen de 104px, met minimale padding zodat de volle breedte van het gat benut
+          wordt. */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-2">
-        {hover ? (
+        {hover ?? selected ? (
           (() => {
-            const a = arcs.find((x) => x.key === hover);
+            const a = arcs.find((x) => x.key === (hover ?? selected));
             if (!a) return null;
             return (
               <>

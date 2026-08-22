@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PieChart } from "lucide-react";
+import { PieChart, X } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
@@ -54,6 +54,11 @@ interface CampaignMonthlyRow {
 export function CampaignTypeSplit({ clientId }: { clientId: string }) {
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
   const [tabelOpen, toggleTabel] = useRememberedOpen("campagnetype-tabel", false);
+  // Klik op een ring-segment of een legendaregel selecteert dat campagnetype -- gedeeld tussen
+  // beide donuts (Kosten en Conversies lichten samen op, niet los van elkaar) en filtert de tabel
+  // eronder. Nogmaals klikken op hetzelfde type heft de selectie op.
+  const [selected, setSelected] = useState<string | null>(null);
+  const toggleSelected = (key: string) => setSelected((cur) => (cur === key ? null : key));
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +83,8 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
 
     return () => { cancelled = true; };
   }, [clientId]);
+
+  useEffect(() => { setSelected(null); }, [clientId]);
 
   const slices = useMemo(() => (rows ? buildNetworkSplit(rows, { labelOf: typeLabel }) : []), [rows]);
   const totals = useMemo(() => networkTotals(slices), [slices]);
@@ -114,6 +121,8 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
                 centerLabel="totale kosten"
                 format={eur}
                 ariaLabel={`Kostenverdeling over campagnetypes: ${slices.map((s) => `${s.label} ${pct(s.costShare)}`).join(", ")}`}
+                selected={selected}
+                onSliceClick={toggleSelected}
               />
               <figcaption className="text-meta font-medium text-brand-gray">Kosten</figcaption>
             </figure>
@@ -126,22 +135,55 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
                   centerLabel="conversies"
                   format={(v) => num(v, 1)}
                   ariaLabel={`Conversieverdeling over campagnetypes: ${slices.map((s) => `${s.label} ${pct(s.conversionShare)}`).join(", ")}`}
+                  selected={selected}
+                  onSliceClick={toggleSelected}
                 />
                 <figcaption className="text-meta font-medium text-brand-gray">Conversies</figcaption>
               </figure>
             )}
           </div>
 
-          <ul className="flex min-w-[10rem] flex-1 flex-col gap-2 pt-1.5">
-            {slices.map((s) => (
-              <li key={s.networkType} className="flex items-center gap-2 text-meta">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colorFor(s.networkType, order) }} aria-hidden />
-                <span className="text-brand-gray font-medium">{s.label}</span>
-                <span className="ml-auto tabular-nums text-muted-foreground">{pct(s.costShare)}</span>
-              </li>
-            ))}
+          {/* Klikbaar, niet alleen decoratief: zelfde selectie als een ringsegment aanklikken --
+              een legendaregel is een groter, makkelijker doelwit dan een dun segment van een
+              type met een klein aandeel. */}
+          <ul className="flex min-w-[10rem] flex-1 flex-col gap-1 pt-1">
+            {slices.map((s) => {
+              const kleur = colorFor(s.networkType, order);
+              const isSelected = selected === s.networkType;
+              const isDimmed = selected != null && !isSelected;
+              return (
+                <li key={s.networkType}>
+                  <button
+                    type="button"
+                    onClick={() => toggleSelected(s.networkType)}
+                    className={`flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-meta transition-opacity hover:bg-muted/60 ${isDimmed ? "opacity-40" : ""}`}
+                    style={isSelected ? { boxShadow: `inset 2px 0 0 ${kleur}`, background: "var(--muted, rgba(15,23,42,0.04))" } : undefined}
+                    aria-pressed={isSelected}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: kleur }} aria-hidden />
+                    <span className="text-brand-gray font-medium">{s.label}</span>
+                    <span className="ml-auto tabular-nums text-muted-foreground">{pct(s.costShare)}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
+
+        {selected && (
+          <div className="mt-3 flex items-center gap-2 text-meta">
+            <span className="rounded-full bg-brand-blue/10 px-2.5 py-1 font-medium text-brand-blue-ink">
+              Gefilterd op {typeLabel(selected)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="flex items-center gap-1 text-muted-foreground hover:text-brand-gray"
+            >
+              <X className="h-3 w-3" /> Wis filter
+            </button>
+          </div>
+        )}
 
         {!totals.hasConversions && (
           <p className="text-meta text-muted-foreground text-center mt-3">
@@ -167,8 +209,10 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
             <KolomKop getal>CPA</KolomKop>
           </Kop>
           <Body>
+            {/* Dimmen, niet verbergen: verdwijnende rijen zouden de TotaalRij's "100%" laten
+                lezen als het totaal van alleen de zichtbare rijen -- precies verkeerd. */}
             {slices.map((s: NetworkSlice) => (
-              <Rij key={s.networkType}>
+              <Rij key={s.networkType} className={selected != null && selected !== s.networkType ? "opacity-40" : ""}>
                 <NaamCel>
                   <span className="inline-flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: colorFor(s.networkType, order) }} aria-hidden />

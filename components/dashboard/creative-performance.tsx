@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Sparkles, ImageOff, ArrowUpRight } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { summarizeCreatives, type CreativeRow } from "@/lib/analysis/creative-summary";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
@@ -59,8 +58,6 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setCards(null); setError(null);
     const since = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
@@ -98,9 +95,9 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
         const ids = [...byAd.keys()];
         if (ids.length > 0) {
           const [{ data: assets }, { data: meta }, { data: images }] = await Promise.all([
-            sb!.from("google_ads_rsa_assets").select("ad_id, field_type, asset_text, impressions").eq("client_id", clientId).in("ad_id", ids),
-            sb!.from("google_ads_ad_meta").select("ad_id, final_url").eq("client_id", clientId).in("ad_id", ids),
-            sb!.from("google_ads_image_assets").select("ad_id, image_url").eq("client_id", clientId).in("ad_id", ids),
+            dbSelect<Record<string, unknown>>("google_ads_rsa_assets", { select: "ad_id, field_type, asset_text, impressions", clientId, filters: [{ op: "in", column: "ad_id", values: ids }] }),
+            dbSelect<Record<string, unknown>>("google_ads_ad_meta", { select: "ad_id, final_url", clientId, filters: [{ op: "in", column: "ad_id", values: ids }] }),
+            dbSelect<Record<string, unknown>>("google_ads_image_assets", { select: "ad_id, image_url", clientId, filters: [{ op: "in", column: "ad_id", values: ids }] }),
           ]);
           const pick = (adId: string, field: string) => (assets ?? [])
             .filter((a) => String(a.ad_id) === adId && a.field_type === field)
@@ -120,7 +117,10 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
           dbSelect<Record<string, unknown>>("meta_creatives", {
             select: "creative_id, title, body, thumbnail_url, format, call_to_action_type, link_url", clientId,
           }),
-          sb!.from("meta_ad_daily").select("entity_id, impressions, link_clicks, spend, conversions").eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("meta_ad_daily", {
+            select: "entity_id, impressions, link_clicks, spend, conversions", clientId,
+            filters: [{ op: "gte", column: "date", value: since }],
+          }),
         ]);
         const cr = new Map(creatives.map((c) => [String(c.creative_id), c as Record<string, unknown>]));
         const metrics = new Map<string, { impressions: number; clicks: number; cost: number; conversions: number }>();
@@ -147,7 +147,10 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
           dbSelect<Record<string, unknown>>("linkedin_creatives", {
             select: "creative_urn, headline, post_text, image_storage_path, cta_label, landing_url, format", clientId,
           }),
-          sb!.from("linkedin_creative_daily").select("entity_urn, impressions, clicks, spend, external_website_conversions, one_click_leads").eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("linkedin_creative_daily", {
+            select: "entity_urn, impressions, clicks, spend, external_website_conversions, one_click_leads", clientId,
+            filters: [{ op: "gte", column: "date", value: since }],
+          }),
         ]);
         const metrics = new Map<string, { impressions: number; clicks: number; cost: number; conversions: number }>();
         for (const d of (daily ?? []) as Record<string, unknown>[]) {

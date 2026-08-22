@@ -6380,3 +6380,70 @@ via `ss -ltnp`/`fuser -n tcp 3190` (die WEL de echte listener tonen) en op exact
 schoon herbouwd. Drie screenshots tegen de verse build bevestigen alle drie de fixes: God View leest
 nu als een lichte kaart met indigo accenten, de geo-kaart is zichtbaar groter met een bredere
 tabel, de donut-legenda staat naast de ringen met percentages. `POORTEN GROEN`.
+
+### 17.83 Klik-filter op de campagnetype-donuts, en een tweede split-brain-vondst: Creative Performance voor Meta/LinkedIn stond overal op nul (22 augustus 2026)
+
+Eigenaar: "Bouw filter/klik-interactie op de donuts. Maar dit waren puur punten vanuit mij om aan
+te tonen dat er echt nog veel niet goed is. Dus doe een extreem uitgebreide sterke check." Twee
+delen: de donut-interactie (concreet, gebouwd), en een brede, kritische screenshotronde (~23
+schermen: Overzicht/Campagnes/Prognose × alle vier kanaaltabs, Analyse & advies, Planning &
+rapportage, Instellingen, Portfolio, een geo-kloon-beurspagina, God Mode, licht én donker).
+
+**Donut-klik-interactie** (`components/dashboard/donut-chart.tsx` + `campaign-type-split.tsx`):
+een ringsegment of legendaregel aanklikken selecteert dat campagnetype — gedeeld tussen de Kosten-
+en Conversies-donut (allebei dimmen tegelijk, niet los van elkaar), de legenda markeert de
+selectie met een accentrand, de detailtabel dimt de niet-geselecteerde rijen (niet verbergen: een
+verdwenen rij zou de `TotaalRij`'s "100%" laten lezen als het totaal van alleen wat nog zichtbaar
+is), en een "Gefilterd op X"-chip met een wis-knop maakt de actieve selectie expliciet. Nogmaals
+klikken heft de selectie op. Geverifieerd met een directe DOM-`dispatchEvent`-klik (Playwright's
+eigen `.click()` op het SVG-pad had moeite met de hit-test in deze headless omgeving, geen
+productiebug): opacity van de niet-geselecteerde segmenten valt van 1 naar 0,35, de filterchip
+verschijnt.
+
+**De hoofdvondst van de brede doorloop: Creative Performance voor Meta en LinkedIn stond
+structureel op €0/0 conversies**, terwijl de Creative-vermoeidheid-tabel op dezelfde pagina, voor
+dezelfde advertenties, wél echte CTR-cijfers toonde. Uitgezocht tot op de rij: `creative-
+performance.tsx` haalt de IDENTITEIT (`meta_ads`, `meta_creatives`, `linkedin_creatives`) via
+`dbSelect()` op — die gaat altijd langs de echte database, demo of niet (vaste conclusie sinds
+17.78). De METRICS (`meta_ad_daily`, `linkedin_creative_daily`) gingen nog rechtstreeks via
+`supabase.from(...)`, en dat loopt voor `demo-greentech` wél door `lib/demo/mock-supabase.ts`'s
+demo-onderschepping, die UITSLUITEND de curated fixture in `lib/demo/demo-rows.ts` teruggeeft.
+Die fixture droeg nog de ad-id's van een oudere generatie demo-data (`demo-m-hero`,
+`demo-m-life`, `demo-m-banner`); de echte database was intussen doorgeseed met een nieuwe reeks
+(`demo-ad-hero-a`, `demo-ad-lifestyle-b`, ..., geverifieerd met een rechtstreekse SQL-query op
+beide tabellen). Twee routes naar dezelfde kaart die het niet meer over dezelfde ad-id's hadden —
+de identiteit kwam binnen (vandaar dat naam/format/CTA wél klopten), de metrics nooit (want de
+`Map`-lookup op ad-id trof nooit een match). Precies dezelfde onderliggende architectuurfout als
+17.78, nu in een ander bestand.
+
+**Fix**: de vijf tabellen (`meta_ad_daily`, `linkedin_creative_daily`, en voor consistentie ook
+Google's `google_ads_rsa_assets`/`google_ads_ad_meta`/`google_ads_image_assets`, die tot nu toe
+"toevallig" goed gingen omdat hun curated ad-id's wél nog matchten) lopen voortaan allemaal via
+`dbSelect()`. Toegevoegd aan `lib/data-access/read-policy.ts`'s allowlist (met de reden erbij in
+een commentaarblok, zodat een volgende lezer niet opnieuw hoeft uit te zoeken waarom). De dode
+`supabase`-import en de nu overbodige "Supabase niet geconfigureerd"-vroege-return zijn
+weggehaald.
+
+**Live geverifieerd**: Meta's Creative Performance-kaarten tonen nu Klikken 992 / CTR 0,97% /
+Kosten €3.520 / Conversies 128 voor "Hero Video A" (was 0/—/€0/0); LinkedIn's kaarten tonen
+Klikken 552 / CTR 1,5% / Kosten €2.760 / Conversies 23 voor "Ontmoet uw ICP op GreenTech" (zelfde
+verhaal). `POORTEN GROEN`.
+
+**Nog niet gefixt, wel exact gediagnosticeerd — twee vervolgpunten:**
+- **Analyse & advies toont een tegenstrijdigheid.** De "Sub-analyses"-kaart zegt "Cross-channel-
+  analyse: Nog niet gedraaid" (uit `cross-channel-analyses.tsx`'s eigen fetch naar
+  `/api/analysis/cross-channel`), terwijl de "Alle analyses"-lijst een paar regels lager dezelfde
+  analyse als "UITGEVOERD" met een echte datum (2026-08-19) toont, uit een ander, apart
+  statusregister. Zelfde soort split-brain als hierboven, alleen nog niet tot op de exacte regel
+  uitgezocht welke van de twee kapot is — dat is het volgende te doen stuk, niet nu erbij gepakt
+  om deze commit gefocust te houden.
+- **LinkedIn-campagnenamen in de demo tonen rauwe URN's** ("urn:li:demo:3" i.p.v. een leesbare
+  naam) op Campagnes en in de vermoeidheidstabel, waar Google en Meta wel namen tonen. Cosmetisch,
+  lage prioriteit, maar zou bij een echte klant met een kapotte naam-sync hetzelfde beeld geven —
+  het dashboard behoort dan niet stilzwijgend op de URN terug te vallen.
+
+De geo-kaart-in-2-koloms-opener (`geo-map-card.tsx`) leek in eerste instantie hetzelfde
+witruimte-gebrek te hebben als 17.82's `geo-breakdown.tsx`-fix — bij het daadwerkelijk opmeten
+(kaart-element-screenshot + bounding box) bleek de kaart al 598 van de 624px kaartbreedte te
+vullen. Vals alarm, met opzet hier vermeld: een vermoeden dat bij het meten niet standhoudt hoort
+niet als bevinding te blijven staan.

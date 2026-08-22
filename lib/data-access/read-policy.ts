@@ -52,6 +52,25 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   meta_creatives: { capability: "client:read", clientColumn: "client_id" },
   linkedin_creatives: { capability: "client:read", clientColumn: "client_id" },
   ads_creative_performance: { capability: "client:read", clientColumn: "client_id" },
+  // components/dashboard/creative-performance.tsx haalde de METRICS voor Meta/LinkedIn (in
+  // tegenstelling tot de identiteitstabellen twee regels hierboven, die al langer via dbSelect
+  // liepen) nog rechtstreeks op met supabase.from() -- in demo-modus loopt dat via de
+  // demo-mock (lib/demo/mock-supabase.ts), die alleen de curated fixture in demo-rows.ts
+  // teruggeeft. Die fixture droeg nog de oude ad-id's (demo-m-hero, ...); de echte database was
+  // ondertussen doorgeseed met een nieuwe reeks (demo-ad-hero-a, ...) waar de identiteitstabellen
+  // (via dbSelect, dus altijd de echte database) al wel op stonden. Twee routes naar dezelfde
+  // kaart die niet meer over dezelfde ad-id's spraken -- vandaar dat elke Meta/LinkedIn-creative
+  // in demo-modus €0/0 conversies toonde terwijl de vermoeidheidstabel (die alleen de dagcijfers
+  // leest, geen identiteitsjoin) wél echte cijfers had. Hier bijgezet zodat ook deze twee via
+  // dbSelect lopen, dezelfde bron als de identiteitstabellen, geen tweede waarheid meer.
+  meta_ad_daily: { capability: "client:read", clientColumn: "client_id" },
+  linkedin_creative_daily: { capability: "client:read", clientColumn: "client_id" },
+  // Dezelfde route als de twee hierboven, voor Google's kant van creative-performance.tsx --
+  // deze drie "toevallig" al goed omdat de curated demo-rows.ts-ad-id's daar (nog) matchten met
+  // de echte database, maar dat was geluk, geen garantie. Nu structureel gelijk aan de rest.
+  google_ads_rsa_assets: { capability: "client:read", clientColumn: "client_id" },
+  google_ads_ad_meta: { capability: "client:read", clientColumn: "client_id" },
+  google_ads_image_assets: { capability: "client:read", clientColumn: "client_id" },
   ads_pmax_asset_performance: { capability: "client:read", clientColumn: "client_id" },
   ads_asset_group_performance_monthly: { capability: "client:read", clientColumn: "client_id" },
   ads_pmax_network_breakdown: { capability: "client:read", clientColumn: "client_id" },
