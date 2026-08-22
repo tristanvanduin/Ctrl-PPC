@@ -144,27 +144,27 @@ export function GodViewPremium() {
       </p>
 
       {!nietDeelbaar && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2.5">
-          <span className="flex items-center gap-1.5 text-meta font-medium text-indigo-200/80">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2.5">
+          <span className="flex items-center gap-1.5 text-meta font-medium text-indigo-700">
             <Filter className="h-3.5 w-3.5" /> Filter
           </span>
-          <label className="flex items-center gap-1.5 text-meta text-indigo-200/70">
+          <label className="flex items-center gap-1.5 text-meta text-muted-foreground">
             Bedrijfsmodel
             <select
               value={modelFilter}
               onChange={(e) => setModelFilter(e.target.value)}
-              className="rounded-md border border-white/15 bg-slate-900 px-2 py-1 text-body font-medium text-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              className="rounded-md border border-border bg-card px-2 py-1 text-body font-medium text-brand-gray focus:outline-none focus:ring-1 focus:ring-indigo-400"
             >
               <option value="">Alle</option>
               {BEDRIJFSMODELLEN.map((b) => <option key={b.waarde} value={b.waarde}>{b.label}</option>)}
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-meta text-indigo-200/70">
+          <label className="flex items-center gap-1.5 text-meta text-muted-foreground">
             Branche/niche
             <select
               value={nicheFilter}
               onChange={(e) => setNicheFilter(e.target.value)}
-              className="rounded-md border border-white/15 bg-slate-900 px-2 py-1 text-body font-medium text-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              className="rounded-md border border-border bg-card px-2 py-1 text-body font-medium text-brand-gray focus:outline-none focus:ring-1 focus:ring-indigo-400"
             >
               <option value="">Alle</option>
               {nichesPerGroep().map((g) => (
@@ -177,7 +177,7 @@ export function GodViewPremium() {
           {(modelFilter || nicheFilter) && (
             <button
               onClick={() => { setModelFilter(""); setNicheFilter(""); }}
-              className="text-meta text-indigo-300 hover:underline"
+              className="text-meta text-indigo-600 hover:underline"
             >
               Filter wissen
             </button>
@@ -208,10 +208,10 @@ export function GodViewPremium() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <section>
             <div className="mb-2 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-indigo-300" />
-              <h3 className="text-body font-semibold text-white">Hoe verhoud je je tot andere bureaus</h3>
+              <TrendingUp className="h-4 w-4 text-indigo-600" />
+              <h3 className="text-body font-semibold text-brand-gray">Hoe verhoud je je tot andere bureaus</h3>
             </div>
-            <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-950/40">
+            <div className="overflow-hidden rounded-lg border border-border">
               <Tabel>
                 <Kop>
                   <KolomKop>Segment</KolomKop>
@@ -240,10 +240,10 @@ export function GodViewPremium() {
 
           <section>
             <div className="mb-2 flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-red-300" />
-              <h3 className="text-body font-semibold text-white">Churn-concentratie per branche</h3>
+              <ShieldAlert className="h-4 w-4 text-red-500" />
+              <h3 className="text-body font-semibold text-brand-gray">Churn-concentratie per branche</h3>
             </div>
-            <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-950/40">
+            <div className="overflow-hidden rounded-lg border border-border">
               <Tabel>
                 <Kop>
                   <KolomKop>Segment</KolomKop>
@@ -269,7 +269,7 @@ export function GodViewPremium() {
               </Tabel>
             </div>
             {churn.cellen.some((c) => c.churn === null) && (
-              <p className="mt-1.5 flex items-center gap-1 text-micro text-indigo-200/60">
+              <p className="mt-1.5 flex items-center gap-1 text-micro text-muted-foreground">
                 <ShieldQuestion className="h-3 w-3" /> Segmenten onder de drempel tonen bewust geen telling.
               </p>
             )}

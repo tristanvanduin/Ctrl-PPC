@@ -6332,3 +6332,51 @@ niet stilzwijgend hoort mee te liften op een kaartvolgorde-fix.
 `POORTEN GROEN` (tsc/tests/build). `check-kaartoverloop.mjs` los gedraaid tegen een verse build +
 `next start -p 3190` (geen server eronder): alle vijf kaarten OK, zelftest bevestigt dat de
 detector de bekende 17.34-regressie nog steeds vindt.
+
+### 17.82 Drie echte stijlgebreken gevonden en gefixt: God View, geo-kaart, campagnetype-donuts (22 augustus 2026)
+
+Eigenaar, na drie screenshots: "Geen bugs, maar is het mooi en optimaal? Ik zie echt nog dingen
+die niet goed zijn... Ga echt kritisch er doorheen." Drie concrete punten, alle drie teruggevonden
+in de code (geen esthetisch giswerk) en gefixt.
+
+**1. `GodViewPremium` (`components/terminal/god-view-premium.tsx`) zat letterlijk in een ander
+thema.** De filterbalk en beide tabellen stonden op `bg-slate-950/40`/`border-white/10`/
+`text-white` — een donker "glas"-paneel, terwijl de rest van het dashboard licht is. De standaard
+`Tabel`-component (`data-table.tsx`) is nergens op een donkere achtergrond afgestemd, dus de
+koppen en cijfers kwamen er als grauw grijs-op-grijs uit — precies het "niet in stijl"-effect op
+de screenshot. Omgezet naar dezelfde lichte kaartstijl als de rest van de app; "premium" blijft
+zichtbaar via de indigo rand, de gradient-streep bovenaan en de Premium-badge, niet via een eigen
+donker thema.
+
+**2. Geo-kaart + ranglijst (`components/dashboard/geo-breakdown.tsx`, het "Alle kanalen"-blok
+"Waar komt het vandaan") had een harde `max-w-[680px]` op de kaart, gecentreerd in een kolom die
+op een brede kaart veel breder is, plus een vaste `17rem`-tabelkolom ernaast — de dubbele dode
+ruimte op de screenshot. Kaart naar 760px (= zijn eigen SVG-viewBox 1:1, dus niet wazig en zonder
+de kaart torenhoog te maken — de reden waarom de cap er in 17.36 kwam blijft geldig, "een
+wereldkaart wordt niet beter van meer pixels"), tabelkolom naar 21rem, en `max-w-6xl` op de hele
+kaart zodat een ultrabrede monitor niet nog meer leegte toevoegt. Alleen de losstaande "kaart+
+ranglijst-samen"-vorm geraakt (cross-channel/blended, Meta, LinkedIn); de Google-opener gebruikt
+een apart onderdeel (`geo-map-card.tsx`/`geo-ranglijst-card.tsx`, buiten scope, geen gebrek daar
+aangetroffen).
+
+**3. Campagnetype-donuts (`components/dashboard/campaign-type-split.tsx`, "Spend per
+campagnetype") stonden links uitgelijnd met de legenda ONDER de donuts — een bewuste keuze uit
+een eerdere feedbackronde (voorkomt dat donuts "los" ogen), maar loste niet op dat de rechterkant
+van de kaart daardoor leeg bleef, exact zoals de screenshot laat zien. Legenda staat nu NAAST de
+donuts (valt terug naar onder bij een smal scherm), met het kostenaandeel per campagnetype
+erbij — vult de ruimte én geeft een cijfer in plaats van alleen een kleurstip.
+
+**Niet gebouwd, bewust**: de vraag "waar zijn de filters binnen de donut" is aan de eigenaar
+teruggelegd — onduidelijk of dit een dropdown-achtig filter (zoals de geo-kaart's "Toon ... per
+land") betekent of klik-interactie tussen legenda en donut, en dat is een keuze die eerst gemaakt
+moet worden, niet geraden.
+
+**Live geverifieerd**, niet alleen gate-groen. Onderweg een reële server-valkuil geraakt en
+opgelost: een `next-server`-proces overleefde herhaalde `pkill -f`/`lsof -ti:3190`-pogingen (Next
+herschrijft zijn procestitel, dus de cmdline-match miste 'm) terwijl een nieuwe `next build`
+alsnog `.next` overschreef — precies de AGENTS.md-valkuil "nooit bouwen onder een draaiende
+server", ditmaal met een proces dat zich niet liet vinden met de gebruikelijke aanpak. Gevonden
+via `ss -ltnp`/`fuser -n tcp 3190` (die WEL de echte listener tonen) en op exact pid gekild, `.next`
+schoon herbouwd. Drie screenshots tegen de verse build bevestigen alle drie de fixes: God View leest
+nu als een lichte kaart met indigo accenten, de geo-kaart is zichtbaar groter met een bredere
+tabel, de donut-legenda staat naast de ringen met percentages. `POORTEN GROEN`.

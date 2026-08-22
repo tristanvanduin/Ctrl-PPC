@@ -6,7 +6,6 @@ import { dbSelect } from "@/lib/data-access/client-read";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
-import { Legenda, type LegendaItem } from "./chart-chrome";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { buildNetworkSplit, networkTotals, type NetworkRow, type NetworkSlice } from "@/lib/pmax/network-split";
 import { Laadvlak } from "@/components/ui/laadvlak";
@@ -101,39 +100,48 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
       </div>
 
       <div className="px-3 py-5 @2xl:px-5">
-        {/* justify-start, niet -center: de titel erboven en de tabel eronder lijnen links uit,
-            en gecentreerde donuts (met name als er maar één rendert, zonder conversies) lazen
-            als een losstaand element in plaats van bij de rest van de kaart te horen. */}
-        <div className="flex flex-wrap items-start justify-start gap-4 @2xl:gap-10">
-          <figure className="flex flex-col items-center gap-2">
-            <DonutChart
-              slices={costSlices}
-              centerValue={eur(totals.cost)}
-              centerLabel="totale kosten"
-              format={eur}
-              ariaLabel={`Kostenverdeling over campagnetypes: ${slices.map((s) => `${s.label} ${pct(s.costShare)}`).join(", ")}`}
-            />
-            <figcaption className="text-meta font-medium text-brand-gray">Kosten</figcaption>
-          </figure>
-
-          {totals.hasConversions && (
+        {/* justify-start op de donutrij, niet -center: de titel erboven en de tabel eronder lijnen
+            links uit. 22 augustus 2026: de legenda stond ERONDER, wat op een brede kaart rechts van
+            de donuts een groot leeg vlak overliet -- de legenda staat nu DAARNAAST (met het aandeel
+            per type erbij, niet alleen een kleurstip) en vult precies die ruimte; op smal valt hij
+            terug onder de donuts (flex-wrap). */}
+        <div className="flex flex-wrap items-start justify-start gap-8 @2xl:gap-12">
+          <div className="flex flex-wrap items-start gap-4 @2xl:gap-10">
             <figure className="flex flex-col items-center gap-2">
               <DonutChart
-                slices={slices.map((s) => ({ key: s.networkType, label: s.label, value: s.conversions, color: colorFor(s.networkType, order) }))}
-                centerValue={num(totals.conversions, 1)}
-                centerLabel="conversies"
-                format={(v) => num(v, 1)}
-                ariaLabel={`Conversieverdeling over campagnetypes: ${slices.map((s) => `${s.label} ${pct(s.conversionShare)}`).join(", ")}`}
+                slices={costSlices}
+                centerValue={eur(totals.cost)}
+                centerLabel="totale kosten"
+                format={eur}
+                ariaLabel={`Kostenverdeling over campagnetypes: ${slices.map((s) => `${s.label} ${pct(s.costShare)}`).join(", ")}`}
               />
-              <figcaption className="text-meta font-medium text-brand-gray">Conversies</figcaption>
+              <figcaption className="text-meta font-medium text-brand-gray">Kosten</figcaption>
             </figure>
-          )}
-        </div>
 
-        <Legenda
-          items={slices.map((s) => ({ label: s.label, kleur: colorFor(s.networkType, order) })) as LegendaItem[]}
-          className="justify-start mt-4"
-        />
+            {totals.hasConversions && (
+              <figure className="flex flex-col items-center gap-2">
+                <DonutChart
+                  slices={slices.map((s) => ({ key: s.networkType, label: s.label, value: s.conversions, color: colorFor(s.networkType, order) }))}
+                  centerValue={num(totals.conversions, 1)}
+                  centerLabel="conversies"
+                  format={(v) => num(v, 1)}
+                  ariaLabel={`Conversieverdeling over campagnetypes: ${slices.map((s) => `${s.label} ${pct(s.conversionShare)}`).join(", ")}`}
+                />
+                <figcaption className="text-meta font-medium text-brand-gray">Conversies</figcaption>
+              </figure>
+            )}
+          </div>
+
+          <ul className="flex min-w-[10rem] flex-1 flex-col gap-2 pt-1.5">
+            {slices.map((s) => (
+              <li key={s.networkType} className="flex items-center gap-2 text-meta">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colorFor(s.networkType, order) }} aria-hidden />
+                <span className="text-brand-gray font-medium">{s.label}</span>
+                <span className="ml-auto tabular-nums text-muted-foreground">{pct(s.costShare)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {!totals.hasConversions && (
           <p className="text-meta text-muted-foreground text-center mt-3">
