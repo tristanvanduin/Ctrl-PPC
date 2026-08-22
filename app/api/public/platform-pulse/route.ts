@@ -4,6 +4,14 @@
 // rij: geen client_id, geen bureaunaam, geen individueel cijfer. Vergelijk het met een publiek
 // jaarverslag-kengetal, niet met een dashboard-export. Service-role, want er is geen sessie om
 // tegen te scopen -- de aggregatie zelf is de grens, niet RLS.
+//
+// 22 augustus 2026: geen enkele query hier sloot demo-greentech en zijn drie geo-klonen uit --
+// terwijl de pagina zelf pal naast deze cijfers "Live numbers across every connected account.
+// Not simulated." beweert. Gemeten: €584.500 van de €2.846.985 getoonde ad spend (20,5%) en 132
+// van de 689 analyses (19,2%) waren fictieve demodata. Een publieke pagina die haar eigen
+// "niet gesimuleerd"-claim voor een vijfde met gesimuleerde cijfers vulde -- precies het soort
+// verschil tussen een migratie en een gok dat deze codebase elders (masterplan, god-view-
+// premium.tsx) expliciet weigert te maken. Alle vier tellingen sluiten `demo-%` nu uit.
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -12,10 +20,10 @@ export async function GET() {
   if (!admin) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const [spendRes, hypothesesRes, analysesRes, clientsRes] = await Promise.all([
-    admin.from("blended_account_monthly").select("spend"),
-    admin.from("sprint_hypotheses").select("id", { count: "exact", head: true }).neq("status", "pending"),
-    admin.from("sop_analysis_output").select("id", { count: "exact", head: true }),
-    admin.from("accounts").select("client_id", { count: "exact", head: true }),
+    admin.from("blended_account_monthly").select("spend").not("client_id", "ilike", "demo-%"),
+    admin.from("sprint_hypotheses").select("id", { count: "exact", head: true }).neq("status", "pending").not("client_id", "ilike", "demo-%"),
+    admin.from("sop_analysis_output").select("id", { count: "exact", head: true }).not("client_id", "ilike", "demo-%"),
+    admin.from("accounts").select("client_id", { count: "exact", head: true }).not("client_id", "ilike", "demo-%"),
   ]);
 
   const adSpend = (spendRes.data ?? []).reduce((sum, r) => sum + (typeof r.spend === "number" ? r.spend : 0), 0);

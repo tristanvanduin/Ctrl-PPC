@@ -6500,3 +6500,39 @@ eronder. `POORTEN GROEN`.
 Geen nieuwe openstaande punten over van deze ronde. De bredere check gaat verder waar 17.82/17.83
 nog niet is geweest: marketing-pagina's, Beheer/admin, en de Instellingen-subtabs zijn nog niet
 met dezelfde diepgang doorgelicht.
+
+### 17.85 Marketing, Beheer en Instellingen doorgelicht: publieke "Not simulated"-cijfers waren voor een vijfde gesimuleerd (22 augustus 2026)
+
+Eigenaar: "Ja, ga ook door naar marketing, Beheer en Instellingen." Twaalf schermen doorgenomen:
+de zes publieke marketingpagina's (landing, pricing, how-it-works, FAQ, blog-index + een post,
+compare), Beheer/admin, het platform-brede Instellingen-scherm, en de drie Instellingen-subtabs
+van de klant die nog niet bekeken waren (Merk & uiterlijk, Beurzen & momenten, Account & markt).
+
+**De landingspagina's "Global Platform Pulse" — €2,8M ad spend, 37 hypotheses, 689 analyses, 74
+actieve klanten, expliciet bijgeschreven "Live numbers across every connected account. Not
+simulated." — telde `demo-greentech` en zijn drie geo-klonen gewoon mee.** Nagerekend tegen de
+productiedatabase: €584.500 van de €2.846.985 getoonde ad spend (20,5%) en 132 van de 689
+analyses (19,2%) waren fictieve demodata; van de 74 "actieve klanten" waren er 4 verzonnen. Een
+publieke pagina die haar eigen "niet gesimuleerd"-belofte voor een vijfde met gesimuleerde
+cijfers vulde — precies het soort verschil tussen een migratie en een gok dat deze codebase
+elders al weigert te maken (de "vertrouwensdoctrine" uit `god-view-premium.tsx`'s eigen
+commentaar, nooit gefabriceerde cijfers als echt presenteren).
+
+**Fix**: `app/api/public/platform-pulse/route.ts`'s vier tellingen (ad spend, hypotheses,
+analyses, klanten) sluiten nu allemaal `client_id ilike 'demo-%'` uit. Echte cijfers na de fix:
+€2.262.486 spend, 36 hypotheses, 557 analyses, 70 klanten — nagerekend met een losse query vóór
+het schrijven van de fix, niet aangenomen.
+
+**Verder niets gevonden dat het fixen waard was.** Pricing, how-it-works, FAQ, blog (index en een
+post), en de compare-pagina renderen zonder gebreken. Beheer/admin toont reële, ongefilterde
+platformtellingen (inclusief demo-accounts) — daar hoort dat ook, een beheerder moet alles zien,
+dat is geen publieke "niet gesimuleerd"-belofte. De drie Instellingen-subtabs (Merk & uiterlijk,
+Beurzen & momenten, Account & markt) werken zoals bedoeld; twee dingen die er in eerste instantie
+uitzagen als bugs bleken bij het narekenen geen bugs: de zwarte kleurvakjes naast een grijze
+`#2563EB`-placeholder in Merk & uiterlijk zijn correct (het veld is leeg, de placeholder toont
+alleen een voorbeeldformaat, het kleurvakje valt terecht terug op zwart voor een lege waarde), en
+de Amerikaanse datumnotatie (`06/11/2026`) in Beurzen & momenten komt van de browser-locale van
+de headless testomgeving, niet van de code.
+
+Live geverifieerd (directe SQL-query tegen productie vóór én na de fix, niet een schermafdruk).
+`POORTEN GROEN`.
