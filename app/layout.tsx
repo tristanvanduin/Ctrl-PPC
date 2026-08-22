@@ -37,7 +37,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="nl" className="h-full antialiased">
+    // suppressHydrationWarning: het thema-script hierboven zet colorScheme al vóór React
+    // hydrateert (bewust, tegen de lichtflits) -- de server rendert zonder dat style-attribuut,
+    // dus React ziet elke keer een mismatch die geen bug is, maar wel op elke pagina een
+    // "hydration mismatch"-waarschuwing in de console gaf die een echte kon verdringen.
+    <html lang="nl" className="h-full antialiased" suppressHydrationWarning>
       <head>
         {/* Vóór React en vóór de eerste verf: anders laadt de pagina in het licht en klapt hij een
             fractie later om. Die witte flits op een donker scherm is precies het moment waarop een

@@ -6914,3 +6914,66 @@ uitbreiding raakt geen bestaande tabel.
 `POORTEN GROEN`. **Nog niet uitgevoerd tegen productie** — dit is alleen de scriptuitbreiding;
 `npx tsx scripts/demo/seed-demo-client.ts` (de echte insert) is een aparte, expliciet te bevestigen
 stap.
+
+### 17.94 Beheer/Instellingen/Insights doorgelicht: een stille hydration-mismatch, een querystring die wegviel, en een productie-drift die de poort deed falen (22 augustus 2026)
+
+Vervolg op "blijf kritisch checken". Dev-server op poort 3100, Playwright-sweep over Instellingen,
+Klanten, Decision Terminal, Portfolio, Scripts, Vandaag, Code Rood en Beheer, met console-errors
+gelogd per pagina.
+
+**Vondst 1 — hydration-mismatch op élke pagina.** `app/layout.tsx` laadt `THEMA_INIT_SCRIPT` vóór
+React hydrateert, met opzet: dat voorkomt de lichtflits door `document.documentElement.style
+.colorScheme` al in de `<head>` te zetten (zie `components/ui/thema-schakelaar.tsx`). Maar de
+server-gerenderde `<html>` had dat `style`-attribuut niet, dus meldde React op elke pagina een
+hydration-mismatch — precies het geval waarvoor React zelf `suppressHydrationWarning` documenteert.
+Fix: dat attribuut op de `<html>`-tag in `app/layout.tsx`. Geverifieerd met een schone
+Turbopack-cache (`.next` verwijderd, server herstart — zie vondst 3 hieronder voor waarom dat
+nodig was): de waarschuwing is weg op alle acht doorgelichte pagina's.
+
+**Vondst 2 — `/insights?demo=1` liet de querystring vallen.** `/insights` is een dode-eindpunt-
+doorverwijzing naar `/clients` (de inzichten wonen tegenwoordig per klant onder `/client/[id]`).
+`redirect("/clients")` had geen querystring, dus wie deze route met `?demo=1` opende — precies
+wat de eigen lege-staat van `/clients` aanraadt ("open de demo met ?demo=1 in de URL") — kwam op
+een oprecht lege klantenlijst uit: de tegenovergestelde tegenspraak van wat de pagina zelf
+voorstelt. Fix: `searchParams` uitlezen en doorzetten naar `/clients?<dezelfde-query>`. Geen
+interne links wijzen naar `/insights` (bevestigd met een repo-brede grep) — dit raakt alleen oude
+bookmarks/externe links, maar was met een paar regels correct te maken.
+
+**Vondst 3 — een stale Turbopack-cache verborg beide fixes.** Na het wijzigen van `/insights`
+bleef de server domweg `/clients` zonder querystring teruggeven, ook na een `console.error`-regel
+vlak vóór de `redirect()`-aanroep die nooit in de server-log verscheen — zelfs niet toen er
+expres een syntaxfout ná de functie werd toegevoegd en de server daar niet op struikelde. Dat
+laatste bewees dat de route helemaal niet herbouwd werd: een stale `.next`-devcache diende de
+oude gecompileerde versie. Fix voor het testen (niet voor de app): server stoppen op PID, `.next`
+verwijderen, schoon herstart — daarna compileerde de route wél opnieuw en gaf de juiste
+doorverwijzing. Vermeld voor de volgende sessie die hier iets niet ziet veranderen na een edit:
+twijfel dan eerst aan de cache, niet aan de edit.
+
+**Vondst 4 (niet gefixt, apart gemeld) — `scripts/gates.sh` faalde op `view-dekking`, niet op mijn
+wijzigingen.** `hygiene`, `tsc` (0 fouten) en `tests` (314/314 groen) bleven schoon, en de `build`
+compileerde; alleen `view-dekking` gaf `POORTEN GEFAALD`. Rechtstreeks met SQL nagelopen
+(`scripts/supabase-sql.mjs`) omdat dit een productiecontrole is, geen codefout: `meta_account_daily`
+(de VIEW, leest uit `fact_core`) heeft nu 163 rijen tegen 160 in `meta_account_daily_legacy` (de
+oude fysieke tabel) — drie rijen die wel in `fact_core` staan maar nooit naar de legacy-tabel zijn
+doorgeschreven. Hetzelfde patroon bij `meta_campaign_daily` (+18), `meta_ad_daily` (+12),
+`linkedin_account_daily` (+3), `linkedin_campaign_daily` (+18), `linkedin_creative_daily` (+6) —
+stabiel bij een herhaalde meting, dus geen meetartefact. Uitgesloten als eigen oorzaak: de
+dev-server-log van deze sessie bevat uitsluitend GET-verzoeken naar `demo-greentech`, geen enkele
+schrijfactie. Dit is dus een echte, op zichzelf staande productiebevinding — vermoedelijk een
+live sync voor een echte klant die tijdens deze sessie `fact_core` bijwerkte zonder de
+legacy-tabel mee te nemen — en precies waar `check-view-dekking.mjs` voor bestaat: het bewaakt of
+de fase-3-hernoeming veilig is, en dat is hij nu niet. Niet hier onderzocht of gefixt (vergt
+uitzoeken welk deel van de syncpijplijn wel naar `fact_core` en niet naar de legacy-tabel
+schrijft) — wel expliciet gemeld, in plaats van de rode poort te negeren of de check aan te passen
+om hem groen te krijgen.
+
+**Overige doorgelichte pagina's zonder bevindingen**: Klanten, Decision Terminal, Portfolio,
+Scripts, Vandaag, Beheer (statisch gelezen — de anonieme/401-staat is al eerder bewust apart
+afgehandeld, zie het commentaar bij `AdoptieSectie` in `app/(app)/admin/page.tsx`), Code Rood-
+dossier (`"Niet ingelogd"` is hier correct: deze route vereist altijd een echte sessie, los van
+`?demo=1`, en dat is bewust — Code Rood is bureaubreed gevoelig genoeg om niet in de client-side
+demo-bypass mee te liften).
+
+`tsc`/`tests`/`build` groen, `view-dekking` rood om de hierboven genoemde, aan mijn wijzigingen
+onttrokken reden. De twee code-fixes (suppressHydrationWarning, /insights-querystring) zijn apart
+geverifieerd tegen een schone cache en veilig te committen.
