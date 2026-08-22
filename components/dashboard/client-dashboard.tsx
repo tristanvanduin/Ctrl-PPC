@@ -28,7 +28,6 @@ import { MetaCreativeAnalyses } from "../insights/meta-creative-analyses";
 import { SignalAnalysisCard } from "./signal-analysis-card";
 import { CrossChannelAnalyses } from "./cross-channel-analyses";
 import { MasterSynthesisAnalysis } from "./master-synthesis-analysis";
-import { ChannelForecast, ChannelMonthlyTrend } from "./channel-forecast";
 import { ChannelForecastSections } from "./channel-forecast-sections";
 import { ChannelBudgetScenario } from "./channel-budget-scenario";
 import { EventForecaster } from "./event-forecaster";
@@ -47,6 +46,7 @@ import { DgmView } from "./dgm-view";
 import { MetaView, MetaCampagnes } from "./meta-view";
 import { LinkedInView, LinkedInCampagnes } from "./linkedin-view";
 import { GoogleView, GoogleCampagnes, GoogleForecast } from "./google-view";
+import { ForecastSummaryTiles, ForecastTable } from "./forecast-table";
 import { CrossChannelView } from "./cross-channel-view";
 import { CampaignsPerChannel } from "./campaigns-per-channel";
 import { BrandingView } from "./branding-view";
@@ -473,41 +473,37 @@ export function ClientDashboard({ client }: { client: Client }) {
                   {channel === "google" && <GoogleForecast clientId={client.id} />}
                   {channel === "blended" && (
                     <>
+                      {/* Zelfde kalenderjaar-prognosetabel als Google altijd al had (GoogleForecast
+                          hierboven), nu ook over Google+Meta+LinkedIn samen (feedback 22 augustus:
+                          "ik wil daadwerkelijk alle kanalen ook die tabel krijgt met gecombineerde
+                          data"). Bron: lib/api/blended-historical.ts, fact_core level='account'/
+                          grain='month' over alle drie kanalen. Eerder bewust weggelaten omdat
+                          Meta/LinkedIn geen meerjarige historie hebben voor de seizoenscorrectie --
+                          dat blokkeert alleen de interpretatie van vroege maanden, niet de data:
+                          computeMonthlyExpected negeert een maand toch al zodra de waarde 0 is, dus
+                          een periode voordat Meta/LinkedIn liepen levert gewoon Google's eigen
+                          totaal op. Zelfde drie secties, zelfde volgorde als GoogleForecast. */}
                       <Sectie
                         eerste
                         icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
-                        titel="Prognose over alle kanalen"
-                        bijschrift="De blended projectie richting het einde van de periode"
+                        titel="Waar dit jaar op uitkomt"
+                        bijschrift="Jaarprognose over alle kanalen samen, tegen het geschatte jaardoel (vorig jaar +10%)"
                       >
-                        <ChannelForecast clientId={client.id} channel="blended" metGrafiek={false} />
+                        <ForecastSummaryTiles clientId={client.id} channel="blended" />
                       </Sectie>
-                      {/* Ontbrak hier: Google en Meta/LinkedIn hebben allebei al een
-                          budgetscenario naast hun samenvatting (GoogleForecast resp.
-                          ChannelForecastSections) -- blended miste dat element helemaal, terwijl
-                          ChannelBudgetScenario "blended" al als kanaal ondersteunt (dezelfde
-                          run-rate-hook als hierboven). Puur bedrading, geen nieuw component. */}
                       <Sectie
-                        icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+                        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
                         titel="Wat een budgetwijziging zou doen"
                         bijschrift="Over alle kanalen samen"
                       >
                         <ChannelBudgetScenario clientId={client.id} channel="blended" />
                       </Sectie>
-                      {/* Maandgrafiek als eigen sectie ná de slider, zelfde volgorde als Google
-                          (ForecastTable) en Meta/LinkedIn (ChannelMonthlyTrend) -- layout-
-                          uniformering 22 augustus. */}
-                      {/* Geen CrossChannelView hier: die stond hier gedupliceerd (staat al op
-                          Overzicht, regel hierboven bij activeTab === "dashboard") en brak
-                          precies de uniformiteit die deze layout-ronde moest bereiken -- Google/
-                          Meta/LinkedIn's Prognose-tab heeft ook geen geo-kaart of kanaaltabel,
-                          alleen de drie prognose-secties. Weggehaald (feedback 22 augustus:
-                          "waarom is alle kanalen niet uniform aan google, meta en linkedin?"). */}
                       <Sectie
                         icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
-                        titel="Volle maanden"
-                        bijschrift="Spend en acties (conv. + leads) per maand, run-rate-basis"
+                        titel="Maandelijkse uitsplitsing"
+                        bijschrift="Gerealiseerd plus prognose per maand, over alle kanalen samen"
                       >
-                        <ChannelMonthlyTrend clientId={client.id} channel="blended" />
+                        <ForecastTable clientId={client.id} channel="blended" />
                       </Sectie>
                     </>
                   )}

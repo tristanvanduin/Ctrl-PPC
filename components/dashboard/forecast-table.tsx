@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
-import { actieveMetrics, computeForecast, MONTH_LABELS, type ForecastMetric } from "@/lib/forecast";
+import { useBlendedClientData } from "@/lib/use-blended-client-data";
+import { actieveMetrics, computeForecast, MONTH_LABELS, type ForecastMetric, type ClientForecast } from "@/lib/forecast";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalVoet, VoetRij, TotaalCel } from "./data-table";
@@ -12,6 +13,28 @@ const METRICS: { id: ForecastMetric; label: string; format: (v: number) => strin
     .map((id) => ({ id, label: METRIC_LABELS[id], format: formatterFor(id) }));
 
 /**
+ * Kiest tussen de Google-context (altijd al gefetcht, ook op andere tabbladen) en de blended
+ * hook (Google+Meta+LinkedIn uit fact_core) -- zie lib/api/blended-historical.ts voor waarom dit
+ * nu ook voor "alle kanalen" mag: computeMonthlyExpected negeert toch al maanden zonder data
+ * (mv > 0), dus een periode voordat Meta/LinkedIn liepen levert gewoon Google's eigen totaal op.
+ * Beide hooks worden onvoorwaardelijk aangeroepen (React-regel), alleen het resultaat wisselt.
+ */
+function useChannelForecast(clientId: string, channel: "google" | "blended"): { forecast: ClientForecast | null; loading: boolean; error: string | null } {
+  const googleData = useClientHistoricalData(clientId);
+  const googleForecast = useForecast();
+  const blended = useBlendedClientData(clientId);
+
+  if (channel === "blended") {
+    return {
+      forecast: blended.data ? computeForecast(blended.data) : null,
+      loading: blended.loading,
+      error: blended.error,
+    };
+  }
+  return { forecast: googleForecast ?? computeForecast(googleData), loading: false, error: null };
+}
+
+/**
  * De jaarprognose + bandbreedte als eigen, korte kop-sectie -- in dezelfde vorm als Meta/LinkedIn's
  * "Lopende maand"/"Volgende maand"-tegels in ChannelForecast, zodat de Prognose-tab voor elk kanaal
  * met dezelfde soort eerste sectie begint (feedback: de layout moet voor elk kanaal gelijk zijn --
@@ -19,10 +42,8 @@ const METRICS: { id: ForecastMetric; label: string; format: (v: number) => strin
  * Voorheen stonden deze twee getallen als voetregels ONDER de maandtabel; nu staan ze los, boven de
  * budgetslider, en toont de tabel zelf (hieronder) alleen nog de rijen zelf.
  */
-export function ForecastSummaryTiles({ clientId }: { clientId: string }) {
-  const data = useClientHistoricalData(clientId);
-  const gedeeld = useForecast();
-  const forecast = gedeeld ?? computeForecast(data);
+export function ForecastSummaryTiles({ clientId, channel = "google" }: { clientId: string; channel?: "google" | "blended" }) {
+  const { forecast, loading, error } = useChannelForecast(clientId, channel);
 
   const [hasEvents, setHasEvents] = useState(false);
   useEffect(() => {
@@ -35,6 +56,14 @@ export function ForecastSummaryTiles({ clientId }: { clientId: string }) {
       });
     return () => { cancelled = true; };
   }, [clientId]);
+
+  if (!forecast) {
+    return (
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4 text-meta text-muted-foreground">
+        {loading ? "Blended jaarprognose laadt…" : error ? `Geen blended data: ${error}` : "Nog geen data over alle kanalen samen."}
+      </div>
+    );
+  }
 
   // Eén metric als kop: dezelfde "één eerlijke default" als MonthlyTrendBars/MonthlyTrendLine
   // elders in de opener -- de eerste met een ingesteld doel, dus nooit een lege selector.
@@ -101,13 +130,19 @@ export function ForecastSummaryTiles({ clientId }: { clientId: string }) {
   );
 }
 
-export function ForecastTable({ clientId }: { clientId: string }) {
+export function ForecastTable({ clientId, channel = "google" }: { clientId: string; channel?: "google" | "blended" }) {
   const [selectedMetric, setSelectedMetric] = useState<ForecastMetric>("conversions");
-  const data = useClientHistoricalData(clientId);
-  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
-  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
-  const gedeeld = useForecast();
-  const forecast = gedeeld ?? computeForecast(data);
+  // Uit de provider (Google) of de blended hook -- eerder rekende dit component de forecast bij
+  // elke render opnieuw uit (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const { forecast, loading, error } = useChannelForecast(clientId, channel);
+
+  if (!forecast) {
+    return (
+      <div className="bg-card rounded-xl border border-border shadow-sm p-5 text-meta text-muted-foreground">
+        {loading ? "Blended maandtabel laadt…" : error ? `Geen blended data: ${error}` : "Nog geen data over alle kanalen samen."}
+      </div>
+    );
+  }
 
   const metric = METRICS.find((m) => m.id === selectedMetric)!;
   const result = forecast[selectedMetric];

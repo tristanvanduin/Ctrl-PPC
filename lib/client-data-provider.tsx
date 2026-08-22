@@ -3,8 +3,9 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { type ClientHistoricalData } from "./types";
 import { useClientData, type ClientDataState } from "./use-client-data";
-import { getClientSettings, loadClientSettings } from "./client-settings";
+import { loadClientSettings } from "./client-settings";
 import { computeForecast, type ClientForecast } from "./forecast";
+import { mergeKpiTargets } from "./kpi-target-merge";
 
 const ClientDataContext = createContext<ClientDataState | null>(null);
 
@@ -28,53 +29,11 @@ export function ClientDataProvider({ clientId, children }: { clientId: string; c
   // Load settings from Supabase on mount (populates cache for getClientSettings)
   useEffect(() => { loadClientSettings(clientId); }, [clientId]);
 
-  // Merge user's settings targets into the data
+  // Merge user's settings targets into the data (gedeelde helper, zie lib/kpi-target-merge.ts --
+  // de blended prognosetabel gebruikt dezelfde functie buiten deze context om).
   const enrichedData = useMemo(() => {
     if (!clientData.data) return clientData;
-
-    const settings = getClientSettings(clientId);
-    const kpi = settings.kpiTargets;
-    const originalTarget = clientData.data.targetCurrentYear;
-
-    const convTarget = kpi.conversionsMode === "absolute"
-      ? kpi.conversionsAbsolute
-      : Math.round(originalTarget.conversions * (1 + kpi.conversionsGrowthPct / 100));
-
-    const revTarget = kpi.revenueMode === "absolute"
-      ? kpi.revenueAbsolute
-      : Math.round(originalTarget.revenue * (1 + kpi.revenueGrowthPct / 100));
-
-    // Derive spend target from KPI goals instead of using the API default:
-    // Option 1: conversions × CPA (if both are set)
-    // Option 2: revenue / ROAS (if both are set)
-    // Fallback: use the API-derived target
-    let spendTarget = originalTarget.adSpend;
-
-    const effectiveConv = convTarget > 0 ? convTarget : originalTarget.conversions;
-    const effectiveRev = revTarget > 0 ? revTarget : originalTarget.revenue;
-
-    if (kpi.cpaTarget > 0 && effectiveConv > 0) {
-      // Budget = conversions × target CPA
-      spendTarget = Math.round(effectiveConv * kpi.cpaTarget);
-    } else if (kpi.roasTarget > 0 && effectiveRev > 0) {
-      // Budget = revenue / target ROAS
-      spendTarget = Math.round(effectiveRev / kpi.roasTarget);
-    }
-
-    const hasUserTargets = convTarget > 0 || revTarget > 0;
-    if (!hasUserTargets) return clientData;
-
-    const mergedData: ClientHistoricalData = {
-      ...clientData.data,
-      targetCurrentYear: {
-        conversions: convTarget > 0 ? convTarget : originalTarget.conversions,
-        revenue: revTarget > 0 ? revTarget : originalTarget.revenue,
-        adSpend: spendTarget,
-      },
-      conversionOverrides: kpi.conversionOverrides,
-    };
-
-    return { ...clientData, data: mergedData };
+    return { ...clientData, data: mergeKpiTargets(clientId, clientData.data) };
   }, [clientData, clientId]);
 
   // Eén keer per datawijziging, gedeeld met alle kinderen.

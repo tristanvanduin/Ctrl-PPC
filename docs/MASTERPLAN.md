@@ -6248,3 +6248,47 @@ bevestiging.
 `rpc-rechten`, `view-dekking`, `bureaugrens`, `rls-scheiding` alle vier groen, tsc schoon, 314/314
 tests, build groen. Eerste keer deze sessie dat de volledige poort in één run zonder enige
 uitzondering doorkomt.
+
+### 17.80 Blended jaarprognose-tabel: "Alle kanalen" krijgt nu ook de Google-tabel, met gecombineerde data (22 augustus 2026)
+
+Eigenaar, na uitleg waarom "Alle kanalen" eerder bewust géén kalenderjaar-prognosetabel had
+(`channel-forecast-sections.tsx`: Meta/LinkedIn missen de meerjarige historie voor de
+seizoenscorrectie): "Ik wil daadwerkelijk alle kanalen ook die tabel krijgt met gecombineerde
+data." Bij nader inzien blokkeert dat ontbreken alleen de INTERPRETATIE van vroege maanden, niet
+de DATA zelf — `computeMonthlyExpected` in `lib/forecast.ts` negeert een jaar/maand toch al zodra
+de waarde 0 is (`mv > 0`-check), dus een periode van vóórdat Meta/LinkedIn liepen levert gewoon
+Google's eigen totaal op, geen vertekend nulpunt. Reden om het eerder te laten liggen was dus
+zwakker dan gedacht.
+
+**Gebouwd, channel-neutraal, geen live-API-aanroepen:**
+- `lib/api/blended-historical.ts` — leest `fact_core` (`level='account'`, `grain='month'`, alle
+  drie kanalen) en telt per (jaar, maand) op. Google's maandrijen zijn er al via
+  `ads_account_monthly_legacy`; Meta/LinkedIn via `refresh_rollups()` uit de dagcijfers (zelfde
+  bron als `compute-targets.ts`'s kanaalneutrale lezer al gebruikte).
+- `app/api/blended/client-data/route.ts` — nieuwe route, bewust met `getSupabaseAdmin()` en NIET
+  via `supabaseForClient()`/de demo-mock-wrapper: die laatste serveert curated JS-fixtures die
+  `fact_core` niet dekken (het split-brain-patroon uit 17.78). Voor demo-greentech levert deze
+  route dus dezelfde echte databaserijen als voor een productieklant.
+- `lib/use-blended-client-data.ts` — client-hook, zelfde cache-vorm als `use-client-data.ts`.
+- `lib/kpi-target-merge.ts` — de KPI-doelen-merge uit `client-data-provider.tsx` (Google-context)
+  uitgetrokken naar een pure functie, zodat de blended hook dezelfde doelenlogica gebruikt zonder
+  de Google-specifieke context eromheen.
+- `components/dashboard/forecast-table.tsx` — `ForecastSummaryTiles`/`ForecastTable` accepteren nu
+  een `channel`-prop (`"google"` default, ongewijzigd gedrag); op `"blended"` kiest de nieuwe
+  `useChannelForecast`-hook de blended databron in plaats van de Google-context. Beide
+  onderliggende hooks worden onvoorwaardelijk aangeroepen (React-regel), alleen het resultaat
+  wisselt — geen extra fetch-kosten op de Google-kant.
+- `components/dashboard/client-dashboard.tsx` — "Alle kanalen" op de Prognose-tab toont nu
+  dezelfde drie secties, in dezelfde volgorde, als `GoogleForecast`: Jaarprognose-tegels →
+  budgetscenario → maandtabel. Verving de eerdere run-rate-tegels (`ChannelForecast`) en
+  maandgrafiek (`ChannelMonthlyTrend`) op die tab; die twee componenten blijven ongewijzigd in
+  gebruik voor de losse Meta/LinkedIn-subtabbladen (`channel-forecast-sections.tsx`), waar de
+  oorspronkelijke beperking — geen multi-jaar historie voor DIE ENE bron alleen — nog steeds geldt.
+
+**Live geverifieerd**, niet alleen op tsc/tests/build (`POORTEN GROEN`, 314/314 tests). Server
+herstart met de echte credentials, Playwright naar `demo-greentech` → Prognose → Alle kanalen
+(default tab): "Waar dit jaar op uitkomt" toont Jaarprognose — Conversies 3.591 tegen doel 2.601
+(+38%), bandbreedte 3.219–3.963; "Maandelijkse uitsplitsing" toont een echte, blended maandreeks
+(bv. jan 171 verwacht/90 gerealiseerd/53%, mrt 200/341/171%) — aantoonbaar andere cijfers dan
+Google alleen. Rechtstreekse curl-test op de nieuwe route bevestigt reële, opgetelde
+meerjarige data terug (2024 t/m 2026).
