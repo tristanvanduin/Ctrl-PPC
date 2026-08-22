@@ -5920,3 +5920,61 @@ worden, geen sandbox-toegang), Beurzen/momenten-naam (al "Beurzen & momenten").
 
 **Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
 groen. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
+
+### 17.73 Prognose-layout uniform, God View eigen tabblad + segmentfilter (22 augustus 2026)
+
+Eigenaar leverde een concrete, uitgeschreven paginastructuur aan (tekst-dump van alle vier de
+Prognose-varianten) met de eis: "dit moet voor elk kanaal de layout worden" — geen productvraag
+meer, een directe instructie. Ook: God View uit Bevindingen halen naar een eigen tabblad, en een
+segmentfilter erop. Losse SOP-cleanup-scriptfout opgehelderd (JS-bestand in de SQL-editor
+geplakt — geen bug, verkeerd venster).
+
+**Prognose uniform (`58ee31a`)**: elk kanaal toont nu dezelfde drie secties in dezelfde volgorde:
+(1) samenvatting ("waar dit op uitkomt"), (2) budgetscenario, (3) detail. Google had dit
+omgekeerd (tabel-met-jaarprognose-als-voetregel, dan pas de slider); Meta/LinkedIn/blended
+hadden geen sectie 3. `ForecastSummaryTiles` (nieuw, in forecast-table.tsx) tilt Google's
+jaarprognose+bandbreedte uit de tabelvoet naar een eigen tegel-sectie, in dezelfde vorm als
+Meta/LinkedIn's Lopende-/Volgende-maand-kaarten. `ChannelMonthlyTrend` (nieuw, in
+channel-forecast.tsx) tilt de maandgrafiek uit `ChannelForecast` naar een eigen derde sectie.
+Bewuste asymmetrie: Meta/LinkedIn/blended's sectie 3 is een grafiek, geen kopie van Google's
+Verwacht/Prognose/Ratio-tabel — die tabel toetst tegen een jaardoel, en dat doel bestaat voor
+Meta/LinkedIn niet (geen meerjarige historie voor een seizoenscorrectie, zie de bestaande
+uitleg in channel-forecast.tsx). Eén rondje layout-gelijktrekken, geen methodologie-gelijktrekken.
+
+**God View eigen tabblad + filter (`58ee31a`)**: nieuwe `godview`-tab in `CLIENT_SECTIONS`,
+op dezelfde hoogte als Analyseren/Bevindingen/Second opinion, precies zoals gevraagd. Was een
+`Sectie` boven-in `OutcomesTab` (Bevindingen); die stond er sinds 21 augustus alleen omdat er nog
+geen eigen plek was, niet omdat het inhoudelijk bij "bevindingen" hoorde. `GodViewPremium`
+(god-view-premium.tsx) kreeg een filter op Bedrijfsmodel (B2B/B2C) en Branche/niche
+(`lib/benchmark/segment.ts`'s bestaande lijst), client-side over de cellen die de server al
+teruggaf. Dat is bewust geen nieuwe anonimiteitslaag: elke cel die de route teruggeeft heeft de
+k-anonimiteitsdrempel (`lib/benchmark/cel.ts`) al gehaald of staat expliciet als testmodus
+gelabeld — filteren op wat al binnen is, kan nooit iets nieuws blootleggen. Land/regio-filter
+NIET gebouwd: die dimensie zit nog niet in `GodViewInvoerRij` (lib/benchmark/god-view.ts) — geen
+land/regio-veld in de aggregatie-invoer, dus niets om op te filteren zonder eerst de
+GAQL-/Meta-/LinkedIn-syncs en de aggregator uit te breiden. Dat is een aparte, grotere klus.
+
+**SOP-cleanup-scriptfout (geen actie)**: de eigenaar plakte de inhoud van
+`scripts/cleanup-orphaned-sop-files.mjs` (Node.js, met `import`-statements) in de Supabase
+SQL-editor en kreeg een syntax-fout op `{`. Dat is geen bug in het script — het is Node-code, geen
+SQL, en moet in een terminal draaien: `SUPABASE_SERVICE_ROLE_KEY=... node
+scripts/cleanup-orphaned-sop-files.mjs [--dry-run]`. Gevraagd of de eigenaar terminal-/
+Node-toegang heeft; zo niet, dan is een admin-API-route (in de browser te triggeren) het
+alternatief — nog niet gebouwd, wacht op antwoord.
+
+**Nog open — expliciet om een aanbeveling gevraagd**: de "Analyse & advies"-pagina is te lang en
+te rommelig om snel iets in te vinden ("Extreem lange pagina, is dit aanraad?"). Nog geen code
+gebouwd; zie het antwoord aan de eigenaar in de sessie zelf voor de aanbeveling (gegroepeerde,
+standaard-ingeklapte secties per thema i.p.v. één platte lijst — zelfde disclosure-patroon als
+`RegioToggle` elders in de codebase). Dit raakt meerdere bestanden tegelijk (standalone-analyses.tsx,
+de per-kanaal structuur&segment-efficiëntie-kaarten, de Analyseren/Bevindingen-taxonomie) en verdient
+een eigen, gerichte bouwronde in plaats van hier meegenomen te worden.
+
+**Meta-feedback**: de eigenaar wees er terecht op dat herhaalde feedback (bv. witruimte, meerdere
+rondes) niet onder "eerder besloten, geen actie" hoort te blijven staan alsof één antwoord voor
+altijd geldt. Vastgelegd als werkwijze: als hetzelfde punt een tweede of derde keer terugkomt, is
+dat een signaal dat de eerdere aanpak niet volstaat, en moet het heropend worden — niet afgevinkt
+onder verwijzing naar een oude beslissing.
+
+**Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
+groen. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
