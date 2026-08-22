@@ -32,7 +32,7 @@ import { VideoPlacements } from "./video-placements";
 import { CampaignTable } from "./campaign-table";
 import { CreativePerformance } from "./creative-performance";
 import { SearchTermsTable } from "./search-terms-table";
-import { ForecastTable } from "./forecast-table";
+import { ForecastTable, ForecastSummaryTiles } from "./forecast-table";
 import { BudgetScenario } from "./budget-scenario";
 import { AudienceSplit } from "./audience-split";
 
@@ -374,19 +374,25 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
   );
 }
 
-/** De Prognose-tab voor Google Ads (alleen gerenderd buiten een gekozen geo-kloon). */
+/**
+ * De Prognose-tab voor Google Ads (alleen gerenderd buiten een gekozen geo-kloon).
+ *
+ * Volgorde uniform met Meta/LinkedIn (feedback 22 augustus: "dit moet voor elk kanaal de layout
+ * worden"): eerst het antwoord op "waar komen we uit" (hier: ForecastSummaryTiles, het Google-
+ * equivalent van Meta/LinkedIn's Lopende-/Volgende-maand-tegels), dan het budgetscenario, dan pas
+ * de detailtabel. Stond hiervoor als tabel-eerst-dan-slider -- de jaarprognose en bandbreedte
+ * zaten als voetregels ONDER de tabel, dus je moest voorbij de slider scrollen om ze te missen.
+ */
 export function GoogleForecast({ clientId }: { clientId: string }) {
   return (
     <>
-      {/* De prognose is het antwoord; het budgetscenario is wat je ermee doet.
-          Twee onderwerpen, dus twee secties. */}
       <Sectie
         eerste
         icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Waar dit jaar op uitkomt"
-        bijschrift="Gerealiseerd plus prognose per maand, tegen het geschatte jaardoel (vorig jaar +10%)"
+        bijschrift="Jaarprognose tegen het geschatte jaardoel (vorig jaar +10%)"
       >
-        <ForecastTable clientId={clientId} />
+        <ForecastSummaryTiles clientId={clientId} />
       </Sectie>
       <Sectie
         icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -394,6 +400,13 @@ export function GoogleForecast({ clientId }: { clientId: string }) {
         bijschrift="Doorrekening van een hoger of lager mediabudget op dezelfde efficiëntie"
       >
         <BudgetScenario clientId={clientId} />
+      </Sectie>
+      <Sectie
+        icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Maandelijkse uitsplitsing"
+        bijschrift="Gerealiseerd plus prognose per maand"
+      >
+        <ForecastTable clientId={clientId} />
       </Sectie>
     </>
   );

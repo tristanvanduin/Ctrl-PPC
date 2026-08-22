@@ -17,7 +17,13 @@ export type { ChannelKind };
 const eur = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v));
 const fmt = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(v));
 
-export function ChannelForecast({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
+export function ChannelForecast({ clientId, channel, metGrafiek = true }: {
+  clientId: string;
+  channel: ChannelKind;
+  /** 22 augustus: layout-uniformering met Google zet de maandgrafiek in een eigen derde sectie,
+   *  ná de budgetslider (zie ChannelMonthlyTrend hieronder) — hier dan uit. */
+  metGrafiek?: boolean;
+}) {
   const { cfg, error, loading, model } = useChannelRunRateModel(clientId, channel);
 
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
@@ -67,11 +73,29 @@ export function ChannelForecast({ clientId, channel }: { clientId: string; chann
         </div>
       </div>
 
-      {chartData.length >= 2 && (
+      {metGrafiek && chartData.length >= 2 && (
         <MonthlyTrendChart title={`Volle maanden — spend & ${cfg.convLabel.toLowerCase()}`} data={chartData} lineLabel={cfg.convLabel} />
       )}
     </div>
   );
+}
+
+/**
+ * De maandgrafiek als eigen sectie, los van ChannelForecast -- het Meta/LinkedIn/blended-
+ * equivalent van Google's `ForecastTable`-sectie: het detail dat ná het budgetscenario komt, niet
+ * ervoor (layout-uniformering, 22 augustus). Zelfde model opnieuw opgehaald i.p.v. via een prop
+ * doorgegeven: dezelfde onafhankelijke-per-sectie-aanpak als elders in dit bestand (bv.
+ * ForecastSummaryTiles/ForecastTable die allebei zelf useForecast() aanroepen).
+ */
+export function ChannelMonthlyTrend({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
+  const { cfg, error, loading, model } = useChannelRunRateModel(clientId, channel);
+  if (error || loading || !model) return null;
+
+  const { spendF, convF } = model;
+  const chartData = spendF.fullMonths.map((m, i) => ({ maand: m.month, spend: m.value, lijn: convF.fullMonths[i]?.value ?? 0 }));
+  if (chartData.length < 2) return null;
+
+  return <MonthlyTrendChart title={`Volle maanden — spend & ${cfg.convLabel.toLowerCase()}`} data={chartData} lineLabel={cfg.convLabel} />;
 }
 
 function Row({ label, value, strong, warn }: { label: string; value: string; strong?: boolean; warn?: boolean }) {

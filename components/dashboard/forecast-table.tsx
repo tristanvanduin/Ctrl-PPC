@@ -11,17 +11,19 @@ const METRICS: { id: ForecastMetric; label: string; format: (v: number) => strin
   (["conversions", "revenue", "roas", "cpa"] as ForecastMetric[])
     .map((id) => ({ id, label: METRIC_LABELS[id], format: formatterFor(id) }));
 
-export function ForecastTable({ clientId }: { clientId: string }) {
-  const [selectedMetric, setSelectedMetric] = useState<ForecastMetric>("conversions");
+/**
+ * De jaarprognose + bandbreedte als eigen, korte kop-sectie -- in dezelfde vorm als Meta/LinkedIn's
+ * "Lopende maand"/"Volgende maand"-tegels in ChannelForecast, zodat de Prognose-tab voor elk kanaal
+ * met dezelfde soort eerste sectie begint (feedback: de layout moet voor elk kanaal gelijk zijn --
+ * eerst het antwoord op "waar komen we uit", dan het budgetscenario, dan pas de detailtabel).
+ * Voorheen stonden deze twee getallen als voetregels ONDER de maandtabel; nu staan ze los, boven de
+ * budgetslider, en toont de tabel zelf (hieronder) alleen nog de rijen zelf.
+ */
+export function ForecastSummaryTiles({ clientId }: { clientId: string }) {
   const data = useClientHistoricalData(clientId);
-  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
-  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
   const gedeeld = useForecast();
   const forecast = gedeeld ?? computeForecast(data);
 
-  // Event-besef: heeft deze klant beurzen geconfigureerd, dan is de kalender-YoY-prognose
-  // hieronder misleidend voor de maandvorm (een 2-jaarlijkse beurs vergelijkt met een
-  // beursloos jaar). We waarschuwen eerlijk en verwijzen naar de event-relatieve beursanalyse.
   const [hasEvents, setHasEvents] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +35,79 @@ export function ForecastTable({ clientId }: { clientId: string }) {
       });
     return () => { cancelled = true; };
   }, [clientId]);
+
+  // Eén metric als kop: dezelfde "één eerlijke default" als MonthlyTrendBars/MonthlyTrendLine
+  // elders in de opener -- de eerste met een ingesteld doel, dus nooit een lege selector.
+  const primaryId = actieveMetrics(forecast)[0] ?? "conversions";
+  const metric = METRICS.find((m) => m.id === primaryId)!;
+  const result = forecast[primaryId];
+  const fmt = metric.format;
+  const isInverted = primaryId === "cpa";
+
+  const totalExpected = result.points.reduce((s, p) => s + p.expected, 0);
+  const isRatio = primaryId === "roas" || primaryId === "cpa";
+  const kpiAdjusted = result.kpi.adjustedAnnual;
+  const totalDiffPct = result.kpi.diffPct;
+  const isPositive = isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0;
+
+  return (
+    <div className="space-y-4">
+      {hasEvents && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
+          <strong>Event-gedreven account.</strong> Deze kalender-jaarprognose vergelijkt elke maand met dezelfde
+          kalendermaand vorig jaar. Voor een beurs met een andere cadans (bijv. 2-jaarlijks) vertekent dat de
+          maandvorm — vorig jaar was er dan geen beurs. Gebruik de <strong>beursanalyse</strong> (kies een beurs
+          in het menu → Analyses) voor de event-relatieve prognose die de aanloop op gelijke afstand tot de
+          beursdag vergelijkt.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+          <div className="text-meta font-semibold text-brand-blue-ink uppercase tracking-wide mb-2">
+            Jaarprognose — {metric.label}
+          </div>
+          <div className="space-y-1.5 text-lead">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Gerealiseerd + prognose</span>
+              <span className="font-semibold text-brand-gray">{isRatio ? fmt(result.kpi.annualTarget) : fmt(kpiAdjusted)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">vs. doel</span>
+              <span className={`font-semibold ${isPositive ? "text-green-600" : "text-red-500"}`}>
+                {fmt(totalExpected)} ({formatDeltaPercent(totalDiffPct, 0)})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+          <div className="text-meta font-semibold text-brand-blue-ink uppercase tracking-wide mb-2">Bandbreedte</div>
+          {!isRatio && result.kpi.forecastSpreadPct > 0 ? (
+            <>
+              <div className="text-lead font-semibold text-brand-gray">
+                {fmt(result.kpi.forecastLow)} – {fmt(result.kpi.forecastHigh)}
+              </div>
+              <p className="text-micro text-muted-foreground mt-2">
+                O.b.v. de spreiding in gerealiseerde maanden (±{result.kpi.forecastSpreadPct}%).
+              </p>
+            </>
+          ) : (
+            <p className="text-meta text-muted-foreground">Geen bandbreedte voor een verhoudingsgetal — zie de maandtabel voor het verloop.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ForecastTable({ clientId }: { clientId: string }) {
+  const [selectedMetric, setSelectedMetric] = useState<ForecastMetric>("conversions");
+  const data = useClientHistoricalData(clientId);
+  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
+  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const gedeeld = useForecast();
+  const forecast = gedeeld ?? computeForecast(data);
 
   const metric = METRICS.find((m) => m.id === selectedMetric)!;
   const result = forecast[selectedMetric];
@@ -58,16 +133,6 @@ export function ForecastTable({ clientId }: { clientId: string }) {
   const totalDiffPct = result.kpi.diffPct;
 
   return (
-    <div className="space-y-4">
-      {hasEvents && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
-          <strong>Event-gedreven account.</strong> Deze kalender-jaarprognose vergelijkt elke maand met dezelfde
-          kalendermaand vorig jaar. Voor een beurs met een andere cadans (bijv. 2-jaarlijks) vertekent dat de
-          maandvorm — vorig jaar was er dan geen beurs. Gebruik de <strong>beursanalyse</strong> (kies een beurs
-          in het menu → Analyses) voor de event-relatieve prognose die de aanloop op gelijke afstand tot de
-          beursdag vergelijkt.
-        </div>
-      )}
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header with metric tabs */}
       <div className="px-5 pt-5 pb-4 flex items-center justify-between">
@@ -121,8 +186,9 @@ export function ForecastTable({ clientId }: { clientId: string }) {
             );
           })}
         </Body>
-        {/* Drie voetregels in plaats van één: het totaal, de jaarprognose en de bandbreedte
-            eronder. Daarom TotaalVoet met eigen rijen — een vaste totaalrij past hier niet. */}
+        {/* Alleen het totaal over de weergegeven maanden -- de jaarprognose en de bandbreedte
+            staan sinds de layout-uniformering (feedback 22 augustus) los in ForecastSummaryTiles,
+            als eigen sectie boven de budgetslider. */}
         <TotaalVoet>
           <VoetRij className="border-t-2 border-border bg-gray-50 font-semibold text-brand-gray">
             <TotaalCel>Totaal</TotaalCel>
@@ -133,33 +199,8 @@ export function ForecastTable({ clientId }: { clientId: string }) {
               {formatDeltaPercent(totalDiffPct, 0)}
             </TotaalCel>
           </VoetRij>
-
-          {!isRatio && (
-            <VoetRij className="bg-brand-blue/5">
-              <TotaalCel colSpan={2} className="text-xs font-semibold text-brand-blue-ink">
-                Jaarprognose (gerealiseerd + prognose)
-              </TotaalCel>
-              <TotaalCel getal colSpan={2} className="text-xs font-bold text-brand-blue-ink">{fmt(kpiAdjusted)}</TotaalCel>
-              <TotaalCel getal className={`text-xs font-bold ${(isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"}`}>
-                vs doel {fmt(totalExpected)}
-              </TotaalCel>
-            </VoetRij>
-          )}
-
-          {!isRatio && result.kpi.forecastSpreadPct > 0 && (
-            <VoetRij className="bg-brand-blue/5">
-              <TotaalCel colSpan={2} className="text-meta text-muted-foreground">
-                Bandbreedte (o.b.v. de spreiding in gerealiseerde maanden)
-              </TotaalCel>
-              <TotaalCel getal colSpan={3} className="text-meta text-muted-foreground">
-                {fmt(result.kpi.forecastLow)} – {fmt(result.kpi.forecastHigh)}
-                <span className="ml-1 opacity-70">(±{result.kpi.forecastSpreadPct}%)</span>
-              </TotaalCel>
-            </VoetRij>
-          )}
         </TotaalVoet>
       </Tabel>
-    </div>
     </div>
   );
 }

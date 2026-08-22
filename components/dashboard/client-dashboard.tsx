@@ -28,7 +28,7 @@ import { MetaCreativeAnalyses } from "../insights/meta-creative-analyses";
 import { SignalAnalysisCard } from "./signal-analysis-card";
 import { CrossChannelAnalyses } from "./cross-channel-analyses";
 import { MasterSynthesisAnalysis } from "./master-synthesis-analysis";
-import { ChannelForecast } from "./channel-forecast";
+import { ChannelForecast, ChannelMonthlyTrend } from "./channel-forecast";
 import { ChannelForecastSections } from "./channel-forecast-sections";
 import { ChannelBudgetScenario } from "./channel-budget-scenario";
 import { EventForecaster } from "./event-forecaster";
@@ -76,7 +76,7 @@ interface Client {
   source?: string;
 }
 
-type Tab = "dashboard" | "campaigns" | "forecast" | "insights" | "outcomes" | "sprint" | "reporting" | "dgm" | "second-opinion" | "files" | "settings";
+type Tab = "dashboard" | "campaigns" | "forecast" | "insights" | "outcomes" | "godview" | "sprint" | "reporting" | "dgm" | "second-opinion" | "files" | "settings";
 
 
 type Channel = "google" | "meta" | "linkedin" | "blended";
@@ -127,13 +127,13 @@ function ChannelTabs({ channel, onChange, beschikbaar }: {
 // alleen de navigatie hergroepeert (activeTab blijft dezelfde id-set).
 const CLIENT_SECTIONS: { id: string; label: string; icon: React.ReactNode; tabs: Tab[] }[] = [
   { id: "prestaties", label: "Prestaties", icon: <BarChart3 className="w-4 h-4" />, tabs: ["dashboard", "campaigns", "forecast"] },
-  { id: "analyse", label: "Analyse & advies", icon: <Lightbulb className="w-4 h-4" />, tabs: ["insights", "outcomes", "second-opinion"] },
+  { id: "analyse", label: "Analyse & advies", icon: <Lightbulb className="w-4 h-4" />, tabs: ["insights", "outcomes", "godview", "second-opinion"] },
   { id: "planning", label: "Planning & rapportage", icon: <Kanban className="w-4 h-4" />, tabs: ["sprint", "dgm", "reporting", "files"] },
   { id: "instellingen", label: "Instellingen", icon: <Settings className="w-4 h-4" />, tabs: ["settings"] },
 ];
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: "Overzicht", campaigns: "Campagnes", forecast: "Prognose",
-  insights: "Analyseren", outcomes: "Bevindingen", "second-opinion": "Second opinion",
+  insights: "Analyseren", outcomes: "Bevindingen", godview: "God View", "second-opinion": "Second opinion",
   sprint: "Sprint", dgm: "Doelen & voortgang", reporting: "Rapporten", files: "Bestanden",
   settings: "Instellingen",
 };
@@ -478,7 +478,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                         titel="Prognose over alle kanalen"
                         bijschrift="De blended projectie richting het einde van de periode"
                       >
-                        <ChannelForecast clientId={client.id} channel="blended" />
+                        <ChannelForecast clientId={client.id} channel="blended" metGrafiek={false} />
                       </Sectie>
                       {/* Ontbrak hier: Google en Meta/LinkedIn hebben allebei al een
                           budgetscenario naast hun samenvatting (GoogleForecast resp.
@@ -491,6 +491,16 @@ export function ClientDashboard({ client }: { client: Client }) {
                         bijschrift="Over alle kanalen samen"
                       >
                         <ChannelBudgetScenario clientId={client.id} channel="blended" />
+                      </Sectie>
+                      {/* Maandgrafiek als eigen sectie ná de slider, zelfde volgorde als Google
+                          (ForecastTable) en Meta/LinkedIn (ChannelMonthlyTrend) -- layout-
+                          uniformering 22 augustus. */}
+                      <Sectie
+                        icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+                        titel="Volle maanden"
+                        bijschrift="Spend en acties (conv. + leads) per maand, run-rate-basis"
+                      >
+                        <ChannelMonthlyTrend clientId={client.id} channel="blended" />
                       </Sectie>
                       <CrossChannelView clientId={client.id} />
                     </>
@@ -516,6 +526,12 @@ export function ClientDashboard({ client }: { client: Client }) {
           {activeTab === "outcomes" && (
             <div className="space-y-6">
               <OutcomesTab clientId={client.id} />
+            </div>
+          )}
+
+          {activeTab === "godview" && (
+            <div className="space-y-6">
+              <GodViewTab clientId={client.id} />
             </div>
           )}
 
@@ -848,6 +864,35 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
   );
 }
 
+// Los eigen tabblad, niet langer een sectie boven in Bevindingen (feedback 22 augustus: "ik zou
+// god view uit de bevindingen halen ... en een eigen god view sub tablad geven op dezelfde hoogte
+// als analyse en bevindingen en voor second opinion. Dat is de logische plaats"). Bevindingen is
+// een uitkomst/inzicht over DEZE klant; God View is platform-/bureaubreed en had daar nooit
+// inhoudelijk bij gehoord -- het stond er alleen omdat er nog geen eigen plek was.
+function GodViewTab({ clientId }: { clientId: string }) {
+  const [demoModus, setDemoModus] = useState(false);
+  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
+
+  if (!demoModus) {
+    return (
+      <p className="rounded-lg border border-border bg-gray-50/70 px-3 py-2 text-body text-muted-foreground">
+        God View is platform-/bureaubreed en hoort normaal op Vandaag, niet op een klantpagina — hier
+        alleen zichtbaar in demo-modus.
+      </p>
+    );
+  }
+  return (
+    <Sectie
+      eerste
+      icoon={<Crown className="w-4.5 h-4.5 text-brand-blue-ink" />}
+      titel="Cross-account & God View (demo)"
+      bijschrift="Platform-/bureaubreed voorbeeld — hoort normaal op Vandaag, hier alleen zichtbaar in demo-modus"
+    >
+      <GodViewDemo />
+    </Sectie>
+  );
+}
+
 // De uitkomsten-laag, losgetrokken van het draaien van analyses zodat beide pagina's
 // behapbaar blijven: wachtrij, inzichten, aanbevelingen, hypotheses-workflows en taken,
 // met het kanaal-filter (standaard Alle) over alles heen.
@@ -855,11 +900,6 @@ function OutcomesTab({ clientId }: { clientId: string }) {
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [channelFilter, setChannelFilter] = useState<InsightChannel | null>(null);
-  // isDemoMode() leest window.location, dus in een effect en niet in de eerste render -- anders
-  // rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde reden als
-  // demoModus elders in dit bestand).
-  const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
 
   return (
     <div>
@@ -868,25 +908,6 @@ function OutcomesTab({ clientId }: { clientId: string }) {
         {/* Kanaal-filter over inzichten, aanbevelingen, hypotheses, wachtrij en taken. */}
         <ChannelFilter value={channelFilter} onChange={setChannelFilter} />
       </div>
-
-      {/* God View en cross-account (portfolio-synthese) zijn platform-/bureaubreed, geen
-          klant-eigen data -- ze horen normaal op /vandaag, niet op een klantpagina. Maar
-          "in het demo-account" is precies waar een demo-bezoeker ze wil kunnen laten zien zonder
-          eerst weg te navigeren. Zelfde componenten, zelfde statische demo-data
-          (lib/demo/god-view-demo.ts, GEEN echte sessie of LLM-aanroep nodig) als op
-          /vandaag?demo=1 -- puur hier ook ingesloten. Alleen in demo-modus: buiten demo is dit
-          geen klant-eigen data en hoort het hier niet te staan.
-          Verplaatst van Analyseren naar Bevindingen (feedbackronde 21 augustus): dit is een
-          uitkomst/inzicht, geen analyse die je zelf draait. */}
-      {demoModus && (
-        <Sectie
-          icoon={<Crown className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Cross-account & God View (demo)"
-          bijschrift="Platform-/bureaubreed voorbeeld — hoort normaal op Vandaag, hier alleen zichtbaar in demo-modus"
-        >
-          <GodViewDemo />
-        </Sectie>
-      )}
 
       {/* Wat op goedkeuring wacht staat vooraan: dat is het enige op deze pagina waar direct een
           handeling van jou op zit. De rest is lezen. */}

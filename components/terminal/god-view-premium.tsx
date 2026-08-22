@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Gem, ShieldAlert, ShieldQuestion, TrendingUp, AlertTriangle, Loader2 } from "lucide-react";
+import { Gem, ShieldAlert, ShieldQuestion, TrendingUp, AlertTriangle, Loader2, Filter } from "lucide-react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel } from "@/components/dashboard/data-table";
 import { CHURN_KLEUR } from "@/lib/branding/chart-colors";
 import { isDemoMode } from "@/lib/demo/demo-mode";
 import { DEMO_GOD_VIEW_CELLEN, DEMO_GOD_VIEW_CHURN_CELLEN } from "@/lib/demo/god-view-demo";
+import { BEDRIJFSMODELLEN, nichesPerGroep } from "@/lib/benchmark/segment";
 
 // ============================================================================
 // GOD VIEW PREMIUM: cross-agency benchmark + churn-concentratie
@@ -76,6 +77,13 @@ export function GodViewPremium() {
   const [ratio, setRatio] = useState<Antwoord<RatioCel> | null | undefined>(undefined);
   const [churn, setChurn] = useState<Antwoord<ChurnCel> | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  // Filter op wat er al binnen is: elke cel die de server teruggeeft heeft de k-anonimiteitsdrempel
+  // al gehaald (of staat als testmodus gelabeld) -- filteren hier laat dus nooit iets nieuws zien
+  // dat de server niet al vrijgaf, het toont alleen een subset van wat al mocht. Land/regio staat
+  // hier bewust niet bij: die dimensie zit nog niet in GodViewInvoerRij (lib/benchmark/god-view.ts),
+  // dus filteren erop zou een dimensie voorspiegelen die de aggregatie nog niet meet.
+  const [modelFilter, setModelFilter] = useState<string>("");
+  const [nicheFilter, setNicheFilter] = useState<string>("");
 
   useEffect(() => {
     if (isDemoMode()) {
@@ -110,8 +118,11 @@ export function GodViewPremium() {
   }
   if (!ratio || !churn) return null;
 
-  const deelbareRatioCellen = ratio.cellen.filter((c) => c.metrics !== null).sort((a, b) => b.accounts - a.accounts);
-  const deelbareChurnCellen = churn.cellen.filter((c) => c.churn !== null && (c.churn.rood + c.churn.amber) > 0);
+  const matchtFilter = (c: { model: string | null; niche: string | null }) =>
+    (!modelFilter || c.model === modelFilter) && (!nicheFilter || c.niche === nicheFilter);
+
+  const deelbareRatioCellen = ratio.cellen.filter((c) => c.metrics !== null && matchtFilter(c)).sort((a, b) => b.accounts - a.accounts);
+  const deelbareChurnCellen = churn.cellen.filter((c) => c.churn !== null && (c.churn.rood + c.churn.amber) > 0 && matchtFilter(c));
   const nietDeelbaar = ratio.stand.cellenTotaal === 0;
 
   return (
@@ -131,6 +142,48 @@ export function GodViewPremium() {
         platform is churnrisico geconcentreerd? Altijd geaggregeerd en anoniem — nooit een
         individueel bureau of account herleidbaar, gewaarborgd door {ratio.stand.bureausNodigVoorEersteCel === 1 ? "de testdrempel hieronder" : "een harde k-anonimiteitsdrempel"}.
       </p>
+
+      {!nietDeelbaar && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2.5">
+          <span className="flex items-center gap-1.5 text-meta font-medium text-indigo-200/80">
+            <Filter className="h-3.5 w-3.5" /> Filter
+          </span>
+          <label className="flex items-center gap-1.5 text-meta text-indigo-200/70">
+            Bedrijfsmodel
+            <select
+              value={modelFilter}
+              onChange={(e) => setModelFilter(e.target.value)}
+              className="rounded-md border border-white/15 bg-slate-900 px-2 py-1 text-body font-medium text-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            >
+              <option value="">Alle</option>
+              {BEDRIJFSMODELLEN.map((b) => <option key={b.waarde} value={b.waarde}>{b.label}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-meta text-indigo-200/70">
+            Branche/niche
+            <select
+              value={nicheFilter}
+              onChange={(e) => setNicheFilter(e.target.value)}
+              className="rounded-md border border-white/15 bg-slate-900 px-2 py-1 text-body font-medium text-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            >
+              <option value="">Alle</option>
+              {nichesPerGroep().map((g) => (
+                <optgroup key={g.groep} label={g.groep}>
+                  {g.opties.map((n) => <option key={n.waarde} value={n.waarde}>{n.label}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          {(modelFilter || nicheFilter) && (
+            <button
+              onClick={() => { setModelFilter(""); setNicheFilter(""); }}
+              className="text-meta text-indigo-300 hover:underline"
+            >
+              Filter wissen
+            </button>
+          )}
+        </div>
+      )}
 
       {(ratio.testMode || churn.testMode) && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
