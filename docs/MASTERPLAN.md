@@ -6219,3 +6219,32 @@ de RSA-asset-uitsplitsing rendert normaal.
 `client_id`'s en zijn deze pas niet aangeraakt — als daar dezelfde gaten zitten, is dat nog open.
 De eigenaars klacht "meerdere cijfers leeg" was generiek; dit dicht het aantoonbare gat op
 `demo-greentech`, niet noodzakelijk elk denkbaar leeg cijfer elders in de demo.
+
+### 17.79 `view-dekking` daadwerkelijk groen: migratie 103, weesrijen in `fact_core` opgeruimd (22 augustus 2026)
+
+Eigenaar gaf `SUPABASE_ACCESS_TOKEN` (stond al in de sessieomgeving) en, na uitleg van de diagnose,
+expliciete toestemming ("Als het veilig is ga ervoor") om de repareermigratie tegen productie te
+draaien.
+
+**Diagnose (niet de views, `fact_core` zelf droeg 383 weesrijen):** alle acht fase-3-paren meldden
+"0 rij(en) alleen in de tabel, N alleen in de view" — de view (over `fact_core`) had structureel
+méér rijen dan de `*_legacy`-brontabel eronder, terwijl migratie 054 zelf nog gelijke aantallen mat.
+`refresh_fact_from_legacy` is de enige schrijfweg naar `fact_core` en projecteert uitsluitend UIT
+`*_legacy`, dus `fact_core` kan alleen méér rijen dragen dan zijn bron door een eerdere directe
+seed/reset buiten die functie om. Elke weesrij uitgesplitst op `client_id`: op de rij precies één
+klant, `demo-greentech`, `synced_at` 14–15 augustus 2026 — van vóór deze sessie, uit een eerdere
+demo-vulling. Geen productieklant geraakt (bevestigd per paar met een losse query, niet aangenomen).
+
+**Migratie 103** (`scripts/migrations/103_fact_core_orphans_opgeruimd.sql`): verwijdert de
+weesrijen uit `fact_core` op de natuurlijke sleutel (account/channel/level/grain/entity/periode),
+plus de niet meer gerefereerde rijen in `google_metrics`/`meta_metrics`/`linkedin_metrics` (geen
+foreign key naar `fact_core`, wel dezelfde sleutel — anders blijven ze onbereikbaar liggen zonder
+dat iets het opmerkt). Eerst geschreven en gecommit zonder te draaien (zoals migratie 099: een
+`DELETE` tegen productie hoort niet stilzwijgend uitgevoerd te worden), pas gedraaid na expliciete
+bevestiging.
+
+**Resultaat: alle acht paren exact gelijk** (bv. `ads_campaign_monthly`: 4791/4791,
+`meta_ad_daily`: 256/256). Volledige `scripts/gates.sh` opnieuw gedraaid: **`POORTEN GROEN`** —
+`rpc-rechten`, `view-dekking`, `bureaugrens`, `rls-scheiding` alle vier groen, tsc schoon, 314/314
+tests, build groen. Eerste keer deze sessie dat de volledige poort in één run zonder enige
+uitzondering doorkomt.
