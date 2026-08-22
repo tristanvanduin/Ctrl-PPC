@@ -623,11 +623,18 @@ const clientFiles: Row[] = [
 const clientSettings: Row[] = [{
   client_id: CID,
   brand_guide: { brandName: "GreenTech", visual: { primaryColor: "#0B7A3B", accentColor: "#8BC34A", secondaryColor: "#0A3D2C", headingFont: "Gilroy, Ubuntu, sans-serif" } },
+  // 22 augustus 2026: deze drie misten `id` (en droegen afwijkende namen/edities/cadans dan de
+  // echte, doorgeseede database) -- lib/demo/event-forecaster.tsx's T-minus Forecaster leest de
+  // eventlijst via dbSelectOne (dus altijd de echte database, met id "demo-grt" etc.), maar
+  // app/api/analysis/event-pacing/route.ts zoekt datzelfde event op via supabaseForClient (in
+  // demo-modus dus deze mock) op `e.id === eventId`. Zonder `id` hier matchte dat nooit: de
+  // dropdown toonde "GreenTech Amsterdam", en de pagina eronder zei "Event demo-grt niet gevonden
+  // bij deze klant". Nu woordelijk gelijk aan wat de productiedatabase voor demo-greentech draagt.
   rai_events: {
     events: [
-      { abbrev: "GRT", cadence: "annual", editions: [{ date: "2025-08-25", label: "2025" }, { date: "2026-08-25", label: "2026" }] },
-      { abbrev: "GRA", cadence: "annual", editions: [{ date: "2025-09-15", label: "2025" }, { date: "2026-09-15", label: "2026" }] },
-      { abbrev: "GRN", cadence: "annual", editions: [{ date: "2025-10-06", label: "2025" }, { date: "2026-10-06", label: "2026" }] },
+      { id: "demo-grt", name: "GreenTech Amsterdam", abbrev: "GRT", cadence: "annual", editions: [{ date: "2026-06-11", label: "2026" }, { date: "2027-06-10", label: "2027" }] },
+      { id: "demo-gra", name: "GreenTech Americas", abbrev: "GRA", cadence: "annual", editions: [{ date: "2025-09-16", label: "2025" }, { date: "2026-09-15", label: "2026" }] },
+      { id: "demo-grn", name: "GreenTech North America", abbrev: "GRN", cadence: "custom", editions: [{ date: "2026-11-04", label: "2026" }] },
     ],
   },
   kpi_targets: { conversionsAbsolute: 700, revenueAbsolute: 90000, roasTarget: 4, cpaTarget: 60 },

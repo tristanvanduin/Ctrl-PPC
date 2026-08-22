@@ -6786,3 +6786,40 @@ zekerheid dan de twee fixes hierboven, dus hier alleen gemeld in plaats van aang
 
 `POORTEN GROEN`. Beide fixes live geverifieerd: `/auth/reset` toont nu exact dezelfde donkere
 kaart als `/login`; de "Wat je elke maand krijgt"-tekst is leesbaar zonder de kaart te overheersen.
+
+### 17.91 Brandbook tegen de code getoetst, en een vierde smaak van de split-brain-bug: T-minus Forecaster (22 augustus 2026)
+
+De gebruiker leverde `Ctrl PPC — Brandbook (werkdocument)` aan en vroeg dit te toetsen tegen zowel
+de marketingsite als de code.
+
+**Kleuren en typografie kloppen tot op de hex.** Alle hex-waarden in brandbook-sectie 3
+(kernpalet, licht/donker-semantische tokens, alle acht grafiekreeksen licht én donker) zijn
+letterlijk gecontroleerd tegen `app/globals.css` — geen enkele afwijking. Typografie (sectie 4)
+klopt met de status die het brandbook zelf al erkent: marketingsite laadt Plus Jakarta Sans +
+JetBrains Mono, dashboard laadt nog Ubuntu — een bekend, nog niet uitgevoerd migratiepunt, geen
+nieuwe bevinding.
+
+**Eén tegenstrijdigheid gemeld, niet gefixt op expliciet verzoek van de gebruiker**: het brandbook
+(sectie 2) stelt dat er nog geen logo is en beschrijft een creatief brief voor een externe
+designer, met de wordmark-tekst als tijdelijke oplossing (sectie 6.4). De code bevat echter al een
+volledig uitgewerkt icoon ("Blueprint v2.0" in `components/ui/logo.tsx`) dat overal live staat:
+dashboard-zijbalk, marketing-navbalk, en de browserfavicon (`app/icon.svg`, identieke SVG). Gemeld
+aan de gebruiker; antwoord: "Hou voor nu het huidige logo, logo wordt later aangepast" — geen
+codewijziging.
+
+**Bij het doorlopen van de rest van de klantpagina's (Prognose-tabblad) een vierde variant van de
+split-brain-bug gevonden.** De T-minus Forecaster toonde de banier "Event demo-grt niet gevonden
+bij deze klant" terwijl de dropdown ernaast gewoon "GreenTech Amsterdam" liet zien. Oorzaak:
+`components/dashboard/event-forecaster.tsx` leest de eventlijst via `dbSelectOne` (dus altijd de
+echte database, met `id: "demo-grt"`), maar `app/api/analysis/event-pacing/route.ts` zoekt
+hetzelfde event op via `supabaseForClient(clientId)` — in demo-modus dus de demo-mock — op
+`e.id === eventId`. De fixture in `lib/demo/demo-rows.ts` had voor deze drie events helemaal geen
+`id`-veld (alleen `abbrev`), en droeg bovendien afwijkende namen, edities en cadans dan wat de
+productiedatabase voor demo-greentech inmiddels draagt (nagerekend via de data-API: GRT-editie nu
+2026-06-11, niet de 2025-08-25 uit de fixture; GRN is "custom" met één editie, niet "annual" met
+twee). Fix: de fixture woordelijk gelijkgetrokken met wat de echte database nu bevat (id, naam,
+abbrev, cadans, edities).
+
+Live geverifieerd: het Prognose-tabblad toont nu de volledige T-minus Forecaster (spend/conversies/
+CPA-curves, "Ahead of Goal") in plaats van de foutbanier. `POORTEN GROEN` (314/314 tests, schone
+rebuild).
