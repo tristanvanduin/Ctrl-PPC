@@ -6026,3 +6026,97 @@ voor de meeste ook al als hersteld `.md`-bestand), alleen de specifieke historis
 
 **Resultaat, geverifieerd tegen live data**: 80 SOP-bestanden weer downloadbaar, 0 weesrijen over
 in `client_files` (dry-run erna: "0 van 80 rijen wijzen naar een niet-bestaand object").
+
+### 17.75 Grondige launch-readiness-check: poorten echt gedraaid, masterplan-audit, sync-pipeline-audit (22 augustus 2026)
+
+Eigenaar wil geen launching customer toelaten voordat de productvolwassenheid duidelijk is. Vier
+onderzoekssporen tegelijk: de vier DB-auth-poorten voor het eerst deze sessie ECHT gedraaid (met
+de sleutel van de eigenaar), twee agents die het hele masterplan doorzochten op tegenstrijdigheden,
+en een agent die de sync-pipeline (Google/Meta/LinkedIn) code-niveau doorlichtte op correctheid
+zonder live account.
+
+**De vier poorten, voor het eerst echt gedraaid (niet meer "sandbox faalt sowieso"):**
+- `rpc-rechten`: **GROEN.** Geen enkele muterende functie aanroepbaar door anon/authenticated.
+- `bureaugrens`: **GROEN.** Een proefgebruiker (performance_marketeer, bureau "Demo") mag bij zijn
+  eigen bureau, niet bij "Demo — Cross-account portfolio", en is niet per ongeluk platformbeheerder.
+- `view-dekking`: **ROOD**, maar bij nader onderzoek (zie hieronder) grotendeels onschuldig.
+- `rls-scheiding`: **overgeslagen** — vereist naast de service-role-sleutel ook een echte
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, die niet is meegegeven. Dit is de enige van de vier die nog
+  niet daadwerkelijk bevestigd is; zie "wat nog nodig is" hieronder.
+
+**`view-dekking` uitgezocht (agent, code-niveau, tegen de echte migratie-SQL)**: drie categorieën,
+geen van alle een echte productiebug voor een klant vandaag.
+1. *Meer rijen in de view dan in de `_legacy`-tabel* — verwacht gedrag: de `_legacy`-tabellen zijn
+   bevroren sinds migratie 054, de views lezen uit `fact_core`, die bij elke sync blijft groeien.
+2. *`roas` in de `_legacy`-tabel klopt niet met zijn eigen kolommen* — dezelfde, al eerder
+   gedocumenteerde klasse fout als migratie 047 (Google herrekent conversiewaarde met
+   terugwerkende kracht; de oude tabel is een verouderde momentopname, de view rekent elke keer
+   opnieuw en is aantoonbaar correct volgens zijn eigen formule).
+3. *`clicks_all` (Meta) en `conversion_value` (LinkedIn-creative) staan leeg in de bron maar als
+   `0` in de view* — de coalescing naar 0 gebeurt niet in de view maar al bij het schrijven naar
+   `fact_core` (migratie 054). Vandaag onschuldig: geen enkele component selecteert deze kolommen
+   voor weergave (geverifieerd met een grep over `components/` en `lib/`). Wél **breekbaar**: als
+   ooit iemand deze kolommen gaat tonen, faalt de vertrouwensdoctrine ("nooit een ontbrekende
+   meting als nul tonen") stilzwijgend, want de bescherming zit nergens vastgelegd, alleen toevallig
+   waar. Aanbeveling: een guard/comment bij de `fact_core`-insert, niet nu urgent.
+
+**Sync-pipeline-audit (agent, code-niveau, geen live account nodig) — de belangrijkste vondst van
+de hele check:**
+1. **Meta en LinkedIn's sync-code heeft nog NOOIT tegen een echt account gedraaid** — beide
+   bestanden dragen zelf `LIVE-ONGETEST` in hun kop. Bekend, al eerder vastgelegd.
+2. **Nieuw, kritiek: Meta en LinkedIn hebben geen equivalent van Google's fetch-failure-isolatie.**
+   Google's orchestrator (`recordFetchFailure`/`hasFetchFailure`, `lib/api/fetch-failures.ts`)
+   weigert expliciet te schrijven en markeert een dataset als mislukt als de onderliggende fetch
+   faalde. Meta (`lib/meta/sync.ts:88-139`) en LinkedIn (`lib/linkedin/sync.ts:103-165`) hebben dit
+   niet: een mislukte API-call of een mislukte upsert wordt gelogd en geeft `0`/`[]` terug — exact
+   dezelfde waarde als "dit account had gewoon niets om te syncen". Bij de eerste sync van een
+   echte klant is een kapotte Meta/LinkedIn-koppeling dus niet te onderscheiden van een leeg
+   account, en de sync rapporteert stilzwijgend "gelukt". Dit is de eerste concrete, bouwbare
+   aanbeveling uit deze sessie voor "op groen krijgen zonder een klant" — het patroon van Google
+   overnemen voor Meta en LinkedIn is code-werk, geen live-account-werk.
+3. **Currency**: Meta's account-valuta wordt wél opgehaald (`lib/api/meta-ads.ts:24-25,174-175`)
+   maar nergens opgeslagen; beide kanalen formatteren bedragen hardcoded als EUR
+   (`Intl.NumberFormat("nl-NL", {currency:"EUR"})`). Bij een niet-EUR-account zou het cijfer kloppen
+   maar het valutateken niet — misleidend, geen rekenfout.
+4. **LinkedIn-paginering** (`fetchAnalyticsPage`) is niet bevestigd volledig te lopen zoals Meta's
+   expliciete `while(next)`-lus; bij een venster met meer resultaten dan de paginagrootte is
+   afkapping niet uit te sluiten zonder live data. "Nader te verifiëren", geen bevestigde bug.
+5. Google's eigen OAuth-refresh-bij-mislukking-tijdens-sync en de volledige paginering van alle 24
+   GAQL-getters zijn niet binnen deze pas volledig getraceerd (3558 regels) — expliciet
+   "niet beoordeeld", niet "goedgekeurd".
+
+**Masterplan-tegenstrijdigheden-audit (twee agents, hele document)**: geen enkele bevinding wees op
+een structureel probleem — het document is ongewoon zelfcorrigerend. Confirmed, klein:
+- `middleware.ts`/`login/page.tsx` droegen nog letterlijk "LIVE-ONGETEST" in hun kopcommentaar
+  terwijl masterplan 15.7 allang een echte, geslaagde livetest tegen productie beschrijft — de
+  code was de enige plek die nog het oude verhaal vertelde. **Gefixt in deze ronde (`b74ce17`)**:
+  commentaar bijgewerkt, geen gedragswijziging.
+- Bevestigd, geen actie nodig: de RLS/auth-volgorde (`O1_AUTH_ENFORCED` → migratie 099) is overal
+  in het document consistent; twee eerder al bekende "overloaded fase-nummer"-gevallen (O1-auth
+  "fase 3" vs. multitenant-schema "fase 3"; nu ook EXECUTION_PLAN.md's eigen "Fase 1" vs.
+  masterplan's "Fase 1") zijn losstaand risico bij het naast elkaar lezen van de documenten, geen
+  actieve fout.
+- **Herbevestigd, nog steeds open**: de demo-data is verspreid over minstens drie/vier
+  bronnen (`lib/demo/demo-rows.ts`, `lib/demo/greentech-mock.ts`, `seed-demo-client.ts`, én — nieuw
+  ontdekt in deze sessie, zie hieronder — echte, rechtstreeks in de productiedatabase gezaaide
+  rijen voor `demo-greentech`) die elkaar kunnen tegenspreken. Dit is precies waarom "vul de
+  mockdata aan" niet zo simpel is als één bestand aanvullen.
+
+**Nieuwe architectuurvondst: de demo-data heeft een split-brain.** `dbSelect()`/`dbSelectOne()`
+(`lib/data-access/client-read.ts`) — de leeslaag die steeds meer componenten gebruiken sinds de
+O1-auth-migratie — gaat NOOIT door de client-side demo-mock (`lib/demo/mock-supabase.ts`); het is
+een `fetch` naar `/api/data/[table]`, een server-route die altijd de ECHTE database met de
+service-role-sleutel bevraagt, demo of niet. Componenten die nog rechtstreeks `supabase.from(...)`
+aanroepen (client-side) gaan WEL door de mock. Gevolg: voor tabellen als `ads_creative_performance`
+bepaalt niet `demo-rows.ts` wat een demo-bezoeker ziet, maar wat er letterlijk in de productie-
+database staat onder `client_id = 'demo-greentech'`. Bevestigd: die rijen bestaan al (5 creative-
+rijen, 5 RSA-assets), maar `google_ads_ad_meta` heeft er maar 1, `google_ads_image_assets` 0, en
+Shopping/Merchant Center-tabellen (`ads_product_performance_monthly`, `merchant_center_products`)
+hebben 0 rijen voor demo-greentech. **Consequentie voor "vul de mockdata aan"**: het bijvullen van
+`lib/demo/demo-rows.ts` alleen lost dit niet op voor de dbSelect-gelezen tabellen — de duurzame
+fix is de ECHTE database voor `demo-greentech` compleet zaaien, niet (alleen) het JS-bestand. Nog
+niet gebouwd deze ronde — wel de blokkerende aanname (JS-mock volstaat) weerlegd vóór er tijd in
+gaat.
+
+**Geverifieerd**: `scripts/gates.sh` op de comment-only fix — hygiëne schoon, `tsc` schoon,
+314/314 tests groen, `build` groen.
