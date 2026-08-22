@@ -6120,3 +6120,36 @@ gaat.
 
 **Geverifieerd**: `scripts/gates.sh` op de comment-only fix — hygiëne schoon, `tsc` schoon,
 314/314 tests groen, `build` groen.
+
+### 17.76 Meta/LinkedIn fetch-failure-isolatie gebouwd (22 augustus 2026)
+
+De hoogste-waarde aanbeveling uit 17.75's sync-pipeline-audit, direct opgepakt: Google's
+orchestrator weigert te schrijven en markeert een dataset expliciet mislukt als de onderliggende
+API-call faalde (`lib/api/fetch-failures.ts`); Meta en LinkedIn hadden dit niet. Een mislukte
+fetch of upsert gaf `0`/`[]` terug — dezelfde waarde als "dit account had niets". Bij de eerste
+sync van een echte klant was een kapotte koppeling dus niet te onderscheiden van een leeg
+account (`d4e9d18`):
+
+- `lib/api/fetch-failures.ts`: `recordFetchFailure` kreeg een optioneel `channel`-argument
+  (default `"google-ads"`, backwards compatible), zodat een Meta/LinkedIn-fout niet als
+  `[google-ads] ... faalde` in de logs staat.
+- `lib/meta/sync.ts`: `fetchInsightsAsync` noteert nu elke faalroute, inclusief een nieuwe:
+  de polling-timeout na 30 pogingen las voorheen stilzwijgend door naar de resultaat-pull alsof
+  het rapport klaar was. `syncMetaLevel`/`syncMetaDaily`/`syncMetaBackfill` geven nu
+  `{ rows, success, error? }` terug i.p.v. een kaal rijenaantal. Nog aan geen route gekoppeld
+  (gated op MDP-approval, `check-hygiene.mjs`'s `TOEGESTANE_WEZEN`) — wel klaar voor als dat
+  zover is, in plaats van dit er dan nog bij te moeten bouwen.
+- `lib/linkedin/sync.ts`: zelfde patroon voor `fetchAnalyticsPage`/`syncLinkedinLevel`/
+  `syncLinkedinDemographics`/`syncLinkedinDaily`/`syncLinkedinBackfill`.
+- `app/api/sync/linkedin/route.ts` (de enige kant die al gekoppeld is): leest de nieuwe vorm,
+  markeert `linkedin_sync_runs` als `"failed"` met een concrete foutmelding zodra één niveau/
+  chunk mislukte i.p.v. altijd `"completed"`, en geeft een 502 i.p.v. een misleidende 200 terug.
+  `linkedin_connections.status` blijft bewust `"active"` bij een sync-fout (de koppeling/token
+  werkte, alleen de data-fetch faalde deels) — geen nieuwe statuswaarde erbij die de rest van de
+  codebase niet kent.
+
+**Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
+groen. Geen enkele bestaande aanroeper gebroken: `syncMetaDaily`/`syncMetaBackfill`/
+`syncLinkedinDemographics` hebben nog geen enkele aanroeper (bevestigd met een grep over de hele
+repo), en `syncLinkedinDaily`/`syncLinkedinBackfill` se enige aanroeper (de LinkedIn-route) is in
+dezelfde commit meeveranderd.
