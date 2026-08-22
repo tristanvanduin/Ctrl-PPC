@@ -31,6 +31,7 @@ import { PmaxAssetCoverage } from "./pmax-asset-coverage";
 import { VideoPlacements } from "./video-placements";
 import { CampaignTable } from "./campaign-table";
 import { CreativePerformance } from "./creative-performance";
+import { CreativeDeepDive } from "./creative-deep-dive";
 import { SearchTermsTable } from "./search-terms-table";
 import { ForecastTable, ForecastSummaryTiles } from "./forecast-table";
 import { BudgetScenario } from "./budget-scenario";
@@ -359,9 +360,13 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
       <Sectie
         icoon={<Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="De advertenties zelf"
-        bijschrift="Hoe de creatives eruitzien en wat ze opleverden"
+        bijschrift="Hoe de creatives eruitzien, wat ze opleverden, en of ze vermoeid raken"
       >
         <CreativePerformance clientId={clientId} channel="google" />
+        {/* Vermoeidheid + asset-uitsplitsing verhuisd van Bevindingen hierheen (feedback 22
+            augustus): dit is waar je al naar de creatives zelf kijkt, dus hier hoort ook te staan
+            of ze verslijten -- niet op een aparte pagina, drie kaarten ver uit elkaar. */}
+        <CreativeDeepDive clientId={clientId} channel="google" />
       </Sectie>
       <Sectie
         icoon={<AlertTriangle className="w-4.5 h-4.5 text-brand-blue-ink" />}

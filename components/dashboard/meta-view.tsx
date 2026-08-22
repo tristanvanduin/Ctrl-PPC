@@ -5,6 +5,7 @@ import { Megaphone, Calendar, Sparkles, Target } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
+import { CreativeDeepDive } from "./creative-deep-dive";
 import { ChannelViewHeader } from "./channel-view-header";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
@@ -208,6 +209,9 @@ export function MetaCampagnes({ clientId }: { clientId: string }) {
         bijschrift="Creatives, hun prestaties en vermoeidheid"
       >
         <CreativePerformance clientId={clientId} channel="meta" />
+        {/* Verhuisd van Bevindingen hierheen (feedback 22 augustus): het bijschrift beloofde
+            "vermoeidheid" hier al, maar de kaart zelf stond drie tabbladen verderop. */}
+        <CreativeDeepDive clientId={clientId} channel="meta" />
       </Sectie>
     </div>
   );

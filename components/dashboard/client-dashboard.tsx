@@ -944,32 +944,27 @@ function OutcomesTab({ clientId }: { clientId: string }) {
         <ProposalQueue clientId={clientId} refreshKey={refreshKey} channel={channelFilter} onWorkflowChange={() => setRefreshKey((k) => k + 1)} />
       </Sectie>
 
+      {/* Inzichten direct na de wachtrij (feedback 22 augustus: "starten met wacht op je
+          oordeel, daaronder de inzichten"). Creative-vermoeidheid stond hier ook tot vandaag --
+          verplaatst naar "De advertenties zelf" op elk kanaal se Campagnes-tab (google-view.tsx/
+          meta-view.tsx/linkedin-view.tsx): dat is waar je al naar de creatives zelf kijkt, en een
+          materiële vermoeidheid landt sowieso al als eigen inzicht hieronder via de kanaal-
+          signalen -- een aparte, meestal-lege "geen materiële vermoeidheid"-tabel per kanaal,
+          drie kaarten ver uit elkaar, voegde daarnaast niets toe. InsightsBlock heeft al zijn
+          eigen koptekst ("Inzichten"), dus geen dubbele Sectie-chrome eromheen. */}
+      <InsightsBlock
+        clientId={clientId}
+        selectedInsightId={selectedInsightId}
+        onSelectInsight={setSelectedInsightId}
+        refreshKey={refreshKey}
+        channel={channelFilter}
+      />
+
       {/* Geen demo-gate, in tegenstelling tot het God View-blok hierboven: dit is de echte,
           niet-fictieve God View-laag, alleen (nog) vrijwel altijd insufficient_data bij minder
           dan 4 bureaus in het segment. ChannelGapCard rendert zichzelf weg (return null) zolang
           er niets deelbaars is -- geen "onvoldoende data"-ruis, gewoon stilte. */}
       <ChannelGapCard clientId={clientId} />
-
-      {/* Creative-vermoeidheid stond bij de analyses, maar er valt niets te draaien: het is een
-          aflezing van data die er al is, dus een bevinding. Hij volgt het kanaalfilter; op
-          "Alle" staan de kanalen naast elkaar en tonen alleen de kanalen die iets te zeggen
-          hebben zichzelf. */}
-      <Sectie
-        icoon={<Lightbulb className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Wat de analyses zien"
-        bijschrift="Creative-vermoeidheid per kanaal, en de inzichten die eruit volgen"
-      >
-        {(channelFilter === null ? (["google", "meta", "linkedin"] as const) : channelFilter === "cross" ? [] : [channelFilter]).map((c) => (
-          <CreativeDeepDive key={c} clientId={clientId} channel={c} />
-        ))}
-        <InsightsBlock
-          clientId={clientId}
-          selectedInsightId={selectedInsightId}
-          onSelectInsight={setSelectedInsightId}
-          refreshKey={refreshKey}
-          channel={channelFilter}
-        />
-      </Sectie>
 
       <Sectie
         icoon={<Kanban className="w-4.5 h-4.5 text-brand-blue-ink" />}
