@@ -18,12 +18,33 @@ import { StandaloneAnalyses } from "../insights/standalone-analyses";
 import { CreditBalanceBadge } from "../insights/credit-balance-badge";
 import { HypothesesBlock } from "../insights/hypotheses-block";
 import { ProposalQueue } from "../insights/proposal-queue";
-import { supabase } from "@/lib/supabase";
 import { ChannelFilter } from "../insights/channel-filter";
+import { dbSelect } from "@/lib/data-access/client-read";
 import {
   laadBeschikbareKanalen, zichtbareTabs, geldigeKeuze, geenDataTekst, kanalenOpsomming,
   type Kanaal,
 } from "@/lib/kanalen/beschikbaar";
+
+// laadBeschikbareKanalen() neemt structureel een client aan met .from(); de browser-singleton
+// (lib/supabase.ts) is dat in demo-modus de mock, en die herkent alleen client_id ===
+// "demo-greentech" als demo-klant -- de geo-klonen demo-grt/demo-gra/demo-grn (eigen rijen in
+// `accounts`, eigen doorgeseede data) vallen daarbuiten en kregen dus altijd [] terug: de banier
+// "nog geen data" bovenaan een klantpagina die eronder gewoon cijfers toonde (de rest van deze
+// pagina loopt al via dbSelect, dus altijd de echte database). Deze kleine adapter praat met
+// dezelfde /api/data-route als dbSelect, in plaats van met de mogelijk-gemockte singleton.
+const dbSelectAlsSupabase = {
+  from(tabel: string) {
+    return {
+      select(kolom: string) {
+        return {
+          eq(_kolom: string, waarde: string) {
+            return { limit: (n: number) => dbSelect(tabel, { select: kolom, clientId: waarde, limit: n }) };
+          },
+        };
+      },
+    };
+  },
+};
 import { MetaCreativeAnalyses } from "../insights/meta-creative-analyses";
 import { SignalAnalysisCard } from "./signal-analysis-card";
 import { CrossChannelAnalyses } from "./cross-channel-analyses";
@@ -205,8 +226,7 @@ export function ClientDashboard({ client }: { client: Client }) {
 
   useEffect(() => {
     let levend = true;
-    if (!supabase) { setKanalen([]); return; }
-    laadBeschikbareKanalen(supabase as never, client.id)
+    laadBeschikbareKanalen(dbSelectAlsSupabase, client.id)
       .then((k) => { if (levend) setKanalen(k); })
       .catch(() => { if (levend) setKanalen([]); });
     return () => { levend = false; };

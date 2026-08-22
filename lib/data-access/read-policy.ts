@@ -125,6 +125,20 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   meta_account_daily: { capability: "client:read", clientColumn: "client_id" },
   linkedin_account_daily: { capability: "client:read", clientColumn: "client_id" },
   blended_account_monthly: { capability: "client:read", clientColumn: "client_id" },
+
+  // 22 augustus 2026: lib/kanalen/beschikbaar.ts's laadBeschikbareKanalen() neemt structureel een
+  // client aan met .from() -- de meeste aanroepers geven de echte, service-role admin-client mee
+  // (server-side cron/analyse-routes), maar components/dashboard/client-dashboard.tsx gaf de
+  // browser-singleton mee, en dat is in demo-modus de demo-mock. De mock herkent alleen
+  // client_id === "demo-greentech" als demo-klant (isDemoClientValue in mock-supabase.ts) -- de
+  // geo-klonen demo-grt/demo-gra/demo-grn, die als eigen rijen in `accounts` bestaan met eigen
+  // doorgeseede data, vallen daarbuiten en kregen dus altijd [] terug. Zichtbaar op
+  // /client/demo-grt: de banier "Voor deze klant staat nog geen data in het systeem" bovenaan,
+  // terwijl de kaarten eronder (die al via dbSelect liepen) gewoon €62.760 omzet en 368 conversies
+  // toonden -- dezelfde pagina die zichzelf tegenspreekt. client-dashboard.tsx geeft nu een kleine
+  // dbSelect-adapter mee in plaats van de singleton; de functie zelf en haar server-side
+  // aanroepers blijven ongewijzigd.
+  ads_account_monthly: { capability: "client:read", clientColumn: "client_id" },
 };
 
 export function isReadableTable(table: string): boolean {

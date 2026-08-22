@@ -461,7 +461,10 @@ function PortfolioScoreboardBody() {
 
       {/* Quick stats on mobile (hero hides them) */}
       {activeCount > 0 && (
-        <div className="grid grid-cols-4 gap-3 lg:hidden">
+        // grid-cols-4 op een telefoonbreedte (~390px) knijpt "€ 230.130" en "€ 103.579" plat
+        // tegen de kaartrand -- vier kolommen passen pas comfortabel vanaf sm. Twee kolommen
+        // eronder, zelfde kaarten, gewoon twee rijen.
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:hidden">
           <SummaryCard label="Conversies" value={num(portfolioConv)} />
           <SummaryCard label="Omzet" value={fmt(portfolioRev)} />
           <SummaryCard label="Spend" value={fmt(portfolioSpend)} />

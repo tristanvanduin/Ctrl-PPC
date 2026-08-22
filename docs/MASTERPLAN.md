@@ -6688,3 +6688,62 @@ locale van de testomgeving (17.85) — niet opnieuw gemeld.
 
 `POORTEN GROEN`. Live geverifieerd: na de fix toont de kaart alleen nog de foutmelding, geen
 spinner ernaast.
+
+### 17.89 Mobiele weergave en een lege klant: een pagina die zichzelf tegenspreekt (22 augustus 2026)
+
+Vervolgvraag van de gebruiker: "kijk ook naar mobiele weergave en een lege klant." Een "lege
+klant" is er niet standaard binnen demo-greentech (elke geo-kloon is een campagnenaam-filter
+binnen dezelfde account, geen los account met eigen nul-staat) — maar de drie geo-klonen
+(demo-grt/gra/grn) bestaan ook als EIGEN rijen in `accounts`, met eigen doorgeseede productiedata,
+en zijn direct bereikbaar op `/client/demo-grt` (niet via de normale navigatie, die altijd naar
+`/client/demo-greentech?geo=GRT` linkt — wel bereikbaar voor wie de URL kent, bijv. via `/admin`).
+Dat bleek de "lege klant" te zijn die de moeite waard was.
+
+**Vondst — `/client/demo-grt` toonde zichzelf tegensprekend.** Bovenaan de pagina: "Voor deze
+klant staat nog geen data in het systeem." Direct eronder: €62.760 omzet, 368 conversies,
+€81.600 advertentiekosten, gevulde grafieken. Oorzaak: twee verschillende "is dit de demo-klant"-
+definities die het oneens zijn. `isDemoClientId` (`lib/demo/demo-mode.ts`, bepaalt of de sessie
+demo-modus aanzet) telt de geo-klonen mee; `isDemoClientValue` (`lib/demo/mock-supabase.ts`,
+bepaalt binnen de mock welke rijen "van de demo-klant" zijn) telt ALLEEN `demo-greentech`. Gevolg:
+zodra demo-modus aanstaat (via het pad, wél geo-kloon-bewust) en een component nog de rechtstreekse
+browser-`supabase`-singleton gebruikt in plaats van `dbSelect`, ziet die singleton de mock, en de
+mock geeft voor `client_id=demo-grt` altijd `[]` terug — nul rijen, niet "geen toegang". Precies dit
+trof `lib/kanalen/beschikbaar.ts`'s `laadBeschikbareKanalen()` (bepaalt welke kanaal-tabs en dus
+welke bovenste banier getoond worden), aangeroepen vanuit `client-dashboard.tsx` met de
+singleton — terwijl de kaarten eronder allang via `dbSelect` liepen (dus altijd de echte
+database) en daardoor gewoon de echte, voor demo-grt doorgeseede cijfers toonden.
+
+**Fix**: niet de gedeelde `laadBeschikbareKanalen()` zelf aangepast — die wordt ook server-side
+aangeroepen (cron/analyse-routes) met de echte service-role-client, waar dit probleem niet
+bestaat. In plaats daarvan geeft `client-dashboard.tsx` nu een kleine adapter mee die dezelfde
+`/api/data`-route als `dbSelect` aanspreekt, in plaats van de mogelijk-gemockte singleton.
+`ads_account_monthly` toegevoegd aan `READABLE_TABLES` (de twee andere kanaaltabellen stonden er
+al). Live geverifieerd: de banier is weg, de kanaalkiezer toont correct alleen "Google" (het enige
+kanaal met data voor GRT), en "Waar komt het vandaan" (die eerder ook "Geen locatiedata
+beschikbaar" zei om dezelfde reden) toont nu "Al het verkeer... uit Nederland."
+
+**Mobiel (390×844, iPhone-breedte) doorgelopen: dashboard, Vandaag, Portfolio, marketing-
+homepage.** Twee dingen gevonden:
+
+1. **Portfolio's KPI-kaartrij (`components/portfolio/portfolio-scoreboard.tsx`) knalde vast op
+   een telefoonbreedte.** Een onvoorwaardelijke `grid-cols-4` (alleen `lg:hidden`, dus actief op
+   ELKE breedte onder `lg`, niet alleen tablet) perste "€ 230.130" en "€ 103.579" in kaartjes van
+   ~90px breed — de bedragen liepen letterlijk tegen de kaartrand, terwijl de rest van de pagina
+   ruim binnen de 390px paste. Fix: `grid-cols-2 sm:grid-cols-4` — twee kolommen op telefoon,
+   vier vanaf tablet, dezelfde kaarten.
+2. **De kanaaltabs op een klantpagina wrappen ongelijk** ("Prestaties" + "Analyse & advies" op
+   regel 1, "Planning & rapportage" alleen op regel 2, "Instellingen" alleen op regel 3) — een
+   `flex-wrap`-pillnav die op smalle breedte geen nette rijverdeling oplevert. Functioneel
+   werkt dit gewoon (alles zichtbaar, leesbaar, klikbaar) en is een bekend, veelgebruikt patroon;
+   dit is een cosmetische kanttekening, geen fix — een herontwerp (bijv. een vast 2×2-grid of
+   horizontaal scrollende tabbalk) is een ontwerpkeuze die niet zomaar te raden is, dus hier
+   alleen genoteerd in plaats van gegokt.
+
+**Retractie**: de Cross-channel-tabel op mobiel leek af te snijden na "Klikken" (Conversies,
+Conv.waarde, CPA niet zichtbaar) — gemeten of dit een bug was door de daadwerkelijke
+scrollbreedte op te vragen (`scrollWidth: 553` vs `clientWidth: 300`): de tabel zit terecht in
+`overflow-x-auto` (hetzelfde patroon als het al eerder geretraceerde kanban-bord) en is gewoon
+horizontaal te swipen. Geen fix.
+
+`POORTEN GROEN` (314/314 tests, schone rebuild). Beide fixes live geverifieerd op zowel desktop-
+als mobiele viewport.
