@@ -6153,3 +6153,27 @@ groen. Geen enkele bestaande aanroeper gebroken: `syncMetaDaily`/`syncMetaBackfi
 `syncLinkedinDemographics` hebben nog geen enkele aanroeper (bevestigd met een grep over de hele
 repo), en `syncLinkedinDaily`/`syncLinkedinBackfill` se enige aanroeper (de LinkedIn-route) is in
 dezelfde commit meeveranderd.
+
+### 17.77 Vierde en laatste poort: `rls-scheiding` echt bevestigd (22 augustus 2026)
+
+Eigenaar gaf de echte `NEXT_PUBLIC_SUPABASE_ANON_KEY` — het enige dat nog ontbrak om deze poort
+(die naast de service-role-sleutel ook een echte anon-sessie nodig heeft) voor het eerst echt te
+draaien. Eén obstakel onderweg: een test-gebruiker van een eerdere, nooit voltooide poging
+(`rls-a@voorbeeld.invalid`) blokkeerde het aanmaken van een verse — opgeruimd via de admin-API
+(precies het wegwerpgebruikers-patroon dat het script zelf hoort te doen), daarna schoon gedraaid.
+
+**Resultaat: GROEN.**
+- Bureau A ("Demo") ziet precies zijn eigen 1 account, bureau B ("Demo — Cross-account
+  portfolio") precies zijn eigen 3 — geen overlap, geen lek.
+- A ziet zijn eigen 2.258 `fact_core`-rijen, B zijn eigen 155 — geen van beide ziet de ander se
+  rijen.
+- Zonder sessie: 0 rijen op alle drie de checks (http 200, niet een fout — een lege, geen
+  verboden, respons).
+- De al bekende, bewuste "LET OP"-waarschuwing staat er nog (de acht legacy-views lezen nog om
+  RLS heen, met opzet, tot `O1_AUTH_ENFORCED` staat) — dat is geen falen van deze poort, dat is
+  precies wat het scriptcommentaar al zei te verwachten.
+
+**Hiermee zijn alle vier de DB-auth-poorten deze sessie minstens één keer echt, tegen productie,
+bevestigd groen/consistent** (`rpc-rechten`, `bureaugrens`, `view-dekking` — rood maar uitgezocht
+en onschuldig bevonden, `rls-scheiding`). Geen enkele van de vier was hiervoor ooit in deze sessie
+verder gekomen dan "faalt sowieso door sandbox-placeholders".
