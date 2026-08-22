@@ -187,8 +187,11 @@ export function GoogleView({
                 state={geo}
                 verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
               />
-              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
+              {/* 22 augustus 2026: ranglijst boven de staafdiagram -- "Conversies per land" is de
+                  vraag die bij deze kaart hoort te openen, de maandtrend is de achtergrondinfo
+                  erna. Bewust alleen de volgorde geruild, geen andere aanpassing hier. */}
               <GeoRanglijstCard state={geo} />
+              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
             </div>
           </div>
 

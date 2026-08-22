@@ -6292,3 +6292,43 @@ herstart met de echte credentials, Playwright naar `demo-greentech` → Prognose
 (bv. jan 171 verwacht/90 gerealiseerd/53%, mrt 200/341/171%) — aantoonbaar andere cijfers dan
 Google alleen. Rechtstreekse curl-test op de nieuwe route bevestigt reële, opgetelde
 meerjarige data terug (2024 t/m 2026).
+
+### 17.81 Rechterkolom Google-opener: ranglijst boven de maandgrafiek, plus visuele controleronde (22 augustus 2026)
+
+Feedback: op de Google Overzicht-opener ("Hele account" → Google Ads) stond in de rechterkolom
+`GeoMapCard` → `MonthlyTrendBars` ("Conversies per maand") → `GeoRanglijstCard` ("Conversies per
+land"). De ranglijst hoort bij de kaart boven hem — "waar" en "wie is de grootste" — en de
+maandtrend is achtergrondinfo erna, niet andersom. In `components/dashboard/google-view.tsx`
+(rechterkolom van de 2x2-opener, 17.41) de twee cards geruild: nu kaart → ranglijst → maandgrafiek.
+Puur een volgorde-wissel, geen andere aanpassing aan een van beide componenten. Alleen dit ene
+scherm heeft deze combinatie — Meta/LinkedIn's opener (`meta-view.tsx`/`linkedin-view.tsx`) heeft
+geen `MonthlyTrendBars` naast `GeoRanglijstCard`, dus daar was niets te ruilen.
+
+**Visuele controleronde erbij**, op verzoek (build + `next start -p 3190`, Playwright/Chromium
+1440×900, demo-greentech, licht én donker): Overzicht (alle kanalen), Campagnes (alle kanalen,
+Google-specifiek, Meta, LinkedIn), Prognose (alle kanalen — de nieuwe 17.80-tabel — en Google),
+Analyse & advies, Planning & rapportage (Sprintbord), Instellingen, de beursoverzicht-pagina
+(GreenTech Amsterdam, geo-clone), Portfolio en Klantoverzicht. Geen overige gebreken gevonden — de
+ranglijst/maandgrafiek-swap past zonder gat of overlap in beide kolomhoogtes (de linkerkolom blijft
+langer, zoals bedoeld sinds 17.41), en donkere modus heeft nergens laag contrast of een niet-
+omgekleurd vlak buiten de bewust witte Google-zoekadvertentie-preview (`creative-performance.tsx`,
+met eigen toelichting waarom die licht blijft). Eén observatie die GEEN bug is, dus niet aangepast:
+de Meta/LinkedIn-creativethumbnails (`picsum.photos`-URLs in de demo-fixtures) laadden niet in deze
+sessie — de headless Chromium hier heeft geen proxy-configuratie en dus geen internetroute, terwijl
+`curl` (die de proxy-env wel gebruikt) dezelfde URL gewoon 302't. Productie en een gewone browser
+raken dat pad niet; geen code-wijziging.
+
+**Niet in scope, wel genoteerd voor productbeslissing**: de eigenaar had eerder de video/CPA-
+grafieken bij "Waar het budget landt" als "levenloos" bestempeld met de wens voor een YouTube-
+video-preview naast een placements-tabel. Dat blok bestaat vandaag als `VideoPerformance`
+(`components/dashboard/video-performance.tsx`) + `VideoPlacements`
+(`components/dashboard/video-placements.tsx`), samen ingeladen in
+`components/dashboard/google-view.tsx` regel 237–244 (sectie "Waar het budget landt", onder
+Video en placements — alléén zichtbaar bij niet-geo-clone accounts met videocampagnes). Dat is het
+concrete aangrijpingspunt voor een eventuele redesign; hier bewust niet aangepakt omdat het een
+eigen ontwerpvraag is (welke maat een "levende" preview toont, hoe de tabel ernaast moet ogen) die
+niet stilzwijgend hoort mee te liften op een kaartvolgorde-fix.
+
+`POORTEN GROEN` (tsc/tests/build). `check-kaartoverloop.mjs` los gedraaid tegen een verse build +
+`next start -p 3190` (geen server eronder): alle vijf kaarten OK, zelftest bevestigt dat de
+detector de bekende 17.34-regressie nog steeds vindt.
