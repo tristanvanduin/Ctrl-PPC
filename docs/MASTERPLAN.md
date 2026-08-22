@@ -6747,3 +6747,42 @@ horizontaal te swipen. Geen fix.
 
 `POORTEN GROEN` (314/314 tests, schone rebuild). Beide fixes live geverifieerd op zowel desktop-
 als mobiele viewport.
+
+### 17.90 Marketingsite verder doorgelicht: een thema-breuk en tekst die te licht was om te lezen (22 augustus 2026)
+
+Vervolg op eerdere rondes — nu de nog niet bekeken marketingpagina's: /demo, /login, /auth/reset,
+/vs (compare), /pricing, /faq, /how-it-works, de blogindex en een individuele blogpost.
+
+**Vondst 1 — `/auth/reset` (het "nieuw wachtwoord instellen"-scherm na de resetmail) had een
+volledig andere theming dan de rest van de site.** Elke andere marketingpagina, inclusief de
+buurpagina `/login`, is donker (`bg-midnight-slate-raised`, `text-off-white`, de `#818cf8`-
+accentkleur). `/auth/reset` gebruikte losse, hardgecodeerde lichte `gray-*`-klassen
+(`bg-gray-50`, `text-gray-900`, een zwarte knop) — een compleet ander kleurenpalet. Wie op
+"wachtwoord vergeten" klikt op de donkere loginpagina en via de mail hier terechtkomt, landt op
+een pagina die eruitziet als een ander, onafgemaakt product. Fix: dezelfde donkere klassen als
+`login/page.tsx`, exact overgenomen (inclusief de "klaar"-staat na het opslaan).
+
+**Vondst 2 — de "Wat je elke maand krijgt"-tekst op /how-it-works was praktisch onleesbaar.** De
+kaart "The deliverable: structured per channel, one document" toonde haar kernpunten
+(`Know exactly why a Search or PMax metric moved...`) op `text-off-white/25`, en de afsluitende
+zin op `/20` — ruim onder elk redelijk contrastniveau, en opvallend lager dan de rest van
+hetzelfde component (dat elders `/40`-`/50` gebruikt voor vergelijkbare bijschriften, bijv. de
+Impact/Action-labels in de "Priority"-kaart eronder). Het las als achtergronddecoratie, niet als
+de inhoud die de kaart juist moest verkopen. Fix: de puntenlijst naar `/60`, de afsluitzin naar
+`/40` — dezelfde "leesbaar maar secundair"-laag die dit component zelf al elders gebruikt, geen
+nieuwe waarde verzonnen.
+
+**Verder schoon.** /demo, /faq, /vs en de blogindex zijn consistent Engels, donker getheemd,
+zonder gebreken. Een individuele blogpost rendert correct; het kleurverschil tussen de twee
+soorten "Related reading"-links (blauw voor interne productpagina's, gedimd wit voor andere
+blogposts) bleek bij het lezen van de bron een bewuste, aparte stijllaag per linktype — geen bug.
+
+**Niet-fix, wel genoteerd**: het login- en reset-formulier zijn Nederlands terwijl de rest van de
+marketingsite Engels is (nav, pricing, FAQ, compare, blog — allemaal Engels). Gegeven dat de
+marketingsite kennelijk bewust Engelstalig is voor een breder/internationaal publiek terwijl de
+daadwerkelijke gebruikers (uitgenodigde teamleden van een Nederlandse beursbureau-doelgroep) na
+het inloggen alleen Nederlands te zien krijgen, is dit vermoedelijk opzet en geen bug — met minder
+zekerheid dan de twee fixes hierboven, dus hier alleen gemeld in plaats van aangepast.
+
+`POORTEN GROEN`. Beide fixes live geverifieerd: `/auth/reset` toont nu exact dezelfde donkere
+kaart als `/login`; de "Wat je elke maand krijgt"-tekst is leesbaar zonder de kaart te overheersen.

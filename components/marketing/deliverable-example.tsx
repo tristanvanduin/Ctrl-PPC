@@ -159,10 +159,10 @@ export function DeliverableExample() {
           </p>
           <ul className="mt-2 space-y-1">
             {actief.outcomes.map((o) => (
-              <li key={o} className="text-[11px] leading-relaxed text-off-white/25">{o}</li>
+              <li key={o} className="text-[11px] leading-relaxed text-off-white/60">{o}</li>
             ))}
           </ul>
-          <p className="mt-2 text-[10px] leading-relaxed text-off-white/20">
+          <p className="mt-2 text-[10px] leading-relaxed text-off-white/40">
             Every channel's reasoning ends in hypothesis validation, and every finding clears the same quality gates before it reaches you.
           </p>
         </div>

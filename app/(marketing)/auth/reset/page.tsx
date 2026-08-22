@@ -39,26 +39,31 @@ export default function ResetPage() {
     setKlaar(true);
   }
 
+  // Zelfde donkere marketing-theming als login/page.tsx (bg-midnight-slate-raised, text-off-white,
+  // de #818cf8-accent) -- deze pagina gebruikte tot 22 augustus 2026 een losse set lichte
+  // gray-*-klassen, terwijl elke andere pagina op de marketingsite (inclusief de loginpagina
+  // ernaast) donker is. Wie op "wachtwoord vergeten" klikt en via de mail hier landt, kwam zo op
+  // een pagina die eruitzag alsof hij een ander, onafgemaakt product had geopend.
   if (klaar) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-card p-6 shadow-sm">
-          <h1 className="mb-2 text-lg font-semibold text-gray-900">Wachtwoord ingesteld</h1>
-          <p className="mb-4 text-sm text-gray-600">Je kunt nu inloggen met je nieuwe wachtwoord.</p>
-          <a href="/login" className="text-sm font-medium text-gray-900 underline">Naar inloggen</a>
+      <div className="flex min-h-[calc(100vh-73px)] items-center justify-center px-4">
+        <div className="w-full max-w-sm rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6">
+          <h1 className="mb-2 text-lg font-semibold text-off-white">Wachtwoord ingesteld</h1>
+          <p className="mb-4 text-sm text-off-white/50">Je kunt nu inloggen met je nieuwe wachtwoord.</p>
+          <a href="/login" className="text-sm font-medium text-off-white underline hover:text-off-white/80">Naar inloggen</a>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-card p-6 shadow-sm">
-        <h1 className="mb-1 text-lg font-semibold text-gray-900">Nieuw wachtwoord</h1>
-        <p className="mb-5 text-sm text-gray-500">Ingesteld via de link uit je mail.</p>
+    <div className="flex min-h-[calc(100vh-73px)] items-center justify-center px-4">
+      <div className="w-full max-w-sm rounded-[6px] border border-off-white/10 bg-midnight-slate-raised p-6">
+        <h1 className="mb-1 text-lg font-semibold text-off-white">Nieuw wachtwoord</h1>
+        <p className="mb-5 text-sm text-off-white/50">Ingesteld via de link uit je mail.</p>
         <form onSubmit={opslaan} className="space-y-4">
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="mb-1 block text-sm font-medium text-off-white/70">
               Nieuw wachtwoord
             </label>
             <input
@@ -67,11 +72,11 @@ export default function ResetPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-[6px] border border-off-white/15 bg-midnight-slate px-3 py-2 text-sm text-off-white focus:border-neon-indigo focus:outline-none"
             />
           </div>
           <div>
-            <label htmlFor="herhaal" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="herhaal" className="mb-1 block text-sm font-medium text-off-white/70">
               Herhaal wachtwoord
             </label>
             <input
@@ -80,14 +85,15 @@ export default function ResetPage() {
               required
               value={herhaal}
               onChange={(e) => setHerhaal(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-[6px] border border-off-white/15 bg-midnight-slate px-3 py-2 text-sm text-off-white focus:border-neon-indigo focus:outline-none"
             />
           </div>
-          {melding && <p className="text-sm text-red-600">{melding}</p>}
+          {melding && <p className="text-sm text-amber-waste">{melding}</p>}
           <button
             type="submit"
             disabled={bezig}
-            className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
+            className="w-full rounded-[6px] px-3 py-2 text-sm font-medium text-midnight-slate disabled:opacity-60"
+            style={{ backgroundColor: "#818cf8" }}
           >
             {bezig ? "Bezig..." : "Opslaan"}
           </button>
