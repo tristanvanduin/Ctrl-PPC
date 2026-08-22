@@ -133,20 +133,51 @@ export async function POST(request: NextRequest) {
     };
 
     const endDate = lastCompleteMonthEnd();
-    const rowsUpserted =
-      scope === "backfill"
-        ? { backfill: await syncLinkedinBackfill(ctx, endDate, entitiesByLevel) }
-        : await syncLinkedinDaily(ctx, endDate, entitiesByLevel);
+
+    // De sync geeft nu per niveau/chunk expliciet succes of mislukking terug (voorheen alleen
+    // een rijenaantal -- 0 rijen door een lege periode en 0 rijen door een mislukte fetch/upsert
+    // zagen er identiek uit, dus een kapotte koppeling rapporteerde stilzwijgend "voltooid" met
+    // niets gesynct). Eén mislukt niveau/chunk is genoeg om de hele run als mislukt te markeren:
+    // een halve sync die zichzelf "completed" noemt is gevaarlijker dan een duidelijke fout.
+    let rowsUpserted: unknown;
+    let failed: string[] = [];
+    if (scope === "backfill") {
+      const outcome = await syncLinkedinBackfill(ctx, endDate, entitiesByLevel);
+      rowsUpserted = { backfill: outcome.rows };
+      failed = outcome.failedChunks;
+    } else {
+      const outcome = await syncLinkedinDaily(ctx, endDate, entitiesByLevel);
+      rowsUpserted = Object.fromEntries(Object.entries(outcome).map(([level, o]) => [level, o.rows]));
+      failed = Object.entries(outcome).filter(([, o]) => !o.success).map(([level, o]) => `${level}: ${o.error ?? "onbekende fout"}`);
+    }
+    const success = failed.length === 0;
 
     if (runId) {
       await supabase.from("linkedin_sync_runs").update({
         finished_at: new Date().toISOString(),
-        status: "completed",
+        status: success ? "completed" : "failed",
         rows_upserted: rowsUpserted,
+        ...(success ? {} : { error: `ophalen/schrijven mislukt: ${failed.join("; ")}` }),
       }).eq("id", runId);
     }
-    await supabase.from("linkedin_connections").update({ last_sync_at: new Date().toISOString(), status: "active", last_error: null, updated_at: new Date().toISOString() }).eq("client_id", clientId);
+    // status blijft "active": de koppeling/token werkte (anders was getAccessToken hierboven al
+    // gestopt) -- alleen de analytics-fetch faalde deels. Dat is een sync-uitkomst
+    // (linkedin_sync_runs.status hierboven), geen connectieprobleem; "error" is hier bewust geen
+    // nieuwe statuswaarde, want de rest van de codebase kent alleen "active"/"expired".
+    await supabase.from("linkedin_connections").update({
+      last_sync_at: new Date().toISOString(),
+      status: "active",
+      last_error: success ? null : failed.join("; "),
+      updated_at: new Date().toISOString(),
+    }).eq("client_id", clientId);
 
+    if (!success) {
+      return Response.json({
+        ok: false, client_id: clientId, scope,
+        entities: { campaigns: campaignUrns.length, creatives: creativeUrns.length },
+        rows_upserted: rowsUpserted, failed,
+      }, { status: 502 });
+    }
     return Response.json({ ok: true, client_id: clientId, scope, entities: { campaigns: campaignUrns.length, creatives: creativeUrns.length }, rows_upserted: rowsUpserted });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync mislukt";

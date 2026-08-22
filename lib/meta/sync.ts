@@ -19,6 +19,7 @@ import { trailingWindow, backfillWindow, monthlyChunks } from "./sync-windows";
 import { logger } from "@/lib/logger";
 import { META_GRAPH_BASE } from "./api-version";
 import { schrijftabel } from "@/lib/data-access/feitentabellen";
+import { recordFetchFailure, withFetchFailures, hasFetchFailure } from "@/lib/api/fetch-failures";
 
 // De versie staat in lib/meta/api-version.ts, zodat hij niet opnieuw uit de pas kan lopen met
 // het koppelscherm. Blijft hier herge-exporteerd voor bestaande importeurs.
@@ -75,6 +76,10 @@ export async function fetchInsightsAsync(
   ctx: SyncContext,
   opts: { level: MetaLevel; since: string; until: string; breakdowns?: string }
 ): Promise<MetaInsightsRow[]> {
+  // Bron-naam per niveau, niet één "fetchInsightsAsync" voor alle vier: syncMetaLevel moet per
+  // niveau kunnen zien of ZIJN ophaal mislukte, anders trekt een mislukte account-pull ook de
+  // (misschien wel geslaagde) campaign/adset/ad-pulls mee als "onbetrouwbaar".
+  const source = `meta:${opts.level}`;
   const params = new URLSearchParams({
     level: opts.level,
     time_increment: "1",
@@ -87,20 +92,28 @@ export async function fetchInsightsAsync(
   const createRes = await fetch(`${GRAPH}/${ctx.accountId}/insights`, { method: "POST", body: params });
   const created = (await createRes.json()) as { report_run_id?: string; error?: { message?: string } };
   if (!created.report_run_id) {
-    log.error("Geen report_run_id van Meta:", created.error?.message ?? "onbekend");
+    recordFetchFailure(source, created.error?.message ?? "geen report_run_id van Meta", "meta");
     return [];
   }
 
   // Poll tot het rapport klaar is (max een redelijk aantal pogingen).
+  let completed = false;
   for (let attempt = 0; attempt < 30; attempt++) {
     await new Promise((r) => setTimeout(r, 2000));
     const statusRes = await fetch(`${GRAPH}/${created.report_run_id}?access_token=${ctx.accessToken}`);
     const status = (await statusRes.json()) as { async_status?: string; async_percent_completion?: number };
-    if (status.async_status === "Job Completed") break;
+    if (status.async_status === "Job Completed") { completed = true; break; }
     if (status.async_status === "Job Failed") {
-      log.error("Meta insights-job faalde voor", opts.level, opts.since, opts.until);
+      recordFetchFailure(source, `Meta insights-job faalde voor ${opts.level} ${opts.since}..${opts.until}`, "meta");
       return [];
     }
+  }
+  // Alle 30 pogingen op, nooit "Job Completed" of "Job Failed" gezien: dit las voorheen gewoon
+  // door naar de resultaat-pull, met een (mogelijk halfklaar) rapport als bron -- een timeout is
+  // geen bevestigde leegte, dus telt hier ook als mislukt in plaats van als stilzwijgend "klaar".
+  if (!completed) {
+    recordFetchFailure(source, `polling voor ${opts.level} ${opts.since}..${opts.until} timed out na 30 pogingen`, "meta");
+    return [];
   }
 
   // Haal de resultaten op met paginatie.
@@ -125,38 +138,66 @@ function dedupeByKey(rows: Record<string, unknown>[], keyFields: string[]): Reco
   return [...seen.values()];
 }
 
-// Synct een niveau voor een venster: pull, map, dedupe, upsert. Geeft het aantal rijen terug.
-export async function syncMetaLevel(ctx: SyncContext, level: MetaLevel, since: string, until: string): Promise<number> {
+/** Resultaat van één niveau/venster: expliciet succes/mislukking, niet alleen een rijenaantal --
+ *  0 rijen door een lege periode en 0 rijen door een mislukte fetch/upsert zagen er voorheen
+ *  identiek uit. */
+export interface MetaSyncOutcome {
+  rows: number;
+  success: boolean;
+  error?: string;
+}
+
+// Synct een niveau voor een venster: pull, map, dedupe, upsert.
+export async function syncMetaLevel(ctx: SyncContext, level: MetaLevel, since: string, until: string): Promise<MetaSyncOutcome> {
   const insights = await fetchInsightsAsync(ctx, { level, since, until });
+  // De fetch zelf noteert zijn eigen mislukking (zie fetchInsightsAsync); hier alleen uitlezen.
+  // Zonder deze check leest "insights is leeg" altijd als "niets te syncen", ook wanneer de
+  // fetch juist daarom leeg was.
+  if (hasFetchFailure(`meta:${level}`)) {
+    return { rows: 0, success: false, error: `ophalen mislukt voor ${level}` };
+  }
   const dbRows = insights.map((r) => metaDailyToDbRow(mapInsightsRow(r), ctx.clientId, { includeRankings: level === "ad" }));
   const deduped = dedupeByKey(dbRows, ["client_id", "date", "entity_id"]);
-  if (deduped.length === 0) return 0;
+  if (deduped.length === 0) return { rows: 0, success: true };
   const { error } = await ctx.supabase.from(LEVEL_TABLE[level]).upsert(deduped, { onConflict: META_DAILY_CONFLICT, ignoreDuplicates: false });
   if (error) {
+    recordFetchFailure(`meta:${level}:upsert`, error.message, "meta");
     log.error("Upsert mislukt voor", level, error.message);
-    return 0;
+    return { rows: 0, success: false, error: error.message };
   }
-  return deduped.length;
+  return { rows: deduped.length, success: true };
 }
 
 // Daily incremental: alle vier de niveaus over het 28-daagse trailing venster (attributie-herstatement).
-export async function syncMetaDaily(ctx: SyncContext, endDate: string): Promise<Record<MetaLevel, number>> {
-  const { since, until } = trailingWindow(endDate, 28);
-  const result = {} as Record<MetaLevel, number>;
-  for (const level of ["account", "campaign", "adset", "ad"] as MetaLevel[]) {
-    result[level] = await syncMetaLevel(ctx, level, since, until);
-  }
+// Draait binnen een eigen ophaal-fout-verzamelaar (zelfde patroon als de Google-orchestrator,
+// lib/sync/orchestrator.ts): twee gelijktijdige syncs voor verschillende klanten lopen elkaar zo
+// niet voor de voeten.
+export async function syncMetaDaily(ctx: SyncContext, endDate: string): Promise<Record<MetaLevel, MetaSyncOutcome>> {
+  const { result } = await withFetchFailures(async () => {
+    const { since, until } = trailingWindow(endDate, 28);
+    const result = {} as Record<MetaLevel, MetaSyncOutcome>;
+    for (const level of ["account", "campaign", "adset", "ad"] as MetaLevel[]) {
+      result[level] = await syncMetaLevel(ctx, level, since, until);
+    }
+    return result;
+  });
   return result;
 }
 
 // Initiele backfill: 13 maanden, in maand-chunks om de async-pulls behapbaar te houden.
-export async function syncMetaBackfill(ctx: SyncContext, endDate: string): Promise<number> {
-  const { since, until } = backfillWindow(endDate, 13);
-  let total = 0;
-  for (const chunk of monthlyChunks(since, until)) {
-    for (const level of ["account", "campaign", "adset", "ad"] as MetaLevel[]) {
-      total += await syncMetaLevel(ctx, level, chunk.since, chunk.until);
+export async function syncMetaBackfill(ctx: SyncContext, endDate: string): Promise<{ rows: number; success: boolean; failedChunks: string[] }> {
+  const { result } = await withFetchFailures(async () => {
+    const { since, until } = backfillWindow(endDate, 13);
+    let total = 0;
+    const failedChunks: string[] = [];
+    for (const chunk of monthlyChunks(since, until)) {
+      for (const level of ["account", "campaign", "adset", "ad"] as MetaLevel[]) {
+        const outcome = await syncMetaLevel(ctx, level, chunk.since, chunk.until);
+        total += outcome.rows;
+        if (!outcome.success) failedChunks.push(`${level} ${chunk.since}..${chunk.until}`);
+      }
     }
-  }
-  return total;
+    return { rows: total, success: failedChunks.length === 0, failedChunks };
+  });
+  return result;
 }

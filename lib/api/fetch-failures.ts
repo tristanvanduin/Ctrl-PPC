@@ -50,10 +50,14 @@ export async function withFetchFailures<T>(fn: () => Promise<T>): Promise<{ resu
 /**
  * Noteert een opgeslikte ophaalfout. Logt altijd — ook zonder actieve verzamelaar, want een
  * stille catch is precies wat we hier wegnemen.
+ *
+ * `channel` is puur voor de logregel (welk kanaal faalde) -- oorspronkelijk alleen voor
+ * google-ads.ts gebouwd, vandaar de default. Meta/LinkedIn geven hun eigen kanaal mee zodat een
+ * mislukte Meta-call niet als "[google-ads] ... faalde" in de logs staat.
  */
-export function recordFetchFailure(source: string, err: unknown): void {
+export function recordFetchFailure(source: string, err: unknown, channel: string = "google-ads"): void {
   const message = err instanceof Error ? err.message : String(err);
-  logger.error(`[google-ads] ${source} faalde: ${message}`);
+  logger.error(`[${channel}] ${source} faalde: ${message}`);
   store.getStore()?.push({ source, message, at: new Date().toISOString() });
 }
 

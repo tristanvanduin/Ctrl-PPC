@@ -20,6 +20,7 @@ import { buildAnalyticsQuery, splitFieldSets } from "./restli";
 import { trailingWindow, backfillWindow, monthlyChunks } from "./sync-windows";
 import { logger } from "@/lib/logger";
 import { schrijftabel } from "@/lib/data-access/feitentabellen";
+import { recordFetchFailure, withFetchFailures, hasFetchFailure } from "@/lib/api/fetch-failures";
 
 // Pin een recente ondersteunde versie; verifieer in de docs bij een upgrade (versies
 // verouderen na circa een jaar). Geen verspreide literals: alles via deze constante.
@@ -85,7 +86,7 @@ function isoToDatePart(iso: string): { year: number; month: number; day: number 
 // LIVE-ONGETEST. Eén adAnalytics-call met versie-headers en Restli 2.0. 429 met backoff;
 // tel de call voor de quota-logging. De vorm volgt de LinkedIn-docs (GET /adAnalytics met
 // q=analytics, timeGranularity=DAILY, pivot, dateRange, fields, entiteit-List).
-async function fetchAnalyticsPage(ctx: SyncContext, query: string, callCounter: { calls: number }): Promise<LinkedInAnalyticsElement[]> {
+async function fetchAnalyticsPage(ctx: SyncContext, query: string, callCounter: { calls: number }, source: string): Promise<LinkedInAnalyticsElement[]> {
   const url = `${REST_BASE}/adAnalytics?${query}`;
   for (let attempt = 0; attempt < 5; attempt++) {
     callCounter.calls += 1;
@@ -101,13 +102,13 @@ async function fetchAnalyticsPage(ctx: SyncContext, query: string, callCounter: 
       continue;
     }
     if (!res.ok) {
-      log.error("adAnalytics-call faalde:", res.status);
+      recordFetchFailure(source, `adAnalytics-call faalde met status ${res.status}`, "linkedin");
       return [];
     }
     const body = (await res.json()) as { elements?: LinkedInAnalyticsElement[] };
     return Array.isArray(body.elements) ? body.elements : [];
   }
-  log.error("adAnalytics gaf 429 na alle pogingen");
+  recordFetchFailure(source, "adAnalytics gaf 429 na alle pogingen", "linkedin");
   return [];
 }
 
@@ -116,7 +117,8 @@ async function fetchAnalyticsPage(ctx: SyncContext, query: string, callCounter: 
 async function fetchAnalytics(
   ctx: SyncContext,
   opts: { pivot: string; since: string; until: string; entities: string[]; fields: string[] },
-  callCounter: { calls: number }
+  callCounter: { calls: number },
+  source: string
 ): Promise<LinkedInAnalyticsElement[]> {
   const sets = splitFieldSets(opts.fields, 18);
   let merged: LinkedInAnalyticsElement[] = [];
@@ -127,7 +129,7 @@ async function fetchAnalytics(
       fields: fieldSet,
       campaigns: opts.entities,
     });
-    const page = await fetchAnalyticsPage(ctx, query, callCounter);
+    const page = await fetchAnalyticsPage(ctx, query, callCounter, source);
     merged = merged.length === 0 ? page : mergeFieldSets(merged, page);
   }
   return merged;
@@ -144,7 +146,16 @@ function dedupeByKey(rows: Record<string, unknown>[], keyFields: string[]): Reco
   return [...seen.values()];
 }
 
-// Synct een niveau voor een venster: pull, merge, map, dedupe, upsert. Geeft het aantal rijen terug.
+/** Resultaat van één niveau/venster: expliciet succes/mislukking, niet alleen een rijenaantal --
+ *  0 rijen door een lege periode en 0 rijen door een mislukte fetch/upsert zagen er voorheen
+ *  identiek uit. */
+export interface LinkedInSyncOutcome {
+  rows: number;
+  success: boolean;
+  error?: string;
+}
+
+// Synct een niveau voor een venster: pull, merge, map, dedupe, upsert.
 export async function syncLinkedinLevel(
   ctx: SyncContext,
   level: LinkedInLevel,
@@ -152,17 +163,24 @@ export async function syncLinkedinLevel(
   since: string,
   until: string,
   callCounter: { calls: number } = { calls: 0 }
-): Promise<number> {
-  const elements = await fetchAnalytics(ctx, { pivot: LEVEL_PIVOT[level], since, until, entities, fields: ANALYTICS_FIELDS }, callCounter);
+): Promise<LinkedInSyncOutcome> {
+  const source = `linkedin:${level}`;
+  const elements = await fetchAnalytics(ctx, { pivot: LEVEL_PIVOT[level], since, until, entities, fields: ANALYTICS_FIELDS }, callCounter, source);
+  // De fetch noteert zijn eigen mislukking (fetchAnalyticsPage); hier alleen uitlezen -- zonder
+  // deze check leest "elements is leeg" altijd als "niets te syncen", ook als het daarom leeg was.
+  if (hasFetchFailure(source)) {
+    return { rows: 0, success: false, error: `ophalen mislukt voor ${level}` };
+  }
   const dbRows = elements.map((el) => linkedinDailyToDbRow(mapAnalyticsElement(el), ctx.clientId));
   const deduped = dedupeByKey(dbRows, ["client_id", "date", "entity_urn"]);
-  if (deduped.length === 0) return 0;
+  if (deduped.length === 0) return { rows: 0, success: true };
   const { error } = await ctx.supabase.from(LEVEL_TABLE[level]).upsert(deduped, { onConflict: LINKEDIN_DAILY_CONFLICT, ignoreDuplicates: false });
   if (error) {
+    recordFetchFailure(`${source}:upsert`, error.message, "linkedin");
     log.error("Upsert mislukt voor", level, error.message);
-    return 0;
+    return { rows: 0, success: false, error: error.message };
   }
-  return deduped.length;
+  return { rows: deduped.length, success: true };
 }
 
 // LIVE-ONGETEST. Synct de demografie voor een campagne over een venster: per pivot-type een
@@ -176,10 +194,13 @@ export async function syncLinkedinDemographics(
   until: string,
   dailyTotalsByDate: Map<string, number>,
   callCounter: { calls: number } = { calls: 0 }
-): Promise<number> {
+): Promise<LinkedInSyncOutcome> {
   const allRows: LinkedInDemographicRow[] = [];
+  const failedPivots: string[] = [];
   for (const pivotType of LINKEDIN_PIVOT_TYPES) {
-    const elements = await fetchAnalytics(ctx, { pivot: pivotType, since, until, entities: [campaignUrn], fields: DEMOGRAPHIC_FIELDS }, callCounter);
+    const source = `linkedin:demographic:${pivotType}`;
+    const elements = await fetchAnalytics(ctx, { pivot: pivotType, since, until, entities: [campaignUrn], fields: DEMOGRAPHIC_FIELDS }, callCounter, source);
+    if (hasFetchFailure(source)) failedPivots.push(pivotType);
     const segments = elements.map((el) => mapDemographicElement(el, { level: "CAMPAIGN", entityUrn: campaignUrn, pivotType }));
     allRows.push(...segments);
 
@@ -196,28 +217,38 @@ export async function syncLinkedinDemographics(
       allRows.push(buildCoverageSummaryRow(daySegments, total, { date, level: "CAMPAIGN", entityUrn: campaignUrn, pivotType }));
     }
   }
+  if (failedPivots.length > 0) {
+    return { rows: 0, success: false, error: `ophalen mislukt voor pivots: ${failedPivots.join(", ")}` };
+  }
   const dbRows = allRows.map((row) => linkedinDemographicToDbRow(row, ctx.clientId));
   const deduped = dedupeByKey(dbRows, ["client_id", "date", "level", "entity_urn", "pivot_type", "pivot_value_urn"]);
-  if (deduped.length === 0) return 0;
+  if (deduped.length === 0) return { rows: 0, success: true };
   const { error } = await ctx.supabase.from("linkedin_demographic_daily").upsert(deduped, { onConflict: LINKEDIN_DEMOGRAPHIC_CONFLICT, ignoreDuplicates: false });
   if (error) {
+    recordFetchFailure("linkedin:demographic:upsert", error.message, "linkedin");
     log.error("Demografie-upsert mislukt:", error.message);
-    return 0;
+    return { rows: 0, success: false, error: error.message };
   }
-  return deduped.length;
+  return { rows: deduped.length, success: true };
 }
 
 // Daily incremental: de drie niveaus over het trailing venster van 30 dagen (attributie-herstatement).
+// Draait binnen een eigen ophaal-fout-verzamelaar (zelfde patroon als de Google-orchestrator,
+// lib/sync/orchestrator.ts): twee gelijktijdige syncs voor verschillende klanten lopen elkaar zo
+// niet voor de voeten.
 export async function syncLinkedinDaily(
   ctx: SyncContext,
   endDate: string,
   entitiesByLevel: Record<LinkedInLevel, string[]>
-): Promise<Record<LinkedInLevel, number>> {
-  const { since, until } = trailingWindow(endDate, 30);
-  const result = {} as Record<LinkedInLevel, number>;
-  for (const level of ["account", "campaign", "creative"] as LinkedInLevel[]) {
-    result[level] = await syncLinkedinLevel(ctx, level, entitiesByLevel[level], since, until);
-  }
+): Promise<Record<LinkedInLevel, LinkedInSyncOutcome>> {
+  const { result } = await withFetchFailures(async () => {
+    const { since, until } = trailingWindow(endDate, 30);
+    const result = {} as Record<LinkedInLevel, LinkedInSyncOutcome>;
+    for (const level of ["account", "campaign", "creative"] as LinkedInLevel[]) {
+      result[level] = await syncLinkedinLevel(ctx, level, entitiesByLevel[level], since, until);
+    }
+    return result;
+  });
   return result;
 }
 
@@ -227,15 +258,27 @@ export async function syncLinkedinBackfill(
   ctx: SyncContext,
   endDate: string,
   entitiesByLevel: Record<LinkedInLevel, string[]>
-): Promise<number> {
+): Promise<{ rows: number; success: boolean; failedChunks: string[] }> {
+  const { result } = await withFetchFailures(() => syncLinkedinBackfillRun(ctx, endDate, entitiesByLevel));
+  return result;
+}
+
+async function syncLinkedinBackfillRun(
+  ctx: SyncContext,
+  endDate: string,
+  entitiesByLevel: Record<LinkedInLevel, string[]>
+): Promise<{ rows: number; success: boolean; failedChunks: string[] }> {
   const { since, until } = backfillWindow(endDate, 13);
   let total = 0;
+  const failedChunks: string[] = [];
   for (const chunk of monthlyChunks(since, until)) {
     for (const level of ["account", "campaign", "creative"] as LinkedInLevel[]) {
-      total += await syncLinkedinLevel(ctx, level, entitiesByLevel[level], chunk.since, chunk.until);
+      const outcome = await syncLinkedinLevel(ctx, level, entitiesByLevel[level], chunk.since, chunk.until);
+      total += outcome.rows;
+      if (!outcome.success) failedChunks.push(`${level} ${chunk.since}..${chunk.until}`);
     }
   }
-  return total;
+  return { rows: total, success: failedChunks.length === 0, failedChunks };
 }
 
 // Helper voor de demografie-coverage: bouwt de dag-totaalimpressies uit reeds gesynct
