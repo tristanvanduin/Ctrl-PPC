@@ -5997,3 +5997,32 @@ diens keuze over de eigen sleutel, geen wijziging aan bovenstaande weigering.
 
 **Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
 groen. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
+
+### 17.74 SOP-cleanup daadwerkelijk gedraaid tegen live data — bucket bleek nooit te hebben bestaan (22 augustus 2026)
+
+De eigenaar verstrekte de service-role-sleutel rechtstreeks in de chat en gaf expliciete,
+herhaalde instructie om hem te gebruiken ("ik geef ze met consent... ik roteer zodra we klaar
+zijn met bouwen en testen, voordat er een echte klant met live data in zit"). Sleutel is niet
+opgeslagen, niet gecommit — alleen inline in losse Bash-aanroepen gebruikt, deze sessie.
+
+**Bevinding**: de `client-files`-bucket zelf is pas op 21 augustus aangemaakt (`created_at` uit
+`listBuckets()`) — hij heeft dus nooit eerder bestaan. De eigenaar bevestigde dit is verwacht
+(recent nieuw). Dat betekent: alle 166 `client_files`-rijen die naar een SOP-bestand wezen waren
+altijd al kapot, geschreven door de silent-upload-bug van vóór 17.47-17.50 — geen nieuw incident,
+precies het scenario waar `cleanup-orphaned-sop-files.mjs` voor gebouwd is.
+
+**Niet blind verwijderd — eerst hersteld wat kon**: de onderliggende tekst bleek intact in
+`sop_analysis_output` (section "full", per client_id/sop_type/analysis_date). Nieuw script
+`scripts/restore-orphaned-sop-md.mjs` (`1e6f01d`) uploadt die tekst terug naar het exacte,
+al opgeslagen `storage_path` — een letterlijke herhaling van de destijds mislukte upload, geen
+gok. 80 van de 166 rijen waren `.md`-bestanden; allemaal hersteld en geverifieerd (gedownload,
+lengte en inhoud kloppen). De resterende 86 rijen zijn PDF's: 82 maandvarianten (renderer haalt
+kanaaloverstijgende context live opnieuw op — regenereren zou een PDF opleveren die niet meer
+overeenkomt met wat er destijds echt stond) en 4 weekly/biweekly (wél veilig te regenereren,
+zonder live afhankelijkheid, maar de bestaande renderroute schrijft naar een nieuw pad i.p.v. de
+kapotte rij te repareren — apart traject, niet gebouwd). Die 86 zijn verwijderd met het bestaande
+`cleanup-orphaned-sop-files.mjs`: hun tekst is niet weg (staat nog in `sop_analysis_output`, en
+voor de meeste ook al als hersteld `.md`-bestand), alleen de specifieke historische PDF-export.
+
+**Resultaat, geverifieerd tegen live data**: 80 SOP-bestanden weer downloadbaar, 0 weesrijen over
+in `client_files` (dry-run erna: "0 van 80 rijen wijzen naar een niet-bestaand object").
