@@ -38,6 +38,7 @@ import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
 import { createClient } from "@supabase/supabase-js";
 import type { MetaObjective } from "../../lib/meta/campaign-types";
 import type { LinkedInObjective } from "../../lib/linkedin/campaign-types";
+import { splitInt } from "../../lib/demo/split";
 
 export const DEMO_CLIENT = "demo-greentech";
 const DEMO_NAME = "DEMO — GreenTech (fictief)";
@@ -568,6 +569,131 @@ export function buildAllRows(): Record<string, Row[]> {
   }];
   tables["geo_clone_settings"] = GEO_CLONE_SETTINGS.map((s) => ({ client_id: DEMO_CLIENT, ...s }));
   tables["client_sync_status"] = [{ client_id: DEMO_CLIENT, last_sync_at: new Date().toISOString(), last_sync_status: "demo", last_successful_sync_at: new Date().toISOString(), datasets_available: 10, datasets_total: 10, freshness_status: "fresh" }];
+
+  // ── PMax-detail: assetgroepen, netwerkverdeling en assetdekking (22 augustus 2026) ─────────
+  // PmaxNetworkSplit en PmaxAssetCoverage lazen al ads_pmax_network_breakdown /
+  // ads_asset_group_performance_monthly / ads_pmax_asset_performance via dbSelect (dus ook in
+  // productie, niet alleen de mock) -- maar dit seed-script vulde geen van de drie, dus beide
+  // kaarten renderden `null` voor demo-greentech zodra iemand met een niet-gemockt (dbSelect-)pad
+  // keek. lib/demo/pmax-video-demo.ts heeft dezelfde soort generatoren voor de mock, maar die
+  // hangen aan een andere campagne-identiteit ("GreenTech | PMax | Standhouders") dan de PMax-rij
+  // die dit script al genereert ("GRT | Performance Max", zie GOOGLE_AOV/googleMonthly hierboven)
+  // -- vandaar losse generatoren hier, gekoppeld aan de campagne die al bestaat, met hetzelfde
+  // verhaal: een budget-absorberende groep en een Maps/YouTube-zware netwerkverdeling.
+  const pmaxCampaignName = "GRT | Performance Max";
+  const pmaxCampaignId = campaignIdOf(pmaxCampaignName);
+  const pmaxMonths = g.filter((r) => r.campaign === pmaxCampaignName && r.monthIdx <= 5);
+
+  const assetGroupIdOf = (naam: string) => `${pmaxCampaignId}-${naam.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+  // Drie assetgroepen: twee die presteren naar hun aandeel, en "Bezoekers — breed" die 32% van
+  // de kosten draagt tegen 11% van de conversies (budget-absorptie, controlepunt 47) EN onder
+  // Google's minima zit (zie assetGroups hieronder) -- zo hebben zowel de aandelen-logica in
+  // lib/pmax/assetdekking.ts als de tekort-detectie een echte rij om op te reageren.
+  const ASSET_GROUPS = [
+    { naam: "Standhouders — Nederland", costW: 0.36, convW: 0.48 },
+    { naam: "Standhouders — internationaal", costW: 0.32, convW: 0.41 },
+    { naam: "Bezoekers — breed", costW: 0.32, convW: 0.11 },
+  ];
+
+  // Zeven netwerken met dezelfde scheefstand als lib/demo/pmax-video-demo.ts: Maps en YouTube
+  // zijn duur en leveren weinig, Search draait de meeste conversies tegen weinig kosten.
+  const PMAX_NETWORKS = [
+    { type: "MAPS", costW: 0.34, convW: 0.11, impW: 0.22 },
+    { type: "YOUTUBE", costW: 0.27, convW: 0.09, impW: 0.38 },
+    { type: "SEARCH", costW: 0.23, convW: 0.57, impW: 0.09 },
+    { type: "SEARCH_PARTNERS", costW: 0.12, convW: 0.15, impW: 0.07 },
+    { type: "DISCOVER", costW: 0.035, convW: 0.06, impW: 0.16 },
+    { type: "CONTENT", costW: 0.005, convW: 0.02, impW: 0.08 },
+    { type: "GMAIL", costW: 0, convW: 0, impW: 0 },
+  ];
+
+  const assetGroupMonthly: Row[] = [];
+  const networkBreakdown: Row[] = [];
+
+  for (const m of pmaxMonths) {
+    const month = monthsBack(m.monthIdx);
+    const costW = ASSET_GROUPS.map((a) => a.costW);
+    const convW = ASSET_GROUPS.map((a) => a.convW);
+    const groupCost = splitInt(Math.round(m.cost), costW);
+    const groupConv = splitInt(Math.round(m.conv), convW);
+    const groupImp = splitInt(m.imp, costW);
+    const groupClicks = splitInt(m.clicks, costW);
+    const groupValue = splitInt(Math.round(m.value), convW);
+
+    ASSET_GROUPS.forEach((a, i) => {
+      assetGroupMonthly.push({
+        client_id: DEMO_CLIENT, month, campaign_id: pmaxCampaignId, campaign_name: pmaxCampaignName,
+        asset_group_id: assetGroupIdOf(a.naam), asset_group_name: a.naam, asset_group_status: "ENABLED",
+        impressions: groupImp[i], clicks: groupClicks[i], cost: groupCost[i], conversions: groupConv[i],
+        conversions_value: groupValue[i],
+      });
+
+      // Netwerkverdeling per assetgroep, met dezelfde zeven netwerken en gewichten in elke groep:
+      // de scheefstand is een eigenschap van PMax zelf (waar Google het budget laat landen), niet
+      // van één assetgroep.
+      const netCost = splitInt(groupCost[i], PMAX_NETWORKS.map((n) => n.costW));
+      const netConv = splitInt(groupConv[i], PMAX_NETWORKS.map((n) => n.convW));
+      const netImp = splitInt(groupImp[i], PMAX_NETWORKS.map((n) => n.impW));
+      const netClicks = splitInt(groupClicks[i], PMAX_NETWORKS.map((n) => n.impW));
+      const netValue = splitInt(groupValue[i], PMAX_NETWORKS.map((n) => n.convW));
+      PMAX_NETWORKS.forEach((n, j) => {
+        networkBreakdown.push({
+          client_id: DEMO_CLIENT, month, campaign_id: pmaxCampaignId, campaign_name: pmaxCampaignName,
+          asset_group_id: assetGroupIdOf(a.naam), asset_group_name: a.naam, network_type: n.type,
+          impressions: netImp[j], clicks: netClicks[j], cost: netCost[j], conversions: netConv[j],
+          conversions_value: netValue[j],
+        });
+      });
+    });
+  }
+  tables["ads_asset_group_performance_monthly"] = assetGroupMonthly;
+  tables["ads_pmax_network_breakdown"] = networkBreakdown;
+
+  // Assetdekking: per groep de acht Google-veldtypen. "Standhouders — Nederland" en
+  // "— internationaal" zitten ruim boven de minima uit lib/pmax/assetdekking.ts; "Bezoekers —
+  // breed" mist een kop (2 van de 3 minimum) EN heeft geen eigen video -- precies het scenario
+  // dat PmaxAssetCoverage moet tonen: een tekort onder Google's minimum, gecombineerd met de
+  // groep die het meeste budget absorbeert zonder te leveren.
+  const pmaxAssetMonth = pmaxMonths.length > 0 ? monthsBack(pmaxMonths[0].monthIdx) : monthsBack(0);
+  type AssetSpec = { type: string; labels: string[] };
+  const compleetGroep: AssetSpec[] = [
+    { type: "HEADLINE", labels: ["BEST", "GOOD", "GOOD", "GOOD", "LEARNING"] },
+    { type: "LONG_HEADLINE", labels: ["GOOD", "GOOD"] },
+    { type: "DESCRIPTION", labels: ["BEST", "GOOD", "GOOD"] },
+    { type: "MARKETING_IMAGE", labels: ["GOOD", "GOOD"] },
+    { type: "SQUARE_MARKETING_IMAGE", labels: ["GOOD", "GOOD"] },
+    { type: "LOGO", labels: ["GOOD"] },
+    { type: "YOUTUBE_VIDEO", labels: ["GOOD"] },
+  ];
+  const tekortGroep: AssetSpec[] = [
+    // 2 koppen: onder het minimum van 3, en de tweede presteert LOW -- een echte tekort- én
+    // zwakte-rij tegelijk.
+    { type: "HEADLINE", labels: ["GOOD", "LOW"] },
+    { type: "LONG_HEADLINE", labels: ["GOOD"] },
+    { type: "DESCRIPTION", labels: ["LOW", "PENDING"] },
+    { type: "MARKETING_IMAGE", labels: ["GOOD"] },
+    { type: "SQUARE_MARKETING_IMAGE", labels: ["GOOD"] },
+    { type: "LOGO", labels: ["GOOD"] },
+    // Geen YOUTUBE_VIDEO-rij: geen eigen video.
+  ];
+  const assetPerformance: Row[] = [];
+  const vulGroep = (groepNaam: string, specs: AssetSpec[]) => {
+    specs.forEach((spec, typeIdx) => {
+      spec.labels.forEach((label, k) => {
+        assetPerformance.push({
+          client_id: DEMO_CLIENT, month: pmaxAssetMonth, campaign_id: pmaxCampaignId, campaign_name: pmaxCampaignName,
+          asset_group_id: assetGroupIdOf(groepNaam), asset_group_name: groepNaam,
+          asset_id: `${assetGroupIdOf(groepNaam)}-${spec.type.toLowerCase()}-${typeIdx}-${k}`,
+          asset_type: spec.type, performance_label: label,
+        });
+      });
+    });
+  };
+  vulGroep("Standhouders — Nederland", compleetGroep);
+  vulGroep("Standhouders — internationaal", compleetGroep);
+  vulGroep("Bezoekers — breed", tekortGroep);
+  tables["ads_pmax_asset_performance"] = assetPerformance;
 
   return tables;
 }

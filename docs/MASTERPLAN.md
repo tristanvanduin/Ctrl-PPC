@@ -6868,3 +6868,49 @@ resterende amber-/red-/gray-/slate-klasse.
 
 `POORTEN GROEN`. Live geverifieerd: het "voorstel"-badge en "Code Rood" zijn nu duidelijk amber/
 rood leesbaar tegen de zijbalk, in zowel licht als donker.
+
+### 17.93 PMax-detailkaarten hadden geen data om te tonen: het seed-script uitgebreid met drie tabellen (22 augustus 2026)
+
+Vervolg op het doorlichten van Performance Max. `PmaxNetworkSplit` (`components/dashboard/
+pmax-network-split.tsx`) en `PmaxAssetCoverage` (`components/dashboard/pmax-asset-coverage.tsx`)
+lezen allebei via `dbSelect()` — dus via het echte, niet-gemockte pad, ook in demo-modus — uit
+`ads_pmax_network_breakdown`, `ads_asset_group_performance_monthly` en `ads_pmax_asset_performance`.
+Directe SQL tegen productie (`scripts/supabase-sql.mjs`) bevestigde dat alle drie tabellen nul rijen
+hebben voor `demo-greentech`: `scripts/demo/seed-demo-client.ts` genereerde ze nooit. Beide kaarten
+renderen dan `null` (`if (slices.length === 0 ...)`, `if (!dekking || dekking.groepen.length === 0)`)
+— onzichtbaar, niet "leeg", dus niemand die de PMax-kaarten naast elkaar ziet merkt dat er twee
+missen. (De losstaande `PmaxScorecard` toont wél cijfers, omdat die via `/api/analysis/
+pmax-scorecard` loopt, dat `supabaseForClient` gebruikt en dus wél de mock leest — vandaar de
+tegenspraak die dit aan het licht bracht: één PMax-scorecard met een score, twee ernaast zwijgend.)
+
+`lib/demo/pmax-video-demo.ts` heeft al generatoren met precies dit verhaal (budget-absorberende
+assetgroep, Maps/YouTube-zware netwerkverdeling) voor de mock, maar die hangen aan een andere
+campagne-identiteit (`"GreenTech | PMax | Standhouders"`) dan de PMax-campagne die het seed-script
+al genereert (`"GRT | Performance Max"`, via `googleMonthly()`/`GOOGLE_AOV`). Niet hergebruikt om
+die mismatch niet te importeren; wel dezelfde gewichten en dezelfde soort niet-representatieve rijen
+opnieuw opgebouwd, nu gekoppeld aan de bestaande campagne, in `buildAllRows()`:
+
+- **`ads_asset_group_performance_monthly`** — drie assetgroepen (`splitInt` uit `lib/demo/split.ts`
+  voor de som-behoudende verdeling): "Standhouders — Nederland" (36% kosten / 48% conversies),
+  "Standhouders — internationaal" (32% / 41%), en "Bezoekers — breed" (32% kosten / 11%
+  conversies — de budget-absorbeerder, controlepunt 47 in `lib/pmax/assetdekking.ts`).
+- **`ads_pmax_network_breakdown`** — per assetgroep dezelfde zeven netwerken met de scheve
+  verdeling uit de mock: Maps en YouTube duur en zwak (34%/27% van de kosten, 11%/9% van de
+  conversies), Search goedkoop en sterk (23% kosten, 57% conversies).
+- **`ads_pmax_asset_performance`** — "Standhouders — Nederland/internationaal" ruim boven Google's
+  minima (zie `lib/pmax/assetdekking.ts`: 3 koppen, 2 beschrijvingen, eigen video, etc.);
+  "Bezoekers — breed" met opzet eronder: 2 koppen (tekort van 1, minimum is 3, waarvan één LOW) en
+  geen eigen video.
+
+Geverifieerd met een tijdelijk script (`.tmp-check-pmax.mts`, verwijderd na gebruik) dat
+`buildAllRows()` rechtstreeks aanroept en de output door `analyseerAssetdekking()` en
+`buildNetworkSplit()` haalt — dezelfde functies die de kaarten zelf gebruiken: "Bezoekers — breed"
+is de enige groep in `aandacht` (tekort `HEADLINE`, `zonderVideo: true`, `absorbeertBudget: true`
+bij 32% kosten tegen 12,5% conversies), de andere twee zijn `compleet`; de netwerk-ring laat MAPS/
+YOUTUBE domineren op kosten en SEARCH op conversies, exact de bedoelde scheefstand. `scripts/
+demo/seed-demo-client.ts --check` blijft alle dertien bestaande scenario's triggeren — de
+uitbreiding raakt geen bestaande tabel.
+
+`POORTEN GROEN`. **Nog niet uitgevoerd tegen productie** — dit is alleen de scriptuitbreiding;
+`npx tsx scripts/demo/seed-demo-client.ts` (de echte insert) is een aparte, expliciet te bevestigen
+stap.
