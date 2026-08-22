@@ -59,7 +59,12 @@ function TakBlok({ tak, diepte, ingeklapt, wissel, Link }: {
             op het instellingenscherm. Anders is een geraden indeling in de navigatie niet van een
             bevestigde te onderscheiden. */}
         {!tak.bevestigd && (
-          <span className="rounded-full bg-amber-400/20 px-1.5 text-micro text-amber-200">voorstel</span>
+          // Vaste kleurwaarden, geen bg-amber-400/text-amber-200: die tokens worden in het
+          // donkere APP-thema herdefinieerd voor content-kaarten (donkere ondergrond, lichte
+          // tekst), maar de zijbalk zelf blijft altijd zijn eigen indigo -- ongeacht Licht/
+          // Donker. Met de swappable tokens werd dit badge in donkere modus onleesbaar: bijna-
+          // zwarte tekst op een bijna-zwarte vlek.
+          <span className="rounded-full px-1.5 text-micro" style={{ background: "rgba(251, 191, 36, 0.2)", color: "#fde68a" }}>voorstel</span>
         )}
         <span className="ml-auto text-micro text-white/30">{tak.aantal}</span>
       </button>
@@ -442,12 +447,16 @@ function SidebarInner() {
           <div className="mb-2">
             <button
               onClick={() => setCodeRoodOpen((o) => !o)}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-200 transition-colors hover:bg-red-500/20"
+              // Zelfde reden als het "voorstel"-badge hierboven: vaste kleuren i.p.v. de
+              // text-red-200/bg-red-500-tokens die in donkere modus herdefinieerd worden voor
+              // content-kaarten en op de altijd-donkere zijbalk onleesbaar werden.
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-[#ef4444]/20"
+              style={{ color: "#fecaca" }}
             >
               {codeRoodOpen ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
-              <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: "#ef4444" }} />
               <span className="truncate text-body font-semibold">Code Rood</span>
-              <span className="ml-auto text-micro font-bold text-white bg-red-600 rounded-full px-1.5">{codeRoodZichtbaar.length}</span>
+              <span className="ml-auto text-micro font-bold text-white rounded-full px-1.5" style={{ background: "#dc2626" }}>{codeRoodZichtbaar.length}</span>
             </button>
             {codeRoodOpen && (
               <div className="ml-4 mt-0.5 space-y-0.5">

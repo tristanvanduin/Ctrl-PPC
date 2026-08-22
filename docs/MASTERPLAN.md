@@ -6823,3 +6823,48 @@ abbrev, cadans, edities).
 Live geverifieerd: het Prognose-tabblad toont nu de volledige T-minus Forecaster (spend/conversies/
 CPA-curves, "Ahead of Goal") in plaats van de foutbanier. `POORTEN GROEN` (314/314 tests, schone
 rebuild).
+
+### 17.92 Donkere modus expliciet getest: een onleesbaar zijbalk-badge, en twee vals-alarm-checks (22 augustus 2026)
+
+De hele sessie tot nu toe draaide alles op het standaard "Systeem"-thema (in deze omgeving licht).
+Gebruiker: "blijf kritisch checken", en na het aankondigen van deze ronde expliciet benadrukt dat
+donkere modus "enorm belangrijk" is en goede contrasten moet houden — dus grondig getest, niet
+oppervlakkig.
+
+**Vondst — het "voorstel"-badge en de "Code Rood"-link in de zijbalk waren in donkere modus
+onleesbaar.** `app/globals.css` herdefinieert onder een `.dark`-klasse de hele Tailwind amber-/
+red-/gray-/slate-kleurenschaal (bedoeld zodat een in licht-modus geschreven combinatie als
+`bg-amber-50 text-amber-700` vanzelf goed leest op een donkere content-kaart — zie het al
+bestaande, expliciete commentaar in `sop-dekking-banner.tsx` dat dit mechanisme documenteert).
+Maar de zijbalk zelf is altijd zijn eigen indigo, ongeacht Licht/Donker — en `.dark` wordt op
+`document.documentElement` gezet, dus de hele zijbalk zit er toch binnen. `bg-amber-400/20
+text-amber-200` (het "voorstel"-badge) en `text-red-200`/`bg-red-500`/`bg-red-600` (de "Code Rood"-
+link) kregen zo de content-geoptimaliseerde donkere varianten (bijna-zwarte tekst, bijna-zwarte
+achtergrond) op een achtergrond die daar niet bij hoort: onzichtbaar in plaats van amber/rood. Fix:
+vaste, letterlijke kleurwaarden (dezelfde tinten als de licht-modus default van diezelfde Tailwind-
+klassen) in plaats van de swappable tokens — precies zoals de rest van de zijbalk al met
+`text-white/75`, `text-white/30` werkt in plaats van thema-afhankelijke tokens.
+
+**Twee dingen gemeten en met vertrouwen retracted, niet aangenomen.** (1) Een `fullPage`-
+screenshot van `/how-it-works` met een geleakte `.dark`-klasse (zie hieronder) toonde de sticky
+navbalk als een witte streep MIDDEN op de pagina — leek een ernstige thema-bug. Navigatie + scroll
+in een echte viewport (niet fullPage) liet zien dat de navbalk daar gewoon correct donker blijft;
+de computed background-kleur was zelfs met `.dark` aanwezig nog steeds `lab(7.9 ... / 0.8)` (bijna
+zwart). Dit was een `fullPage`-screenshot-artefact van hoe Playwright `position: sticky`-elementen
+stitcht over meerdere scroll-frames, geen productbug. (2) Vermoed dat `quality-gate-matrix.tsx` en
+`decision-loop-ring.tsx` (marketingsite, gebruiken `red-400`/`emerald-400`) hetzelfde
+leesbaarheidsprobleem zouden hebben als het zijbalk-badge, omdat `.dark` via
+`document.documentElement.classList` ook naar marketingpagina's lekt zodra iemand in dezelfde
+browser eerst in de app op Donker heeft geklikt (bevestigd: `html.classList.contains("dark")` is
+`true` op `/how-it-works` na een app-bezoek). Pixel-voor-pixel vergeleken met en zonder die lek:
+identieke screenshots. `red-400`/`emerald-400` staan namelijk niet in de lijst tokens die de
+`.dark`-scope herdefinieert (alleen amber-*, red-200/500/600, gray-*, slate-*, yellow-* worden
+omgeklapt) — dus geen bug, wel een reëel te onderzoeken risico dat het had kunnen zijn.
+
+**Verder gecontroleerd en in orde**: de KPI-band en severity-badges op Vandaag (content-oppervlak,
+theme-aware, swapt correct), de gebruikersmenu-dropdown (`bg-card`, theme-aware), en `top-bar.tsx`
+(zelf ook theme-aware, dezelfde reden als sop-dekking-banner). Sidebar is na de fix vrij van elke
+resterende amber-/red-/gray-/slate-klasse.
+
+`POORTEN GROEN`. Live geverifieerd: het "voorstel"-badge en "Code Rood" zijn nu duidelijk amber/
+rood leesbaar tegen de zijbalk, in zowel licht als donker.
