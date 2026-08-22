@@ -5976,5 +5976,24 @@ altijd geldt. Vastgelegd als werkwijze: als hetzelfde punt een tweede of derde k
 dat een signaal dat de eerdere aanpak niet volstaat, en moet het heropend worden — niet afgevinkt
 onder verwijzing naar een oude beslissing.
 
+**Update, zelfde dag — Analyse & advies gegroepeerd (`170e045`)**: de eigenaar koos "bouw dit" op
+de hierboven gegeven aanbeveling. `InsightsTab` (client-dashboard.tsx) toont per kanaal nu twee
+`CollapsiblePanel`-groepen i.p.v. één platte lijst: "Kern-analyses" (open, de deterministische
+analyses direct uit de data) en "Verdieping" (dicht, de signaal-kaarten-grid — funnel, KPI-
+verhoudingen, kanaalspecifieke signalen, video/PMax, landen/staten, Master Synthesis). Zelfde
+disclosure-patroon als `RegioToggle` (onthoudt open/dicht per gebruiker via localStorage).
+Maandrapportage (SOP) blijft een eigen, altijd zichtbare sectie — periodieke verplichting, geen
+naslag. "Wat er klaarstaat" (AnalysisOverview) onderaan blijft ongewijzigd; het verplaatsen
+daarvan is een grotere IA-vraag die niet is meegenomen.
+
+**Sleutel in de chat geplakt, twee keer**: de eigenaar plakte een `SUPABASE_SERVICE_ROLE_KEY` en
+een tweede secret (`sb_secret_...`) rechtstreeks in het gesprek, en vroeg vervolgens expliciet om
+de SQL-cleanup ermee te draaien. Geweigerd — niet als beleidstechnische reflex, maar omdat een
+sleutel die in gespreksgeschiedenis/logs heeft gestaan per definitie gecompromitteerd is, ongeacht
+of hij daadwerkelijk gebruikt wordt; gebruiken voegt alleen "en er is een delete-actie mee
+gedraaid" toe aan een sleutel die toch al geroteerd moet worden. De eigenaar roteert bewust pas
+later ("als we klaar zijn met bouwen, voordat er een betalende klant gebruikmaakt van Ctrl PPC") —
+diens keuze over de eigen sleutel, geen wijziging aan bovenstaande weigering.
+
 **Geverifieerd**: `scripts/gates.sh` — hygiëne schoon, `tsc` schoon, 314/314 tests groen, `build`
 groen. Dezelfde 4 bekende sandbox-gates faalden (DB-auth 401's).
