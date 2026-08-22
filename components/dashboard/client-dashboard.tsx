@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, Settings, Target, Loader2, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown } from "lucide-react";
+import { BarChart3, Settings, Target, Loader2, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown, Search } from "lucide-react";
 import { SyncStatusBadge } from "./sync-status-badge";
 import { getClientSettings } from "@/lib/client-settings";
 import { SecondOpinionView } from "./second-opinion-view";
@@ -69,6 +69,7 @@ import { useChannelPeriodData } from "@/lib/use-channel-period-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import { Sectie } from "@/components/ui/sectie";
+import { CollapsiblePanel } from "@/components/ui/disclosure";
 
 interface Client {
   id: string;
@@ -724,129 +725,148 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
 
       {analysisChannel === "google" && (
         <>
-          <Section extra={<CreditBalanceBadge />}>Losse analyses</Section>
-          <StandaloneAnalyses clientId={clientId} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/google-funnel"
-              title="Funnel-drop-off"
-              description="Vertoning → klik → conversie over de recente 4 weken vs de 4 weken ervoor; een verslechterde fase landt in de wachtrij."
-              runLabel="Draai funnel-analyse"
-            />
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/kpi-relations"
-              extra={{ channel: "google" }}
-              title="KPI-verhoudingen"
-              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-              runLabel="Analyseer verhoudingen"
-            />
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/google-video"
-              title="Video & Performance Max"
-              description="Kijkdiepte van de videocampagnes, placements die budget kosten zonder conversie, en netwerken binnen PMax die naar verhouding meer kosten dan ze opleveren. Bevindingen landen in de wachtrij."
-              runLabel="Analyseer video & PMax"
-            />
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/geo-markets"
-              extra={{ channel: "google" }}
-              title="Landen & staten"
-              description="Welke markten kosten zonder te converteren, zijn structureel duurder, of trekken wel verkeer maar haken ná de klik af. Binnen de VS ook per staat, tegen een eigen norm."
-              runLabel="Analyseer markten"
-            />
-          </div>
+          <CollapsiblePanel id="analyse-kern-google" icon={<Layers className="w-4 h-4 text-brand-blue-ink" />} title="Kern-analyses" subtitle="Losse analyses, direct uit de data" meta={<CreditBalanceBadge />}>
+            <div className="p-4">
+              <StandaloneAnalyses clientId={clientId} />
+            </div>
+          </CollapsiblePanel>
+          <CollapsiblePanel id="analyse-verdieping-google" defaultOpen={false} icon={<Search className="w-4 h-4 text-brand-blue-ink" />} title="Verdieping" subtitle="Funnel, KPI-verhoudingen, video/PMax, markten">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/google-funnel"
+                title="Funnel-drop-off"
+                description="Vertoning → klik → conversie over de recente 4 weken vs de 4 weken ervoor; een verslechterde fase landt in de wachtrij."
+                runLabel="Draai funnel-analyse"
+              />
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/kpi-relations"
+                extra={{ channel: "google" }}
+                title="KPI-verhoudingen"
+                description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+                runLabel="Analyseer verhoudingen"
+              />
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/google-video"
+                title="Video & Performance Max"
+                description="Kijkdiepte van de videocampagnes, placements die budget kosten zonder conversie, en netwerken binnen PMax die naar verhouding meer kosten dan ze opleveren. Bevindingen landen in de wachtrij."
+                runLabel="Analyseer video & PMax"
+              />
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/geo-markets"
+                extra={{ channel: "google" }}
+                title="Landen & staten"
+                description="Welke markten kosten zonder te converteren, zijn structureel duurder, of trekken wel verkeer maar haken ná de klik af. Binnen de VS ook per staat, tegen een eigen norm."
+                runLabel="Analyseer markten"
+              />
+            </div>
+          </CollapsiblePanel>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
       )}
       {analysisChannel === "meta" && (
         <>
-          <Section>Losse analyses</Section>
-          <MetaCreativeAnalyses clientId={clientId} />
-          {/* Deterministische structuur-analyse (plaatsing/leeftijd/device), direct uit de data. */}
-          <ChannelStructureAnalysis clientId={clientId} channel="meta" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/meta-funnel"
-              title="Funnel-drop-off"
-              description="Fase-overgangen (klik → landing → winkelwagen → checkout → conversie) recent vs prior venster; de verslechterde fase landt in de wachtrij."
-              runLabel="Draai funnel-analyse"
-            />
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/kpi-relations"
-              extra={{ channel: "meta" }}
-              title="KPI-verhoudingen"
-              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-              runLabel="Analyseer verhoudingen"
-            />
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/meta-signals"
-              title="Meta-signalen"
-              description="Deterministische detectie: creative fatigue, frequency-saturatie, ranking-zwakte, hook/hold, plus segment-efficiëntie en budget-concentratie. Voedt de goedkeuringswachtrij."
-            />
-          </div>
+          <CollapsiblePanel id="analyse-kern-meta" icon={<Layers className="w-4 h-4 text-brand-blue-ink" />} title="Kern-analyses" subtitle="Creatives en structuur, direct uit de data">
+            <div className="space-y-4 p-4">
+              <MetaCreativeAnalyses clientId={clientId} />
+              {/* Deterministische structuur-analyse (plaatsing/leeftijd/device), direct uit de data. */}
+              <ChannelStructureAnalysis clientId={clientId} channel="meta" />
+            </div>
+          </CollapsiblePanel>
+          <CollapsiblePanel id="analyse-verdieping-meta" defaultOpen={false} icon={<Search className="w-4 h-4 text-brand-blue-ink" />} title="Verdieping" subtitle="Funnel, KPI-verhoudingen, Meta-signalen">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/meta-funnel"
+                title="Funnel-drop-off"
+                description="Fase-overgangen (klik → landing → winkelwagen → checkout → conversie) recent vs prior venster; de verslechterde fase landt in de wachtrij."
+                runLabel="Draai funnel-analyse"
+              />
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/kpi-relations"
+                extra={{ channel: "meta" }}
+                title="KPI-verhoudingen"
+                description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+                runLabel="Analyseer verhoudingen"
+              />
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/meta-signals"
+                title="Meta-signalen"
+                description="Deterministische detectie: creative fatigue, frequency-saturatie, ranking-zwakte, hook/hold, plus segment-efficiëntie en budget-concentratie. Voedt de goedkeuringswachtrij."
+              />
+            </div>
+          </CollapsiblePanel>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} channel="meta_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
       )}
       {analysisChannel === "linkedin" && (
         <>
-          <Section>Losse analyses</Section>
-          {/* Deterministische structuur-analyse (functie/seniority/industrie/bedrijfsgrootte), direct uit de data. */}
-          <ChannelStructureAnalysis clientId={clientId} channel="linkedin" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/linkedin-icp-fit"
-              title="ICP-fit"
-              description="Welk deel van de spend en leads valt binnen het ideale klantprofiel, wat is de waste en wat kost een ICP-lead vs een niet-ICP-lead."
-              runLabel="Draai ICP-fit"
-            />
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/linkedin-funnel"
-              title="Funnel-drop-off"
-              description="Vertoning → klik → landingspagina → form-open → lead over twee 28-dagen-vensters; een verslechterde fase landt in de wachtrij."
-              runLabel="Draai funnel-analyse"
-            />
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/kpi-relations"
-              extra={{ channel: "linkedin" }}
-              title="KPI-verhoudingen"
-              description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
-              runLabel="Analyseer verhoudingen"
-            />
-            <SignalAnalysisCard
-              clientId={clientId}
-              endpoint="/api/analysis/linkedin-signals"
-              title="LinkedIn-signalen"
-              description="Deterministische detectie: lead-form drop-off, CPL-druk, engagement- en video-zwakte, plus demografie-efficiëntie/-drift en budget-concentratie. Voedt de goedkeuringswachtrij."
-            />
-          </div>
+          <CollapsiblePanel id="analyse-kern-linkedin" icon={<Layers className="w-4 h-4 text-brand-blue-ink" />} title="Kern-analyses" subtitle="Structuur, direct uit de data">
+            <div className="p-4">
+              {/* Deterministische structuur-analyse (functie/seniority/industrie/bedrijfsgrootte), direct uit de data. */}
+              <ChannelStructureAnalysis clientId={clientId} channel="linkedin" />
+            </div>
+          </CollapsiblePanel>
+          <CollapsiblePanel id="analyse-verdieping-linkedin" defaultOpen={false} icon={<Search className="w-4 h-4 text-brand-blue-ink" />} title="Verdieping" subtitle="ICP-fit, funnel, KPI-verhoudingen, LinkedIn-signalen">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/linkedin-icp-fit"
+                title="ICP-fit"
+                description="Welk deel van de spend en leads valt binnen het ideale klantprofiel, wat is de waste en wat kost een ICP-lead vs een niet-ICP-lead."
+                runLabel="Draai ICP-fit"
+              />
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/linkedin-funnel"
+                title="Funnel-drop-off"
+                description="Vertoning → klik → landingspagina → form-open → lead over twee 28-dagen-vensters; een verslechterde fase landt in de wachtrij."
+                runLabel="Draai funnel-analyse"
+              />
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/kpi-relations"
+                extra={{ channel: "linkedin" }}
+                title="KPI-verhoudingen"
+                description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+                runLabel="Analyseer verhoudingen"
+              />
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/linkedin-signals"
+                title="LinkedIn-signalen"
+                description="Deterministische detectie: lead-form drop-off, CPL-druk, engagement- en video-zwakte, plus demografie-efficiëntie/-drift en budget-concentratie. Voedt de goedkeuringswachtrij."
+              />
+            </div>
+          </CollapsiblePanel>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} channel="linkedin_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
       )}
       {analysisChannel === "blended" && (
         <>
-          <Section>Sub-analyses</Section>
-          {/* Cross-channel als losse sub-analyse-kaarten (net als de kanalen), uit één run. */}
-          <CrossChannelAnalyses clientId={clientId} />
+          <CollapsiblePanel id="analyse-kern-blended" icon={<Layers className="w-4 h-4 text-brand-blue-ink" />} title="Sub-analyses" subtitle="Cross-channel, uit één run">
+            <div className="p-4">
+              {/* Cross-channel als losse sub-analyse-kaarten (net als de kanalen), uit één run. */}
+              <CrossChannelAnalyses clientId={clientId} />
+            </div>
+          </CollapsiblePanel>
           {/* Master Synthesis (Pijler 6) heeft pas iets kanaaloverstijgends te zeggen bij 2+
               kanalen -- zelfde grootheid (kanalen.length > 1) als meerdereKanalen elders op deze
               pagina. Bij één kanaal is elke aanbeveling per definitie van dat ene kanaal. */}
           {kanalen.length > 1 && (
-            <>
-              <Section>Pijler 6</Section>
-              <MasterSynthesisAnalysis clientId={clientId} />
-            </>
+            <CollapsiblePanel id="analyse-verdieping-blended" defaultOpen={false} icon={<Search className="w-4 h-4 text-brand-blue-ink" />} title="Pijler 6" subtitle="Master Synthesis, kanaaloverstijgend">
+              <div className="p-4">
+                <MasterSynthesisAnalysis clientId={clientId} />
+              </div>
+            </CollapsiblePanel>
           )}
         </>
       )}
