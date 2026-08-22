@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { CANONIEK_DOMEIN } from "@/lib/domein";
-import { BLOG_POSTS } from "@/lib/marketing/blog-posts";
+import { getPublishedBlogPosts } from "@/lib/marketing/blog-posts";
 
 // Ontbrak volledig (404 op productie, gemeten). Alleen de publieke marketingpagina's -- de
 // ingelogde app hoort sowieso niet in een sitemap, en staat nu ook achter O1_AUTH_ENFORCED.
@@ -15,7 +15,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${basis}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${basis}/blog`, changeFrequency: "weekly", priority: 0.7 },
   ];
-  const artikelen: MetadataRoute.Sitemap = BLOG_POSTS.map((post) => ({
+  // getPublishedBlogPosts(), niet de ruwe BLOG_POSTS: er stonden hier ook de twee drafts
+  // (published: false, zie lib/marketing/blog-posts.ts) in -- generateStaticParams filtert ze al
+  // wel uit, dus /blog/dashboard-illusie-pro-con en /blog/god-view-collectieve-marktdata gaven
+  // een 404, terwijl de sitemap ze wél aan Google en AI-crawlers aanbood. Twee dode links in je
+  // eigen sitemap is precies het soort signaal dat crawlbudget verspilt en een site minder
+  // betrouwbaar laat lijken. Gevonden bij de blog SEO/GEO-audit, 22 augustus 2026.
+  const artikelen: MetadataRoute.Sitemap = getPublishedBlogPosts().map((post) => ({
     url: `${basis}/blog/${post.slug}`,
     lastModified: post.datum,
     changeFrequency: "yearly",

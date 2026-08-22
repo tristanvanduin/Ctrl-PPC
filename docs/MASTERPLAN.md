@@ -7008,3 +7008,64 @@ tekst viel — geen productbug, geverifieerd via `innerText()` op de echte DOM-n
 
 `tsc`/`tests`/`build` groen, `view-dekking` rood om dezelfde, hier al gemelde en aan de code-
 wijzigingen onttrokken productiedrift als vorige ronde.
+
+### 17.96 Blog SEO/GEO-audit: dode links in de sitemap, en géén og:image op de hele marketingsite buiten "/" (22 augustus 2026)
+
+Eigenaar gaf de blogsectie expliciet als eigen SEO/GEO-opdracht, met de instructie dit oprecht en
+diep te doen, niet oppervlakkig. Twee vondsten, oplopend in reikwijdte.
+
+**Vondst 1 — `app/sitemap.ts` bood twee 404's aan crawlers aan.** `lib/marketing/blog-posts.ts`
+heeft twee draft-posts (`published: false`: `dashboard-illusie-pro-con`,
+`god-view-collectieve-marktdata`) die `generateStaticParams` en de blog-lijst al correct uitsluiten
+via `getPublishedBlogPosts()`. De sitemap las in plaats daarvan de ruwe `BLOG_POSTS` en zette dus
+beide concept-URL's in `/sitemap.xml`. Live bevestigd vóór de fix: beide URL's stonden in de
+sitemap en gaven allebei een 404. Fix: `getPublishedBlogPosts()` ook hier. Twee dode links in je
+eigen sitemap is precies het soort signaal dat crawlbudget verspilt en een AI-crawler of
+zoekmachine leert de rest van de sitemap met minder vertrouwen te lezen.
+
+**Vondst 2 (groter dan de opdracht, hier voor blog opgelost) — geen enkele marketingpagina buiten
+"/" had een og:image.** Bij het controleren van de per-artikel og-tags bleek `og:image` volledig te
+ontbreken op een blogartikel. Vergeleken met andere marketingpagina's: `/pricing`, `/how-it-works`,
+`/faq`, `/vs`, `/blog` en elk artikel misten hem ALLEMAAL; alleen `/` zelf had er een (uit
+`app/(marketing)/opengraph-image.tsx`, het gedeelde merk-kaartje). Root cause, nagelezen in
+`node_modules/next/dist/docs/.../generate-metadata.md` ("Merging" / "Overwriting fields"): een
+`openGraph`-object dat een pagina zelf exporteert vervangt bij Next's metadata-merge het VOLLEDIGE
+`openGraph`-object van een bovenliggend segment, inclusief een `images`-veld dat daar via het
+`opengraph-image.tsx`-bestandsconventie in zou zijn beland. Elke marketingpagina hier zet zijn
+eigen `openGraph.title`/`description` (terecht, voor eigen SERP-tekst) maar dus zonder het te
+weten ook zijn eigen image. Voor blog specifiek is dat extra jammer: een gedeeld linkje in Slack of
+LinkedIn toonde geen enkele aanwijzing welk artikel het was.
+
+Opgelost voor blog (de opdracht), niet voor de rest van de marketingsite (buiten scope, apart te
+beslissen): twee nieuwe bestanden, `app/(marketing)/blog/opengraph-image.tsx` (het merk-kaartje
+voor de bloglijst) en `app/(marketing)/blog/[slug]/opengraph-image.tsx` (dynamisch, met `params`
+zoals de Next-docs voorschrijven: leest de eigen `post.titel` en rendert die op de kaart, i.p.v.
+alleen het generieke merk). Geverifieerd: de gegenereerde PNG's (1200×630) tonen de juiste titel,
+ook de langste van de 25 (`pmax-creative-dekking`, 81 tekens) blijft binnen het canvas. **Dezelfde
+oorzaak treft `/pricing`, `/how-it-works`, `/faq`, `/vs`, `/demo` en `/login` nog steeds — als de
+eigenaar wil dat die ook een socialkaartje krijgen, is dat dezelfde soort bestand per pagina,
+maar dat is een aparte beslissing, hier bewust niet meegenomen.**
+
+**Vondst 3 (gerapporteerd, niet zelf herschreven) — 21 van de 25 gepubliceerde titels/beschrijvingen
+overschrijden Google's praktische SERP-lengte.** Een script tegen `getPublishedBlogPosts()`
+gedraaid: titels >60 tekens en meta-descriptions >160 tekens knippen in de zoekresultaten af, vaak
+midden in een zin. 15 titels en 20 descriptions raken dit (de ergste: `pmax-vijf-blinde-vlekken-in-
+een-overzicht` op 264 tekens beschrijving, `pmax-creative-dekking` op 81 tekens titel). Dit is
+tekst, geen code — bewust niet zelf herschreven, want het is een redactionele/merkstem-beslissing
+en geen bugfix. Volledige lijst met exacte tekens per post is opvraagbaar; nog te beslissen of dit
+handmatig wordt ingekort of dat er een lengte-richtlijn bijkomt voor nieuwe posts.
+
+**Verder gecontroleerd, geen bevindingen**: elke gepubliceerde post heeft minstens één `## `-
+subkop (geen enkele is een platte alinea-muur), geen dubbele slugs of titels, geen
+`gerelateerdeSlugs`-verwijzing naar een niet-bestaande of draft-post, `leesminuten` klopt nog
+steeds met de woordentelling (eerdere 12-augustus-fix hield stand). Toegevoegd: `ItemList`
+structured data op `/blog` zelf (had alleen elk artikel apart, niet de lijst) — een crawler of
+AI-antwoordmachine kan nu de volledige, geordende artikellijst met titel en URL in één keer lezen
+zonder de gerenderde HTML te hoeven parsen.
+
+Twee keer tegen een stale Turbopack-devcache aangelopen tijdens het verifiëren (zelfde patroon als
+17.94, vondst 3) — beide keren opgelost met `.next` verwijderen en een schone herstart; niet meer
+als losse vondst gemeld, want het patroon staat al gedocumenteerd.
+
+`tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijzigingen
+onttrokken productiedrift.
