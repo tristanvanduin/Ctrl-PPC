@@ -256,7 +256,15 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
                     ))}
                   </Body>
                   <TotaalRij>
-                    <TotaalCel>Totaal ({chartMonths.length} maanden)</TotaalCel>
+                    {/* De kanaaltotalen hierboven (`tot`) sommeren ALLE opgehaalde rijen, niet
+                        alleen het 6-maanden-venster van de grafiek erboven -- dat venster heet
+                        `chartMonths` en is voor recente demo-data (24 maanden historie) een stuk
+                        korter dan de werkelijke reeks. Het label gebruikte per ongeluk
+                        chartMonths.length en beweerde dus "Totaal (6 maanden)" bij een bedrag dat
+                        over de hele historie liep -- op deze klant ~4x te hoog voor wat het label
+                        zei. `months` (alle maanden in `rows`) is de tabel die er echt bij hoort;
+                        de maanddetails eronder tonen dezelfde volledige reeks. */}
+                    <TotaalCel>Totaal ({months.length} maanden)</TotaalCel>
                     <TotaalCel getal>{eur(tot.spend)}</TotaalCel>
                     <TotaalCel getal>{fmt(tot.clicks)}</TotaalCel>
                     <TotaalCel getal>{fmt(tot.conversions)}</TotaalCel>

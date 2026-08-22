@@ -6977,3 +6977,34 @@ demo-bypass mee te liften).
 `tsc`/`tests`/`build` groen, `view-dekking` rood om de hierboven genoemde, aan mijn wijzigingen
 onttrokken reden. De twee code-fixes (suppressHydrationWarning, /insights-querystring) zijn apart
 geverifieerd tegen een schone cache en veilig te committen.
+
+### 17.95 Cross-channel-tabel op het klantdashboard beweerde "6 maanden" bij een som over 24 (22 augustus 2026)
+
+Vervolg op "blijf kritisch checken", ditmaal het klantdashboard zelf (na de marketingsite en de
+achterkant-schermen) plus een bredere marketing-sweep (FAQ, Pricing, How It Works, Compare —
+desktop én 390px mobiel): geen bevindingen daar, alle zes clean.
+
+**Vondst — een kloppende som met een verkeerd label, 3,8x te hoog geleken.** Op de Overzicht-tab
+staat "Verdeling over de kanalen" (een 6-maanden-grafiek, met opzet recent: "de laatste maanden
+richting de beurs", zie het commentaar in `cross-channel-view.tsx`) direct boven "Cross-channel
+(blended)" (een tabel met kanaaltotalen over de VOLLEDIGE opgehaalde historie — die tabel filtert
+`rows` bewust niet, want de uitklapbare maandregels eronder tonen ook de volle reeks). Google's
+spend stond in de grafiekbox op € 72.000 ("TOTAAL OVER 6 MAANDEN"), en een paar centimeter lager
+in de tabel op € 273.600 onder het label "Totaal (6 maanden)" — twee kaarten naast elkaar over
+"hetzelfde" venster met bijna een factor 4 verschil, zonder dat er iets fout gerekend werd: de
+tabeltotalen (`tot`, opgebouwd uit alle `rows`) waren altijd al correct over de hele historie,
+maar het label ernaast hergebruikte per abuis `chartMonths.length` — een constante die door
+`RECENT_MONTHS = 6` altijd op 6 uitkomt, ongeacht hoeveel maanden er werkelijk in de som zaten
+(op deze klant 24, de volledige seed-historie). Fix: het label leest nu `months.length` (het
+werkelijke aantal maanden in `rows`) in plaats van `chartMonths.length`. De "Dubbeltelling"-
+waarschuwing ernaast gebruikt `chartMonths.length` wél terecht — die is expliciet berekend over
+alleen het 6-maanden-venster (`betrouwbaarheid`) en klopte al.
+
+Geverifieerd live: het label toont nu "Totaal (24 maanden)" bij dezelfde € 329.700, consistent met
+de 24 maanden Google/Meta/LinkedIn-historie die het seed-script genereert. Terzijde bevestigd: de
+"nstellingen"/"NCY MEMORY"-ogende tekstafkappingen die in twee screenshots opvielen (zijbalk,
+Compare-pagina mobiel) waren allebei de zwevende Next.js-devtools-badge die toevallig over die
+tekst viel — geen productbug, geverifieerd via `innerText()` op de echte DOM-node.
+
+`tsc`/`tests`/`build` groen, `view-dekking` rood om dezelfde, hier al gemelde en aan de code-
+wijzigingen onttrokken productiedrift als vorige ronde.
