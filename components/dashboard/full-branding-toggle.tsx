@@ -65,7 +65,11 @@ export function FullBrandingToggle({ clientId }: { clientId: string }) {
       </p>
       {error && <p className="text-meta text-red-500 mb-3">{error}</p>}
       {actief === null ? (
-        <div className="flex items-center gap-2 text-meta text-muted-foreground"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Laden...</div>
+        // Een mislukte fetch zet nooit `actief` -- die blijft de initiele null-sentinel voor
+        // "nog niet geladen". Zonder de !error-guard bleef de spinner hier voor altijd draaien
+        // NAAST de foutmelding erboven: geen bug die zichzelf herstelt, want er komt geen tweede
+        // poging. Bij een fout tonen we alleen de foutmelding, geen knop (actief is echt onbekend).
+        !error && <div className="flex items-center gap-2 text-meta text-muted-foreground"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Laden...</div>
       ) : (
         <button
           onClick={toggle}

@@ -6661,3 +6661,30 @@ Live geverifieerd met Playwright: de derde advertentiekaart toont na de fix de a
 in plaats van een lege doos (de RSA-tekst bestond al voor die ad_id, viel voorheen nooit op
 omdat de gebroken `<img>` er stil overheen bleef staan); Vandaag daalt van 56.977px naar 8.196px
 met zichtbare "Toon N meer"-knoppen per band. `POORTEN GROEN` (314/314 tests, schone rebuild).
+
+### 17.88 Een spinner die nooit stopt: God View, Beheer, Bevindingen en client-Instellingen doorgelicht (22 augustus 2026)
+
+Vervolg op 17.87 — verder gescreenshot over Beheer/admin, God View, Second opinion, Bevindingen,
+Bestanden en alle vier client-Instellingen-subtabs (Doelen & meten, Merk & uiterlijk, Beurzen &
+momenten, Account & markt).
+
+**Vondst — "Volledige branding (beheerder)" op Merk & uiterlijk toonde tegelijk een foutmelding
+én een spinner die nooit stopt.** `components/dashboard/full-branding-toggle.tsx` haalt bij
+mount de status op via `/api/admin/full-branding`; mislukt die call (hier: geen sessie), dan zet
+de code `setError(...)` maar laat `actief` op zijn initiele `null`-sentinel staan. De render-
+conditie `actief === null ? <spinner/> : <knop/>` kent geen derde staat voor "geladen, maar
+mislukt" — dus bleef de spinner naast de foutmelding draaien, voorgoed, want er komt geen tweede
+poging. **Fix**: de spinner verschijnt nu alleen als er nog geen `error` is (`!error && actief ===
+null`); bij een fout blijft alleen de foutmelding staan, geen knop (de aan/uit-status is dan
+immers echt onbekend).
+
+**Verder schoon.** God View (Cross-account & God View, k-anonieme accounts, top/bottom-10,
+portfolio-synthese) rendert correct en consistent geanonimiseerd. Bevindingen gebruikt al het
+"Toon N meer"-patroon (140 taken, 6 getoond, "Toon 134 taken meer") — bevestigt dat de aanpak uit
+17.87's Vandaag-fix het bestaande idioom van de app volgt, geen nieuw patroon. Beheer/
+Gebruikersbeheer, Second opinion, Bestanden en alle vier Instellingen-subtabs: geen gebreken.
+De Amerikaanse datumnotatie in Beurzen & momenten is dezelfde, al eerder geretraceerde browser-
+locale van de testomgeving (17.85) — niet opnieuw gemeld.
+
+`POORTEN GROEN`. Live geverifieerd: na de fix toont de kaart alleen nog de foutmelding, geen
+spinner ernaast.
