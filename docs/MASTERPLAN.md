@@ -6177,3 +6177,45 @@ draaien. Eén obstakel onderweg: een test-gebruiker van een eerdere, nooit volto
 bevestigd groen/consistent** (`rpc-rechten`, `bureaugrens`, `view-dekking` — rood maar uitgezocht
 en onschuldig bevonden, `rls-scheiding`). Geen enkele van de vier was hiervoor ooit in deze sessie
 verder gekomen dan "faalt sowieso door sandbox-placeholders".
+
+### 17.78 Dekkingsgat demo-mock gedicht: `demo-greentech` echt bijgevuld in productie (22 augustus 2026)
+
+Eigenaar gaf de echte `NEXT_PUBLIC_SUPABASE_ANON_KEY` en expliciete toestemming: "Ja, vul de mock
+data compleet aan". Eerst uitgezocht **waarom** de eerdere sandbox-verificatie de "Invalid API
+key"-fout op de Google-creative-sectie niet had kunnen bewijzen of ontkrachten: `dbSelect()`
+(`lib/data-access/client-read.ts`) gaat via de serverroute `/api/data/[table]`, die altijd
+`getSupabaseAdmin()` gebruikt — demo-mode-onbewust, ook voor `demo-greentech`. Wat een demo-
+bezoeker op die tabellen ziet komt dus uit de echte productie-database onder
+`client_id = 'demo-greentech'`, niet uit `lib/demo/demo-rows.ts`. Dat verklaart de "split-brain":
+client-side `supabase.from()`-aanroepen lopen wél via de curated mock (`lib/demo/mock-supabase.ts`),
+`dbSelect()`-aanroepen nooit.
+
+**Gat vastgesteld door schema en bestaande rijen direct te bevragen:**
+- `ads_creative_performance` voor `demo-greentech` had maar **één maand** data (2026-08-01) —
+  rechtstreeks de oorzaak van "Te weinig data" op elke creative in de fatigue-tabel.
+- `google_ads_ad_meta`: 0 rijen voor de bestaande advertenties.
+- `google_ads_image_assets`: 0 rijen — geen enkele Display-asset om te tonen.
+- `ads_product_performance_monthly`: 0 rijen — de door de eigenaar genoemde ontbrekende
+  Shopping/feed-inzichten. `merchant_center_products`/`ads_shopping_performance` bestaan niet als
+  tabellen, dus Shopping-cijfers lopen via deze Performance Max-productrijen.
+
+**Idempotent seedscript geschreven en echt gedraaid** (eerst dry-run, toen tegen productie):
+4 maanden creative-performance-historie voor de 5 bestaande search-ads plus 1 nieuwe Display-ad,
+`google_ads_ad_meta` voor alle 6 advertenties, `google_ads_image_assets` voor de Display-ad (3
+veldtypes), en `ads_product_performance_monthly` voor 5 fictieve GreenTech-tuinbouwproducten × 4
+maanden. Resultaat: 24 / 7 / 3 / 20 rijen geschreven, nul duplicaten (eerst verwijderd op
+ad_id/maand voor idempotentie, dan pas ingevoegd). Script niet in `scripts/` opgenomen — eenmalige
+databijvulling, geen herbruikbare tool; verwijderd uit de werkmap na de run.
+
+**Live geverifieerd, niet alleen op rijenaantal.** Lokale server herstart mét de echte
+credentials (niet de sandbox-placeholders — anders bewijst een test opnieuw niets, zie hierboven),
+Playwright naar `/client/demo-greentech?demo=1` → Campagnes → Google Ads. Screenshot bevestigt:
+de "Creative Performance — Google"-kaart toont nu 3 echte creative-cards met echte cijfers (geen
+"Invalid API key" meer), een nieuw samenvattings-/aanbevelingenblok, "Creative-vermoeidheid" toont
+alle 5 creatives met echte sparklines, stuk voor stuk "Stabiel" in plaats van "Te weinig data", en
+de RSA-asset-uitsplitsing rendert normaal.
+
+**Nog niet aangepakt:** de geo-kloon-democliënten (`demo-grt`/`demo-gra`/`demo-grn`) zijn aparte
+`client_id`'s en zijn deze pas niet aangeraakt — als daar dezelfde gaten zitten, is dat nog open.
+De eigenaars klacht "meerdere cijfers leeg" was generiek; dit dicht het aantoonbare gat op
+`demo-greentech`, niet noodzakelijk elk denkbaar leeg cijfer elders in de demo.
