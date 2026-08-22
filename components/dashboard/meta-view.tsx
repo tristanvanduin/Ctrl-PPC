@@ -14,7 +14,7 @@ import { GeoRanglijstCard } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoClient } from "@/lib/demo/demo-mode";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/meta/campaign-types";
 import { buildMetaObjectiveBreakdown, type MetaObjectiveDailyRow } from "@/lib/meta/objective-breakdown";
 import { ObjectiveInsights, type ObjectiveGroupLike } from "./objective-insights";
@@ -136,16 +136,14 @@ function useMetaObjectiveGroups(clientId: string): ObjectiveGroupLike[] | null {
   const [groups, setGroups] = useState<ObjectiveGroupLike[] | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setGroups([]); return; }
     let cancelled = false;
     setGroups(null);
     const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
     const DAILY_SELECT = "entity_id, spend, impressions, reach, frequency, link_clicks, cpm, cpc_link, ctr_link, conversions, conversion_value, purchase_roas, cpa, roas, leads, add_to_cart, initiate_checkout, landing_page_views, video_thruplay, post_engagement, hook_rate, hold_rate";
 
     Promise.all([
-      sb.from("meta_campaigns").select("campaign_id, name, objective").eq("client_id", clientId),
-      sb.from("meta_campaign_daily").select(DAILY_SELECT).eq("client_id", clientId).gte("date", since),
+      dbSelect<Record<string, unknown>>("meta_campaigns", { select: "campaign_id, name, objective", clientId }),
+      dbSelect<Record<string, unknown>>("meta_campaign_daily", { select: DAILY_SELECT, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
     ]).then(([campRes, dailyRes]) => {
       if (cancelled) return;
       const campaigns = ((campRes.data ?? []) as Record<string, unknown>[]).map((r) => ({

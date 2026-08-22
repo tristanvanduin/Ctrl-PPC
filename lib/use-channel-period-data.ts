@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { dbSelectOne } from "@/lib/data-access/client-read";
+import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
 import {
   resolveChannelConversionConfig, sumSelectedConversions,
   type ChannelConversionConfig, type ChannelConversionChannel,
@@ -16,10 +15,16 @@ import type { ClientHistoricalData, MonthlyRecord } from "@/lib/types";
 // samen op voor "blended" (de standaardweergave, "Alle kanalen") -- zodat client-dashboard.tsx aan
 // PeriodSummary precies dezelfde vorm data kan geven, welk kanaal er ook actief is.
 //
-// Bewust dezelfde bron als ChannelPerformance (rechtstreekse supabase.from(), demo-bewust via
-// lib/supabase.ts) en dezelfde conversieselectie (resolveChannelConversionConfig/
+// Bewust dezelfde bron als ChannelPerformance (dbSelect, dus altijd de echte database, ook in
+// demo-modus) en dezelfde conversieselectie (resolveChannelConversionConfig/
 // sumSelectedConversions uit lib/analysis/channel-conversion-config.ts) -- zodat de KPI-rij en de
 // kanaal-eigen ChannelPerformance-kaart nooit een ander getal voor dezelfde conversie tonen.
+//
+// 22 augustus 2026: dit las tot nu toe rechtstreeks met supabase.from(), wat in demo-modus via de
+// demo-mock liep -- de tegenhanger, ChannelPerformance, is in dezelfde ronde net van hetzelfde
+// patroon naar dbSelect omgezet. Was dit blijven staan, dan waren de twee juist uit elkaar gaan
+// lopen: de KPI-rij bovenaan de pagina met een ander cijfer dan de kaart eronder, voor exact
+// dezelfde metriek.
 //
 // `weeks` blijft overal een lege array: comparePeriods()/slicePeriod() (lib/period/apply-period.ts)
 // gebruiken alleen month/conversions/revenue/adSpend uit een MonthlyRecord, nooit .weeks -- die is
@@ -57,15 +62,15 @@ const CONFIG: Record<MetaLinkedIn, RowConfig> = {
 interface MaandTotaal { year: number; month: number; conversions: number; revenue: number; adSpend: number }
 
 async function fetchChannelMonths(clientId: string, channel: MetaLinkedIn, convConfig: ChannelConversionConfig): Promise<MaandTotaal[]> {
-  const sb = supabase;
-  if (!sb) return [];
   const cfg = CONFIG[channel];
   // Twee jaar: genoeg venster voor "vorig jaar"-vergelijkingen waar de data dat toelaat. Minder
   // diep dan dat levert eerlijk "ontbrekende maanden" op via slicePeriod() -- geen aanname, geen
   // stille kortere reeks.
   const since = new Date(Date.now() - 730 * 86_400_000).toISOString().slice(0, 10);
-  const { data } = await sb.from(cfg.accountTable).select(cfg.select).eq("client_id", clientId).gte("date", since);
-  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  const { data } = await dbSelect<Record<string, unknown>>(cfg.accountTable, {
+    select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }],
+  });
+  const rows = data;
 
   const byMonth = new Map<string, MaandTotaal>();
   for (const r of rows) {

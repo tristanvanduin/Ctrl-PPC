@@ -113,6 +113,18 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // 096_rls_auth_read_opruiming.sql voor de overige vijf tabellen met dezelfde oude policy, die
   // geen van alle een browser-lezer hebben en dus zonder deze stap al veilig zijn.
   ads_video_placements: { capability: "client:read", clientColumn: "client_id" },
+
+  // 22 augustus 2026: dezelfde split-brain-bug als hierboven, gevonden bij een systematische grep
+  // op resterende supabase.from()-lezers na de derde ronde. channel-performance.tsx ("Maand-
+  // prestaties", gemount in elke Meta/LinkedIn-view), cross-channel-view.tsx (het Cross-channel/
+  // blended-tabblad) en channel-structure-analysis.tsx (de signaaldetectie op Analyse & advies)
+  // lazen deze drie tabellen nog rechtstreeks met de anon-key -- in demo-modus dus via de
+  // demo-mock met lege of niet-matchende fixtures, terwijl de rest van diezelfde schermen al via
+  // dbSelect liep. Zelfde symptoom als eerder: kaarten die voor demo-klanten leeg of nul draaien
+  // terwijl de identieke code voor een echte klant gewoon werkt.
+  meta_account_daily: { capability: "client:read", clientColumn: "client_id" },
+  linkedin_account_daily: { capability: "client:read", clientColumn: "client_id" },
+  blended_account_monthly: { capability: "client:read", clientColumn: "client_id" },
 };
 
 export function isReadableTable(table: string): boolean {

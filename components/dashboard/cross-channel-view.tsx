@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Globe, Info, Layers, Loader2, TrendingUp, TriangleAlert } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
 import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
@@ -54,19 +54,17 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setRows(null); setError(null);
-    sb.from("blended_account_monthly")
-      .select("month, channel, currency, impressions, clicks, spend, conversions, conversion_value, leads")
-      .eq("client_id", clientId)
-      .order("month", { ascending: false })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) setError(error.message);
-        else setRows((data ?? []) as BlendedRow[]);
-      });
+    dbSelect<BlendedRow>("blended_account_monthly", {
+      select: "month, channel, currency, impressions, clicks, spend, conversions, conversion_value, leads",
+      clientId,
+      order: { column: "month", ascending: false },
+    }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) setError(error.message);
+      else setRows(data);
+    });
     return () => { cancelled = true; };
   }, [clientId]);
 

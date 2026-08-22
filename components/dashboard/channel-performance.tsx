@@ -3,8 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Calendar, TrendingUp, Gauge, BarChart3 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { dbSelectOne } from "@/lib/data-access/client-read";
+import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { today as vandaag } from "@/lib/reporting-date";
@@ -106,17 +105,15 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setAccount(null); setError(null);
     const since = new Date(Date.now() - 200 * 86_400_000).toISOString().slice(0, 10);
     Promise.all([
-      sb.from(cfg.accountTable).select(cfg.select).eq("client_id", clientId).gte("date", since),
+      dbSelect<Record<string, unknown>>(cfg.accountTable, { select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
       // Campagne-dagdata over het volle venster: nodig zodra een beurs gekozen is, want de
       // account-tabel draagt geen campagnenaam en kan dus niet per beurs gesplitst worden.
-      sb.from(cfg.campaignTable).select(cfg.select).eq("client_id", clientId).gte("date", since),
-      sb.from(cfg.nameTable).select(`${cfg.nameId}, name`).eq("client_id", clientId),
+      dbSelect<Record<string, unknown>>(cfg.campaignTable, { select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
+      dbSelect<Record<string, unknown>>(cfg.nameTable, { select: `${cfg.nameId}, name`, clientId }),
       dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId }),
     ]).then(([accRes, campRes, nameRes, settingsRes]) => {
       if (cancelled) return;

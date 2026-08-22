@@ -51,6 +51,19 @@ function demoClientIdInPath(pathname: string): string | null {
   return isDemoClientId(id) ? id : null;
 }
 
+// 22 augustus 2026: de Decision Terminal (components/terminal/decision-terminal-page.tsx) draagt
+// de klant bewust NIET in het pad maar in ?client= (zie de toelichting daar: geen eigen route per
+// klant, één pagina). demoClientIdInPath hierboven kende alleen /client/<id> en miste dat, dus
+// gaf isDemoMode() op een verse tab op /decision-terminal?client=demo-greentech "false" terug --
+// exact het patroon dat hierboven al is gedocumenteerd voor het pad, nu via de querystring. Zichtbaar
+// gevolg: de hoofdinhoud (die zelf clientId al uit de URL leest) toonde gewoon demodata, maar de
+// zijbalk eromheen -- die via getAllClients()/isDemoMode() loopt -- toonde "KLANTEN (0)".
+function demoClientIdInQuery(search: string): string | null {
+  const id = new URLSearchParams(search).get("client");
+  if (!id) return null;
+  return isDemoClientId(id) ? id : null;
+}
+
 export function isDemoMode(): boolean {
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") return true;
   if (typeof window === "undefined") return false;
@@ -67,7 +80,7 @@ export function isDemoMode(): boolean {
       return false;
     }
     if (window.sessionStorage.getItem(SLEUTEL) === "1") return true;
-    if (demoClientIdInPath(window.location.pathname)) {
+    if (demoClientIdInPath(window.location.pathname) || demoClientIdInQuery(window.location.search)) {
       window.sessionStorage.setItem(SLEUTEL, "1");
       return true;
     }
@@ -78,7 +91,7 @@ export function isDemoMode(): boolean {
       const param = new URLSearchParams(window.location.search).get("demo");
       if (param === "1") return true;
       if (param === "0") return false;
-      return demoClientIdInPath(window.location.pathname) !== null;
+      return demoClientIdInPath(window.location.pathname) !== null || demoClientIdInQuery(window.location.search) !== null;
     } catch {
       return false;
     }

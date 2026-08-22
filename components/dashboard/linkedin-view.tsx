@@ -14,7 +14,7 @@ import { GeoRanglijstCard } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoClient } from "@/lib/demo/demo-mode";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/linkedin/campaign-types";
 import { buildLinkedInObjectiveBreakdown } from "@/lib/linkedin/objective-breakdown";
 import { ObjectiveInsights, type ObjectiveGroupLike } from "./objective-insights";
@@ -115,16 +115,14 @@ function useLinkedInObjectiveGroups(clientId: string): ObjectiveGroupLike[] | nu
   const [groups, setGroups] = useState<ObjectiveGroupLike[] | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setGroups([]); return; }
     let cancelled = false;
     setGroups(null);
     const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
     const DAILY_SELECT = "entity_urn, spend, impressions, clicks, ctr, cpc, cpm, landing_page_clicks, one_click_lead_form_opens, one_click_leads, external_website_conversions, post_click_conversions, conversion_value, cpl, form_completion_rate, video_starts, video_views, video_completions, video_completion_rate, total_engagements, follows, reactions, comments, shares";
 
     Promise.all([
-      sb.from("linkedin_campaigns").select("campaign_urn, name, objective_type").eq("client_id", clientId),
-      sb.from("linkedin_campaign_daily").select(DAILY_SELECT).eq("client_id", clientId).gte("date", since),
+      dbSelect<Record<string, unknown>>("linkedin_campaigns", { select: "campaign_urn, name, objective_type", clientId }),
+      dbSelect<Record<string, unknown>>("linkedin_campaign_daily", { select: DAILY_SELECT, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
     ]).then(([campRes, dailyRes]) => {
       if (cancelled) return;
       const campaigns = ((campRes.data ?? []) as Record<string, unknown>[]).map((r) => ({

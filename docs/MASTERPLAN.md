@@ -6536,3 +6536,77 @@ de headless testomgeving, niet van de code.
 
 Live geverifieerd (directe SQL-query tegen productie vóór én na de fix, niet een schermafdruk).
 `POORTEN GROEN`.
+
+### 17.86 Systematische grep op de split-brain-bug: negen bestanden, plus een KLANTEN(0)-bug in de Decision Terminal (22 augustus 2026)
+
+Na 17.82-17.85 vroeg de gebruiker het expliciet: "Dus je bent 100% zeker dat ik geen feedback
+meer ga vinden?" Eerlijk antwoord: nee. Elke vorige ronde die zich "compleet" voelde, leverde de
+volgende ronde weer een nieuwe instantie van hetzelfde bugpatroon op — dat is een signaal, geen
+toeval. Dus in plaats van weer schermpje voor schermpje hopen dat het opvalt: een systematische
+`grep` op het patroon zelf (`import { supabase } from "@/lib/supabase"` gecombineerd met
+`.from(` in dashboard-componenten), plus de nog niet bekeken pagina's (Decision Terminal,
+Scripts, Code Rood, /clients).
+
+**De grep vond negen resterende bestanden met dezelfde split-brain-bug** (rechtstreekse
+`supabase.from()`, die in demo-modus via de demo-mock loopt en dus alleen de curated fixture in
+`demo-rows.ts` ziet, niet de doorgeseede echte database):
+
+- `components/dashboard/linkedin-view.tsx` / `meta-view.tsx` — de objective-breakdown-donut
+  ("Waar gaat het budget heen") las `linkedin_campaigns`/`linkedin_campaign_daily` resp.
+  `meta_campaigns`/`meta_campaign_daily` rechtstreeks. Stond voor demo-klanten op nul.
+- `components/dashboard/channel-performance.tsx` — **de grootste vondst van deze ronde**: dit is
+  `ChannelPerformance`, gemount als "Maandprestaties" in ELKE Meta- en LinkedIn-view (Kerncijfers,
+  pacing, maandtabel, campagnetabel). Las `meta_account_daily`/`linkedin_account_daily`
+  (accounttabel), `meta_campaign_daily`/`linkedin_campaign_daily` (campagnetabel) én
+  `meta_campaigns`/`linkedin_campaigns` (naamtabel) alle drie rechtstreeks.
+- `lib/use-channel-period-data.ts` — voedt de KPI-rij bovenaan het klantdashboard op elk
+  kanaaltabblad. De eigen code-comment zei expliciet "bewust dezelfde bron als
+  ChannelPerformance" om te garanderen dat de KPI-rij en de kaart eronder nooit een ander getal
+  tonen — maar las zelf ook rechtstreeks. Was dit blijven staan terwijl ChannelPerformance wél
+  gefixt werd, waren de twee juist voor het eerst uit elkaar gaan lopen: exact de tegenovergestelde
+  bug van wat de comment beloofde.
+- `components/dashboard/cross-channel-view.tsx` — het hele Cross-channel/blended-tabblad
+  (`blended_account_monthly`) rechtstreeks.
+- `components/dashboard/geo-clone-overview.tsx` — het beursoverzicht per geo-kloon
+  (`ads_campaign_monthly`) rechtstreeks; relevant omdat geo-klonen per definitie demo-only zijn.
+- `components/dashboard/channel-structure-analysis.tsx` — de signaaldetectie op Analyse & advies
+  (budgetconcentratie, weekdag-efficiëntie, tracking-gaps, dagdeel-spreiding) mixte `dbSelect()`
+  voor de ene helft van zijn databronnen met rechtstreekse `supabase.from()` voor
+  `meta_campaign_daily`, `meta_account_daily`, `linkedin_campaign_daily`, `linkedin_account_daily`
+  — dezelfde detectiefunctie kreeg dus voor demo-klanten deels echte, deels lege data.
+- `components/layout/sidebar.tsx` — de geo-kloon-detectie in de zijbalk (welke sub-beurzen onder
+  een klant getoond worden) las `ads_campaign_monthly` rechtstreeks.
+
+**Fix**: alle negen naar `dbSelect()`, drie tabellen (`meta_account_daily`,
+`linkedin_account_daily`, `blended_account_monthly`) toegevoegd aan `READABLE_TABLES` in
+`lib/data-access/read-policy.ts`. `linkedin_urn_labels` (een gedeelde opzoektabel zonder
+`client_id`) blijft bewust rechtstreeks — die valt buiten dit patroon, staat al zo gedocumenteerd
+in `channel-structure-analysis.tsx`. `video-performance.tsx` gebruikt óók nog `supabase.from()`,
+maar special-cast élke demo-klant vóór die aanroep naar een eigen statische fixture
+(`lib/demo/video-demo.ts`) — voor demo-klanten wordt de rechtstreekse call dus nooit bereikt, geen
+bug, niet aangepast.
+
+**Los daarvan, bij het doorlopen van Decision Terminal (`/decision-terminal?client=<id>`,
+bewust nog niet in de navigatie): de zijbalk toonde "KLANTEN (0)" terwijl het hoofdpaneel gewoon
+demodata liet zien.** Root cause in `lib/demo/demo-mode.ts`: `isDemoMode()` herkent demo-modus via
+`?demo=1`, een sessionStorage-vlag, of een pad dat op `/client/<demo-id>` lijkt — maar de Decision
+Terminal draagt de klant bewust niet in het pad, in `?client=` (zie de toelichting in
+`decision-terminal-page.tsx`: geen eigen route per klant, één pagina). Op een verse tab, direct
+naar die URL genavigeerd, herkende `isDemoMode()` dat niet, dus voegde `getAllClients()` de
+demo-klant niet toe aan de zijbalklijst — exact het "KLANTEN (0)"-patroon dat al gedocumenteerd
+stond in `sidebar.tsx` voor een andere oorzaak (een falende `Promise.all` naar `app_settings`),
+nu via een derde weg. **Fix**: `demoClientIdInQuery()` toegevoegd naast het bestaande
+`demoClientIdInPath()`, checkt `?client=` op dezelfde manier.
+
+Live geverifieerd: Playwright-doorloop van de LinkedIn- en Meta-tab op `demo-greentech` toont nu
+volledig gevulde, consistente cijfers door de hele pagina heen, inclusief de eerder kapotte
+"Waar gaat het budget heen"-donuts (LinkedIn: €3.480 verdeeld over Education/Operations; Meta:
+€2.146 verdeeld over Feed/Reels/Stories) en de maand-/campagnetabellen. Decision Terminal toont na
+de fix "KLANTEN (1)" met GreenTech (demo) in de zijbalk, op alle vier tabbladen. Scripts, /clients
+en de overige Decision Terminal-tabbladen (Attribution View, Decision Log, Trackrecord) zijn
+schoon — geen gebreken gevonden. Code Rood-pagina gaf "Niet ingelogd": terecht, die route vereist
+een echte sessie (`requireCapability`) ongeacht demo-modus, en deze testomgeving heeft er geen —
+geen bug, geen fix.
+
+`POORTEN GROEN` (schone rebuild, 314/314 tests). Geen andere resterende `supabase.from()`-lezers
+gevonden buiten de hierboven genoemde, bewust ongemoeide uitzonderingen.

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Loader2, MapPin, Info, TrendingUp } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { dbSelect } from "@/lib/data-access/client-read";
 import { aggregateCampaignMonthlyByGeoClone, type CampaignMonthlyRow } from "@/lib/fair/geo-clone-aggregate";
 import { FAIR_GEO_CLONES } from "@/lib/fair/geo-clone-catalog";
 import { SignalAnalysisCard } from "./signal-analysis-card";
@@ -49,19 +49,17 @@ export function GeoCloneOverview({ clientId, geoClone }: { clientId: string; geo
   const label = variant ? `${variant.brand} ${variant.location}` : geoClone;
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setRows(null); setError(null);
-    sb.from("ads_campaign_monthly")
-      .select("campaign_name, month, impressions, clicks, cost, conversions, conversions_value")
-      .eq("client_id", clientId)
-      .order("month", { ascending: true })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) setError(error.message);
-        else setRows((data ?? []) as CampaignMonthlyRow[]);
-      });
+    dbSelect<CampaignMonthlyRow>("ads_campaign_monthly", {
+      select: "campaign_name, month, impressions, clicks, cost, conversions, conversions_value",
+      clientId,
+      order: { column: "month", ascending: true },
+    }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) setError(error.message);
+      else setRows(data);
+    });
     return () => { cancelled = true; };
   }, [clientId]);
 

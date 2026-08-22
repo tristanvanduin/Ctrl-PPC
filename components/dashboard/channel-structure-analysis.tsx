@@ -48,8 +48,6 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setStories(null); setError(null);
     const since = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
@@ -74,9 +72,9 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
             select: "breakdown_type, breakdown_value, date, impressions, link_clicks, spend, conversions",
             clientId, filters: [{ op: "gte", column: "date", value: since }],
           }),
-          sb!.from("meta_campaign_daily").select("entity_id, spend, conversions").eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("meta_campaign_daily", { select: "entity_id, spend, conversions", clientId, filters: [{ op: "gte", column: "date", value: since }] }),
           dbSelect<{ campaign_id: string; name: string | null }>("meta_campaigns", { select: "campaign_id, name", clientId }),
-          sb!.from("meta_account_daily").select("date, spend, conversions, link_clicks").eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("meta_account_daily", { select: "date, spend, conversions, link_clicks", clientId, filters: [{ op: "gte", column: "date", value: since }] }),
           dbSelect<Record<string, unknown>>("meta_hourly_performance", {
             select: "hour, spend, conversions", clientId, filters: [{ op: "gte", column: "date", value: since }],
           }),
@@ -113,10 +111,10 @@ export function ChannelStructureAnalysis({ clientId, channel }: { clientId: stri
           }),
           // linkedin_urn_labels is een gedeelde opzoektabel zonder client_id: blijft de
           // rechtstreekse anon-lezer, buiten migratie 067's scope (zie de kop van die migratie).
-          sb!.from("linkedin_urn_labels").select("urn, label"),
-          sb!.from("linkedin_campaign_daily").select("entity_urn, spend, one_click_leads").eq("client_id", clientId).gte("date", since),
+          supabase ? supabase.from("linkedin_urn_labels").select("urn, label") : Promise.resolve({ data: [] as { urn: string; label: string }[] }),
+          dbSelect<Record<string, unknown>>("linkedin_campaign_daily", { select: "entity_urn, spend, one_click_leads", clientId, filters: [{ op: "gte", column: "date", value: since }] }),
           dbSelect<{ campaign_urn: string; name: string | null }>("linkedin_campaigns", { select: "campaign_urn, name", clientId }),
-          sb!.from("linkedin_account_daily").select("date, spend, one_click_leads, clicks").eq("client_id", clientId).gte("date", since),
+          dbSelect<Record<string, unknown>>("linkedin_account_daily", { select: "date, spend, one_click_leads, clicks", clientId, filters: [{ op: "gte", column: "date", value: since }] }),
         ]);
         if (demoErr) { if (!cancelled) { setError(demoErr.message); setStories([]); } return; }
         const urnLabel = new Map((labels ?? []).map((l) => [String(l.urn), String(l.label)]));
