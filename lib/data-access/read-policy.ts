@@ -65,6 +65,16 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // dbSelect lopen, dezelfde bron als de identiteitstabellen, geen tweede waarheid meer.
   meta_ad_daily: { capability: "client:read", clientColumn: "client_id" },
   linkedin_creative_daily: { capability: "client:read", clientColumn: "client_id" },
+  // Zelfde route, gevonden in components/dashboard/campaigns-per-channel.tsx ("Wat er draait"):
+  // de campagnenamen kwamen al via dbSelect (meta_campaigns/linkedin_campaigns, dus de echte
+  // database), maar de dagcijfers waarmee ze aan elkaar geknoopt worden nog via supabase.from() --
+  // in demo-modus dus de demo-mock. De curated LinkedIn-fixture in demo-rows.ts gebruikt een eigen
+  // URN-schema (urn:li:demo:1...) dat niets te maken heeft met wat de echte, inmiddels doorgeseede
+  // database voor demo-greentech draagt (urn:li:sponsoredCampaign:demo1...) -- dus de naam-
+  // opzoeking trof nooit een match en viel terug op de rauwe URN als "naam". Beide kanten nu op
+  // dezelfde bron.
+  meta_campaign_daily: { capability: "client:read", clientColumn: "client_id" },
+  linkedin_campaign_daily: { capability: "client:read", clientColumn: "client_id" },
   // Dezelfde route als de twee hierboven, voor Google's kant van creative-performance.tsx --
   // deze drie "toevallig" al goed omdat de curated demo-rows.ts-ad-id's daar (nog) matchten met
   // de echte database, maar dat was geluk, geen garantie. Nu structureel gelijk aan de rest.

@@ -30,7 +30,6 @@ import { mergeDetections } from "@/lib/signals/types";
 import { analyzeFunnelOverlap, deriveLinkedInAudienceKind, type CampaignFunnelInput } from "@/lib/cross-channel/funnel-overlap";
 import type { TargetingSummary } from "@/lib/linkedin/entities";
 import { today } from "@/lib/reporting-date";
-import { supabaseForClient } from "@/lib/demo/server-supabase";
 
 const SECTION = "cross_channel_v1";
 // Additieve sectie: de sub-analyses als losse blokken (JSON), zodat de UI de cross-channel-
@@ -56,9 +55,16 @@ const PIVOT_TO_DIMENSION: Record<string, AudienceDimension> = {
 export async function GET(request: NextRequest) {
   const clientId = new URL(request.url).searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  // Demo-rijen voor de demo-klant, de echte client voor de rest. Zonder dit gaf deze route in
-  // demo-modus een 500 en bleef het tabblad Analyse leeg.
-  const supabase = supabaseForClient(clientId);
+  // 22 augustus 2026: was supabaseForClient() (de demo-mock voor de demo-klant). Deze GET doet
+  // uitsluitend twee read-only sop_analysis_output-selects, geen van de zware signaal-berekening
+  // hieronder (die zit in POST) -- de "500 in demo-modus"-zorg waar dit ooit voor werd toegevoegd
+  // gaat hier niet op. De demo-mock heeft bovendien geen curated cross_channel-rij (alleen
+  // budget_allocation/google_video/geo_markets, zie lib/demo/analyses-demo.ts), terwijl de echte
+  // database voor demo-greentech een reële cross_channel-run draagt -- de "Sub-analyses"-kaart zei
+  // daardoor "Nog niet gedraaid" terwijl de analyse-lijst (analysis-overview.tsx, altijd al via
+  // dbSelect dus de echte database) diezelfde run "UITGEVOERD" toonde, tegenstrijdig op één pagina.
+  // Altijd de echte database voor deze status-check, zoals analysis-overview.tsx al deed.
+  const supabase = getSupabase();
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
   const [{ data }, { data: groupsRow }] = await Promise.all([

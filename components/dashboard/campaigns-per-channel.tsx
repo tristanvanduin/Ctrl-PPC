@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
@@ -34,8 +33,6 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sb = supabase;
-    if (!sb) { setError("Supabase is niet geconfigureerd"); return; }
     let cancelled = false;
     setBlocks(null); setError(null);
     const sinceMonth = new Date(Date.now() - 200 * 86_400_000).toISOString().slice(0, 10);
@@ -43,11 +40,17 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
 
     async function load() {
       const [gRes, mNamesRes, mDailyRes, lNamesRes, lDailyRes] = await Promise.all([
-        sb!.from("ads_campaign_monthly").select("campaign_name, month, cost, conversions").eq("client_id", clientId).gte("month", sinceMonth),
+        dbSelect<{ campaign_name: string | null; month: string; cost: number | null; conversions: number | null }>("ads_campaign_monthly", {
+          select: "campaign_name, month, cost, conversions", clientId, filters: [{ op: "gte", column: "month", value: sinceMonth }],
+        }),
         dbSelect<{ campaign_id: string; name: string | null }>("meta_campaigns", { select: "campaign_id, name", clientId }),
-        sb!.from("meta_campaign_daily").select("entity_id, spend, conversions").eq("client_id", clientId).gte("date", sinceDay),
+        dbSelect<{ entity_id: string; spend: number | null; conversions: number | null }>("meta_campaign_daily", {
+          select: "entity_id, spend, conversions", clientId, filters: [{ op: "gte", column: "date", value: sinceDay }],
+        }),
         dbSelect<{ campaign_urn: string; name: string | null }>("linkedin_campaigns", { select: "campaign_urn, name", clientId }),
-        sb!.from("linkedin_campaign_daily").select("entity_urn, spend, one_click_leads").eq("client_id", clientId).gte("date", sinceDay),
+        dbSelect<{ entity_urn: string; spend: number | null; one_click_leads: number | null }>("linkedin_campaign_daily", {
+          select: "entity_urn, spend, one_click_leads", clientId, filters: [{ op: "gte", column: "date", value: sinceDay }],
+        }),
       ]);
       if (cancelled) return;
 

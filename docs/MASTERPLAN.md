@@ -6447,3 +6447,56 @@ witruimte-gebrek te hebben als 17.82's `geo-breakdown.tsx`-fix — bij het daadw
 (kaart-element-screenshot + bounding box) bleek de kaart al 598 van de 624px kaartbreedte te
 vullen. Vals alarm, met opzet hier vermeld: een vermoeden dat bij het meten niet standhoudt hoort
 niet als bevinding te blijven staan.
+
+### 17.84 De twee vervolgpunten uit 17.83 opgelost, plus een derde plek met dezelfde bug gevonden (22 augustus 2026)
+
+Eigenaar: "Pak de twee openstaande punten ook op. En je hebt verder geen dingen gevonden???" —
+terechte vraag; bij het daadwerkelijk oplossen van de twee bekende punten bleek de tweede zich
+over een derde bestand uit te strekken dat nog niet was bekeken.
+
+**1. "Wat er draait" (`components/dashboard/campaigns-per-channel.tsx`) toonde voor Meta ÉN
+LinkedIn rauwe ID's/URN's** in plaats van campagnenamen — niet alleen LinkedIn, zoals 17.83 nog
+dacht; Meta had exact dezelfde vorm (`demo-mcamp-pro` i.p.v. "GreenTech Blog Traffic"). Zelfde
+patroon als 17.83's hoofdvondst: de campagnenamen kwamen al via `dbSelect` (`meta_campaigns`,
+`linkedin_campaigns` — dus altijd de echte database), maar de dagcijfers waarmee ze aan elkaar
+geknoopt worden (`meta_campaign_daily`, `linkedin_campaign_daily`, en ook Google's
+`ads_campaign_monthly`) nog via `supabase.from()`. Voor LinkedIn specifiek: de curated
+demo-rows.ts-fixture gebruikt een eigen URN-schema (`urn:li:demo:1...`) dat niets te maken heeft
+met wat de echte, inmiddels doorgeseede database voor `demo-greentech` draagt
+(`urn:li:sponsoredCampaign:demo1...`, geverifieerd met een rechtstreekse query) — de naam-
+opzoeking trof dus nooit een match en viel terug op de rauwe entity-id. Alle drie tabellen lopen nu
+via `dbSelect`; `meta_campaign_daily` en `linkedin_campaign_daily` toegevoegd aan
+`read-policy.ts`'s allowlist.
+
+**2. Analyse & advies-tegenstrijdigheid.** `app/api/analysis/cross-channel/route.ts`'s GET-
+handler gebruikte `supabaseForClient()` (de demo-mock) voor de status-check — met als reden, uit
+het bestaande commentaar, "anders 500 in demo-modus". Die zorg bleek niet meer te kloppen voor
+deze specifieke GET: hij doet uitsluitend twee read-only `sop_analysis_output`-selects, geen van
+de zware signaal-berekening die verderop in hetzelfde bestand (de POST) staat. De demo-mock heeft
+bovendien geen gecureerde `cross_channel`-rij (`lib/demo/analyses-demo.ts` kent alleen
+`budget_allocation`/`google_video`/`geo_markets`), terwijl de echte database voor
+`demo-greentech` een reële, complete cross-channel-run draagt (geverifieerd: acht rijen,
+`analysis_date` 17-19 augustus 2026). GET gebruikt nu `getSupabase()` (de admin-client, ook al
+gebruikt in dezelfde file's POST), dezelfde bron als `analysis-overview.tsx` (de "Alle
+analyses"-lijst) altijd al gebruikte.
+
+**3. Bij het narekennen van punt 1 bleek `components/dashboard/creative-deep-dive.tsx`
+(de Creative-vermoeidheidstabel op Analyse & advies) exact dezelfde vorm van de bug te dragen** —
+niet gevonden tijdens de eerste doorloop, wel bij het gericht doorlichten van elke plek die
+dezelfde vijf tabellen aanraakt. Google's `google_ads_rsa_assets`, Meta's `meta_ad_daily` en
+LinkedIn's `linkedin_creative_daily` liepen hier ook nog via `supabase.from()` — dezelfde tabellen
+die 17.83 al voor `creative-performance.tsx` naar `dbSelect` had gezet, dus geen nieuwe
+`read-policy.ts`-regels nodig, alleen de aanroepen zelf. Dit is de bron van de rauwe
+"urn:li:demo:cr1"-labels in de vermoeidheidstabel die 17.83 als apart, cosmetisch punt noteerde —
+bij het echt oplossen bleek het dezelfde architectuurfout te zijn, niet een los naam-probleem.
+
+**Live geverifieerd**: "Wat er draait" toont nu voor alle drie kanalen leesbare namen (Meta:
+"GreenTech Blog Traffic", "GRA | Awareness US", ...; LinkedIn: "GreenTech Gids Downloads", "GRT
+ABM Benelux", ...). De "Sub-analyses"-kaart toont nu "Laatst: 2026-08-19" met de zeven echte
+sub-analyses (Cross-funnel, Zaai-oogst & mix-shift, KPI-verhoudingen, Doelgroep-samenhang, GA4 CRO,
+Data-volledigheid, Bereikkosten & verzadiging) — geen tegenstrijdigheid meer met de analyselijst
+eronder. `POORTEN GROEN`.
+
+Geen nieuwe openstaande punten over van deze ronde. De bredere check gaat verder waar 17.82/17.83
+nog niet is geweest: marketing-pagina's, Beheer/admin, en de Instellingen-subtabs zijn nog niet
+met dezelfde diepgang doorgelicht.
