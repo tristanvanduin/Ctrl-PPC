@@ -2,7 +2,9 @@
 
 // W1.2 (O1): login met e-mail en wachtwoord. Invite-only: publieke signup staat uit in
 // Supabase; accounts ontstaan via de admin-invite (vervolgstap 5e). Wachtwoord-vergeten
-// stuurt de standaard Supabase-resetmail. LIVE-ONGETEST tot de WL.3-activatie.
+// stuurt de standaard Supabase-resetmail. Sessie/cookie-pad inmiddels getest tegen echte
+// productie-Supabase (masterplan 15.7); wacht nog op de WL.3-activatie zelf
+// (O1_AUTH_ENFORCED=true in Vercel, buiten bereik van deze sessie).
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";

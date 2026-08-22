@@ -2,8 +2,11 @@
 // Centrale toegangscontrole. VEILIG TE MERGEN: zonder O1_AUTH_ENFORCED=true is dit een
 // pass-through en verandert er niets aan de app. De activatie is een bewuste WL.3-stap,
 // gecoordineerd met migratie 001 en 032 (user_roles, user_clients plus de eerste
-// admin-seed) en 017 (RLS-lockdown). LIVE-ONGETEST: sessies, cookies, redirects en de
-// lookups zijn pas tegen een echte Supabase-omgeving te verifieren.
+// admin-seed) en 017 (RLS-lockdown). Sessies, cookies, redirects en de lookups zijn
+// inmiddels wél getest tegen de echte productie-Supabase (masterplan 15.7): publieke
+// paden blijven publiek, beveiligde paden redirecten, eigen-bureau-toegang wordt
+// toegelaten, andere-bureau-toegang geweigerd. O1_AUTH_ENFORCED=true staat desondanks nog
+// NIET in productie -- dat vergt Vercel-toegang die deze sessie niet heeft.
 //
 // De scope-check hier dekt het beurs-id in de querystring en in het paginapad. Staat het in
 // een request-body, dan kan de middleware er niet bij zonder de stream op te eten; die
