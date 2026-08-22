@@ -496,6 +496,12 @@ export function ClientDashboard({ client }: { client: Client }) {
                       {/* Maandgrafiek als eigen sectie ná de slider, zelfde volgorde als Google
                           (ForecastTable) en Meta/LinkedIn (ChannelMonthlyTrend) -- layout-
                           uniformering 22 augustus. */}
+                      {/* Geen CrossChannelView hier: die stond hier gedupliceerd (staat al op
+                          Overzicht, regel hierboven bij activeTab === "dashboard") en brak
+                          precies de uniformiteit die deze layout-ronde moest bereiken -- Google/
+                          Meta/LinkedIn's Prognose-tab heeft ook geen geo-kaart of kanaaltabel,
+                          alleen de drie prognose-secties. Weggehaald (feedback 22 augustus:
+                          "waarom is alle kanalen niet uniform aan google, meta en linkedin?"). */}
                       <Sectie
                         icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
                         titel="Volle maanden"
@@ -503,7 +509,6 @@ export function ClientDashboard({ client }: { client: Client }) {
                       >
                         <ChannelMonthlyTrend clientId={client.id} channel="blended" />
                       </Sectie>
-                      <CrossChannelView clientId={client.id} />
                     </>
                   )}
                   {(channel === "meta" || channel === "linkedin") && (
