@@ -180,7 +180,7 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "attributie-zonder-trackingcode",
-    titel: "Attribution without a tracking code: what change history tells you",
+    titel: "What change history tells you without a tracking code",
     samenvatting:
       "You do not need to manually log every change to know whether a hypothesis was executed. The change history the platform already keeps tells you.",
     datum: "2026-07-15",
@@ -230,7 +230,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "kanaalsynergie-bewijzen",
     titel: "Proving channel synergy between Google, Meta, and LinkedIn",
     samenvatting:
-      "Every channel delivers its own report, and no report shows whether the channels reinforce each other or double-pay for the same warm audience. A concrete way to actually see it.",
+      "Every channel reports on its own, and none shows whether they reinforce each other or double-pay for the same warm audience. A concrete way to see it.",
     datum: "2026-07-28",
     leesminuten: 3,
     inhoud: [
@@ -279,9 +279,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "rsa-asset-dubbeltelling",
-    titel: "The asset trap in RSA reporting: when your top line is a double count",
+    titel: "The RSA asset trap: when your top line is a double count",
     samenvatting:
-      "Most RSA analysis stops at the ad group level. Go one layer deeper, to individual assets, and you can walk into a double count that makes your best headline look worse than it is.",
+      "Most RSA analysis stops at the ad group level. One layer deeper, at individual assets, a double count can make your best headline look worse than it is.",
     datum: "2026-08-04",
     leesminuten: 3,
     inhoud: [
@@ -376,7 +376,7 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "acht-kpi-relaties-die-rapportages-missen",
-    titel: "Eight KPI relationships most reports never set against each other",
+    titel: "Eight KPI relationships most reports never compare",
     samenvatting:
       "A report usually lists CPA, CTR, and reach separately. The signal is often not in either one, but in the ratio between them.",
     datum: "2026-08-10",
@@ -421,9 +421,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "pmax-network-mix-verschuiving",
-    titel: "When Performance Max quietly moves your budget away from Search",
+    titel: "When Performance Max quietly moves budget away from Search",
     samenvatting:
-      "PMax reports one blended number for the whole campaign. Underneath, spend can drift heavily toward Display, Video, Discover, Gmail, and Maps without a proportional share of conversions -- and the headline CPA never says so.",
+      "PMax reports one blended number. Spend can drift toward Display, Video, Discover, Gmail and Maps without a matching share of conversions, and CPA never says so.",
     datum: "2026-08-13",
     leesminuten: 2,
     inhoud: [
@@ -466,9 +466,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "pmax-taal-lekkage",
-    titel: "Performance Max can quietly start bidding in languages you never targeted",
+    titel: "PMax can start bidding in languages you never targeted",
     samenvatting:
-      "PMax expands reach automatically, and that expansion can drift into search categories in languages your account was never set up to serve -- with no cost figure attached, because Google does not report spend at that level.",
+      "PMax expands reach automatically, and that can drift into languages your account was never set up for -- with no cost figure attached at that level.",
     datum: "2026-08-13",
     leesminuten: 2,
     inhoud: [
@@ -507,9 +507,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "pmax-asset-group-risico",
-    titel: "One asset group can quietly become your whole Performance Max campaign",
+    titel: "One asset group can quietly become your whole PMax campaign",
     samenvatting:
-      "A single asset group taking over most of a PMax campaign's spend is a concentration risk worth naming. A separate asset group can spend real money with zero conversions for months without either one showing up in the campaign total.",
+      "One asset group taking over most of a PMax campaign's spend is a concentration risk. Another can spend real money with zero conversions, invisible in the total.",
     datum: "2026-08-13",
     leesminuten: 2,
     inhoud: [
@@ -547,9 +547,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "pmax-creative-dekking",
-    titel: "Why a Performance Max campaign with no video assets is leaving reach on the table",
+    titel: "No video assets is leaving PMax reach on the table",
     samenvatting:
-      "Performance Max serves across placements that reward different asset types. A campaign built only on images quietly caps how well it can perform on the video-first inventory it is still paying to reach.",
+      "PMax serves across placements that reward different asset types. Images-only caps how well a campaign performs on the video-first inventory it still pays for.",
     datum: "2026-08-13",
     leesminuten: 2,
     inhoud: [
@@ -585,9 +585,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "pmax-zoekcategorie-dilutie",
-    titel: "How much of your Performance Max reach never has a chance to convert",
+    titel: "How much PMax reach never gets a chance to convert",
     samenvatting:
-      "PMax can spread meaningful impression volume across search categories that never produce a single conversion -- reach that looks like growth on a report and behaves like waste in practice.",
+      "PMax can spread real impression volume across categories that never convert -- reach that looks like growth on a report and behaves like waste in practice.",
     datum: "2026-08-13",
     leesminuten: 2,
     inhoud: [
@@ -622,9 +622,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "false-positive-prevention-seizoen-vs-structureel",
-    titel: "The question every performance drop needs answered before you touch the budget",
+    titel: "The question every performance drop needs answered first",
     samenvatting:
-      "A metric falling because the whole market slowed down calls for a different response than the same metric falling because something in the account broke. Confusing the two is the more expensive mistake.",
+      "A metric falling because the market slowed needs a different response than the same drop caused by a broken account. Confusing the two costs more.",
     datum: "2026-08-13",
     leesminuten: 3,
     inhoud: [
@@ -666,9 +666,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "linkedin-icp-waste",
-    titel: "How much of your LinkedIn spend never reaches your actual buyer",
+    titel: "How much LinkedIn spend never reaches your actual buyer",
     samenvatting:
-      "LinkedIn's own targeting reports spend and leads by job function, seniority, industry, and company size. Most accounts never set that breakdown against who they are actually trying to reach.",
+      "LinkedIn's own targeting reports spend and leads by job function, seniority, industry, and size. Most accounts never set that against who they're targeting.",
     datum: "2026-08-13",
     leesminuten: 3,
     inhoud: [
@@ -711,9 +711,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "linkedin-creative-verval-zonder-frequency",
-    titel: "Why 'creative fatigue' means something different on LinkedIn than on Meta",
+    titel: "Why 'creative fatigue' means something different on LinkedIn",
     samenvatting:
-      "Meta shows you frequency per ad, so fatigue is a number you can watch directly. LinkedIn never reports it -- creative decay has to be read a different way entirely.",
+      "Meta shows frequency per ad, so fatigue is a number you watch directly. LinkedIn never reports it -- creative decay has to be read a different way entirely.",
     datum: "2026-08-13",
     leesminuten: 2,
     inhoud: [
@@ -752,9 +752,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "linkedin-audience-network-lekkage",
-    titel: "The LinkedIn toggle that quietly changes where your ads actually run",
+    titel: "The LinkedIn toggle that changes where your ads actually run",
     samenvatting:
-      "Audience Network extends a LinkedIn campaign's reach beyond LinkedIn itself, bundled into the same campaign-level number. Whether that extra reach is worth what it costs is a question most reports never separate out.",
+      "Audience Network extends reach beyond LinkedIn itself, bundled into the same campaign number. Whether that reach is worth its cost is rarely separated out.",
     datum: "2026-08-13",
     leesminuten: 2,
     inhoud: [
@@ -870,9 +870,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "merk-cannibalisatie-search-console-vs-ads",
-    titel: "The Google Ads brand cannibalization check most accounts skip",
+    titel: "The brand cannibalization check most accounts skip",
     samenvatting:
-      "Branded paid spend can look justified while organic already owns the same query. The two signals rarely get checked against each other, and when they do, they sometimes disagree -- which is itself the finding.",
+      "Branded paid spend can look justified while organic already owns the query. The two signals rarely get checked against each other -- and sometimes disagree.",
     datum: "2026-08-17",
     leesminuten: 3,
     inhoud: [
@@ -899,7 +899,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "seed-and-harvest-cross-channel-budget",
     titel: "When cutting Google Ads budget also cuts what Meta earned",
     samenvatting:
-      "Scale Meta up and Google's brand traffic often moves too, in the same direction. Read the two channels separately and that link disappears -- along with the return one channel was quietly generating for the other.",
+      "Scale Meta up and Google's brand traffic often moves too. Read the channels apart and that link disappears, along with the return one was quietly generating.",
     datum: "2026-08-17",
     leesminuten: 3,
     inhoud: [
@@ -946,9 +946,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "pmax-en-search-verschillend-scorebord",
-    titel: "Why your Performance Max and Search campaigns shouldn't share a scorecard",
+    titel: "Why PMax and Search shouldn't share a scorecard",
     samenvatting:
-      "Impressions, CTR, CPC, ROAS -- the same four columns, for a Search campaign and a PMax campaign sitting in the same table. Neither gets judged on what actually drives it.",
+      "Impressions, CTR, CPC, ROAS -- the same four columns for Search and PMax in the same table. Neither gets judged on what actually drives it.",
     datum: "2026-08-17",
     leesminuten: 3,
     inhoud: [
@@ -973,7 +973,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "meta-doelgroep-verzadiging-vs-creative-fatigue",
     titel: "Your Meta ad isn't tired, your audience is out of new people",
     samenvatting:
-      "CPA climbs, CTR falls, and the reflex is always the same: refresh the creative. New creative goes live. CPA doesn't move -- because the problem was never the ad.",
+      "CPA climbs, CTR falls, and the reflex is always the same: refresh the creative. New creative goes live. CPA doesn't move -- the problem was never the ad.",
     datum: "2026-08-17",
     leesminuten: 3,
     inhoud: [
@@ -999,7 +999,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "roas-illusie-refunds-kortingscodes",
     titel: "Why your ROAS looks great and your margin doesn't",
     samenvatting:
-      "Google and Meta both report the ROAS you asked them to report: at the moment of the click, before a single order gets refunded, discounted, or turns out to be a repeat customer you already had.",
+      "Google and Meta both report the ROAS you asked for: at the click, before an order gets refunded, discounted, or turns out to be a repeat customer.",
     datum: "2026-08-17",
     leesminuten: 3,
     inhoud: [
@@ -1026,7 +1026,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "utm-tags-die-je-attributie-breken",
     titel: "The UTM mistakes that quietly corrupt your channel reporting",
     samenvatting:
-      "A UTM parameter only works if every person and every system that touches it types the same thing. Most accounts never check whether that held -- until direct traffic climbs for no reason and a channel that should report as one line splits into three.",
+      "A UTM parameter works only if everyone who touches it types the same thing. Most never check -- until direct traffic climbs and one channel splits into three.",
     datum: "2026-08-17",
     leesminuten: 4,
     inhoud: [
@@ -1050,9 +1050,9 @@ export const BLOG_POSTS: BlogPost[] = [
   // dit optelt"-sectie in elk), niet uit herhaling met andere woorden.
   {
     slug: "pmax-vijf-blinde-vlekken-in-een-overzicht",
-    titel: "How one Performance Max campaign can be failing in five places at once",
+    titel: "How one PMax campaign can fail in five places at once",
     samenvatting:
-      "Performance Max collapses network mix, language drift, asset-group concentration, creative coverage, and search-category dilution into one blended number. Read separately, each blind spot looks survivable. Read together, they are usually the same underlying drift.",
+      "PMax collapses network mix, language drift, asset-group risk, creative coverage, and category dilution into one number. Together, it's usually the same drift.",
     datum: "2026-08-17",
     leesminuten: 5,
     inhoud: [
@@ -1084,7 +1084,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "geen-enkel-kanaalrapport-vertelt-het-hele-verhaal",
     titel: "Why no single channel's report can tell you the whole story",
     samenvatting:
-      "Every channel's own dashboard can read green while the portfolio pays three times for one audience, funds a competitor's own brand search, or loses the tag that would have shown any of it. None of that is visible from inside a single channel's report.",
+      "Every channel's dashboard can read green while the portfolio pays twice for one audience, funds a rival's brand search, or loses the tag that would show it.",
     datum: "2026-08-17",
     leesminuten: 5,
     inhoud: [

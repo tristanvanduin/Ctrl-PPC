@@ -7069,3 +7069,31 @@ als losse vondst gemeld, want het patroon staat al gedocumenteerd.
 
 `tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijzigingen
 onttrokken productiedrift.
+
+### 17.97 Blog-titels en -beschrijvingen ingekort voor SERP-lengte, met een nagelaten stap eerlijk gemeld (22 augustus 2026)
+
+Eigenaar gaf voor blog expliciet meer vrijheid dan voor de rest van de marketingsite ("bij blogs
+heb je meer vrijheid... maar niet blind copy aanpassen op de marketing site"). De 21 in 17.96
+gevonden te lange titels/beschrijvingen (titel >60 tekens, description >160) herschreven, met
+dezelfde directe, technische toon als de rest van de posts -- geen enkele feitelijke claim
+gewijzigd, alleen ingekort. Twee titels bleken bij het narekenen ook >60 en waren aanvankelijk
+gemist (`linkedin-icp-waste`, `merk-cannibalisatie-search-console-vs-ads`) -- gecorrigeerd na een
+tweede verificatieronde. Alle 25 gepubliceerde `post.titel`/`post.samenvatting` zitten nu binnen
+de grens; geverifieerd met een script tegen de daadwerkelijke geëxporteerde data, niet met de hand
+geteld.
+
+**Eerlijk gemeld, niet stilgehouden: de grens die ik toetste was te optimistisch.** De pagina
+rendert niet `post.titel` als `<title>`, maar `` `${post.titel}: Ctrl PPC` `` (blog/[slug]/page.tsx)
+-- de merknaam-toevoeging kost er zonder uitzondering nog eens 10 tekens bij. Tegen de
+daadwerkelijke `<title>`-tekst nagerekend zitten 17 van de 25 posts (waaronder posts die op
+`post.titel` alleen prima binnen de grens vielen) alsnog over de ~60-tekens-vuistregel. Bewust
+NIET nog een ronde herschreven: dat zou ofwel titels die al eens ingekort zijn nog verder
+uitkleden (met reëel verlies aan betekenis) ofwel het `": Ctrl PPC"`-achtervoegsel zelf aanpassen
+-- en dat patroon zit niet alleen in blog/[slug]/page.tsx maar vermoedelijk sitewide op elke
+marketingpagina's eigen `metadata.title`, dus wijzigen daarvan raakt precies het "niet blind de
+rest van de marketingsite aanpassen"-hek. Gemeld in plaats van doorgeduwd; ligt klaar voor een
+beslissing (achtervoegsel inkorten/weglaten op blog specifiek, of de ~60-regel loslaten als
+zachte richtlijn in plaats van een harde grens).
+
+`tsc`/`tests`/`build` groen, `view-dekking` rood om dezelfde, aan deze wijziging onttrokken
+productiedrift.
