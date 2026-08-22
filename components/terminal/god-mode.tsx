@@ -160,9 +160,13 @@ export function GodMode() {
 
       <GodViewPremium />
 
+      {/* "Top 10"/"Bottom 10" was een vast label, ook toen er minder dan 10 accounts waren --
+          bij 9 accounts (zoals hier in demo-modus) tonen beide lijsten dan dezelfde 9 klanten in
+          omgekeerde volgorde onder een kop die "10" beweert. Het aantal in de kop volgt nu de
+          werkelijke lengte van de rij. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Ranglijst titel="Top 10 · spend" rows={data.top10} />
-        <Ranglijst titel="Bottom 10 · spend" rows={data.bottom10} />
+        <Ranglijst titel={`Top ${data.top10.length} · spend`} rows={data.top10} />
+        <Ranglijst titel={`Bottom ${data.bottom10.length} · spend`} rows={data.bottom10} />
       </div>
 
       <RaweTabel rows={data.all} />

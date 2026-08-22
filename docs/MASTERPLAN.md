@@ -7097,3 +7097,57 @@ zachte richtlijn in plaats van een harde grens).
 
 `tsc`/`tests`/`build` groen, `view-dekking` rood om dezelfde, aan deze wijziging onttrokken
 productiedrift.
+
+### 17.98 Echt doorklikken in plaats van laden-en-screenshotten: CPA/ROAS-kaart loog over hoe erg het misging (22 augustus 2026)
+
+Eigenaar, expliciet: eerdere rondes waren te oppervlakkig ("load page → screenshot → check
+console errors" vangt zichtbare renderfouten, niet wat achter een klik zit). Deze ronde
+daadwerkelijk elk tabblad van het klantdashboard doorgeklikt (Campagnes, Prognose, Analyseren,
+Bevindingen, God View, Sprint, Doelen & voortgang, Rapporten, Bestanden, Instellingen — Second
+opinion bewust overgeslagen, code moet daar eerst goed staan) i.p.v. alleen de eerste tab te
+bekijken.
+
+**Vondst — de KPI-kaart voor CPA (en ROAS) toonde een percentage dat niet bij zijn eigen Doel/
+Prognose-cijfers hoorde, met een verkeerde statuskleur tot gevolg.** Op Doelen & voortgang: kaart
+"Kosten per lead" toonde "Doel: € 45" en "Prognose: € 67 (+10%)" naast elkaar — maar (67−45)/45 is
+49%, niet 10%. Oorzaak in `lib/forecast.ts`: `deriveForecast()` bouwt voor cpa/roas een eigen
+`annualTarget` als quotiënt van twee ANDERE doelen (`adSpend.annualTarget / conversions
+.annualTarget`), niet het werkelijk ingestelde CPA-doel. Iemand had de kaart in `dgm-view.tsx` al
+eerder gecorrigeerd om het échte doel (`settings.kpiTargets.cpaTarget`) en een direct berekende
+prognose (`spend.adjustedAnnual / conv.adjustedAnnual`) te tonen -- maar `diffPct` (het percentage
+én de statuskleur) bleef aan het OUDE, afgeleide-doel-object hangen. Gevolg: een overschrijding van
+49% (ruim in de rode zone, drempel >15%) zag er met amber "+10%" uit als een milde afwijking.
+Dezelfde kopie-fout stond in de ROAS-kaart eronder (`roas.diffPct` naast lokaal berekende
+`realized`/`target`/`forecast`).
+
+Fix: nieuwe functie `diffPctVanWeergave(target, waarde)` in `dgm-view.tsx`, die het percentage
+rechtstreeks uit de WEERGEGEVEN doel/prognose-waarden berekent in plaats van uit een los
+forecast-object. Beide kaarten gebruiken hem nu. Geverifieerd live: de CPA-kaart toont nu
+"Prognose: € 67 (+48%)" en de statuskleur/balk staan om van amber naar rood — precies de kleur die
+bij een structurele CPA-overschrijding hoort, niet de kleur die zei dat het meeviel.
+
+**Tweede, kleinere vondst — "Top 10 · spend"/"Bottom 10 · spend" op God View (`components/
+terminal/god-mode.tsx`) beweerden 10 accounts terwijl er bij 9 accounts (deze demo) allebei
+dezelfde 9 klanten tonen, alleen omgekeerd gesorteerd, onder een kop die desondanks "10" zegt.**
+Label volgt nu `rows.length` i.p.v. een vast "10".
+
+**Twee schijnbare stuck-spinners bleken vals alarm, met bewijs in plaats van aanname.** "Kanaal-
+aanbevelingen laden..." (Bevindingen) en "Blended maandtabel laadt..." (Prognose) stonden nog op
+het scherm bij de eerste screenshot (1,2s na de klik) — met een langere wacht (6-8s) en een
+netwerklog erbij bleken beide APIs gewoon binnen die tijd te antwoorden (200). Niet gefixt, want
+er was niets stuk; wel bewust met een netwerklog geverifieerd in plaats van op het eerste
+schermbeeld af te gaan, na de "eeuwig draaiende spinner"-fout eerder deze sessie.
+
+**Verder echt doorgeklikt, geen bevindingen**: Campagnes (drie kanaaltabellen kloppen), Sprint
+(leeg bord — legitiem, er is nog niets geaccepteerd in deze demo-snapshot; "Verlopen"-kolom die
+aan de rand lijkt af te snijden zit terecht achter `overflow-x-auto`, met een expliciete comment
+waarom), Rapporten en Bestanden (schone lege staten), Instellingen (KPI-doelstellingen kloppen met
+wat de CPA-kaart nu laat zien: Doel € 45), Analyseren (toont zelf expliciet "1 van 21 gedraaid" —
+de reden dat Bevindingen/hypotheses-workflow nog leeg is, staat dus al op het scherm, geen losse
+bug). De `monthly-hypotheses`-404's (drie kanalen) komen van `sop_analysis_output`, de output van
+de AI-analyse-engine zelf — niet iets wat het seed-script kan voorspiegelen zoals bij de PMax-
+tabellen; het vergt de analysepijplijn echt draaien. Gemeld, niet zelf opgepakt: dat kost
+waarschijnlijk echte LLM-aanroepen en is dus geen "voeg wat rijen toe"-beslissing.
+
+`tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijzigingen
+onttrokken productiedrift.

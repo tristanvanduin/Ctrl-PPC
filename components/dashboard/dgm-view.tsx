@@ -103,6 +103,28 @@ function pct(v: number): string {
   return `${v > 0 ? "+" : ""}${Math.round(v)}%`;
 }
 
+/**
+ * (waarde − doel) / doel, in procent. Losgetrokken van `deriveForecast()` in lib/forecast.ts,
+ * die voor cpa/roas een `diffPct` teruggeeft op basis van een HEEL ANDER doel dan wat de
+ * KPI-kaart hieronder toont.
+ *
+ * ── WAAROM DIT NODIG IS ──────────────────────────────────────────────────────
+ *
+ * lib/forecast.ts berekent cpa/roas als afgeleide van twee losse reeksen (adSpend/conversions
+ * resp. revenue/adSpend). Zijn `annualTarget` voor cpa is dus `adSpend.annualTarget /
+ * conversions.annualTarget` -- een quotient van twee doelen, niet het werkelijk ingestelde
+ * CPA-doel. De kaarten hieronder tonen wél het werkelijke doel (`settings.kpiTargets.cpaTarget`/
+ * `roasTarget`) en een direct berekende prognose (spend/conv resp. revenue/spend) -- maar gaven
+ * tot nu toe het percentage én de statuskleur nog aan `cpa.diffPct`/`roas.diffPct` mee, de
+ * afgeleide-doel-versie. Op deze demo-klant: Doel € 45, Prognose € 67 (een overschrijding van
+ * 49%) naast een groen/amber "+10%" -- een overschrijding die er als milde afwijking uitzag
+ * terwijl hij ruim in de rode zone hoort (drempel: >15% is rood). Beide kaarten gebruiken deze
+ * functie nu voor `diffPct`, op precies de doel/prognose-waarden die ernaast staan.
+ */
+function diffPctVanWeergave(target: number, waarde: number): number {
+  return target > 0 ? ((waarde - target) / target) * 100 : 0;
+}
+
 function dateLabel(): string {
   return new Date().toLocaleDateString("nl-NL", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -978,17 +1000,21 @@ export function DgmView({ clientId }: { clientId: string }) {
               format="currency"
             />
           )}
-          {cpa.annualTarget > 0 && (
-            <KpiCard
-              label={vocab.cpa.charAt(0).toUpperCase() + vocab.cpa.slice(1)}
-              realized={cpa.ytdRealized > 0 ? spend.ytdRealized / conv.ytdRealized : 0}
-              target={settings.kpiTargets.cpaTarget}
-              forecast={conv.adjustedAnnual > 0 ? spend.adjustedAnnual / conv.adjustedAnnual : 0}
-              diffPct={cpa.diffPct}
-              format="currency"
-              lagerIsBeter
-            />
-          )}
+          {cpa.annualTarget > 0 && (() => {
+            const cpaTarget = settings.kpiTargets.cpaTarget;
+            const cpaForecast = conv.adjustedAnnual > 0 ? spend.adjustedAnnual / conv.adjustedAnnual : 0;
+            return (
+              <KpiCard
+                label={vocab.cpa.charAt(0).toUpperCase() + vocab.cpa.slice(1)}
+                realized={cpa.ytdRealized > 0 ? spend.ytdRealized / conv.ytdRealized : 0}
+                target={cpaTarget}
+                forecast={cpaForecast}
+                diffPct={diffPctVanWeergave(cpaTarget, cpaForecast)}
+                format="currency"
+                lagerIsBeter
+              />
+            );
+          })()}
           {spend.annualTarget > 0 && (
             <KpiCard
               label="Advertentiebudget gebruikt"
@@ -999,16 +1025,20 @@ export function DgmView({ clientId }: { clientId: string }) {
               format="currency"
             />
           )}
-          {roas.annualTarget > 0 && settings.kpiTargets.roasTarget > 0 && (
-            <KpiCard
-              label="Rendement op advertentiebudget"
-              realized={spend.ytdRealized > 0 ? rev.ytdRealized / spend.ytdRealized : 0}
-              target={settings.kpiTargets.roasTarget}
-              forecast={spend.adjustedAnnual > 0 ? rev.adjustedAnnual / spend.adjustedAnnual : 0}
-              diffPct={roas.diffPct}
-              format="ratio"
-            />
-          )}
+          {roas.annualTarget > 0 && settings.kpiTargets.roasTarget > 0 && (() => {
+            const roasTarget = settings.kpiTargets.roasTarget;
+            const roasForecast = spend.adjustedAnnual > 0 ? rev.adjustedAnnual / spend.adjustedAnnual : 0;
+            return (
+              <KpiCard
+                label="Rendement op advertentiebudget"
+                realized={spend.ytdRealized > 0 ? rev.ytdRealized / spend.ytdRealized : 0}
+                target={roasTarget}
+                forecast={roasForecast}
+                diffPct={diffPctVanWeergave(roasTarget, roasForecast)}
+                format="ratio"
+              />
+            );
+          })()}
         </div>
       </div>
 
