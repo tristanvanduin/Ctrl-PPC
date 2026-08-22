@@ -50,10 +50,19 @@ function Seg<T extends string>({ value, onChange, options }: { value: T; onChang
 
 const eur = (v: number): string => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 
+// Hoeveel kaarten per band standaard zichtbaar zijn voor "Toon meer" inklapt. Elke band rendert
+// zonder deze grens ongelimiteerd -- gemeten op demo-greentech: 349 kaarten in één ongepagineerde
+// kolom, een pagina van bijna 57.000px. Precies het soort "het is geen bug, het rendert gewoon"
+// dat deze codebase elders al kent (zie AGENTS.md's kaartoverloop-controle): geen van de tests of
+// de build zag dit, want er is niets kapot -- de lijst is alleen nooit bedoeld om ongelimiteerd te
+// tonen op een "wat vraagt vandaag aandacht"-triagescherm.
+const BAND_PAGE_SIZE = 15;
+
 export function TodayFeed() {
   const feed = useTodayFeed();
   const [owner, setOwner] = useState<OwnerFilter>("team");
   const [channel, setChannel] = useState<ChannelFilter>("all");
+  const [expanded, setExpanded] = useState<Record<FeedSeverity, boolean>>({ critical: false, decision: false, watch: false });
 
   const match = useMemo(() => (i: FeedItem): boolean => {
     if (channel !== "all" && i.channel !== channel) return false;
@@ -157,9 +166,17 @@ export function TodayFeed() {
                 <p className="text-body text-muted-foreground bg-card border border-border rounded-lg px-4 py-3">Niets in deze band{owner !== "team" || channel !== "all" ? " binnen dit filter" : ""}.</p>
               ) : (
                 <div className="space-y-2">
-                  {bands[b.key].map((item) => (
+                  {(expanded[b.key] ? bands[b.key] : bands[b.key].slice(0, BAND_PAGE_SIZE)).map((item) => (
                     <FeedCard key={item.id} item={item} onSnooze={feed.snooze} onAssign={feed.assign} onStatus={feed.setStatus} />
                   ))}
+                  {!expanded[b.key] && bands[b.key].length > BAND_PAGE_SIZE && (
+                    <button
+                      onClick={() => setExpanded((prev) => ({ ...prev, [b.key]: true }))}
+                      className="text-meta font-medium text-brand-blue-ink hover:underline px-1"
+                    >
+                      Toon {bands[b.key].length - BAND_PAGE_SIZE} meer
+                    </button>
+                  )}
                 </div>
               )}
             </section>

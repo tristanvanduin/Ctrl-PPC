@@ -56,6 +56,12 @@ const REC_STYLE: Record<string, string> = {
 export function CreativePerformance({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
   const [cards, setCards] = useState<CreativeCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // De preview-afbeeldingen zijn extern (Meta/LinkedIn-CDN's, of picsum.photos voor Google
+  // Display-demodata) -- een dode link, ad-blocker of offline demo laat de <img> dan leeg renderen
+  // zonder enig signaal, in plaats van de nette ImageOff-tekst die er al is voor een écht
+  // ontbrekende afbeelding. Bijgehouden welke ad_id's al op een load-fout stuitten, zodat die
+  // alsnog naar dezelfde fallback vallen.
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -206,9 +212,14 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
             <div key={c.id} className="rounded-lg border border-border overflow-hidden flex flex-col">
               {/* Preview — beeld voor Meta/LinkedIn, een echte zoekadvertentie-look voor Google-tekst. */}
               <div className="p-3 border-b border-border min-h-[92px] flex items-center" style={{ background: "var(--preview-vlak, rgb(243 244 246 / 0.7))" }}>
-                {c.imageUrl ? (
+                {c.imageUrl && !brokenImages.has(c.id) ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.imageUrl} alt={c.name} className="w-full h-36 object-cover rounded-md" />
+                  <img
+                    src={c.imageUrl}
+                    alt={c.name}
+                    className="w-full h-36 object-cover rounded-md"
+                    onError={() => setBrokenImages((prev) => new Set(prev).add(c.id))}
+                  />
                 ) : c.headline ? (
                   // Google-zoekadvertentie: blauwe kop, Ad-badge + weergave-URL, grijze beschrijving.
                   // Deze preview blijft licht, ook in de donkere modus. Het is geen kaart van dit
@@ -234,7 +245,9 @@ export function CreativePerformance({ clientId, channel }: { clientId: string; c
                         assets, tekst-only) -- geen sync die nog moet lopen, maar een pijplijn die
                         nog niet gebouwd is. Dat verschil hoort de gebruiker te zien, ook al is de
                         echte fix (een nieuwe Google Ads-asset-sync) hier niet gebouwd. */}
-                    {isDisplayFormat(c.format)
+                    {brokenImages.has(c.id)
+                      ? "Afbeelding kon niet laden — alleen prestaties beschikbaar."
+                      : isDisplayFormat(c.format)
                       ? "Display-advertentie: beeldsync bestaat nog niet — alleen prestaties beschikbaar."
                       : "Creative-tekst/visual niet gesynct — alleen prestaties beschikbaar."}
                   </div>

@@ -6610,3 +6610,54 @@ geen bug, geen fix.
 
 `POORTEN GROEN` (schone rebuild, 314/314 tests). Geen andere resterende `supabase.from()`-lezers
 gevonden buiten de hierboven genoemde, bewust ongemoeide uitzonderingen.
+
+### 17.87 Kritische visuele doorloop: een stille lege kaart en een pagina van 57.000px (22 augustus 2026)
+
+Vervolgvraag van de gebruiker: "Ga verder, blijf kritisch checken op andere schermen. Kijk ook
+naar teveel witruimtes in elementen of gekke uitlijningen." Screenshotronde over Google-tab,
+Campagnes, Analyse & advies, Planning & rapportage, Instellingen, Portfolio en Vandaag.
+
+**Vondst 1 — lege kaart in "Creative Performance — Google".** De derde advertentiekaart
+(`Prospecting — Tuinbouw NL/BE`, een Responsive Display Ad) toonde een volledig lege grijze
+rechthoek in plaats van een afbeelding of de bestaande `ImageOff`-nettekst
+(`components/dashboard/creative-performance.tsx`). Eerst gemeten of dit aan het sandbox-netwerk
+lag (de afbeeldingen komen van `picsum.photos`, en deze omgevings-proxy blokkeert dat domein met
+`ERR_CONNECTION_RESET`, bevestigd met en zonder `--proxy-server`) — dat verklaart WAAROM de
+afbeelding hier niet laadt, maar niet WAAROM de UI daar niets van liet zien. De `<img>`-tag had
+geen `onError`: een gebroken externe afbeelding (dode link, ad-blocker, sandbox-netwerkbeleid)
+rendert in React stilzwijgend leeg, in plaats van terug te vallen op de nette fallback die er al
+voor "geen afbeelding gesynct" bestond. **Fix**: `onError` toegevoegd die de kaart naar de
+bestaande fallback laat vallen (tekstpreview als er een headline is, anders `ImageOff` met een
+aangepaste boodschap "Afbeelding kon niet laden" i.p.v. de misleidende "beeldsync bestaat nog
+niet" voor een kaart die wél gesynct is maar alleen niet laadt). Geldt voor Meta/LinkedIn-
+thumbnails net zo goed als Google Display, dus niet kanaal-specifiek gefixt.
+
+**Vondst 2 — Vandaag-pagina van 56.977px.** Een `fullPage`-screenshot van `/vandaag` mat een
+absurde hoogte; een isolerende herhaling wees uit dat dit alleen optrad na eerst een klant-
+dashboard te bezoeken (het pad-gebaseerde deel van `isDemoMode()`, zie 17.86, moet daarvoor
+actief geworden zijn). Eerste hypothese — kaarten die letterlijk gedupliceerd worden — bleek bij
+narekenen fout: van de 349 kaarten waren er 295 uniek qua tekst (`a.text-sm.font-bold` toonde
+overal "GreenTech (demo)" omdat dat de klantnaam-link op élke kaart is, geen itemtitel). De echte
+oorzaak: `components/today/today-feed.tsx` rendert de drie triage-banden (`critical`, `decision`,
+`watch`) volledig ongelimiteerd — `bands[b.key].map(...)` zonder `slice`, terwijl de vierde lijst
+op deze pagina (`myActions`) wél al `.slice(0, 8)` had. Voor demo-greentech's rijke fixture-data
+(bedoeld om de diepte van de analyse te tonen) betekent dat 349 losse kaarten in één ongepagineerde
+kolom op een scherm dat juist bedoeld is als *dagelijkse triage* — precies het tegenovergestelde
+van het doel van de pagina. **Fix**: elke band toont voortaan de eerste 15 kaarten met een "Toon
+N meer"-knop eronder (zelfde patroon als elders in de app, bijv. "Toon 15 analyses meer" op
+Analyse & advies). Na de fix: 8.196px in plaats van 56.977px voor exact dezelfde onderliggende
+data — geen enkel item verdwenen, alleen niet meer allemaal tegelijk gerenderd.
+
+**Retracties**: de kanban-kolom "Verlopen" op Planning & rapportage → Sprint leek aan de
+viewportrand afgesneden in een `fullPage`-screenshot, maar de rij staat bewust in een
+`overflow-x-auto`-container (horizontaal scrollbaar kanban-bord, standaardpatroon) —
+`fullPage`-screenshots vangen geen geneste horizontale scroll, dus dit was een artefact van de
+meetmethode, geen bug. Een vermeende ontbrekende spatie vóór het bolletje in
+"1 merk · alleen deze as..." (Portfolio) bleek bij het lezen van de bron gewoon aanwezig
+(`&middot;` met spaties aan beide kanten) — een lettertype-renderartefact in het screenshot, geen
+brontekstfout; niet aangepast.
+
+Live geverifieerd met Playwright: de derde advertentiekaart toont na de fix de advertentietekst
+in plaats van een lege doos (de RSA-tekst bestond al voor die ad_id, viel voorheen nooit op
+omdat de gebroken `<img>` er stil overheen bleef staan); Vandaag daalt van 56.977px naar 8.196px
+met zichtbare "Toon N meer"-knoppen per band. `POORTEN GROEN` (314/314 tests, schone rebuild).
