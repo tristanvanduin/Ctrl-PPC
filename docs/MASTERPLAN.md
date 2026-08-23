@@ -7512,3 +7512,27 @@ inhoudelijk onderbouwde keuze.
 Met dit besluit is de channel-unificatieronde (Overzicht-hero, Campagnes-secties, Prognose-structuur)
 afgerond. Openstaand, buiten deze ronde: of de Prognose-tab ooit overstapt op dezelfde jaar-forecast-
 motor als Jaaroverzicht 2026 — dat is een grotere, eigen beslissing en niet gevraagd.
+
+### 17.104 Fout hersteld: de Overzicht-hero had 50/50 moeten blijven, niet 5/7 (23 augustus 2026)
+
+17.99 zette Google's hero om naar dezelfde 5/7-donut/kaart-indeling die Meta/LinkedIn al hadden, met
+Account Health los erboven -- op eigen initiatief, zonder de eigenaar eerst het eindresultaat te laten
+zien. Dat was fout: de gewenste layout is de oorspronkelijke Google-opzet, Account Health 50/50 naast
+de wereldkaart, voor alle drie de kanalen. De eigenaar zag dit pas live en moest het expliciet
+terugvragen.
+
+Hersteld via git-geschiedenis (niet uit het geheugen gereconstrueerd): `git show` op de 17.99-commit
+liet de exacte oude structuur zien. Google's hero terug naar zijn 2-koloms opbouw (Health/Pacing/
+CampaignTypeSplit/CPA-lijn | kaart/ranglijst/maandstaven, `xl:grid-cols-2`), `ChannelViewHeader` blijft
+staan (daar was geen bezwaar tegen). Meta/LinkedIn omgezet naar dezelfde 50/50-indeling (Health+donut
+| kaart+ranglijst) i.p.v. hun standalone Health-kaart boven een 5/7-hero -- de eerste keer dat Meta/
+LinkedIn's hero op dit punt Google's ontwerp overneemt in plaats van andersom.
+
+**De les.** Bij een layout-beslissing met een concreet visueel eindbeeld (niet alleen "structuur
+gelijktrekken" maar een specifieke verhouding/indeling) een screenshot van het resultaat laten zien
+vóór het als afgerond te melden, in plaats van er alleen over te schrijven. §17.99 beschreef de
+5/7-keuze uitgebreid maar liet nooit een render zien waarin de eigenaar "nee, dit niet" kon zeggen
+vóór het al op main stond.
+
+Geverifieerd op de live demo: alle drie kanalen tonen nu Account Health 50/50 naast de wereldkaart.
+`tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon.
