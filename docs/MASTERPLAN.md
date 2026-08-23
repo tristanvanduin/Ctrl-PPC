@@ -1344,6 +1344,120 @@ Volle gas op sales hoort na stap 4, niet eerder. Een demo die converteert op een
 product nog niet waarmaakt, kost meer dan hij oplevert: het eerste bureau dat afhaakt vertelt het
 door in een markt waar iedereen elkaar kent.
 
+### 10.3 Prijsstrategie: tiers, modules en positionering — samengevat (22 augustus 2026)
+
+Stond tot nu toe verspreid over de commentaren in `lib/marketing/tiers.ts` en `lib/marketing/
+modules.ts` plus losse `17.xx`-logregels. Hier op één plek, gebouwd op verzoek van de eigenaar zodat
+er niet meer in twee bestanden gezocht hoeft te worden. Bron is uitsluitend de code/site zelf —
+`lib/marketing/tiers.ts`, `lib/marketing/modules.ts`, `app/(marketing)/pricing/page.tsx`,
+`app/(marketing)/vs/page.tsx`, `lib/marketing/foundation-cap.ts`, `lib/tenancy/sop-dekking.ts`.
+
+#### De zes tiers
+
+| Tier | €/mnd | Credits/mnd | SOP-dekking | Focus |
+|---|---|---|---|---|
+| **Foundation** | 0 (permanent gratis) | 0 | 0 (geen automatische SOP's) | Connect everything. See what happened, always free. |
+| **Core** | 749 | 10.000 | 20 accounts | The data engine and operational foundation. |
+| **Growth** | 1.249 | 25.000 | 50 accounts | Portfolio overview and light narrative control. |
+| **Scale** | 1.999 | 50.000 | 100 accounts | Visual control, IP, and priority. |
+| **Professional** | 2.999 | 100.000 | 200 accounts | E-commerce dominance and enterprise tech. |
+| **Enterprise** | Custom | 500.000 | ∞ ("maximaal, maar hard gecapt" in de blueprint) | Custom-built for mega-agencies. |
+
+Elke tier bevat alles van de tier eronder (cumulatief, `lib/chat/toegang.ts`'s RANG erft omhoog) —
+dat staat systemisch op de pricing-pagina, niet herhaald per kaart. Prijzen zijn charm-pricing: het
+bedrag net onder het ronde honderdtal (749/1.249/1.999/2.999), de gangbare SaaS-conventie, gekozen
+uit de door de eigenaar aangeleverde paren op 11 augustus 2026 — dat leveringsmoment is ook het
+scharnierpunt waarop de featurelijst van placeholder naar definitief ging.
+
+**Gebouwd vs roadmap, per 22 augustus 2026** (elke feature draagt een `gebouwd`-vlag, "Coming soon"
+i.p.v. verzwegen of als feit gepresenteerd):
+- **Al echt in het product:** Google/Meta/LinkedIn Ads-koppeling, unlimited accounts/kanalen/
+  gebruikers (geen cap in `agencies.licentie`), dashboarding/forecasting/KPI-monitoring, Agency
+  Memory (hypotheses/sprintitems/leerpunten), Code Oranje & Code Red (cron + UI + persistentie,
+  migratie 073), Cross-Account Portfolio-view, de kredietgrootboek-infrastructuur zelf (migratie
+  070 — alleen de prijs per analyse staat nog leeg).
+- **Nog roadmap:** Microsoft/Bing Ads (nul code — geen synctabel, geen rij in de database), GA4-
+  integratie (data-access-laag geeft altijd "absent" terug voor een echt account), externe Slack/
+  Teams-alerts, de volledige rapportage-aanpasbaarheid vanaf Growth (koppen/body bewerken,
+  verbergen, 3 master-templates, grafiekopties — Core heeft alleen kale, niet-aanpasbare
+  rapportage), Custom Playbook Engine + AI SOP Extractor, Priority Queue, Business Intelligence
+  Connect (Shopify/WooCommerce/WordPress — `ECOMMERCE_KOPPELING_GEBOUWD = false`, één vlag die ook
+  het blogartikel erover dekt), MCP Sandbox, en alles onder Enterprise.
+
+**Beslissingen die in de featurelijst zitten, niet vanzelfsprekend:**
+- **CRM eruit, e-commerce blijft.** Professional noemde ooit "Business Intelligence Connect:
+  Shopify, WooCommerce, CRM, WordPress" — botste met de eerder al vastgelegde "geen CRM/ERP-
+  koppeling, hier wil ik echt wegblijven" (naar aanleiding van het Funnel.io-reverse-engineering-
+  document). CRM eruit; Shopify/WooCommerce/WordPress waren nooit het bezwaar.
+- **BI-API/webhook-exports nooit standaard, op geen enkele tier — herbevestigd, geen incident.**
+  Bewuste, herhaalde productbeslissing (zie ook §11 "Wat we niet bouwen"): alleen op aanvraag en
+  alleen bij genoeg volume, zelfs niet als standaard-inclusie op Enterprise ("Custom" prijst toch
+  al per klant). Mag niet stilzwijgend terugkomen als standaard-tier-feature.
+- **Foundation-launchcap: 15, geen live teller.** `FOUNDATION_CAP` in `lib/marketing/foundation-
+  cap.ts`, verlaagd van 50 naar 15 op 15 augustus. Twee redenen: (1) de API-belasting bewust
+  opschaalbaar houden terwijl de Meta/LinkedIn-pipelines nog nooit tegen een echt gekoppeld account
+  hebben gedraaid, (2) de 8GB-database niet laten vollopen met gratis Foundation-data voordat er
+  omzet tegenover staat — schept als bijeffect ook exclusiviteit op een tier die toch al permanent
+  gratis blijft. Bewust GEEN "X van de 15"-teller op de site: alleen een boolean naar buiten, want
+  een cijfer dat moet blijven kloppen is een belofte en er is geen self-serve flow die het
+  automatisch bijhoudt (`agencies.licentie` wordt handmatig gezet).
+- **Second Opinion-welkomstcadeau: 5 gratis trialruns bij elke upgrade naar een betaalde tier**
+  (migratie 074, `lib/analysis/second-opinion-trial.ts`), zichtbaar als een gedraaide, gestippelde
+  tag op elke betaalde kaart (niet als los blok, niet als begraven checkmark — twee eerdere versies
+  daarvan zijn expliciet afgewezen). Nadrukkelijk GEEN permanente tier-eigenschap: een
+  acquisitiemiddel voor de launch, bedoeld om de losse Second Opinion-module (€250/mnd) daarna
+  daadwerkelijk te laten afnemen. Een limiet op eerste-X-afnemers of eerste-X-weken is overwogen
+  maar bewust niet gebouwd — "dit moet nog bedacht worden," open gelaten, niet half afgemaakt.
+
+#### De modulewinkel ("The Intelligence Store") en bundels
+
+Losse add-ons onder de tier-grid, zelfde `gebouwd`-discipline. **Al echt gebouwd:** Second Opinion
+(€250/mnd, werkende PDF-export), Whitelabel Portal (€500/mnd, `agencies.whitelabel_actief`,
+migratie 068), Volume Compute (dynamisch geprijsd, het kredietgrootboek zelf is echt — alleen de
+zelfbedienings-koopflow is hier gesimuleerd). **Nog geen spoor in de codebase:** AI Council
+(€300/mnd), Demand Intelligence (€250/mnd), Demand Flow Intelligence (€350/mnd, expliciet ánders
+dan Demand Intelligence — die is Search Console/SEO-vs-betaald, deze is kanaal-halo-effecten tussen
+Google/Meta/LinkedIn/Bing), Proof Engine (€150/mnd). **God View** (€750/1.250/2.500 voor Standard/
+Tactical/Pulse) is nadrukkelijk geen simpele opklimmende reeks — Tactical en Pulse hebben BEIDE
+zowel de marktdata (Standard) als het leergeheugen (`agency_memory_events`, fase 4) nodig, zie §7.
+Twee bundels: **Agency Growth Bundle** (Second Opinion + Proof Engine, €325/mnd) en **Deep
+Intelligence Bundle** (AI Council + Demand Intelligence, €450/mnd).
+
+Elke module draagt drie gescheiden stukken tekst met elk hun eigen taak, geen onderlinge herhaling:
+`omschrijving` (wat het doet, altijd zichtbaar op de kaart), `positionering` (waarom/hoe verkocht —
+de info-icoon-popover, bv. Second Opinion: "built to win the next pitch, not to audit your own
+team"), `detail` (de volledige uitleg in het uitklap-paneel).
+
+#### Positionering en messaging
+
+**"No Limits"** is de kernbelofte op de pricing-pagina zelf: elk plan schaalt met het aantal
+accounts, zonder nieuwe factuur per extra klant — vergeleken met de sector, waar dat zeldzaam is
+(zie hieronder). **Radical transparency** is de tweede pijler: niet-gebouwde features krijgen een
+zichtbaar "Coming soon"-label i.p.v. verzwegen te worden — zelf benoemd als verkoopargument ("een
+leverancier die op de prijspagina toegeeft wat er nog niet is, wordt geloofd over wat er wel is").
+
+**De Compare-pagina (`/vs`, "Beyond the Dashboard Layer")** zet dit tegenover de markt op vier
+assen, elk met een concreet "×" en "✓":
+1. **The Business Model:** "The Success Tax" (prijs gekoppeld aan ad spend/GMV, groeit met de
+   klant) tegenover **Predictable Infrastructure** (vlakke tier-prijs, optioneel Volume Compute).
+2. **Agency Memory:** geïsoleerde accountsilo's (wat één accountmanager leert blijft bij die
+   persoon) tegenover **Agency Memory** (geleerde lessen overleven een personeelswissel).
+3. **The End Product:** passieve dashboards/inzichten (jij moet nog bedenken wat te doen)
+   tegenover **A Quality-Gated Hypothesis, Ready to Execute** (diagnose, hypothese en kwaliteitspoort
+   al gedaan — één concrete aanbeveling, geen dashboard om te interpreteren).
+4. **The Handoff:** handmatige diagnose én handmatige uitvoering over elk platform apart
+   tegenover **One Handoff: You Execute** (nul handoffs voor diagnose/prioritering/attributie — het
+   enige dat overblijft is zelf op de knop drukken in het eigen advertentieplatform).
+
+De pagina onderbouwt "the success tax" met acht met naam genoemde concurrenten en hun eigen
+gepubliceerde prijsstructuur (Optmyzr — 30-dagen-spend, Triple Whale — 12-maands-GMV, Madgicx —
+maandelijkse Meta-spend, Skai — jaarlijkse spend, Revealbot — gecombineerde spend over accounts,
+Northbeam — mediaspend + pageviews, Adalysis — maandelijks herberekende spend, Opteo —
+accountaantal + spend-plafond), met een disclaimer dat dit op elk platforms eigen publieke
+structuur is gebaseerd, niet actuele tarieven. Homepage's `ComparisonBlock` gebruikt dezelfde
+"erbovenop, niet in plaats van"-framing (niet "stop met dashboards bouwen" — dat zou tegenspreken
+dat Foundation zelf een gratis dashboard is).
+
 ---
 
 ## 11. Wat we niet bouwen
