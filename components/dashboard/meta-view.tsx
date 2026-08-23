@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Megaphone, Calendar, Sparkles, Target } from "lucide-react";
+import { Megaphone, Calendar, LayoutGrid, Sparkles, Target } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
+import { ChannelCampaignTable } from "./channel-campaign-table";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { CreativeDeepDive } from "./creative-deep-dive";
@@ -178,7 +179,7 @@ function useMetaObjectiveGroups(clientId: string): ObjectiveGroupLike[] | null {
  * "Wat er draait" — de koppelingsstatus van een kanaal is een overzichtsvraag en hoort niet op
  * elk tabblad herhaald te worden.
  */
-export function MetaCampagnes({ clientId }: { clientId: string }) {
+export function MetaCampagnes({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
   const objectiveGroups = useMetaObjectiveGroups(clientId);
 
   return (
@@ -198,6 +199,17 @@ export function MetaCampagnes({ clientId }: { clientId: string }) {
             emptyLabel="Geen campagnes met een herkend objective in de laatste 90 dagen."
           />
         )}
+      </Sectie>
+
+      {/* Verhuisd van Overzicht (ChannelPerformance) hierheen, 22 augustus 2026: zelfde plek als
+          bij Google ("Wat er draait" op Campagnes) -- deze view beantwoordt zelf al "hoe loopt
+          het", niet "wat draait er", zie de toelichting bovenaan dit bestand. */}
+      <Sectie
+        icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Wat er draait"
+        bijschrift="Alle campagnes van dit account over de laatste 28 dagen"
+      >
+        <ChannelCampaignTable clientId={clientId} channel="meta" geoClone={geoClone} />
       </Sectie>
 
       {/* Quick scan: creatives + prestaties + samenvatting. */}

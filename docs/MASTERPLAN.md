@@ -7324,3 +7324,33 @@ meegenomen.
 
 `tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijziging
 onttrokken productiedrift.
+
+### 17.100 Campagnetabel verhuisd naar de Campagnes-tab, uniform met Google (22 augustus 2026)
+
+Vervolg op 17.99. Gevraagd welke plek moest winnen — Google's (tabel op Campagnes) of Meta/
+LinkedIn's (tabel op Overzicht, binnen `ChannelPerformance`) — met de keus aan mij. Google's plek
+wint, om een reden die al in de eigen code van Meta/LinkedIn stond: `meta-view.tsx`'s eigen
+toelichting zegt letterlijk dat Overzicht "hoe loopt het en waar komt het vandaan" beantwoordt en
+Campagnes "wat draait er en hoe ziet het eruit" — een campagne-voor-campagne prestatietabel is
+per definitie "wat draait er", dus hoorde hij op Campagnes, niet op Overzicht. Meta/LinkedIn's
+eigen plek sprak hun eigen tabsplitsing tegen.
+
+**De verhuizing.** `channel-performance.tsx`'s campagnetabel-sectie (onderaan, "Campagnes (laatste
+28 dagen)") verwijderd — die component beantwoordt nu alleen nog Overzicht-vragen (KPI's, pacing,
+maandverloop), net als Google's Overzicht geen campagnetabel toont. Nieuw bestand
+`channel-campaign-table.tsx`: een lichte, zelfstandige component met zijn eigen 28-dagen-fetch
+(geen gedeelde hook met `ChannelPerformance` — de twee tabbladen zijn nooit tegelijk gemount, dus
+delen zou geen netwerkverzoek besparen, alleen code-koppeling toevoegen). Hergebruikt `CONFIG`/
+`eur`/`fmt`/`pctS`/`ChannelKind`/`DailyRow` uit `channel-performance.tsx` (nu geëxporteerd) zodat
+beide tabbladen dezelfde kolomdefinities en tabelnamen lezen — één bron, geen tweede kopie die kan
+gaan afwijken. Toegevoegd aan `MetaCampagnes`/`LinkedInCampagnes` onder een nieuwe sectie "Wat er
+draait" — zelfde icoon (`LayoutGrid`) en titel als Google's Campagnes-tab.
+
+Geverifieerd: Meta's Overzicht toont de oude "Campagnes (laatste 28 dagen)"-kop niet meer
+(bevestigd met een tekst-zoekopdracht op de live pagina, niet aangenomen); Meta en LinkedIn's
+Campagnes-tab tonen nu allebei de nieuwe "Wat er draait"-sectie met een werkende, correct
+opgemaakte tabel (LinkedIn toont terecht CPL i.p.v. CPA, Meta toont de eigen conversieselectie);
+Google's Campagnes-tab ongewijzigd, geen console-fouten op alle drie kanalen. `tsc` 0 fouten.
+
+`tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijziging
+onttrokken productiedrift.

@@ -32,9 +32,9 @@ function maandVoluit(isoMaand: string): string {
   return naam ? `${naam} ${jaar}` : isoMaand;
 }
 
-type ChannelKind = "meta" | "linkedin";
+export type ChannelKind = "meta" | "linkedin";
 
-interface DailyRow {
+export interface DailyRow {
   date: string;
   entity: string;
   impressions: number;
@@ -57,7 +57,12 @@ interface ChannelConfig {
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
-const CONFIG: Record<ChannelKind, ChannelConfig> = {
+// Geëxporteerd (22 augustus 2026) zodat channel-campaign-table.tsx dezelfde tabelnamen/mapping
+// gebruikt -- de campagnetabel verhuisde naar de Campagnes-tab (feedback: "structuur exact
+// hetzelfde" tussen kanalen, en de campagnetabel hoort bij "wat draait er", niet bij "hoe loopt
+// het", zelfde tabsplitsing als deze view zelf al documenteert). Eén bron voor de kolomnamen
+// voorkomt dat de twee views ooit een ander veld voor dezelfde kolom lezen.
+export const CONFIG: Record<ChannelKind, ChannelConfig> = {
   meta: {
     accountTable: "meta_account_daily",
     campaignTable: "meta_campaign_daily",
@@ -80,9 +85,9 @@ const CONFIG: Record<ChannelKind, ChannelConfig> = {
   },
 };
 
-const eur = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v));
-const fmt = (v: number | null, d = 0): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d }).format(v));
-const pctS = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 2 }).format(v));
+export const eur = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v));
+export const fmt = (v: number | null, d = 0): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d }).format(v));
+export const pctS = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 2 }).format(v));
 // Het percentage als getal en niet als tekst. Als tekst moest de weergave de richting uit het
 // plusteken afleiden (`startsWith("+") ? groen : rood`), en dat is fout zodra lager beter is: een
 // CPL die met twaalf procent stijgt kleurde groen. Wie hoort te stijgen zegt de aanroeper.
@@ -187,19 +192,7 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
       if (r.date.slice(0, 7) === prevMonth && day <= dayOfMonth) { prevMtd.spend += r.spend; prevMtd.conv += convOf(r); }
     }
 
-    // Campagnetabel: laatste 28 dagen per campagne (bij beurs-scope alleen de matchende).
-    const campSource = geoClone ? campaign.filter((r) => matchedEntities?.has(r.entity)) : campaign;
-    const byCampaign = new Map<string, Agg>();
-    for (const r of campSource) {
-      const age = (new Date(today).getTime() - new Date(r.date).getTime()) / 86_400_000;
-      if (age >= 28) continue;
-      const a = byCampaign.get(r.entity) ?? emptyAgg();
-      a.impressions += r.impressions; a.clicks += r.clicks; a.spend += r.spend; a.conv += convOf(r);
-      byCampaign.set(r.entity, a);
-    }
-    const campaigns = [...byCampaign.entries()].map(([entity, a]) => ({ entity, ...a })).sort((a, b) => b.spend - a.spend);
-
-    return { empty: false as const, fullMonths, recent, prior, mtd, prevMtd, campaigns, dayOfMonth };
+    return { empty: false as const, fullMonths, recent, prior, mtd, prevMtd, dayOfMonth };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, campaign, convConfig, geoClone, matchedEntities]);
 
@@ -216,7 +209,7 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
   }
   if (!derived) return null; // geen data: de kanaaltab toont al de eerlijke lege staat
 
-  const { fullMonths, recent, prior, mtd, prevMtd, campaigns, dayOfMonth } = derived;
+  const { fullMonths, recent, prior, mtd, prevMtd, dayOfMonth } = derived;
   const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, vandaag()) : null;
   const cpa = (a: Agg): number | null => (a.conv > 0 ? a.spend / a.conv : null);
   const ctr = (a: Agg): number | null => (a.impressions > 0 ? a.clicks / a.impressions : null);
@@ -370,64 +363,11 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
         })()}
       </div>
 
-      {/* Campagnetabel */}
-      {campaigns.length > 0 && (
-        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-            <BarChart3 className="w-4.5 h-4.5 text-brand-blue-ink" />
-            <h3 className="text-title font-semibold text-brand-gray">Campagnes (laatste 28 dagen)</h3>
-          </div>
-          {(() => {
-            const som = campaigns.reduce((t, c) => ({
-              spend: t.spend + c.spend, impressions: t.impressions + c.impressions,
-              clicks: t.clicks + c.clicks, conv: t.conv + c.conv,
-            }), { spend: 0, impressions: 0, clicks: 0, conv: 0 });
-            // Tegen de grootste campagne, net als campaign-table hiernaast. Zie de maandtabel.
-            const grootste = campaigns.reduce((t, c) => ({
-              spend: Math.max(t.spend, c.spend), impressions: Math.max(t.impressions, c.impressions),
-              clicks: Math.max(t.clicks, c.clicks), conv: Math.max(t.conv, c.conv),
-            }), { spend: 0, impressions: 0, clicks: 0, conv: 0 });
-            const deel = (v: number, max: number) => (max > 0 ? v / max : 0);
-            return (
-              <Tabel>
-                <Kop>
-                  {/* `breed` alleen hier: campagnenamen zijn lange vrije tekst, dus die kolom mag de
-                      overruimte opslokken zodat de getallen compact naast elkaar staan. */}
-                  <KolomKop breed>Campagne</KolomKop>
-                  <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
-                  <KolomKop getal>Vertoningen</KolomKop>
-                  <KolomKop getal>Klikken</KolomKop>
-                  <KolomKop getal>CTR</KolomKop>
-                  <KolomKop getal>{convLabel}</KolomKop>
-                  <KolomKop getal>{useLeadsLabel ? "CPL" : "CPA"}</KolomKop>
-                </Kop>
-                <Body>
-                  {campaigns.map((c) => (
-                    <Rij key={c.entity}>
-                      <NaamCel>{names.get(c.entity) ?? c.entity}</NaamCel>
-                      <AandeelCel waarde={eur(c.spend)} aandeel={deel(c.spend, grootste.spend)} />
-                      <AandeelCel waarde={fmt(c.impressions)} aandeel={deel(c.impressions, grootste.impressions)} />
-                      <AandeelCel waarde={fmt(c.clicks)} aandeel={deel(c.clicks, grootste.clicks)} />
-                      <GetalCel>{pctS(ctr(c))}</GetalCel>
-                      <AandeelCel waarde={fmt(c.conv, 1)} aandeel={deel(c.conv, grootste.conv)} />
-                      <GetalCel>{eur(cpa(c))}</GetalCel>
-                    </Rij>
-                  ))}
-                </Body>
-                <TotaalRij>
-                  <TotaalCel>Totaal</TotaalCel>
-                  <TotaalCel getal>{eur(som.spend)}</TotaalCel>
-                  <TotaalCel getal>{fmt(som.impressions)}</TotaalCel>
-                  <TotaalCel getal>{fmt(som.clicks)}</TotaalCel>
-                  <TotaalCel getal>{pctS(ctr(som))}</TotaalCel>
-                  <TotaalCel getal>{fmt(som.conv, 1)}</TotaalCel>
-                  <TotaalCel getal>{eur(cpa(som))}</TotaalCel>
-                </TotaalRij>
-              </Tabel>
-            );
-          })()}
-        </div>
-      )}
+      {/* De campagnetabel stond hier tot 22 augustus 2026 -- verhuisd naar de Campagnes-tab
+          (channel-campaign-table.tsx), want deze view beantwoordt zelf al "hoe loopt het en waar
+          komt het vandaan" en niet "wat draait er" (zie de toelichting bovenaan meta-view.tsx).
+          Google's campagnetabel stond al op Campagnes; dit bracht Meta/LinkedIn op dezelfde
+          indeling ("structuur exact hetzelfde" over de kanalen, feedback 22 augustus). */}
     </div>
   );
 }

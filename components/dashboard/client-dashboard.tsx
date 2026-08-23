@@ -454,8 +454,8 @@ export function ClientDashboard({ client }: { client: Client }) {
                   onCountryFilterChange={setCountryFilter}
                 />
               )}
-              {channel === "meta" && <MetaCampagnes clientId={client.id} />}
-              {channel === "linkedin" && <LinkedInCampagnes clientId={client.id} />}
+              {channel === "meta" && <MetaCampagnes clientId={client.id} geoClone={geoClone} />}
+              {channel === "linkedin" && <LinkedInCampagnes clientId={client.id} geoClone={geoClone} />}
               {/* Alle kanalen op de Campagnes-tab: welke campagnes draaien per kanaal (niet de
                   blended maandgrafiek — die hoort bij Prognose/Overzicht). */}
               {channel === "blended" && <CampaignsPerChannel clientId={client.id} geoClone={geoClone} />}

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Briefcase, Calendar, Sparkles, Target } from "lucide-react";
+import { Briefcase, Calendar, LayoutGrid, Sparkles, Target } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
+import { ChannelCampaignTable } from "./channel-campaign-table";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { CreativeDeepDive } from "./creative-deep-dive";
@@ -158,7 +159,7 @@ function useLinkedInObjectiveGroups(clientId: string): ObjectiveGroupLike[] | nu
  * Geen ChannelViewHeader, net als bij Meta en Google: de koppelingsstatus is een overzichtsvraag
  * en hoort niet op elk tabblad herhaald te worden.
  */
-export function LinkedInCampagnes({ clientId }: { clientId: string }) {
+export function LinkedInCampagnes({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
   const objectiveGroups = useLinkedInObjectiveGroups(clientId);
 
   return (
@@ -178,6 +179,17 @@ export function LinkedInCampagnes({ clientId }: { clientId: string }) {
             emptyLabel="Geen campagnes met een herkend objective in de laatste 90 dagen."
           />
         )}
+      </Sectie>
+
+      {/* Verhuisd van Overzicht (ChannelPerformance) hierheen, 22 augustus 2026: zelfde plek als
+          bij Google ("Wat er draait" op Campagnes) -- deze view beantwoordt zelf al "hoe loopt
+          het", niet "wat draait er", zie de toelichting bovenaan meta-view.tsx (zelfde opzet). */}
+      <Sectie
+        icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Wat er draait"
+        bijschrift="Alle campagnes van dit account over de laatste 28 dagen"
+      >
+        <ChannelCampaignTable clientId={clientId} channel="linkedin" geoClone={geoClone} />
       </Sectie>
 
       {/* Quick scan: creatives + prestaties + samenvatting. */}
