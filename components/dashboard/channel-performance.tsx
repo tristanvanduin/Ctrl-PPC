@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
-import { Calendar, TrendingUp, Gauge, BarChart3 } from "lucide-react";
+import { Calendar, TrendingUp, BarChart3 } from "lucide-react";
 import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { today as vandaag } from "@/lib/reporting-date";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
-import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { useVorige } from "@/lib/use-vorige";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
@@ -101,7 +100,9 @@ const deltaPct = (cur: number | null, prev: number | null): number | null =>
 interface Agg { impressions: number; clicks: number; spend: number; conv: number }
 const emptyAgg = (): Agg => ({ impressions: 0, clicks: 0, spend: 0, conv: 0 });
 
-export function ChannelPerformance({ clientId, channel, geoClone, edition }: { clientId: string; channel: ChannelKind; geoClone?: string | null; edition?: UpcomingEdition | null }) {
+// `edition` is hier weg: die diende alleen het pacing-blok ("nog N weken tot de beurs"),
+// en dat staat nu in channel-pacing.tsx.
+export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: string; channel: ChannelKind; geoClone?: string | null }) {
   const cfg = CONFIG[channel];
   const [accountRuw, setAccount] = useState<DailyRow[] | null>(null);
   // De vorige inhoud blijft staan terwijl de nieuwe binnenkomt: bij een kanaalwissel klapte deze
@@ -185,18 +186,7 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
     const recent = win(0, 28);
     const prior = win(28, 56);
 
-    // Pacing: maand-tot-nu vs dezelfde dag-telling vorige maand.
-    const dayOfMonth = Number(today.slice(8, 10));
-    const prevMonthDate = new Date(today); prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
-    const prevMonth = prevMonthDate.toISOString().slice(0, 7);
-    const mtd = emptyAgg(); const prevMtd = emptyAgg();
-    for (const r of source) {
-      const day = Number(r.date.slice(8, 10));
-      if (r.date.slice(0, 7) === curMonth) { mtd.spend += r.spend; mtd.conv += convOf(r); }
-      if (r.date.slice(0, 7) === prevMonth && day <= dayOfMonth) { prevMtd.spend += r.spend; prevMtd.conv += convOf(r); }
-    }
-
-    return { empty: false as const, fullMonths, recent, prior, mtd, prevMtd, dayOfMonth };
+    return { empty: false as const, fullMonths, recent, prior };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, campaign, convConfig, geoClone, matchedEntities]);
 
@@ -213,14 +203,10 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
   }
   if (!derived) return null; // geen data: de kanaaltab toont al de eerlijke lege staat
 
-  const { fullMonths, recent, prior, mtd, prevMtd, dayOfMonth } = derived;
-  const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, vandaag()) : null;
+  const { fullMonths, recent, prior } = derived;
   const cpa = (a: Agg): number | null => (a.conv > 0 ? a.spend / a.conv : null);
   const ctr = (a: Agg): number | null => (a.impressions > 0 ? a.clicks / a.impressions : null);
   const chartData = fullMonths.map(([m, a]) => ({ maand: m, spend: Math.round(a.spend), lijn: Math.round(a.conv) }));
-  const paceP = deltaPct(mtd.spend, prevMtd.spend);
-  const pace = paceP == null ? null : `${paceP >= 0 ? "+" : ""}${Math.round(paceP)}%`;
-  const pacePct = mtd.spend > 0 && prevMtd.spend > 0 ? mtd.spend / prevMtd.spend : null;
 
   const kpis: { label: string; value: string; delta: number | null; hogerIsBeter: boolean }[] = [
     { label: "Spend (28d)", value: eur(recent.spend), delta: deltaPct(recent.spend, prior.spend), hogerIsBeter: false },
@@ -260,36 +246,12 @@ export function ChannelPerformance({ clientId, channel, geoClone, edition }: { c
         </div>
       </div>
 
-      {/* Pacing */}
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <Gauge className="w-4.5 h-4.5 text-brand-blue-ink" />
-          <h3 className="text-title font-semibold text-brand-gray">Pacing — maand tot nu (dag {dayOfMonth})</h3>
-          {/* Google telt inmiddels naar de beursdag; hier stond nog alleen de kalendermaand, en
-              dan vertellen twee kanaaltabbladen naast elkaar een ander verhaal over dezelfde
-              week. De maandvergelijking blijft staan — die voedt de cijfers hieronder — maar de
-              afstand die er echt toe doet staat er nu bij. */}
-          {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
-            <span className="ml-auto text-meta font-medium text-brand-blue-ink">
-              nog {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"} tot {edition!.label}
-            </span>
-          )}
-        </div>
-        <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 gap-4 text-lead">
-          <div>
-            <div className="text-meta text-muted-foreground">Spend deze maand</div>
-            <div className="font-semibold text-brand-gray">{eur(mtd.spend)} <span className="text-meta text-muted-foreground font-normal">(vorige maand op dag {dayOfMonth}: {eur(prevMtd.spend)})</span></div>
-          </div>
-          <div>
-            <div className="text-meta text-muted-foreground">{convLabel} deze maand</div>
-            <div className="font-semibold text-brand-gray">{fmt(mtd.conv, 1)} <span className="text-meta text-muted-foreground font-normal">(was {fmt(prevMtd.conv, 1)})</span></div>
-          </div>
-          <div>
-            <div className="text-meta text-muted-foreground">Tempo vs vorige maand</div>
-            <div className={`font-semibold ${pacePct != null && pacePct > 1.15 ? "text-amber-600" : "text-brand-gray"}`}>{pace ?? "—"}{pacePct != null && pacePct > 1.15 ? " (loopt voor)" : ""}</div>
-          </div>
-        </div>
-      </div>
+      {/* Het pacing-blok stond hier. Verhuisd naar components/dashboard/channel-pacing.tsx en
+          naar de HERO van Meta en LinkedIn, direct onder Account Health -- dezelfde plek als
+          Google's PacingMonitor, en dezelfde ringen. Het stond hier onderaan een lange sectie
+          terwijl het de vraag beantwoordt die je bovenaan stelt. De rekenkern zit nu in
+          lib/kanalen/maand-pacing.ts, zodat er niet twee definities van "vorige maand tot dezelfde
+          dag" naast elkaar leven. */}
 
       {/* Maandverloop. Stond hier als eigen ComposedChart met spend links en conversies rechts —
           dezelfde dubbele as en dezelfde opbouw als MonthlyTrendChart, dus twee kopieën van

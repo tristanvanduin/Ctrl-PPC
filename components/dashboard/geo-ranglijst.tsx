@@ -122,9 +122,14 @@ export function GeoRanglijst({
           Als 2-koloms rooster van kleine kaartjes i.p.v. een verticale lijst (17.36): een rij
           label/getal-paren onder elkaar leest als bijschrift, een rooster van eigen kaartjes leest
           als cijfers die het bekijken waard zijn -- zelfde `--spoor`-rand als de aandeelbalk erboven,
-          geen nieuwe kleur erbij. */}
+          geen nieuwe kleur erbij.
+
+          Container-breekpunten en geen vaste twee kolommen: deze zes tegels staan zowel in een
+          halfbrede kolom als over de volle schermbreedte. Op vol scherm stonden ze in twee
+          kolommen van 700px met een getal van vier tekens erin -- dezelfde "te breed uitgestrekt"
+          die de hero ook had. Zes tegels naast elkaar vullen die breedte wél. */}
       {totalen && totalen.length > 0 && (
-        <dl className="mt-4 grid grid-cols-2 gap-1.5 border-t border-border pt-3">
+        <dl className="mt-4 grid grid-cols-2 gap-1.5 border-t border-border pt-3 @2xl:grid-cols-3 @5xl:grid-cols-6">
           {totalen.map((t) => (
             <div key={t.label} className="rounded-lg border border-border/70 bg-muted/40 px-2 py-1.5">
               <dt className="text-micro text-muted-foreground leading-tight">{t.label}</dt>

@@ -13,6 +13,7 @@ import { CreativeDeepDive } from "./creative-deep-dive";
 import { ChannelViewHeader } from "./channel-view-header";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
+import { ChannelPacing } from "./channel-pacing";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
@@ -102,8 +103,10 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
       <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
         <div className="flex flex-col gap-4">
           <ChannelHealthBadge clientId={clientId} channel="linkedin" />
+          {/* Pacing direct onder Account Health, net als op Google en Meta, en tegelijk de
+              opvanger van deze kolom. */}
           <div className="flex flex-1 flex-col">
-            <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
+            <ChannelPacing clientId={clientId} channel="linkedin" edition={edition} />
           </div>
         </div>
         <div className="flex flex-1 flex-col">
@@ -115,7 +118,13 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           onafhankelijke kolommen -- zie meta-view.tsx voor de redenering. LinkedIn heeft hier maar
           twee kaarten: alleen MEMBER_JOB_FUNCTION heeft demografiedata (nagemeten in
           linkedin_demographic_daily), dus een tweede doelgroep-donut zou leeg zijn. */}
-      <GeoRanglijstCard state={geo} zonderBalken />
+      {/* LinkedIn heeft maar één ringkaart (alleen MEMBER_JOB_FUNCTION is gevuld; leeftijd en
+          gender levert LinkedIn niet), dus staat de landenkaart ernaast in plaats van een tweede
+          ring. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
+        <GeoRanglijstCard state={geo} zonderBalken />
+      </div>
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
       <Sectie
@@ -123,7 +132,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         titel="Maandprestaties"
         bijschrift="Kerncijfers, pacing en het maandverloop"
       >
-        <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} edition={edition} />
+        <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} />
       </Sectie>
 
       {/* LinkedIn-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde

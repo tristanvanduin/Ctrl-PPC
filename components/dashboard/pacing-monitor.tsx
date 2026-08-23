@@ -34,7 +34,11 @@ function num(v: number): string {
 //     extras toe".
 //
 // De ringdikte schaalt mee (5 op 44 werd optisch dun op 128); de verhouding blijft gelijk.
-function PacingRing({ pct, color, size = 128 }: { pct: number; color: string; size?: number }) {
+//
+// Geexporteerd omdat channel-pacing.tsx (Meta/LinkedIn) dezelfde ring gebruikt. Een tweede
+// ring-implementatie zou binnen een week een andere dikte of een andere achtergrondkleur hebben
+// dan deze, en dan staan er twee ringen naast elkaar op het scherm die niet hetzelfde bedoelen.
+export function PacingRing({ pct, color, size = 128 }: { pct: number; color: string; size?: number }) {
   const dikte = Math.max(5, Math.round(size / 9));
   const r = (size - dikte - 1) / 2;
   const circ = 2 * Math.PI * r;

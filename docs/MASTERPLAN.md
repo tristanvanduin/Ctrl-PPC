@@ -8282,3 +8282,64 @@ Onder 1800px: één kolom, elke kaart natuurlijk, verschil per definitie nul.
 omdat ROAS één regel meer heeft dan de andere drie. Dat zijn `Kerncijfer`-tegels en daar
 waarschuwt AGENTS.md expliciet voor: een `h-full` kind in een rastercel duwt daar alles wat erna
 komt de kaart uit.
+
+### 17.119 Pacing als eigen kaart op Meta en LinkedIn (23 augustus 2026)
+
+"Je bent nu pacing kwijt. Als je die 2 donuts naast elkaar zet (1 op de plek van conversies per
+land) en direct onder de health pacing toevoegt zijn we er denk ik."
+
+Terecht: op Google staat Pacing sinds 17.118 direct onder Account Health, maar op Meta en LinkedIn
+bestond die kaart niet. Hun pacing stond als een blokje van drie regels ONDERAAN de sectie
+"Maandprestaties" — terwijl het de vraag beantwoordt die je bovenaan stelt.
+
+**Waarom het geen tweede PacingMonitor kon zijn.** Google's PacingMonitor leest het jaardoel en de
+jaarprognose (ClientDataProvider + computeForecast), en dat pad bestaat voor Meta en LinkedIn niet:
+er is voor die kanalen geen doel ingevoerd. De eerlijke vergelijking daar is maand-tot-nu tegen
+dezelfde dag-telling van de vorige maand — geen doel nodig, en niet vertekend door het aantal
+verstreken dagen.
+
+Drie dingen zijn daarbij gedeeld in plaats van gekopieerd, want dit is precies het soort kaart
+waar anders een tweede waarheid ontstaat:
+
+| wat | waar | waarom gedeeld |
+|---|---|---|
+| de rekenkern | `lib/kanalen/maand-pacing.ts` | twee kopieën van "vorige maand tot dezelfde dag" lopen uit elkaar op het detail dat ertoe doet: telt dag 31 mee in een maand van 30 dagen |
+| de ring | `PacingRing` uit `pacing-monitor.tsx`, nu geëxporteerd | een tweede ring krijgt binnen een week een andere dikte of achtergrondkleur, en dan staan er twee ringen op het scherm die niet hetzelfde bedoelen |
+| de tabelnamen en mapping | `CONFIG` uit `channel-performance.tsx`, al geëxporteerd | anders leest de ene view een ander veld voor dezelfde kolom |
+
+De fetch is wél apart, en dat is geen kopie maar een aantoonbaar kleinere query: ChannelPerformance
+haalt 200 dagen account- én campagnedata plus campagnenamen op (voor de maandtabel en de
+beurs-splitsing); deze kaart heeft aan 70 dagen account-data genoeg om de huidige en de volle
+vorige maand te dekken.
+
+**Wat de kaart toont.** Twee ringen (spend en de geselecteerde conversie, als percentage van de
+vorige maand op dezelfde dag) en vier tegels: tempo per dag voor allebei, en waar dat op uitkomt
+aan het eind van de maand. Die laatste is met opzet een rechte lijn en zegt dat ook: voor deze
+kanalen bestaat er geen seizoensmodel, en een prognose suggereren die er niet is, is erger dan een
+rechte lijn die zichzelf zo noemt. De kleur zegt "in de pas of niet", niet "goed of slecht" — boven
+115% is dat bij spend een blik op het budget waard en bij conversies juist het gewenste beeld,
+vandaar amber en niet rood.
+
+**De rest van de indeling, precies zoals gevraagd.** Meta: de twee ringkaarten
+("Waar gaat het budget heen" en "Doelgroepen") staan nu naast elkaar in plaats van boven elkaar,
+en "Conversies per land" staat eronder over de volle breedte. LinkedIn heeft maar één ringkaart
+(alleen `MEMBER_JOB_FUNCTION` is gevuld — leeftijd en gender levert LinkedIn niet), dus staat de
+landenkaart daar ernaast.
+
+**En de tegels in "Conversies per land" gebruiken nu de breedte.** Zes tegels in twee kolommen van
+700px is dezelfde "te breed uitgestrekt" als de hero eerder had. Ze staan nu op
+`@2xl:grid-cols-3 @5xl:grid-cols-6`, dus zes naast elkaar over de volle breedte en drie in een
+halfbrede kolom.
+
+**Gemeten, kolomhoogtes links en rechts op 1920px:** Google 765/765, Meta 794/794, LinkedIn
+841/841 — en elke kaart eindigt binnen 21px van zijn onderrand, wat de eigen `p-5` is.
+
+**Nog een keer in dezelfde val gelopen.** De kaartoverloop-controle meldde twee runs lang
+"OK, niets buiten de kaart" op alle vijftien schermen en faalde toen op zijn eigen zelftest.
+Oorzaak: op poort 3190 draaide nog een `next start` van uren eerder, en die serveerde een `.next`
+die inmiddels overschreven was — precies waar AGENTS.md voor waarschuwt. De pagina's waren leeg,
+dus "niets buiten de kaart" was waar en betekende niets. De zelftest ving dat: hij kon zijn eigen
+kaarten niet vinden en zei letterlijk "deze uitslag zegt niets". Zonder die zelftest had ik hier
+twee groene runs gerapporteerd over een dode server. Server opnieuw gestart op de verse build:
+vijftien schermen schoon en de zelftest vindt zijn 9 bevindingen weer.
+

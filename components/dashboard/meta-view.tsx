@@ -13,6 +13,7 @@ import { CreativeDeepDive } from "./creative-deep-dive";
 import { ChannelViewHeader } from "./channel-view-header";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
+import { ChannelPacing } from "./channel-pacing";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
@@ -116,12 +117,12 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
       <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
         <div className="flex flex-col gap-4">
           <ChannelHealthBadge clientId={clientId} channel="meta" />
-          {/* De opvanger links. BreakdownDonuts is Meta's equivalent van Google's Pacing-plek:
-              spend/conversies per plaatsing, platform of device (tabs), altijd gevuld zodra er
-              breakdown-data is. groep="levering": alleen plaatsing/platform/device, dus "waar komt
-              het vandaan". Leeftijd en gender staan hieronder (groep="doelgroep"). */}
+          {/* Pacing direct onder Account Health, net als op Google -- en tegelijk de opvanger van
+              deze kolom: zes blokken met een ring worden leesbaarder van hoogte. Dit blok stond
+              tot 23 augustus 2026 onderaan de sectie "Maandprestaties", terwijl het de vraag
+              beantwoordt die je bovenaan stelt. */}
           <div className="flex flex-1 flex-col">
-            <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
+            <ChannelPacing clientId={clientId} channel="meta" edition={edition} />
           </div>
         </div>
         <div className="flex flex-1 flex-col">
@@ -129,10 +130,16 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         </div>
       </div>
 
+      {/* De twee ringkaarten naast elkaar. groep="levering" is plaatsing/platform/device ("waar
+          komt het vandaan"), groep="doelgroep" is leeftijd en gender ("wie bereiken we"). Ze
+          horen naast elkaar omdat ze dezelfde vorm en dezelfde vraag hebben, alleen op een andere
+          as -- en omdat ze even hoog zijn is er niets uit te rekken. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
         <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
-        <GeoRanglijstCard state={geo} zonderBalken />
       </div>
+
+      <GeoRanglijstCard state={geo} zonderBalken />
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
       <Sectie
@@ -140,7 +147,7 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         titel="Maandprestaties"
         bijschrift="Kerncijfers, pacing en het maandverloop"
       >
-        <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} edition={edition} />
+        <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} />
       </Sectie>
 
       {/* Meta-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde plek en icoon
