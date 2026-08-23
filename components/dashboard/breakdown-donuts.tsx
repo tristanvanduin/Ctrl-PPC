@@ -225,7 +225,10 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
 
   return (
     <div
-      className="bg-card rounded-xl border border-border shadow-sm overflow-hidden transition-opacity duration-200"
+      // `flex h-full flex-col` met het ring+rasterblok als `flex-1`: deze kaart staat op Meta naast
+      // "Conversies per land" en is niet altijd de hoogste van de twee. Zonder dit zakte het
+      // verschil naar de onderrand als wit.
+      className="bg-card flex h-full flex-col rounded-xl border border-border shadow-sm overflow-hidden transition-opacity duration-200"
       style={{ opacity: ververst ? 0.55 : 1 }}
       aria-busy={ververst}
     >
@@ -282,7 +285,7 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
           het vergelijken van waarden die dicht bij elkaar liggen is een ring de verkeerde vorm;
           strepen op één gedeelde nullijn zijn de goede. De ring die blijft doet wat een ring wél
           kan: in één oogopslag het geheel en het totaalbedrag in het midden. */}
-      <div className="px-5 py-5">
+      <div className="flex flex-1 flex-col justify-center px-5 py-5">
         <div className="flex flex-wrap items-center gap-8">
           <figure className="flex shrink-0 flex-col items-center gap-2">
             <DonutChart

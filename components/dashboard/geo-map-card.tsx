@@ -39,7 +39,11 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
   if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} />;
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    // `flex h-full flex-col` met het kaartvlak als `flex-1`: deze kaart deelt een rasterrij met
+    // Account Health, en welke van de twee de hoogste is wisselt met de schermbreedte. Wie de
+    // laagste is kreeg het verschil als wit onderin. Nu vangt het kaartvlak het op -- de projectie
+    // blijft even groot (hij is gecapt), maar staat gecentreerd in de ruimte die overblijft.
+    <div className="bg-card flex h-full flex-col rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <Globe2 className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">
@@ -76,16 +80,28 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
         </label>
       </div>
 
-      <div className="px-3 py-3">
+      <div className="flex flex-1 flex-col justify-center px-3 py-3">
         {ranked.length === 0 ? (
           <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
         ) : (
+          // De kaart-SVG is `w-full h-auto` op een viewBox van 760x380, dus zijn hoogte groeit
+          // LINEAIR mee met de kolombreedte -- als enige kaart op het scherm. Alle andere kaarten
+          // zijn inhoudsgestuurd en blijven even hoog. Op 1600px viel dat toevallig samen (beide
+          // 682px), maar op 1920/2200/2560 stond er 509/579/669px wit onder Account Health, en dat
+          // is precies wat de eigenaar zag. Een raster kan dat niet oplossen: de rij wordt zo hoog
+          // als zijn hoogste cel, en die cel groeide onbegrensd.
+          //
+          // De cap staat op de eigen tekengrootte van de kaart (760px). Daarboven werd er alleen
+          // opgeschaald: geen enkel land wordt zichtbaarder van een projectie van 1200px breed, de
+          // kaart werd alleen groter. Hij centreert nu binnen de kolom en houdt op met groeien.
           <MapErrorBoundary>
-            {focus === "US" ? (
-              <UsStatesMap values={values} format={metric.fmt} metricLabel={metric.label} />
-            ) : (
-              <WorldMap values={values} format={metric.fmt} metricLabel={metric.label} onCountryClick={canDrillUs ? (a) => a === "US" && setFocus("US") : undefined} />
-            )}
+            <div className="mx-auto w-full max-w-[760px]">
+              {focus === "US" ? (
+                <UsStatesMap values={values} format={metric.fmt} metricLabel={metric.label} />
+              ) : (
+                <WorldMap values={values} format={metric.fmt} metricLabel={metric.label} onCountryClick={canDrillUs ? (a) => a === "US" && setFocus("US") : undefined} />
+              )}
+            </div>
           </MapErrorBoundary>
         )}
         {focus == null && canDrillUs && (

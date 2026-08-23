@@ -115,7 +115,12 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
     : spendPaceRatio >= 0.9 ? "Op schema" : spendPaceRatio >= 0.7 ? "Achterlopend" : "Sterk achter";
 
   return (
-    <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
+    // `flex h-full flex-col` + een grid dat `flex-1` is: deze kaart deelt een rasterrij met de
+    // campagnetype-donut, en die is inhoudelijk hoger (364px tegen 203-270px op brede schermen).
+    // Rasterrijen rekken naar de hoogste cel, dus stond het verschil als wit ONDER de zes blokken.
+    // Nu rekken de blokken zelf mee en staat hun inhoud verticaal gecentreerd: dezelfde hoogte,
+    // maar gevuld in plaats van afgetopt.
+    <div className="@container flex h-full flex-col bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing</h3>
@@ -143,11 +148,11 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
           Vijf kolommen i.p.v. zes zonder "volgens prognose" (geen seizoensmodel voor dit account):
           met een vaste zes-koloms grid en maar vijf blokken bleef de laatste kolom leeg -- geen
           witruimte maar een gat, precies waar de eigen comment hierboven al voor waarschuwt. */}
-      <div className={`grid grid-cols-2 gap-4 @2xl:grid-cols-3 ${
+      <div className={`grid flex-1 grid-cols-2 items-stretch gap-4 @2xl:grid-cols-3 ${
         convLanding.volgensPrognose !== null ? "@5xl:grid-cols-6" : "@5xl:grid-cols-5"
       }`}>
         {/* Conversions pacing */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center gap-3">
           <div className="relative">
             <PacingRing pct={convPacingPct} color={convColor} />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -164,7 +169,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         </div>
 
         {/* Spend pacing */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center gap-3">
           <div className="relative">
             <PacingRing pct={spendPacingPct} color={spendColor} />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -181,7 +186,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         </div>
 
         {/* Daily run rate — conversions */}
-        <div className="border-l border-border pl-4">
+        <div className="flex flex-col justify-center border-l border-border pl-4">
           <div className="flex items-center gap-1.5 mb-1">
             <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Tempo conversies</p>
@@ -201,7 +206,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         </div>
 
         {/* Daily run rate — spend */}
-        <div className="border-l border-border pl-4">
+        <div className="flex flex-col justify-center border-l border-border pl-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Tempo spend</p>
@@ -231,7 +236,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
 
             "geschat jaardoel" en niet "jaardoel": dat getal is vorig jaar x 1,10 uit
             client-data/route.ts, want er is nog geen scherm om een doel in te voeren. */}
-        <div className="border-l border-border pl-4">
+        <div className="flex flex-col justify-center border-l border-border pl-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Flag className="w-3.5 h-3.5 text-muted-foreground" />
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Op dit tempo</p>
@@ -245,7 +250,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         </div>
 
         {convLanding.volgensPrognose !== null && (
-          <div className="border-l border-border pl-4">
+          <div className="flex flex-col justify-center border-l border-border pl-4">
             <div className="flex items-center gap-1.5 mb-1">
               <Target className="w-3.5 h-3.5 text-muted-foreground" />
               <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Volgens prognose</p>

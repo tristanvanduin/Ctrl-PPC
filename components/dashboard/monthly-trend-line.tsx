@@ -46,14 +46,19 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
   const { domain, tickCount } = asSchaalLijn(Math.max(...waarden, 0));
 
   return (
-    <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+    // Deelt een rasterrij met "Conversies per land"; die is hoger, dus stond het verschil als wit
+    // onder de lijn. De grafiek pakt nu de resthoogte (`flex-1` + ResponsiveContainer op 100%)
+    // in plaats van vast op 130px te blijven: een lijngrafiek wordt beter leesbaar van meer
+    // hoogte, dus dat is inhoud en geen opvulling.
+    <div className="bg-card flex h-full flex-col rounded-xl border border-border p-4 shadow-sm">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-meta font-semibold text-brand-blue-ink uppercase tracking-wide">
           CPA per maand
         </h3>
         <span className="text-micro text-muted-foreground">laatste 6 maanden</span>
       </div>
-      <ResponsiveContainer width="100%" height={130}>
+      <div className="min-h-[130px] flex-1">
+        <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
           <Raster />
           <XAxis
@@ -88,7 +93,8 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
             connectNulls
           />
         </LineChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
 
       {openIdx !== null && (() => {
         const idx = offset + openIdx;

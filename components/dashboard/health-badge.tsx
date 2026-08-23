@@ -51,7 +51,7 @@ export function HealthBadgeView({
     : "#ef4444";
 
   return (
-    <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
+    <div className="@container flex h-full flex-col bg-card rounded-xl border border-border p-5 shadow-sm">
       {/* CONTAINER QUERY, GEEN VIEWPORT-BREEKPUNT -- en dat is de kern van de fix.
           Hier stond `xl:flex-row`. Dat is een VENSTER-breekpunt, terwijl deze kaart in de hero in
           een halfbrede kolom staat. Bij een venster van 1500px is `xl` (1280px) waar, dus zette de
@@ -65,7 +65,7 @@ export function HealthBadgeView({
           krijgt hij zijn rij-indeling terug.
 
           Zie ook pacing-monitor.tsx, dat @container al gebruikt -- Tailwind v4 heeft het ingebouwd. */}
-      <div className="flex flex-col gap-5 @2xl:flex-row @2xl:flex-wrap @2xl:items-start">
+      <div className="flex flex-1 flex-col justify-between gap-5 @6xl:flex-row @6xl:flex-wrap @6xl:items-start">
         {/* Score circle */}
         <div className="relative w-20 h-20 shrink-0">
           <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
@@ -162,6 +162,12 @@ export function HealthBadgeView({
             een brede kaart, maar niet verder dan waar de inhoud (twee kolommen `dl`) al op
             uitkomt. */}
         <div className="flex min-w-0 flex-1 max-w-2xl flex-col gap-4">
+          {/* De rest van de kaart is inhoudsgestuurd; DEZE kolom is de plek waar de kaart zijn
+              hoogte vandaan haalt als de rasterrij hoger uitvalt dan de inhoud. Zonder een
+              expliciete verdeler zakt dat verschil naar de onderkant en leest het als een gat --
+              precies wat de eigenaar op een 1920px-scherm zag. De factorenlijst hieronder krijgt
+              daarom `flex-1` met `content-between`: de vijf regels verdelen de extra hoogte over
+              hun onderlinge ruimte in plaats van hem onderaan te laten staan. */}
           {health.anomalies.length > 0 && (
             <div className="min-w-0">
               <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">
@@ -190,7 +196,7 @@ export function HealthBadgeView({
             </div>
           )}
 
-          <div className="min-w-0">
+          <div className="flex min-w-0 flex-1 flex-col">
             <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Waaruit de score bestaat
             </p>
@@ -202,7 +208,7 @@ export function HealthBadgeView({
                 factor: naam+score blijven kort en lijnen zelf al uit (justify-between binnen hun
                 eigen regel), de uitleg krijgt een eigen regel eronder en wordt niet meer
                 afgekapt -- geen kolom om uit te lijnen, dus niets meer om uit te lijnen. */}
-            <dl className="grid gap-x-5 gap-y-3 @lg:grid-cols-2">
+            <dl className="grid flex-1 content-between gap-x-5 gap-y-3 @lg:grid-cols-2">
               {health.factors.map((f) => (
                 <div key={f.name} className="min-w-0">
                   <div className="flex items-baseline justify-between gap-2">

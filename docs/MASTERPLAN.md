@@ -8139,3 +8139,66 @@ Display 6,7%), Campagne 6 segmenten met de accountnamen intact, Kanaal 3 segment
 55,1%, LinkedIn 25,3%, Meta 19,6%). Kanaal leest bewust uit `blended_account_monthly` en niet uit
 `ads_campaign_monthly`: die laatste kent per definitie alleen Google-campagnes en zou dus een
 "kanaalverdeling" van 100% Google opleveren -- een ring die klopt en niets zegt.
+
+### 17.117 Waarom het gat terugkwam: één kaart groeide mee met het scherm (23 augustus 2026)
+
+"Bij mij is het gat nog steeds niet gevuld", met een schermafdruk van Account Health met een leeg
+onderveld. Ik had de balans in 17.116 gemeten op één breedte (1600px) en daar stond hij op 0. Dat
+was de meting optimaliseren, niet het probleem — precies de fout uit 17.114, opnieuw gemaakt.
+
+**Nagemeten over vijf breedtes, met `align-items: start` zodat elke kaart zijn natuurlijke hoogte
+kreeg:**
+
+| breedte | Account Health | wereldkaart | Pacing | donut |
+|---|---|---|---|---|
+| 1440 | 723 | 642 | 332 | 482 |
+| 1600 | 625 | 682 | 332 | 364 |
+| 1920 | 274 | 762 | 270 | 364 |
+| 2560 | 274 | 763 | 203 | 364 |
+
+Twee dingen springen eruit, en ze zijn allebei structureel.
+
+**1. De wereldkaart was de enige kaart die met het scherm meegroeide.** De SVG staat op
+`w-full h-auto` met een viewBox van 760x380, dus zijn hoogte is een vaste fractie van de
+kolombreedte: breder scherm, hogere kaart, zonder bovengrens. Elke andere kaart is
+inhoudsgestuurd en blijft even hoog. Een rasterrij wordt zo hoog als zijn hoogste cel, dus dat
+verschil landde als wit. De kaart is nu gecapt op zijn eigen tekengrootte (`max-w-[760px]`,
+gecentreerd): daarboven werd er alleen opgeschaald — geen land wordt zichtbaarder van een
+projectie van 1200px breed. Dat haalde 2200 en 2560 van 579/669px wit naar de rij van 1920.
+
+**2. Account Health klapte van 723 naar 274 bij `@2xl` (672px).** Op dat punt gaan score-ring,
+radar en factoren naast elkaar staan. In een halfbrede hero-kolom gebeurt dat vanaf een venster
+van ongeveer 1750px — en precies daar viel de kaart in elkaar terwijl zijn buur doorgroeide. Het
+breekpunt staat nu op `@6xl` (1152px): in de hero blijft de kaart dus gestapeld (en dus hoog) tot
+ver voorbij 2560, en een volle-breedte plaatsing (Meta/LinkedIn's channel-health-badge, de
+Search-scorecard in 5.4) krijgt zijn rij-indeling gewoon terug. Dat is wat het container-breekpunt
+uit 17.114 bedoelde; de waarde was alleen te laag gekozen.
+
+**En daarna: de slack moet ergens IN de kaart landen, niet eronder.** Ook met gelijke rijhoogtes
+blijft er per kaart een restverschil. Vijf kaarten hebben nu een expliciete opvanger — geen
+`h-full` op een willekeurig kind (dat duwt inhoud juist uit de kaart, zie de kaartoverloop-notitie
+in AGENTS.md), maar één aangewezen gebied per kaart dat `flex-1` krijgt:
+
+| kaart | wat de resthoogte opvangt |
+|---|---|
+| `health-badge.tsx` | de factorenlijst: `grid flex-1 content-between` — de vijf regels verdelen de extra hoogte over hun onderlinge ruimte |
+| `pacing-monitor.tsx` | het zesblokkenraster: `flex-1 items-stretch`, inhoud per blok verticaal gecentreerd |
+| `geo-map-card.tsx` | het kaartvlak: `flex-1 justify-center` — de projectie blijft even groot (gecapt), maar centreert |
+| `geo-ranglijst-card.tsx` | het cijferblok, idem |
+| `monthly-trend-line.tsx` | de grafiek zelf: van vast `height={130}` naar `flex-1` met `min-h-[130px]` — een lijngrafiek wórdt beter van meer hoogte |
+| `breakdown-donuts.tsx` | het ring+rasterblok (Meta's doelgroepenkaart), idem |
+
+**Gemeten na afloop, over 1440/1600/1920/2200/2560 en over Google, Meta en LinkedIn:** elke
+hero-kaart eindigt binnen 21px van zijn onderrand, en 21px is de eigen `p-5` van de kaart. Op
+Meta en LinkedIn ging "Conversies per land" van 144-170px wit naar nul, en Meta's doelgroepenkaart
+van 80-93px naar nul.
+
+**Wat er blijft staan.** De vier Jaaroverzicht-tegels (Conversies/Omzet/ROAS/CPA) houden 17 tot
+33px onder hun laatste regel, omdat ROAS één regel meer heeft dan de andere drie. Die tegels zijn
+`Kerncijfer`, en dat is precies de component waar AGENTS.md voor waarschuwt: een `h-full` kind in
+een rastercel duwt daar alles wat erna komt de kaart uit. Voor 17px is dat risico het niet waard.
+
+**En de les die het waard is te bewaren:** een meting op één breedte bewijst niets over een
+raster. De controle die dit had moeten vangen bestond niet; hij bestaat nu als de tabel hierboven
+— natuurlijke hoogte per kaart, over minstens vier breedtes, vóór er iets over balans wordt
+beweerd.
