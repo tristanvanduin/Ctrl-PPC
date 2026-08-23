@@ -75,6 +75,29 @@ console.log("regel 4 — tegenstrijdige budgetacties op dezelfde entiteit:");
     "budget omhoog + omlaag op dezelfde entiteit => beide investigate_first");
 }
 
+// ── Regel 4 raakt alleen de tegenstrijdige aanbevelingen, niet de hele groep ──
+//
+// De downgrade-lus liep over de hele groep op deze entiteit i.p.v. over alleen de aanbevelingen
+// die de tegenstrijdigheid zelf vormen. Een derde, ongerelateerde direct_action-aanbeveling op
+// dezelfde entiteit (bv. "pauzeer deze advertentie") werd zo stil meegedowngraded, terwijl er
+// voor die aanbeveling zelf niets tegenstrijdigs is.
+
+console.log("regel 4 — alleen de tegenstrijdige aanbevelingen gaan omlaag, niet de hele groep:");
+{
+  const recs = applyActionGating(
+    [finding({ entity_name: "Campagne X", current_value: 500 })],
+    [
+      rec({ finding_index: 0, hypothesis: "Verhoog budget voor deze campagne" }),
+      rec({ finding_index: 0, hypothesis: "Verlaag budget voor deze campagne" }),
+      rec({ finding_index: 0, hypothesis: "Pauzeer de onderpresterende advertentie in deze campagne" }),
+    ]
+  );
+  assert(readiness(recs[0]) === "investigate_first" && readiness(recs[1]) === "investigate_first",
+    "de twee tegenstrijdige budget-aanbevelingen gaan omlaag");
+  assert(readiness(recs[2]) === "direct_action",
+    "een derde, ongerelateerde aanbeveling op dezelfde entiteit blijft direct_action");
+}
+
 // ── De drempel van 50 euro geldt alleen voor bedragen ──────────────────────
 //
 // `current_value` is de waarde van welke metriek de bevinding ook beschrijft. De drempel werd er

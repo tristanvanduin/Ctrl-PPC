@@ -99,12 +99,19 @@ export function ForecastSummaryTiles({ clientId, channel = "google" }: { clientI
           <div className="space-y-1.5 text-lead">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Gerealiseerd + prognose</span>
-              <span className="font-semibold text-brand-gray">{isRatio ? fmt(result.kpi.annualTarget) : fmt(kpiAdjusted)}</span>
+              {/* kpi.adjustedAnnual is voor ROAS/CPA al de juiste enkele ratio (calcKpi rekent op de
+                  som van de jaartotalen, niet op een gemiddelde van maandratio's) -- geen isRatio-
+                  uitzondering meer nodig, die zette hier eerder juist het DOEL neer i.p.v. het
+                  gerealiseerde+voorspelde cijfer waar deze rij naar heet. */}
+              <span className="font-semibold text-brand-gray">{fmt(kpiAdjusted)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">vs. doel</span>
+              {/* Bij een ratio-metriek is totalExpected de som van 12 losse maandratio's -- een
+                  getal zonder betekenis (tot ~12x te hoog). Wat hier hoort te staan is het doel
+                  zelf, dezelfde waarde als diffPct ernaast al tegen afzet. */}
               <span className={`font-semibold ${isPositive ? "text-green-600" : "text-red-500"}`}>
-                {fmt(totalExpected)} ({formatDeltaPercent(totalDiffPct, 0)})
+                {fmt(isRatio ? result.kpi.annualTarget : totalExpected)} ({formatDeltaPercent(totalDiffPct, 0)})
               </span>
             </div>
           </div>

@@ -20,9 +20,10 @@ interface StructuredRow { output: string }
 function mockSupabase(opts: {
   structuredByChannel?: Partial<Record<string, StructuredRow | null>>;
   crossChannelSignals?: string | null;
+  crossChannelSignalsDate?: string;
   synthesisExists?: boolean;
 }): SupabaseClient {
-  const { structuredByChannel = {}, crossChannelSignals = null, synthesisExists = false } = opts;
+  const { structuredByChannel = {}, crossChannelSignals = null, crossChannelSignalsDate = "2026-08-01", synthesisExists = false } = opts;
   const from = (table: string) => {
     let filters: Record<string, string> = {};
     const b = {
@@ -37,7 +38,7 @@ function mockSupabase(opts: {
           return Promise.resolve({ data: row, error: null });
         }
         if (filters.section === "cross_channel_v1") {
-          return Promise.resolve({ data: crossChannelSignals ? { output: crossChannelSignals } : null, error: null });
+          return Promise.resolve({ data: crossChannelSignals ? { output: crossChannelSignals, analysis_date: crossChannelSignalsDate } : null, error: null });
         }
         if (filters.section === "cross_channel_synthesis_v1") {
           return Promise.resolve({ data: synthesisExists ? { id: "existing" } : null, error: null });
@@ -138,12 +139,17 @@ async function main() {
       ["google_ads", { channel: "google_ads", primaryThread: "CPA loopt op", rootCause: "verzadiging", topRecommendations: ["verhoog budget"], executiveMarkdown: "" }],
       ["meta_ads", { channel: "meta_ads", primaryThread: "Frequency te hoog", rootCause: "klein publiek", topRecommendations: ["verbreed doelgroep"], executiveMarkdown: "" }],
     ]);
-    const { systemPrompt, userMessage } = buildSynthesisPrompt(summaries, "## Cross-channel-signalen\n\nDubbele warme pool.");
+    const { systemPrompt, userMessage } = buildSynthesisPrompt(summaries, "## Cross-channel-signalen\n\nDubbele warme pool.", "2026-07-01");
     check("systemPrompt noemt beide kanaalnamen", systemPrompt.includes("SEA") && systemPrompt.includes("Meta Ads"), systemPrompt);
     check("systemPrompt eist één samenhangend verhaal, geen los-per-kanaal", systemPrompt.toLowerCase().includes("synthese"));
     check("systemPrompt verbiedt een verzonnen kanaal", systemPrompt.toLowerCase().includes("verzin nooit een kanaal"));
     check("userMessage bevat beide primary threads", userMessage.includes("CPA loopt op") && userMessage.includes("Frequency te hoog"));
     check("userMessage bevat de deterministische signalen", userMessage.includes("Dubbele warme pool"));
+    // Geen valse versheid: de datum van de laatst opgeslagen cross_channel_v1-rij moet in de
+    // prompt staan, want die rij kan van een eerdere cyclus zijn dan deze synthese.
+    check("userMessage meldt de datum van de signalen (geen valse versheid)", userMessage.includes("2026-07-01") && userMessage.toLowerCase().includes("eerdere cyclus"));
+    const { userMessage: zonderDatum } = buildSynthesisPrompt(summaries, "## Cross-channel-signalen\n\nDubbele warme pool.", null);
+    check("zonder datum blijft de kop neutraal (geen gegokte datum)", !zonderDatum.toLowerCase().includes("eerdere cyclus") && zonderDatum.includes("Deterministische cross-channel-signalen"));
   }
 
   // ── alreadySynthesized ──

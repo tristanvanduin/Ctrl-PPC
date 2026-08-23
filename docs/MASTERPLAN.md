@@ -7644,3 +7644,59 @@ camelCase velden) is niet hetzelfde shape als `MonthlyChannelRow` (`month` als "
 `laadBeschikbareKanalen` opvragen, Meta/LinkedIn-dagcijfers ophalen voor dezelfde periode, optellen per
 maand en de ratio's herberekenen uit de opgetelde tellers. Voor Vandaag: geen bestaand live-overview-
 endpoint voor Meta/LinkedIn om op te varen; zou een nieuwe, DB-gebaseerde signaalbron moeten worden.
+
+### 17.108 SOP/analyse-engine geaudit: drie echte bugs gevonden en gefixed (23 augustus 2026)
+
+Vervolgvraag: "moeten we nog logica bouwen/tweaken/optimaliseren voor dashboarding/deep dive/SOPs?" Eerst
+gecontroleerd of er nog fouten in zitten voordat aan "optimaliseren" te beginnen. Vier parallelle audits op
+`lib/analysis/` (funnel-facts, cross-channel-synthese, hypothese-gating/betrouwbaarheid, SOP-triggers +
+forecast/budget-scenario-rekenlogica) -- de eerste twee kwamen schoon terug (spend-weighted, uit ruwe
+tellers herberekend, division-by-zero overal afgevangen), de laatste twee vonden elk één tot twee echte
+bugs.
+
+**1. `action-gating.ts` regel 4 -- collaterale downgrade.** Bij een budget-omhoog/omlaag-tegenstrijdigheid
+op dezelfde entiteit werd niet alleen de conflicterende aanbevelingen naar `investigate_first` gezet, maar
+de HELE groep aanbevelingen op die entiteit -- ook een derde, ongerelateerde `direct_action`-aanbeveling
+(bv. "pauzeer deze advertentie") die niets met budgetrichting te maken heeft. De loop liep over `group` in
+plaats van over alleen de twee aanbevelingen die de tegenstrijdigheid zelf vormen. Gefixed door de
+downgrade te beperken tot de aanbevelingen die zelf aan het "verhoog/verlaag budget"- resp. "verhoog/
+verlaag ROAS"-patroon voldoen. Regressietest toegevoegd in `__action_gating_test.ts` met precies dit
+3-aanbevelingen-scenario.
+
+**2. `cross-channel-synthesis.ts` -- valse versheid.** De query naar de laatst opgeslagen
+`cross_channel_v1`-signalenrij heeft geen datumfilter (pakt de meest recente, kan van een eerdere cyclus
+zijn) en gaf die tekst zonder datum of versheidswaarschuwing door aan de LLM-prompt, met een kop die
+letterlijk "(dezelfde cyclus)" beweerde. Het zusterbestand `cross-channel-context.ts` doet dit voor exact
+dezelfde tabel/sectie wél goed (expliciete datum + waarschuwing in de prompttekst) -- hier was het gemist.
+Gefixed: `analysis_date` mee opgehaald en doorgegeven aan `buildSynthesisPrompt`, die nu bij een bekende
+datum "laatst gedraaid: X -- kan van een eerdere cyclus zijn" in de kop zet, en zonder datum een neutrale
+kop houdt (geen gegokte tekst). Regressietest toegevoegd.
+
+**3. Forecast/budget-scenario -- twee rekenbugs.**
+- `forecast-table.tsx` (`ForecastSummaryTiles`): bij ROAS/CPA als primaire metriek somde de "vs. doel"-rij
+  twaalf losse MAANDRATIO's op i.p.v. het doel te tonen -- een getal tot ~12x te hoog, en de rij erboven
+  ("Gerealiseerd + prognose") toonde bij diezelfde metrieken juist het DOEL, dus omgekeerd gelabeld. Beide
+  rijen nu consistent: rij 1 altijd `kpiAdjusted` (het echte geprojecteerde jaarcijfer, ook voor ROAS/CPA al
+  correct berekend via `calcKpi` op de jaartotalen, niet gemiddeld per maand), rij 2 het doel bij een
+  ratio-metriek. Numeriek geverifieerd met een synthetisch ROAS-scenario (`computeForecast` rechtstreeks
+  aangeroepen): oude rij 2 gaf 54,00 i.p.v. het echte doel van 4,5 -- twaalf keer te hoog. **Eerlijkheid
+  over impact:** met de huidige `actieveMetrics()`-volgorde (`conversions, revenue, roas, cpa`) en de manier
+  waarop een ROAS/CPA-doel wiskundig wordt AFGELEID uit het conversies/omzet-doel, kan `primaryId` in de
+  praktijk nooit op "roas" of "cpa" uitkomen zolang er ook maar een spoor conversies/omzet-historie is --
+  dit pad is vandaag dus niet bereikbaar via de UI. De fix kost niets (geen gedragswijziging op het wél
+  bereikbare pad, bevestigd via de volledige testsuite en een live render) en maakt de formule alvast
+  correct voor het moment dat dat verandert.
+- `budget-scenario.tsx`: `currentMonthlySpend` rekende bij een ingesteld jaardoel met `annualTarget / 12`,
+  terwijl de rest van de kaart (`currentAnnualSpend/Conv/Rev`) op de PROJECTIE draait
+  (`adjustedAnnual`) -- met een eigen comment die dat expliciet als doel stelde ("ALL on annual projected
+  basis for consistency"). Bij een account dat achter- of voorloopt op zijn doel (heel gewoon, zie
+  `computeBudgetRecommendation`'s `behindTarget`) schaalde het scenario dan vanaf een maandbedrag dat niet
+  bij de rest van de berekening hoorde, en klopte `newAnnualSpend` niet meer intern. Gefixed door
+  `currentMonthlySpend` altijd van `currentAnnualSpend / 12` af te leiden, dezelfde basis als de rest van
+  de kaart -- dit was wél bereikbaar (elk account met een jaardoel dat niet exact op schema ligt) en is nu
+  consistent.
+
+Geverifieerd: `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316 (inclusief twee nieuwe regressietests),
+`npx next build` compileert schoon, beide UI-fixes bevestigd via een live render op de demo (geen crash,
+geen NaN, sane waarden). `view-dekking` staat rood, de al bekende, niet aan deze wijzigingen gerelateerde
+meta/linkedin-drift.

@@ -33,7 +33,14 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
   const currentAnnualConv = conv.adjustedAnnual;
   const currentAnnualRev = forecast.revenue.kpi.adjustedAnnual;
   const currentAnnualSpend = spend.adjustedAnnual;
-  const currentMonthlySpend = spend.annualTarget > 0 ? spend.annualTarget / 12 : spend.ytdRealized / Math.max(realizedMonths, 1);
+  // Zelfde basis als hierboven ("ALL on annual projected basis for consistency"): deze rekende
+  // bij een ingesteld doel met doel/12 i.p.v. de geprojecteerde jaartotaal/12, terwijl
+  // currentAnnualSpend/Conv/Rev al op de PROJECTIE staan. Bij een account dat achter- of
+  // voorloopt op zijn doel (heel gewoon, zie computeBudgetRecommendation's behindTarget) gaf dat
+  // twee verschillende "huidige" cijfers door elkaar in dezelfde berekening: het scenario schaalt
+  // dan vanaf een maandbedrag dat niet bij currentAnnualSpend hoort, en newAnnualSpend
+  // (currentAnnualSpend + de opgetelde toename) klopt dan niet meer intern.
+  const currentMonthlySpend = currentAnnualSpend / 12;
   // CPA on ANNUAL basis (not YTD) so before/after are comparable
   const currentCpa = currentAnnualConv > 0 ? currentAnnualSpend / currentAnnualConv : 0;
   const currentRoas = currentAnnualSpend > 0 ? currentAnnualRev / currentAnnualSpend : 0;

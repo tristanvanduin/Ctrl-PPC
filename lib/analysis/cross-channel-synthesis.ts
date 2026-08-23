@@ -144,7 +144,8 @@ const MAX_SIGNAL_CHARS = 3000;
 
 export function buildSynthesisPrompt(
   summaries: Map<SopChannel, ChannelSummary | null>,
-  crossChannelSignals: string | null
+  crossChannelSignals: string | null,
+  signalsDate: string | null = null
 ): { systemPrompt: string; userMessage: string } {
   const channels = [...summaries.entries()].filter((e): e is [SopChannel, ChannelSummary] => e[1] !== null);
   const channelLabels = channels.map(([ch]) => CHANNEL_CONFIG[ch].headerLabel);
@@ -182,12 +183,20 @@ export function buildSynthesisPrompt(
       : crossChannelSignals
     : "(geen deterministische cross-channel-signalen beschikbaar voor deze cyclus)";
 
+  // Geen valse versheid: de opgeslagen cross_channel_v1-rij is de LAATST gedraaide, niet per se
+  // van deze cyclus (dezelfde discipline als cross-channel-context.ts voor de per-kanaal
+  // hypotheses-stap). Zonder datum erbij leest de kop hieronder als "dezelfde cyclus" terwijl het
+  // net zo goed een vorige, inmiddels opgeloste bevinding kan zijn.
+  const signalsKop = signalsDate
+    ? `## Deterministische cross-channel-signalen (laatst gedraaid: ${signalsDate} — kan van een eerdere cyclus zijn, check de datum voordat je 'm als actueel citeert)`
+    : "## Deterministische cross-channel-signalen";
+
   const userMessage = [
     "## Afgeronde kanaalanalyses deze cyclus",
     "",
     channelBlocks,
     "",
-    "## Deterministische cross-channel-signalen (dezelfde cyclus)",
+    signalsKop,
     "",
     signalsBlock,
   ].join("\n");
@@ -295,7 +304,7 @@ export async function runCrossChannelSynthesis(opts: {
 
   const { data: signalsRow } = await supabase
     .from("sop_analysis_output")
-    .select("output")
+    .select("output, analysis_date")
     .eq("client_id", clientId)
     .eq("sop_type", SOP_TYPE)
     .eq("section", "cross_channel_v1")
@@ -303,7 +312,11 @@ export async function runCrossChannelSynthesis(opts: {
     .limit(1)
     .maybeSingle();
 
-  const { systemPrompt, userMessage } = buildSynthesisPrompt(summaries, signalsRow?.output ? String(signalsRow.output) : null);
+  const { systemPrompt, userMessage } = buildSynthesisPrompt(
+    summaries,
+    signalsRow?.output ? String(signalsRow.output) : null,
+    signalsRow?.analysis_date ? String(signalsRow.analysis_date) : null,
+  );
 
   const response = await callLayer("reasoning", {
     apiKey,

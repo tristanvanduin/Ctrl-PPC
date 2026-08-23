@@ -159,23 +159,28 @@ export function applyActionGating(
   for (const [, group] of entityActions) {
     if (group.length <= 1) continue;
 
-    // Check for budget up + budget down on same entity
-    const budgetUp = group.some((g) => g.rec.hypothesis.toLowerCase().includes("verhoog") && g.rec.hypothesis.toLowerCase().includes("budget"));
-    const budgetDown = group.some((g) => g.rec.hypothesis.toLowerCase().includes("verlaag") && g.rec.hypothesis.toLowerCase().includes("budget"));
-    if (budgetUp && budgetDown) {
-      // Downgrade both to investigate_first
+    // Check for budget up + budget down on same entity. Alleen de twee aanbevelingen die de
+    // tegenstrijdigheid zelf vormen gaan omlaag -- niet de hele groep. Een derde, ongerelateerde
+    // direct_action-aanbeveling op dezelfde entiteit (bv. "pauzeer deze advertentie") werd hier
+    // eerder collateraal meegedowngraded omdat de loop over `group` liep i.p.v. over de
+    // aanbevelingen die zelf "verhoog"/"verlaag budget" bevatten.
+    const isBudgetUp = (g: { rec: Recommendation }) => g.rec.hypothesis.toLowerCase().includes("verhoog") && g.rec.hypothesis.toLowerCase().includes("budget");
+    const isBudgetDown = (g: { rec: Recommendation }) => g.rec.hypothesis.toLowerCase().includes("verlaag") && g.rec.hypothesis.toLowerCase().includes("budget");
+    if (group.some(isBudgetUp) && group.some(isBudgetDown)) {
       for (const g of group) {
+        if (!isBudgetUp(g) && !isBudgetDown(g)) continue;
         if ((g.rec as Record<string, unknown>).action_readiness === "direct_action") {
           (g.rec as Record<string, unknown>).action_readiness = "investigate_first";
         }
       }
     }
 
-    // Check for tROAS up + tROAS down
-    const roasUp = group.some((g) => g.rec.hypothesis.toLowerCase().includes("verhoog") && g.rec.hypothesis.toLowerCase().includes("roas"));
-    const roasDown = group.some((g) => g.rec.hypothesis.toLowerCase().includes("verlaag") && g.rec.hypothesis.toLowerCase().includes("roas"));
-    if (roasUp && roasDown) {
+    // Check for tROAS up + tROAS down. Zelfde precisie als hierboven.
+    const isRoasUp = (g: { rec: Recommendation }) => g.rec.hypothesis.toLowerCase().includes("verhoog") && g.rec.hypothesis.toLowerCase().includes("roas");
+    const isRoasDown = (g: { rec: Recommendation }) => g.rec.hypothesis.toLowerCase().includes("verlaag") && g.rec.hypothesis.toLowerCase().includes("roas");
+    if (group.some(isRoasUp) && group.some(isRoasDown)) {
       for (const g of group) {
+        if (!isRoasUp(g) && !isRoasDown(g)) continue;
         if ((g.rec as Record<string, unknown>).action_readiness === "direct_action") {
           (g.rec as Record<string, unknown>).action_readiness = "investigate_first";
         }
