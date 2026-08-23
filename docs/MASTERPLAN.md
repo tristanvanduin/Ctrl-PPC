@@ -8033,3 +8033,48 @@ wereldkaart, wat de oorspronkelijke wens was) met de rest in een volle-breedte r
 Teruggelegd bij de eigenaar in plaats van er zelf een derde keer een truc op los te laten.
 
 `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316. Alle metingen live op de demo.
+
+### 17.115 De hero terug naar twee kaarten, en de onbalans nu echt op nul (23 augustus 2026)
+
+Na 17.114 ("exact 0px is niet haalbaar met deze opzet") koos de eigenaar de herindeling: hero terug
+naar twee kaarten, de rest eronder, aanvullen met logische kaarten en flexibele hoogte binnen
+proportie. Dat werkt wel, en het is een beter antwoord dan de trucs ervoor.
+
+**Waarom het eerder niet lukte.** De hero bestond uit twee KOLOM-divs met elk 2-4 kaarten. Een
+kolom is één rastercel; de cel rekt naar de hoogste, maar de kaarten erin behouden hun eigen hoogte.
+Het verschil belandt onderaan de kortste kolom als niemandsland. Kaarthoogtes hangen af van de data
+(hoeveel landen, hoeveel dimensies met data), dus twee kolommen komen alleen bij toeval gelijk uit.
+
+**De nieuwe opzet.** De hero is nu één raster met twee DIRECTE kaarten: Account Health en de
+wereldkaart. Rastercellen in dezelfde rij rekken naar dezelfde hoogte, dus die twee zijn per definitie
+even lang. De rest staat eronder in een tweede raster (`lg:grid-cols-2 xl:grid-cols-3`), waar
+hetzelfde principe per rij geldt.
+
+**Het gat in de hero met inhoud gevuld, niet met rek.** Gemeten bij 574px kolombreedte: Account
+Health is 638-705px, de kale kaart 390-437px -- 200 tot 315px verschil. De landenranglijst-balken zijn
+uit hun eigen kaart gehaald en als `verdieping` ín de kaart gehangen (`GeoRanglijstInKaart`). Dat
+vult het gat met inhoud die er inhoudelijk hoort: de kaart codeert ligging, de ranglijst rangorde --
+"wie is de grootste en hoeveel scheelt dat" lees je niet van een projectie af (zie de kop van
+geo-ranglijst.tsx). De cijfers en de uitklaptabel blijven eronder in `GeoRanglijstCard`, nu met
+`zonderBalken` zodat dezelfde rangorde niet twee keer op het scherm staat.
+
+**Google's onderste rij vol gemaakt.** Vijf kaarten in drie kolommen laat de zesde cel leeg. De
+laatste (`MonthlyTrendBars`) beslaat er nu twee: de rij is vol, en een maandstaven-grafiek wint bij
+extra breedte -- opvulling die de kaart ook echt beter maakt.
+
+**Gemeten resultaat, alle rijen exact gelijk:**
+
+| | hero | raster eronder |
+|---|---|---|
+| Google | 657 / 657 | 670/670/670 en 189/189 |
+| Meta | 658 / 658 | 446/446/446 |
+| LinkedIn | 705 / 705 | 437/437 |
+
+Binnen de hero-cellen resteert 21-40px onder Account Health -- dat is de eigen `p-5`-padding van de
+kaart, geen gat. LinkedIn's kaartcel houdt 96px over (14% van 705px): de kaart plus vier landen komt
+daar net onder Health uit. Dat is de "flexibele hoogte binnen proportie" die de eigenaar toestond, en
+het leest als ruimte onder een lijst, niet als een scheve rand.
+
+`tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon. Alle hoogtes
+live gemeten op de demo, en de hero's van alle drie de kanalen bekeken -- niet alleen de meting
+vertrouwd, want dat was in 17.114 precies de fout.

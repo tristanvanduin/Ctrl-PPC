@@ -10,7 +10,35 @@ import { int, eur, pct, nf, type GeoBreakdownState } from "@/lib/geo/use-geo-bre
 // campagnetype-donut, zodat GeoMapCard ernaast de kaart alleen heeft en dus groter kan. Zelfde
 // state-object als GeoMapCard (uit useGeoBreakdown(), één keer aangeroepen door de aanroepende
 // pagina) -- klik op de VS hier stuurt dezelfde focus-state die de kaart ernaast laat omschakelen.
-export function GeoRanglijstCard({ state }: { state: GeoBreakdownState }) {
+/**
+ * De ranglijst-BALKEN alleen, om als `verdieping` ín GeoMapCard te hangen.
+ *
+ * Waarom in de kaart en niet ernaast. De hero is twee kaarten: Account Health links, de kaart
+ * rechts. Gemeten bij een kolombreedte van 574px is Health 638-705px hoog en de kaart 390-437px --
+ * een gat van 200 tot 315px dat met CSS niet te dichten is zonder een kaart uit te rekken. De
+ * balken vullen precies dat gat MET inhoud, en ze horen er inhoudelijk ook: de kaart codeert
+ * ligging, de ranglijst rangorde. "Wie is de grootste en hoeveel scheelt dat" lees je niet van een
+ * projectie af (zie de kop van geo-ranglijst.tsx).
+ *
+ * De cijfers en de uitklaptabel blijven eronder in GeoRanglijstCard (met `zonderBalken`), zodat er
+ * niets dubbel staat.
+ */
+export function GeoRanglijstInKaart({ state }: { state: GeoBreakdownState }) {
+  const { metric, focus, setFocus, laden, canDrillUs, labelOf, ranked, eenLandOfMinder } = state;
+  if (laden || eenLandOfMinder || ranked.length === 0) return null;
+  return (
+    <div className="border-t border-border px-4 py-3">
+      <GeoRanglijst
+        regels={ranked.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
+        metriekLabel={metric.label}
+        klikbaar={(code) => canDrillUs && code === "US" && focus == null}
+        onKlik={() => setFocus("US")}
+      />
+    </div>
+  );
+}
+
+export function GeoRanglijstCard({ state, zonderBalken = false }: { state: GeoBreakdownState; zonderBalken?: boolean }) {
   const { metric, focus, setFocus, laden, canDrillUs, labelOf, geoWord, ranked, totaal, eenLandOfMinder } = state;
   const [tabelOpen, toggleTabel] = useRememberedOpen("geo-tabel", false);
 
@@ -24,8 +52,10 @@ export function GeoRanglijstCard({ state }: { state: GeoBreakdownState }) {
       </div>
 
       <div className="px-4 py-3">
+        {/* zonderBalken: de balken staan dan al in de kaart erboven (GeoRanglijstInKaart). Alleen
+            de totalen tonen voorkomt dat dezelfde rangorde twee keer op het scherm staat. */}
         <GeoRanglijst
-          regels={ranked.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
+          regels={zonderBalken ? [] : ranked.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
           metriekLabel={metric.label}
           klikbaar={(code) => canDrillUs && code === "US" && focus == null}
           onKlik={() => setFocus("US")}

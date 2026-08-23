@@ -14,7 +14,7 @@ import { ChannelViewHeader } from "./channel-view-header";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
 import { GeoMapCard } from "./geo-map-card";
-import { GeoRanglijstCard } from "./geo-ranglijst-card";
+import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoClient } from "@/lib/demo/demo-mode";
@@ -108,19 +108,18 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
           plaatsing, platform of device (tabs), altijd gevuld zodra er breakdown-data is.
           groep="levering": alleen plaatsing/platform/device, dus "waar komt het vandaan". Leeftijd
           en gender staan op Campagnes onder "Doelgroepsignalen" (groep="doelgroep"). */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <div className="min-w-0 flex flex-col gap-4">
-          <ChannelHealthBadge clientId={clientId} channel="meta" />
-          <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
-        </div>
-        <div className="min-w-0 flex flex-col gap-4">
-          <GeoMapCard state={geo} channel="meta" />
-          <GeoRanglijstCard state={geo} />
-          {/* Vierde kaart, om de kolommen even lang te maken MET echte inhoud i.p.v. een gerekte
-              kaart met een gat erin. Leeftijd/gender stond alleen op Campagnes; hier is het nieuwe
-              informatie naast de leveringsdonut links (plaatsing/platform/device). */}
-          <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
-        </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
+        <ChannelHealthBadge clientId={clientId} channel="meta" />
+        <GeoMapCard state={geo} channel="meta" verdieping={<GeoRanglijstInKaart state={geo} />} />
+      </div>
+
+      {/* Wat eerst als derde en vierde kaart in de hero-kolommen stond. Een raster van gelijke
+          cellen i.p.v. twee onafhankelijke kolommen: cellen in dezelfde rij rekken naar dezelfde
+          hoogte, dus hier ontstaat geen scheve onderrand meer. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
+        <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
+        <GeoRanglijstCard state={geo} zonderBalken />
       </div>
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}

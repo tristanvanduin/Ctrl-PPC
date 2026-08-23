@@ -14,7 +14,7 @@ import { ChannelViewHeader } from "./channel-view-header";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
 import { GeoMapCard } from "./geo-map-card";
-import { GeoRanglijstCard } from "./geo-ranglijst-card";
+import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoClient } from "@/lib/demo/demo-mode";
@@ -97,21 +97,18 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           de 1084px rechterkolom leeg (62%). Met de ranglijst rechts EN de donut nu gevuld staan de
           kolommen weer in verhouding -- de 307px die na alleen de verhuizing overbleef was juist
           het gat dat deze lege donut achterliet. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <div className="min-w-0 flex flex-col gap-4">
-          <ChannelHealthBadge clientId={clientId} channel="linkedin" />
-          <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
-        </div>
-        <div className="min-w-0 flex flex-col gap-4">
-          <GeoMapCard state={geo} channel="linkedin" />
-          <GeoRanglijstCard state={geo} />
-          {/* Hier zou een tweede doelgroep-donut staan (senioriteit/industrie/bedrijfsgrootte),
-              zoals Meta er een heeft. Nagemeten in linkedin_demographic_daily: alleen
-              MEMBER_JOB_FUNCTION heeft rijen -- de andere drie dimensies zijn nul. Een tweede
-              kaart zou dus niets tonen, en de component vangt dat terecht af met "niets renderen
-              zonder data". Zodra die dimensies wel gesynct worden hoort hij hier:
-              <BreakdownDonuts ... groep="doelgroep" overslaan={["MEMBER_JOB_FUNCTION"]} /> */}
-        </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
+        <ChannelHealthBadge clientId={clientId} channel="linkedin" />
+        <GeoMapCard state={geo} channel="linkedin" verdieping={<GeoRanglijstInKaart state={geo} />} />
+      </div>
+
+      {/* Wat eerst als derde kaart in een hero-kolom stond. Raster van gelijke cellen i.p.v. twee
+          onafhankelijke kolommen -- zie meta-view.tsx voor de redenering. LinkedIn heeft hier maar
+          twee kaarten: alleen MEMBER_JOB_FUNCTION heeft demografiedata (nagemeten in
+          linkedin_demographic_daily), dus een tweede doelgroep-donut zou leeg zijn. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
+        <GeoRanglijstCard state={geo} zonderBalken />
       </div>
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}

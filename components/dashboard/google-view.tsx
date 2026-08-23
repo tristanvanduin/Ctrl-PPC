@@ -21,7 +21,7 @@ import { MetricCards } from "./metric-cards";
 import { PerformanceChart } from "./performance-chart";
 import { GeoChannelMatrix } from "./geo-channel-matrix";
 import { GeoMapCard } from "./geo-map-card";
-import { GeoRanglijstCard } from "./geo-ranglijst-card";
+import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { VideoPerformance } from "./video-performance";
 import { PmaxNetworkSplit } from "./pmax-network-split";
@@ -178,22 +178,35 @@ export function GoogleView({
               Google-opener: links Health + Pacing + campagnetype-donut + CPA-lijn, rechts de kaart +
               ranglijst + maandstaven. Meta en LinkedIn krijgen dezelfde 50/50-indeling (health naast
               kaart), zie meta-view.tsx/linkedin-view.tsx. */}
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="min-w-0 flex flex-col gap-4">
-              <HealthBadge clientId={clientId} />
-              <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
-              <CampaignTypeSplit clientId={clientId} />
-              <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
-            </div>
-            <div className="min-w-0 flex flex-col gap-4">
-              {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
-                  landentabel met één kolom -- dat is precies wat de kaart al toont, en de matrix
-                  zou een "kanaalmix" beloven die niet bestaat. */}
-              <GeoMapCard
-                state={geo}
-                verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
-              />
-              <GeoRanglijstCard state={geo} />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
+            <HealthBadge clientId={clientId} />
+            {/* De landenranglijst hangt in de kaart (GeoRanglijstInKaart): gemeten is Health
+                638px en de kale kaart 437px, en die balken vullen dat gat met inhoud die er
+                inhoudelijk hoort. De land×kanaal-matrix alleen bij meerdere kanalen -- met één
+                kanaal is het een landentabel met één kolom, precies wat de kaart al toont. */}
+            <GeoMapCard
+              state={geo}
+              verdieping={
+                <>
+                  <GeoRanglijstInKaart state={geo} />
+                  {meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : null}
+                </>
+              }
+            />
+          </div>
+
+          {/* Wat eerst als tweede t/m vierde kaart in de hero-kolommen stond. Raster van gelijke
+              cellen i.p.v. twee onafhankelijke kolommen: cellen in dezelfde rij rekken naar dezelfde
+              hoogte, dus geen scheve onderrand meer. */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+            <CampaignTypeSplit clientId={clientId} />
+            <GeoRanglijstCard state={geo} zonderBalken />
+            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+            {/* Vijf kaarten in drie kolommen laat de zesde cel leeg. Deze laatste beslaat er twee,
+                zodat de onderste rij vol is -- en een maandstaven-grafiek wint bij extra breedte,
+                dus het is geen opvulling maar een betere plek voor juist deze kaart. */}
+            <div className="xl:col-span-2">
               <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
             </div>
           </div>
