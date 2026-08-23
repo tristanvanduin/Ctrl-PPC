@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge } from "lucide-react";
+import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge, SearchIcon } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import type { ForecastMetric } from "@/lib/forecast";
 import { Sectie } from "@/components/ui/sectie";
 import { HealthBadge } from "./health-badge";
+import { ChannelViewHeader } from "./channel-view-header";
 import { SearchScorecard } from "./search-scorecard";
 import { PmaxScorecard } from "./pmax-scorecard";
 import { DisplayScorecard } from "./display-scorecard";
@@ -111,7 +112,32 @@ export function GoogleView({
 
   return (
     <>
-      {geoClone && <HealthBadge clientId={clientId} />}
+      {/* Zelfde kaart als Meta/LinkedIn (ChannelViewHeader, gebouwd "zodat ze dezelfde opbouw als
+          de Google-weergave hebben" -- maar Google zelf gebruikte hem nooit. Toegevoegd 22 augustus
+          2026 (feedback: "alle kanalen moeten een zelfde layout hebben... de structuur en layout
+          moet exact hetzelfde voelen") zodat alle drie kanalen met dezelfde kop-kaart openen. */}
+      <ChannelViewHeader
+        icon={<SearchIcon className="w-5 h-5 text-brand-blue-ink" />}
+        title="Google Ads"
+        geoClone={geoClone}
+        status={{ kind: "connected" }}
+        blurb={
+          geoClone
+            ? <>Cijfers hieronder zijn <strong>her-geaggregeerd per beurs</strong> ({geoClone}) uit de campagnes waarvan de naam bij deze beurs hoort.</>
+            : <>Account-brede Google Ads-cijfers: kerncijfers, pacing, maandverloop, scorecards per campagnetype (Search, Performance Max, Shopping, Display) en de campagnes zelf.</>
+        }
+        delivers={["Scorecard per campagnetype", "Zoektermen en ad groups die weglekken", "Doelgroepsignalen", "Video & placements", "Advertenties en creative-vermoeidheid"]}
+        analysesHint={
+          meerdereKanalen
+            ? <>De Google-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong> → Google.</>
+            : <>De Google-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong>.</>
+        }
+      />
+
+      {/* Standalone, boven de opener -- zelfde positie als ChannelHealthBadge bij Meta/LinkedIn.
+          Beide renderen dezelfde HealthBadgeView; alleen de databron verschilt. */}
+      <HealthBadge clientId={clientId} />
+
       {geoClone ? (
         // Beurs gekozen: her-geaggregeerd beursoverzicht (uit campagnedata) i.p.v. de
         // account-brede kaarten, die niet per beurs te splitsen zijn.
@@ -148,38 +174,27 @@ export function GoogleView({
             </div>
           )}
 
-          {/* DE OPENER, herbouwd naar een 2x2-wireframe (17.40): de eigenaar leverde een eigen
-              schets aan ("klant / menu-items / KPI-rij / [Account Health | Geo] / [Pacing |
-              Graph]"). Bevestigd via AskUserQuestion: Account Health en de campagnetype-donut
-              blijven TWEE losse kaarten (niet samengevoegd -- "twee vragen, twee vormen", zelfde
-              principe dat elders in deze codebase al staat), en deze herindeling geldt alleen voor
-              Google (Meta/LinkedIn missen een losse Pacing-widget, zie 17.38's toelichting over
-              het gedeelde ChannelPerformance-component; die blijven op de 17.38/17.39-opener).
+          {/* DE OPENER, uniform met Meta/LinkedIn (22 augustus 2026, feedback: "alle kanalen
+              moeten een zelfde layout hebben... niet alleen in overzicht, maar ook bij alle
+              andere categorieën en sub tabs"). Was een eigen 2x2-wireframe (Health/Pacing/donut/
+              lijn | kaart/ranglijst/staven, xl:grid-cols-2) -- Meta en LinkedIn's opener is
+              donut+ranglijst (5 kolommen) naast alleen de kaart (7 kolommen), op
+              xl:grid-cols-12, met Pacing/KPI's/grafiek/tabel in een gedeelde sectie erONDER
+              (ChannelPerformance). Google's Account Health stond bovendien IN de linkerkolom
+              i.p.v. los erboven (nu gefixt, zie hierboven).
 
-              Bewust GEEN `items-stretch`/geforceerde gelijke hoogte: dat patroon heeft deze sessie
-              al drie keer een wit gat in een kaart veroorzaakt zodra de content links en rechts
-              van nature verschilt (17.34, 17.35, 17.37). Twee kolommen met hun eigen natuurlijke
-              hoogte is het uitgangspunt; alleen bijstellen als een screenshot een echt gat laat
-              zien.
-
-              17.41: precies dat gat verscheen ("als we deze in het gat plaatsen kan de geo map
-              breder", met een cirkel om de ranglijst) -- links (Health + donut + Pacing, drie
-              kaarten) werd de langste kolom, rechts bleef na kaart+grafiek ruimte over. Ranglijst
-              en statistiekjes (`GeoRanglijstCard`) verhuizen daarom naar ONDERAAN de rechterkolom,
-              onder de grafiek, en de kaart wordt weer de gesplitste `GeoMapCard` (alleen, dus
-              breder) -- zelfde bouwstenen als de 17.36-opener, nu alleen in een andere volgorde
-              omdat het gat aan de ONDERKANT zit i.p.v. ernaast. */}
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="min-w-0 flex flex-col gap-4">
-              <HealthBadge clientId={clientId} />
-              {/* 17.42: donut en pacing omgedraaid op verzoek. */}
-              <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+              Zelfde bouwstenen als eerst (CampaignTypeSplit i.p.v. Meta's BreakdownDonuts --
+              "misschien andere elementen, maar structuur exact hetzelfde"), nu in dezelfde
+              5/7-verdeling en dezelfde volgorde. Pacing en de twee maandtrend-grafieken
+              verhuizen naar de Maandprestaties-sectie eronder, naast de bestaande week-/
+              maandvisualisatie -- zelfde plek als bij Meta/LinkedIn, waar dat ook allemaal in
+              één sectie zit. */}
+          <div className="hero-rij grid grid-cols-1 gap-4 items-start xl:grid-cols-12">
+            <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
               <CampaignTypeSplit clientId={clientId} />
-              {/* 17.43: "ik mis de lijn diagram nog" -- vult het resterende hoogteverschil met de
-                  rechterkolom, en ROAS is de efficiëntievraag die bij Health/Pacing past. */}
-              <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+              <GeoRanglijstCard state={geo} />
             </div>
-            <div className="min-w-0 flex flex-col gap-4">
+            <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
               {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
                   landentabel met één kolom -- dat is precies wat de kaart al toont, en de matrix
                   zou een "kanaalmix" beloven die niet bestaat. */}
@@ -187,11 +202,6 @@ export function GoogleView({
                 state={geo}
                 verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
               />
-              {/* 22 augustus 2026: ranglijst boven de staafdiagram -- "Conversies per land" is de
-                  vraag die bij deze kaart hoort te openen, de maandtrend is de achtergrondinfo
-                  erna. Bewust alleen de volgorde geruild, geen andere aanpassing hier. */}
-              <GeoRanglijstCard state={geo} />
-              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
             </div>
           </div>
 
@@ -202,13 +212,13 @@ export function GoogleView({
               + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
             }
             bijschrift={beursAs
-              ? `Per week: hoeveel weken zijn we van ${edition!.eventName} en lopen we op schema?`
-              : "Per maand: waar staan we en wat is de trend?"}
+              ? `Kerncijfers, pacing en hoeveel weken we van ${edition!.eventName} zijn`
+              : "Kerncijfers, pacing en het maandverloop"}
             actie={edition && <TijdasKeuze value={tijdas} onChange={onTijdasChange} />}
           >
-            {/* PacingMonitor staat sinds 17.33 in de opener hierboven, naast de donut -- hier
-                blijft alleen de week-/maandvisualisatie over, die te breed is voor een kolom naast
-                de donut. */}
+            <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+            <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
             {beursAs
               ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} />
               : <MonthlyOverview clientId={clientId} countryFilter={countryFilter} />}

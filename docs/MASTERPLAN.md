@@ -7151,3 +7151,62 @@ waarschijnlijk echte LLM-aanroepen en is dus geen "voeg wat rijen toe"-beslissin
 
 `tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijzigingen
 onttrokken productiedrift.
+
+### 17.99 Overzicht-hero uniform over de drie kanalen (22 augustus 2026)
+
+Eigenaar, na de CPA/ROAS-vondst (17.98), rechtstreeks met twee screenshots naast elkaar: "hoe kan
+het dat dit nog steeds niet een uniforme layout heeft" — Google Ads en Meta stonden zichtbaar
+anders opgebouwd. Antwoord vooraf, eerlijk: ik had de kanaal-subtabs nooit naast elkaar gezet, elke
+ronde tot nu toe testte "Alle kanalen" of losse paginabezoeken, nooit een directe vergelijking. Op
+"ja, unify de Overzicht-hero, structuur exact hetzelfde, andere elementen mogen" gecontroleerd wat
+er echt verschilde, in de code.
+
+**De bevinding.** Meta en LinkedIn zijn al elkaars gelijke (`ChannelViewHeader` → `ChannelHealthBadge`
+→ hero donut+ranglijst/kaart 5-7-kolommen → één "Maandprestaties"-sectie met het gedeelde
+`ChannelPerformance`-component). Google was de uitzondering: geen `ChannelViewHeader` (het bestand
+zegt zelf letterlijk dat het gebouwd is "zodat ze [Meta/LinkedIn] dezelfde opbouw als de
+Google-weergave hebben" — maar Google gebruikte het nooit), een eigen `HealthBadge` MIDDENIN de
+hero-linkerkolom i.p.v. los erboven, en een eigen 2×2-hero (`xl:grid-cols-2`) met Pacing en twee
+maandtrend-grafieken er middenin i.p.v. in de sectie eronder. Beide componenten (`HealthBadge` en
+`ChannelHealthBadge`) bleken zelf al hetzelfde te renderen (`HealthBadgeView`) — dat deel was dus al
+uniform, alleen zijn positie niet.
+
+Ook gevonden, niet toevallig: het commentaar bij Google's `GoogleForecast` citeert vandaags eigen
+feedback woordelijk ("dit moet voor elk kanaal de layout worden") en de Prognose-tab wérd toen al
+uniform gemaakt (`GoogleForecast`/`ChannelForecastSections`/de blended tak delen letterlijk dezelfde
+drie secties, geverifieerd in `client-dashboard.tsx`) — maar de Overzicht-hero werd toen bewust NIET
+meegenomen ("de eigenaar koos expliciet voor... een grotere ingreep"). Dezelfde vraag kwam dus twee
+keer terug omdat de eerste keer een bewust kleinere scope kreeg zonder dat "dit is nog niet uniform"
+werd teruggekoppeld.
+
+**De fix**, in `components/dashboard/google-view.tsx`:
+- `ChannelViewHeader` toegevoegd (icoon, titel, koppelstatus, blurb, "wat dit kanaal levert",
+  analyses-verwijzing) — zelfde kaart als Meta/LinkedIn, Google-eigen inhoud.
+- `HealthBadge` losgetrokken van de hero, nu los erboven — zelfde positie als `ChannelHealthBadge`.
+- Hero herbouwd naar exact hetzelfde grid (`xl:grid-cols-12`, 5/7-verdeling): `CampaignTypeSplit`
+  (Google's donut-equivalent van Meta's `BreakdownDonuts`) + `GeoRanglijstCard` links, `GeoMapCard`
+  alleen rechts.
+- `PacingMonitor`, `MonthlyTrendLine` en `MonthlyTrendBars` verhuisd van de hero naar de
+  "Maandprestaties"-sectie eronder, samen met de bestaande week-/maandvisualisatie — zelfde plek als
+  waar Meta/LinkedIn dat allemaal al bij elkaar hebben (in hun geval via `ChannelPerformance`).
+
+Geverifieerd: drie screenshots (Google/Meta/LinkedIn, Overzicht, na elkaar aangeklikt in dezelfde
+sessie) tonen nu identieke sectie-volgorde en -opbouw, met alleen de content per slot verschillend
+(donuttype, health-score, kaartcijfers) — precies "andere elementen, dezelfde structuur". Een
+full-page screenshot van Google bevestigt dat de verhuisde Pacing/trend-grafieken en de bestaande
+Jaaroverzicht/Video-secties eronder zonder regressie meerenderen. `tsc` 0 fouten, geen console-
+errors in de browser op alle drie kanalen.
+
+**Nog niet uniform, bewust niet in deze ronde meegenomen — Campagnes-tab.** Google's Campagnes-tab
+heeft vijf secties (Scorecard, Wat er draait/campagnetabel, Doelgroepsignalen, De advertenties zelf,
+Waar het weglekt); Meta/LinkedIn hebben er twee (Per objective, De advertenties zelf) — laatstgenoemde
+sectie is al letterlijk identiek (icoon, titel, componenten) over alle drie. Concreet, niet
+cosmetisch verschil gevonden: de CAMPAGNETABEL leeft bij Google op het Campagnes-tabblad
+(`CampaignTable` in `GoogleCampagnes`), maar bij Meta/LinkedIn op het OVERZICHT-tabblad (onderaan
+`ChannelPerformance`, sectie "Campagnes (laatste 28 dagen)") — dezelfde soort content op een ander
+tabblad per kanaal. Dat oplossen is een grotere ingreep (verplaatsen uit een gedeeld component, of
+Google's tabelplek volgen) en een eigen productbeslissing, dus hier gemeld en niet stilzwijgend
+meegenomen.
+
+`tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijziging
+onttrokken productiedrift.
