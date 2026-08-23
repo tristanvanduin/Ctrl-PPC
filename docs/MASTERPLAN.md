@@ -8078,3 +8078,64 @@ het leest als ruimte onder een lijst, niet als een scheve rand.
 `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon. Alle hoogtes
 live gemeten op de demo, en de hero's van alle drie de kanalen bekeken -- niet alleen de meting
 vertrouwd, want dat was in 17.114 precies de fout.
+
+### 17.116 Pacing naar het gat, een uitsplitsingskiezer op de Google-donut (23 augustus 2026)
+
+Drie dingen uit één terugmelding: "Pacing moet in het gat onder account health in de lege wit
+ruimte. Dan moet er op de plek van pacing een andere kaart komen, en de kaart rechts van de donut
+moet ook gevuld zijn met data. Plus, waarom heeft de Google donut nog steeds geen filter opties?"
+
+**De hero is nu één raster met vier directe cellen.** Eerder waren het twee kolom-`div`s met
+kaarten erin. Een kolom-`div` is voor CSS Grid ÉÉN cel: die cel rekt naar de hoogste van de rij,
+maar de kaarten erbinnen houden hun eigen hoogte, dus het verschil landt als niemandsland onder
+de laatste kaart. Met de kaarten als directe kinderen rekt elke rij paarsgewijs, en dat is
+deterministisch. Rij 1: Account Health naast de wereldkaart (beide 682px gemeten). Rij 2: Pacing
+naast Spend per campagnetype (beide 364px). Pacing zit daarmee precies in het gat waar de
+gebruiker naar wees, en op Pacings oude plek staat de donut.
+
+**De kaart rechts van de donut was leeg door mijn eigen ingreep.** `GeoRanglijstCard` kreeg in
+17.115 een `zonderBalken`-vlag omdat de balken naar de kaart verhuisden. Maar `GeoRanglijst`
+begint met `if (regels.length === 0) return null` -- met een lege balkenlijst viel dus óók de
+totalenrij weg, en bleef er een kaart met alleen een kop over. De guard kijkt nu naar allebei:
+`if (regels.length === 0 && !totalen?.length) return null`, en de kop "per regio" staat onder
+`regels.length > 0`. De kaart toont weer landen, vertoningen, klikken, conversies, CTR en CPA.
+
+**De rij eronder ging van drie kolommen naar twee.** `xl:grid-cols-3` met drie kaarten waarvan de
+laatste de volle breedte pakte, liet de derde cel van de bovenste rij leeg -- op 1600px een wit
+vlak van een halve kolombreedte naast "Conversies per land". Twee kolommen vult die rij precies;
+de maandstaven eronder houden `lg:col-span-2`, want een staafgrafiek per maand wint bij breedte.
+
+**De uitsplitsingskiezer op de donut.** De vraag was breder ("kanaal verdeling, campagne
+verdeling, doelgroep, device"), dus eerst nagemeten wat er ECHT in de database staat voor de
+demo-klant:
+
+| bron | rijen | bruikbaar als uitsplitsing |
+|---|---|---|
+| `ads_campaign_monthly` | 128 | ja — `campaign_type` én `campaign_name` |
+| `blended_account_monthly` | gevuld | ja — `channel` (google_ads/meta_ads/linkedin_ads) |
+| `ads_device_monthly` | 0 | nee |
+| `ads_audience_monthly` | 0 | nee |
+| `ads_network_monthly` | 0 | nee |
+| `ads_schedule_monthly` | 0 | nee |
+
+Device en doelgroep vragen dus een sync-uitbreiding, geen extra tabblad. Een knop die op nul rijen
+uitkomt belooft data die er niet is -- precies wat de kanaalkiezer elders al niet meer doet
+(`lib/kanalen/beschikbaar.ts`). Er staan daarom drie knoppen: Campagnetype, Campagne, Kanaal.
+
+Twee dingen die daarbij misgingen en gerepareerd zijn, allebei pas zichtbaar in de browser en niet
+in tsc:
+
+1. `buildNetworkSplit` normaliseert sleutels standaard naar HOOFDLETTERS. Goed voor enums, fout
+   voor namen: "GRT | Search | NL" kwam er als "GRT | SEARCH | NL" uit, en de kanaalsleutels
+   botsten met een labeltabel op kleine letters ("GOOGLE_ADS" stond onvertaald in de legenda).
+   `normalizeKey` gaat nu per uitsplitsing mee: hoofdletters voor type en kanaal, alleen
+   witruimte-trim voor campagnenamen.
+2. De kaart deed `return null` bij nul segmenten. Op het starttabblad klopt dat, maar staat de
+   gebruiker op "Kanaal" en levert dat niets op, dan verdwijnen de knoppen mee en kan hij niet
+   terug. De kaart blijft nu staan met een regel uitleg; alleen het starttabblad valt weg.
+
+Gemeten in de browser na afloop: Campagnetype 3 segmenten (Search 71,7%, Performance Max 21,7%,
+Display 6,7%), Campagne 6 segmenten met de accountnamen intact, Kanaal 3 segmenten (Google Ads
+55,1%, LinkedIn 25,3%, Meta 19,6%). Kanaal leest bewust uit `blended_account_monthly` en niet uit
+`ads_campaign_monthly`: die laatste kent per definitie alleen Google-campagnes en zou dus een
+"kanaalverdeling" van 100% Google opleveren -- een ring die klopt en niets zegt.

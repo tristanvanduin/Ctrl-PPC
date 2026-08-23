@@ -179,6 +179,10 @@ export function GoogleView({
               ranglijst + maandstaven. Meta en LinkedIn krijgen dezelfde 50/50-indeling (health naast
               kaart), zie meta-view.tsx/linkedin-view.tsx. */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
+            {/* PACING ONDER HEALTH, IN DEZELFDE CEL. Account Health vult zijn cel niet: de radar
+                plus de score-uitsplitsing eindigt ruim boven de onderrand, en de cel rekt mee met
+                de kaartcel ernaast. Dat gat is met echte data gevuld i.p.v. met rek -- pacing hoort
+                er inhoudelijk ook bij ("hoe sta ik ervoor" naast "hoe gezond is het account"). */}
             <HealthBadge clientId={clientId} />
             {/* De landenranglijst hangt in de kaart (GeoRanglijstInKaart): gemeten is Health
                 638px en de kale kaart 437px, en die balken vullen dat gat met inhoud die er
@@ -193,20 +197,33 @@ export function GoogleView({
                 </>
               }
             />
+            {/* TWEEDE RIJ VAN DE HERO. Als losse cellen en niet als twee kolom-divs: rastercellen
+                in dezelfde RIJ rekken naar dezelfde hoogte, dus elke rij lijnt apart uit. Twee
+                lange kolommen daarentegen komen alleen bij toeval gelijk uit -- dat was het
+                probleem in 17.114/17.115.
+
+                Pacing vult het gat onder Account Health (de radar plus score-uitsplitsing eindigt
+                ruim boven de onderrand) en hoort er inhoudelijk bij: "hoe sta ik ervoor" naast
+                "hoe gezond is het". De campagnetype-ringen ernaast beantwoorden "waar gaat het
+                geld heen", wat aansluit op de kaart erboven. */}
+            <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+            <CampaignTypeSplit clientId={clientId} />
           </div>
 
           {/* Wat eerst als tweede t/m vierde kaart in de hero-kolommen stond. Raster van gelijke
               cellen i.p.v. twee onafhankelijke kolommen: cellen in dezelfde rij rekken naar dezelfde
               hoogte, dus geen scheve onderrand meer. */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
-            <CampaignTypeSplit clientId={clientId} />
-            <GeoRanglijstCard state={geo} zonderBalken />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Pacing stond hier; die is naar de hero verhuisd (zie hierboven). De CPA-lijn neemt
+                zijn plek in, zodat de bovenste rij vol blijft. */}
             <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
-            {/* Vijf kaarten in drie kolommen laat de zesde cel leeg. Deze laatste beslaat er twee,
-                zodat de onderste rij vol is -- en een maandstaven-grafiek wint bij extra breedte,
-                dus het is geen opvulling maar een betere plek voor juist deze kaart. */}
-            <div className="xl:col-span-2">
+            <GeoRanglijstCard state={geo} zonderBalken />
+            {/* Drie kaarten in DRIE kolommen liet de derde cel van de bovenste rij leeg -- op
+                1600px een wit vlak van een halve schermbreedte naast "Conversies per land".
+                Twee kolommen vult die rij precies, en de maandstaven eronder over de volle
+                breedte: een staafgrafiek per maand wint bij extra breedte, dus dat is geen
+                opvulling maar de betere plek voor juist deze kaart. */}
+            <div className="lg:col-span-2">
               <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
             </div>
           </div>

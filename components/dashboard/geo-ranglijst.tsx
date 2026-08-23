@@ -56,14 +56,20 @@ export function GeoRanglijst({
   onKlik?: (code: string) => void;
   klikbaar?: (code: string) => boolean;
 }) {
-  if (regels.length === 0) return null;
+  // Zonder regels EN zonder totalen valt er niets te tonen. Met alleen totalen wel: dat is de
+  // stand waarin de balken al in de kaart erboven hangen (zie GeoRanglijstInKaart) en deze kaart
+  // nog de cijfers draagt. Een kale `regels.length === 0`-afvang maakte die kaart leeg -- alleen
+  // een kop en een uitklapknop boven een half scherm wit.
+  if (regels.length === 0 && !totalen?.length) return null;
   const grootste = regels.reduce((m, r) => Math.max(m, r.waarde ?? 0), 0);
 
   return (
     <div className="flex h-full flex-col">
-      <p className="mb-2 text-micro font-semibold uppercase tracking-wider text-muted-foreground">
-        {metriekLabel} per regio
-      </p>
+      {regels.length > 0 && (
+        <p className="mb-2 text-micro font-semibold uppercase tracking-wider text-muted-foreground">
+          {metriekLabel} per regio
+        </p>
+      )}
       <ol className="space-y-3">
         {regels.map((r, i) => {
           const kanKlikken = Boolean(onKlik && klikbaar?.(r.code));

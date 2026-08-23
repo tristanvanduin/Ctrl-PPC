@@ -44,6 +44,7 @@ function colorFor(campaignType: string, order: string[]): string {
 
 interface CampaignMonthlyRow {
   campaign_type: string | null;
+  campaign_name: string | null;
   cost: number | null;
   conversions: number | null;
   conversions_value: number | null;
@@ -51,8 +52,74 @@ interface CampaignMonthlyRow {
   clicks: number | null;
 }
 
+interface BlendedMonthlyRow {
+  channel: string | null;
+  spend: number | null;
+  conversions: number | null;
+  conversion_value: number | null;
+  impressions: number | null;
+  clicks: number | null;
+}
+
+// blended_account_monthly schrijft de kanaalsleutel als google_ads/meta_ads/linkedin_ads (zie
+// lib/demo/demo-rows.ts en lib/benchmark/god-view-data.ts). KANAAL_NAAM uit lib/kanalen gebruikt
+// de korte sleutels (google/meta/linkedin), dus dit is een aparte kaart en geen tweede definitie
+// van dezelfde: het zijn twee verschillende sleutelruimtes voor dezelfde drie kanalen.
+const KANAAL_LABEL_BLENDED: Record<string, string> = {
+  google_ads: "Google Ads",
+  meta_ads: "Meta",
+  linkedin_ads: "LinkedIn",
+};
+
+/**
+ * De uitsplitsingen die Google's ringen kunnen tonen.
+ *
+ * Waarom alleen deze drie. De eigenaar vroeg om meer filteropties (campagne, doelgroep, device,
+ * kanaal). Nagemeten in de database welke bronnen daadwerkelijk gevuld zijn:
+ * `ads_campaign_monthly` heeft 128 rijen voor de demo (campagnetype EN campagnenaam), en de
+ * blended maandtabel draagt de kanaalverdeling. `ads_device_monthly`, `ads_audience_monthly`,
+ * `ads_network_monthly` en `ads_schedule_monthly` bestaan wel maar zijn LEEG -- device en doelgroep
+ * vragen dus een sync-uitbreiding, geen extra tabblad. Een knop die op nul rijen uitkomt belooft
+ * data die er niet is, en dat is precies wat de kanaalkiezer elders al niet meer doet
+ * (lib/kanalen/beschikbaar.ts).
+ */
+const UITSPLITSINGEN = [
+  { key: "type", label: "Campagnetype", meervoud: "campagnetypes", titel: "Spend per campagnetype" },
+  { key: "campagne", label: "Campagne", meervoud: "campagnes", titel: "Spend per campagne" },
+  { key: "kanaal", label: "Kanaal", meervoud: "kanalen", titel: "Spend per kanaal" },
+] as const;
+type Uitsplitsing = (typeof UITSPLITSINGEN)[number]["key"];
+
+/**
+ * Hoe een sleutel van de gekozen uitsplitsing op het scherm heet.
+ *
+ * Campagnenamen komen letterlijk uit het account en hebben dus geen vertaaltabel -- die geven we
+ * ongewijzigd terug in plaats van ze door TYPE_LABEL te halen, want dat zou stilzwijgend "SEARCH"
+ * van een campagne die toevallig zo heet omzetten naar "Search" en daarmee twee verschillende
+ * dingen op één regel laten lijken.
+ */
+function labelVoor(u: Uitsplitsing, sleutel: string): string {
+  if (u === "type") return typeLabel(sleutel);
+  if (u === "kanaal") return KANAAL_LABEL_BLENDED[sleutel] ?? sleutel;
+  return sleutel;
+}
+
+/**
+ * Wanneer twee rijen hetzelfde segment zijn.
+ *
+ * buildNetworkSplit normaliseert standaard naar HOOFDLETTERS, en dat is goed voor enum-achtige
+ * sleutels (campagnetype, kanaal) maar verkeerd voor campagnenamen: "GRT | Search | NL" kwam er
+ * als "GRT | SEARCH | NL" uit -- de naam zoals hij in het account staat is dan niet meer
+ * terug te vinden. Namen normaliseren daarom alleen op witruimte.
+ */
+function normaliseer(u: Uitsplitsing, sleutel: string): string {
+  if (u === "campagne") return (sleutel || "Onbekende campagne").trim();
+  return (sleutel || "onbekend").toLowerCase();
+}
+
 export function CampaignTypeSplit({ clientId }: { clientId: string }) {
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
+  const [uitsplitsing, setUitsplitsing] = useState<Uitsplitsing>("type");
   const [tabelOpen, toggleTabel] = useRememberedOpen("campagnetype-tabel", false);
   // Klik op een ring-segment of een legendaregel selecteert dat campagnetype -- gedeeld tussen
   // beide donuts (Kosten en Conversies lichten samen op, niet los van elkaar) en filtert de tabel
@@ -66,13 +133,39 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
     // genoeg om een verschoven mix (bv. een gestopt PMax-experiment) nog te laten zien --
     // zelfde overweging als PmaxNetworkSplit's eigen venster, alleen op maandrijen i.p.v. dagrijen.
     const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    setRows(null);
+
+    // Kanaal komt uit een ANDERE tabel dan campagnetype en campagne. blended_account_monthly is de
+    // enige bron die Meta en LinkedIn naast Google zet; ads_campaign_monthly kent per definitie
+    // alleen Google-campagnes en zou dus een "kanaalverdeling" van 100% Google opleveren -- een
+    // ring die klopt en niets zegt.
+    if (uitsplitsing === "kanaal") {
+      dbSelect<BlendedMonthlyRow>("blended_account_monthly", {
+        select: "channel, spend, conversions, conversion_value, impressions, clicks",
+        clientId, filters: [{ op: "gte", column: "month", value: since.slice(0, 8) + "01" }],
+      }).then(({ data }) => {
+        if (cancelled) return;
+        setRows(data.map((r) => ({
+          networkType: r.channel ?? "onbekend",
+          cost: Number(r.spend ?? 0),
+          conversions: Number(r.conversions ?? 0),
+          conversionsValue: Number(r.conversion_value ?? 0),
+          impressions: Number(r.impressions ?? 0),
+          clicks: Number(r.clicks ?? 0),
+        })));
+      }, () => { if (!cancelled) setRows([]); });
+      return () => { cancelled = true; };
+    }
+
     dbSelect<CampaignMonthlyRow>("ads_campaign_monthly", {
-      select: "campaign_type, cost, conversions, conversions_value, impressions, clicks",
+      select: "campaign_type, campaign_name, cost, conversions, conversions_value, impressions, clicks",
       clientId, filters: [{ op: "gte", column: "month", value: since }],
     }).then(({ data }) => {
       if (cancelled) return;
       setRows(data.map((r) => ({
-        networkType: r.campaign_type ?? "ONBEKEND",
+        networkType: uitsplitsing === "campagne"
+          ? (r.campaign_name ?? "Onbekende campagne")
+          : (r.campaign_type ?? "ONBEKEND"),
         cost: Number(r.cost ?? 0),
         conversions: Number(r.conversions ?? 0),
         conversionsValue: Number(r.conversions_value ?? 0),
@@ -82,29 +175,85 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
     }, () => { if (!cancelled) setRows([]); });
 
     return () => { cancelled = true; };
-  }, [clientId]);
+  }, [clientId, uitsplitsing]);
 
-  useEffect(() => { setSelected(null); }, [clientId]);
+  useEffect(() => { setSelected(null); }, [clientId, uitsplitsing]);
 
-  const slices = useMemo(() => (rows ? buildNetworkSplit(rows, { labelOf: typeLabel }) : []), [rows]);
+  const actief = UITSPLITSINGEN.find((u) => u.key === uitsplitsing) ?? UITSPLITSINGEN[0];
+  const slices = useMemo(
+    () => (rows
+      ? buildNetworkSplit(rows, {
+          labelOf: (k) => labelVoor(uitsplitsing, k),
+          normalizeKey: (k) => normaliseer(uitsplitsing, k),
+        })
+      : []),
+    [rows, uitsplitsing],
+  );
   const totals = useMemo(() => networkTotals(slices), [slices]);
   const order = useMemo(() => slices.map((s) => s.networkType), [slices]);
 
   const costSlices: DonutSlice[] = slices.map((s) => ({ key: s.networkType, label: s.label, value: s.cost, color: colorFor(s.networkType, order) }));
 
-  if (rows === null) {
-    return <Laadvlak vorm="grafiek" hoogte={200} titel="Spend per campagnetype" />;
+  const leeg = rows !== null && (slices.length === 0 || totals.cost <= 0);
+
+  // Geen campagnedata deze periode: niets tonen in plaats van een lege ring. Alleen op het
+  // START-tabblad -- staat de gebruiker op "Kanaal" of "Campagne" en levert dat niets op, dan
+  // moet de kaart BLIJVEN staan met een uitleg, anders verdwijnen de tabbladen mee en kan hij
+  // niet terug naar het tabblad dat wel data had.
+  if (rows === null && uitsplitsing === "type") {
+    return <Laadvlak vorm="grafiek" hoogte={200} titel={UITSPLITSINGEN[0].titel} />;
   }
-  // Geen campagnedata deze periode: niets tonen in plaats van een lege ring.
-  if (slices.length === 0 || totals.cost <= 0) return null;
+  if (leeg && uitsplitsing === "type") return null;
+
+  const kop = (
+    <div className="border-b border-border px-5 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
+        <h3 className="text-title font-semibold text-brand-gray">{actief.titel}</h3>
+        <span className="text-meta text-muted-foreground">laatste 90 dagen</span>
+      </div>
+      {/* De uitsplitsingskiezer. Radiogroup en geen tabs-rol: er is één paneel eronder dat van
+          inhoud wisselt, niet drie panelen waarvan er één zichtbaar is. */}
+      <div className="mt-2 flex flex-wrap gap-1" role="radiogroup" aria-label="Uitsplitsing">
+        {UITSPLITSINGEN.map((u) => {
+          const aan = u.key === uitsplitsing;
+          return (
+            <button
+              key={u.key}
+              type="button"
+              role="radio"
+              aria-checked={aan}
+              onClick={() => setUitsplitsing(u.key)}
+              className={`rounded-full px-2.5 py-1 text-meta font-medium transition-colors ${
+                aan
+                  ? "bg-brand-blue/10 text-brand-blue-ink"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-brand-gray"
+              }`}
+            >
+              {u.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  if (rows === null || leeg) {
+    return (
+      <div className="bg-card overflow-hidden rounded-xl border border-border shadow-sm">
+        {kop}
+        <p className="px-5 py-8 text-center text-meta text-muted-foreground">
+          {rows === null
+            ? "Bezig met laden…"
+            : `Voor deze klant staat er in de laatste 90 dagen geen verdeling per ${actief.label.toLowerCase()} in het systeem.`}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
-        <h3 className="text-title font-semibold text-brand-gray">Spend per campagnetype</h3>
-        <span className="text-meta text-muted-foreground">laatste 90 dagen</span>
-      </div>
+      {kop}
 
       <div className="px-3 py-5 @2xl:px-5">
         {/* justify-start op de donutrij, niet -center: de titel erboven en de tabel eronder lijnen
@@ -120,7 +269,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
                 centerValue={eur(totals.cost)}
                 centerLabel="totale kosten"
                 format={eur}
-                ariaLabel={`Kostenverdeling over campagnetypes: ${slices.map((s) => `${s.label} ${pct(s.costShare)}`).join(", ")}`}
+                ariaLabel={`Kostenverdeling over ${actief.meervoud}: ${slices.map((s) => `${s.label} ${pct(s.costShare)}`).join(", ")}`}
                 selected={selected}
                 onSliceClick={toggleSelected}
               />
@@ -134,7 +283,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
                   centerValue={num(totals.conversions, 1)}
                   centerLabel="conversies"
                   format={(v) => num(v, 1)}
-                  ariaLabel={`Conversieverdeling over campagnetypes: ${slices.map((s) => `${s.label} ${pct(s.conversionShare)}`).join(", ")}`}
+                  ariaLabel={`Conversieverdeling over ${actief.meervoud}: ${slices.map((s) => `${s.label} ${pct(s.conversionShare)}`).join(", ")}`}
                   selected={selected}
                   onSliceClick={toggleSelected}
                 />
@@ -173,7 +322,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
         {selected && (
           <div className="mt-3 flex items-center gap-2 text-meta">
             <span className="rounded-full bg-brand-blue/10 px-2.5 py-1 font-medium text-brand-blue-ink">
-              Gefilterd op {typeLabel(selected)}
+              Gefilterd op {labelVoor(uitsplitsing, selected)}
             </span>
             <button
               type="button"
@@ -187,7 +336,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
 
         {!totals.hasConversions && (
           <p className="text-meta text-muted-foreground text-center mt-3">
-            Er zijn in dit venster geen conversies per campagnetype geregistreerd, dus alleen de kostenverdeling is te tonen.
+            Er zijn in dit venster geen conversies per {actief.label.toLowerCase()} geregistreerd, dus alleen de kostenverdeling is te tonen.
           </p>
         )}
       </div>
@@ -196,12 +345,12 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
         open={tabelOpen}
         onToggle={toggleTabel}
         controls="campagnetype-tabel"
-        label={`de cijfers per campagnetype (${slices.length})`}
+        label={`de cijfers per ${actief.label.toLowerCase()} (${slices.length})`}
       />
       <div id="campagnetype-tabel" hidden={!tabelOpen} className="border-t border-border">
         <Tabel>
           <Kop>
-            <KolomKop>Campagnetype</KolomKop>
+            <KolomKop>{actief.label}</KolomKop>
             <KolomKop getal>Kosten</KolomKop>
             <KolomKop getal>Aandeel</KolomKop>
             <KolomKop getal>Conversies</KolomKop>
@@ -228,7 +377,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
             ))}
           </Body>
           <TotaalRij>
-            <TotaalCel>Alle campagnetypes</TotaalCel>
+            <TotaalCel>Alle {actief.meervoud}</TotaalCel>
             <TotaalCel getal>{eur(totals.cost)}</TotaalCel>
             <TotaalCel getal>100%</TotaalCel>
             <TotaalCel getal>{totals.hasConversions ? num(totals.conversions, 1) : "—"}</TotaalCel>
