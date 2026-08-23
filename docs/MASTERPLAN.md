@@ -7602,3 +7602,45 @@ alleen nog de ~5px-baseline. `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/31
 `npx next build` compileert schoon. `view-dekking` staat rood, maar dat is de al langer bekende,
 niet aan deze sessie gerelateerde drift tussen `*_legacy`-tabellen en de `fact_core`-views voor
 meta/linkedin (zie eerdere sessienotities).
+
+### 17.107 Twee Google-only plekken gevonden, bewust niet blind gefixed: Portfolio en Vandaag (23 augustus 2026)
+
+Vervolgaudit op schermen die deze sessie nog niet bekeken waren (Vandaag, Decision Terminal, Code Rood,
+Insights, Settings, Portfolio). Twee echte gaten gevonden, dezelfde familie als de eerdere DGM/
+client-reports-bugs: cijfers die alleen Google Ads meetellen terwijl een klant ook Meta/LinkedIn kan
+draaien.
+
+**1. `components/portfolio/portfolio-scoreboard.tsx`.** De YTD/YoY-cijfers per klant komen uitsluitend
+uit `/api/google-ads/overview` (een LIVE call naar de Google Ads API, geen databasequery). Meta- of
+LinkedIn-omzet van dezelfde klant telt niet mee in de portfoliobreedte totalen, sortering of ROAS/CPA --
+exact het patroon dat in `client-reports/route.ts` al gefixed is met `laadBeschikbareKanalen` +
+`monthlyFromDaily`/`blendMonthly`.
+
+**2. `lib/feed/use-today-feed.ts`.** De operationele signalen op de Vandaag-cockpit ("Data ophalen
+mislukt", "Conversies fors onder vorig jaar") komen ook alleen uit `/api/google-ads/overview`. Er bestaat
+geen Meta/LinkedIn-equivalent, dus een sync-storing of omzetinstorting bij een Meta/LinkedIn-klant
+verschijnt nooit op het triagescherm dat daar juist voor bedoeld is.
+
+**Waarom niet meteen gefixed, zoals de eerdere gevallen wel gebeurde.** Twee redenen, allebei net iets
+anders dan bij client-reports:
+
+- `lib/kanalen/beschikbaar.ts` documenteert zijn eigen meting: van de 71 accounts in de database draaien
+  62 Google-only, 8 hebben nog helemaal geen data, en precies 1 -- de demo -- draait op alle drie. Er
+  bestaat op dit moment dus geen enkele ECHTE (niet-demo) klant die dit gat concreet raakt: elke klant
+  komt sowieso alleen via de Google Ads MCC-koppeling het klantenregister binnen (`testGoogle()` in
+  `/settings` is de enige plek die `saveApiClients()` aanroept), dus "een Meta-only klant zonder Google"
+  kan vandaag niet eens ontstaan. Dat maakt dit een reëel maar op dit moment sluimerend gat, niet een
+  bug die nu ergens fout rekent.
+- De demo-klant (de enige met alle drie de kanalen) draait Portfolio/Vandaag via een apart, met de hand
+  gebouwd mockpad (`buildGreentechClientData` in `lib/demo/greentech-mock.ts`) dat zelf geen aparte Meta/
+  LinkedIn-componenten modelleert. Een fix hier zou dus geen enkel zichtbaar verschil in de demo geven om
+  tegen te verifiëren -- en cijfers die klanten geld voorspiegelen zonder een render te kunnen laten zien
+  waarin ze kloppen, is precies de fout die §17.104 al kostte. Beter eerlijk melden dan blind wijzigen.
+
+**Aanpak wanneer dit wél relevant wordt** (een echte klant met meerdere kanalen, of de demo-mock
+uitgebreid met een eigen Meta/LinkedIn-tak): Portfolio's `ApiMonthlyData`-vorm (`month` als 1-12,
+camelCase velden) is niet hetzelfde shape als `MonthlyChannelRow` (`month` als "YYYY-MM", snake_case) dat
+`monthlyFromDaily`/`blendMonthly` verwachten -- geen drop-in, wel hetzelfde principe: per klant
+`laadBeschikbareKanalen` opvragen, Meta/LinkedIn-dagcijfers ophalen voor dezelfde periode, optellen per
+maand en de ratio's herberekenen uit de opgetelde tellers. Voor Vandaag: geen bestaand live-overview-
+endpoint voor Meta/LinkedIn om op te varen; zou een nieuwe, DB-gebaseerde signaalbron moeten worden.
