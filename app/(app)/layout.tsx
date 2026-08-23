@@ -50,10 +50,17 @@ export default function AppLayout({
               1700px naast elkaar. Uitzoomen vergroot precies die effectieve viewport, dus het brak
               exact daar waar de eigenaar het zag.
 
-              1920px: ruim boven de laptop- en desktopbreedtes waar de app dagelijks op staat (die
-              raken deze grens niet en veranderen dus niet), en de bovengrens waarboven een raster
-              alleen nog maar leegte toevoegt. Boven die breedte groeit de marge i.p.v. de inhoud. */}
-          <main className="mx-auto w-full max-w-[1920px] flex-1 p-6">{children}</main>
+              2560px en niet 1920px: met 1920 hield een 1440p-monitor (2560px breed, 2272px na de
+              sidebar) al 352px marge over, en dat leest als een smalle strook op een breed scherm --
+              precies de klacht na de eerste poging. Met 2560 vult zo'n monitor volledig en verschijnt
+              de marge pas daarboven: bij 4K, of bij uitzoomen.
+
+              Dit blijft een afweging, geen exacte grens. Ver uitzoomen (25%) maakt de effectieve
+              viewport zo groot dat de inhoud hoe dan ook een eiland in het midden wordt; de enige
+              andere optie is oneindig uitrekken, en dat gaf kaarten van 2864px. Er is geen instelling
+              die beide uitersten tegelijk goed doet -- 2560px houdt elk realistisch scherm heel en
+              accepteert marge bij extreme zoom. */}
+          <main className="mx-auto w-full max-w-[2560px] flex-1 p-6">{children}</main>
         </div>
       </div>
     </SidebarMobileProvider>

@@ -71,8 +71,22 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
   // demoModus in client-dashboard.tsx). SOP's roepen een echte LLM aan (OpenRouter/Gemini,
   // reasoning-budget) -- in demo-modus zou een bezoeker anders op een publieke link telkens een
   // echte, kostende run tegen demo-greentech kunnen starten.
+  // ── DE TESTSCHAKELAAR ──────────────────────────────────────────────────────
+  //
+  // De demo-blokkade hierboven beschermt tegen een BEZOEKER op een publieke demo-link. Ze
+  // blokkeerde daarmee ook de eigenaar die op demo-greentech wil testen -- en dat is precies
+  // waar de demo-klant voor bestaat, want hij is de enige klant met alle drie de kanalen.
+  //
+  // NEXT_PUBLIC_SOP_HANDMATIG_IN_DEMO=1 heft de blokkade op. Standaard UIT, dus de publieke
+  // demo blijft beschermd zolang de vlag niet expliciet gezet is; zet hem alleen in een
+  // preview-/testomgeving, niet op de productie-demo.
+  //
+  // Bewust een env-vlag en niet "sta het toe als je ingelogd bent": zolang O1_AUTH_ENFORCED uit
+  // staat is er geen sessie (zie lib/auth/use-access.ts), dus "ingelogd" is vandaag niet van
+  // "anonieme bezoeker" te onderscheiden. Die check zou nu dus iedereen doorlaten.
+  const testTriggerToegestaan = process.env.NEXT_PUBLIC_SOP_HANDMATIG_IN_DEMO === "1";
   const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoClient(clientId)); }, [clientId]);
+  useEffect(() => { setDemoModus(isDemoClient(clientId) && !testTriggerToegestaan); }, [clientId, testTriggerToegestaan]);
   const [status, setStatus] = useState<Record<SopType, SopStatus>>({
     weekly: { running: false, lastDate: null, error: null, success: false },
     biweekly: { running: false, lastDate: null, error: null, success: false },

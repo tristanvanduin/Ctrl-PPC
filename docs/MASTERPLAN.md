@@ -7924,3 +7924,59 @@ echte databeperking eronder is teruggelegd bij de eigenaar, met de vraag welke v
 
 `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon. Alle drie de
 fixes zijn live nagemeten op de demo, niet alleen beredeneerd.
+
+### 17.113 Vier terugmeldingen: demo-blokkade op de SOP-knop, LinkedIn's lege donut, zoomgrens bijgesteld (23 augustus 2026)
+
+**1. De SOP-knop was nog steeds dood -- een TWEEDE oorzaak, niet dezelfde als 17.112.** Daar is de
+`sops_enabled`-dekkingsgate gescheiden van handmatig triggeren, en dat was een echte bug. Maar de
+eigenaar meldde terecht dat de knop nog altijd niet werkte. Deze keer de knop daadwerkelijk ingedrukt
+in de browser i.p.v. de code beredeneerd, en toen kwam de tweede blokkade boven:
+`sop-trigger-buttons.tsx` zet `disabled={anyRunning || demoModus}` op de demo-klant, met
+`if (demoModus) return;` als extra afvang in de handler. Reden in de code: een publieke demo-link mag
+geen echte, kostende LLM-runs kunnen starten. Volkomen terecht -- alleen is demo-greentech ook de
+enige klant met alle drie de kanalen, en dus precies waar de eigenaar op test.
+
+Opgelost met `NEXT_PUBLIC_SOP_HANDMATIG_IN_DEMO=1`: standaard UIT (publieke demo blijft beschermd),
+aan te zetten in een preview-/testomgeving. Bewust een env-vlag en geen "sta het toe als je ingelogd
+bent": zolang `O1_AUTH_ENFORCED` uit staat is er geen sessie (zie `lib/auth/use-access.ts`), dus
+"ingelogd" is vandaag niet van "anonieme bezoeker" te onderscheiden -- die check zou nu iedereen
+doorlaten. Gedocumenteerd in `.env.example`.
+
+Geverifieerd door te klikken: de knop is nu actief en vuurt `POST /api/analysis/weekly` af. Het
+antwoord is een 500 met `OpenRouter 401: Missing Authentication header` -- de bekende
+sandbox-beperking (geen sleutel hier), niet de code.
+
+**De les.** In 17.112 is "de knop werkt weer" gemeld op basis van code lezen: de gate was weg, dus
+klaar. Er zat een tweede, onafhankelijke blokkade in een ander bestand. Eén keer klikken had dat
+meteen laten zien. Bij een melding "ik kan X niet" hoort X geprobeerd te worden, niet alleen het pad
+ernaartoe gelezen.
+
+**2. LinkedIn had helemaal geen donut.** `BREAKDOWN_DIMENSIES` zet LinkedIn's vier dimensies
+(functie, senioriteit, industrie, bedrijfsgrootte) allemaal in groep "doelgroep"; de hero vroeg om
+groep "levering" en LinkedIn heeft daar nul dimensies, dus rendeerde de component niets. De
+"niets tonen zonder data"-afvang deed hier het verkeerde: er IS data, alleen in een andere groep, en
+een leeg vlak leest als "dit kanaal heeft geen uitsplitsing". Voor LinkedIn is de doelgroep-
+uitsplitsing bovendien HET antwoord op "waar gaat mijn geld heen" -- daar koop je je bereik mee.
+Hero toont nu `groep="doelgroep"`.
+
+Dit loste meteen de restwitruimte uit 17.112 op: die 307px was precies het gat van deze lege donut.
+Gemeten: links 596+437 = 1033px (0px ongebruikt), rechts 415+472 = 887px (147px). Van 669px via
+307px naar 147px.
+
+**3. Zoomgrens van 1920px naar 2560px.** De cap uit 17.112 loste het uitrekken op maar sloeg door de
+andere kant uit: op een 1440p-monitor (2560px breed, 2272px na de sidebar) bleef 352px marge over, en
+ver uitzoomen maakte de inhoud een smalle strook in het midden. Met 2560px vult zo'n monitor volledig
+(gemeten: 2272px, geen marge) en verschijnt de marge pas bij 4K of bij uitzoomen. Blijft een afweging:
+bij 25% zoom wordt de inhoud hoe dan ook een eiland, en de enige andere optie is oneindig uitrekken
+(kaarten van 2864px). Er is geen instelling die beide uitersten goed doet.
+
+**4. Google's donut heeft geen filters -- dataprobleem, geen UI-probleem.** De eigenaar vroeg om meer
+filteropties (kanaalverdeling, campagneverdeling, doelgroep, device). Nagemeten welke Google-
+dimensietabellen gevuld zijn: `ads_campaign_monthly` 4.791 rijen en `ads_country_monthly` 251 rijen;
+`ads_device_*`, `ads_audience_*`, `ads_network_*` en `ads_schedule_*` zijn leeg. Campagnetype is dus
+al wat de donut toont en geo zit al in de wereldkaart ernaast. Device en doelgroep vragen een
+sync-uitbreiding, geen UI-wijziging. Kanaalverdeling kan wel op bestaande data. Teruggelegd bij de
+eigenaar welke van de twee eerst.
+
+`tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon. Alle drie de
+fixes live nagemeten op de demo.

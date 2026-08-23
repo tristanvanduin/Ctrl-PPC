@@ -74,27 +74,33 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
       />
 
       {/* DE OPENER (23 augustus 2026, teruggezet naar 50/50): Account Health naast de wereldkaart,
-          zelfde indeling als Google en Meta (zie google-view.tsx). LinkedIn heeft geen
-          leveringsdimensie zoals Meta's plaatsing/platform/device -- functie/senioriteit/industrie/
-          bedrijfsgrootte zijn zelf allemaal wie-vragen en staan op Campagnes onder
-          "Doelgroepsignalen" (groep="doelgroep"). BreakdownDonuts rendert hier dus niets voor
-          LinkedIn (groep="levering" heeft geen dimensies); de linkerkolom toont dan Health +
-          ranglijst, zelfde "niets tonen zonder data"-afvang als overal elders voor de donut.
+          zelfde indeling als Google en Meta (zie google-view.tsx).
+
+          DE DONUT TOONT HIER "doelgroep", NIET "levering" -- en dat is een correctie. LinkedIn heeft
+          geen leveringsdimensie zoals Meta's plaatsing/platform/device; zijn vier dimensies
+          (functie, senioriteit, industrie, bedrijfsgrootte) staan allemaal als "doelgroep" in
+          BREAKDOWN_DIMENSIES. De hero vroeg om groep="levering" en LinkedIn heeft daar nul
+          dimensies, dus stond hier simpelweg niets -- terwijl de data er wél ligt.
+
+          Dat "niets tonen zonder data" was hier het verkeerde antwoord: er ís data, alleen in een
+          andere groep. Een leeg vlak op de opener leest als "dit kanaal heeft geen uitsplitsing",
+          en dat is onjuist. Voor LinkedIn is de doelgroep-uitsplitsing bovendien HET antwoord op
+          "waar gaat mijn geld heen" -- daar koop je op dit kanaal immers je bereik mee.
+
+          Ja, Campagnes toont dezelfde groep onder "Doelgroepsignalen". Dat is aanvaardbare
+          herhaling: de opener geeft het overzicht, Campagnes de verdieping -- net zoals Google's
+          campagnetype-ringen op beide plekken terugkomen.
 
           RANGLIJST HOORT RECHTS, ONDER DE KAART -- correctie op mezelf, zelfde meting als in
           meta-view.tsx. De eerdere reden ("de kaart is intrinsiek hoger") is nagemeten en klopt
           niet: de kaart is 415px en Health alleen al 596px. Met de ranglijst links bleef 669px van
-          de 1084px rechterkolom leeg (62%).
-
-          Gemeten met de ranglijst hier rechts: links 596px, rechts 415+472 = 903px. Nog steeds
-          307px onbalans, en dat is voor LinkedIn niet verder weg te poetsen met deze drie kaarten:
-          BreakdownDonuts rendert hier niets (LinkedIn heeft geen leveringsdimensie, zie hierboven),
-          dus er zijn maar drie kaarten om over twee kolommen te verdelen. 307px is wel minder dan
-          de helft van de 669px die de vorige indeling overliet. */}
+          de 1084px rechterkolom leeg (62%). Met de ranglijst rechts EN de donut nu gevuld staan de
+          kolommen weer in verhouding -- de 307px die na alleen de verhuizing overbleef was juist
+          het gat dat deze lege donut achterliet. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="min-w-0 flex flex-col gap-4">
           <ChannelHealthBadge clientId={clientId} channel="linkedin" />
-          <BreakdownDonuts clientId={clientId} channel="linkedin" groep="levering" />
+          <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
         </div>
         <div className="min-w-0 flex flex-col gap-4">
           <GeoMapCard state={geo} channel="linkedin" />
