@@ -1445,7 +1445,11 @@ Sorteer van hoog naar laag ICE. Geef voor elke hypothese ook aan:
 // 2. BI-WEEKLY SYSTEM PROMPT
 // ============================================================
 
-export function buildBiWeeklyPrompt(
+// Gedeeld tussen buildBiWeeklyPrompt (nu alleen de preambule, voor bestaande tests) en de vier
+// losse stap-prompts hieronder. previousMonthlyOutput en de "Kritieke instructie" staan bewust in
+// ELKE stap-call: "Verwijs in elke stap expliciet terug naar de maandanalyse bevindingen" is de
+// hele reden van deze SOP, dus die eis mag niet verdwijnen zodra een stap zijn eigen call krijgt.
+function biWeeklyPreamble(
   goalsSection: string,
   accountType: AccountType,
   previousMonthlyOutput: string,
@@ -1454,7 +1458,6 @@ export function buildBiWeeklyPrompt(
   const benchmarks = channel === "meta_ads" ? META_BENCHMARKS[accountType]
     : channel === "linkedin_ads" ? LINKEDIN_BENCHMARKS[accountType]
     : getBenchmarks(accountType);
-  const content = channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null;
 
   return `
 Je bent een senior SEA specialist die een bi-weekly check-in uitvoert.
@@ -1487,12 +1490,37 @@ Vermeld altijd de prognose bij stap 1 en vergelijk met de doelstelling.
 - Vergelijk "deze maand tot nu" met hetzelfde aantal dagen vorige maand
 - Significante afwijking van maandanalyse verwachting: >20% verschil
 - Let op maandeinde effect: conversies zijn vaak hoger in laatste week
+`.trim();
+}
+
+/**
+ * @deprecated Alleen nog de preambule, niet meer de vier stappen -- die zijn opgesplitst in aparte
+ * calls, zie buildBiWeeklyStep1/2/3/4Prompt hieronder (masterplan 17.11x). Blijft bestaan voor
+ * bestaande tests die hier de gedeelde gronding uit lezen.
+ */
+export function buildBiWeeklyPrompt(
+  goalsSection: string,
+  accountType: AccountType,
+  previousMonthlyOutput: string,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  return biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel);
+}
+
+/** Stap 1 van de bi-weekly check-in: account performance + maandprognose. */
+export function buildBiWeeklyStep1Prompt(
+  goalsSection: string,
+  accountType: AccountType,
+  previousMonthlyOutput: string,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  return `${biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel)}
 
 ---
 
 ## Stap 1: Account Performance
 
-Gebruik: ${content ? content.step1Dataset : "account_monthly (this month + last 2 months), account_weekly (laatste 30 dagen)"}
+Gebruik: ${(channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null)?.step1Dataset ?? "account_monthly (this month + last 2 months), account_weekly (laatste 30 dagen)"}
 
 ### Werkwijze
 1. Ligt de maand op schema voor de doelstellingen?
@@ -1510,12 +1538,27 @@ Gebruik: ${content ? content.step1Dataset : "account_monthly (this month + last 
 - Conclusie: [op schema / aandacht nodig / directe actie vereist]"
 
 TOP 3 BEVINDINGEN STAP 1: [bevinding 1] | [bevinding 2] | [bevinding 3]
+`.trim();
+}
+
+/**
+ * Stap 2 van de bi-weekly check-in: campagne-performance. Verwacht in de userMessage de
+ * conclusie/TOP-3-bevindingen van stap 1 (de oorspronkelijke instructie "conclusie stap 1"),
+ * anders mist deze stap de context waar hij naar verwijst.
+ */
+export function buildBiWeeklyStep2Prompt(
+  goalsSection: string,
+  accountType: AccountType,
+  previousMonthlyOutput: string,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  return `${biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel)}
 
 ---
 
 ## Stap 2: Campagne Performance
 
-Gebruik: ${content ? content.step2Dataset : "campaign_monthly (this month + last 2 months), conclusie stap 1"}
+Gebruik: ${(channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null)?.step2Dataset ?? "campaign_monthly (this month + last 2 months), conclusie stap 1"}
 
 ### Werkwijze
 1. Ontwikkelen de campagnes uit de maandanalyse zich zoals verwacht?
@@ -1530,6 +1573,21 @@ Gebruik: ${content ? content.step2Dataset : "campaign_monthly (this month + last
 meetbaar effect: [KPI A] [steeg/daalde] met X% sinds implementatie op [datum]."
 
 TOP 3 BEVINDINGEN STAP 2: [bevinding 1] | [bevinding 2] | [bevinding 3]
+`.trim();
+}
+
+/**
+ * Stap 3 van de bi-weekly check-in (kanaalafhankelijke titel, bv. Ad Group Performance).
+ * Verwacht de conclusies van stap 1+2 in de userMessage.
+ */
+export function buildBiWeeklyStep3Prompt(
+  goalsSection: string,
+  accountType: AccountType,
+  previousMonthlyOutput: string,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  const content = channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null;
+  return `${biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel)}
 
 ---
 
@@ -1546,6 +1604,24 @@ ${content ? content.step3Body : `### Werkwijze
 [beschrijving met concrete cijfers en vergelijking met maandanalyse verwachting]."`}
 
 TOP 3 BEVINDINGEN STAP 3: [bevinding 1] | [bevinding 2] | [bevinding 3]
+`.trim();
+}
+
+/**
+ * Stap 4 van de bi-weekly check-in (kanaalafhankelijke titel, bv. Device & Engagement), plus de
+ * afsluitende Eindconclusie (maandprognose, directe acties, sprintplanning, 2 hypotheses). Die
+ * Eindconclusie stond in de ongesplitste versie na stap 4 omdat hij alle vier stappen nodig
+ * heeft -- vandaar hier gebundeld i.p.v. een aparte vijfde call: de aanroeper geeft stap 1, 2 en
+ * 3's output mee als context in de userMessage.
+ */
+export function buildBiWeeklyStep4Prompt(
+  goalsSection: string,
+  accountType: AccountType,
+  previousMonthlyOutput: string,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  const content = channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null;
+  return `${biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel)}
 
 ---
 
@@ -1568,6 +1644,9 @@ TOP 3 BEVINDINGEN STAP 4: [bevinding 1] | [bevinding 2] | [bevinding 3]
 
 ## Eindconclusie
 
+Je krijgt in de userMessage ook de output van stap 1, 2 en 3 mee. Gebruik die om de eindconclusie
+te bouwen -- niet alleen stap 4.
+
 ### Maandprognose
 "Prognose: maand eindigt op [waarde] voor [primaire doelstelling],
 [X%] [boven/onder] target. [Op schema / Bijsturing nodig / Kritiek]."
@@ -1589,7 +1668,11 @@ ${HYPOTHESE_INSTRUCTIES}
 // 3. WEEKLY SYSTEM PROMPT
 // ============================================================
 
-export function buildWeeklyPrompt(
+// Gedeeld tussen buildWeeklyPrompt (nu alleen de preambule, voor tests die de gedeelde gronding/
+// drempels controleren) en de drie losse stap-prompts hieronder. Elke stap-call krijgt deze hele
+// preambule mee -- geen selectief knippen -- zodat elke stap dezelfde doelen/benchmarks/
+// urgentieniveaus ziet die de vorige, ongesplitste versie ook altijd in beeld had.
+function weeklyPreamble(
   goalsSection: string,
   accountType: AccountType,
   channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
@@ -1625,6 +1708,35 @@ ${content
   : `- Bleeder keyword: cost > 2× gemiddelde account CPA, 0 conversies
 - Bleeder zoekterm: cost > 1,5× gemiddelde account CPA, 0 conversies`}
 - Budget anomalie: >30% meer spend dan zelfde weekdag vorige week
+`.trim();
+}
+
+/**
+ * @deprecated Alleen nog de preambule (doelen/benchmarks/urgentieniveaus/drempels), niet meer de
+ * drie stappen -- die zijn opgesplitst in aparte calls, zie buildWeeklyStep1/2/3Prompt hieronder
+ * (masterplan 17.11x). Blijft bestaan omdat bestaande tests (__shared_grounding_test.ts,
+ * __thresholds_test.ts) hier de gedeelde gronding/drempeltekst uit lezen.
+ */
+export function buildWeeklyPrompt(
+  goalsSection: string,
+  accountType: AccountType,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  return weeklyPreamble(goalsSection, accountType, channel);
+}
+
+/**
+ * Stap 1 van de wekelijkse health check: account health + tracking-verificatie. Eerste van drie
+ * losse calls (zie masterplan 17.11x) -- de bevindingen hier bepalen of stap 2/3 hun
+ * performance-adviezen mogen geven (bij een vermoedelijke tracking break zijn die zinloos), dus
+ * de aanroeper hoort deze output aan stap 2 en 3 door te geven als context.
+ */
+export function buildWeeklyStep1Prompt(
+  goalsSection: string,
+  accountType: AccountType,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  return `${weeklyPreamble(goalsSection, accountType, channel)}
 
 ---
 
@@ -1660,7 +1772,7 @@ is er sprake van een waarschijnlijke tracking break.
 Bij vermoeden van tracking-issues:
 → Flag als: "KRITIEK — MOGELIJKE TRACKING BREAK"
 → Geef GEEN performance-adviezen (budget, biedingen, targeting) — die zijn zinloos bij kapotte tracking
-→ Aanbeveling: "Controleer conversietracking via ${content ? content.trackingTool : "Google Tag Assistant / GTM debug mode"}"
+→ Aanbeveling: "Controleer conversietracking via ${(channel === "meta_ads" ? META_WEEKLY : channel === "linkedin_ads" ? LINKEDIN_WEEKLY : null)?.trackingTool ?? "Google Tag Assistant / GTM debug mode"}"
 → Bereken wat de conversies ZOUDEN zijn geweest op basis van historische conv/spend ratio
 
 ### Werkwijze
@@ -1673,6 +1785,21 @@ Mogelijke oorzaak: [oorzaak indien identificeerbaar uit change history of campag
 Aanbeveling: [concrete actie]."
 
 Geen afwijkingen: "Account health: geen significante anomalies (alle KPI's binnen ±20% WoW)."
+`.trim();
+}
+
+/**
+ * Stap 2 van de wekelijkse health check: keyword-/zoekterm-bleeders. Krijgt de conclusie van
+ * stap 1 als context mee (via de aanroeper's userMessage) zodat een vermoedelijke tracking break
+ * uit stap 1 hier niet alsnog tot een performance-advies op bleeders leidt.
+ */
+export function buildWeeklyStep2Prompt(
+  goalsSection: string,
+  accountType: AccountType,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  const content = channel === "meta_ads" ? META_WEEKLY : channel === "linkedin_ads" ? LINKEDIN_WEEKLY : null;
+  return `${weeklyPreamble(goalsSection, accountType, channel)}
 
 ---
 
@@ -1691,6 +1818,22 @@ Campagne: [naam] | Aanbeveling: [exact/phrase uitsluiten of monitoren].
 Totaal wasted spend deze week: €[X]."
 
 Geen bleeders: "Keyword/zoekterm check: geen bleeders boven drempel deze week."`}
+`.trim();
+}
+
+/**
+ * Stap 3 van de wekelijkse health check: budget-/spend-anomalieën, plus de afsluitende
+ * Weekoverzicht-synthese. Die synthese stond in de oorspronkelijke, ongesplitste versie na stap 3
+ * omdat hij alle drie stappen nodig heeft -- vandaar hier gebundeld i.p.v. een aparte vierde call:
+ * de aanroeper geeft stap 1 en 2's output mee als context in de userMessage.
+ */
+export function buildWeeklyStep3Prompt(
+  goalsSection: string,
+  accountType: AccountType,
+  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+): string {
+  const content = channel === "meta_ads" ? META_WEEKLY : channel === "linkedin_ads" ? LINKEDIN_WEEKLY : null;
+  return `${weeklyPreamble(goalsSection, accountType, channel)}
 
 ---
 
@@ -1728,6 +1871,9 @@ Geen anomalies: "Spend check: geen significante budget anomalies geïdentificeer
 ---
 
 ## Weekoverzicht
+
+Je krijgt in de userMessage ook de output van stap 1 (Account Health) en stap 2 (Bleeders) mee.
+Gebruik die om het weekoverzicht samen te vatten -- niet alleen stap 3.
 
 Sluit altijd af met:
 

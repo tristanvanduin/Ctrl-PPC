@@ -12,7 +12,7 @@ import {
   type AccountType,
 } from "../prompts/sop-prompts";
 import { type OpenRouterResponse } from "./openrouter-client";
-import { callRouted, callLayer } from "./llm-router";
+import { callRouted, callLayer, type Layer } from "./llm-router";
 import { daysAgo, today } from "../reporting-date";
 import { externAccountId } from "@/lib/tenancy/klanten";
 
@@ -374,6 +374,16 @@ export async function runStep(opts: {
   evalCapture?: { fixtureSet: string } | null;
   /** X3: de soort aanroep voor de fixture; replay speelt standaard alleen "step". */
   evalKind?: "step" | "checkpoint" | "repair";
+  /**
+   * Expliciete laag voor deze stap (zie llm-router.ts's Layer). Zonder dit: stap 13 gaat naar de
+   * reasoning-laag (bestaand gedrag, monthly's synthese-stap), elke andere stap naar callRouted's
+   * tier-keten (STEP_TIER, per cadans+stapnummer). Weekly/biweekly's stappen geven hier "narrative"
+   * mee -- dat is het model dat hun ENE grote analyse-call vóór de opsplitsing ook al gebruikte
+   * (via runAnalysis's callLayer("narrative", ...)); zonder deze parameter zouden ze bij het
+   * opsplitsen in losse runStep-aanroepen stilzwijgend naar callRouted's heavy-tier (Gemini)
+   * verschuiven, een modelwissel die niemand heeft gevraagd.
+   */
+  layer?: Layer;
 }): Promise<StepResult> {
   const { supabase, apiKey, clientId, sopType, systemPrompt, userMessage, periodStart, periodEnd, stepNumber, stepName, jsonMode, jsonSchema } = opts;
   const analysisDate = today();
@@ -394,15 +404,23 @@ export async function runStep(opts: {
   }
 
   const stepLabel = `${sopType}-step-${stepNumber}-${stepName.toLowerCase().replace(/\s+/g, "-")}`;
-  // Stap 13 synthetiseert de conclusies van stap 1-12 tot hypotheses/sprintplan -- multi-hop
-  // redeneren over eerder werk, geen los datapunt. Dat is precies waar de reasoning-laag (Grok)
-  // voor bedoeld is, zie LAYER_MODEL in llm-router.ts.
-  const response = stepNumber === 13
-    ? await callLayer("reasoning", {
+  // Een expliciete laag (opts.layer) wint altijd. Anders: stap 13 synthetiseert de conclusies van
+  // stap 1-12 tot hypotheses/sprintplan -- multi-hop redeneren over eerder werk, geen los
+  // datapunt, en dat is precies waar de reasoning-laag (Grok) voor bedoeld is (zie LAYER_MODEL in
+  // llm-router.ts). Alle andere stappen zonder opts.layer gaan via callRouted's tier-keten.
+  //
+  // 16000 i.p.v. de gebruikelijke 4096/8192 zodra de laag een reasoning-budget reserveert (nu
+  // alleen "narrative", Claude): dezelfde marge als runAnalysis() hierboven en om dezelfde reden
+  // (masterplan 17.28 -- te weinig ruimte na de reasoning-reservering gaf lege content terug).
+  const layer = opts.layer ?? (stepNumber === 13 ? "reasoning" : null);
+  const reservesReasoningBudget = layer === "narrative" || layer === "strategic";
+  const stepMaxTokens = reservesReasoningBudget ? 16000 : (jsonMode ? 8192 : 4096);
+  const response = layer
+    ? await callLayer(layer, {
         apiKey,
         systemPrompt,
         userMessage,
-        maxTokens: jsonMode ? 8192 : 4096,
+        maxTokens: stepMaxTokens,
         jsonMode,
         jsonSchema,
         label: stepLabel,
@@ -411,7 +429,7 @@ export async function runStep(opts: {
         apiKey,
         systemPrompt,
         userMessage,
-        maxTokens: jsonMode ? 8192 : 4096,
+        maxTokens: stepMaxTokens,
         jsonMode,
         jsonSchema,
         label: stepLabel,

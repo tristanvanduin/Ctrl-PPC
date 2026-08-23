@@ -7731,3 +7731,68 @@ Regressietest toegevoegd in `__llm_router_test.ts` die het exacte botsingsscenar
 monthly-stap-2, biweekly-stap-6 vs monthly-stap-6) afdekt. Geen enkele bestaande `STEP_TIER`-override was
 gezet (stond leeg), dus geen gedragswijziging voor productie. `tsc` 0 fouten,
 `node scripts/run-tests.mjs` 316/316.
+
+### 17.110 Weekly en biweekly opgesplitst in losse stap-calls, net als monthly (23 augustus 2026)
+
+Vervolg op 17.109: die fix maakte per-cadans routering mogelijk, maar weekly/biweekly's HOOFDANALYSE was
+zelf nog altijd één grote call per kanaal (`runAnalysis`, label `"<sopType>-full"`) -- drie resp. vier
+onderwerpen in dezelfde prompt, dus zonder een individueel stapnummer om op te routeren. Eerst grondig de
+echte stap-instructies gelezen (niet alleen de namen) om zeker te weten wat er precies opgeknipt wordt,
+inclusief de expliciete ketening tussen stappen (biweekly's "conclusie stap 1", "conclusies stap 1+2",
+etc. -- geen losse onderwerpen maar een bewuste keten).
+
+**Wat er is gebouwd.** `lib/prompts/sop-prompts.ts`: `buildWeeklyPrompt`/`buildBiWeeklyPrompt` zijn nu
+alleen nog de gedeelde preambule (doelen/benchmarks/urgentieniveaus, en bij biweekly ook de
+maandanalyse-context + "verwijs in elke stap terug"-instructie); de losse onderwerpen zijn nieuwe
+`buildWeeklyStep1/2/3Prompt` en `buildBiWeeklyStep1/2/3/4Prompt`-functies, elk met de volledige preambule
+plus alleen de instructietekst van die ene stap. De twee bestaande tests die de gedeelde gronding/drempels uit
+`buildWeeklyPrompt`/`buildBiWeeklyPrompt` lazen (`__shared_grounding_test.ts`, `__thresholds_test.ts`)
+bleven ongewijzigd werken, want die tekst zit in de preambule.
+
+`app/api/analysis/weekly/route.ts` en `biweekly/route.ts`: alle 6 kanaalfuncties (weekly x3, biweekly x3)
+draaien nu 3 resp. 4 sequentiële `runStep`-calls i.p.v. 1 `runAnalysis`-call. Elke stap krijgt de VOLLEDIGE
+gedeelde context (targets/reliability/enrichment) plus de output van alle voorgaande stappen als "Conclusie
+stap N" -- niet selectief geknipt, om niets te missen wat de ongesplitste versie ook altijd zag. De
+afsluitende synthese (weekly's "Weekoverzicht", biweekly's "Eindconclusie") is gebundeld in de LAATSTE
+stap-call i.p.v. een aparte call: die had toch alle voorgaande stappen nodig.
+
+**De twee dingen die dit had kunnen breken, en hoe ze zijn afgevangen.**
+
+1. *Stilzwijgende modelwissel.* `runStep()` routeert standaard via `callRouted` (de heavy-tier/Gemini-
+   keten) tenzij je een `layer` meegeeft. `runAnalysis()` (de oude, ongesplitste call) gebruikte al
+   `callLayer("narrative", ...)` = Claude Sonnet 5. Zonder ingrijpen was elke nieuwe stap dus stilzwijgend
+   van Claude naar Gemini overgestapt -- een modelwissel die niemand heeft gevraagd, en precies het risico
+   dat bij de eerdere kostenanalyse al naar boven kwam. Opgelost: `runStep()` kreeg een nieuwe optionele
+   `layer`-parameter; elke weekly/biweekly-stap geeft nu expliciet `layer: "narrative"` mee. Bijkomend
+   effect, ook gecheckt: `maxTokens` moest voor de narrative-laag omhoog naar 16000 (zelfde marge als
+   `runAnalysis` altijd al gebruikte) omdat Claude's reasoning-tokenbudget van de laag anders te weinig
+   ruimte overlaat voor de zichtbare tekst -- exact het al eerder gedocumenteerde risico (17.26/17.28).
+2. *Verdwenen "is deze cyclus klaar"-signaal.* `runAnalysis()` sloeg zijn hele output op onder
+   `section: "full"`. Twee echte consumenten lezen die rij: `cross-channel-synthesis-lite.ts` (puur als
+   bestaanscheck, geen inhoud) en `app/api/analysis/pdf/route.ts` (dat weekly/biweekly-PDF's ondersteunt,
+   niet alleen monthly). `runStep()` slaat elke stap apart op onder `section: stepName`, dus zonder
+   ingrijpen zou er nooit meer een `"full"`-rij ontstaan en zouden beide consumenten weekly/biweekly als
+   "nooit afgerond" resp. "geen PDF beschikbaar" zien. Opgelost: een nieuwe `saveFullOutputMarker()`-helper
+   in elk route-bestand schrijft, ná het samenvoegen van de stap-outputs, ALSNOG een `section: "full"`-rij
+   met de gecombineerde narrative -- exact de vorm die beide consumenten al verwachtten.
+
+**Bijvangst.** Elke stap wordt nu apart gelogd in `llm_usage` (via `runStep`'s bestaande `recordUsage`,
+mits `runKey` is meegegeven -- nu overal gezet op `jobId`). `runAnalysis()` deed dat nooit: de Claude-
+kosten van weekly/biweekly's hoofdanalyse waren volledig onzichtbaar in de kostenregistratie (zie de
+eerdere kostenanalyse in dit gesprek, waar geen enkele Claude-rij in `llm_usage` te vinden was). Dat gat is
+nu automatisch gedicht, als bijproduct van de opsplitsing, niet als los project.
+
+**Wat hierna wél specifiek te kiezen is.** Met deze opsplitsing is elke stap nu een eigen, apart
+gelabeld `"<sopType>-step-<n>"`-aanroep. Om een individuele stap goedkoper te maken (bv. de eenvoudigere
+data-stappen naar Gemini i.p.v. Claude) is een kleine, gerichte wijziging: die ene `runStep`-aanroep zijn
+`layer`-parameter weglaten (dan valt hij terug op `callRouted`'s STEP_TIER, per 17.109 al cadans-bewust)
+of expliciet een andere laag meegeven. Bewust nog niet gedaan in deze ronde -- dat is een aparte,
+inhoudelijke afweging per stap, geen architectuurwijziging.
+
+**Verificatie.** Elke stap-tekst is exact overgenomen uit de bestaande prompts, alleen herverdeeld over
+functies -- geen inhoudelijke herschrijving. Alle downstream-consumenten van `sop_analysis_output`
+(`section="full"`) opgespoord en gecheckt: `cross-channel-synthesis-lite.ts` en `pdf/route.ts` lezen
+weekly/biweekly-rijen (nu afgedekt door `saveFullOutputMarker`), `monthly-hypotheses/route.ts` en
+biweekly's eigen "vorige maandanalyse"-lookup lezen uitsluitend `*_monthly`-sopTypes (ongemoeid). `tsc`
+0 fouten, `node scripts/run-tests.mjs` 316/316. Geen live LLM-verificatie mogelijk (OpenRouter 401 in deze
+sandbox, al eerder vastgesteld) -- dat blijft de ene, niet af te dekken restrisico van deze wijziging.

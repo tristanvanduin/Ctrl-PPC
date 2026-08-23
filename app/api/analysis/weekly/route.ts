@@ -1,12 +1,14 @@
 import { NextRequest, after } from "next/server";
-import { buildWeeklyPrompt, WEEKLY_FINDINGS_SYSTEM, WEEKLY_RECS_SYSTEM } from "@/lib/prompts/sop-prompts";
+import { buildWeeklyStep1Prompt, buildWeeklyStep2Prompt, buildWeeklyStep3Prompt, WEEKLY_FINDINGS_SYSTEM, WEEKLY_RECS_SYSTEM } from "@/lib/prompts/sop-prompts";
 import {
   getSupabase,
   getOpenRouterKey,
   fetchClientContext,
-  runAnalysis,
+  runStep,
   daysAgo,
   fmt,
+  saveAnalysisOutputSection,
+  type AnalysisResult,
 } from "@/lib/analysis/helpers";
 import { buildEnrichmentContext } from "@/lib/analysis/enrichment";
 import { computeAnalysisTargets } from "@/lib/analysis/compute-targets";
@@ -38,6 +40,21 @@ import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cro
 // als app/api/analysis/monthly/route.ts, waar de kale Google-hoofdanalyse al 284-313s bleek
 // te duren op de oude 300s-grens.
 export const maxDuration = 600;
+
+// cross-channel-synthesis-lite.ts leest section="full" puur als bestaanscheck ("is deze cyclus
+// voor dit kanaal afgerond"), niet voor de inhoud -- zie de toelichting daar. Vóór de opsplitsing
+// in losse runStep-calls (masterplan 17.11x) schreef runAnalysis() die rij vanzelf; runStep()
+// slaat elke stap apart op (section = stepName), dus zonder deze extra rij verdwijnt dat signaal.
+async function saveFullOutputMarker(supabase: SupabaseClient, result: AnalysisResult): Promise<void> {
+  await saveAnalysisOutputSection({
+    supabase,
+    row: {
+      client_id: result.clientId, sop_type: result.sopType, analysis_date: result.analysisDate,
+      period_start: result.periodStart, period_end: result.periodEnd,
+      section: "full", output: result.output, model_used: result.model, tokens_used: result.tokensUsed,
+    },
+  });
+}
 
 async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
   await createProgressJob(supabase, {
@@ -123,48 +140,98 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   });
   const reliabilityText = `\n\n${weeklyReliability.promptContext}`;
 
-  const systemPrompt = buildWeeklyPrompt(goalsSection, accountType);
-
   const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
 
-  const userMessage = `Voer een wekelijkse health check uit voor client "${clientId}".
-Periode: ${periodStart} t/m ${periodEnd}.${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
+  // Alle context die de ongesplitste versie eenmalig onderaan de userMessage meegaf, gaat nu naar
+  // ELKE stap-call -- geen enkele stap hoort minder te weten dan de vorige, ongesplitste versie
+  // altijd had.
+  const sharedContext = `${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+
+  // Drie losse calls i.p.v. één grote (masterplan 17.11x): elke stap is nu apart routeerbaar
+  // (STEP_TIER, per "weekly-step-N") en apart gelogd in llm_usage. `layer: "narrative"` behoudt
+  // precies het model dat de ongesplitste versie ook al gebruikte (Claude Sonnet 5 via
+  // callLayer) -- zonder deze parameter zou runStep() stilzwijgend naar callRouted's heavy-tier
+  // (Gemini) zijn overgestapt, een modelwissel die hier niet gevraagd is.
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check & Tracking Verificatie..." });
+  const step1 = await runStep({
+    supabase, apiKey, clientId, sopType: "weekly", periodStart, periodEnd,
+    stepNumber: 1, stepName: "Account Health Check",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep1Prompt(goalsSection, accountType),
+    userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}".
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 
 ## Account Performance (wekelijks, laatste 14 dagen)
 \`\`\`
 ${toPromptTable(weeklyData)}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_2", message: "Stap 2: Keyword & zoekterm bleeders..." });
+  const step2 = await runStep({
+    supabase, apiKey, clientId, sopType: "weekly", periodStart, periodEnd,
+    stepNumber: 2, stepName: "Keyword Zoekterm Bleeders",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep2Prompt(goalsSection, accountType),
+    userMessage: `Voer stap 2 (${"Keyword & Zoekterm Bleeders"}) uit voor client "${clientId}".
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Health Check)
+${step1.output}
 
 ## Wasteful Search Terms (laatste 30 dagen, top 30 op cost)
 \`\`\`
 ${toPromptTable(searchResult.data ?? [])}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: Budget & spend anomalieën, weekoverzicht..." });
+  const step3 = await runStep({
+    supabase, apiKey, clientId, sopType: "weekly", periodStart, periodEnd,
+    stepNumber: 3, stepName: "Budget Spend Anomalies",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep3Prompt(goalsSection, accountType),
+    userMessage: `Voer stap 3 (Budget & Spend Anomalies) en het afsluitende Weekoverzicht uit voor client "${clientId}".
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Health Check)
+${step1.output}
+
+## Conclusie stap 2 (Keyword & Zoekterm Bleeders)
+${step2.output}
 
 ## Campaign Performance (laatste 2 maanden, voor budget/spend check)
 \`\`\`
 ${toPromptTable(campaignResult.data ?? [])}
-\`\`\`${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}
+\`\`\`
 
-Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders die directe actie vereisen.`;
-
-  await updateProgressPhase(supabase, {
-    jobId,
-    phaseKey: "run_analysis",
-    message: "Wekelijkse SOP-analyse uitvoeren...",
-  });
-  const result = await runAnalysis({
-    supabase,
-    apiKey,
-    clientId,
-    sopType: "weekly",
-    systemPrompt,
-    userMessage,
-    periodStart,
-    periodEnd,
+Focus alleen op anomalies en bleeders die directe actie vereisen.`,
   });
 
-  // Sanitize final output (heading dedup + whitespace cleanup)
-  result.output = sanitizeOutput(result.output);
+  const result: AnalysisResult = {
+    clientId, sopType: "weekly", analysisDate: today(), periodStart, periodEnd,
+    model: step3.model,
+    tokensUsed: step1.tokensUsed + step2.tokensUsed + step3.tokensUsed,
+    output: sanitizeOutput(`## Stap 1: Account Health Check & Tracking Verificatie
+
+${step1.output}
+
+---
+
+## Stap 2: Keyword & Zoekterm Bleeders
+
+${step2.output}
+
+---
+
+## Stap 3: Budget & Spend Anomalies
+
+${step3.output}`),
+    saved: step1.saved && step2.saved && step3.saved,
+    latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs,
+    retries: step1.retries + step2.retries + step3.retries,
+  };
+  await saveFullOutputMarker(supabase, result);
 
   // ── Structured extraction (findings + recommendations + tasks) ──
   const extraction = await extractStructuredData({
@@ -178,8 +245,8 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
     analysisOutput: result.output,
     findingsSystemPrompt: WEEKLY_FINDINGS_SYSTEM,
     recsSystemPrompt: WEEKLY_RECS_SYSTEM,
-    stepOffset: 1, // findings = step 2, recs = step 3
-    analysisId: null, // weekly uses runAnalysis, not tracked by analysis_id
+    stepOffset: 3, // 3 analyse-stappen (masterplan 17.11x); findings = step 4, recs = step 5
+    analysisId: null, // weekly is losse runStep-calls, niet gekoppeld aan een analysis_id
     reliability: weeklyReliability,
     onPhase: async (phaseKey, message) => {
       await updateProgressPhase(supabase, { jobId, phaseKey, message });
@@ -288,8 +355,6 @@ Huidige maand (${["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","N
 BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
     : "";
 
-  const systemPrompt = buildWeeklyPrompt(goalsSection, accountType, "meta_ads");
-
   // F5 fase1.1: reliability-gating parity met Google -- zelfde functie, genormaliseerd naar
   // Meta's spend/link_clicks-kolomnamen via computeMetaReliability().
   const metaReliability = computeMetaReliability({
@@ -305,13 +370,34 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   const adRows = withMetaNames(adResult.filter((r) => new Date(String(r.date)) >= new Date(periodBleederStart)), adNames);
   const campaignRows = withMetaNames(campaignResult, campaignNames);
 
-  const userMessage = `Voer een wekelijkse health check uit voor client "${clientId}" (Meta Ads).
-Periode: ${periodStart} t/m ${periodEnd}.${targetText}${reliabilityText}
+  const sharedContext = `${targetText}${reliabilityText}`;
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (Meta)..." });
+  const step1 = await runStep({
+    supabase, apiKey, clientId, sopType: "meta_weekly", periodStart, periodEnd,
+    stepNumber: 1, stepName: "Account Health Check",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep1Prompt(goalsSection, accountType, "meta_ads"),
+    userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}" (Meta Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 
 ## Account Performance (dagelijks, laatste 14 dagen -- gebruik voor WoW-vergelijking)
 \`\`\`
 ${toPromptTable(accountResult)}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_2", message: "Stap 2: bleeders en creative fatigue (Meta)..." });
+  const step2 = await runStep({
+    supabase, apiKey, clientId, sopType: "meta_weekly", periodStart, periodEnd,
+    stepNumber: 2, stepName: "Ad Set en Ad Bleeders",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep2Prompt(goalsSection, accountType, "meta_ads"),
+    userMessage: `Voer stap 2 uit voor client "${clientId}" (Meta Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Health Check)
+${step1.output}
 
 ## Ad Set Performance (laatste 7 dagen + frequency/hook rate trend uit de 14-dagen ophaal, voor bleeders en creative fatigue)
 \`\`\`
@@ -321,20 +407,56 @@ ${toPromptTable(adsetRows)}
 ## Ad/Creative Performance (laatste 7 dagen, voor bleeders en creative fatigue)
 \`\`\`
 ${toPromptTable(adRows)}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: budget & spend anomalieën, weekoverzicht (Meta)..." });
+  const step3 = await runStep({
+    supabase, apiKey, clientId, sopType: "meta_weekly", periodStart, periodEnd,
+    stepNumber: 3, stepName: "Budget Spend Anomalies",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep3Prompt(goalsSection, accountType, "meta_ads"),
+    userMessage: `Voer stap 3 (Budget & Spend Anomalies) en het afsluitende Weekoverzicht uit voor client "${clientId}" (Meta Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Health Check)
+${step1.output}
+
+## Conclusie stap 2 (Ad Set en Ad Bleeders)
+${step2.output}
 
 ## Campaign Performance (laatste 60 dagen, voor spend-anomalie WoW-check)
 \`\`\`
 ${toPromptTable(campaignRows)}
 \`\`\`
 
-Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders die directe actie vereisen.`;
-
-  await updateProgressPhase(supabase, { jobId, phaseKey: "run_analysis", message: "Wekelijkse Meta SOP-analyse uitvoeren..." });
-  const result = await runAnalysis({
-    supabase, apiKey, clientId, sopType: "meta_weekly", systemPrompt, userMessage, periodStart, periodEnd,
+Focus alleen op anomalies en bleeders die directe actie vereisen.`,
   });
-  result.output = sanitizeOutput(result.output);
+
+  const result: AnalysisResult = {
+    clientId, sopType: "meta_weekly", analysisDate: today(), periodStart, periodEnd,
+    model: step3.model,
+    tokensUsed: step1.tokensUsed + step2.tokensUsed + step3.tokensUsed,
+    output: sanitizeOutput(`## Stap 1: Account Health Check & Tracking Verificatie
+
+${step1.output}
+
+---
+
+## Stap 2: Ad Set en Ad Bleeders
+
+${step2.output}
+
+---
+
+## Stap 3: Budget & Spend Anomalies
+
+${step3.output}`),
+    saved: step1.saved && step2.saved && step3.saved,
+    latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs,
+    retries: step1.retries + step2.retries + step3.retries,
+  };
+  await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
     supabase, apiKey, clientId, sopType: "meta_weekly",
@@ -342,7 +464,7 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
     analysisOutput: result.output,
     findingsSystemPrompt: WEEKLY_FINDINGS_SYSTEM,
     recsSystemPrompt: WEEKLY_RECS_SYSTEM,
-    stepOffset: 1,
+    stepOffset: 3, // 3 analyse-stappen; findings = step 4, recs = step 5
     analysisId: null,
     reliability: metaReliability,
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
@@ -459,8 +581,6 @@ Huidige maand (${["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","N
 BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
     : "";
 
-  const systemPrompt = buildWeeklyPrompt(goalsSection, accountType, "linkedin_ads");
-
   // F5 fase1.1: reliability-gating parity met Google -- genormaliseerd naar LinkedIn's
   // spend/leads-kolomnamen via computeLinkedinReliability().
   const linkedinReliability = computeLinkedinReliability({
@@ -476,13 +596,34 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   const creativeRows = withLinkedinNames(creativeRowsRaw, creativeFormats);
   const campaignSpendRowsNamed = withLinkedinNames(campaignSpendRows, campaignNames);
 
-  const userMessage = `Voer een wekelijkse health check uit voor client "${clientId}" (LinkedIn Ads).
-Periode: ${periodStart} t/m ${periodEnd}.${targetText}${reliabilityText}
+  const sharedContext = `${targetText}${reliabilityText}`;
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (LinkedIn)..." });
+  const step1 = await runStep({
+    supabase, apiKey, clientId, sopType: "linkedin_weekly", periodStart, periodEnd,
+    stepNumber: 1, stepName: "Account Health Check",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep1Prompt(goalsSection, accountType, "linkedin_ads"),
+    userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}" (LinkedIn Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 
 ## Account Performance (dagelijks, laatste 14 dagen -- gebruik voor WoW-vergelijking)
 \`\`\`
 ${toPromptTable(accountRows)}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_2", message: "Stap 2: bleeders (LinkedIn)..." });
+  const step2 = await runStep({
+    supabase, apiKey, clientId, sopType: "linkedin_weekly", periodStart, periodEnd,
+    stepNumber: 2, stepName: "Campagne en Creative Bleeders",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep2Prompt(goalsSection, accountType, "linkedin_ads"),
+    userMessage: `Voer stap 2 uit voor client "${clientId}" (LinkedIn Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Health Check)
+${step1.output}
 
 ## Campaign Performance (laatste 7 dagen, voor bleeders)
 \`\`\`
@@ -492,20 +633,56 @@ ${toPromptTable(campaignRows)}
 ## Creative Performance (laatste 7 dagen, entity_name is het formaat -- LinkedIn-creatives hebben geen eigen naam)
 \`\`\`
 ${toPromptTable(creativeRows)}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: budget & spend anomalieën, weekoverzicht (LinkedIn)..." });
+  const step3 = await runStep({
+    supabase, apiKey, clientId, sopType: "linkedin_weekly", periodStart, periodEnd,
+    stepNumber: 3, stepName: "Budget Spend Anomalies",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep3Prompt(goalsSection, accountType, "linkedin_ads"),
+    userMessage: `Voer stap 3 (Budget & Spend Anomalies) en het afsluitende Weekoverzicht uit voor client "${clientId}" (LinkedIn Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Health Check)
+${step1.output}
+
+## Conclusie stap 2 (Campagne en Creative Bleeders)
+${step2.output}
 
 ## Campaign Performance (laatste 60 dagen, voor spend-anomalie WoW-check)
 \`\`\`
 ${toPromptTable(campaignSpendRowsNamed)}
 \`\`\`
 
-Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders die directe actie vereisen.`;
-
-  await updateProgressPhase(supabase, { jobId, phaseKey: "run_analysis", message: "Wekelijkse LinkedIn SOP-analyse uitvoeren..." });
-  const result = await runAnalysis({
-    supabase, apiKey, clientId, sopType: "linkedin_weekly", systemPrompt, userMessage, periodStart, periodEnd,
+Focus alleen op anomalies en bleeders die directe actie vereisen.`,
   });
-  result.output = sanitizeOutput(result.output);
+
+  const result: AnalysisResult = {
+    clientId, sopType: "linkedin_weekly", analysisDate: today(), periodStart, periodEnd,
+    model: step3.model,
+    tokensUsed: step1.tokensUsed + step2.tokensUsed + step3.tokensUsed,
+    output: sanitizeOutput(`## Stap 1: Account Health Check & Tracking Verificatie
+
+${step1.output}
+
+---
+
+## Stap 2: Campagne en Creative Bleeders
+
+${step2.output}
+
+---
+
+## Stap 3: Budget & Spend Anomalies
+
+${step3.output}`),
+    saved: step1.saved && step2.saved && step3.saved,
+    latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs,
+    retries: step1.retries + step2.retries + step3.retries,
+  };
+  await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
     supabase, apiKey, clientId, sopType: "linkedin_weekly",
@@ -513,7 +690,7 @@ Voer nu de wekelijkse health check uit. Focus alleen op anomalies en bleeders di
     analysisOutput: result.output,
     findingsSystemPrompt: WEEKLY_FINDINGS_SYSTEM,
     recsSystemPrompt: WEEKLY_RECS_SYSTEM,
-    stepOffset: 1,
+    stepOffset: 3, // 3 analyse-stappen; findings = step 4, recs = step 5
     analysisId: null,
     reliability: linkedinReliability,
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },

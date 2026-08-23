@@ -1,12 +1,15 @@
 import { NextRequest, after } from "next/server";
-import { buildBiWeeklyPrompt, BIWEEKLY_FINDINGS_SYSTEM, BIWEEKLY_RECS_SYSTEM } from "@/lib/prompts/sop-prompts";
+import { buildBiWeeklyStep1Prompt, buildBiWeeklyStep2Prompt, buildBiWeeklyStep3Prompt, buildBiWeeklyStep4Prompt, BIWEEKLY_FINDINGS_SYSTEM, BIWEEKLY_RECS_SYSTEM } from "@/lib/prompts/sop-prompts";
 import {
   getSupabase,
   getOpenRouterKey,
   fetchClientContext,
-  runAnalysis,
+  runStep,
   monthsAgo,
   fmt,
+  today,
+  saveAnalysisOutputSection,
+  type AnalysisResult,
 } from "@/lib/analysis/helpers";
 import { buildEnrichmentContext } from "@/lib/analysis/enrichment";
 import { computeAnalysisTargets } from "@/lib/analysis/compute-targets";
@@ -37,6 +40,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // als app/api/analysis/monthly/route.ts, waar de kale Google-hoofdanalyse al 284-313s bleek
 // te duren op de oude 300s-grens.
 export const maxDuration = 600;
+
+// cross-channel-synthesis-lite.ts leest section="full" puur als bestaanscheck ("is deze cyclus
+// voor dit kanaal afgerond"), niet voor de inhoud -- zie de toelichting daar. Vóór de opsplitsing
+// in losse runStep-calls (masterplan 17.11x) schreef runAnalysis() die rij vanzelf; runStep()
+// slaat elke stap apart op (section = stepName), dus zonder deze extra rij verdwijnt dat signaal.
+async function saveFullOutputMarker(supabase: SupabaseClient, result: AnalysisResult): Promise<void> {
+  await saveAnalysisOutputSection({
+    supabase,
+    row: {
+      client_id: result.clientId, sop_type: result.sopType, analysis_date: result.analysisDate,
+      period_start: result.periodStart, period_end: result.periodEnd,
+      section: "full", output: result.output, model_used: result.model, tokens_used: result.tokensUsed,
+    },
+  });
+}
 
 // Gedeeld door alle drie de kanalen: elke stap sluit af met "TOP 3 BEVINDINGEN STAP N: ...",
 // en die worden als beknopte samenvatting doorgegeven aan de extractie-stap (i.p.v. de volledige
@@ -174,14 +192,28 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
   });
   const bwComparisonText = formatComparisonFacts(bwComparisonFacts);
 
-  const systemPrompt = buildBiWeeklyPrompt(goalsSection, accountType, previousMonthlyOutput);
-
   const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
 
-  const userMessage = `Voer een bi-weekly check-in uit voor client "${clientId}".
-Periode: ${periodStart} t/m ${periodEnd}.${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
+  // Alle context die de ongesplitste versie eenmalig meegaf, gaat nu naar ELKE stap-call (masterplan
+  // 17.11x) -- zie de toelichting bij weekly/route.ts voor dezelfde redenering.
+  const sharedContext = `${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
 
-${bwComparisonText}
+${bwComparisonText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+
+  // De hypothese-tracking-instructie hoort specifiek bij stap 2 (zo stond het ook in de
+  // ongesplitste versie: "beoordeel dan in stap 2 of het verwachte effect al zichtbaar is").
+  const hypothesisInstructionForStep2 = enrichment.hypothesisTracking
+    ? "\n\nAls er uitgevoerde hypotheses zijn die nog niet gemeten zijn, beoordeel dan of het verwachte effect al zichtbaar is. Formuleer: 'Hypothese [X] toont [wel/geen/te vroeg] meetbaar effect: [KPI] [steeg/daalde] met X% sinds implementatie op [datum].'"
+    : "";
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance..." });
+  const step1 = await runStep({
+    supabase, apiKey, clientId, sopType: "biweekly", periodStart, periodEnd,
+    stepNumber: 1, stepName: "Account Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep1Prompt(goalsSection, accountType, previousMonthlyOutput),
+    userMessage: `Voer stap 1 (Account Performance) uit voor client "${clientId}".
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 
 ## Account Performance (maandelijks, laatste 3 maanden)
 \`\`\`
@@ -191,38 +223,99 @@ ${toPromptTable(accountData)}
 ## Account Performance (wekelijks, laatste 30 dagen)
 \`\`\`
 ${toPromptTable(weeklyResult.data ?? [])}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_2", message: "Stap 2: Campagne Performance..." });
+  const step2 = await runStep({
+    supabase, apiKey, clientId, sopType: "biweekly", periodStart, periodEnd,
+    stepNumber: 2, stepName: "Campagne Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep2Prompt(goalsSection, accountType, previousMonthlyOutput),
+    userMessage: `Voer stap 2 (Campagne Performance) uit voor client "${clientId}".
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
 
 ## Campaign Performance (maandelijks, laatste 3 maanden)
 \`\`\`
 ${toPromptTable(campaignResult.data ?? [])}
-\`\`\`
+\`\`\`${hypothesisInstructionForStep2}`,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: Ad Group Performance..." });
+  const step3 = await runStep({
+    supabase, apiKey, clientId, sopType: "biweekly", periodStart, periodEnd,
+    stepNumber: 3, stepName: "Ad Group Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep3Prompt(goalsSection, accountType, previousMonthlyOutput),
+    userMessage: `Voer stap 3 (Ad Group Performance) uit voor client "${clientId}".
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
+
+## Conclusie stap 2 (Campagne Performance)
+${step2.output}
 
 ## Ad Group Performance (laatste 3 maanden)
 \`\`\`
 ${toPromptTable(adgroupResult.data ?? [])}
-\`\`\`${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}
-
-Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug aan de maandanalyse.
-${enrichment.hypothesisTracking ? "\nAls er uitgevoerde hypotheses zijn die nog niet gemeten zijn, beoordeel dan in stap 2 of het verwachte effect al zichtbaar is. Formuleer: 'Hypothese [X] toont [wel/geen/te vroeg] meetbaar effect: [KPI] [steeg/daalde] met X% sinds implementatie op [datum].'" : ""}`;
-
-  await updateProgressPhase(supabase, {
-    jobId,
-    phaseKey: "run_analysis",
-    message: "Bi-weekly SOP-analyse uitvoeren...",
-  });
-  const result = await runAnalysis({
-    supabase,
-    apiKey,
-    clientId,
-    sopType: "biweekly",
-    systemPrompt,
-    userMessage,
-    periodStart,
-    periodEnd,
+\`\`\``,
   });
 
-  result.output = sanitizeOutput(result.output);
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_4", message: "Stap 4: Device & Engagement, eindconclusie..." });
+  const step4 = await runStep({
+    supabase, apiKey, clientId, sopType: "biweekly", periodStart, periodEnd,
+    stepNumber: 4, stepName: "Device Engagement",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep4Prompt(goalsSection, accountType, previousMonthlyOutput),
+    userMessage: `Voer stap 4 (Device & Engagement) en de afsluitende Eindconclusie uit voor client "${clientId}".
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
+
+## Conclusie stap 2 (Campagne Performance)
+${step2.output}
+
+## Conclusie stap 3 (Ad Group Performance)
+${step3.output}
+
+Koppel bevindingen terug aan de maandanalyse.`,
+  });
+
+  const result: AnalysisResult = {
+    clientId, sopType: "biweekly", analysisDate: today(), periodStart, periodEnd,
+    model: step4.model,
+    tokensUsed: step1.tokensUsed + step2.tokensUsed + step3.tokensUsed + step4.tokensUsed,
+    output: sanitizeOutput(`## Stap 1: Account Performance
+
+${step1.output}
+
+---
+
+## Stap 2: Campagne Performance
+
+${step2.output}
+
+---
+
+## Stap 3: Ad Group Performance
+
+${step3.output}
+
+---
+
+## Stap 4: Device & Engagement
+
+${step4.output}`),
+    saved: step1.saved && step2.saved && step3.saved && step4.saved,
+    latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs + step4.latencyMs,
+    retries: step1.retries + step2.retries + step3.retries + step4.retries,
+  };
+  await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
     supabase,
@@ -235,7 +328,7 @@ ${enrichment.hypothesisTracking ? "\nAls er uitgevoerde hypotheses zijn die nog 
     analysisOutput: result.output,
     findingsSystemPrompt: BIWEEKLY_FINDINGS_SYSTEM,
     recsSystemPrompt: BIWEEKLY_RECS_SYSTEM,
-    stepOffset: 4, // biweekly has 4 text steps, findings = step 5, recs = step 6
+    stepOffset: 4, // biweekly heeft 4 analyse-stappen, findings = step 5, recs = step 6
     analysisId: null,
     reliability: biweeklyReliability,
     topFindings: extractTopFindings(result.output).join("\n") || undefined,
@@ -351,8 +444,6 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const currentMonth = now.getMonth() + 1;
   const targetText = monthText(currentMonth, targetResult);
 
-  const systemPrompt = buildBiWeeklyPrompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads");
-
   // F5 fase1.1: reliability-gating parity met Google.
   const metaReliability = computeMetaReliability({
     accountDaily: accountRows,
@@ -369,8 +460,16 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const adsetMonthly = withMetaNames(aggregateMonthlyPerEntity(adsetRows, META_SUM_FIELDS), adsetNames);
   const adsetRecent = withMetaNames(adsetRows.filter((r) => String(r.date) >= monthsAgo(1)).slice(-500), adsetNames);
 
-  const userMessage = `Voer een bi-weekly check-in uit voor client "${clientId}" (Meta Ads).
-Periode: ${periodStart} t/m ${periodEnd}.${targetText}${reliabilityText}
+  const sharedContext = `${targetText}${reliabilityText}`;
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance (Meta)..." });
+  const step1 = await runStep({
+    supabase, apiKey, clientId, sopType: "meta_biweekly", periodStart, periodEnd,
+    stepNumber: 1, stepName: "Account Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep1Prompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads"),
+    userMessage: `Voer stap 1 (Account Performance) uit voor client "${clientId}" (Meta Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 
 ## Account Performance (maandelijks, laatste 3 maanden)
 \`\`\`
@@ -380,30 +479,104 @@ ${toPromptTable(accountMonthly)}
 ## Account Performance (dagelijks, laatste 30 dagen)
 \`\`\`
 ${toPromptTable(accountLast30)}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_2", message: "Stap 2: Campagne Performance (Meta)..." });
+  const step2 = await runStep({
+    supabase, apiKey, clientId, sopType: "meta_biweekly", periodStart, periodEnd,
+    stepNumber: 2, stepName: "Campagne Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep2Prompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads"),
+    userMessage: `Voer stap 2 (Campagne Performance) uit voor client "${clientId}" (Meta Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
 
 ## Campaign Performance (maandelijks, laatste 3 maanden)
 \`\`\`
 ${toPromptTable(campaignMonthly)}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: Ad Set & Doelgroep Performance (Meta)..." });
+  const step3 = await runStep({
+    supabase, apiKey, clientId, sopType: "meta_biweekly", periodStart, periodEnd,
+    stepNumber: 3, stepName: "Ad Set en Doelgroep Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep3Prompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads"),
+    userMessage: `Voer stap 3 (Ad Set & Doelgroep Performance) uit voor client "${clientId}" (Meta Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
+
+## Conclusie stap 2 (Campagne Performance)
+${step2.output}
 
 ## Ad Set Performance (maandelijks, laatste 3 maanden)
 \`\`\`
 ${toPromptTable(adsetMonthly)}
-\`\`\`
+\`\`\``,
+  });
 
-## Ad Set Frequency (dagelijks, laatste maand -- voor de verzadigingscheck in stap 4)
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_4", message: "Stap 4: Frequency & Verzadiging (Meta), eindconclusie..." });
+  const step4 = await runStep({
+    supabase, apiKey, clientId, sopType: "meta_biweekly", periodStart, periodEnd,
+    stepNumber: 4, stepName: "Frequency en Verzadiging",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep4Prompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads"),
+    userMessage: `Voer stap 4 (Frequency & Verzadiging) en de afsluitende Eindconclusie uit voor client "${clientId}" (Meta Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
+
+## Conclusie stap 2 (Campagne Performance)
+${step2.output}
+
+## Conclusie stap 3 (Ad Set en Doelgroep Performance)
+${step3.output}
+
+## Ad Set Frequency (dagelijks, laatste maand -- voor de verzadigingscheck)
 \`\`\`
 ${toPromptTable(adsetRecent)}
 \`\`\`
 
-Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug aan de maandanalyse.`;
-
-  await updateProgressPhase(supabase, { jobId, phaseKey: "run_analysis", message: "Bi-weekly Meta SOP-analyse uitvoeren..." });
-  const result = await runAnalysis({
-    supabase, apiKey, clientId, sopType: "meta_biweekly", systemPrompt, userMessage, periodStart, periodEnd,
+Koppel bevindingen terug aan de maandanalyse.`,
   });
-  result.output = sanitizeOutput(result.output);
+
+  const result: AnalysisResult = {
+    clientId, sopType: "meta_biweekly", analysisDate: today(), periodStart, periodEnd,
+    model: step4.model,
+    tokensUsed: step1.tokensUsed + step2.tokensUsed + step3.tokensUsed + step4.tokensUsed,
+    output: sanitizeOutput(`## Stap 1: Account Performance
+
+${step1.output}
+
+---
+
+## Stap 2: Campagne Performance
+
+${step2.output}
+
+---
+
+## Stap 3: Ad Set & Doelgroep Performance
+
+${step3.output}
+
+---
+
+## Stap 4: Frequency & Verzadiging
+
+${step4.output}`),
+    saved: step1.saved && step2.saved && step3.saved && step4.saved,
+    latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs + step4.latencyMs,
+    retries: step1.retries + step2.retries + step3.retries + step4.retries,
+  };
+  await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
     supabase, apiKey, clientId, sopType: "meta_biweekly",
@@ -539,8 +712,6 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   const currentMonth = now.getMonth() + 1;
   const targetText = monthText(currentMonth, targetResult);
 
-  const systemPrompt = buildBiWeeklyPrompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads");
-
   // F5 fase1.1: reliability-gating parity met Google.
   const linkedinReliability = computeLinkedinReliability({
     accountDaily: accountRows,
@@ -556,8 +727,16 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   const campaignMonthly = withLinkedinNames(aggregateMonthlyPerEntity(campaignRows, LINKEDIN_SUM_FIELDS), campaignNames);
   const creativeMonthly = withLinkedinNames(aggregateMonthlyPerEntity(creativeRows, LINKEDIN_SUM_FIELDS), creativeFormats);
 
-  const userMessage = `Voer een bi-weekly check-in uit voor client "${clientId}" (LinkedIn Ads).
-Periode: ${periodStart} t/m ${periodEnd}.${targetText}${reliabilityText}
+  const sharedContext = `${targetText}${reliabilityText}`;
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance (LinkedIn)..." });
+  const step1 = await runStep({
+    supabase, apiKey, clientId, sopType: "linkedin_biweekly", periodStart, periodEnd,
+    stepNumber: 1, stepName: "Account Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep1Prompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads"),
+    userMessage: `Voer stap 1 (Account Performance) uit voor client "${clientId}" (LinkedIn Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 
 ## Account Performance (maandelijks, laatste 3 maanden)
 \`\`\`
@@ -567,25 +746,104 @@ ${toPromptTable(accountMonthly)}
 ## Account Performance (dagelijks, laatste 30 dagen)
 \`\`\`
 ${toPromptTable(accountLast30)}
-\`\`\`
+\`\`\``,
+  });
 
-## Campaign Performance (maandelijks, laatste 3 maanden -- gebruik ook voor de pacing-check in stap 4)
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_2", message: "Stap 2: Campagne Performance (LinkedIn)..." });
+  const step2 = await runStep({
+    supabase, apiKey, clientId, sopType: "linkedin_biweekly", periodStart, periodEnd,
+    stepNumber: 2, stepName: "Campagne Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep2Prompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads"),
+    userMessage: `Voer stap 2 (Campagne Performance) uit voor client "${clientId}" (LinkedIn Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
+
+## Campaign Performance (maandelijks, laatste 3 maanden -- wordt ook gebruikt voor de pacing-check in stap 4)
 \`\`\`
 ${toPromptTable(campaignMonthly)}
-\`\`\`
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: Creative Performance (LinkedIn)..." });
+  const step3 = await runStep({
+    supabase, apiKey, clientId, sopType: "linkedin_biweekly", periodStart, periodEnd,
+    stepNumber: 3, stepName: "Creative Performance",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep3Prompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads"),
+    userMessage: `Voer stap 3 (Creative Performance) uit voor client "${clientId}" (LinkedIn Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
+
+## Conclusie stap 2 (Campagne Performance)
+${step2.output}
 
 ## Creative Performance (maandelijks, laatste 3 maanden; entity_name is het formaat -- LinkedIn-creatives hebben geen eigen naam)
 \`\`\`
 ${toPromptTable(creativeMonthly)}
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_4", message: "Stap 4: Bidding & Pacing (LinkedIn), eindconclusie..." });
+  const step4 = await runStep({
+    supabase, apiKey, clientId, sopType: "linkedin_biweekly", periodStart, periodEnd,
+    stepNumber: 4, stepName: "Bidding en Pacing",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildBiWeeklyStep4Prompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads"),
+    userMessage: `Voer stap 4 (Bidding & Pacing) en de afsluitende Eindconclusie uit voor client "${clientId}" (LinkedIn Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Performance)
+${step1.output}
+
+## Conclusie stap 2 (Campagne Performance)
+${step2.output}
+
+## Conclusie stap 3 (Creative Performance)
+${step3.output}
+
+## Campaign Performance (maandelijks, laatste 3 maanden -- voor de pacing-check)
+\`\`\`
+${toPromptTable(campaignMonthly)}
 \`\`\`
 
-Voer nu de bi-weekly check-in uit volgens alle stappen. Koppel bevindingen terug aan de maandanalyse.`;
-
-  await updateProgressPhase(supabase, { jobId, phaseKey: "run_analysis", message: "Bi-weekly LinkedIn SOP-analyse uitvoeren..." });
-  const result = await runAnalysis({
-    supabase, apiKey, clientId, sopType: "linkedin_biweekly", systemPrompt, userMessage, periodStart, periodEnd,
+Koppel bevindingen terug aan de maandanalyse.`,
   });
-  result.output = sanitizeOutput(result.output);
+
+  const result: AnalysisResult = {
+    clientId, sopType: "linkedin_biweekly", analysisDate: today(), periodStart, periodEnd,
+    model: step4.model,
+    tokensUsed: step1.tokensUsed + step2.tokensUsed + step3.tokensUsed + step4.tokensUsed,
+    output: sanitizeOutput(`## Stap 1: Account Performance
+
+${step1.output}
+
+---
+
+## Stap 2: Campagne Performance
+
+${step2.output}
+
+---
+
+## Stap 3: Creative Performance
+
+${step3.output}
+
+---
+
+## Stap 4: Bidding & Pacing
+
+${step4.output}`),
+    saved: step1.saved && step2.saved && step3.saved && step4.saved,
+    latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs + step4.latencyMs,
+    retries: step1.retries + step2.retries + step3.retries + step4.retries,
+  };
+  await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
     supabase, apiKey, clientId, sopType: "linkedin_biweekly",
