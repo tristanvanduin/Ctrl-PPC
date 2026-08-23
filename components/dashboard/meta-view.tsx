@@ -89,34 +89,22 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         ) : undefined}
       />
 
-      <ChannelHealthBadge clientId={clientId} channel="meta" />
-
-      {/* DE OPENER (17.38, eerste kanaal na Google): "moeten we dit op andere pagina's
-          voortzetten?" -- "ja". Zelfde patroon als Google's opener (17.34-17.37): donut + ranglijst
-          links, kaart alleen rechts, gedeelde geo-state via useGeoBreakdown(). Bewust NIET pacing/
-          KPI's erbij -- die zitten hier, anders dan bij Google, in één gedeeld component
-          (ChannelPerformance) dat ook LinkedIn's weergave voedt. Dat uit elkaar trekken is een
-          grotere ingreep die LinkedIn meteen meeraakt; de eigenaar koos expliciet voor "alleen
-          kaart + donuts in de hero" en ChannelPerformance ongewijzigd laten.
+      {/* DE OPENER (23 augustus 2026, teruggezet naar 50/50): Account Health naast de wereldkaart,
+          zelfde indeling als Google's hero (zie google-view.tsx). Health + donut links, kaart +
+          ranglijst rechts -- geen standalone Health meer los erboven.
 
           BreakdownDonuts is Meta's eigen equivalent van CampaignTypeSplit: spend/conversies per
-          plaatsing, platform of device (tabs), altijd gevuld zodra er breakdown-data is -- geen
-          kanaalspecifieke leegte zoals PmaxNetworkSplit bij Google had.
-
-          groep="levering": alleen plaatsing/platform/device, dus "waar komt het vandaan" zoals
-          deze hero zelf beantwoordt (zie de toelichting bovenaan dit bestand). Leeftijd en gender
-          zijn wie-vragen en staan sinds 23 augustus op Campagnes onder "Doelgroepsignalen" --
-          zelfde component, ander dimensiefilter, zie lib/analysis/breakdown-dimensions.ts. */}
-      {/* items-start: zonder deze guard rekt Grid's default stretch-gedrag de kortste kolom uit tot
-          de hoogte van de langste (hier meestal de kaart) en blijft er een leeg vlak onderin de
-          andere kolom staan -- exact het patroon dat Google's hero-grid al bewust vermijdt. */}
-      <div className="hero-rij grid grid-cols-1 gap-4 items-start xl:grid-cols-12">
-        <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
+          plaatsing, platform of device (tabs), altijd gevuld zodra er breakdown-data is.
+          groep="levering": alleen plaatsing/platform/device, dus "waar komt het vandaan". Leeftijd
+          en gender staan op Campagnes onder "Doelgroepsignalen" (groep="doelgroep"). */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="min-w-0 flex flex-col gap-4">
+          <ChannelHealthBadge clientId={clientId} channel="meta" />
           <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
-          <GeoRanglijstCard state={geo} />
         </div>
-        <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
+        <div className="min-w-0 flex flex-col gap-4">
           <GeoMapCard state={geo} channel="meta" />
+          <GeoRanglijstCard state={geo} />
         </div>
       </div>
 

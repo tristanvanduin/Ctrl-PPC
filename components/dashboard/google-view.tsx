@@ -134,9 +134,7 @@ export function GoogleView({
         }
       />
 
-      {/* Standalone, boven de opener -- zelfde positie als ChannelHealthBadge bij Meta/LinkedIn.
-          Beide renderen dezelfde HealthBadgeView; alleen de databron verschilt. */}
-      <HealthBadge clientId={clientId} />
+      {geoClone && <HealthBadge clientId={clientId} />}
 
       {geoClone ? (
         // Beurs gekozen: her-geaggregeerd beursoverzicht (uit campagnedata) i.p.v. de
@@ -174,27 +172,20 @@ export function GoogleView({
             </div>
           )}
 
-          {/* DE OPENER, uniform met Meta/LinkedIn (22 augustus 2026, feedback: "alle kanalen
-              moeten een zelfde layout hebben... niet alleen in overzicht, maar ook bij alle
-              andere categorieën en sub tabs"). Was een eigen 2x2-wireframe (Health/Pacing/donut/
-              lijn | kaart/ranglijst/staven, xl:grid-cols-2) -- Meta en LinkedIn's opener is
-              donut+ranglijst (5 kolommen) naast alleen de kaart (7 kolommen), op
-              xl:grid-cols-12, met Pacing/KPI's/grafiek/tabel in een gedeelde sectie erONDER
-              (ChannelPerformance). Google's Account Health stond bovendien IN de linkerkolom
-              i.p.v. los erboven (nu gefixt, zie hierboven).
-
-              Zelfde bouwstenen als eerst (CampaignTypeSplit i.p.v. Meta's BreakdownDonuts --
-              "misschien andere elementen, maar structuur exact hetzelfde"), nu in dezelfde
-              5/7-verdeling en dezelfde volgorde. Pacing en de twee maandtrend-grafieken
-              verhuizen naar de Maandprestaties-sectie eronder, naast de bestaande week-/
-              maandvisualisatie -- zelfde plek als bij Meta/LinkedIn, waar dat ook allemaal in
-              één sectie zit. */}
-          <div className="hero-rij grid grid-cols-1 gap-4 items-start xl:grid-cols-12">
-            <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
+          {/* DE OPENER (23 augustus 2026, teruggezet): 50/50, Account Health naast de wereldkaart --
+              expliciete correctie op de eerdere 5/7-donut/kaart-indeling van vandaag, die de kaart
+              te ver van Account Health had gezet. Zelfde 2-koloms opbouw als de oorspronkelijke
+              Google-opener: links Health + Pacing + campagnetype-donut + CPA-lijn, rechts de kaart +
+              ranglijst + maandstaven. Meta en LinkedIn krijgen dezelfde 50/50-indeling (health naast
+              kaart), zie meta-view.tsx/linkedin-view.tsx. */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="min-w-0 flex flex-col gap-4">
+              <HealthBadge clientId={clientId} />
+              <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
               <CampaignTypeSplit clientId={clientId} />
-              <GeoRanglijstCard state={geo} />
+              <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
             </div>
-            <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
+            <div className="min-w-0 flex flex-col gap-4">
               {/* De land×kanaal-matrix alleen bij meerdere kanalen. Met één kanaal is het een
                   landentabel met één kolom -- dat is precies wat de kaart al toont, en de matrix
                   zou een "kanaalmix" beloven die niet bestaat. */}
@@ -202,6 +193,8 @@ export function GoogleView({
                 state={geo}
                 verdieping={meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : undefined}
               />
+              <GeoRanglijstCard state={geo} />
+              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
             </div>
           </div>
 
@@ -212,13 +205,10 @@ export function GoogleView({
               + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
             }
             bijschrift={beursAs
-              ? `Kerncijfers, pacing en hoeveel weken we van ${edition!.eventName} zijn`
-              : "Kerncijfers, pacing en het maandverloop"}
+              ? `Per week: hoeveel weken zijn we van ${edition!.eventName} en lopen we op schema?`
+              : "Per maand: waar staan we en wat is de trend?"}
             actie={edition && <TijdasKeuze value={tijdas} onChange={onTijdasChange} />}
           >
-            <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
-            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
-            <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
             {beursAs
               ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} />
               : <MonthlyOverview clientId={clientId} countryFilter={countryFilter} />}

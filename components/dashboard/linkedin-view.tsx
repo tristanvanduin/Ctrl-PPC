@@ -73,32 +73,21 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         ) : undefined}
       />
 
-      <ChannelHealthBadge clientId={clientId} channel="linkedin" />
-
-      {/* DE OPENER (17.39, derde kanaal): zelfde patroon als Google (17.34-17.37) en Meta
-          (17.38) -- BreakdownDonuts + ranglijst links, kaart alleen rechts, gedeelde geo-state
-          via useGeoBreakdown().
-
-          groep="levering" (23 augustus 2026): LinkedIn heeft geen leveringsdimensie zoals Meta's
-          plaatsing/platform/device -- functie/senioriteit/industrie/bedrijfsgrootte zijn zelf
-          allemaal wie-vragen, en die staan sinds vandaag op Campagnes onder "Doelgroepsignalen"
-          (zie LinkedInCampagnes hieronder). BreakdownDonuts rendert hier dus niets voor LinkedIn;
-          dat is de bewuste consequentie van de scheiding en geen ontbrekende data. De hero blijft
-          met alleen de ranglijst en de kaart staan, precies zoals de kaart er ook staat als een
-          van de twee leeg is (zie BreakdownDonuts' eigen "niets tonen"-afvang).
-
-          Ook hier bewust geen pacing/KPI's in de hero: die zitten in ChannelPerformance, dat
-          Meta en LinkedIn delen (zie 17.38's toelichting). */}
-      {/* items-start: zelfde reden als meta-view.tsx -- zonder deze guard rekt Grid's default
-          stretch-gedrag de kortste kolom uit tot de hoogte van de langste en blijft er een leeg
-          vlak staan. */}
-      <div className="hero-rij grid grid-cols-1 gap-4 items-start xl:grid-cols-12">
-        <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
+      {/* DE OPENER (23 augustus 2026, teruggezet naar 50/50): Account Health naast de wereldkaart,
+          zelfde indeling als Google en Meta (zie google-view.tsx). LinkedIn heeft geen
+          leveringsdimensie zoals Meta's plaatsing/platform/device -- functie/senioriteit/industrie/
+          bedrijfsgrootte zijn zelf allemaal wie-vragen en staan op Campagnes onder
+          "Doelgroepsignalen" (groep="doelgroep"). BreakdownDonuts rendert hier dus niets voor
+          LinkedIn (groep="levering" heeft geen dimensies); de linkerkolom toont dan alleen Account
+          Health, zelfde "niets tonen zonder data"-afvang als overal elders. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="min-w-0 flex flex-col gap-4">
+          <ChannelHealthBadge clientId={clientId} channel="linkedin" />
           <BreakdownDonuts clientId={clientId} channel="linkedin" groep="levering" />
-          <GeoRanglijstCard state={geo} />
         </div>
-        <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
+        <div className="min-w-0 flex flex-col gap-4">
           <GeoMapCard state={geo} channel="linkedin" />
+          <GeoRanglijstCard state={geo} />
         </div>
       </div>
 
