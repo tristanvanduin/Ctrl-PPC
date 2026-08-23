@@ -38,7 +38,13 @@ const STRAAL = 72;
 // te bevatten, zodat de browser er layoutruimte voor reserveert net als voor de rest van de SVG.
 const LABEL_MARGE = 55;
 const BREEDTE = ZIJDE + LABEL_MARGE * 2;
-const MAX_BREEDTE_PX = Math.round(240 * (BREEDTE / ZIJDE));
+// De radar blijft op 360px (240 tekengebied-eenheden x BREEDTE/ZIJDE = 1,5). Hij is even 450px
+// geweest om de kaart hoger te maken; dat is teruggedraaid toen Account Health naast de radar ook
+// de score-uitsplitsing kreeg. In die rij-indeling is elke pixel die de radar extra pakt een
+// pixel minder voor de tekst ernaast, en de tekst heeft hem harder nodig -- bij 450px hield de
+// uitsplitsing in een hero-kolom nog 135px over, en dat is precies hoe de botsing van 17.114
+// eruitzag. De maat staat als letterlijke klasse in de bron: Tailwind leest statisch, dus
+// `max-w-[${x}px]` levert geen regel CSS op.
 
 export function HealthRadar({
   factoren,
@@ -58,8 +64,7 @@ export function HealthRadar({
     <figure className="m-0">
       <svg
         viewBox={`-${LABEL_MARGE} 0 ${BREEDTE} ${ZIJDE}`}
-        className="w-full mx-auto overflow-visible"
-        style={{ maxWidth: `${MAX_BREEDTE_PX}px` }}
+        className="w-full mx-auto overflow-visible max-w-[360px]"
         role="img"
         aria-labelledby={`${id}-titel`}
       >

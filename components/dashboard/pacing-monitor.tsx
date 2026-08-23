@@ -20,18 +20,33 @@ function num(v: number): string {
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(v);
 }
 
-function PacingRing({ pct, color, size = 44 }: { pct: number; color: string; size?: number }) {
-  const r = (size - 6) / 2;
+// 23 augustus 2026: van 44 naar 72px. Twee redenen, en de tweede is de belangrijkste.
+//
+// (1) Leesbaarheid. Het percentage stond in een ring van 44px in `text-micro` -- op een
+//     1920px-scherm is dat een cijfer van een paar millimeter, terwijl het de eerste vraag van
+//     deze kaart beantwoordt ("lopen we op schema"). De eigenaar wees er zelf op: "dan worden die
+//     kleine donuts wat groter en leesbaarder".
+//
+// (2) Hoogte. Deze kaart deelt een rasterrij met de campagnetype-donut en was daarvan de laagste
+//     (270px tegen 364px). Dat verschil werd opgevangen door de zes blokken uit elkaar te
+//     trekken. Grotere ringen vullen dezelfde ruimte met inhoud in plaats van met lucht -- dat is
+//     de regel die de eigenaar eerder gaf: "of je maakt een sectie langer, of je voegt iets
+//     extras toe".
+//
+// De ringdikte schaalt mee (5 op 44 werd optisch dun op 128); de verhouding blijft gelijk.
+function PacingRing({ pct, color, size = 128 }: { pct: number; color: string; size?: number }) {
+  const dikte = Math.max(5, Math.round(size / 9));
+  const r = (size - dikte - 1) / 2;
   const circ = 2 * Math.PI * r;
   const filled = Math.min(pct / 100, 1) * circ;
 
   return (
     <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E1E5F2" strokeWidth="5" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E1E5F2" strokeWidth={dikte} />
       <circle
         cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke={color}
-        strokeWidth="5"
+        strokeWidth={dikte}
         strokeLinecap="round"
         strokeDasharray={`${filled} ${circ}`}
       />
@@ -142,29 +157,39 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
           De landing stond eerst onder een scheidingslijn. Dat gebruikte 40% van de breedte en liet
           de rest leeg -- hetzelfde gat als elders, alleen binnen een kaart.
 
-          @2xl en niet lg: op een breedte waar zes blokken niet passen vallen ze terug op twee
-          kolommen. lg: kijkt naar het venster en ziet die kaartbreedte niet.
+          @6xl en niet lg: op een breedte waar zes blokken niet passen vallen ze terug op twee
+          kolommen. lg: kijkt naar het venster en ziet die kaartbreedte niet. De grens stond op
+          @2xl (672px); daar sloeg de kaart al bij een hero-kolom van 784px om naar drie kolommen
+          en werd hij 276px hoog naast een donut-kaart van 364px. Op @6xl (1152px) blijft het bij
+          twee kolommen van drie, en dat is precies de hoogte die de rij toch al vraagt -- de
+          blokken worden er breder van in plaats van dat de kaart lucht krijgt.
+
+          @7xl en niet @5xl voor de eenrijige variant: op 1024px kaartbreedte werden het zes smalle
+          kolommen op EEN rij, en dan is de kaart 203px hoog naast een donut-kaart van 364px --
+          161px die als lucht tussen de blokken landde. Op 1280px is er ook echt ruimte voor zes
+          kolommen naast elkaar; daaronder blijven het twee rijen van drie, en dat is precies de
+          hoogte die de rij vraagt.
 
           Vijf kolommen i.p.v. zes zonder "volgens prognose" (geen seizoensmodel voor dit account):
           met een vaste zes-koloms grid en maar vijf blokken bleef de laatste kolom leeg -- geen
           witruimte maar een gat, precies waar de eigen comment hierboven al voor waarschuwt. */}
-      <div className={`grid flex-1 grid-cols-2 items-stretch gap-4 @2xl:grid-cols-3 ${
-        convLanding.volgensPrognose !== null ? "@5xl:grid-cols-6" : "@5xl:grid-cols-5"
+      <div className={`grid flex-1 grid-cols-2 items-stretch gap-4 @6xl:grid-cols-3 ${
+        convLanding.volgensPrognose !== null ? "@7xl:grid-cols-6" : "@7xl:grid-cols-5"
       }`}>
         {/* Conversions pacing */}
         <div className="flex items-center justify-center gap-3">
           <div className="relative">
             <PacingRing pct={convPacingPct} color={convColor} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-micro font-bold" style={{ color: convColor }}>
+              <span className="text-figure font-bold leading-none tabular-nums" style={{ color: convColor }}>
                 {Math.round(convPacingPct)}%
               </span>
             </div>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-brand-gray">Conversies</p>
-            <p className="text-micro text-muted-foreground">{num(conv.ytdRealized)} / {num(conv.annualTarget)}</p>
-            <p className="text-micro font-medium" style={{ color: convColor }}>{convStatus}</p>
+            <p className="text-title font-semibold text-brand-gray">Conversies</p>
+            <p className="text-body text-muted-foreground">{num(conv.ytdRealized)} / {num(conv.annualTarget)}</p>
+            <p className="text-body font-semibold" style={{ color: convColor }}>{convStatus}</p>
           </div>
         </div>
 
@@ -173,15 +198,15 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
           <div className="relative">
             <PacingRing pct={spendPacingPct} color={spendColor} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-micro font-bold" style={{ color: spendColor }}>
+              <span className="text-figure font-bold leading-none tabular-nums" style={{ color: spendColor }}>
                 {Math.round(spendPacingPct)}%
               </span>
             </div>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-brand-gray">Budget</p>
-            <p className="text-micro text-muted-foreground">{fmt(spend.ytdRealized)} / {fmt(spend.annualTarget)}</p>
-            <p className="text-micro font-medium" style={{ color: spendColor }}>{spendStatus}</p>
+            <p className="text-title font-semibold text-brand-gray">Budget</p>
+            <p className="text-body text-muted-foreground">{fmt(spend.ytdRealized)} / {fmt(spend.annualTarget)}</p>
+            <p className="text-body font-semibold" style={{ color: spendColor }}>{spendStatus}</p>
           </div>
         </div>
 
@@ -192,7 +217,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Tempo conversies</p>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-brand-gray">{num(dailyConvRate)}</span>
+            <span className="text-figure font-bold leading-none text-brand-gray">{num(dailyConvRate)}</span>
             <span className="text-micro text-muted-foreground">/dag</span>
           </div>
           {convNeededPerDay > 0 && (
@@ -212,7 +237,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Tempo spend</p>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-brand-gray">{fmt(dailySpendRate)}</span>
+            <span className="text-figure font-bold leading-none text-brand-gray">{fmt(dailySpendRate)}</span>
             <span className="text-micro text-muted-foreground">/dag</span>
           </div>
           {spendNeededPerDay > 0 && (
@@ -241,7 +266,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             <Flag className="w-3.5 h-3.5 text-muted-foreground" />
             <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Op dit tempo</p>
           </div>
-          <span className="text-lg font-bold text-brand-gray">{num(convLanding.opTempo)}</span>
+          <span className="text-figure font-bold leading-none text-brand-gray">{num(convLanding.opTempo)}</span>
           {convLanding.deelVanDoel !== null && (
             <p className="text-micro mt-1 text-muted-foreground">
               {Math.round(convLanding.deelVanDoel * 100)}% van geschat jaardoel
@@ -255,7 +280,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
               <Target className="w-3.5 h-3.5 text-muted-foreground" />
               <p className="text-micro font-semibold text-muted-foreground uppercase tracking-wider">Volgens prognose</p>
             </div>
-            <span className="text-lg font-bold text-brand-gray">{num(convLanding.volgensPrognose)}</span>
+            <span className="text-figure font-bold leading-none text-brand-gray">{num(convLanding.volgensPrognose)}</span>
             <p className="text-micro mt-1 text-muted-foreground">seizoen meegerekend</p>
           </div>
         )}

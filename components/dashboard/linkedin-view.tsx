@@ -97,19 +97,25 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           de 1084px rechterkolom leeg (62%). Met de ranglijst rechts EN de donut nu gevuld staan de
           kolommen weer in verhouding -- de 307px die na alleen de verhuizing overbleef was juist
           het gat dat deze lege donut achterliet. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
-        <ChannelHealthBadge clientId={clientId} channel="linkedin" />
-        <GeoMapCard state={geo} channel="linkedin" verdieping={<GeoRanglijstInKaart state={geo} />} />
+      {/* Zelfde asymmetrische opzet als Google (zie google-view.tsx voor de volledige redenering):
+          twee KOLOMMEN met elk één aangewezen opvanger, en pas vanaf 1800px twee kolommen. */}
+      <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+        <div className="flex flex-col gap-4">
+          <ChannelHealthBadge clientId={clientId} channel="linkedin" />
+          <div className="flex flex-1 flex-col">
+            <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
+          </div>
+        </div>
+        <div className="flex flex-1 flex-col">
+          <GeoMapCard state={geo} channel="linkedin" verdieping={<GeoRanglijstInKaart state={geo} />} />
+        </div>
       </div>
 
       {/* Wat eerst als derde kaart in een hero-kolom stond. Raster van gelijke cellen i.p.v. twee
           onafhankelijke kolommen -- zie meta-view.tsx voor de redenering. LinkedIn heeft hier maar
           twee kaarten: alleen MEMBER_JOB_FUNCTION heeft demografiedata (nagemeten in
           linkedin_demographic_daily), dus een tweede doelgroep-donut zou leeg zijn. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
-        <GeoRanglijstCard state={geo} zonderBalken />
-      </div>
+      <GeoRanglijstCard state={geo} zonderBalken />
 
       {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
       <Sectie

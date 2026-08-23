@@ -225,10 +225,10 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
 
   return (
     <div
-      // `flex h-full flex-col` met het ring+rasterblok als `flex-1`: deze kaart staat op Meta naast
-      // "Conversies per land" en is niet altijd de hoogste van de twee. Zonder dit zakte het
-      // verschil naar de onderrand als wit.
-      className="bg-card flex h-full flex-col rounded-xl border border-border shadow-sm overflow-hidden transition-opacity duration-200"
+      // `flex flex-col` met het ring+rasterblok als `flex-1`: deze kaart staat op Meta naast
+      // "Conversies per land" en is niet altijd de hoogste van de twee. Geen `h-full`: als
+      // directe rastercel rekt hij al vanzelf naar de rijhoogte.
+      className="bg-card flex flex-col rounded-xl border border-border shadow-sm overflow-hidden transition-opacity duration-200"
       style={{ opacity: ververst ? 0.55 : 1 }}
       aria-busy={ververst}
     >

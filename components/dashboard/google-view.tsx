@@ -178,55 +178,81 @@ export function GoogleView({
               Google-opener: links Health + Pacing + campagnetype-donut + CPA-lijn, rechts de kaart +
               ranglijst + maandstaven. Meta en LinkedIn krijgen dezelfde 50/50-indeling (health naast
               kaart), zie meta-view.tsx/linkedin-view.tsx. */}
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
-            {/* PACING ONDER HEALTH, IN DEZELFDE CEL. Account Health vult zijn cel niet: de radar
-                plus de score-uitsplitsing eindigt ruim boven de onderrand, en de cel rekt mee met
-                de kaartcel ernaast. Dat gat is met echte data gevuld i.p.v. met rek -- pacing hoort
-                er inhoudelijk ook bij ("hoe sta ik ervoor" naast "hoe gezond is het account"). */}
-            <HealthBadge clientId={clientId} />
-            {/* De landenranglijst hangt in de kaart (GeoRanglijstInKaart): gemeten is Health
-                638px en de kale kaart 437px, en die balken vullen dat gat met inhoud die er
-                inhoudelijk hoort. De land×kanaal-matrix alleen bij meerdere kanalen -- met één
-                kanaal is het een landentabel met één kolom, precies wat de kaart al toont. */}
-            <GeoMapCard
-              state={geo}
-              verdieping={
-                <>
-                  <GeoRanglijstInKaart state={geo} />
-                  {meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : null}
-                </>
-              }
-            />
-            {/* TWEEDE RIJ VAN DE HERO. Als losse cellen en niet als twee kolom-divs: rastercellen
-                in dezelfde RIJ rekken naar dezelfde hoogte, dus elke rij lijnt apart uit. Twee
-                lange kolommen daarentegen komen alleen bij toeval gelijk uit -- dat was het
-                probleem in 17.114/17.115.
+          {/* ASYMMETRISCHE HERO: Account Health naast de wereldkaart, Pacing eronder door.
 
-                Pacing vult het gat onder Account Health (de radar plus score-uitsplitsing eindigt
-                ruim boven de onderrand) en hoort er inhoudelijk bij: "hoe sta ik ervoor" naast
-                "hoe gezond is het". De campagnetype-ringen ernaast beantwoorden "waar gaat het
-                geld heen", wat aansluit op de kaart erboven. */}
-            <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+              Wat er mis was met losse rastercellen (Health naast kaart, Pacing naast donut):
+              cellen in dezelfde rij worden even hoog. De wereldkaart is inhoudelijk hoger dan
+              Account Health, dus werd Health tot diens hoogte opgerekt -- een halflege kaart, hoe
+              je de resthoogte binnenin ook verdeelt.
+
+              Wat er mis was met Health over de volle breedte: dan is hij "te breed uitgestrekt" --
+              drie stukken over 1580px is geen dichte strook meer maar een dunne band.
+
+              Dit is de derde vorm, en de enige die allebei vermijdt. Twee KOLOMMEN met elk precies
+              één aangewezen opvanger (`flex-1` om de kaart heen, de kaart zelf `h-full`). De
+              kolommen zijn even hoog, de verdeling erbinnen niet: links houdt Account Health zijn
+              eigen hoogte en pakt Pacing alles wat overblijft, rechts houdt de donut zijn hoogte en
+              pakt de wereldkaart de rest. Pacing loopt daardoor van onder Health tot onderaan de
+              kolom -- langs de onderkant van de kaart en langs de donut ernaast.
+
+              Dat Pacing de opvanger is en niet Health, is geen willekeur: zes blokken met een ring
+              en een percentage worden leesbaarder van hoogte. Een radar en een score-uitsplitsing
+              worden dat niet -- die worden alleen maar verder uit elkaar getrokken.
+
+              EN WAAROM DE GRENS OP 1800px LIGT EN NIET OP `xl` (1280px). Account Health zet zijn
+              drie stukken pas naast elkaar vanaf 672px KAARTBREEDTE; daaronder staat hij gestapeld
+              en is hij 625 tot 652px hoog in plaats van ~330px. Een hero-kolom haalt die 672px pas
+              bij een venster van 1792px, en dat is nagemeten en niet gerekend. Twee dingen
+              zitten in die som die je makkelijk vergeet: een container-query meet de CONTENT-box,
+              dus de `p-5` van de kaart (2x20px) telt niet mee -- de kaart moet 712px breed zijn om
+              672px container te hebben. En de kolom is (venster - 256 zijbalk - 48 pagina-padding
+              - 48 main-padding - 16 tussenruimte) / 2. Op een venster van 1700px is de kaart 674px
+              en stond Health dus nog gestapeld, precies wat deze grens moest voorkomen. Tussen 1280 en 1800 stond Health dus gestapeld naast
+              een wereldkaart die door de smalle kolom juist LAGER werd -- 652 tegen 635, en dan
+              1086 tegen 635 zodra Pacing eronder kwam: een gat van 400px in de kaart. Onder 1800px
+              is de hero daarom één kolom: elke kaart op zijn natuurlijke hoogte, en dan valt er per
+              definitie niets te overbruggen. */}
+          <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+            <div className="flex flex-col gap-4">
+              <HealthBadge clientId={clientId} />
+              <div className="flex flex-1 flex-col">
+                <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {/* De opvanger van de rechterkolom, voor het geval links de hoogste is (smalle
+                  schermen, waar Account Health gestapeld staat). De landenranglijst hangt in deze
+                  kaart: die balken horen bij de projectie en vullen hem met inhoud. De
+                  land x kanaal-matrix alleen bij meerdere kanalen -- met één kanaal is het een
+                  landentabel met één kolom, precies wat de kaart al toont. */}
+              <div className="flex flex-1 flex-col">
+                <GeoMapCard
+                  state={geo}
+                  verdieping={
+                    <>
+                      <GeoRanglijstInKaart state={geo} />
+                      {meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : null}
+                    </>
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* DRIE GRAFIEKKAARTEN OP EEN RIJ. Alle drie tonen een verdeling of een verloop, en dat
+              is precies waarom ze samen een rij kunnen zijn zonder dat er iets uitgerekt hoeft te
+              worden: een lijn en een staafreeks WORDEN beter van meer hoogte (hun grafiekvlak is
+              `flex-1`), dus als de donut ernaast hoger uitvalt, vullen ze dat met een grotere
+              grafiek in plaats van met wit. Bij een tegelkaart of een tekstblok kan dat niet, en
+              dat is het verschil tussen "opvullen" en "uitrekken". */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+            <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
             <CampaignTypeSplit clientId={clientId} />
           </div>
 
-          {/* Wat eerst als tweede t/m vierde kaart in de hero-kolommen stond. Raster van gelijke
-              cellen i.p.v. twee onafhankelijke kolommen: cellen in dezelfde rij rekken naar dezelfde
-              hoogte, dus geen scheve onderrand meer. */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Pacing stond hier; die is naar de hero verhuisd (zie hierboven). De CPA-lijn neemt
-                zijn plek in, zodat de bovenste rij vol blijft. */}
-            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
-            <GeoRanglijstCard state={geo} zonderBalken />
-            {/* Drie kaarten in DRIE kolommen liet de derde cel van de bovenste rij leeg -- op
-                1600px een wit vlak van een halve schermbreedte naast "Conversies per land".
-                Twee kolommen vult die rij precies, en de maandstaven eronder over de volle
-                breedte: een staafgrafiek per maand wint bij extra breedte, dus dat is geen
-                opvulling maar de betere plek voor juist deze kaart. */}
-            <div className="lg:col-span-2">
-              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} />
-            </div>
-          </div>
+          <GeoRanglijstCard state={geo} zonderBalken />
 
           <Sectie
             icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}

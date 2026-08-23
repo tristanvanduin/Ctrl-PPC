@@ -91,7 +91,7 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
           // is precies wat de eigenaar zag. Een raster kan dat niet oplossen: de rij wordt zo hoog
           // als zijn hoogste cel, en die cel groeide onbegrensd.
           //
-          // De cap staat op de eigen tekengrootte van de kaart (760px). Daarboven werd er alleen
+          // De cap staat op de eigen tekengrootte van de projectie (760px). Daarboven werd er alleen
           // opgeschaald: geen enkel land wordt zichtbaarder van een projectie van 1200px breed, de
           // kaart werd alleen groter. Hij centreert nu binnen de kolom en houdt op met groeien.
           <MapErrorBoundary>

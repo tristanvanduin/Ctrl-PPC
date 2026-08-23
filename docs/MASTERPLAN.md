@@ -8202,3 +8202,83 @@ een rastercel duwt daar alles wat erna komt de kaart uit. Voor 17px is dat risic
 raster. De controle die dit had moeten vangen bestond niet; hij bestaat nu als de tabel hierboven
 — natuurlijke hoogte per kaart, over minstens vier breedtes, vóór er iets over balans wordt
 beweerd.
+
+### 17.118 De asymmetrische hero: waarom gelijke rastercellen hier het probleem waren (23 augustus 2026)
+
+Vier rondes terugmelding op één scherm, en ze wezen alle vier naar hetzelfde: "voelt of de health
+score extreem opgerekt is", "te gestrecht en te wit", "de manier hoe dit gebouwd is geeft veel te
+veel witruimte", en uiteindelijk de richting die het oploste — "dat pacing hoger is dan de donut
+sectie... op die manier asymetrisch".
+
+**De denkfout die ik drie keer heb herhaald.** Ik bleef de hero bouwen als losse rastercellen:
+Health naast de kaart, Pacing naast de donut. Cellen in dezelfde rij worden even hoog. De
+wereldkaart is inhoudelijk hoger dan Account Health, dus werd Health tot diens hoogte opgerekt —
+en toen ik dat verschil binnen de kaart ging verdelen (`content-between` op de factorenlijst)
+loste dat de meting op en niet het probleem: de vijf regels stonden 40px uit elkaar en de kaart
+las nog steeds als half leeg. Een kaart die 330px inhoud heeft, hoort geen 760px hoog te zijn.
+
+**Wat het wél is.** Twee KOLOMMEN met per kolom precies één aangewezen opvanger (`flex-1` om de
+kaart, de kaart zelf `h-full`). De kolommen zijn even hoog — daar sluit het raster op — maar de
+verdeling erbínnen hoeft niet gelijk te zijn. Links houdt Account Health zijn eigen hoogte en
+pakt Pacing wat overblijft; rechts staat de wereldkaart. Pacing loopt daardoor van onder Health
+tot onderaan de kolom, langs de onderkant van de kaart.
+
+Dat Pacing de opvanger is, is geen willekeur en dat is de hele regel: **zes blokken met een ring
+en een percentage worden leesbaarder van hoogte, een radar en een score-uitsplitsing niet.** Die
+laatste worden alleen maar verder uit elkaar getrokken. Elke kaart die hier hoogte opvangt is er
+één waarvan de inhoud er beter van wordt — een lijngrafiek, een staafgrafiek, een projectie die
+centreert. Een tegelkaart of een tekstblok nooit.
+
+Dit is niet dezelfde constructie als de kolommen uit 17.114, die "alleen bij toeval gelijk
+uitkwamen". Dáár had geen enkele kaart in de kolom de opdracht om de rest op te vangen, dus zakte
+het verschil naar de onderrand van de kolom. Precies één opvanger per kolom is het verschil.
+
+**Account Health moest dicht worden, en daar zat een meetfout in.** De kaart zet zijn drie stukken
+(scorering, radar, uitsplitsing) naast elkaar vanaf `@2xl` = 672px CONTAINER-breedte. Een
+container-query meet de content-box, dus de `p-5` van de kaart (2x20px) telt niet mee: de kaart
+moet 712px breed zijn. Een hero-kolom is (venster − 256 zijbalk − 96 padding − 16 tussenruimte)/2
+en haalt die 712px pas bij een venster van 1792px. Op 1700px was de kaart 674px en stond hij dus
+nog gestapeld — nagemeten, want doorgerekend kwam ik op 1650 uit en dat was fout.
+
+Daarom klapt de hero pas op **1800px** naar twee kolommen. Daaronder is het één kolom: elke kaart
+op zijn natuurlijke hoogte, en dan valt er per definitie niets te overbruggen. Tussen 1280 en 1800
+stond Health gestapeld (625–652px) naast een wereldkaart die door de smalle kolom juist LAGER werd
+(635px) — en met Pacing eronder werd dat 1086 tegen 635: een gat van 400px in de kaartkaart.
+
+**Gemeten resultaat, natuurlijke hoogtes per kaart:**
+
+| venster | Account Health | Pacing | + tussenruimte | wereldkaart | verschil |
+|---|---|---|---|---|---|
+| 1800 | 345 | 418 | 779 | 745 | 34 (kaart vangt op) |
+| 1920 | 331 | 418 | 765 | **765** | **0** |
+| 2200 | 274 | 418 | 708 | 763 | 55 (Pacing vangt op) |
+| 2560 | 274 | 418 | 708 | 763 | 55 (Pacing vangt op) |
+
+Onder 1800px: één kolom, elke kaart natuurlijk, verschil per definitie nul.
+
+**Wat er verder veranderde.**
+
+- De pacing-ringen van 44 naar **128px**, het percentage van `text-micro` (10px) naar `text-figure`
+  (30px), en de vier tempo-getallen van 18 naar 30px. Dat is de andere helft van de vraag ("maak
+  de circles groter... we moeten de ruimte slimmer gebruiken"): de hoogte die Pacing opvangt gaat
+  nu in leesbaarheid zitten in plaats van in lucht. Het zesblokkenraster blijft twee kolommen van
+  drie tot `@6xl`; op `@2xl` sloeg het al bij een kolom van 784px om naar drie kolommen en werd de
+  kaart 276px hoog naast een donut van 364px.
+- Onder de hero staan nu **drie grafiekkaarten op een rij** (CPA per maand, Conversies per maand,
+  Spend per campagnetype) — de eigenaar: "daaronder 3 losse cards met grafieken/diagrammen zou de
+  look afmaken". Dat kán als rij omdat een lijn en een staafreeks hun grafiekvlak op `flex-1`
+  hebben: valt de donut ernaast hoger uit, dan vullen ze dat met een grotere grafiek.
+- De wereldkaart-SVG is gecapt op zijn eigen tekengrootte (760px). Hij stond op `w-full h-auto`
+  met een viewBox van 760x380 en groeide dus lineair mee met de kolombreedte — als enige kaart op
+  het scherm, want alle andere zijn inhoudsgestuurd.
+- `h-full` is weggehaald bij `geo-ranglijst-card`, `monthly-trend-line` en `breakdown-donuts`. Als
+  directe rastercel rekt een kaart al vanzelf naar de rijhoogte; in een flex-KOLOM doet `h-full`
+  wél iets, en precies het verkeerde: dan rekt élke kaart mee en heeft de aangewezen opvanger
+  niets meer op te vangen. Dat was meetbaar: Pacing bleef op 358px staan terwijl de kaarten eronder
+  van 277 naar 325 en van 189 naar 348 groeiden.
+- Meta en LinkedIn kregen dezelfde opzet, met `BreakdownDonuts` als opvanger links.
+
+**Wat blijft staan.** De vier Jaaroverzicht-tegels houden 17 tot 33px onder hun laatste regel,
+omdat ROAS één regel meer heeft dan de andere drie. Dat zijn `Kerncijfer`-tegels en daar
+waarschuwt AGENTS.md expliciet voor: een `h-full` kind in een rastercel duwt daar alles wat erna
+komt de kaart uit.

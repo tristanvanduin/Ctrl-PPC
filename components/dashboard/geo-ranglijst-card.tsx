@@ -45,10 +45,12 @@ export function GeoRanglijstCard({ state, zonderBalken = false }: { state: GeoBr
   if (laden || eenLandOfMinder || ranked.length === 0) return null;
 
   return (
-    // `flex h-full flex-col` met het cijferblok als `flex-1`: deze kaart deelt op elk kanaal een
-    // rasterrij met een kaart die hoger is (de CPA-lijn op Google, de doelgroepenkaart op Meta).
-    // Zonder dit zakte dat verschil naar de onderrand -- 144 tot 170px wit onder de laatste tegel.
-    <div className="bg-card flex h-full flex-col rounded-xl border border-border shadow-sm overflow-hidden">
+    // `flex flex-col` met het cijferblok als `flex-1`, en met OPZET geen `h-full`. Als directe
+    // rastercel (Meta/LinkedIn) rekt de kaart al vanzelf naar de rijhoogte -- `h-full` voegt daar
+    // niets toe. In een flex-KOLOM (de Google-hero) zou het wél iets doen, en precies het
+    // verkeerde: dan rekt élke kaart in de kolom mee en heeft de aangewezen opvanger niets meer
+    // op te vangen. Zie google-view.tsx voor waarom er per kolom precies één opvanger is.
+    <div className="bg-card flex flex-col rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <ListOrdered className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{metric.label} per {geoWord}</h3>

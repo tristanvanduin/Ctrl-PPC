@@ -51,7 +51,7 @@ export function HealthBadgeView({
     : "#ef4444";
 
   return (
-    <div className="@container flex h-full flex-col bg-card rounded-xl border border-border p-5 shadow-sm">
+    <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
       {/* CONTAINER QUERY, GEEN VIEWPORT-BREEKPUNT -- en dat is de kern van de fix.
           Hier stond `xl:flex-row`. Dat is een VENSTER-breekpunt, terwijl deze kaart in de hero in
           een halfbrede kolom staat. Bij een venster van 1500px is `xl` (1280px) waar, dus zette de
@@ -59,13 +59,21 @@ export function HealthBadgeView({
           "Doelstelling" en "Efficiency 16/20" over elkaar heen, en tekst die om de twee woorden
           afbrak. De kaart wist niet dat hij smal stond; hij keek naar het scherm.
 
-          `@2xl` (672px) meet de KAART zelf: pas als er echt ruimte is voor de cirkel (80px) plus
-          twee tekstkolommen gaan de stukken naast elkaar. In de halfbrede hero blijft het dus
-          netjes onder elkaar, en op een volle-breedte plaatsing (waar deze kaart ook voorkomt)
-          krijgt hij zijn rij-indeling terug.
+          `@4xl` (896px) meet de KAART zelf: pas als er echt ruimte is voor de cirkel (80px), de
+          radar (360px) en twee tekstkolommen gaan de stukken naast elkaar.
+
+          De grens stond eerst op @2xl (672px) en daarna kort op @6xl (1152px). 672 was te laag --
+          bij een kaartbreedte van 700px hield de uitsplitsing nog geen 200px over en werd het weer
+          krap. 1152 was te hoog: bij een venster van 1290px is deze kaart over de volle breedte
+          1010px, en dan stond hij alsnog gestapeld met de radar tussen twee stroken wit. 896px is
+          de breedte waarop de drie stukken écht naast elkaar passen, en die haalt de kaart over de
+          volle breedte op elk scherm vanaf ongeveer 1200px.
+
+          En daarom staat hij ook OVER DE VOLLE BREEDTE en niet meer in een hero-kolom: een
+          halfbrede kolom is op 2560px nog maar 1104px, dus daar zou hij nooit boven de 896 komen.
 
           Zie ook pacing-monitor.tsx, dat @container al gebruikt -- Tailwind v4 heeft het ingebouwd. */}
-      <div className="flex flex-1 flex-col justify-between gap-5 @6xl:flex-row @6xl:flex-wrap @6xl:items-start">
+      <div className="flex flex-col gap-5 @2xl:flex-row @2xl:flex-wrap @2xl:items-start">
         {/* Score circle */}
         <div className="relative w-20 h-20 shrink-0">
           <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
@@ -161,13 +169,14 @@ export function HealthBadgeView({
             kaartbreedte en bleef rechts een leeg vlak over. De kolom groeit nog steeds mee met
             een brede kaart, maar niet verder dan waar de inhoud (twee kolommen `dl`) al op
             uitkomt. */}
-        <div className="flex min-w-0 flex-1 max-w-2xl flex-col gap-4">
-          {/* De rest van de kaart is inhoudsgestuurd; DEZE kolom is de plek waar de kaart zijn
-              hoogte vandaan haalt als de rasterrij hoger uitvalt dan de inhoud. Zonder een
-              expliciete verdeler zakt dat verschil naar de onderkant en leest het als een gat --
-              precies wat de eigenaar op een 1920px-scherm zag. De factorenlijst hieronder krijgt
-              daarom `flex-1` met `content-between`: de vijf regels verdelen de extra hoogte over
-              hun onderlinge ruimte in plaats van hem onderaan te laten staan. */}
+        <div className="@container flex min-w-0 flex-1 max-w-2xl @2xl:max-w-none flex-col gap-4">
+          {/* GEEN opvanger meer voor resthoogte. Die zat hier (`flex-1` + `content-between` op de
+              factorenlijst) toen deze kaart nog een rastercel deelde met de wereldkaart en dus tot
+              diens hoogte werd opgerekt. De regels stonden daardoor 40px uit elkaar en de kaart
+              las als half leeg -- "voelt of de health score extreem opgerekt is". In de
+              asymmetrische hero (zie google-view.tsx) houdt deze kaart zijn eigen hoogte en vangt
+              Pacing eronder het verschil op. Een radar en een score-uitsplitsing worden niet beter
+              van hoogte; zes pacing-blokken wel. */}
           {health.anomalies.length > 0 && (
             <div className="min-w-0">
               <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">
@@ -196,7 +205,7 @@ export function HealthBadgeView({
             </div>
           )}
 
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="min-w-0">
             <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Waaruit de score bestaat
             </p>
@@ -208,7 +217,7 @@ export function HealthBadgeView({
                 factor: naam+score blijven kort en lijnen zelf al uit (justify-between binnen hun
                 eigen regel), de uitleg krijgt een eigen regel eronder en wordt niet meer
                 afgekapt -- geen kolom om uit te lijnen, dus niets meer om uit te lijnen. */}
-            <dl className="grid flex-1 content-between gap-x-5 gap-y-3 @lg:grid-cols-2">
+            <dl className="grid gap-x-5 gap-y-3 @sm:grid-cols-2 @2xl:grid-cols-3">
               {health.factors.map((f) => (
                 <div key={f.name} className="min-w-0">
                   <div className="flex items-baseline justify-between gap-2">
