@@ -12,6 +12,9 @@ import {
 } from "@/lib/progress/server";
 import { logger } from "@/lib/logger";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { laadBeschikbareKanalen, KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
+import { resolveChannelConversionConfig, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
+import { monthlyFromDaily, blendMonthly } from "@/lib/analysis/channel-report-blend";
 
 export const maxDuration = 120;
 
@@ -55,6 +58,18 @@ interface CountrySection {
   metricSections: MetricSection[];
 }
 
+// 23 augustus 2026: het kanaal-equivalent van CountrySection, zelfde vorm. De top-level kpiCards/
+// metricSections werden hiervoor uitsluitend uit ads_account_monthly (Google) opgebouwd en zo aan
+// de klant gepresenteerd als "het account" -- voor de klanten die ook Meta en/of LinkedIn draaien
+// (9 van de 71 op het moment van schrijven) waren die cijfers dus stelselmatig te laag, zonder dat
+// het rapport dat ergens zei. Zie de toelichting bij `meerdereKanalen` verderop.
+interface ChannelSection {
+  channelKey: Kanaal;
+  channelLabel: string;
+  kpiCards: KpiCard[];
+  metricSections: MetricSection[];
+}
+
 interface ReportData {
   title: string;
   reportMonth: string;
@@ -66,6 +81,7 @@ interface ReportData {
   summaryHeadline?: string;
   summarySubtitle?: string;
   countrySections?: CountrySection[];
+  channelSections?: ChannelSection[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -231,12 +247,24 @@ export async function POST(request: NextRequest) {
     const periodEnd = `${lastMonthYear}-${String(lastMonth).padStart(2, "0")}-31`;
     const daysAgo60 = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
+    // 23 augustus 2026: welke kanalen draait deze klant echt? Bepaalt of de rest hieronder
+    // ook meta_account_daily/linkedin_account_daily moet meenemen. Zie de kop van
+    // lib/kanalen/beschikbaar.ts -- 62 van de 71 klanten zijn Google-only, dan verandert er
+    // niets aan het bestaande gedrag.
+    // "as never": zelfde workaround als trigger-sops/route.ts en cross-channel-synthesis/route.ts
+    // al gebruiken -- laadBeschikbareKanalen's structurele parametertype geeft TS bij een volle
+    // SupabaseClient "Type instantiation is excessively deep and possibly infinite", ondanks dat
+    // de vorm wel klopt.
+    const kanalen = await laadBeschikbareKanalen(supabase as never, clientId);
+    const meerdereKanalen = kanalen.length > 1;
+
     // ── Fetch all data ───────────────────────────────────────────
 
     const [
       accountMonthlyRes, isRes,
       sprintItemsRes, completedTasksRes, changeHistoryRes,
       clientCtx, targetResult, latestSopRes, hypothesesRes,
+      metaMonthlyRes, linkedinMonthlyRes, convConfigRes,
     ] = await Promise.all([
       supabase.from("ads_account_monthly").select("*").eq("client_id", clientId).gte("month", thirteenMonthsAgo).lte("month", periodEnd).order("month"),
       supabase.from("ads_campaign_impression_share").select("month, search_impression_share").eq("client_id", clientId).gte("month", thirteenMonthsAgo).lte("month", periodEnd).order("month"),
@@ -247,10 +275,56 @@ export async function POST(request: NextRequest) {
       computeAnalysisTargets(supabase, clientId),
       supabase.from("sop_analysis_output").select("output, sop_type, analysis_date").eq("client_id", clientId).order("analysis_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("sprint_hypotheses").select("hypothesis, expected_result, status, ice_total").eq("client_id", clientId).in("status", ["pending", "accepted", "completed"]).order("ice_total", { ascending: false }).limit(15),
+      kanalen.includes("meta")
+        ? supabase.from("meta_account_daily").select("date, impressions, link_clicks, spend, conversions, leads, conversion_value").eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+      kanalen.includes("linkedin")
+        ? supabase.from("linkedin_account_daily").select("date, impressions, clicks, spend, one_click_leads, external_website_conversions, post_click_conversions, conversion_value").eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+      meerdereKanalen
+        ? supabase.from("client_settings").select("channel_conversion_config").eq("client_id", clientId).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     const accountData = (accountMonthlyRes.data ?? []) as Array<Record<string, unknown>>;
     const isData = (isRes.data ?? []) as Array<Record<string, unknown>>;
+
+    // ── Meta/LinkedIn dagcijfers → maandrijen in dezelfde vorm als ads_account_monthly ──
+    //
+    // Zelfde velden (impressions/clicks/cost/conversions/conversions_value) plus herberekende
+    // ratio's (ctr/avg_cpc/conversion_rate) -- zo werken findMonth()/g()/buildChartData() hieronder
+    // ONGEWIJZIGD op deze rijen, of ze nou van Google, Meta of LinkedIn komen of samengeteld zijn.
+    const convConfig: ChannelConversionConfig = resolveChannelConversionConfig(
+      ((convConfigRes as { data: { channel_conversion_config: unknown } | null }).data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null,
+    );
+
+    // Generiek getypeerd (Record<string, unknown>) i.p.v. het exportte MonthlyChannelRow: de rest
+    // van deze route (findMonth/g/buildChartData, blendMonthly, de kanaalsecties) behandelt Google-
+    // en Meta/LinkedIn-maandrijen al overal als hetzelfde losse-veld-record, nooit met een eigen type.
+    const metaData = monthlyFromDaily((metaMonthlyRes.data ?? []) as Array<Record<string, unknown>>, {
+      dateField: "date",
+      clicksField: "link_clicks",
+      convFields: (r) => ({ conversions: Number(r.conversions ?? 0), leads: Number(r.leads ?? 0) }),
+      channelKey: "meta_ads",
+      convConfig,
+    });
+    const linkedinData = monthlyFromDaily((linkedinMonthlyRes.data ?? []) as Array<Record<string, unknown>>, {
+      dateField: "date",
+      clicksField: "clicks",
+      convFields: (r) => ({
+        one_click_leads: Number(r.one_click_leads ?? 0),
+        external_website_conversions: Number(r.external_website_conversions ?? 0),
+        post_click_conversions: Number(r.post_click_conversions ?? 0),
+      }),
+      channelKey: "linkedin_ads",
+      convConfig,
+    });
+
+    // Blended maandrijen: Google + Meta + LinkedIn opgeteld per maand, ratio's herberekend uit de
+    // opgetelde tellers (niet de ratio's zelf gemiddeld -- anders weegt een maand met weinig
+    // verkeer even zwaar als een maand met veel verkeer). Bij een Google-only klant is dit
+    // identiek aan accountData: geen gedragswijziging voor de 62 van de 71.
+    const blendedAccountData: Array<Record<string, unknown>> = meerdereKanalen ? blendMonthly([accountData, metaData, linkedinData]) : accountData;
 
     await updateProgressPhase(supabase, {
       jobId,
@@ -259,9 +333,9 @@ export async function POST(request: NextRequest) {
     });
     // ── Compute per-metric MoM + YoY ─────────────────────────────
 
-    const cur = findMonth(accountData, lastMonthStr);
-    const prev = findMonth(accountData, prevMonthStr);
-    const yoy = findMonth(accountData, yoyMonthStr);
+    const cur = findMonth(blendedAccountData, lastMonthStr);
+    const prev = findMonth(blendedAccountData, prevMonthStr);
+    const yoy = findMonth(blendedAccountData, yoyMonthStr);
 
     const g = (row: Record<string, unknown> | undefined, key: string): number => Number(row?.[key] ?? 0);
 
@@ -282,7 +356,7 @@ export async function POST(request: NextRequest) {
     // ── Build chart data (13 months) ─────────────────────────────
 
     // Sort accountData by month string (YYYY-MM) to guarantee chronological order
-    const sortedAccountData = [...accountData].sort((a, b) =>
+    const sortedAccountData = [...blendedAccountData].sort((a, b) =>
       String(a.month ?? "").localeCompare(String(b.month ?? ""))
     );
 
@@ -360,8 +434,13 @@ export async function POST(request: NextRequest) {
     const curIS = isChartData.length > 0 ? isChartData[isChartData.length - 1]?.value : null;
     const prevIS = isChartData.length > 1 ? isChartData[isChartData.length - 2]?.value : null;
 
-    const userMessage = `Schrijf een maandrapportage voor ${clientName} over ${reportMonthLabel} ${lastMonthYear}.
+    const kanaalNamen = kanalen.map((k) => KANAAL_NAAM[k]);
+    const kanalenNotitie = meerdereKanalen
+      ? `\n## Kanalen\nDit account draait op ${kanaalNamen.join(" + ")}. De cijfers hieronder zijn de OPGETELDE performance over al deze kanalen -- schrijf erover als "de accountprestaties" of "alle kanalen samen", niet als "Google Ads" specifiek (tenzij de Wijzigingen-sectie, die is wél alleen Google Ads).\n`
+      : "";
 
+    const userMessage = `Schrijf een maandrapportage voor ${clientName} over ${reportMonthLabel} ${lastMonthYear}.
+${kanalenNotitie}
 ## Doelstellingen
 ${goalsSection}
 
@@ -397,7 +476,7 @@ ${openTasks.length > 0 ? openTasks.map((t) => `- [${t.priority}] ${t.title}: ${t
 ${openItems.length > 0 ? openItems.map((i) => `- [${i.owner}] ${i.task} (${i.status})`).join("\n") : ""}
 ${hypotheses.length > 0 ? "\nHypotheses:\n" + hypotheses.map((h) => `- [${h.status}] ${h.hypothesis} → ${h.expected_result}`).join("\n") : ""}
 
-## Wijzigingen in Google Ads (laatste 60 dagen)
+## Wijzigingen${meerdereKanalen ? " in Google Ads (enige kanaal met een wijzigingslog)" : " in Google Ads"} (laatste 60 dagen)
 ${changeHistory.length > 0 ? changeHistory.slice(0, 15).map((c) => {
       const date = new Date(c.change_datetime as string).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
       return `- ${date}: ${c.change_type} op ${c.campaign_name}`;
@@ -530,6 +609,157 @@ Schrijf nu het rapport. Retourneer ALLEEN valid JSON.`;
         chartLabel: "Search Impression Share (%)",
         chartType: "line",
       });
+    }
+
+    // ── Multi-channel sections (if applicable) ──────────────────
+    //
+    // Zelfde vraag als de landensecties hieronder, maar per kanaal in plaats van per land: de
+    // top-level kpiCards/metricSections zijn nu de opgetelde performance (blendedAccountData), dus
+    // hier komt de uitsplitsing terug -- óók voor Google zelf, symmetrisch met Meta/LinkedIn, want
+    // een klant die weet dat er drie kanalen zijn wil ze alle drie kunnen navragen, niet alleen de
+    // twee die "erbij kwamen".
+
+    let channelSections: ChannelSection[] | undefined;
+
+    if (meerdereKanalen) {
+      await updateProgressPhase(supabase, {
+        jobId,
+        phaseKey: "compose_channel_sections",
+        message: `Kanaalsecties genereren voor ${kanalen.length} kanalen...`,
+      });
+
+      const channelRows: Record<Kanaal, Array<Record<string, unknown>>> = {
+        google: accountData, meta: metaData, linkedin: linkedinData,
+      };
+
+      const channelPromises = kanalen.map(async (kanaal): Promise<ChannelSection | null> => {
+        const rows = [...channelRows[kanaal]].sort((a, b) => String(a.month ?? "").localeCompare(String(b.month ?? "")));
+        if (rows.length === 0) return null;
+        const cChannel = findMonth(rows, lastMonthStr) ?? rows[rows.length - 1];
+        const pChannel = findMonth(rows, prevMonthStr);
+        const yChannel = findMonth(rows, yoyMonthStr);
+        const label = KANAAL_NAAM[kanaal];
+
+        const cRoas = g(cChannel, "cost") > 0 ? g(cChannel, "conversions_value") / g(cChannel, "cost") * 100 : 0;
+        const pRoas = g(pChannel, "cost") > 0 ? g(pChannel, "conversions_value") / g(pChannel, "cost") * 100 : 0;
+        const cCpa = g(cChannel, "conversions") > 0 ? g(cChannel, "cost") / g(cChannel, "conversions") : 0;
+        const pCpa = g(pChannel, "conversions") > 0 ? g(pChannel, "cost") / g(pChannel, "conversions") : 0;
+
+        const cKpis: KpiCard[] = [
+          { label: "Conversies", current: g(cChannel, "conversions"), previous: g(pChannel, "conversions"), changePct: pct(g(cChannel, "conversions"), g(pChannel, "conversions")) ?? 0, yoyCurrent: null, yoyPrevious: null, yoyChangePct: yChannel ? pct(g(cChannel, "conversions"), g(yChannel, "conversions")) : null, format: "number" },
+          { label: "Omzet", current: g(cChannel, "conversions_value"), previous: g(pChannel, "conversions_value"), changePct: pct(g(cChannel, "conversions_value"), g(pChannel, "conversions_value")) ?? 0, yoyCurrent: null, yoyPrevious: null, yoyChangePct: yChannel ? pct(g(cChannel, "conversions_value"), g(yChannel, "conversions_value")) : null, format: "currency" },
+          { label: "Kosten", current: g(cChannel, "cost"), previous: g(pChannel, "cost"), changePct: pct(g(cChannel, "cost"), g(pChannel, "cost")) ?? 0, yoyCurrent: null, yoyPrevious: null, yoyChangePct: yChannel ? pct(g(cChannel, "cost"), g(yChannel, "cost")) : null, format: "currency" },
+          { label: "ROAS", current: cRoas, previous: pRoas, changePct: pct(cRoas, pRoas) ?? 0, yoyCurrent: null, yoyPrevious: null, yoyChangePct: null, format: "percent" },
+          { label: "CPA", current: cCpa, previous: pCpa, changePct: pct(cCpa, pCpa) ?? 0, yoyCurrent: null, yoyPrevious: null, yoyChangePct: null, format: "currency" },
+        ];
+
+        function channelChartData(key: string): MetricPoint[] {
+          return rows.map((r) => ({ month: chartLabel(String(r.month ?? "")), value: Number(r[key] ?? 0) }));
+        }
+        const ctrChart: MetricPoint[] = rows.map((r) => ({ month: chartLabel(String(r.month ?? "")), value: Number(r.ctr ?? 0) * 100 }));
+        const cpcChart: MetricPoint[] = rows.map((r) => ({ month: chartLabel(String(r.month ?? "")), value: Number(r.avg_cpc ?? 0) }));
+        const crChart: MetricPoint[] = rows.map((r) => ({ month: chartLabel(String(r.month ?? "")), value: Number(r.conversion_rate ?? 0) * 100 }));
+        const roasChart: MetricPoint[] = rows.map((r) => ({ month: chartLabel(String(r.month ?? "")), value: Number(r.cost ?? 0) > 0 ? Number(r.conversions_value ?? 0) / Number(r.cost ?? 1) * 100 : 0 }));
+
+        const channelPrompt = `Schrijf per-metric koppen en analyse voor het kanaal ${label} binnen het account van ${clientName}.
+Dit is een KANAALSECTIE binnen een breder rapport dat meerdere kanalen samenvoegt. Houd het kort en specifiek voor ${label}.
+ELKE KOP MOET CONCLUDEREND ZIJN — bevat een oorzaak of gevolg, niet alleen een observatie.
+FOUT: "Conversies stijgen naar 120" ← alleen observatie
+GOED: "Conversies in ${label} stijgen naar 120 door de verhoogde inzet op leadgeneratie" ← bevat oorzaak
+
+## Data ${label}
+- Impressies: ${g(cChannel, "impressions")} (was ${g(pChannel, "impressions")})
+- Klikken: ${g(cChannel, "clicks")} (was ${g(pChannel, "clicks")})
+- Conversies: ${g(cChannel, "conversions")} (was ${g(pChannel, "conversions")})
+- Omzet: ${fmt(g(cChannel, "conversions_value"), "currency")} (was ${fmt(g(pChannel, "conversions_value"), "currency")})
+- Kosten: ${fmt(g(cChannel, "cost"), "currency")} (was ${fmt(g(pChannel, "cost"), "currency")})
+- ROAS: ${cRoas.toFixed(0)}% (was ${pRoas.toFixed(0)}%)
+- CPA: ${fmt(cCpa, "currency")} (was ${fmt(pCpa, "currency")})
+
+Retourneer ALLEEN valid JSON:
+{
+  "impressies": { "heading": "string", "body": "string (1-2 zinnen)" },
+  "cpc": { "heading": "string", "body": "string (1-2 zinnen)" },
+  "conversies": { "heading": "string", "body": "string (1-2 zinnen)" },
+  "omzet_roas": { "heading": "string", "body": "string (1-2 zinnen)" }
+}`;
+
+        let channelLlm: Record<string, { heading: string; body: string }> = {};
+        try {
+          const chRes = await callLayer("narrative", {
+            apiKey,
+            systemPrompt: buildReportPrompt(clientName),
+            userMessage: channelPrompt,
+            maxTokens: 2048,
+            jsonMode: true,
+            label: `channel-report-${kanaal}`,
+          });
+          channelLlm = sanitizeAllStrings(JSON.parse(chRes.output));
+        } catch { /* use defaults */ }
+
+        const cMetrics: MetricSection[] = [
+          {
+            id: `${kanaal}_impressies`,
+            label: `${label} | Impressies`,
+            heading: channelLlm.impressies?.heading ?? `Impressies ${label}`,
+            body: channelLlm.impressies?.body ?? "",
+            bullets: [
+              `Impressies: ${g(pChannel, "impressions")} → ${g(cChannel, "impressions")}`,
+              `Klikken: ${g(pChannel, "clicks")} → ${g(cChannel, "clicks")}`,
+            ],
+            chartData: channelChartData("impressions"),
+            chartData2: ctrChart,
+            chartLabel: `Impressies (${label})`,
+            chartLabel2: `CTR (${label})`,
+            chartType: "bar",
+            chartType2: "line",
+          },
+          {
+            id: `${kanaal}_cpc`,
+            label: `${label} | CPC`,
+            heading: channelLlm.cpc?.heading ?? `Gemiddelde kosten per klik ${label}`,
+            body: channelLlm.cpc?.body ?? "",
+            bullets: [`Kosten: ${fmt(g(pChannel, "cost"), "currency")} → ${fmt(g(cChannel, "cost"), "currency")}`],
+            chartData: cpcChart,
+            chartLabel: `CPC (${label})`,
+            chartType: "line",
+          },
+          {
+            id: `${kanaal}_conversies`,
+            label: `${label} | Conversies`,
+            heading: channelLlm.conversies?.heading ?? `Conversies ${label}`,
+            body: channelLlm.conversies?.body ?? "",
+            bullets: [`Conversies: ${g(pChannel, "conversions")} → ${g(cChannel, "conversions")}`],
+            chartData: channelChartData("conversions"),
+            chartData2: crChart,
+            chartLabel: `Conversies (${label})`,
+            chartLabel2: `Conversieratio (${label})`,
+            chartType: "bar",
+            chartType2: "line",
+          },
+          {
+            id: `${kanaal}_omzet`,
+            label: `${label} | Omzet & ROAS`,
+            heading: channelLlm.omzet_roas?.heading ?? `Omzet & ROAS ${label}`,
+            body: channelLlm.omzet_roas?.body ?? "",
+            bullets: [
+              `Omzet: ${fmt(g(pChannel, "conversions_value"), "currency")} → ${fmt(g(cChannel, "conversions_value"), "currency")}`,
+              `ROAS: ${pRoas.toFixed(0)}% → ${cRoas.toFixed(0)}%`,
+            ],
+            chartData: channelChartData("conversions_value"),
+            chartData2: roasChart,
+            chartLabel: `Omzet (${label})`,
+            chartLabel2: `ROAS (${label})`,
+            chartType: "bar",
+            chartType2: "line",
+          },
+        ];
+
+        return { channelKey: kanaal, channelLabel: label, kpiCards: cKpis, metricSections: cMetrics };
+      });
+
+      const channelResults = await Promise.all(channelPromises);
+      channelSections = channelResults.filter((cs): cs is ChannelSection => cs !== null);
     }
 
     // ── Multi-country sections (if applicable) ─────────────────
@@ -792,6 +1022,7 @@ Retourneer ALLEEN valid JSON:
       summaryHeadline: (llmData as Record<string, unknown>).summary_headline as string | undefined,
       summarySubtitle: (llmData as Record<string, unknown>).summary_subtitle as string | undefined,
       countrySections: countrySections && countrySections.length > 0 ? countrySections : undefined,
+      channelSections: channelSections && channelSections.length > 0 ? channelSections : undefined,
     };
 
     // ── Save to Supabase ─────────────────────────────────────────

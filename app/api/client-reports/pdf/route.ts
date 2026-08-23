@@ -88,6 +88,7 @@ export async function GET(request: NextRequest) {
       summaryHeadline: rd.summaryHeadline as string | undefined,
       summarySubtitle: rd.summarySubtitle as string | undefined,
       countrySections: rd.countrySections as ReportPdfProps["countrySections"],
+      channelSections: rd.channelSections as ReportPdfProps["channelSections"],
       brandLogoUrl,
       clientLogoUrl,
     };

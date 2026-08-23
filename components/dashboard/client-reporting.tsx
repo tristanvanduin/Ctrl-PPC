@@ -25,12 +25,21 @@ interface CountrySection {
   kpiCards: KpiCard[];
   metricSections: MetricSection[];
 }
+// 23 augustus 2026: kanaal-equivalent van CountrySection, zie de toelichting in
+// app/api/client-reports/route.ts.
+interface ChannelSection {
+  channelKey: string;
+  channelLabel: string;
+  kpiCards: KpiCard[];
+  metricSections: MetricSection[];
+}
 interface ReportData {
   title: string; reportMonth: string; reportYear: number;
   kpiCards: KpiCard[]; metricSections: MetricSection[];
   actionSection: { heading: string; body: string };
   planningSection: { heading: string; body: string };
   countrySections?: CountrySection[];
+  channelSections?: ChannelSection[];
   reportId?: string | null;
 }
 interface ReportSummary { id: string; report_date: string; report_month: number; report_year: number; title: string; status: string; created_at: string }
@@ -528,6 +537,67 @@ export function ClientReporting({ clientId }: { clientId: string }) {
               )}
             </div>
           </div>
+
+          {/* ── Channel Sections (multi-channel only) ── */}
+          {report.channelSections && report.channelSections.length > 0 && (
+            <>
+              {report.channelSections.map((cs) => (
+                <div key={cs.channelKey}>
+                  {/* Channel divider */}
+                  <div className="bg-brand-blue rounded-xl p-6 mt-2">
+                    <h2 className="text-xl font-bold text-white">Voortgang {cs.channelLabel}</h2>
+                  </div>
+
+                  {/* Channel KPI cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mt-4">
+                    {cs.kpiCards.map((kpi) => {
+                      const isPositive = kpi.changePct > 0;
+                      const invertColor = kpi.label === "CPA" || kpi.label === "Kosten";
+                      const changeColor = invertColor
+                        ? (isPositive ? "text-red-600" : "text-green-600")
+                        : (isPositive ? "text-green-600" : "text-red-600");
+                      return (
+                        <div key={kpi.label} className="bg-card rounded-xl border border-border shadow-sm p-4">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-micro font-medium text-muted-foreground">{kpi.label}</span>
+                            <span className={`text-micro font-bold ${changeColor}`}>{kpi.changePct > 0 ? "+" : ""}{kpi.changePct}%</span>
+                          </div>
+                          <p className="text-lg font-bold text-brand-gray">{fmtValue(kpi.current, kpi.format)}</p>
+                          <p className="text-micro text-muted-foreground">({fmtValue(kpi.previous, kpi.format)})</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Channel metric sections */}
+                  {cs.metricSections.map((section) => (
+                    <div key={section.id} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden mt-4">
+                      <div className="px-5 py-2 border-b border-border bg-gray-50/50">
+                        <span className="text-micro font-medium text-muted-foreground uppercase tracking-wider">{section.label}</span>
+                      </div>
+                      <div className="px-5 py-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-brand-gray leading-snug mb-3">{section.heading}<span className="text-brand-orange-ink">.</span></h3>
+                            <div className="space-y-0.5 mb-3">
+                              {section.bullets.map((b, i) => <p key={i} className="text-sm text-brand-gray"><span className="font-semibold">•</span> {b}</p>)}
+                            </div>
+                            <p className="text-sm text-brand-gray leading-relaxed">{section.body}</p>
+                          </div>
+                          <div className="space-y-4">
+                            <MiniChart data={section.chartData} type={section.chartType} label={section.chartLabel} />
+                            {section.chartData2 && section.chartLabel2 && (
+                              <MiniChart data={section.chartData2} type={section.chartType2 ?? "line"} label={section.chartLabel2} color="#1e40af" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
 
           {/* ── Country Sections (multi-country only) ── */}
           {report.countrySections && report.countrySections.length > 0 && (

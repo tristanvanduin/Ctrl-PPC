@@ -39,6 +39,16 @@ interface CountrySection {
   kpiCards: KpiCard[];
   metricSections: MetricSection[];
 }
+// 23 augustus 2026: kanaal-equivalent van CountrySection, zie de toelichting in
+// app/api/client-reports/route.ts. Zelfde vorm, dus CountryDividerPage/CountrySummaryPage/
+// MetricPage hieronder werken ongewijzigd -- die functies tonen alleen de meegegeven naam/cijfers,
+// en weten niet of dat een land of een kanaal is.
+interface ChannelSection {
+  channelKey: string;
+  channelLabel: string;
+  kpiCards: KpiCard[];
+  metricSections: MetricSection[];
+}
 
 export interface ReportPdfProps {
   clientName: string; title: string; reportMonth: string; reportYear: number;
@@ -46,6 +56,7 @@ export interface ReportPdfProps {
   actionSection: { heading: string; body: string }; planningSection: { heading: string; body: string };
   summaryHeadline?: string; summarySubtitle?: string;
   countrySections?: CountrySection[];
+  channelSections?: ChannelSection[];
   brandLogoUrl?: string; clientLogoUrl?: string; coverImageUrl?: string; closingImageUrl?: string;
 }
 
@@ -436,6 +447,15 @@ function Doc(p: ReportPdfProps) {
       .filter((section) => section.heading && section.heading.trim().length > 0 && (section.bullets.length > 0 || section.body.trim().length > 0 || section.chartData.length > 0))
       .map((section) => MetricPage({ section, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl })),
     ActionPage({ actionSection: p.actionSection, planningSection: p.planningSection, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl }),
+    // Channel sections (if multi-channel) -- vóór de landensecties: kanaal is de hogere
+    // uitsplitsing, landen zijn een verdieping binnen Google specifiek.
+    ...(p.channelSections ?? []).flatMap((cs) => [
+      CountryDividerPage({ countryName: cs.channelLabel, reportMonth: p.reportMonth, reportYear: p.reportYear, brandLogoUrl: p.brandLogoUrl }),
+      CountrySummaryPage({ kpiCards: cs.kpiCards, countryName: cs.channelLabel, reportMonth: p.reportMonth, reportYear: p.reportYear, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl }),
+      ...cs.metricSections
+        .filter((section) => section.heading && section.heading.trim().length > 0 && (section.bullets.length > 0 || section.body.trim().length > 0 || section.chartData.length > 0))
+        .map((section) => MetricPage({ section, clientName: p.clientName, brandLogoUrl: p.brandLogoUrl })),
+    ]),
     // Country sections (if multi-country)
     ...(p.countrySections ?? []).flatMap((cs) => [
       CountryDividerPage({ countryName: cs.countryName, reportMonth: p.reportMonth, reportYear: p.reportYear, brandLogoUrl: p.brandLogoUrl }),
