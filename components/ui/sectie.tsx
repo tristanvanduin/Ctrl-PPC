@@ -36,7 +36,11 @@ export function Sectie({
 }) {
   return (
     <section className={eerste ? "" : "mt-10"}>
-      <div className="mb-4 flex items-center gap-3">
+      {/* flex-wrap: bij een brede `actie` (bv. vier campagnetype-knoppen) en weinig ruimte kon de
+          titel/bijschrift-kolom (min-w-0) tot 0 breed uitgeknepen worden in plaats van dat de
+          actie naar een eigen regel brak -- op een telefoonbreed scherm duwde dat de hele pagina
+          breder. */}
+      <div className="mb-4 flex flex-wrap items-center gap-3 gap-y-2">
         {icoon && (
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10">{icoon}</div>
         )}

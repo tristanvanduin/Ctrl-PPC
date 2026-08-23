@@ -116,8 +116,11 @@ export function PerformanceChart({ clientId, countryFilter, metric: metricProp, 
 
   return (
     <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+      {/* flex-wrap: op smalle schermen (telefoon) paste deze rij -- titel + weergavekiezer +
+          "Vorig jaar" + vier metric-knoppen -- niet naast elkaar en duwde de hele pagina breder in
+          plaats van zelf om te breken. Genoeg knoppen op één rij om nooit in te krimpen. */}
+      <div className="flex flex-wrap items-center justify-between gap-y-2 mb-4">
+        <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
             Performance {new Date().getFullYear()}
           </h3>

@@ -230,9 +230,11 @@ export function MonthlyOverview({ clientId, countryFilter }: { clientId: string;
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      {/* Header with metric tabs */}
-      <div className="px-5 pt-5 pb-4 flex items-center justify-between">
-        <div>
+      {/* Header with metric tabs. flex-wrap + min-w-0: zelfde overflow-risico als
+          fair-weeks-overview.tsx's kop -- op een telefoonbreed scherm duwden titel/toelichting
+          plus de metric-knoppen de pagina breder i.p.v. zelf om te breken. */}
+      <div className="px-5 pt-5 pb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
             Maandprestaties
           </h3>

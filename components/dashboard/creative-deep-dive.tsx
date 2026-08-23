@@ -173,11 +173,15 @@ export function CreativeDeepDive({ clientId, channel }: { clientId: string; chan
                 ? `${flagged.length} van ${fatigue.length} creatives zakken onder hun CTR-piek — kandidaat om te verversen.`
                 : `Geen materiële vermoeidheid over ${fatigue.length} creatives; het CTR-traject blijft stabiel.`}
             </div>
-            <div className="divide-y divide-border">
+            {/* overflow-x-auto: elke rij draagt een badge, naam, sparkline en twee vaste
+                getalkolommen -- op een telefoonbreed scherm past die combinatie niet naast elkaar
+                zonder de pagina breder te duwen. Horizontaal scrollen binnen de rij, net als de
+                week-strip hierboven, i.p.v. kolommen laten verdwijnen. */}
+            <div className="divide-y divide-border overflow-x-auto">
               {fatigue.slice(0, 15).map((f) => (
-                <div key={f.id} className="px-5 py-2.5 flex items-center gap-3">
+                <div key={f.id} className="px-5 py-2.5 flex items-center gap-3 min-w-max">
                   <span className={`text-micro font-semibold border rounded-full px-2 py-0.5 shrink-0 ${FATIGUE_STYLE[f.status]}`}>{FATIGUE_LABEL[f.status]}</span>
-                  <span className="text-body text-brand-gray truncate flex-1 min-w-0" title={f.name}>{f.name}</span>
+                  <span className="text-body text-brand-gray truncate flex-1 min-w-0 max-w-[220px]" title={f.name}>{f.name}</span>
                   <Sparkline punten={f.points.map((p) => p.ctr)} basis="bereik" breedte={72} hoogte={20} titel={`CTR-verloop van ${f.name}`} />
                   <span className="text-meta text-muted-foreground w-28 text-right shrink-0 tabular-nums">
                     {f.peakCtr != null ? `piek ${pct(f.peakCtr)} → ${pct(f.latestCtr)}` : "—"}

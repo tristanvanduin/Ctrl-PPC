@@ -253,8 +253,11 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-border">
-        <div className="flex items-center justify-between gap-4">
-          <div>
+        {/* flex-wrap + min-w-0: de samenvattingsregel plus land-/doelfilters pasten niet altijd
+            naast elkaar op een telefoonbreed scherm en duwden de hele pagina breder i.p.v. zelf
+            te breken. */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
             {/* De kaarttitel "Campagnes" is vervallen: die stond twee regels onder de sectiekop
                 die hetzelfde zegt. De samenvattingsregel blijft — die draagt cijfers. */}
             <p className="text-meta text-muted-foreground">

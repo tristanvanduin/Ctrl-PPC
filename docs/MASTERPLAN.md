@@ -7536,3 +7536,69 @@ vóór het al op main stond.
 
 Geverifieerd op de live demo: alle drie kanalen tonen nu Account Health 50/50 naast de wereldkaart.
 `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon.
+
+### 17.105 Twee echte bugs na de 50/50-restauratie: labeloverlap en scheve kolomhoogtes (23 augustus 2026)
+
+De eigenaar stuurde vier screenshots: een uitvergrote Account Health-kaart met tekst die over elkaar
+heen stond ("Efficiency" botste met "WAARUIT DE SCORE BESTAAT"), en drie paginabrede screenshots van
+Meta/LinkedIn/Google Overzicht met opvallend veel lege witruimte onderin de linkerkolom.
+
+**Labeloverlap.** `HealthRadar`'s SVG tekende zijn aslabels met `overflow-visible` buiten de eigen
+`viewBox`. Dat werkt zolang de kaart breed genoeg is, maar `overflow-visible` reserveert geen
+layoutruimte in het DOM-boxmodel -- naburige flex-kinderen schuiven niet opzij voor content die buiten
+de SVG's eigen box rendert. Bij de smallere 50/50-kaart (na 17.104) landde de "Waaruit de score
+bestaat"-kolom soms recht over de labels heen. Root cause gevonden door de DOM-ancestor-keten na te
+lopen in Playwright, niet door te gokken vanaf het screenshot. Fix: de `viewBox` en `max-width` zelf
+groot genoeg maken om de labels te bevatten, i.p.v. op overflow te vertrouwen dat siblings wegschuiven.
+
+**Scheve kolomhoogtes.** Meta en vooral LinkedIn's linkerkolom (Health + leverings-donut) was veel
+korter dan de wereldkaart rechts -- bij LinkedIn extra scheef, want de leverings-donut toont daar niets
+(geen leveringsdimensies in die databron). `GeoRanglijstCard` verhuisd naar de linkerkolom (kaart
+alleen nog rechts) om de hoogtes te balanceren; Google bleef ongewijzigd, was al in balans.
+
+Geverifieerd op de live demo bij dezelfde breedte als de screenshots. `tsc` 0 fouten,
+`node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon.
+
+### 17.106 Responsiviteitscontrole: negen niet-wrappende rijen die pagina's breder maakten dan het scherm (23 augustus 2026)
+
+De eigenaar vroeg expliciet naar responsiviteit over het hele bereik: uitgezoomd, klein/groot scherm,
+telefoon/tablet. Aanpak: een geautomatiseerd Playwright-script dat `document.documentElement.scrollWidth`
+tegen `clientWidth` legt op 8 breedtes (375px telefoon t/m 2560px ultrawide), over alle 3 kanalen x 3
+subtabs. `scrollWidth` op het documentElement is het betrouwbare signaal voor echte pagina-overloop --
+een losse `getBoundingClientRect()` per element geeft valse positieven voor content die keurig binnen
+een eigen `overflow-x-auto`-strip staat maar buiten beeld gescrold is; dat onderscheid moest expliciet
+gemaakt worden nadat een eerste run het "week-strip"-component onterecht aanwees.
+
+**Het patroon.** Negen plekken hadden een `flex items-center justify-between` (of vergelijkbaar) rijtje
+zonder `flex-wrap`, met aan de ene kant een titel/tekstblok en aan de andere een knoppengroep of
+tabblad-rij. Bij weinig ruimte kon de browser i.p.v. wrappen ook het titel-tekstblok tot bijna nul
+breed knijpen -- alleen zichtbaar als de titel is afgekapt, niet als pagina-overloop, tenzij het
+tekstblok een `min-w-0` mist die het juist tot knijpen dwingt terwijl de knoppengroep `shrink-0` blijft.
+Fix overal hetzelfde recept: `flex-wrap` op de rij, `min-w-0` op het tekstblok, en waar de knoppengroep
+zelf te breed kan worden ook `overflow-x-auto max-w-full` daarop.
+
+Getroffen: `performance-chart.tsx`, `fair-weeks-overview.tsx`, `monthly-overview.tsx`,
+`search-terms-table.tsx`, `campaign-table.tsx`, `forecast-table.tsx` (maandelijkse-uitsplitsing-header).
+`creative-deep-dive.tsx` kreeg in plaats daarvan `overflow-x-auto` op de fatigue-rijen zelf (vaste
+kolombreedtes lenen zich niet voor wrappen, wel voor scrollen -- hetzelfde patroon als de bestaande
+week-strip). `budget-scenario.tsx` en `channel-budget-scenario.tsx` (de twee losse implementaties van
+de budget-scenario-presets, Google resp. Meta/LinkedIn) kregen `flex-wrap` op hun zes-knoppen-rij.
+
+**De gedeelde root cause.** `components/ui/sectie.tsx` -- de sectiekop die elke pagina gebruikt -- had
+hetzelfde euvel: bij een brede `actie`-prop (bv. Google's vier `CampagneTypeTabs`-knoppen op de
+Scorecard-sectie) werd de titel/bijschrift-kolom tot 0 geknepen i.p.v. dat de actie naar een eigen regel
+brak. Dit was de laatste en grootste boosdoener (53px overloop op Google/Campagnes bij 375px) en gaf,
+eenmaal gefixed, meteen ook de andere pagina's die dezelfde `Sectie` gebruiken minder overloop.
+
+**Resultaat.** Voor de fix: overloop op vrijwel elke telefoonbreedte-pagina, oplopend tot 227px op de
+ergste. Na de fix: alle tablet/laptop/wide/ultrawide-breedtes volledig schoon; op telefoonbreedte (375px)
+resteert een universele ~5px overloop op nagenoeg elke pagina, deels herleid tot subpixel-overloop in
+KPI-kaarten (bv. "€372.510" dat 127px nodig heeft in een 123px-brede cel) -- cosmetisch verwaarloosbaar
+(geen zichtbare scrollbalk, geen functionele impact), waarschijnlijk al aanwezig vóór deze sessie, hier
+niet verder achtervolgd.
+
+Geverifieerd: volledige 8-breedtes x 3-kanalen x 3-subtabs sweep na elke fix herhaald, laatste run toont
+alleen nog de ~5px-baseline. `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316,
+`npx next build` compileert schoon. `view-dekking` staat rood, maar dat is de al langer bekende,
+niet aan deze sessie gerelateerde drift tussen `*_legacy`-tabellen en de `fact_core`-views voor
+meta/linkedin (zie eerdere sessienotities).

@@ -170,11 +170,11 @@ export function ForecastTable({ clientId, channel = "google" }: { clientId: stri
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header with metric tabs */}
-      <div className="px-5 pt-5 pb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
+      <div className="px-5 pt-5 pb-4 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="min-w-0 text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
           Maandelijkse uitsplitsing — {metric.label}
         </h3>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 overflow-x-auto max-w-full">
           {zichtbareMetrics.map((m) => (
             <button
               key={m.id}

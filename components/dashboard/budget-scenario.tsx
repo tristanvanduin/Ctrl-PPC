@@ -131,7 +131,7 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
         </div>
 
         {/* Presets */}
-        <div className="flex gap-1.5 mt-3">
+        <div className="flex flex-wrap gap-1.5 mt-3">
           {presets.map((p) => (
             <button
               key={p}

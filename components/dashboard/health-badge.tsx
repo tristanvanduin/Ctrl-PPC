@@ -52,7 +52,14 @@ export function HealthBadgeView({
 
   return (
     <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-      <div className="flex flex-wrap items-start gap-5">
+      {/* flex-col tot xl: bij drie stukken content (cirkel, factoren, anomalieën+uitleg) naast
+          elkaar kon de derde kolom bij een kaart smaller dan hun gecombineerde breedte niet meer
+          naar een eigen regel breken -- flex-wrap verdeelt de resterende ruimte dan over een
+          flex-1 kolom die tot bijna 0 kan uitgeknepen worden in plaats van te wrappen. `lg` alleen
+          was niet breed genoeg: de sidebar wordt zichtbaar/vast vanaf `lg` (`lg:ml-72`), dus de
+          kaart zelf is op precies dat breakpoint juist het smalst. Onder xl staan de drie stukken
+          voortaan gewoon onder elkaar. */}
+      <div className="flex flex-col gap-5 xl:flex-row xl:flex-wrap xl:items-start">
         {/* Score circle */}
         <div className="relative w-20 h-20 shrink-0">
           <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
@@ -100,7 +107,10 @@ export function HealthBadgeView({
           {magRadarTonen(health.factors) ? (
             <HealthRadar factoren={health.factors} kleur={radarKleur} />
           ) : (
-            <div className="grid grid-cols-5 gap-2">
+            // grid-cols-3 op smal, grid-cols-5 vanaf sm: vijf kolommen met labels als "Conversion
+            // Efficiency" pasten niet naast elkaar op een telefoonbreed scherm en duwden de hele
+            // pagina breder in plaats van zelf om te breken.
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {health.factors.map((f) => (
                 <div key={f.name} className="text-center">
                   {/* Niet-beoordeeld toont een streepje en geen 0/20: een nul-balk leest als een

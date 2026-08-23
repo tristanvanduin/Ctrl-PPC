@@ -74,7 +74,7 @@ export function ChannelBudgetScenario({ clientId, channel }: { clientId: string;
         <div className="flex justify-between text-micro text-muted-foreground mt-1">
           <span>-50%</span><span>0%</span><span>+50%</span><span>+100%</span>
         </div>
-        <div className="flex gap-1.5 mt-3">
+        <div className="flex flex-wrap gap-1.5 mt-3">
           {presets.map((p) => (
             <button
               key={p}

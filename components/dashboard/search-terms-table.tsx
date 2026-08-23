@@ -121,9 +121,11 @@ export function SearchTermsTable({ clientId, countryFilter, geoClone }: { client
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      {/* Header with subtabs */}
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+      {/* Header with subtabs. flex-wrap op de buitenste rij + overflow-x-auto op de knoppenrij:
+          vier subtab-knoppen plus de samenvattingstekst pasten niet naast elkaar op een
+          telefoonbreed scherm en duwden de hele pagina breder i.p.v. zelf te breken/scrollen. */}
+      <div className="px-5 py-4 border-b border-border flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 overflow-x-auto max-w-full">
           <button
             onClick={() => setSubtab("terms")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
