@@ -7483,3 +7483,32 @@ met de policy-regel hierboven en herverifieerd tot 0 nieuwe fouten. `tsc` 0 fout
 
 `tsc`/`tests`/`build` groen (315/315), `view-dekking` rood om dezelfde, aan deze wijziging onttrokken
 productiedrift.
+
+### 17.103 Prognose-titels: bewust niet gelijkgetrokken (23 augustus 2026)
+
+Vervolg op 17.99-17.102, sluit de channel-unificatieronde af. Opdracht: "unify de Prognose-titels ook"
+— het laatste, eerder als open punt gemelde verschil tussen Google en Meta/LinkedIn.
+
+`channel-forecast-sections.tsx`'s eigen kop (geschreven bij 17.x, ruim voor deze ronde) legt al uit
+waarom sectie 1's titel afwijkt: Meta/LinkedIn's Prognose-tab draait op een simpel run-rate-model
+(lopende + volgende maand, geen seizoenscorrectie, geen jaardoel — `lib/analysis/use-channel-run-rate.ts`).
+"Waar dit jaar op uitkomt" (Google) zou daar een precisie claimen die het model niet levert; "Waar dit
+tempo op uitkomt" is de eerlijke titel voor wat er werkelijk berekend wordt. Dat verschil was dus al
+bewust, niet een gemiste plek.
+
+17.102 maakte de vraag echter opnieuw relevant: Meta/LinkedIn hebben nu wél een volwaardige jaar-
+forecast (Jaaroverzicht 2026 op Overzicht, `computeForecast()` met seizoenscorrectie en een jaardoel
+uit `client_targets`). Titels blind gelijktrekken op de Prognose-tab zou nu een claim doen over een
+model dat zelf niet is meegegroeid — de Prognose-tab draait nog steeds op het oude run-rate-model,
+apart van Jaaroverzicht 2026's motor. Voorgelegd met drie opties (titels laten staan / het run-rate-
+model vervangen door de nieuwe jaar-forecast, incl. de blended-variant die de nieuwe engine nu niet
+ondersteunt / alleen sectie 3 hernoemen): "titels laten staan" gekozen.
+
+Geen codewijziging. Vastgelegd omdat dit de expliciete afsluiting is van een vraag die al drie keer
+eerder als open punt genoemd is (17.98's eerlijke antwoord, 17.100's melding, 17.101's "nog open") —
+zonder deze regel leest een volgende doorloop het opnieuw als vergeten in plaats van als een bewuste,
+inhoudelijk onderbouwde keuze.
+
+Met dit besluit is de channel-unificatieronde (Overzicht-hero, Campagnes-secties, Prognose-structuur)
+afgerond. Openstaand, buiten deze ronde: of de Prognose-tab ooit overstapt op dezelfde jaar-forecast-
+motor als Jaaroverzicht 2026 — dat is een grotere, eigen beslissing en niet gevraagd.
