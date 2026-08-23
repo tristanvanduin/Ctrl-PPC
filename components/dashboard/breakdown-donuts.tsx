@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PieChart } from "lucide-react";
+import { PieChart, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
@@ -106,10 +106,10 @@ function AandeelRaster({ slices, kleur, toonConversies, conversieWoord }: {
   );
 }
 
-export function BreakdownDonuts({ clientId, channel }: { clientId: string; channel: Kanaal }) {
+export function BreakdownDonuts({ clientId, channel, groep = "levering" }: { clientId: string; channel: Kanaal; groep?: "levering" | "doelgroep" }) {
   const [segmenten, setSegmenten] = useState<Segment[] | null>(null);
   const [dimensie, setDimensie] = useState<string | null>(null);
-  const [tabelOpen, toggleTabel] = useRememberedOpen(`breakdown-tabel-${channel}`, false);
+  const [tabelOpen, toggleTabel] = useRememberedOpen(`breakdown-tabel-${channel}-${groep}`, false);
 
   useEffect(() => {
     const sb = supabase;
@@ -165,6 +165,11 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
     return () => { cancelled = true; };
   }, [clientId, channel]);
 
+  // Groep-wissel (Overzicht vs Campagnes) is geen nieuwe fetch -- dezelfde rijen, ander filter --
+  // maar de eerder gekozen dimensieknop kan uit de andere groep zijn en moet dan terugvallen op
+  // de eerste beschikbare knop van de nieuwe groep.
+  useEffect(() => { setDimensie(null); }, [groep]);
+
   // Alleen dimensies waar daadwerkelijk iets in zit. Een lege keuzeknop belooft data die er niet is.
   // De vorige uitsplitsing blijft staan zolang de nieuwe onderweg is.
   const getoond = useVorige(segmenten);
@@ -173,8 +178,8 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
   const beschikbaar = useMemo(() => {
     if (!getoond) return [];
     const metData = new Set(getoond.filter((s) => s.spend > 0 || s.impressies > 0).map((s) => s.dimensie));
-    return BREAKDOWN_DIMENSIES[channel].filter((d) => metData.has(d.key));
-  }, [getoond, channel]);
+    return BREAKDOWN_DIMENSIES[channel].filter((d) => d.groep === groep && metData.has(d.key));
+  }, [getoond, channel, groep]);
 
   const actief = dimensie ?? beschikbaar[0]?.key ?? null;
 
@@ -197,7 +202,7 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
   // vorige uitsplitsing staan op verlaagde dekking terwijl de nieuwe binnenkomt — geen terugval
   // naar een skelet, geen hoogtesprong. Zie lib/use-vorige.ts.
   if (getoond === null) {
-    return <Laadvlak vorm="grafiek" hoogte={200} titel="Waar gaat het budget heen" />;
+    return <Laadvlak vorm="grafiek" hoogte={200} titel={groep === "doelgroep" ? "Doelgroepen — wie we bereiken" : "Waar gaat het budget heen"} />;
   }
   // Geen uitsplitsingen gesynct: niets tonen in plaats van een lege ring.
   if (beschikbaar.length === 0 || slices.length === 0) return null;
@@ -212,8 +217,14 @@ export function BreakdownDonuts({ clientId, channel }: { clientId: string; chann
       aria-busy={ververst}
     >
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
-        <h3 className="text-title font-semibold text-brand-gray">Waar gaat het budget heen</h3>
+        {groep === "doelgroep" ? (
+          <Users className="w-4.5 h-4.5 text-brand-blue-ink" />
+        ) : (
+          <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
+        )}
+        <h3 className="text-title font-semibold text-brand-gray">
+          {groep === "doelgroep" ? "Doelgroepen — wie we bereiken" : "Waar gaat het budget heen"}
+        </h3>
         <span className="text-meta text-muted-foreground">laatste 60 dagen</span>
         <div className="ml-auto flex gap-1 bg-gray-100 rounded-lg p-0.5 flex-wrap">
           {beschikbaar.map((d) => (

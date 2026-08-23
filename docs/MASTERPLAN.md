@@ -7354,3 +7354,59 @@ Google's Campagnes-tab ongewijzigd, geen console-fouten op alle drie kanalen. `t
 
 `tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijziging
 onttrokken productiedrift.
+
+### 17.101 Doelgroepsignalen en Waar het weglekt: de twee laatste Campagnes-gaten (23 augustus 2026)
+
+Vervolg op 17.99-17.100. Gevraagd "hoeveel is er nog niet uniform" — het eerlijke antwoord had drie
+resterende gaten: Overzicht ("Jaaroverzicht 2026", "Waar het budget landt", alleen Google), Campagnes
+("Doelgroepsignalen", "Waar het weglekt", alleen Google) en Prognose (structureel gelijk, twee van
+drie titels tekstueel anders). Opdracht: begin met de twee Campagnes-gaten.
+
+**Waarom dit geen simpele verhuizing was.** Google's "Doelgroepsignalen" (`audience-split.tsx`) leest
+`ads_audience_performance_monthly` — een Google Ads-audience-rapport (affiniteit/in-market/
+remarketing/custom/vergelijkbaar) dat Meta en LinkedIn niet syncen. "Waar het weglekt"
+(`search-terms-table.tsx`) leest zoektermen en ad groups — een concept dat alleen bestaat op een
+zoekplatform. Blind dezelfde component overnemen was niet mogelijk; er moest ofwel nieuwe data
+gesynced worden (buiten scope) of een eerlijke invulling gevonden worden met wat er al lag.
+
+**Doelgroepsignalen: gesplitst i.p.v. gedupliceerd.** Meta/LinkedIn syncen al `meta_breakdown_daily`/
+`linkedin_demographic_daily`, getoond via `BreakdownDonuts` op Overzicht — maar die dimensies zijn
+een mix van twee vragen. Meta's plaatsing/platform/device zijn leverings­vragen ("waar komt het
+vandaan", hoort bij Overzicht); Meta's leeftijd/gender en LinkedIn's functie/senioriteit/industrie/
+bedrijfsgrootte zijn zelf al doelgroepsignalen. Voorgelegd aan de gebruiker met drie opties (splits de
+dimensies / dupliceer de hele kaart / sla de sectie over) — "splits" gekozen. Uitgevoerd:
+`BREAKDOWN_DIMENSIES` (`lib/analysis/breakdown-dimensions.ts`) kreeg een `groep`-veld
+("levering"/"doelgroep") per dimensie; `BreakdownDonuts` kreeg een `groep`-prop die de knoppenrij
+filtert en de eigen kop/icoon omzet (PieChart "Waar gaat het budget heen" vs Users "Doelgroepen — wie
+we bereiken", dezelfde titel als Google's `AudienceSplit` intern al gebruikt). Overzicht's hero draait
+nu op `groep="levering"`, de nieuwe Campagnes-sectie "Doelgroepsignalen" op `groep="doelgroep"`.
+Bewuste consequentie: LinkedIn heeft geen leveringsdimensie, dus LinkedIn's Overzicht-hero toont sinds
+deze wijziging geen breakdown-donut meer (alleen ranglijst + kaart) — geen bug, de kaart verdwijnt zoals
+elke andere lege sectie hier al stil blijft.
+
+**Waar het weglekt: campagne-niveau, niet zoekterm-niveau.** Nieuw bestand
+`channel-bleeders-table.tsx`: zelfde 28-dagen-fetch als `channel-campaign-table.tsx` (hergebruikt
+`CONFIG` uit `channel-performance.tsx`), gefilterd op spend > 0 én conversies = 0, gesorteerd op
+kosten. Rood gestyled zoals Google's `SearchTermsTable` (`VERSPIL_KLEUR` #ef4444, `AlertTriangle`-
+icoon per rij). Dit is de granulariteit die Meta/LinkedIn wél hebben — geen zoekterm- of ad group-
+niveau, wel campagne-niveau — en geen verzonnen vervanging: elke rij is een echte campagne met echte
+nul-conversie-spend.
+
+Beide secties toegevoegd aan `MetaCampagnes` en `LinkedInCampagnes` op dezelfde relatieve plek als bij
+Google (Doelgroepsignalen tussen "Wat er draait" en "De advertenties zelf"; Waar het weglekt als
+laatste sectie).
+
+Geverifieerd op de live demo-omgeving, alle vier de betrokken schermen (Meta/LinkedIn × Overzicht/
+Campagnes): Meta's Overzicht-hero toont nog steeds plaatsing/platform/device (geen leeftijd/gender-
+knoppen meer); LinkedIn's Overzicht-hero toont terecht geen donutkaart meer, layout blijft intact;
+Meta's Campagnes toont "Doelgroepsignalen" met een gevulde leeftijd/gender-donut en "Waar het weglekt"
+terecht leeg (geen bleeders in de demodata); LinkedIn's Campagnes toont "Doelgroepsignalen" met alle
+vier de dimensieknoppen (alleen Functie met data) en "Waar het weglekt" met twee echte
+nul-conversiecampagnes en een correct opgeteld totaal. Geen console-fouten buiten de al langer
+bestaande 401's op een niet aan deze wijziging gerelateerde resource. `tsc` 0 fouten.
+
+Nog open: Overzicht's "Jaaroverzicht 2026"/"Waar het budget landt" (alleen Google) en Prognose's twee
+afwijkende titels — niet gevraagd in deze ronde, dus niet aangepakt.
+
+`tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijziging onttrokken
+productiedrift (meta/linkedin `*_legacy` vs `fact_core`-rijtelverschillen, al meermaals gemeld).

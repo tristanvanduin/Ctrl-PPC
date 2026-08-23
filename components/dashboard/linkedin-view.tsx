@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Briefcase, Calendar, LayoutGrid, Sparkles, Target } from "lucide-react";
+import { Briefcase, Calendar, LayoutGrid, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
+import { ChannelBleedersTable } from "./channel-bleeders-table";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { CreativeDeepDive } from "./creative-deep-dive";
@@ -74,9 +75,15 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
 
       {/* DE OPENER (17.39, derde kanaal): zelfde patroon als Google (17.34-17.37) en Meta
           (17.38) -- BreakdownDonuts + ranglijst links, kaart alleen rechts, gedeelde geo-state
-          via useGeoBreakdown(). BreakdownDonuts toont hier functie/senioriteit/industrie/
-          bedrijfsgrootte i.p.v. Meta's leeftijd/plaatsing/device -- zelfde component, andere
-          dimensies (BREAKDOWN_DIMENSIES["linkedin"]), geen aparte code nodig.
+          via useGeoBreakdown().
+
+          groep="levering" (23 augustus 2026): LinkedIn heeft geen leveringsdimensie zoals Meta's
+          plaatsing/platform/device -- functie/senioriteit/industrie/bedrijfsgrootte zijn zelf
+          allemaal wie-vragen, en die staan sinds vandaag op Campagnes onder "Doelgroepsignalen"
+          (zie LinkedInCampagnes hieronder). BreakdownDonuts rendert hier dus niets voor LinkedIn;
+          dat is de bewuste consequentie van de scheiding en geen ontbrekende data. De hero blijft
+          met alleen de ranglijst en de kaart staan, precies zoals de kaart er ook staat als een
+          van de twee leeg is (zie BreakdownDonuts' eigen "niets tonen"-afvang).
 
           Ook hier bewust geen pacing/KPI's in de hero: die zitten in ChannelPerformance, dat
           Meta en LinkedIn delen (zie 17.38's toelichting). */}
@@ -85,7 +92,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           vlak staan. */}
       <div className="hero-rij grid grid-cols-1 gap-4 items-start xl:grid-cols-12">
         <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
-          <BreakdownDonuts clientId={clientId} channel="linkedin" />
+          <BreakdownDonuts clientId={clientId} channel="linkedin" groep="levering" />
           <GeoRanglijstCard state={geo} />
         </div>
         <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
@@ -192,6 +199,20 @@ export function LinkedInCampagnes({ clientId, geoClone }: { clientId: string; ge
         <ChannelCampaignTable clientId={clientId} channel="linkedin" geoClone={geoClone} />
       </Sectie>
 
+      {/* LinkedIn-equivalent van Google's "Doelgroepsignalen" (23 augustus 2026). Zelfde component
+          als de hero (BreakdownDonuts), maar hier zonder ander dimensiefilter nodig: LinkedIn's
+          vier dimensies (functie/senioriteit/industrie/bedrijfsgrootte) zijn allemaal
+          doelgroepsignalen, dus groep="doelgroep" toont ze alle vier -- de hero's groep="levering"
+          toont er sindsdien geen enkele, zie de toelichting daarboven. Vóór "De advertenties
+          zelf", zelfde volgorde als bij Google en Meta. */}
+      <Sectie
+        icoon={<Users className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Doelgroepsignalen"
+        bijschrift="Welke functies, senioriteit, industrieën en bedrijfsgroottes de campagnes bereiken, en wat het oplevert"
+      >
+        <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
+      </Sectie>
+
       {/* Quick scan: creatives + prestaties + samenvatting. */}
       <Sectie
         icoon={<Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -202,6 +223,17 @@ export function LinkedInCampagnes({ clientId, geoClone }: { clientId: string; ge
         {/* Verhuisd van Bevindingen hierheen (feedback 22 augustus): het bijschrift beloofde
             "vermoeidheid" hier al, maar de kaart zelf stond drie tabbladen verderop. */}
         <CreativeDeepDive clientId={clientId} channel="linkedin" />
+      </Sectie>
+
+      {/* LinkedIn-equivalent van Google's "Waar het weglekt" (23 augustus 2026). Zelfde toelichting
+          als bij Meta: geen zoektermrapport op dit platform, dus de granulariteit die er wél is --
+          campagnes met spend en nul conversies in de laatste 28 dagen. */}
+      <Sectie
+        icoon={<AlertTriangle className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Waar het weglekt"
+        bijschrift="Campagnes die kosten maken zonder conversie"
+      >
+        <ChannelBleedersTable clientId={clientId} channel="linkedin" geoClone={geoClone} />
       </Sectie>
     </div>
   );

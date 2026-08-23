@@ -11,23 +11,35 @@ export interface BreakdownDimensie {
   /** De waarde van breakdown_type (Meta) of pivot_type (LinkedIn). */
   key: string;
   label: string;
+  /**
+   * "levering" = hoe/waar de ad getoond wordt (Overzicht: "waar komt het vandaan").
+   * "doelgroep" = wie erdoor bereikt wordt (Campagnes: "Doelgroepsignalen", zelfde vraag als
+   * Google's AudienceSplit daar beantwoordt). Toegevoegd 23 augustus 2026: Google's
+   * Doelgroepsignalen draait op audience-targeting-typedata die Meta/LinkedIn niet syncen, maar
+   * leeftijd/gender (Meta) en alle vier LinkedIn-dimensies zijn zelf al doelgroepsignalen — geen
+   * nieuwe databron nodig, alleen dezelfde uitsplitsing op de juiste plek tonen.
+   */
+  groep: "levering" | "doelgroep";
 }
 
 export const BREAKDOWN_DIMENSIES: Record<BreakdownKanaal, BreakdownDimensie[]> = {
   // Volgorde is niet willekeurig: plaatsing is waar een Meta-adverteerder als eerste kijkt.
   // Het platform zegt op wélk netwerk je zat, de positie zegt wáár op dat netwerk.
   meta: [
-    { key: "platform_position", label: "Plaatsing" },
-    { key: "publisher_platform", label: "Platform" },
-    { key: "device_platform", label: "Device" },
-    { key: "age", label: "Leeftijd" },
-    { key: "gender", label: "Gender" },
+    { key: "platform_position", label: "Plaatsing", groep: "levering" },
+    { key: "publisher_platform", label: "Platform", groep: "levering" },
+    { key: "device_platform", label: "Device", groep: "levering" },
+    { key: "age", label: "Leeftijd", groep: "doelgroep" },
+    { key: "gender", label: "Gender", groep: "doelgroep" },
   ],
+  // LinkedIn heeft geen leveringsdimensie zoals Meta's plaatsing/platform/device -- alle vier zijn
+  // wie-vragen. Op Overzicht (groep "levering") toont BreakdownDonuts hier dus niets; dat is de
+  // bewuste consequentie van de scheiding en geen ontbrekende data.
   linkedin: [
-    { key: "MEMBER_JOB_FUNCTION", label: "Functie" },
-    { key: "MEMBER_SENIORITY", label: "Senioriteit" },
-    { key: "MEMBER_INDUSTRY", label: "Industrie" },
-    { key: "MEMBER_COMPANY_SIZE", label: "Bedrijfsgrootte" },
+    { key: "MEMBER_JOB_FUNCTION", label: "Functie", groep: "doelgroep" },
+    { key: "MEMBER_SENIORITY", label: "Senioriteit", groep: "doelgroep" },
+    { key: "MEMBER_INDUSTRY", label: "Industrie", groep: "doelgroep" },
+    { key: "MEMBER_COMPANY_SIZE", label: "Bedrijfsgrootte", groep: "doelgroep" },
   ],
 };
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Megaphone, Calendar, LayoutGrid, Sparkles, Target } from "lucide-react";
+import { Megaphone, Calendar, LayoutGrid, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
+import { ChannelBleedersTable } from "./channel-bleeders-table";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { CreativeDeepDive } from "./creative-deep-dive";
@@ -97,14 +98,19 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
           kaart + donuts in de hero" en ChannelPerformance ongewijzigd laten.
 
           BreakdownDonuts is Meta's eigen equivalent van CampaignTypeSplit: spend/conversies per
-          leeftijd, plaatsing of device (tabs), altijd gevuld zodra er breakdown-data is -- geen
-          kanaalspecifieke leegte zoals PmaxNetworkSplit bij Google had. */}
+          plaatsing, platform of device (tabs), altijd gevuld zodra er breakdown-data is -- geen
+          kanaalspecifieke leegte zoals PmaxNetworkSplit bij Google had.
+
+          groep="levering": alleen plaatsing/platform/device, dus "waar komt het vandaan" zoals
+          deze hero zelf beantwoordt (zie de toelichting bovenaan dit bestand). Leeftijd en gender
+          zijn wie-vragen en staan sinds 23 augustus op Campagnes onder "Doelgroepsignalen" --
+          zelfde component, ander dimensiefilter, zie lib/analysis/breakdown-dimensions.ts. */}
       {/* items-start: zonder deze guard rekt Grid's default stretch-gedrag de kortste kolom uit tot
           de hoogte van de langste (hier meestal de kaart) en blijft er een leeg vlak onderin de
           andere kolom staan -- exact het patroon dat Google's hero-grid al bewust vermijdt. */}
       <div className="hero-rij grid grid-cols-1 gap-4 items-start xl:grid-cols-12">
         <div className="hero-ring min-w-0 xl:col-span-5 flex flex-col gap-4">
-          <BreakdownDonuts clientId={clientId} channel="meta" />
+          <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
           <GeoRanglijstCard state={geo} />
         </div>
         <div className="hero-kaart min-w-0 xl:col-span-7 flex flex-col gap-4">
@@ -212,6 +218,21 @@ export function MetaCampagnes({ clientId, geoClone }: { clientId: string; geoClo
         <ChannelCampaignTable clientId={clientId} channel="meta" geoClone={geoClone} />
       </Sectie>
 
+      {/* Meta-equivalent van Google's "Doelgroepsignalen" (23 augustus 2026). Google's sectie
+          draait op audience-targeting-typedata (affiniteit/in-market/remarketing) die Meta niet
+          syncet; wat wél al gesynced is (meta_breakdown_daily) bevat leeftijd en gender, zelf ook
+          doelgroepsignalen. Zelfde component als de hero (BreakdownDonuts), ander dimensiefilter
+          (groep="doelgroep") -- geen dubbele kaart met identieke data, want de hero toont alleen
+          plaatsing/platform/device. Vóór "De advertenties zelf", zelfde volgorde als bij Google:
+          de doelgroepmix is een targeting-vraag, geen creative-vraag. */}
+      <Sectie
+        icoon={<Users className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Doelgroepsignalen"
+        bijschrift="Welke leeftijds- en gendergroepen de campagnes bereiken, en wat het oplevert"
+      >
+        <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
+      </Sectie>
+
       {/* Quick scan: creatives + prestaties + samenvatting. */}
       <Sectie
         icoon={<Sparkles className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -222,6 +243,19 @@ export function MetaCampagnes({ clientId, geoClone }: { clientId: string; geoClo
         {/* Verhuisd van Bevindingen hierheen (feedback 22 augustus): het bijschrift beloofde
             "vermoeidheid" hier al, maar de kaart zelf stond drie tabbladen verderop. */}
         <CreativeDeepDive clientId={clientId} channel="meta" />
+      </Sectie>
+
+      {/* Meta-equivalent van Google's "Waar het weglekt" (23 augustus 2026). Google ziet dit tot op
+          zoekterm- en ad group-niveau omdat het een zoekplatform is; Meta syncet geen
+          zoektermrapport. Wat wél kan: campagnes met spend en nul conversies in de laatste 28
+          dagen, zelfde databron als "Wat er draait" hierboven maar gefilterd op het risico. Zie
+          channel-bleeders-table.tsx voor de toelichting waarom dit de eerlijke granulariteit is. */}
+      <Sectie
+        icoon={<AlertTriangle className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Waar het weglekt"
+        bijschrift="Campagnes die kosten maken zonder conversie"
+      >
+        <ChannelBleedersTable clientId={clientId} channel="meta" geoClone={geoClone} />
       </Sectie>
     </div>
   );
