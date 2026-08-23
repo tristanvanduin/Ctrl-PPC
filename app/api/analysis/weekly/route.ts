@@ -148,15 +148,27 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   const sharedContext = `${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   // Drie losse calls i.p.v. één grote (masterplan 17.11x): elke stap is nu apart routeerbaar
-  // (STEP_TIER, per "weekly-step-N") en apart gelogd in llm_usage. `layer: "narrative"` behoudt
-  // precies het model dat de ongesplitste versie ook al gebruikte (Claude Sonnet 5 via
-  // callLayer) -- zonder deze parameter zou runStep() stilzwijgend naar callRouted's heavy-tier
-  // (Gemini) zijn overgestapt, een modelwissel die hier niet gevraagd is.
+  // (STEP_TIER, per "weekly-step-N") en apart gelogd in llm_usage.
+  //
+  // MODELKEUZE PER STAP (masterplan 17.111). De ongesplitste versie draaide alles op Claude
+  // Sonnet 5 ($2/$10 per 1M) via runAnalysis' callLayer("narrative"). Dat is de duurste plek in
+  // de hele pijplijn: weekly draait ~52x per jaar per kanaal tegen monthly's ~12x, dus 4x het
+  // volume op een model met 5,3x de uitvoerprijs van Gemini 3.7 Flash -- en het werd nooit gelogd,
+  // dus het stond in geen enkel kostenoverzicht.
+  //
+  // Stap 1 en 2 zijn signaleringswerk: tabellen lezen, afwijkingen benoemen, bleeders aanwijzen.
+  // Ze geven daarom GEEN expliciete laag mee en vallen terug op callRouted's heavy-tier
+  // (Gemini 3.7 Flash) -- exact hetzelfde model dat monthly's twaalf, inhoudelijk zwaardere
+  // analysestappen al draait. Geen sprong naar iets onbewezen, wel gelijktrekken met wat werkt.
+  //
+  // Stap 3 HOUDT `layer: "narrative"` (Claude): daar zit het Weekoverzicht, de synthese die de
+  // hele week samenvat in acties per urgentieniveau. Dat is formuleerwerk, en dat is precies waar
+  // Sonnet 5 zijn meerprijs verdient.
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check & Tracking Verificatie..." });
   const step1 = await runStep({
     supabase, apiKey, clientId, sopType: "weekly", periodStart, periodEnd,
     stepNumber: 1, stepName: "Account Health Check",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildWeeklyStep1Prompt(goalsSection, accountType),
     userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}".
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -171,7 +183,7 @@ ${toPromptTable(weeklyData)}
   const step2 = await runStep({
     supabase, apiKey, clientId, sopType: "weekly", periodStart, periodEnd,
     stepNumber: 2, stepName: "Keyword Zoekterm Bleeders",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildWeeklyStep2Prompt(goalsSection, accountType),
     userMessage: `Voer stap 2 (${"Keyword & Zoekterm Bleeders"}) uit voor client "${clientId}".
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -376,7 +388,7 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   const step1 = await runStep({
     supabase, apiKey, clientId, sopType: "meta_weekly", periodStart, periodEnd,
     stepNumber: 1, stepName: "Account Health Check",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildWeeklyStep1Prompt(goalsSection, accountType, "meta_ads"),
     userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}" (Meta Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -391,7 +403,7 @@ ${toPromptTable(accountResult)}
   const step2 = await runStep({
     supabase, apiKey, clientId, sopType: "meta_weekly", periodStart, periodEnd,
     stepNumber: 2, stepName: "Ad Set en Ad Bleeders",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildWeeklyStep2Prompt(goalsSection, accountType, "meta_ads"),
     userMessage: `Voer stap 2 uit voor client "${clientId}" (Meta Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -602,7 +614,7 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   const step1 = await runStep({
     supabase, apiKey, clientId, sopType: "linkedin_weekly", periodStart, periodEnd,
     stepNumber: 1, stepName: "Account Health Check",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildWeeklyStep1Prompt(goalsSection, accountType, "linkedin_ads"),
     userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}" (LinkedIn Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -617,7 +629,7 @@ ${toPromptTable(accountRows)}
   const step2 = await runStep({
     supabase, apiKey, clientId, sopType: "linkedin_weekly", periodStart, periodEnd,
     stepNumber: 2, stepName: "Campagne en Creative Bleeders",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildWeeklyStep2Prompt(goalsSection, accountType, "linkedin_ads"),
     userMessage: `Voer stap 2 uit voor client "${clientId}" (LinkedIn Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}

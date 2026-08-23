@@ -196,6 +196,12 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
 
   // Alle context die de ongesplitste versie eenmalig meegaf, gaat nu naar ELKE stap-call (masterplan
   // 17.11x) -- zie de toelichting bij weekly/route.ts voor dezelfde redenering.
+  //
+  // MODELKEUZE PER STAP (masterplan 17.111), zelfde afweging als weekly: stap 1 t/m 3 zijn
+  // signaleringswerk en draaien op callRouted's heavy-tier (Gemini 3.7 Flash, hetzelfde model als
+  // monthly's analysestappen). Stap 4 houdt `layer: "narrative"` (Claude Sonnet 5), want daar zit
+  // de Eindconclusie met maandprognose, directe acties, sprintplanning-update en twee hypotheses --
+  // formuleerwerk waar nuance telt.
   const sharedContext = `${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
 
 ${bwComparisonText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
@@ -210,7 +216,7 @@ ${bwComparisonText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks
   const step1 = await runStep({
     supabase, apiKey, clientId, sopType: "biweekly", periodStart, periodEnd,
     stepNumber: 1, stepName: "Account Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep1Prompt(goalsSection, accountType, previousMonthlyOutput),
     userMessage: `Voer stap 1 (Account Performance) uit voor client "${clientId}".
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -230,7 +236,7 @@ ${toPromptTable(weeklyResult.data ?? [])}
   const step2 = await runStep({
     supabase, apiKey, clientId, sopType: "biweekly", periodStart, periodEnd,
     stepNumber: 2, stepName: "Campagne Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep2Prompt(goalsSection, accountType, previousMonthlyOutput),
     userMessage: `Voer stap 2 (Campagne Performance) uit voor client "${clientId}".
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -248,7 +254,7 @@ ${toPromptTable(campaignResult.data ?? [])}
   const step3 = await runStep({
     supabase, apiKey, clientId, sopType: "biweekly", periodStart, periodEnd,
     stepNumber: 3, stepName: "Ad Group Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep3Prompt(goalsSection, accountType, previousMonthlyOutput),
     userMessage: `Voer stap 3 (Ad Group Performance) uit voor client "${clientId}".
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -466,7 +472,7 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const step1 = await runStep({
     supabase, apiKey, clientId, sopType: "meta_biweekly", periodStart, periodEnd,
     stepNumber: 1, stepName: "Account Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep1Prompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads"),
     userMessage: `Voer stap 1 (Account Performance) uit voor client "${clientId}" (Meta Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -486,7 +492,7 @@ ${toPromptTable(accountLast30)}
   const step2 = await runStep({
     supabase, apiKey, clientId, sopType: "meta_biweekly", periodStart, periodEnd,
     stepNumber: 2, stepName: "Campagne Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep2Prompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads"),
     userMessage: `Voer stap 2 (Campagne Performance) uit voor client "${clientId}" (Meta Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -504,7 +510,7 @@ ${toPromptTable(campaignMonthly)}
   const step3 = await runStep({
     supabase, apiKey, clientId, sopType: "meta_biweekly", periodStart, periodEnd,
     stepNumber: 3, stepName: "Ad Set en Doelgroep Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep3Prompt(goalsSection, accountType, previousMonthlyOutput, "meta_ads"),
     userMessage: `Voer stap 3 (Ad Set & Doelgroep Performance) uit voor client "${clientId}" (Meta Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -733,7 +739,7 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   const step1 = await runStep({
     supabase, apiKey, clientId, sopType: "linkedin_biweekly", periodStart, periodEnd,
     stepNumber: 1, stepName: "Account Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep1Prompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads"),
     userMessage: `Voer stap 1 (Account Performance) uit voor client "${clientId}" (LinkedIn Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -753,7 +759,7 @@ ${toPromptTable(accountLast30)}
   const step2 = await runStep({
     supabase, apiKey, clientId, sopType: "linkedin_biweekly", periodStart, periodEnd,
     stepNumber: 2, stepName: "Campagne Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep2Prompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads"),
     userMessage: `Voer stap 2 (Campagne Performance) uit voor client "${clientId}" (LinkedIn Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
@@ -771,7 +777,7 @@ ${toPromptTable(campaignMonthly)}
   const step3 = await runStep({
     supabase, apiKey, clientId, sopType: "linkedin_biweekly", periodStart, periodEnd,
     stepNumber: 3, stepName: "Creative Performance",
-    layer: "narrative", runKey: jobId,
+    runKey: jobId,
     systemPrompt: buildBiWeeklyStep3Prompt(goalsSection, accountType, previousMonthlyOutput, "linkedin_ads"),
     userMessage: `Voer stap 3 (Creative Performance) uit voor client "${clientId}" (LinkedIn Ads).
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}

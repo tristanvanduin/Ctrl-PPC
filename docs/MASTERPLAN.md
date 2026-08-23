@@ -7796,3 +7796,73 @@ weekly/biweekly-rijen (nu afgedekt door `saveFullOutputMarker`), `monthly-hypoth
 biweekly's eigen "vorige maandanalyse"-lookup lezen uitsluitend `*_monthly`-sopTypes (ongemoeid). `tsc`
 0 fouten, `node scripts/run-tests.mjs` 316/316. Geen live LLM-verificatie mogelijk (OpenRouter 401 in deze
 sandbox, al eerder vastgesteld) -- dat blijft de ene, niet af te dekken restrisico van deze wijziging.
+
+### 17.111 Weekly/biweekly data-stappen van Claude naar Gemini 3.7 Flash (23 augustus 2026)
+
+De eigenaar vond de kosten hoog en vroeg welk model waar hoort. Eerst gemeten in de echte
+`llm_usage`-tabel (410 rijen, 18 juli-19 augustus, 12 klanten) in plaats van geschat.
+
+**Wat de meting liet zien.**
+
+| | calls | kosten | per call |
+|---|---|---|---|
+| Gemini 3.7 Flash | 306 (75%) | EUR 2,70 (52%) | EUR 0,0088 |
+| Grok 4.6 (monthly stap 13) | 28 (7%) | EUR 2,21 (42%) | EUR 0,079 |
+| Gemini 2.5 Flash | 38 | EUR 0,33 | |
+| Claude Sonnet 5 | **0 rijen** | **niet gelogd** | |
+
+Gemini 3.7 Flash was dus NIET de kostenpost -- driekwart van de calls voor iets meer dan de helft
+van de kosten, negen keer goedkoper per call dan Grok. De echte bevinding zit in de laatste regel:
+Claude stond met nul rijen in de kostenregistratie, terwijl weekly en biweekly er volledig op
+draaiden. `runAnalysis()` gaf nooit een `runKey` mee, dus `recordUsage()` sloeg nooit aan.
+
+**Waarom dat zoveel uitmaakt.** Per `lib/scheduler/sop-cadence.ts` draait weekly elke 7 dagen en
+biweekly elke 14: samen ~78 runs per jaar per klant per kanaal, tegen monthly's ~12. Dat is 6,5x het
+runvolume van de maandanalyse, op een model met 5,3x de uitvoerprijs van Gemini 3.7 Flash
+($10 vs $1,88 per 1M) -- en het stond in geen enkel overzicht. De gemeten EUR 5,24 was in de praktijk
+alleen de maandanalyses.
+
+**De wijziging.** Dankzij de opsplitsing van 17.110 is elke stap nu apart routeerbaar. Weekly's
+stappen 1-2 en biweekly's stappen 1-3 (signaleringswerk: tabellen lezen, afwijkingen benoemen,
+bleeders aanwijzen) geven geen expliciete laag meer mee en vallen terug op `callRouted`'s heavy-tier
+= Gemini 3.7 Flash. Weekly's stap 3 (Weekoverzicht) en biweekly's stap 4 (Eindconclusie met
+maandprognose, directe acties, sprintplanning en twee hypotheses) HOUDEN `layer: "narrative"`
+(Claude Sonnet 5): dat is formuleerwerk waar nuance telt. 15 stappen verplaatst, 6 behouden.
+
+**Waarom dit geen kwaliteitsgok is.** Monthly's twaalf analysestappen draaien al op Gemini 3.7 Flash
+en over die kwaliteit was de eigenaar expliciet tevreden. Weekly's stappen zijn inhoudelijk lichter
+(afwijkingen over 14 dagen) dan wat dat model in monthly al doet (volledige deep-dive met causale
+ketens, seizoenscorrectie, significantietoetsing). Geen sprong naar iets onbewezen, wel gelijktrekken
+met wat aantoonbaar werkt.
+
+**Bewust NIET gewijzigd, met reden.**
+- *Monthly stap 13 (Grok 4.6 -> Gemini)* zou 71% op die stap besparen (EUR 2,21 -> EUR 0,64) en is de
+  grootste enkele post. Toch niet gedaan: dit is de hypothese- en sprintplanningsynthese, de output
+  waar het bureau zijn acties op baseert. Dat is precies de plek waar goedkoop zich terugbetaalt in
+  slechtere adviezen.
+- *Monthly stap 1-12 -> Flash-Lite* zou 77% op dat blok besparen. Ook niet gedaan: het zijn geen
+  mechanische stappen. Stap 1 doet causale ketenredenering plus seizoenscorrectie plus
+  significantietoetsing; stap 5 beslist welke zoektermen veilig uit te sluiten zijn, en die output
+  gaat rechtstreeks naar `action-gating.ts` dat het als `direct_action` kan markeren. Fout oordeel
+  daar sluit een converterende term uit.
+
+**Een claim die ik moest intrekken.** Ik stelde eerst dat prompt-caching de grootste besparing was:
+5,2M prompt-tokens met 0,1% cachehit, en `CACHED_INPUT_FACTOR` (0,25) staat al in de code. Nagemeten
+klopt de premisse niet. De stabiele prefix van een maandstap-prompt is 1.713 tokens (44% van de
+systemprompt), maar een gemiddelde call is 12.679 tokens en de zware zoektermstappen 41.000 -- die
+massa zit in de `userMessage` met datatabellen, uniek per klant en per run. Zelfs bij perfecte caching
+raak je ~13% van de invoer, en invoer is maar EUR 1,17 van de EUR 2,70 op Gemini. Enkele dubbeltjes,
+geen structurele post. Uitvoer is met 63% van de kosten de dure kant, niet invoer.
+
+**Nog open.** Monthly stap 13 meet gemiddeld 11.009 uitvoertokens tegen een `maxTokens` van 8.192 --
+Grok's onzichtbare redeneertokens worden dus bovenop het zichtbare antwoord gefactureerd, ongelimiteerd.
+De `narrative`- en `strategic`-lagen hebben daarvoor al een `reasoningMaxTokens`-cap; de
+`reasoning`-laag niet. Niet in deze ronde gefixed omdat `__llm_router_test.ts` expliciet vastlegt dat
+Grok-compatibiliteit met dat veld nog niet bevestigd is -- en een niet-ondersteund veld laat de call
+falen, waarna de fallback stilzwijgend naar Gemini gaat: precies de modelwissel op stap 13 die hierboven
+bewust is afgewezen. Eerst bevestigen dat OpenRouter `reasoning.max_tokens` voor x-ai/grok-4.6
+doorgeeft, dan pas aanzetten.
+
+`tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon. Geen live
+LLM-verificatie mogelijk (OpenRouter 401 in deze sandbox) -- het effect op de output is dus beredeneerd
+op basis van wat hetzelfde model in monthly al produceert, niet A/B-getest op eigen data.
