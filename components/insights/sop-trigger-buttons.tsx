@@ -71,22 +71,25 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
   // demoModus in client-dashboard.tsx). SOP's roepen een echte LLM aan (OpenRouter/Gemini,
   // reasoning-budget) -- in demo-modus zou een bezoeker anders op een publieke link telkens een
   // echte, kostende run tegen demo-greentech kunnen starten.
-  // ── DE TESTSCHAKELAAR ──────────────────────────────────────────────────────
+  // ── DE DEMO-BLOKKADE STAAT STANDAARD UIT ───────────────────────────────────
   //
-  // De demo-blokkade hierboven beschermt tegen een BEZOEKER op een publieke demo-link. Ze
-  // blokkeerde daarmee ook de eigenaar die op demo-greentech wil testen -- en dat is precies
-  // waar de demo-klant voor bestaat, want hij is de enige klant met alle drie de kanalen.
+  // De blokkade hierboven beschermt tegen een BEZOEKER op een publieke demo-link die op jouw
+  // rekening echte LLM-runs start. Ze blokkeerde daarmee ook de eigenaar zelf, en demo-greentech
+  // is nu juist de enige klant met alle drie de kanalen -- dus precies waar getest wordt.
   //
-  // NEXT_PUBLIC_SOP_HANDMATIG_IN_DEMO=1 heft de blokkade op. Standaard UIT, dus de publieke
-  // demo blijft beschermd zolang de vlag niet expliciet gezet is; zet hem alleen in een
-  // preview-/testomgeving, niet op de productie-demo.
+  // Eerst opgelost met een vlag die de blokkade OPHEFT (standaard aan-blijvend). Dat was de
+  // verkeerde kant op: die vlag moet je in Vercel zetten en opnieuw deployen, dus in een
+  // preview-omgeving veranderde er niets en bleef de knop grijs. Een oplossing die je eerst
+  // ergens anders moet configureren lost een blokkade niet op, hij verplaatst hem.
   //
-  // Bewust een env-vlag en niet "sta het toe als je ingelogd bent": zolang O1_AUTH_ENFORCED uit
-  // staat is er geen sessie (zie lib/auth/use-access.ts), dus "ingelogd" is vandaag niet van
-  // "anonieme bezoeker" te onderscheiden. Die check zou nu dus iedereen doorlaten.
-  const testTriggerToegestaan = process.env.NEXT_PUBLIC_SOP_HANDMATIG_IN_DEMO === "1";
+  // Nu andersom: handmatig triggeren KAN, tenzij NEXT_PUBLIC_SOP_DEMO_BLOKKADE=1 gezet is. Zet
+  // die vlag zodra de demo publiek bereikbaar wordt voor mensen buiten je eigen team; tot die
+  // tijd is er niemand om tegen te beschermen. De server-kant blijft hoe dan ook gelden: zonder
+  // OPENROUTER_API_KEY draait er niets, en de dekkingsgate voor AUTOMATISCHE runs staat los
+  // hiervan (zie de routes; masterplan 17.112).
+  const demoBlokkadeAan = process.env.NEXT_PUBLIC_SOP_DEMO_BLOKKADE === "1";
   const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoClient(clientId) && !testTriggerToegestaan); }, [clientId, testTriggerToegestaan]);
+  useEffect(() => { setDemoModus(isDemoClient(clientId) && demoBlokkadeAan); }, [clientId, demoBlokkadeAan]);
   const [status, setStatus] = useState<Record<SopType, SopStatus>>({
     weekly: { running: false, lastDate: null, error: null, success: false },
     biweekly: { running: false, lastDate: null, error: null, success: false },

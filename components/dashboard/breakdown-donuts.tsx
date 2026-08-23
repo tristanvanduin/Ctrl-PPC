@@ -106,10 +106,22 @@ function AandeelRaster({ slices, kleur, toonConversies, conversieWoord }: {
   );
 }
 
-export function BreakdownDonuts({ clientId, channel, groep = "levering" }: { clientId: string; channel: Kanaal; groep?: "levering" | "doelgroep" }) {
+/**
+ * `overslaan`: dimensies die deze kaart NIET mag tonen.
+ *
+ * Waarvoor. De hero kan twee van deze kaarten naast elkaar zetten -- bv. LinkedIn, waar alle vier
+ * de dimensies in dezelfde groep zitten en er zonder dit twee keer dezelfde donut zou staan. De
+ * tweede kaart krijgt de eerste dimensie mee als `overslaan` en pakt dan vanzelf de volgende die
+ * data heeft. Zo zie je er twee tegelijk in plaats van één met de rest achter tabjes.
+ *
+ * Bewust "welke NIET" en niet "welke WEL": een vaste dimensie voorschrijven levert een lege kaart
+ * op zodra die dimensie voor deze klant geen data heeft. Uitsluiten laat de bestaande
+ * `beschikbaar`-filter (alleen dimensies met echte data) gewoon zijn werk doen.
+ */
+export function BreakdownDonuts({ clientId, channel, groep = "levering", overslaan }: { clientId: string; channel: Kanaal; groep?: "levering" | "doelgroep"; overslaan?: readonly string[] }) {
   const [segmenten, setSegmenten] = useState<Segment[] | null>(null);
   const [dimensie, setDimensie] = useState<string | null>(null);
-  const [tabelOpen, toggleTabel] = useRememberedOpen(`breakdown-tabel-${channel}-${groep}`, false);
+  const [tabelOpen, toggleTabel] = useRememberedOpen(`breakdown-tabel-${channel}-${groep}${overslaan?.length ? "-b" : ""}`, false);
 
   useEffect(() => {
     const sb = supabase;
@@ -178,8 +190,9 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering" }: { cli
   const beschikbaar = useMemo(() => {
     if (!getoond) return [];
     const metData = new Set(getoond.filter((s) => s.spend > 0 || s.impressies > 0).map((s) => s.dimensie));
-    return BREAKDOWN_DIMENSIES[channel].filter((d) => d.groep === groep && metData.has(d.key));
-  }, [getoond, channel, groep]);
+    const uitgesloten = new Set(overslaan ?? []);
+    return BREAKDOWN_DIMENSIES[channel].filter((d) => d.groep === groep && metData.has(d.key) && !uitgesloten.has(d.key));
+  }, [getoond, channel, groep, overslaan]);
 
   const actief = dimensie ?? beschikbaar[0]?.key ?? null;
 

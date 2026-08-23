@@ -7980,3 +7980,56 @@ eigenaar welke van de twee eerst.
 
 `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon. Alle drie de
 fixes live nagemeten op de demo.
+
+### 17.114 Container queries, de SOP-blokkade omgedraaid, en waarom "0px onbalans" niet haalbaar bleek (23 augustus 2026)
+
+**1. De echte layoutbug: Account Health keek naar het scherm i.p.v. naar zichzelf.** De eigenaar
+noemde een screenshot "verschrikkelijk", en terecht: in de halfbrede hero liepen "Doelstelling" en
+"Efficiency 16/20" over elkaar en brak de uitleg om de twee woorden af. Oorzaak: `xl:flex-row` en
+`sm:grid-cols-2` zijn VENSTER-breekpunten. Bij een venster van 1500px is `xl` (1280px) waar, dus
+zette de kaart cirkel + factoren + anomalieën naast elkaar -- in een kolom van ~598px. De kaart wist
+niet dat hij smal stond.
+
+Gefixt met container queries (`@container` + `@2xl`/`@md`/`@lg`), die de KAART meten en niet het
+scherm. Tailwind v4 heeft ze ingebouwd en `pacing-monitor.tsx` gebruikte ze al. Resultaat: radar met
+vrije labels, "Waaruit de score bestaat" in twee leesbare kolommen met hele zinnen.
+
+Dit is een patroon om op te letten: elke kaart die zowel op volle breedte als in een halfbrede kolom
+kan staan, hoort container queries te gebruiken. Viewport-breekpunten liegen daar per definitie.
+
+**2. De SOP-knop: mijn eigen oplossing loste niets op.** In 17.113 is de demo-blokkade opgeheven met
+`NEXT_PUBLIC_SOP_HANDMATIG_IN_DEMO=1` -- standaard UIT. Maar zo'n vlag moet je in Vercel zetten en
+opnieuw deployen, dus in de preview veranderde er niets en bleef de knop grijs. De eigenaar meldde
+voor de derde keer dat hij niet kon triggeren. Een oplossing die je eerst ergens anders moet
+configureren lost een blokkade niet op, hij verplaatst hem.
+
+Omgedraaid: handmatig triggeren KAN nu standaard, ook op de demo-klant. `NEXT_PUBLIC_SOP_DEMO_BLOKKADE=1`
+zet de bescherming aan zodra de demo publiek bereikbaar wordt. De eigenaar heeft nu geen live
+klanten, dus er is voorlopig niemand om tegen te beschermen -- en de server-kant blijft hoe dan ook
+gelden (zonder `OPENROUTER_API_KEY` draait er niets).
+
+**3. "Waarom niet hard op 0px onbalans?" -- geprobeerd, en eerlijk: niet gehaald.** De eigenaar
+vroeg terecht waarom een restmarge acceptabel zou zijn. Eerste poging: de laatste kaart van elke
+kolom de restruimte laten opnemen (`[&>*:last-child]:grow`). Meting: 0px op alle drie de kanalen.
+Maar de render liet een leeg vlak van ~350px ZIEN binnen "Conversies per land", tussen de cijfers en
+de uitklapknop. De meting was opgelost, het probleem niet -- precies de fout waar de eigenaar op
+wees. Teruggedraaid.
+
+Tweede poging, op zijn voorstel ("voeg iets nuttigs toe"): een vierde kaart in de kortere kolom.
+Bij Meta werkt dat -- de doelgroep-donut (leeftijd/gender) stond alleen op Campagnes en is op
+Overzicht nieuwe informatie naast de leveringsdonut. Bij LinkedIn niet: nagemeten in
+`linkedin_demographic_daily` heeft alleen `MEMBER_JOB_FUNCTION` rijen, de andere drie dimensies zijn
+nul. Een tweede kaart zou daar niets tonen.
+
+**Waarom exact 0px structureel niet haalbaar is met deze opzet.** Kaarthoogtes hangen af van de data
+van de klant: hoeveel landen, hoeveel dimensies met data, hoeveel anomalieën. Elke toevoeging kantelt
+bovendien welke kolom de kortste is -- na de Meta-kaart is daar de LINKER kolom 205px korter, waar
+het eerst rechts was. Twee onafhankelijke kolommen met inhoud-gestuurde hoogtes komen alleen bij
+toeval gelijk uit, en dat toeval verschilt per klant.
+
+De echte opties zijn (a) de hero terugbrengen tot precies twee kaarten (Account Health naast de
+wereldkaart, wat de oorspronkelijke wens was) met de rest in een volle-breedte raster eronder, of
+(b) een masonry-achtige stroom waarin kaarten opvullen. Beide zijn een herindeling, geen bijstelling.
+Teruggelegd bij de eigenaar in plaats van er zelf een derde keer een truc op los te laten.
+
+`tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316. Alle metingen live op de demo.

@@ -105,6 +105,12 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         <div className="min-w-0 flex flex-col gap-4">
           <GeoMapCard state={geo} channel="linkedin" />
           <GeoRanglijstCard state={geo} />
+          {/* Hier zou een tweede doelgroep-donut staan (senioriteit/industrie/bedrijfsgrootte),
+              zoals Meta er een heeft. Nagemeten in linkedin_demographic_daily: alleen
+              MEMBER_JOB_FUNCTION heeft rijen -- de andere drie dimensies zijn nul. Een tweede
+              kaart zou dus niets tonen, en de component vangt dat terecht af met "niets renderen
+              zonder data". Zodra die dimensies wel gesynct worden hoort hij hier:
+              <BreakdownDonuts ... groep="doelgroep" overslaan={["MEMBER_JOB_FUNCTION"]} /> */}
         </div>
       </div>
 

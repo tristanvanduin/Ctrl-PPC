@@ -51,15 +51,21 @@ export function HealthBadgeView({
     : "#ef4444";
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-      {/* flex-col tot xl: bij drie stukken content (cirkel, factoren, anomalieën+uitleg) naast
-          elkaar kon de derde kolom bij een kaart smaller dan hun gecombineerde breedte niet meer
-          naar een eigen regel breken -- flex-wrap verdeelt de resterende ruimte dan over een
-          flex-1 kolom die tot bijna 0 kan uitgeknepen worden in plaats van te wrappen. `lg` alleen
-          was niet breed genoeg: de sidebar wordt zichtbaar/vast vanaf `lg` (`lg:ml-72`), dus de
-          kaart zelf is op precies dat breakpoint juist het smalst. Onder xl staan de drie stukken
-          voortaan gewoon onder elkaar. */}
-      <div className="flex flex-col gap-5 xl:flex-row xl:flex-wrap xl:items-start">
+    <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
+      {/* CONTAINER QUERY, GEEN VIEWPORT-BREEKPUNT -- en dat is de kern van de fix.
+          Hier stond `xl:flex-row`. Dat is een VENSTER-breekpunt, terwijl deze kaart in de hero in
+          een halfbrede kolom staat. Bij een venster van 1500px is `xl` (1280px) waar, dus zette de
+          kaart cirkel + factoren + anomalieën naast elkaar -- in een kolom van ~598px. Resultaat:
+          "Doelstelling" en "Efficiency 16/20" over elkaar heen, en tekst die om de twee woorden
+          afbrak. De kaart wist niet dat hij smal stond; hij keek naar het scherm.
+
+          `@2xl` (672px) meet de KAART zelf: pas als er echt ruimte is voor de cirkel (80px) plus
+          twee tekstkolommen gaan de stukken naast elkaar. In de halfbrede hero blijft het dus
+          netjes onder elkaar, en op een volle-breedte plaatsing (waar deze kaart ook voorkomt)
+          krijgt hij zijn rij-indeling terug.
+
+          Zie ook pacing-monitor.tsx, dat @container al gebruikt -- Tailwind v4 heeft het ingebouwd. */}
+      <div className="flex flex-col gap-5 @2xl:flex-row @2xl:flex-wrap @2xl:items-start">
         {/* Score circle */}
         <div className="relative w-20 h-20 shrink-0">
           <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
@@ -110,7 +116,7 @@ export function HealthBadgeView({
             // grid-cols-3 op smal, grid-cols-5 vanaf sm: vijf kolommen met labels als "Conversion
             // Efficiency" pasten niet naast elkaar op een telefoonbreed scherm en duwden de hele
             // pagina breder in plaats van zelf om te breken.
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            <div className="grid grid-cols-3 gap-2 @md:grid-cols-5">
               {health.factors.map((f) => (
                 <div key={f.name} className="text-center">
                   {/* Niet-beoordeeld toont een streepje en geen 0/20: een nul-balk leest als een
@@ -196,7 +202,7 @@ export function HealthBadgeView({
                 factor: naam+score blijven kort en lijnen zelf al uit (justify-between binnen hun
                 eigen regel), de uitleg krijgt een eigen regel eronder en wordt niet meer
                 afgekapt -- geen kolom om uit te lijnen, dus niets meer om uit te lijnen. */}
-            <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
+            <dl className="grid gap-x-5 gap-y-3 @lg:grid-cols-2">
               {health.factors.map((f) => (
                 <div key={f.name} className="min-w-0">
                   <div className="flex items-baseline justify-between gap-2">

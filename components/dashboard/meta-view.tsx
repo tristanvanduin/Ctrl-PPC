@@ -116,6 +116,10 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         <div className="min-w-0 flex flex-col gap-4">
           <GeoMapCard state={geo} channel="meta" />
           <GeoRanglijstCard state={geo} />
+          {/* Vierde kaart, om de kolommen even lang te maken MET echte inhoud i.p.v. een gerekte
+              kaart met een gat erin. Leeftijd/gender stond alleen op Campagnes; hier is het nieuwe
+              informatie naast de leveringsdonut links (plaatsing/platform/device). */}
+          <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
         </div>
       </div>
 
