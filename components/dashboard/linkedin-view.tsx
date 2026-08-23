@@ -5,6 +5,8 @@ import { Briefcase, Calendar, LayoutGrid, Sparkles, Target, Users, AlertTriangle
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
 import { ChannelBleedersTable } from "./channel-bleeders-table";
+import { ChannelVideoPerformance } from "./channel-video-performance";
+import { ChannelForecastOverview } from "./channel-forecast-overview";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { CreativeDeepDive } from "./creative-deep-dive";
@@ -107,6 +109,27 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         bijschrift="Kerncijfers, pacing en het maandverloop"
       >
         <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} edition={edition} />
+      </Sectie>
+
+      {/* LinkedIn-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde
+          toelichting als bij Meta: computeForecast is al kanaalneutraal, dit levert alleen de
+          LinkedIn-databron en het client_targets-jaardoel. Zie channel-forecast-overview.tsx. */}
+      <Sectie
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Jaaroverzicht 2026"
+        bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+      >
+        <ChannelForecastOverview clientId={clientId} channel="linkedin" />
+      </Sectie>
+
+      {/* LinkedIn-equivalent van Google's "Waar het budget landt" (23 augustus 2026) -- alleen het
+          campagne-niveau videodeel, zelfde toelichting als bij Meta. */}
+      <Sectie
+        icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Waar het budget landt"
+        bijschrift="Video"
+      >
+        <ChannelVideoPerformance clientId={clientId} channel="linkedin" />
       </Sectie>
     </div>
   );

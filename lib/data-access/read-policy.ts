@@ -139,6 +139,14 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // dbSelect-adapter mee in plaats van de singleton; de functie zelf en haar server-side
   // aanroepers blijven ongewijzigd.
   ads_account_monthly: { capability: "client:read", clientColumn: "client_id" },
+
+  // 23 augustus 2026: channel-forecast-overview.tsx (Meta/LinkedIn's "Jaaroverzicht 2026") is de
+  // eerste browser-lezer van client_targets. De tabel bestond al (migratie 002/082, fase 2
+  // MASTERPLAN.md) maar werd tot nu toe uitsluitend server-side gelezen (de analyseroutes, met de
+  // service-role-client) -- vandaar dat hij hier nog ontbrak. Zonder deze regel gaf /api/data een
+  // 400 terug (tabel niet in READABLE_TABLES) en viel de forecast stil terug op "geen doel
+  // ingesteld", niet omdat er geen doel was maar omdat de query nooit aankwam.
+  client_targets: { capability: "client:read", clientColumn: "client_id" },
 };
 
 export function isReadableTable(table: string): boolean {

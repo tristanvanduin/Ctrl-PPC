@@ -42,6 +42,10 @@ export interface DailyRow {
   spend: number;
   // Ruwe conversievelden per naam; welke meetellen bepaalt de conversie-selectie per kanaal.
   convFields: Record<string, number>;
+  /** conversion_value -- toegevoegd 23 augustus 2026 voor channel-forecast-data.ts (Jaaroverzicht
+   *  op Meta/LinkedIn), dat een omzetcijfer nodig heeft naast de conversie-telling. Bestaande
+   *  lezers negeren dit veld gewoon. */
+  revenue: number;
 }
 
 interface ChannelConfig {
@@ -70,8 +74,8 @@ export const CONFIG: Record<ChannelKind, ChannelConfig> = {
     nameId: "campaign_id",
     entityField: "entity_id",
     channelKey: "meta_ads",
-    select: "date, entity_id, impressions, link_clicks, spend, conversions, leads",
-    map: (r) => ({ date: String(r.date), entity: String(r.entity_id), impressions: num(r.impressions), clicks: num(r.link_clicks), spend: num(r.spend), convFields: { conversions: num(r.conversions), leads: num(r.leads) } }),
+    select: "date, entity_id, impressions, link_clicks, spend, conversions, leads, conversion_value",
+    map: (r) => ({ date: String(r.date), entity: String(r.entity_id), impressions: num(r.impressions), clicks: num(r.link_clicks), spend: num(r.spend), convFields: { conversions: num(r.conversions), leads: num(r.leads) }, revenue: num(r.conversion_value) }),
   },
   linkedin: {
     accountTable: "linkedin_account_daily",
@@ -80,8 +84,8 @@ export const CONFIG: Record<ChannelKind, ChannelConfig> = {
     nameId: "campaign_urn",
     entityField: "entity_urn",
     channelKey: "linkedin_ads",
-    select: "date, entity_urn, impressions, clicks, spend, one_click_leads, external_website_conversions, post_click_conversions",
-    map: (r) => ({ date: String(r.date), entity: String(r.entity_urn), impressions: num(r.impressions), clicks: num(r.clicks), spend: num(r.spend), convFields: { one_click_leads: num(r.one_click_leads), external_website_conversions: num(r.external_website_conversions), post_click_conversions: num(r.post_click_conversions) } }),
+    select: "date, entity_urn, impressions, clicks, spend, one_click_leads, external_website_conversions, post_click_conversions, conversion_value",
+    map: (r) => ({ date: String(r.date), entity: String(r.entity_urn), impressions: num(r.impressions), clicks: num(r.clicks), spend: num(r.spend), convFields: { one_click_leads: num(r.one_click_leads), external_website_conversions: num(r.external_website_conversions), post_click_conversions: num(r.post_click_conversions) }, revenue: num(r.conversion_value) }),
   },
 };
 

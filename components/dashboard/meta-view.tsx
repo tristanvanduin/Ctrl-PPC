@@ -5,6 +5,8 @@ import { Megaphone, Calendar, LayoutGrid, Sparkles, Target, Users, AlertTriangle
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
 import { ChannelBleedersTable } from "./channel-bleeders-table";
+import { ChannelVideoPerformance } from "./channel-video-performance";
+import { ChannelForecastOverview } from "./channel-forecast-overview";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { CreativePerformance } from "./creative-performance";
 import { CreativeDeepDive } from "./creative-deep-dive";
@@ -125,6 +127,29 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         bijschrift="Kerncijfers, pacing en het maandverloop"
       >
         <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} edition={edition} />
+      </Sectie>
+
+      {/* Meta-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde plek en icoon
+          als bij Google; renderd niets zolang er geen dagcijfers gesynced zijn (demo heeft die
+          wel). Zie channel-forecast-overview.tsx voor de volledige toelichting -- computeForecast
+          is al kanaalneutraal, dit levert alleen de Meta-databron en het client_targets-jaardoel. */}
+      <Sectie
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Jaaroverzicht 2026"
+        bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+      >
+        <ChannelForecastOverview clientId={clientId} channel="meta" />
+      </Sectie>
+
+      {/* Meta-equivalent van Google's "Waar het budget landt" (23 augustus 2026) -- alleen het
+          campagne-niveau videodeel; zie channel-video-performance.tsx voor waarom het
+          placement-uitsluitingsadvies (VideoPlacements) hier ontbreekt. */}
+      <Sectie
+        icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Waar het budget landt"
+        bijschrift="Video"
+      >
+        <ChannelVideoPerformance clientId={clientId} channel="meta" />
       </Sectie>
     </div>
   );

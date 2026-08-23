@@ -7410,3 +7410,76 @@ afwijkende titels — niet gevraagd in deze ronde, dus niet aangepakt.
 
 `tsc`/`tests`/`build` groen (314/314), `view-dekking` rood om dezelfde, aan deze wijziging onttrokken
 productiedrift (meta/linkedin `*_legacy` vs `fact_core`-rijtelverschillen, al meermaals gemeld).
+
+### 17.102 Jaaroverzicht 2026 en Waar het budget landt: de laatste twee Overzicht-gaten (23 augustus 2026)
+
+Vervolg op 17.99-17.101. Opdracht: "pak Jaaroverzicht 2026 en Waar het budget landt op" — de laatste
+twee Google-only secties op Overzicht.
+
+**Verkenning vóór het bouwen.** "Jaaroverzicht 2026" (jaardoelen vs bijgestelde prognose) draait op
+`/api/google-ads/client-data` en `client_settings.kpiTargets` — leek op het eerste gezicht volledig
+Google-specifiek. Bij het lezen van `lib/forecast.ts` bleek `computeForecast()` zelf al kanaalneutraal:
+hij rekent op `ClientHistoricalData`, kent geen Google Ads-concept. Het Google-specifieke zat alleen in
+de databron en het jaardoel. Verder gezocht naar een jaardoel-bron: `client_targets` (migratie 002/082,
+fase 2 MASTERPLAN.md) bleek al kanaal-gescoopt (`channel`: google_ads/meta_ads/linkedin_ads,
+`metric`: cpa/roas/cpl/conversions/spend/conversion_value) en al gedeeltelijk in gebruik (Meta's
+briefing-analyse leest er al cpa/roas uit) — maar zonder enige invoer-UI, voor geen van de drie
+kanalen (`lib/health-score.ts` noemt dit letterlijk een open gat). Een derde, eigen targets-schema voor
+Meta/LinkedIn bouwen was tegen deze lopende migratie ingegaan. Voorgelegd aan de gebruiker: bouwen op
+`client_targets` (geen nieuwe UI deze ronde — target 0 = terugval op historisch totaal, exact zoals
+Google al doet) — bevestigd.
+
+Voor "Waar het budget landt" (video): Google's `VideoPerformance` (campagne-niveau CPM/CPV/kijkdiepte)
+en `VideoPlacements` (welke YouTube-plek uitsluiten) zijn twee verschillende dingen. Het eerste is
+bouwbaar: Meta syncet al `video_thruplay`/`hook_rate`/`hold_rate` per campagne, LinkedIn al
+`video_starts`/`video_views`/`video_completion_rate` — allebei tot nu toe ongebruikt buiten de
+objective-analyse. Het tweede niet: `ads_video_placements` is een YouTube-placementrapport zonder
+Meta/LinkedIn-equivalent. Voorgelegd en bevestigd: alleen het campagne-niveau deel bouwen.
+
+**Jaaroverzicht 2026.** `lib/analysis/channel-forecast-data.ts` (nieuw, met test): bouwt
+`ClientHistoricalData` uit ruwe dagrijen via `buildClientDataFromApi` — dezelfde adapter die Google al
+gebruikt (`lib/api/adapter.ts`), dus geen tweede aggregatielogica. Het jaardoel komt uit `resolveTargets`
+(`lib/analysis/o2-targets-cost.ts`, al bestond, al getest) op metrics conversions/conversion_value/spend
+voor channel meta_ads/linkedin_ads. `channel-performance.tsx`'s `DailyRow`/`CONFIG` kregen een `revenue`-
+veld (conversion_value, was nog niet geselecteerd) — additief, bestaande lezers negeren het gewoon.
+Nieuwe component `channel-forecast-overview.tsx`: eigen fetch (volledige historie, geen 200-dagen-
+venster zoals ChannelPerformance — de forecast heeft complete jaren nodig om te wegen) + client_targets
++ conversieselectie, vier KPI-tegels (Conversies/Omzet/ROAS/CPA, alleen de kanalen met een doel of met
+historie — `actieveMetrics()`, al bestond) en een prognosegrafiek per maand — beide handgebouwd i.p.v.
+Google's `MetricCards`/`PerformanceChart` hergebruikt, want die twee roepen `useClientHistoricalData`/
+`useForecast` intern aan, en die hooks GOOIEN als ze buiten `ClientDataProvider` draaien (niet "geven
+null terug binnen provider" maar "geven altijd null context terug buiten provider" → altijd een throw).
+Meta/LinkedIn-schermen zitten niet in die provider (Google-specifiek, hangt aan `/api/google-ads`), dus
+hergebruik zou een crash betekenen, geen nette leegte. Zelfde formatters or/verhoudingslogica
+(`lib/forecast-format.ts`, `actieveMetrics`) wél hergebruikt — geen tweede waarheid over "is CPA lager
+beter", alleen de React-laag eromheen is nieuw.
+
+Tijdens het live testen bleek `client_targets` nog niet in `lib/data-access/read-policy.ts`'s
+`READABLE_TABLES` te staan — de tabel bestond alleen voor server-side lezers (de analyseroutes met de
+service-role-client); dit is de eerste browser-lezer. Zonder de policy-regel gaf `/api/data/
+client_targets` een 400 terug en viel de forecast stil terug op "geen doel ingesteld" — niet omdat er
+geen doel was, maar omdat de query nooit aankwam. Toegevoegd, zelfde patroon als de zeventien tabellen
+ervoor in datzelfde bestand.
+
+**Waar het budget landt.** Nieuwe component `channel-video-performance.tsx`: eigen fetch per kanaal
+(Meta: thruplay/hook_rate/hold_rate; LinkedIn: views/completions/completion_rate) over 60 dagen,
+geaggregeerd per campagne, alleen getoond bij echt videosignaal (zelfde "niets tonen zonder data"-
+afvang als Google's `VideoPerformance`). Twee aparte tabelcomponenten (Meta en LinkedIn tonen andere
+kolommen — géén gedwongen gemeenschappelijke vorm over twee platforms die het net niet hetzelfde meten).
+
+Beide secties toegevoegd aan `MetaView`/`LinkedInView` op dezelfde relatieve plek als bij Google (na
+Maandprestaties: eerst Jaaroverzicht 2026, dan Waar het budget landt), zelfde titel/icoon/bijschrift.
+
+Geverifieerd op de live demo: beide Jaaroverzicht-secties tonen vier werkende KPI-tegels ("Jaardoel
+(geen ingesteld — historisch totaal)", correcte fallback want de demo heeft geen client_targets-rijen)
+en een prognosegrafiek met Verwacht/Gerealiseerd/Prognose-lijnen, voor zowel Meta als LinkedIn. Waar het
+budget landt toont terecht niets voor beide kanalen — de demo-fixture bevat geen video-specifieke
+velden (`grep video_thruplay lib/demo/greentech-mock.ts` levert niets op), dus dit is een eerlijke lege
+staat, geen bug; niet zelf demo-data bijgemaakt om dat te verbergen, want dat viel buiten de gevraagde
+scope. Eerste testrun gaf 4× een 400 op `client_targets` — gevonden via een netwerklogger in de
+Playwright-check, niet aangenomen dat de 401's (bekend, ongerelateerd) de enige fout waren; opgelost
+met de policy-regel hierboven en herverifieerd tot 0 nieuwe fouten. `tsc` 0 fouten,
+`node scripts/run-tests.mjs` 315/315 (was 314, plus de nieuwe forecast-test).
+
+`tsc`/`tests`/`build` groen (315/315), `view-dekking` rood om dezelfde, aan deze wijziging onttrokken
+productiedrift.
