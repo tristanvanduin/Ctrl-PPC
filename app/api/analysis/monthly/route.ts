@@ -1564,12 +1564,15 @@ export async function POST(request: NextRequest) {
   if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
   const googleAdsCredentials = credentialsUitOmgeving();
 
+  // Alleen de cron (app/api/cron/trigger-sops) zet deze vlag; de handmatige knop laat 'm weg.
+  let automatisch = false;
   let clientId: string;
   let jobId = crypto.randomUUID();
   let adapter: ChannelAdapter;
   let evalCapture: { fixtureSet: string } | null = null;
   try {
     const body = await request.json();
+    automatisch = body.automatisch === true;
     clientId = body.client_id;
     jobId = body.job_id || crypto.randomUUID();
     adapter = getAdapter(body.channel || "google_ads");
@@ -1581,8 +1584,12 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Verwacht: { client_id: string }" }, { status: 400 });
   }
 
-  if (!(await magSopDraaien(supabase, clientId))) {
-    return Response.json({ error: "SOP's zijn uitgeschakeld voor dit account." }, { status: 403 });
+  // Alleen AUTOMATISCHE runs zijn dekkingsgebonden. sops_enabled is de licentievlag voor
+  // automatische SOP's (zie de kop van lib/tenancy/sop-dekking.ts); handmatig triggeren is testen en
+  // hoort altijd te kunnen. Vóór deze scheiding blokkeerde een dekkingskeuze -- "SOP's uitzetten voor
+  // de accounts die niet meer passen" -- ook de knop in de UI, op 66 van de 74 accounts.
+  if (automatisch && !(await magSopDraaien(supabase, clientId))) {
+    return Response.json({ error: "Automatische SOP's staan uit voor dit account (dekking). Handmatig triggeren kan wel." }, { status: 403 });
   }
 
   try {

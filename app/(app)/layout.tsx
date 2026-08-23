@@ -43,7 +43,17 @@ export default function AppLayout({
         <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:ml-72">
           <TopBar />
           <SopDekkingBanner />
-          <main className="flex-1 p-6">{children}</main>
+          {/* max-w + mx-auto: zonder maximumbreedte rekt de inhoud oneindig mee met het venster.
+              Gemeten op een uitgezoomd/breed scherm: bij een effectieve viewport van 3840px werd de
+              content 3552px breed, en dan verliezen de verhoudingen het -- KPI-kaarten worden
+              meters breed, tekstregels onleesbaar lang, en een 2-koloms raster zet twee kaarten van
+              1700px naast elkaar. Uitzoomen vergroot precies die effectieve viewport, dus het brak
+              exact daar waar de eigenaar het zag.
+
+              1920px: ruim boven de laptop- en desktopbreedtes waar de app dagelijks op staat (die
+              raken deze grens niet en veranderen dus niet), en de bovengrens waarboven een raster
+              alleen nog maar leegte toevoegt. Boven die breedte groeit de marge i.p.v. de inhoud. */}
+          <main className="mx-auto w-full max-w-[1920px] flex-1 p-6">{children}</main>
         </div>
       </div>
     </SidebarMobileProvider>

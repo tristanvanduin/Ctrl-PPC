@@ -385,7 +385,10 @@ async function voerSopUit(
   const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ client_id: clientId, job_id: jobId, channel }),
+    // `automatisch: true` markeert dit als een AUTOMATISCHE run. Alleen dan geldt de
+    // sops_enabled-dekkingsgate in de analyse-routes; de handmatige knop laat de vlag weg en
+    // blijft dus altijd werken, ook voor accounts die buiten de dekking zijn gezet.
+    body: JSON.stringify({ client_id: clientId, job_id: jobId, channel, automatisch: true }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `${endpoint} gaf ${res.status}`);

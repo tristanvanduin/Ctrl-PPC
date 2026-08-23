@@ -81,18 +81,24 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           LinkedIn (groep="levering" heeft geen dimensies); de linkerkolom toont dan Health +
           ranglijst, zelfde "niets tonen zonder data"-afvang als overal elders voor de donut.
 
-          Ranglijst bij Health i.p.v. onder de kaart, zelfde reden als meta-view.tsx: de kaart is
-          intrinsiek hoger, en zonder de donut (leeg voor LinkedIn) bleef de linkerkolom hiervoor
-          bijna leeg terwijl de rechterkolom nog ver doorliep -- precies het gat dat de eigenaar
-          terugmeldde. */}
+          RANGLIJST HOORT RECHTS, ONDER DE KAART -- correctie op mezelf, zelfde meting als in
+          meta-view.tsx. De eerdere reden ("de kaart is intrinsiek hoger") is nagemeten en klopt
+          niet: de kaart is 415px en Health alleen al 596px. Met de ranglijst links bleef 669px van
+          de 1084px rechterkolom leeg (62%).
+
+          Gemeten met de ranglijst hier rechts: links 596px, rechts 415+472 = 903px. Nog steeds
+          307px onbalans, en dat is voor LinkedIn niet verder weg te poetsen met deze drie kaarten:
+          BreakdownDonuts rendert hier niets (LinkedIn heeft geen leveringsdimensie, zie hierboven),
+          dus er zijn maar drie kaarten om over twee kolommen te verdelen. 307px is wel minder dan
+          de helft van de 669px die de vorige indeling overliet. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="min-w-0 flex flex-col gap-4">
           <ChannelHealthBadge clientId={clientId} channel="linkedin" />
           <BreakdownDonuts clientId={clientId} channel="linkedin" groep="levering" />
-          <GeoRanglijstCard state={geo} />
         </div>
         <div className="min-w-0 flex flex-col gap-4">
           <GeoMapCard state={geo} channel="linkedin" />
+          <GeoRanglijstCard state={geo} />
         </div>
       </div>
 

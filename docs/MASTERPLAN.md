@@ -7866,3 +7866,61 @@ doorgeeft, dan pas aanzetten.
 `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon. Geen live
 LLM-verificatie mogelijk (OpenRouter 401 in deze sandbox) -- het effect op de output is dus beredeneerd
 op basis van wat hetzelfde model in monthly al produceert, niet A/B-getest op eigen data.
+
+### 17.112 Drie terugmeldingen: uitzoomen, witruimte (eigen fout) en de geblokkeerde SOP-knop (23 augustus 2026)
+
+Drie losse meldingen van de eigenaar, elk apart nagemeten in de browser i.p.v. beredeneerd.
+
+**1. Uitzoomen brak de verhoudingen.** `<main>` had geen maximumbreedte: `flex-1 p-6`, en dus rekte de
+inhoud oneindig mee met het venster. Gemeten bij een effectieve viewport van 3840px (wat uitzoomen
+feitelijk doet): main werd 3552px breed, KPI-kaarten 2864px, tekstregels onleesbaar lang. De eerdere
+responsiviteitsronde (17.106) keek uitsluitend naar horizontale OVERLOOP en die was overal nul -- een
+te breed uitgerekte layout is geen overloop, dus die controle kon dit per definitie niet zien.
+Gefixt met `mx-auto w-full max-w-[1920px]`. Gemeten na de fix: 1440px -> 1152, 1920px -> 1632 (beide
+onder de grens, dus onveranderd), 2560px -> 1920, 3840px -> 1920 met groeiende marge. Nul overloop op
+alle breedtes.
+
+**2. Witruimte bij Meta/LinkedIn -- een correctie op mezelf.** In 17.105 is `GeoRanglijstCard` naar de
+LINKERkolom verhuisd met als reden "de kaart is intrinsiek hoger dan Health+donut samen". Die aanname
+is nu nagemeten en klopt niet: de kaart is 415px, Account Health 480px (Meta) resp. 596px (LinkedIn).
+Links was dus al de hoogste kolom en de verhuizing maakte het aantoonbaar erger:
+
+| | rechterkolom ongebruikt vóór | na |
+|---|---|---|
+| Meta | 1012px van 1427px (71%) | 55px |
+| LinkedIn | 669px van 1084px (62%) | 306px |
+
+Ranglijst terug naar rechts, onder de kaart. LinkedIn houdt 306px over: daar rendert BreakdownDonuts
+niets (geen leveringsdimensie), dus er zijn maar drie kaarten om over twee kolommen te verdelen. Minder
+dan de helft van wat het was, maar niet nul -- en dat is met deze drie kaarten niet verder op te lossen.
+
+**De les, en het is dezelfde als 17.104.** Kolomhoogtes hoor je in de browser na te rekenen, niet af te
+leiden uit "wat intrinsiek hoger voelt". Een wereldkaart-SVG oogt groot maar is in deze kaart 415px. Ik
+heb in 17.105 een layoutbeslissing genomen op een gevoel over relatieve hoogtes en die als opgelost
+gemeld; de eigenaar zag vervolgens live dat het gat er nog stond. Meten kost hier één script.
+
+**3. De handmatige SOP-knop was dood.** `sops_enabled` (migratie 072) is de licentie-dekkingsvlag voor
+AUTOMATISCHE SOP's -- de kop van `lib/tenancy/sop-dekking.ts` zegt het expliciet: bij overschrijding is
+de oplossing "upgraden, dekking bijkopen, of SOP's uitzetten voor de accounts die niet meer passen".
+Maar de check stond in de POST-handler van de analyse-routes, en die bedient OOK de handmatige knop uit
+`sop-trigger-buttons.tsx`. Gemeten in de database: **66 van de 74 accounts staan op `false`**, precies
+wat de "SOP's uitzetten"-actie in de dekkingsbanner doet. Voor vrijwel elke echte klant gaf de knop dus
+een 403, terwijl de eigenaar in de testfase juist alles met de hand wil kunnen triggeren.
+
+Gescheiden: de cron (`app/api/cron/trigger-sops`) stuurt nu `automatisch: true` mee, en alleen dan
+geldt de dekkingsgate. Zonder die vlag -- dus vanuit de UI-knop -- draait de analyse altijd. Vier
+routes aangepast (weekly, biweekly, monthly, monthly-decision).
+
+Terzijde, ter geruststelling: er draait sowieso geen SOP-cron. `vercel.json` bevat alleen
+`/api/sync/cron` (dagelijkse datasync om 05:00); `/api/cron/trigger-sops` bestaat als endpoint maar
+heeft geen schema.
+
+**Openstaand, bewust niet zelf beslist.** De eigenaar meldde ook dat Meta bij Prognose "de
+Google-tabel" mist. Dat is geen regressie maar een expliciete keuze uit `58ee31a`: *"de vorm is bewust
+een grafiek en geen Verwacht/Prognose/Ratio-tabel: die tabel toetst aan een jaardoel, en dat bestaat
+voor Meta/LinkedIn niet (geen meerjarige historie)"*. Google HEEFT de tabel nog wel (nagemeten: de
+sectie "Maandelijkse uitsplitsing" rendert). Het omkeren van een gedocumenteerde beslissing met een
+echte databeperking eronder is teruggelegd bij de eigenaar, met de vraag welke variant hij wil.
+
+`tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316, `npx next build` compileert schoon. Alle drie de
+fixes zijn live nagemeten op de demo, niet alleen beredeneerd.

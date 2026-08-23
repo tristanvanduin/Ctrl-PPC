@@ -90,13 +90,19 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
       />
 
       {/* DE OPENER (23 augustus 2026, teruggezet naar 50/50): Account Health naast de wereldkaart,
-          zelfde indeling als Google's hero (zie google-view.tsx). Health + donut + ranglijst links,
-          kaart alleen rechts -- geen standalone Health meer los erboven.
+          zelfde indeling als Google's hero (zie google-view.tsx).
 
-          Ranglijst bewust bij Health/donut i.p.v. onder de kaart: de kaart (een wereld-SVG) is
-          intrinsiek hoger dan Health+donut samen, en Ranglijst (een compacte lijst) balanceert dat
-          beter dan een lege kolom onder een korte linkerkant -- vooral bij LinkedIn, waar de donut
-          niets toont (zie linkedin-view.tsx) en de linkerkolom zonder ranglijst bijna leeg bleef.
+          RANGLIJST HOORT RECHTS, ONDER DE KAART -- en dat is een correctie op mezelf. Eerder is de
+          ranglijst naar links verhuisd met als reden "de kaart is intrinsiek hoger dan Health+donut
+          samen". Dat is nagemeten en het klopt niet: de kaart is 415px, Health 480px en de donut
+          397px. Links was dus al de hoogste kolom, en de verhuizing maakte het veel erger in plaats
+          van beter -- gemeten 1012px van de 1427px rechterkolom bleef leeg (71%).
+
+          De gemeten verdeling met de ranglijst hier rechts: links 480+397 = 893px, rechts
+          415+518 = 949px. Verschil 56px, tegen 1012px daarvoor.
+
+          De les: kolomhoogtes narekenen in de browser, niet beredeneren uit "wat intrinsiek hoger
+          voelt". Een wereldkaart-SVG ziet er groot uit maar is in deze kaart maar 415px hoog.
 
           BreakdownDonuts is Meta's eigen equivalent van CampaignTypeSplit: spend/conversies per
           plaatsing, platform of device (tabs), altijd gevuld zodra er breakdown-data is.
@@ -106,10 +112,10 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         <div className="min-w-0 flex flex-col gap-4">
           <ChannelHealthBadge clientId={clientId} channel="meta" />
           <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
-          <GeoRanglijstCard state={geo} />
         </div>
         <div className="min-w-0 flex flex-col gap-4">
           <GeoMapCard state={geo} channel="meta" />
+          <GeoRanglijstCard state={geo} />
         </div>
       </div>
 
