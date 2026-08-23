@@ -46,26 +46,31 @@ const TIER_CHAIN: Record<Tier, string[]> = {
 
 const DEFAULT_TIER: Tier = "heavy";
 
-// Per stapnummer een tier. Leeg betekent: alles heavy, dus geen gedragswijziging. Zet hier
-// specifieke stappen op "light" of "medium" om kosten te besparen, pas na verificatie.
-const STEP_TIER: Record<number, Tier> = {
-  // voorbeeld: 1: "light",
+// Per cadans EN stapnummer een tier, sleutel "<sopType>-step-<n>" (dezelfde vorm als de
+// stepLabel die runStep() in helpers.ts opbouwt). Eerder was dit Record<number, Tier> -- puur op
+// stapnummer, zonder de cadans erbij. Weekly's stap 2 ("Findings Extractie") en biweekly's stap 6
+// ("Aanbevelingen & Taken") botsen dan met monthly's ÉCHT andere stap 2 en 6 ("Findings
+// Extractie" resp. "Product Performance"): een override voor de een zette 'm ook voor de ander,
+// zonder dat er iets in de code op wees. Leeg betekent: alles heavy, dus geen gedragswijziging.
+// Zet hier specifieke stappen op "light" of "medium" om kosten te besparen, pas na verificatie.
+const STEP_TIER: Record<string, Tier> = {
+  // voorbeeld: "weekly-step-2": "light",
 };
 
 /** Leidt de tier af uit het call-label (bv. "monthly-step-3-findings" of "monthly-full"). */
 export function resolveTier(
   label: string,
-  stepTier: Record<number, Tier> = STEP_TIER
+  stepTier: Record<string, Tier> = STEP_TIER
 ): Tier {
-  const m = /step-(\d+)/.exec(label);
-  if (m) return stepTier[Number(m[1])] ?? DEFAULT_TIER;
+  const m = /^(.+)-step-(\d+)-/.exec(label);
+  if (m) return stepTier[`${m[1]}-step-${m[2]}`] ?? DEFAULT_TIER;
   return DEFAULT_TIER;
 }
 
 /** Resolvet de tier plus de modelketen voor een label. */
 export function resolveChain(
   label: string,
-  stepTier?: Record<number, Tier>
+  stepTier?: Record<string, Tier>
 ): { tier: Tier; chain: string[] } {
   const tier = resolveTier(label, stepTier);
   return { tier, chain: TIER_CHAIN[tier] };

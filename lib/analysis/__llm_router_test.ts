@@ -16,14 +16,25 @@ function fakeResp(model: string): OpenRouterResponse {
 console.log("\n1. Tier-resolutie uit het label");
 check("een stap-label zonder override krijgt heavy", resolveTier("monthly-step-3-findings") === "heavy");
 check("een -full label krijgt heavy", resolveTier("monthly-full") === "heavy");
-check("een als light gemarkeerde stap krijgt light", resolveTier("monthly-step-1-x", { 1: "light" }) === "light");
+check("een als light gemarkeerde stap krijgt light", resolveTier("monthly-step-1-x", { "monthly-step-1": "light" }) === "light");
 check("een onbekend label valt terug op heavy", resolveTier("iets-zonder-stap") === "heavy");
+
+console.log("\n1b. Tier-resolutie is per cadans, niet alleen per stapnummer");
+{
+  // Weekly's stap 2 ("Findings Extractie") en monthly's stap 2 zijn compleet andere stappen die
+  // toevallig hetzelfde nummer dragen. Een override voor de een mag de ander niet raken -- dat
+  // was precies het gat vóór deze fix (Record<number, Tier>, geen cadans in de sleutel).
+  const override = { "weekly-step-2": "light" as const };
+  check("de override raakt de bedoelde cadans/stap", resolveTier("weekly-step-2-findings-extractie", override) === "light");
+  check("dezelfde stap-NUMMER in een andere cadans blijft ongemoeid", resolveTier("monthly-step-2-x", override) === "heavy");
+  check("biweekly's stap 6 en monthly's stap 6 zijn ook onafhankelijk", resolveTier("biweekly-step-6-aanbevelingen-taken", { "monthly-step-6": "light" }) === "heavy");
+}
 
 console.log("\n2. Modelketen per tier");
 const heavy = resolveChain("monthly-step-3-x");
 check("heavy primair is het sterke model", heavy.chain[0] === MODEL_CATALOG.strong);
 check("heavy heeft een fallback erachter", heavy.chain.length >= 2 && heavy.chain[1] === MODEL_CATALOG.crossFallback);
-const light = resolveChain("monthly-step-1-x", { 1: "light" });
+const light = resolveChain("monthly-step-1-x", { "monthly-step-1": "light" });
 check("light primair is het goedkope model", light.chain[0] === MODEL_CATALOG.cheap);
 check("light valt terug op het sterke model", light.chain[1] === MODEL_CATALOG.strong);
 

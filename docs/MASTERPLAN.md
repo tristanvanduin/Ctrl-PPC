@@ -7700,3 +7700,34 @@ Geverifieerd: `tsc` 0 fouten, `node scripts/run-tests.mjs` 316/316 (inclusief tw
 `npx next build` compileert schoon, beide UI-fixes bevestigd via een live render op de demo (geen crash,
 geen NaN, sane waarden). `view-dekking` staat rood, de al bekende, niet aan deze wijzigingen gerelateerde
 meta/linkedin-drift.
+
+### 17.109 STEP_TIER per cadans i.p.v. alleen per stapnummer (23 augustus 2026)
+
+Vraag: welk LLM-model is kosten-efficient per stap, voor weekly/biweekly/monthly. Eerst de echte
+`llm_usage`-tabel bekeken (410 rijen, 18 juli-19 augustus): 42% van de bekende kosten komt van 28 calls op
+één stap, monthly-stap 13 ("Hypotheses & Sprintplanning", de `reasoning`-laag/Grok 4.6) -- terwijl die stap
+zelf op `maxTokens: 8192` staat maar gemiddeld 11.009 completion-tokens meet. Dat kan alleen als Grok's
+onzichtbare redeneertokens meetellen in de facturering buiten het zichtbare maxTokens-plafond om -- exact
+hetzelfde patroon als de al opgeloste Claude-bug (17.26/17.28), maar de `reasoning`-laag heeft nooit een
+`reasoningMaxTokens`-cap gekregen zoals `narrative`/`strategic` dat wel hebben. Niet in deze ronde gefixed
+(zie hieronder waarom), wel hier gedocumenteerd zodat het niet zoekraakt.
+
+Bij het uitzoeken van weekly/biweekly's structuur (om per stap een model te kunnen kiezen) bleek
+`STEP_TIER` een bug te bevatten die onafhankelijk van modelkeuze stond: de sleutel was puur het stapnummer
+(`Record<number, Tier>`), zonder de cadans. Weekly's stap 2 ("Findings Extractie") en monthly's stap 2
+zijn totaal verschillende stappen die toevallig hetzelfde nummer dragen; biweekly's stap 6 ("Aanbevelingen
+& Taken") botst zo met monthly's stap 6 ("Product Performance"). Een override voor de een zou de ander
+ongemerkt meenemen. Gefixed: `STEP_TIER` is nu `Record<string, Tier>` met sleutel `"<sopType>-step-<n>"`
+(dezelfde vorm als `stepLabel` in `helpers.ts`), en `resolveTier`'s regex haalt beide delen uit het label.
+Leeg = geen gedragswijziging, exact zoals daarvoor.
+
+**Scope bewust beperkt.** De vraag "moet ook de hoofdanalyse van weekly/biweekly opgeknipt worden in
+onderwerp-stappen, zoals monthly?" kwam expliciet langs. Daar níét aan begonnen: dat raakt de precieze
+inhoud van elke stap-instructie per kanaal en hoe checkpoints/`extractStructuredData` op elkaar voortbouwen
+-- iets wat ik niet grondig genoeg ken en, met OpenRouter's 401 in deze sandbox, ook niet live kan
+verifiëren. Beter de kleinere, wél geverifieerde fix leveren dan een grote herstructurering blind wagen.
+
+Regressietest toegevoegd in `__llm_router_test.ts` die het exacte botsingsscenario (weekly-stap-2 vs
+monthly-stap-2, biweekly-stap-6 vs monthly-stap-6) afdekt. Geen enkele bestaande `STEP_TIER`-override was
+gezet (stond leeg), dus geen gedragswijziging voor productie. `tsc` 0 fouten,
+`node scripts/run-tests.mjs` 316/316.
