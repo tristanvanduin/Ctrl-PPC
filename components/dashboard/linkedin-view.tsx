@@ -78,16 +78,21 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           leveringsdimensie zoals Meta's plaatsing/platform/device -- functie/senioriteit/industrie/
           bedrijfsgrootte zijn zelf allemaal wie-vragen en staan op Campagnes onder
           "Doelgroepsignalen" (groep="doelgroep"). BreakdownDonuts rendert hier dus niets voor
-          LinkedIn (groep="levering" heeft geen dimensies); de linkerkolom toont dan alleen Account
-          Health, zelfde "niets tonen zonder data"-afvang als overal elders. */}
+          LinkedIn (groep="levering" heeft geen dimensies); de linkerkolom toont dan Health +
+          ranglijst, zelfde "niets tonen zonder data"-afvang als overal elders voor de donut.
+
+          Ranglijst bij Health i.p.v. onder de kaart, zelfde reden als meta-view.tsx: de kaart is
+          intrinsiek hoger, en zonder de donut (leeg voor LinkedIn) bleef de linkerkolom hiervoor
+          bijna leeg terwijl de rechterkolom nog ver doorliep -- precies het gat dat de eigenaar
+          terugmeldde. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="min-w-0 flex flex-col gap-4">
           <ChannelHealthBadge clientId={clientId} channel="linkedin" />
           <BreakdownDonuts clientId={clientId} channel="linkedin" groep="levering" />
+          <GeoRanglijstCard state={geo} />
         </div>
         <div className="min-w-0 flex flex-col gap-4">
           <GeoMapCard state={geo} channel="linkedin" />
-          <GeoRanglijstCard state={geo} />
         </div>
       </div>
 

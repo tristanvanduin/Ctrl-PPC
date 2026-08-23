@@ -28,6 +28,18 @@ const ZIJDE = 220;
 const MIDDEN = ZIJDE / 2;
 const STRAAL = 72;
 
+// 23 augustus 2026: de aslabels (bv. "Efficiency" rechts, tekst-anchor "start") staken met
+// `overflow-visible` letterlijk buiten de viewBox uit -- dat is zichtbaar zolang niets ernaast
+// staat, maar `overflow-visible` claimt geen layoutruimte. Bij een smallere kaart (Account Health
+// naast de kaart, 50/50 i.p.v. losstaand) landde de buurkolom ("Waaruit de score bestaat") dus
+// recht over het label heen zodra de kaart smal genoeg was en de tekst ernaast toevallig op
+// dezelfde hoogte viel -- geen visuele samenloop maar een structureel gat in de layout. De viewBox
+// hieronder is nu zelf breed genoeg om het langste label (~11 tekens, fontSize 9) aan weerszijden
+// te bevatten, zodat de browser er layoutruimte voor reserveert net als voor de rest van de SVG.
+const LABEL_MARGE = 55;
+const BREEDTE = ZIJDE + LABEL_MARGE * 2;
+const MAX_BREEDTE_PX = Math.round(240 * (BREEDTE / ZIJDE));
+
 export function HealthRadar({
   factoren,
   kleur,
@@ -45,8 +57,9 @@ export function HealthRadar({
   return (
     <figure className="m-0">
       <svg
-        viewBox={`0 0 ${ZIJDE} ${ZIJDE}`}
-        className="w-full max-w-[240px] mx-auto overflow-visible"
+        viewBox={`-${LABEL_MARGE} 0 ${BREEDTE} ${ZIJDE}`}
+        className="w-full mx-auto overflow-visible"
+        style={{ maxWidth: `${MAX_BREEDTE_PX}px` }}
         role="img"
         aria-labelledby={`${id}-titel`}
       >
