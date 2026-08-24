@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
+import { proposalSourceForSopType } from "@/lib/second-opinion/findings-to-hypotheses";
 import { decideTransition } from "@/lib/learning/hypothesis-status";
 import { recordMemoryEvent } from "@/lib/memory/agency-memory-events";
 import type { MonthlyStructuredOutput, OperatingHypothesisTrace } from "@/lib/analysis/monthly-structured";
@@ -254,7 +255,7 @@ export async function POST(request: NextRequest) {
 
   const persisted = findPersistedHypothesis(ctx.hypothesisRows, ctx.fullRow.id, hypothesis, ctx.structuredRow.created_at)
     ?? await ensurePersistedHypothesisRow({
-      source: sopType === "monthly" ? "analysis" : sopType,
+      source: proposalSourceForSopType(sopType),
       supabase: ctx.supabase,
       clientId,
       analysisId: ctx.fullRow.id,

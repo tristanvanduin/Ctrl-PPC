@@ -39,6 +39,14 @@ export function channelOfSource(source: string | null | undefined): InsightChann
   if (META_KEYS.has(s)) return "meta";
   if (LINKEDIN_KEYS.has(s)) return "linkedin";
   if (CROSS_KEYS.has(s)) return "cross";
+  // Naast de expliciete sleutels ook de naamconventie zelf: elke bron of sop_type die met
+  // `meta_` of `linkedin_` begint hoort bij dat kanaal. De lijsten hierboven waren met de hand
+  // bijgehouden en liepen daardoor achter -- meta_weekly en linkedin_biweekly stonden er niet in
+  // en werden dus stil als Google gelabeld. Een verkeerde badge is erger dan geen badge: hij
+  // beweert iets. lib/analysis/extract-structured.ts leidt het kanaal al op precies deze manier af
+  // (`sopType.startsWith("linkedin_")`), dus dit maakt één regel van twee.
+  if (s.startsWith("meta_")) return "meta";
+  if (s.startsWith("linkedin_")) return "linkedin";
   return "google";
 }
 

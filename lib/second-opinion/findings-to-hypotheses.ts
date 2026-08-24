@@ -137,7 +137,38 @@ export type ProposalSource =
   | "linkedin_kpi"
   | "google_video"
   | "geo_markets"
-  | "master_synthesis";
+  | "master_synthesis"
+  // De zes weekly-/bi-weekly-varianten. Ze schreven alle zes onder "analysis" -- de bron van de
+  // MAANDpijplijn -- en saveProposalsReplacingPending verwijdert bij elke schrijfbeurt de bestaande
+  // pending-rijen van diezelfde bron. Zes varianten die om beurten elkaars openstaande voorstellen
+  // wisten, dus alleen de laatst gedraaide hield iets over. De 22 kleinere deelanalyses hierboven
+  // kregen juist élk een eigen bron om precies dat te voorkomen; dit sluit de uitzondering.
+  //
+  // De namen zijn de sop_type-waarden zelf, conform het patroon dat
+  // app/api/insights/monthly-hypotheses/route.ts al hanteert: `sopType === "monthly" ? "analysis" : sopType`.
+  | "weekly"
+  | "meta_weekly"
+  | "linkedin_weekly"
+  | "biweekly"
+  | "meta_biweekly"
+  | "linkedin_biweekly";
+
+/**
+ * De voorstellenbron van een SOP-variant.
+ *
+ * Eén definitie, want de regel bestond op twee plekken: app/api/insights/monthly-hypotheses/
+ * route.ts had hem al als inline ternary, en lib/analysis/extract-structured.ts kreeg hem er bijna
+ * bij. Precies het soort tweede definitie van een gedeeld hulpje dat scripts/check-hygiene.mjs
+ * vangt -- en hier telt het extra, want als de twee ooit uiteenlopen schrijft de ene helft van de
+ * keten onder een andere bron dan de andere, en dan wist de een de voorstellen van de ander.
+ *
+ * "analysis" is en blijft de MAANDpijplijn; components/insights/proposal-queue.tsx sluit precies
+ * die bron uit omdat de maand zijn eigen workflow-block heeft. Elke andere variant draagt zijn
+ * eigen sop_type als bron, en verschijnt dus wél in de wachtrij.
+ */
+export function proposalSourceForSopType(sopType: string): ProposalSource {
+  return (sopType === "monthly" ? "analysis" : sopType) as ProposalSource;
+}
 
 /**
  * Schrijft nieuwe pending voorstellen weg en vervangt de oude van dezelfde bron,

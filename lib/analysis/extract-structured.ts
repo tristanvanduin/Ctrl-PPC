@@ -22,7 +22,7 @@ import {
   type Task,
 } from "../schema/analysis-schema";
 import { applyActionGating } from "./action-gating";
-import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
+import { saveProposalsReplacingPending, proposalSourceForSopType, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
 import { extractGroundedNumbers, gateItemFields } from "./weekly-number-gate";
 import type { DataReliabilityAssessment } from "./data-reliability";
 import type { DroppedItems } from "@/lib/schema/analysis-schema";
@@ -162,6 +162,28 @@ ${analysisOutput}`,
   // F5 fase2.5: sopType draagt het kanaal al in de naam (meta_weekly, linkedin_biweekly, ...);
   // alleen het kanaal-voorvoegsel is relevant voor kanaalspecifieke gating-regels.
   const channel = sopType.startsWith("linkedin_") ? "linkedin_ads" : sopType.startsWith("meta_") ? "meta_ads" : "google_ads";
+
+  // ── De voorstellenbron: per SOP-variant, niet één gedeelde ────────────────
+  //
+  // Dit stond op de vaste string "analysis", en dat was op twee manieren fout.
+  //
+  // 1. DATAVERLIES. saveProposalsReplacingPending verwijdert de bestaande pending-rijen van de
+  //    opgegeven bron. Alle zes de weekly-/bi-weekly-varianten schreven onder dezelfde bron, dus
+  //    draaide de Meta-weekly ná de Google-weekly, dan waren Google's openstaande voorstellen weg.
+  //    Van de zes hield alleen de laatst gedraaide iets over. De 22 kleinere deelanalyses kregen
+  //    juist élk een eigen bron om precies dat te voorkomen.
+  //
+  // 2. ONZICHTBAARHEID. "analysis" is de bron van de MAANDpijplijn, en
+  //    components/insights/proposal-queue.tsx sluit die bewust uit ("de maand-bron heeft zijn eigen
+  //    workflow-block"). Weekly- en bi-weekly-voorstellen werden dus weggeschreven en daarna
+  //    verborgen. Met een eigen bron verschijnen ze voor het eerst in de wachtrij -- dat is geen
+  //    neveneffect maar het herstel: die uitsluitingsreden geldt niet voor hen.
+  //
+  // Het patroon is niet nieuw: app/api/insights/monthly-hypotheses/route.ts doet al
+  // `sopType === "monthly" ? "analysis" : sopType`. extractStructuredData wordt nooit met "monthly"
+  // aangeroepen (alleen de zes varianten), maar de ternary blijft staan zodat de betekenis van
+  // "analysis" op één plek leesbaar blijft: dat is de maand, en niets anders.
+  const voorstelBron = proposalSourceForSopType(sopType);
   recs = applyActionGating(findings, recs, { channel });
 
   // W2.5 (W2): number-gate voor de korte cadans. Markeert en schrapt percentages en euro's in
@@ -326,9 +348,9 @@ ${analysisOutput}`,
         ice_ease: rec.ice_ease,
         ice_total: rec.ice_total,
         status: "pending",
-        source: "analysis",
+        source: voorstelBron,
       }));
-      await saveProposalsReplacingPending(supabase, clientId, "analysis", hypotheseRows);
+      await saveProposalsReplacingPending(supabase, clientId, voorstelBron, hypotheseRows);
 
       saved = true;
     } catch (e) {
