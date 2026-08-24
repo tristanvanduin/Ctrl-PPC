@@ -30,6 +30,7 @@
  */
 
 import { opsomming } from "@/lib/util/tekst";
+import { CHANNEL_CHART_COLOR } from "@/lib/branding/chart-colors";
 
 export type Kanaal = "google" | "meta" | "linkedin";
 
@@ -47,6 +48,25 @@ export const KANAAL_NAAM: Record<Kanaal, string> = {
   google: "Google Ads",
   meta: "Meta",
   linkedin: "LinkedIn",
+};
+
+/**
+ * De vaste kleur van een kanaal, overal op het scherm dezelfde.
+ *
+ * Waarom hij hier staat en niet bij het component dat hem toevallig als eerste nodig had: dit
+ * bestand is de plek waar een kanaal BESTAAT -- zijn bron, zijn naam. Stond de kleur ergens
+ * anders, dan is "een kanaal toevoegen" twee losse bewerkingen waarvan je de tweede vergeet, en
+ * dan valt het nieuwe kanaal terug op een positie-kleur die per grafiek verschilt. Dat is precies
+ * wat er in kanaal-health-ranking.tsx gebeurd was: Meta stond daar oranje en overal elders violet.
+ *
+ * De waarden komen uit CHANNEL_CHART_COLOR, het gevalideerde categorische palet. Kleur volgt de
+ * IDENTITEIT van het kanaal, nooit zijn positie in een lijst -- een rangschikking die van volgorde
+ * wisselt mag de kleuren niet laten verspringen.
+ */
+export const KANAAL_KLEUR: Record<Kanaal, string> = {
+  google: CHANNEL_CHART_COLOR.Google,
+  meta: CHANNEL_CHART_COLOR.Meta,
+  linkedin: CHANNEL_CHART_COLOR.LinkedIn,
 };
 
 /**
