@@ -18,6 +18,7 @@ import { computeMetaReliability, computeLinkedinReliability } from "@/lib/analys
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { computeComparisonFacts, formatComparisonFacts, computePacingFacts, formatPacingFacts } from "@/lib/analysis/comparison-facts";
+import { buildMonthlyHandoff } from "@/lib/analysis/monthly-handoff";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
 import { fetchNameMap, fetchDaily as fetchMetaDaily } from "@/lib/meta/analysis-data";
@@ -105,7 +106,10 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     supabase.from("ads_campaign_monthly").select("*").eq("client_id", clientId).gte("month", periodStart).order("month"),
     supabase.from("ads_account_weekly").select("*").eq("client_id", clientId).gte("week_start", monthsAgo(1)).order("week_start"),
     supabase.from("ads_adgroup_monthly").select("*").eq("client_id", clientId).gte("month", periodStart).order("month"),
-    supabase.from("sop_analysis_output").select("output, analysis_date").eq("client_id", clientId).eq("sop_type", "monthly").eq("section", "full").order("analysis_date", { ascending: false }).limit(1).maybeSingle(),
+    // Beide secties, nieuwste eerst: structured_monthly_v2 draagt de hypotheses en de diagnose als
+    // VELDEN, "full" is het narratieve document. buildMonthlyHandoff kiest de gestructureerde als
+    // die er is en valt anders zichtbaar terug -- zie lib/analysis/monthly-handoff.ts.
+    supabase.from("sop_analysis_output").select("output, analysis_date, section").eq("client_id", clientId).eq("sop_type", "monthly").in("section", ["structured_monthly_v2", "full"]).order("analysis_date", { ascending: false }).limit(6),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId),
     // Stap 4 heet "Device & Engagement" en het output-format eist waarden voor en na
@@ -148,8 +152,19 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     channel: "google_ads",
   });
 
-  const previousMonthlyOutput = monthlyOutputResult.data?.output
-    ?? "Geen eerdere maandelijkse analyse beschikbaar. Voer de analyse uit op basis van de data zonder referentie aan eerdere bevindingen.";
+  // De overdracht uit de maandanalyse. Ging voorheen als het volledige narratieve document
+  // ongetruncateerd de system prompt van alle VIER de stappen in; nu de gestructureerde vorm, met
+  // de hypotheses en hun succescriteria als losse punten om tegen te toetsen.
+  const monthlySecties = (monthlyOutputResult.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
+  const monthlyStructured = monthlySecties.find((r) => r.section === "structured_monthly_v2");
+  const monthlyNarratief = monthlySecties.find((r) => r.section === "full");
+  const monthlyHandoff = buildMonthlyHandoff({
+    structured: monthlyStructured?.output ?? null,
+    narratief: monthlyNarratief?.output ?? null,
+    analysisDate: (monthlyStructured ?? monthlyNarratief)?.analysis_date ?? null,
+    cadans: "biweekly",
+  });
+  const previousMonthlyOutput = monthlyHandoff.tekst;
 
   // Format monthly targets from forecast engine (same as monthly route)
   const now = new Date();
@@ -487,7 +502,10 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
     fetchMetaDaily(supabase, clientId, "meta_adset_daily", periodStart, periodEnd),
     fetchNameMap(supabase, clientId, "meta_campaigns", "campaign_id", "name"),
     fetchNameMap(supabase, clientId, "meta_adsets", "adset_id", "name"),
-    supabase.from("sop_analysis_output").select("output, analysis_date").eq("client_id", clientId).eq("sop_type", "meta_monthly").eq("section", "full").order("analysis_date", { ascending: false }).limit(1).maybeSingle(),
+    // Beide secties, nieuwste eerst: structured_monthly_v2 draagt de hypotheses en de diagnose als
+    // VELDEN, "full" is het narratieve document. buildMonthlyHandoff kiest de gestructureerde als
+    // die er is en valt anders zichtbaar terug -- zie lib/analysis/monthly-handoff.ts.
+    supabase.from("sop_analysis_output").select("output, analysis_date, section").eq("client_id", clientId).eq("sop_type", "meta_monthly").in("section", ["structured_monthly_v2", "full"]).order("analysis_date", { ascending: false }).limit(6),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "meta"),
     supabase.from("client_settings").select("conversion_lag_days").eq("client_id", clientId).maybeSingle(),
@@ -506,8 +524,19 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
     }, { status: 404 });
   }
 
-  const previousMonthlyOutput = monthlyOutputResult.data?.output
-    ?? "Geen eerdere maandelijkse analyse beschikbaar. Voer de analyse uit op basis van de data zonder referentie aan eerdere bevindingen.";
+  // De overdracht uit de maandanalyse. Ging voorheen als het volledige narratieve document
+  // ongetruncateerd de system prompt van alle VIER de stappen in; nu de gestructureerde vorm, met
+  // de hypotheses en hun succescriteria als losse punten om tegen te toetsen.
+  const monthlySecties = (monthlyOutputResult.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
+  const monthlyStructured = monthlySecties.find((r) => r.section === "structured_monthly_v2");
+  const monthlyNarratief = monthlySecties.find((r) => r.section === "full");
+  const monthlyHandoff = buildMonthlyHandoff({
+    structured: monthlyStructured?.output ?? null,
+    narratief: monthlyNarratief?.output ?? null,
+    analysisDate: (monthlyStructured ?? monthlyNarratief)?.analysis_date ?? null,
+    cadans: "biweekly",
+  });
+  const previousMonthlyOutput = monthlyHandoff.tekst;
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -793,7 +822,10 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
     fetchLinkedinDaily("linkedin_creative_daily"),
     fetchLinkedinNameMap(supabase, clientId, "linkedin_campaigns", "campaign_urn", "name"),
     fetchLinkedinNameMap(supabase, clientId, "linkedin_creatives", "creative_urn", "format"),
-    supabase.from("sop_analysis_output").select("output, analysis_date").eq("client_id", clientId).eq("sop_type", "linkedin_monthly").eq("section", "full").order("analysis_date", { ascending: false }).limit(1).maybeSingle(),
+    // Beide secties, nieuwste eerst: structured_monthly_v2 draagt de hypotheses en de diagnose als
+    // VELDEN, "full" is het narratieve document. buildMonthlyHandoff kiest de gestructureerde als
+    // die er is en valt anders zichtbaar terug -- zie lib/analysis/monthly-handoff.ts.
+    supabase.from("sop_analysis_output").select("output, analysis_date, section").eq("client_id", clientId).eq("sop_type", "linkedin_monthly").in("section", ["structured_monthly_v2", "full"]).order("analysis_date", { ascending: false }).limit(6),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "linkedin"),
     supabase.from("client_settings").select("conversion_lag_days").eq("client_id", clientId).maybeSingle(),
@@ -819,8 +851,19 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
     }, { status: 404 });
   }
 
-  const previousMonthlyOutput = monthlyOutputResult.data?.output
-    ?? "Geen eerdere maandelijkse analyse beschikbaar. Voer de analyse uit op basis van de data zonder referentie aan eerdere bevindingen.";
+  // De overdracht uit de maandanalyse. Ging voorheen als het volledige narratieve document
+  // ongetruncateerd de system prompt van alle VIER de stappen in; nu de gestructureerde vorm, met
+  // de hypotheses en hun succescriteria als losse punten om tegen te toetsen.
+  const monthlySecties = (monthlyOutputResult.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
+  const monthlyStructured = monthlySecties.find((r) => r.section === "structured_monthly_v2");
+  const monthlyNarratief = monthlySecties.find((r) => r.section === "full");
+  const monthlyHandoff = buildMonthlyHandoff({
+    structured: monthlyStructured?.output ?? null,
+    narratief: monthlyNarratief?.output ?? null,
+    analysisDate: (monthlyStructured ?? monthlyNarratief)?.analysis_date ?? null,
+    cadans: "biweekly",
+  });
+  const previousMonthlyOutput = monthlyHandoff.tekst;
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;

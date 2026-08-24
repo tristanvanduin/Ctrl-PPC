@@ -42,9 +42,25 @@ assert(gHyp.includes("Learning: CPA daalde 12 procent"), "de learning wordt toeg
 const gefaald = buildClientMemoryGrounding(mem([], [hypo({ hypothesis: "X", status: "completed", resultMet: false })]));
 assert(gefaald.includes("doel niet gehaald"), "resultMet false geeft doel niet gehaald");
 
-// Zonder resultMet valt het terug op outcome of status
-const opStatus = buildClientMemoryGrounding(mem([], [hypo({ hypothesis: "Y", status: "rejected", outcome: null })]));
-assert(opStatus.includes("(uitkomst: rejected)"), "zonder resultMet en outcome valt het terug op de status");
+// Zonder resultMet valt het terug op outcome of status. Bewust een NIET-afgewezen status: een
+// afgewezen hypothese heeft een eigen formulering (zie hieronder), want daar is nooit iets
+// uitgevoerd en "uitkomst: rejected" leest dan als een mislukte poging.
+const opStatus = buildClientMemoryGrounding(mem([], [hypo({ hypothesis: "Y", status: "pending", outcome: null })]));
+assert(opStatus.includes("(uitkomst: pending)"), "zonder resultMet en outcome valt het terug op de status");
+
+// Een afgewezen hypothese is geen mislukking maar een keuze, en moet zo gelezen worden.
+const afgewezen = buildClientMemoryGrounding(mem([], [hypo({ hypothesis: "Y", status: "rejected", outcome: null })]));
+assert(afgewezen.includes("afgewezen, niet uitgevoerd"), "een afwijzing leest niet als een mislukte poging");
+assert(afgewezen.includes("stel hem niet opnieuw voor"), "de instructie verbiedt herhaling van afgewezen advies");
+
+// En hij mag niet verdringen worden door hypotheses mét uitkomst: dat was precies de fout.
+// Acht met uitkomst plus een afwijzing -- de afwijzing hoort er nog steeds in te staan.
+const veelMetUitkomst = Array.from({ length: 8 }, (_, i) =>
+  hypo({ hypothesis: `Uitgevoerd ${i}`, status: "completed", resultMet: true }));
+const metAfwijzing = buildClientMemoryGrounding(
+  mem([], [...veelMetUitkomst, hypo({ hypothesis: "Nooit doen", status: "rejected", outcome: null })])
+);
+assert(metAfwijzing.includes("Nooit doen"), "een afwijzing wordt niet verdrongen door uitkomsten");
 
 // Cap van 8 hypotheses, met voorkeur voor die met uitkomst
 const twaalfMetUitkomst = Array.from({ length: 12 }, (_v, i) => hypo({ hypothesis: `H${i}`, status: "completed", resultMet: i % 2 === 0 }));

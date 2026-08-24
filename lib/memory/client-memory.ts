@@ -115,17 +115,33 @@ export function buildClientMemoryGrounding(memory: ClientMemory): string {
     for (const r of recentReports) lines.push(`- ${r.month}/${r.year} (${r.status})`);
   }
 
-  const withOutcome = memory.hypotheses.filter((h) => h.outcome != null || h.resultMet != null).slice(0, 8);
-  const toShow = withOutcome.length > 0 ? withOutcome : memory.hypotheses.slice(0, 8);
+  // AFGEWEZEN HYPOTHESES KRIJGEN EEN GEGARANDEERDE PLEK.
+  //
+  // De selectie hieronder gaf voorrang aan hypotheses met een UITKOMST, en viel anders terug op de
+  // acht meest recente. Een afgewezen hypothese heeft geen uitkomst -- er is niets uitgevoerd, dus
+  // er valt niets te meten -- en verdween daardoor uit het geheugen zodra er acht met een uitkomst
+  // stonden. Precies de verkeerde kant op: "dit is geprobeerd en het werkte niet" is nuttig, maar
+  // "dit is voorgesteld en men wilde het niet" is dat óók, en dat laatste komt anders elke maand
+  // terug. De slotregel van dit blok belooft dat expliciet ("niet herhalen wat al is geprobeerd").
+  const afgewezen = memory.hypotheses.filter((h) => h.status === "rejected").slice(0, 4);
+  const metUitkomst = memory.hypotheses
+    .filter((h) => (h.outcome != null || h.resultMet != null) && h.status !== "rejected")
+    .slice(0, 8 - afgewezen.length);
+  const gecombineerd = [...afgewezen, ...metUitkomst];
+  const toShow = gecombineerd.length > 0 ? gecombineerd : memory.hypotheses.slice(0, 8);
   if (toShow.length > 0) {
     lines.push("Eerdere hypotheses en uitkomsten:");
     for (const h of toShow) {
-      const outcome = h.resultMet == null ? (h.outcome || h.status) : (h.resultMet ? "doel gehaald" : "doel niet gehaald");
+      // Bij een afgewezen hypothese is "uitkomst" misleidend: er is nooit iets uitgevoerd. Dat
+      // onderscheid moet blijven staan, anders leest een afwijzing als een mislukte poging.
+      const outcome = h.status === "rejected"
+        ? "afgewezen, niet uitgevoerd"
+        : h.resultMet == null ? (h.outcome || h.status) : (h.resultMet ? "doel gehaald" : "doel niet gehaald");
       const learning = h.learning ? ` Learning: ${h.learning}` : "";
       lines.push(`- [${h.status}] ${h.hypothesis} (uitkomst: ${outcome}).${learning}`);
     }
   }
 
-  lines.push("Gebruik dit om niet te herhalen wat al is geprobeerd en om voort te bouwen op wat werkte of faalde. Verzin geen geheugen dat hier niet staat.");
+  lines.push("Gebruik dit om niet te herhalen wat al is geprobeerd en om voort te bouwen op wat werkte of faalde. Een AFGEWEZEN hypothese is geen mislukking maar een keuze: stel hem niet opnieuw voor tenzij er nieuwe data is die de afwijzing weerlegt, en zeg dan expliciet wat er veranderd is. Verzin geen geheugen dat hier niet staat.");
   return lines.join("\n");
 }

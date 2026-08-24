@@ -18,6 +18,7 @@ import { computeMetaReliability, computeLinkedinReliability } from "@/lib/analys
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
 import { today, addDays } from "@/lib/reporting-date";
+import { buildMonthlyHandoff, buildOpenPointsBlock } from "@/lib/analysis/monthly-handoff";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
 import { fetchNameMap, fetchDaily as fetchMetaDaily } from "@/lib/meta/analysis-data";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -187,7 +188,40 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
   const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
-  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  // ── De weekly was een eiland ────────────────────────────────────────────────
+  //
+  // Hij las geen enkele eerdere SOP-output: niet de maandanalyse, en ook niet zijn eigen vorige run.
+  // Van de drie cadansen stond de vaakst draaiende (52x per jaar per kanaal) dus volledig los, wat
+  // twee dingen kostte. Hij kon niet zien of een acuut signaal botst met de maanddiagnose, en hij
+  // kon dezelfde bleeder drie weken achter elkaar als nieuw melden -- terwijl "voor de derde week"
+  // precies het verschil is tussen een incident en een patroon.
+  //
+  // Bewust KLEIN gehouden. De weekly is expliciet "geen diepe analyse": hij krijgt de hoofdlijn van
+  // de maand in een paar regels (niet de onderbouwing, niet de succescriteria) en zijn eigen nog
+  // openstaande punten. Meer zou hem de maandanalyse laten overdoen.
+  const [maandSecties, eigenOpen] = await Promise.all([
+    supabase.from("sop_analysis_output").select("output, analysis_date, section")
+      .eq("client_id", clientId).eq("sop_type", "monthly")
+      .in("section", ["structured_monthly_v2", "full"])
+      .order("analysis_date", { ascending: false }).limit(6),
+    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans -- geen
+    // kanaalvermenging zoals bij sop_tasks, dat die kolom niet heeft.
+    supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
+      .eq("client_id", clientId).eq("sop_type", "weekly")
+      .order("analysis_date", { ascending: false }).limit(25),
+  ]);
+  const maandRijen = (maandSecties.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
+  const maandStructured = maandRijen.find((r) => r.section === "structured_monthly_v2");
+  const maandNarratief = maandRijen.find((r) => r.section === "full");
+  const maandHandoff = buildMonthlyHandoff({
+    structured: maandStructured?.output ?? null,
+    narratief: maandNarratief?.output ?? null,
+    analysisDate: (maandStructured ?? maandNarratief)?.analysis_date ?? null,
+    cadans: "weekly",
+  });
+  const ketenContext = `\n\n${maandHandoff.tekst}${buildOpenPointsBlock((eigenOpen.data ?? []) as Parameters<typeof buildOpenPointsBlock>[0])}`;
+
+  const sharedContext = `${ketenContext}${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   // Drie losse calls i.p.v. één grote (masterplan 17.11x): elke stap is nu apart routeerbaar
   // (STEP_TIER, per "weekly-step-N") en apart gelogd in llm_usage.
@@ -453,7 +487,40 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
   const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
-  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  // ── De weekly was een eiland ────────────────────────────────────────────────
+  //
+  // Hij las geen enkele eerdere SOP-output: niet de maandanalyse, en ook niet zijn eigen vorige run.
+  // Van de drie cadansen stond de vaakst draaiende (52x per jaar per kanaal) dus volledig los, wat
+  // twee dingen kostte. Hij kon niet zien of een acuut signaal botst met de maanddiagnose, en hij
+  // kon dezelfde bleeder drie weken achter elkaar als nieuw melden -- terwijl "voor de derde week"
+  // precies het verschil is tussen een incident en een patroon.
+  //
+  // Bewust KLEIN gehouden. De weekly is expliciet "geen diepe analyse": hij krijgt de hoofdlijn van
+  // de maand in een paar regels (niet de onderbouwing, niet de succescriteria) en zijn eigen nog
+  // openstaande punten. Meer zou hem de maandanalyse laten overdoen.
+  const [maandSecties, eigenOpen] = await Promise.all([
+    supabase.from("sop_analysis_output").select("output, analysis_date, section")
+      .eq("client_id", clientId).eq("sop_type", "meta_monthly")
+      .in("section", ["structured_monthly_v2", "full"])
+      .order("analysis_date", { ascending: false }).limit(6),
+    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans -- geen
+    // kanaalvermenging zoals bij sop_tasks, dat die kolom niet heeft.
+    supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
+      .eq("client_id", clientId).eq("sop_type", "meta_weekly")
+      .order("analysis_date", { ascending: false }).limit(25),
+  ]);
+  const maandRijen = (maandSecties.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
+  const maandStructured = maandRijen.find((r) => r.section === "structured_monthly_v2");
+  const maandNarratief = maandRijen.find((r) => r.section === "full");
+  const maandHandoff = buildMonthlyHandoff({
+    structured: maandStructured?.output ?? null,
+    narratief: maandNarratief?.output ?? null,
+    analysisDate: (maandStructured ?? maandNarratief)?.analysis_date ?? null,
+    cadans: "weekly",
+  });
+  const ketenContext = `\n\n${maandHandoff.tekst}${buildOpenPointsBlock((eigenOpen.data ?? []) as Parameters<typeof buildOpenPointsBlock>[0])}`;
+
+  const sharedContext = `${ketenContext}${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (Meta)..." });
   const step1 = await runStep({
@@ -708,7 +775,40 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
   const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
-  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  // ── De weekly was een eiland ────────────────────────────────────────────────
+  //
+  // Hij las geen enkele eerdere SOP-output: niet de maandanalyse, en ook niet zijn eigen vorige run.
+  // Van de drie cadansen stond de vaakst draaiende (52x per jaar per kanaal) dus volledig los, wat
+  // twee dingen kostte. Hij kon niet zien of een acuut signaal botst met de maanddiagnose, en hij
+  // kon dezelfde bleeder drie weken achter elkaar als nieuw melden -- terwijl "voor de derde week"
+  // precies het verschil is tussen een incident en een patroon.
+  //
+  // Bewust KLEIN gehouden. De weekly is expliciet "geen diepe analyse": hij krijgt de hoofdlijn van
+  // de maand in een paar regels (niet de onderbouwing, niet de succescriteria) en zijn eigen nog
+  // openstaande punten. Meer zou hem de maandanalyse laten overdoen.
+  const [maandSecties, eigenOpen] = await Promise.all([
+    supabase.from("sop_analysis_output").select("output, analysis_date, section")
+      .eq("client_id", clientId).eq("sop_type", "linkedin_monthly")
+      .in("section", ["structured_monthly_v2", "full"])
+      .order("analysis_date", { ascending: false }).limit(6),
+    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans -- geen
+    // kanaalvermenging zoals bij sop_tasks, dat die kolom niet heeft.
+    supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
+      .eq("client_id", clientId).eq("sop_type", "linkedin_weekly")
+      .order("analysis_date", { ascending: false }).limit(25),
+  ]);
+  const maandRijen = (maandSecties.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
+  const maandStructured = maandRijen.find((r) => r.section === "structured_monthly_v2");
+  const maandNarratief = maandRijen.find((r) => r.section === "full");
+  const maandHandoff = buildMonthlyHandoff({
+    structured: maandStructured?.output ?? null,
+    narratief: maandNarratief?.output ?? null,
+    analysisDate: (maandStructured ?? maandNarratief)?.analysis_date ?? null,
+    cadans: "weekly",
+  });
+  const ketenContext = `\n\n${maandHandoff.tekst}${buildOpenPointsBlock((eigenOpen.data ?? []) as Parameters<typeof buildOpenPointsBlock>[0])}`;
+
+  const sharedContext = `${ketenContext}${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (LinkedIn)..." });
   const step1 = await runStep({
