@@ -811,7 +811,7 @@ export default function SettingsPage() {
               <ol className="space-y-1.5 list-decimal list-inside">
                 <li>Ga naar <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Meta for Developers <ExternalLink className="w-3 h-3" /></a> en maak een app aan (type: Business)</li>
                 <li>Voeg de Marketing API product toe aan je app</li>
-                <li>Genereer een User Access Token via de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Graph API Explorer <ExternalLink className="w-3 h-3" /></a> met permissions: <code className="font-mono text-micro">ads_read, ads_management</code></li>
+                <li>Genereer een User Access Token via de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-brand-blue-ink hover:underline inline-flex items-center gap-0.5">Graph API Explorer <ExternalLink className="w-3 h-3" /></a> met permission: <code className="font-mono text-micro">ads_read</code></li>
                 <li>Wissel het token om voor een long-lived token (geldig ~60 dagen)</li>
                 <li>Kopieer alles naar <code className="font-mono">.env.local</code> en herstart de dev server</li>
               </ol>

@@ -71,7 +71,22 @@ export const OAUTH_PROVIDERS: Record<Provider, OAuthProviderConfig> = {
     familie: "meta",
     label: "Meta Ads",
     authorizeUrl: "https://www.facebook.com/v21.0/dialog/oauth",
-    scope: "ads_read,ads_management",
+    // ads_read alleen, ZONDER ads_management (24 augustus 2026). Dat schrijfrecht stond hier
+    // wel maar wordt nergens gebruikt: de enige POST in lib/meta/ is de async insights-job, en
+    // die is een leesaanroep die Meta nu eenmaal als POST heeft vormgegeven. Twee redenen om
+    // hem weg te halen, en de tweede is de duurste:
+    //
+    //   1. Meta laat je bij App Review elke permissie met een screencast onderbouwen. Een
+    //      schrijfrecht dat het product niet gebruikt kun je niet demonstreren, en dat is een
+    //      afwijzingsgrond op de aanvraag zelf.
+    //   2. Het sprak onze eigen pagina's tegen. /faq zegt "never executes anything itself in
+    //      Google Ads, Meta, or LinkedIn" en het Privacy Statement spreekt van leestoegang.
+    //      Een consent-scherm dat beheerrechten vraagt, zegt tegen de klant iets anders dan de
+    //      site die hem overtuigd heeft -- en de klant ziet dat scherm.
+    //
+    // Gaat het product ooit wél schrijven naar Meta, dan hoort ads_management hier terug te
+    // komen SAMEN met de tekst op /faq en in het Privacy Statement, niet los.
+    scope: "ads_read",
     clientId: () => process.env.META_ADS_APP_ID,
     clientSecret: () => process.env.META_ADS_APP_SECRET,
   },
