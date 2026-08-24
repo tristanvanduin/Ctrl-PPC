@@ -27,6 +27,35 @@ import { logger } from "@/lib/logger";
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type SopType = "monthly" | "weekly" | "biweekly";
+export type EnrichmentChannel = "google_ads" | "meta_ads" | "linkedin_ads";
+
+// ── WELKE LAGEN GELDEN VOOR WELK KANAAL ────────────────────────────────────
+//
+// Dit bestand heette "kanaalneutraal" omdat de matrix hieronder op CADANS is gesleuteld en niet op
+// kanaal. Dat is de matrix ook -- maar de LAGEN eronder zijn dat grotendeels niet: zes van de acht
+// bevragen `ads_*`-tabellen, en dat zijn Google Ads-tabellen. Ze zomaar voor Meta of LinkedIn
+// aanroepen levert geen lege laag op maar een VERKEERDE: Google-data gepresenteerd als context van
+// een ander kanaal.
+//
+// Het scherpste geval is sectorBenchmarks. Die tabel draagt "Bron: WordStream/LocaliQ/Triple Whale"
+// -- Search-benchmarks. Een CTR van 1,2% is voor Meta-feed gezond en zou tegen een Search-benchmark
+// als ver ondergemiddeld lezen. Erger nog: de weekly- en bi-weekly-preambule injecteren voor die
+// kanalen al META_BENCHMARKS respectievelijk LINKEDIN_BENCHMARKS, dus er zouden twee elkaar
+// tegensprekende benchmarkblokken in dezelfde prompt staan.
+//
+// Vandaar deze lijst. Een laag die hier in staat draait alleen voor Google; voor de andere kanalen
+// wordt hij overgeslagen én gemeld, zodat de afwezigheid als structureel leest en niet als "er was
+// niets te melden". Krimpt deze lijst, dan is er een kanaaleigen equivalent gebouwd -- dat is
+// precies de bedoeling, en de plek waar hij ingeplugd hoort te worden staat hiermee vast.
+const ALLEEN_GOOGLE: ReadonlySet<string> = new Set([
+  "leadingIndicators",      // ads_account_weekly, ads_leading_indicators
+  "sectorBenchmarks",       // benchmark_sectors is met Search-benchmarks gevuld; zie hierboven
+  "changeHistory",          // ads_change_history
+  "geoContext",             // ads_country_monthly, ads_country_yoy, ads_campaign_country_monthly
+  "pmaxInsights",           // Performance Max is een Google-product
+  "dimensionAvailability",  // ads_dimension_availability + de ads_*_monthly-tabellen
+  "portfolioAnalysis",      // krijgt Google-gevormde campagnerijen aangeleverd
+]);
 
 export interface EnrichmentContext {
   strategicContext: string;
@@ -53,6 +82,13 @@ export interface EnrichmentContext {
    * is een andere conclusie dan "we hebben het niet kunnen nakijken".
    */
   failedLayers: string[];
+  /**
+   * Lagen die voor dit kanaal bewust NIET zijn opgehaald omdat ze op Google-tabellen leunen. Een
+   * ander soort afwezigheid dan failedLayers: hier is niets misgegaan, deze laag bestaat gewoon
+   * niet voor dit kanaal. Het verschil hoort in de prompt te staan, want "niet gecontroleerd" en
+   * "niet van toepassing" leiden tot verschillende conclusies.
+   */
+  skippedLayers: string[];
 }
 
 /**
@@ -103,6 +139,8 @@ interface EnrichmentOpts {
   clientId: string;
   accountType: AccountType;
   sopType: SopType;
+  /** Het kanaal. Bepaalt welke lagen van toepassing zijn -- zie ALLEEN_GOOGLE hierboven. */
+  channel?: EnrichmentChannel;
   /** Required for strategic context date filtering */
   analysisDate: string;
   /** Required for portfolio analysis — pass campaignData + campaignMetaData */
@@ -117,7 +155,10 @@ interface EnrichmentOpts {
  */
 export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<EnrichmentContext> {
   const { supabase, clientId, accountType, sopType, analysisDate, campaignData, campaignMetaData } = opts;
+  const channel = opts.channel ?? "google_ads";
   const matrix = ENRICHMENT_MATRIX[sopType];
+  // Een laag draait als de matrix hem voor deze cadans aanzet EN hij voor dit kanaal bestaat.
+  const geldt = (laag: string): boolean => channel === "google_ads" || !ALLEEN_GOOGLE.has(laag);
 
   const result: EnrichmentContext = {
     strategicContext: "",
@@ -132,6 +173,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     pmaxInsights: null,
     geoContext: "",
     failedLayers: [],
+    skippedLayers: [],
   };
 
   // Build array of parallel fetches based on matrix
@@ -145,7 +187,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     );
   }
 
-  if (matrix.portfolioAnalysis && campaignData && campaignMetaData) {
+  if (geldt("portfolioAnalysis") && matrix.portfolioAnalysis && campaignData && campaignMetaData) {
     tasks.push(
       calculatePortfolioAnalysis(supabase, clientId, campaignData, campaignMetaData)
         .then((v) => { result.portfolioAnalysis = v; })
@@ -161,7 +203,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     );
   }
 
-  if (matrix.leadingIndicators) {
+  if (geldt("leadingIndicators") && matrix.leadingIndicators) {
     tasks.push(
       calculateLeadingIndicators(supabase, clientId)
         .then((v) => { result.leadingIndicators = v; })
@@ -169,7 +211,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     );
   }
 
-  if (matrix.sectorBenchmarks) {
+  if (geldt("sectorBenchmarks") && matrix.sectorBenchmarks) {
     tasks.push(
       fetchSectorBenchmarks(supabase, accountType, clientId)
         .then((v) => { result.sectorBenchmarks = v; })
@@ -177,7 +219,7 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     );
   }
 
-  if (matrix.changeHistory) {
+  if (geldt("changeHistory") && matrix.changeHistory) {
     tasks.push(
       fetchEnhancedChangeHistory(supabase, clientId)
         .then((v) => { result.changeHistory = v; })
@@ -185,8 +227,8 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
     );
   }
 
-  // Always compute PMAX insights (only produces output if PMAX campaigns exist)
-  tasks.push(
+  // PMAX bestaat alleen bij Google; voor de andere kanalen overslaan i.p.v. leeg laten.
+  if (geldt("pmaxInsights")) tasks.push(
     computePmaxInsights(supabase, clientId)
       .then((insights) => {
         result.pmaxInsights = insights;
@@ -195,15 +237,15 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
       .catch((e) => { logger.error("[enrichment] pmaxInsights failed:", e); result.failedLayers.push("pmaxInsights"); })
   );
 
-  // Always compute geo context (only produces output if multi-country)
-  tasks.push(
+  // Geo leest de ads_country_*-tabellen; die zijn Google.
+  if (geldt("geoContext")) tasks.push(
     calculateGeoContext(supabase, clientId)
       .then((v) => { result.geoContext = v; })
       .catch((e) => { logger.error("[enrichment] geoContext failed:", e); result.failedLayers.push("geoContext"); })
   );
 
-  // Always fetch dimension availability (lightweight query)
-  tasks.push(
+  // Dimensiebeschikbaarheid kijkt naar de ads_*-tabellen; ook Google.
+  if (geldt("dimensionAvailability")) tasks.push(
     getDimensionAvailability(supabase, clientId)
       .then((profile) => {
         result.dimensionProfile = profile;
@@ -211,6 +253,14 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
       })
       .catch((e) => { logger.error("[enrichment] dimensionAvailability failed:", e); result.failedLayers.push("dimensionAvailability"); })
   );
+
+  for (const laag of ALLEEN_GOOGLE) {
+    // Alleen melden wat voor deze cadans überhaupt aan zou hebben gestaan; een laag die de matrix
+    // sowieso uitzet is geen kanaalbeperking en hoort de melding niet te vervuilen.
+    const inMatrix = (matrix as Record<string, boolean>)[laag];
+    const altijdAan = laag === "pmaxInsights" || laag === "geoContext" || laag === "dimensionAvailability";
+    if (!geldt(laag) && (altijdAan || inMatrix)) result.skippedLayers.push(laag);
+  }
 
   await Promise.all(tasks);
 
@@ -224,6 +274,21 @@ export async function buildEnrichmentContext(opts: EnrichmentOpts): Promise<Enri
   // Het wordt aan dimensionAvailability geplakt omdat dat blok in stap 1 van alle drie de SOP's
   // al wordt meegestuurd. Ook als die laag zelf faalde: dan is de melding het hele blok, en juist
   // dan moet hij zichtbaar zijn.
+  // Overgeslagen lagen: een ANDERE mededeling dan mislukte lagen, en dat verschil telt. "Niet
+  // gecontroleerd" vraagt om voorzichtigheid; "bestaat niet voor dit kanaal" vraagt erom dat het
+  // model er niet naar op zoek gaat en er ook niet over klaagt.
+  if (result.skippedLayers.length > 0) {
+    const melding = [
+      "## Niet van toepassing op dit kanaal",
+      `Deze contextlagen bestaan alleen voor Google Ads en zijn hier bewust overgeslagen: ${result.skippedLayers.join(", ")}.`,
+      "Er is dus niets misgegaan. Behandel ze niet als ontbrekende data en doe er geen aanname over.",
+      "De kanaaleigen benchmarks die je wél hebt, staan in de preambule hierboven.",
+    ].join("\n");
+    result.dimensionAvailability = result.dimensionAvailability
+      ? `${result.dimensionAvailability}\n\n${melding}`
+      : melding;
+  }
+
   if (result.failedLayers.length > 0) {
     const melding = [
       "## Niet opgehaalde context",

@@ -27,6 +27,8 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { getClientMemory, buildClientMemoryGrounding } from "@/lib/memory/client-memory";
+import { ALLE_SOP_CHANNELS, type SopChannel } from "@/lib/analysis/sop-channel-config";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
@@ -143,6 +145,7 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     accountType,
     sopType: "biweekly",
     analysisDate: periodEnd,
+    channel: "google_ads",
   });
 
   const previousMonthlyOutput = monthlyOutputResult.data?.output
@@ -234,7 +237,12 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
   // monthly's analysestappen). Stap 4 houdt `layer: "narrative"` (Claude Sonnet 5), want daar zit
   // de Eindconclusie met maandprognose, directe acties, sprintplanning-update en twee hypotheses --
   // formuleerwerk waar nuance telt.
-  const sharedContext = `${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
+  // E1-wiring voor weekly/bi-weekly: het klantgeheugen zat alleen in de monthly, terwijl juist de
+  // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
+  // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
+  // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
+  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
 
 ${bwComparisonText}${bwPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
@@ -531,7 +539,26 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
         }
       : null
   );
-  const sharedContext = `${targetText}${reliabilityText}${metaPacingText}`;
+  // Zelfde verrijkingslaag als het Google-pad, nu kanaalbewust (zie ALLEEN_GOOGLE in
+  // lib/analysis/enrichment.ts). Voor de bi-weekly is hypothesisTracking de laag die er het meest
+  // toe doet: die is echt kanaalneutraal (sop_hypothesis_tracking draagt geen kanaalkolom) en het
+  // is precies wat deze cadans hoort te doen -- toetsen of doorgevoerde hypotheses effect tonen.
+  //
+  // De hypothese-instructie bij stap 2 hing tot nu toe alleen in de Google-tak; hij hoort bij de
+  // laag, niet bij het kanaal.
+  const enrichment = await buildEnrichmentContext({
+    supabase, clientId, accountType, sopType: "biweekly", analysisDate: periodEnd, channel: "meta_ads",
+  });
+  const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
+  const hypothesisInstructionForStep2 = enrichment.hypothesisTracking
+    ? "\n\nAls er uitgevoerde hypotheses zijn die nog niet gemeten zijn, beoordeel dan of het verwachte effect al zichtbaar is. Formuleer: 'Hypothese [X] toont [wel/geen/te vroeg] meetbaar effect: [KPI] [steeg/daalde] met X% sinds implementatie op [datum].'"
+    : "";
+  // E1-wiring voor weekly/bi-weekly: het klantgeheugen zat alleen in de monthly, terwijl juist de
+  // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
+  // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
+  // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
+  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${metaPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance (Meta)..." });
   const step1 = await runStep({
@@ -568,7 +595,7 @@ ${step1.output}
 ## Campaign Performance (maandelijks, laatste 3 maanden)
 \`\`\`
 ${toPromptTable(campaignMonthly)}
-\`\`\``,
+\`\`\`${hypothesisInstructionForStep2}`,
   });
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: Ad Set & Doelgroep Performance (Meta)..." });
@@ -822,7 +849,26 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
       ? { conversies: Number(targetResult.monthlyExpected[Number(today().slice(5, 7)) - 1]?.conversions ?? 0) }
       : null
   );
-  const sharedContext = `${targetText}${reliabilityText}${linkedinPacingText}`;
+  // Zelfde verrijkingslaag als het Google-pad, nu kanaalbewust (zie ALLEEN_GOOGLE in
+  // lib/analysis/enrichment.ts). Voor de bi-weekly is hypothesisTracking de laag die er het meest
+  // toe doet: die is echt kanaalneutraal (sop_hypothesis_tracking draagt geen kanaalkolom) en het
+  // is precies wat deze cadans hoort te doen -- toetsen of doorgevoerde hypotheses effect tonen.
+  //
+  // De hypothese-instructie bij stap 2 hing tot nu toe alleen in de Google-tak; hij hoort bij de
+  // laag, niet bij het kanaal.
+  const enrichment = await buildEnrichmentContext({
+    supabase, clientId, accountType, sopType: "biweekly", analysisDate: periodEnd, channel: "linkedin_ads",
+  });
+  const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
+  const hypothesisInstructionForStep2 = enrichment.hypothesisTracking
+    ? "\n\nAls er uitgevoerde hypotheses zijn die nog niet gemeten zijn, beoordeel dan of het verwachte effect al zichtbaar is. Formuleer: 'Hypothese [X] toont [wel/geen/te vroeg] meetbaar effect: [KPI] [steeg/daalde] met X% sinds implementatie op [datum].'"
+    : "";
+  // E1-wiring voor weekly/bi-weekly: het klantgeheugen zat alleen in de monthly, terwijl juist de
+  // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
+  // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
+  // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
+  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${linkedinPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance (LinkedIn)..." });
   const step1 = await runStep({
@@ -859,7 +905,7 @@ ${step1.output}
 ## Campaign Performance (maandelijks, laatste 3 maanden -- wordt ook gebruikt voor de pacing-check in stap 4)
 \`\`\`
 ${toPromptTable(campaignMonthly)}
-\`\`\``,
+\`\`\`${hypothesisInstructionForStep2}`,
   });
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: Creative Performance (LinkedIn)..." });
@@ -1015,6 +1061,17 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: "Verwacht: { client_id: string }" }, { status: 400 });
+  }
+
+  // Een onbekend kanaal viel stilzwijgend terug op de volledige Google-analyse, op Google-tabellen.
+  // Een typefout in body.channel gaf dus geen fout maar een verkeerd antwoord, en de monthly-route
+  // doet dit al wél streng via getAdapter(). ALLE_SOP_CHANNELS is de ene lijst die ook de knoppen
+  // en de cron gebruiken.
+  if (!ALLE_SOP_CHANNELS.includes(channel as SopChannel)) {
+    return Response.json(
+      { error: `Onbekend kanaal "${channel}". Geldig: ${ALLE_SOP_CHANNELS.join(", ")}.` },
+      { status: 400 }
+    );
   }
 
   // Alleen AUTOMATISCHE runs zijn dekkingsgebonden. sops_enabled is de licentievlag voor

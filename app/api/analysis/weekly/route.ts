@@ -29,6 +29,8 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { getClientMemory, buildClientMemoryGrounding } from "@/lib/memory/client-memory";
+import { ALLE_SOP_CHANNELS, type SopChannel } from "@/lib/analysis/sop-channel-config";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 
@@ -148,6 +150,7 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
     accountType,
     sopType: "weekly",
     analysisDate: periodEnd,
+    channel: "google_ads",
   });
 
   // Format monthly targets from forecast engine
@@ -179,7 +182,12 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   // Alle context die de ongesplitste versie eenmalig onderaan de userMessage meegaf, gaat nu naar
   // ELKE stap-call -- geen enkele stap hoort minder te weten dan de vorige, ongesplitste versie
   // altijd had.
-  const sharedContext = `${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  // E1-wiring voor weekly/bi-weekly: het klantgeheugen zat alleen in de monthly, terwijl juist de
+  // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
+  // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
+  // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
+  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   // Drie losse calls i.p.v. één grote (masterplan 17.11x): elke stap is nu apart routeerbaar
   // (STEP_TIER, per "weekly-step-N") en apart gelogd in llm_usage.
@@ -425,7 +433,27 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   const adRows = withMetaNames(adResult.filter((r) => new Date(String(r.date)) >= new Date(periodBleederStart)), adNames);
   const campaignRows = withMetaNames(campaignResult, campaignNames);
 
-  const sharedContext = `${targetText}${reliabilityText}`;
+  // Dezelfde verrijkingslaag als het Google-pad. Hij werd hier nooit aangeroepen, waardoor Meta en
+  // LinkedIn twee contextblokken kregen waar Google er acht kreeg.
+  //
+  // De laag is nu kanaalbewust (zie ALLEEN_GOOGLE in lib/analysis/enrichment.ts): de zes lagen die
+  // op ads_*-tabellen leunen worden voor dit kanaal overgeslagen én gemeld, in plaats van
+  // Google-data als context van dit kanaal te presenteren. Wat overblijft is echt kanaalneutraal:
+  // de strategische klantcontext en -- voor de bi-weekly -- de hypothese-tracking.
+  //
+  // De compositie hieronder is WOORDELIJK gelijk aan die van het Google-pad. Dat is opzet: de
+  // Google-only velden komen hier als lege string terug, dus dezelfde regel levert vanzelf de
+  // juiste, kortere context op. Eén vorm om te onderhouden in plaats van drie.
+  const enrichment = await buildEnrichmentContext({
+    supabase, clientId, accountType, sopType: "weekly", analysisDate: periodEnd, channel: "meta_ads",
+  });
+  const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
+  // E1-wiring voor weekly/bi-weekly: het klantgeheugen zat alleen in de monthly, terwijl juist de
+  // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
+  // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
+  // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
+  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (Meta)..." });
   const step1 = await runStep({
@@ -660,7 +688,27 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   const creativeRows = withLinkedinNames(creativeRowsRaw, creativeFormats);
   const campaignSpendRowsNamed = withLinkedinNames(campaignSpendRows, campaignNames);
 
-  const sharedContext = `${targetText}${reliabilityText}`;
+  // Dezelfde verrijkingslaag als het Google-pad. Hij werd hier nooit aangeroepen, waardoor Meta en
+  // LinkedIn twee contextblokken kregen waar Google er acht kreeg.
+  //
+  // De laag is nu kanaalbewust (zie ALLEEN_GOOGLE in lib/analysis/enrichment.ts): de zes lagen die
+  // op ads_*-tabellen leunen worden voor dit kanaal overgeslagen én gemeld, in plaats van
+  // Google-data als context van dit kanaal te presenteren. Wat overblijft is echt kanaalneutraal:
+  // de strategische klantcontext en -- voor de bi-weekly -- de hypothese-tracking.
+  //
+  // De compositie hieronder is WOORDELIJK gelijk aan die van het Google-pad. Dat is opzet: de
+  // Google-only velden komen hier als lege string terug, dus dezelfde regel levert vanzelf de
+  // juiste, kortere context op. Eén vorm om te onderhouden in plaats van drie.
+  const enrichment = await buildEnrichmentContext({
+    supabase, clientId, accountType, sopType: "weekly", analysisDate: periodEnd, channel: "linkedin_ads",
+  });
+  const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
+  // E1-wiring voor weekly/bi-weekly: het klantgeheugen zat alleen in de monthly, terwijl juist de
+  // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
+  // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
+  // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
+  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (LinkedIn)..." });
   const step1 = await runStep({
@@ -817,6 +865,17 @@ export async function POST(request: NextRequest) {
     if (!clientId) throw new Error("missing");
   } catch {
     return Response.json({ error: "Verwacht: { client_id: string }" }, { status: 400 });
+  }
+
+  // Een onbekend kanaal viel stilzwijgend terug op de volledige Google-analyse, op Google-tabellen.
+  // Een typefout in body.channel gaf dus geen fout maar een verkeerd antwoord, en de monthly-route
+  // doet dit al wél streng via getAdapter(). ALLE_SOP_CHANNELS is de ene lijst die ook de knoppen
+  // en de cron gebruiken.
+  if (!ALLE_SOP_CHANNELS.includes(channel as SopChannel)) {
+    return Response.json(
+      { error: `Onbekend kanaal "${channel}". Geldig: ${ALLE_SOP_CHANNELS.join(", ")}.` },
+      { status: 400 }
+    );
   }
 
   // Alleen AUTOMATISCHE runs zijn dekkingsgebonden. sops_enabled is de licentievlag voor

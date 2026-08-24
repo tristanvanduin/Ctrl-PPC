@@ -1186,6 +1186,21 @@ async function runMetaMonthlyAnalysis(
   // E1-wiring (Meta): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
   const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
 
+  // Fase 2: dezelfde verrijkingslaag als het Google-pad, nu kanaalbewust. Zes van de acht lagen
+  // leunen op ads_*-tabellen en worden voor dit kanaal overgeslagen én gemeld (zie ALLEEN_GOOGLE in
+  // lib/analysis/enrichment.ts); wat overblijft -- de strategische klantcontext en de
+  // hypothese-tracking -- is echt kanaalneutraal. Het gaat mee bij stap 1, waar de accountcontext
+  // hoort, precies zoals het Google-pad het bij zijn eerste stap zet.
+  const enrichment = await buildEnrichmentContext({
+    supabase, clientId, accountType, sopType: "monthly", analysisDate: periodEnd, channel: adapter.channel as "meta_ads" | "linkedin_ads",
+  });
+  const enrichmentText = [
+    enrichment.strategicContext,
+    enrichment.hypothesisTracking,
+    enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "",
+  ].filter(Boolean).join("");
+
+
   const shared = { supabase, apiKey, clientId, sopType: adapter.sopTypeKey, periodStart, periodEnd, runKey: jobId, channel: adapter.channel, evalCapture, jsonSchema: { name: "monthly_step_output", schema: buildStepOutputJsonSchema(adapter.issueClusters, adapter.entityTypes) } };
   const parsedSteps: ParsedStepOutput[] = [];
   const allSteps: StepResult[] = [];
@@ -1235,6 +1250,7 @@ async function runMetaMonthlyAnalysis(
       clientMemorySection
     );
     const userMessage = buildMetaStepMessage(stepNumber, stepFacts[stepNumber], clientId)
+      + (stepNumber === 1 ? enrichmentText : "")
       + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
       + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "")
       + (stepNumber === 6 && godViewText ? `\n\n${godViewText}` : "");
@@ -1399,6 +1415,21 @@ async function runLinkedinMonthlyAnalysis(
   // E1-wiring (LinkedIn): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
   const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
 
+  // Fase 2: dezelfde verrijkingslaag als het Google-pad, nu kanaalbewust. Zes van de acht lagen
+  // leunen op ads_*-tabellen en worden voor dit kanaal overgeslagen én gemeld (zie ALLEEN_GOOGLE in
+  // lib/analysis/enrichment.ts); wat overblijft -- de strategische klantcontext en de
+  // hypothese-tracking -- is echt kanaalneutraal. Het gaat mee bij stap 1, waar de accountcontext
+  // hoort, precies zoals het Google-pad het bij zijn eerste stap zet.
+  const enrichment = await buildEnrichmentContext({
+    supabase, clientId, accountType, sopType: "monthly", analysisDate: periodEnd, channel: adapter.channel as "meta_ads" | "linkedin_ads",
+  });
+  const enrichmentText = [
+    enrichment.strategicContext,
+    enrichment.hypothesisTracking,
+    enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "",
+  ].filter(Boolean).join("");
+
+
   const shared = { supabase, apiKey, clientId, sopType: adapter.sopTypeKey, periodStart, periodEnd, runKey: jobId, channel: adapter.channel, evalCapture, jsonSchema: { name: "monthly_step_output", schema: buildStepOutputJsonSchema(adapter.issueClusters, adapter.entityTypes) } };
   const parsedSteps: ParsedStepOutput[] = [];
   const allSteps: StepResult[] = [];
@@ -1447,6 +1478,7 @@ async function runLinkedinMonthlyAnalysis(
       clientMemorySection
     );
     const userMessage = buildLinkedinStepMessage(stepNumber, stepFacts[stepNumber], clientId)
+      + (stepNumber === 1 ? enrichmentText : "")
       + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
       + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "")
       + (stepNumber === 6 && godViewText ? `\n\n${godViewText}` : "");
