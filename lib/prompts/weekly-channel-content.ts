@@ -44,7 +44,10 @@ Geen bleeders: "Ad set/creative check: geen bleeders of fatigue-signalen boven d
   spendAnomalyRootCauses: `a. Learning phase nog niet afgerond? (nieuwe/gewijzigde ad set heeft tijd en volume nodig)
      b. Doelgroep te smal? (interesse-/lookalike-targeting te beperkt -> verbreden)
      c. Bod- of kostenplafond te laag? (advertenties winnen de auctie niet)
-     d. Creative afgekeurd of learning limited? (check delivery-status in Ads Manager)
+     d. Learning limited of afgekeurde creative? Je krijgt learning_stage_info en het dagbudget per
+        ad set mee -- lees de status daaruit in plaats van naar Ads Manager te verwijzen, en noem de
+        ad set bij naam. LEARNING_LIMITED betekent te weinig conversies om uit de leerfase te komen;
+        dat vraagt om consolideren of het conversiedoel verruimen, niet om meer budget.
      e. Frequency saturation binnen de doelgroep? (budget kan niet meer op zonder frequency-schade)`,
 };
 

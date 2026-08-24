@@ -78,7 +78,7 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   // Phase 1: Fetch data + client context + forecast targets in parallel
   const [
     weeklyResult, searchResult, campaignResult, accountMonthlyResult,
-    clientCtx, targetResult, campaignMetaResult,
+    clientCtx, targetResult, campaignMetaResult, impressionShareResult,
   ] = await Promise.all([
     supabase.from("ads_account_weekly").select("*").eq("client_id", clientId).gte("week_start", periodStart).order("week_start"),
     supabase.from("ads_search_terms_wasteful").select("*").eq("client_id", clientId).order("cost", { ascending: false }).limit(500),
@@ -92,6 +92,14 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
     // beantwoorden zonder te gokken. ads_campaign_metadata draagt budget_amount en budget_type
     // en wordt door de bestaande sync gevuld.
     supabase.from("ads_campaign_metadata").select("campaign_name, campaign_type, budget_amount, budget_type, bidding_strategy, serving_status").eq("client_id", clientId),
+    // Impressieaandeel verloren aan budget: het DIRECTE bewijs voor de "Budget vs. Vraag"-vraag uit
+    // stap 3. Zonder deze kolom moest het model budgetkrapte afleiden uit spend versus dagbudget --
+    // een omweg die niet onderscheidt tussen "budget op" en "te weinig vraag". search_budget_lost_is
+    // zegt het rechtstreeks. De tabel bestond al en wordt door de sync gevuld; de weekly bevroeg hem
+    // alleen niet (de maand-SOP en de second opinion doen dat wel).
+    supabase.from("ads_campaign_impression_share")
+      .select("campaign_name, month, search_impression_share, search_budget_lost_is, search_rank_lost_is, daily_budget, budget_utilization")
+      .eq("client_id", clientId).order("month", { ascending: false }).limit(60),
   ]);
 
   const { goalsSection, accountType } = clientCtx;
@@ -296,6 +304,11 @@ ${toPromptTable(campaignResult.data ?? [])}
 ## Campagne-instellingen (dagbudget en biedstrategie -- voor de Budget vs. Vraag-analyse)
 \`\`\`
 ${toPromptTable(campaignMetaResult.data ?? [])}
+\`\`\`
+
+## Impressieaandeel (search_budget_lost_is = aandeel gemist DOOR budget, search_rank_lost_is = gemist door positie)
+\`\`\`
+${toPromptTable(impressionShareResult.data ?? [])}
 \`\`\`
 
 Focus alleen op anomalies en bleeders die directe actie vereisen.`,

@@ -1,13 +1,26 @@
 // Kanaal-specifieke inhoud voor buildBiWeeklyPrompt (fase C, vervolg op weekly, 12 aug 2026).
-// Bi-weekly toetst continu terug op de maandanalyse (zie HYPOTHESE_INSTRUCTIES en de
-// "Zoals geidentificeerd in de maandanalyse..."-formulering in sop-prompts.ts), dus Stap 3 en
-// Stap 4 moeten verwijzen naar een laag die de bijbehorende monthly-adapter ook daadwerkelijk
-// als stap heeft. Referentie: lib/meta/step-message.ts (11 stappen, stap 3 "Ad Set en Doelgroep",
-// stap 9 "Frequency en Verzadiging") en lib/linkedin/step-message.ts (9 stappen, stap 4
-// "Creative Performance", stap 8 "Bidding en Pacing"). Google's "Ad Group"/"Device & Engagement"
-// bestaan niet in die structuur -- Meta heeft geen ad groups (ad sets zijn het niveau eronder) en
-// LinkedIn heeft geen ad-groeplaag uberhaupt; device-only performance is voor geen van beide een
-// stap die de monthly-analyse apart bijhoudt.
+// Bi-weekly toetst continu terug op de maandanalyse, dus Stap 3 en Stap 4 moeten verwijzen naar een
+// laag die de bijbehorende monthly-adapter ook daadwerkelijk kent.
+//
+// BIJGEWERKT: deze kop verwees naar een stappenstructuur die niet meer bestaat -- "lib/meta/
+// step-message.ts (11 stappen, stap 3 en stap 9)" en "lib/linkedin/step-message.ts (9 stappen,
+// stap 4 en stap 8)". Beide adapters zijn sinds F5 fase3 geconsolideerd naar ZES pijlers. De
+// verwijzing klopte dus niet meer, en dat is het soort commentaar dat een lezer op het verkeerde
+// been zet omdat het gezaghebbend oogt.
+//
+// De INHOUD hieronder mapt nog wel, en zo hoort het gelezen te worden:
+//   Meta stap 3 "Ad Set & Doelgroep"      -> pijler 2 "Structuur & Budget", NIVEAU B
+//   Meta stap 4 "Frequency & Verzadiging" -> pijler 5 "Funnel, Verzadiging & Schedule", NIVEAU B
+//   LinkedIn stap 3 "Creative Performance"-> pijler 3 "Creative Performance"
+//   LinkedIn stap 4 "Bidding & Pacing"    -> pijler 2 "Structuur, Budget & Bidding", NIVEAU C
+//
+// De bi-weekly houdt bewust zijn eigen nummering 1 t/m 4: hij is een check-in met vier stappen, geen
+// verkorte maandanalyse. Wat moet kloppen is dat elk onderwerp bestaat in de maandanalyse waarnaar
+// wordt teruggekoppeld -- niet dat de nummers gelijklopen.
+//
+// Google's "Ad Group"/"Device & Engagement" bestaan in geen van beide structuren: Meta heeft geen ad
+// groups (ad sets zijn het niveau eronder) en LinkedIn heeft die laag uberhaupt niet; device-only
+// performance is voor geen van beide een onderwerp dat de maandanalyse apart bijhoudt.
 //
 // Stap 1 en Stap 2 blijven inhoudelijk hetzelfde format (Account/Campagne Performance, "ontwikkelt
 // dit zich zoals verwacht") -- alleen de "Gebruik:"-databronregel verandert per kanaal.

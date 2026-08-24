@@ -193,47 +193,14 @@ Geef altijd aan of het account op schema ligt: OP SCHEMA / NIET OP SCHEMA / KRIT
 // HYPOTHESE INSTRUCTIES (gedeeld door alle prompts)
 // ============================================================
 
-const HYPOTHESE_INSTRUCTIES = `
-## Hypothese formaat
-Schrijf elke hypothese exact in dit formaat:
-
-"Met het [concrete actie] verwachten we [meetbare verwachting] voor [campagne/ad group/keyword],
-gemeten via [specifieke metric(s)] binnen [tijdshorizon], omdat [onderbouwing vanuit de data]."
-
-Regels:
-- De actie moet specifiek en uitvoerbaar zijn (niet "PMAX optimaliseren" maar "tROAS verlagen van X% naar Y%")
-- De verwachting moet meetbaar zijn (niet "betere performance" maar "+20% conversies")
-- De tijdshorizon is realistisch: quick wins 2-4 weken, structurele veranderingen 2-3 maanden
-- De onderbouwing verwijst expliciet naar data uit de analyse
-- Geef per hypothese een ICE score:
-  - Impact (1-10): effect op de primaire doelstelling
-  - Confidence (1-10): zekerheid op basis van beschikbare data
-  - Ease (1-10): implementatiegemak
-  - ICE totaal = (Impact + Confidence + Ease) / 3
-- Sorteer hypotheses van hoog naar laag ICE score
-
-## BELANGRIJK: Verantwoordelijkheid en afhankelijkheden
-Hypotheses en taken zijn NIET altijd voor het bureau. Wijs per taak een verantwoordelijke toe:
-- **Bureau**: alles wat in Google Ads, Merchant Center, Tag Manager, Analytics etc. gebeurt
-- **Klant**: alles wat op de website, in het CMS, in de productfeed-bron, of buiten Google Ads moet gebeuren
-
-### Afhankelijkheden herkennen
-Veel hypotheses vereisen actie van BEIDE partijen. Genereer dan ook BEIDE taken, in de juiste volgorde.
-Zonder de klant-taak kan het bureau vaak niet verder. Maak dit expliciet.
-
-Voorbeelden (niet limitatief — gebruik je eigen expertise):
-- Nieuwe campagnetypes (Display, Video, Awareness, Remarketing, Demand Gen) → klant levert content/creatives aan → bureau bouwt campagne
-- Nieuwe markten/landen → klant regelt vertalingen, betaalmethoden, verzending → bureau maakt campagnes
-- Productfeed-verbeteringen → klant vult data aan → bureau optimaliseert feed-regels
-- Landingspagina-issues → bureau deelt analyse/aanbevelingen → klant implementeert verbeteringen
-- Reviews/UGC/trust → klant activeert platform/verzamelt content → bureau koppelt aan ads
-- Prijsstrategie → klant past prijzen aan → bureau optimaliseert biedingen op nieuwe marges
-- Tracking/conversie-setup → klant geeft toegang/implementeert tags → bureau configureert
-
-## BELANGRIJK: Denk breed — niet alleen optimalisaties
-Je bent niet beperkt tot het optimaliseren van bestaande campagnes. Als de data erop wijst, stel dan gerust voor:
-
-### Strategiewijzigingen
+// De "denk breed"-catalogus is het enige deel van de hypothese-instructies dat echt per platform
+// verschilt: het somt de strategische zetten op die op dat kanaal bestaan. De Google-versie
+// hieronder is WOORDELIJK de bestaande tekst -- geen gedragswijziging voor Google. Meta en
+// LinkedIn kregen tot nu toe diezelfde lijst, met adviezen over Performance Max, Shopping-feeds,
+// zoekwoorden en Merchant Center: zetten die op hun platform niet bestaan. Een model dat gevraagd
+// wordt breed te denken, denkt dan breed in de verkeerde richting.
+const DENK_BREED: Record<PromptKanaal, string> = {
+  google_ads: `### Strategiewijzigingen
 - Overstappen van manual bidding naar Smart Bidding (tCPA, tROAS, Maximize Conversions)
 - Overstappen van tROAS naar tCPA of andersom als de data dit onderbouwt
 - Verschuiven van budget tussen campagnetypes (Search → Shopping, PMax → Search, etc.)
@@ -270,15 +237,143 @@ Je bent niet beperkt tot het optimaliseren van bestaande campagnes. Als de data 
 - Productfeed-optimalisatie (titels, beschrijvingen, afbeeldingen, custom labels)
 - Promoties en merchant promotions
 - Productstatus-issues oplossen (afgekeurde producten)
-- Prijsconcurrentie-analyse
+- Prijsconcurrentie-analyse`,
 
-Dit is geen uitputtende lijst — gebruik je expertise als senior SEA specialist. Als je op basis van de data een kans of probleem ziet dat hier niet staat, formuleer het als hypothese.`;
+  meta_ads: `### Strategiewijzigingen
+- Van ABO naar CBO (of terug) als budgetverdeling tussen ad sets het knelpunt is
+- Overstappen op Advantage+ campagnes of juist terug naar handmatige doelgroepen
+- Van conversie-optimalisatie naar waarde-optimalisatie als de conversiewaarde betrouwbaar is
+- Consolideren van te veel kleine ad sets (elk apart in learning phase) tot minder, grotere
+- Full-funnel: prospecting, retargeting en retentie als aparte campagnes met eigen doelen
+
+### Nieuwe campagne- en advertentievormen
+- Advantage+ Shopping als aanvulling op handmatige conversiecampagnes
+- Catalogus/dynamic product ads als er een productfeed is
+- Reels- en Stories-native creatives in plaats van bijgesneden feed-materiaal
+- Lead ads met instant form als de landingspagina de drop-off veroorzaakt
+- Video als de statische creatives hun hook rate niet meer halen
+
+### Structuur en doelgroepen
+- Doelgroepoverlap opheffen (dezelfde omschrijving in meerdere ad sets laat je tegen jezelf bieden)
+- Lookalikes verbreden of versmallen op basis van de bronlijst-kwaliteit
+- Exclusies toevoegen (bestaande klanten, recente kopers) waar dat past bij het doel
+- Placement-uitsluitingen bij aantoonbare verspilling, bijvoorbeeld op Audience Network
+- Frequency-plafond als verzadiging de CTR of de incrementele conversies aantast
+
+### Creative en meting
+- Creatieve rotatie op basis van fatigue-signalen in plaats van op kalender
+- Hook-varianten testen als de eerste drie seconden het lek zijn
+- Conversions API naast de pixel als de browserzijde ondermeet
+- Attributievenster expliciet meewegen bij het beoordelen van korte campagnes`,
+
+  linkedin_ads: `### Strategiewijzigingen
+- Van maximum delivery naar handmatig bieden (of terug) als de CPC-ontwikkeling daarom vraagt
+- Objective heroverwegen als het gekozen doel niet bij de gewenste actie past
+- Van lead gen forms naar landingspagina of andersom, afhankelijk van waar de drop-off zit
+- Campagnegroepen inzetten om budget over doelgroepen te verdelen in plaats van per campagne
+- Full-funnel: thought leadership voor bereik, gevolgd door conversiecampagnes op wie engageerde
+
+### Nieuwe campagne- en advertentievormen
+- Document ads als de doelgroep in de oriëntatiefase zit
+- Video of carrousel als single image de CTR-benchmark niet haalt
+- Conversation of message ads voor een gerichte, kleine doelgroep
+- Thought leader ads via profielen van medewerkers als merkvertrouwen het knelpunt is
+
+### Doelgroep en ICP
+- Matched audiences: bedrijvenlijsten of contactlijsten uploaden in plaats van breed targeten
+- Doelgroep verbreden als de CPM stijgt bij dalende CTR (te smal publiek raakt op)
+- Uitsluiten van functies of senioriteiten die spend opnemen zonder leads op te leveren
+- Audience Network uitzetten wanneer de leadkwaliteit daar aantoonbaar achterblijft
+- ICP-definitie aanscherpen of vastleggen als de fit-score niet te berekenen is
+
+### Meting en opvolging
+- Insight Tag en conversietracking controleren als leads buiten het platform landen
+- Lead-kwaliteit terugkoppelen uit het CRM; LinkedIn meet het formulier, niet de opportunity
+- Rekening houden met lange B2B-doorlooptijden bij het beoordelen van een kort venster`,
+};
+
+// Het voorbeeld bij de "wees specifiek"-regel. De REGEL is gedeeld vakmanschap; het VOORBEELD niet
+// -- dat noemde een PMax-campagne en een tROAS-doel, ook in een LinkedIn-prompt. Een test ving dat:
+// het lek zat niet in de catalogus maar in de gedeelde regels eromheen, waar je het niet zoekt.
+const SPECIFIEK_VOORBEELD: Record<PromptKanaal, string> = {
+  google_ads: 'niet "PMAX optimaliseren" maar "tROAS verlagen van X% naar Y%"',
+  meta_ads: 'niet "de campagne optimaliseren" maar "het dagbudget van ad set X van 40 naar 25 euro verlagen"',
+  linkedin_ads: 'niet "de targeting aanscherpen" maar "senioriteit Entry uitsluiten in campagne X"',
+};
+
+// ── DE ROL DIE HET MODEL AANNEEMT ──────────────────────────────────────────
+//
+// Alle vier de preambules begonnen met "Je bent een senior SEA specialist", ook wanneer de analyse
+// over Meta of LinkedIn ging. SEA is search advertising; dat is niet wat een LinkedIn-analist doet.
+// De rol stuurt welk vakjargon, welke reflexen en welke standaardoplossingen het model aandraagt,
+// dus dit is geen cosmetische regel -- een "SEA-specialist" die naar een LinkedIn-account kijkt,
+// grijpt naar zoekwoorden en biedstrategieen die daar niet bestaan.
+//
+// Alleen de rolzin verschilt. Alles eromheen -- cijferdiscipline, hypotheseformaat, ICE, de
+// KPI-ketenredenering -- blijft woordelijk gedeeld: dat is vakmanschap dat niet per platform verschilt.
+export type PromptKanaal = "google_ads" | "meta_ads" | "linkedin_ads";
+
+const KANAAL_ROL: Record<PromptKanaal, string> = {
+  google_ads: "senior SEA-specialist",
+  meta_ads: "senior Meta Ads-specialist",
+  linkedin_ads: "senior LinkedIn Ads-specialist in B2B",
+};
+
+export function rolVoorKanaal(kanaal?: string): string {
+  return KANAAL_ROL[(kanaal ?? "google_ads") as PromptKanaal] ?? KANAAL_ROL.google_ads;
+}
+
+function buildHypotheseInstructies(kanaal: PromptKanaal = "google_ads"): string {
+  return `
+## Hypothese formaat
+Schrijf elke hypothese exact in dit formaat:
+
+"Met het [concrete actie] verwachten we [meetbare verwachting] voor [campagne/ad group/keyword],
+gemeten via [specifieke metric(s)] binnen [tijdshorizon], omdat [onderbouwing vanuit de data]."
+
+Regels:
+- De actie moet specifiek en uitvoerbaar zijn (${SPECIFIEK_VOORBEELD[kanaal] ?? SPECIFIEK_VOORBEELD.google_ads})
+- De verwachting moet meetbaar zijn (niet "betere performance" maar "+20% conversies")
+- De tijdshorizon is realistisch: quick wins 2-4 weken, structurele veranderingen 2-3 maanden
+- De onderbouwing verwijst expliciet naar data uit de analyse
+- Geef per hypothese een ICE score:
+  - Impact (1-10): effect op de primaire doelstelling
+  - Confidence (1-10): zekerheid op basis van beschikbare data
+  - Ease (1-10): implementatiegemak
+  - ICE totaal = (Impact + Confidence + Ease) / 3
+- Sorteer hypotheses van hoog naar laag ICE score
+
+## BELANGRIJK: Verantwoordelijkheid en afhankelijkheden
+Hypotheses en taken zijn NIET altijd voor het bureau. Wijs per taak een verantwoordelijke toe:
+- **Bureau**: alles wat in de advertentieplatformen en meetinstrumenten van dit kanaal gebeurt
+- **Klant**: alles wat op de website, in het CMS, in de databron, of buiten het advertentieplatform moet gebeuren
+
+### Afhankelijkheden herkennen
+Veel hypotheses vereisen actie van BEIDE partijen. Genereer dan ook BEIDE taken, in de juiste volgorde.
+Zonder de klant-taak kan het bureau vaak niet verder. Maak dit expliciet.
+
+Voorbeelden (niet limitatief — gebruik je eigen expertise):
+- Nieuwe campagnetypes (Display, Video, Awareness, Remarketing, Demand Gen) → klant levert content/creatives aan → bureau bouwt campagne
+- Nieuwe markten/landen → klant regelt vertalingen, betaalmethoden, verzending → bureau maakt campagnes
+- Productfeed-verbeteringen → klant vult data aan → bureau optimaliseert feed-regels
+- Landingspagina-issues → bureau deelt analyse/aanbevelingen → klant implementeert verbeteringen
+- Reviews/UGC/trust → klant activeert platform/verzamelt content → bureau koppelt aan ads
+- Prijsstrategie → klant past prijzen aan → bureau optimaliseert biedingen op nieuwe marges
+- Tracking/conversie-setup → klant geeft toegang/implementeert tags → bureau configureert
+
+## BELANGRIJK: Denk breed — niet alleen optimalisaties
+Je bent niet beperkt tot het optimaliseren van bestaande campagnes. Als de data erop wijst, stel dan gerust voor:
+
+${DENK_BREED[kanaal] ?? DENK_BREED.google_ads}
+
+Dit is geen uitputtende lijst — gebruik je expertise als ${rolVoorKanaal(kanaal)}. Als je op basis van de data een kans of probleem ziet dat hier niet staat, formuleer het als hypothese.`;
+}
 
 // ============================================================
 // MONTHLY PER-STEP PROMPTS (moved from monthly/route.ts)
 // ============================================================
 
-const MONTHLY_BASE_ROLE = `Je bent een senior SEA strateeg bij het bureau die een volledige maandelijkse analyse uitvoert.
+const MONTHLY_BASE_ROLE = (kanaal?: string) => `Je bent een ${rolVoorKanaal(kanaal)} bij het bureau die een volledige maandelijkse analyse uitvoert.
 Je denkt niet als een rapporteur maar als een adviseur. Elke observatie eindigt met een conclusie en actie.
 Schrijf altijd in het Nederlands. Gebruik altijd concrete cijfers. Nooit vage omschrijvingen.
 
@@ -1183,6 +1278,10 @@ Elke bevinding:
 // voldoet structureel aan deze vorm, dus de route geeft de adapter rechtstreeks door. Geen
 // import van ChannelAdapter hier, zodat er geen circulaire afhankelijkheid ontstaat.
 export interface ChannelPromptConfig {
+  /** Optioneel: de adapters dragen dit veld al, dus elke bestaande aanroep levert het vanzelf.
+   *  Bepaalt de rolzin en de kanaalspecifieke "denk breed"-catalogus. Ontbreekt hij, dan blijft
+   *  het gedrag exact zoals het was (Google). */
+  channel?: string;
   benchmarks: Record<AccountType, string>;
   issueClusters: readonly string[];
   entityTypes: readonly string[];
@@ -1204,7 +1303,7 @@ export function buildMonthlyStepPrompt(
   // A-track: de deterministisch gedetecteerde signalen en cross-checks. Zelfde principe als
   // het geheugenblok: leeg blok betekent een byte-identieke prompt.
   const signalsBlock = signalsSection && signalsSection.length > 0 ? `\n\n${signalsSection}` : "";
-  let prompt = `${MONTHLY_BASE_ROLE}\n\n${MONTHLY_OUTPUT_DISCIPLINE}\n\n${WORLD_KNOWLEDGE_GROUNDING}${memoryBlock}${signalsBlock}\n\n${goalsSection}\n\n${benchmarks[accountType]}\n\n---\n\n${stepInstruction}`;
+  let prompt = `${MONTHLY_BASE_ROLE(channel?.channel)}\n\n${MONTHLY_OUTPUT_DISCIPLINE}\n\n${WORLD_KNOWLEDGE_GROUNDING}${memoryBlock}${signalsBlock}\n\n${goalsSection}\n\n${benchmarks[accountType]}\n\n---\n\n${stepInstruction}`;
   if (previousConclusions) {
     prompt += `\n\n---\n\n## Context: Conclusies vorige stappen\n${previousConclusions}`;
   }
@@ -1433,7 +1532,7 @@ dat alle stap-conclusies verbindt. Vermeld de meest kritieke bevinding expliciet
 
 ### 3 Hypotheses voor sprintplanning
 
-${HYPOTHESE_INSTRUCTIES}
+${buildHypotheseInstructies()}
 
 Sorteer van hoog naar laag ICE. Geef voor elke hypothese ook aan:
 - Welke stap-bevinding de hypothese onderbouwt
@@ -1460,7 +1559,7 @@ function biWeeklyPreamble(
     : getBenchmarks(accountType);
 
   return `
-Je bent een senior SEA specialist die een bi-weekly check-in uitvoert.
+Je bent een ${rolVoorKanaal(channel)} die een bi-weekly check-in uitvoert.
 Schrijf altijd in het Nederlands. Gebruik altijd concrete cijfers.
 Focus op: ontwikkelt de maand zich zoals verwacht? Zijn er directe acties nodig?
 
@@ -1666,7 +1765,7 @@ Verwacht effect: [meetbare verwachting] binnen [tijdshorizon]."
 in prioriteit omdat [nieuwe data onderbouwing]."
 
 ### 2 Hypotheses
-${HYPOTHESE_INSTRUCTIES}
+${buildHypotheseInstructies(channel)}
 `.trim();
 }
 
@@ -1689,7 +1788,7 @@ function weeklyPreamble(
   const content = channel === "meta_ads" ? META_WEEKLY : channel === "linkedin_ads" ? LINKEDIN_WEEKLY : null;
 
   return `
-Je bent een senior SEA specialist die een wekelijkse health check uitvoert.
+Je bent een ${rolVoorKanaal(channel)} die een wekelijkse health check uitvoert.
 Schrijf altijd in het Nederlands. Wees beknopt en direct actionable.
 Doel: vroeg signaleren van anomalies en ad waste. Geen diepe analyse.
 
@@ -1855,7 +1954,14 @@ ${content
    wekelijkse campagnereeks. Doe hier dus GEEN week-over-week-uitspraak per campagne — dat getal
    is niet af te leiden en mag niet geschat worden. Vergelijk in plaats daarvan de lopende maand
    tot nu toe met dezelfde periode van vorige maand, en benoem de korrel expliciet. De
-   week-over-week-vergelijking op ACCOUNTNIVEAU staat in stap 1 en is daar wél gegrond.`}
+   week-over-week-vergelijking op ACCOUNTNIVEAU staat in stap 1 en is daar wél gegrond.
+
+1b. BUDGETKRAPTE, recht uit de data. Je krijgt search_budget_lost_is mee: het aandeel vertoningen
+   dat is misgelopen DOORDAT het budget op was. Dat hoeft dus niet uit spend-versus-dagbudget te
+   worden afgeleid -- het staat er. Boven de 10% is een campagne aantoonbaar budgetbeperkt en is
+   "verhoog het budget" wél een gegrond advies, mits de campagne op zijn doelstelling presteert.
+   Onderscheid het scherp van search_rank_lost_is: dát is misgelopen door positie (bod of
+   kwaliteit), en daar helpt budget niet. Noem het percentage dat je gebruikt.`}
 2. BELANGRIJK — Budget vs. Vraag analyse:
    Als een campagne een hoog dagbudget heeft maar de werkelijke spend is <50% van het budget:
    - Dit is GEEN budget-probleem maar een VRAAG-probleem
