@@ -119,6 +119,12 @@ export default function MarketingLayout({
             <Link href="/faq" className="py-2.5 hover:text-off-white">FAQ</Link>
             <Link href="/blog" className="py-2.5 hover:text-off-white">Blog</Link>
             <Link href="/demo" className="py-2.5 hover:text-off-white">Demo</Link>
+            {/* Privacy en Terms staan alleen in de footer, niet in de hoofdnavigatie: het zijn de
+                pagina's die je zoekt als je ze nodig hebt, niet die je aan een bezoeker aanbiedt.
+                Wel op elke pagina bereikbaar -- daar is de footer voor, en een AVG-verklaring die
+                nergens vandaan te vinden is, is er in de praktijk niet. */}
+            <Link href="/privacy" className="py-2.5 hover:text-off-white">Privacy</Link>
+            <Link href="/terms" className="py-2.5 hover:text-off-white">Terms</Link>
             <span>&copy; {new Date().getFullYear()} Ctrl PPC</span>
           </div>
         </div>

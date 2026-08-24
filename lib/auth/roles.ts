@@ -194,6 +194,11 @@ export function isPublicPath(pathname: string): boolean {
   // De demo-CTA: het formulier zelf en de route waar het naar post moeten allebei zonder
   // sessie werken, want een bezoeker die een demo aanvraagt heeft er per definitie nog geen.
   if (pathname === "/demo" || pathname === "/api/public/demo-request") return true;
+  // Privacy Statement en Algemene Voorwaarden. Dezelfde val als hierboven bij /how-it-works en
+  // /vs, en hier zwaarder: een privacyverklaring die alleen na inloggen te lezen is, is precies
+  // het tegenovergestelde van wat de AVG ermee bedoelt -- en de footer linkt ernaar vanaf elke
+  // pagina, dus ook vanaf pagina's die een bezoeker zonder sessie bekijkt.
+  if (pathname === "/privacy" || pathname === "/terms") return true;
   return false;
 }
 

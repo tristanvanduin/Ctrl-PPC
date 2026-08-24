@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { CANONIEK_DOMEIN } from "@/lib/domein";
 import { getPublishedBlogPosts } from "@/lib/marketing/blog-posts";
+import { isDefinitief } from "@/lib/legal/bedrijfsgegevens";
 
 // Ontbrak volledig (404 op productie, gemeten). Alleen de publieke marketingpagina's -- de
 // ingelogde app hoort sowieso niet in een sitemap, en staat nu ook achter O1_AUTH_ENFORCED.
@@ -15,6 +16,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${basis}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${basis}/blog`, changeFrequency: "weekly", priority: 0.7 },
   ];
+  // Alleen als de juridische documenten definitief zijn. Zolang er nog bedrijfsgegevens ontbreken
+  // (zie lib/legal/bedrijfsgegevens.ts) dragen die pagina's een noindex-meta, en een sitemap die
+  // een noindex-pagina aanbiedt spreekt zichzelf tegen -- precies het soort tegenstrijdig signaal
+  // dat de blog-audit van 22 augustus 2026 hier al eens opleverde met twee drafts. Eén functie
+  // bepaalt beide kanten, dus ze kunnen niet uit elkaar lopen.
+  if (isDefinitief()) {
+    statisch.push(
+      { url: `${basis}/privacy`, changeFrequency: "yearly", priority: 0.3 },
+      { url: `${basis}/terms`, changeFrequency: "yearly", priority: 0.3 },
+    );
+  }
   // getPublishedBlogPosts(), niet de ruwe BLOG_POSTS: er stonden hier ook de twee drafts
   // (published: false, zie lib/marketing/blog-posts.ts) in -- generateStaticParams filtert ze al
   // wel uit, dus /blog/dashboard-illusie-pro-con en /blog/god-view-collectieve-marktdata gaven
