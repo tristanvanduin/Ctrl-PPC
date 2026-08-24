@@ -25,7 +25,18 @@
 // interventie is geprobeerd en mislukt: dat is een andere les, en de kop van
 // hypothesis-evaluator.ts zei dat al voordat dit bestand het waarmaakte.
 //
-// LIVE-ONGETEST: vergt migratie 021 en aangenomen hypotheses met een verstreken venster.
+// TESTSTATUS, per laag verschillend -- dat onderscheid telt.
+//
+// De BESLISSING is niet langer ongetoetst: hij is verhuisd naar
+// lib/learning/evaluate-hypothesis-row.ts en draait daar op fixtures
+// (lib/learning/__evaluate_hypothesis_row_test.ts), inclusief de vier manieren waarop er geen
+// oordeel komt, de baseline-reconstructie, de omzetting van een relatieve drempel met de echte
+// baseline, en de uitvoeringsdetectie die een oordeel kan omdraaien. Ook op de 26 echte weekrijen
+// uit de demo-data, zodat het niet alleen op speelgoedgetallen bewezen is.
+//
+// Wat WEL ongetoetst blijft is deze schil: de supabase-reads hierboven, het wegschrijven in
+// writeVerdict en de idempotentie daarvan (.is("evaluated_at", null)). Dat vergt migratie 021 en
+// een echte database; het is bewust klein gehouden zodat er weinig overblijft om fout te gaan.
 //
 // NIET IN vercel.json (17 augustus 2026, op verzoek van de eigenaar: "ik wil geen API-kosten
 // maken in de nacht en ik wil zelf testen kunnen draaien"). Stond er kort in, samen met
@@ -39,27 +50,16 @@
 
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
-import { parseHypothesis, resolvePredicate } from "@/lib/learning/hypothesis-parser";
-import { evaluateHypothesisOutcome, detectExecutionAccountWide, type ChangeEvent } from "@/lib/learning/hypothesis-evaluator";
+import { type ChangeEvent } from "@/lib/learning/hypothesis-evaluator";
 import { classificeerChangeHistory, type RawChangeHistoryRow } from "@/lib/learning/change-history-classifier";
-import { aggregateWeeks, weeksInWindow, addDays, isDerivableMetric, type WeeklyRow } from "@/lib/learning/weekly-metrics";
+import { type WeeklyRow } from "@/lib/learning/weekly-metrics";
+// De beslissing per hypothese leeft in lib/learning/evaluate-hypothesis-row.ts, puur en op
+// fixtures te draaien -- zelfde opzet als lib/eval/replay-core.ts. Deze route houdt wat een route
+// hoort te houden: autoriseren, lezen, schrijven.
+import { evaluateHypothesisRow, type HypothesisRow } from "@/lib/learning/evaluate-hypothesis-row";
 import { recordMemoryEvent, memoryEventsForVerdict } from "@/lib/memory/agency-memory-events";
 
 export const maxDuration = 300;
-
-const DEFAULT_WINDOW_DAYS = 28; // als de hypothese geen bruikbaar tijdvenster noemt
-const ACCOUNT_SCOPE_NOTE =
-  "Gemeten op accountniveau: de hypothese draagt geen entiteit-referentie en er is geen campagne-weekdata, dus een effect op een enkele campagne kan in het accountgemiddelde wegvallen.";
-
-interface HypothesisRow {
-  id: string;
-  client_id: string;
-  hypothesis: string;
-  expected_result: string | null;
-  measurement_metric: string | null;
-  timeframe: string | null;
-  accepted_at: string | null;
-}
 
 export async function GET(request: NextRequest) {
   // Fail-closed, zoals de andere cron- en eval-routes.
@@ -115,87 +115,20 @@ export async function GET(request: NextRequest) {
   }
 
   for (const row of rows) {
-    const acceptedAt = new Date(row.accepted_at as string);
-    const parsed = parseHypothesis({
-      expectedResult: row.expected_result,
-      measurementMetric: row.measurement_metric,
-      timeframe: row.timeframe,
+    const uitkomst = evaluateHypothesisRow({
+      row,
+      weekly: weeklyByClient.get(row.client_id) ?? [],
+      changeEvents: changeHistoryByClient.get(row.client_id) ?? [],
+      now,
     });
 
-    // Een onparsebare hypothese krijgt geen gegokt verdict maar een eerlijke reden.
-    if (!parsed.ok) {
-      const outcome = { verdict: "unmeasurable", resultMet: null, reason: `niet toetsbaar geformuleerd: ${parsed.reason}`, metrics: [] };
-      results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
-      if (!dryRun) await writeVerdict(supabase, row.id, row.client_id, outcome, now);
+    if (uitkomst.soort === "overgeslagen") {
+      skipped.push({ id: row.id, reason: uitkomst.reden });
       continue;
     }
 
-    const windowDays = parsed.parsed.windowDays ?? DEFAULT_WINDOW_DAYS;
-    const windowEnd = addDays(acceptedAt, windowDays);
-    if (windowEnd > now) {
-      skipped.push({ id: row.id, reason: `het meetvenster van ${windowDays} dagen loopt nog tot ${windowEnd.toISOString().slice(0, 10)}` });
-      continue;
-    }
-
-    const metric = parsed.parsed.predicate.metric;
-    if (!isDerivableMetric(metric)) {
-      const outcome = { verdict: "unmeasurable", resultMet: null, reason: `de metric ${metric} zit niet in de weekdata op accountniveau, dus er is niets om tegen te meten`, metrics: [] };
-      results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
-      if (!dryRun) await writeVerdict(supabase, row.id, row.client_id, outcome, now);
-      continue;
-    }
-
-    const weekly = weeklyByClient.get(row.client_id) ?? [];
-    const baseline = aggregateWeeks(weeksInWindow(weekly, addDays(acceptedAt, -windowDays), acceptedAt));
-    const measured = aggregateWeeks(weeksInWindow(weekly, acceptedAt, windowEnd));
-
-    // De relatieve eis omzetten met de ECHTE baseline: de evaluator leest de drempel als
-    // absolute magnitude, dus zonder deze stap zou vijftien procent als 0,15 euro gelden.
-    const predicate = resolvePredicate(parsed.parsed, baseline);
-    const metrickUitkomst = evaluateHypothesisOutcome({
-      successPredicates: [predicate],
-      guardrailPredicates: [],
-      baseline,
-      measured,
-      windowImpressions: measured.impressions ?? 0,
-      entityActive: (measured.cost ?? 0) > 0,
-      ageInDays: Math.floor((now.getTime() - acceptedAt.getTime()) / (24 * 3600 * 1000)),
-    });
-
-    const metrickReden = `${describeOutcome(metrickUitkomst.verdict, predicate.metric, baseline[predicate.metric], measured[predicate.metric])} ${ACCOUNT_SCOPE_NOTE}`;
-
-    // Uitvoeringsdetectie: alleen zinvol als de metriek zelf al een oordeel (accepted/rejected)
-    // opleverde. Bij unmeasurable/expired is er sowieso geen betrouwbaar gemeten effect om aan
-    // uitvoering te koppelen, en verandert de uitvoeringsstatus niets aan het verdict.
-    let verdict: string = metrickUitkomst.verdict;
-    let resultMet: boolean | null = metrickUitkomst.verdict === "accepted" ? true : metrickUitkomst.verdict === "rejected" ? false : null;
-    let reason = metrickReden;
-
-    if (metrickUitkomst.verdict === "accepted" || metrickUitkomst.verdict === "rejected") {
-      const vensterStart = acceptedAt.toISOString().slice(0, 10);
-      const vensterEind = windowEnd.toISOString().slice(0, 10);
-      const alleEvents = changeHistoryByClient.get(row.client_id) ?? [];
-      const vensterEvents = alleEvents.filter((e) => e.date >= vensterStart && e.date <= vensterEind);
-      const uitvoering = detectExecutionAccountWide(row.hypothesis, vensterEvents, true);
-
-      if (uitvoering.status === "not_executed") {
-        // Verworpen maar niet uitgevoerd is een andere les dan uitgevoerd en verworpen (zie de
-        // kop van hypothesis-evaluator.ts): het metriekverdict wint hier niet, want een beweging
-        // die niet aan een interventie is toe te schrijven is geen leerpunt over die interventie.
-        verdict = "niet_uitgevoerd";
-        resultMet = null;
-        reason = `${metrickReden} Niet uitgevoerd: geen wijziging van het bedoelde type gevonden in ads_change_history in het meetvenster, dus de gemeten beweging kan niet aan deze interventie worden toegeschreven.`;
-      } else if (uitvoering.status === "detected") {
-        verdict = metrickUitkomst.verdict === "accepted" ? "uitgevoerd_en_gehaald" : "uitgevoerd_en_niet_gehaald";
-        reason = `${metrickReden} Uitgevoerd: ${uitvoering.evidence}.`;
-      } else {
-        reason = `${metrickReden} Uitvoering niet vast te stellen: de interventietekst bevat geen herkenbaar wijzigingstype (budget, bod, pauze, zoekwoord) om tegen ads_change_history te toetsen.`;
-      }
-    }
-
-    const outcome = { verdict, resultMet, reason, metrics: metrickUitkomst.metrics };
-    results.push({ id: row.id, verdict: outcome.verdict, reason: outcome.reason });
-    if (!dryRun) await writeVerdict(supabase, row.id, row.client_id, outcome, now);
+    results.push({ id: row.id, verdict: uitkomst.uitkomst.verdict, reason: uitkomst.uitkomst.reason });
+    if (!dryRun) await writeVerdict(supabase, row.id, row.client_id, uitkomst.uitkomst, now);
   }
 
   return Response.json({
@@ -206,12 +139,6 @@ export async function GET(request: NextRequest) {
     results,
     skipped,
   });
-}
-
-function describeOutcome(verdict: string, metric: string, baseline: number | undefined, measured: number | undefined): string {
-  const b = typeof baseline === "number" ? baseline.toFixed(2) : "onbekend";
-  const m = typeof measured === "number" ? measured.toFixed(2) : "onbekend";
-  return `${metric} ging van ${b} in het venster voor acceptatie naar ${m} erna; verdict ${verdict}.`;
 }
 
 async function writeVerdict(
