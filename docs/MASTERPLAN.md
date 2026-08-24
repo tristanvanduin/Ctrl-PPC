@@ -8593,3 +8593,53 @@ Twee dingen die de gemiddelde lijn eerlijk houden:
 
 Het radar-component blijft meervoudig — dat kost niets en houdt de vergelijkingsvorm beschikbaar.
 
+
+### 17.124 De beurs-sectie op "Alle kanalen", en waarom Meta/LinkedIn er anders uitzien (24 augustus 2026)
+
+"Ligt het aan mij of zijn deze niet uniform? Die van Google vind ik de mooiste. Waarom heeft alle
+kanalen deze sectie niet?"
+
+**Het lag niet aan de gebruiker.** Google's beurs-sectie toont per week een verwachting, een ratio
+en een gekleurde balk; dezelfde sectie op Meta en LinkedIn toonde alleen het gerealiseerde. Bij het
+uitzoeken bleek er één oorzaak met twee heel verschillende helften.
+
+**De helft die een bug was.** `toFairWeeks` spreidt het jaardoel over de weken, dus zonder jaardoel
+is elke week "verwacht 0" en elke ratio 0%. Google heeft dat doel wél, en niet omdat er een doel is
+ingevoerd — `client_targets` is leeg — maar omdat zijn API-route een TERUGVAL kent: het laatst
+volledige jaar plus tien procent (spend plus vijf). Diezelfde terugval stond ook in
+`lib/api/blended-historical.ts`, los uitgeschreven. Op de derde plek, `buildChannelForecast` voor
+Meta en LinkedIn, stond hij niet en viel het doel op nul.
+
+Drie plekken, twee kopieën, één gat. De regel staat nu één keer in
+`lib/analysis/standaard-jaardoel.ts` en alle drie gebruiken hem. De terugval is per METRIC: een
+klant die alleen een conversiedoel invoert, hoort voor omzet en spend niet op nul te vallen — dat
+leest als "doel gehaald" terwijl er niets is ingevuld.
+
+**De helft die geen bug is.** Meta en LinkedIn tonen nog steeds geen ratio, en dat is correct: hun
+dagdata begint op **2026-03-13**. Er is geen 2025 om tien procent bovenop te doen. De terugval kan
+niets afleiden uit een jaar dat niet bestaat, en een verwachting verzinnen zou precies de fout zijn
+die de rest van dit hoofdstuk vermijdt. De sectie zegt dat ook ronduit: "geen jaardoel ingesteld
+voor dit kanaal, dus alleen het gerealiseerde". Zodra die kanalen een vol jaar historie hebben —
+of er een doel wordt ingevoerd — verschijnt de ratio vanzelf, zonder codewijziging.
+
+**En "Alle kanalen" heeft nu beide secties.** Ook daar was de oorzaak dezelfde soort koppeling als
+bij de beurs-sectie eerder: `MetricCards` en `PerformanceChart` haalden hun data uit
+`ClientDataProvider`, en die is Google-only. Alle drie de componenten zijn nu gesplitst in een
+Google-ingang en een weergave die `data` + `forecast` als props neemt. `useBlendedClientData`
+levert exact dezelfde twee vormen over Google, Meta en LinkedIn samen — inclusief hetzelfde
+jaardoel-mechanisme, en inclusief Google's 2025-historie, dus daar is de ratio er wél.
+
+Bij het blended jaaroverzicht staat een waarschuwing die bij de blended tabel al stond: elk kanaal
+claimt zijn eigen conversies met zijn eigen attributievenster, dus de som is een BOVENGRENS. Een
+prognose die daarop rekent erft dat, en dan hoort het erbij te staan — niet alleen bij de tabel
+twee secties verderop.
+
+**Gemeten op "Alle kanalen":** jaardoel 2.600 conversies, 79% gerealiseerd, prognose 3.431, en de
+weekkolommen tonen ratio's tussen 132% en 170%. Dezelfde vorm als Google, andere cijfers.
+
+**De test die meeveranderde.** `__channel_forecast_data_test.ts` had de oude uitkomst vastgelegd:
+"geen omzetdoel ingesteld: blijft 0". Die assertie is nu de nieuwe waarde (vorig jaar +10% = 9240
+op de fixture), en er staat een tweede geval bij dat de situatie van Meta en LinkedIn vastlegt:
+**zonder vorig jaar valt er ook niets terug te vallen** en blijft het doel nul. Dat tweede geval is
+het belangrijkste van de twee — het legt vast dat de terugval niets verzint als er niets is.
+

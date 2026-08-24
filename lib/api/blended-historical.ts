@@ -3,6 +3,7 @@ import { klantVanId } from "../tenancy/klanten";
 import { today } from "../reporting-date";
 import type { ApiMonthlyData, YearDataInput } from "./adapter";
 import type { ClientAnnualData } from "../types";
+import { standaardJaardoel } from "@/lib/analysis/standaard-jaardoel";
 
 /**
  * Blended (Google + Meta + LinkedIn) equivalent van app/api/google-ads/client-data/route.ts's
@@ -118,21 +119,19 @@ export async function fetchBlendedHistoricalData(
   const monthsWithData = currentYearMonthly.map((m) => m.month).filter((m) => m < currentMonthNum);
   const realizedThroughMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 0;
 
-  // Zelfde default als de Google-route: 10% groei op het laatst volledige jaar. De echte
-  // klant-KPI-doelen (Instellingen) overschrijven dit toch via lib/kpi-target-merge.ts.
+  // De gedeelde terugval (lib/analysis/standaard-jaardoel.ts): vorig jaar plus groei zolang er geen
+  // doel is ingevoerd. De echte klant-KPI-doelen (Instellingen) overschrijven dit toch via
+  // lib/kpi-target-merge.ts.
   const laatsteJaar = historicalYears.length > 0 ? historicalYears[historicalYears.length - 1] : null;
-  const prevConv = laatsteJaar?.monthly.reduce((s, m) => s + m.conversions, 0) ?? 0;
-  const prevRev = laatsteJaar?.monthly.reduce((s, m) => s + m.revenue, 0) ?? 0;
-  const prevSpend = laatsteJaar?.monthly.reduce((s, m) => s + m.adSpend, 0) ?? 0;
 
   return {
     currentYear,
     realizedThroughMonth,
-    targetCurrentYear: {
-      conversions: Math.round(prevConv * 1.10),
-      revenue: Math.round(prevRev * 1.10),
-      adSpend: Math.round(prevSpend * 1.05),
-    },
+    targetCurrentYear: standaardJaardoel(laatsteJaar === null ? null : {
+      conversions: laatsteJaar.monthly.reduce((s, m) => s + m.conversions, 0),
+      revenue: laatsteJaar.monthly.reduce((s, m) => s + m.revenue, 0),
+      adSpend: laatsteJaar.monthly.reduce((s, m) => s + m.adSpend, 0),
+    }),
     historicalYears,
     currentYearMonthly,
   };

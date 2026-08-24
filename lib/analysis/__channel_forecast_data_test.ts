@@ -48,8 +48,32 @@ assert(withTarget !== null, "forecast met doelen levert data op");
 if (withTarget) {
   assert(withTarget.data.targetCurrentYear.conversions === 1000, `conversiedoel komt uit client_targets (kreeg ${withTarget.data.targetCurrentYear.conversions})`);
   assert(withTarget.data.targetCurrentYear.adSpend === 50000, `spenddoel komt uit client_targets (kreeg ${withTarget.data.targetCurrentYear.adSpend})`);
-  assert(withTarget.data.targetCurrentYear.revenue === 0, "geen omzetdoel ingesteld: blijft 0 (fallback op historie gebeurt in computeForecast)");
+  // 24 augustus 2026: dit was "blijft 0". Zonder ingevoerd doel valt het jaardoel nu terug op het
+  // laatst volledige jaar plus groei -- dezelfde regel die de Google-route en de blended historie
+  // al toepasten (lib/analysis/standaard-jaardoel.ts). Het gat zat hier: met een doel van nul
+  // spreidt toFairWeeks een verwachting van nul over de weken, en dan toont de beurs-sectie op
+  // Meta en LinkedIn geen ratio terwijl dezelfde sectie op Google er wel een heeft.
+  // 2025 in deze fixture: 28 dagen x 300 omzet = 8400, x 1,10 = 9240.
+  assert(
+    withTarget.data.targetCurrentYear.revenue === 9240,
+    `geen omzetdoel ingesteld: terugval op vorig jaar +10% (kreeg ${withTarget.data.targetCurrentYear.revenue})`,
+  );
   assert(withTarget.forecast.conversions.kpi.annualTarget === 1000, "de forecast zelf gebruikt hetzelfde doel");
+}
+
+// ── Geen vorig jaar: dan valt er ook niets terug te vallen ──
+//
+// Dit is de situatie van Meta en LinkedIn in de demo: hun dagdata begint pas in maart 2026. De
+// terugval kan niets afleiden uit een jaar dat niet bestaat, en een verwachting verzinnen zou erger
+// zijn dan geen verwachting tonen -- de beurs-sectie zegt in dat geval "geen jaardoel ingesteld".
+const alleenDitJaar: ChannelForecastRow[] = Array.from({ length: 23 }, (_, i) =>
+  rij(`2026-08-${String(i + 1).padStart(2, "0")}`, 120, 3, 400));
+const zonderVorigJaar = buildChannelForecast("c1", alleenDitJaar, [], "meta_ads", "2026-08-23");
+assert(zonderVorigJaar !== null, "alleen dit jaar levert nog steeds een forecast op");
+if (zonderVorigJaar) {
+  assert(zonderVorigJaar.data.targetCurrentYear.conversions === 0, "zonder vorig jaar geen conversiedoel");
+  assert(zonderVorigJaar.data.targetCurrentYear.revenue === 0, "zonder vorig jaar geen omzetdoel");
+  assert(zonderVorigJaar.data.targetCurrentYear.adSpend === 0, "zonder vorig jaar geen spenddoel");
 }
 
 // Zonder doel: computeForecast valt terug op het historisch totaal (zelfde gedrag als Google).

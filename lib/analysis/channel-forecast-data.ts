@@ -14,6 +14,7 @@ import type { ClientAnnualData, ClientHistoricalData } from "@/lib/types";
 import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "@/lib/api/adapter";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
 import { resolveTargets, type TargetRow } from "./o2-targets-cost";
+import { jaardoelMetTerugval } from "./standaard-jaardoel";
 
 export interface ChannelForecastRow {
   /** YYYY-MM-DD */
@@ -114,11 +115,29 @@ export function buildChannelForecast(
   todayIso: string,
 ): { data: ClientHistoricalData; forecast: ClientForecast } | null {
   const targets = resolveTargets(targetRows, targetChannel, todayIso);
-  const targetCurrentYear: ClientAnnualData = {
-    conversions: targets.conversions ?? 0,
-    revenue: targets.conversion_value ?? 0,
-    adSpend: targets.spend ?? 0,
-  };
+
+  // Zonder ingevoerd doel terugvallen op vorig jaar plus groei -- dezelfde regel die de
+  // Google-route en de blended historie al toepassen (lib/analysis/standaard-jaardoel.ts).
+  //
+  // Dit stond hier op nul, en dat is precies waarom de beurs-sectie op Meta en LinkedIn er anders
+  // uitzag dan op Google: `toFairWeeks` spreidt het jaardoel over de weken, dus met een doel van
+  // nul was elke week "verwacht 0" en elke ratio 0% -- geen verwachting, geen balk, geen kleur.
+  // Op Google werkte dezelfde sectie wél, niet omdat dat kanaal anders is maar omdat zijn route
+  // de terugval kende en deze niet.
+  const currentYear = Number(todayIso.slice(0, 4));
+  const vorigJaar = rows.reduce<{ conversions: number; revenue: number; adSpend: number } | null>((acc, r) => {
+    if (Number(r.date.slice(0, 4)) !== currentYear - 1) return acc;
+    const t = acc ?? { conversions: 0, revenue: 0, adSpend: 0 };
+    t.conversions += r.conv;
+    t.revenue += r.revenue;
+    t.adSpend += r.spend;
+    return t;
+  }, null);
+
+  const targetCurrentYear: ClientAnnualData = jaardoelMetTerugval(
+    { conversions: targets.conversions, revenue: targets.conversion_value, adSpend: targets.spend },
+    vorigJaar,
+  );
 
   const data = buildChannelHistoricalData(clientId, rows, targetCurrentYear, todayIso);
   if (!data) return null;

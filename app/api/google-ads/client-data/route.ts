@@ -23,6 +23,7 @@ import {
   type YearDataInput,
 } from "@/lib/api/adapter";
 import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
+import { standaardJaardoel } from "@/lib/analysis/standaard-jaardoel";
 
 
 /**
@@ -155,19 +156,16 @@ export async function GET(request: NextRequest) {
       ? Math.max(...monthsWithData)
       : 0;
 
-    // Default target: 10% growth over most recent full year
+    // De gedeelde terugval (lib/analysis/standaard-jaardoel.ts) zolang er geen doel is ingevoerd.
     const lastFullYear = historicalYearsData.length > 0
       ? historicalYearsData[historicalYearsData.length - 1]
       : null;
-    const prevConv = lastFullYear?.monthly.reduce((s, m) => s + m.conversions, 0) ?? 0;
-    const prevRev = lastFullYear?.monthly.reduce((s, m) => s + m.revenue, 0) ?? 0;
-    const prevSpend = lastFullYear?.monthly.reduce((s, m) => s + m.adSpend, 0) ?? 0;
 
-    const targetCurrentYear = {
-      conversions: Math.round(prevConv * 1.10),
-      revenue: Math.round(prevRev * 1.10),
-      adSpend: Math.round(prevSpend * 1.05),
-    };
+    const targetCurrentYear = standaardJaardoel(lastFullYear === null ? null : {
+      conversions: lastFullYear.monthly.reduce((s, m) => s + m.conversions, 0),
+      revenue: lastFullYear.monthly.reduce((s, m) => s + m.revenue, 0),
+      adSpend: lastFullYear.monthly.reduce((s, m) => s + m.adSpend, 0),
+    });
 
     // Campaign data — includes all statuses (ENABLED, PAUSED, REMOVED)
     // so historical performance of paused/removed campaigns is preserved

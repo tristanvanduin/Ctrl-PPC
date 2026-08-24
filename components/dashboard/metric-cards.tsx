@@ -3,7 +3,8 @@
 import { TrendingUp, TrendingDown, Target, DollarSign, BarChart3, Wallet } from "lucide-react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { actieveMetrics, computeForecast, type ForecastMetric } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
+import type { ClientHistoricalData } from "@/lib/types";
 import { getClientSettings } from "@/lib/client-settings";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas } from "@/lib/forecast-format";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
@@ -102,6 +103,13 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
   );
 }
 
+/**
+ * De Google-ingang: haalt data en forecast uit ClientDataProvider en geeft ze door aan de weergave.
+ *
+ * Gesplitst om dezelfde reden als FairWeeksOverview (zie fair-weeks-overview.tsx): "Alle kanalen"
+ * hoort dezelfde kaartjes te krijgen, en die heeft de Google-only provider niet. De blended
+ * historie levert exact dezelfde ClientHistoricalData + ClientForecast.
+ */
 export function MetricCards({ clientId, countryFilter, selected, onSelect }: {
   clientId: string;
   countryFilter?: string | null;
@@ -115,7 +123,24 @@ export function MetricCards({ clientId, countryFilter, selected, onSelect }: {
   // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
   // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
   const gedeeld = useForecast();
-  const forecast = gedeeld ?? computeForecast(data);
+  return (
+    <MetricCardsView
+      clientId={clientId}
+      data={data}
+      forecast={gedeeld ?? computeForecast(data)}
+      selected={selected}
+      onSelect={onSelect}
+    />
+  );
+}
+
+export function MetricCardsView({ clientId, data, forecast, selected, onSelect }: {
+  clientId: string;
+  data: ClientHistoricalData;
+  forecast: ClientForecast;
+  selected?: ForecastMetric;
+  onSelect?: (metric: ForecastMetric) => void;
+}) {
   const settings = getClientSettings(clientId);
   const kpi = settings.kpiTargets;
 

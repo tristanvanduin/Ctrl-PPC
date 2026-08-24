@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Globe, Info, Layers, Loader2, TrendingUp, TriangleAlert } from "lucide-react";
+import { CalendarClock, Globe, Info, Layers, Loader2, Target, TrendingUp, TriangleAlert } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
@@ -15,6 +15,12 @@ import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { KanaalHealthRanking } from "./kanaal-health-ranking";
+import { useBlendedClientData } from "@/lib/use-blended-client-data";
+import { computeForecast, type ForecastMetric } from "@/lib/forecast";
+import { FairWeeksView } from "./fair-weeks-overview";
+import { MetricCardsView } from "./metric-cards";
+import { PerformanceChartView } from "./performance-chart";
+import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { BlendedPacing } from "./blended-pacing";
 import type { Kanaal } from "@/lib/kanalen/beschikbaar";
 
@@ -53,11 +59,23 @@ function fmt(n: number | null): string {
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(n);
 }
 
-export function CrossChannelView({ clientId, kanalen = [] }: { clientId: string; kanalen?: Kanaal[] }) {
+export function CrossChannelView({ clientId, kanalen = [], edition }: {
+  clientId: string;
+  kanalen?: Kanaal[];
+  edition?: UpcomingEdition | null;
+}) {
   const [maandenOpen, toggleMaanden] = useRememberedOpen("cross-maanden", false);
   // Eén hook-aanroep voor beide geo-kaarten: de kaart en de cijfers eronder delen dezelfde
   // metric-keuze en dezelfde VS-drilldown. Twee aanroepen zouden twee losse states geven.
   const geo = useGeoBreakdown({ clientId, channel: "blended" });
+  // De blended historie voedt zowel de beurs-sectie als het jaaroverzicht. Eén hook, één forecast:
+  // twee aanroepen zouden dezelfde route twee keer bevragen en twee keer dezelfde som uitrekenen.
+  const blended = useBlendedClientData(clientId);
+  const blendedForecast = useMemo(
+    () => (blended.data ? { data: blended.data, forecast: computeForecast(blended.data) } : null),
+    [blended.data],
+  );
+  const [jaaroverzichtMetric, setJaaroverzichtMetric] = useState<ForecastMetric>("conversions");
   const [rows, setRows] = useState<BlendedRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -181,6 +199,53 @@ export function CrossChannelView({ clientId, kanalen = [] }: { clientId: string;
           bijschrift="Spend per kanaal per maand — welk kanaal draagt welk deel van het budget"
         >
           <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} />
+        </Sectie>
+      )}
+
+      {/* DEZELFDE TWEE SECTIES ALS DE KANAALTABBLADEN, gevoed uit de blended historie.
+          "Waarom heeft alle kanalen deze sectie niet?" -- omdat FairWeeksOverview, MetricCards en
+          PerformanceChart hun data uit ClientDataProvider haalden, en die is Google-only. Alle
+          drie zijn nu gesplitst in een Google-ingang en een weergave die data + forecast als props
+          neemt; useBlendedClientData levert exact dezelfde twee vormen over Google, Meta en
+          LinkedIn samen, inclusief hetzelfde jaardoel-mechanisme (vorig jaar plus groei zolang er
+          niets is ingevoerd, zie lib/analysis/standaard-jaardoel.ts). */}
+      {blendedForecast && edition && (
+        <Sectie
+          icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Prestaties richting de beurs"
+          bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+        >
+          <FairWeeksView data={blendedForecast.data} forecast={blendedForecast.forecast} edition={edition} />
+        </Sectie>
+      )}
+
+      {blendedForecast && (
+        <Sectie
+          icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Jaaroverzicht"
+          bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend, over alle kanalen samen"
+        >
+          {/* De waarschuwing hoort hier en niet alleen bij de tabel verderop: elk kanaal claimt
+              zijn eigen conversies met zijn eigen attributievenster, dus de blended som is een
+              BOVENGRENS. Een prognose die daarop rekent erft dat, en dan moet het erbij staan. */}
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-meta text-amber-900">
+            De conversies hieronder zijn de som over de kanalen, en elk kanaal telt met zijn eigen
+            attributievenster. Dezelfde aankoop kan door twee kanalen geclaimd zijn, dus dit is een
+            bovengrens en geen exacte telling.
+          </div>
+          <MetricCardsView
+            clientId={clientId}
+            data={blendedForecast.data}
+            forecast={blendedForecast.forecast}
+            selected={jaaroverzichtMetric}
+            onSelect={setJaaroverzichtMetric}
+          />
+          <PerformanceChartView
+            clientData={blendedForecast.data}
+            forecast={blendedForecast.forecast}
+            metric={jaaroverzichtMetric}
+            onMetricChange={setJaaroverzichtMetric}
+          />
         </Sectie>
       )}
 
