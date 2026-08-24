@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { isMonthlySopType } from "@/lib/analysis/sop-channel-config";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { renderSopPdf, type SopPdfProps } from "@/lib/analysis/sop-pdf-renderer";
 import {
@@ -99,7 +100,12 @@ export async function GET(request: NextRequest) {
   });
 
   // Fetch the most recent analysis output
-  if (sopType === "monthly") {
+  //
+  // De poort gold alleen voor Google: `sopType === "monthly"` is de sleutel van dát kanaal, terwijl
+  // Meta en LinkedIn onder meta_monthly en linkedin_monthly draaien. Een geblokkeerde Meta-analyse
+  // kon dus gewoon als PDF de deur uit. isMonthlySopType() leidt de drie sleutels af uit
+  // CHANNEL_CONFIG, dezelfde tabel die de knoppen en de cron gebruiken.
+  if (isMonthlySopType(sopType)) {
     const { data: qualityGateRow } = await supabase
       .from("sop_analysis_output")
       .select("output, analysis_date, created_at")

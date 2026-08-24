@@ -33,3 +33,22 @@ export const CHANNEL_CONFIG: Record<
     headerLabel: "LinkedIn Ads",
   },
 };
+
+/**
+ * De sop_type-sleutels van de MAANDanalyse, over alle kanalen heen: "monthly", "meta_monthly",
+ * "linkedin_monthly".
+ *
+ * Bestaat omdat app/api/analysis/pdf/route.ts zijn kwaliteitspoort ophing aan de letterlijke
+ * vergelijking `sopType === "monthly"`. Dat is alleen Google: een Meta- of LinkedIn-export sloeg de
+ * poort dus volledig over en kon een geblokkeerde analyse alsnog als PDF opleveren. Afgeleid uit
+ * CHANNEL_CONFIG en niet als losse lijst, want een vierde kanaal hoort hier vanzelf in te vallen --
+ * een handgeschreven kopie loopt achter zonder dat iets het merkt.
+ */
+export const MONTHLY_SOP_TYPES: readonly string[] = ALLE_SOP_CHANNELS.map(
+  (kanaal) => CHANNEL_CONFIG[kanaal].sopTypeKey.monthly
+);
+
+/** Of een sop_type een maandanalyse is, ongeacht kanaal. */
+export function isMonthlySopType(sopType: string): boolean {
+  return MONTHLY_SOP_TYPES.includes(sopType);
+}

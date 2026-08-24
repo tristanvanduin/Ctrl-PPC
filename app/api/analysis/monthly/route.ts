@@ -1096,6 +1096,26 @@ async function finalizeChannelMonthlySynthesis(opts: {
     acceptance: acceptanceReport, step_validations: stepValidations,
     candidate_counts: { findings: canonical.findings.length, curated_findings: curatedFindings.length, recommendations: structured.recommendations.length, tasks: structured.tasks.length, threads: structured.threads.length },
   }));
+
+  // ── De poort blokkeert nu ook hier ──────────────────────────────────────────
+  //
+  // Tot nu toe werd qualityGate hier berekend, opgeslagen en vervolgens genegeerd: `full`,
+  // `structured_monthly_v2` en de insights/recommendations/tasks gingen er onvoorwaardelijk
+  // achteraan. Een run met een ongeldige stap leverde dus een deliverable op die er precies zo
+  // uitzag als een geldige. Het Google-pad in dit bestand doet het al goed en dit is exact zijn
+  // patroon: het OORDEEL wordt bewaard, het PRODUCT niet.
+  //
+  // Waarom het oordeel wél wordt opgeslagen: anders is na afloop niet te achterhalen waaróm er
+  // niets staat, en dat is precies het moment waarop iemand het nodig heeft. De sectie
+  // quality_gate_monthly_v2 draagt de blocking_reasons en de stap-validaties.
+  //
+  // Waarom de stap-outputs blijven staan: die zijn per stap al apart weggeschreven (runStep) en
+  // kosten geld. Ze weggooien maakt diagnose duurder zonder iets veiliger te maken -- het gaat om
+  // de SAMENGESTELDE deliverable, want die wordt gelezen alsof hij klopt.
+  if (!qualityGate.passed) {
+    return { structured, acceptanceReport, qualityGate, geblokkeerd: true as const };
+  }
+
   await save("full", sanitizeOutput(structured.deliverable_markdown));
   await save("structured_monthly_v2", JSON.stringify({
     stats: { ...canonical.stats, curated_count: curatedFindings.length },
@@ -1115,7 +1135,11 @@ async function finalizeChannelMonthlySynthesis(opts: {
     appendix_markdown: structured.appendix_markdown,
     checkpoints: [],
     parsed_steps: parsedSteps.map((s) => ({ stepNumber: s.stepNumber, stepName: s.stepName, narrative: s.narrative, log_entries: s.log_entries, findings: s.findings, status: s.status, actions: s.actions, step_conclusion: s.step_conclusion })),
-    step_validations: [],
+    // Stond op een lege array terwijl dezelfde run ze in de sectie hierboven wél meestuurt. Meta en
+    // LinkedIn berekenen hun stap-validaties gewoon (metaStepValidations/linkedinStepValidations) en
+    // geven ze door; alleen dit veld liep achter. Twee secties van dezelfde run die verschillende
+    // dingen beweren is precies wat een lezer laat twijfelen aan allebei.
+    step_validations: stepValidations,
     acceptance: acceptanceReport,
     quality_gate: qualityGate,
     success_next_month: structured.success_next_month,
@@ -1127,7 +1151,7 @@ async function finalizeChannelMonthlySynthesis(opts: {
     curatedFindings, structured,
   });
 
-  return { structured, acceptanceReport, qualityGate };
+  return { structured, acceptanceReport, qualityGate, geblokkeerd: false as const };
 }
 
 // M2 route-wiring: het additieve Meta-pad. Draait de 11-staps Meta SOP op de gedeelde route-helpers
@@ -1328,6 +1352,33 @@ async function runMetaMonthlyAnalysis(
     stepValidations: metaStepValidations,
     checkpointsRun: metaCheckpointsRun,
   });
+
+  // De poort blokkeerde de deliverable: dit is een mislukte run, geen geslaagde met een
+  // kanttekening. markProgressFailed met partialOutputExists, precies zoals het Google-pad verderop
+  // in dit bestand, zodat de UI hetzelfde onderscheid maakt: er is wél iets weggeschreven (de
+  // stap-outputs en het poortoordeel), maar geen bruikbare deliverable. Zonder deze tak meldde de
+  // run zich als ok:true met een passed:false-veld dat niemand las.
+  if (synthesis.geblokkeerd) {
+    await markProgressFailed(supabase, {
+      jobId,
+      errorMessage: synthesis.qualityGate.blocking_reasons.join(" | "),
+      metadata: {
+        analysis_date: analysisDate,
+        sop_type: adapter.sopTypeKey,
+        quality_gate: synthesis.qualityGate,
+        structured_saved: false,
+      },
+      partialOutputExists: true,
+    });
+    return Response.json({
+      ok: false,
+      channel: adapter.channel,
+      analysisDate,
+      qualityGate: synthesis.qualityGate,
+      error: `Analyse geblokkeerd door de kwaliteitspoort: ${synthesis.qualityGate.blocking_reasons.join(" | ")}`,
+    }, { status: 422 });
+  }
+
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
   // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
@@ -1558,6 +1609,33 @@ async function runLinkedinMonthlyAnalysis(
     stepValidations: linkedinStepValidations,
     checkpointsRun: linkedinCheckpointsRun,
   });
+
+  // De poort blokkeerde de deliverable: dit is een mislukte run, geen geslaagde met een
+  // kanttekening. markProgressFailed met partialOutputExists, precies zoals het Google-pad verderop
+  // in dit bestand, zodat de UI hetzelfde onderscheid maakt: er is wél iets weggeschreven (de
+  // stap-outputs en het poortoordeel), maar geen bruikbare deliverable. Zonder deze tak meldde de
+  // run zich als ok:true met een passed:false-veld dat niemand las.
+  if (synthesis.geblokkeerd) {
+    await markProgressFailed(supabase, {
+      jobId,
+      errorMessage: synthesis.qualityGate.blocking_reasons.join(" | "),
+      metadata: {
+        analysis_date: analysisDate,
+        sop_type: adapter.sopTypeKey,
+        quality_gate: synthesis.qualityGate,
+        structured_saved: false,
+      },
+      partialOutputExists: true,
+    });
+    return Response.json({
+      ok: false,
+      channel: adapter.channel,
+      analysisDate,
+      qualityGate: synthesis.qualityGate,
+      error: `Analyse geblokkeerd door de kwaliteitspoort: ${synthesis.qualityGate.blocking_reasons.join(" | ")}`,
+    }, { status: 422 });
+  }
+
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
   // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
