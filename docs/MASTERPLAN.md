@@ -8391,3 +8391,39 @@ conversie" tellen.
 **Opgeruimd:** "Maandprestaties" stond twee keer op het scherm (de sectiekop en de maandtabel
 erbinnen); de tabel heet nu "Per maand", en het bijschrift van de sectie klopt weer nu pacing en
 maandverloop eruit zijn.
+
+### 17.121 Vier losse kaarten, vier keer dezelfde query (24 augustus 2026)
+
+Een schermafdruk van het Meta-tabblad met de beurs-sectie nog op zijn skelet. Nagemeten in de
+browser: **54 data-verzoeken per paginabezoek**, waarvan `meta_account_daily` **elf keer** en
+`client_targets` vier keer — allemaal dezelfde rijen.
+
+Dat is mijn eigen werk van de vorige twee entries. Toen pacing, het maandverloop en de beurs-sectie
+losse kaarten werden, kreeg elke kaart zijn eigen ophaalcode: `ChannelPacing` (70 dagen),
+`ChannelMonthlyChart` (200 dagen), `ChannelFairWeeks` (volle historie), `ChannelForecastOverview`
+(volle historie) en `ChannelPerformance` (200 dagen plus campagnes). Losse kaarten zijn goed;
+losse fetches per kaart zijn dat niet.
+
+`ChannelDataProvider` haalt het nu één keer op — dagrijen, conversie-selectie en doelen — en bouwt
+de forecast één keer. Alle vier de kaarten lezen mee. Google doet dit al zo (ClientDataProvider +
+ForecastContext); dit is de tegenhanger voor Meta en LinkedIn.
+
+**Gemeten na afloop:** 54 → 22 verzoeken, en de beurs-sectie staat binnen zes seconden op zijn
+cijfers in plaats van na twintig seconden nog op zijn skelet. Wat er nog dubbel staat is
+StrictMode (dev verdubbelt elk effect) plus `ChannelPerformance`, dat naast de accountrijen ook
+campagnerijen en -namen nodig heeft; in productie is `meta_account_daily` twee verzoeken in plaats
+van elf.
+
+**En de volgorde is nu op alle drie de tabbladen dezelfde.** Google, Meta en LinkedIn hadden er
+elk een andere, en dan moet je bij elke tabwissel opnieuw zoeken waar iets staat:
+
+1. hero — Account Health met Pacing eronder, naast de wereldkaart
+2. Conversies per land, over de volle breedte (hoort bij de kaart erboven: "waar komt het vandaan"
+   en "wat leverde het per land op" is één vraag in twee kaarten)
+3. een rij grafiek- en diagramkaarten — Google drie (CPA-lijn, maandstaven, campagnetype-ringen),
+   Meta drie (levering, doelgroep, maandverloop), LinkedIn twee
+4. Prestaties richting de beurs
+5. Maandprestaties en Jaaroverzicht
+
+LinkedIn heeft er twee in plaats van drie omdat LinkedIn alleen `MEMBER_JOB_FUNCTION` als
+doelgroepdata levert; een lege derde kolom zou beloven dat leeftijd en gender er wel zijn.

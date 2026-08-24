@@ -2,10 +2,9 @@
 
 import { useMemo } from "react";
 import { today as vandaag } from "@/lib/reporting-date";
-import { useKanaalDagen } from "@/lib/kanalen/use-kanaal-dagen";
+import { useKanaalData } from "./channel-data-provider";
 import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { Laadvlak } from "@/components/ui/laadvlak";
-import type { ChannelKind } from "./channel-performance";
 
 // Het maandverloop van een kanaal als eigen kaart.
 //
@@ -14,13 +13,12 @@ import type { ChannelKind } from "./channel-performance";
 // landencijfers in de hero-rij -- "trek dat maandverloop ook los", en de grafiek wint erbij: een
 // staafreeks met zes maanden heeft geen 1600px nodig, en de kaart ernaast wél gezelschap.
 //
-// De data komt uit dezelfde hook als de pacing-kaart (lib/kanalen/use-kanaal-dagen.ts), zodat er
-// niet drie plekken zijn die elk hun eigen idee hebben van "welke velden tellen als conversie".
-// Wél een eigen venster: 200 dagen, want zes VOLLE maanden terug betekent op 1 januari nog steeds
-// juli t/m december.
+// De data komt uit ChannelDataProvider, samen met de pacing-kaart, de beurs-sectie en het
+// jaaroverzicht. Dat scheelt niet alleen verzoeken: drie losse fetches betekent drie plekken die
+// elk hun eigen idee kunnen krijgen van "welke velden tellen als conversie".
 
-export function ChannelMonthlyChart({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
-  const { rijen, convVan, convLabel } = useKanaalDagen(clientId, channel, 200);
+export function ChannelMonthlyChart() {
+  const { rijen, convVan, convLabel } = useKanaalData();
 
   const maanden = useMemo(() => {
     if (!rijen || rijen.length === 0) return [];

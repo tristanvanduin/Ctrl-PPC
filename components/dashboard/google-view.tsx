@@ -240,6 +240,11 @@ export function GoogleView({
             </div>
           </div>
 
+          {/* De landencijfers direct onder de hero en BOVEN de grafiekenrij: ze horen bij de
+              wereldkaart erboven ("waar komt het vandaan" / "wat leverde het per land op"), en
+              stonden onder de grafieken een scherm verderop. */}
+          <GeoRanglijstCard state={geo} zonderBalken />
+
           {/* DRIE GRAFIEKKAARTEN OP EEN RIJ. Alle drie tonen een verdeling of een verloop, en dat
               is precies waarom ze samen een rij kunnen zijn zonder dat er iets uitgerekt hoeft te
               worden: een lijn en een staafreeks WORDEN beter van meer hoogte (hun grafiekvlak is
@@ -251,8 +256,6 @@ export function GoogleView({
             <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
             <CampaignTypeSplit clientId={clientId} />
           </div>
-
-          <GeoRanglijstCard state={geo} zonderBalken />
 
           <Sectie
             icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}

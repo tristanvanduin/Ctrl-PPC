@@ -17,6 +17,7 @@ import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { useKanaalData } from "./channel-data-provider";
 import { KlikbareKaart } from "@/components/ui/klikbare-kaart";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { CONFIG, type ChannelKind, type DailyRow } from "./channel-performance";
@@ -43,50 +44,9 @@ function formatYAxis(metric: ForecastMetric) {
   return (v: number) => new Intl.NumberFormat("nl-NL", { notation: "compact" }).format(v);
 }
 
-/** De forecast én de historische data waaruit hij is opgebouwd. Dat tweede is nodig zodra een
- *  andere weergave dan de jaargrafiek hem gebruikt: FairWeeksOverview leest `data.currentYear` om
- *  de weken tegen het jaardoel af te zetten. Geëxporteerd zodat meta-view en linkedin-view de
- *  beurs-sectie kunnen voeden zonder de fetch nog een keer te schrijven. */
-export function useChannelForecast(clientId: string, channel: ChannelKind): ChannelForecastState {
-  const [forecast, setForecast] = useState<ChannelForecastState>(null);
-  const cfg = CONFIG[channel];
-
-  useEffect(() => {
-    let cancelled = false;
-    setForecast(null);
-
-    Promise.all([
-      // Geen datumfilter: de forecast heeft de volle historie nodig om jaren te kunnen wegen
-      // (lib/forecast.ts's computeMonthlyExpected) -- ChannelPerformance's 200-dagen-venster is
-      // hier bewust niet hergebruikt.
-      dbSelect<Record<string, unknown>>(cfg.accountTable, { select: cfg.select, clientId }),
-      dbSelect<{ channel: string; metric: string; target_value: number; valid_from: string; valid_to: string | null }>(
-        "client_targets", { select: "channel, metric, target_value, valid_from, valid_to", clientId },
-      ),
-      dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId }),
-    ]).then(([accRes, targetRes, settingsRes]) => {
-      if (cancelled) return;
-      const dailyRows = ((accRes.data ?? []) as unknown as Record<string, unknown>[]).map(cfg.map);
-      const convConfig: ChannelConversionConfig = resolveChannelConversionConfig(
-        (settingsRes.data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null,
-      );
-      const rows = dailyRows.map((r: DailyRow) => ({
-        date: r.date, spend: r.spend, revenue: r.revenue,
-        conv: sumSelectedConversions(r.convFields, cfg.channelKey, convConfig),
-      }));
-      const targetRows: TargetRow[] = (targetRes.data ?? []).map((r) => ({
-        channel: r.channel, metric: r.metric, targetValue: Number(r.target_value ?? 0),
-        validFrom: r.valid_from, validTo: r.valid_to,
-      }));
-      const built = buildChannelForecast(clientId, rows, targetRows, TARGET_CHANNEL[channel], vandaag());
-      setForecast(built ?? "leeg");
-    }, () => { if (!cancelled) setForecast("leeg"); });
-
-    return () => { cancelled = true; };
-  }, [clientId, channel, cfg]);
-
-  return forecast;
-}
+// De fetch stond hier (useChannelForecast) en is verhuisd naar channel-data-provider.tsx: hij werd
+// door twee secties op dezelfde pagina aangeroepen -- deze en de beurs-sectie -- en haalde dan twee
+// keer de volledige historie op. Zie die provider voor de gemeten aanleiding.
 
 function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
   metric: ForecastMetric;
@@ -193,8 +153,8 @@ function ForecastChart({ forecast, metric, onMetricChange }: { forecast: ClientF
   );
 }
 
-export function ChannelForecastOverview({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
-  const gebouwd = useChannelForecast(clientId, channel);
+export function ChannelForecastOverview() {
+  const { forecast: gebouwd } = useKanaalData();
   const [metric, setMetric] = useState<ForecastMetric>("conversions");
 
   if (gebouwd === null) return <Laadvlak vorm="grafiek" hoogte={280} titel="Jaaroverzicht" />;

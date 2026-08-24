@@ -16,6 +16,7 @@ import { ChannelHealthBadge } from "./channel-health-badge";
 import { ChannelPacing } from "./channel-pacing";
 import { ChannelMonthlyChart } from "./channel-monthly-chart";
 import { ChannelFairWeeks } from "./channel-fair-weeks";
+import { ChannelDataProvider } from "./channel-data-provider";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
@@ -64,6 +65,10 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
   }, [clientId]);
 
   return (
+    // Eén provider om alle kaarten heen: pacing, maandverloop, de beurs-sectie en het
+    // jaaroverzicht lezen allemaal dezelfde dagrijen en dezelfde forecast. Zie
+    // channel-data-provider.tsx voor wat er zonder gebeurde.
+    <ChannelDataProvider clientId={clientId} channel="meta">
     <div className="space-y-6">
       <ChannelViewHeader
         icon={<Megaphone className="w-5 h-5 text-brand-blue-ink" />}
@@ -124,7 +129,7 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
               tot 23 augustus 2026 onderaan de sectie "Maandprestaties", terwijl het de vraag
               beantwoordt die je bovenaan stelt. */}
           <div className="flex flex-1 flex-col">
-            <ChannelPacing clientId={clientId} channel="meta" edition={edition} />
+            <ChannelPacing edition={edition} />
           </div>
         </div>
         <div className="flex flex-1 flex-col">
@@ -132,20 +137,22 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         </div>
       </div>
 
-      {/* De twee ringkaarten naast elkaar. groep="levering" is plaatsing/platform/device ("waar
-          komt het vandaan"), groep="doelgroep" is leeftijd en gender ("wie bereiken we"). Ze
-          horen naast elkaar omdat ze dezelfde vorm en dezelfde vraag hebben, alleen op een andere
-          as -- en omdat ze even hoog zijn is er niets uit te rekken. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* DEZELFDE VOLGORDE ALS GOOGLE, en dat is het punt: hero, dan de landencijfers, dan een rij
+          grafiek- en diagramkaarten. De drie tabbladen hadden alle drie een andere volgorde, en dan
+          moet je bij elke tabwissel opnieuw zoeken waar iets staat.
+
+          De landencijfers horen direct onder de wereldkaart uit de hero: "waar komt het vandaan"
+          en "wat leverde het per land op" is één vraag in twee kaarten. */}
+      <GeoRanglijstCard state={geo} zonderBalken />
+
+      {/* groep="levering" is plaatsing/platform/device ("waar komt het vandaan"), groep="doelgroep"
+          is leeftijd en gender ("wie bereiken we"), en het maandverloop zet dat in de tijd. Drie
+          kaarten die alle drie een verdeling of een verloop tonen -- en alle drie inhoudsgestuurd,
+          dus er valt niets uit te rekken. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
         <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
-      </div>
-
-      {/* De maandverloop-grafiek naast de landencijfers. Allebei "wat leverde het op", allebei
-          inhoudsgestuurd, en de grafiek pakt de resthoogte als de landenkaart hoger uitvalt. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChannelMonthlyChart clientId={clientId} channel="meta" />
-        <GeoRanglijstCard state={geo} zonderBalken />
+        <ChannelMonthlyChart />
       </div>
 
       {/* "Prestaties richting de beurs" -- de sectie die Google al had en deze kanalen niet.
@@ -157,7 +164,7 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
           titel="Prestaties richting de beurs"
           bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
         >
-          <ChannelFairWeeks clientId={clientId} channel="meta" edition={edition} />
+          <ChannelFairWeeks edition={edition} />
         </Sectie>
       )}
 
@@ -181,7 +188,7 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         titel="Jaaroverzicht 2026"
         bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
       >
-        <ChannelForecastOverview clientId={clientId} channel="meta" />
+        <ChannelForecastOverview />
       </Sectie>
 
       {/* Meta-equivalent van Google's "Waar het budget landt" (23 augustus 2026) -- alleen het
@@ -195,6 +202,7 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         <ChannelVideoPerformance clientId={clientId} channel="meta" />
       </Sectie>
     </div>
+    </ChannelDataProvider>
   );
 }
 

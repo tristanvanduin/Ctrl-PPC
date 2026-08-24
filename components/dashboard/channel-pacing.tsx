@@ -5,8 +5,8 @@ import { Zap, TrendingUp, Calendar, Flag, Target } from "lucide-react";
 import { today as vandaag } from "@/lib/reporting-date";
 import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { berekenMaandPacing } from "@/lib/kanalen/maand-pacing";
-import { useKanaalDagen } from "@/lib/kanalen/use-kanaal-dagen";
-import { eur, fmt, type ChannelKind } from "./channel-performance";
+import { useKanaalData } from "./channel-data-provider";
+import { eur, fmt } from "./channel-performance";
 import { PacingRing } from "./pacing-monitor";
 import { Laadvlak } from "@/components/ui/laadvlak";
 
@@ -19,18 +19,12 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 // nodig, wel eerlijk tempo. De rekenkern staat in lib/kanalen/maand-pacing.ts en wordt gedeeld met
 // channel-performance.tsx, dat hem al gebruikte.
 //
-// Waarom een eigen, KLEIN venster en niet dat van ChannelPerformance: die haalt 200 dagen account-
-// EN campagnedata plus campagnenamen op, voor de maandtabel en de beurs-splitsing. Deze kaart heeft
-// aan de huidige en de vorige maand genoeg. De fetch zelf is wel gedeeld (useKanaalDagen), zodat er
-// niet twee plekken zijn die elk hun eigen idee hebben van welke velden als conversie tellen.
+// De data komt uit ChannelDataProvider en niet uit een eigen fetch: deze kaart deelt zijn dagrijen
+// met het maandverloop, de beurs-sectie en het jaaroverzicht. Elk daarvan haalde ze eerst zelf op,
+// en dat waren elf identieke meta_account_daily-verzoeken per paginabezoek.
 
-export function ChannelPacing({ clientId, channel, edition }: {
-  clientId: string;
-  channel: ChannelKind;
-  edition?: UpcomingEdition | null;
-}) {
-  // 70 dagen: genoeg om de volle vorige maand te dekken, ook op dag 1 van de huidige.
-  const { rijen, convVan, convLabel } = useKanaalDagen(clientId, channel, 70);
+export function ChannelPacing({ edition }: { edition?: UpcomingEdition | null }) {
+  const { rijen, convVan, convLabel } = useKanaalData();
 
   const pacing = useMemo(() => {
     if (!rijen || rijen.length === 0) return null;
