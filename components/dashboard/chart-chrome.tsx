@@ -153,14 +153,22 @@ export function AsX({ dataKey, formatter, basislijn = false }: {
  * de as helemaal weg te laten, want twee panelen boven elkaar moeten links op dezelfde pixel
  * beginnen — anders staan de balken en de lijn eronder niet meer boven elkaar.
  */
-export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5, stil = false }: {
+export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5, ticks, stil = false }: {
   formatter?: (v: number) => string;
   width?: number;
   domain?: [number | string, number | string];
   tickCount?: number;
+  /**
+   * De exacte streepjes. `tickCount` is voor recharts een WENS, geen opdracht: hij rondt zelf naar
+   * "mooie" waarden en rekt het domein daarvoor desnoods op. Bij een venster dat niet op nul
+   * begint (asSchaalVenster) leverde dat een as van 63, 66, 69, 72 én 73 op -- vier gelijke
+   * stappen met een vijfde streepje van één euro erbovenop. Met een expliciete lijst is er niets
+   * te raden.
+   */
+  ticks?: number[];
   stil?: boolean;
 }) {
-  if (stil) return <YAxis tick={false} tickLine={false} axisLine={false} width={width} domain={domain} tickCount={tickCount} />;
+  if (stil) return <YAxis tick={false} tickLine={false} axisLine={false} width={width} domain={domain} tickCount={tickCount} ticks={ticks} />;
   return (
     <YAxis
       tick={AS_TICK}
@@ -170,6 +178,7 @@ export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5, 
       width={width}
       domain={domain}
       tickCount={tickCount}
+      ticks={ticks}
       allowDecimals={false}
       tickFormatter={(v: number) => formatter(v)}
     />
@@ -205,6 +214,56 @@ export function asSchaal(max: number, gewensteStappen = 4): { domain: [number, n
  *
  * Acht procent is genoeg om de lijn vrij te laten en weinig genoeg om de vorm niet plat te drukken.
  */
+/**
+ * Een schaal die om de DATA heen ligt in plaats van vanaf nul.
+ *
+ * Wanneer wel en wanneer niet. Bij een balk of een vlak codeert de LENGTE de waarde: die moet bij
+ * nul beginnen, anders liegt de lengte. Bij een lijn die een VERHOUDING over tijd toont (CPA, ROAS,
+ * CTR) codeert alleen de hoogte-verandering iets, en dan is nul geen betekenisvol nulpunt maar een
+ * lege onderste helft. De CPA-lijn liep zes maanden tussen 68 en 72 euro op een as van 0 tot 75:
+ * kaarsrecht in beeld, terwijl er wel degelijk beweging in zit. Dat is niet "stabiel tonen", dat is
+ * de vraag niet beantwoorden.
+ *
+ * De ondergrens is nooit onder nul en de marge is een tiende van de spreiding aan beide kanten, met
+ * een bodem van vijf procent van de waarde zelf -- anders wordt een vlakke reeks (spreiding bijna
+ * nul) alsnog uitvergroot tot ruis die op een trend lijkt.
+ */
+export function asSchaalVenster(
+  min: number,
+  max: number,
+  gewensteStappen = 4,
+): { domain: [number, number]; tickCount: number; ticks: number[] } {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= 0) return { domain: [0, 1], tickCount: 2, ticks: [0, 1] };
+  const spreiding = Math.max(max - min, 0);
+  const marge = Math.max(spreiding * 0.1, max * 0.05);
+  const onder = Math.max(0, min - marge);
+  const boven = max + marge;
+  // Op een nette stap afronden, zodat de labels ronde getallen blijven.
+  const stap = kiesStap((boven - onder) / gewensteStappen);
+  const laag = Math.max(0, Math.floor(onder / stap) * stap);
+  const hoog = Math.ceil(boven / stap) * stap;
+  const aantal = Math.round((hoog - laag) / stap) + 1;
+  const ticks = Array.from({ length: aantal }, (_, i) => laag + i * stap);
+  return { domain: [laag, hoog], tickCount: aantal, ticks };
+}
+
+/**
+ * De eerstvolgende "nette" stap (1, 2, 5 of 10 maal een macht van tien) op of boven `ruw`.
+ *
+ * Bewust GEEN 2,5 in die reeks. De as staat op `allowDecimals={false}` en de formatters ronden af,
+ * dus een stap van 2,5 gaf streepjes op 62,5 / 65 / 67,5 met labels "€ 63", "€ 65", "€ 68" -- een
+ * rasterlijn met "€ 68" erop die in werkelijkheid op 67,50 ligt. Liever een stap grover dan een
+ * label dat niet klopt.
+ */
+function kiesStap(ruw: number): number {
+  if (!Number.isFinite(ruw) || ruw <= 0) return 1;
+  const macht = Math.pow(10, Math.floor(Math.log10(ruw)));
+  for (const factor of [1, 2, 5, 10]) {
+    if (macht * factor >= ruw) return macht * factor;
+  }
+  return macht * 10;
+}
+
 export function asSchaalLijn(max: number, gewensteStappen = 4): { domain: [number, number]; tickCount: number } {
   if (!Number.isFinite(max) || max <= 0) return { domain: [0, 1], tickCount: 2 };
   return kiesSchaal(max * 1.08, gewensteStappen);

@@ -8508,3 +8508,64 @@ tegen een volle vergelijken is precies de fout die de kanaal-pacing vermijdt), e
 ClientDataProvider en niet via een leesbare dagtabel. Optellen kan dus wel, maar het is drie
 verschillende paden bij elkaar rapen — een eigen bouwstuk, geen kaartje erbij.
 
+
+### 17.123 Vijf terugmeldingen op "Alle kanalen", en een ring die de verkeerde vorm was (24 augustus 2026)
+
+**"Dit leest heel slordig, niet dan?"** — de rangschikking. Klopte: per kanaal een ring van 64px,
+de naam ernaast, en de vijf factoren daar weer naast, drie keer onder elkaar. Drie kolommen van
+verschillende hoogte per rij; dat las als een tabel die geen tabel is. Nu per kanaal een blokje met
+een kopregel (stip, naam, cijfer, zwakste factor, anomalie) en daaronder een vaste rij van vijf
+gelijke kolommen. Dezelfde vijf op dezelfde plek bij elk kanaal, dus je kunt verticaal vergelijken
+— en dat is het hele punt van een rangschikking.
+
+**"Waarom is dit geen pacing?"** — voor de tweede keer gevraagd, en de vorige keer had ik geantwoord
+dat het niet eerlijk kon. Dat antwoord was te smal. Het klopt dat maand-op-maand pacing dagdata over
+alle kanalen vraagt en die er niet is (`blended_account_monthly` is per maand, er is geen
+`blended_account_daily`, en Google heeft geen leesbare dagtabel). Maar pacing hoeft niet
+maand-op-maand te zijn: **het jaar tot nu tegen hetzelfde deel van vorig jaar** kan wél, met exact
+de data die dit tabblad toch al ophaalt. Beide kanten zijn even lang, en er is geen doel voor nodig
+— wat de kern was, want `client_targets` is leeg.
+
+De vergelijking loopt tot en met de laatste VOLLEDIG gemeten maand. De lopende maand is aan beide
+kanten anders ver, en meenemen zou de vergelijking scheeftrekken op precies het moment dat je ernaar
+kijkt.
+
+**En daar ging ik meteen de mist in met de vorm.** De eerste versie zette er twee ringen in, net als
+de kanaal-pacing. Resultaat: een volle ring met "255%" erin. Een ring codeert een DEEL VAN EEN
+GEHEEL — hij loopt van leeg naar vol en stopt daar. Deze verhouding heeft geen plafond, dus zei de
+ring niets meer dan "meer dan honderd". Nu staat het verschil er als getal (+68% / +155%) met beide
+absolute waarden eronder. Het verschil en niet de verhouding: "+68%" is wat je wilt weten, "168%"
+moet je zelf nog omrekenen, en bij een halvering leest "-50%" meteen goed waar "50%" dubbelzinnig is.
+
+**"Dit kan over de breedte van de pagina"** — de landencijfers stonden in een halve kolom met zes
+tegels in twee rijen van drie en een lege onderhelft. Nu over de volle breedte, zes naast elkaar.
+Pacing is de opvanger van die kolom geworden.
+
+**"Waarom is dit zo extreem leeg?"** — de gegroepeerde maandstaven. `plotBreedte()` rekent 130px per
+categorie; bij zes maanden is dat 852px in een kaart van 1584px, dus bleef er ruim 500px leeg tussen
+de plot en de cijferkolom. Dat plafond bestaat om te voorkomen dat balken absurd breed worden bij
+weinig categorieën, maar dat regelt recharts zelf: zonder vaste `barSize` (nu `maxBarSize`) verdeelt
+hij elke maandgroep over de beschikbare band. De balken worden dus dikker in plaats van dat de kaart
+leger wordt.
+
+**"Maak deze stappen kleiner zodat de CPA meer fluctueert"** — de CPA-lijn liep zes maanden tussen
+€66,80 en €68,10 op een as van €0 tot €75: kaarsrecht in beeld, terwijl er beweging in zit.
+
+Hier zit een regel achter die het waard is te noteren: **bij een balk of een vlak codeert de LENGTE
+de waarde, en die moet bij nul beginnen. Bij een lijn die een verhouding over tijd toont (CPA, ROAS,
+CTR) codeert alleen de hoogte-verándering iets** — dan is nul geen betekenisvol nulpunt maar een
+lege onderste helft. `asSchaalVenster()` legt de as om de data heen; `asSchaal`/`asSchaalLijn`
+blijven vanaf nul voor alles wat een magnitude toont.
+
+Twee dingen die daarbij misgingen en pas op de schermafdruk zichtbaar waren:
+
+1. `tickCount` is voor recharts een WENS, geen opdracht. Hij rondt zelf naar "mooie" waarden en rekt
+   het domein daarvoor desnoods op — de as kwam uit op 63, 66, 69, 72 én 73: vier gelijke stappen
+   met een vijfde streepje van één euro erbovenop. `AsY` accepteert nu een expliciete `ticks`-lijst.
+2. Een stap van 2,5 gaf streepjes op 62,5 / 65 / 67,5 met labels "€ 63", "€ 65", "€ 68" — een
+   rasterlijn met "€ 68" erop die in werkelijkheid op €67,50 ligt, want de as staat op
+   `allowDecimals={false}` en de formatter rondt af. 2,5 is uit de stapreeks gehaald: liever een
+   stap grover dan een label dat niet klopt.
+
+**Gemeten na afloop, kolomhoogtes op 1920px:** Google 765/765, Meta 794/794, LinkedIn 841/841, en
+geen enkele pagefout op de drie tabbladen.

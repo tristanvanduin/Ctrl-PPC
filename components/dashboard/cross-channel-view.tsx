@@ -15,6 +15,7 @@ import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { KanaalHealthRanking } from "./kanaal-health-ranking";
+import { BlendedPacing } from "./blended-pacing";
 import type { Kanaal } from "@/lib/kanalen/beschikbaar";
 
 // Cross-channel (blended) tab. Leest de blended_account_monthly-view over Google, Meta en
@@ -151,16 +152,21 @@ export function CrossChannelView({ clientId, kanalen = [] }: { clientId: string;
         <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
           <div className="flex flex-col gap-4">
             <KanaalHealthRanking clientId={clientId} kanalen={kanalen} />
-            {/* De opvanger van deze kolom: de wereldkaart ernaast is hoger dan de rangschikking,
-                en zes tegels die in wat meer hoogte gecentreerd staan leest als ruimte, terwijl
-                drie kanaalregels die 200px uit elkaar getrokken worden als een gat leest. */}
+            {/* De opvanger van deze kolom. Pacing hoort hier ook inhoudelijk: de rangschikking
+                zegt hoe gezond elk kanaal is, pacing zegt of het geheel op tempo ligt. */}
             <div className="flex flex-1 flex-col">
-              <GeoRanglijstCard state={geo} zonderBalken />
+              <BlendedPacing rows={rows} />
             </div>
           </div>
           <div className="flex flex-1 flex-col">
             <GeoMapCard state={geo} channel="blended" verdieping={<GeoRanglijstInKaart state={geo} />} />
           </div>
+        </div>
+
+        {/* Over de volle breedte: zes tegels naast elkaar vullen die breedte, in een halve kolom
+            stonden ze in twee rijen van drie met een lege onderhelft. */}
+        <div className="mt-4">
+          <GeoRanglijstCard state={geo} zonderBalken />
         </div>
       </Sectie>
 

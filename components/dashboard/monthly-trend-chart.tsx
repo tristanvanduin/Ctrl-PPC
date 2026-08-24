@@ -7,7 +7,7 @@ import { categoricalColor, CHART_LINE_SECONDARY } from "@/lib/branding/chart-col
 import {
   Raster, AsX, AsY, Tip, Legenda, PLOT_MARGE,
   BALK_RADIUS, BALK_GAP, GROEP_GAP,
-  kortEuro, kortEuroLabel, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte,
+  kortEuro, kortEuroLabel, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte, BALK_MAX,
   PLOT_MARGE_LABELS, PLOT_MARGE_WAARDEN, PLOT_MARGE_EIND, plotBreedte,
   BalkVerloop, VlakWas, verloopId, type LegendaItem,
 } from "./chart-chrome";
@@ -301,16 +301,18 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
       {/* Plot links, de cijfers ertegenaan — dezelfde indeling als MonthlyTrendChart hierboven,
           en om dezelfde reden.
 
-          De plot is zo breed als zijn data (zie plotBreedte). Bij zes maanden bleef er ruim een
-          derde kaart over, en die stond leeg: een grafiek die in witruimte zweeft leest als een
-          kaart die niet af is, hoe netjes de balken zelf ook zijn. Dat was ook de terugkoppeling
-          -- "straalt geen premium uit" ging niet over de marks maar over de leegte eromheen.
-
           Wat er rechts staat is geen opvulling maar de vraag die deze grafiek oproept en niet
           beantwoordt: hoeveel draagt elk kanaal nou eigenlijk? Dat tel je niet op uit achttien
           balkjes. Het kleurblokje bindt de regel aan zijn balken. */}
       <div className="flex items-stretch">
-      <div className="min-w-0 flex-1 px-3 py-4" style={{ height, maxWidth: plotBreedte(data.length) }}>
+      {/* GEEN plafond op de plotbreedte hier, anders dan bij MonthlyTrendChart hierboven.
+          plotBreedte() rekent 130px per categorie; bij zes maanden is dat 852px in een kaart van
+          1584px, dus bleef er ruim 500px leeg tussen de plot en de cijferkolom -- "waarom is dit
+          zo extreem leeg". Het plafond bestaat om te voorkomen dat balken absurd breed worden bij
+          weinig categorieen, maar dat regelt recharts hier zelf: zonder vaste `barSize` verdeelt
+          hij elke maandgroep over de beschikbare band, met `barCategoryGap` als lucht ertussen.
+          De balken worden dus dikker in plaats van dat de kaart leger wordt. */}
+      <div className="min-w-0 flex-1 px-3 py-4" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={PLOT_MARGE_LABELS} barCategoryGap={GROEP_GAP} barGap={BALK_GAP}>
             <Raster />
@@ -319,7 +321,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
             <Tip formatter={volledigEuro} />
             {series.map((s, i) => <BalkVerloop key={`v-${s}`} id={verloopId(s, i)} kleur={kleurVan(i)} />)}
             {series.map((s, i) => (
-              <Bar key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} filter={`url(#${verloopId(s, i)}-gloed)`} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)}>
+              <Bar key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} filter={`url(#${verloopId(s, i)}-gloed)`} radius={BALK_RADIUS} maxBarSize={BALK_MAX}>
                 {/* Alleen de grootste serie draagt een naam, boven zijn laatste balk. Zie
                     `grootsteSerie` hierboven voor waarom het er één is en niet drie. */}
                 {s === grootsteSerie && (

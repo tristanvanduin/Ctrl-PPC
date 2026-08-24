@@ -8,7 +8,7 @@ import { ALLE_FORECAST_METRICS, computeForecast } from "@/lib/forecast";
 import { METRIC_LABELS, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
-import { Tip, AsY, Raster, asSchaalLijn, kortEuro } from "./chart-chrome";
+import { Tip, AsY, Raster, asSchaalVenster, kortEuro } from "./chart-chrome";
 import { PeriodPopover } from "@/components/ui/period-popover";
 
 // Compacte lijngrafiek voor de linkerkolom van de opener (17.43): "ik mis de lijn diagram nog" --
@@ -43,7 +43,10 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
 
   const eur = (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
   const waarden = data.map((d) => d.waarde).filter((w): w is number => w !== null);
-  const { domain, tickCount } = asSchaalLijn(Math.max(...waarden, 0));
+  // Een venster om de data en niet vanaf nul: CPA is een verhouding, en op een as van 0 tot 75
+  // lag deze lijn zes maanden kaarsrecht terwijl hij tussen 68 en 72 euro bewoog. Zie
+  // asSchaalVenster voor waarom dat bij een balk juist NIET mag.
+  const { domain, tickCount, ticks } = asSchaalVenster(Math.min(...waarden), Math.max(...waarden, 0));
 
   return (
     // De grafiek pakt de resthoogte (`flex-1` + ResponsiveContainer op 100%) in plaats van vast
@@ -68,7 +71,7 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
             axisLine={false}
             tickMargin={6}
           />
-          <AsY formatter={kortEuro} width={44} domain={domain} tickCount={tickCount} />
+          <AsY formatter={kortEuro} width={44} domain={domain} tickCount={tickCount} ticks={ticks} />
           <Tip formatter={eur} />
           <Line
             type="monotone"

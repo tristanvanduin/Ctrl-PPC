@@ -8,7 +8,6 @@ import { computeForecast } from "@/lib/forecast";
 import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore } from "@/lib/health-score";
 import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
-import { PacingRing } from "./pacing-monitor";
 import { KanaalHealthRadar, type RadarReeks } from "./kanaal-health-radar";
 
 /**
@@ -33,7 +32,7 @@ import { KanaalHealthRadar, type RadarReeks } from "./kanaal-health-radar";
  * rapporteert, en dat is meer machinerie dan het probleem groot is.
  */
 // De lijnkleur per kanaal in de radar. Bewust NIET de statuskleur (groen/oranje/rood): die zit al
-// in de ring en het cijfer ernaast, en met drie polygonen over elkaar moet de kleur zeggen WELK
+// in het cijfer naast de naam, en met drie polygonen over elkaar moet de kleur zeggen WELK
 // kanaal je ziet, niet hoe het ervoor staat. Dezelfde volgorde als CHART_CATEGORICAL elders.
 const KANAAL_KLEUR: Record<Kanaal, string> = {
   google: CHART_CATEGORICAL[0],
@@ -100,7 +99,7 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
             kanaal; hier liggen ze over elkaar, want de vraag op "Alle kanalen" is een
             vergelijking. */}
         {reeksen.length > 0 && (
-          <div className="shrink-0 @2xl:w-[300px]">
+          <div className="shrink-0 @2xl:w-[250px]">
             <KanaalHealthRadar reeksen={reeksen} />
           </div>
         )}
@@ -135,68 +134,60 @@ function KanaalRegel({ kanaal, health }: { kanaal: Kanaal; health: HealthScore }
   const kritiek = health.anomalies.find((a) => a.severity === "critical") ?? health.anomalies[0];
 
   return (
-    <div className="flex items-start gap-3">
-      <div className="relative shrink-0">
-        <PacingRing pct={health.grade === "?" ? 0 : health.total} color={kleur} size={64} />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lead font-bold leading-none tabular-nums" style={{ color: kleur }}>
-            {health.grade === "?" ? "—" : health.total}
+    <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
+      {/* Kop van de regel: stip, naam, cijfer. Het cijfer stond eerst in een ring van 64px met de
+          naam ernaast en de vijf factoren daar weer naast -- drie kolommen van verschillende
+          hoogte per kanaal, drie keer onder elkaar. Dat las als een tabel die geen tabel is. Nu
+          per kanaal een blokje met een kopregel en een vaste factorrij eronder: dezelfde vijf
+          kolommen op dezelfde plek bij elk kanaal, dus je kunt verticaal vergelijken. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: KANAAL_KLEUR[kanaal] }} aria-hidden />
+        <span className="text-title font-semibold text-brand-gray">{KANAAL_NAAM[kanaal]}</span>
+        <span className="text-lead font-bold tabular-nums" style={{ color: kleur }}>
+          {health.grade === "?" ? "—" : health.total}
+        </span>
+        {health.grade === "?" ? (
+          <span className="text-meta text-muted-foreground">
+            te weinig beoordeeld ({health.assessedCount}/5)
           </span>
-        </div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <p className="text-title font-semibold text-brand-gray flex items-center gap-1.5">
-            {/* De stip koppelt deze regel aan zijn polygoon in de radar; zonder koppeling is een
-                radar met drie lijnen drie anonieme vormen. */}
-            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: KANAAL_KLEUR[kanaal] }} aria-hidden />
-            {KANAAL_NAAM[kanaal]}
-          </p>
-          {health.grade === "?" ? (
-            <span className="text-meta text-muted-foreground">
-              te weinig beoordeeld voor een cijfer ({health.assessedCount}/5 factoren)
-            </span>
-          ) : zwakste ? (
-            <span className="text-meta text-muted-foreground">
-              zwakste: <span className="font-medium text-brand-gray">{zwakste.name}</span> {zwakste.score}/{zwakste.maxScore}
-            </span>
-          ) : null}
-        </div>
-
-        {/* De vijf factoren als staafjes, en dat is wat een rangschikking pas bruikbaar maakt:
-            twee kanalen met dezelfde score kunnen op heel verschillende assen zwak zijn. Op het
-            kanaaltabblad zelf staat dezelfde uitsplitsing als radar; die vorm laat zich niet
-            vergelijken tussen drie kanalen onder elkaar, staafjes op een gedeelde schaal wel. */}
-        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 @lg:grid-cols-3 @3xl:grid-cols-5">
-          {health.factors.map((f) => (
-            <div key={f.name} className="min-w-0">
-              <div className="flex items-baseline justify-between gap-1">
-                <dt className={`text-micro truncate ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`}>{f.name}</dt>
-                <dd className={`text-micro shrink-0 tabular-nums ${f.assessed ? "text-brand-gray" : "text-muted-foreground/60"}`}>
-                  {f.assessed ? f.score : "—"}
-                </dd>
-              </div>
-              <div className="mt-0.5 h-1 rounded-full bg-gray-100 overflow-hidden">
-                {/* Geen balk als de factor niet beoordeeld is: een balk op nul leest als "score
-                    nul", terwijl er niet gemeten is. */}
-                {f.assessed && (
-                  <div
-                    className={`h-full rounded-full ${f.score >= 16 ? "bg-green-400" : f.score >= 10 ? "bg-amber-400" : "bg-red-400"}`}
-                    style={{ width: `${(f.score / f.maxScore) * 100}%` }}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
-        </dl>
-
+        ) : zwakste ? (
+          <span className="text-meta text-muted-foreground">
+            zwakste: <span className="font-medium text-brand-gray">{zwakste.name}</span> {zwakste.score}/{zwakste.maxScore}
+          </span>
+        ) : null}
         {kritiek && (
-          <p className="mt-2 text-meta text-muted-foreground flex items-start gap-1">
-            <AlertTriangle className={`w-3 h-3 shrink-0 mt-0.5 ${kritiek.severity === "critical" ? "text-red-500" : "text-amber-500"}`} />
-            <span className="min-w-0">{kritiek.title}</span>
-          </p>
+          <span className="ml-auto flex items-center gap-1 text-meta text-muted-foreground">
+            <AlertTriangle className={`w-3 h-3 shrink-0 ${kritiek.severity === "critical" ? "text-red-500" : "text-amber-500"}`} />
+            <span className="min-w-0 truncate">{kritiek.title}</span>
+          </span>
         )}
       </div>
+
+      {/* De vijf factoren, altijd alle vijf en altijd in dezelfde volgorde: dat is wat een
+          rangschikking bruikbaar maakt. Twee kanalen met een andere score kunnen op dezelfde as
+          vastlopen, en dat zie je alleen als de kolommen uitlijnen. */}
+      <dl className="mt-2 grid grid-cols-5 gap-x-3">
+        {health.factors.map((f) => (
+          <div key={f.name} className="min-w-0">
+            <div className="flex items-baseline justify-between gap-1">
+              <dt className={`text-micro truncate ${f.assessed ? "text-muted-foreground" : "text-muted-foreground/60"}`}>{f.name}</dt>
+              <dd className={`text-micro shrink-0 tabular-nums ${f.assessed ? "text-brand-gray" : "text-muted-foreground/60"}`}>
+                {f.assessed ? f.score : "—"}
+              </dd>
+            </div>
+            <div className="mt-1 h-1 rounded-full bg-border/60 overflow-hidden">
+              {/* Geen balk als de factor niet beoordeeld is: een balk op nul leest als "score
+                  nul", terwijl er niet gemeten is. */}
+              {f.assessed && (
+                <div
+                  className={`h-full rounded-full ${f.score >= 16 ? "bg-green-400" : f.score >= 10 ? "bg-amber-400" : "bg-red-400"}`}
+                  style={{ width: `${(f.score / f.maxScore) * 100}%` }}
+                />
+              )}
+            </div>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
