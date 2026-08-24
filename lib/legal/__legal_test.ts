@@ -6,11 +6,11 @@
 // kan komen die niemand ziet. Twee kanten van dezelfde fout, allebei duur.
 
 import {
-  BEDRIJFSGEGEVENS, VELDLABELS, VERPLICHTE_VELDEN,
+  BEDRIJFSGEGEVENS, NIET_BLOKKEREND, VELDLABELS, VERPLICHTE_VELDEN,
   isDefinitief, ontbrekendeVelden, type Bedrijfsgegevens,
 } from "./bedrijfsgegevens";
 import {
-  ALGEMENE_VOORWAARDEN, JURIDISCHE_DOCUMENTEN, PRIVACY_STATEMENT, parseInline,
+  ALGEMENE_VOORWAARDEN, DATA_DELETION, JURIDISCHE_DOCUMENTEN, PRIVACY_STATEMENT, parseInline,
   type Blok, type JuridischDocument,
 } from "./documenten";
 
@@ -40,24 +40,73 @@ const COMPLEET: Bedrijfsgegevens = {
   vercelRegio: "EU (Frankfurt)",
   versie: "1.0",
   laatstGewijzigd: "2026-08-24",
+  contractvoorwaardenBevestigd: true,
 };
+
+function alleTeksten(doc: JuridischDocument): string[] {
+  const uit: string[] = [doc.inleiding, doc.slotnoot, doc.taalnoot];
+  for (const par of doc.paragrafen) {
+    uit.push(par.titel, par.korteTitel);
+    for (const blok of par.blokken as Blok[]) {
+      if (blok.soort === "alinea" || blok.soort === "subkop") uit.push(blok.tekst);
+      else if (blok.soort === "lijst" || blok.soort === "genummerd") uit.push(...blok.items);
+      else uit.push(...blok.koppen, ...blok.rijen.flat());
+    }
+  }
+  return uit;
+}
 
 // ── De conceptpoort ────────────────────────────────────────────────────────
 
 assert(!isDefinitief(BEDRIJFSGEGEVENS), "de huidige, lege gegevens leveren een concept op");
 assert(isDefinitief(COMPLEET), "een volledig ingevulde set is definitief");
 
-assert(
-  ontbrekendeVelden(BEDRIJFSGEGEVENS).length === VERPLICHTE_VELDEN.length,
-  "met niets ingevuld ontbreekt elk verplicht veld"
-);
-// De cast is nodig omdat TypeScript het uitgesloten veld al uit het type van VERPLICHTE_VELDEN
+// Niet meer "alles ontbreekt": de vijf contracttermijnen staan op conventionele waarden ingevuld.
+// Wat wél moet gelden is dat de harde feiten en het akkoord op die termijnen nog openstaan --
+// anders zou een voorstel van de assistent stilzwijgend als een besluit tellen.
+const nuOntbrekend = ontbrekendeVelden(BEDRIJFSGEGEVENS);
+assert(nuOntbrekend.length > 0, "de huidige gegevens leveren nog openstaande velden op");
+for (const veld of ["handelsnaam", "vestigingsadres", "contactEmail", "contractvoorwaardenBevestigd"] as const) {
+  assert(nuOntbrekend.includes(veld), `${veld} staat vandaag nog open`);
+}
+// De cast is nodig omdat TypeScript de uitgesloten velden al uit het type van VERPLICHTE_VELDEN
 // heeft weggefilterd (het leidt het type-predicaat uit de filter-callback zelf af). Dat is precies
 // wat we willen, maar het maakt de controle op waarde-niveau anders onmogelijk om op te schrijven.
+const verplicht = VERPLICHTE_VELDEN as readonly string[];
+for (const veld of NIET_BLOKKEREND.keys()) {
+  assert(!verplicht.includes(veld), `${veld} staat in NIET_BLOKKEREND en telt dus niet mee`);
+}
 assert(
-  !(VERPLICHTE_VELDEN as readonly string[]).includes("aansprakelijkheidscapMaximum"),
-  "het optionele aansprakelijkheidsmaximum telt niet mee voor 'definitief'"
+  [...NIET_BLOKKEREND.values()].every((reden) => reden.trim().length > 10),
+  "elke uitzondering draagt een reden, geen lege string"
 );
+// De lijst hoort kort te blijven. Groeit hij, dan is dat een beslissing die iemand bewust neemt --
+// niet iets dat er ongemerkt bij komt omdat een veld lastig in te vullen bleek.
+assert(NIET_BLOKKEREND.size <= 3, "de lijst met niet-blokkerende velden is niet stilletjes gegroeid");
+
+// De contractvlag is een boolean, en false is daar de LEGE waarde. Zonder het onderscheid in
+// ontbrekendeVelden zou hij als ingevuld tellen zodra hij bestaat, en dan bewaakt hij niets.
+assert(
+  ontbrekendeVelden({ ...COMPLEET, contractvoorwaardenBevestigd: false })
+    .includes("contractvoorwaardenBevestigd"),
+  "een niet-bevestigde contractvlag telt als ontbrekend, niet als een ingevulde 'nee'"
+);
+assert(
+  !isDefinitief({ ...COMPLEET, contractvoorwaardenBevestigd: false }),
+  "zonder akkoord op de contracttermijnen blijft het document een concept"
+);
+
+// KvK en BTW blokkeren niet meer, maar staan wél nog in de tekst: leeg horen ze een zichtbare
+// markering op te leveren. Anders zou "niet blokkerend" stilletjes "weggelaten" zijn geworden.
+for (const veld of ["kvkNummer", "btwNummer"] as const) {
+  const zonder = { ...COMPLEET, [veld]: null };
+  assert(isDefinitief(zonder), `zonder ${veld} kan het document definitief zijn`);
+  const gaten = JURIDISCHE_DOCUMENTEN
+    .flatMap((d) => alleTeksten(d))
+    .flatMap((t) => parseInline(t, zonder))
+    .filter((n) => n.soort === "ontbreekt");
+  assert(gaten.length > 0, `een leeg ${veld} is nog steeds zichtbaar in de tekst`);
+}
 
 // Eén veld leeg is genoeg om het concept te houden. Dit is de kern van de poort: hij mag niet
 // "bijna af" als af behandelen, en niet op één specifiek veld hangen dat iemand ooit koos.
@@ -67,7 +116,9 @@ for (const veld of VERPLICHTE_VELDEN) {
 }
 
 // Witruimte is geen waarde: " " in een KvK-veld is een vergissing, geen ingevuld nummer.
-assert(!isDefinitief({ ...COMPLEET, kvkNummer: "   " }), "witruimte telt niet als ingevuld");
+// Op een VERPLICHT veld, niet op kvkNummer: die blokkeert sinds 24 augustus 2026 niet meer, dus
+// daar zou witruimte terecht doorkomen en bewijst de controle niets.
+assert(!isDefinitief({ ...COMPLEET, handelsnaam: "   " }), "witruimte telt niet als ingevuld");
 
 assert(
   VERPLICHTE_VELDEN.every((v) => typeof VELDLABELS[v] === "string" && VELDLABELS[v].length > 0),
@@ -130,21 +181,10 @@ assert(
 
 // ── De documenten zelf ─────────────────────────────────────────────────────
 
-function alleTeksten(doc: JuridischDocument): string[] {
-  const uit: string[] = [doc.inleiding, doc.slotnoot, doc.taalnoot];
-  for (const par of doc.paragrafen) {
-    uit.push(par.titel, par.korteTitel);
-    for (const blok of par.blokken as Blok[]) {
-      if (blok.soort === "alinea" || blok.soort === "subkop") uit.push(blok.tekst);
-      else if (blok.soort === "lijst" || blok.soort === "genummerd") uit.push(...blok.items);
-      else uit.push(...blok.koppen, ...blok.rijen.flat());
-    }
-  }
-  return uit;
-}
-
 assert(PRIVACY_STATEMENT.paragrafen.length === 11, "het Privacy Statement heeft elf paragrafen");
 assert(ALGEMENE_VOORWAARDEN.paragrafen.length === 17, "de Algemene Voorwaarden hebben zeventien artikelen");
+assert(DATA_DELETION.paragrafen.length === 4, "de verwijderpagina heeft vier paragrafen");
+assert(JURIDISCHE_DOCUMENTEN.length === 3, "er zijn drie juridische documenten");
 
 for (const doc of JURIDISCHE_DOCUMENTEN) {
   const ids = doc.paragrafen.map((p) => p.id);
@@ -203,7 +243,7 @@ const alleLinks = JURIDISCHE_DOCUMENTEN.flatMap((d) =>
 ).filter((n) => n.soort === "link");
 assert(alleLinks.length >= 2, "de documenten verwijzen naar elkaar");
 assert(
-  alleLinks.every((n) => n.soort === "link" && ["/privacy", "/terms"].includes(n.href)),
+  alleLinks.every((n) => n.soort === "link" && ["/privacy", "/terms", "/data-deletion"].includes(n.href)),
   "elke interne link wijst naar een bestaande route, niet naar een .md-bestand"
 );
 

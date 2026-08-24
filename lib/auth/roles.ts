@@ -199,6 +199,10 @@ export function isPublicPath(pathname: string): boolean {
   // het tegenovergestelde van wat de AVG ermee bedoelt -- en de footer linkt ernaar vanaf elke
   // pagina, dus ook vanaf pagina's die een bezoeker zonder sessie bekijkt.
   if (pathname === "/privacy" || pathname === "/terms") return true;
+  // /data-deletion moet zonder account leesbaar zijn: Meta vraagt de URL bij App Review op en
+  // haalt hem zonder sessie op, en een betrokkene die verwijdering wil vragen heeft per definitie
+  // geen werkend account meer -- of nooit een account gehad.
+  if (pathname === "/data-deletion") return true;
   return false;
 }
 

@@ -12,7 +12,7 @@ In deze algemene voorwaarden wordt verstaan onder:
 
 * **Platform**: de door Ctrl PPC ontwikkelde en beheerde performance-marketing-analyse-engine, inclusief de bijbehorende webapplicatie, API-koppelingen en gegenereerde rapportages, adviezen en hypotheses.
 * **Dienst**: het geheel van diensten dat Ctrl PPC via het Platform aan Opdrachtgever levert, waaronder het ophalen, verwerken, analyseren en presenteren van advertentiedata, en het genereren van AI-ondersteunde inzichten, hypotheses en aanbevelingen.
-* **Gekoppelde Platformen**: externe advertentie- en marketingplatformen waarmee Opdrachtgever het Platform laat koppelen, waaronder in elk geval Google Ads, Meta (Facebook/Instagram) Ads en LinkedIn Ads.
+* **Gekoppelde Platformen**: externe advertentie-, analyse- en marketingplatformen waarmee Opdrachtgever het Platform laat koppelen, waaronder in elk geval Google Ads, Meta (Facebook/Instagram) Ads, LinkedIn Ads, Google Analytics 4 en Google Search Console.
 * **AI-modelproviders**: externe aanbieders van taalmodellen die door het Platform worden geraadpleegd voor data-synthese, samenvatting en adviesgeneratie, waaronder in elk geval de dienst OpenRouter en de daarachter liggende modelaanbieders.
 * **Overeenkomst**: iedere overeenkomst tussen Ctrl PPC en Opdrachtgever waarop deze algemene voorwaarden van toepassing zijn.
 * **Partijen**: Ctrl PPC en Opdrachtgever gezamenlijk.

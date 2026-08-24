@@ -68,6 +68,18 @@ export interface Bedrijfsgegevens {
   versie: string | null;
   /** Datum van de laatste wijziging, als ISO-datum (YYYY-MM-DD). */
   laatstGewijzigd: string | null;
+  /**
+   * Zijn de commerciële termijnen hieronder (betaling, opzegging, aansprakelijkheidscap,
+   * aankondiging, overmacht) door de eigenaar bevestigd?
+   *
+   * Ze staan ingevuld met conventionele waarden, zodat de tekst leesbaar is en de pagina niet
+   * op vijf plekken een gat toont voor beslissingen waar een gangbaar antwoord op bestaat. Maar
+   * ingevuld is niet hetzelfde als besloten: dit zijn de bedragen en termijnen waar Opdrachtgever
+   * zich straks op beroept. Zonder deze vlag op true zou een voorstel van mij stilzwijgend een
+   * afspraak worden zodra de laatste bedrijfsgegevens binnen zijn -- precies het soort
+   * onopgemerkte overgang waar de conceptpoort voor bedoeld is.
+   */
+  contractvoorwaardenBevestigd: boolean;
 }
 
 /**
@@ -84,18 +96,22 @@ export const BEDRIJFSGEGEVENS: Bedrijfsgegevens = {
   btwNummer: null,
   contactEmail: null,
   arrondissement: null,
-  betalingstermijnDagen: null,
-  opzegtermijn: null,
-  aansprakelijkheidscapMaanden: null,
+  // De vijf termijnen hieronder staan op conventionele waarden, NIET op een besluit. Zie
+  // contractvoorwaardenBevestigd: zolang die op false staat blijft het document een concept,
+  // ook als al het andere gevuld is. Pas ze aan waar je iets anders wilt, en zet dan de vlag om.
+  betalingstermijnDagen: 14,
+  opzegtermijn: "één kalendermaand",
+  aansprakelijkheidscapMaanden: 12,
   aansprakelijkheidscapMaximum: null,
-  wijzigingstermijnDagen: null,
-  overmachtstermijnDagen: null,
+  wijzigingstermijnDagen: 30,
+  overmachtstermijnDagen: 60,
   cookiegebruik: null,
   cookieInstellingen: null,
   supabaseRegio: null,
   vercelRegio: null,
   versie: null,
   laatstGewijzigd: null,
+  contractvoorwaardenBevestigd: false,
 };
 
 /**
@@ -123,19 +139,54 @@ export const VELDLABELS: Record<keyof Bedrijfsgegevens, string> = {
   vercelRegio: "hostingregio Vercel",
   versie: "versienummer",
   laatstGewijzigd: "datum laatste wijziging",
+  contractvoorwaardenBevestigd: "akkoord op de contracttermijnen",
 };
+
+/**
+ * Velden die het document NIET tegenhouden, met de reden per stuk. Alles wat hier niet in staat
+ * is verplicht. Deze lijst hoort kort te blijven: elke uitzondering is een stukje document dat
+ * definitief kan heten terwijl het onvolledig is.
+ */
+export const NIET_BLOKKEREND = new Map<keyof Bedrijfsgegevens, string>([
+  // De brontekst noemt dit maximum zelf optioneel; een cap op basis van betaalde vergoeding
+  // staat ook zonder absoluut plafond. Leeg betekent hier "geldt niet", niet "weten we nog niet".
+  ["aansprakelijkheidscapMaximum", "art. 13 lid 1 noemt dit maximum zelf optioneel"],
+
+  // KvK en BTW: op verzoek van de eigenaar (24 augustus 2026) niet blokkerend, zodat de pagina's
+  // definitief kunnen zijn voordat de onderneming is ingeschreven.
+  //
+  // LET OP WAT DIT WEL EN NIET BETEKENT. Voor de AVG is het in orde: art. 13 vraagt om de
+  // identiteit en contactgegevens van de verwerkingsverantwoordelijke -- naam, adres, een
+  // werkend contactadres -- en niet om een registratienummer. Die drie blijven verplicht.
+  //
+  // Maar art. 3:15d BW (de e-commercebepaling) verplicht wie online een dienst aanbiedt wél om
+  // handelsregisternummer en BTW-identificatienummer permanent en makkelijk vindbaar te tonen.
+  // BEN JE INGESCHREVEN, DAN HOREN ZE ER DUS OP, en publiceren zonder is een bewuste
+  // tekortkoming en geen vergetelheid. Ze staan om die reden nog steeds in de tekst: zolang ze
+  // leeg zijn toont de pagina op die plek een zichtbare markering, alleen blokkeert hij de
+  // publicatie niet meer.
+  ["kvkNummer", "eigenaar publiceert vooruitlopend op inschrijving; art. 3:15d BW vraagt hem wél"],
+  ["btwNummer", "zelfde reden als kvkNummer: nog geen inschrijving, art. 3:15d BW vraagt hem wél"],
+]);
 
 /** Elk veld dat gevuld moet zijn voordat een document definitief mag heten. */
 export const VERPLICHTE_VELDEN = (Object.keys(VELDLABELS) as (keyof Bedrijfsgegevens)[]).filter(
-  (v) => v !== "aansprakelijkheidscapMaximum"
+  (v) => !NIET_BLOKKEREND.has(v)
 );
 
-/** De verplichte velden die nog leeg zijn, in de volgorde van VELDLABELS. */
+/**
+ * De verplichte velden die nog leeg zijn, in de volgorde van VELDLABELS.
+ *
+ * contractvoorwaardenBevestigd is een boolean en geen tekst: `false` is dáár de lege waarde, en
+ * niet een ingevulde "nee". Zonder dit onderscheid zou de vlag als ingevuld tellen zodra hij
+ * bestaat, en dan bewaakt hij niets.
+ */
 export function ontbrekendeVelden(
   gegevens: Bedrijfsgegevens = BEDRIJFSGEGEVENS
 ): (keyof Bedrijfsgegevens)[] {
   return VERPLICHTE_VELDEN.filter((veld) => {
     const waarde = gegevens[veld];
+    if (typeof waarde === "boolean") return !waarde;
     return waarde === null || waarde === undefined || `${waarde}`.trim() === "";
   });
 }

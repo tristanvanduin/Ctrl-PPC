@@ -27,14 +27,26 @@ Dit statement beschrijft beide rollen. Waar relevant, is aangegeven in welke hoe
 
 ### 2.2 Gegevens verwerkt namens Opdrachtgever (wij: verwerker)
 
-Via de door Opdrachtgever gekoppelde advertentieaccounts halen wij, met de door Opdrachtgever verstrekte API-autorisatie, campagne- en accountdata op bij **Google Ads, Meta (Facebook/Instagram) Ads en LinkedIn Ads**. Dit betreft in de kern **geaggregeerde, campagnegerichte prestatiedata**: vertoningen, klikken, kosten, conversies, doelgroep­segmenten (bijvoorbeeld op functieniveau of senioriteit, zoals aangeleverd door het advertentieplatform zelf, altijd op segment- en nooit op individueel niveau) en vergelijkbare statistieken.
+Via de door Opdrachtgever gekoppelde accounts halen wij, met de door Opdrachtgever verstrekte API-autorisatie, campagne-, account- en websitedata op bij **Google Ads, Meta (Facebook/Instagram) Ads, LinkedIn Ads, Google Analytics 4 en Google Search Console**. Dit betreft in de kern **geaggregeerde, campagnegerichte prestatiedata**: vertoningen, klikken, kosten, conversies, doelgroep­segmenten (bijvoorbeeld op functieniveau of senioriteit, zoals aangeleverd door het advertentieplatform zelf, altijd op segment- en nooit op individueel niveau) en vergelijkbare statistieken.
 
 * Deze data betreft in de regel **geen tot individuele consumenten herleidbare persoonsgegevens**: advertentieplatformen leveren doorgaans geaggregeerde cijfers op campagne-, advertentiegroep- of doelgroepsegmentniveau, niet op het niveau van een geïdentificeerd of identificeerbaar natuurlijk persoon. Dit geldt ook voor leadformulier-data van LinkedIn: wij lezen uitsluitend het aantal openingen en inzendingen per formulier, geen namen of contactgegevens van individuele leads.
 * Voor zover in specifieke gevallen toch persoonsgegevens onderdeel zijn van deze dataset (bijvoorbeeld een contactpersoon vermeld in klantnotities die Opdrachtgever zelf invoert), verwerken wij deze **uitsluitend in opdracht van en volgens instructies van Opdrachtgever**, als verwerker. De grondslag voor deze verwerking berust bij Opdrachtgever als verwerkingsverantwoordelijke.
-* Wij gebruiken deze data uitsluitend om de Dienst aan Opdrachtgever te leveren, en niet voor eigen doeleinden, behoudens geaggregeerde en/of geanonimiseerde statistiek zoals toegelicht in paragraaf 2.4.
+* Wij gebruiken deze data uitsluitend om de Dienst aan Opdrachtgever te leveren, en niet voor eigen doeleinden, behoudens geaggregeerde en/of geanonimiseerde statistiek zoals toegelicht in paragraaf 2.5.
+* Van **Google Analytics 4** lezen wij uitsluitend gerapporteerde, geaggregeerde statistieken (sessies, gebruikersaantallen, conversies en vergelijkbare maatstaven per kanaal, campagne of landingspagina), met de leesscope `analytics.readonly`. Van **Google Search Console** lezen wij vertoningen, klikken, posities en zoekopdrachten op siteniveau, met de leesscope `webmasters.readonly`. In beide gevallen gaat het om rapportagedata op geaggregeerd niveau; wij lezen geen individuele gebruikersprofielen, client-ID's of gebeurtenissen van een afzonderlijke bezoeker uit, en wij schrijven niets terug naar deze diensten.
 * De autorisatie (koppeling) die Opdrachtgever aan ons verleent, wordt niet als leesbare tekst opgeslagen: het toegangstoken zelf staat in een aparte, versleutelde kluis (zie paragraaf 7), niet in dezelfde tabel als de campagnedata.
 
-### 2.3 Gebruik van AI-modellen bij analyse en advisering
+* Alle koppelingen zijn **uitsluitend lezend**. Het Platform voert geen wijzigingen door in advertentieaccounts, en de gevraagde autorisaties bevatten geen beheerrechten.
+
+### 2.3 Google-gebruikersdata: beperkt gebruik (Limited Use)
+
+Op de data die wij via Google-API's ontvangen (Google Ads, Google Analytics 4 en Google Search Console) is aanvullend het **Google API Services User Data Policy** van toepassing, inclusief de **Limited Use**-eisen daarvan. Concreet betekent dat:
+
+* wij gebruiken deze data uitsluitend om de functies te leveren die Opdrachtgever in het Platform zichtbaar zijn, en voor geen enkel ander doel;
+* wij dragen deze data niet over aan derden, behalve aan de subverwerkers die nodig zijn om de Dienst te leveren (zie paragraaf 5), of wanneer de wet daartoe verplicht;
+* wij gebruiken deze data **niet** voor advertentiedoeleinden van onszelf of van anderen, en **niet** om modellen mee te trainen;
+* wij staan geen mens toe deze data te lezen, tenzij Opdrachtgever daar toestemming voor geeft, het nodig is voor beveiliging of foutopsporing, of de wet dat verlangt.
+
+### 2.4 Gebruik van AI-modellen bij analyse en advisering
 
 Het Platform gebruikt taalmodellen om op basis van de in 2.2 genoemde geaggregeerde prestatiedata analyses, samenvattingen, hypotheses en aanbevelingen te genereren. Deze modellen worden ontsloten via **OpenRouter**, dat als routeringslaag fungeert naar onderliggende modelaanbieders (afhankelijk van de taak, onder meer aanbieders van Claude-, Gemini- en Grok-achtige modellen).
 
@@ -42,18 +54,18 @@ Het Platform gebruikt taalmodellen om op basis van de in 2.2 genoemde geaggregee
 * Voor zover een AI-modelprovider daarbij optreedt als (sub)verwerker in de zin van de AVG, is dit opgenomen in ons subverwerkersoverzicht (paragraaf 5). Wij streven ernaar uitsluitend providers in te schakelen die contractueel toezeggen klantdata niet te gebruiken voor het trainen van hun modellen; dit wordt per daadwerkelijk actieve provider bevestigd en is op verzoek in te zien, in plaats van hier als vaststaand gegeven te worden gepresenteerd.
 * Door AI gegenereerde output is per definitie een geautomatiseerd gegenereerd advies. Er wordt geen besluit met rechtsgevolg of vergelijkbaar wezenlijk gevolg voor een natuurlijk persoon (in de zin van art. 22 AVG) op louter geautomatiseerde wijze genomen: de output betreft campagne-/marketingadvies aan een onderneming (Opdrachtgever), niet een geautomatiseerd besluit over een individuele betrokkene.
 
-### 2.4 Product- en dienstverbetering
+### 2.5 Product- en dienstverbetering
 
 Wij kunnen geaggregeerde en waar mogelijk geanonimiseerde gebruiksstatistieken (bijvoorbeeld: welke onderdelen van het Platform worden gebruikt, foutmeldingen, prestatiemetingen van het Platform zelf) gebruiken om de Dienst te verbeteren, op grond van ons gerechtvaardigd belang (art. 6 lid 1 sub f AVG) bij een goed functionerend product. Dit betreft geen analyse van de inhoud van klantcampagnes voor doeleinden buiten de dienstverlening aan de betreffende Opdrachtgever.
 
-### 2.5 Websitebezoekers
+### 2.6 Websitebezoekers
 
 Voor de publieke website (bijvoorbeeld de pagina's over prijzen, blog en contact) verwerken wij beperkte technische en analytische gegevens (zoals IP-adres, browsertype en bezochte pagina's), voor zover van toepassing via cookies zoals toegelicht in paragraaf 9. Grondslag: toestemming (voor niet-noodzakelijke cookies) respectievelijk gerechtvaardigd belang (voor strikt noodzakelijke, functionele cookies).
 
 ## 3. Herkomst van de gegevens
 
 * Accountgegevens: rechtstreeks verstrekt door Opdrachtgever bij aanmelding en gebruik van het Platform.
-* Campagne- en prestatiedata: opgehaald bij Google Ads, Meta en LinkedIn, op basis van de autorisatie (OAuth-koppeling) die Opdrachtgever aan Ctrl PPC verleent.
+* Campagne-, prestatie- en websitedata: opgehaald bij Google Ads, Meta, LinkedIn, Google Analytics 4 en Google Search Console, op basis van de autorisatie (OAuth-koppeling) die Opdrachtgever aan Ctrl PPC verleent.
 * Facturatiegegevens: rechtstreeks verstrekt door Opdrachtgever.
 
 ## 4. Geen verkoop van gegevens
@@ -70,7 +82,7 @@ Voor de uitvoering van de Dienst maken wij gebruik van de volgende categorieën 
 | Hostingplatform webapplicatie (Vercel) | Hosten en uitleveren van het Platform, uitvoeren van de dagelijkse synchronisatie | [REGIO/SCC'S BEVESTIGEN] |
 | AI-modelrouteringsdienst (OpenRouter) | Routeert analysetaken naar het voor die taak geschikte model | Verwerking (mogelijk) buiten de EER; doorgifte op basis van Standard Contractual Clauses c.q. een passend beschermingsniveau, te bevestigen |
 | Onderliggende modelaanbieders, geraadpleegd via OpenRouter (o.a. Anthropic-, Google- en xAI-modellen, afhankelijk van de aard van de analysetaak) | Genereren van analysetekst, samenvattingen en gestructureerde bevindingen op basis van geaggregeerde campagnedata | Verwerking (mogelijk) buiten de EER, per aanbieder te bevestigen |
-| Google Ads, Meta Ads, LinkedIn Ads | Bron van de campagne- en advertentieprestatiedata die Opdrachtgever laat koppelen | Treden hier niet op als onze subverwerker, maar als platform waarop Opdrachtgever (of diens klant) zelf verwerkingsverantwoordelijke is; wij lezen deze data uit met de door Opdrachtgever verleende autorisatie. Voor Google Ads geldt dat de leestoegang loopt via één technische koppeling op accountniveau van Ctrl PPC (een "manageraccount"), niet via een los token per Opdrachtgever |
+| Google Ads, Meta Ads, LinkedIn Ads, Google Analytics 4, Google Search Console | Bron van de campagne-, advertentieprestatie- en websitedata die Opdrachtgever laat koppelen | Treden hier niet op als onze subverwerker, maar als platform waarop Opdrachtgever (of diens klant) zelf verwerkingsverantwoordelijke is; wij lezen deze data uit met de door Opdrachtgever verleende autorisatie. Voor Google Ads geldt dat de leestoegang loopt via één technische koppeling op accountniveau van Ctrl PPC (een "manageraccount"), niet via een los token per Opdrachtgever |
 
 Met alle subverwerkers die persoonsgegevens buiten de Europese Economische Ruimte verwerken, zijn passende waarborgen overeengekomen (zoals de Standard Contractual Clauses van de Europese Commissie). Een actueel, volledig overzicht van subverwerkers, inclusief de op dat moment daadwerkelijk actieve modelaanbieders, is op verzoek beschikbaar via [E-MAILADRES].
 
@@ -121,7 +133,7 @@ Voor zover Ctrl PPC ten aanzien van uw gegevens optreedt als verwerkingsverantwo
 * **Bezwaar** tegen verwerking op grond van gerechtvaardigd belang;
 * **Intrekking van toestemming**, voor zover een verwerking op toestemming berust, zonder gevolgen voor de rechtmatigheid van de verwerking vóór de intrekking.
 
-U kunt deze rechten uitoefenen door contact op te nemen via [E-MAILADRES]. Wij reageren binnen de wettelijke termijn van één maand.
+U kunt deze rechten uitoefenen door contact op te nemen via [E-MAILADRES]. Wij reageren binnen de wettelijke termijn van één maand. Voor het specifieke geval van verwijdering staat de procedure stap voor stap op de pagina Data deletion (/data-deletion).
 
 Bent u gebruiker van het Platform via een Opdrachtgever (bijvoorbeeld als medewerker van een marketingbureau of als klant van dat bureau) en betreft uw verzoek gegevens waarvoor Opdrachtgever verwerkingsverantwoordelijke is? Dan verzoeken wij u zich in eerste instantie te wenden tot Opdrachtgever; wij ondersteunen Opdrachtgever desgevraagd bij de afhandeling van uw verzoek.
 

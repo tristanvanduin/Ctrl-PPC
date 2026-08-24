@@ -25,6 +25,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     statisch.push(
       { url: `${basis}/privacy`, changeFrequency: "yearly", priority: 0.3 },
       { url: `${basis}/terms`, changeFrequency: "yearly", priority: 0.3 },
+      { url: `${basis}/data-deletion`, changeFrequency: "yearly", priority: 0.3 },
     );
   }
   // getPublishedBlogPosts(), niet de ruwe BLOG_POSTS: er stonden hier ook de twee drafts

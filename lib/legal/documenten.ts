@@ -120,6 +120,14 @@ export function parseInline(
     }
     const veld = naam as keyof Bedrijfsgegevens;
     const waarde = gegevens[veld];
+    // Een boolean hoort niet in lopende tekst -- contractvoorwaardenBevestigd bewaakt de
+    // conceptpoort en is geen woord in een zin. Als er ooit toch {{contractvoorwaardenBevestigd}}
+    // in de tekst belandt, is dat een vergissing, en dan hoort de pagina dat te laten zien in
+    // plaats van "true" af te drukken.
+    if (typeof waarde === "boolean") {
+      nodes.push({ soort: "ontbreekt", label: VELDLABELS[veld] ?? veld });
+      continue;
+    }
     if (waarde === null || waarde === undefined || `${waarde}`.trim() === "") {
       // Het label i.p.v. de veldnaam: "[nog in te vullen: KvK-nummer]" leest voor een bezoeker
       // als een eerlijk gat, "[nog in te vullen: kvkNummer]" als een lek uit de codebase.
@@ -203,9 +211,10 @@ const PRIVACY_PARAGRAFEN: Paragraaf[] = [
       {
         soort: "alinea",
         tekst:
-          "Via de door Opdrachtgever gekoppelde advertentieaccounts halen wij, met de door Opdrachtgever " +
-          "verstrekte API-autorisatie, campagne- en accountdata op bij **Google Ads, Meta " +
-          "(Facebook/Instagram) Ads en LinkedIn Ads**. Dit betreft in de kern **geaggregeerde, " +
+          "Via de door Opdrachtgever gekoppelde accounts halen wij, met de door Opdrachtgever " +
+          "verstrekte API-autorisatie, campagne-, account- en websitedata op bij **Google Ads, Meta " +
+          "(Facebook/Instagram) Ads, LinkedIn Ads, Google Analytics 4 en Google Search Console**. " +
+          "Dit betreft in de kern **geaggregeerde, " +
           "campagnegerichte prestatiedata**: vertoningen, klikken, kosten, conversies, " +
           "doelgroepsegmenten (bijvoorbeeld op functieniveau of senioriteit, zoals aangeleverd door het " +
           "advertentieplatform zelf, altijd op segment- en nooit op individueel niveau) en vergelijkbare " +
@@ -227,13 +236,49 @@ const PRIVACY_PARAGRAFEN: Paragraaf[] = [
             "verwerkingsverantwoordelijke.",
           "Wij gebruiken deze data uitsluitend om de Dienst aan Opdrachtgever te leveren, en niet voor " +
             "eigen doeleinden, behoudens geaggregeerde en/of geanonimiseerde statistiek zoals toegelicht " +
-            "in paragraaf 2.4.",
+            "in paragraaf 2.5.",
+          "Van **Google Analytics 4** lezen wij uitsluitend gerapporteerde, geaggregeerde statistieken " +
+            "(sessies, gebruikersaantallen, conversies en vergelijkbare maatstaven per kanaal, campagne of " +
+            "landingspagina), met de leesscope `analytics.readonly`. Van **Google Search Console** lezen " +
+            "wij vertoningen, klikken, posities en zoekopdrachten op siteniveau, met de leesscope " +
+            "`webmasters.readonly`. In beide gevallen gaat het om rapportagedata op geaggregeerd niveau; " +
+            "wij lezen geen individuele gebruikersprofielen, client-ID's of gebeurtenissen van een " +
+            "afzonderlijke bezoeker uit, en wij schrijven niets terug naar deze diensten.",
           "De autorisatie (koppeling) die Opdrachtgever aan ons verleent, wordt niet als leesbare tekst " +
             "opgeslagen: het toegangstoken zelf staat in een aparte, versleutelde kluis (zie paragraaf 7), " +
             "niet in dezelfde tabel als de campagnedata.",
+          "Alle koppelingen zijn **uitsluitend lezend**. Het Platform voert geen wijzigingen door in " +
+            "advertentieaccounts, en de gevraagde autorisaties bevatten geen beheerrechten.",
         ],
       },
-      { soort: "subkop", tekst: "2.3 Gebruik van AI-modellen bij analyse en advisering" },
+
+      // 2.3 is nieuw (24 augustus 2026). Google eist voor de gevoelige leesscopes van GA4 en
+      // Search Console dat de verklaring benoemt welke Google-gebruikersdata je ophaalt, waarvoor,
+      // en dat je je aan de Limited Use-eisen houdt. Zonder deze paragraaf beschreef het document
+      // niet wat er daadwerkelijk wordt aangevraagd -- en dat is precies waar de verificatie op
+      // toetst. De oude 2.3 t/m 2.5 zijn een nummer opgeschoven.
+      { soort: "subkop", tekst: "2.3 Google-gebruikersdata: beperkt gebruik (Limited Use)" },
+      {
+        soort: "alinea",
+        tekst:
+          "Op de data die wij via Google-API's ontvangen (Google Ads, Google Analytics 4 en Google " +
+          "Search Console) is aanvullend het **Google API Services User Data Policy** van toepassing, " +
+          "inclusief de **Limited Use**-eisen daarvan. Concreet betekent dat:",
+      },
+      {
+        soort: "lijst",
+        items: [
+          "wij gebruiken deze data uitsluitend om de functies te leveren die Opdrachtgever in het " +
+            "Platform zichtbaar zijn, en voor geen enkel ander doel;",
+          "wij dragen deze data niet over aan derden, behalve aan de subverwerkers die nodig zijn om " +
+            "de Dienst te leveren (zie paragraaf 5), of wanneer de wet daartoe verplicht;",
+          "wij gebruiken deze data **niet** voor advertentiedoeleinden van onszelf of van anderen, en " +
+            "**niet** om modellen mee te trainen;",
+          "wij staan geen mens toe deze data te lezen, tenzij Opdrachtgever daar toestemming voor geeft, " +
+            "het nodig is voor beveiliging of foutopsporing, of de wet dat verlangt.",
+        ],
+      },
+      { soort: "subkop", tekst: "2.4 Gebruik van AI-modellen bij analyse en advisering" },
       {
         soort: "alinea",
         tekst:
@@ -260,7 +305,7 @@ const PRIVACY_PARAGRAFEN: Paragraaf[] = [
             "besluit over een individuele betrokkene.",
         ],
       },
-      { soort: "subkop", tekst: "2.4 Product- en dienstverbetering" },
+      { soort: "subkop", tekst: "2.5 Product- en dienstverbetering" },
       {
         soort: "alinea",
         tekst:
@@ -271,7 +316,7 @@ const PRIVACY_PARAGRAFEN: Paragraaf[] = [
           "inhoud van klantcampagnes voor doeleinden buiten de dienstverlening aan de betreffende " +
           "Opdrachtgever.",
       },
-      { soort: "subkop", tekst: "2.5 Websitebezoekers" },
+      { soort: "subkop", tekst: "2.6 Websitebezoekers" },
       {
         soort: "alinea",
         tekst:
@@ -294,8 +339,9 @@ const PRIVACY_PARAGRAFEN: Paragraaf[] = [
         items: [
           "Accountgegevens: rechtstreeks verstrekt door Opdrachtgever bij aanmelding en gebruik van het " +
             "Platform.",
-          "Campagne- en prestatiedata: opgehaald bij Google Ads, Meta en LinkedIn, op basis van de " +
-            "autorisatie (OAuth-koppeling) die Opdrachtgever aan Ctrl PPC verleent.",
+          "Campagne-, prestatie- en websitedata: opgehaald bij Google Ads, Meta, LinkedIn, Google " +
+            "Analytics 4 en Google Search Console, op basis van de autorisatie (OAuth-koppeling) die " +
+            "Opdrachtgever aan Ctrl PPC verleent.",
           "Facturatiegegevens: rechtstreeks verstrekt door Opdrachtgever.",
         ],
       },
@@ -356,8 +402,8 @@ const PRIVACY_PARAGRAFEN: Paragraaf[] = [
             "Verwerking (mogelijk) buiten de EER, per aanbieder te bevestigen",
           ],
           [
-            "Google Ads, Meta Ads, LinkedIn Ads",
-            "Bron van de campagne- en advertentieprestatiedata die Opdrachtgever laat koppelen",
+            "Google Ads, Meta Ads, LinkedIn Ads, Google Analytics 4, Google Search Console",
+            "Bron van de campagne-, advertentieprestatie- en websitedata die Opdrachtgever laat koppelen",
             "Treden hier niet op als onze subverwerker, maar als platform waarop Opdrachtgever (of diens " +
               "klant) zelf verwerkingsverantwoordelijke is; wij lezen deze data uit met de door " +
               "Opdrachtgever verleende autorisatie. Voor Google Ads geldt dat de leestoegang loopt via " +
@@ -535,7 +581,8 @@ const PRIVACY_PARAGRAFEN: Paragraaf[] = [
         soort: "alinea",
         tekst:
           "U kunt deze rechten uitoefenen door contact op te nemen via {{contactEmail}}. Wij reageren " +
-          "binnen de wettelijke termijn van één maand.",
+          "binnen de wettelijke termijn van één maand. Voor het specifieke geval van verwijdering staat " +
+          "de procedure stap voor stap op [[Data deletion|/data-deletion]].",
       },
       {
         soort: "alinea",
@@ -658,9 +705,9 @@ const VOORWAARDEN_PARAGRAFEN: Paragraaf[] = [
           "**Dienst**: het geheel van diensten dat Ctrl PPC via het Platform aan Opdrachtgever levert, " +
             "waaronder het ophalen, verwerken, analyseren en presenteren van advertentiedata, en het " +
             "genereren van AI-ondersteunde inzichten, hypotheses en aanbevelingen.",
-          "**Gekoppelde Platformen**: externe advertentie- en marketingplatformen waarmee Opdrachtgever " +
-            "het Platform laat koppelen, waaronder in elk geval Google Ads, Meta (Facebook/Instagram) Ads " +
-            "en LinkedIn Ads.",
+          "**Gekoppelde Platformen**: externe advertentie-, analyse- en marketingplatformen waarmee " +
+            "Opdrachtgever het Platform laat koppelen, waaronder in elk geval Google Ads, Meta " +
+            "(Facebook/Instagram) Ads, LinkedIn Ads, Google Analytics 4 en Google Search Console.",
           "**AI-modelproviders**: externe aanbieders van taalmodellen die door het Platform worden " +
             "geraadpleegd voor data-synthese, samenvatting en adviesgeneratie, waaronder in elk geval de " +
             "dienst OpenRouter en de daarachter liggende modelaanbieders.",
@@ -1117,4 +1164,138 @@ export const ALGEMENE_VOORWAARDEN: JuridischDocument = {
     "verwerkersovereenkomst voor.",
 };
 
-export const JURIDISCHE_DOCUMENTEN = [PRIVACY_STATEMENT, ALGEMENE_VOORWAARDEN];
+// ── Data deletion ──────────────────────────────────────────────────────────
+// Geen vertaling van een stuk uit het Privacy Statement, maar de aparte pagina die Meta bij App
+// Review vraagt als "Data Deletion Instructions URL": een bezoeker moet zonder account kunnen
+// lezen hoe hij verwijdering vraagt en wat er dan gebeurt. Privacy §8 verwijst ernaar.
+//
+// ENGELS, ANDERS DAN DE TWEE DOCUMENTEN HIERBOVEN. Die zijn Nederlands omdat het de nagelezen,
+// bindende contractteksten zijn. Dit is geen contract maar een instructie, en de twee lezers zijn
+// een reviewer van Meta of Google en een bezoeker van een Engelstalige site. Onderaan staat
+// dezelfde procedure in het Nederlands, zodat een Nederlandse betrokkene die zijn AVG-recht
+// uitoefent niet op een Engelse pagina wordt vastgezet.
+
+const DATA_DELETION_PARAGRAFEN: Paragraaf[] = [
+  {
+    id: "d1",
+    nummer: "§1",
+    titel: "What we hold",
+    korteTitel: "What we hold",
+    blokken: [
+      {
+        soort: "alinea",
+        tekst:
+          "Ctrl PPC is a B2B analytics platform. We hold three kinds of data about a customer: the " +
+          "account details of the people who log in, the advertising and website data we read from the " +
+          "platforms that customer connected (Google Ads, Meta Ads, LinkedIn Ads, Google Analytics 4, " +
+          "Google Search Console), and the analyses our platform generated from it.",
+      },
+      {
+        soort: "alinea",
+        tekst:
+          "We never receive login credentials for those platforms. What we hold is an access token, " +
+          "stored in a separate encrypted vault, that lets us **read** reporting data. We do not write " +
+          "anything back.",
+      },
+    ],
+  },
+  {
+    id: "d2",
+    nummer: "§2",
+    titel: "How to request deletion",
+    korteTitel: "How to request deletion",
+    blokken: [
+      {
+        soort: "genummerd",
+        items: [
+          "**Disconnect the platform.** In Ctrl PPC, open Settings and disconnect the account you want " +
+            "us to stop reading. You can also revoke our access from the platform's own side: in Google " +
+            "through your Google Account's third-party access settings, in Meta through Business " +
+            "Settings, in LinkedIn through your account's permitted services. From that moment we can no " +
+            "longer read new data.",
+          "**Email us to erase what we already hold.** Send a message to {{contactEmail}} from the " +
+            "address associated with the account, naming the customer or client account concerned. " +
+            "Disconnecting stops new data coming in; it does not by itself erase what is already stored.",
+          "**We confirm what will go, then erase it.** We reply with an inventory of what is held for " +
+            "that account, and once you confirm, we erase it. We respond within one month, the statutory " +
+            "period under Article 12(3) GDPR.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "d3",
+    nummer: "§3",
+    titel: "What is erased, and what is kept",
+    korteTitel: "What is erased, and what is kept",
+    blokken: [
+      {
+        soort: "alinea",
+        tekst:
+          "Erasure covers the account data, the campaign and website data read from connected platforms, " +
+          "the generated analyses and reports, and the stored access tokens. Two categories survive, and " +
+          "we would rather say so here than surprise you afterwards:",
+      },
+      {
+        soort: "lijst",
+        items: [
+          "**Invoicing and accounting records**, for the seven-year statutory retention period under " +
+            "Dutch tax law (Article 52 AWR). We are not permitted to erase these on request.",
+          "**Aggregated, anonymised statistics** that can no longer be traced to an account, person or " +
+            "campaign. These are no longer personal data, and erasing them would not add any protection.",
+        ],
+      },
+      {
+        soort: "alinea",
+        tekst:
+          "See the [[Privacy Statement|/privacy]] for the retention period of each category, and the " +
+          "[[Terms of Service|/terms]] for what happens to your data when an agreement ends.",
+      },
+    ],
+  },
+  {
+    id: "d4",
+    nummer: "§4",
+    titel: "In het Nederlands",
+    korteTitel: "In het Nederlands",
+    blokken: [
+      {
+        soort: "alinea",
+        tekst:
+          "Wilt u dat wij uw gegevens verwijderen? Verbreek de koppeling in Ctrl PPC onder Instellingen " +
+          "(of trek onze toegang in bij Google, Meta of LinkedIn zelf) en stuur daarna een bericht aan " +
+          "{{contactEmail}} vanaf het e-mailadres dat bij het account hoort, met vermelding van de klant " +
+          "of het account waar het om gaat. Het verbreken van de koppeling stopt de aanvoer van nieuwe " +
+          "data; het wist niet uit zichzelf wat er al staat.",
+      },
+      {
+        soort: "alinea",
+        tekst:
+          "Wij sturen u een overzicht van wat er voor dat account bewaard wordt, en verwijderen het na " +
+          "uw bevestiging. Wij reageren binnen één maand (art. 12 lid 3 AVG). Facturatie- en " +
+          "administratiegegevens houden wij zeven jaar, omdat de fiscale bewaarplicht (art. 52 AWR) ons " +
+          "dat voorschrijft; geanonimiseerde, niet meer herleidbare statistiek blijft eveneens bestaan. " +
+          "Zie het [[Privacy Statement|/privacy]] voor de bewaartermijn per categorie.",
+      },
+    ],
+  },
+];
+
+export const DATA_DELETION: JuridischDocument = {
+  slug: "data-deletion",
+  titel: "Data deletion",
+  taalnoot:
+    "Deze pagina staat in het Engels omdat hij ook door reviewers van Google en Meta gelezen wordt. " +
+    "Paragraaf 4 geeft dezelfde procedure in het Nederlands.",
+  inleiding:
+    "This page explains how to have data held by {{handelsnaam}} erased, and what happens once you " +
+    "ask. It covers customers of Ctrl PPC and anyone whose data reached us through a customer. For " +
+    "the full picture of what we process and why, see the [[Privacy Statement|/privacy]].",
+  paragrafen: DATA_DELETION_PARAGRAFEN,
+  slotnoot:
+    "Bent u eindgebruiker en heeft een marketingbureau uw gegevens in Ctrl PPC gezet, dan is dat bureau " +
+    "de verwerkingsverantwoordelijke en wij de verwerker. Richt uw verzoek dan in eerste instantie tot " +
+    "dat bureau; wij ondersteunen hen bij de afhandeling.",
+};
+
+export const JURIDISCHE_DOCUMENTEN = [PRIVACY_STATEMENT, ALGEMENE_VOORWAARDEN, DATA_DELETION];

@@ -13,7 +13,7 @@ export default function robots(): MetadataRoute.Robots {
       // noindex-meta (zie de twee page.tsx'en), en die kan een crawler alleen lezen als hij de
       // pagina mag ophalen. Disallow zou het tegenovergestelde bereiken van wat het lijkt: de
       // pagina blijft dan zonder inhoud in de index hangen omdat de noindex nooit gezien wordt.
-      allow: ["/", "/how-it-works", "/pricing", "/vs", "/faq", "/blog", "/blog/", "/demo", "/privacy", "/terms"],
+      allow: ["/", "/how-it-works", "/pricing", "/vs", "/faq", "/blog", "/blog/", "/demo", "/privacy", "/terms", "/data-deletion"],
       disallow: [
         "/login",
         "/auth/",
