@@ -343,9 +343,29 @@ vult ook `meta_account_daily` en `linkedin_account_daily`, en `app/api/eval/repl
 fixtures string-gelijk opnieuw af met een expliciet model op temperatuur 0, met een `confirm`-rem
 tegen onbedoelde kosten. Wat ontbreekt is de brug ertussen.
 
+De demo-data is al opvallend compleet: 22 Google-tabellen plus `meta_account_daily`,
+`meta_campaign_daily`, `meta_ad_daily`, `meta_breakdown_daily`, `linkedin_campaign_daily`,
+`linkedin_creative_daily` en `linkedin_demographic_daily`. Er is één echt gat, precies op het niveau
+dat er bij Meta het meest toe doet.
+
+Deterministic:
+- `meta_adsets` en `meta_adset_daily` ontbreken volledig in `lib/demo/demo-rows.ts`, terwijl alle drie
+  de cadansen ze lezen: weekly (`route.ts:335`), bi-weekly (`route.ts:424`) en monthly
+  (`lib/meta/analysis-data.ts:149`). Ad set is bij Meta het niveau waar budget en doelgroep leven.
+  Af te leiden uit `meta_campaign_daily` met dezelfde `splitInt`-methode die `google-sop-demo.ts` al
+  gebruikt, zodat de som exact terugkomt op het campagnetotaal.
+- `client_settings.linkedin_icp` is geen tabel maar een configuratieveld, en is in de demo-rij niet
+  gevuld. Zonder dat blijft LinkedIn pijler 4 beschrijvend zonder fit-score. Eén waarde.
+- `meta_creative_patterns`, `meta_creative_visual_features`, `meta_change_log` en
+  `linkedin_lead_forms` mogen leeg blijven: die hebben een uitgeschreven geen-data-uitweg in de prompt.
+
+Werk:
 - Rookproef-script: alle negen combinaties op de demo-klant, faalt op 404, 500, lege stap of
   niet-gehaalde quality gate. Buiten `gates.sh` houden (die moet snel blijven), zoals
   `check-kaartoverloop.mjs`.
+- De rookproef eist niet dat alles gevuld is, maar dat leegte eerlijk landt: waar een bron ontbreekt
+  moet de gedocumenteerde uitwijkzin verschijnen en geen bewering met cijfers. Dat toetst precies de
+  faalwijze die tsc, de tests en de build niet zien.
 - Eén fixture-set per kanaal per cadans vastleggen.
 - Replay twee keer op dezelfde fixture, spreiding rapporteren. Dat is de enige eerlijke meting van de
   as "consistentie".
@@ -397,6 +417,11 @@ Pas hier, want dit is het enige echte redactiewerk, en zonder fase 0 niet te beo
   learning-limited-status, LinkedIn objective/format-mismatch.
 - Bi-weekly stap 3 en 4 hermappen op de zes pijlers; kopcommentaar bijwerken.
 - Google's nummering normaliseren naar 1–8.
+
+Eén grens is eerlijk te benoemen: zolang de MDP-goedkeuring uitblijft haalt Meta op demo-data wel alle
+bedrading en handhaving, maar niet de bevestiging dat benchmarks en drempels tegen echte Meta-cijfers
+kloppen. Meta-specifiek promptwerk (fase 5) is daarmee de enige post die beter kan wachten tot de data
+loopt; al het overige Meta-werk zit in fase 2 en 4 en is nu af te ronden.
 
 Inferred: fase 0 t/m 4 is vrijwel volledig bedrading — bestaande modules aan bestaande aanroepers
 knopen. Daarom is 8+ op elke as haalbaar zonder herbouw.
