@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Zap, TrendingUp, Calendar, Flag, Target } from "lucide-react";
-import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
 import { today as vandaag } from "@/lib/reporting-date";
 import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { berekenMaandPacing } from "@/lib/kanalen/maand-pacing";
-import {
-  resolveChannelConversionConfig,
-  sumSelectedConversions,
-  selectedConversionLabels,
-  type ChannelConversionConfig,
-} from "@/lib/analysis/channel-conversion-config";
-import { CONFIG, eur, fmt, type ChannelKind, type DailyRow } from "./channel-performance";
+import { useKanaalDagen } from "@/lib/kanalen/use-kanaal-dagen";
+import { eur, fmt, type ChannelKind } from "./channel-performance";
 import { PacingRing } from "./pacing-monitor";
 import { Laadvlak } from "@/components/ui/laadvlak";
 
@@ -25,52 +19,23 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 // nodig, wel eerlijk tempo. De rekenkern staat in lib/kanalen/maand-pacing.ts en wordt gedeeld met
 // channel-performance.tsx, dat hem al gebruikte.
 //
-// Waarom een eigen, KLEINE fetch en niet die van ChannelPerformance: die haalt 200 dagen account-
-// EN campagnedata plus campagnenamen op, voor de maandtabel en de beurs-splitsing. Deze kaart
-// heeft aan de huidige en de vorige maand genoeg. Dat is geen tweede kopie van dezelfde query maar
-// een aantoonbaar kleinere.
+// Waarom een eigen, KLEIN venster en niet dat van ChannelPerformance: die haalt 200 dagen account-
+// EN campagnedata plus campagnenamen op, voor de maandtabel en de beurs-splitsing. Deze kaart heeft
+// aan de huidige en de vorige maand genoeg. De fetch zelf is wel gedeeld (useKanaalDagen), zodat er
+// niet twee plekken zijn die elk hun eigen idee hebben van welke velden als conversie tellen.
 
 export function ChannelPacing({ clientId, channel, edition }: {
   clientId: string;
   channel: ChannelKind;
   edition?: UpcomingEdition | null;
 }) {
-  const cfg = CONFIG[channel];
-  const [rijen, setRijen] = useState<DailyRow[] | null>(null);
-  const [convConfig, setConvConfig] = useState<ChannelConversionConfig>(() => resolveChannelConversionConfig(null));
-
-  useEffect(() => {
-    let cancelled = false;
-    setRijen(null);
-    // 70 dagen: genoeg om de volle vorige maand te dekken ook op dag 1 van de huidige.
-    const since = new Date(Date.now() - 70 * 86_400_000).toISOString().slice(0, 10);
-    Promise.all([
-      dbSelect<Record<string, unknown>>(cfg.accountTable, {
-        select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }],
-      }),
-      dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", {
-        select: "channel_conversion_config", clientId,
-      }),
-    ]).then(([accRes, settingsRes]) => {
-      if (cancelled) return;
-      setRijen(((accRes.data ?? []) as unknown as Record<string, unknown>[]).map(cfg.map));
-      setConvConfig(resolveChannelConversionConfig(
-        (settingsRes.data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null,
-      ));
-    }, () => { if (!cancelled) setRijen([]); });
-    return () => { cancelled = true; };
-  }, [clientId, cfg]);
-
-  const convLabel = selectedConversionLabels(cfg.channelKey, convConfig).join(" + ");
+  // 70 dagen: genoeg om de volle vorige maand te dekken, ook op dag 1 van de huidige.
+  const { rijen, convVan, convLabel } = useKanaalDagen(clientId, channel, 70);
 
   const pacing = useMemo(() => {
     if (!rijen || rijen.length === 0) return null;
-    return berekenMaandPacing(
-      rijen,
-      (r) => sumSelectedConversions(r.convFields, cfg.channelKey, convConfig),
-      vandaag(),
-    );
-  }, [rijen, cfg.channelKey, convConfig]);
+    return berekenMaandPacing(rijen, convVan, vandaag());
+  }, [rijen, convVan]);
 
   if (rijen === null) return <Laadvlak vorm="grafiek" hoogte={200} titel="Pacing" />;
   if (!pacing) return null;

@@ -7,6 +7,7 @@ import { actieveMetrics, computeForecast, type ForecastMetric } from "@/lib/fore
 import { getClientSettings } from "@/lib/client-settings";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas } from "@/lib/forecast-format";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { KlikbareKaart } from "@/components/ui/klikbare-kaart";
 
 interface KpiCardProps {
   label: string;
@@ -33,18 +34,8 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
   const StatusIcon = isPositive ? TrendingUp : TrendingDown;
   const statusColor = isPositive ? "text-green-600" : "text-red-500";
   const statusBg = isPositive ? "bg-green-50" : "bg-red-50";
-  const clickable = metricKey !== undefined && onSelect !== undefined;
-
   return (
-    <div
-      role={clickable ? "button" : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      onClick={clickable ? () => onSelect(metricKey) : undefined}
-      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(metricKey); } } : undefined}
-      className={`bg-card rounded-xl border p-5 shadow-sm transition-colors ${
-        clickable ? "cursor-pointer hover:border-brand-blue/40" : ""
-      } ${selected ? "border-brand-blue ring-1 ring-brand-blue/30" : "border-border"}`}
-    >
+    <KlikbareKaart waarde={metricKey} geselecteerd={selected} onKies={onSelect}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
@@ -107,7 +98,7 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
           <span>100%</span>
         </div>
       </div>
-    </div>
+    </KlikbareKaart>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Megaphone, Calendar, LayoutGrid, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
+import { Megaphone, Calendar, CalendarClock, LayoutGrid, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
 import { ChannelBleedersTable } from "./channel-bleeders-table";
@@ -14,6 +14,8 @@ import { ChannelViewHeader } from "./channel-view-header";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
 import { ChannelPacing } from "./channel-pacing";
+import { ChannelMonthlyChart } from "./channel-monthly-chart";
+import { ChannelFairWeeks } from "./channel-fair-weeks";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
@@ -139,13 +141,33 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
       </div>
 
-      <GeoRanglijstCard state={geo} zonderBalken />
+      {/* De maandverloop-grafiek naast de landencijfers. Allebei "wat leverde het op", allebei
+          inhoudsgestuurd, en de grafiek pakt de resthoogte als de landenkaart hoger uitvalt. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ChannelMonthlyChart clientId={clientId} channel="meta" />
+        <GeoRanglijstCard state={geo} zonderBalken />
+      </div>
 
-      {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
+      {/* "Prestaties richting de beurs" -- de sectie die Google al had en deze kanalen niet.
+          Alleen als er een event gekozen is; zonder event is "nog N weken tot" een lege zin.
+          Zie channel-fair-weeks.tsx voor waarom hij hier ontbrak: niet de cijfers maar de ingang. */}
+      {edition && (
+        <Sectie
+          icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Prestaties richting de beurs"
+          bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+        >
+          <ChannelFairWeeks clientId={clientId} channel="meta" edition={edition} />
+        </Sectie>
+      )}
+
+      {/* Wat er van de prestatie-view overblijft: de kerncijfers over 28 dagen en de maandtabel.
+          Pacing staat nu in de hero en het maandverloop naast de landencijfers -- allebei
+          losgetrokken omdat ze de vraag beantwoorden die je bovenaan stelt, niet onderaan. */}
       <Sectie
         icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Maandprestaties"
-        bijschrift="Kerncijfers, pacing en het maandverloop"
+        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
       >
         <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} />
       </Sectie>

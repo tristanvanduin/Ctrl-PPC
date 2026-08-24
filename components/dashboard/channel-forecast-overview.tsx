@@ -11,11 +11,13 @@ import { resolveChannelConversionConfig, sumSelectedConversions, type ChannelCon
 import { buildChannelForecast } from "@/lib/analysis/channel-forecast-data";
 import type { TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { actieveMetrics, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
+import type { ClientHistoricalData } from "@/lib/types";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas, formatterFor, METRIC_LABELS } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { KlikbareKaart } from "@/components/ui/klikbare-kaart";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { CONFIG, type ChannelKind, type DailyRow } from "./channel-performance";
 
@@ -31,6 +33,9 @@ import { CONFIG, type ChannelKind, type DailyRow } from "./channel-performance";
 
 const TARGET_CHANNEL: Record<ChannelKind, string> = { meta: "meta_ads", linkedin: "linkedin_ads" };
 
+/** null = nog aan het laden, "leeg" = geen dagcijfers gesynced, anders de opgebouwde forecast. */
+export type ChannelForecastState = { data: ClientHistoricalData; forecast: ClientForecast } | null | "leeg";
+
 function formatYAxis(metric: ForecastMetric) {
   if (metric === "revenue") return (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", notation: "compact", maximumFractionDigits: 0 }).format(v);
   if (metric === "roas") return (v: number) => `${v.toFixed(1)}x`;
@@ -38,8 +43,12 @@ function formatYAxis(metric: ForecastMetric) {
   return (v: number) => new Intl.NumberFormat("nl-NL", { notation: "compact" }).format(v);
 }
 
-function useChannelForecast(clientId: string, channel: ChannelKind): ClientForecast | null | "leeg" {
-  const [forecast, setForecast] = useState<ClientForecast | null | "leeg">(null);
+/** De forecast én de historische data waaruit hij is opgebouwd. Dat tweede is nodig zodra een
+ *  andere weergave dan de jaargrafiek hem gebruikt: FairWeeksOverview leest `data.currentYear` om
+ *  de weken tegen het jaardoel af te zetten. Geëxporteerd zodat meta-view en linkedin-view de
+ *  beurs-sectie kunnen voeden zonder de fetch nog een keer te schrijven. */
+export function useChannelForecast(clientId: string, channel: ChannelKind): ChannelForecastState {
+  const [forecast, setForecast] = useState<ChannelForecastState>(null);
   const cfg = CONFIG[channel];
 
   useEffect(() => {
@@ -70,7 +79,7 @@ function useChannelForecast(clientId: string, channel: ChannelKind): ClientForec
         validFrom: r.valid_from, validTo: r.valid_to,
       }));
       const built = buildChannelForecast(clientId, rows, targetRows, TARGET_CHANNEL[channel], vandaag());
-      setForecast(built ? built.forecast : "leeg");
+      setForecast(built ?? "leeg");
     }, () => { if (!cancelled) setForecast("leeg"); });
 
     return () => { cancelled = true; };
@@ -79,7 +88,12 @@ function useChannelForecast(clientId: string, channel: ChannelKind): ClientForec
   return forecast;
 }
 
-function KpiTegel({ metric, forecast }: { metric: ForecastMetric; forecast: ClientForecast }) {
+function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
+  metric: ForecastMetric;
+  forecast: ClientForecast;
+  geselecteerd?: boolean;
+  onKies?: (m: ForecastMetric) => void;
+}) {
   const ICON: Record<ForecastMetric, ReactNode> = {
     conversions: <Target className="w-4 h-4 text-brand-blue-ink" />,
     revenue: <DollarSign className="w-4 h-4 text-brand-blue-ink" />,
@@ -92,7 +106,10 @@ function KpiTegel({ metric, forecast }: { metric: ForecastMetric; forecast: Clie
   const realizedPct = kpi.annualTarget > 0 ? (kpi.ytdRealized / kpi.annualTarget) * 100 : 0;
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+    // Klikbaar, net als Google's jaaroverzicht-kaartjes: een klik zet de grafiek eronder op deze
+    // metric. Dezelfde schil (components/ui/klikbare-kaart.tsx), zodat rol, tabvolgorde en
+    // toetsbediening op beide tabbladen hetzelfde zijn.
+    <KlikbareKaart waarde={metric} geselecteerd={geselecteerd} onKies={onKies}>
       <div className="flex items-center gap-2.5 mb-4">
         <div className="w-8 h-8 rounded-lg bg-brand-blue/10 flex items-center justify-center">{ICON[metric]}</div>
         <h3 className="text-title font-semibold text-brand-blue-ink">{METRIC_LABELS[metric]}</h3>
@@ -124,7 +141,7 @@ function KpiTegel({ metric, forecast }: { metric: ForecastMetric; forecast: Clie
           </div>
         </div>
       )}
-    </div>
+    </KlikbareKaart>
   );
 }
 
@@ -177,11 +194,12 @@ function ForecastChart({ forecast, metric, onMetricChange }: { forecast: ClientF
 }
 
 export function ChannelForecastOverview({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
-  const forecast = useChannelForecast(clientId, channel);
+  const gebouwd = useChannelForecast(clientId, channel);
   const [metric, setMetric] = useState<ForecastMetric>("conversions");
 
-  if (forecast === null) return <Laadvlak vorm="grafiek" hoogte={280} titel="Jaaroverzicht" />;
-  if (forecast === "leeg") return null; // geen dagcijfers gesynced: niets te tonen
+  if (gebouwd === null) return <Laadvlak vorm="grafiek" hoogte={280} titel="Jaaroverzicht" />;
+  if (gebouwd === "leeg") return null; // geen dagcijfers gesynced: niets te tonen
+  const forecast = gebouwd.forecast;
 
   const actief = actieveMetrics(forecast);
   const zichtbareMetric = actief.includes(metric) ? metric : actief[0];
@@ -189,7 +207,15 @@ export function ChannelForecastOverview({ clientId, channel }: { clientId: strin
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {actief.map((m) => <KpiTegel key={m} metric={m} forecast={forecast} />)}
+        {actief.map((m) => (
+          <KpiTegel
+            key={m}
+            metric={m}
+            forecast={forecast}
+            geselecteerd={zichtbareMetric === m}
+            onKies={setMetric}
+          />
+        ))}
       </div>
       <ForecastChart forecast={forecast} metric={zichtbareMetric} onMetricChange={setMetric} />
     </div>

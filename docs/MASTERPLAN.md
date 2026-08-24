@@ -8343,3 +8343,51 @@ kaarten niet vinden en zei letterlijk "deze uitslag zegt niets". Zonder die zelf
 twee groene runs gerapporteerd over een dode server. Server opnieuw gestart op de verse build:
 vijftien schermen schoon en de zelftest vindt zijn 9 bevindingen weer.
 
+
+### 17.120 Maandverloop losgetrokken, en waarom Meta/LinkedIn de beurs-sectie misten (23 augustus 2026)
+
+Drie vragen in één bericht, en de laatste twee waren de interessantste.
+
+**"Trek dat maandverloop ook los."** De grafiek stond middenin `channel-performance.tsx`, tussen de
+kerncijfers en de maandtabel, en kon daardoor alleen over de volle breedte onderaan staan. Nu een
+eigen kaart (`channel-monthly-chart.tsx`) naast de landencijfers. Zes maanden staven worden niet
+beter van 1600px, en de kaart ernaast had gezelschap nodig.
+
+**"Waarom hebben Meta en LinkedIn deze sectie niet?"** — over "Prestaties richting de beurs".
+Nagekeken: het Jaaroverzicht hádden ze wel (`ChannelForecastOverview`), de beurs-sectie niet. En
+niet omdat de cijfers ontbraken: `buildChannelForecast` levert voor deze kanalen exact dezelfde
+twee vormen als Google's forecast — `ClientHistoricalData` + `ClientForecast`, inclusief de
+`weeklyPoints` waar de weekkolommen op draaien. Wat ontbrak was een INGANG:
+`FairWeeksOverview` haalde data en forecast zélf uit `ClientDataProvider`, en die provider is
+Google-only. Dat is dezelfde vorm van koppeling die PacingMonitor Google-only maakte.
+
+De reparatie is een splitsing, geen kopie: `FairWeeksView` neemt data en forecast als PROPS,
+`FairWeeksOverview` blijft de Google-ingang die ze uit de provider haalt, en `ChannelFairWeeks`
+doet hetzelfde met de kanaal-forecast. Eén weergave, drie kanalen.
+
+**Waarbij meteen een eerlijkheidsprobleem opdook.** Meta en LinkedIn hebben (nog) geen jaardoelen
+in `client_targets`, dus spreidt `toFairWeeks` een doel van nul over de weken: `expected = 0`,
+`ratio = 0`. Het eerste resultaat was een weekraster vol rode "0%" naast een gerealiseerde 42, en
+groene "+0,0%"-pijlen in de drie weekkaarten. Dat leest als "je haalt niets" terwijl er niets te
+halen viel. Nu bepaalt `heeftVerwachting = weken.some(w => w.expected > 0)` of de verwachting, de
+ratio, de balk en de deltapijl überhaupt getoond worden, en zegt de kop het ronduit: "geen jaardoel
+ingesteld voor dit kanaal, dus alleen het gerealiseerde". Een lege plek is eerlijker dan een nul
+die iets anders betekent dan hij lijkt — regel 3 van de vertrouwensdoctrine.
+
+**"Waarom is bij Google het wel klikbaar en bij Meta en LinkedIn niet? Voor de record, clickable
+is de way to go."** Klopt: `metric-cards.tsx` (Google) had rol, tabindex, Enter/spatie en een
+selectierand, `channel-forecast-overview.tsx` had een kale `<div>`. De klik-schil staat nu één keer
+in `components/ui/klikbare-kaart.tsx` en wordt door allebei gebruikt. Twee kopieën van dit gedrag
+lopen binnen een maand uit elkaar op precies de dingen die je niet ziet tenzij je met een
+toetsenbord werkt.
+
+**Nog een gedeelde fetch.** Er hingen inmiddels drie kaarten aan dezelfde twee queries
+(pacing-kaart, maandverloop, prestatieview), elk met hun eigen "haal de dagtabel op, haal
+client_settings op, los de conversie-selectie op". Die staat nu één keer in
+`lib/kanalen/use-kanaal-dagen.ts`, met het venster als parameter: 70 dagen voor pacing, 200 voor
+het maandverloop. Zonder dat zouden twee kaarten op hetzelfde scherm ooit iets anders als "een
+conversie" tellen.
+
+**Opgeruimd:** "Maandprestaties" stond twee keer op het scherm (de sectiekop en de maandtabel
+erbinnen); de tabel heet nu "Per maand", en het bijschrift van de sectie klopt weer nu pacing en
+maandverloop eruit zijn.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Briefcase, Calendar, LayoutGrid, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
+import { Briefcase, Calendar, CalendarClock, LayoutGrid, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
 import { ChannelBleedersTable } from "./channel-bleeders-table";
@@ -14,6 +14,8 @@ import { ChannelViewHeader } from "./channel-view-header";
 import { BreakdownDonuts } from "./breakdown-donuts";
 import { ChannelHealthBadge } from "./channel-health-badge";
 import { ChannelPacing } from "./channel-pacing";
+import { ChannelMonthlyChart } from "./channel-monthly-chart";
+import { ChannelFairWeeks } from "./channel-fair-weeks";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
@@ -126,11 +128,28 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         <GeoRanglijstCard state={geo} zonderBalken />
       </div>
 
-      {/* Volwaardige prestatie-view: KPI's, pacing, grafiek, maand- en campagnetabel. */}
+      <ChannelMonthlyChart clientId={clientId} channel="linkedin" />
+
+      {/* "Prestaties richting de beurs" -- de sectie die Google al had en deze kanalen niet.
+          Alleen als er een event gekozen is; zonder event is "nog N weken tot" een lege zin.
+          Zie channel-fair-weeks.tsx voor waarom hij hier ontbrak: niet de cijfers maar de ingang. */}
+      {edition && (
+        <Sectie
+          icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Prestaties richting de beurs"
+          bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+        >
+          <ChannelFairWeeks clientId={clientId} channel="linkedin" edition={edition} />
+        </Sectie>
+      )}
+
+      {/* Wat er van de prestatie-view overblijft: de kerncijfers over 28 dagen en de maandtabel.
+          Pacing staat nu in de hero en het maandverloop naast de landencijfers -- allebei
+          losgetrokken omdat ze de vraag beantwoorden die je bovenaan stelt, niet onderaan. */}
       <Sectie
         icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Maandprestaties"
-        bijschrift="Kerncijfers, pacing en het maandverloop"
+        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
       >
         <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} />
       </Sectie>

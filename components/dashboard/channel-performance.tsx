@@ -7,7 +7,6 @@ import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { today as vandaag } from "@/lib/reporting-date";
-import { MonthlyTrendChart } from "./monthly-trend-chart";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { useVorige } from "@/lib/use-vorige";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
@@ -206,7 +205,6 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
   const { fullMonths, recent, prior } = derived;
   const cpa = (a: Agg): number | null => (a.conv > 0 ? a.spend / a.conv : null);
   const ctr = (a: Agg): number | null => (a.impressions > 0 ? a.clicks / a.impressions : null);
-  const chartData = fullMonths.map(([m, a]) => ({ maand: m, spend: Math.round(a.spend), lijn: Math.round(a.conv) }));
 
   const kpis: { label: string; value: string; delta: number | null; hogerIsBeter: boolean }[] = [
     { label: "Spend (28d)", value: eur(recent.spend), delta: deltaPct(recent.spend, prior.spend), hogerIsBeter: false },
@@ -253,20 +251,16 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
           lib/kanalen/maand-pacing.ts, zodat er niet twee definities van "vorige maand tot dezelfde
           dag" naast elkaar leven. */}
 
-      {/* Maandverloop. Stond hier als eigen ComposedChart met spend links en conversies rechts —
-          dezelfde dubbele as en dezelfde opbouw als MonthlyTrendChart, dus twee kopieën van
-          hetzelfde probleem. Nu één component, dat de twee metrieken onder elkaar zet. */}
-      <MonthlyTrendChart
-        title="Maandverloop"
-        lineLabel={convLabel}
-        data={chartData.map((d) => ({ maand: d.maand, spend: d.spend, lijn: d.lijn }))}
-      />
+      {/* De maandverloop-grafiek stond hier. Verhuisd naar channel-monthly-chart.tsx en naar de
+          rij naast de landencijfers: middenin deze sectie kon hij alleen over de volle breedte
+          staan, terwijl zes maanden staven daar niet beter van worden en de kaart ernaast wél
+          gezelschap kreeg. */}
 
       {/* Maandtabel */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">
           <Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />
-          <h3 className="text-title font-semibold text-brand-gray">Maandprestaties</h3>
+          <h3 className="text-title font-semibold text-brand-gray">Per maand</h3>
         </div>
         {/* De gedeelde tabelcomponenten: zelfde ritme, sorteerbare opmaak, aandeelstrepen en een
             totaalregel als bij de dertien andere schermen. Handgeschreven <table> stond hier met
