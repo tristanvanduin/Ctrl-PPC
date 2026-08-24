@@ -8569,3 +8569,27 @@ Twee dingen die daarbij misgingen en pas op de schermafdruk zichtbaar waren:
 
 **Gemeten na afloop, kolomhoogtes op 1920px:** Google 765/765, Meta 794/794, LinkedIn 841/841, en
 geen enkele pagefout op de drie tabbladen.
+
+**Naschrift: één blended lijn in plaats van drie.** "Ik wil 1 blended lijn zien in de matrix. Niet
+3 lijnen." De drie polygonen waren leesbaar zolang ze uit elkaar lagen; bij vijf of tien kanalen
+wordt dat een kluwen, en de cijfers per kanaal staan er rechts toch al uitgesplitst naast. De radar
+zegt nu "hoe staat het account ervoor", de regels ernaast "en waar zit het verschil".
+
+Dat mag hier, terwijl een blended TOTAALCIJFER dat niet mag, en het verschil is precies aan te
+wijzen: **de factorscores zijn al genormaliseerd.** Elke as loopt van 0 tot 20 en is per kanaal
+tegen de eigen maatstaf bepaald. Middelen betekent dan "hoe staat het account er gemiddeld voor op
+deze as" — niet "meet alle spend tegen één doel", en dát was het bezwaar.
+
+Twee dingen die de gemiddelde lijn eerlijk houden:
+
+- **Een as telt alleen mee voor de kanalen die hem beoordeeld hebben.** Budget en Hygiëne staan
+  voor Meta en LinkedIn op "niet beoordeeld"; die als nul meenemen zou het gemiddelde omlaag
+  trekken om een reden die niets met de prestatie te maken heeft.
+- **De dekking staat in het aslabel** zodra niet elk kanaal die as meet: "Budget 1/3". Zonder dat
+  stond Budget op de volle 20 omdat alleen Google hem beoordeelt, en dan zegt de vorm "het budget
+  van dit account is perfect" terwijl dat een uitspraak over één van de drie kanalen is. De as
+  helemaal weglaten zou Google's budgetcijfer weggooien om een misverstand te vermijden; het erbij
+  zetten laat het cijfer staan en vertelt waar het vandaan komt.
+
+Het radar-component blijft meervoudig — dat kost niets en houdt de vergelijkingsvorm beschikbaar.
+

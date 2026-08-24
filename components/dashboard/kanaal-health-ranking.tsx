@@ -5,10 +5,11 @@ import { Activity, AlertTriangle } from "lucide-react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useChannelForecast } from "@/lib/analysis/use-channel-forecast";
 import { computeForecast } from "@/lib/forecast";
-import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore } from "@/lib/health-score";
+import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore, type HealthFactor } from "@/lib/health-score";
 import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { KanaalHealthRadar, type RadarReeks } from "./kanaal-health-radar";
+import type { RadarFactor } from "@/lib/health-radar";
 
 /**
  * Account Health per kanaal, naast elkaar en op volgorde — de opener van "Alle kanalen".
@@ -31,9 +32,10 @@ import { KanaalHealthRadar, type RadarReeks } from "./kanaal-health-radar";
  * leesbaar; een dynamische lijst zou een component per kanaal vragen die zijn score naar boven
  * rapporteert, en dat is meer machinerie dan het probleem groot is.
  */
-// De lijnkleur per kanaal in de radar. Bewust NIET de statuskleur (groen/oranje/rood): die zit al
-// in het cijfer naast de naam, en met drie polygonen over elkaar moet de kleur zeggen WELK
-// kanaal je ziet, niet hoe het ervoor staat. Dezelfde volgorde als CHART_CATEGORICAL elders.
+// De kleur per kanaal, voor de stip voor de kanaalnaam. Die stond er oorspronkelijk om een regel
+// aan zijn eigen polygoon in de radar te koppelen; nu er één gemiddelde lijn staat, is het puur
+// kanaal-identiteit -- dezelfde kleur die het kanaal in de spend-grafiek eronder heeft, zodat een
+// kanaal over de hele pagina dezelfde kleur houdt. Volgorde van CHART_CATEGORICAL.
 const KANAAL_KLEUR: Record<Kanaal, string> = {
   google: CHART_CATEGORICAL[0],
   meta: CHART_CATEGORICAL[1],
@@ -78,9 +80,53 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
 
   if (rijen.length === 0) return null;
 
-  const reeksen: RadarReeks[] = rijen
-    .filter((r) => r.health.grade !== "?")
-    .map((r) => ({ label: KANAAL_NAAM[r.kanaal], kleur: KANAAL_KLEUR[r.kanaal], factoren: r.health.factors }));
+  // EEN lijn, niet drie. De radar toont het gemiddelde per as over de kanalen die die as
+  // daadwerkelijk METEN.
+  //
+  // Waarom dat wél mag terwijl een blended totaalcijfer dat niet mag: de factorscores zijn al
+  // genormaliseerd. Elke as loopt van 0 tot 20 en is per kanaal tegen de eigen maatstaf bepaald --
+  // middelen betekent hier "hoe staat het account er gemiddeld voor op deze as", niet "meet alle
+  // spend tegen één doel". Dat laatste was het bezwaar tegen een samengestelde score, en dat geldt
+  // hier niet.
+  //
+  // Een as telt alleen mee voor de kanalen die hem beoordeeld hebben. Budget en Hygiëne staan voor
+  // Meta en LinkedIn op "niet beoordeeld"; die als nul meenemen zou het gemiddelde omlaag trekken
+  // om een reden die niets met de prestatie te maken heeft. Meet geen enkel kanaal een as, dan is
+  // de as ook voor het gemiddelde niet beoordeeld en tekent de radar er geen punt.
+  const blended: RadarFactor[] = (rijen[0]?.health.factors ?? []).map((sjabloon, i) => {
+    const gemeten = rijen
+      .map((r) => r.health.factors[i])
+      .filter((f): f is HealthFactor => Boolean(f) && f.assessed);
+    return {
+      // De dekking in het label zodra niet elk kanaal deze as meet. Zonder dat staat "Budget" hier
+      // op de volle 20 terwijl alleen Google hem beoordeelt -- de vorm zegt dan "het budget van dit
+      // account is perfect", en dat is een uitspraak over één van de drie kanalen. De as helemaal
+      // weglaten zou Google's budgetcijfer weggooien om een misverstand te vermijden; het erbij
+      // zetten laat het cijfer staan en vertelt waar het vandaan komt.
+      name: gemeten.length > 0 && gemeten.length < rijen.length
+        ? `${sjabloon.name} ${gemeten.length}/${rijen.length}`
+        : sjabloon.name,
+      maxScore: sjabloon.maxScore,
+      assessed: gemeten.length > 0,
+      score: gemeten.length > 0 ? gemeten.reduce((t, f) => t + f.score, 0) / gemeten.length : 0,
+    };
+  });
+
+  // De kleur van de lijn volgt het gemiddelde zelf, met dezelfde drempels als een losse
+  // health-kaart: geschaald over de assen die beoordeeld zijn, precies zoals computeHealthScore
+  // dat doet.
+  const beoordeeldeAssen = blended.filter((f) => f.assessed);
+  const blendedTotaal = beoordeeldeAssen.length > 0
+    ? Math.round((beoordeeldeAssen.reduce((t, f) => t + f.score, 0) / (beoordeeldeAssen.length * 20)) * 100)
+    : null;
+  const blendedKleur = blendedTotaal == null ? "#9ca3af"
+    : blendedTotaal >= 70 ? "#22c55e"
+    : blendedTotaal >= 50 ? "#f59e0b"
+    : "#ef4444";
+
+  const reeksen: RadarReeks[] = beoordeeldeAssen.length > 0
+    ? [{ label: "Gemiddeld over de kanalen", kleur: blendedKleur, factoren: blended }]
+    : [];
 
   return (
     <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
@@ -95,12 +141,17 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
           landencijfers eronder vangen het hoogteverschil met de wereldkaart op -- zie
           cross-channel-view.tsx. */}
       <div className="flex flex-col gap-5 @2xl:flex-row @2xl:items-start">
-        {/* De radar met alle kanalen erin. Op het kanaaltabblad staat dezelfde vijfhoek met één
-            kanaal; hier liggen ze over elkaar, want de vraag op "Alle kanalen" is een
-            vergelijking. */}
+        {/* Eén lijn: het gemiddelde over de kanalen. Er hebben hier drie lijnen over elkaar
+            gestaan, één per kanaal -- leesbaar zolang ze uit elkaar liggen, maar bij vijf of tien
+            kanalen wordt dat een kluwen, en de per-kanaal cijfers staan er rechts toch al
+            uitgesplitst naast. De radar zegt hier "hoe staat het account ervoor", de regels ernaast
+            "en waar zit het verschil". */}
         {reeksen.length > 0 && (
           <div className="shrink-0 @2xl:w-[250px]">
             <KanaalHealthRadar reeksen={reeksen} />
+            <p className="mt-1 text-center text-micro text-muted-foreground">
+              Gemiddeld{blendedTotaal != null && <> — <span className="font-semibold" style={{ color: blendedKleur }}>{blendedTotaal}</span></>}
+            </p>
           </div>
         )}
         <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -111,9 +162,12 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
       </div>
 
       <p className="mt-4 border-t border-border pt-3 text-meta leading-snug text-muted-foreground">
-        Geen samengesteld cijfer over alle kanalen samen: dat zou tegen één doel moeten meten, en
-        een doel dat voor het ene kanaal gezet is zegt niets over het andere. Elk kanaal wordt hier
-        beoordeeld zoals op zijn eigen tabblad.
+        De radar is het gemiddelde per as over de kanalen die die as meten — Budget en Hygiëne
+        worden voor Meta en LinkedIn niet beoordeeld en tellen daar dus niet mee. Dat kan omdat de
+        assen al genormaliseerd zijn: elk kanaal is tegen zijn eigen maatstaf beoordeeld, zoals op
+        zijn eigen tabblad. Wat er bewust níét staat is één samengesteld cijfer over de spend van
+        alle kanalen samen: dat zou tegen één doel moeten meten, en een doel dat voor het ene
+        kanaal gezet is zegt niets over het andere.
       </p>
     </div>
   );

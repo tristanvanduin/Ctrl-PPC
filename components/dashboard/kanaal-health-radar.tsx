@@ -3,16 +3,13 @@
 import { useId } from "react";
 import { radarPunten, radarRanden, radarVlak, WEBRINGEN, type RadarFactor } from "@/lib/health-radar";
 
-// De radar met MEER DAN EEN kanaal erin: dezelfde vijf assen, een polygoon per kanaal.
+// Een radar die MEER DAN EEN reeks aankan: dezelfde vijf assen, een polygoon per reeks.
 //
-// Waarom niet drie losse radars naast elkaar. De vraag op "Alle kanalen" is een vergelijking, en
-// drie aparte vijfhoeken vergelijk je niet -- dan moet je per as heen en weer kijken tussen drie
-// figuren en de hoeken tegen elkaar wegen. Over elkaar heen op dezelfde assen is de vergelijking
-// zelf de vorm: waar de polygonen uit elkaar lopen zit het verschil.
-//
-// Waarom niet één radar met een gemiddelde. Dat zou een blended score zijn met precies het
-// probleem dat kanaal-health-ranking.tsx beschrijft: middelen over kanalen die tegen verschillende
-// maatstaven gemeten zijn.
+// In de praktijk staat er één lijn in -- het gemiddelde over de kanalen (zie
+// kanaal-health-ranking.tsx). Er hebben drie lijnen in gestaan, één per kanaal, en dat was
+// leesbaar zolang ze uit elkaar lagen; bij vijf of tien kanalen wordt het een kluwen, en de
+// cijfers per kanaal staan er toch al uitgesplitst naast. Het component blijft meervoudig omdat
+// dat niets extra kost en de vergelijkingsvorm daarmee beschikbaar blijft.
 //
 // De geometrie komt uit lib/health-radar.ts, dezelfde die health-radar.tsx gebruikt -- niet omdat
 // het toevallig past, maar omdat twee radars op hetzelfde scherm anders vroeg of laat een andere
@@ -48,7 +45,7 @@ export function KanaalHealthRadar({ reeksen }: { reeksen: readonly RadarReeks[] 
         aria-labelledby={`${id}-titel`}
       >
         <title id={`${id}-titel`}>
-          {reeksen.map((r) => `${r.label}: ${r.factoren.filter((f) => f.assessed).map((f) => `${f.name} ${f.score} van ${f.maxScore}`).join(", ")}`).join(". ")}
+          {reeksen.map((r) => `${r.label}: ${r.factoren.filter((f) => f.assessed).map((f) => `${f.name} ${Math.round(f.score * 10) / 10} van ${f.maxScore}`).join(", ")}`).join(". ")}
         </title>
 
         {WEBRINGEN.map((ring) => (
@@ -72,10 +69,10 @@ export function KanaalHealthRadar({ reeksen }: { reeksen: readonly RadarReeks[] 
           const randen = radarRanden(punten);
           return (
             <g key={reeks.label}>
-              {/* Zacht gevuld en niet dicht: met drie kanalen over elkaar zou een volle vulling de
-                  onderste polygoon onzichtbaar maken. De lijn draagt de vorm, de vulling geeft
-                  hem alleen gewicht. */}
-              {vlak && <polygon points={vlak} fill={reeks.kleur} opacity={0.1} />}
+              {/* Bij meerdere reeksen zachter gevuld: een volle vulling zou de onderste polygoon
+                  onzichtbaar maken. Bij één reeks is er niets om achter te verdwijnen en mag de
+                  vorm gewicht krijgen. */}
+              {vlak && <polygon points={vlak} fill={reeks.kleur} opacity={reeksen.length > 1 ? 0.1 : 0.18} />}
               {randen.map((r, i) => (
                 <line
                   key={i}
