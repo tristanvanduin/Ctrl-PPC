@@ -7,7 +7,7 @@ import { useChannelForecast } from "@/lib/analysis/use-channel-forecast";
 import { computeForecast } from "@/lib/forecast";
 import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore, type HealthFactor } from "@/lib/health-score";
 import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
-import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
+import { CHANNEL_CHART_COLOR } from "@/lib/branding/chart-colors";
 import { KanaalHealthRadar, type RadarReeks } from "./kanaal-health-radar";
 import type { RadarFactor } from "@/lib/health-radar";
 
@@ -35,11 +35,18 @@ import type { RadarFactor } from "@/lib/health-radar";
 // De kleur per kanaal, voor de stip voor de kanaalnaam. Die stond er oorspronkelijk om een regel
 // aan zijn eigen polygoon in de radar te koppelen; nu er één gemiddelde lijn staat, is het puur
 // kanaal-identiteit -- dezelfde kleur die het kanaal in de spend-grafiek eronder heeft, zodat een
-// kanaal over de hele pagina dezelfde kleur houdt. Volgorde van CHART_CATEGORICAL.
+// kanaal over de hele pagina dezelfde kleur houdt.
+//
+// Uit CHANNEL_CHART_COLOR en niet uit de POSITIE in CHART_CATEGORICAL: dat laatste stond hier wel
+// (0/1/2) en gaf Meta oranje, terwijl Meta in elke andere grafiek violet is. Precies de fout die
+// chart-colors.ts beschrijft -- kleur volgt de identiteit van het kanaal, nooit zijn rangnummer.
+// Dat is ook wat dit component nodig heeft om te schalen: een vierde kanaal krijgt een kleur
+// omdat het dat kanaal is, niet omdat het vierde in de lijst staat, en die kleur blijft gelijk
+// als de rangschikking van volgorde wisselt.
 const KANAAL_KLEUR: Record<Kanaal, string> = {
-  google: CHART_CATEGORICAL[0],
-  meta: CHART_CATEGORICAL[1],
-  linkedin: CHART_CATEGORICAL[2],
+  google: CHANNEL_CHART_COLOR.Google,
+  meta: CHANNEL_CHART_COLOR.Meta,
+  linkedin: CHANNEL_CHART_COLOR.LinkedIn,
 };
 
 export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; kanalen: Kanaal[] }) {
