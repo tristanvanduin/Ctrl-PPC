@@ -11,7 +11,11 @@ import { RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
 import { maandLabel } from "./chart-chrome";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Sectie } from "@/components/ui/sectie";
-import { GeoBreakdown } from "./geo-breakdown";
+import { GeoMapCard } from "./geo-map-card";
+import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
+import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
+import { KanaalHealthRanking } from "./kanaal-health-ranking";
+import type { Kanaal } from "@/lib/kanalen/beschikbaar";
 
 // Cross-channel (blended) tab. Leest de blended_account_monthly-view over Google, Meta en
 // LinkedIn heen. De view levert de bouwstenen; de attributie-voetnoot is verplicht, want elk
@@ -48,8 +52,11 @@ function fmt(n: number | null): string {
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(n);
 }
 
-export function CrossChannelView({ clientId }: { clientId: string }) {
+export function CrossChannelView({ clientId, kanalen = [] }: { clientId: string; kanalen?: Kanaal[] }) {
   const [maandenOpen, toggleMaanden] = useRememberedOpen("cross-maanden", false);
+  // Eén hook-aanroep voor beide geo-kaarten: de kaart en de cijfers eronder delen dezelfde
+  // metric-keuze en dezelfde VS-drilldown. Twee aanroepen zouden twee losse states geven.
+  const geo = useGeoBreakdown({ clientId, channel: "blended" });
   const [rows, setRows] = useState<BlendedRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,7 +137,31 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
         titel="Markten"
         bijschrift="Waar het verkeer en de conversies vandaan komen, over alle kanalen samen"
       >
-        <GeoBreakdown clientId={clientId} channel="blended" />
+        {/* DEZELFDE TWEE KAARTEN ALS DE KANAALTABBLADEN, en niet meer GeoBreakdown.
+            GeoBreakdown is de oude, ongesplitste vorm: kaart links en ranglijst rechts in één
+            kaart, met een `max-w-6xl` (1152px) die op een scherm van 1920px gecentreerd in een
+            kaart van 1584px stond -- 216px wit aan weerszijden en een projectie van 760px in het
+            midden. Dat viel niet op zolang alle tabbladen zo waren; nu de kanaaltabbladen de
+            gesplitste vorm hebben (projectie plus balken in de kaart, cijfers in een eigen kaart
+            eronder) las het als "er is iets met de kaart gebeurd". Zelfde componenten, zelfde
+            volgorde, zelfde breedtegedrag. */}
+        {/* Dezelfde asymmetrische hero als de kanaaltabbladen: links de gezondheid, rechts de
+            wereldkaart, en de linkerkolom vangt het hoogteverschil op. Zie google-view.tsx voor
+            de volledige redenering achter de 1800px-grens. */}
+        <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+          <div className="flex flex-col gap-4">
+            <KanaalHealthRanking clientId={clientId} kanalen={kanalen} />
+            {/* De opvanger van deze kolom: de wereldkaart ernaast is hoger dan de rangschikking,
+                en zes tegels die in wat meer hoogte gecentreerd staan leest als ruimte, terwijl
+                drie kanaalregels die 200px uit elkaar getrokken worden als een gat leest. */}
+            <div className="flex flex-1 flex-col">
+              <GeoRanglijstCard state={geo} zonderBalken />
+            </div>
+          </div>
+          <div className="flex flex-1 flex-col">
+            <GeoMapCard state={geo} channel="blended" verdieping={<GeoRanglijstInKaart state={geo} />} />
+          </div>
+        </div>
       </Sectie>
 
       {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een

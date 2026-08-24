@@ -8427,3 +8427,84 @@ elk een andere, en dan moet je bij elke tabwissel opnieuw zoeken waar iets staat
 
 LinkedIn heeft er twee in plaats van drie omdat LinkedIn alleen `MEMBER_JOB_FUNCTION` als
 doelgroepdata levert; een lege derde kolom zou beloven dat leeftijd en gender er wel zijn.
+
+### 17.122 Een rangschikking in plaats van een blended score (24 augustus 2026)
+
+"Moeten we anders niet een algemene accounthealth nemen en die naast de wereldkaart zetten zodat
+alles uniform is? Ook alle kanalen?"
+
+**Eerst wat er met die kaart gebeurd was.** Niets — en dat is de pointe. `git diff` bevestigde dat
+ik `geo-breakdown.tsx` niet had aangeraakt. "Alle kanalen" gebruikte nog de ÓÚDE, ongesplitste vorm:
+kaart links en ranglijst rechts in één kaart, met een `max-w-6xl` (1152px) die op een scherm van
+1920px gecentreerd stond in een kaart van 1584px — 216px wit aan weerszijden en een projectie van
+760px in het midden. Dat viel niet op zolang alle tabbladen zo waren. Nu de kanaaltabbladen de
+gesplitste vorm hebben (projectie plus balken in de kaart, cijfers in een eigen kaart eronder) las
+het als "er is iets met de kaart gebeurd". `GeoBreakdown` is verwijderd; "Alle kanalen" gebruikt nu
+dezelfde `GeoMapCard` en `GeoRanglijstCard` als de rest.
+
+**En toen de vraag die ik niet zelf kon beantwoorden.** Een blended Account Health moet ergens
+tegenaan meten, en `client_targets` is voor deze klanten leeg: Meta en LinkedIn hebben geen enkel
+jaardoel (daarom zegt hun beurs-sectie ook "geen jaardoel ingesteld"), en Google's doelen komen uit
+een ander pad. Drie voorstellen voorgelegd — alleen de gemeten assen, Google's doel als anker, of
+eerst een doelen-scherm bouwen — en de eigenaar kwam met een vierde die beter is dan alle drie:
+**"Waarom niet gewoon een health score die de health scores van de kanalen weergeeft? Een ranking
+voor google, meta, linkedin, later bing, tiktok, snapchat, chatgpt, etc."**
+
+Dat omzeilt het probleem in plaats van het op te lossen, en dat is hier precies goed: een
+rangschikking hoeft nergens tegenaan te meten. Elk kanaal wordt beoordeeld tegen zijn eigen
+maatstaf — exact zoals op zijn eigen tabblad — en naast elkaar zetten beantwoordt de vraag die je
+op "Alle kanalen" stelt: waar zit de zwakke plek.
+
+`kanaal-health-ranking.tsx` toont per kanaal de score-ring, de zwakste beoordeelde factor, de vijf
+factoren als staafjes op een gedeelde schaal, en de zwaarste anomalie. Gemeten in de demo: Google
+Ads 88, Meta 55, LinkedIn 20 — en de staafjes laten zien dat Meta en LinkedIn allebei op Trend
+vastlopen terwijl Meta's Efficiency nog op 16/20 staat. Dát is wat een rangschikking bruikbaar
+maakt: twee kanalen met een andere score kunnen op dezelfde as zwak zijn, en twee met dezelfde
+score op verschillende.
+
+Drie dingen die de eerlijkheid bewaken:
+
+- **Google krijgt dezelfde hygiëne-correctie als de rest.** `zonderKanaalSpecifiekeHygiene` zet die
+  factor op "niet beoordeeld", want de Google-specifieke argumenten (impressionShare, zoektermen,
+  ad groups) zijn hier niet beschikbaar en `computeHealthScore` zou de factor dan stilzwijgend vol
+  punten geven. Zonder die correctie scoort Google hoger dan de rest om een reden die niets met het
+  account te maken heeft.
+- **Geen balk bij een niet-beoordeelde factor.** Een balk op nul leest als "score nul" terwijl er
+  niet gemeten is.
+- **Kanalen zonder cijfer onderaan.** Een onbekende score is geen nul, maar hij hoort ook niet
+  tussen de beoordeelde kanalen in te dringen.
+
+**Uitbreiden naar Bing, TikTok en de rest** is drie regels per kanaal: een `useChannelForecast`-
+aanroep met `enabled` op de beschikbaarheid en een regel in de opbouw. De hooks staan bewust plat
+naast elkaar en niet in een lus — een hook mag niet voorwaardelijk aangeroepen worden, en een
+dynamische lijst zou een component per kanaal vragen dat zijn score naar boven rapporteert. Dat is
+meer machinerie dan het probleem groot is.
+
+**Gemeten hoogtes op 1920px:** rangschikking 454 + landencijfers 383 = 853, wereldkaart 853. De
+landencijfers zijn de opvanger van die kolom en niet de rangschikking: zes tegels die in wat meer
+hoogte gecentreerd staan lezen als ruimte, terwijl drie kanaalregels die 200px uit elkaar getrokken
+worden als een gat lezen — dat was de eerste versie, en die zag er precies zo uit.
+
+**En daarna: "waar is de hexagon ding?"** De eerste versie toonde per kanaal alleen een ring en
+staafjes — de radar van het kanaaltabblad was weg. Terecht gemist, en de oplossing is beter dan
+teruggeven wat er stond: één radar met een polygoon PER KANAAL, over elkaar heen op dezelfde vijf
+assen. Drie losse vijfhoeken naast elkaar vergelijk je namelijk niet; dan kijk je per as heen en
+weer tussen drie figuren. Over elkaar heen is de vergelijking zelf de vorm — waar de lijnen uit
+elkaar lopen zit het verschil.
+
+De lijnkleur is met opzet NIET de statuskleur (groen/oranje/rood): die zit al in de ring en het
+cijfer ernaast, en met drie polygonen over elkaar moet de kleur zeggen wélk kanaal je ziet. Een
+kleurstip voor de kanaalnaam koppelt de regel aan zijn polygoon; zonder die koppeling is een radar
+met drie lijnen drie anonieme vormen. De geometrie komt uit dezelfde `lib/health-radar.ts` als de
+enkelvoudige radar — twee radars op hetzelfde scherm krijgen anders vroeg of laat een andere
+nulhoek of een andere schaal.
+
+**Wat er nog niet is: pacing op "Alle kanalen".** Ook gevraagd, en het antwoord is niet "vergeten"
+maar "kan nog niet eerlijk". Blended pacing zou "maand tot nu tegen vorige maand op dezelfde dag"
+moeten zijn, en dat vraagt DAGdata over alle kanalen samen. Die is er niet als één bron:
+`blended_account_monthly` is per maand (de lopende maand is dus partieel, en een partiële maand
+tegen een volle vergelijken is precies de fout die de kanaal-pacing vermijdt), en er is geen
+`blended_account_daily`. Meta en LinkedIn hebben elk een dagtabel, Google loopt via
+ClientDataProvider en niet via een leesbare dagtabel. Optellen kan dus wel, maar het is drie
+verschillende paden bij elkaar rapen — een eigen bouwstuk, geen kaartje erbij.
+
