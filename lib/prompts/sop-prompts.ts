@@ -1482,14 +1482,20 @@ Gebruik formuleringen als:
 - "De breuklijn uit de maandanalyse ontwikkelt zich..."
 - "In tegenstelling tot de verwachting uit de maandanalyse..."
 
-## Prognose berekening
-Prognose maandeinde = (huidige waarde / verstreken dagen) × totaal dagen in maand
-Vermeld altijd de prognose bij stap 1 en vergelijk met de doelstelling.
+## Prognose maandeinde
+De prognose is VOORBEREKEND en staat in het blok "VOORBEREKENDE MAANDPACING" in je invoer.
+Reken hem niet zelf uit en herbereken hem niet. Vermeld hem bij stap 1 en zet hem naast de
+doelstelling.
+
+Het is een RECHTE LIJN vanuit de stand tot nu toe. Behandel hem als ondergrens, niet als
+verwachting, en benoem dat: conversies liggen vaak hoger in de laatste week van een maand, en die
+curve zit niet in het getal.
 
 ## Rekenregels
-- Vergelijk "deze maand tot nu" met hetzelfde aantal dagen vorige maand
 - Significante afwijking van maandanalyse verwachting: >20% verschil
-- Let op maandeinde effect: conversies zijn vaak hoger in laatste week
+- De vergelijkingsblokken in je invoer dragen hun periode in de kop. Neem die periode letterlijk
+  over in je tekst. Het blok "VOORBEREKENDE VERGELIJKINGEN" gaat over de laatste AFGESLOTEN maand,
+  niet over de maand die nu loopt — schrijf dus nooit "deze maand" bij een cijfer dat daaruit komt.
 `.trim();
 }
 
@@ -1839,10 +1845,17 @@ export function buildWeeklyStep3Prompt(
 
 ## Stap 3: Budget & Spend Anomalies
 
-Gebruik: campaign_monthly (laatste 2 maanden als proxy), campaign metadata (budget/dag)
+Gebruik: ${content ? "de dagelijkse campagnereeks hierboven (week-over-week te vergelijken)" : "campaign_monthly (maandkorrel) plus de campagne-metadata met dagbudget"}
 
 ### Werkwijze
-1. Identificeer campagnes met onverwachte spend stijgingen of dalingen >30% WoW.
+${content
+  ? `1. Identificeer campagnes met onverwachte spend stijgingen of dalingen >30% WoW. Je krijgt dagrijen,
+   dus tel zelf de laatste 7 dagen en de 7 dagen daarvóór op en vergelijk die twee.`
+  : `1. Spend-ontwikkeling. LET OP DE KORREL: de campagnedata is MAANDELIJKS, er bestaat geen
+   wekelijkse campagnereeks. Doe hier dus GEEN week-over-week-uitspraak per campagne — dat getal
+   is niet af te leiden en mag niet geschat worden. Vergelijk in plaats daarvan de lopende maand
+   tot nu toe met dezelfde periode van vorige maand, en benoem de korrel expliciet. De
+   week-over-week-vergelijking op ACCOUNTNIVEAU staat in stap 1 en is daar wél gegrond.`}
 2. BELANGRIJK — Budget vs. Vraag analyse:
    Als een campagne een hoog dagbudget heeft maar de werkelijke spend is <50% van het budget:
    - Dit is GEEN budget-probleem maar een VRAAG-probleem
@@ -1857,7 +1870,7 @@ ${content ? content.spendAnomalyRootCauses : `     a. Zoekwoorden te restrictief
 
 ### Output format
 Alleen bij anomalie:
-"[URGENTIE] SPEND ANOMALIE — Campagne [X] spendeert [X]% [meer/minder] dan vorige week
+"[URGENTIE] SPEND ANOMALIE — Campagne [X] spendeert [X]% [meer/minder] dan ${content ? "vorige week" : "dezelfde periode vorige maand"}
 (€[oud] → €[nieuw]) bij [X]% [meer/minder] conversies.
 [Indien change history]: Mogelijk gerelateerd aan [wijziging] op [datum].
 Aanbeveling: [concrete actie]."

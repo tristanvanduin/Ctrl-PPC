@@ -17,7 +17,7 @@ import { computeDataReliability } from "@/lib/analysis/data-reliability";
 import { computeMetaReliability, computeLinkedinReliability } from "@/lib/analysis/channel-reliability";
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { checkDataFreshness } from "@/lib/sync/freshness";
-import { computeComparisonFacts, formatComparisonFacts } from "@/lib/analysis/comparison-facts";
+import { computeComparisonFacts, formatComparisonFacts, computePacingFacts, formatPacingFacts } from "@/lib/analysis/comparison-facts";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
 import { fetchNameMap, fetchDaily as fetchMetaDaily } from "@/lib/meta/analysis-data";
@@ -97,7 +97,7 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
   // Phase 1: Fetch data + client context + forecast targets in parallel
   const [
     accountResult, campaignResult, weeklyResult, adgroupResult,
-    monthlyOutputResult, clientCtx, targetResult,
+    monthlyOutputResult, clientCtx, targetResult, deviceResult,
   ] = await Promise.all([
     supabase.from("ads_account_monthly").select("*").eq("client_id", clientId).gte("month", periodStart).order("month"),
     supabase.from("ads_campaign_monthly").select("*").eq("client_id", clientId).gte("month", periodStart).order("month"),
@@ -106,6 +106,12 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     supabase.from("sop_analysis_output").select("output, analysis_date").eq("client_id", clientId).eq("sop_type", "monthly").eq("section", "full").order("analysis_date", { ascending: false }).limit(1).maybeSingle(),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId),
+    // Stap 4 heet "Device & Engagement" en het output-format eist waarden voor en na
+    // ("[metric] steeg van [waarde] naar [waarde]"), maar de userMessage bevatte alleen de
+    // conclusies van stap 1 t/m 3 -- geen enkele device-rij. Onder NUMBER_DISCIPLINE kon het model
+    // daar dus alleen mee weigeren of getallen verzinnen. De monthly-route haalt deze tabel al op
+    // (monthly/route.ts, ads_device_performance_monthly); de bi-weekly bevroeg hem niet.
+    supabase.from("ads_device_performance_monthly").select("*").eq("client_id", clientId).gte("month", periodStart).order("month"),
   ]);
 
   const { goalsSection, accountType } = clientCtx;
@@ -190,7 +196,33 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     sectorBenchmarks: bwBenchmarkRows,
     lastCompleteMonth: lastMonth,
   });
-  const bwComparisonText = formatComparisonFacts(bwComparisonFacts);
+  // De maandnaam van het blok expliciet meegeven: dit gaat over de laatste AFGESLOTEN maand,
+  // terwijl de bi-weekly over de lopende maand gaat.
+  const afgeslotenMaand = `${lastMonth === 12 ? Number(today().slice(0, 4)) - 1 : today().slice(0, 4)}-${String(lastMonth).padStart(2, "0")}`;
+  const bwComparisonText = formatComparisonFacts(bwComparisonFacts, `${afgeslotenMaand} (de laatste afgesloten maand)`);
+
+  // De maandpacing: waar komt de LOPENDE maand uit? Voorberekend, want de preambule liet dit tot nu
+  // toe door het model doen met een rechte lijn die hij twee regels later zelf moest nuanceren.
+  // De MTD-stand komt uit de rij van de lopende maand in ads_account_monthly.
+  const huidigeMaandSleutel = today().slice(0, 7);
+  const huidigeMaandRij = (accountData as Array<Record<string, unknown>>)
+    .find((r) => String(r.month ?? "").slice(0, 7) === huidigeMaandSleutel);
+  const bwPacingText = huidigeMaandRij
+    ? formatPacingFacts(computePacingFacts({
+        mtd: {
+          spend: Number(huidigeMaandRij.cost ?? 0),
+          conversies: Number(huidigeMaandRij.conversions ?? 0),
+          conversiewaarde: Number(huidigeMaandRij.conversions_value ?? 0),
+        },
+        today: today(),
+        targets: targetResult?.monthlyExpected?.[Number(huidigeMaandSleutel.slice(5, 7)) - 1]
+          ? {
+              conversies: Number(targetResult.monthlyExpected[Number(huidigeMaandSleutel.slice(5, 7)) - 1]?.conversions ?? 0),
+              conversiewaarde: Number(targetResult.monthlyExpected[Number(huidigeMaandSleutel.slice(5, 7)) - 1]?.revenue ?? 0),
+            }
+          : null,
+      }))
+    : "";
 
   const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
 
@@ -204,7 +236,7 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
   // formuleerwerk waar nuance telt.
   const sharedContext = `${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
 
-${bwComparisonText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+${bwComparisonText}${bwPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   // De hypothese-tracking-instructie hoort specifiek bij stap 2 (zo stond het ook in de
   // ongesplitste versie: "beoordeel dan in stap 2 of het verwachte effect al zichtbaar is").
@@ -288,6 +320,11 @@ ${step2.output}
 
 ## Conclusie stap 3 (Ad Group Performance)
 ${step3.output}
+
+## Device Performance (maandelijks, laatste 3 maanden)
+\`\`\`
+${toPromptTable(deviceResult.data ?? [])}
+\`\`\`
 
 Koppel bevindingen terug aan de maandanalyse.`,
   });
@@ -398,6 +435,24 @@ function withMetaNames(rows: Array<Record<string, unknown>>, names: Map<string, 
   return rows.map((row) => ({ ...row, entity_name: names.get(String(row.entity_id ?? "")) ?? row.entity_id }));
 }
 
+// De maandpacing voor de kanalen met DAGRIJEN (Meta en LinkedIn). Zij kunnen de stand tot nu toe
+// exact optellen, waar de Google-tak het uit de maandrij van de lopende maand haalt. Zelfde
+// voorberekende blok, andere bron -- de prompt kent maar één vorm.
+function pacingUitDagrijen(
+  dagrijen: Array<Record<string, unknown>>,
+  velden: Record<string, string>,
+  targets: Record<string, number> | null
+): string {
+  const maandSleutel = today().slice(0, 7);
+  const dezeMaand = dagrijen.filter((r) => String(r.date ?? "").slice(0, 7) === maandSleutel);
+  if (dezeMaand.length === 0) return "";
+  const mtd: Record<string, number> = {};
+  for (const [label, kolom] of Object.entries(velden)) {
+    mtd[label] = dezeMaand.reduce((som, r) => som + Number(r[kolom] ?? 0), 0);
+  }
+  return formatPacingFacts(computePacingFacts({ mtd, today: today(), targets }));
+}
+
 const META_SUM_FIELDS = ["impressions", "spend", "link_clicks", "conversions", "conversion_value"];
 
 async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
@@ -466,7 +521,17 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const adsetMonthly = withMetaNames(aggregateMonthlyPerEntity(adsetRows, META_SUM_FIELDS), adsetNames);
   const adsetRecent = withMetaNames(adsetRows.filter((r) => String(r.date) >= monthsAgo(1)).slice(-500), adsetNames);
 
-  const sharedContext = `${targetText}${reliabilityText}`;
+  const metaPacingText = pacingUitDagrijen(
+    accountRows,
+    { spend: "spend", conversies: "conversions", conversiewaarde: "conversion_value" },
+    targetResult?.monthlyExpected?.[Number(today().slice(5, 7)) - 1]
+      ? {
+          conversies: Number(targetResult.monthlyExpected[Number(today().slice(5, 7)) - 1]?.conversions ?? 0),
+          conversiewaarde: Number(targetResult.monthlyExpected[Number(today().slice(5, 7)) - 1]?.revenue ?? 0),
+        }
+      : null
+  );
+  const sharedContext = `${targetText}${reliabilityText}${metaPacingText}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance (Meta)..." });
   const step1 = await runStep({
@@ -676,6 +741,15 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   const periodStart = monthsAgo(3);
   const period30Start = monthsAgo(1);
   const periodEnd = fmt(new Date());
+  // De eerste van de LOPENDE maand: stap 4 kijkt naar pacing binnen de maand die nu loopt, en
+  // daarvoor zijn dagrijen nodig -- uit een maandtotaal is niet af te lezen of een dagbudget al op
+  // de tiende op was.
+  //
+  // Afgeleid van today() en niet van periodEnd: periodEnd is fmt(new Date()), dus de UTC-datum,
+  // terwijl today() de Amsterdamse is. Op 1 augustus om 01:00 Amsterdamse tijd zegt UTC nog
+  // 31 juli, en dan zou dit filter een hele maand te vroeg beginnen en de "lopende maand" met de
+  // vorige vullen. lib/reporting-date.ts schrijft die regel expliciet voor.
+  const huidigeMaandStart = `${today().slice(0, 7)}-01`;
 
   const fetchLinkedinDaily = async (table: string): Promise<Array<Record<string, unknown>>> => {
     const { data } = await supabase.from(table).select("*").eq("client_id", clientId).gte("date", periodStart).lte("date", periodEnd);
@@ -685,7 +759,7 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   const [
     accountRows, campaignRows, creativeRows,
     campaignNames, creativeFormats,
-    monthlyOutputResult, clientCtx, targetResult, lagSettingsResult,
+    monthlyOutputResult, clientCtx, targetResult, lagSettingsResult, campaignMetaResult,
   ] = await Promise.all([
     fetchLinkedinDaily("linkedin_account_daily"),
     fetchLinkedinDaily("linkedin_campaign_daily"),
@@ -696,6 +770,13 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "linkedin"),
     supabase.from("client_settings").select("conversion_lag_days").eq("client_id", clientId).maybeSingle(),
+    // Stap 4 heet "Bidding & Pacing" en vraagt of een campagne vroeg leegloopt dan wel
+    // onderbesteed blijft, en of een CPL-stijging op een te laag bod wijst. Zonder dagbudget,
+    // eenheidsprijs en biedstrategie is geen van beide vragen te beantwoorden -- en tot nu toe
+    // kreeg de stap alleen maandaggregaten, waaruit een pacingcurve per definitie niet af te
+    // lezen is. Deze kolommen bestaan al in linkedin_campaigns (lib/linkedin/entities.ts:107-110
+    // vult ze bij elke sync); ze werden alleen nergens geselecteerd.
+    supabase.from("linkedin_campaigns").select("campaign_urn, name, daily_budget, unit_cost, bid_strategy, cost_type").eq("client_id", clientId),
   ]);
 
   const { goalsSection, accountType } = clientCtx;
@@ -733,7 +814,15 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   const campaignMonthly = withLinkedinNames(aggregateMonthlyPerEntity(campaignRows, LINKEDIN_SUM_FIELDS), campaignNames);
   const creativeMonthly = withLinkedinNames(aggregateMonthlyPerEntity(creativeRows, LINKEDIN_SUM_FIELDS), creativeFormats);
 
-  const sharedContext = `${targetText}${reliabilityText}`;
+  // LinkedIn rekent in leads, niet in conversiewaarde: CPL leidt (zie LINKEDIN_BENCHMARKS).
+  const linkedinPacingText = pacingUitDagrijen(
+    accountRows,
+    { spend: "spend", leads: "one_click_leads", conversies: "external_website_conversions" },
+    targetResult?.monthlyExpected?.[Number(today().slice(5, 7)) - 1]
+      ? { conversies: Number(targetResult.monthlyExpected[Number(today().slice(5, 7)) - 1]?.conversions ?? 0) }
+      : null
+  );
+  const sharedContext = `${targetText}${reliabilityText}${linkedinPacingText}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance (LinkedIn)..." });
   const step1 = await runStep({
@@ -812,9 +901,19 @@ ${step2.output}
 ## Conclusie stap 3 (Creative Performance)
 ${step3.output}
 
-## Campaign Performance (maandelijks, laatste 3 maanden -- voor de pacing-check)
+## Campaign Performance (maandelijks, laatste 3 maanden)
 \`\`\`
 ${toPromptTable(campaignMonthly)}
+\`\`\`
+
+## Campagne-instellingen (dagbudget, biedstrategie, eenheidsprijs)
+\`\`\`
+${toPromptTable(campaignMetaResult.data ?? [])}
+\`\`\`
+
+## Dagelijkse spend per campagne, lopende maand (voor de pacing-curve -- uit maandtotalen is niet te zien of een budget vroeg opraakt)
+\`\`\`
+${toPromptTable(withLinkedinNames(campaignRows.filter((r) => String(r.date ?? "") >= huidigeMaandStart), campaignNames))}
 \`\`\`
 
 Koppel bevindingen terug aan de maandanalyse.`,

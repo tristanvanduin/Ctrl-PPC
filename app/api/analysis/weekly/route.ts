@@ -17,7 +17,7 @@ import { computeDataReliability } from "@/lib/analysis/data-reliability";
 import { computeMetaReliability, computeLinkedinReliability } from "@/lib/analysis/channel-reliability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
-import { today } from "@/lib/reporting-date";
+import { today, addDays } from "@/lib/reporting-date";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
 import { fetchNameMap, fetchDaily as fetchMetaDaily } from "@/lib/meta/analysis-data";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -75,7 +75,7 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   // Phase 1: Fetch data + client context + forecast targets in parallel
   const [
     weeklyResult, searchResult, campaignResult, accountMonthlyResult,
-    clientCtx, targetResult,
+    clientCtx, targetResult, campaignMetaResult,
   ] = await Promise.all([
     supabase.from("ads_account_weekly").select("*").eq("client_id", clientId).gte("week_start", periodStart).order("week_start"),
     supabase.from("ads_search_terms_wasteful").select("*").eq("client_id", clientId).order("cost", { ascending: false }).limit(500),
@@ -83,11 +83,18 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
     supabase.from("ads_account_monthly").select("*").eq("client_id", clientId).gte("month", daysAgo(90)).order("month"),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId),
+    // De "Budget vs. Vraag"-tak van stap 3 vraagt om campagnes die minder dan de helft van hun
+    // dagbudget opmaken. De prompt noemde dat dagbudget al ("campaign metadata (budget/dag)"),
+    // maar de route stuurde het nooit mee: er was dus geen enkele manier om die vraag te
+    // beantwoorden zonder te gokken. ads_campaign_metadata draagt budget_amount en budget_type
+    // en wordt door de bestaande sync gevuld.
+    supabase.from("ads_campaign_metadata").select("campaign_name, campaign_type, budget_amount, budget_type, bidding_strategy, serving_status").eq("client_id", clientId),
   ]);
 
   const { goalsSection, accountType } = clientCtx;
 
   const weeklyData = weeklyResult.data ?? [];
+
   if (weeklyData.length === 0) {
     const freshness = await checkDataFreshness(supabase, clientId, ["ads_account_weekly"]);
     await markProgressFailed(supabase, {
@@ -101,6 +108,33 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
       action: "Sync de data via POST /api/sync",
     }, { status: 404 });
   }
+
+  // ── De lopende, halve week eruit ────────────────────────────────────────────
+  //
+  // scripts/migrations/037_rollups.sql groepeert de weekrijen met date_trunc('week', ...) en kent
+  // geen volledigheidsfilter: de week die NU loopt krijgt dus gewoon een rij, met de dagen die er
+  // tot nu toe zijn. Stap 1 zegt "Vergelijk week-over-week op alle KPI's. Rapporteer alleen bij
+  // >20% afwijking" -- en een halve week tegen een hele week is op elke volumemetriek een daling
+  // van tientallen procenten. Dat vlagde dus elke run, bij elk account, zonder dat er iets aan de
+  // hand was. Erger nog: de prompt biedt "Budgetdaling" als verklaring aan ("spend >25% gedaald EN
+  // conversies ook gedaald"), dus het waarschijnlijke antwoord was een zelfverzekerd verkeerd
+  // antwoord in plaats van een zichtbare fout.
+  //
+  // Een week is compleet zodra hij helemaal voorbij is: week_start + 7 dagen <= vandaag. De
+  // lopende week gaat niet verloren -- hij gaat als apart, expliciet gelabeld blok mee, zodat het
+  // vroege signaal blijft bestaan zonder in de WoW-vergelijking mee te tellen. Dat is precies het
+  // onderscheid dat de weekly nodig heeft: signaleren mag op halve data, vergelijken niet.
+  const vandaagISO = today();
+  const weekIsCompleet = (rij: Record<string, unknown>): boolean =>
+    addDays(String(rij.week_start ?? ""), 7) <= vandaagISO;
+  const volledigeWeken = weeklyData.filter(weekIsCompleet);
+  const lopendeWeek = weeklyData.filter((r) => !weekIsCompleet(r as Record<string, unknown>));
+  // Valt er door het filter niets over (een gloednieuw account met alleen deze week), dan is een
+  // WoW-vergelijking sowieso niet te maken; dan is de halve week beter dan niets, mits gelabeld.
+  const weekTabel = volledigeWeken.length > 0 ? volledigeWeken : weeklyData;
+  const lopendeWeekBlok = lopendeWeek.length > 0 && volledigeWeken.length > 0
+    ? `\n\n## Lopende week (NOG NIET COMPLEET -- niet gebruiken voor de week-over-week-vergelijking)\nDeze week is nog bezig; de cijfers dekken alleen de dagen tot nu toe. Gebruik hem hooguit om een acuut signaal te noemen, nooit als vergelijkingsbasis.\n\`\`\`\n${toPromptTable(lopendeWeek)}\n\`\`\``
+    : "";
 
   // Phase 2: Build enrichment context via matrix (parallel)
   await updateProgressPhase(supabase, {
@@ -173,10 +207,10 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
     userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}".
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 
-## Account Performance (wekelijks, laatste 14 dagen)
+## Account Performance (wekelijks, alleen AFGESLOTEN weken -- dit is de basis voor de WoW-vergelijking)
 \`\`\`
-${toPromptTable(weeklyData)}
-\`\`\``,
+${toPromptTable(weekTabel)}
+\`\`\`${lopendeWeekBlok}`,
   });
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_2", message: "Stap 2: Keyword & zoekterm bleeders..." });
@@ -212,9 +246,14 @@ ${step1.output}
 ## Conclusie stap 2 (Keyword & Zoekterm Bleeders)
 ${step2.output}
 
-## Campaign Performance (laatste 2 maanden, voor budget/spend check)
+## Campaign Performance (MAANDELIJKSE korrel, laatste 2 maanden -- er bestaat geen wekelijkse campagnereeks)
 \`\`\`
 ${toPromptTable(campaignResult.data ?? [])}
+\`\`\`
+
+## Campagne-instellingen (dagbudget en biedstrategie -- voor de Budget vs. Vraag-analyse)
+\`\`\`
+${toPromptTable(campaignMetaResult.data ?? [])}
 \`\`\`
 
 Focus alleen op anomalies en bleeders die directe actie vereisen.`,
@@ -328,7 +367,7 @@ async function runMetaWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, c
 
   const [
     accountResult, adsetResult, adResult, campaignResult,
-    campaignNames, adsetNames, adNames,
+    campaignNames, adsetNames, adsetMetaResult, adNames,
     clientCtx, targetResult, reliabilityAccountResult, lagSettingsResult,
   ] = await Promise.all([
     fetchMetaDaily(supabase, clientId, "meta_account_daily", periodStart, periodEnd),
@@ -337,6 +376,10 @@ async function runMetaWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, c
     fetchMetaDaily(supabase, clientId, "meta_campaign_daily", periodSpendStart, periodEnd),
     fetchNameMap(supabase, clientId, "meta_campaigns", "campaign_id", "name"),
     fetchNameMap(supabase, clientId, "meta_adsets", "adset_id", "name"),
+    // Zelfde reden als bij Google hierboven: de "Budget vs. Vraag"-tak van stap 3 vraagt om
+    // budgetbenutting, en zonder dagbudget is dat niet te beantwoorden. Bij Meta zit het budget op
+    // AD SET-niveau (meta_adsets.daily_budget), niet op de campagne.
+    supabase.from("meta_adsets").select("adset_id, name, campaign_id, daily_budget, optimization_goal, learning_stage_info").eq("client_id", clientId),
     fetchNameMap(supabase, clientId, "meta_ads", "ad_id", "name"),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "meta"),
@@ -440,6 +483,11 @@ ${step2.output}
 ## Campaign Performance (laatste 60 dagen, voor spend-anomalie WoW-check)
 \`\`\`
 ${toPromptTable(campaignRows)}
+\`\`\`
+
+## Ad set-instellingen (dagbudget, optimalisatiedoel, learning-status -- voor de Budget vs. Vraag-analyse)
+\`\`\`
+${toPromptTable(adsetMetaResult.data ?? [])}
 \`\`\`
 
 Focus alleen op anomalies en bleeders die directe actie vereisen.`,
@@ -556,7 +604,7 @@ async function runLinkedinWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
 
   const [
     accountRows, campaignRowsRaw, creativeRowsRaw, campaignSpendRows,
-    campaignNames, creativeFormats,
+    campaignNames, creativeFormats, campaignMetaResult,
     clientCtx, targetResult, reliabilityAccountRows, lagSettingsResult,
   ] = await Promise.all([
     fetchLinkedinDaily("linkedin_account_daily", periodStart),
@@ -565,6 +613,10 @@ async function runLinkedinWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     fetchLinkedinDaily("linkedin_campaign_daily", periodSpendStart),
     fetchLinkedinNameMap(supabase, clientId, "linkedin_campaigns", "campaign_urn", "name"),
     fetchLinkedinNameMap(supabase, clientId, "linkedin_creatives", "creative_urn", "format"),
+    // Zelfde reden als bij Google en Meta: de "Budget vs. Vraag"-tak van stap 3 vraagt om
+    // budgetbenutting. Bij LinkedIn zit het dagbudget op de campagne, samen met het biedregime --
+    // en dat laatste is bij een B2B-auctie vaak de eigenlijke verklaring van onderbesteding.
+    supabase.from("linkedin_campaigns").select("campaign_urn, name, daily_budget, unit_cost, bid_strategy, cost_type").eq("client_id", clientId),
     fetchClientContext(supabase, clientId),
     computeAnalysisTargets(supabase, clientId, "linkedin"),
     // F5 fase1.1: apart, langer venster puur voor de betrouwbaarheidscheck.
@@ -666,6 +718,11 @@ ${step2.output}
 ## Campaign Performance (laatste 60 dagen, voor spend-anomalie WoW-check)
 \`\`\`
 ${toPromptTable(campaignSpendRowsNamed)}
+\`\`\`
+
+## Campagne-instellingen (dagbudget, biedstrategie, eenheidsprijs -- voor de Budget vs. Vraag-analyse)
+\`\`\`
+${toPromptTable(campaignMetaResult.data ?? [])}
 \`\`\`
 
 Focus alleen op anomalies en bleeders die directe actie vereisen.`,

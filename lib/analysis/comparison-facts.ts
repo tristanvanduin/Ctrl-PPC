@@ -297,10 +297,15 @@ export function computeComparisonFacts(opts: {
  * Format comparison facts as a text block to inject into the LLM user message.
  * The LLM must USE these exact numbers and labels — not recompute them.
  */
-export function formatComparisonFacts(facts: ComparisonFacts): string {
+export function formatComparisonFacts(facts: ComparisonFacts, periodeLabel?: string): string {
   const lines: string[] = [];
 
   lines.push("## VOORBEREKENDE VERGELIJKINGEN (gebruik deze exacte waarden en labels — niet zelf herberekenen)");
+  // De maand-SOP analyseert de laatste afgesloten maand, dus daar is de periode impliciet en
+  // klopt hij. De bi-weekly gaat over de LOPENDE maand terwijl dit blok over de afgesloten maand
+  // gaat -- zonder label leest het model "deze maand" bij een cijfer van vorige maand. Vandaar dat
+  // de aanroeper de periode mee kan geven; hij hoort in de kop en niet in de aanname.
+  if (periodeLabel) lines.push(`Periode van ALLE cijfers in dit blok: ${periodeLabel}.`);
 
   if (facts.targetComparisons.length > 0) {
     lines.push("\n### Doelstellingsstatus");
@@ -592,4 +597,75 @@ export function computeAdGroupComparisonFacts(opts: {
     .filter((row) => Number.isFinite(row.spendMomPct))
     .sort((a, b) => Math.abs(b.spendMomPct) - Math.abs(a.spendMomPct))
     .slice(0, 20);
+}
+
+// ── Maandpacing: waar komt de lopende maand uit? ────────────────────────────
+//
+// De bi-weekly preambule liet dit door het model doen: "Prognose maandeinde = (huidige waarde /
+// verstreken dagen) x totaal dagen in maand". Twee regels lager waarschuwde diezelfde preambule
+// voor het maandeinde-effect ("conversies zijn vaak hoger in de laatste week") zonder correctie --
+// het model moest dus een fout maken en die daarna zelf in proza nuanceren.
+//
+// Deze functie rekent het voor. Dat is de regel die AGENTS.md elders al afdwingt: laat het model
+// niet rekenen wat deterministisch aan te leveren is.
+//
+// WAT DIT BEWUST NIET DOET: een seizoensgecorrigeerde prognose. lib/forecast.ts kent wel een
+// meerjarig seizoenspatroon, maar dat voorspelt hoe een HELE maand zich tot het jaar verhoudt --
+// niet hoe de tweede helft van een maand zich tot de eerste verhoudt. Die binnen-maand-curve
+// bestaat nergens in deze codebase, en hem hier verzinnen zou een getal opleveren dat preciezer
+// oogt dan het is. De lineaire projectie wordt daarom als lineair gelabeld, met het maandtarget
+// ernaast zodat het model twee gegronde ankers heeft in plaats van één zelfgemaakt getal.
+export interface PacingFacts {
+  daysElapsed: number;
+  daysInMonth: number;
+  metrics: Array<{ metric: string; mtd: number; projected: number; target: number | null; deltaPct: number | null }>;
+}
+
+/** Dagen in de maand van een ISO-datum (YYYY-MM-DD). */
+export function daysInMonthOf(iso: string): number {
+  const [y, m] = iso.split("-").map(Number);
+  if (!y || !m) return 30;
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+export function computePacingFacts(opts: {
+  /** Month-to-date totalen van de lopende maand, per metriek. */
+  mtd: Record<string, number>;
+  /** De datum waarop de analyse draait, YYYY-MM-DD. */
+  today: string;
+  /** Het maandtarget per metriek, als dat er is. */
+  targets?: Record<string, number> | null;
+}): PacingFacts {
+  const daysElapsed = Number(opts.today.slice(8, 10)) || 1;
+  const daysInMonth = daysInMonthOf(opts.today);
+  const metrics = Object.entries(opts.mtd).map(([metric, mtd]) => {
+    const projected = Math.round((mtd / daysElapsed) * daysInMonth * 100) / 100;
+    const target = opts.targets?.[metric] ?? null;
+    // Geen target of een target van nul: geen percentage. Een deling door nul als "0%" tonen is
+    // precies het soort stil verzonnen getal waar de number-discipline tegen bedoeld is.
+    const deltaPct = target != null && target !== 0
+      ? Math.round(((projected - target) / target) * 1000) / 10
+      : null;
+    return { metric, mtd: Math.round(mtd * 100) / 100, projected, target, deltaPct };
+  });
+  return { daysElapsed, daysInMonth, metrics };
+}
+
+export function formatPacingFacts(facts: PacingFacts): string {
+  if (facts.metrics.length === 0) return "";
+  const lines = [
+    "",
+    "## VOORBEREKENDE MAANDPACING (gebruik deze exacte waarden — niet zelf herberekenen)",
+    `Stand: dag ${facts.daysElapsed} van ${facts.daysInMonth}.`,
+    "De prognose is een RECHTE LIJN vanuit de stand tot nu toe. Hij houdt geen rekening met het",
+    "maandeinde-effect (conversies liggen vaak hoger in de laatste week), dus behandel hem als",
+    "ondergrens en niet als verwachting, en zeg dat er expliciet bij.",
+  ];
+  for (const m of facts.metrics) {
+    const doel = m.target == null
+      ? "geen maandtarget vastgelegd"
+      : `maandtarget ${m.target}${m.deltaPct == null ? "" : ` → lineaire prognose ${m.deltaPct > 0 ? "+" : ""}${m.deltaPct}%`}`;
+    lines.push(`- ${m.metric}: ${m.mtd} tot nu toe → lineaire prognose maandeinde ${m.projected} (${doel})`);
+  }
+  return lines.join("\n");
 }

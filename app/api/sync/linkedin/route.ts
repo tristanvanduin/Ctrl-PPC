@@ -21,6 +21,7 @@ import {
   fetchCampaignGroups, fetchCampaigns, fetchCreatives,
   campaignGroupToDbRow, campaignToDbRow, creativeToDbRow,
 } from "@/lib/linkedin/entities";
+import { todayUTC } from "@/lib/linkedin/sync-windows";
 
 export const maxDuration = 300; // backfill kan lang duren
 
@@ -132,7 +133,26 @@ export async function POST(request: NextRequest) {
       creative: creativeUrns,
     };
 
-    const endDate = lastCompleteMonthEnd();
+    // TWEE VERSCHILLENDE EINDDATUMS, en dat is het hele punt.
+    //
+    // De backfill vult de geschiedenis en stopt bewust bij de laatste AFGESLOTEN maand: hij bestaat
+    // om hele maanden achter elkaar te zetten, en een halve lopende maand hoort daar niet bij.
+    //
+    // De dagelijkse sync moet juist tot vandaag lopen. Dat ging mis: hij kreeg dezelfde
+    // lastCompleteMonthEnd() mee, dus de data liep nooit verder dan de laatste dag van de vorige
+    // maand -- terwijl app/api/analysis/weekly/route.ts de laatste 14 dagen opvraagt. Die twee
+    // vensters overlappen na de 14e van een maand helemaal niet meer, en de weekly gaf dan een 404
+    // met "Sync de data via POST /api/sync" terwijl de sync correct had gedraaid. Zonder live
+    // klanten is dat nooit als storing zichtbaar geweest.
+    //
+    // todayUTC() bestond al in lib/linkedin/sync-windows.ts en werd buiten tests nergens gebruikt;
+    // de kop van dat bestand legt ook precies uit waaróm de daily een trailing venster tot vandaag
+    // nodig heeft: LinkedIn herschrijft conversies met terugwerkende kracht binnen het
+    // attributievenster, dus de laatste 30 dagen worden elke run opnieuw ge-upsert. Een deels
+    // gevulde dag van vandaag wordt daarmee morgen vanzelf gecorrigeerd -- dat is waar die
+    // 30-daagse her-upsert voor is.
+    const backfillEnd = lastCompleteMonthEnd();
+    const dailyEnd = todayUTC();
 
     // De sync geeft nu per niveau/chunk expliciet succes of mislukking terug (voorheen alleen
     // een rijenaantal -- 0 rijen door een lege periode en 0 rijen door een mislukte fetch/upsert
@@ -142,11 +162,11 @@ export async function POST(request: NextRequest) {
     let rowsUpserted: unknown;
     let failed: string[] = [];
     if (scope === "backfill") {
-      const outcome = await syncLinkedinBackfill(ctx, endDate, entitiesByLevel);
+      const outcome = await syncLinkedinBackfill(ctx, backfillEnd, entitiesByLevel);
       rowsUpserted = { backfill: outcome.rows };
       failed = outcome.failedChunks;
     } else {
-      const outcome = await syncLinkedinDaily(ctx, endDate, entitiesByLevel);
+      const outcome = await syncLinkedinDaily(ctx, dailyEnd, entitiesByLevel);
       rowsUpserted = Object.fromEntries(Object.entries(outcome).map(([level, o]) => [level, o.rows]));
       failed = Object.entries(outcome).filter(([, o]) => !o.success).map(([level, o]) => `${level}: ${o.error ?? "onbekende fout"}`);
     }
