@@ -24,6 +24,7 @@ import {
 } from "./pmax-video-demo";
 import { OWNER_TEAM, OWNER_CLIENT } from "../branding/brand";
 import { analyseOutputRows } from "./analyses-demo";
+import { splitInt, splitAlong } from "./split";
 
 type Row = Record<string, unknown>;
 
@@ -300,6 +301,131 @@ const metaCampaignDaily: Row[] = META_CAMPAIGNS.flatMap((c) =>
   })
 );
 
+// ── meta_adsets + meta_adset_daily ──────────────────────────────────────────
+//
+// Het ad set-niveau ontbrak volledig, terwijl ALLE DRIE de Meta-cadansen het lezen: de weekly voor
+// de bleeder- en fatigue-check (app/api/analysis/weekly/route.ts), de bi-weekly voor stap 3
+// (biweekly/route.ts) en de monthly voor pijler 2 niveau B (lib/meta/analysis-data.ts). Bij Meta is
+// dit het niveau waar budget en doelgroep leven -- zonder deze twee tabellen viel juist het
+// waardevolste deel van de Meta-analyse in de demo terug op "geen data", en was er dus geen manier
+// om zonder live klant te laten zien dat die analyse werkt.
+//
+// AFGELEID, NIET VERZONNEN. De dagrijen worden uit metaCampaignDaily gesplitst met splitInt/
+// splitAlong, zodat de som van de ad sets per dag en per metriek exact zijn campagne is. Dat is
+// dezelfde regel als in google-sop-demo.ts: een dimensie die niet optelt tot zijn ouder is precies
+// de tegenstrijdigheid waar een analist over struikelt.
+//
+// FREQUENCY EN REACH WORDEN NIET GESPLITST maar per ad set gezet. Frequency is geen optelbare
+// grootheid (dezelfde persoon in twee ad sets telt één keer) en reach evenmin --
+// scripts/migrations/037_rollups.sql legt die uitzondering al vast voor de rollups. Ze afleiden met
+// splitInt zou een getal opleveren dat er echt uitziet en nergens op slaat.
+//
+// Elk patroon hieronder is er één die een detector in de code echt zoekt:
+//  - `pro-int` is de BLEEDER: het grootste spend-aandeel van zijn campagne en structureel 0
+//    conversies, ruim boven de weekly-drempel (cost > 2x account-CPA bij 0 conversies).
+//  - `pro-int` en `aw-int` dragen DEZELFDE targeting_summary: het overlap-risico dat pijler 2
+//    niveau B expliciet zoekt ("zelfde doelgroepomschrijving in meerdere adsets"). Dat de
+//    overlappende ad set óók de bleeder is, is het verhaal dat een analist hoort te vinden.
+//  - `rt-web` loopt VERZADIGING op: frequency klimt van 2,4 naar 4,3 en kruist de 3,5 uit
+//    META_BENCHMARKS ergens rond twee maanden geleden.
+//  - `pro-int` staat op LEARNING_LIMITED, zodat de learning-status uit pijler 2 niveau A niet leeg is.
+//
+// targeting_summary is bewust gevuld: de kolom bestaat in migratie 007 maar wordt door geen enkele
+// syncroute geschreven (zie lib/cross-channel/funnel-overlap.ts:35-37). In de demo hoort hij wél te
+// staan, anders is niet te zien dat de analyse ermee werkt zodra een sync hem levert.
+//
+// EENHEID VAN daily_budget: hier in hele euro's. De Meta API levert dit veld in CENTEN, maar geen
+// enkele analysestap leest meta_adsets.daily_budget vandaag (de enige daily_budget-lezer in de
+// codebase is app/api/analysis/impression-share/route.ts, op een Google-tabel). Zodra pijler 2's
+// budgetbenutting hem wél gaat lezen, moet hier de eenheid van de echte sync worden aangehouden --
+// anders staat de demo een factor honderd naast productie.
+const META_ADSETS = [
+  // Awareness EU -- gezonde brede basis plus een interessesegment dat overlapt met prospecting.
+  { id: "demo-mas-aw-broad", campaign: "demo-mcamp-aw", name: "GRT | Awareness EU — Broad (Advantage+)",
+    targeting: "Advantage+ doelgroep (breed) · EU · 25-65", goal: "REACH", budget: 80, learning: "LEARNING_COMPLETE",
+    w: { imp: 70, clk: 68, spend: 65, conv: 71 }, freq: (d: number) => 1.9 + 0.4 * (1 - d / 149) },
+  { id: "demo-mas-aw-int", campaign: "demo-mcamp-aw", name: "GRT | Awareness EU — Interesse: duurzame landbouw",
+    targeting: "Interesse: duurzame landbouw, tuinbouw · NL, BE · 25-55", goal: "REACH", budget: 40, learning: "LEARNING_COMPLETE",
+    w: { imp: 30, clk: 32, spend: 35, conv: 29 }, freq: (d: number) => 2.2 + 0.5 * (1 - d / 149) },
+
+  // Retargeting NL -- kleine, warme doelgroep die opraakt.
+  { id: "demo-mas-rt-web", campaign: "demo-mcamp-rt", name: "GRT | Retargeting NL — Websitebezoekers 30d",
+    targeting: "Custom audience: websitebezoekers 30 dagen · NL", goal: "OFFSITE_CONVERSIONS", budget: 25, learning: "LEARNING_COMPLETE",
+    w: { imp: 62, clk: 65, spend: 60, conv: 67 }, freq: (d: number) => 2.4 + 1.9 * (1 - d / 149) },
+  { id: "demo-mas-rt-news", campaign: "demo-mcamp-rt", name: "GRT | Retargeting NL — Custom: nieuwsbriefleden",
+    targeting: "Custom audience: nieuwsbrieflijst · NL", goal: "OFFSITE_CONVERSIONS", budget: 20, learning: "LEARNING_COMPLETE",
+    w: { imp: 38, clk: 35, spend: 40, conv: 33 }, freq: (d: number) => 2.6 + 0.3 * (1 - d / 149) },
+
+  // Prospecting breed -- de dominante, slecht converterende campagne, hier uitgesplitst naar de
+  // lookalike die alles oplevert en het interessesegment dat alles kost.
+  { id: "demo-mas-pro-lal", campaign: "demo-mcamp-pro", name: "GRT | Prospecting breed — Lookalike 1% kopers",
+    targeting: "Lookalike 1% (kopers 180d) · NL, BE, DE", goal: "OFFSITE_CONVERSIONS", budget: 60, learning: "LEARNING_COMPLETE",
+    w: { imp: 45, clk: 48, spend: 38, conv: 100 }, freq: (d: number) => 1.7 + 0.3 * (1 - d / 149) },
+  { id: "demo-mas-pro-int", campaign: "demo-mcamp-pro", name: "GRT | Prospecting breed — Interesse: tuinbouw breed",
+    targeting: "Interesse: duurzame landbouw, tuinbouw · NL, BE · 25-55", goal: "OFFSITE_CONVERSIONS", budget: 150, learning: "LEARNING_LIMITED",
+    w: { imp: 55, clk: 52, spend: 62, conv: 0 }, freq: (d: number) => 2.0 + 0.4 * (1 - d / 149) },
+
+  // De andere twee beurzen, zodat Meta binnen GRN/GRA ook op ad set-niveau niet leeg is.
+  { id: "demo-mas-grn-broad", campaign: "demo-mcamp-grn", name: "GRN | Awareness NA — Broad (Advantage+)",
+    targeting: "Advantage+ doelgroep (breed) · US, CA · 25-65", goal: "REACH", budget: 55, learning: "LEARNING_COMPLETE",
+    w: { imp: 66, clk: 64, spend: 62, conv: 68 }, freq: (d: number) => 1.8 + 0.4 * (1 - d / 149) },
+  { id: "demo-mas-grn-int", campaign: "demo-mcamp-grn", name: "GRN | Awareness NA — Interesse: agritech",
+    targeting: "Interesse: agritech, precisielandbouw · US, CA · 25-55", goal: "REACH", budget: 30, learning: "LEARNING_COMPLETE",
+    w: { imp: 34, clk: 36, spend: 38, conv: 32 }, freq: (d: number) => 2.1 + 0.4 * (1 - d / 149) },
+  { id: "demo-mas-gra-web", campaign: "demo-mcamp-gra", name: "GRA | Retargeting US — Websitebezoekers 30d",
+    targeting: "Custom audience: websitebezoekers 30 dagen · US", goal: "OFFSITE_CONVERSIONS", budget: 22, learning: "LEARNING_COMPLETE",
+    w: { imp: 58, clk: 60, spend: 57, conv: 62 }, freq: (d: number) => 2.3 + 0.6 * (1 - d / 149) },
+  { id: "demo-mas-gra-news", campaign: "demo-mcamp-gra", name: "GRA | Retargeting US — Custom: nieuwsbriefleden",
+    targeting: "Custom audience: nieuwsbrieflijst · US", goal: "OFFSITE_CONVERSIONS", budget: 18, learning: "LEARNING_COMPLETE",
+    w: { imp: 42, clk: 40, spend: 43, conv: 38 }, freq: (d: number) => 2.5 + 0.3 * (1 - d / 149) },
+];
+
+const metaAdsets: Row[] = META_ADSETS.map((a) => ({
+  client_id: CID, adset_id: a.id, campaign_id: a.campaign, name: a.name,
+  status: "ACTIVE", effective_status: "ACTIVE",
+  optimization_goal: a.goal, billing_event: "IMPRESSIONS",
+  daily_budget: a.budget, destination_type: "WEBSITE",
+  learning_stage_info: { status: a.learning },
+  targeting_summary: a.targeting,
+}));
+
+// De splitsing zelf. Per campagne-dagrij worden de vier optelbare grootheden over de ad sets van
+// die campagne verdeeld; conversion_value gaat mét splitAlong langs de al verdeelde conversies mee,
+// zodat er geen ad set met nul conversies en tóch omzet ontstaat -- de fout die __demo_sop_inputs_
+// test.ts elders al bewaakt, en die bij `pro-int` (conv-gewicht 0) anders gegarandeerd optreedt.
+const metaAdsetDaily: Row[] = (() => {
+  const perCampagne = new Map<string, typeof META_ADSETS>();
+  for (const a of META_ADSETS) {
+    const lijst = perCampagne.get(a.campaign) ?? [];
+    lijst.push(a);
+    perCampagne.set(a.campaign, lijst);
+  }
+  const out: Row[] = [];
+  for (const rij of metaCampaignDaily) {
+    const adsets = perCampagne.get(String(rij.entity_id)) ?? [];
+    if (adsets.length === 0) continue;
+    const datum = String(rij.date);
+    const dagenGeleden = Math.round((Date.now() - Date.parse(`${datum}T00:00:00Z`)) / 86_400_000);
+    const imp = splitInt(Number(rij.impressions), adsets.map((a) => a.w.imp));
+    const clk = splitInt(Number(rij.link_clicks), adsets.map((a) => a.w.clk));
+    const spend = splitInt(Number(rij.spend), adsets.map((a) => a.w.spend));
+    const conv = splitInt(Number(rij.conversions), adsets.map((a) => a.w.conv));
+    const waarde = splitAlong(Number(rij.conversion_value), conv, adsets.map((a) => a.w.imp));
+    adsets.forEach((a, i) => {
+      const frequency = Math.round(a.freq(Math.max(0, Math.min(149, dagenGeleden))) * 100) / 100;
+      out.push({
+        client_id: CID, entity_id: a.id, date: datum,
+        impressions: imp[i], link_clicks: clk[i], spend: spend[i],
+        conversions: conv[i], leads: 0, conversion_value: waarde[i],
+        // reach volgt uit de eigen frequency van deze ad set, niet uit een splitsing.
+        reach: frequency > 0 ? Math.round(imp[i] / frequency) : 0,
+        frequency,
+      });
+    });
+  }
+  return out;
+})();
+
 // meta_breakdown_daily: plaatsing/leeftijd/device-segmenten met een dure verspiller
 // (audience_network / desktop) en een efficiënte schaalkans (facebook), zodat de
 // breakdown-efficiëntie-detector in de demo iets zinnigs vindt.
@@ -489,6 +615,50 @@ const linkedinUrnLabels: Row[] = LI_DEMO_SEGMENTS.map((s) => ({ urn: s.urn, labe
   { urn: "urn:li:function:demo-ops", label: "Operations" },
 ]);
 
+// ── client_targets + benchmark_sectors ──────────────────────────────────────
+//
+// Twee tabellen die de bi-weekly en de monthly allebei lezen en die in de demo leeg stonden. Geen
+// van beide geeft een foutmelding als hij leeg is -- ze leveren stilzwijgend een slechter antwoord,
+// en dat is precies de faalwijze waar deze demo tegen hoort te beschermen.
+//
+// client_targets is sinds migratie 082 de bron voor de doelstellingen; kpi_targets hierboven is de
+// OUDE plek. De demo droeg alleen de oude, dus resolveTargets() kreeg nul rijen terug en gaf
+// roas/cpa als 0 door aan computeComparisonFacts -- waarna de analyse tegen een doel van nul
+// vergeleek in plaats van te zeggen dat er geen doel was. De waarden hieronder zijn WOORDELIJK
+// dezelfde als in kpi_targets: twee bronnen die verschillende getallen noemen is precies de
+// tegenstrijdigheid die een demo dodelijk maakt.
+//
+// Alleen google_ads: zowel monthly/route.ts:1789 als biweekly/route.ts:165 filtert hard op dat
+// kanaal. Rijen voor meta/linkedin zouden nergens gelezen worden.
+const clientTargets: Row[] = [
+  { client_id: CID, channel: "google_ads", metric: "roas", target_value: 4, valid_from: monthISO(24), valid_to: null },
+  { client_id: CID, channel: "google_ads", metric: "cpa", target_value: 60, valid_from: monthISO(24), valid_to: null },
+];
+
+// benchmark_sectors is een GEDEELDE referentietabel (migratie 012), niet klantdata -- vandaar dat
+// hij per `sector` gaat en niet per client_id. Zonder rijen blijft het hele sectorbenchmark-blok
+// uit de prompt, en kan de demo dus niet laten zien dat die laag bestaat.
+//
+// De waarden zijn zo gekozen dat de demo een GEMENGD beeld geeft en niet overal groen of overal
+// rood: bij de julicijfers van dit account (CTR 1,87%, conv.rate 2,73%, CPA €66,66, ROAS 1,82)
+// levert dit "gemiddeld" op CTR en CPA, en "onder sectorgemiddelde" op conversieratio en ROAS. Dat
+// laatste rijmt met het gemiste ROAS-doel van 4 hierboven -- een demo waarin de benchmark en het
+// doel elkaar tegenspreken, leest als een bug.
+//
+// Let op de ordening: voor cpa en avg_cpc is LAGER beter, dus daar loopt de reeks andersom
+// (top10 < high < median < low). Zie labelBenchmark() in lib/analysis/comparison-facts.ts.
+//
+// avg_cpc staat er BEWUST NIET bij. De demo-maandrijen dragen avg_cpc 0, en tegen een omgekeerde
+// benchmark leest 0 als "top 10% van de sector" -- een compliment voor een ontbrekend getal. Liever
+// geen benchmark dan een onware.
+const DEMO_SECTOR = "leadgen_generiek";
+const benchmarkSectors: Row[] = [
+  { sector: DEMO_SECTOR, account_type: "leadgen_cpa", metric: "ctr", low: 0.012, median: 0.018, high: 0.028, top10: 0.042 },
+  { sector: DEMO_SECTOR, account_type: "leadgen_cpa", metric: "conversion_rate", low: 0.015, median: 0.030, high: 0.050, top10: 0.080 },
+  { sector: DEMO_SECTOR, account_type: "leadgen_cpa", metric: "cpa", low: 120, median: 75, high: 45, top10: 28 },
+  { sector: DEMO_SECTOR, account_type: "leadgen_cpa", metric: "roas", low: 1.2, median: 2.0, high: 3.2, top10: 5.0 },
+];
+
 const clientNotes: Row[] = [
   { id: "demo-note-1", client_id: CID, title: "Beursweek", content: "Piek verwacht rond de beursweek — budgetten tijdig ophogen.", created_at: iso(), updated_at: iso() },
 ];
@@ -638,6 +808,28 @@ const clientSettings: Row[] = [{
     ],
   },
   kpi_targets: { conversionsAbsolute: 700, revenueAbsolute: 90000, roasTarget: 4, cpaTarget: 60 },
+  // De sector waarop benchmark_sectors wordt opgezocht. Stond niet ingevuld, waardoor sectorKey
+  // terugviel op de accounttype-afleiding en er alsnog niets gevonden werd.
+  sector: DEMO_SECTOR,
+  // Zonder ingevuld ICP blijft LinkedIn's pijler 4 (Doelgroep: ICP-fit & Verzadiging) beschrijvend
+  // en zonder fit-score -- de adapter zegt dat zelf: "Zonder ingevuld ICP: beschrijvend, geen
+  // fit-score, met expliciete melding". Dat is het eerlijke gedrag, maar het betekent ook dat de
+  // demo de kernstap van de LinkedIn-analyse niet kon laten zien.
+  //
+  // URN's, geen labels: computeIcpFitForPivot vergelijkt met `icpSet.has(s.pivotValueUrn)`
+  // (lib/linkedin/icp-fit.ts), dus labels zouden hier stil een fit van 0% opleveren. Deze vier
+  // lijsten gebruiken exact de URN's uit LI_DEMO_SEGMENTS hierboven.
+  //
+  // De keuze is die van een vakbeurs voor de tuinbouw, en is zo gezet dat elke pivot een echt
+  // waste-segment overhoudt in plaats van een fit van 100%: Sales (veel spend, nauwelijks leads),
+  // Entry-senioriteit, zakelijke dienstverlening en de kleinste bedrijven vallen erbuiten. Dat is
+  // precies de snede die de analyse hoort te vinden.
+  linkedin_icp: {
+    job_functions: ["urn:li:function:8", "urn:li:function:15"],           // Engineering, Marketing
+    seniorities: ["urn:li:seniority:5", "urn:li:seniority:4"],            // Senior, Manager
+    industries: ["urn:li:industry:2", "urn:li:industry:47"],              // Tuinbouw & agrifood, Machinebouw
+    company_sizes: ["urn:li:companySize:D", "urn:li:companySize:E", "urn:li:companySize:G"],
+  },
   // Conversie-acties ontbraken, en dat had een gevolg dat verder reikte dan dit veld: zonder
   // primaire actie valt de accounttype-bepaling terug op "hybrid", wat de SOP labelt als
   // "Hybrid (Shopping + Search)". Een vakbeurs verkoopt geen producten in een webshop — er is
@@ -720,6 +912,8 @@ export function demoRows(): Record<string, Row[]> {
     meta_account_daily: metaAccountDaily,
     meta_campaigns: metaCampaigns,
     meta_campaign_daily: metaCampaignDaily,
+    meta_adsets: metaAdsets,
+    meta_adset_daily: metaAdsetDaily,
     meta_breakdown_daily: metaBreakdownDaily,
     meta_hourly_performance: metaHourlyPerformance,
     linkedin_campaigns: linkedinCampaigns,
@@ -739,5 +933,7 @@ export function demoRows(): Record<string, Row[]> {
     ads_region_monthly: adsRegionMonthly,
     blended_account_monthly: blendedAccountMonthly,
     client_settings: clientSettings,
+    client_targets: clientTargets,
+    benchmark_sectors: benchmarkSectors,
   };
 }
