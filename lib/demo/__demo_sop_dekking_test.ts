@@ -30,6 +30,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { demoRows } from "./demo-rows";
+import { buildMetaStepFacts } from "@/lib/meta/prepared-facts";
+import { buildLinkedinStepFacts } from "@/lib/linkedin/prepared-facts";
+import { mapMetaDailyToComputeRow, mapMetaBreakdownToComputeRow } from "@/lib/meta/analysis-data";
+import { mapLinkedinDailyToComputeRow, mapLinkedinDemographicToComputeRow } from "@/lib/linkedin/analysis-data";
 
 let passed = 0, failed = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -258,6 +262,106 @@ check("elke pivot houdt een waste-segment over (geen 100% fit)", (() => {
     return [...urns].some((u) => !inSet.has(u)) && [...urns].some((u) => inSet.has(u));
   });
 })());
+
+
+// ── DE TWEEDE LAAG: leveren de stappen ook FEITEN? ──────────────────────────
+//
+// Alles hierboven toetst of de TABELLEN gevuld zijn. Dat is één laag te grof, en dat heeft precies
+// gedaan wat een te grove test doet: hij stond groen terwijl drie stappen niets te zeggen hadden.
+//
+//  - Meta pijler 3 kwam eruit met hook_rate_pct 0 en hold_rate_pct null, omdat meta_ad_daily geen
+//    videokolommen droeg -- terwijl de prompt, META_BENCHMARKS en de weekly-bleeder-check alle drie
+//    op die cijfers leunen.
+//  - LinkedIn pijler 5 leverde een TEGENSTRIJDIG object: cpl 43,33 en leads 131,6 naast has_leadgen
+//    false en "Geen leadgen-campagnes in deze periode", omdat one_click_lead_form_opens ontbrak.
+//  - De competitor-dimensie had één maand, dus over "auction insights over de tijd" viel niets te zeggen.
+//
+// De tabellen waren in alle drie de gevallen gevuld. Het waren de KOLOMMEN erin die ontbraken.
+// Daarom draait deze sectie de echte fact-builders van productie en kijkt naar de uitkomst.
+
+const metaFeiten = buildMetaStepFacts({
+  account: (rijen.meta_account_daily ?? []).map((x) => mapMetaDailyToComputeRow(x as Record<string, unknown>)),
+  campaigns: (rijen.meta_campaign_daily ?? []).map((x) => mapMetaDailyToComputeRow(x as Record<string, unknown>)),
+  adsets: (rijen.meta_adset_daily ?? []).map((x) => mapMetaDailyToComputeRow(x as Record<string, unknown>)),
+  ads: (rijen.meta_ad_daily ?? []).map((x) => mapMetaDailyToComputeRow(x as Record<string, unknown>, "demo")),
+  breakdowns: (rijen.meta_breakdown_daily ?? []).map((x) => mapMetaBreakdownToComputeRow(x as Record<string, unknown>)),
+  targets: { roasTarget: 4, cpaTarget: 60 },
+});
+
+const linkedinFeiten = buildLinkedinStepFacts({
+  account: (rijen.linkedin_account_daily ?? []).map((x) => mapLinkedinDailyToComputeRow(x as Record<string, unknown>)),
+  campaigns: (rijen.linkedin_campaign_daily ?? []).map((x) => mapLinkedinDailyToComputeRow(x as Record<string, unknown>)),
+  creatives: (rijen.linkedin_creative_daily ?? []).map((x) => mapLinkedinDailyToComputeRow(x as Record<string, unknown>)),
+  demographics: (rijen.linkedin_demographic_daily ?? []).map((x) => mapLinkedinDemographicToComputeRow(x as Record<string, unknown>)),
+  icp: (settings.linkedin_icp ?? null) as never,
+  targets: { cplTarget: 80 },
+});
+
+/** Een pijler die zichzelf als onbeschikbaar meldt, kan in een demo-run niets laten zien. */
+function pijlerBeschikbaar(feiten: unknown): boolean {
+  if (feiten == null) return false;
+  if (typeof feiten === "object" && "available" in (feiten as Record<string, unknown>)) {
+    return (feiten as Record<string, unknown>).available !== false;
+  }
+  return true;
+}
+
+console.log("\nElke pijler levert feiten, niet alleen een tabel");
+for (let i = 1; i <= 6; i++) {
+  check(`meta pijler ${i}`, pijlerBeschikbaar(metaFeiten[i]), JSON.stringify(metaFeiten[i]).slice(0, 90));
+  check(`linkedin pijler ${i}`, pijlerBeschikbaar(linkedinFeiten[i]), JSON.stringify(linkedinFeiten[i]).slice(0, 90));
+}
+
+console.log("\nDe ratio's waar de prompts op leunen zijn ook echt berekend");
+{
+  const p3 = (metaFeiten[3] ?? {}) as Record<string, Record<string, unknown>>;
+  const cp = (p3.creative_performance ?? {}) as Record<string, unknown>;
+  const bench = (cp.account_benchmark ?? {}) as Record<string, unknown>;
+  // META_BENCHMARKS noemt "hook rate video 25 tot 40%, hold rate 10 tot 20%" en de weekly vraagt om
+  // "hook rate dalend WoW". Een nul hier zou als een GEMETEN nul lezen, niet als ontbrekende data.
+  check("meta: account-hook rate is berekend", Number(bench.hook_rate_pct) > 0, String(bench.hook_rate_pct));
+  check("meta: account-hold rate is berekend", bench.hold_rate_pct != null && Number(bench.hold_rate_pct) > 0, String(bench.hold_rate_pct));
+
+  const ads = (cp.ads ?? []) as Record<string, unknown>[];
+  const videoAds = ads.filter((a) => Number(a.hook_rate_pct) > 0);
+  check("meta: minstens één advertentie heeft een hook rate", videoAds.length > 0);
+  // Statische advertenties horen GEEN hook rate te hebben; een nul daar is correct en betekent
+  // "geen video", niet "slecht presterende video".
+  check("meta: niet elke advertentie is video", videoAds.length < ads.length, `${videoAds.length}/${ads.length}`);
+  check("meta: de hold rate ligt in een plausibele band",
+    videoAds.every((a) => Number(a.hold_rate_pct) > 5 && Number(a.hold_rate_pct) < 40),
+    videoAds.map((a) => a.hold_rate_pct).join(", "));
+}
+{
+  const p5 = (linkedinFeiten[5] ?? {}) as Record<string, unknown>;
+  // Dit is het geval dat zichzelf tegensprak: leads en cpl berekend, has_leadgen false.
+  check("linkedin: has_leadgen is waar", p5.has_leadgen === true, JSON.stringify(p5));
+  check("linkedin: geen tegenspraak tussen leads en has_leadgen",
+    !(Number(p5.leads) > 0 && p5.has_leadgen === false), JSON.stringify(p5));
+  check("linkedin: open rate is berekend", Number(p5.open_rate_pct) > 0, String(p5.open_rate_pct));
+  // LINKEDIN_BENCHMARKS noemt "form completion 10 tot 15%"; buiten die band zou de demo zijn eigen
+  // benchmark tegenspreken.
+  const completion = Number(p5.completion_rate_pct);
+  check("linkedin: completion rate ligt in de benchmarkband", completion >= 10 && completion <= 15, String(completion));
+}
+
+console.log("\nDe competitor-dimensie heeft een reeks, geen enkel punt");
+{
+  const is = (rijen.ads_campaign_impression_share ?? []) as Record<string, unknown>[];
+  const maanden = new Set(is.map((r) => String(r.month)));
+  // De maand-SOP haalt zes maanden op en vraagt om auction insights OVER DE TIJD; met één meetpunt
+  // valt daar niets over te zeggen, ook al is de tabel technisch "gevuld".
+  check("meerdere maanden", maanden.size >= 4, `${maanden.size} maanden`);
+  const perCampagne = new Map<string, number[]>();
+  for (const r of is) {
+    const k = String(r.campaign_name);
+    perCampagne.set(k, [...(perCampagne.get(k) ?? []), Number(r.search_budget_lost_is)]);
+  }
+  // Een vlakke reeks levert geen bevinding op. Minstens één campagne moet een ontwikkeling tonen.
+  check("minstens één campagne beweegt",
+    [...perCampagne.values()].some((v) => Math.max(...v) - Math.min(...v) > 0.05),
+    [...perCampagne.entries()].map(([k, v]) => `${k}: ${Math.min(...v)}-${Math.max(...v)}`).join(" | "));
+}
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (ontbrekend.size > 0) {

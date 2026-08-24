@@ -114,11 +114,42 @@ const adsAccountMonthly: Row[] = Array.from({ length: N_MONTHS }, (_, i) => {
     ctr: impressions > 0 ? clicks / impressions : 0, conversion_rate: clicks > 0 ? conversions / clicks : 0,
     cost_per_conversion: conversions > 0 ? cost / conversions : 0, roas: cost > 0 ? conversionsValue / cost : 0 };
 });
-const adsCampaignImpressionShare: Row[] = [
-  { client_id: CID, campaign_id: "demo-c-grt", campaign_name: "GRT | Search | NL", campaign_type: "SEARCH", month: monthISO(0), cost: 4200, conversions: 60, search_impression_share: 0.55, search_budget_lost_is: 0.28, search_rank_lost_is: 0.05, daily_budget: 140, budget_utilization: 0.97 },
-  { client_id: CID, campaign_id: "demo-c-grn", campaign_name: "GRN | Search | Canada", campaign_type: "SEARCH", month: monthISO(0), cost: 1900, conversions: 24, search_impression_share: 0.48, search_budget_lost_is: 0.31, search_rank_lost_is: 0.08, daily_budget: 90, budget_utilization: 0.95 },
-  { client_id: CID, campaign_id: "demo-c-brand", campaign_name: "GreenTech | Brand", campaign_type: "SEARCH", month: monthISO(0), cost: 500, conversions: 55, search_impression_share: 0.93, search_budget_lost_is: 0.01, search_rank_lost_is: 0.03, daily_budget: 20, budget_utilization: 0.8 },
+// ── Impressieaandeel over de tijd ───────────────────────────────────────────
+//
+// Stond op DRIE rijen, alle drie in de lopende maand. De competitor-dimensie gold daarmee als
+// "beschikbaar" (de dekkingscheck kijkt naar length > 0), maar de maand-SOP vraagt om auction
+// insights OVER DE TIJD en de route haalt zes maanden op -- met een enkel meetpunt valt daar niets
+// over te zeggen. Nu zes maanden per campagne.
+//
+// Het patroon is niet vlak, want dan was er nog steeds niets te melden: GRT loopt op van 12% naar
+// 28% verlies aan budget (een campagne die geleidelijk vastloopt op zijn dagbudget), GRN blijft
+// rond de 30% (structureel te krap), en Brand verliest vrijwel niets op budget maar wel wat op
+// positie. Dat zijn drie verschillende conclusies, en dat is precies waar de stap voor bestaat.
+const IS_CAMPAGNES = [
+  { id: "demo-c-grt", naam: "GRT | Search | NL", kosten: 4200, conv: 60, isStart: 0.68, isEind: 0.55, budgetStart: 0.12, budgetEind: 0.28, rank: 0.05, dagbudget: 140, benutting: 0.97 },
+  { id: "demo-c-grn", naam: "GRN | Search | Canada", kosten: 1900, conv: 24, isStart: 0.51, isEind: 0.48, budgetStart: 0.29, budgetEind: 0.31, rank: 0.08, dagbudget: 90, benutting: 0.95 },
+  { id: "demo-c-brand", naam: "GreenTech | Brand", kosten: 500, conv: 55, isStart: 0.95, isEind: 0.93, budgetStart: 0.01, budgetEind: 0.01, rank: 0.03, dagbudget: 20, benutting: 0.8 },
 ];
+const adsCampaignImpressionShare: Row[] = IS_CAMPAGNES.flatMap((c) =>
+  // monthISO(5) is de oudste, monthISO(0) de lopende maand.
+  Array.from({ length: 6 }, (_, i) => {
+    const maandenTerug = 5 - i;
+    const t = i / 5; // 0 = oudst, 1 = meest recent
+    const meng = (van: number, naar: number) => Math.round((van + (naar - van) * t) * 100) / 100;
+    // Kosten en conversies bewegen mee met het impressieaandeel: een campagne die meer aandeel
+    // verliest, geeft ook minder uit. Anders spreekt deze tabel de campagnetabel tegen.
+    const schaal = 0.85 + 0.15 * t;
+    return {
+      client_id: CID, campaign_id: c.id, campaign_name: c.naam, campaign_type: "SEARCH",
+      month: monthISO(maandenTerug),
+      cost: Math.round(c.kosten * schaal), conversions: Math.round(c.conv * schaal),
+      search_impression_share: meng(c.isStart, c.isEind),
+      search_budget_lost_is: meng(c.budgetStart, c.budgetEind),
+      search_rank_lost_is: c.rank,
+      daily_budget: c.dagbudget, budget_utilization: c.benutting,
+    };
+  })
+);
 
 // ── Inzichten: sop_* + sprint_hypotheses ──
 const sopInsights: Row[] = [
@@ -192,7 +223,7 @@ const rsaAssets: Row[] = CREATIVES.flatMap((c) => [
 
 // ── Meta + LinkedIn: entiteiten + dagseries (voor views, fatigue en forecast) ──
 const META_ADS = [
-  { id: "demo-m-hero", name: "GRT | Awareness EU — hero video", creative: "demo-mc-hero", imp: 1100, clk: 22, spend: 55, conv: 3, seed: 0 },
+  { id: "demo-m-hero", name: "GRT | Awareness EU — hero video", creative: "demo-mc-hero", imp: 1100, clk: 22, spend: 55, conv: 3, seed: 0, video: true },
   { id: "demo-m-life", name: "GRT | Awareness EU — lifestyle", creative: "demo-mc-life", imp: 1400, clk: 26, spend: 62, conv: 4, seed: 2 },
   { id: "demo-m-banner", name: "GRT | Retargeting — banner", creative: "demo-mc-banner", imp: 800, clk: 30, spend: 44, conv: 6, seed: 4 },
 ];
@@ -202,18 +233,73 @@ const metaCreatives: Row[] = [
   { client_id: CID, creative_id: "demo-mc-life", title: "Innovatie in de kas", body: "Lifestyle-beeld met een teler.", thumbnail_url: "https://picsum.photos/seed/greentech-life/320/200", format: "single_image", call_to_action_type: "SIGN_UP", link_url: "https://demo.greentech-fictief.example/bezoek" },
   { client_id: CID, creative_id: "demo-mc-banner", title: "Boek uw stand", body: "Statische banner met CTA.", thumbnail_url: "https://picsum.photos/seed/greentech-banner/320/200", format: "single_image", call_to_action_type: "BOOK_TRAVEL", link_url: "https://demo.greentech-fictief.example/beurs" },
 ];
+// ── De videokolommen op advertentieniveau ───────────────────────────────────
+//
+// meta_ad_daily droeg alleen impressions/link_clicks/spend/conversions, en daardoor kwam pijler 3
+// (Creative & Visual) eruit met hook_rate_pct 0 en hold_rate_pct null. Dat raakt meer dan die ene
+// pijler: de prompt vraagt letterlijk om "de funnel-metrics (hook rate, hold rate, link CTR, CVR)"
+// tegen het accountgemiddelde, META_BENCHMARKS noemt "hook rate video 25 tot 40%, hold rate 10 tot
+// 20%", en de weekly-bleeder-check vraagt om "hook rate dalend WoW". Drie plekken die leunden op een
+// cijfer dat de demo niet kon leveren.
+//
+// De formules staan in lib/meta/prepared-compute.ts en zijn hier gevolgd, niet benaderd:
+//   hook_rate_pct = video_3s_views / impressions
+//   hold_rate_pct = video_p100     / video_3s_views
+//
+// ALLEEN de hero is video (zie meta_creatives: format "video"; de andere twee zijn single_image).
+// Bij de andere twee blijven de kolommen dus AFWEZIG in plaats van nul -- een statische banner heeft
+// geen hook rate, en een nul zou als een gemeten nul lezen. mapMetaDailyToComputeRow gebruikt
+// numOrNull, dus afwezig komt als null door en valt netjes uit de ratio's.
+//
+// De hook rate van de hero DAALT over de tijd, van circa 36% naar 24%: hij zakt daarmee recent
+// onder de benchmarkband van 25-40%, zodat zowel de fatigue-detectie in de monthly als de
+// "hook rate dalend WoW"-check in de weekly een echt signaal hebben in plaats van een vlakke lijn.
+// De hold rate blijft rond 15% (midden in de 10-20%-band): het probleem zit in de hook, niet in
+// het vasthouden -- dat is een scherpere casus dan alles tegelijk laten dalen.
+const metaHookRate = (dagenGeleden: number): number => 0.24 + 0.12 * (dagenGeleden / 149);
+
 const metaAdDaily: Row[] = META_ADS.flatMap((a) =>
   Array.from({ length: 150 }, (_, d) => {
-    const f = dayFactor(149 - d, a.seed);
-    return { client_id: CID, entity_id: a.id, date: dayISO(149 - d), impressions: Math.round(a.imp * f), link_clicks: Math.round(a.clk * f), spend: Math.round(a.spend * f), conversions: Math.max(0, Math.round(a.conv * f)) };
+    const dagenGeleden = 149 - d;
+    const f = dayFactor(dagenGeleden, a.seed);
+    const impressions = Math.round(a.imp * f);
+    const basis: Row = {
+      client_id: CID, entity_id: a.id, date: dayISO(dagenGeleden),
+      impressions, link_clicks: Math.round(a.clk * f), spend: Math.round(a.spend * f),
+      conversions: Math.max(0, Math.round(a.conv * f)),
+    };
+    if (!a.video) return basis;
+    const video3s = Math.round(impressions * metaHookRate(dagenGeleden));
+    return {
+      ...basis,
+      video_3s_views: video3s,
+      // thruplay (15s of afgerond) zit tussen 3s en p100 in; p100 is het echte 100%-kijkcijfer.
+      video_thruplay: Math.round(video3s * 0.34),
+      video_p100: Math.round(video3s * 0.15),
+    };
   })
 );
+// De videokolommen tellen HIER ook op: het account is de som van zijn advertenties, en dat is de
+// regel die de rest van deze demo ook volgt. Zonder deze sommen kwam het accountgemiddelde uit op
+// hook_rate_pct 0 -- en dat leest als een GEMETEN nul, terwijl het "geen videodata" betekende. Een
+// advertentie afzetten tegen een benchmark van nul maakt elke video oneindig bovengemiddeld.
+//
+// Het accountcijfer valt lager uit dan dat van de hero zelf (circa 8% tegen 25%), en dat hoort zo:
+// maar een deel van de impressies is video, en Meta's accountrapportage wordt op precies dezelfde
+// manier verdund door statische plaatsingen.
 const metaDayAgg = (day: number) => META_ADS.reduce((s, a) => {
   const f = dayFactor(day, a.seed);
-  s.impressions += Math.round(a.imp * f); s.link_clicks += Math.round(a.clk * f);
+  const imp = Math.round(a.imp * f);
+  s.impressions += imp; s.link_clicks += Math.round(a.clk * f);
   s.spend += Math.round(a.spend * f); s.conversions += Math.max(0, Math.round(a.conv * f));
+  if (a.video) {
+    const v3 = Math.round(imp * metaHookRate(day));
+    s.video_3s_views += v3;
+    s.video_thruplay += Math.round(v3 * 0.34);
+    s.video_p100 += Math.round(v3 * 0.15);
+  }
   return s;
-}, { impressions: 0, link_clicks: 0, spend: 0, conversions: 0 });
+}, { impressions: 0, link_clicks: 0, spend: 0, conversions: 0, video_3s_views: 0, video_thruplay: 0, video_p100: 0 });
 // Meta raakt in de demo geleidelijk verzadigd: bereik wordt duurder (meer spend per vertoning)
 // terwijl de advertentie minder aanslaat (minder klikken per vertoning). Dat is precies de
 // signatuur waar de CPM/verzadigingsdetector op let — zonder zo'n verloop zou die kaart in de
@@ -243,7 +329,7 @@ const metaAccountDailyRecent: Row[] = Array.from({ length: 150 }, (_, d) => {
   // telt voor meta_ads standaard conversions+leads op; dezelfde waarde in allebei de velden
   // verdubbelde zo elke Meta-conversie in elke consument die de standaardselectie gebruikt
   // (ChannelPerformance vandaag al, en de kanaalafhankelijke KPI-rij die dit ontdekte).
-  return { client_id: CID, date: dayISO(day), impressions: a.impressions, reach: Math.round(a.impressions / frequency), frequency: Math.round(frequency * 100) / 100, link_clicks: Math.round(a.link_clicks * metaSaturationClicks(day)), spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: 0, conversion_value: Math.round(conv * META_ACCOUNT_AOV) };
+  return { client_id: CID, date: dayISO(day), impressions: a.impressions, reach: Math.round(a.impressions / frequency), frequency: Math.round(frequency * 100) / 100, link_clicks: Math.round(a.link_clicks * metaSaturationClicks(day)), spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: 0, video_3s_views: a.video_3s_views, video_thruplay: a.video_thruplay, video_p100: a.video_p100, conversion_value: Math.round(conv * META_ACCOUNT_AOV) };
 });
 // Oudere geschiedenis (dag 150 t/m 729, ~19 maanden extra vóór het gedetailleerde venster
 // hierboven): vlak/licht groeiend, GEEN verzadigings-/frequency-drama (metaSaturationSpend/Clicks
@@ -518,10 +604,30 @@ const LI_META = [
   { urn: "urn:li:demo:cr4", imp: 940, clk: 16, spend: 37, leads: 1, seed: 7 },
   { urn: "urn:li:demo:cr5", imp: 310, clk: 9, spend: 22, leads: 1, seed: 9 },
 ];
+// ── Form opens: de kolom waar de hele Lead Gen Funnel-pijler op staat ───────
+//
+// linkedin_*_daily droeg wel one_click_leads maar geen one_click_lead_form_opens, en daardoor kwam
+// pijler 5 (Lead Gen Funnel) eruit met een TEGENSTRIJDIG object: cpl 43,33 en leads 131,6 in
+// hetzelfde antwoord als has_leadgen false en "Geen leadgen-campagnes in deze periode". De oorzaak
+// is een enkele regel in lib/linkedin/prepared-facts.ts -- `has_leadgen: latest.form_opens > 0` --
+// en de hele pijler gaat over open rate → completion rate → waar zit de drop-off.
+//
+// De formules staan in lib/linkedin/prepared-compute.ts en zijn hier gevolgd:
+//   open_rate_pct            = form_opens / clicks
+//   form_completion_rate_pct = leads      / form_opens
+//
+// 55% van de kliks opent het formulier. Bij de bestaande leadaantallen levert dat een completion
+// rate rond 12 tot 14 procent: midden in de band die LINKEDIN_BENCHMARKS noemt ("form completion
+// 10 tot 15%"). Bewust NIET uit de leads teruggerekend naar een vast percentage -- dan zou de
+// completion rate een constante zijn en had de analyse er niets over te zeggen. Nu varieert hij
+// mee met de dagcurve, zoals in werkelijkheid.
+const linkedinFormOpens = (clicks: number): number => Math.round(clicks * 0.55);
+
 const linkedinCreativeDaily: Row[] = LI_META.flatMap((c) =>
   Array.from({ length: 150 }, (_, d) => {
     const f = dayFactor(149 - d, c.seed);
-    return { client_id: CID, entity_urn: c.urn, date: dayISO(149 - d), impressions: Math.round(c.imp * f), clicks: Math.round(c.clk * f), spend: Math.round(c.spend * f), external_website_conversions: Math.round(f), one_click_leads: Math.max(0, Math.round(c.leads * f)) };
+    const clicks = Math.round(c.clk * f);
+    return { client_id: CID, entity_urn: c.urn, date: dayISO(149 - d), impressions: Math.round(c.imp * f), clicks, spend: Math.round(c.spend * f), external_website_conversions: Math.round(f), one_click_leads: Math.max(0, Math.round(c.leads * f)), one_click_lead_form_opens: linkedinFormOpens(clicks) };
   })
 );
 // 730 dagen (~2 jaar), niet 150: LinkedIn heeft -- anders dan Meta -- geen dag-domein-begrensde
@@ -541,7 +647,7 @@ const linkedinAccountDaily: Row[] = Array.from({ length: 730 }, (_, d) => {
   const agg = LI_META.reduce((s, c) => { const f = dayFactor(day, c.seed); s.impressions += Math.round(c.imp * f); s.clicks += Math.round(c.clk * f); s.spend += Math.round(c.spend * f); s.leads += Math.max(0, Math.round(c.leads * f)); return s; }, { impressions: 0, clicks: 0, spend: 0, leads: 0 });
   const leads = agg.leads * weekdayConvPenalty(day);
   const conversions = Math.round(leads * 0.3);
-  return { client_id: CID, date: dayISO(day), impressions: agg.impressions, clicks: agg.clicks, spend: Math.round(agg.spend * recentSpendBump(day)), external_website_conversions: conversions, one_click_leads: leads, conversion_value: Math.round((conversions + leads) * LI_ACCOUNT_AOV) };
+  return { client_id: CID, date: dayISO(day), impressions: agg.impressions, clicks: agg.clicks, spend: Math.round(agg.spend * recentSpendBump(day)), external_website_conversions: conversions, one_click_leads: leads, one_click_lead_form_opens: linkedinFormOpens(agg.clicks), conversion_value: Math.round((conversions + leads) * LI_ACCOUNT_AOV) };
 });
 // linkedin_campaign_daily voedt de ChannelPerformance-view (per campagne).
 // Expliciet i.p.v. formule: 'Brede awareness' domineert de spend maar levert weinig leads,
@@ -558,7 +664,8 @@ const linkedinCampaignDaily: Row[] = LI_CAMP_DEFS.flatMap((c) =>
     const f = dayFactor(149 - d, c.seed);
     const oneClickLeads = Math.max(0, Math.round(c.leads * f));
     const externalConv = Math.round(f);
-    return { client_id: CID, entity_urn: c.urn, date: dayISO(149 - d), impressions: Math.round(c.imp * f), clicks: Math.round(c.clk * f), spend: Math.round(c.spend * f), external_website_conversions: externalConv, one_click_leads: oneClickLeads, conversion_value: Math.round((oneClickLeads + externalConv) * LI_ACCOUNT_AOV) };
+    const clicks = Math.round(c.clk * f);
+    return { client_id: CID, entity_urn: c.urn, date: dayISO(149 - d), impressions: Math.round(c.imp * f), clicks, spend: Math.round(c.spend * f), external_website_conversions: externalConv, one_click_leads: oneClickLeads, one_click_lead_form_opens: linkedinFormOpens(clicks), conversion_value: Math.round((oneClickLeads + externalConv) * LI_ACCOUNT_AOV) };
   })
 );
 
