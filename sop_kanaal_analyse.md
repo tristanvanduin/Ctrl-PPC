@@ -25,6 +25,36 @@ Deterministic:
 
 ---
 
+## 1b. Waar elke SOP voor bedoeld is
+
+Deterministic, uit de prompts zelf en `docs/ANALYSE-LOGICA.md` §5:
+
+| Cadans | Frequentie | Venster | Doel |
+| --- | --- | --- | --- |
+| Weekly | 52×/jaar/kanaal | 14 dagen | Vroeg signaleren van anomalieen en ad waste; tracking-verificatie die de rest gijzelt. Expliciet **geen** diepe analyse (`sop-prompts.ts:1688`). |
+| Bi-weekly | 26×/jaar/kanaal | 3 maanden | Ontwikkelt de maand zich zoals de maandanalyse voorspelde? Maandeindprognose, en toetsen of doorgevoerde hypotheses meetbaar effect tonen (`sop-prompts.ts:1465`, ANALYSE-LOGICA §5.3). |
+| Monthly | 12×/jaar/kanaal | 13 maanden | De volledige diagnose, eindigend in hypotheses en sprintplanning met ICE-score, meetbare verwachting en tijdshorizon. Het enige moment waarop het systeem een belofte doet die later afgerekend kan worden. |
+
+Inferred: dit is bedoeld als een geneste regelkring — de monthly stelt het plan op, de bi-weekly
+toetst het halverwege, de weekly vangt wat niet kan wachten. **De implementatie breekt beide
+koppelingen.**
+
+Deterministic:
+
+- **Monthly → bi-weekly** bestaat, maar via de verkeerde bron: `section = "full"` (narratief proza)
+  in plaats van `structured_monthly_v2` (de hypotheses als velden). Hypothese-tracking bereikt
+  bovendien alleen Google.
+- **Monthly/bi-weekly → weekly** bestaat niet. De weekly leest geen enkele eerdere SOP-output. Van de
+  drie lussen staat de vaakst draaiende volledig los.
+- **Terug omhoog**: de monthly ziet niet wat de weekly die maand vlagde, en `evaluate-hypotheses` —
+  de stap die de belofte afrekent — is `LIVE-ONGETEST`.
+
+Inferred: de kring is nergens rond, niet omdat onderdelen ontbreken maar omdat ze niet aan elkaar
+geknoopt zijn. Dat is ook waarom het stappenplan hieronder vrijwel volledig bedrading is.
+
+
+---
+
 ## 2. Scorekaart (1–10)
 
 | As | Systeem | Weekly | Bi-weekly | Monthly |
@@ -66,8 +96,13 @@ Inferred: op 24 augustus vult de sync 2–31 juli en vraagt de weekly 10–24 au
 Alleen in de eerste twee weken van een maand is er gedeeltelijke dekking; de rest van de maand geeft
 deze SOP een 404 die de gebruiker vertelt te syncen terwijl de sync correct heeft gedraaid.
 
-Kans: laat de *dagelijkse* sync tot gisteren lopen; alleen de backfill heeft een maandgrens nodig.
-Eén aanroep op regel 135. Zolang dat niet kan, hoort de combinatie niet als beschikbaar in de UI.
+Deterministic: `lib/linkedin/sync-windows.ts:1-30` exporteert `todayUTC()` en legt uit waarom de daily
+een trailing venster tot vandaag nodig heeft (LinkedIn herschrijft conversies met terugwerkende kracht
+binnen 30 dagen). Die functie wordt buiten tests nergens gebruikt. De maandgrens hoort bij de *backfill*
+en is per ongeluk ook de einddatum van de daily geworden.
+
+Inferred: er zijn geen live klanten, dus dit is nooit als storing zichtbaar geweest — maar het is uit
+twee regels code te bewijzen. Kans: geef de daily `todayUTC()` mee. Eén regel.
 
 Aanpalend (deterministic): `lib/meta/sync.ts` heeft nul productie-imports en staat als toegestane
 wees in `scripts/check-hygiene.mjs:163` — "gated op MDP-approval". De Meta-entiteitstabellen worden
@@ -198,8 +233,9 @@ Deterministic:
 - `app/api/analysis/period-evaluation/route.ts:7` — "zolang de hypothese-evaluator niet gewired is,
   levert deze route geen outcomes mee".
 
-Inferred: gedocumenteerde eigenaarskeuze, geen vergissing. Maar het gevolg is dat de hele cadanslogica
-ongebruikt is en de leercyclus wel gebouwd maar nooit gedraaid. Dat is de reden dat leercyclus en
+Inferred: een juiste keuze bij deze stand — zonder echte klanten kost een nachtelijke run alleen geld.
+Het punt is dan ook niet dat de cron uit staat, maar dat niemand kan vaststellen wat er gebeurt als hij
+aan gaat: de cadanslogica is nooit in werking geweest en de leercyclus is wel gebouwd maar nooit gedraaid. Dat is de reden dat leercyclus en
 agency memory op 4 staan: de architectuur verdient een 7, de werkelijkheid een 2.
 
 Kans: `evaluate-hypotheses` doet geen analyse — het legt bestaande weekcijfers naast eerder aangenomen
@@ -293,3 +329,74 @@ Inferred:
 6. Bi-weekly op `structured_monthly_v2` en een deterministische prognose (P1-6, P1-7).
 7. Weekly-geheugen (P1-5).
 8. De rest.
+
+---
+
+## 7. Stappenplan naar 8+ op elke as
+
+Inferred. Zes fasen op volgorde van afhankelijkheid, niet van moeite.
+
+### Fase 0 — Bewijsbaar maken zonder klanten *(volwassenheid, consistentie)*
+
+Zonder live accounts is "het werkt" een aanname. Het gereedschap ligt er al: `lib/demo/demo-rows.ts`
+vult ook `meta_account_daily` en `linkedin_account_daily`, en `app/api/eval/replay` speelt gecapturede
+fixtures string-gelijk opnieuw af met een expliciet model op temperatuur 0, met een `confirm`-rem
+tegen onbedoelde kosten. Wat ontbreekt is de brug ertussen.
+
+- Rookproef-script: alle negen combinaties op de demo-klant, faalt op 404, 500, lege stap of
+  niet-gehaalde quality gate. Buiten `gates.sh` houden (die moet snel blijven), zoals
+  `check-kaartoverloop.mjs`.
+- Eén fixture-set per kanaal per cadans vastleggen.
+- Replay twee keer op dezelfde fixture, spreiding rapporteren. Dat is de enige eerlijke meting van de
+  as "consistentie".
+
+### Fase 1 — De vijf harde koppelfouten *(logica 6 → 8)*
+
+- **LinkedIn daily sync**: `route.ts:135` geeft `lastCompleteMonthEnd()` aan backfill én daily.
+  `todayUTC()` bestaat, is geëxporteerd, en wordt buiten tests nergens gebruikt — terwijl de kop van
+  `sync-windows.ts` uitlegt waarom de daily een trailing venster tot vandaag nodig heeft. Eén regel.
+- **De lopende, halve week**: `refresh_rollups` groepeert op `date_trunc('week', …)` zonder
+  volledigheidsfilter, dus de laatste weekrij is een deelweek. Stap 1 vergelijkt die WoW en rapporteert
+  boven 20% afwijking — gegarandeerd raak op elke volumemetriek. Uitsluiten of markeren.
+- **Google weekly stap 3**: weekaggregatie per campagne + dagbudgetkolom, of de vraag uit de prompt.
+- **Google bi-weekly stap 4**: `ads_device_performance_monthly` toevoegen. **LinkedIn bi-weekly stap 4**:
+  `daily_budget`, `unit_cost`, `bid_strategy` meeselecteren.
+- **De periode-fouten**: `computeComparisonFacts` op month-to-date, en de prognose deterministisch uit
+  de forecast-engine.
+
+### Fase 2 — Kanaalpariteit in context *(kwaliteit 7 → 8, dekking → 8)*
+
+- `buildEnrichmentContext` uit de Google-tak naar gedeelde voorbereiding, alle routes × alle kanalen.
+- `failedLayers` zichtbaar maken: nu leest een stukgelopen laag exact hetzelfde als "niets te melden".
+- `getClientMemory` ook in weekly en bi-weekly.
+- `channel` valideren tegen `ALLE_SOP_CHANNELS` met een 400.
+
+### Fase 3 — De regelkring sluiten *(leercyclus 4 → 8, memory → 8)*
+
+- Bi-weekly leest `structured_monthly_v2` (hypotheses, primary_thread, open recommendations).
+- Weekly krijgt open punten van vorige week + lopende maandhypotheses, met de instructie herhaling te
+  benoemen.
+- `evaluate-hypotheses` op fixtures bewijzen, daarna **handmatig maandelijks** draaien. Deze cron doet
+  geen analyse — hij legt bestaande weekcijfers naast aangenomen hypotheses — dus de kostenzorg die de
+  SOP-triggering pauzeert geldt hier niet.
+- Afgewezen advies onthouden via de bestaande `agency_memory_events`-laag.
+
+### Fase 4 — Handhaving hard maken *(consistentie 6 → 8, volwassenheid → 8)*
+
+- Quality gate blokkeert de **save**, niet alleen de PDF-export.
+- PDF-poort op alle drie de monthly-sleutels in plaats van de letterlijke string `"monthly"`.
+- Per-stap-validaties voor Meta en LinkedIn (adapters dragen skeletons en purityRules al).
+- Cluster-validatie ook voor Google.
+
+### Fase 5 — Vakinhoud bijtrekken *(kwaliteit → 9, dekking → 9)*
+
+Pas hier, want dit is het enige echte redactiewerk, en zonder fase 0 niet te beoordelen.
+
+- Kanaalspecifieke rolregel en bureau/klant-voorbeelden; hypotheseformaat en ICE blijven gedeeld.
+- De ontbrekende weekcheck per kanaal: Google impression share verloren aan budget, Meta delivery- en
+  learning-limited-status, LinkedIn objective/format-mismatch.
+- Bi-weekly stap 3 en 4 hermappen op de zes pijlers; kopcommentaar bijwerken.
+- Google's nummering normaliseren naar 1–8.
+
+Inferred: fase 0 t/m 4 is vrijwel volledig bedrading — bestaande modules aan bestaande aanroepers
+knopen. Daarom is 8+ op elke as haalbaar zonder herbouw.
