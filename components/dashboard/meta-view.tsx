@@ -145,16 +145,6 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
           en "wat leverde het per land op" is één vraag in twee kaarten. */}
       <GeoRanglijstCard state={geo} zonderBalken />
 
-      {/* groep="levering" is plaatsing/platform/device ("waar komt het vandaan"), groep="doelgroep"
-          is leeftijd en gender ("wie bereiken we"), en het maandverloop zet dat in de tijd. Drie
-          kaarten die alle drie een verdeling of een verloop tonen -- en alle drie inhoudsgestuurd,
-          dus er valt niets uit te rekken. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
-        <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
-        <ChannelMonthlyChart />
-      </div>
-
       {/* "Prestaties richting de beurs" -- de sectie die Google al had en deze kanalen niet.
           Alleen als er een event gekozen is; zonder event is "nog N weken tot" een lege zin.
           Zie channel-fair-weeks.tsx voor waarom hij hier ontbrak: niet de cijfers maar de ingang. */}
@@ -168,17 +158,6 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         </Sectie>
       )}
 
-      {/* Wat er van de prestatie-view overblijft: de kerncijfers over 28 dagen en de maandtabel.
-          Pacing staat nu in de hero en het maandverloop naast de landencijfers -- allebei
-          losgetrokken omdat ze de vraag beantwoorden die je bovenaan stelt, niet onderaan. */}
-      <Sectie
-        icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Maandprestaties"
-        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
-      >
-        <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} />
-      </Sectie>
-
       {/* Meta-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde plek en icoon
           als bij Google; renderd niets zolang er geen dagcijfers gesynced zijn (demo heeft die
           wel). Zie channel-forecast-overview.tsx voor de volledige toelichting -- computeForecast
@@ -189,6 +168,27 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
       >
         <ChannelForecastOverview />
+      </Sectie>
+
+      {/* groep="levering" is plaatsing/platform/device ("waar komt het vandaan"), groep="doelgroep"
+          is leeftijd en gender ("wie bereiken we"), en het maandverloop zet dat in de tijd. Drie
+          kaarten die alle drie een verdeling of een verloop tonen -- en alle drie inhoudsgestuurd,
+          dus er valt niets uit te rekken. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
+        <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
+        <ChannelMonthlyChart />
+      </div>
+
+      {/* Wat er van de prestatie-view overblijft: de kerncijfers over 28 dagen en de maandtabel.
+          Pacing staat nu in de hero en het maandverloop naast de landencijfers -- allebei
+          losgetrokken omdat ze de vraag beantwoorden die je bovenaan stelt, niet onderaan. */}
+      <Sectie
+        icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Maandprestaties"
+        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
+      >
+        <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} />
       </Sectie>
 
       {/* Meta-equivalent van Google's "Waar het budget landt" (23 augustus 2026) -- alleen het

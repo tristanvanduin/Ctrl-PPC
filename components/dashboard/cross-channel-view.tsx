@@ -188,20 +188,6 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
         </div>
       </Sectie>
 
-      {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
-          vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
-          binnen zichzelf, terwijl het twee antwoorden op twee vragen zijn — "hoe verhouden de
-          kanalen zich over de maanden" en "wat leverde elk kanaal op". */}
-      {rows && rows.length > 0 && (
-        <Sectie
-          icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Verdeling over de kanalen"
-          bijschrift="Spend per kanaal per maand — welk kanaal draagt welk deel van het budget"
-        >
-          <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} />
-        </Sectie>
-      )}
-
       {/* DEZELFDE TWEE SECTIES ALS DE KANAALTABBLADEN, gevoed uit de blended historie.
           "Waarom heeft alle kanalen deze sectie niet?" -- omdat FairWeeksOverview, MetricCards en
           PerformanceChart hun data uit ClientDataProvider haalden, en die is Google-only. Alle
@@ -246,6 +232,20 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
             metric={jaaroverzichtMetric}
             onMetricChange={setJaaroverzichtMetric}
           />
+        </Sectie>
+      )}
+
+      {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
+          vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
+          binnen zichzelf, terwijl het twee antwoorden op twee vragen zijn — "hoe verhouden de
+          kanalen zich over de maanden" en "wat leverde elk kanaal op". */}
+      {rows && rows.length > 0 && (
+        <Sectie
+          icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Verdeling over de kanalen"
+          bijschrift="Spend per kanaal per maand — welk kanaal draagt welk deel van het budget"
+        >
+          <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} />
         </Sectie>
       )}
 

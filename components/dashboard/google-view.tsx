@@ -240,22 +240,16 @@ export function GoogleView({
             </div>
           </div>
 
-          {/* De landencijfers direct onder de hero en BOVEN de grafiekenrij: ze horen bij de
-              wereldkaart erboven ("waar komt het vandaan" / "wat leverde het per land op"), en
-              stonden onder de grafieken een scherm verderop. */}
+          {/* De landencijfers direct onder de hero: ze horen bij de wereldkaart erboven ("waar
+              komt het vandaan" / "wat leverde het per land op"), en stonden een scherm verderop. */}
           <GeoRanglijstCard state={geo} zonderBalken />
 
-          {/* DRIE GRAFIEKKAARTEN OP EEN RIJ. Alle drie tonen een verdeling of een verloop, en dat
-              is precies waarom ze samen een rij kunnen zijn zonder dat er iets uitgerekt hoeft te
-              worden: een lijn en een staafreeks WORDEN beter van meer hoogte (hun grafiekvlak is
-              `flex-1`), dus als de donut ernaast hoger uitvalt, vullen ze dat met een grotere
-              grafiek in plaats van met wit. Bij een tegelkaart of een tekstblok kan dat niet, en
-              dat is het verschil tussen "opvullen" en "uitrekken". */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
-            <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
-            <CampaignTypeSplit clientId={clientId} />
-          </div>
+          {/* BEURS EN JAAROVERZICHT VOOR DE GRAFIEKENRIJ. Deze twee secties dragen de vraag van
+              het tabblad -- lopen we op schema, en halen we het jaar -- en dat is wat je als
+              eerste wilt weten. De drie grafiekkaarten eronder gaan de diepte in (verloop per
+              maand, verdeling per campagnetype); die horen bij het detailwerk dat daaronder
+              doorloopt. Dezelfde volgorde op alle vier de tabbladen, zodat een tabwissel niets
+              verplaatst. */}
 
           <Sectie
             icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -281,6 +275,18 @@ export function GoogleView({
             <MetricCards clientId={clientId} countryFilter={countryFilter} selected={jaaroverzichtMetric} onSelect={setJaaroverzichtMetric} />
             <PerformanceChart clientId={clientId} countryFilter={countryFilter} metric={jaaroverzichtMetric} onMetricChange={setJaaroverzichtMetric} />
           </Sectie>
+
+          {/* DRIE GRAFIEKKAARTEN OP EEN RIJ. Alle drie tonen een verdeling of een verloop, en dat
+              is precies waarom ze samen een rij kunnen zijn zonder dat er iets uitgerekt hoeft te
+              worden: een lijn en een staafreeks WORDEN beter van meer hoogte (hun grafiekvlak is
+              `flex-1`), dus als de donut ernaast hoger uitvalt, vullen ze dat met een grotere
+              grafiek in plaats van met wit. Bij een tegelkaart of een tekstblok kan dat niet, en
+              dat is het verschil tussen "opvullen" en "uitrekken". */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+            <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
+            <CampaignTypeSplit clientId={clientId} />
+          </div>
 
           {/* Feedback punt 29+31: PmaxNetworkSplit was hier al gemarkeerd als PMax-only ("ze
               bestaan alleen bij Performance Max"), maar stond toch op Overzicht i.p.v. onder de
