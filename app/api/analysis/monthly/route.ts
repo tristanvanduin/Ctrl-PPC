@@ -87,13 +87,11 @@ import {
 } from "@/lib/progress/server";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { logger } from "@/lib/logger";
-import { getClientMemory, buildClientMemoryGrounding } from "@/lib/memory/client-memory";
+import { buildGeheugenMetTaken } from "@/lib/analysis/geheugen-grounding";
 import { buildGoogleSignalsSection, type CampaignIsRow, type CampaignMonthlyRow, type KeywordMonthlyRow, type ChangeHistoryRow, type ScheduleRow, type NetworkMonthlyRow, type DeviceMonthlyRow, type SearchTermMonthlyLite, type NegativeKeywordRow } from "@/lib/analysis/signal-section";
 import { today } from "@/lib/reporting-date";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
 import { callLogMark, logCacheSummary } from "@/lib/analysis/openrouter-client";
-import { buildTaskStatusGrounding } from "@/lib/tasks/task-tracking";
-import { priorTasksVoorGrounding } from "@/lib/tasks/prior-tasks";
 import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 import { triggerCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 import { triggerPortfolioSynthesisIfReady } from "@/lib/analysis/auto-portfolio-synthesis-trigger";
@@ -1155,47 +1153,6 @@ async function finalizeChannelMonthlySynthesis(opts: {
   return { structured, acceptanceReport, qualityGate, geblokkeerd: false as const };
 }
 
-/**
- * Het geheugenblok van een maandrun: alles wat we van deze klant weten uit eerdere runs.
- *
- * Twee bronnen, samengevoegd tot EEN argument in plaats van twee. Ze beschrijven hetzelfde soort
- * ding -- wat er eerder is vastgesteld en wat er eerder is afgesproken -- en buildMonthlyStepPrompt
- * laat een leeg blok al byte-identiek weg. Een klant zonder historie krijgt dus precies dezelfde
- * prompt als voordat dit blok bestond.
- *
- *   client-geheugen   wat er in eerdere analyses is vastgesteld over deze klant.
- *   taakstatus        de openstaande en afgeronde taken van de vorige cyclus, met de instructie
- *                     afgeronde taken niet te herhalen tenzij de cijfers aantoonbaar terugvielen.
- *                     Zonder dit begint elke maandanalyse met een schone lei en beveelt hij opnieuw
- *                     aan wat vorige maand al is gedaan.
- *
- * De taakbron is sop_tasks. De pure kern (buildTaskStatusGrounding) is geschreven op
- * analysis_tasks uit migratie 006, maar die tabel wordt nergens geschreven of gelezen. Twee velden
- * bestaan in sop_tasks niet -- execution_status en deadline_hint -- en die blijven dus onbekend;
- * de functie laat de bijbehorende regels dan weg in plaats van iets aan te nemen.
- *
- * `sopTypeKey` begrenst de taken tot het eigen kanaal (migratie 104). Zonder die grens leest een
- * Meta-analyse dat een Google-actie al is uitgevoerd, en andersom.
- *
- * Deze functie bestaat omdat alle drie de kanaalpaden hem nodig hebben. Het Google-pad had het
- * blok als enige, inline; Meta en LinkedIn kregen alleen het client-geheugen en helemaal geen
- * taakhistorie -- de gebruikelijke vorm hier: de Google-variant is stilzwijgend de norm. Drie
- * kopieen van dezelfde vier regels is precies wat AGENTS.md beschrijft bij median/safeDiv, dus
- * een plek in plaats van drie.
- */
-async function buildGeheugenMetTaken(
-  supabase: SupabaseClient,
-  clientId: string,
-  periodEnd: string,
-  sopTypeKey: string
-): Promise<string> {
-  const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
-  const taakStatusSection = buildTaskStatusGrounding(
-    await priorTasksVoorGrounding(supabase, clientId, periodEnd, sopTypeKey)
-  );
-  return [clientMemorySection, taakStatusSection].filter(Boolean).join("\n\n");
-}
-
 // M2 route-wiring: het additieve Meta-pad. Draait de 11-staps Meta SOP op de gedeelde route-helpers
 // met de Meta-datalaag, en laat het Google-pad volledig ongemoeid via de vroege branch in POST.
 // LIVE-ONGETEST: de Supabase-fetch in buildMetaAnalysisData en de end-to-end run zijn pas met echte
@@ -1253,7 +1210,9 @@ async function runMetaMonthlyAnalysis(
   // nu toe alleen het client-geheugen: de taakhistorie zat in het Google-pad, na de vroege branch
   // in POST, en Meta kwam daar dus nooit. Een Meta-maandanalyse begon daardoor elke keer met een
   // schone lei over wat er vorige cyclus is uitgevoerd.
-  const geheugenMetTaken = await buildGeheugenMetTaken(supabase, clientId, periodEnd, adapter.sopTypeKey);
+  const geheugenMetTaken = await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: adapter.sopTypeKey, cadans: "monthly",
+  });
 
   // Fase 2: dezelfde verrijkingslaag als het Google-pad, nu kanaalbewust. Zes van de acht lagen
   // leunen op ads_*-tabellen en worden voor dit kanaal overgeslagen én gemeld (zie ALLEEN_GOOGLE in
@@ -1510,7 +1469,9 @@ async function runLinkedinMonthlyAnalysis(
 
   // E1-wiring (LinkedIn): het geheugenblok eenmalig ophalen, zelfde patroon als Google -- en om
   // dezelfde reden als bij Meta droeg dit tot nu toe alleen het client-geheugen en geen taken.
-  const geheugenMetTaken = await buildGeheugenMetTaken(supabase, clientId, periodEnd, adapter.sopTypeKey);
+  const geheugenMetTaken = await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: adapter.sopTypeKey, cadans: "monthly",
+  });
 
   // Fase 2: dezelfde verrijkingslaag als het Google-pad, nu kanaalbewust. Zes van de acht lagen
   // leunen op ads_*-tabellen en worden voor dit kanaal overgeslagen én gemeld (zie ALLEEN_GOOGLE in
@@ -1834,7 +1795,9 @@ export async function POST(request: NextRequest) {
     // E1-wiring: het geheugenblok eenmalig ophalen voor de lus (niet per step). Zie
     // buildGeheugenMetTaken voor wat erin zit en waarom het één argument is; dat stond hier
     // inline tot Meta en LinkedIn hetzelfde blok nodig hadden.
-    const geheugenMetTaken = await buildGeheugenMetTaken(supabase, clientId, periodEnd, adapter.sopTypeKey);
+    const geheugenMetTaken = await buildGeheugenMetTaken({
+      supabase, clientId, voorDatum: periodEnd, sopType: adapter.sopTypeKey, cadans: "monthly",
+    });
 
     // A-track: de deterministisch gedetecteerde signalen en cross-checks, eenmalig voor de
     // lus. Zelfde principe als het geheugenblok: een lege sectie geeft byte-identieke

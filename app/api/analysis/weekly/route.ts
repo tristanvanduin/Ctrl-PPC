@@ -30,7 +30,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
-import { getClientMemory, buildClientMemoryGrounding } from "@/lib/memory/client-memory";
+import { buildGeheugenMetTaken, alsContextBlok } from "@/lib/analysis/geheugen-grounding";
 import { ALLE_SOP_CHANNELS, type SopChannel } from "@/lib/analysis/sop-channel-config";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
@@ -195,7 +195,15 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
-  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  //
+  // Sinds migratie 104 draagt dit blok ook de TAAKSTATUS, en dat is voor de weekly het zwaarste
+  // deel: het openstaande-punten-blok hieronder toont wat er nog open staat, maar niet wat er
+  // AFGEROND is. Zonder dat laatste beveelt een weekly een uitgevoerde taak 52 keer per jaar
+  // opnieuw aan. Twaalf taken, begrensd tot dit kanaal; wat er buiten valt wordt gemeld en niet
+  // stil weggelaten.
+  const geheugenMetTaken = alsContextBlok(await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: "weekly", cadans: "weekly",
+  }));
   // ── De weekly was een eiland ────────────────────────────────────────────────
   //
   // Hij las geen enkele eerdere SOP-output: niet de maandanalyse, en ook niet zijn eigen vorige run.
@@ -212,8 +220,9 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
       .eq("client_id", clientId).eq("sop_type", "monthly")
       .in("section", ["structured_monthly_v2", "full"])
       .order("analysis_date", { ascending: false }).limit(6),
-    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans -- geen
-    // kanaalvermenging zoals bij sop_tasks, dat die kolom niet heeft.
+    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans. Dat
+    // gold ooit niet voor sop_tasks; sinds migratie 104 draagt die de kolom ook, en het
+    // geheugenblok hierboven gebruikt hem om de taken tot dit kanaal te begrenzen.
     supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
       .eq("client_id", clientId).eq("sop_type", "weekly")
       .order("analysis_date", { ascending: false }).limit(25),
@@ -229,7 +238,7 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   });
   const ketenContext = `\n\n${maandHandoff.tekst}${buildOpenPointsBlock((eigenOpen.data ?? []) as Parameters<typeof buildOpenPointsBlock>[0])}`;
 
-  const sharedContext = `${ketenContext}${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  const sharedContext = `${ketenContext}${geheugenMetTaken}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   // Drie losse calls i.p.v. één grote (masterplan 17.11x): elke stap is nu apart routeerbaar
   // (STEP_TIER, per "weekly-step-N") en apart gelogd in llm_usage.
@@ -499,7 +508,15 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
-  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  //
+  // Sinds migratie 104 draagt dit blok ook de TAAKSTATUS, en dat is voor de weekly het zwaarste
+  // deel: het openstaande-punten-blok hieronder toont wat er nog open staat, maar niet wat er
+  // AFGEROND is. Zonder dat laatste beveelt een weekly een uitgevoerde taak 52 keer per jaar
+  // opnieuw aan. Twaalf taken, begrensd tot dit kanaal; wat er buiten valt wordt gemeld en niet
+  // stil weggelaten.
+  const geheugenMetTaken = alsContextBlok(await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: "meta_weekly", cadans: "weekly",
+  }));
   // ── De weekly was een eiland ────────────────────────────────────────────────
   //
   // Hij las geen enkele eerdere SOP-output: niet de maandanalyse, en ook niet zijn eigen vorige run.
@@ -516,8 +533,9 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
       .eq("client_id", clientId).eq("sop_type", "meta_monthly")
       .in("section", ["structured_monthly_v2", "full"])
       .order("analysis_date", { ascending: false }).limit(6),
-    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans -- geen
-    // kanaalvermenging zoals bij sop_tasks, dat die kolom niet heeft.
+    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans. Dat
+    // gold ooit niet voor sop_tasks; sinds migratie 104 draagt die de kolom ook, en het
+    // geheugenblok hierboven gebruikt hem om de taken tot dit kanaal te begrenzen.
     supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
       .eq("client_id", clientId).eq("sop_type", "meta_weekly")
       .order("analysis_date", { ascending: false }).limit(25),
@@ -533,7 +551,7 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   });
   const ketenContext = `\n\n${maandHandoff.tekst}${buildOpenPointsBlock((eigenOpen.data ?? []) as Parameters<typeof buildOpenPointsBlock>[0])}`;
 
-  const sharedContext = `${ketenContext}${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  const sharedContext = `${ketenContext}${geheugenMetTaken}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (Meta)..." });
   const step1 = await runStep({
@@ -787,7 +805,15 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
-  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  //
+  // Sinds migratie 104 draagt dit blok ook de TAAKSTATUS, en dat is voor de weekly het zwaarste
+  // deel: het openstaande-punten-blok hieronder toont wat er nog open staat, maar niet wat er
+  // AFGEROND is. Zonder dat laatste beveelt een weekly een uitgevoerde taak 52 keer per jaar
+  // opnieuw aan. Twaalf taken, begrensd tot dit kanaal; wat er buiten valt wordt gemeld en niet
+  // stil weggelaten.
+  const geheugenMetTaken = alsContextBlok(await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: "linkedin_weekly", cadans: "weekly",
+  }));
   // ── De weekly was een eiland ────────────────────────────────────────────────
   //
   // Hij las geen enkele eerdere SOP-output: niet de maandanalyse, en ook niet zijn eigen vorige run.
@@ -804,8 +830,9 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
       .eq("client_id", clientId).eq("sop_type", "linkedin_monthly")
       .in("section", ["structured_monthly_v2", "full"])
       .order("analysis_date", { ascending: false }).limit(6),
-    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans -- geen
-    // kanaalvermenging zoals bij sop_tasks, dat die kolom niet heeft.
+    // sop_recommendations draagt sop_type, dus dit blijft binnen dit kanaal EN deze cadans. Dat
+    // gold ooit niet voor sop_tasks; sinds migratie 104 draagt die de kolom ook, en het
+    // geheugenblok hierboven gebruikt hem om de taken tot dit kanaal te begrenzen.
     supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
       .eq("client_id", clientId).eq("sop_type", "linkedin_weekly")
       .order("analysis_date", { ascending: false }).limit(25),
@@ -821,7 +848,7 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   });
   const ketenContext = `\n\n${maandHandoff.tekst}${buildOpenPointsBlock((eigenOpen.data ?? []) as Parameters<typeof buildOpenPointsBlock>[0])}`;
 
-  const sharedContext = `${ketenContext}${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  const sharedContext = `${ketenContext}${geheugenMetTaken}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (LinkedIn)..." });
   const step1 = await runStep({

@@ -179,7 +179,8 @@ function narratieveTerugval(opts: HandoffOpts, datumRegel: string): MonthlyHando
 // dat het verschil maakt tussen een incident en een patroon.
 //
 // sop_recommendations draagt een sop_type-kolom, dus dit blijft binnen hetzelfde kanaal én dezelfde
-// cadans. Geen migratie nodig, en geen kanaalvermenging zoals bij sop_tasks (dat die kolom niet heeft).
+// cadans. Geen migratie nodig -- en sop_tasks draagt sinds migratie 104 dezelfde kolom, dus daar is
+// de kanaalvermenging inmiddels ook weg.
 
 export interface OpenPunt {
   hypothesis?: unknown;

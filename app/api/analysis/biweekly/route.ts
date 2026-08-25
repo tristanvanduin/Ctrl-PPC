@@ -28,7 +28,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
-import { getClientMemory, buildClientMemoryGrounding } from "@/lib/memory/client-memory";
+import { buildGeheugenMetTaken, alsContextBlok } from "@/lib/analysis/geheugen-grounding";
 import { ALLE_SOP_CHANNELS, type SopChannel } from "@/lib/analysis/sop-channel-config";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
@@ -256,8 +256,14 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
   // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
-  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
-  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
+  //
+  // Sinds migratie 104 draagt dit blok ook de TAAKSTATUS: twintig taken, begrensd tot dit kanaal.
+  // De bi-weekly beoordeelt in stap 2 of uitgevoerde hypotheses al effect tonen -- zonder te weten
+  // welke taken werkelijk zijn afgerond is dat een vraag zonder antwoord.
+  const geheugenMetTaken = alsContextBlok(await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: "biweekly", cadans: "biweekly",
+  }));
+  const sharedContext = `${geheugenMetTaken}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}
 
 ${bwComparisonText}${bwPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
@@ -586,8 +592,14 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
-  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
-  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${metaPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  //
+  // Sinds migratie 104 draagt dit blok ook de TAAKSTATUS: twintig taken, begrensd tot dit kanaal.
+  // De bi-weekly beoordeelt in stap 2 of uitgevoerde hypotheses al effect tonen -- zonder te weten
+  // welke taken werkelijk zijn afgerond is dat een vraag zonder antwoord.
+  const geheugenMetTaken = alsContextBlok(await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: "meta_biweekly", cadans: "biweekly",
+  }));
+  const sharedContext = `${geheugenMetTaken}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${metaPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance (Meta)..." });
   const step1 = await runStep({
@@ -910,8 +922,14 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   // vaakst draaiende cadans er baat bij heeft -- een weekly die niet weet wat er eerder over deze
   // klant is vastgelegd, begint 52 keer per jaar blanco. Kanaalneutraal: client_memory gaat over de
   // klant, niet over een advertentieplatform, dus alle drie de kanalen krijgen hetzelfde.
-  const clientMemoryText = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
-  const sharedContext = `${clientMemoryText}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${linkedinPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+  //
+  // Sinds migratie 104 draagt dit blok ook de TAAKSTATUS: twintig taken, begrensd tot dit kanaal.
+  // De bi-weekly beoordeelt in stap 2 of uitgevoerde hypotheses al effect tonen -- zonder te weten
+  // welke taken werkelijk zijn afgerond is dat een vraag zonder antwoord.
+  const geheugenMetTaken = alsContextBlok(await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: "linkedin_biweekly", cadans: "biweekly",
+  }));
+  const sharedContext = `${geheugenMetTaken}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${linkedinPacingText}${enrichment.hypothesisTracking}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
 
   await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Performance (LinkedIn)..." });
   const step1 = await runStep({

@@ -20,7 +20,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PriorTask, TaskStatus } from "./task-tracking";
 import { sopTypesVanZelfdeKanaal } from "@/lib/analysis/sop-channel-config";
 
-/** Hoeveel taken er hoogstens mee de prompt in gaan. */
+/**
+ * Hoeveel taken er hoogstens mee de prompt in gaan, als de aanroeper niets opgeeft.
+ *
+ * Veertig is de maat van de MAANDanalyse: die heeft ruimte en een cyclus van een maand om over te
+ * rapporteren. De weekly en de bi-weekly hanteren een kleinere limiet -- niet omdat hun taken
+ * minder waard zijn, maar omdat hun hele prompt korter is (de weekly is expliciet "geen diepe
+ * analyse") en veertig regels taakhistorie daar de rest zouden verdringen.
+ */
 const MAX_TAKEN = 40;
 
 /**
@@ -65,6 +72,21 @@ export function toPriorTasks(rijen: Record<string, unknown>[]): PriorTask[] {
 }
 
 /**
+ * Wat de ophaler teruggeeft: de taken die de prompt in gaan, en hoeveel er zijn afgekapt.
+ *
+ * Het aantal hoort erbij en niet alleen de lijst. Het promptblok sluit af met "Verzin geen taken
+ * die hier niet staan"; wordt er stil afgekapt, dan leest het model dat als "deze taak bestaat
+ * niet" terwijl hij gewoon buiten de selectie viel.
+ */
+export interface PriorTaskSelectie {
+  taken: PriorTask[];
+  weggelaten: number;
+}
+
+/** Geen taken, niets afgekapt. Ook het antwoord bij een fout: de analyse draait dan zonder blok. */
+const LEEG: PriorTaskSelectie = { taken: [], weggelaten: 0 };
+
+/**
  * Haalt de taken op van vóór de huidige analysedatum. Een fout levert een lege lijst op en
  * daarmee een leeg groundingblok: de analyse draait dan zonder taakhistorie, precies zoals
  * voordat deze module bestond. Dat is beter dan de run laten vallen op een contextblok.
@@ -86,8 +108,9 @@ export async function priorTasksVoorGrounding(
   supabase: SupabaseClient,
   clientId: string,
   voorDatum: string,
-  sopType?: string
-): Promise<PriorTask[]> {
+  sopType?: string,
+  limiet: number = MAX_TAKEN
+): Promise<PriorTaskSelectie> {
   try {
     let query = supabase
       .from("sop_tasks")
@@ -100,12 +123,17 @@ export async function priorTasksVoorGrounding(
     const kanaalTypes = sopType ? sopTypesVanZelfdeKanaal(sopType) : [];
     if (kanaalTypes.length > 0) query = query.in("sop_type", kanaalTypes);
 
+    // Eén rij MEER ophalen dan we tonen. Dat is het hele verschil tussen "dit zijn je taken" en
+    // "dit is een selectie": zonder die extra rij weet de aanroeper niet of hij precies aan de
+    // limiet zat of eroverheen, en dan kan het promptblok niet melden dat er meer was.
     const { data, error } = await query
       .order("analysis_date", { ascending: false })
-      .limit(MAX_TAKEN);
-    if (error) return [];
-    return toPriorTasks((data ?? []) as Record<string, unknown>[]);
+      .limit(limiet + 1);
+    if (error) return LEEG;
+
+    const rijen = (data ?? []) as Record<string, unknown>[];
+    return { taken: toPriorTasks(rijen.slice(0, limiet)), weggelaten: Math.max(0, rijen.length - limiet) };
   } catch {
-    return [];
+    return LEEG;
   }
 }

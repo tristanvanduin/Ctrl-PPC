@@ -109,7 +109,12 @@ export interface PriorTask {
 // volgende run. Lege lijst geeft een lege string, dus geen gedragswijziging voor een
 // eerste run. Niet-uitgevoerde taken met deadline direct worden expliciet ge-escaleerd,
 // zodat de stapinstructies ze kunnen opvoeren.
-export function buildTaskStatusGrounding(priorTasks: PriorTask[]): string {
+//
+// `weggelaten` is het aantal taken dat de ophaler heeft afgekapt. Dat MOET erbij, want dit blok
+// eindigt met "Verzin geen taken die hier niet staan" -- een stille afkapping vertelt het model
+// dan dat een echte openstaande taak niet bestaat. Zolang de weekly en de bi-weekly een kleinere
+// limiet hanteren dan de monthly is dat geen theoretisch geval.
+export function buildTaskStatusGrounding(priorTasks: PriorTask[], weggelaten = 0): string {
   if (priorTasks.length === 0) return "";
   const lines: string[] = ["## Taakstatus vorige cyclus"];
 
@@ -130,6 +135,9 @@ export function buildTaskStatusGrounding(priorTasks: PriorTask[]): string {
     }
   }
 
+  if (weggelaten > 0) {
+    lines.push(`(en nog ${weggelaten} oudere taken, hier niet getoond -- dit is de recentste selectie, geen volledige lijst)`);
+  }
   lines.push("Baseer opvolging op deze status. Verzin geen taken die hier niet staan.");
   return lines.join("\n");
 }

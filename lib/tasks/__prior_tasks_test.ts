@@ -104,8 +104,9 @@ async function main() {
   {
     const kapot = { from() { throw new Error("verbinding weg"); } } as unknown as SupabaseClient;
     const r = await priorTasksVoorGrounding(kapot, "c1", "2026-07-01");
-    check("een fout geeft een lege lijst", r.length === 0);
-    check("en dus een leeg blok", buildTaskStatusGrounding(r) === "");
+    check("een fout geeft een lege lijst", r.taken.length === 0);
+    check("en meldt niets als afgekapt", r.weggelaten === 0);
+    check("en dus een leeg blok", buildTaskStatusGrounding(r.taken, r.weggelaten) === "");
   }
   {
     const metFout = {
@@ -114,7 +115,7 @@ async function main() {
       }),
     } as unknown as SupabaseClient;
     const r = await priorTasksVoorGrounding(metFout, "c1", "2026-07-01");
-    check("een databasefout ook", r.length === 0);
+    check("een databasefout ook", r.taken.length === 0 && r.weggelaten === 0);
   }
   {
     const goed = {
@@ -125,7 +126,8 @@ async function main() {
       }),
     } as unknown as SupabaseClient;
     const r = await priorTasksVoorGrounding(goed, "c1", "2026-07-01");
-    check("een geslaagde ophaal levert taken", r.length === 1 && r[0].status === "done", JSON.stringify(r));
+    check("een geslaagde ophaal levert taken", r.taken.length === 1 && r.taken[0].status === "done", JSON.stringify(r));
+    check("en meldt niets als afgekapt", r.weggelaten === 0);
   }
 
   // ── Het kanaalfilter ────────────────────────────────────────────────────
@@ -202,6 +204,75 @@ async function main() {
       check("cross_channel filtert niet in plaats van alles weg te gooien", gezien() === null,
         JSON.stringify(gezien()));
     }
+  }
+
+  // ── De limiet, en de eerlijkheid erover ─────────────────────────────────
+  //
+  // De drie cadansen hanteren verschillende limieten (TAAKLIMIET): de weekly-prompt is expliciet
+  // kort en veertig regels taakhistorie zouden daar de rest verdringen. Een limiet is prima; een
+  // STILLE limiet niet, want dit blok sluit af met "Verzin geen taken die hier niet staan". Wordt
+  // er stil afgekapt, dan leest het model dat als "die taak bestaat niet" terwijl hij gewoon
+  // buiten de selectie viel -- en dat is een verkeerde bewering, niet een ontbrekende.
+
+  console.log("\nDe limiet wordt gemeld en niet stil toegepast");
+  {
+    /** Mock die N rijen teruggeeft en vastlegt met welke limiet er is gevraagd. */
+    function metRijen(n: number): { client: SupabaseClient; gevraagd: () => number | null } {
+      let gevraagd: number | null = null;
+      const rijen = Array.from({ length: n }, (_, i) => ({
+        title: `Taak ${i + 1}`, status: "open", analysis_date: "2026-06-01",
+      }));
+      const client = {
+        from: () => ({ select: () => ({ eq: () => ({ lt: () => ({
+          order: () => ({ limit: (l: number) => { gevraagd = l; return Promise.resolve({ data: rijen.slice(0, l), error: null }); } }),
+        }) }) }) }),
+      } as unknown as SupabaseClient;
+      return { client, gevraagd: () => gevraagd };
+    }
+
+    // Precies op de limiet: niets afgekapt.
+    {
+      const { client } = metRijen(12);
+      const r = await priorTasksVoorGrounding(client, "c1", "2026-07-01", undefined, 12);
+      check("precies aan de limiet: alles komt mee", r.taken.length === 12, String(r.taken.length));
+      check("en er wordt niets gemeld", r.weggelaten === 0, String(r.weggelaten));
+    }
+
+    // Eén erover: de eerste twaalf komen mee en de rest wordt geméld.
+    {
+      const { client } = metRijen(13);
+      const r = await priorTasksVoorGrounding(client, "c1", "2026-07-01", undefined, 12);
+      check("boven de limiet: precies de limiet komt mee", r.taken.length === 12, String(r.taken.length));
+      check("en de rest wordt gemeld", r.weggelaten === 1, String(r.weggelaten));
+    }
+
+    // De query vraagt er één MEER dan hij toont -- anders valt niet te zien of er meer was.
+    {
+      const { client, gevraagd } = metRijen(50);
+      await priorTasksVoorGrounding(client, "c1", "2026-07-01", undefined, 12);
+      check("de query vraagt limiet + 1", gevraagd() === 13, String(gevraagd()));
+    }
+
+    // Zonder opgave blijft de oude maandlimiet gelden: geen gedragswijziging voor de monthly.
+    {
+      const { client, gevraagd } = metRijen(5);
+      await priorTasksVoorGrounding(client, "c1", "2026-07-01");
+      check("zonder opgave geldt de maandlimiet van 40", gevraagd() === 41, String(gevraagd()));
+    }
+  }
+
+  console.log("\nHet blok zegt het ook echt");
+  {
+    const taken = toPriorTasks([{ title: "Bod verlagen", status: "open" }]);
+    const zonder = buildTaskStatusGrounding(taken, 0);
+    const met = buildTaskStatusGrounding(taken, 7);
+    check("zonder afkapping geen melding", !/niet getoond/.test(zonder), zonder);
+    check("met afkapping wel", /7 oudere taken/.test(met), met);
+    // De melding mag de belofte "verzin geen taken" niet vervangen maar aanvullen: allebei blijven.
+    check("en de slotregel blijft staan", met.includes("Verzin geen taken die hier niet staan"), met);
+    // Geen taken blijft geen blok, ook als er iets is afgekapt -- dat kan niet, maar als het ooit
+    // kan mag het geen blok met alleen een meldregel opleveren.
+    check("nul taken geeft nog steeds niets", buildTaskStatusGrounding([], 5) === "");
   }
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);
