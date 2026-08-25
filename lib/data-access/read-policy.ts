@@ -45,6 +45,17 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // de tabellen uit die migratie met een gevonden browser-lezer.
   meta_breakdown_daily: { capability: "client:read", clientColumn: "client_id" },
   linkedin_demographic_daily: { capability: "client:read", clientColumn: "client_id" },
+  // Het vierde kanaal (migratie 106). Zelfde patroon als de meta_*- en linkedin_*-tabellen.
+  microsoft_campaigns: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_adgroups: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_account_daily: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_campaign_daily: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_adgroup_daily: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_breakdown_daily: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_keyword_monthly: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_search_terms_monthly: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_campaign_impression_share: { capability: "client:read", clientColumn: "client_id" },
+  microsoft_profile_monthly: { capability: "client:read", clientColumn: "client_id" },
   meta_campaigns: { capability: "client:read", clientColumn: "client_id" },
   linkedin_campaigns: { capability: "client:read", clientColumn: "client_id" },
   meta_hourly_performance: { capability: "client:read", clientColumn: "client_id" },

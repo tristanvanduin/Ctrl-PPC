@@ -27,7 +27,7 @@ import { logger } from "@/lib/logger";
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type SopType = "monthly" | "weekly" | "biweekly";
-export type EnrichmentChannel = "google_ads" | "meta_ads" | "linkedin_ads";
+export type EnrichmentChannel = "google_ads" | "meta_ads" | "linkedin_ads" | "microsoft_ads";
 
 // ── WELKE LAGEN GELDEN VOOR WELK KANAAL ────────────────────────────────────
 //

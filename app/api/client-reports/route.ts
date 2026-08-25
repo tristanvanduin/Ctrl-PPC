@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
       accountMonthlyRes, isRes,
       sprintItemsRes, completedTasksRes, changeHistoryRes,
       clientCtx, targetResult, latestSopRes, hypothesesRes,
-      metaMonthlyRes, linkedinMonthlyRes, convConfigRes,
+      metaMonthlyRes, linkedinMonthlyRes, microsoftMonthlyRes, convConfigRes,
     ] = await Promise.all([
       supabase.from("ads_account_monthly").select("*").eq("client_id", clientId).gte("month", thirteenMonthsAgo).lte("month", periodEnd).order("month"),
       supabase.from("ads_campaign_impression_share").select("month, search_impression_share").eq("client_id", clientId).gte("month", thirteenMonthsAgo).lte("month", periodEnd).order("month"),
@@ -280,6 +280,9 @@ export async function POST(request: NextRequest) {
         : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
       kanalen.includes("linkedin")
         ? supabase.from("linkedin_account_daily").select("date, impressions, clicks, spend, one_click_leads, external_website_conversions, post_click_conversions, conversion_value").eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+      kanalen.includes("microsoft")
+        ? supabase.from("microsoft_account_daily").select("date, impressions, clicks, spend, conversions, conversion_value").eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
         : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
       meerdereKanalen
         ? supabase.from("client_settings").select("channel_conversion_config").eq("client_id", clientId).maybeSingle()
@@ -319,12 +322,19 @@ export async function POST(request: NextRequest) {
       channelKey: "linkedin_ads",
       convConfig,
     });
+    const microsoftData = monthlyFromDaily((microsoftMonthlyRes.data ?? []) as Array<Record<string, unknown>>, {
+      dateField: "date",
+      clicksField: "clicks",
+      convFields: (r) => ({ conversions: Number(r.conversions ?? 0) }),
+      channelKey: "microsoft_ads",
+      convConfig,
+    });
 
-    // Blended maandrijen: Google + Meta + LinkedIn opgeteld per maand, ratio's herberekend uit de
-    // opgetelde tellers (niet de ratio's zelf gemiddeld -- anders weegt een maand met weinig
-    // verkeer even zwaar als een maand met veel verkeer). Bij een Google-only klant is dit
-    // identiek aan accountData: geen gedragswijziging voor de 62 van de 71.
-    const blendedAccountData: Array<Record<string, unknown>> = meerdereKanalen ? blendMonthly([accountData, metaData, linkedinData]) : accountData;
+    // Blended maandrijen: Google + Meta + LinkedIn + Microsoft opgeteld per maand, ratio's
+    // herberekend uit de opgetelde tellers (niet de ratio's zelf gemiddeld -- anders weegt een
+    // maand met weinig verkeer even zwaar als een maand met veel verkeer). Bij een Google-only
+    // klant is dit identiek aan accountData: geen gedragswijziging voor de 62 van de 71.
+    const blendedAccountData: Array<Record<string, unknown>> = meerdereKanalen ? blendMonthly([accountData, metaData, linkedinData, microsoftData]) : accountData;
 
     await updateProgressPhase(supabase, {
       jobId,
@@ -629,7 +639,7 @@ Schrijf nu het rapport. Retourneer ALLEEN valid JSON.`;
       });
 
       const channelRows: Record<Kanaal, Array<Record<string, unknown>>> = {
-        google: accountData, meta: metaData, linkedin: linkedinData,
+        google: accountData, meta: metaData, linkedin: linkedinData, microsoft: microsoftData,
       };
 
       const channelPromises = kanalen.map(async (kanaal): Promise<ChannelSection | null> => {

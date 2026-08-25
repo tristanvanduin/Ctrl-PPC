@@ -30,8 +30,9 @@ check("alleen LinkedIn: geen tabs", zichtbareTabs(["linkedin"]).length === 0);
 check("twee kanalen: blended plus die twee",
   zichtbareTabs(["google", "meta"]).join(",") === "blended,google,meta",
   zichtbareTabs(["google", "meta"]).join(","));
-check("drie kanalen: alles",
-  zichtbareTabs(ALLE_KANALEN).join(",") === "blended,google,meta,linkedin");
+check("alle kanalen: alles",
+  zichtbareTabs(ALLE_KANALEN).join(",") === "blended,google,meta,linkedin,microsoft",
+  zichtbareTabs(ALLE_KANALEN).join(","));
 
 // Volgorde ligt vast, ongeacht de volgorde waarin ze binnenkomen: anders verspringen de tabs
 // zodra er een kanaal bijkomt of de bron een andere volgorde teruggeeft.
@@ -76,8 +77,8 @@ check("één kanaal: alleen dat kanaal", kanalenOpsomming(["linkedin"]) === "Lin
   String(kanalenOpsomming(["linkedin"])));
 check("twee kanalen: met 'en' ertussen", kanalenOpsomming(["google", "meta"]) === "Google Ads en Meta",
   String(kanalenOpsomming(["google", "meta"])));
-check("drie kanalen: komma's en één 'en'",
-  kanalenOpsomming(ALLE_KANALEN) === "Google Ads, Meta en LinkedIn",
+check("alle kanalen: komma's en één 'en'",
+  kanalenOpsomming(ALLE_KANALEN) === "Google Ads, Meta, LinkedIn en Microsoft Ads",
   String(kanalenOpsomming(ALLE_KANALEN)));
 // Vaste volgorde, net als bij de tabs: anders wisselt de tekst mee met de volgorde waarin de
 // drie queries toevallig terugkomen.
@@ -113,8 +114,8 @@ async function main(): Promise<void> {
   }
   {
     const k = await laadBeschikbareKanalen(
-      nepSupabase(["ads_account_monthly", "meta_account_daily", "linkedin_account_daily"]) as never, "klant");
-    check("vindt alle drie", k.length === 3, k.join(","));
+      nepSupabase(["ads_account_monthly", "meta_account_daily", "linkedin_account_daily", "microsoft_account_daily"]) as never, "klant");
+    check("vindt alle vier", k.length === 4, k.join(","));
   }
   {
     const k = await laadBeschikbareKanalen(nepSupabase([]) as never, "klant");

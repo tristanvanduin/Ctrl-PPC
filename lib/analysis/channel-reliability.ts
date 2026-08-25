@@ -81,3 +81,11 @@ export function computeMetaReliability(input: ChannelReliabilityInput): DataReli
 export function computeLinkedinReliability(input: ChannelReliabilityInput): DataReliabilityAssessment {
   return computeChannelReliability(input, LINKEDIN_FIELD_MAP);
 }
+
+// Microsoft is search: clicks zijn gewoon clicks (geen link_clicks-onderscheid zoals Meta) en
+// conversions het primaire signaal. De kolomnamen komen uit microsoft_*_daily (migratie 106).
+const MICROSOFT_FIELD_MAP = { impressions: "impressions", clicks: "clicks", cost: "spend", conversions: "conversions", conversionsValue: "conversion_value" };
+
+export function computeMicrosoftReliability(input: ChannelReliabilityInput): DataReliabilityAssessment {
+  return computeChannelReliability(input, MICROSOFT_FIELD_MAP);
+}

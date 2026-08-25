@@ -42,6 +42,7 @@ const KANAAL_TO_SOP_CHANNEL: Record<Kanaal, SopChannel> = {
   google: "google_ads",
   meta: "meta_ads",
   linkedin: "linkedin_ads",
+  microsoft: "microsoft_ads",
 };
 
 function sectionFor(cadence: LiteCadence): string {

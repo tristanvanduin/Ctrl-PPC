@@ -27,6 +27,9 @@ import { buildMetaStepMessage, metaStepName } from "@/lib/meta/step-message";
 import "@/lib/analysis/adapters/linkedin-ads"; // registreert de LinkedIn-adapter zodat getAdapter("linkedin_ads") resolvet
 import { buildLinkedinAnalysisData } from "@/lib/linkedin/analysis-data";
 import { buildLinkedinStepMessage, linkedinStepName } from "@/lib/linkedin/step-message";
+import "@/lib/analysis/adapters/microsoft-ads"; // registreert de Microsoft-adapter zodat getAdapter("microsoft_ads") resolvet
+import { buildMicrosoftAnalysisData, thirteenMonthStart as microsoftThirteenMonthStart } from "@/lib/microsoft/analysis-data";
+import { buildMicrosoftStepMessage, microsoftStepName } from "@/lib/microsoft/step-message";
 import { resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, bureauVanKlant, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { recordGateObservations } from "@/lib/decision/gate-observations";
 import type { GateInput } from "@/lib/decision/quality-gates";
@@ -1673,6 +1676,243 @@ async function runLinkedinMonthlyAnalysis(
   });
 }
 
+// Microsoft route-wiring: het additieve Microsoft-pad (Bing). Draait de 6-pijler Microsoft SOP op
+// de gedeelde route-helpers met de Microsoft-datalaag (lib/microsoft/), en laat de andere drie
+// paden ongemoeid via de vroege branch in POST. LIVE-ONGETEST: de Supabase-fetch in
+// buildMicrosoftAnalysisData en de end-to-end run zijn pas met een echt Microsoft-account met
+// API-toegang te verifieren -- de syncclient bestaat bewust nog niet, zelfde route als Meta
+// destijds. De synthese-laag (structured_monthly_v2 + acceptance + quality-gate) draait via
+// finalizeChannelMonthlySynthesis, gelijk aan de andere kanalen.
+//
+// Geen targets-argument naar buildMicrosoftAnalysisData: Meta en LinkedIn geven die ook niet mee
+// (het target-blok in pijler 1 blijft dan null en de doelstellingen komen via goalsSection de
+// prompt in). Zodra client_targets per kanaal gevuld wordt, is dit de plek om ze door te geven.
+async function runMicrosoftMonthlyAnalysis(
+  supabase: SupabaseClient,
+  adapter: ChannelAdapter,
+  clientId: string,
+  jobId: string,
+  evalCapture: { fixtureSet: string } | null = null
+): Promise<Response> {
+  const apiKey = getOpenRouterKey();
+  if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const analysisYear = currentMonth === 1 ? now.getFullYear() - 1 : now.getFullYear();
+  const lastCompleteMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const periodEnd = fmt(new Date(analysisYear, lastCompleteMonth, 0));
+  const periodStart = microsoftThirteenMonthStart(periodEnd);
+
+  await createProgressJob(supabase, {
+    jobId,
+    clientId,
+    jobType: "monthly_sop",
+    initialMessage: "Microsoft Ads-analyse wordt voorbereid...",
+    metadata: { sop_type: adapter.sopTypeKey },
+  });
+  await updateProgressPhase(supabase, {
+    jobId,
+    phaseKey: "load_microsoft_data",
+    message: "Microsoft-data en voorgerekende feiten laden...",
+  });
+
+  const clientCtx = await fetchClientContext(supabase, clientId);
+  const { goalsSection, accountType } = clientCtx;
+
+  const { canonicalMetricMap, stepFacts } = await buildMicrosoftAnalysisData(supabase, clientId, periodEnd);
+
+  // Dezelfde contextlagen als Meta en LinkedIn, op dezelfde plekken: GA4 bij stap 1 (de
+  // classifier kent bing/microsoft-cpc sinds fase 0), cross-channel en God View bij stap 6.
+  const ga4ContextText = (await channelGa4Context(clientId, adapter.channel, { supabase: supabase as unknown as Ga4SupabaseLike })).promptContext;
+  const crossChannelText = (await crossChannelContext(supabase, clientId, adapter.channel)).promptContext;
+  const godViewText = (await godViewContext(supabase, clientId, adapter.channel)).promptContext;
+
+  const geheugenMetTaken = await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: adapter.sopTypeKey, cadans: "monthly",
+  });
+
+  // Kanaalbewuste verrijking: de ads_*-lagen slaan zichzelf over (ALLEEN_GOOGLE), wat overblijft
+  // is de strategische klantcontext en de hypothese-tracking -- kanaalneutraal.
+  const enrichment = await buildEnrichmentContext({
+    supabase, clientId, accountType, sopType: "monthly", analysisDate: periodEnd, channel: adapter.channel as "meta_ads" | "linkedin_ads" | "microsoft_ads",
+  });
+  const enrichmentText = [
+    enrichment.strategicContext,
+    enrichment.hypothesisTracking,
+    enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "",
+  ].filter(Boolean).join("");
+
+  const shared = { supabase, apiKey, clientId, sopType: adapter.sopTypeKey, periodStart, periodEnd, runKey: jobId, channel: adapter.channel, evalCapture, jsonSchema: { name: "monthly_step_output", schema: buildStepOutputJsonSchema(adapter.issueClusters, adapter.entityTypes) } };
+  const parsedSteps: ParsedStepOutput[] = [];
+  const allSteps: StepResult[] = [];
+  const conclusions: string[] = [];
+  const microsoftStepValidations: StepValidationResult[] = [];
+  let microsoftRepairCount = 0;
+  const analysisDate = today();
+
+  for (let stepNumber = 1; stepNumber <= adapter.stepCount; stepNumber++) {
+    const stepName = microsoftStepName(stepNumber);
+    await updateProgressPhase(supabase, {
+      jobId,
+      phaseKey: `run_step_${stepNumber}`,
+      message: `Stap ${stepNumber} uitvoeren: ${stepName}...`,
+    });
+    // Hard-skip op het available:false-signaal uit lib/microsoft/prepared-facts.ts -- geen
+    // LLM-call op een lege datatabel. Bij Microsoft kan dat pijler 3 (geen keyword-data) of
+    // pijler 4 (profiel en device allebei afwezig) zijn.
+    const microsoftAvailability = isChannelStepFactsUnavailable(stepFacts[stepNumber]);
+    if (microsoftAvailability.unavailable) {
+      const fallback = buildStepNoDataFallback({
+        stepNumber, stepName,
+        narrative: microsoftAvailability.note,
+        logEntry: microsoftAvailability.note,
+        actionText: `Controleer databeschikbaarheid voor ${stepName}`,
+        actionImpact: `Maakt ${stepName} in de volgende cyclus weer mogelijk.`,
+        stepConclusion: `${stepName} niet uitvoerbaar: ${microsoftAvailability.note}`,
+      });
+      const fallbackOutput = JSON.stringify({
+        narrative: fallback.narrative, log_entries: fallback.log_entries, top_3_findings: fallback.findings,
+        status: fallback.status, actions: fallback.actions, step_conclusion: fallback.step_conclusion,
+      }, null, 2);
+      allSteps.push({ stepNumber, stepName, output: fallbackOutput, model: "runtime-fallback", tokensUsed: 0, saved: true, latencyMs: 0, retries: 0 });
+      parsedSteps.push(fallback);
+      if (fallback.step_conclusion) conclusions.push(fallback.step_conclusion);
+      await saveAnalysisOutputSection({
+        supabase,
+        row: { client_id: clientId, sop_type: adapter.sopTypeKey, analysis_date: analysisDate, period_start: periodStart, period_end: periodEnd, section: stepName, output: fallbackOutput, model_used: "runtime-fallback", tokens_used: 0, step_number: stepNumber, step_name: stepName },
+      });
+      continue;
+    }
+    const systemPrompt = buildMonthlyStepPrompt(
+      goalsSection,
+      accountType,
+      adapter.stepInstructions[stepNumber],
+      conclusions.slice(-2).join("\n\n"),
+      adapter,
+      geheugenMetTaken
+    );
+    const userMessage = buildMicrosoftStepMessage(stepNumber, stepFacts[stepNumber], clientId)
+      + (stepNumber === 1 ? enrichmentText : "")
+      + (stepNumber === 1 && ga4ContextText ? `\n\n${ga4ContextText}` : "")
+      + (stepNumber === 6 && crossChannelText ? `\n\n${crossChannelText}` : "")
+      + (stepNumber === 6 && godViewText ? `\n\n${godViewText}` : "");
+    let step = await runStep({ ...shared, stepNumber, stepName, systemPrompt, userMessage, jsonMode: true });
+    const priorStepConclusion = conclusions.at(-1);
+    let { parsed, validation } = parseStructuredStepOutput(
+      step,
+      priorStepConclusion,
+      undefined,
+      canonicalMetricMap,
+      undefined,
+      { purityRules: adapter.purityRules, logFormatSkeletons: adapter.logFormatSkeletons }
+    );
+    if (shouldRepairStep(validation, microsoftRepairCount > 5)) {
+      microsoftRepairCount++;
+      const repairMessage = buildStepRepairUserMessage(userMessage, validation, conclusions.slice(-2).join("\n\n"));
+      const repairedStep = await runStep({ ...shared, stepNumber, stepName, jsonMode: true, systemPrompt, userMessage: repairMessage });
+      const repairedParse = parseStructuredStepOutput(
+        repairedStep, priorStepConclusion, undefined, canonicalMetricMap, undefined,
+        { purityRules: adapter.purityRules, logFormatSkeletons: adapter.logFormatSkeletons }
+      );
+      const best = pickBetterStepAttempt(
+        { step, parsed, validation },
+        { step: repairedStep, parsed: repairedParse.parsed, validation: repairedParse.validation }
+      );
+      step = best.step;
+      parsed = best.parsed;
+      validation = best.validation;
+      step.retries = (step.retries ?? 0) + 1;
+    }
+    allSteps.push(step);
+    parsedSteps.push(parsed);
+    microsoftStepValidations.push(validation);
+    if (!validation.valid || validation.warnings.length > 0) {
+      logger.warn(`[microsoft-monthly] Step ${stepNumber} validation`, validation);
+    }
+    if (parsed.step_conclusion) conclusions.push(parsed.step_conclusion);
+    await saveAnalysisOutputSection({
+      supabase,
+      row: {
+        client_id: clientId,
+        sop_type: adapter.sopTypeKey,
+        analysis_date: analysisDate,
+        period_start: periodStart,
+        period_end: periodEnd,
+        section: stepName,
+        output: step.output,
+        model_used: step.model,
+        tokens_used: step.tokensUsed,
+        step_number: stepNumber,
+        step_name: stepName,
+      },
+    });
+  }
+
+  const microsoftCheckpoint = await runChannelCheckpoint({ shared, name: "Checkpoint Microsoft", clusterSteps: parsedSteps });
+  allSteps.push(microsoftCheckpoint.checkpointStep);
+  const microsoftCheckpointsRun = microsoftCheckpoint.success ? 1 : 0;
+
+  const rawStepFindings = parsedSteps.flatMap((step) => step.findings);
+  const canonical = canonicalizeFindings(rawStepFindings, {}, {
+    entityAliases: adapter.entityAliases,
+    metricAliases: adapter.metricAliases,
+    validClusters: adapter.issueClusters,
+  });
+  const curatedFindings = curateMonthlyStructuredFindings(canonical.findings);
+  const curatedClusters = clusterFindings(curatedFindings);
+
+  const synthesis = await finalizeChannelMonthlySynthesis({
+    supabase, adapter, clientId, periodStart, periodEnd, analysisDate,
+    parsedSteps, allSteps, canonical, curatedFindings, curatedClusters,
+    conclusionText: conclusions.slice(-1)[0] ?? conclusions.join("\n\n"),
+    stepValidations: microsoftStepValidations,
+    checkpointsRun: microsoftCheckpointsRun,
+  });
+
+  if (synthesis.geblokkeerd) {
+    await markProgressFailed(supabase, {
+      jobId,
+      errorMessage: synthesis.qualityGate.blocking_reasons.join(" | "),
+      metadata: {
+        analysis_date: analysisDate,
+        sop_type: adapter.sopTypeKey,
+        quality_gate: synthesis.qualityGate,
+        structured_saved: false,
+      },
+      partialOutputExists: true,
+    });
+    return Response.json({
+      ok: false,
+      channel: adapter.channel,
+      analysisDate,
+      qualityGate: synthesis.qualityGate,
+      error: `Analyse geblokkeerd door de kwaliteitspoort: ${synthesis.qualityGate.blocking_reasons.join(" | ")}`,
+    }, { status: 422 });
+  }
+
+  after(async () => {
+    await triggerCrossChannelSynthesisIfReady(supabase, clientId);
+    await triggerPortfolioSynthesisIfReady(supabase, clientId);
+  });
+
+  return Response.json({
+    ok: true,
+    channel: adapter.channel,
+    analysisDate,
+    model: allSteps[0]?.model,
+    period: { start: periodStart, end: periodEnd },
+    steps: parsedSteps.length,
+    findings: curatedFindings.length,
+    clusters: curatedClusters.length,
+    recommendations: synthesis.structured.recommendations.length,
+    tasks: synthesis.structured.tasks.length,
+    qualityGate: { passed: synthesis.qualityGate.passed, state: synthesis.qualityGate.state },
+    tokensUsed: allSteps.reduce((sum, current) => sum + (current.tokensUsed || 0), 0),
+    fullOutput: sanitizeOutput(synthesis.structured.deliverable_markdown),
+  });
+}
+
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
@@ -1715,6 +1955,9 @@ export async function POST(request: NextRequest) {
     }
     if (adapter.channel === "linkedin_ads") {
       return await runLinkedinMonthlyAnalysis(supabase, adapter, clientId, jobId, evalCapture);
+    }
+    if (adapter.channel === "microsoft_ads") {
+      return await runMicrosoftMonthlyAnalysis(supabase, adapter, clientId, jobId, evalCapture);
     }
     // Vanaf hier tellen de LLM-calls van deze run, zodat de cachesamenvatting aan het eind
     // niet die van een eerdere analyse in hetzelfde proces meepakt.

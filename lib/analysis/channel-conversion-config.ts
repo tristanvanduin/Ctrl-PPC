@@ -7,7 +7,7 @@
 // Eén centrale bron zodat elke leesplek (ChannelPerformance, ChannelForecast, cross-channel,
 // de beurs-forecast) exact dezelfde selectie toepast. Puur, geen IO, los getest.
 
-export type ChannelConversionChannel = "meta_ads" | "linkedin_ads";
+export type ChannelConversionChannel = "meta_ads" | "linkedin_ads" | "microsoft_ads";
 
 export interface ChannelConversionSource {
   field: string; // kolomnaam in de *_daily-tabellen van het kanaal
@@ -26,8 +26,18 @@ export const LINKEDIN_CONVERSION_SOURCES: ChannelConversionSource[] = [
   { field: "post_click_conversions", label: "Post-click-conversies", hint: "na een klik toegeschreven" },
 ];
 
+// Microsoft levert één conversiekolom: de sync (zodra die er is) telt de conversiedoelen al
+// samen, zoals Google's ads_*-tabellen dat ook doen. Eén selecteerbaar veld dus -- de dropdown
+// heeft daar niets te kiezen, maar de vorm blijft gelijk aan de andere kanalen zodat elke
+// leesplek dezelfde route volgt.
+export const MICROSOFT_CONVERSION_SOURCES: ChannelConversionSource[] = [
+  { field: "conversions", label: "Conversies", hint: "alle conversiedoelen (UET)" },
+];
+
 export function conversionSourcesFor(channel: ChannelConversionChannel): ChannelConversionSource[] {
-  return channel === "meta_ads" ? META_CONVERSION_SOURCES : LINKEDIN_CONVERSION_SOURCES;
+  return channel === "meta_ads" ? META_CONVERSION_SOURCES
+    : channel === "linkedin_ads" ? LINKEDIN_CONVERSION_SOURCES
+    : MICROSOFT_CONVERSION_SOURCES;
 }
 
 // Welke velden per kanaal meetellen. Leeg/ongeldig valt terug op de default van dat kanaal,
@@ -35,11 +45,13 @@ export function conversionSourcesFor(channel: ChannelConversionChannel): Channel
 export interface ChannelConversionConfig {
   meta_ads: string[];
   linkedin_ads: string[];
+  microsoft_ads: string[];
 }
 
 export const DEFAULT_CHANNEL_CONVERSION_CONFIG: ChannelConversionConfig = {
   meta_ads: ["conversions", "leads"],
   linkedin_ads: ["one_click_leads", "external_website_conversions"],
+  microsoft_ads: ["conversions"],
 };
 
 function validFields(selected: unknown, channel: ChannelConversionChannel): string[] {
@@ -54,6 +66,7 @@ export function resolveChannelConversionConfig(stored: Partial<Record<ChannelCon
   return {
     meta_ads: validFields(stored?.meta_ads, "meta_ads"),
     linkedin_ads: validFields(stored?.linkedin_ads, "linkedin_ads"),
+    microsoft_ads: validFields(stored?.microsoft_ads, "microsoft_ads"),
   };
 }
 

@@ -25,7 +25,10 @@ import { computeForecast, type ClientForecast } from "../forecast";
 import { today } from "../reporting-date";
 import { klantVanId } from "../tenancy/klanten";
 
-export type AnalysisChannel = "google" | "meta" | "linkedin";
+// "microsoft" leest, net als meta/linkedin, uit fact_core. Zolang de bevroren fase-3-projectie
+// daar geen microsoft-rijen zet, komt dit leeg terug en valt de functie netjes op null -- de
+// routes laten targetText dan weg, precies zoals bij een net gekoppeld Meta-account.
+export type AnalysisChannel = "google" | "meta" | "linkedin" | "microsoft";
 
 interface AccountRow {
   month: string;         // YYYY-MM-DD

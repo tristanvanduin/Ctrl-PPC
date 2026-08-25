@@ -31,22 +31,25 @@
 
 import { opsomming } from "@/lib/util/tekst";
 
-export type Kanaal = "google" | "meta" | "linkedin";
+export type Kanaal = "google" | "meta" | "linkedin" | "microsoft";
 
 /** Waar per kanaal te kijken. De view volstaat: er hoeft maar één rij te bestaan. */
 export const KANAAL_BRON: Record<Kanaal, { tabel: string; kolom: string }> = {
   google: { tabel: "ads_account_monthly", kolom: "month" },
   meta: { tabel: "meta_account_daily", kolom: "date" },
   linkedin: { tabel: "linkedin_account_daily", kolom: "date" },
+  // Gewone tabel, geen view: microsoft_* is niet in de bevroren fase-3-projectie opgenomen.
+  microsoft: { tabel: "microsoft_account_daily", kolom: "date" },
 };
 
-export const ALLE_KANALEN: Kanaal[] = ["google", "meta", "linkedin"];
+export const ALLE_KANALEN: Kanaal[] = ["google", "meta", "linkedin", "microsoft"];
 
 /** Hoe een kanaal heet in een zin. Dezelfde namen als op de tabbladen. */
 export const KANAAL_NAAM: Record<Kanaal, string> = {
   google: "Google Ads",
   meta: "Meta",
   linkedin: "LinkedIn",
+  microsoft: "Microsoft Ads",
 };
 
 /**

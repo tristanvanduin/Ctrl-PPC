@@ -51,7 +51,7 @@ interface ExtractionOptions {
   supabase: SupabaseClient;
   apiKey: string;
   clientId: string;
-  sopType: "weekly" | "biweekly" | "monthly" | "meta_weekly" | "linkedin_weekly" | "meta_biweekly" | "linkedin_biweekly";
+  sopType: "weekly" | "biweekly" | "monthly" | "meta_weekly" | "linkedin_weekly" | "meta_biweekly" | "linkedin_biweekly" | "microsoft_weekly" | "microsoft_biweekly";
   analysisDate: string;
   periodStart: string;
   periodEnd: string;

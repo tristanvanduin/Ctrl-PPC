@@ -1,4 +1,4 @@
-// Krijgen alle negen SOP-combinaties hun taakhistorie mee, of alleen sommige?
+// Krijgen alle twaalf SOP-combinaties hun taakhistorie mee, of alleen sommige?
 // Draaien: npx tsx lib/tasks/__taakgrounding_dekking_test.ts
 //
 // ── WAAROM DEZE TEST BESTAAT ────────────────────────────────────────────────
@@ -17,7 +17,7 @@
 // ── WAAROM DEZE TEST DE BRON LEEST ──────────────────────────────────────────
 //
 // Wat hier fout kan gaan is BEDRADING, en bedrading is niet met een pure functie te toetsen: de
-// vraag is niet of buildGeheugenMetTaken werkt maar of alle negen paden hem aanroepen. Een lijst
+// vraag is niet of buildGeheugenMetTaken werkt maar of alle twaalf paden hem aanroepen. Een lijst
 // "welk pad heeft het blok" zou hetzelfde probleem hebben als het probleem zelf -- hij zou
 // verouderen zonder dat iemand het merkt. Daarom leest deze test de routes zoals
 // lib/demo/__demo_sop_dekking_test.ts dat ook doet, en zoals scripts/check-hygiene.mjs de bron
@@ -41,11 +41,11 @@ function check(name: string, cond: boolean, detail = "") {
 const WORTEL = join(import.meta.dirname, "..", "..");
 const lees = (p: string): string => readFileSync(join(WORTEL, p), "utf8");
 
-// ── De negen kanaalpaden ────────────────────────────────────────────────────
+// ── De twaalf kanaalpaden ───────────────────────────────────────────────────
 //
-// In de weekly en de bi-weekly heeft elk kanaal een eigen run*-functie. In de monthly hebben Meta
-// en LinkedIn dat ook, maar Google draait inline in POST, ná de twee vroege returns -- daar is het
-// stuk vanaf POST tot het einde van het bestand dus het Google-pad.
+// In de weekly en de bi-weekly heeft elk kanaal een eigen run*-functie. In de monthly hebben Meta,
+// LinkedIn en Microsoft dat ook, maar Google draait inline in POST, ná de vroege returns -- daar
+// is het stuk vanaf POST tot het einde van het bestand dus het Google-pad.
 function stukVanaf(bron: string, start: string, eindes: string[]): string {
   const i = bron.indexOf(start);
   if (i < 0) return "";
@@ -61,20 +61,23 @@ const MONTHLY = lees("app/api/analysis/monthly/route.ts");
 const PADEN: Record<string, [string, string, string]> = {
   "weekly/google": [stukVanaf(WEEKLY, "async function runGoogleWeeklyAnalysis(", ["async function runMetaWeeklyAnalysis("]), "weekly", "weekly"],
   "weekly/meta": [stukVanaf(WEEKLY, "async function runMetaWeeklyAnalysis(", ["async function fetchLinkedinNameMap(", "async function runLinkedinWeeklyAnalysis("]), "meta_weekly", "weekly"],
-  "weekly/linkedin": [stukVanaf(WEEKLY, "async function runLinkedinWeeklyAnalysis(", ["export async function POST("]), "linkedin_weekly", "weekly"],
+  "weekly/linkedin": [stukVanaf(WEEKLY, "async function runLinkedinWeeklyAnalysis(", ["function withMicrosoftNames(", "async function runMicrosoftWeeklyAnalysis("]), "linkedin_weekly", "weekly"],
+  "weekly/microsoft": [stukVanaf(WEEKLY, "async function runMicrosoftWeeklyAnalysis(", ["export async function POST("]), "microsoft_weekly", "weekly"],
 
   "biweekly/google": [stukVanaf(BIWEEKLY, "async function runGoogleBiWeeklyAnalysis(", ["async function runMetaBiWeeklyAnalysis("]), "biweekly", "biweekly"],
   "biweekly/meta": [stukVanaf(BIWEEKLY, "async function runMetaBiWeeklyAnalysis(", ["async function runLinkedinBiWeeklyAnalysis("]), "meta_biweekly", "biweekly"],
-  "biweekly/linkedin": [stukVanaf(BIWEEKLY, "async function runLinkedinBiWeeklyAnalysis(", ["export async function POST("]), "linkedin_biweekly", "biweekly"],
+  "biweekly/linkedin": [stukVanaf(BIWEEKLY, "async function runLinkedinBiWeeklyAnalysis(", ["const withMicrosoftNames", "async function runMicrosoftBiWeeklyAnalysis("]), "linkedin_biweekly", "biweekly"],
+  "biweekly/microsoft": [stukVanaf(BIWEEKLY, "async function runMicrosoftBiWeeklyAnalysis(", ["export async function POST("]), "microsoft_biweekly", "biweekly"],
 
   // De monthly geeft adapter.sopTypeKey mee in plaats van een literal: één lus bedient daar alle
-  // drie de kanalen via de adapter.
+  // kanalen via de adapter.
   "monthly/meta": [stukVanaf(MONTHLY, "async function runMetaMonthlyAnalysis(", ["async function runLinkedinMonthlyAnalysis("]), "adapter.sopTypeKey", "monthly"],
-  "monthly/linkedin": [stukVanaf(MONTHLY, "async function runLinkedinMonthlyAnalysis(", ["export async function POST("]), "adapter.sopTypeKey", "monthly"],
+  "monthly/linkedin": [stukVanaf(MONTHLY, "async function runLinkedinMonthlyAnalysis(", ["async function runMicrosoftMonthlyAnalysis("]), "adapter.sopTypeKey", "monthly"],
+  "monthly/microsoft": [stukVanaf(MONTHLY, "async function runMicrosoftMonthlyAnalysis(", ["export async function POST("]), "adapter.sopTypeKey", "monthly"],
   "monthly/google": [stukVanaf(MONTHLY, "export async function POST(", []), "adapter.sopTypeKey", "monthly"],
 };
 
-console.log("Alle negen paden zijn te vinden in hun route");
+console.log("Alle twaalf paden zijn te vinden in hun route");
 for (const [naam, [stuk]] of Object.entries(PADEN)) {
   // Faalt deze, dan is een route hernoemd of geherstructureerd en zeggen alle checks hieronder
   // niets meer -- een test die zijn eigen doelwit kwijt is hoort te falen, niet groen te blijven.
@@ -86,15 +89,15 @@ for (const [naam, [stuk]] of Object.entries(PADEN)) {
   check(`${naam}: roept buildGeheugenMetTaken aan`, stuk.includes("buildGeheugenMetTaken("), "geen aanroep");
 }
 {
-  // Eén definitie in lib, negen aanroepen in de routes. Was dit blok per pad gekopieerd, dan gingen
-  // de kopieën uit elkaar lopen -- precies de median/safeDiv-les uit AGENTS.md, en hier kost hij
-  // meer dan netheid: een achtergebleven kopie geeft die cadans stil minder context.
+  // Eén definitie in lib, twaalf aanroepen in de routes. Was dit blok per pad gekopieerd, dan
+  // gingen de kopieën uit elkaar lopen -- precies de median/safeDiv-les uit AGENTS.md, en hier kost
+  // hij meer dan netheid: een achtergebleven kopie geeft die cadans stil minder context.
   const helper = lees("lib/analysis/geheugen-grounding.ts");
   check("één definitie, in lib", [...helper.matchAll(/export async function buildGeheugenMetTaken\(/g)].length === 1);
   const aanroepen = [WEEKLY, BIWEEKLY, MONTHLY]
     .map((b) => [...b.matchAll(/buildGeheugenMetTaken\(\{/g)].length)
     .reduce((a, b) => a + b, 0);
-  check("negen aanroepen, één per combinatie", aanroepen === 9, String(aanroepen));
+  check("twaalf aanroepen, één per combinatie", aanroepen === 12, String(aanroepen));
   for (const [naam, bron] of [["weekly", WEEKLY], ["biweekly", BIWEEKLY], ["monthly", MONTHLY]] as const) {
     check(`${naam}: geen eigen kopie van het blok meer`,
       !/buildClientMemoryGrounding\(/.test(bron),
@@ -141,9 +144,9 @@ console.log("\nDe weekly en bi-weekly zetten het blok als eigen blok in de keten
   // voorloop. buildClientMemoryGrounding deed dat als enige niet, waardoor zijn kop op dezelfde
   // regel belandde als het laatste opsommingsteken ervoor -- en een `##` middenin een regel is geen
   // kop meer. De monthly gebruikt alsContextBlok NIET: buildMonthlyStepPrompt zet er zelf al één voor.
-  check("weekly wikkelt in alsContextBlok", [...WEEKLY.matchAll(/alsContextBlok\(/g)].length === 3,
+  check("weekly wikkelt in alsContextBlok", [...WEEKLY.matchAll(/alsContextBlok\(/g)].length === 4,
     String([...WEEKLY.matchAll(/alsContextBlok\(/g)].length));
-  check("biweekly wikkelt in alsContextBlok", [...BIWEEKLY.matchAll(/alsContextBlok\(/g)].length === 3,
+  check("biweekly wikkelt in alsContextBlok", [...BIWEEKLY.matchAll(/alsContextBlok\(/g)].length === 4,
     String([...BIWEEKLY.matchAll(/alsContextBlok\(/g)].length));
   check("de monthly doet dat juist niet", !MONTHLY.includes("alsContextBlok"));
 

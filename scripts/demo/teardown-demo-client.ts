@@ -18,6 +18,7 @@ const TABLES = [
   "ads_search_terms_wasteful", "google_ads_ad_meta", "google_ads_rsa_assets", "ads_creative_performance",
   "meta_connections", "meta_campaigns", "meta_ads", "meta_creatives", "meta_ad_daily", "meta_campaign_daily", "meta_account_daily",
   "linkedin_connections", "linkedin_campaigns", "linkedin_creatives", "linkedin_campaign_daily", "linkedin_creative_daily", "linkedin_account_daily", "linkedin_demographic_daily",
+  "microsoft_campaigns", "microsoft_adgroups", "microsoft_account_daily", "microsoft_campaign_daily", "microsoft_adgroup_daily", "microsoft_breakdown_daily", "microsoft_keyword_monthly", "microsoft_search_terms_monthly", "microsoft_campaign_impression_share", "microsoft_profile_monthly",
   "client_settings", "geo_clone_settings", "client_sync_status",
   // Door analyses/wachtrij gegenereerd:
   "sop_analysis_output", "sop_insights", "sop_recommendations", "sop_tasks",

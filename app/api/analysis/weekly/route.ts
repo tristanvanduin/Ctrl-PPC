@@ -14,7 +14,8 @@ import { buildEnrichmentContext } from "@/lib/analysis/enrichment";
 import { computeAnalysisTargets } from "@/lib/analysis/compute-targets";
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { computeDataReliability } from "@/lib/analysis/data-reliability";
-import { computeMetaReliability, computeLinkedinReliability } from "@/lib/analysis/channel-reliability";
+import { computeMetaReliability, computeLinkedinReliability, computeMicrosoftReliability } from "@/lib/analysis/channel-reliability";
+import { fetchMicrosoftDaily, fetchMicrosoftNameMap } from "@/lib/microsoft/analysis-data";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
 import { today, addDays } from "@/lib/reporting-date";
@@ -984,6 +985,282 @@ ${step3.output}`),
   });
 }
 
+function withMicrosoftNames(rows: Array<Record<string, unknown>>, names: Map<string, string>): Array<Record<string, unknown>> {
+  return rows.map((r) => ({ ...r, entity_name: names.get(String(r.entity_id ?? "")) ?? r.entity_id }));
+}
+
+// Microsoft route-wiring (Bing): de wekelijkse health check als search-variant. Zelfde
+// drie-stappenvorm als de andere kanalen, met twee kanaaleigen accenten: de VOLUMEREM in stap 2
+// (op een tiende van Google-volumes is 0 conversies bij weinig spend "te vroeg", geen bleeder --
+// zie MICROSOFT_WEEKLY in lib/prompts/weekly-channel-content.ts) en het Audience Network als
+// aparte bleeder-soort. LIVE-ONGETEST: pas met een echt Microsoft-account te verifieren.
+async function runMicrosoftWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
+  await createProgressJob(supabase, {
+    jobId,
+    clientId,
+    jobType: "weekly_sop",
+    initialMessage: "Wekelijkse Microsoft Ads-analyse wordt voorbereid...",
+    metadata: { sop_type: "microsoft_weekly" },
+  });
+  await updateProgressPhase(supabase, {
+    jobId,
+    phaseKey: "fetch_data",
+    message: "Wekelijkse Microsoft-data ophalen...",
+  });
+
+  const periodStart = daysAgo(14);
+  const periodBleederStart = daysAgo(7);
+  const periodSpendStart = daysAgo(60);
+  const periodEnd = fmt(new Date());
+
+  const periodReliabilityStart = daysAgo(90);
+
+  const [
+    accountResult, adgroupResult, campaignResult, breakdownResult,
+    campaignNames, adgroupNames, keywordResult, impressionShareResult, campaignMetaResult,
+    clientCtx, targetResult, reliabilityAccountResult, lagSettingsResult,
+  ] = await Promise.all([
+    fetchMicrosoftDaily(supabase, clientId, "microsoft_account_daily", periodStart, periodEnd),
+    fetchMicrosoftDaily(supabase, clientId, "microsoft_adgroup_daily", periodStart, periodEnd),
+    fetchMicrosoftDaily(supabase, clientId, "microsoft_campaign_daily", periodSpendStart, periodEnd),
+    // De netwerksplitsing (search/syndicated/audience) voor de lek-check in stap 2.
+    fetchMicrosoftDaily(supabase, clientId, "microsoft_breakdown_daily", periodStart, periodEnd),
+    fetchMicrosoftNameMap(supabase, clientId, "microsoft_campaigns", "campaign_id"),
+    fetchMicrosoftNameMap(supabase, clientId, "microsoft_adgroups", "adgroup_id"),
+    // Keywords zijn maandkorrel (hoge kardinaliteit); de bleeder-stap krijgt de recentste twee
+    // maanden, zodat er ook begin-van-de-maand iets te beoordelen valt.
+    supabase.from("microsoft_keyword_monthly").select("keyword_text, match_type, campaign_name, ad_group_name, month, impressions, clicks, cost, conversions, quality_score").eq("client_id", clientId).gte("month", daysAgo(62)).order("cost", { ascending: false }).limit(100),
+    // Impressieaandeel: het directe bewijs voor de "Budget vs. Vraag"-vraag in stap 3, met
+    // budget- en positieverlies apart -- die vragen tegengestelde ingrepen.
+    supabase.from("microsoft_campaign_impression_share")
+      .select("campaign_name, month, impression_share, budget_lost_is, rank_lost_is, daily_budget, budget_utilization")
+      .eq("client_id", clientId).order("month", { ascending: false }).limit(60),
+    // Campagne-instellingen mét import_source: een spend-anomalie na een verversde import is een
+    // eigen wortelooorzaak (zie MICROSOFT_WEEKLY.spendAnomalyRootCauses).
+    supabase.from("microsoft_campaigns").select("campaign_id, name, campaign_type, daily_budget, bid_strategy, import_source, serving_status").eq("client_id", clientId),
+    fetchClientContext(supabase, clientId),
+    computeAnalysisTargets(supabase, clientId, "microsoft"),
+    fetchMicrosoftDaily(supabase, clientId, "microsoft_account_daily", periodReliabilityStart, periodEnd),
+    supabase.from("client_settings").select("conversion_lag_days").eq("client_id", clientId).maybeSingle(),
+  ]);
+
+  const { goalsSection, accountType } = clientCtx;
+
+  if (accountResult.length === 0) {
+    const freshness = await checkDataFreshness(supabase, clientId, ["microsoft_account_daily"]);
+    await markProgressFailed(supabase, { jobId, errorMessage: freshness.message });
+    return Response.json({
+      error: freshness.message,
+      freshnessStatus: freshness.freshnessStatus,
+      lastSyncAt: freshness.lastSyncAt,
+      action: "Sync de data via POST /api/sync",
+    }, { status: 404 });
+  }
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const targetText = targetResult
+    ? `\n\n## Maandtargets (berekend door forecast engine)
+Huidige maand (${["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"][currentMonth - 1]}): verwacht ${targetResult.monthlyExpected[currentMonth - 1]?.conversions ?? "?"} conversies, €${targetResult.monthlyExpected[currentMonth - 1]?.revenue ?? "?"} omzet
+BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
+    : "";
+
+  // Zelfde betrouwbaarheidscheck als de andere kanalen, genormaliseerd naar de
+  // Microsoft-kolomnamen (clicks/spend/conversions) via computeMicrosoftReliability().
+  const microsoftReliability = computeMicrosoftReliability({
+    accountDaily: reliabilityAccountResult,
+    campaignDaily: campaignResult,
+    conversionLagDays: (lagSettingsResult.data?.conversion_lag_days as number) ?? 3,
+    lastCompleteMonth: amsterdamseMaand() === 1 ? 12 : amsterdamseMaand() - 1,
+    hasKpiTargets: !!goalsSection,
+  });
+  const reliabilityText = `\n\n${microsoftReliability.promptContext}`;
+
+  const adgroupRows = withMicrosoftNames(adgroupResult.filter((r) => new Date(String(r.date)) >= new Date(periodBleederStart)), adgroupNames);
+  const campaignRows = withMicrosoftNames(campaignResult, campaignNames);
+  // De netwerk-week: alleen de laatste 7 dagen en alleen de network-dimensie, geaggregeerd per
+  // netwerk zodat de lek-check een tabel van drie regels krijgt in plaats van honderd dagrijen.
+  const netwerkWeek = (() => {
+    const rows = breakdownResult.filter((r) => String(r.breakdown_type) === "network" && new Date(String(r.date)) >= new Date(periodBleederStart));
+    const per = new Map<string, { spend: number; conversions: number; clicks: number }>();
+    for (const r of rows) {
+      const k = String(r.breakdown_value);
+      const v = per.get(k) ?? { spend: 0, conversions: 0, clicks: 0 };
+      v.spend += Number(r.spend ?? 0); v.conversions += Number(r.conversions ?? 0); v.clicks += Number(r.clicks ?? 0);
+      per.set(k, v);
+    }
+    return [...per.entries()].map(([network, v]) => ({ network, spend: Math.round(v.spend * 100) / 100, conversions: Math.round(v.conversions * 100) / 100, clicks: v.clicks }));
+  })();
+
+  const enrichment = await buildEnrichmentContext({
+    supabase, clientId, accountType, sopType: "weekly", analysisDate: periodEnd, channel: "microsoft_ads",
+  });
+  const dimAvailText = enrichment.dimensionAvailability ? `\n\n${enrichment.dimensionAvailability}` : "";
+  const geheugenMetTaken = alsContextBlok(await buildGeheugenMetTaken({
+    supabase, clientId, voorDatum: periodEnd, sopType: "microsoft_weekly", cadans: "weekly",
+  }));
+  const [maandSecties, eigenOpen] = await Promise.all([
+    supabase.from("sop_analysis_output").select("output, analysis_date, section")
+      .eq("client_id", clientId).eq("sop_type", "microsoft_monthly")
+      .in("section", ["structured_monthly_v2", "full"])
+      .order("analysis_date", { ascending: false }).limit(6),
+    supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
+      .eq("client_id", clientId).eq("sop_type", "microsoft_weekly")
+      .order("analysis_date", { ascending: false }).limit(25),
+  ]);
+  const maandRijen = (maandSecties.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
+  const maandStructured = maandRijen.find((r) => r.section === "structured_monthly_v2");
+  const maandNarratief = maandRijen.find((r) => r.section === "full");
+  const maandHandoff = buildMonthlyHandoff({
+    structured: maandStructured?.output ?? null,
+    narratief: maandNarratief?.output ?? null,
+    analysisDate: (maandStructured ?? maandNarratief)?.analysis_date ?? null,
+    cadans: "weekly",
+  });
+  const ketenContext = `\n\n${maandHandoff.tekst}${buildOpenPointsBlock((eigenOpen.data ?? []) as Parameters<typeof buildOpenPointsBlock>[0])}`;
+
+  const sharedContext = `${ketenContext}${geheugenMetTaken}${enrichment.strategicContext}${targetText}${dimAvailText}${reliabilityText}${enrichment.leadingIndicators}${enrichment.sectorBenchmarks}${enrichment.changeHistory}${enrichment.geoContext}`;
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_1", message: "Stap 1: Account Health Check (Microsoft)..." });
+  const step1 = await runStep({
+    supabase, apiKey, clientId, sopType: "microsoft_weekly", periodStart, periodEnd,
+    stepNumber: 1, stepName: "Account Health Check",
+    runKey: jobId,
+    systemPrompt: buildWeeklyStep1Prompt(goalsSection, accountType, "microsoft_ads"),
+    userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}" (Microsoft Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Account Performance (dagelijks, laatste 14 dagen -- gebruik voor WoW-vergelijking; noem bij elk percentage het absolute aantal)
+\`\`\`
+${toPromptTable(accountResult)}
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_2", message: "Stap 2: keyword- en zoektermbleeders (Microsoft)..." });
+  const step2 = await runStep({
+    supabase, apiKey, clientId, sopType: "microsoft_weekly", periodStart, periodEnd,
+    stepNumber: 2, stepName: "Keyword en Zoekterm Bleeders",
+    runKey: jobId,
+    systemPrompt: buildWeeklyStep2Prompt(goalsSection, accountType, "microsoft_ads"),
+    userMessage: `Voer stap 2 uit voor client "${clientId}" (Microsoft Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Health Check)
+${step1.output}
+
+## Ad Group Performance (laatste 7 dagen, voor bleeders -- let op de volumerem: onder €25 spend is 0 conversies "te vroeg", geen bleeder)
+\`\`\`
+${toPromptTable(adgroupRows)}
+\`\`\`
+
+## Keyword Performance (maandkorrel, recentste maanden, top op cost -- met match type en quality score)
+\`\`\`
+${toPromptTable(keywordResult.data ?? [])}
+\`\`\`
+
+## Netwerkverdeling deze week (search / syndicated / audience -- voor de Audience Network-lekcheck)
+\`\`\`
+${toPromptTable(netwerkWeek)}
+\`\`\``,
+  });
+
+  await updateProgressPhase(supabase, { jobId, phaseKey: "run_step_3", message: "Stap 3: budget & spend anomalieën, weekoverzicht (Microsoft)..." });
+  const step3 = await runStep({
+    supabase, apiKey, clientId, sopType: "microsoft_weekly", periodStart, periodEnd,
+    stepNumber: 3, stepName: "Budget Spend Anomalies",
+    layer: "narrative", runKey: jobId,
+    systemPrompt: buildWeeklyStep3Prompt(goalsSection, accountType, "microsoft_ads"),
+    userMessage: `Voer stap 3 (Budget & Spend Anomalies) en het afsluitende Weekoverzicht uit voor client "${clientId}" (Microsoft Ads).
+Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
+
+## Conclusie stap 1 (Account Health Check)
+${step1.output}
+
+## Conclusie stap 2 (Keyword en Zoekterm Bleeders)
+${step2.output}
+
+## Campaign Performance (laatste 60 dagen, voor spend-anomalie WoW-check)
+\`\`\`
+${toPromptTable(campaignRows)}
+\`\`\`
+
+## Campagne-instellingen (dagbudget, biedstrategie, import_source -- voor de Budget vs. Vraag-analyse en de import-wortelooorzaak)
+\`\`\`
+${toPromptTable(campaignMetaResult.data ?? [])}
+\`\`\`
+
+## Impressieaandeel (budget_lost_is = aandeel gemist DOOR budget, rank_lost_is = gemist door positie)
+\`\`\`
+${toPromptTable(impressionShareResult.data ?? [])}
+\`\`\`
+
+Focus alleen op anomalies en bleeders die directe actie vereisen.`,
+  });
+
+  const result: AnalysisResult = {
+    clientId, sopType: "microsoft_weekly", analysisDate: today(), periodStart, periodEnd,
+    model: step3.model,
+    tokensUsed: step1.tokensUsed + step2.tokensUsed + step3.tokensUsed,
+    output: sanitizeOutput(`## Stap 1: Account Health Check & Tracking Verificatie
+
+${step1.output}
+
+---
+
+## Stap 2: Keyword en Zoekterm Bleeders
+
+${step2.output}
+
+---
+
+## Stap 3: Budget & Spend Anomalies
+
+${step3.output}`),
+    saved: step1.saved && step2.saved && step3.saved,
+    latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs,
+    retries: step1.retries + step2.retries + step3.retries,
+  };
+  await saveFullOutputMarker(supabase, result);
+
+  const extraction = await extractStructuredData({
+    supabase, apiKey, clientId, sopType: "microsoft_weekly",
+    analysisDate: result.analysisDate, periodStart, periodEnd,
+    analysisOutput: result.output,
+    findingsSystemPrompt: WEEKLY_FINDINGS_SYSTEM,
+    recsSystemPrompt: WEEKLY_RECS_SYSTEM,
+    stepOffset: 3,
+    analysisId: null,
+    reliability: microsoftReliability,
+    onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
+  });
+
+  await markProgressCompleted(supabase, {
+    jobId,
+    message: "Wekelijkse Microsoft SOP-analyse gereed.",
+    metadata: {
+      analysis_date: result.analysisDate, sop_type: "microsoft_weekly",
+      findings: extraction.findings.length, recommendations: extraction.recommendations.length, tasks: extraction.tasks.length,
+    },
+  });
+
+  after(async () => {
+    await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "weekly", periodStart, periodEnd);
+  });
+
+  return Response.json({
+    jobId,
+    ...result,
+    structured: {
+      findings: extraction.findings.length,
+      recommendations: extraction.recommendations.length,
+      tasks: extraction.tasks.length,
+      saved: extraction.saved,
+      findingsParseOk: extraction.findingsParseOk,
+      recsParseOk: extraction.recsParseOk,
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
@@ -1032,6 +1309,9 @@ export async function POST(request: NextRequest) {
     }
     if (channel === "linkedin_ads") {
       return await runLinkedinWeeklyAnalysis(supabase, apiKey, clientId, jobId);
+    }
+    if (channel === "microsoft_ads") {
+      return await runMicrosoftWeeklyAnalysis(supabase, apiKey, clientId, jobId);
     }
     return await runGoogleWeeklyAnalysis(supabase, apiKey, clientId, jobId);
   } catch (err) {
