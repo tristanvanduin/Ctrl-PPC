@@ -81,3 +81,41 @@ export const LINKEDIN_BIWEEKLY: BiWeeklyChannelContent = {
 "[Campagne X] pacing is [op schema / te snel / te langzaam] — [beschrijving]. CPL-ontwikkeling
 [wijst wel/niet] op een biedprobleem sinds de maandanalyse."`,
 };
+
+export const MICROSOFT_BIWEEKLY: BiWeeklyChannelContent = {
+  step1Dataset: "microsoft_account_daily (deze maand + vorige 2 maanden, per maand samengevat), microsoft_account_daily (laatste 30 dagen)",
+  step2Dataset: "microsoft_campaign_daily (deze maand + vorige 2 maanden, per maand samengevat), conclusie stap 1",
+  step3Title: "Keyword & Ad Group-ontwikkeling",
+  step3Dataset: "microsoft_adgroup_daily (deze maand + vorige 2 maanden) en microsoft_keyword_monthly, conclusies stap 1 + 2",
+  step3Body: `### Werkwijze
+1. Ontwikkelen de keywords en ad groups uit de maandanalyse zich zoals verwacht?
+2. Effect van optimalisaties zichtbaar (bijv. negatives toegevoegd, bid-modifier gezet, import ververst)?
+   Weeg het volume mee: op dit kanaal is twee weken vaak te kort voor een hard oordeel -- zeg dan
+   "te vroeg", dat is een geldige uitkomst.
+
+### Output format
+"Keyword/ad group X (geïdentificeerd in maandanalyse) ontwikkelt zich [conform verwachting /
+afwijkend / te vroeg om te beoordelen]: [beschrijving met concrete cijfers, absolute aantallen
+erbij, en vergelijking met de maandanalyse-verwachting]."`,
+  step4Title: "Netwerk & Device",
+  step4Dataset: "microsoft_breakdown_daily (network en device), microsoft_campaign_impression_share, conclusies stap 1 t/m 3",
+  step4Body: `### Werkwijze
+1. Is het Audience Network-aandeel in spend gegroeid of gekrompen sinds de maandanalyse, en beweegt
+   het conversie-aandeel mee?
+2. Verschuift de desktop/mobile-verhouding, en volgt de efficiëntie die verschuiving?
+3. Ontwikkelt het impressieaandeel zich -- en is het verlies budget of positie? Die twee vragen
+   tegengestelde ingrepen.
+
+### Output format
+"Netwerk [X] draagt [Y]% van spend bij [Z]% van conversies ([+/-] sinds de maandanalyse) — dit
+[verklaart/verklaart niet] de ontwikkeling uit stap 1-3. Impressieaandeel [campagne]: [budget/positie]-verlies
+[stijgt/daalt] naar [X]%."`,
+};
+
+// Zelfde opzoektabel-vorm als WEEKLY_CHANNEL_CONTENT: één plek die kanalen kent, google_ads valt
+// op undefined terug en houdt zijn inline defaults in sop-prompts.ts.
+export const BIWEEKLY_CHANNEL_CONTENT: Partial<Record<string, BiWeeklyChannelContent>> = {
+  meta_ads: META_BIWEEKLY,
+  linkedin_ads: LINKEDIN_BIWEEKLY,
+  microsoft_ads: MICROSOFT_BIWEEKLY,
+};

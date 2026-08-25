@@ -11,9 +11,9 @@ export type Ga4Availability = "live" | "mock" | "partial" | "absent";
 // waar ze op rust — advertentieplatform, GA4, een combinatie, of een schatting.
 export type EvidenceBasis = "platform" | "ga4" | "combined" | "estimated";
 
-// Onze kanaal-union, gemapt uit GA4 sessionSource/Medium. "other" = verkeer buiten paid Google/
-// Meta/LinkedIn (organisch, direct, e-mail): telt mee voor het website-totaal, niet per kanaal.
-export type Ga4Channel = "google" | "meta" | "linkedin" | "other";
+// Onze kanaal-union, gemapt uit GA4 sessionSource/Medium. "other" = verkeer buiten de betaalde
+// kanalen (organisch, direct, e-mail): telt mee voor het website-totaal, niet per kanaal.
+export type Ga4Channel = "google" | "meta" | "linkedin" | "microsoft" | "other";
 
 // GA4 deviceCategory. Optioneel op de dagrij: detectoren die device negeren aggregeren gewoon
 // over alle waarden; de device-CRO-detector kijkt alleen naar rijen met een device.

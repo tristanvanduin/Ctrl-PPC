@@ -98,7 +98,7 @@ export function buildGa4CroSignals(rows: Ga4DailyRow[], opts: { idPrefix?: strin
 
   const triggered: SignalStory[] = [];
   // Deterministische volgorde (grootste kloof eerst) zodat de output stabiel is.
-  const paid = [...byChannel.entries()].filter(([ch]) => ch === "google" || ch === "meta" || ch === "linkedin");
+  const paid = [...byChannel.entries()].filter(([ch]) => ch === "google" || ch === "meta" || ch === "linkedin" || ch === "microsoft");
   const scored = paid
     .filter(([, a]) => a.sessions >= GA4_CRO_MIN_CHANNEL_SESSIONS)
     .map(([ch, a]) => ({ ch, a, rate: a.sessions > 0 ? a.key / a.sessions : 0 }))

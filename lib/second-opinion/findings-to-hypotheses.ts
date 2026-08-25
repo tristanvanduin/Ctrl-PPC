@@ -151,7 +151,13 @@ export type ProposalSource =
   | "linkedin_weekly"
   | "biweekly"
   | "meta_biweekly"
-  | "linkedin_biweekly";
+  | "linkedin_biweekly"
+  // Het vierde kanaal. Anders dan bij de drie oorspronkelijke kanalen draagt hier OOK de maand
+  // zijn eigen sop_type als bron: "analysis" is historisch de GOOGLE-maandbron (zo leest de
+  // wachtrij-uitsluiting hem), en een nieuw kanaal hoort daar niet stil onder te schuilen.
+  | "microsoft_weekly"
+  | "microsoft_biweekly"
+  | "microsoft_monthly";
 
 /**
  * De voorstellenbron van een SOP-variant.

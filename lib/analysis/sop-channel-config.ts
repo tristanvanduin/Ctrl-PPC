@@ -10,10 +10,10 @@
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
 
 export type SopType = "weekly" | "biweekly" | "monthly";
-export type SopChannel = "google_ads" | "meta_ads" | "linkedin_ads";
+export type SopChannel = "google_ads" | "meta_ads" | "linkedin_ads" | "microsoft_ads";
 
 export const ALLE_SOP_TYPES: readonly SopType[] = ["weekly", "biweekly", "monthly"];
-export const ALLE_SOP_CHANNELS: readonly SopChannel[] = ["google_ads", "meta_ads", "linkedin_ads"];
+export const ALLE_SOP_CHANNELS: readonly SopChannel[] = ["google_ads", "meta_ads", "linkedin_ads", "microsoft_ads"];
 
 export const CHANNEL_CONFIG: Record<
   SopChannel,
@@ -33,6 +33,14 @@ export const CHANNEL_CONFIG: Record<
     types: ["weekly", "biweekly", "monthly"],
     sopTypeKey: { weekly: "linkedin_weekly", biweekly: "linkedin_biweekly", monthly: "linkedin_monthly" },
     headerLabel: "LinkedIn Ads",
+  },
+  // Vierde kanaal (25 aug 2026). De sleutel is microsoft_ads en niet bing_ads: de beslissingslaag
+  // (lib/decision/types.ts) reserveerde "microsoft" al, en dit is de officiele productnaam --
+  // "Bing" is het label waaronder gebruikers hem kennen, en dat mag in UI-teksten gewoon zo heten.
+  microsoft_ads: {
+    types: ["weekly", "biweekly", "monthly"],
+    sopTypeKey: { weekly: "microsoft_weekly", biweekly: "microsoft_biweekly", monthly: "microsoft_monthly" },
+    headerLabel: "Microsoft Ads",
   },
 };
 
@@ -60,6 +68,7 @@ const SOP_KANAAL_VAN_INSIGHT: Partial<Record<InsightChannel, SopChannel>> = {
   google: "google_ads",
   meta: "meta_ads",
   linkedin: "linkedin_ads",
+  microsoft: "microsoft_ads",
 };
 
 /**

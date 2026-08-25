@@ -32,10 +32,15 @@ const ALLE_SLEUTELS = ALLE_SOP_CHANNELS.flatMap((kanaal) =>
   ALLE_SOP_TYPES.map((cadans) => CHANNEL_CONFIG[kanaal].sopTypeKey[cadans])
 );
 
-console.log("De negen sleutels vormen een partitie in drie kanalen");
+// Het aantal is afgeleid, niet hardgecodeerd: bij het vierde kanaal (microsoft_ads, 25 aug 2026)
+// ging dit van 9 naar 12, en de test hoort dan mee te groeien via dezelfde tabel als de
+// productiecode -- niet te falen op een getal dat gisteren klopte.
+const VERWACHT = ALLE_SOP_CHANNELS.length * ALLE_SOP_TYPES.length;
+
+console.log(`De ${VERWACHT} sleutels vormen een partitie in ${ALLE_SOP_CHANNELS.length} kanalen`);
 {
-  check("er zijn negen sleutels", ALLE_SLEUTELS.length === 9, ALLE_SLEUTELS.join(", "));
-  check("en ze zijn allemaal uniek", new Set(ALLE_SLEUTELS).size === 9, ALLE_SLEUTELS.join(", "));
+  check(`er zijn ${VERWACHT} sleutels`, ALLE_SLEUTELS.length === VERWACHT, ALLE_SLEUTELS.join(", "));
+  check("en ze zijn allemaal uniek", new Set(ALLE_SLEUTELS).size === VERWACHT, ALLE_SLEUTELS.join(", "));
 
   for (const sleutel of ALLE_SLEUTELS) {
     const groep = sopTypesVanZelfdeKanaal(sleutel);
@@ -57,7 +62,7 @@ console.log("De negen sleutels vormen een partitie in drie kanalen");
   // Volledig: de drie groepen samen dekken alle negen. Een sleutel die nergens in valt zou
   // stilzwijgend uit elke taakhistorie verdwijnen.
   const gedekt = new Set(ALLE_SLEUTELS.flatMap((s) => sopTypesVanZelfdeKanaal(s)));
-  check("samen dekken de groepen alle negen sleutels", gedekt.size === 9,
+  check(`samen dekken de groepen alle ${VERWACHT} sleutels`, gedekt.size === VERWACHT,
     [...gedekt].sort().join(", "));
 }
 
@@ -95,6 +100,16 @@ console.log("\nWat er buiten de negen valt");
     sopTypesVanZelfdeKanaal("meta_signals").join(", "));
   check("linkedin_icp valt bij LinkedIn", sopTypesVanZelfdeKanaal("linkedin_icp").every((t) => t.startsWith("linkedin_")),
     sopTypesVanZelfdeKanaal("linkedin_icp").join(", "));
+
+  // Het vierde kanaal volgt de prefixregel, niet een handmatige sleutellijst -- precies zoals
+  // meta_weekly en linkedin_biweekly ooit uit de handlijsten vielen en stil Google werden.
+  check("microsoft_weekly valt bij Microsoft",
+    JSON.stringify(sopTypesVanZelfdeKanaal("microsoft_weekly").sort()) ===
+    JSON.stringify(["microsoft_biweekly", "microsoft_monthly", "microsoft_weekly"]),
+    sopTypesVanZelfdeKanaal("microsoft_weekly").join(", "));
+  check("een toekomstige microsoft_-bron valt er ook onder",
+    sopTypesVanZelfdeKanaal("microsoft_iets_nieuws").every((t) => t.startsWith("microsoft_")),
+    sopTypesVanZelfdeKanaal("microsoft_iets_nieuws").join(", "));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

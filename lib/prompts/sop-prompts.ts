@@ -8,9 +8,10 @@
 
 import { WORLD_KNOWLEDGE_GROUNDING } from "./shared-grounding";
 import { IS_LOSS_ALARM_PCT, PMAX_LEARNING_WEEKS, PMAX_LEARNING_CONVERSIONS } from "../analysis/thresholds";
-import { META_WEEKLY, LINKEDIN_WEEKLY } from "./weekly-channel-content";
-import { META_BIWEEKLY, LINKEDIN_BIWEEKLY } from "./biweekly-channel-content";
+import { WEEKLY_CHANNEL_CONTENT } from "./weekly-channel-content";
+import { BIWEEKLY_CHANNEL_CONTENT } from "./biweekly-channel-content";
 import { META_BENCHMARKS } from "../analysis/adapters/meta-ads";
+import { MICROSOFT_BENCHMARKS } from "../analysis/adapters/microsoft-ads";
 import { LINKEDIN_BENCHMARKS } from "../analysis/adapters/linkedin-ads";
 
 // ============================================================
@@ -290,6 +291,34 @@ const DENK_BREED: Record<PromptKanaal, string> = {
 - Insight Tag en conversietracking controleren als leads buiten het platform landen
 - Lead-kwaliteit terugkoppelen uit het CRM; LinkedIn meet het formulier, niet de opportunity
 - Rekening houden met lange B2B-doorlooptijden bij het beoordelen van een kort venster`,
+
+  microsoft_ads: `### Strategiewijzigingen
+- Overstappen van manual bidding naar Smart Bidding (tCPA, tROAS, Maximize Conversions) -- met de kanttekening dat Smart Bidding hier trager leert door het kleinere volume
+- Losbreken van de Google-import: een campagne die alleen als kopie draait, native herbouwen als de veiling hier structureel anders ligt
+- Import-cadans aanscherpen of juist stoppen: een eenmalige import die nooit ververst is drift, een automatische die native optimalisaties overschrijft ook
+- Budget verschuiven tussen campagnes op basis van impressieaandeel: bij dit volume is de veiling vaker de grens dan het budget
+
+### Nieuwe campagnetypes
+- Performance Max (Microsoft-variant) als aanvulling op Search, met dezelfde kanttekeningen als bij Google
+- Dynamic Search Ads voor keyword-discovery op het eigen (kleinere) zoekvolume
+- Shopping-campagnes via Microsoft Merchant Center als er een productfeed is
+- Audience ads ALLEEN bewust: als apart gestuurd experiment met eigen budget, nooit als stille bijvangst van search-campagnes
+
+### Profieltargeting en netwerk (wat alleen dit kanaal kan)
+- Bid-modifiers op LinkedIn-profieldimensies: industry, company en job function bovenop search-intent -- verhoog op segmenten die aantoonbaar converteren, sluit structurele lekken uit
+- Audience Network per campagne uitsluiten of afmodulen wanneer het spend opneemt zonder conversies
+- Syndicated search partners apart beoordelen; kwaliteit wisselt per partner
+- Device-modifiers: dit kanaal is desktop-zwaar, en de biedverdeling hoort dat verschil te volgen
+
+### Account structuur en hygiene
+- Negative keyword-lijsten synchroon houden met het Google-bronaccount, of bewust laten divergeren waar het zoekgedrag hier anders is
+- Match-type-mix herzien: broad zonder strakke negatives is hier duurder dan bij Google, want het volume om automatisch bij te sturen ontbreekt
+- Quality-score-clusters aanpakken via advertentierelevantie en landingspagina, niet via het bod
+- UET-tag en doelinstellingen verifieren als de CVR breekt zonder spend- of positiewijziging
+
+### Meting en volume
+- Meetvensters verlengen: een ingreep die op Google in een week meetbaar is, heeft hier vaak een maand nodig
+- Percentages altijd met absolute aantallen beoordelen; een verdubbeling van 3 naar 6 conversies is geen trend`,
 };
 
 // Het voorbeeld bij de "wees specifiek"-regel. De REGEL is gedeeld vakmanschap; het VOORBEELD niet
@@ -299,6 +328,7 @@ const SPECIFIEK_VOORBEELD: Record<PromptKanaal, string> = {
   google_ads: 'niet "PMAX optimaliseren" maar "tROAS verlagen van X% naar Y%"',
   meta_ads: 'niet "de campagne optimaliseren" maar "het dagbudget van ad set X van 40 naar 25 euro verlagen"',
   linkedin_ads: 'niet "de targeting aanscherpen" maar "senioriteit Entry uitsluiten in campagne X"',
+  microsoft_ads: 'niet "het Audience Network beoordelen" maar "een bid-modifier van -100% op het Audience Network zetten in campagne X"',
 };
 
 // ── DE ROL DIE HET MODEL AANNEEMT ──────────────────────────────────────────
@@ -311,12 +341,15 @@ const SPECIFIEK_VOORBEELD: Record<PromptKanaal, string> = {
 //
 // Alleen de rolzin verschilt. Alles eromheen -- cijferdiscipline, hypotheseformaat, ICE, de
 // KPI-ketenredenering -- blijft woordelijk gedeeld: dat is vakmanschap dat niet per platform verschilt.
-export type PromptKanaal = "google_ads" | "meta_ads" | "linkedin_ads";
+export type PromptKanaal = "google_ads" | "meta_ads" | "linkedin_ads" | "microsoft_ads";
 
 const KANAAL_ROL: Record<PromptKanaal, string> = {
   google_ads: "senior SEA-specialist",
   meta_ads: "senior Meta Ads-specialist",
   linkedin_ads: "senior LinkedIn Ads-specialist in B2B",
+  // Wel search-vakjargon (dit IS search), maar de eigen reflexen: import-hygiene,
+  // profieltargeting en netwerkcontrole in plaats van Google-schaal-aannames.
+  microsoft_ads: "senior Microsoft Ads-specialist (Bing)",
 };
 
 export function rolVoorKanaal(kanaal?: string): string {
@@ -1552,10 +1585,11 @@ function biWeeklyPreamble(
   goalsSection: string,
   accountType: AccountType,
   previousMonthlyOutput: string,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
   const benchmarks = channel === "meta_ads" ? META_BENCHMARKS[accountType]
     : channel === "linkedin_ads" ? LINKEDIN_BENCHMARKS[accountType]
+    : channel === "microsoft_ads" ? MICROSOFT_BENCHMARKS[accountType]
     : getBenchmarks(accountType);
 
   return `
@@ -1607,7 +1641,7 @@ export function buildBiWeeklyPrompt(
   goalsSection: string,
   accountType: AccountType,
   previousMonthlyOutput: string,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
   return biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel);
 }
@@ -1617,7 +1651,7 @@ export function buildBiWeeklyStep1Prompt(
   goalsSection: string,
   accountType: AccountType,
   previousMonthlyOutput: string,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
   return `${biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel)}
 
@@ -1625,7 +1659,7 @@ export function buildBiWeeklyStep1Prompt(
 
 ## Stap 1: Account Performance
 
-Gebruik: ${(channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null)?.step1Dataset ?? "account_monthly (this month + last 2 months), account_weekly (laatste 30 dagen)"}
+Gebruik: ${(BIWEEKLY_CHANNEL_CONTENT[channel] ?? null)?.step1Dataset ?? "account_monthly (this month + last 2 months), account_weekly (laatste 30 dagen)"}
 
 ### Werkwijze
 1. Ligt de maand op schema voor de doelstellingen?
@@ -1655,7 +1689,7 @@ export function buildBiWeeklyStep2Prompt(
   goalsSection: string,
   accountType: AccountType,
   previousMonthlyOutput: string,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
   return `${biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel)}
 
@@ -1663,7 +1697,7 @@ export function buildBiWeeklyStep2Prompt(
 
 ## Stap 2: Campagne Performance
 
-Gebruik: ${(channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null)?.step2Dataset ?? "campaign_monthly (this month + last 2 months), conclusie stap 1"}
+Gebruik: ${(BIWEEKLY_CHANNEL_CONTENT[channel] ?? null)?.step2Dataset ?? "campaign_monthly (this month + last 2 months), conclusie stap 1"}
 
 ### Werkwijze
 1. Ontwikkelen de campagnes uit de maandanalyse zich zoals verwacht?
@@ -1689,9 +1723,9 @@ export function buildBiWeeklyStep3Prompt(
   goalsSection: string,
   accountType: AccountType,
   previousMonthlyOutput: string,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
-  const content = channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null;
+  const content = BIWEEKLY_CHANNEL_CONTENT[channel] ?? null;
   return `${biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel)}
 
 ---
@@ -1723,9 +1757,9 @@ export function buildBiWeeklyStep4Prompt(
   goalsSection: string,
   accountType: AccountType,
   previousMonthlyOutput: string,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
-  const content = channel === "meta_ads" ? META_BIWEEKLY : channel === "linkedin_ads" ? LINKEDIN_BIWEEKLY : null;
+  const content = BIWEEKLY_CHANNEL_CONTENT[channel] ?? null;
   return `${biWeeklyPreamble(goalsSection, accountType, previousMonthlyOutput, channel)}
 
 ---
@@ -1780,12 +1814,13 @@ ${buildHypotheseInstructies(channel)}
 function weeklyPreamble(
   goalsSection: string,
   accountType: AccountType,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
   const benchmarks = channel === "meta_ads" ? META_BENCHMARKS[accountType]
     : channel === "linkedin_ads" ? LINKEDIN_BENCHMARKS[accountType]
+    : channel === "microsoft_ads" ? MICROSOFT_BENCHMARKS[accountType]
     : getBenchmarks(accountType);
-  const content = channel === "meta_ads" ? META_WEEKLY : channel === "linkedin_ads" ? LINKEDIN_WEEKLY : null;
+  const content = WEEKLY_CHANNEL_CONTENT[channel] ?? null;
 
   return `
 Je bent een ${rolVoorKanaal(channel)} die een wekelijkse health check uitvoert.
@@ -1825,7 +1860,7 @@ ${content
 export function buildWeeklyPrompt(
   goalsSection: string,
   accountType: AccountType,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
   return weeklyPreamble(goalsSection, accountType, channel);
 }
@@ -1839,7 +1874,7 @@ export function buildWeeklyPrompt(
 export function buildWeeklyStep1Prompt(
   goalsSection: string,
   accountType: AccountType,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
   return `${weeklyPreamble(goalsSection, accountType, channel)}
 
@@ -1877,7 +1912,7 @@ is er sprake van een waarschijnlijke tracking break.
 Bij vermoeden van tracking-issues:
 → Flag als: "KRITIEK — MOGELIJKE TRACKING BREAK"
 → Geef GEEN performance-adviezen (budget, biedingen, targeting) — die zijn zinloos bij kapotte tracking
-→ Aanbeveling: "Controleer conversietracking via ${(channel === "meta_ads" ? META_WEEKLY : channel === "linkedin_ads" ? LINKEDIN_WEEKLY : null)?.trackingTool ?? "Google Tag Assistant / GTM debug mode"}"
+→ Aanbeveling: "Controleer conversietracking via ${(WEEKLY_CHANNEL_CONTENT[channel] ?? null)?.trackingTool ?? "Google Tag Assistant / GTM debug mode"}"
 → Bereken wat de conversies ZOUDEN zijn geweest op basis van historische conv/spend ratio
 
 ### Werkwijze
@@ -1901,9 +1936,9 @@ Geen afwijkingen: "Account health: geen significante anomalies (alle KPI's binne
 export function buildWeeklyStep2Prompt(
   goalsSection: string,
   accountType: AccountType,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
-  const content = channel === "meta_ads" ? META_WEEKLY : channel === "linkedin_ads" ? LINKEDIN_WEEKLY : null;
+  const content = WEEKLY_CHANNEL_CONTENT[channel] ?? null;
   return `${weeklyPreamble(goalsSection, accountType, channel)}
 
 ---
@@ -1935,9 +1970,9 @@ Geen bleeders: "Keyword/zoekterm check: geen bleeders boven drempel deze week."`
 export function buildWeeklyStep3Prompt(
   goalsSection: string,
   accountType: AccountType,
-  channel: "google_ads" | "meta_ads" | "linkedin_ads" = "google_ads"
+  channel: PromptKanaal = "google_ads"
 ): string {
-  const content = channel === "meta_ads" ? META_WEEKLY : channel === "linkedin_ads" ? LINKEDIN_WEEKLY : null;
+  const content = WEEKLY_CHANNEL_CONTENT[channel] ?? null;
   return `${weeklyPreamble(goalsSection, accountType, channel)}
 
 ---

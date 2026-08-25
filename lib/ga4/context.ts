@@ -30,6 +30,7 @@ const CHANNEL_OF_SOP: Record<ChannelId, Ga4Channel> = {
   google_ads: "google",
   meta_ads: "meta",
   linkedin_ads: "linkedin",
+  microsoft_ads: "microsoft",
 };
 
 // Deterministische bewijs-basis-resolver (de "guard" achter het expliciete evidenceBasis-veld).
@@ -48,7 +49,7 @@ export function resolveEvidenceBasis(opts: {
   return "platform";
 }
 
-const CHANNEL_LABEL: Record<Ga4Channel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", other: "Overig (organisch/direct)" };
+const CHANNEL_LABEL: Record<Ga4Channel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", microsoft: "Microsoft (Bing)", other: "Overig (organisch/direct)" };
 
 interface Windowed { sessions: number; engaged: number; key: number; funnel: Record<string, number> }
 function windowAgg(rows: Ga4DailyRow[], fromDays: number, toDays: number): Windowed {

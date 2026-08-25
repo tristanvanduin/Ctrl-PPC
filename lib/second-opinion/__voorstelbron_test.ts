@@ -28,14 +28,17 @@ function check(name: string, cond: boolean, detail = "") {
   else { failed++; console.log("  FAIL  " + name + "  " + detail); }
 }
 
-// Exact de zes waarden waarmee app/api/analysis/{weekly,biweekly}/route.ts
-// extractStructuredData aanroepen.
-const VARIANTEN = ["weekly", "meta_weekly", "linkedin_weekly", "biweekly", "meta_biweekly", "linkedin_biweekly"] as const;
+// ALLE niet-maandvarianten, afgeleid uit CHANNEL_CONFIG: de waarden waarmee de weekly- en
+// biweekly-routes extractStructuredData aanroepen. Groeit vanzelf mee met een nieuw kanaal.
+const VARIANTEN = ALLE_SOP_CHANNELS.flatMap((kanaal) =>
+  ALLE_SOP_TYPES.filter((c) => c !== "monthly").map((c) => CHANNEL_CONFIG[kanaal].sopTypeKey[c])
+);
 
 console.log("De zes varianten delen geen bron meer");
 {
   const bronnen = VARIANTEN.map(proposalSourceForSopType);
-  check("zes varianten, zes verschillende bronnen", new Set(bronnen).size === 6, bronnen.join(", "));
+  check(`${VARIANTEN.length} varianten, ${VARIANTEN.length} verschillende bronnen`,
+    new Set(bronnen).size === VARIANTEN.length, bronnen.join(", "));
   // Dit is de kern: zou ook maar één variant nog "analysis" schrijven, dan wist die bij elke run
   // de voorstellen van de maandpijplijn -- en die is in de wachtrij niet eens zichtbaar, dus
   // niemand zou het merken.
@@ -51,6 +54,7 @@ console.log("\nElke variant landt bij het juiste kanaal in de wachtrij");
     weekly: "google", biweekly: "google",
     meta_weekly: "meta", meta_biweekly: "meta",
     linkedin_weekly: "linkedin", linkedin_biweekly: "linkedin",
+    microsoft_weekly: "microsoft", microsoft_biweekly: "microsoft",
   };
   for (const v of VARIANTEN) {
     const kanaal = channelOfSource(proposalSourceForSopType(v));
@@ -87,13 +91,18 @@ console.log("\nDe opruimmigratie noemt dezelfde zes varianten");
   const sql = readFileSync(join(process.cwd(), "scripts/migrations/105_wees_voorstellen_terug_naar_eigen_bron.sql"), "utf8");
   const inSql = [...sql.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
 
-  const nietMaand = ALLE_SOP_CHANNELS.flatMap((kanaal) =>
-    ALLE_SOP_TYPES.filter((c) => c !== "monthly").map((c) => CHANNEL_CONFIG[kanaal].sopTypeKey[c])
-  );
-  check("de migratie kent zes niet-maandvarianten", nietMaand.length === 6, nietMaand.join(", "));
-  for (const variant of nietMaand) {
+  // BEVROREN, niet afgeleid -- en dat is hier een principekwestie. Migratie 105 repareert een
+  // HISTORISCHE toestand: voorstellen die vóór de bronsplitsing onder "analysis" zijn
+  // weggeschreven. Alleen de zes varianten die toen bestonden kunnen daar wezen hebben; een
+  // kanaal dat ná de splitsing geboren is (microsoft, 25 aug 2026) heeft nooit onder "analysis"
+  // geschreven en hoort dus juist NIET in die migratie -- hem daar alsnog aan toevoegen zou
+  // suggereren dat er iets te herstellen valt. De levende eis voor nieuwe kanalen staat hierboven:
+  // proposalSourceForSopType mag voor geen enkele variant "analysis" teruggeven.
+  const HISTORISCHE_ZES = ["weekly", "biweekly", "meta_weekly", "meta_biweekly", "linkedin_weekly", "linkedin_biweekly"];
+  for (const variant of HISTORISCHE_ZES) {
     check(`105 noemt ${variant}`, inSql.includes(variant), inSql.join(", "));
   }
+  check("en geen enkele latere variant", !inSql.some((w) => w.startsWith("microsoft_")), inSql.join(", "));
   // En andersom: de migratie mag geen maandbron aanraken. Die rijen staan terecht onder
   // "analysis" -- 84 van de 85 pending rijen in deze database zijn dat.
   for (const maand of ALLE_SOP_CHANNELS.map((k) => CHANNEL_CONFIG[k].sopTypeKey.monthly)) {

@@ -34,7 +34,10 @@ function check(name: string, cond: boolean, detail = "") {
 
 console.log("De exportpoort kent alle drie de maandkanalen");
 {
-  check("er zijn er precies drie", MONTHLY_SOP_TYPES.length === 3, MONTHLY_SOP_TYPES.join(", "));
+  // Afgeleid, niet hardgecodeerd: bij het vierde kanaal (microsoft_ads) werd dit vier, en dat is
+  // precies de bedoeling -- een nieuw kanaal hoort VANZELF onder de poort te vallen.
+  check(`er is er precies één per kanaal (${ALLE_SOP_CHANNELS.length})`,
+    MONTHLY_SOP_TYPES.length === ALLE_SOP_CHANNELS.length, MONTHLY_SOP_TYPES.join(", "));
   for (const kanaal of ALLE_SOP_CHANNELS) {
     const sleutel = CHANNEL_CONFIG[kanaal].sopTypeKey.monthly;
     check(`${kanaal} (${sleutel}) valt onder de poort`, isMonthlySopType(sleutel));

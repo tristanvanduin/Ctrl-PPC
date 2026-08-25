@@ -15,5 +15,6 @@ export function classifyGa4Channel(source: string | null | undefined, medium: st
   if (isPaid && (s.includes("google") || s === "adwords")) return "google";
   if (isPaid && (s.includes("facebook") || s.includes("instagram") || s.includes("meta") || s.includes("fb"))) return "meta";
   if (isPaid && s.includes("linkedin")) return "linkedin";
+  if (isPaid && (s.includes("bing") || s.includes("microsoft"))) return "microsoft";
   return "other";
 }

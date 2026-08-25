@@ -16,7 +16,7 @@ export type FeedStatus = "new" | "in_progress" | "awaiting_approval" | "snoozed"
 export type ImpactType = "measured" | "estimated";
 export type ImpactDirection = "risk" | "gain" | "neutral";
 export type FeedSource = "signal" | "queue" | "task" | "tracking" | "pacing" | "recommendation" | "manual";
-export type FeedChannel = "google" | "meta" | "linkedin" | "cross";
+export type FeedChannel = "google" | "meta" | "linkedin" | "microsoft" | "cross";
 
 export interface FeedActionRef {
   kind: "view" | "investigate" | "snooze" | "assign" | "resolve" | "approve" | "open";

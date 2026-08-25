@@ -72,3 +72,44 @@ volume om te beoordelen)."`,
      d. Dagbudget te vroeg opgebruikt? (check delivery pacing in Campaign Manager)
      e. Seizoenseffect? (B2B-budgetten dalen vaak rond december en in de zomer)`,
 };
+
+export const MICROSOFT_WEEKLY: WeeklyChannelContent = {
+  trackingTool: "UET-tag en conversiedoelen in Microsoft Advertising",
+  wasteStepTitle: "Keyword & Zoekterm Bleeders",
+  wasteStepDataset: "microsoft_adgroup_daily en microsoft_campaign_daily (7 dagen), microsoft_keyword_monthly (lopende maand), microsoft_breakdown_daily (network)",
+  wasteStepBody: `Identificeer bleeders op ad group- en keywordniveau: cost > 2x gemiddelde account CPA,
+0 conversies. VOLUMEREM: dit kanaal draait op een fractie van Google-volumes -- weeg 0 conversies
+bij weinig spend (<EUR 25) als "te vroeg om te beoordelen", niet als bleeder, anders vlagt elke
+rustige week vals. Vlag daarnaast Audience Network-lekkage als aparte bleeder-soort: een netwerk
+dat deze week spend absorbeert zonder conversies is geen keywordprobleem maar een
+plaatsingsprobleem, en de ingreep (uitsluiten of afmodulen) is een andere.
+
+### Output format
+Alleen bij bleeders:
+"[URGENTIE] BLEEDER — Keyword/ad group '[naam]' | €[cost] spend | 0 conversies |
+Campagne: [naam] | Aanbeveling: [negative toevoegen, bod verlagen of pauzeren]."
+
+Bij netwerk-lekkage:
+"[URGENTIE] NETWERK-LEK — Audience Network | €[cost] spend | [X] conversies |
+aandeel [Y]% van weekspend | Aanbeveling: [uitsluiten of bid-modifier -X%]."
+
+Geen bleeders: "Keyword/zoekterm check: geen bleeders boven drempel deze week (of te weinig
+volume om te beoordelen)."`,
+  spendAnomalyRootCauses: `a. Impressieaandeel verschoven? Je krijgt budget- en positieverlies apart mee -- die vragen
+        tegengestelde ingrepen (budget: herallocatie of verhoging; positie: bod of relevantie).
+     b. Audience Network-aandeel gegroeid? (stille spend-verschuiving naar native plaatsingen)
+     c. Google-import ververst? Een re-import kan budgetten, biedingen of negatives overschreven
+        hebben -- check import_source en leg de wijziging naast de importdatum.
+     d. Biedstrategie opnieuw in de leerfase? (Smart Bidding leert hier trager: het volume is klein)
+     e. Veiling zelf gekrompen of gegroeid? Bij dit volume beweegt de totale veilinggrootte mee met
+        seizoen en kantooruren -- niet elke spend-dip is een accountprobleem.`,
+};
+
+// Eén opzoektabel in plaats van dezelfde ternary op vijf plekken in sop-prompts.ts. De Google-
+// afwezigheid is bewust: google_ads valt op undefined terug en houdt zijn inline defaults --
+// precies het oude ternary-gedrag, maar met één plek die kanalen kent in plaats van vijf.
+export const WEEKLY_CHANNEL_CONTENT: Partial<Record<string, WeeklyChannelContent>> = {
+  meta_ads: META_WEEKLY,
+  linkedin_ads: LINKEDIN_WEEKLY,
+  microsoft_ads: MICROSOFT_WEEKLY,
+};

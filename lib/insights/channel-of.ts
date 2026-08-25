@@ -5,12 +5,15 @@
 // oudere bronnen (analysis, second_opinion, search_terms, SI7) zijn Google-pijplijnen.
 // Puur en los getest.
 
-export type InsightChannel = "google" | "meta" | "linkedin" | "cross";
+export type InsightChannel = "google" | "meta" | "linkedin" | "microsoft" | "cross";
 
 export const CHANNEL_LABEL: Record<InsightChannel, string> = {
   google: "Google",
   meta: "Meta",
   linkedin: "LinkedIn",
+  // De productnaam is Microsoft Ads; "Bing" is hoe gebruikers hem kennen. In dit korte label
+  // wint de herkenbaarheid -- de marketingpagina's zeggen ook "Microsoft (Bing) Ads".
+  microsoft: "Microsoft",
   cross: "Cross-channel",
 };
 
@@ -26,6 +29,9 @@ export const CHANNEL_BADGE_CLASS: Record<InsightChannel, string> = {
   google: "bg-blue-50 text-blue-700 border-blue-200",
   meta: "bg-indigo-50 text-indigo-700 border-indigo-200",
   linkedin: "bg-teal-50 text-teal-700 border-teal-200",
+  // Emerald: het enige vrije slot dat niet botst -- blue/indigo/teal/amber zijn bezet, en sky
+  // was bij LinkedIn al afgewezen omdat het te dicht op Google's blauw zit.
+  microsoft: "bg-emerald-50 text-emerald-700 border-emerald-200",
   cross: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
@@ -47,6 +53,7 @@ export function channelOfSource(source: string | null | undefined): InsightChann
   // (`sopType.startsWith("linkedin_")`), dus dit maakt één regel van twee.
   if (s.startsWith("meta_")) return "meta";
   if (s.startsWith("linkedin_")) return "linkedin";
+  if (s.startsWith("microsoft_")) return "microsoft";
   return "google";
 }
 

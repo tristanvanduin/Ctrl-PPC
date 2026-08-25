@@ -13,7 +13,7 @@
 import type { AccountType } from "@/lib/prompts/sop-prompts";
 import type { StepPurityRule } from "@/lib/analysis/step-validator";
 
-export type ChannelId = "google_ads" | "meta_ads" | "linkedin_ads";
+export type ChannelId = "google_ads" | "meta_ads" | "linkedin_ads" | "microsoft_ads";
 
 export interface ChannelAdapter {
   channel: ChannelId;
