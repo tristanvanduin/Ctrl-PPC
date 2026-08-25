@@ -5,7 +5,7 @@
 // ── WAAROM DEZE TEST BESTAAT ────────────────────────────────────────────────
 //
 // Er zijn geen live klanten. De demo-data is daarmee de enige plek waar te bewijzen valt dat de
-// negen SOP-combinaties werken -- en die bewijskracht is precies zo groot als de dekking van die
+// twaalf SOP-combinaties werken -- en die bewijskracht is precies zo groot als de dekking van die
 // data. Dat ging al een keer mis en niemand zag het: meta_adsets en meta_adset_daily ontbraken
 // volledig terwijl alle drie de Meta-cadansen ze lezen, dus het ad set-niveau (bij Meta het niveau
 // waar budget en doelgroep leven) viel in elke demo-run stil terug op leeg. Tsc zag dat niet, de
@@ -32,8 +32,14 @@ import { join } from "node:path";
 import { demoRows } from "./demo-rows";
 import { buildMetaStepFacts } from "@/lib/meta/prepared-facts";
 import { buildLinkedinStepFacts } from "@/lib/linkedin/prepared-facts";
+import { buildMicrosoftStepFacts } from "@/lib/microsoft/prepared-facts";
 import { mapMetaDailyToComputeRow, mapMetaBreakdownToComputeRow } from "@/lib/meta/analysis-data";
 import { mapLinkedinDailyToComputeRow, mapLinkedinDemographicToComputeRow } from "@/lib/linkedin/analysis-data";
+import {
+  mapMicrosoftDailyToComputeRow, mapMicrosoftBreakdownToComputeRow, mapMicrosoftKeywordRow,
+  mapMicrosoftSearchTermRow, mapMicrosoftImpressionShareRow, mapMicrosoftProfileRow,
+  mapMicrosoftCampaignMetaRow,
+} from "@/lib/microsoft/analysis-data";
 
 let passed = 0, failed = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -53,7 +59,7 @@ const lees = (p: string): string => readFileSync(join(WORTEL, p), "utf8");
 //   fetchLinkedinDaily("linkedin_account_daily", start)
 // supabase en clientId zijn identifiers, geen strings, dus "eerste string" is eenduidig. De
 // kolomnamen komen er altijd ná.
-const AANROEP = /(?:\.from|fetchMetaDaily|fetchDaily|fetchNameMap|fetchLinkedinDaily|fetchLinkedinNameMap)\(([^)]*)\)/g;
+const AANROEP = /(?:\.from|fetchMetaDaily|fetchDaily|fetchMonthly|fetchNameMap|fetchLinkedinDaily|fetchLinkedinNameMap|fetchMicrosoftDaily|fetchMicrosoftMonthly|fetchMicrosoftNameMap)\(([^)]*)\)/g;
 
 function tabellenIn(bron: string): Set<string> {
   const uit = new Set<string>();
@@ -81,19 +87,24 @@ const biweekly = lees("app/api/analysis/biweekly/route.ts");
 const monthly = lees("app/api/analysis/monthly/route.ts");
 const metaData = lees("lib/meta/analysis-data.ts");
 const linkedinData = lees("lib/linkedin/analysis-data.ts");
+const microsoftData = lees("lib/microsoft/analysis-data.ts");
 
-// De negen combinaties, elk met de broncode die zijn datatoegang bevat. Voor de monthly van Meta en
-// LinkedIn zit het ophalen in de gedeelde analysis-data-module, niet in de routefunctie zelf.
+// De twaalf combinaties, elk met de broncode die zijn datatoegang bevat. Voor de monthly van Meta,
+// LinkedIn en Microsoft zit het ophalen in de gedeelde analysis-data-module, niet in de
+// routefunctie zelf.
 const COMBINATIES: Array<{ kanaal: string; cadans: string; bron: string }> = [
   { kanaal: "google_ads", cadans: "weekly", bron: functie(weekly, "runGoogleWeeklyAnalysis") },
   { kanaal: "meta_ads", cadans: "weekly", bron: functie(weekly, "runMetaWeeklyAnalysis") },
   { kanaal: "linkedin_ads", cadans: "weekly", bron: functie(weekly, "runLinkedinWeeklyAnalysis") },
+  { kanaal: "microsoft_ads", cadans: "weekly", bron: functie(weekly, "runMicrosoftWeeklyAnalysis") },
   { kanaal: "google_ads", cadans: "biweekly", bron: functie(biweekly, "runGoogleBiWeeklyAnalysis") },
   { kanaal: "meta_ads", cadans: "biweekly", bron: functie(biweekly, "runMetaBiWeeklyAnalysis") },
   { kanaal: "linkedin_ads", cadans: "biweekly", bron: functie(biweekly, "runLinkedinBiWeeklyAnalysis") },
+  { kanaal: "microsoft_ads", cadans: "biweekly", bron: functie(biweekly, "runMicrosoftBiWeeklyAnalysis") },
   { kanaal: "google_ads", cadans: "monthly", bron: monthly.slice(monthly.indexOf("export async function POST")) },
   { kanaal: "meta_ads", cadans: "monthly", bron: functie(monthly, "runMetaMonthlyAnalysis") + metaData },
   { kanaal: "linkedin_ads", cadans: "monthly", bron: functie(monthly, "runLinkedinMonthlyAnalysis") + linkedinData },
+  { kanaal: "microsoft_ads", cadans: "monthly", bron: functie(monthly, "runMicrosoftMonthlyAnalysis") + microsoftData },
 ];
 
 // ── Tabellen die in de demo leeg MOGEN zijn, met de reden erbij ─────────────
@@ -297,6 +308,19 @@ const linkedinFeiten = buildLinkedinStepFacts({
   targets: { cplTarget: 80 },
 });
 
+const microsoftFeiten = buildMicrosoftStepFacts({
+  account: (rijen.microsoft_account_daily ?? []).map((x) => mapMicrosoftDailyToComputeRow(x as Record<string, unknown>)),
+  campaigns: (rijen.microsoft_campaign_daily ?? []).map((x) => mapMicrosoftDailyToComputeRow(x as Record<string, unknown>)),
+  adgroups: (rijen.microsoft_adgroup_daily ?? []).map((x) => mapMicrosoftDailyToComputeRow(x as Record<string, unknown>)),
+  campaignMeta: (rijen.microsoft_campaigns ?? []).map((x) => mapMicrosoftCampaignMetaRow(x as Record<string, unknown>)),
+  keywords: (rijen.microsoft_keyword_monthly ?? []).map((x) => mapMicrosoftKeywordRow(x as Record<string, unknown>)),
+  searchTerms: (rijen.microsoft_search_terms_monthly ?? []).map((x) => mapMicrosoftSearchTermRow(x as Record<string, unknown>)),
+  impressionShare: (rijen.microsoft_campaign_impression_share ?? []).map((x) => mapMicrosoftImpressionShareRow(x as Record<string, unknown>)),
+  breakdowns: (rijen.microsoft_breakdown_daily ?? []).map((x) => mapMicrosoftBreakdownToComputeRow(x as Record<string, unknown>)),
+  profile: (rijen.microsoft_profile_monthly ?? []).map((x) => mapMicrosoftProfileRow(x as Record<string, unknown>)),
+  targets: { cpaTarget: 18 },
+});
+
 /** Een pijler die zichzelf als onbeschikbaar meldt, kan in een demo-run niets laten zien. */
 function pijlerBeschikbaar(feiten: unknown): boolean {
   if (feiten == null) return false;
@@ -310,6 +334,7 @@ console.log("\nElke pijler levert feiten, niet alleen een tabel");
 for (let i = 1; i <= 6; i++) {
   check(`meta pijler ${i}`, pijlerBeschikbaar(metaFeiten[i]), JSON.stringify(metaFeiten[i]).slice(0, 90));
   check(`linkedin pijler ${i}`, pijlerBeschikbaar(linkedinFeiten[i]), JSON.stringify(linkedinFeiten[i]).slice(0, 90));
+  check(`microsoft pijler ${i}`, pijlerBeschikbaar(microsoftFeiten[i]), JSON.stringify(microsoftFeiten[i]).slice(0, 90));
 }
 
 console.log("\nDe ratio's waar de prompts op leunen zijn ook echt berekend");
@@ -343,6 +368,23 @@ console.log("\nDe ratio's waar de prompts op leunen zijn ook echt berekend");
   // benchmark tegenspreken.
   const completion = Number(p5.completion_rate_pct);
   check("linkedin: completion rate ligt in de benchmarkband", completion >= 10 && completion <= 15, String(completion));
+}
+{
+  // De twee kanaaleigen Microsoft-vragen waar de maandprompt op leunt: import-pariteit (pijler 2
+  // niveau B) mag alleen STELLIG zijn als beide groepen de volumegrens halen, en het netwerk-lek
+  // (pijler 5 niveau A) moet als berekend feit binnenkomen, niet als optelsom van het model.
+  const p2 = (microsoftFeiten[2] ?? {}) as Record<string, Record<string, unknown>>;
+  const pariteit = (p2.import_pariteit ?? {}) as Record<string, unknown>;
+  check("microsoft: import-pariteit is stellig (beide groepen boven de volumegrens)",
+    pariteit.stellig === true, JSON.stringify(pariteit).slice(0, 120));
+  check("microsoft: de import-CPA wijkt materieel af van native",
+    Number(pariteit.cpa_delta_pct_import_vs_native) > 30, String(pariteit.cpa_delta_pct_import_vs_native));
+
+  const p5 = (microsoftFeiten[5] ?? {}) as Record<string, Record<string, unknown>>;
+  const segmenten = ((p5.netwerk ?? {}).segments ?? []) as Record<string, unknown>[];
+  const audience = segmenten.find((s) => /audience/i.test(String(s.segment)));
+  check("microsoft: het Audience Network staat als lek gemarkeerd",
+    audience?.lek === true, JSON.stringify(audience ?? {}).slice(0, 120));
 }
 
 console.log("\nDe competitor-dimensie heeft een reeks, geen enkel punt");
@@ -541,6 +583,73 @@ console.log("\nDe bi-weekly stap 3 en 4 per kanaal");
     benutting.some((b) => b.pct > 85), benutting.map((b) => `${b.naam}: ${b.pct.toFixed(0)}%`).join(" | "));
   check("linkedin biweekly: en één die structureel onderbesteedt",
     benutting.some((b) => b.pct < 75), benutting.map((b) => `${b.naam}: ${b.pct.toFixed(0)}%`).join(" | "));
+}
+
+console.log("\nMicrosoft weekly: de volumerem werkt aan beide kanten en het lek is een weekfeit");
+{
+  // MICROSOFT_WEEKLY stap 2: cost > 2x account-CPA en 0 conversies is een bleeder, maar onder de
+  // EUR 25-rem is het "te vroeg om te beoordelen". Zonder een geval aan ELKE kant toetst de demo
+  // de rem niet -- dezelfde twee-kanten-les als de LinkedIn-rem hierboven.
+  const accountDagen = (rijen.microsoft_account_daily ?? []) as Record<string, unknown>[];
+  const accWeek = dagenVenster(accountDagen, 0, 7);
+  const accCpa = accWeek.reduce((s, x) => s + getal(x.spend), 0)
+    / Math.max(1, accWeek.reduce((s, x) => s + getal(x.conversions), 0));
+  const kw = (rijen.microsoft_keyword_monthly ?? []) as Record<string, unknown>[];
+  const laatsteMaand = [...new Set(kw.map((x) => String(x.month)))].sort().at(-1);
+  const recent = kw.filter((x) => String(x.month) === laatsteMaand);
+  const zonderConv = recent.filter((x) => getal(x.conversions) === 0);
+  check("microsoft weekly: er is een keyword-bleeder boven 2x de account-CPA",
+    zonderConv.some((x) => getal(x.cost) > 2 * accCpa),
+    `account-CPA ${accCpa.toFixed(2)}, drempel ${(2 * accCpa).toFixed(2)}`);
+  check("microsoft weekly: en één onder de EUR 25-rem, die terecht géén bleeder is",
+    zonderConv.some((x) => getal(x.cost) > 0 && getal(x.cost) < 25),
+    zonderConv.map((x) => `${x.keyword_text}: ${x.cost}`).join(" | "));
+  check("microsoft weekly: en keywords die het wél doen", recent.some((x) => getal(x.conversions) >= 2),
+    String(recent.length));
+
+  // Het Audience Network-lek moet in het WEEKvenster zichtbaar zijn (stap 2 kijkt naar 7 dagen),
+  // niet alleen in het maandtotaal van de tweede laag hierboven.
+  const netwerkWeek = dagenVenster(
+    ((rijen.microsoft_breakdown_daily ?? []) as Record<string, unknown>[]).filter((x) => String(x.breakdown_type) === "network"), 0, 7);
+  const perNetwerk = somPer(netwerkWeek, "breakdown_value", ["spend", "conversions"]);
+  const audience = perNetwerk.get("Audience Network");
+  const totaalSpend = [...perNetwerk.values()].reduce((s, v) => s + v.spend, 0);
+  check("microsoft weekly: het Audience Network absorbeert >10% van de weekspend vrijwel zonder conversies",
+    audience != null && audience.spend / totaalSpend > 0.1 && audience.conversions < 1,
+    audience ? `${((100 * audience.spend) / totaalSpend).toFixed(0)}% spend, ${audience.conversions.toFixed(2)} conv` : "geen segment");
+}
+
+console.log("\nMicrosoft biweekly: netwerk/device en impressieaandeel dragen een reeks");
+{
+  // Stap 4 vergelijkt aandelen OVER DE MAANDEN heen; met één maand valt er niets te vergelijken.
+  const breakdown = (rijen.microsoft_breakdown_daily ?? []) as Record<string, unknown>[];
+  const maanden = new Set(breakdown.map((x) => String(x.date).slice(0, 7)));
+  check("microsoft biweekly: de breakdown beslaat meerdere maanden", maanden.size >= 3, `${maanden.size} maanden`);
+  check("microsoft biweekly: met network én device als dimensie",
+    new Set(breakdown.map((x) => String(x.breakdown_type))).size === 2,
+    [...new Set(breakdown.map((x) => x.breakdown_type))].join(", "));
+
+  const is = (rijen.microsoft_campaign_impression_share ?? []) as Record<string, unknown>[];
+  check("microsoft biweekly: het impressieaandeel heeft meerdere maanden",
+    new Set(is.map((x) => String(x.month))).size >= 4, String(new Set(is.map((x) => String(x.month))).size));
+  const perCampagne = new Map<string, number[]>();
+  for (const x of is) {
+    const k = String(x.campaign_name);
+    perCampagne.set(k, [...(perCampagne.get(k) ?? []), getal(x.budget_lost_is)]);
+  }
+  check("microsoft biweekly: het budgetverlies van minstens één campagne beweegt",
+    [...perCampagne.values()].some((v) => Math.max(...v) - Math.min(...v) > 0.1),
+    [...perCampagne.entries()].map(([k, v]) => `${k}: ${Math.min(...v)}-${Math.max(...v)}`).join(" | "));
+
+  // Stap 2 legt campagne-instellingen naast de cijfers; de import-pariteit heeft BEIDE kanten
+  // nodig: minstens één geïmporteerde en één native campagne.
+  const campagnes = (rijen.microsoft_campaigns ?? []) as Record<string, unknown>[];
+  check("microsoft biweekly: elke campagne draagt budget en biedregime",
+    campagnes.length > 0 && campagnes.every((c) => getal(c.daily_budget) > 0 && c.bid_strategy != null),
+    JSON.stringify(campagnes[0] ?? {}).slice(0, 120));
+  check("microsoft biweekly: er is een geïmporteerde én een native campagne",
+    campagnes.some((c) => c.import_source != null) && campagnes.some((c) => c.import_source == null),
+    campagnes.map((c) => `${c.name}: ${c.import_source ?? "native"}`).join(" | "));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

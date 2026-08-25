@@ -25,6 +25,7 @@ import {
 import { OWNER_TEAM, OWNER_CLIENT } from "../branding/brand";
 import { analyseOutputRows } from "./analyses-demo";
 import { splitInt, splitAlong } from "./split";
+import { microsoftDemoRows } from "./microsoft-demo";
 
 type Row = Record<string, unknown>;
 
@@ -1025,8 +1026,14 @@ const clientGroupMembers: Row[] = [
   { group_id: DEMO_GROEP_MERK, client_id: CID },
 ];
 
+// Eén keer berekend, net als de module-constanten hierboven: demoRows() kan per render meermaals
+// worden aangeroepen en de Microsoft-generator bouwt duizenden dagrijen.
+const microsoftTables = microsoftDemoRows(CID);
+
 export function demoRows(): Record<string, Row[]> {
   return {
+    // Microsoft (Bing) [S14-S20]: uit dezelfde generator als de seed -- zie lib/demo/microsoft-demo.ts.
+    ...microsoftTables,
     ads_campaign_monthly: adsCampaignMonthly,
     ads_account_monthly: adsAccountMonthly,
     ads_account_weekly: adsAccountWeekly,
