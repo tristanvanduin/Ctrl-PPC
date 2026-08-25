@@ -32,7 +32,7 @@ import type { ClientHistoricalData, MonthlyRecord } from "@/lib/types";
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0);
 
-type MetaLinkedIn = "meta" | "linkedin";
+type NietGoogleKanaal = "meta" | "linkedin" | "microsoft";
 
 interface RowConfig {
   accountTable: string;
@@ -42,7 +42,7 @@ interface RowConfig {
   revenue: (r: Record<string, unknown>) => number;
 }
 
-const CONFIG: Record<MetaLinkedIn, RowConfig> = {
+const CONFIG: Record<NietGoogleKanaal, RowConfig> = {
   meta: {
     accountTable: "meta_account_daily",
     channelKey: "meta_ads",
@@ -57,11 +57,18 @@ const CONFIG: Record<MetaLinkedIn, RowConfig> = {
     spend: (r) => num(r.spend),
     revenue: (r) => num(r.conversion_value),
   },
+  microsoft: {
+    accountTable: "microsoft_account_daily",
+    channelKey: "microsoft_ads",
+    select: "date, spend, conversions, conversion_value",
+    spend: (r) => num(r.spend),
+    revenue: (r) => num(r.conversion_value),
+  },
 };
 
 interface MaandTotaal { year: number; month: number; conversions: number; revenue: number; adSpend: number }
 
-async function fetchChannelMonths(clientId: string, channel: MetaLinkedIn, convConfig: ChannelConversionConfig): Promise<MaandTotaal[]> {
+async function fetchChannelMonths(clientId: string, channel: NietGoogleKanaal, convConfig: ChannelConversionConfig): Promise<MaandTotaal[]> {
   const cfg = CONFIG[channel];
   // Twee jaar: genoeg venster voor "vorig jaar"-vergelijkingen waar de data dat toelaat. Minder
   // diep dan dat levert eerlijk "ontbrekende maanden" op via slicePeriod() -- geen aanname, geen
@@ -113,7 +120,7 @@ function bouwHistorischeData(clientId: string, maanden: MaandTotaal[]): ClientHi
   };
 }
 
-/** Google+Meta+LinkedIn bij elkaar optellen, maand voor maand, voor de "Alle kanalen"-weergave. */
+/** Alle kanalen bij elkaar optellen, maand voor maand, voor de "Alle kanalen"-weergave. */
 function samenvoegen(clientId: string, sets: ClientHistoricalData[]): ClientHistoricalData {
   const totalen = new Map<string, MaandTotaal>();
   const optellen = (year: number, m: MonthlyRecord | null) => {
@@ -140,7 +147,7 @@ function samenvoegen(clientId: string, sets: ClientHistoricalData[]): ClientHist
 export interface ChannelPeriodDataArgs {
   clientId: string;
   /** De actieve kanaaltab. "blended" = Alle kanalen (de standaardweergave). */
-  channel: "google" | "meta" | "linkedin" | "blended";
+  channel: "google" | "meta" | "linkedin" | "microsoft" | "blended";
   /** Google's al opgehaalde data -- deze hook haalt alleen Meta/LinkedIn zelf op. */
   googleData: ClientHistoricalData | null;
 }
@@ -150,6 +157,7 @@ export function useChannelPeriodData({ clientId, channel, googleData }: ChannelP
   const [convConfig, setConvConfig] = useState<ChannelConversionConfig>(() => resolveChannelConversionConfig(null));
   const [metaData, setMetaData] = useState<ClientHistoricalData | null>(null);
   const [linkedinData, setLinkedinData] = useState<ClientHistoricalData | null>(null);
+  const [microsoftData, setMicrosoftData] = useState<ClientHistoricalData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,11 +186,20 @@ export function useChannelPeriodData({ clientId, channel, googleData }: ChannelP
     return () => { cancelled = true; };
   }, [clientId, convConfig]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchChannelMonths(clientId, "microsoft", convConfig).then((maanden) => {
+      if (!cancelled) setMicrosoftData(bouwHistorischeData(clientId, maanden));
+    });
+    return () => { cancelled = true; };
+  }, [clientId, convConfig]);
+
   if (channel === "google") return googleData;
   if (channel === "meta") return metaData;
   if (channel === "linkedin") return linkedinData;
-  // blended: pas tonen zodra alle drie binnen zijn -- anders telt een half-geladen kanaal als nul
-  // mee, en dat leest als "dit kanaal presteert niet" in plaats van "nog aan het laden".
-  if (!googleData || !metaData || !linkedinData) return null;
-  return samenvoegen(clientId, [googleData, metaData, linkedinData]);
+  if (channel === "microsoft") return microsoftData;
+  // blended: pas tonen zodra alle kanalen binnen zijn -- anders telt een half-geladen kanaal als
+  // nul mee, en dat leest als "dit kanaal presteert niet" in plaats van "nog aan het laden".
+  if (!googleData || !metaData || !linkedinData || !microsoftData) return null;
+  return samenvoegen(clientId, [googleData, metaData, linkedinData, microsoftData]);
 }

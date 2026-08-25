@@ -5,7 +5,7 @@ import type { ClientForecast } from "../forecast";
 
 /** Client-side ophaalhulp voor /api/analysis/channel-forecast -- de Meta/LinkedIn-tegenhanger
  *  van wat ClientDataProvider/ForecastContext voor Google al doet. */
-export function useChannelForecast(clientId: string, channel: "meta" | "linkedin"): {
+export function useChannelForecast(clientId: string, channel: "meta" | "linkedin" | "microsoft"): {
   forecast: ClientForecast | null;
   loading: boolean;
 } {

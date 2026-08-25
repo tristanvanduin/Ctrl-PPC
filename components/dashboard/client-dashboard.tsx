@@ -66,6 +66,7 @@ import { ClientFiles } from "./client-files";
 import { DgmView } from "./dgm-view";
 import { MetaView, MetaCampagnes } from "./meta-view";
 import { LinkedInView, LinkedInCampagnes } from "./linkedin-view";
+import { MicrosoftView, MicrosoftCampagnes } from "./microsoft-view";
 import { GoogleView, GoogleCampagnes, GoogleForecast } from "./google-view";
 import { ForecastSummaryTiles, ForecastTable } from "./forecast-table";
 import { CrossChannelView } from "./cross-channel-view";
@@ -101,13 +102,14 @@ interface Client {
 type Tab = "dashboard" | "campaigns" | "forecast" | "insights" | "outcomes" | "godview" | "sprint" | "reporting" | "dgm" | "second-opinion" | "files" | "settings";
 
 
-type Channel = "google" | "meta" | "linkedin" | "blended";
+type Channel = "google" | "meta" | "linkedin" | "microsoft" | "blended";
 
 const CHANNELS: { id: Channel; label: string; icon: React.ReactNode }[] = [
   { id: "blended", label: "Alle kanalen", icon: <Layers className="w-3.5 h-3.5" /> },
   { id: "google", label: "Google Ads", icon: <BarChart3 className="w-3.5 h-3.5" /> },
   { id: "meta", label: "Meta", icon: <Megaphone className="w-3.5 h-3.5" /> },
   { id: "linkedin", label: "LinkedIn", icon: <Briefcase className="w-3.5 h-3.5" /> },
+  { id: "microsoft", label: "Microsoft", icon: <Search className="w-3.5 h-3.5" /> },
 ];
 
 /**
@@ -426,6 +428,7 @@ export function ClientDashboard({ client }: { client: Client }) {
               <PeriodSummary data={periodSummaryData} />
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
+              {channel === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "blended" && <CrossChannelView clientId={client.id} />}
               {channel === "google" && (
                 <GoogleView
@@ -456,6 +459,7 @@ export function ClientDashboard({ client }: { client: Client }) {
               )}
               {channel === "meta" && <MetaCampagnes clientId={client.id} geoClone={geoClone} />}
               {channel === "linkedin" && <LinkedInCampagnes clientId={client.id} geoClone={geoClone} />}
+              {channel === "microsoft" && <MicrosoftCampagnes clientId={client.id} geoClone={geoClone} />}
               {/* Alle kanalen op de Campagnes-tab: welke campagnes draaien per kanaal (niet de
                   blended maandgrafiek — die hoort bij Prognose/Overzicht). */}
               {channel === "blended" && <CampaignsPerChannel clientId={client.id} geoClone={geoClone} />}
@@ -527,7 +531,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                       </Sectie>
                     </>
                   )}
-                  {(channel === "meta" || channel === "linkedin") && (
+                  {(channel === "meta" || channel === "linkedin" || channel === "microsoft") && (
                     <ChannelForecastSections clientId={client.id} channel={channel} />
                   )}
                 </>
@@ -869,6 +873,28 @@ function InsightsTab({ clientId, onSopError, kanalen }: { clientId: string; onSo
           </CollapsiblePanel>
           <Section>Maandrapportage (SOP)</Section>
           <SopTriggerButtons clientId={clientId} channel="linkedin_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
+        </>
+      )}
+      {analysisChannel === "microsoft" && (
+        <>
+          {/* Microsoft heeft (nog) geen deterministische kern-analyses zoals Meta's creatives of
+              LinkedIn's structuur: het kanaaleigen rekenwerk (import-pariteit, netwerk-lek,
+              volumerem) zit in de maand-SOP zelf, als prepared facts. De Verdieping biedt wel de
+              gedeelde KPI-verhoudingen. */}
+          <CollapsiblePanel id="analyse-verdieping-microsoft" defaultOpen={false} icon={<Search className="w-4 h-4 text-brand-blue-ink" />} title="Verdieping" subtitle="KPI-verhoudingen">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
+              <SignalAnalysisCard
+                clientId={clientId}
+                endpoint="/api/analysis/kpi-relations"
+                extra={{ channel: "microsoft" }}
+                title="KPI-verhoudingen"
+                description="Hoe KPI's zich tot elkaar verhouden: CPA-decompositie (klik duurder vs slechter converterend), belofte-kloof, verzadiging, bereik-verdunning en meer."
+                runLabel="Analyseer verhoudingen"
+              />
+            </div>
+          </CollapsiblePanel>
+          <Section>Maandrapportage (SOP)</Section>
+          <SopTriggerButtons clientId={clientId} channel="microsoft_ads" onAnalysisComplete={onComplete} onAnalysisError={onSopError} multiChannel={(kanalen?.length ?? 0) > 1} />
         </>
       )}
       {analysisChannel === "blended" && (

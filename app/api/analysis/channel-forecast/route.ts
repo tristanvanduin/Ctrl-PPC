@@ -14,7 +14,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { computeAnalysisTargets, type AnalysisChannel } from "@/lib/analysis/compute-targets";
 
 function isChannel(v: string | null): v is AnalysisChannel {
-  return v === "google" || v === "meta" || v === "linkedin";
+  return v === "google" || v === "meta" || v === "linkedin" || v === "microsoft";
 }
 
 export async function GET(request: Request) {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
   if (!clientId || !isChannel(channel)) {
     return Response.json(
-      { error: "clientId en een geldige channel ('google'|'meta'|'linkedin') zijn verplicht" },
+      { error: "clientId en een geldige channel ('google'|'meta'|'linkedin'|'microsoft') zijn verplicht" },
       { status: 400 }
     );
   }

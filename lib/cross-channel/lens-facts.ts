@@ -10,7 +10,7 @@ import type { BudgetFact, BudgetAllocationSummary } from "@/lib/analysis/budget-
 export const ATTRIBUTION_FOOTNOTE =
   "Elk kanaal meet zijn eigen attributie; optellen of vergelijken over kanalen is indicatief, niet de waarheid.";
 
-export type ChannelKey = "google_ads" | "meta_ads" | "linkedin_ads";
+export type ChannelKey = "google_ads" | "meta_ads" | "linkedin_ads" | "microsoft_ads";
 
 // De samenvatting van een kanaal voor de cross-channel-lens: de hefboom-2-uitkomst plus de
 // efficientie op de EIGEN as van het kanaal (CPA of CPL of ROAS, nooit blind opgeteld).

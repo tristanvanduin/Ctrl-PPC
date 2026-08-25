@@ -15,7 +15,7 @@ export interface MasterSynthesisValidation {
 
 // Losjes afgeleid van het log-format zelf (net als LOG_FORMAT_SKELETONS per kanaal): een
 // log_entry hoort "Hypothese:" en een kanaalnaam te bevatten.
-const LOG_FORMAT_SKELETON = [/hypothese/i, /google_ads|meta_ads|linkedin_ads/i];
+const LOG_FORMAT_SKELETON = [/hypothese/i, /google_ads|meta_ads|linkedin_ads|microsoft_ads/i];
 
 export function validateMasterSynthesisOutput(
   output: MasterSynthesisOutput,

@@ -16,7 +16,7 @@ import { HealthBadgeView } from "./health-badge";
  * gevonden", misleidend voor "nooit naar verspilling gekeken". zonderKanaalSpecifiekeHygiene zet
  * die factor daarom expliciet op "niet beoordeeld" en herschaalt het totaal.
  */
-export function ChannelHealthBadge({ clientId, channel }: { clientId: string; channel: "meta" | "linkedin" }) {
+export function ChannelHealthBadge({ clientId, channel }: { clientId: string; channel: "meta" | "linkedin" | "microsoft" }) {
   const { forecast, loading } = useChannelForecast(clientId, channel);
   const health = useMemo(
     () => (forecast ? zonderKanaalSpecifiekeHygiene(computeHealthScore(forecast)) : null),

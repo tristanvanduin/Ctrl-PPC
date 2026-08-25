@@ -16,6 +16,7 @@ const KANAAL_LABEL: Record<string, string> = {
   google_ads: "Google Ads",
   meta_ads: "Meta",
   linkedin_ads: "LinkedIn",
+  microsoft_ads: "Microsoft Ads",
 };
 
 const eur = (v: number | null) => (v == null ? "—" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v));

@@ -142,7 +142,7 @@ export function TodayFeed() {
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
         <Seg value={owner} onChange={setOwner} options={[{ v: "team", l: "Team" }, { v: "mine", l: "Mijn" }, { v: "unassigned", l: "Niet toegewezen" }]} />
-        <Seg value={channel} onChange={setChannel} options={[{ v: "all", l: "Alle kanalen" }, { v: "google", l: "Google" }, { v: "meta", l: "Meta" }, { v: "linkedin", l: "LinkedIn" }]} />
+        <Seg value={channel} onChange={setChannel} options={[{ v: "all", l: "Alle kanalen" }, { v: "google", l: "Google" }, { v: "meta", l: "Meta" }, { v: "linkedin", l: "LinkedIn" }, { v: "microsoft", l: "Microsoft" }]} />
         <span className="ml-auto text-meta font-mono text-muted-foreground bg-card border border-border rounded-full px-3 py-1">Nieuw sinds gisteren · {feed.pulse.newSince}</span>
       </div>
 

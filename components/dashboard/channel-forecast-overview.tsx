@@ -31,7 +31,7 @@ import { CONFIG, type ChannelKind, type DailyRow } from "./channel-performance";
 // heeft voor client_targets): zonder ingesteld doel valt de forecast terug op het historisch totaal,
 // exact zoals hij dat voor Google ook al doet bij een leeg kpiTargets-doel.
 
-const TARGET_CHANNEL: Record<ChannelKind, string> = { meta: "meta_ads", linkedin: "linkedin_ads" };
+const TARGET_CHANNEL: Record<ChannelKind, string> = { meta: "meta_ads", linkedin: "linkedin_ads", microsoft: "microsoft_ads" };
 
 /** null = nog aan het laden, "leeg" = geen dagcijfers gesynced, anders de opgebouwde forecast. */
 export type ChannelForecastState = { data: ClientHistoricalData; forecast: ClientForecast } | null | "leeg";

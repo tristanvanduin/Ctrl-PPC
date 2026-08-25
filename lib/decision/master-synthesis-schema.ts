@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { ActionTypeEnum, FrequencyEnum, PriorityEnum } from "@/lib/schema/analysis-schema";
 
-export const ContributingChannelEnum = z.enum(["google_ads", "meta_ads", "linkedin_ads"]);
+export const ContributingChannelEnum = z.enum(["google_ads", "meta_ads", "linkedin_ads", "microsoft_ads"]);
 export type ContributingChannel = z.infer<typeof ContributingChannelEnum>;
 
 export const MasterSynthesisHypothesisSchema = z.object({

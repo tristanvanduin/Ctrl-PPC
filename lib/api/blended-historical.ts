@@ -71,7 +71,11 @@ export async function fetchBlendedHistoricalData(
     .from("fact_core")
     .select("period_start, impressions, clicks, cost, conversions, conv_value")
     .eq("account_id", klant.id)
-    .in("channel", ["google", "meta", "linkedin"])
+    // microsoft staat er alvast bij maar levert nu nog niets: de microsoft_*-tabellen hebben
+    // bewust geen fact_core-projectie (dat hoort bij het bevroren fase-3-project, zie de kop van
+    // scripts/migrations/106_microsoft_ads_tabellen.sql). Zodra die projectie er is telt het
+    // kanaal hier vanzelf mee.
+    .in("channel", ["google", "meta", "linkedin", "microsoft"])
     .eq("level", "account")
     .eq("grain", "month")
     .order("period_start");

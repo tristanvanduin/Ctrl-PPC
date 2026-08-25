@@ -3,7 +3,7 @@
 // meer KPI's tegen elkaar afzetten (CPA-decompositie, belofte-kloof, verzadiging, bereik-
 // verdunning, waarde-mix, herhaling-vs-bereik, dure zichtbaarheid, vanity-engagement).
 // Deterministisch, geen LLM. Vensters per kanaal: Google op de laatste twee VOLLE maanden
-// (maanddata + impressie-gewogen IS), Meta/LinkedIn op twee 28-dagen-vensters uit de
+// (maanddata + impressie-gewogen IS), Meta/LinkedIn/Microsoft op twee 28-dagen-vensters uit de
 // dagdata. Getriggerde verhalen landen in de wachtrij onder de kanaal-eigen bron.
 // =====================================================================
 
@@ -16,21 +16,21 @@ import { saveSignalHypotheses, type SignalSource } from "@/lib/analysis/signals-
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 
-type Kanaal = "google" | "meta" | "linkedin";
-const SOURCES: Record<Kanaal, SignalSource> = { google: "google_kpi", meta: "meta_kpi", linkedin: "linkedin_kpi" };
-const LABELS: Record<Kanaal, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn" };
+type Kanaal = "google" | "meta" | "linkedin" | "microsoft";
+const SOURCES: Record<Kanaal, SignalSource> = { google: "google_kpi", meta: "meta_kpi", linkedin: "linkedin_kpi", microsoft: "microsoft_kpi" };
+const LABELS: Record<Kanaal, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", microsoft: "Microsoft" };
 
 const sectionFor = (k: Kanaal) => `kpi_relations_${k}_v1`;
 const sopTypeFor = (k: Kanaal) => SOURCES[k];
 
 function parseKanaal(v: string | null): Kanaal | null {
-  return v === "google" || v === "meta" || v === "linkedin" ? v : null;
+  return v === "google" || v === "meta" || v === "linkedin" || v === "microsoft" ? v : null;
 }
 
 export async function GET(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get("client_id");
   const kanaal = parseKanaal(request.nextUrl.searchParams.get("channel"));
-  if (!clientId || !kanaal) return Response.json({ error: "client_id en channel (google|meta|linkedin) zijn verplicht" }, { status: 400 });
+  if (!clientId || !kanaal) return Response.json({ error: "client_id en channel (google|meta|linkedin|microsoft) zijn verplicht" }, { status: 400 });
   // Demo-rijen voor de demo-klant, de echte client voor de rest.
   const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     clientId = String(body.client_id || "");
     kanaal = parseKanaal(String(body.channel || ""));
   } catch { /* onder afgehandeld */ }
-  if (!clientId || !kanaal) return Response.json({ error: "client_id en channel (google|meta|linkedin) zijn verplicht" }, { status: 400 });
+  if (!clientId || !kanaal) return Response.json({ error: "client_id en channel (google|meta|linkedin|microsoft) zijn verplicht" }, { status: 400 });
 
   let windows: { recent: KpiWindow; prior: KpiWindow } | null = null;
 
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
       .eq("client_id", clientId)
       .gte("date", since);
     windows = windowsFromDaily((data ?? []) as DayLike[], { clicks: "link_clicks", conv: "conversions", value: "conversion_value", engagement: "post_engagement", frequency: true });
-  } else {
+  } else if (kanaal === "linkedin") {
     const since = new Date(Date.now() - 70 * 86_400_000).toISOString().slice(0, 10);
     const { data } = await supabase
       .from("linkedin_account_daily")
@@ -145,6 +145,15 @@ export async function POST(request: NextRequest) {
       .eq("client_id", clientId)
       .gte("date", since);
     windows = windowsFromDaily((data ?? []) as DayLike[], { clicks: "clicks", conv: "one_click_leads", value: "conversion_value", engagement: "total_engagements" });
+  } else {
+    // Microsoft: dagkorrel zoals Meta/LinkedIn, zonder engagement- of frequency-as (search).
+    const since = new Date(Date.now() - 70 * 86_400_000).toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("microsoft_account_daily")
+      .select("date, impressions, clicks, spend, conversions, conversion_value")
+      .eq("client_id", clientId)
+      .gte("date", since);
+    windows = windowsFromDaily((data ?? []) as DayLike[], { clicks: "clicks", conv: "conversions", value: "conversion_value" });
   }
 
   if (!windows) return Response.json({ error: `Onvoldoende ${LABELS[kanaal]}-data voor twee vergelijkingsvensters` }, { status: 404 });

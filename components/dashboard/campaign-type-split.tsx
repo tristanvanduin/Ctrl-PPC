@@ -69,6 +69,7 @@ const KANAAL_LABEL_BLENDED: Record<string, string> = {
   google_ads: "Google Ads",
   meta_ads: "Meta",
   linkedin_ads: "LinkedIn",
+  microsoft_ads: "Microsoft Ads",
 };
 
 /**

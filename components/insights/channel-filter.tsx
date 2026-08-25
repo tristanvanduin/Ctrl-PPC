@@ -7,7 +7,7 @@ import { CHANNEL_LABEL, CHANNEL_BADGE_CLASS, type InsightChannel } from "@/lib/i
 // null = alle kanalen. De afleiding (bron/sop_type -> kanaal) leeft in lib/insights/channel-of;
 // dit is puur de weergave, zodat elke plek dezelfde chips en kleuren gebruikt.
 
-const CHANNELS: InsightChannel[] = ["google", "meta", "linkedin", "cross"];
+const CHANNELS: InsightChannel[] = ["google", "meta", "linkedin", "microsoft", "cross"];
 
 export function ChannelFilter({ value, onChange, counts }: {
   value: InsightChannel | null;

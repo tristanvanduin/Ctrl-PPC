@@ -15,12 +15,13 @@ type Cadence = "annual" | "biennial" | "custom";
 interface FairEdition { date: string; label: string }
 interface FairEventCfg { id: string; name: string; abbrev?: string; cadence?: Cadence; editions?: FairEdition[] }
 
-type ChannelKey = "blended" | "google_ads" | "meta_ads" | "linkedin_ads";
+type ChannelKey = "blended" | "google_ads" | "meta_ads" | "linkedin_ads" | "microsoft_ads";
 const CHANNEL_LABEL: Record<ChannelKey, string> = {
   blended: "Totaal account",
   google_ads: "Google",
   meta_ads: "Meta",
   linkedin_ads: "LinkedIn",
+  microsoft_ads: "Microsoft",
 };
 
 interface CurvePoint { daysToFair: number; cumulative: number }

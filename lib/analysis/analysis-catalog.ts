@@ -11,7 +11,7 @@
 //
 // IO-vrij en los getest.
 
-export type AnalyseKanaal = "google" | "meta" | "linkedin" | "blended";
+export type AnalyseKanaal = "google" | "meta" | "linkedin" | "microsoft" | "blended";
 
 export interface AnalyseDefinitie {
   /** De sectie in sop_analysis_output. Uniek; dit is de sleutel voor "is hij gedraaid". */
@@ -26,6 +26,7 @@ export const KANAAL_LABEL: Record<AnalyseKanaal, string> = {
   google: "Google Ads",
   meta: "Meta",
   linkedin: "LinkedIn",
+  microsoft: "Microsoft Ads",
   blended: "Alle kanalen",
 };
 
@@ -53,6 +54,11 @@ export const ANALYSE_CATALOGUS: AnalyseDefinitie[] = [
   { section: "linkedin_funnel_v1", titel: "Funnel-drop-off", kanaal: "linkedin", waarover: "waar vertoning → klik → form-open → lead afhaakt" },
   { section: "kpi_relations_linkedin_v1", titel: "KPI-verhoudingen", kanaal: "linkedin", waarover: "of een duurdere CPL aan de klik of aan het formulier ligt" },
   { section: "linkedin_signals_v1", titel: "LinkedIn-signalen", kanaal: "linkedin", waarover: "form-drop-off, CPL-druk, demografie-drift en budgetconcentratie" },
+
+  // ── Microsoft ─────────────────────────────────────────────────────────────
+  // Eén losse analyse: het kanaaleigen rekenwerk (import-pariteit, netwerk-lek, volumerem) zit
+  // als prepared facts in de maand-SOP zelf, niet in aparte deterministische kaarten.
+  { section: "kpi_relations_microsoft_v1", titel: "KPI-verhoudingen", kanaal: "microsoft", waarover: "of een duurdere CPA aan de klik of aan de conversie ligt" },
 
   // ── Over de kanalen heen ──────────────────────────────────────────────────
   { section: "cross_channel_v1", titel: "Cross-channel-analyse", kanaal: "blended", waarover: "zaai/oogst, arbitrage, mix, doelgroep-samenhang en GA4-CRO" },

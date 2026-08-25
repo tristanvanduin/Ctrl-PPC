@@ -25,7 +25,7 @@ interface RunResponse {
   evidenceChannels?: string[];
 }
 
-const KANAAL_LABEL_KORT: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn" };
+const KANAAL_LABEL_KORT: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn", microsoft_ads: "Microsoft" };
 
 export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
   const [running, setRunning] = useState(false);

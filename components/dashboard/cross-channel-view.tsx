@@ -33,6 +33,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   google_ads: "Google",
   meta_ads: "Meta",
   linkedin_ads: "LinkedIn",
+  microsoft_ads: "Microsoft",
 };
 
 // Bedragen dragen hun valutateken. Zonder dat staat er "489.160" naast "266.532" en moet je uit

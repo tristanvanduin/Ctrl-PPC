@@ -157,7 +157,10 @@ export type ProposalSource =
   // wachtrij-uitsluiting hem), en een nieuw kanaal hoort daar niet stil onder te schuilen.
   | "microsoft_weekly"
   | "microsoft_biweekly"
-  | "microsoft_monthly";
+  | "microsoft_monthly"
+  // De Microsoft-variant van de KPI-verhoudingen-analyse (app/api/analysis/kpi-relations),
+  // zelfde patroon als google_kpi/meta_kpi/linkedin_kpi hierboven.
+  | "microsoft_kpi";
 
 /**
  * De voorstellenbron van een SOP-variant.

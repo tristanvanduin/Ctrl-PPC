@@ -79,13 +79,13 @@ function statusTone(status: HypothesisWorkflowItem["status"]) {
   return "bg-amber-100 text-amber-700";
 }
 
-type WorkflowChannel = "google" | "meta" | "linkedin";
-const WF_LABEL: Record<WorkflowChannel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn" };
+type WorkflowChannel = "google" | "meta" | "linkedin" | "microsoft";
+const WF_LABEL: Record<WorkflowChannel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", microsoft: "Microsoft" };
 
 export function HypothesesBlock({ clientId, refreshKey, onWorkflowChange, channel }: Props) {
-  // Cross-channel heeft geen maand-SOP-workflow; onder "Alle" stapelen de drie kanalen.
+  // Cross-channel heeft geen maand-SOP-workflow; onder "Alle" stapelen de kanalen.
   if (channel === "cross") return null;
-  const wfChannels: WorkflowChannel[] = channel ? [channel as WorkflowChannel] : ["google", "meta", "linkedin"];
+  const wfChannels: WorkflowChannel[] = channel ? [channel as WorkflowChannel] : ["google", "meta", "linkedin", "microsoft"];
   return (
     <>
       {wfChannels.map((wf) => (

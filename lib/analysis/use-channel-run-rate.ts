@@ -17,7 +17,7 @@ import { today as vandaag } from "@/lib/reporting-date";
 // licht andere kopie te bouwen -- exact de fout die lib/analysis/trend.ts elders al repareerde
 // voor CPA-trends.
 
-export type ChannelKind = "meta" | "linkedin" | "blended";
+export type ChannelKind = "meta" | "linkedin" | "microsoft" | "blended";
 
 interface Source { table: string; channelKey: ChannelConversionChannel }
 export interface ChannelRunRateCfg { sources: Source[]; convLabel: string; label: string }
@@ -25,12 +25,14 @@ export interface ChannelRunRateCfg { sources: Source[]; convLabel: string; label
 export const CHANNEL_RUN_RATE_CFG: Record<ChannelKind, ChannelRunRateCfg> = {
   meta: { sources: [{ table: "meta_account_daily", channelKey: "meta_ads" }], convLabel: "Conversies", label: "Meta" },
   linkedin: { sources: [{ table: "linkedin_account_daily", channelKey: "linkedin_ads" }], convLabel: "Leads", label: "LinkedIn" },
+  microsoft: { sources: [{ table: "microsoft_account_daily", channelKey: "microsoft_ads" }], convLabel: "Conversies", label: "Microsoft" },
   blended: {
     sources: [
       { table: "meta_account_daily", channelKey: "meta_ads" },
       { table: "linkedin_account_daily", channelKey: "linkedin_ads" },
+      { table: "microsoft_account_daily", channelKey: "microsoft_ads" },
     ],
-    convLabel: "Acties (conv. + leads)", label: "Meta + LinkedIn",
+    convLabel: "Acties (conv. + leads)", label: "Meta + LinkedIn + Microsoft",
   },
 };
 

@@ -19,6 +19,7 @@ import {
 const CHANNELS: { channel: ChannelConversionChannel; label: string }[] = [
   { channel: "meta_ads", label: "Meta" },
   { channel: "linkedin_ads", label: "LinkedIn" },
+  { channel: "microsoft_ads", label: "Microsoft Ads" },
 ];
 
 export function ChannelConversionSettings({ clientId }: { clientId: string }) {

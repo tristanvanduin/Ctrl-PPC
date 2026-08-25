@@ -45,10 +45,11 @@ export const CHART_CATEGORICAL = [
 // (indigo/sky) badge -- violet resp. aqua zijn de enige twee overige blauw-aangrenzende tinten
 // in het palet. lib/insights/channel-of.ts se CHANNEL_BADGE_CLASS is bijgewerkt om dezelfde
 // kleurfamilies te tonen, zodat een kanaal er overal hetzelfde uitziet.
-export const CHANNEL_CHART_COLOR: Record<"Google" | "Meta" | "LinkedIn" | "Cross-channel", string> = {
+export const CHANNEL_CHART_COLOR: Record<"Google" | "Meta" | "LinkedIn" | "Microsoft" | "Cross-channel", string> = {
   Google: CHART_CATEGORICAL[0],       // blauw
   Meta: CHART_CATEGORICAL[6],         // violet — dichtst bij de indigo-badge
   LinkedIn: CHART_CATEGORICAL[2],     // aqua — dichtst bij de sky-badge
+  Microsoft: CHART_CATEGORICAL[5],    // groen — zelfde familie als de emerald-badge
   "Cross-channel": CHART_CATEGORICAL[3], // geel/amber, zelfde familie als de amber-badge
 };
 

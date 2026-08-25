@@ -66,6 +66,7 @@ const UIT_TEMPLATE = new Map<string, string>([
   ["kpi_relations_google_v1", "`kpi_relations_${"],
   ["kpi_relations_meta_v1", "`kpi_relations_${"],
   ["kpi_relations_linkedin_v1", "`kpi_relations_${"],
+  ["kpi_relations_microsoft_v1", "`kpi_relations_${"],
 ]);
 
 for (const sectie of secties) {

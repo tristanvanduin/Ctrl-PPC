@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, Megaphone, Briefcase, Layers } from "lucide-react";
+import { BarChart3, Megaphone, Briefcase, Layers, Search } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
@@ -14,7 +14,7 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 // dagdata/maanddata direct uit Supabase en aggregeert per campagne over het recente venster.
 // Vult het gat dat de blended-maandgrafiek liet: die toont spend-per-maand, niet de campagnes.
 
-type ChannelKey = "google_ads" | "meta_ads" | "linkedin_ads";
+type ChannelKey = "google_ads" | "meta_ads" | "linkedin_ads" | "microsoft_ads";
 interface CampaignAgg { name: string; spend: number; conversions: number }
 interface ChannelBlock { channel: ChannelKey; label: string; convLabel: string; campaigns: CampaignAgg[] }
 
@@ -26,6 +26,7 @@ const CHANNEL_META: Record<ChannelKey, { label: string; convLabel: string; icon:
   google_ads: { label: "Google Ads", convLabel: "Conversies", icon: <BarChart3 className="w-4 h-4 text-brand-blue-ink" /> },
   meta_ads: { label: "Meta", convLabel: "Conversies", icon: <Megaphone className="w-4 h-4 text-brand-blue-ink" /> },
   linkedin_ads: { label: "LinkedIn", convLabel: "Leads", icon: <Briefcase className="w-4 h-4 text-brand-blue-ink" /> },
+  microsoft_ads: { label: "Microsoft Ads", convLabel: "Conversies", icon: <Search className="w-4 h-4 text-brand-blue-ink" /> },
 };
 
 export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
@@ -39,7 +40,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
     const sinceDay = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
 
     async function load() {
-      const [gRes, mNamesRes, mDailyRes, lNamesRes, lDailyRes] = await Promise.all([
+      const [gRes, mNamesRes, mDailyRes, lNamesRes, lDailyRes, msNamesRes, msDailyRes] = await Promise.all([
         dbSelect<{ campaign_name: string | null; month: string; cost: number | null; conversions: number | null }>("ads_campaign_monthly", {
           select: "campaign_name, month, cost, conversions", clientId, filters: [{ op: "gte", column: "month", value: sinceMonth }],
         }),
@@ -50,6 +51,10 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
         dbSelect<{ campaign_urn: string; name: string | null }>("linkedin_campaigns", { select: "campaign_urn, name", clientId }),
         dbSelect<{ entity_urn: string; spend: number | null; one_click_leads: number | null }>("linkedin_campaign_daily", {
           select: "entity_urn, spend, one_click_leads", clientId, filters: [{ op: "gte", column: "date", value: sinceDay }],
+        }),
+        dbSelect<{ campaign_id: string; name: string | null }>("microsoft_campaigns", { select: "campaign_id, name", clientId }),
+        dbSelect<{ entity_id: string; spend: number | null; conversions: number | null }>("microsoft_campaign_daily", {
+          select: "entity_id, spend, conversions", clientId, filters: [{ op: "gte", column: "date", value: sinceDay }],
         }),
       ]);
       if (cancelled) return;
@@ -84,6 +89,10 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
         lNamesRes.data.map((c) => ({ id: String(c.campaign_urn), name: String(c.name ?? c.campaign_urn) })),
         (lDailyRes.data ?? []).map((r) => ({ entity: String(r.entity_urn), spend: num(r.spend), conv: num(r.one_click_leads) })),
       );
+      const msMap = aggByEntity(
+        msNamesRes.data.map((c) => ({ id: String(c.campaign_id), name: String(c.name ?? c.campaign_id) })),
+        (msDailyRes.data ?? []).map((r) => ({ entity: String(r.entity_id), spend: num(r.spend), conv: num(r.conversions) })),
+      );
 
       const scope = (rows: CampaignAgg[]) => rows
         .filter((c) => c.spend > 0 || c.conversions > 0)
@@ -94,6 +103,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
         { channel: "google_ads" as const, map: gMap },
         { channel: "meta_ads" as const, map: mMap },
         { channel: "linkedin_ads" as const, map: lMap },
+        { channel: "microsoft_ads" as const, map: msMap },
       ]).map(({ channel, map }) => ({
         channel, label: CHANNEL_META[channel].label, convLabel: CHANNEL_META[channel].convLabel,
         campaigns: scope([...map.values()]),

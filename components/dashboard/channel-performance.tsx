@@ -30,7 +30,7 @@ function maandVoluit(isoMaand: string): string {
   return naam ? `${naam} ${jaar}` : isoMaand;
 }
 
-export type ChannelKind = "meta" | "linkedin";
+export type ChannelKind = "meta" | "linkedin" | "microsoft";
 
 export interface DailyRow {
   date: string;
@@ -84,6 +84,16 @@ export const CONFIG: Record<ChannelKind, ChannelConfig> = {
     channelKey: "linkedin_ads",
     select: "date, entity_urn, impressions, clicks, spend, one_click_leads, external_website_conversions, post_click_conversions, conversion_value",
     map: (r) => ({ date: String(r.date), entity: String(r.entity_urn), impressions: num(r.impressions), clicks: num(r.clicks), spend: num(r.spend), convFields: { one_click_leads: num(r.one_click_leads), external_website_conversions: num(r.external_website_conversions), post_click_conversions: num(r.post_click_conversions) }, revenue: num(r.conversion_value) }),
+  },
+  microsoft: {
+    accountTable: "microsoft_account_daily",
+    campaignTable: "microsoft_campaign_daily",
+    nameTable: "microsoft_campaigns",
+    nameId: "campaign_id",
+    entityField: "entity_id",
+    channelKey: "microsoft_ads",
+    select: "date, entity_id, impressions, clicks, spend, conversions, conversion_value",
+    map: (r) => ({ date: String(r.date), entity: String(r.entity_id), impressions: num(r.impressions), clicks: num(r.clicks), spend: num(r.spend), convFields: { conversions: num(r.conversions) }, revenue: num(r.conversion_value) }),
   },
 };
 
