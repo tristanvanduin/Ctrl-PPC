@@ -306,6 +306,7 @@ ${analysisOutput}`,
         return {
           client_id: clientId,
           recommendation_id: recIds[recIdx] ?? null,
+          sop_type: sopType,
           analysis_date: analysisDate,
           title: task.title,
           description: task.description,

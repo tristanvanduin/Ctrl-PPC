@@ -188,10 +188,19 @@ const sprintItems: Row[] = [
   { id: "demo-si5", client_id: CID, hypothesis_id: null, task: "Placement-uitsluitingen doorvoeren uit de video-analyse", week_number: HUIDIGE_WEEK - 1, status: "done", owner: OWNER_CLIENT, owner_soort: null, owner_naam: null, owner_user_id: null, metrics: "cost", review_timeframe: "1 week", created_at: iso(), updated_at: iso() },
 ];
 
+// De drie taken dragen sinds migratie 104 hun eigen sop_type. Dat is hier niet cosmetisch: t3 is
+// een META-taak, en zonder die kolom leidde components/insights/tasks-block.tsx het kanaal af uit
+// de aanbeveling en viel bij het ontbreken daarvan terug op "google". Alle drie de demo-taken
+// hebben geen recommendation_id, dus de Meta-taak stond met een Google-badge in de demo -- precies
+// de fout die de kolom oplost, zichtbaar op het scherm dat hem hoort te laten zien.
+//
+// analysis_date staat er ook bij. De kolom is NOT NULL in de echte tabel en
+// priorTasksVoorGrounding filtert en sorteert erop; een demo-rij zonder die waarde zou langs een
+// pad lopen dat in productie niet bestaat.
 const sopTasks: Row[] = [
-  { id: "demo-t1", client_id: CID, title: "Negatieve zoektermen toevoegen GRA | US", description: "Voeg brede-match-vervuilers toe als negative.", action_type: "negative_keywords", priority: "high", due_date: dayISO(-1), status: "open", frequency: "direct", affected_campaign: "GRA | Search | US" },
-  { id: "demo-t2", client_id: CID, title: "Dagbudget Brand +25%", description: "Verhoog het budget en monitor IS.", action_type: "budget", priority: "medium", due_date: dayISO(-3), status: "open", frequency: "direct", affected_campaign: "GreenTech | Brand" },
-  { id: "demo-t3", client_id: CID, title: "Nieuwe Meta-creatives briefen", description: "Brief 3 nieuwe varianten voor Awareness EU.", action_type: "creative", priority: "medium", due_date: dayISO(4), status: "open", frequency: "direct", affected_campaign: "GRT | Awareness EU" },
+  { id: "demo-t1", client_id: CID, sop_type: "weekly", analysis_date: dayISO(7), title: "Negatieve zoektermen toevoegen GRA | US", description: "Voeg brede-match-vervuilers toe als negative.", action_type: "negative_keywords", priority: "high", due_date: dayISO(-1), status: "open", frequency: "direct", affected_campaign: "GRA | Search | US" },
+  { id: "demo-t2", client_id: CID, sop_type: "monthly", analysis_date: dayISO(14), title: "Dagbudget Brand +25%", description: "Verhoog het budget en monitor IS.", action_type: "budget", priority: "medium", due_date: dayISO(-3), status: "open", frequency: "direct", affected_campaign: "GreenTech | Brand" },
+  { id: "demo-t3", client_id: CID, sop_type: "meta_weekly", analysis_date: dayISO(7), title: "Nieuwe Meta-creatives briefen", description: "Brief 3 nieuwe varianten voor Awareness EU.", action_type: "creative", priority: "medium", due_date: dayISO(4), status: "open", frequency: "direct", affected_campaign: "GRT | Awareness EU" },
 ];
 
 // ── Creative: ads_creative_performance (6 mnd per ad, één fatiguet) + RSA-assets ──

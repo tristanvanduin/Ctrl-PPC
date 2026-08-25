@@ -7,6 +7,8 @@
 // median/safeDiv-les), dus verplaatst i.p.v. herhaald. De knoppen blijven functioneel identiek --
 // dit is een zuivere verhuizing, geen gedragswijziging.
 
+import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
+
 export type SopType = "weekly" | "biweekly" | "monthly";
 export type SopChannel = "google_ads" | "meta_ads" | "linkedin_ads";
 
@@ -51,4 +53,34 @@ export const MONTHLY_SOP_TYPES: readonly string[] = ALLE_SOP_CHANNELS.map(
 /** Of een sop_type een maandanalyse is, ongeacht kanaal. */
 export function isMonthlySopType(sopType: string): boolean {
   return MONTHLY_SOP_TYPES.includes(sopType);
+}
+
+/** Van InsightChannel (de kanaalindeling van de inzichtenlaag) naar de SOP-kanaalsleutel. */
+const SOP_KANAAL_VAN_INSIGHT: Partial<Record<InsightChannel, SopChannel>> = {
+  google: "google_ads",
+  meta: "meta_ads",
+  linkedin: "linkedin_ads",
+};
+
+/**
+ * Alle sop_type-sleutels van hetzelfde KANAAL als `sopType` -- de drie cadansen ervan.
+ * Bijvoorbeeld: "meta_monthly" geeft ["meta_weekly", "meta_biweekly", "meta_monthly"].
+ *
+ * Bedoeld om taak- en voorstelhistorie binnen een kanaal te houden. De grens ligt bewust bij het
+ * kanaal en niet bij de cadans: een Google-maandanalyse HOORT te zien wat de Google-weekly heeft
+ * aangedragen (dat is precies de doorgeefketen uit lib/analysis/monthly-handoff.ts), maar niet
+ * wat er op LinkedIn is gebeurd -- daar gelden andere ingrepen en een ander vocabulaire.
+ *
+ * Het kanaal komt uit channelOfSopType() en niet uit een eigen prefixregel. Die regel bestaat al
+ * en een tweede kopie is precies wat scripts/check-hygiene.mjs vangt; erger nog, twee regels die
+ * uiteenlopen zouden betekenen dat de UI een taak bij een ander kanaal indeelt dan de prompt.
+ *
+ * "cross_channel" hoort per definitie bij geen enkel kanaal en geeft een lege lijst: de aanroeper
+ * leest dat als "geen kanaalfilter mogelijk" en filtert dan niet, in plaats van alles weg te
+ * gooien.
+ */
+export function sopTypesVanZelfdeKanaal(sopType: string): string[] {
+  const kanaal = SOP_KANAAL_VAN_INSIGHT[channelOfSopType(sopType)];
+  if (!kanaal) return [];
+  return ALLE_SOP_TYPES.map((cadans) => CHANNEL_CONFIG[kanaal].sopTypeKey[cadans]);
 }

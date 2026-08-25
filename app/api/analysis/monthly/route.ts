@@ -912,6 +912,7 @@ async function persistMonthlyStructuredData(opts: {
       return {
         client_id: clientId,
         recommendation_id: recIds[task.recommendation_index] ?? null,
+        sop_type: sopType,
         analysis_date: analysisDate,
         title: task.title,
         description: `${task.description} Thread: ${task.thread_id ?? "geen"}. Phase: ${task.phase}.`,
@@ -1802,7 +1803,7 @@ export async function POST(request: NextRequest) {
     // wordt. Twee velden bestaan daar niet: execution_status en deadline_hint blijven dus
     // onbekend, en de functie laat de bijbehorende regels dan gewoon weg in plaats van iets aan
     // te nemen.
-    const taakStatusSection = buildTaskStatusGrounding(await priorTasksVoorGrounding(supabase, clientId, periodEnd));
+    const taakStatusSection = buildTaskStatusGrounding(await priorTasksVoorGrounding(supabase, clientId, periodEnd, adapter.sopTypeKey));
 
     // Bij het geheugenblok gevoegd in plaats van als los argument: beide beschrijven wat we van
     // deze klant weten uit eerdere runs, en buildMonthlyStepPrompt laat een leeg blok al

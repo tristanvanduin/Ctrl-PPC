@@ -210,8 +210,13 @@ export async function GET(request: NextRequest) {
           .order("ice_total", { ascending: false }),
         supabase
           .from("sop_tasks")
+          // Migratie 104. De twee queries hierboven filteren allebei op sop_type; deze kon dat
+          // niet, want de kolom bestond niet -- dus een Meta-export op een dag waarop óók de
+          // Google-maandanalyse liep, zette Google's taken onder Meta's bevindingen. De PDF is
+          // het document dat de klant krijgt, dus dat is de duurste plek voor die vermenging.
           .select("title, description, action_type, priority, frequency, due_date, affected_campaign, status")
           .eq("client_id", clientId)
+          .eq("sop_type", sopType)
           .eq("analysis_date", analysis.analysis_date)
           .order("priority"),
       ]);

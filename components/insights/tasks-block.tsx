@@ -210,6 +210,8 @@ interface AiTask {
   status: string;
   due_date: string | null;
   recommendation_id: string | null;
+  /** Migratie 104. Zie de kanaalafleiding hieronder voor waarom deze kolom er moest komen. */
+  sop_type: string | null;
 }
 
 const FREQUENCY_MAP: Record<Cadence, string> = {
@@ -294,19 +296,26 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
 
   // Fetch AI-generated tasks from sop_tasks
   const [recInsightMap, setRecInsightMap] = useState<Map<string, string>>(new Map());
-  // Kanaal per aanbeveling (uit de sop_type): taken erven het kanaal van hun aanbeveling.
-  const [recChannelMap, setRecChannelMap] = useState<Map<string, InsightChannel>>(new Map());
 
-  // Kanaal-filter: het kanaal van de taak volgt uit zijn aanbeveling; zonder aanbeveling is de
-  // taak uit de Google-pijplijn (de enige die losse taken schrijft).
+  // Kanaal-filter, rechtstreeks uit sop_tasks.sop_type (migratie 104).
+  //
+  // Dit liep eerst via de aanbeveling: het kanaal van de taak was dat van zijn recommendation_id,
+  // en zonder aanbeveling gold "google, de enige pijplijn die losse taken schrijft". Die aanname
+  // klopte niet meer -- van de 1156 taken in de database hebben er 768 geen recommendation_id
+  // (de koppeling is optioneel en breekt bij een recommendation_index buiten bereik), dus twee
+  // derde kreeg een Google-badge ongeacht het echte kanaal. Nu draagt de taak zijn eigen sop_type.
+  //
+  // Een taak zonder sop_type is niet toe te wijzen (zie migratie 104: alleen demo-dagen waarop
+  // alle kanalen tegelijk draaiden) en valt uit elk kanaalfilter, in plaats van bij Google te
+  // worden gerekend.
   const filteredAiTasks = useMemo(() => {
     const channelTasks = channel
-      ? aiTasks.filter((t) => (t.recommendation_id ? recChannelMap.get(t.recommendation_id) ?? "google" : "google") === channel)
+      ? aiTasks.filter((t) => t.sop_type != null && channelOfSopType(t.sop_type) === channel)
       : aiTasks;
     return selectedInsightId
       ? channelTasks.filter((t) => t.recommendation_id && recInsightMap.get(t.recommendation_id) === selectedInsightId)
       : channelTasks;
-  }, [aiTasks, channel, recChannelMap, selectedInsightId, recInsightMap]);
+  }, [aiTasks, channel, selectedInsightId, recInsightMap]);
   const aiTakenLijst = useTruncatedList(filteredAiTasks, AI_TAKEN_ZICHTBAAR);
 
   useEffect(() => {
@@ -326,18 +335,16 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
       setAiTasksLoading(false);
     });
 
-    // Fetch recommendation → insight_id + kanaal mapping for filtering
-    dbSelect<{ id: string; insight_id: string | null; sop_type: string | null }>("sop_recommendations", {
-      select: "id, insight_id, sop_type", clientId,
+    // Fetch recommendation → insight_id mapping, alleen nog voor het inzicht-filter: het kanaal
+    // komt sinds migratie 104 uit de taak zelf en hoeft hier niet meer uit te worden afgeleid.
+    dbSelect<{ id: string; insight_id: string | null }>("sop_recommendations", {
+      select: "id, insight_id", clientId,
     }).then(({ data: rows }) => {
         const map = new Map<string, string>();
-        const chMap = new Map<string, InsightChannel>();
         for (const r of rows) {
           if (r.insight_id) map.set(r.id, r.insight_id);
-          chMap.set(r.id, channelOfSopType(r.sop_type));
         }
         setRecInsightMap(map);
-        setRecChannelMap(chMap);
       });
   }, [clientId, cadence, refreshKey]);
 

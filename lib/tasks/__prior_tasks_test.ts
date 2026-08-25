@@ -128,6 +128,82 @@ async function main() {
     check("een geslaagde ophaal levert taken", r.length === 1 && r[0].status === "done", JSON.stringify(r));
   }
 
+  // ── Het kanaalfilter ────────────────────────────────────────────────────
+  //
+  // sop_tasks had geen sop_type, dus de enige filters waren client_id en datum. De
+  // Google-maandprompt kreeg daardoor de taken van de Meta- en LinkedIn-runs ongelabeld binnen,
+  // mét de instructie afgeronde taken niet te herhalen: dan leest een Google-analyse dat een
+  // LinkedIn-formulierwijziging al gedaan is en laat hij een echte Google-actie liggen.
+  //
+  // Wat hier te toetsen valt is niet of de query rijen teruggeeft (dat doet de database), maar
+  // WELK filter er wordt meegestuurd. De mock legt het `in`-argument vast.
+
+  console.log("\nHet kanaalfilter");
+  {
+    /** Mock die vastlegt of en waarop `.in()` is aangeroepen. */
+    function spionerendeClient(): { client: SupabaseClient; gezien: () => { kolom: string; waarden: string[] } | null } {
+      let gezien: { kolom: string; waarden: string[] } | null = null;
+      const eindpunt = { order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) };
+      const naLt = {
+        ...eindpunt,
+        in: (kolom: string, waarden: string[]) => { gezien = { kolom, waarden }; return eindpunt; },
+      };
+      const client = {
+        from: () => ({ select: () => ({ eq: () => ({ lt: () => naLt }) }) }),
+      } as unknown as SupabaseClient;
+      return { client, gezien: () => gezien };
+    }
+
+    // Zonder sopType blijft het gedrag exact zoals het was: geen `in`, dus geen filter.
+    {
+      const { client, gezien } = spionerendeClient();
+      await priorTasksVoorGrounding(client, "c1", "2026-07-01");
+      check("zonder sopType wordt er niet gefilterd", gezien() === null, JSON.stringify(gezien()));
+    }
+
+    // Elk kanaal krijgt zijn eigen drie cadansen -- niet alleen zijn eigen sop_type. Een
+    // maandanalyse HOORT te zien wat de weekly van hetzelfde kanaal heeft aangedragen; dat is de
+    // doorgeefketen. Alleen het andere KANAAL valt af.
+    const verwacht: Record<string, string[]> = {
+      monthly: ["weekly", "biweekly", "monthly"],
+      weekly: ["weekly", "biweekly", "monthly"],
+      meta_monthly: ["meta_weekly", "meta_biweekly", "meta_monthly"],
+      meta_weekly: ["meta_weekly", "meta_biweekly", "meta_monthly"],
+      linkedin_monthly: ["linkedin_weekly", "linkedin_biweekly", "linkedin_monthly"],
+      linkedin_biweekly: ["linkedin_weekly", "linkedin_biweekly", "linkedin_monthly"],
+    };
+    for (const [sopType, types] of Object.entries(verwacht)) {
+      const { client, gezien } = spionerendeClient();
+      await priorTasksVoorGrounding(client, "c1", "2026-07-01", sopType);
+      const g = gezien();
+      check(`${sopType} filtert op zijn eigen kanaal`,
+        g !== null && g.kolom === "sop_type" && JSON.stringify([...g.waarden].sort()) === JSON.stringify([...types].sort()),
+        JSON.stringify(g));
+    }
+
+    // De harde eis waar dit allemaal om begonnen is: geen enkel filter mag een sop_type van een
+    // ANDER kanaal doorlaten.
+    for (const [sopType] of Object.entries(verwacht)) {
+      const { client, gezien } = spionerendeClient();
+      await priorTasksVoorGrounding(client, "c1", "2026-07-01", sopType);
+      const waarden = gezien()?.waarden ?? [];
+      const meta = waarden.filter((w) => w.startsWith("meta_")).length;
+      const li = waarden.filter((w) => w.startsWith("linkedin_")).length;
+      const google = waarden.filter((w) => !w.startsWith("meta_") && !w.startsWith("linkedin_")).length;
+      check(`${sopType} mengt geen kanalen`, [meta, li, google].filter((n) => n > 0).length === 1,
+        JSON.stringify(waarden));
+    }
+
+    // cross_channel hoort bij geen enkel kanaal. Dan liever ongefilterd dan alles weggooien: een
+    // lege `in` zou nul taken opleveren en dat leest als "er is niets gedaan".
+    {
+      const { client, gezien } = spionerendeClient();
+      await priorTasksVoorGrounding(client, "c1", "2026-07-01", "cross_channel");
+      check("cross_channel filtert niet in plaats van alles weg te gooien", gezien() === null,
+        JSON.stringify(gezien()));
+    }
+  }
+
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);
   if (failed > 0) process.exit(1);
 }

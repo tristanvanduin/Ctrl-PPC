@@ -18,6 +18,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PriorTask, TaskStatus } from "./task-tracking";
+import { sopTypesVanZelfdeKanaal } from "@/lib/analysis/sop-channel-config";
 
 /** Hoeveel taken er hoogstens mee de prompt in gaan. */
 const MAX_TAKEN = 40;
@@ -67,18 +68,39 @@ export function toPriorTasks(rijen: Record<string, unknown>[]): PriorTask[] {
  * Haalt de taken op van vóór de huidige analysedatum. Een fout levert een lege lijst op en
  * daarmee een leeg groundingblok: de analyse draait dan zonder taakhistorie, precies zoals
  * voordat deze module bestond. Dat is beter dan de run laten vallen op een contextblok.
+ *
+ * `sopType` begrenst de historie tot het EIGEN KANAAL (alle drie de cadansen ervan, zie
+ * sopTypesVanZelfdeKanaal). Zonder die begrenzing kreeg de Google-maandprompt de taken van de
+ * Meta- en LinkedIn-runs ongelabeld binnen, mét de instructie afgeronde taken niet te herhalen --
+ * dan leest een Google-analyse dat een LinkedIn-formulierwijziging al gedaan is en laat hij een
+ * echte Google-actie liggen. Weglaten van het argument houdt het oude, ongefilterde gedrag; dat
+ * is er voor aanroepers die hun kanaal niet weten.
+ *
+ * Taken zonder sop_type vallen buiten het filter. Dat is de goede kant om fout te gaan: na
+ * migratie 104 is elke productietaak gelabeld, en wat er nog zonder label ligt komt van dagen
+ * waarop alle kanalen tegelijk draaiden en dus niet toe te wijzen is. Zo'n taak alsnog meesturen
+ * zou precies de vermenging zijn die dit filter opheft, en een verkeerde bewering in de prompt is
+ * erger dan een ontbrekende.
  */
 export async function priorTasksVoorGrounding(
   supabase: SupabaseClient,
   clientId: string,
-  voorDatum: string
+  voorDatum: string,
+  sopType?: string
 ): Promise<PriorTask[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("sop_tasks")
       .select("title, status, affected_campaign, affected_adgroup, affected_keyword, analysis_date")
       .eq("client_id", clientId)
-      .lt("analysis_date", voorDatum)
+      .lt("analysis_date", voorDatum);
+
+    // Een leeg resultaat betekent "geen kanaalfilter mogelijk" (cross_channel): dan liever
+    // ongefilterd dan alles weggooien.
+    const kanaalTypes = sopType ? sopTypesVanZelfdeKanaal(sopType) : [];
+    if (kanaalTypes.length > 0) query = query.in("sop_type", kanaalTypes);
+
+    const { data, error } = await query
       .order("analysis_date", { ascending: false })
       .limit(MAX_TAKEN);
     if (error) return [];
