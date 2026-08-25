@@ -311,7 +311,11 @@ export function ClientDashboard({ client }: { client: Client }) {
               </div>
             )
           )}
-          <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+          {/* Neutraal en niet amber. De conversielag is een EIGENSCHAP van het account -- hij
+              staat er elke dag, verandert zelden, en er is niets aan te doen. In alarmkleur zegt
+              hij elke sessie opnieuw "let op" over iets waar niet op te letten valt; naast de
+              live-badge is hij precies wat hij is: een stukje context bij de cijfers. */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 border border-border rounded-lg px-3 py-1.5">
             <Clock className="w-3.5 h-3.5" />
             Conversielag: {lagDays} {lagDays === 1 ? "dag" : "dagen"}
           </div>

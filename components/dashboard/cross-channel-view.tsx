@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { CalendarClock, Globe, Info, Layers, Loader2, Target, TrendingUp, TriangleAlert } from "lucide-react";
+import { CalendarClock, Globe, Info, Layers, Loader2, Target, TrendingUp } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { CampaignTypeSplit } from "./campaign-type-split";
@@ -241,14 +241,15 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
           titel="Jaaroverzicht"
           bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend, over alle kanalen samen"
         >
-          {/* De waarschuwing hoort hier en niet alleen bij de tabel verderop: elk kanaal claimt
+          {/* Het voorbehoud hoort hier en niet alleen bij de tabel verderop: elk kanaal claimt
               zijn eigen conversies met zijn eigen attributievenster, dus de blended som is een
-              BOVENGRENS. Een prognose die daarop rekent erft dat, en dan moet het erbij staan. */}
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-meta text-amber-900">
-            De conversies hieronder zijn de som over de kanalen, en elk kanaal telt met zijn eigen
-            attributievenster. Dezelfde aankoop kan door twee kanalen geclaimd zijn, dus dit is een
-            bovengrens en geen exacte telling.
-          </div>
+              BOVENGRENS, en een prognose die daarop rekent erft dat. Maar als voetnoot en niet in
+              alarmkleur: dit is hoe blended rekenen werkt, niet iets wat vandaag is misgegaan en
+              wat je kunt verhelpen. */}
+          <p className="text-meta leading-snug text-muted-foreground">
+            De conversies hieronder zijn de som over de kanalen, elk met zijn eigen
+            attributievenster: een bovengrens, geen exacte telling.
+          </p>
           <MetricCardsView
             clientId={clientId}
             data={blendedForecast.data}
@@ -438,23 +439,25 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
 
           {/* De twee voorbehouden, naast de cijfers waar ze over gaan. */}
           <aside className="flex flex-col gap-3 lg:col-span-4">
-            {betrouwbaarheid && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-meta leading-snug text-amber-900">
-                <p className="mb-1 flex items-center gap-1.5 font-semibold">
-                  <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
-                  Dubbeltelling
-                </p>
-                Over de laatste {chartMonths.length} maanden claimen de kanalen samen{" "}
-                <strong>{fmt(betrouwbaarheid.blendedSum)} conversies</strong>. {betrouwbaarheid.detail}
-              </div>
-            )}
+            {/* EEN NEUTRAAL BLOK, GEEN AMBER WAARSCHUWING. Hier stonden er twee die hetzelfde
+                zeiden: "Dubbeltelling" in alarmkleur en "Waarom blended indicatief is" in grijs.
+                Het eerste stond er ALTIJD -- overlappende attributie is geen incident maar hoe
+                blended rekenen werkt. Een waarschuwing die nooit weggaat leert je de kleur
+                negeren, en daarmee ook de waarschuwing die er wel toe doet. Het cijfer blijft
+                staan, de alarmkleur niet. */}
             <div className="rounded-lg border border-border bg-gray-50/70 px-4 py-3 text-meta leading-snug text-muted-foreground">
               <p className="mb-1 flex items-center gap-1.5 font-semibold text-brand-gray">
                 <Info className="h-3.5 w-3.5 shrink-0" />
                 Waarom &quot;blended&quot; indicatief is
               </p>
-              Elk kanaal meet zijn eigen attributie, dus de som is geen exacte verdeling. Bedragen
-              alleen optellen over kanalen met gelijke valuta.
+              Elk kanaal meet zijn eigen attributie, dus de som is geen exacte verdeling: dezelfde
+              aankoop kan door twee kanalen geclaimd zijn.
+              {betrouwbaarheid && (
+                <> Over de laatste {chartMonths.length} maanden claimen de kanalen samen{" "}
+                <strong className="text-brand-gray">{fmt(betrouwbaarheid.blendedSum)} conversies</strong>;
+                dat is een bovengrens.</>
+              )}{" "}
+              Bedragen alleen optellen over kanalen met gelijke valuta.
             </div>
             {/* De weggevallen kolom, één keer uitgelegd in plaats van zes keer een streepje.
                 Zie de opmerking bij `heeftWaarde` hierboven. */}

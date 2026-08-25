@@ -246,8 +246,12 @@ export function FairWeeksView({
         </div>
       </div>
 
+      {/* Neutraal en niet amber: de aftelling klopt bij benadering en er gaat niets stuk zolang
+          de echte datum ontbreekt. Dit is een uitnodiging om iets in te vullen, geen alarm dat
+          elke dag opnieuw afgaat -- en juist zo'n blijvend blok maakt de kleur waardeloos voor de
+          meldingen die wel om actie vragen. */}
       {edition.afgeleid && (
-        <div className="mx-5 mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-800 flex items-start gap-2">
+        <div className="mx-5 mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-meta text-muted-foreground flex items-start gap-2">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>
             De datum van {edition.label} staat nog niet in de instellingen; hij is doorgerekend uit de
