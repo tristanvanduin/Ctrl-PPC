@@ -1155,6 +1155,47 @@ async function finalizeChannelMonthlySynthesis(opts: {
   return { structured, acceptanceReport, qualityGate, geblokkeerd: false as const };
 }
 
+/**
+ * Het geheugenblok van een maandrun: alles wat we van deze klant weten uit eerdere runs.
+ *
+ * Twee bronnen, samengevoegd tot EEN argument in plaats van twee. Ze beschrijven hetzelfde soort
+ * ding -- wat er eerder is vastgesteld en wat er eerder is afgesproken -- en buildMonthlyStepPrompt
+ * laat een leeg blok al byte-identiek weg. Een klant zonder historie krijgt dus precies dezelfde
+ * prompt als voordat dit blok bestond.
+ *
+ *   client-geheugen   wat er in eerdere analyses is vastgesteld over deze klant.
+ *   taakstatus        de openstaande en afgeronde taken van de vorige cyclus, met de instructie
+ *                     afgeronde taken niet te herhalen tenzij de cijfers aantoonbaar terugvielen.
+ *                     Zonder dit begint elke maandanalyse met een schone lei en beveelt hij opnieuw
+ *                     aan wat vorige maand al is gedaan.
+ *
+ * De taakbron is sop_tasks. De pure kern (buildTaskStatusGrounding) is geschreven op
+ * analysis_tasks uit migratie 006, maar die tabel wordt nergens geschreven of gelezen. Twee velden
+ * bestaan in sop_tasks niet -- execution_status en deadline_hint -- en die blijven dus onbekend;
+ * de functie laat de bijbehorende regels dan weg in plaats van iets aan te nemen.
+ *
+ * `sopTypeKey` begrenst de taken tot het eigen kanaal (migratie 104). Zonder die grens leest een
+ * Meta-analyse dat een Google-actie al is uitgevoerd, en andersom.
+ *
+ * Deze functie bestaat omdat alle drie de kanaalpaden hem nodig hebben. Het Google-pad had het
+ * blok als enige, inline; Meta en LinkedIn kregen alleen het client-geheugen en helemaal geen
+ * taakhistorie -- de gebruikelijke vorm hier: de Google-variant is stilzwijgend de norm. Drie
+ * kopieen van dezelfde vier regels is precies wat AGENTS.md beschrijft bij median/safeDiv, dus
+ * een plek in plaats van drie.
+ */
+async function buildGeheugenMetTaken(
+  supabase: SupabaseClient,
+  clientId: string,
+  periodEnd: string,
+  sopTypeKey: string
+): Promise<string> {
+  const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  const taakStatusSection = buildTaskStatusGrounding(
+    await priorTasksVoorGrounding(supabase, clientId, periodEnd, sopTypeKey)
+  );
+  return [clientMemorySection, taakStatusSection].filter(Boolean).join("\n\n");
+}
+
 // M2 route-wiring: het additieve Meta-pad. Draait de 11-staps Meta SOP op de gedeelde route-helpers
 // met de Meta-datalaag, en laat het Google-pad volledig ongemoeid via de vroege branch in POST.
 // LIVE-ONGETEST: de Supabase-fetch in buildMetaAnalysisData en de end-to-end run zijn pas met echte
@@ -1208,8 +1249,11 @@ async function runMetaMonthlyAnalysis(
   // k-anoniem gedeeld worden, en dat is de regel die precies doet waarvoor hij bestaat, geen bug.
   const godViewText = (await godViewContext(supabase, clientId, adapter.channel)).promptContext;
 
-  // E1-wiring (Meta): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
-  const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  // E1-wiring (Meta): het geheugenblok eenmalig ophalen, zelfde patroon als Google. Dit droeg tot
+  // nu toe alleen het client-geheugen: de taakhistorie zat in het Google-pad, na de vroege branch
+  // in POST, en Meta kwam daar dus nooit. Een Meta-maandanalyse begon daardoor elke keer met een
+  // schone lei over wat er vorige cyclus is uitgevoerd.
+  const geheugenMetTaken = await buildGeheugenMetTaken(supabase, clientId, periodEnd, adapter.sopTypeKey);
 
   // Fase 2: dezelfde verrijkingslaag als het Google-pad, nu kanaalbewust. Zes van de acht lagen
   // leunen op ads_*-tabellen en worden voor dit kanaal overgeslagen én gemeld (zie ALLEEN_GOOGLE in
@@ -1272,7 +1316,7 @@ async function runMetaMonthlyAnalysis(
       adapter.stepInstructions[stepNumber],
       conclusions.slice(-2).join("\n\n"),
       adapter,
-      clientMemorySection
+      geheugenMetTaken
     );
     const userMessage = buildMetaStepMessage(stepNumber, stepFacts[stepNumber], clientId)
       + (stepNumber === 1 ? enrichmentText : "")
@@ -1464,8 +1508,9 @@ async function runLinkedinMonthlyAnalysis(
   // als bij Meta.
   const godViewText = (await godViewContext(supabase, clientId, adapter.channel)).promptContext;
 
-  // E1-wiring (LinkedIn): het client-geheugen eenmalig ophalen, zelfde patroon als Google.
-  const clientMemorySection = buildClientMemoryGrounding(await getClientMemory(supabase, clientId));
+  // E1-wiring (LinkedIn): het geheugenblok eenmalig ophalen, zelfde patroon als Google -- en om
+  // dezelfde reden als bij Meta droeg dit tot nu toe alleen het client-geheugen en geen taken.
+  const geheugenMetTaken = await buildGeheugenMetTaken(supabase, clientId, periodEnd, adapter.sopTypeKey);
 
   // Fase 2: dezelfde verrijkingslaag als het Google-pad, nu kanaalbewust. Zes van de acht lagen
   // leunen op ads_*-tabellen en worden voor dit kanaal overgeslagen én gemeld (zie ALLEEN_GOOGLE in
@@ -1527,7 +1572,7 @@ async function runLinkedinMonthlyAnalysis(
       adapter.stepInstructions[stepNumber],
       conclusions.slice(-2).join("\n\n"),
       adapter,
-      clientMemorySection
+      geheugenMetTaken
     );
     const userMessage = buildLinkedinStepMessage(stepNumber, stepFacts[stepNumber], clientId)
       + (stepNumber === 1 ? enrichmentText : "")
@@ -1786,30 +1831,10 @@ export async function POST(request: NextRequest) {
 
     const { accountType } = clientCtx;
     let goalsSection = clientCtx.goalsSection;
-    // E1-wiring: het client-geheugen eenmalig ophalen voor de lus (niet per step) en
-    // naar een grounding-blok formatteren; leeg blok bij een klant zonder historie.
-    const clientMemory = await getClientMemory(supabase, clientId);
-    const clientMemorySection = buildClientMemoryGrounding(clientMemory);
-
-    // Taakstatus van de vorige cyclus.
-    //
-    // Zonder dit blok begint elke maandanalyse met een schone lei en beveelt hij opnieuw aan wat
-    // vorige maand al is uitgevoerd — het model heeft geen enkele manier om te weten wat ermee
-    // gebeurd is. buildTaskStatusGrounding zet de openstaande en afgeronde taken in de prompt,
-    // met de instructie afgeronde taken niet te herhalen tenzij de cijfers aantoonbaar terugvielen.
-    //
-    // De bron is sop_tasks. De pure kern is geschreven op analysis_tasks (migratie 006), maar die
-    // tabel wordt nergens geschreven of gelezen; sop_tasks is de tabel die daadwerkelijk gevuld
-    // wordt. Twee velden bestaan daar niet: execution_status en deadline_hint blijven dus
-    // onbekend, en de functie laat de bijbehorende regels dan gewoon weg in plaats van iets aan
-    // te nemen.
-    const taakStatusSection = buildTaskStatusGrounding(await priorTasksVoorGrounding(supabase, clientId, periodEnd, adapter.sopTypeKey));
-
-    // Bij het geheugenblok gevoegd in plaats van als los argument: beide beschrijven wat we van
-    // deze klant weten uit eerdere runs, en buildMonthlyStepPrompt laat een leeg blok al
-    // byte-identiek weg. Een klant zonder taakhistorie krijgt dus precies dezelfde prompt als
-    // voorheen — dat is de eigenschap die de cachetest bewaakt.
-    const geheugenMetTaken = [clientMemorySection, taakStatusSection].filter(Boolean).join("\n\n");
+    // E1-wiring: het geheugenblok eenmalig ophalen voor de lus (niet per step). Zie
+    // buildGeheugenMetTaken voor wat erin zit en waarom het één argument is; dat stond hier
+    // inline tot Meta en LinkedIn hetzelfde blok nodig hadden.
+    const geheugenMetTaken = await buildGeheugenMetTaken(supabase, clientId, periodEnd, adapter.sopTypeKey);
 
     // A-track: de deterministisch gedetecteerde signalen en cross-checks, eenmalig voor de
     // lus. Zelfde principe als het geheugenblok: een lege sectie geeft byte-identieke
