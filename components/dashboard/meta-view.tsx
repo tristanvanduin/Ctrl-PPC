@@ -158,6 +158,16 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         </Sectie>
       )}
 
+      {/* groep="levering" is plaatsing/platform/device ("waar komt het vandaan"), groep="doelgroep"
+          is leeftijd en gender ("wie bereiken we"), en het maandverloop zet dat in de tijd. Drie
+          kaarten die alle drie een verdeling of een verloop tonen -- en alle drie inhoudsgestuurd,
+          dus er valt niets uit te rekken. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
+        <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
+        <ChannelMonthlyChart />
+      </div>
+
       {/* Meta-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde plek en icoon
           als bij Google; renderd niets zolang er geen dagcijfers gesynced zijn (demo heeft die
           wel). Zie channel-forecast-overview.tsx voor de volledige toelichting -- computeForecast
@@ -169,16 +179,6 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
       >
         <ChannelForecastOverview />
       </Sectie>
-
-      {/* groep="levering" is plaatsing/platform/device ("waar komt het vandaan"), groep="doelgroep"
-          is leeftijd en gender ("wie bereiken we"), en het maandverloop zet dat in de tijd. Drie
-          kaarten die alle drie een verdeling of een verloop tonen -- en alle drie inhoudsgestuurd,
-          dus er valt niets uit te rekken. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
-        <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
-        <ChannelMonthlyChart />
-      </div>
 
       {/* Wat er van de prestatie-view overblijft: de kerncijfers over 28 dagen en de maandtabel.
           Pacing staat nu in de hero en het maandverloop naast de landencijfers -- allebei

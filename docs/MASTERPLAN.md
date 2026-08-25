@@ -8643,3 +8643,30 @@ op de fixture), en er staat een tweede geval bij dat de situatie van Meta en Lin
 **zonder vorig jaar valt er ook niets terug te vallen** en blijft het doel nul. Dat tweede geval is
 het belangrijkste van de twee — het legt vast dat de terugval niets verzint als er niets is.
 
+
+## 17.121 Openstaand: wat als de klant niet naar een moment toe werkt? (25 augustus 2026)
+
+De beurs-sectie ("Prestaties richting de beurs") staat nu op alle vier de tabbladen bovenaan,
+direct onder de opener. Dat klopt voor een beursorganisatie: de beursdag is de mijlpaal waar
+alles naartoe rekent, en "nog drie weken" is dan de eerste vraag van de dag.
+
+**Maar niet elke klant werkt naar een moment toe.** Een webshop die het hele jaar door verkoopt
+heeft geen beursdag, en dan is een sectie die de hele breedte pakt om "nog N weken tot X" te
+zeggen niet alleen leeg maar misleidend prominent. Vandaag valt hij in dat geval terug op
+"Maandprestaties" (de Weken/Maanden-keuze in `google-view.tsx`), en op Meta en LinkedIn
+verschijnt hij helemaal niet zolang er geen editie gekozen is.
+
+Wat we hier nog moeten beslissen, op een rustiger moment:
+
+- Is "geen beurs" een **andere volgorde** (dan hoort het maandverloop bovenaan en zakt de
+  beurs-sectie weg) of een **andere sectie** (een periode-doel dat de klant zelf kiest:
+  kwartaal, campagneperiode, seizoen)?
+- Wie bepaalt dat? Nu is het impliciet: het bestaan van `rai_events` in `client_settings`. Een
+  expliciete keuze per klant ("wij sturen op beurzen / op kwartalen / op niets") is eerlijker dan
+  een lege lijst die toevallig hetzelfde effect heeft.
+- De drie tabbladen moeten dezelfde keuze volgen. De reden dat ze nu uniform zijn, is precies
+  dat een tabwissel niets mag verplaatsen; een klantafhankelijke volgorde mag dat niet stukmaken.
+
+Genoteerd op verzoek van de eigenaar, tijdens de ronde waarin de volgorde werd vastgezet:
+"wat doen we als het geen beurzen zijn en niet naar momenten toe werkt? Dan is die sectie niet
+belangrijk."

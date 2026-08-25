@@ -820,6 +820,39 @@ function forecastCoreMetric(
   // We use the combined factor as the default (conservative)
   const projectionFactor = factor;
 
+  // ── ZONDER JAARDOEL: PROJECTEREN OP HET EIGEN TEMPO ────────────────────────────────────────
+  //
+  // `scaledExpected` is de verdeling van het JAARDOEL over de maanden. Staat er geen doel (Meta en
+  // LinkedIn hebben niets in client_targets, en de terugval "vorig jaar +10%" uit
+  // lib/analysis/standaard-jaardoel.ts levert nul zolang er geen vorig jaar gemeten is), dan is
+  // die verdeling overal nul -- en daarmee elke projectie eronder ook, want die is
+  // `expected × factor`.
+  //
+  // Op het scherm gaf dat een beursstrip die de gerealiseerde weken toonde en daarna "0 0 0 0",
+  // met "Prognose 0" in de kaart voor volgende week. Dat leest als "we vallen terug naar niets",
+  // terwijl er niets voorspeld wás. De eigenaar zag het naast elkaar: "Screenshot 1: Google,
+  // screenshot 2: Meta. Dit is niet gelijk toch?"
+  //
+  // Zonder doel projecteren we daarom op het eigen tempo: het gemiddelde van de laatste vier
+  // AFGESLOTEN weken. De laatste gerealiseerde week telt niet mee -- die loopt nog, en een halve
+  // week als tempo nemen halveert de hele prognose (in de demo: 6 tegen 42). Wat hier NIET
+  // verandert is de verwachting: `expected` blijft nul, dus er komt geen ratio, geen balk en geen
+  // doellijn bij. Een tempo is geen doel, en het scherm blijft zeggen dat er geen doel staat.
+  const zonderDoel = annualTarget <= 0;
+  let weekTempo = 0;
+  if (zonderDoel) {
+    const gerealiseerdeWeken: number[] = [];
+    for (const rec of data2026) {
+      if (rec === null) continue;
+      for (const wk of rec.weeks) gerealiseerdeWeken.push(wk[metric]);
+    }
+    const basis = gerealiseerdeWeken.slice(0, -1).slice(-4);
+    weekTempo = basis.length > 0 ? basis.reduce((s, v) => s + v, 0) / basis.length : 0;
+  }
+  // 52 weken op 12 maanden: een maand is gemiddeld 4,33 week. Niet 4, want dan zou de
+  // maandprognose structureel 8% te laag staan tegen de weekprognose ernaast.
+  const maandTempo = weekTempo * (52 / 12);
+
   // Step 4: Build monthly points
   const monthlyRatios: number[] = [];
   const realizedRatios: number[] = []; // alleen de gerealiseerde maanden, voor de onzekerheidsband
@@ -850,7 +883,7 @@ function forecastCoreMetric(
         monthRatio: ratio,
       });
     } else {
-      const proj = Math.round(exp * projectionFactor);
+      const proj = zonderDoel ? Math.round(maandTempo) : Math.round(exp * projectionFactor);
       monthlyRatios.push(projectionFactor);
       futureExpectedSum += exp;
       adjustedAnnual += proj;
@@ -891,7 +924,7 @@ function forecastCoreMetric(
           month: m + 1, week: w + 1, label,
           expected: weekExp,
           realized: null,
-          forecast: Math.round(weekExp * projectionFactor),
+          forecast: zonderDoel ? Math.round(weekTempo) : Math.round(weekExp * projectionFactor),
         });
       }
     }

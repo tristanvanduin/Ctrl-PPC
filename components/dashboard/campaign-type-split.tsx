@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PieChart, X } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
-import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
+import { CHART_CATEGORICAL, CHANNEL_CHART_COLOR } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
@@ -37,8 +37,20 @@ function typeLabel(t: string): string {
   return TYPE_LABEL[(t || "").toUpperCase()] ?? t;
 }
 
-function colorFor(campaignType: string, order: string[]): string {
-  const i = order.indexOf(campaignType);
+// De kleur van een segment. Voor campagnetype en campagnenaam is er geen vaste identiteit, dus
+// telt de positie in de ring (grootste eerst) -- dat is stabiel zolang de verdeling stabiel is.
+//
+// Voor KANALEN telt dat juist niet: Meta was hier paars in de staafgrafiek ernaast en groen in de
+// ring, omdat de ring op volgorde van spend kleurt en de staven op identiteit. Dezelfde fout die
+// lib/branding/chart-colors.ts beschrijft, twee kaarten naast elkaar. Een kanaal houdt nu overal
+// zijn eigen kleur, ook als het van plek wisselt in de verdeling.
+function colorFor(uitsplitsing: Uitsplitsing, sleutel: string, order: string[]): string {
+  if (uitsplitsing === "kanaal") {
+    const naam = KANAAL_LABEL_BLENDED[sleutel];
+    const vast = naam ? CHANNEL_CHART_COLOR[naam as keyof typeof CHANNEL_CHART_COLOR] : undefined;
+    if (vast) return vast;
+  }
+  const i = order.indexOf(sleutel);
   return CHART_CATEGORICAL[(i < 0 ? 0 : i) % CHART_CATEGORICAL.length];
 }
 
@@ -117,9 +129,22 @@ function normaliseer(u: Uitsplitsing, sleutel: string): string {
   return (sleutel || "onbekend").toLowerCase();
 }
 
-export function CampaignTypeSplit({ clientId }: { clientId: string }) {
+/**
+ * @param toon Welke uitsplitsingen deze kaart aanbiedt; de eerste is het starttabblad.
+ *   Standaard alle drie -- dat is de Google-weergave. "Alle kanalen" geeft alleen `["kanaal"]`
+ *   mee: campagnetype en campagnenaam komen uit `ads_campaign_monthly` en die tabel kent enkel
+ *   Google-campagnes, dus daar zouden die twee tabbladen een Google-verdeling tonen onder een kop
+ *   die alle kanalen belooft. Bij één uitsplitsing verdwijnt de kiezer, want er valt niets te
+ *   kiezen.
+ */
+export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u.key) }: {
+  clientId: string;
+  toon?: readonly Uitsplitsing[];
+}) {
+  const keuzes = UITSPLITSINGEN.filter((u) => toon.includes(u.key));
+  const start = keuzes[0]?.key ?? "type";
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
-  const [uitsplitsing, setUitsplitsing] = useState<Uitsplitsing>("type");
+  const [uitsplitsing, setUitsplitsing] = useState<Uitsplitsing>(start);
   const [tabelOpen, toggleTabel] = useRememberedOpen("campagnetype-tabel", false);
   // Klik op een ring-segment of een legendaregel selecteert dat campagnetype -- gedeeld tussen
   // beide donuts (Kosten en Conversies lichten samen op, niet los van elkaar) en filtert de tabel
@@ -180,6 +205,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
   useEffect(() => { setSelected(null); }, [clientId, uitsplitsing]);
 
   const actief = UITSPLITSINGEN.find((u) => u.key === uitsplitsing) ?? UITSPLITSINGEN[0];
+  const opStart = uitsplitsing === start;
   const slices = useMemo(
     () => (rows
       ? buildNetworkSplit(rows, {
@@ -192,7 +218,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
   const totals = useMemo(() => networkTotals(slices), [slices]);
   const order = useMemo(() => slices.map((s) => s.networkType), [slices]);
 
-  const costSlices: DonutSlice[] = slices.map((s) => ({ key: s.networkType, label: s.label, value: s.cost, color: colorFor(s.networkType, order) }));
+  const costSlices: DonutSlice[] = slices.map((s) => ({ key: s.networkType, label: s.label, value: s.cost, color: colorFor(uitsplitsing, s.networkType, order) }));
 
   const leeg = rows !== null && (slices.length === 0 || totals.cost <= 0);
 
@@ -200,10 +226,10 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
   // START-tabblad -- staat de gebruiker op "Kanaal" of "Campagne" en levert dat niets op, dan
   // moet de kaart BLIJVEN staan met een uitleg, anders verdwijnen de tabbladen mee en kan hij
   // niet terug naar het tabblad dat wel data had.
-  if (rows === null && uitsplitsing === "type") {
-    return <Laadvlak vorm="grafiek" hoogte={200} titel={UITSPLITSINGEN[0].titel} />;
+  if (rows === null && opStart) {
+    return <Laadvlak vorm="grafiek" hoogte={200} titel={keuzes[0]?.titel ?? UITSPLITSINGEN[0].titel} />;
   }
-  if (leeg && uitsplitsing === "type") return null;
+  if (leeg && opStart) return null;
 
   const kop = (
     <div className="border-b border-border px-5 py-3">
@@ -213,9 +239,11 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
         <span className="text-meta text-muted-foreground">laatste 90 dagen</span>
       </div>
       {/* De uitsplitsingskiezer. Radiogroup en geen tabs-rol: er is één paneel eronder dat van
-          inhoud wisselt, niet drie panelen waarvan er één zichtbaar is. */}
+          inhoud wisselt, niet drie panelen waarvan er één zichtbaar is. Bij één keuze helemaal
+          weg: een radiogroep met één knop die altijd aan staat is geen keuze maar een label. */}
+      {keuzes.length > 1 && (
       <div className="mt-2 flex flex-wrap gap-1" role="radiogroup" aria-label="Uitsplitsing">
-        {UITSPLITSINGEN.map((u) => {
+        {keuzes.map((u) => {
           const aan = u.key === uitsplitsing;
           return (
             <button
@@ -235,6 +263,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 
@@ -279,7 +308,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
             {totals.hasConversions && (
               <figure className="flex flex-col items-center gap-2">
                 <DonutChart
-                  slices={slices.map((s) => ({ key: s.networkType, label: s.label, value: s.conversions, color: colorFor(s.networkType, order) }))}
+                  slices={slices.map((s) => ({ key: s.networkType, label: s.label, value: s.conversions, color: colorFor(uitsplitsing, s.networkType, order) }))}
                   centerValue={num(totals.conversions, 1)}
                   centerLabel="conversies"
                   format={(v) => num(v, 1)}
@@ -297,7 +326,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
               type met een klein aandeel. */}
           <ul className="flex min-w-[10rem] flex-1 flex-col gap-1 pt-1">
             {slices.map((s) => {
-              const kleur = colorFor(s.networkType, order);
+              const kleur = colorFor(uitsplitsing, s.networkType, order);
               const isSelected = selected === s.networkType;
               const isDimmed = selected != null && !isSelected;
               return (
@@ -364,7 +393,7 @@ export function CampaignTypeSplit({ clientId }: { clientId: string }) {
               <Rij key={s.networkType} className={selected != null && selected !== s.networkType ? "opacity-40" : ""}>
                 <NaamCel>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: colorFor(s.networkType, order) }} aria-hidden />
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: colorFor(uitsplitsing, s.networkType, order) }} aria-hidden />
                     {s.label}
                   </span>
                 </NaamCel>

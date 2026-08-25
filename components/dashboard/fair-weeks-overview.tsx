@@ -203,7 +203,10 @@ export function FairWeeksView({
   const strip = weken.slice(Math.max(0, nu - STRIP_TERUG), nu + STRIP_VOORUIT + 1);
   const wekenTotBeurs = huidige?.weeksOut ?? null;
   // Zonder jaardoel voor deze metric is `expected` overal nul (lib/fair/fair-weeks.ts spreidt het
-  // jaardoel over de weken). Google heeft doelen in client_targets, Meta en LinkedIn vaak niet --
+  // jaardoel over de weken). De toekomstige weken zijn dan niet leeg: computeForecast projecteert
+  // in dat geval op het eigen weektempo, dus de strip loopt door. Wat ontbreekt is de VERWACHTING,
+  // en dus de ratio en de balk -- die zouden een doel suggereren dat er niet is.
+  // Google heeft doelen in client_targets, Meta en LinkedIn vaak niet --
   // en dan stond hier een raster vol "0%" naast een gerealiseerde 42. Zie WeekCard.
   const heeftVerwachting = weken.some((w) => w.expected > 0);
 
@@ -224,7 +227,7 @@ export function FairWeeksView({
               : <>{edition.label} ({edition.fairDate}) is geweest</>}
             {heeftVerwachting
               ? " · ratio geeft aan of je boven of onder verwachting zit"
-              : " · geen jaardoel ingesteld voor dit kanaal, dus alleen het gerealiseerde"}
+              : " · geen jaardoel ingesteld voor dit kanaal: gerealiseerd, en vooruit het huidige tempo"}
           </p>
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 shrink-0">

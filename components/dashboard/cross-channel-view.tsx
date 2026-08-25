@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { CalendarClock, Globe, Info, Layers, Loader2, Target, TrendingUp, TriangleAlert } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
+import { CampaignTypeSplit } from "./campaign-type-split";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
 import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
@@ -205,6 +206,35 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
         </Sectie>
       )}
 
+      {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
+          vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
+          binnen zichzelf, terwijl het twee antwoorden op twee vragen zijn — "hoe verhouden de
+          kanalen zich over de maanden" en "wat leverde elk kanaal op". */}
+      {rows && rows.length > 0 && (
+        <Sectie
+          icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Verdeling over de kanalen"
+          bijschrift="Spend per kanaal per maand en over de laatste 90 dagen"
+        >
+          {/* De staven en de ringen naast elkaar, want het zijn twee helften van dezelfde vraag:
+              de staven tonen het VERLOOP per maand, de ringen de VERDELING nu -- en de ringen ook
+              voor conversies, wat de staven niet doen. "Waarom heeft alle kanalen geen donuts?"
+              was terecht: de kaart bestond al (dezelfde die op Google onder "Spend per kanaal"
+              staat) en las hier alleen niemand.
+
+              Alleen de kanaal-uitsplitsing: campagnetype en campagnenaam komen uit
+              ads_campaign_monthly, en die tabel kent enkel Google-campagnes. Twee tabbladen die
+              een Google-verdeling tonen onder een kop die alle kanalen belooft, is precies de
+              soort halve waarheid die dit tabblad moet vermijden. */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+            <div className="lg:col-span-2">
+              <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} groeit />
+            </div>
+            <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} />
+          </div>
+        </Sectie>
+      )}
+
       {blendedForecast && (
         <Sectie
           icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -232,20 +262,6 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
             metric={jaaroverzichtMetric}
             onMetricChange={setJaaroverzichtMetric}
           />
-        </Sectie>
-      )}
-
-      {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
-          vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
-          binnen zichzelf, terwijl het twee antwoorden op twee vragen zijn — "hoe verhouden de
-          kanalen zich over de maanden" en "wat leverde elk kanaal op". */}
-      {rows && rows.length > 0 && (
-        <Sectie
-          icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Verdeling over de kanalen"
-          bijschrift="Spend per kanaal per maand — welk kanaal draagt welk deel van het budget"
-        >
-          <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} />
         </Sectie>
       )}
 

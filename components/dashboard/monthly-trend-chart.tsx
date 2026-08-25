@@ -235,12 +235,16 @@ function SerieNaam({ x, y, width, index, naam, laatste }: LabelProps & { naam: s
 // Gegroepeerde maandbalken per serie (bijv. spend per kanaal): categorische vergelijking, dus het
 // gevalideerde categorische palet (kleurenblind-veilig, merk-onafhankelijk).
 
-export function GroupedMonthlyBars({ title, months, series, data, height = 260 }: {
+export function GroupedMonthlyBars({ title, months, series, data, height = 260, groeit = false }: {
   title: string;
   months: string[];
   series: string[];
   data: Record<string, number | string>[];
   height?: number;
+  /** Vul de hoogte van de rastercel in plaats van `height` aan te houden. Voor als deze kaart
+   *  naast een hogere staat: een staafgrafiek WORDT beter van meer hoogte, dus dan is meegroeien
+   *  beter dan een gat eronder. Zelfde afspraak als `groeit` in monthly-trend-bars.tsx. */
+  groeit?: boolean;
 }) {
   if (months.length < 1 || series.length === 0) return null;
 
@@ -291,7 +295,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
     .map((x) => ({ ...x, maand: maandLabel(String(data[x.vanaf].maand ?? "")) }));
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className={`bg-card rounded-xl border border-border shadow-sm overflow-hidden ${groeit ? "flex h-full flex-col" : ""}`}>
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{title}</h3>
@@ -304,7 +308,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
           Wat er rechts staat is geen opvulling maar de vraag die deze grafiek oproept en niet
           beantwoordt: hoeveel draagt elk kanaal nou eigenlijk? Dat tel je niet op uit achttien
           balkjes. Het kleurblokje bindt de regel aan zijn balken. */}
-      <div className="flex items-stretch">
+      <div className={`flex items-stretch ${groeit ? "flex-1" : ""}`}>
       {/* GEEN plafond op de plotbreedte hier, anders dan bij MonthlyTrendChart hierboven.
           plotBreedte() rekent 130px per categorie; bij zes maanden is dat 852px in een kaart van
           1584px, dus bleef er ruim 500px leeg tussen de plot en de cijferkolom -- "waarom is dit
@@ -312,7 +316,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
           weinig categorieen, maar dat regelt recharts hier zelf: zonder vaste `barSize` verdeelt
           hij elke maandgroep over de beschikbare band, met `barCategoryGap` als lucht ertussen.
           De balken worden dus dikker in plaats van dat de kaart leger wordt. */}
-      <div className="min-w-0 flex-1 px-3 py-4" style={{ height }}>
+      <div className="min-w-0 flex-1 px-3 py-4" style={groeit ? undefined : { height }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={PLOT_MARGE_LABELS} barCategoryGap={GROEP_GAP} barGap={BALK_GAP}>
             <Raster />
