@@ -580,15 +580,49 @@ const metaHourlyPerformance: Row[] = Array.from({ length: 30 }, (_, d) =>
   })
 ).flat();
 
+// ── De campagnes, met budget en biedregime ─────────────────────────────────
+//
+// daily_budget, unit_cost, bid_strategy en cost_type stonden er niet, terwijl de weekly ze
+// selecteert (weekly/route.ts, de "Budget vs. Vraag"-tak van stap 3) en de bi-weekly er zijn hele
+// stap 4 op bouwt ("pacing t.o.v. budget", "wijst een CPL-stijging op een te laag bod"). Zonder
+// budget valt er over pacing niets te zeggen: dan is er geen noemer.
+//
+// De budgetten staan in verhouding tot wat de campagne werkelijk uitgeeft, zodat elke uitkomst die
+// de stap kent ook een geval heeft:
+//
+//   op schema        1, 2, 4     geeft vrijwel zijn dagbudget uit
+//   vol maar duur    3           besteedt zijn budget volledig -- bij de slechtste CPL van het
+//                                account. Budget is daar niet het probleem, bod en targeting wel;
+//                                dat onderscheid is precies wat stap 4 moet maken.
+//   onderbesteed     5, 6, 7     met MANUAL bieden en een laag unit_cost als verklaring, de
+//                                standaardoorzaak in een B2B-auctie (wortelooorzaak b in de prompt).
 const LI_CAMPAIGNS = [
-  { urn: "urn:li:demo:1", name: "GRT | Leadgen NL" },
-  { urn: "urn:li:demo:2", name: "GRT | Thought Leadership" },
-  { urn: "urn:li:demo:3", name: "GRT | Brede awareness" },
+  { urn: "urn:li:demo:1", name: "GRT | Leadgen NL", budget: 45, bod: 8.5, strategie: "TARGET_COST", kosten: "CPC" },
+  { urn: "urn:li:demo:2", name: "GRT | Thought Leadership", budget: 35, bod: 32, strategie: "MAXIMUM_DELIVERY", kosten: "CPM" },
+  { urn: "urn:li:demo:3", name: "GRT | Brede awareness", budget: 130, bod: 28, strategie: "MAXIMUM_DELIVERY", kosten: "CPM" },
   // Ook op de andere beurzen actief, zodat LinkedIn binnen GRN/GRA niet leeg is.
-  { urn: "urn:li:demo:4", name: "GRN | Leadgen Canada" },
-  { urn: "urn:li:demo:5", name: "GRA | Thought Leadership US" },
+  { urn: "urn:li:demo:4", name: "GRN | Leadgen Canada", budget: 55, bod: 9.2, strategie: "TARGET_COST", kosten: "CPC" },
+  { urn: "urn:li:demo:5", name: "GRA | Thought Leadership US", budget: 60, bod: 4.8, strategie: "MANUAL", kosten: "CPC" },
+  // ── De twee gevallen die de bleeder-regel aan BEIDE kanten toetsen ────────
+  //
+  // De LinkedIn-weekly kent een rem die de andere kanalen niet hebben: "weeg 0 leads bij weinig
+  // spend (<EUR 50) als 'te vroeg om te beoordelen', niet als bleeder -- anders vlagt elke rustige
+  // week vals" (weekly-channel-content.ts). Die regel was op de demo niet te toetsen, want er was
+  // geen enkele campagne zonder leads: de bleeder-stap kon er domweg niets vinden.
+  //
+  // Nu twee, aan weerszijden van de drempel. Zonder de tweede zou een test die de rem WEGHAALT nog
+  // steeds slagen, en dan bewaakt hij hem niet.
+  { urn: "urn:li:demo:6", name: "GRT | Text Ads — leadgen", budget: 20, bod: 3.2, strategie: "MANUAL", kosten: "CPC" },
+  { urn: "urn:li:demo:7", name: "GRA | Retargeting — net live", budget: 25, bod: 6.0, strategie: "TARGET_COST", kosten: "CPC" },
 ];
-const linkedinCampaigns: Row[] = LI_CAMPAIGNS.map((c) => ({ client_id: CID, campaign_urn: c.urn, name: c.name, status: "ACTIVE", objective_type: "LEAD_GENERATION" }));
+const linkedinCampaigns: Row[] = LI_CAMPAIGNS.map((c) => ({
+  client_id: CID, campaign_urn: c.urn, name: c.name, status: "ACTIVE",
+  // Campagne 6 is Text Ads onder een leadgen-doel: precies de objective/format-mismatch die
+  // wortelooorzaak c in de weekly-prompt noemt. De demo modelleert geen koppeling tussen campagne
+  // en creative, dus het signaal moet uit de campagnerij zelf komen -- vandaar de naam.
+  objective_type: "LEAD_GENERATION",
+  daily_budget: c.budget, unit_cost: c.bod, bid_strategy: c.strategie, cost_type: c.kosten,
+}));
 // Twee creatives, allebei single_image, was te dun om de creative-weergave iets te laten zeggen:
 // er viel niets te vergelijken en het formaat-onderscheid was onzichtbaar. Vijf stuks over de
 // formaten die LinkedIn daadwerkelijk kent, met uiteenlopende prestaties — de video trekt
@@ -667,6 +701,12 @@ const LI_CAMP_DEFS = [
   { urn: "urn:li:demo:3", imp: 4000, clk: 30, spend: 120, leads: 2, seed: 4 },
   { urn: "urn:li:demo:4", imp: 1100, clk: 18, spend: 48, leads: 7, seed: 6 },
   { urn: "urn:li:demo:5", imp: 1500, clk: 22, spend: 36, leads: 4, seed: 8 },
+  // Zie de kop bij LI_CAMPAIGNS: twee gevallen aan weerszijden van de EUR 50-rem, allebei met nul
+  // leads. Text Ads halen veel vertoningen en weinig kliks -- vandaar de scheve imp/clk-verhouding.
+  // Over zeven dagen komt 14/dag op circa EUR 105 uit (bleeder) en 4/dag op circa EUR 30 (te vroeg
+  // om te beoordelen). De dagcurve schaalt beide met dezelfde factor, dus die verhouding houdt.
+  { urn: "urn:li:demo:6", imp: 3000, clk: 6, spend: 14, leads: 0, seed: 10 },
+  { urn: "urn:li:demo:7", imp: 300, clk: 4, spend: 4, leads: 0, seed: 12 },
 ];
 const linkedinCampaignDaily: Row[] = LI_CAMP_DEFS.flatMap((c) =>
   Array.from({ length: 150 }, (_, d) => {

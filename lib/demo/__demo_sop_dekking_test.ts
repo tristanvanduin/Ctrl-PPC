@@ -363,6 +363,186 @@ console.log("\nDe competitor-dimensie heeft een reeks, geen enkel punt");
     [...perCampagne.entries()].map(([k, v]) => `${k}: ${Math.min(...v)}-${Math.max(...v)}`).join(" | "));
 }
 
+// ── DE DERDE LAAG: bijt de KANAALCHECK van de weekly en de bi-weekly ergens op? ──
+//
+// De tweede laag hierboven draait de fact-builders van de MAANDanalyse. De weekly en de bi-weekly
+// hebben die niet: hun kanaaleigen inhoud staat als tekst in lib/prompts/weekly-channel-content.ts
+// en biweekly-channel-content.ts, en de route levert de tabellen aan. Wat daar fout kan gaan is
+// dus niet "de functie rekent verkeerd" maar "de vraag is onbeantwoordbaar met deze data" -- en
+// dat ziet er in de uitvoer precies zo uit als een account zonder problemen.
+//
+// Elke check hieronder is een vraag die één van de zes combinaties letterlijk stelt. Slaagt hij,
+// dan is er iets om over te rapporteren. Faalt hij, dan draait die stap wel maar heeft hij niets
+// te melden, en dat is de stilste manier waarop een demo kan liegen.
+//
+// De drempels komen uit de prompts en de adapters, niet uit deze test: 10% impressieaandeel
+// verloren aan budget (weekly stap 3, Google), frequency 3,5 (META_BENCHMARKS), 2x de account-CPA
+// met nul conversies (Meta-bleeder), EUR 50 (de LinkedIn-rem op stille weken).
+
+const dagenVenster = (rows: Record<string, unknown>[], van: number, tot: number) => {
+  const alle = [...new Set(rows.map((x) => String(x.date)))].sort();
+  const venster = alle.slice(alle.length - tot, alle.length - van || undefined);
+  return rows.filter((x) => venster.includes(String(x.date)));
+};
+const getal = (x: unknown) => Number(x ?? 0);
+const somPer = (rows: Record<string, unknown>[], sleutel: string, velden: string[]) => {
+  const uit = new Map<string, Record<string, number>>();
+  for (const r of rows) {
+    const k = String(r[sleutel]);
+    const v = uit.get(k) ?? Object.fromEntries(velden.map((f) => [f, 0]));
+    for (const f of velden) v[f] += getal(r[f]);
+    uit.set(k, v);
+  }
+  return uit;
+};
+
+console.log("\nGoogle weekly: is budgetkrapte uit de data te lezen, niet af te leiden?");
+{
+  const is = (rijen.ads_campaign_impression_share ?? []) as Record<string, unknown>[];
+  const laatste = [...new Set(is.map((x) => String(x.month)))].sort().at(-1);
+  const recent = is.filter((x) => String(x.month) === laatste);
+  // De prompt noemt 10% als drempel. Zit geen enkele campagne erboven, dan is de "Budget vs.
+  // Vraag"-vraag op deze data niet te beantwoorden -- niet fout, maar ook niet getoetst.
+  const boven = recent.filter((x) => getal(x.search_budget_lost_is) > 0.10);
+  check("google weekly: minstens één campagne boven de 10%-drempel", boven.length > 0,
+    recent.map((x) => `${x.campaign_name}: ${x.search_budget_lost_is}`).join(" | "));
+  // Budget- en positieverlies vragen tegengestelde ingrepen. Liggen ze overal gelijk, dan kan het
+  // model het onderscheid niet maken dat de prompt expliciet van hem vraagt.
+  check("google weekly: budgetverlies is te onderscheiden van positieverlies",
+    recent.some((x) => Math.abs(getal(x.search_budget_lost_is) - getal(x.search_rank_lost_is)) > 0.1),
+    recent.map((x) => `${x.search_budget_lost_is} vs ${x.search_rank_lost_is}`).join(" | "));
+  // En de tegenhanger: een campagne die NIET krap zit, anders is "boven de drempel" geen bevinding
+  // maar een eigenschap van de dataset.
+  check("google weekly: en minstens één campagne die niet krap zit",
+    recent.some((x) => getal(x.search_budget_lost_is) < 0.05), String(recent.length));
+
+  const meta = (rijen.ads_campaign_metadata ?? []) as Record<string, unknown>[];
+  check("google weekly: dagbudget en biedstrategie staan erbij",
+    meta.length > 0 && meta.every((x) => x.budget_amount != null && x.bidding_strategy != null),
+    JSON.stringify(meta[0] ?? {}).slice(0, 120));
+}
+
+console.log("\nMeta weekly: bleeder, learning-status en creative fatigue");
+{
+  const adsetDagen = (rijen.meta_adset_daily ?? []) as Record<string, unknown>[];
+  const accountDagen = (rijen.meta_account_daily ?? []) as Record<string, unknown>[];
+  const week = dagenVenster(adsetDagen, 0, 7);
+  const accWeek = dagenVenster(accountDagen, 0, 7);
+
+  // "cost > 2x gemiddelde account CPA, 0 conversies" -- letterlijk uit META_WEEKLY.wasteStepBody.
+  const accCpa = accWeek.reduce((s, x) => s + getal(x.spend), 0)
+    / Math.max(1, accWeek.reduce((s, x) => s + getal(x.conversions), 0));
+  const perAdset = somPer(week, "entity_id", ["spend", "conversions"]);
+  const bleeders = [...perAdset.entries()].filter(([, v]) => v.spend > 2 * accCpa && v.conversions === 0);
+  check("meta weekly: er is een bleeder boven 2x de account-CPA", bleeders.length > 0,
+    `account-CPA ${accCpa.toFixed(2)}, drempel ${(2 * accCpa).toFixed(2)}`);
+  // En niet ALLES is bleeder: anders toetst de drempel niets.
+  check("meta weekly: en niet elke ad set is er een", bleeders.length < perAdset.size,
+    `${bleeders.length}/${perAdset.size}`);
+
+  // Wortelooorzaak d in de spend-anomalie-tak: "Je krijgt learning_stage_info per ad set".
+  const stadia = (rijen.meta_adsets ?? []).map((a) =>
+    String(((a as Record<string, unknown>).learning_stage_info as Record<string, unknown> | null)?.status ?? ""));
+  check("meta weekly: minstens één ad set staat op LEARNING_LIMITED",
+    stadia.includes("LEARNING_LIMITED"), stadia.join(", "));
+  check("meta weekly: en niet alle ad sets staan zo", new Set(stadia).size > 1, [...new Set(stadia)].join(", "));
+
+  // Creative fatigue = frequency boven de benchmark EN hook rate dalend WoW. Twee voorwaarden,
+  // dus twee checks: één ervan missen betekent dat de vlag nooit afgaat.
+  const perFreq = new Map<string, number[]>();
+  for (const x of week) if (x.frequency != null) perFreq.set(String(x.entity_id), [...(perFreq.get(String(x.entity_id)) ?? []), getal(x.frequency)]);
+  const gemiddelden = [...perFreq.values()].map((v) => v.reduce((a, b) => a + b, 0) / v.length);
+  check("meta weekly: een ad set zit boven de frequency-benchmark van 3,5",
+    gemiddelden.some((f) => f > 3.5), gemiddelden.map((f) => f.toFixed(2)).join(", "));
+
+  const videoRijen = ((rijen.meta_ad_daily ?? []) as Record<string, unknown>[]).filter((x) => x.video_3s_views != null);
+  const hook = (rows: Record<string, unknown>[]) => {
+    const imp = rows.reduce((s, x) => s + getal(x.impressions), 0);
+    return imp > 0 ? (100 * rows.reduce((s, x) => s + getal(x.video_3s_views), 0)) / imp : 0;
+  };
+  const dezeWeek = hook(dagenVenster(videoRijen, 0, 7));
+  const vorigeWeek = hook(dagenVenster(videoRijen, 7, 14));
+  check("meta weekly: de hook rate daalt week-over-week",
+    dezeWeek > 0 && dezeWeek < vorigeWeek, `${dezeWeek.toFixed(2)}% tegen ${vorigeWeek.toFixed(2)}%`);
+}
+
+console.log("\nLinkedIn weekly: de bleeder-rem werkt aan beide kanten");
+{
+  const week = dagenVenster((rijen.linkedin_campaign_daily ?? []) as Record<string, unknown>[], 0, 7);
+  const per = somPer(week, "entity_urn", ["spend", "one_click_leads"]);
+  const zonderLeads = [...per.entries()].filter(([, v]) => v.one_click_leads < 1);
+  // LINKEDIN_WEEKLY.wasteStepBody: 0 leads bij minder dan EUR 50 spend is "te vroeg om te
+  // beoordelen", daarboven een bleeder. Zonder een geval aan ELKE kant toetst de demo de rem niet:
+  // haal hem weg en alles zou nog steeds slagen.
+  check("linkedin weekly: er is een campagne met 0 leads boven de 50-euro-rem",
+    zonderLeads.some(([, v]) => v.spend >= 50), zonderLeads.map(([k, v]) => `${k}: ${v.spend.toFixed(0)}`).join(" | "));
+  check("linkedin weekly: en één eronder, die terecht géén bleeder is",
+    zonderLeads.some(([, v]) => v.spend > 0 && v.spend < 50), zonderLeads.map(([k, v]) => `${k}: ${v.spend.toFixed(0)}`).join(" | "));
+  check("linkedin weekly: en campagnes die het wél doen", per.size - zonderLeads.length >= 3,
+    `${per.size - zonderLeads.length} van ${per.size}`);
+
+  // Wortelooorzaak c: "Objective/creative-formaat mismatch? (bijv. Text Ads bij een leadgen-doel)".
+  const creatives = (rijen.linkedin_creatives ?? []) as Record<string, unknown>[];
+  check("linkedin weekly: er zijn meerdere creative-formaten om tegen af te zetten",
+    new Set(creatives.map((c) => String(c.format))).size >= 3,
+    creatives.map((c) => c.format).join(", "));
+}
+
+console.log("\nDe bi-weekly stap 3 en 4 per kanaal");
+{
+  // Google bi-weekly stap 4 draait op device-performance; die tabel ontbrak eerder volledig.
+  const devices = (rijen.ads_device_performance_monthly ?? []) as Record<string, unknown>[];
+  check("google biweekly: device-performance heeft meerdere apparaten",
+    new Set(devices.map((d) => String(d.device))).size >= 2, [...new Set(devices.map((d) => d.device))].join(", "));
+  check("google biweekly: en meerdere maanden om tegen te vergelijken",
+    new Set(devices.map((d) => String(d.month))).size >= 2, String(new Set(devices.map((d) => String(d.month))).size));
+
+  // Meta bi-weekly stap 4: "stijgt frequency richting of over de benchmark-drempel SINDS DE
+  // MAANDANALYSE?" Een vlakke reeks maakt die vraag onbeantwoordbaar.
+  const perMaand = new Map<string, number[]>();
+  for (const x of (rijen.meta_account_daily ?? []) as Record<string, unknown>[]) {
+    if (x.frequency == null) continue;
+    const m = String(x.date).slice(0, 7);
+    perMaand.set(m, [...(perMaand.get(m) ?? []), getal(x.frequency)]);
+  }
+  const reeks = [...perMaand.entries()].sort().slice(-3).map(([, v]) => v.reduce((a, b) => a + b, 0) / v.length);
+  check("meta biweekly: de frequency loopt over de maanden op",
+    reeks.length >= 3 && reeks.at(-1)! > reeks[0], reeks.map((f) => f.toFixed(2)).join(" → "));
+
+  // LinkedIn bi-weekly stap 4: "ligt de budget-pacing op schema, of loopt een campagne vroeg leeg
+  // dan wel blijft onderbesteed?" Zonder dagbudget is er geen noemer en dus geen pacing.
+  const campagnes = (rijen.linkedin_campaigns ?? []) as Record<string, unknown>[];
+  check("linkedin biweekly: elke campagne draagt een dagbudget",
+    campagnes.length > 0 && campagnes.every((c) => getal(c.daily_budget) > 0),
+    campagnes.map((c) => `${c.name}: ${c.daily_budget}`).join(" | "));
+  check("linkedin biweekly: bod en biedregime staan erbij",
+    campagnes.every((c) => c.bid_strategy != null && getal(c.unit_cost) > 0),
+    JSON.stringify(campagnes[0] ?? {}).slice(0, 140));
+
+  // Pacing zegt pas iets als niet elke campagne hetzelfde doet.
+  const weekCamp = dagenVenster((rijen.linkedin_campaign_daily ?? []) as Record<string, unknown>[], 0, 7);
+  const spendPer = somPer(weekCamp, "entity_urn", ["spend"]);
+  // Alleen campagnes met ECHTE cijfers aan beide kanten. Een campagne zonder dagbudget of zonder
+  // uitgaven levert een betekenisloos percentage op -- en "0% benutting" van een campagne die
+  // helemaal niet draait, leest als onderbesteding terwijl er niets te pacen valt. Die val is geen
+  // gedachtenexperiment: toen ik deze sectie tegen de oude demo draaide, slaagde de
+  // onderbestedings-check op precies zo'n lege campagne.
+  const benutting = campagnes
+    .map((c) => ({
+      naam: String(c.name),
+      budget: getal(c.daily_budget),
+      spend: spendPer.get(String(c.campaign_urn))?.spend ?? 0,
+    }))
+    .filter((b) => b.budget > 0 && b.spend > 0)
+    .map((b) => ({ naam: b.naam, pct: (100 * b.spend) / (7 * b.budget) }));
+  check("linkedin biweekly: er zijn campagnes met budget én uitgaven om te pacen",
+    benutting.length >= 3, `${benutting.length} van ${campagnes.length}`);
+  check("linkedin biweekly: er is een campagne die zijn budget vrijwel opmaakt",
+    benutting.some((b) => b.pct > 85), benutting.map((b) => `${b.naam}: ${b.pct.toFixed(0)}%`).join(" | "));
+  check("linkedin biweekly: en één die structureel onderbesteedt",
+    benutting.some((b) => b.pct < 75), benutting.map((b) => `${b.naam}: ${b.pct.toFixed(0)}%`).join(" | "));
+}
+
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (ontbrekend.size > 0) {
   console.log("\nOntbrekende demo-dekking per combinatie:");
