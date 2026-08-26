@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
   // zag) — de vroegste waarschuwing dat een publiek opraakt.
   const sinceFast = new Date(Date.now() - 140 * 86_400_000).toISOString().slice(0, 10);
 
-  const [blendedRes, campaignRes, demoRes, labelRes, settingsRes, metaDailyRes, liDailyRes, gWeeklyRes, liCampaignsRes, metaCampaignsRes] = await Promise.all([
+  const [blendedRes, campaignRes, demoRes, labelRes, settingsRes, metaDailyRes, liDailyRes, gWeeklyRes, liCampaignsRes, metaCampaignsRes, msDailyRes] = await Promise.all([
     supabase
       .from("blended_account_monthly")
       .select("month, channel, impressions, clicks, spend, conversions, conversion_value, leads")
@@ -141,6 +141,9 @@ export async function POST(request: NextRequest) {
       .from("linkedin_demographic_daily")
       .select("pivot_type, pivot_value_urn, leads, conversions")
       .eq("client_id", clientId)
+      // CAMPAIGN-level pin: zie lib/linkedin/sync.ts -- de som over campagnes is de
+      // accountweergave, en een toekomstige ACCOUNT-level rij zou anders dubbel tellen.
+      .eq("level", "CAMPAIGN")
       .gte("date", sinceDemo),
     supabase.from("linkedin_urn_labels").select("urn, label"),
     supabase.from("client_settings").select("audience_profile").eq("client_id", clientId).maybeSingle(),
@@ -166,6 +169,16 @@ export async function POST(request: NextRequest) {
     // Meta heeft geen equivalent: meta_adsets.targeting_summary bestaat als kolom maar wordt
     // door geen enkele syncroute gevuld. Alleen naam (voor merkherkenning) is hier zinvol.
     supabase.from("meta_campaigns").select("campaign_id, name").eq("client_id", clientId),
+    // Microsoft rechtstreeks uit zijn dagtabel: blended_account_monthly leest fact_core, en
+    // microsoft heeft daar bewust geen projectie (het bevroren fase-3-project, zie de kop van
+    // scripts/migrations/106_microsoft_ads_tabellen.sql). Zonder deze fetch zou het vierde
+    // kanaal onzichtbaar zijn voor precies de analyse die kanalen naast elkaar legt. Eén fetch
+    // over het maandvenster dekt ook het snellere verzadigingsvenster (6 maanden > 140 dagen).
+    supabase
+      .from("microsoft_account_daily")
+      .select("date, impressions, clicks, spend, conversions, conversion_value")
+      .eq("client_id", clientId)
+      .gte("date", sinceMonth),
   ]);
 
   const n = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
@@ -178,6 +191,25 @@ export async function POST(request: NextRequest) {
     conversions: n(r.conversions),
     leads: n(r.leads),
   }));
+
+  // Microsoft-maandrijen uit de dagtabel, in dezelfde vorm als de blended view: alleen volle
+  // maanden (zelfde currentMonthStart-grens als de view-query hierboven), leads 0 -- Microsoft
+  // rekent in conversies, niet in leadvelden.
+  const msMaanden = new Map<string, { impressions: number; clicks: number; spend: number; conversions: number; conversionValue: number }>();
+  for (const r of msDailyRes.data ?? []) {
+    const datum = String(r.date ?? "");
+    if (datum.length < 7) continue;
+    const month = datum.slice(0, 7) + "-01";
+    if (month >= currentMonthStart) continue;
+    const a = msMaanden.get(month) ?? { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversionValue: 0 };
+    a.impressions += n(r.impressions); a.clicks += n(r.clicks); a.spend += n(r.spend);
+    a.conversions += n(r.conversions); a.conversionValue += n(r.conversion_value);
+    msMaanden.set(month, a);
+  }
+  for (const [month, a] of msMaanden) {
+    channels.push({ channel: "microsoft_ads", month, impressions: a.impressions, clicks: a.clicks, spend: a.spend, conversions: a.conversions, leads: 0 });
+  }
+
   if (channels.length === 0) {
     return Response.json({ error: "Geen cross-channel maanddata (blended view leeg); minstens een kanaal moet gesynct zijn" }, { status: 404 });
   }
@@ -203,6 +235,16 @@ export async function POST(request: NextRequest) {
     const a = valueByChannel.get(ch) ?? { channel: ch, conversions: 0, conversionValue: 0, spend: 0 };
     a.conversions += n(r.conversions); a.conversionValue += n(r.conversion_value); a.spend += n(r.spend);
     valueByChannel.set(ch, a);
+  }
+  // Microsoft telt hier ook mee: zonder waarde-tracking is de blended ROAS net zo onberekenbaar
+  // door een Microsoft-gat als door een Meta-gat.
+  {
+    const msTotaal = [...msMaanden.values()].reduce(
+      (a, m) => ({ conversions: a.conversions + m.conversions, conversionValue: a.conversionValue + m.conversionValue, spend: a.spend + m.spend }),
+      { conversions: 0, conversionValue: 0, spend: 0 });
+    if (msTotaal.spend > 0 || msTotaal.conversions > 0) {
+      valueByChannel.set("microsoft_ads", { channel: "microsoft_ads", ...msTotaal });
+    }
   }
   const dataGap = buildBlendedDataGapSignals([...valueByChannel.values()]);
 
@@ -433,6 +475,12 @@ export async function POST(request: NextRequest) {
     ...(gWeeklyRes.data ?? []).map((r) => ({
       channel: "google_ads", date: String(r.week_start),
       impressions: n(r.impressions), clicks: n(r.clicks), spend: n(r.cost),
+    })),
+    // Microsoft heeft dagkorrel; hetzelfde snelle venster als Meta/LinkedIn (geen frequency,
+    // dat is een social-metriek).
+    ...(msDailyRes.data ?? []).filter((r) => String(r.date) >= sinceFast).map((r) => ({
+      channel: "microsoft_ads", date: String(r.date),
+      impressions: n(r.impressions), clicks: n(r.clicks), spend: n(r.spend),
     })),
   ];
   const cpm = buildFastSaturationSignals(saturationPoints);

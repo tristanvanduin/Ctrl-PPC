@@ -90,7 +90,7 @@ Werkwijze: beoordeel de objective-mix versus de doelstelling, de cost_type en bi
 
 ### NIVEAU B — Campaign Performance
 Bron: linkedin_campaign_daily.
-Werkwijze: gebruik NIVEAU A hierboven als startpunt. Identificeer boven- en ondergemiddelde campagnes op de KPI-set, MoM-breuklijnen en week-over-week patronen.
+Werkwijze: gebruik NIVEAU A hierboven als startpunt. Identificeer boven- en ondergemiddelde campagnes op de KPI-set, MoM-breuklijnen en week-over-week patronen. Elke campagne draagt boven_volumegrens (leads): onder de grens is een CPL-oordeel indicatief, niet stellig.
 
 ---
 
@@ -108,7 +108,7 @@ Doorloop de twee niveaus hieronder in deze volgorde, binnen ÉÉN antwoord: eers
 
 ### NIVEAU A — Demografie en ICP-fit (de kernstap)
 Bron: linkedin_demographic_daily, linkedin_icp en linkedin_urn_labels, met de voorgerekende ICP-fit en waste.
-Werkwijze: beoordeel per pivot (functie, senioriteit, industrie, bedrijfsgrootte) de verdeling van impressies, clicks, spend en leads. De ICP-fit-score (aandeel spend en aandeel leads binnen ICP-segmenten), de waste (spend op expliciet niet-ICP segmenten) en de CPL binnen versus buiten ICP zijn deterministisch aangeleverd; duid ze. Behandel per ondermaatse campagne de demografie apart en vermeld coverage_pct zodat onderdrukte segmenten eerlijk meewegen. Zonder ingevulde ICP: beschrijvend, geen fit-score, met expliciete melding.
+Werkwijze: beoordeel per pivot (functie, senioriteit, industrie, bedrijfsgrootte) de verdeling van impressies, clicks, spend en leads. De ICP-fit-score (aandeel spend en aandeel leads binnen ICP-segmenten), de waste (spend op expliciet niet-ICP segmenten) en de CPL binnen versus buiten ICP zijn deterministisch aangeleverd; duid ze. Behandel per ondermaatse campagne de demografie apart en vermeld coverage_pct zodat onderdrukte segmenten eerlijk meewegen. Zonder ingevulde ICP: beschrijvend, geen fit-score, met expliciete melding. De fit is over het aangeleverde venster berekend (staat erbij), niet alleen de laatste maand; en elke pivot draagt boven_volumegrens (leads) -- onder de grens is een fit-oordeel indicatief.
 
 ---
 

@@ -80,6 +80,9 @@ export async function POST(request: NextRequest) {
       .from("linkedin_demographic_daily")
       .select("pivot_type, pivot_value_urn, date, spend, leads")
       .eq("client_id", clientId)
+      // CAMPAIGN-level pin: de sync schrijft demografie alleen daar (lib/linkedin/sync.ts); een
+      // toekomstige ACCOUNT-level rij zou anders dubbel tellen.
+      .eq("level", "CAMPAIGN")
       .gte("date", since),
     supabase.from("linkedin_urn_labels").select("urn, label"),
     supabase.from("linkedin_account_daily").select("date, spend, one_click_leads, clicks").eq("client_id", clientId).gte("date", since),

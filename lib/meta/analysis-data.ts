@@ -156,7 +156,10 @@ export async function buildMetaAnalysisData(
   const campaigns = campaignRaw.map((r) => mapMetaDailyToComputeRow(r, campaignNames.get(String(r.entity_id ?? ""))));
   const adsets = adsetRaw.map((r) => mapMetaDailyToComputeRow(r, adsetNames.get(String(r.entity_id ?? ""))));
   const ads = adRaw.map((r) => mapMetaDailyToComputeRow(r, adNames.get(String(r.entity_id ?? ""))));
-  const breakdowns = breakdownRaw.map(mapMetaBreakdownToComputeRow);
+  // Alleen level="account": de unieke sleutel van meta_breakdown_daily draagt een level-kolom
+  // (account/campagne/adset), en zonder dit filter zouden de segment-sommen dubbel tellen zodra
+  // een sync meer dan één level schrijft. Zelfde regel als de Microsoft-datalaag.
+  const breakdowns = breakdownRaw.filter((r) => String(r.level ?? "account") === "account").map(mapMetaBreakdownToComputeRow);
   // F5 fase2.4: alleen de nieuwste periode meenemen (patternRaw is al periodEnd-gefilterd en
   // nieuwste-eerst gesorteerd), zodat step 5 niet meerdere periodes door elkaar aggregeert.
   const newestPatternPeriod = patternRaw[0]?.period_start as string | undefined;

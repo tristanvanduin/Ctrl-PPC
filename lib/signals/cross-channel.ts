@@ -59,9 +59,14 @@ function sumByMonth(rows: { month: string }[], value: (r: never) => number): Map
 // Google mee te bewegen. Beweegt hij mee: verklaringskandidaat voor de brand-groei (niet
 // zomaar "Google werd beter"). Beweegt hij tegengesteld: de zaai-investering vindt geen
 // meetbare oogst — targeting- of merk-capture-vraag.
+// Expliciet welke kanalen "zaaien": awareness-gedreven social. Dit stond als "alles behalve
+// google_ads", en dat brak zodra er een tweede searchkanaal bijkwam -- Microsoft-vertoningen
+// zijn zoekvraag-gedreven, geen awareness-druk, en zouden de zaai-golf-detectie vervuilen.
+const SOCIAL_CHANNELS = new Set(["meta_ads", "linkedin_ads"]);
+
 export function detectSeedHarvest(social: ChannelMonthlyInput[], brand: BrandMonthlyInput[]): DetectionResult {
   const id = "cross_zaai_oogst";
-  const socialRows = social.filter((r) => r.channel !== "google_ads");
+  const socialRows = social.filter((r) => SOCIAL_CHANNELS.has(r.channel));
   const socialSeries = sumByMonth(socialRows, (r: ChannelMonthlyInput) => r.impressions);
   const brandSeries = sumByMonth(brand, (r: BrandMonthlyInput) => r.clicks);
 

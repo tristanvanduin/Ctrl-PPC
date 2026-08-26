@@ -824,6 +824,11 @@ const clientSyncStatus: Row[] = [{ client_id: CID, channel: "google_ads", status
 // blended_account_monthly: per kanaal per maand, zodat de cross-channel-analyse (signalen,
 // funnel, KPI-verhoudingen, pacing) in de demo end-to-end draait. Google uit de maandtotalen,
 // Meta/LinkedIn geaggregeerd uit hun dagreeksen naar dezelfde maand-sleutel (YYYY-MM-01).
+// Vóór blendedAccountMonthly gedeclareerd: die IIFE hieronder telt de Microsoft-dagen mee, en
+// module-constanten evalueren op volgorde. Eén keer berekend, net als de andere constanten --
+// demoRows() kan per render meermaals worden aangeroepen en de generator bouwt duizenden dagrijen.
+const microsoftTables = microsoftDemoRows(CID);
+
 const blendedAccountMonthly: Row[] = (() => {
   const out: Row[] = [];
   for (const r of adsAccountMonthly) {
@@ -842,6 +847,7 @@ const blendedAccountMonthly: Row[] = (() => {
   };
   aggDaily(metaAccountDaily, "meta_ads", (r) => ({ imp: r.impressions as number, clk: r.link_clicks as number, spend: r.spend as number, conv: r.conversions as number, leads: 0 }));
   aggDaily(linkedinAccountDaily, "linkedin_ads", (r) => ({ imp: r.impressions as number, clk: r.clicks as number, spend: r.spend as number, conv: r.external_website_conversions as number, leads: r.one_click_leads as number }));
+  aggDaily(microsoftTables.microsoft_account_daily, "microsoft_ads", (r) => ({ imp: r.impressions as number, clk: r.clicks as number, spend: r.spend as number, conv: r.conversions as number, leads: 0 }));
   return out;
 })();
 
@@ -1025,10 +1031,6 @@ const clientGroupMembers: Row[] = [
   { group_id: DEMO_GROEP_VRIJ, client_id: CID },
   { group_id: DEMO_GROEP_MERK, client_id: CID },
 ];
-
-// Eén keer berekend, net als de module-constanten hierboven: demoRows() kan per render meermaals
-// worden aangeroepen en de Microsoft-generator bouwt duizenden dagrijen.
-const microsoftTables = microsoftDemoRows(CID);
 
 export function demoRows(): Record<string, Row[]> {
   return {

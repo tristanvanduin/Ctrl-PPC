@@ -91,7 +91,7 @@ Werkwijze: toets objectives tegen de doelstelling, beoordeel de CBO- versus ABO-
 
 ### NIVEAU B — Ad Set en Doelgroep Performance
 Bron: meta_adset_daily en targeting_summary.
-Werkwijze: gebruik NIVEAU A hierboven als startpunt. Identificeer boven- en ondergemiddelde adsets, vergelijk audience-types (broad/Advantage+ versus interesse versus custom/lookalike), signaleer overlap-risico (zelfde doelgroepomschrijving in meerdere adsets) en beoordeel de frequency per adset.`,
+Werkwijze: gebruik NIVEAU A hierboven als startpunt. Identificeer boven- en ondergemiddelde adsets, vergelijk audience-types (broad/Advantage+ versus interesse versus custom/lookalike), signaleer overlap-risico (zelfde doelgroepomschrijving in meerdere adsets) en beoordeel de frequency per adset. Elke entiteit draagt boven_volumegrens: onder de grens is een oordeel indicatief, niet stellig.`,
   3: `## Stap 3: Creative & Visual (Kwantitatief → Visueel)
 
 Doorloop de twee niveaus hieronder in deze volgorde, binnen ÉÉN antwoord: eerst de kwantitatieve creative-performance, dan de visuele verklaring daarvan. WELKE ads zijn winnaar of bleeder, en WAAROM (visueel) zijn ze dat.
@@ -115,7 +115,7 @@ Doorloop de twee niveaus hieronder in deze volgorde, binnen ÉÉN antwoord: eers
 
 ### NIVEAU A — Placement en Platform
 Bron: meta_breakdown_daily (publisher_platform, platform_position, impression_device).
-Werkwijze: vergelijk feed versus stories versus reels versus audience network per KPI, beoordeel device-verschillen en signaleer placement-waste (spend zonder conversies, of een onevenredig spend-aandeel naar Audience Network zonder evenredig conversievolume).
+Werkwijze: vergelijk feed versus stories versus reels versus audience network per KPI, beoordeel device-verschillen en signaleer placement-waste (spend zonder conversies, of een onevenredig spend-aandeel naar Audience Network zonder evenredig conversievolume). De segmenten zijn op de laatste maand geankerd en dragen volume_ok: onder de grens is een oordeel indicatief, niet stellig.
 
 ---
 

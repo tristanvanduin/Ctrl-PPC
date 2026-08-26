@@ -79,6 +79,9 @@ export async function POST(request: NextRequest) {
       .from("meta_breakdown_daily")
       .select("breakdown_type, breakdown_value, date, impressions, link_clicks, spend, conversions")
       .eq("client_id", clientId)
+      // Alleen account-level: de unieke sleutel draagt een level-kolom; zonder dit filter tellen
+      // de segment-sommen dubbel zodra een sync ook campagne-/adset-level breakdowns schrijft.
+      .eq("level", "account")
       .gte("date", since),
     supabase
       .from("meta_account_daily")

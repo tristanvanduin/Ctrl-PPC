@@ -79,6 +79,12 @@ function buildAccountFacts(account: LinkedInComputeRow[], targets?: LinkedInPrep
 }
 
 // Stap 2/3: entiteiten (campagnes) versus het accountgemiddelde in de laatste maand.
+// Onder dit aantal leads is een CPL-uitspraak per entiteit of segment indicatief, niet stellig.
+// Overgenomen uit de Microsoft-laag (pariteitsronde, 26 augustus 2026): het volume als BEREKEND
+// feit naast elke vergelijking -- de EUR 50-rem van de weekly bestond al als prompttekst, maar
+// een prompt-wens is zwakker dan een aangeleverd cijfer.
+export const VOLUME_GRENS_LEADS = 10;
+
 function buildEntityVsAccountFacts(
   entities: LinkedInComputeRow[],
   accountBenchmark: DerivedMetrics,
@@ -99,9 +105,10 @@ function buildEntityVsAccountFacts(
       spend: d.spend,
       cpl: computeVsAverage("CPL", d.cpl, accountBenchmark.cpl),
       ctr: computeVsAverage("CTR", d.ctr_pct, accountBenchmark.ctr_pct),
+      boven_volumegrens: (d.leads ?? 0) >= VOLUME_GRENS_LEADS,
     };
   });
-  return { latest_month: latestMonth, entities: facts };
+  return { latest_month: latestMonth, volumegrens: VOLUME_GRENS_LEADS, entities: facts };
 }
 
 // CTR-verval per creative als slijtage-proxy: eerste actieve dagen versus recente actieve dagen.
@@ -153,10 +160,13 @@ function buildCreativeFacts(
       ctr_vs_format: computeVsAverage("CTR", d.ctr_pct, fmtAvg?.ctr_pct ?? null),
       cpl: d.cpl,
       leads: d.leads,
+      // CTR-oordelen leunen op vertoningen en mogen ook onder deze grens; de CPL-kant van een
+      // winnaar/bleeder-label is pas stellig boven de leadgrens.
+      boven_volumegrens: (d.leads ?? 0) >= VOLUME_GRENS_LEADS,
       ctr_decay: ctrDecay(rows),
     };
   });
-  return { latest_month: latestMonth, creatives: creativesFacts, format_averages: formatAverages, note: "Tijdsverval is de slijtage-proxy; LinkedIn geeft geen frequency per creative." };
+  return { latest_month: latestMonth, volumegrens: VOLUME_GRENS_LEADS, creatives: creativesFacts, format_averages: formatAverages, note: "Tijdsverval is de slijtage-proxy; LinkedIn geeft geen frequency per creative." };
 }
 
 // Stap 5 (kernstap): de ICP-fit per pivot, met de lege-ICP-degradatie.
@@ -165,12 +175,24 @@ function buildIcpFacts(demographics?: LinkedInDemographicRow[], icp?: LinkedInIc
     return { available: false, note: "Geen demografie-data beschikbaar voor deze periode." };
   }
   const empty = isIcpEmpty(icp);
+  // Het venster staat er expliciet bij (pariteitsronde, 26 augustus 2026): de demografie wordt
+  // over het volle 13-maandsvenster gelezen -- bewust breder dan de maand-geankerde builders,
+  // want leads zijn hier te schaars voor een maandoordeel. Maar dan moet het model dat wel
+  // wéten, anders leest een 13-maands fit-percentage als de stand van de analysemaand. En elke
+  // pivot draagt zijn leadvolume met de grens ernaast, zodat stelligheid gerechtvaardigd is.
+  const datums = demographics.map((r) => r.date).filter((d): d is string => !!d).sort();
+  const pivots = computeIcpFit(demographics, icp).map((p) => ({
+    ...p,
+    boven_volumegrens: p.totalLeads >= VOLUME_GRENS_LEADS,
+  }));
   return {
     available: true,
     icp_defined: !empty,
     degraded: empty,
     note: empty ? "Geen ICP-definitie: beschrijvend, geen fit-score." : undefined,
-    pivots: computeIcpFit(demographics, icp),
+    venster: { van: datums[0] ?? null, tot: datums.at(-1) ?? null, toelichting: "ICP-fit is over dit volledige venster berekend, niet alleen de laatste maand -- leads zijn te schaars voor een maandoordeel." },
+    volumegrens: VOLUME_GRENS_LEADS,
+    pivots,
   };
 }
 

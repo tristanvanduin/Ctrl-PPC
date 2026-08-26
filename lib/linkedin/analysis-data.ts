@@ -86,12 +86,17 @@ export async function buildLinkedinAnalysisData(
     return (data ?? []) as unknown as DbRow[];
   };
 
-  const [accountRaw, campaignRaw, creativeRaw, demoRaw] = await Promise.all([
+  const [accountRaw, campaignRaw, creativeRaw, demoRawAlleNiveaus] = await Promise.all([
     fetchDaily("linkedin_account_daily"),
     fetchDaily("linkedin_campaign_daily"),
     fetchDaily("linkedin_creative_daily"),
     fetchDaily("linkedin_demographic_daily"),
   ]);
+  // CAMPAIGN-level pin: de sync schrijft demografie uitsluitend op dat niveau
+  // (lib/linkedin/sync.ts:204/217) en de som over campagnes is de accountweergave. Zonder deze
+  // pin zou een toekomstige ACCOUNT-level rij alles dubbel laten tellen -- zelfde regel als het
+  // level-filter in de Meta- en Microsoft-datalaag.
+  const demoRaw = demoRawAlleNiveaus.filter((r) => String(r.level ?? "CAMPAIGN") === "CAMPAIGN");
 
   // Entiteit-metadata voor de stappen 2, 4, 7 en 8 (namen, objective, cost_type, format, audience).
   const { data: campaignMetaRaw } = await supabase.from("linkedin_campaigns").select("campaign_urn, name, objective_type, cost_type, bid_strategy, audience_count_estimate").eq("client_id", clientId);

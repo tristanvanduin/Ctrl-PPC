@@ -63,6 +63,10 @@ export async function POST(request: NextRequest) {
       .from("linkedin_demographic_daily")
       .select("date, level, entity_urn, pivot_type, pivot_value_urn, impressions, clicks, spend, leads, conversions, coverage_pct")
       .eq("client_id", clientId)
+      // De sync schrijft demografie uitsluitend op CAMPAIGN-level (lib/linkedin/sync.ts); de som
+      // over campagnes IS de accountweergave. Zonder deze pin zou een toekomstige ACCOUNT-level
+      // rij alles dubbel laten tellen.
+      .eq("level", "CAMPAIGN")
       .gte("date", since),
     supabase.from("client_settings").select("linkedin_icp").eq("client_id", clientId).maybeSingle(),
     supabase.from("linkedin_urn_labels").select("urn, label"),

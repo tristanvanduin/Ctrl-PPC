@@ -16,7 +16,7 @@ export const DATAGAP_MIN_CONVERSIONS = 20; // het kanaal moet materieel converte
 export const DATAGAP_MIN_SPEND = 500;      // en materieel budget dragen
 export const DATAGAP_NEAR_ZERO_VALUE = 1;  // "€0 waarde" met wat marge
 
-const CHANNEL_LABEL: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn" };
+const CHANNEL_LABEL: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn", microsoft_ads: "Microsoft" };
 const eur = (v: number): string => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 const ev = (metric: string, value: string): SignalEvidence => ({ metric, value });
 

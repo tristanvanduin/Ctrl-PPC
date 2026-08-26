@@ -30,7 +30,7 @@ export const CTR_DROP_THRESHOLD = -0.10;
 /** Frequency-stijging die telt als "we bereiken steeds vaker dezelfde mensen". */
 export const FREQ_RISE_THRESHOLD = 0.15;
 
-const CHANNEL_LABEL: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn" };
+const CHANNEL_LABEL: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn", microsoft_ads: "Microsoft" };
 const labelOf = (c: string) => CHANNEL_LABEL[c] ?? c;
 const eur2 = (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(v);
 const ev = (metric: string, value: string, prev?: string): SignalEvidence => ({ metric, value, prev });

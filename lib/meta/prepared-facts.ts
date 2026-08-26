@@ -122,6 +122,12 @@ const ENTITY_KPIS: Array<{ metric: string; key: keyof DerivedMetrics }> = [
   { metric: "CVR", key: "cvr_pct" },
 ];
 
+// Onder dit aantal conversies is een segment-/entiteit-uitspraak indicatief, niet stellig.
+// Overgenomen uit de Microsoft-laag (pariteitsronde, 26 augustus 2026): volume als BEREKEND feit
+// naast elke vergelijking, zodat de prompt "niet stellig onder de grens" op aangeleverde cijfers
+// kan handhaven in plaats van op een gok.
+export const VOLUME_GRENS_CONVERSIES = 10;
+
 // Stap 2/3: entiteiten (campagnes of adsets) versus het accountgemiddelde van de laatste maand.
 function buildEntityVsAccountFacts(entityRows: MetaComputeRow[], accountBenchmark: DerivedMetrics, latestMonth: string | null) {
   const byEntity = groupBy(entityRows, (r) => r.entity_id);
@@ -142,11 +148,12 @@ function buildEntityVsAccountFacts(entityRows: MetaComputeRow[], accountBenchmar
       frequency: avgFrequency(latestRows),
       vs_average,
       mom_link_ctr: mom.chain.find((c) => c.metric === "Link CTR")?.delta_pct ?? null,
+      boven_volumegrens: d.conversions >= VOLUME_GRENS_CONVERSIES,
     };
   });
   // Sorteer op grootste afwijking van het gemiddelde (Link CTR) zodat de route makkelijk kan trimmen.
   entities.sort((a, b) => Math.abs((b.vs_average[0]?.delta_pct ?? 0)) - Math.abs((a.vs_average[0]?.delta_pct ?? 0)));
-  return { account_benchmark: accountBenchmark, latest_month: latestMonth, entities };
+  return { account_benchmark: accountBenchmark, latest_month: latestMonth, volumegrens: VOLUME_GRENS_CONVERSIES, entities };
 }
 
 // Stap 4: creative-performance kwantitatief. Fatigue plus winnaar/bleeder versus accountgemiddelde.
@@ -180,10 +187,12 @@ function buildAdFacts(ads: MetaComputeRow[], accountBenchmark: DerivedMetrics, l
       vs_average,
       fatigue: fatigue ? { flag: fatigue.fatigue, baseline_link_ctr_pct: fatigue.baseline_link_ctr_pct, recent_link_ctr_pct: fatigue.recent_link_ctr_pct, ctr_change_pct: fatigue.ctr_change_pct, recent_frequency: fatigue.recent_frequency, days_live: fatigue.days_live } : null,
       classification: classifyAd(d, accountBenchmark, Boolean(fatigue?.fatigue)),
+      conversions: d.conversions,
+      boven_volumegrens: d.conversions >= VOLUME_GRENS_CONVERSIES,
     };
   });
   adFacts.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
-  return { account_benchmark: accountBenchmark, latest_month: latestMonth, ads: adFacts };
+  return { account_benchmark: accountBenchmark, latest_month: latestMonth, volumegrens: VOLUME_GRENS_CONVERSIES, ads: adFacts };
 }
 
 // F5 fase2.4: stap 5 (Creative Visual Deep-dive) leest de vision-patronen uit M3 in plaats van
@@ -221,9 +230,16 @@ function buildCreativePatternFacts(rows: MetaCreativePatternRow[] | undefined) {
 }
 
 // Stap 6/7: breakdown-segmenten versus het accountgemiddelde, met waste- en volume-vlaggen.
-function buildBreakdownFacts(rows: MetaBreakdownComputeRow[] | undefined, types: string[], accountBenchmark: DerivedMetrics, minConversions: number) {
+//
+// Op de laatste maand geankerd (pariteitsronde, 26 augustus 2026): elke andere builder in dit
+// bestand filtert al op latestMonth, en de accountBenchmark waarmee vs_average vergelijkt is dat
+// ook. Zonder dit anker vergeleek elk segment een 13-maands gemiddelde met een 1-maands account
+// -- elke accountdrift las dan als segmentafwijking -- en telde de volume-vlag conversies over
+// het hele venster tegen een grens die per maand bedoeld is.
+function buildBreakdownFacts(rows: MetaBreakdownComputeRow[] | undefined, types: string[], accountBenchmark: DerivedMetrics, minConversions: number, latestMonth: string | null) {
   if (!rows || rows.length === 0) return { available: false, segments: [] as unknown[] };
-  const filtered = rows.filter((r) => types.includes(r.breakdown_type));
+  const filtered = rows.filter((r) =>
+    types.includes(r.breakdown_type) && (!latestMonth || String(r.date || "").startsWith(latestMonth)));
   if (filtered.length === 0) return { available: false, segments: [] as unknown[] };
   const byValue = groupBy(filtered, (r) => `${r.breakdown_type}~~${r.breakdown_value}`);
   const segments = [...byValue.values()].map((segRows) => {
@@ -243,7 +259,7 @@ function buildBreakdownFacts(rows: MetaBreakdownComputeRow[] | undefined, types:
     };
   });
   segments.sort((a, b) => b.spend - a.spend);
-  return { available: true, segments };
+  return { available: true, latest_month: latestMonth, segments };
 }
 
 // F5 fase2.3: placement-waste op Audience Network. Vlagt wanneer AN een onevenredig deel van de
@@ -252,9 +268,12 @@ function buildBreakdownFacts(rows: MetaBreakdownComputeRow[] | undefined, types:
 // hierboven, die AN met een klein maar disproportioneel conversievolume niet zou vangen.
 const AN_SPEND_SHARE_FLAG_PCT = 15;
 
-function buildAudienceNetworkWaste(rows: MetaBreakdownComputeRow[] | undefined) {
+function buildAudienceNetworkWaste(rows: MetaBreakdownComputeRow[] | undefined, latestMonth: string | null) {
   if (!rows || rows.length === 0) return null;
-  const platformRows = rows.filter((r) => r.breakdown_type === "publisher_platform");
+  // Zelfde maand-anker als buildBreakdownFacts hierboven: het AN-aandeel is een uitspraak over
+  // de analysemaand, niet over dertien maanden geschiedenis.
+  const platformRows = rows.filter((r) =>
+    r.breakdown_type === "publisher_platform" && (!latestMonth || String(r.date || "").startsWith(latestMonth)));
   if (platformRows.length === 0) return null;
   const anRows = platformRows.filter((r) => r.breakdown_value === "audience_network");
   if (anRows.length === 0) return null;
@@ -448,9 +467,12 @@ export function buildMetaStepFacts(inputs: MetaPreparedInputs): MetaStepFacts {
       visual_patterns: buildCreativePatternFacts(inputs.creativePatterns),
     },
     // Pijler 4: Placement & Doelgroep-segmenten (was stap 6 placement + stap 7 demografie/geo).
+    // Placement kreeg minConversions 0 (volume_ok altijd waar); sinds de pariteitsronde geldt
+    // dezelfde grens als demografie en als de andere kanalen -- een placement-oordeel op 3
+    // conversies is net zo wankel als een leeftijds-oordeel op 3.
     4: combinePlacementAndDemographics(
-      { ...buildBreakdownFacts(inputs.breakdowns, ["publisher_platform", "platform_position", "impression_device"], accountBenchmark, 0), audience_network_waste: buildAudienceNetworkWaste(inputs.breakdowns) },
-      buildBreakdownFacts(inputs.breakdowns, ["age_gender", "country", "region", "dma"], accountBenchmark, 10)
+      { ...buildBreakdownFacts(inputs.breakdowns, ["publisher_platform", "platform_position", "impression_device"], accountBenchmark, VOLUME_GRENS_CONVERSIES, latestMonth), audience_network_waste: buildAudienceNetworkWaste(inputs.breakdowns, latestMonth) },
+      buildBreakdownFacts(inputs.breakdowns, ["age_gender", "country", "region", "dma"], accountBenchmark, VOLUME_GRENS_CONVERSIES, latestMonth)
     ),
     // Pijler 5: Funnel, Verzadiging & Schedule (was stap 8 funnel + stap 9 frequency + stap 10 schedule).
     5: {
