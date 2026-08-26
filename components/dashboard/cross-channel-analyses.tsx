@@ -25,7 +25,7 @@ interface Synthesis {
   channels_used: string[];
 }
 
-const CHANNEL_LABEL: Record<string, string> = { google_ads: "SEA", meta_ads: "Meta Ads", linkedin_ads: "LinkedIn Ads" };
+const CHANNEL_LABEL: Record<string, string> = { google_ads: "SEA", meta_ads: "Meta Ads", linkedin_ads: "LinkedIn Ads", microsoft_ads: "Microsoft Ads" };
 const PRIORITY_STYLE: Record<SynthesizedAction["priority"], string> = {
   hoog: "bg-red-100 text-red-700",
   midden: "bg-amber-100 text-amber-700",

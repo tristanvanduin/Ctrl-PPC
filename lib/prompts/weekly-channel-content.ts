@@ -76,7 +76,7 @@ volume om te beoordelen)."`,
 export const MICROSOFT_WEEKLY: WeeklyChannelContent = {
   trackingTool: "UET-tag en conversiedoelen in Microsoft Advertising",
   wasteStepTitle: "Keyword & Zoekterm Bleeders",
-  wasteStepDataset: "microsoft_adgroup_daily en microsoft_campaign_daily (7 dagen), microsoft_keyword_monthly (lopende maand), microsoft_breakdown_daily (network)",
+  wasteStepDataset: "microsoft_adgroup_daily (7 dagen), microsoft_keyword_monthly (recentste twee maanden), microsoft_breakdown_daily (network, week-aggregatie)",
   wasteStepBody: `Identificeer bleeders op ad group- en keywordniveau: cost > 2x gemiddelde account CPA,
 0 conversies. VOLUMEREM: dit kanaal draait op een fractie van Google-volumes -- weeg 0 conversies
 bij weinig spend (<EUR 25) als "te vroeg om te beoordelen", niet als bleeder, anders vlagt elke

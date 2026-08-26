@@ -1081,7 +1081,9 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
   // De netwerk-week: alleen de laatste 7 dagen en alleen de network-dimensie, geaggregeerd per
   // netwerk zodat de lek-check een tabel van drie regels krijgt in plaats van honderd dagrijen.
   const netwerkWeek = (() => {
-    const rows = breakdownResult.filter((r) => String(r.breakdown_type) === "network" && new Date(String(r.date)) >= new Date(periodBleederStart));
+    // level="account": zonder dit filter telt de som dubbel zodra een sync ook campagne-level
+    // breakdowns schrijft (de unieke sleutel van de tabel draagt een level-kolom).
+    const rows = breakdownResult.filter((r) => String(r.level) === "account" && String(r.breakdown_type) === "network" && new Date(String(r.date)) >= new Date(periodBleederStart));
     const per = new Map<string, { spend: number; conversions: number; clicks: number }>();
     for (const r of rows) {
       const k = String(r.breakdown_value);

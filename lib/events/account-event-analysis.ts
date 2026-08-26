@@ -24,7 +24,7 @@ import type { ForecastConfidence } from "@/lib/fair/event-forecast";
 import type { Edition as SettingsEdition } from "@/lib/fair/geo-clone-settings";
 
 export interface AccountEventChannelInput {
-  channel: string; // "google_ads" | "meta_ads" | "linkedin_ads"
+  channel: string; // "google_ads" | "meta_ads" | "linkedin_ads" | "microsoft_ads"
   points: DailyPoint[]; // conversiepunten
   costPoints: DailyPoint[]; // spend-punten
 }
@@ -201,7 +201,7 @@ function emptyResult(input: AccountEventAnalysisInput, degradations: string[]): 
 
 const fmtPct = (v: number | null): string => (v == null ? "n.v.t." : `${v >= 0 ? "+" : ""}${Math.round(v * 1000) / 10}%`);
 const fmtNum = (v: number | null): string => (v == null ? "n.v.t." : String(Math.round(v)));
-const CHANNEL_LABEL: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn" };
+const CHANNEL_LABEL: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn", microsoft_ads: "Microsoft" };
 const channelLabel = (c: string): string => CHANNEL_LABEL[c] ?? c;
 
 function renderMarkdown(

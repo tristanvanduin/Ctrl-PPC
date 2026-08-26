@@ -55,8 +55,11 @@ function isKliktelling(metric: string | null | undefined): boolean {
  * F5 fase2.5: LinkedIn heeft doorgaans een klein klikvolume (vaak een fractie van Meta/Google).
  * Onder dit aantal klikken is een direct_action-conclusie statistisch te wankel — ruis in een
  * paar klikken verschuift een ratio-metriek al met tientallen procenten.
+ *
+ * Microsoft valt onder dezelfde rem: Bing-volumes zijn een orde kleiner dan Google (zie de
+ * volumediscipline in MICROSOFT_BENCHMARKS), dus dezelfde statistiek geldt daar onverkort.
  */
-const LINKEDIN_MIN_CLICKS_VOOR_DIRECT_ACTION = 30;
+const KLEIN_VOLUME_MIN_CLICKS_VOOR_DIRECT_ACTION = 30;
 
 /**
  * Apply action gating rules to recommendations based on their linked findings.
@@ -72,7 +75,7 @@ export function applyActionGating(
   recommendations: Recommendation[],
   opts?: { channel?: string }
 ): Recommendation[] {
-  const isLinkedin = opts?.channel === "linkedin_ads";
+  const isKleinVolumeKanaal = opts?.channel === "linkedin_ads" || opts?.channel === "microsoft_ads";
   for (const rec of recommendations) {
     const evidenceLevel = (rec as Record<string, unknown>).evidence_level as string | undefined;
     const confidence = (rec as Record<string, unknown>).confidence as string | undefined;
@@ -110,11 +113,12 @@ export function applyActionGating(
           setReadiness(rec, "investigate_first");
         }
 
-        // F5 fase2.5: LinkedIn <30-klik guardrail. Alleen voor bevindingen die zelf een
-        // kliktelling zijn (niet CTR/CPC, die "click" ook in de naam dragen maar geen telling).
+        // F5 fase2.5: de <30-klik guardrail voor kleinvolumekanalen (LinkedIn, Microsoft).
+        // Alleen voor bevindingen die zelf een kliktelling zijn (niet CTR/CPC, die "click" ook
+        // in de naam dragen maar geen telling).
         if (
-          isLinkedin && isKliktelling(finding.metric) &&
-          (finding.current_value ?? 0) < LINKEDIN_MIN_CLICKS_VOOR_DIRECT_ACTION &&
+          isKleinVolumeKanaal && isKliktelling(finding.metric) &&
+          (finding.current_value ?? 0) < KLEIN_VOLUME_MIN_CLICKS_VOOR_DIRECT_ACTION &&
           readinessOf(rec) === "direct_action"
         ) {
           setReadiness(rec, "investigate_first");

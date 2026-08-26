@@ -59,6 +59,10 @@ export interface MicrosoftSearchTermRow {
 }
 
 export interface MicrosoftImpressionShareRow {
+  // campaign_id is de unieke sleutel (client_id, campaign_id, month in migratie 106); de naam is
+  // weergave. Twee campagnes met dezelfde naam zijn legaal -- en bij dit kanaal reëel, want een
+  // import kopieert Google-campagnenamen.
+  campaign_id?: string | null;
   campaign_name: string;
   month: string;
   impression_share: number | null;
@@ -302,8 +306,13 @@ function buildProfileFacts(profile: MicrosoftProfileRow[] | undefined, accountBe
   return { latest_month: laatste, volumegrens: VOLUME_GRENS_CONVERSIES, pivots: perPivot };
 }
 
-function buildBreakdownFacts(breakdowns: MicrosoftBreakdownRow[] | undefined, type: string, accountBenchmark: DerivedMetrics) {
-  const rows = (breakdowns ?? []).filter((b) => b.breakdown_type === type);
+function buildBreakdownFacts(breakdowns: MicrosoftBreakdownRow[] | undefined, type: string, accountBenchmark: DerivedMetrics, latestMonth: string | null) {
+  // Zelfde maand-anker als elke andere builder in dit bestand: de accountBenchmark is op de
+  // laatste maand gefilterd, dus de segmenten moeten dat ook zijn -- anders vergelijkt
+  // vs_account_cpa een 13-maands segmentgemiddelde met een 1-maands account en leest elke drift
+  // als segmentafwijking. En de volumegrens is per maand bedoeld, niet over het hele venster.
+  const rows = (breakdowns ?? []).filter((b) =>
+    b.breakdown_type === type && (!latestMonth || String(b.date || "").startsWith(latestMonth)));
   if (rows.length === 0) {
     return { available: false as const, note: `Geen ${type}-breakdown in deze periode.`, segments: [] };
   }
@@ -328,8 +337,8 @@ function buildBreakdownFacts(breakdowns: MicrosoftBreakdownRow[] | undefined, ty
 }
 
 // ── Pijler 5: netwerk, impressieaandeel, schedule ───────────────────────────
-function buildNetworkFacts(breakdowns: MicrosoftBreakdownRow[] | undefined, accountBenchmark: DerivedMetrics) {
-  const feiten = buildBreakdownFacts(breakdowns, "network", accountBenchmark);
+function buildNetworkFacts(breakdowns: MicrosoftBreakdownRow[] | undefined, accountBenchmark: DerivedMetrics, latestMonth: string | null) {
+  const feiten = buildBreakdownFacts(breakdowns, "network", accountBenchmark, latestMonth);
   if ("available" in feiten && feiten.available === false) return feiten;
   const segments = feiten.segments as Array<Record<string, unknown>>;
   const search = segments.find((s) => String(s.segment).toLowerCase() === "search");
@@ -351,7 +360,11 @@ function buildImpressionShareFacts(impressionShare: MicrosoftImpressionShareRow[
   if (!impressionShare || impressionShare.length === 0) {
     return { available: false as const, note: "Geen impressieaandeel-data in deze periode." };
   }
-  const campagnes = [...groupBy(impressionShare, (r) => r.campaign_name).entries()].map(([naam, rows]) => {
+  // Groeperen op campaign_id (de unieke sleutel), niet op naam: bij een naamcollisie zouden de
+  // maandreeksen van twee campagnes interleaven en zou budget_lost_trend de oudste maand van de
+  // ene met de nieuwste van de andere vergelijken. De naam blijft het weergaveveld.
+  const campagnes = [...groupBy(impressionShare, (r) => String(r.campaign_id ?? r.campaign_name)).entries()].map(([, rows]) => {
+    const naam = rows[0]?.campaign_name ?? "";
     const maanden = rows.sort((a, b) => a.month.localeCompare(b.month)).map((r) => ({
       month: r.month.slice(0, 7),
       impression_share: r.impression_share,
@@ -403,7 +416,7 @@ export function buildMicrosoftStepFacts(inputs: MicrosoftPreparedInputs): Micros
   // Pijler 4: het combineer-patroon van Meta -- alleen top-level onbeschikbaar als beide
   // sub-domeinen ontbreken.
   const profiel = buildProfileFacts(inputs.profile, accountBenchmark);
-  const device = buildBreakdownFacts(inputs.breakdowns, "device", accountBenchmark);
+  const device = buildBreakdownFacts(inputs.breakdowns, "device", accountBenchmark, latestMonth);
   const profielOntbreekt = "available" in profiel && profiel.available === false;
   const deviceOntbreekt = "available" in device && device.available === false;
   const pijler4 = profielOntbreekt && deviceOntbreekt
@@ -425,7 +438,7 @@ export function buildMicrosoftStepFacts(inputs: MicrosoftPreparedInputs): Micros
     3: pijler3,
     4: pijler4,
     5: {
-      netwerk: buildNetworkFacts(inputs.breakdowns, accountBenchmark),
+      netwerk: buildNetworkFacts(inputs.breakdowns, accountBenchmark, latestMonth),
       impressieaandeel: buildImpressionShareFacts(inputs.impressionShare),
       schedule: buildScheduleFacts(inputs.account),
     },

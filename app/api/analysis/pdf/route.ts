@@ -35,9 +35,9 @@ function parseJsonOutput<T>(raw: unknown): T | null {
   }
 }
 
-// De negen sop_type-waarden die de analyse-routes daadwerkelijk schrijven: Google's drie
-// kale namen, en Meta/LinkedIn's kanaal-voorvoegsel-varianten (zie sop-trigger-buttons.tsx
-// CHANNEL_CONFIG). Elke maandvariant (monthly/meta_monthly/linkedin_monthly) krijgt hieronder de
+// De twaalf sop_type-waarden die de analyse-routes daadwerkelijk schrijven: Google's drie
+// kale namen, en de kanaal-voorvoegsel-varianten van Meta/LinkedIn/Microsoft (zie
+// sop-trigger-buttons.tsx CHANNEL_CONFIG). Elke maandvariant krijgt hieronder de
 // verrijkte structured-data-tak: alle drie draaien via dezelfde finalizeChannelMonthlySynthesis en
 // hebben dus een geldige "full"-sectie mét final_sop (geverifieerd 20 augustus, zie de toelichting
 // bij "if (baseType === "monthly")" hieronder -- stond eerst op de letterlijke string "monthly",
@@ -53,6 +53,7 @@ const VALID_SOP_TYPES = [
   "weekly", "biweekly", "monthly",
   "meta_weekly", "meta_biweekly", "meta_monthly",
   "linkedin_weekly", "linkedin_biweekly", "linkedin_monthly",
+  "microsoft_weekly", "microsoft_biweekly", "microsoft_monthly",
 ] as const;
 type PdfSopType = typeof VALID_SOP_TYPES[number];
 
@@ -63,6 +64,7 @@ const MONTHLY_SOP_TYPE_TO_CHANNEL: Partial<Record<PdfSopType, SopChannel>> = {
   monthly: "google_ads",
   meta_monthly: "meta_ads",
   linkedin_monthly: "linkedin_ads",
+  microsoft_monthly: "microsoft_ads",
 };
 
 /**

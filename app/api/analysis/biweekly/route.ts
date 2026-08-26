@@ -1204,8 +1204,11 @@ async function runMicrosoftBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: st
   // Netwerk- en device-segmenten per maand: hergebruik van aggregateMonthlyPerEntity via een
   // samengestelde sleutel, zodat "network=Audience" en "device=Desktop" elk hun eigen maandreeks
   // houden -- stap 4 vergelijkt aandelen over de maanden heen.
+  // level="account": zonder dit filter telt de som dubbel zodra een sync ook campagne-level
+  // breakdowns schrijft (de unieke sleutel van de tabel draagt een level-kolom).
   const netwerkDeviceMonthly = aggregateMonthlyPerEntity(
-    breakdownRows.map((r) => ({ ...r, entity_id: `${r.breakdown_type}=${r.breakdown_value}` })),
+    breakdownRows.filter((r) => String(r.level) === "account")
+      .map((r) => ({ ...r, entity_id: `${r.breakdown_type}=${r.breakdown_value}` })),
     MICROSOFT_SUM_FIELDS
   ).map(({ entity_id, ...rest }) => ({ segment: entity_id, ...rest }));
 

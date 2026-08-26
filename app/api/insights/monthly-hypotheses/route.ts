@@ -35,7 +35,7 @@ function parseStructuredOutput(row: StructuredMonthlyRow | null): MonthlyStructu
 
 // Workflow per kanaal: de SOP-engine bewaart full/structured per adapter-sopTypeKey, dus de
 // workflow werkt voor elk kanaal met een maand-SOP. Google blijft de default.
-const CHANNEL_TO_SOP_TYPE: Record<string, string> = { google: "monthly", meta: "meta_monthly", linkedin: "linkedin_monthly" };
+const CHANNEL_TO_SOP_TYPE: Record<string, string> = { google: "monthly", meta: "meta_monthly", linkedin: "linkedin_monthly", microsoft: "microsoft_monthly" };
 function resolveSopType(channel: string | null | undefined): string {
   return CHANNEL_TO_SOP_TYPE[(channel ?? "google").toLowerCase()] ?? "monthly";
 }

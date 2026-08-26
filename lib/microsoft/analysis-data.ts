@@ -88,6 +88,7 @@ export function mapMicrosoftSearchTermRow(row: DbRow): MicrosoftSearchTermRow {
 
 export function mapMicrosoftImpressionShareRow(row: DbRow): MicrosoftImpressionShareRow {
   return {
+    campaign_id: row.campaign_id == null ? null : String(row.campaign_id),
     campaign_name: str(row.campaign_name),
     month: str(row.month),
     impression_share: numOrNull(row.impression_share),
@@ -125,6 +126,15 @@ export function mapMicrosoftCampaignMetaRow(row: DbRow): MicrosoftCampaignMeta {
 export function thirteenMonthStart(periodEnd: string): string {
   const d = new Date(periodEnd + "T00:00:00Z");
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 12, 1)).toISOString().slice(0, 10);
+}
+
+// Zes maanden (incl. de periodEnd-maand): het venster dat pijler 5 voor het impressieaandeel
+// belooft, gelijk aan Google's monthsAgo(6) in monthly-prepared-context.ts. Bewust smaller dan
+// de 13 maanden van de rest: buildImpressionShareFacts rekent budget_lost_trend als
+// laatste-min-eerste over ALLES wat hij krijgt, dus het venster IS hier de betekenis.
+function sixMonthStart(periodEnd: string): string {
+  const d = new Date(periodEnd + "T00:00:00Z");
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 5, 1)).toISOString().slice(0, 10);
 }
 
 export interface MicrosoftAnalysisData {
@@ -179,7 +189,7 @@ export async function buildMicrosoftAnalysisData(
     fetchDaily("microsoft_breakdown_daily"),
     fetchMonthly("microsoft_keyword_monthly"),
     fetchMonthly("microsoft_search_terms_monthly"),
-    fetchMonthly("microsoft_campaign_impression_share"),
+    fetchMicrosoftMonthly(supabase, clientId, "microsoft_campaign_impression_share", sixMonthStart(periodEnd), periodEnd),
     fetchMonthly("microsoft_profile_monthly"),
     supabase.from("microsoft_campaigns").select("*").eq("client_id", clientId).then((r) => (r.data ?? []) as DbRow[]),
     fetchNameMap("microsoft_campaigns", "campaign_id"),
@@ -198,7 +208,10 @@ export async function buildMicrosoftAnalysisData(
     keywords: keywordRaw.map(mapMicrosoftKeywordRow),
     searchTerms: searchTermRaw.map(mapMicrosoftSearchTermRow),
     impressionShare: impressionShareRaw.map(mapMicrosoftImpressionShareRow),
-    breakdowns: breakdownRaw.map(mapMicrosoftBreakdownToComputeRow),
+    // Alleen level="account": de unieke sleutel van microsoft_breakdown_daily draagt een
+    // level-kolom (account/campagne/adgroup), en zonder dit filter zouden de netwerk- en
+    // device-sommen dubbel tellen zodra een sync meer dan één level schrijft.
+    breakdowns: breakdownRaw.filter((r) => str(r.level) === "account").map(mapMicrosoftBreakdownToComputeRow),
     profile: profileRaw.map(mapMicrosoftProfileRow),
     targets: options?.targets,
   };

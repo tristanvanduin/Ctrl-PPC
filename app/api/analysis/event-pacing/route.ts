@@ -39,11 +39,12 @@ export async function GET(request: NextRequest) {
   const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
-  const [settingsRes, googleRes, metaRes, liRes] = await Promise.all([
+  const [settingsRes, googleRes, metaRes, liRes, msRes] = await Promise.all([
     supabase.from("client_settings").select("rai_events, kpi_targets, channel_conversion_config").eq("client_id", clientId).maybeSingle(),
     supabase.from("ads_account_monthly").select("month, conversions, cost").eq("client_id", clientId).order("month", { ascending: true }),
     supabase.from("meta_account_daily").select("date, spend, conversions, leads").eq("client_id", clientId).order("date", { ascending: true }),
     supabase.from("linkedin_account_daily").select("date, spend, one_click_leads, external_website_conversions, post_click_conversions").eq("client_id", clientId).order("date", { ascending: true }),
+    supabase.from("microsoft_account_daily").select("date, spend, conversions").eq("client_id", clientId).order("date", { ascending: true }),
   ]);
 
   const events = ((settingsRes.data?.rai_events as { events?: FairEventCfg[] } | null)?.events ?? []);
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
   const googleRows = (googleRes.data ?? []) as GoogleAccountMonthlyRow[];
   const metaRows = metaRes.data ?? [];
   const liRows = liRes.data ?? [];
+  const msRows = msRes.data ?? [];
 
   const channels: AccountEventChannelInput[] = [];
   if (googleRows.length > 0) {
@@ -76,6 +78,13 @@ export async function GET(request: NextRequest) {
       channel: "linkedin_ads",
       points: channelDailyConversionPoints(liRows, "linkedin_ads", convConfig),
       costPoints: channelDailyCostPoints(liRows),
+    });
+  }
+  if (msRows.length > 0) {
+    channels.push({
+      channel: "microsoft_ads",
+      points: channelDailyConversionPoints(msRows, "microsoft_ads", convConfig),
+      costPoints: channelDailyCostPoints(msRows),
     });
   }
   if (channels.length === 0) return Response.json({ error: "Geen campagnedata voor deze klant" }, { status: 404 });

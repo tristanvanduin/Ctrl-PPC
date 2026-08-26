@@ -161,7 +161,7 @@ ${analysisOutput}`,
 
   // F5 fase2.5: sopType draagt het kanaal al in de naam (meta_weekly, linkedin_biweekly, ...);
   // alleen het kanaal-voorvoegsel is relevant voor kanaalspecifieke gating-regels.
-  const channel = sopType.startsWith("linkedin_") ? "linkedin_ads" : sopType.startsWith("meta_") ? "meta_ads" : "google_ads";
+  const channel = sopType.startsWith("linkedin_") ? "linkedin_ads" : sopType.startsWith("meta_") ? "meta_ads" : sopType.startsWith("microsoft_") ? "microsoft_ads" : "google_ads";
 
   // ── De voorstellenbron: per SOP-variant, niet één gedeelde ────────────────
   //

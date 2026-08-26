@@ -31,8 +31,11 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
 export const MS_CAMPAIGNS = [
   // [S14] Als Google-import geboren; de drift zelf (verouderde negatives, niet-vertaalde
-  // bid-mapping) zit in de dagdata hieronder, niet in deze metadata.
-  { id: "demo-ms-import", name: "GRT | Search | NL (import)", budget: 30, bid: "enhanced_cpc", importSource: "google_ads" as string | null },
+  // bid-mapping) zit in de dagdata hieronder, niet in deze metadata. Budget 19 bij een spend van
+  // 18/dag: de campagne zit vrijwel aan zijn plafond, consistent met het oplopende
+  // budgetverlies in [S18] -- een "budget-gelimiteerde" campagne met 60% benutting zou zichzelf
+  // tegenspreken.
+  { id: "demo-ms-import", name: "GRT | Search | NL (import)", budget: 19, bid: "enhanced_cpc", importSource: "google_ads" as string | null },
   { id: "demo-ms-native", name: "GreenTech | Search | Native", budget: 20, bid: "target_cpa", importSource: null },
   { id: "demo-ms-brand", name: "GreenTech | Brand | Bing", budget: 5, bid: "manual_cpc", importSource: null },
 ];
@@ -73,24 +76,30 @@ function msAdgroupDaily(): MsDaily[] {
 // [S15]+[S17] De verdeel-assen over de accountdag; conversies wegen naar search en naar desktop.
 // Audience Network: 18% van spend tegen 1% van conversies -- het lek-criterium uit de adapter
 // (>10% spend bij CPA > 2x search) moet hierop aanslaan.
+// clickW wijkt bewust af van impW: zou elk segment op impressie-gewichten ook zijn kliks
+// krijgen, dan had elk segment exact dezelfde CTR -- en een identieke CTR over search, partners
+// en Audience Network leest als gefabriceerde data (wat het dan ook zou zijn).
 const MS_NETWERK = [
-  { value: "Search", spendW: 0.7, convW: 0.93, impW: 0.55 },
-  { value: "Syndicated search partners", spendW: 0.12, convW: 0.06, impW: 0.2 },
-  { value: "Audience Network", spendW: 0.18, convW: 0.01, impW: 0.25 },
+  { value: "Search", spendW: 0.7, convW: 0.93, impW: 0.55, clickW: 0.66 },
+  { value: "Syndicated search partners", spendW: 0.12, convW: 0.06, impW: 0.2, clickW: 0.16 },
+  { value: "Audience Network", spendW: 0.18, convW: 0.01, impW: 0.25, clickW: 0.18 },
 ];
 const MS_DEVICE = [
-  { value: "Desktop", spendW: 0.68, convW: 0.8, impW: 0.62 },
-  { value: "Mobile", spendW: 0.28, convW: 0.17, impW: 0.33 },
-  { value: "Tablet", spendW: 0.04, convW: 0.03, impW: 0.05 },
+  { value: "Desktop", spendW: 0.68, convW: 0.8, impW: 0.62, clickW: 0.58 },
+  { value: "Mobile", spendW: 0.28, convW: 0.17, impW: 0.33, clickW: 0.37 },
+  { value: "Tablet", spendW: 0.04, convW: 0.03, impW: 0.05, clickW: 0.05 },
 ];
 
 // Verdeel een (mogelijk fractioneel) totaal exact over gewichten: alles behalve het laatste
-// segment wordt op centen afgerond, het laatste krijgt de rest -- de segmenten sommeren zo altijd
-// exact naar het accounttotaal (zelfde bedoeling als splitInt, maar dan voor euro's en conversies).
-function verdeelExact(totaal: number, gewichten: number[]): number[] {
-  const delen = gewichten.map((w) => Math.round(totaal * w * 100) / 100);
+// segment wordt afgerond op `decimalen`, het laatste krijgt de rest -- de segmenten sommeren zo
+// altijd exact naar het accounttotaal (zelfde bedoeling als splitInt, maar dan voor euro's en
+// conversies). Conversies gaan op 3 decimalen, dezelfde precisie als de accountrij (r3): op 2
+// decimalen zou de som tot een halve cent-conversie van het accounttotaal kunnen afwijken.
+function verdeelExact(totaal: number, gewichten: number[], decimalen = 2): number[] {
+  const f = Math.pow(10, decimalen);
+  const delen = gewichten.map((w) => Math.round(totaal * w * f) / f);
   const som = delen.slice(0, -1).reduce((s, v) => s + v, 0);
-  delen[delen.length - 1] = Math.round((totaal - som) * 100) / 100;
+  delen[delen.length - 1] = Math.round((totaal - som) * f) / f;
   return delen;
 }
 
@@ -144,9 +153,9 @@ export function microsoftDemoRows(clientId: string): Record<string, Row[]> {
   for (const [date, v] of [...msAccountDag.entries()].filter(([d]) => d >= msBreakdownStart)) {
     for (const [type, segmenten] of [["network", MS_NETWERK], ["device", MS_DEVICE]] as const) {
       const imp = splitInt(v.imp, segmenten.map((s) => s.impW));
-      const clicks = splitInt(v.clicks, segmenten.map((s) => s.impW));
+      const clicks = splitInt(v.clicks, segmenten.map((s) => s.clickW));
       const spend = verdeelExact(v.spend, segmenten.map((s) => s.spendW));
-      const conv = verdeelExact(v.conv, segmenten.map((s) => s.convW));
+      const conv = verdeelExact(v.conv, segmenten.map((s) => s.convW), 3);
       const value = verdeelExact(v.value, segmenten.map((s) => s.convW));
       segmenten.forEach((s, i) => {
         msBreakdown.push({
@@ -159,8 +168,20 @@ export function microsoftDemoRows(clientId: string): Record<string, Row[]> {
   }
   tables["microsoft_breakdown_daily"] = msBreakdown;
 
+  // Maand-tot-nu voor de lopende maand: een sync schrijft de lopende maand als tussenstand,
+  // geen volmaand-cijfers. Zonder deze schaal leest de "recentste maand" op de 1e van de maand
+  // al even groot als een volle maand -- en dat is precies de vorm van liegen die de weekly
+  // (die deze tabellen leest) niet kan zien.
+  const huidigeMaand = monthsBack(0);
+  const dagVanMaand = Number(TODAY.slice(8, 10));
+  const dagenInMaand = new Date(Date.UTC(Number(TODAY.slice(0, 4)), Number(TODAY.slice(5, 7)), 0)).getUTCDate();
+  const mtd = (month: string, v: number): number => (month === huidigeMaand ? (v * dagVanMaand) / dagenInMaand : v);
+  const mtdInt = (month: string, v: number): number => Math.round(mtd(month, v));
+
   // [S19] Keywords, maandkorrel: de bleeder boven 2x account-CPA (~15) zonder conversies, de
-  // EUR 25-tegenhanger die "te vroeg" moet blijven, en het lage-QS-cluster op de importcampagne.
+  // EUR 25-tegenhanger die "te vroeg" moet blijven, en het lage-QS-cluster op de importcampagne
+  // (vier keywords onder QS 5 -- één meer dan de drempel van de cluster-check, zodat die check
+  // marge heeft en niet omvalt zodra iemand er één hernoemt).
   const msKeywords = [
     { id: "kassenbouw-offerte", tekst: "kassenbouw offerte", match: "phrase", camp: MS_CAMPAIGNS[1], ag: MS_ADGROUPS[2], imp: 850, clicks: 46, cost: 55, conv: 5, qs: 8 },
     { id: "kas-kopen-zakelijk", tekst: "kas kopen zakelijk", match: "exact", camp: MS_CAMPAIGNS[1], ag: MS_ADGROUPS[2], imp: 400, clicks: 28, cost: 38, conv: 4, qs: 9 },
@@ -169,20 +190,24 @@ export function microsoftDemoRows(clientId: string): Record<string, Row[]> {
     { id: "greenhouse-solutions", tekst: "greenhouse solutions", match: "broad", camp: MS_CAMPAIGNS[0], ag: MS_ADGROUPS[0], imp: 1400, clicks: 60, cost: 68, conv: 0, qs: 4 },
     { id: "greenhouse-equipment", tekst: "greenhouse equipment", match: "broad", camp: MS_CAMPAIGNS[0], ag: MS_ADGROUPS[0], imp: 800, clicks: 34, cost: 42, conv: 1, qs: 4 },
     { id: "tuinbouw-automatisering", tekst: "tuinbouw automatisering", match: "phrase", camp: MS_CAMPAIGNS[0], ag: MS_ADGROUPS[1], imp: 500, clicks: 22, cost: 30, conv: 2, qs: 3 },
+    { id: "greenhouse-climate-control", tekst: "greenhouse climate control", match: "broad", camp: MS_CAMPAIGNS[0], ag: MS_ADGROUPS[0], imp: 600, clicks: 26, cost: 24, conv: 1, qs: 4 },
     { id: "kas-kopen-tweedehands", tekst: "kas kopen tweedehands", match: "broad", camp: MS_CAMPAIGNS[0], ag: MS_ADGROUPS[0], imp: 300, clicks: 14, cost: 12, conv: 0, qs: 6 },
   ];
   const msMaanden = [5, 4, 3, 2, 1, 0].map((m) => monthsBack(m));
-  tables["microsoft_keyword_monthly"] = msMaanden.flatMap((month) => msKeywords.map((k) => ({
-    client_id: clientId, month, campaign_id: k.camp.id, campaign_name: k.camp.name,
-    ad_group_id: k.ag.id, ad_group_name: k.ag.name, keyword_id: `demo-mskw-${k.id}`,
-    keyword_text: k.tekst, match_type: k.match,
-    impressions: k.imp, clicks: k.clicks, cost: k.cost, conversions: k.conv,
-    conversions_value: r2(k.conv * MS_AOV[k.camp.id]),
-    ctr: r2(k.clicks / k.imp), avg_cpc: r2(k.cost / k.clicks),
-    conversion_rate: k.clicks > 0 ? r2(k.conv / k.clicks) : 0,
-    cost_per_conversion: k.conv > 0 ? r2(k.cost / k.conv) : null,
-    quality_score: k.qs,
-  })));
+  tables["microsoft_keyword_monthly"] = msMaanden.flatMap((month) => msKeywords.map((k) => {
+    const [imp, clicks, cost, conv] = [mtdInt(month, k.imp), mtdInt(month, k.clicks), r2(mtd(month, k.cost)), r2(mtd(month, k.conv))];
+    return {
+      client_id: clientId, month, campaign_id: k.camp.id, campaign_name: k.camp.name,
+      ad_group_id: k.ag.id, ad_group_name: k.ag.name, keyword_id: `demo-mskw-${k.id}`,
+      keyword_text: k.tekst, match_type: k.match,
+      impressions: imp, clicks, cost, conversions: conv,
+      conversions_value: r2(conv * MS_AOV[k.camp.id]),
+      ctr: imp > 0 ? r2(clicks / imp) : 0, avg_cpc: clicks > 0 ? r2(cost / clicks) : 0,
+      conversion_rate: clicks > 0 ? r2(conv / clicks) : 0,
+      cost_per_conversion: conv > 0 ? r2(cost / conv) : null,
+      quality_score: k.qs,
+    };
+  }));
 
   // [S20] Zoektermen: de vervuiling op de import is precies wat het Google-account als negative
   // kent -- verouderde negatives zijn het gezicht van import-drift.
@@ -195,22 +220,49 @@ export function microsoftDemoRows(clientId: string): Record<string, Row[]> {
     { term: "kas laten bouwen prijs", camp: MS_CAMPAIGNS[1], ag: MS_ADGROUPS[2], clicks: 16, cost: 26, conv: 2 },
     { term: "greentech beurs amsterdam", camp: MS_CAMPAIGNS[2], ag: MS_ADGROUPS[4], clicks: 30, cost: 8, conv: 4 },
   ];
-  tables["microsoft_search_terms_monthly"] = msMaanden.flatMap((month) => msTermen.map((t) => ({
-    client_id: clientId, month, campaign_id: t.camp.id, ad_group_id: t.ag.id,
-    campaign_name: t.camp.name, ad_group_name: t.ag.name, search_term: t.term, match_type: "broad",
-    impressions: t.clicks * 18, clicks: t.clicks, cost: t.cost, conversions: t.conv,
-    conversions_value: r2(t.conv * MS_AOV[t.camp.id]), ctr: r2(1 / 18),
-    conversion_rate: t.clicks > 0 ? r2(t.conv / t.clicks) : 0,
-  })));
+  tables["microsoft_search_terms_monthly"] = msMaanden.flatMap((month) => msTermen.map((t) => {
+    const [clicks, cost, conv] = [mtdInt(month, t.clicks), r2(mtd(month, t.cost)), r2(mtd(month, t.conv))];
+    return {
+      client_id: clientId, month, campaign_id: t.camp.id, ad_group_id: t.ag.id,
+      campaign_name: t.camp.name, ad_group_name: t.ag.name, search_term: t.term, match_type: "broad",
+      impressions: clicks * 18, clicks, cost, conversions: conv,
+      conversions_value: r2(conv * MS_AOV[t.camp.id]), ctr: r2(1 / 18),
+      conversion_rate: clicks > 0 ? r2(conv / clicks) : 0,
+    };
+  }));
 
   // [S18] Impressieaandeel: het budgetverlies van de import loopt over zes maanden op van 0.10
-  // naar 0.26 (en de conversies zakken mee -- de drift-echo), brand staat vrijwel vol, native
-  // verliest op positie. Budget- en positieverlies vragen tegengestelde ingrepen.
-  tables["microsoft_campaign_impression_share"] = msMaanden.flatMap((month, i) => [
-    { client_id: clientId, campaign_id: MS_CAMPAIGNS[0].id, campaign_name: MS_CAMPAIGNS[0].name, campaign_type: "search", month, impressions: 9900, clicks: 390, cost: 540, conversions: 30 - i * 2, impression_share: r2(0.46 - i * 0.008), budget_lost_is: r2(0.1 + i * 0.032), rank_lost_is: 0.08, daily_budget: 30, budget_utilization: 0.98 },
-    { client_id: clientId, campaign_id: MS_CAMPAIGNS[1].id, campaign_name: MS_CAMPAIGNS[1].name, campaign_type: "search", month, impressions: 6900, clicks: 270, cost: 360, conversions: 26, impression_share: 0.55, budget_lost_is: 0.03, rank_lost_is: 0.18, daily_budget: 20, budget_utilization: 0.72 },
-    { client_id: clientId, campaign_id: MS_CAMPAIGNS[2].id, campaign_name: MS_CAMPAIGNS[2].name, campaign_type: "search", month, impressions: 1800, clicks: 150, cost: 90, conversions: 15, impression_share: 0.93, budget_lost_is: 0.01, rank_lost_is: 0.02, daily_budget: 5, budget_utilization: 0.55 },
-  ]);
+  // naar 0.26, brand staat vrijwel vol, native verliest op positie. Budget- en positieverlies
+  // vragen tegengestelde ingrepen. De VOLUME-kolommen (impressies/kliks/cost/conversies) en de
+  // budgetbenutting worden uit de campagne-dagsommen AFGELEID, niet verzonnen: zo reconciliëren
+  // ze per definitie met de dagtabel (drift-echo incluis) en is de lopende maand vanzelf een
+  // maand-tot-nu-stand. Alleen de IS-percentages zelf zijn ontworpen reeksen -- die bestaan
+  // nergens anders om uit af te leiden.
+  const perCampagneMaand = new Map<string, { imp: number; clicks: number; spend: number; conv: number; dagen: number }>();
+  for (const [key, v] of msCampagneDag) {
+    const [campaign, date] = key.split("::");
+    const mk = `${campaign}::${date.slice(0, 7)}`;
+    const a = perCampagneMaand.get(mk) ?? { imp: 0, clicks: 0, spend: 0, conv: 0, dagen: 0 };
+    a.imp += v.imp; a.clicks += v.clicks; a.spend += v.spend; a.conv += v.conv; a.dagen += 1;
+    perCampagneMaand.set(mk, a);
+  }
+  tables["microsoft_campaign_impression_share"] = msMaanden.flatMap((month, i) => {
+    const reeks = [
+      { camp: MS_CAMPAIGNS[0], impression_share: r2(0.46 - i * 0.008), budget_lost_is: r2(0.1 + i * 0.032), rank_lost_is: 0.08 },
+      { camp: MS_CAMPAIGNS[1], impression_share: 0.55, budget_lost_is: 0.03, rank_lost_is: 0.18 },
+      { camp: MS_CAMPAIGNS[2], impression_share: 0.93, budget_lost_is: 0.01, rank_lost_is: 0.02 },
+    ];
+    return reeks.map((r) => {
+      const som = perCampagneMaand.get(`${r.camp.id}::${month.slice(0, 7)}`) ?? { imp: 0, clicks: 0, spend: 0, conv: 0, dagen: 0 };
+      return {
+        client_id: clientId, campaign_id: r.camp.id, campaign_name: r.camp.name, campaign_type: "search", month,
+        impressions: som.imp, clicks: som.clicks, cost: r2(som.spend), conversions: r3(som.conv),
+        impression_share: r.impression_share, budget_lost_is: r.budget_lost_is, rank_lost_is: r.rank_lost_is,
+        daily_budget: r.camp.budget,
+        budget_utilization: som.dagen > 0 ? r2(som.spend / (r.camp.budget * som.dagen)) : 0,
+      };
+    });
+  });
 
   // [S16] Profieldimensies (het enige searchkanaal met LinkedIn-targeting): Tuinbouw & Agri zit
   // onder de account-CPA én boven de volumegrens (bid-modifier-kans); Inkoop oogt briljant
@@ -225,7 +277,8 @@ export function microsoftDemoRows(clientId: string): Record<string, Row[]> {
   ];
   tables["microsoft_profile_monthly"] = msMaanden.flatMap((month) => msProfiel.map((p) => ({
     client_id: clientId, month, pivot_type: p.pivot, pivot_value: p.waarde,
-    impressions: p.imp, clicks: p.clicks, spend: p.spend, conversions: p.conv,
+    impressions: mtdInt(month, p.imp), clicks: mtdInt(month, p.clicks),
+    spend: r2(mtd(month, p.spend)), conversions: r2(mtd(month, p.conv)),
   })));
 
   return tables;

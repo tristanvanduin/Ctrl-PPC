@@ -13,9 +13,11 @@ export const CHANNEL_TO_ADAPTER: Partial<Record<Channel, ChannelId>> = {
   google: "google_ads",
   meta: "meta_ads",
   linkedin: "linkedin_ads",
+  // Sinds migratie 106 een echt kanaal met adapter en microsoft_*-tabellen.
+  microsoft: "microsoft_ads",
 };
-// microsoft, tiktok_ads, tiktok_shop, shopify, crm en aicro hebben bewust GEEN adapter: er is
-// voor die kanalen geen synctabel en geen rij in de database. Een lege provider die nul signalen
+// tiktok_ads, tiktok_shop, shopify, crm en aicro hebben bewust GEEN adapter: er is voor die
+// kanalen geen synctabel en geen rij in de database. Een lege provider die nul signalen
 // teruggeeft leest als "gemeten en niets gevonden"; dat is precies het verschil dat we niet
 // willen vervagen. Ze staan wel in het Channel-type, zodat de code compileert zodra de eerste
 // rij er is.

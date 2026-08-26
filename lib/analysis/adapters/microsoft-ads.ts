@@ -118,7 +118,7 @@ Werkwijze: benoem winnaars en bleeders per keyword tegen het accountgemiddelde, 
 ### NIVEAU B — Zoektermen en Negative-dekking
 Bron: microsoft_search_terms_monthly.
 Werkwijze: gebruik NIVEAU A hierboven als startpunt. Kwantificeer vervuiling: zoektermen met spend maar zonder conversies, gegroepeerd op patroon, met de ontbrekende negatives benoemd. Let specifiek op geïmporteerde campagnes (NIVEAU B van stap 2): een negative-lijst die bij de import is achtergebleven, is hier zichtbaar als vervuiling die het Google-broneaccount niet heeft.`,
-  4: `## Stap 4: Profiel & Doelgroep (LinkedIn-dimensies → Demografie/Device/Geo)
+  4: `## Stap 4: Profiel & Doelgroep (LinkedIn-dimensies → Device)
 
 Doorloop de twee niveaus hieronder in deze volgorde, binnen ÉÉN antwoord. NIVEAU A is wat dit kanaal uniek maakt: het enige searchkanaal met B2B-profieldimensies.
 
@@ -130,9 +130,9 @@ Werkwijze: zet elk profielsegment af tegen het accountgemiddelde op de primaire 
 
 ---
 
-### NIVEAU B — Demografie, Device en Geo
-Bron: microsoft_breakdown_daily (device) en demografie-/geosegmenten.
-Werkwijze: gebruik NIVEAU A hierboven als startpunt. Dit kanaal is desktop-zwaar (Edge/Windows-standaard, zakelijke machines): beoordeel het desktop/mobile-verschil op volume EN efficiëntie, en of de biedverdeling dat verschil volgt. Demografie en geo alleen stellig boven de volumegrens.`,
+### NIVEAU B — Device
+Bron: microsoft_breakdown_daily (device).
+Werkwijze: gebruik NIVEAU A hierboven als startpunt. Dit kanaal is desktop-zwaar (Edge/Windows-standaard, zakelijke machines): beoordeel het desktop/mobile-verschil op volume EN efficiëntie, en of de biedverdeling dat verschil volgt. Leeftijd, geslacht en geo zitten NIET in de aangeleverde data -- als een hypothese die dimensies nodig heeft, benoem dat dan expliciet als handmatige check in het platform; verzin er geen cijfers bij.`,
   5: `## Stap 5: Netwerk, Impressieaandeel & Schedule
 
 Doorloop de drie niveaus hieronder in deze volgorde, binnen ÉÉN antwoord: eerst WAAR de vertoningen lopen, dan hoeveel veiling er wordt gemist, dan WANNEER het account anders presteert.
@@ -153,7 +153,7 @@ Werkwijze: gebruik NIVEAU A hierboven als context. Beoordeel per campagne de IS-
 
 ### NIVEAU C — Schedule
 Bron: dagniveau-aggregatie uit microsoft_account_daily (weekdagpatronen).
-Werkwijze: beoordeel weekdag- en dagdeelverschillen per KPI, met de B2B-verwachting (kantooruren, doordeweeks) als referentie. Bij geen materieel signaal: exact 1 zin binnen dit niveau en door.`,
+Werkwijze: beoordeel weekdagverschillen per KPI, met de B2B-verwachting (doordeweeks sterker dan het weekend) als referentie. Dagdeel-korrel (uren) zit NIET in de aangeleverde data; een uurschema-hypothese is een handmatige platformcheck, geen conclusie uit deze cijfers. Bij geen materieel signaal: exact 1 zin binnen dit niveau en door.`,
   6: `## Stap 6: Hypotheses en Sprintplanning
 Bron: alle voorgaande stap-conclusies en de canonical claim-set.
 Werkwijze: synthetiseer gegronde hypotheses met evidence-niveau en routes (containment/recovery/scale), mode-bewust. Weeg bij elke hypothese het kanaaLvolume mee: een ingreep die op Google in een week meetbaar is, heeft hier vaak een maand nodig -- zet het meetvenster er expliciet bij.`,

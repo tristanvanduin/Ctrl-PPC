@@ -984,16 +984,23 @@ async function check() {
     ...MS_CAMPAIGNS.map((c) => [c.id, c.name] as const),
     ...MS_ADGROUPS.map((a) => [a.id, a.name] as const),
   ]);
+  // Zelfde venster als de echte maandroute: periodEnd is daar het einde van de laatste VOLLE
+  // maand, dus de feiten draaien hier ook op volle maanden. Zonder deze trim ankert latestMonth
+  // op de lopende, halve maand en is de import-pariteit begin van elke maand nooit "stellig" --
+  // dan faalde [S14] de 1e t/m ±12e van de maand om een reden die in productie niet bestaat.
+  const msVolleMaandGrens = TODAY.slice(0, 7) + "-01";
+  const msTotVolleMaand = (tabel: string, veld: "date" | "month"): AnyRow[] =>
+    (tables[tabel] as AnyRow[]).filter((r) => String(r[veld] ?? "") < msVolleMaandGrens);
   const msFacts = buildMicrosoftStepFacts({
-    account: (tables["microsoft_account_daily"] as AnyRow[]).map((r) => mapMicrosoftDailyToComputeRow(r)),
-    campaigns: (tables["microsoft_campaign_daily"] as AnyRow[]).map((r) => mapMicrosoftDailyToComputeRow(r, msNaam.get(String(r.entity_id)))),
-    adgroups: (tables["microsoft_adgroup_daily"] as AnyRow[]).map((r) => mapMicrosoftDailyToComputeRow(r, msNaam.get(String(r.entity_id)))),
+    account: msTotVolleMaand("microsoft_account_daily", "date").map((r) => mapMicrosoftDailyToComputeRow(r)),
+    campaigns: msTotVolleMaand("microsoft_campaign_daily", "date").map((r) => mapMicrosoftDailyToComputeRow(r, msNaam.get(String(r.entity_id)))),
+    adgroups: msTotVolleMaand("microsoft_adgroup_daily", "date").map((r) => mapMicrosoftDailyToComputeRow(r, msNaam.get(String(r.entity_id)))),
     campaignMeta: (tables["microsoft_campaigns"] as AnyRow[]).map(mapMicrosoftCampaignMetaRow),
-    keywords: (tables["microsoft_keyword_monthly"] as AnyRow[]).map(mapMicrosoftKeywordRow),
-    searchTerms: (tables["microsoft_search_terms_monthly"] as AnyRow[]).map(mapMicrosoftSearchTermRow),
-    impressionShare: (tables["microsoft_campaign_impression_share"] as AnyRow[]).map(mapMicrosoftImpressionShareRow),
-    breakdowns: (tables["microsoft_breakdown_daily"] as AnyRow[]).map(mapMicrosoftBreakdownToComputeRow),
-    profile: (tables["microsoft_profile_monthly"] as AnyRow[]).map(mapMicrosoftProfileRow),
+    keywords: msTotVolleMaand("microsoft_keyword_monthly", "month").map(mapMicrosoftKeywordRow),
+    searchTerms: msTotVolleMaand("microsoft_search_terms_monthly", "month").map(mapMicrosoftSearchTermRow),
+    impressionShare: msTotVolleMaand("microsoft_campaign_impression_share", "month").map(mapMicrosoftImpressionShareRow),
+    breakdowns: msTotVolleMaand("microsoft_breakdown_daily", "date").map(mapMicrosoftBreakdownToComputeRow),
+    profile: msTotVolleMaand("microsoft_profile_monthly", "month").map(mapMicrosoftProfileRow),
   });
   // De pijler-structuren zijn Record<number, unknown> richting de prompt; hier lezen we ze terug
   // met dezelfde vrijheid als de prompt-JSON dat doet.

@@ -308,16 +308,25 @@ const linkedinFeiten = buildLinkedinStepFacts({
   targets: { cplTarget: 80 },
 });
 
+// Zelfde venster als de echte maandroute: periodEnd is daar het einde van de laatste VOLLE maand
+// (lastCompleteMonth), dus de feiten horen hier ook op volle maanden te draaien. Zonder deze trim
+// ankert latestMonth op de lopende, halve maand en is de import-pariteit aan het begin van elke
+// maand nooit "stellig" -- deze test zou dan de 1e t/m ±12e van de maand rood staan om een reden
+// die in productie niet bestaat.
+const volleMaandGrens = new Date().toISOString().slice(0, 7) + "-01";
+const totVolleMaand = (rows: unknown[] | undefined, veld: "date" | "month") =>
+  ((rows ?? []) as Record<string, unknown>[]).filter((r) => String(r[veld] ?? "") < volleMaandGrens);
+
 const microsoftFeiten = buildMicrosoftStepFacts({
-  account: (rijen.microsoft_account_daily ?? []).map((x) => mapMicrosoftDailyToComputeRow(x as Record<string, unknown>)),
-  campaigns: (rijen.microsoft_campaign_daily ?? []).map((x) => mapMicrosoftDailyToComputeRow(x as Record<string, unknown>)),
-  adgroups: (rijen.microsoft_adgroup_daily ?? []).map((x) => mapMicrosoftDailyToComputeRow(x as Record<string, unknown>)),
+  account: totVolleMaand(rijen.microsoft_account_daily, "date").map((x) => mapMicrosoftDailyToComputeRow(x)),
+  campaigns: totVolleMaand(rijen.microsoft_campaign_daily, "date").map((x) => mapMicrosoftDailyToComputeRow(x)),
+  adgroups: totVolleMaand(rijen.microsoft_adgroup_daily, "date").map((x) => mapMicrosoftDailyToComputeRow(x)),
   campaignMeta: (rijen.microsoft_campaigns ?? []).map((x) => mapMicrosoftCampaignMetaRow(x as Record<string, unknown>)),
-  keywords: (rijen.microsoft_keyword_monthly ?? []).map((x) => mapMicrosoftKeywordRow(x as Record<string, unknown>)),
-  searchTerms: (rijen.microsoft_search_terms_monthly ?? []).map((x) => mapMicrosoftSearchTermRow(x as Record<string, unknown>)),
-  impressionShare: (rijen.microsoft_campaign_impression_share ?? []).map((x) => mapMicrosoftImpressionShareRow(x as Record<string, unknown>)),
-  breakdowns: (rijen.microsoft_breakdown_daily ?? []).map((x) => mapMicrosoftBreakdownToComputeRow(x as Record<string, unknown>)),
-  profile: (rijen.microsoft_profile_monthly ?? []).map((x) => mapMicrosoftProfileRow(x as Record<string, unknown>)),
+  keywords: totVolleMaand(rijen.microsoft_keyword_monthly, "month").map((x) => mapMicrosoftKeywordRow(x)),
+  searchTerms: totVolleMaand(rijen.microsoft_search_terms_monthly, "month").map((x) => mapMicrosoftSearchTermRow(x)),
+  impressionShare: totVolleMaand(rijen.microsoft_campaign_impression_share, "month").map((x) => mapMicrosoftImpressionShareRow(x)),
+  breakdowns: totVolleMaand(rijen.microsoft_breakdown_daily, "date").map((x) => mapMicrosoftBreakdownToComputeRow(x)),
+  profile: totVolleMaand(rijen.microsoft_profile_monthly, "month").map((x) => mapMicrosoftProfileRow(x)),
   targets: { cpaTarget: 18 },
 });
 
@@ -594,13 +603,20 @@ console.log("\nMicrosoft weekly: de volumerem werkt aan beide kanten en het lek 
   const accWeek = dagenVenster(accountDagen, 0, 7);
   const accCpa = accWeek.reduce((s, x) => s + getal(x.spend), 0)
     / Math.max(1, accWeek.reduce((s, x) => s + getal(x.conversions), 0));
+  // De recentste VOLLE maand, niet de lopende: de weekly krijgt de recentste twee maanden mee en
+  // een bleeder-oordeel begin van de maand leunt op de laatste volle -- de lopende maand draagt
+  // (terecht) maand-tot-nu-cijfers en zou deze check de eerste dagen van elke maand laten omvallen.
   const kw = (rijen.microsoft_keyword_monthly ?? []) as Record<string, unknown>[];
-  const laatsteMaand = [...new Set(kw.map((x) => String(x.month)))].sort().at(-1);
+  const laatsteMaand = [...new Set(kw.map((x) => String(x.month)))].filter((m) => m < volleMaandGrens).sort().at(-1);
   const recent = kw.filter((x) => String(x.month) === laatsteMaand);
   const zonderConv = recent.filter((x) => getal(x.conversions) === 0);
   check("microsoft weekly: er is een keyword-bleeder boven 2x de account-CPA",
     zonderConv.some((x) => getal(x.cost) > 2 * accCpa),
     `account-CPA ${accCpa.toFixed(2)}, drempel ${(2 * accCpa).toFixed(2)}`);
+  // Eerlijk over wat dit toetst: bij een account-CPA van ~15 ligt de bleeder-drempel (2x CPA ~30)
+  // BOVEN de EUR 25-rem, dus de rem is hier nooit de bindende grens -- dat wordt hij pas onder
+  // een account-CPA van 12,50. Deze check bewijst dat de "te vroeg om te beoordelen"-zin een
+  // echt geval heeft om over te gaan, niet dat de rem het verschil maakt.
   check("microsoft weekly: en één onder de EUR 25-rem, die terecht géén bleeder is",
     zonderConv.some((x) => getal(x.cost) > 0 && getal(x.cost) < 25),
     zonderConv.map((x) => `${x.keyword_text}: ${x.cost}`).join(" | "));
