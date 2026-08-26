@@ -752,7 +752,11 @@ const linkedinDemographicDaily: Row[] = LI_DEMO_SEGMENTS.flatMap((s) =>
     const recency = 1 - age / (LI_DEMO_DAYS - 1); // 0 oudste → 1 nieuwste
     const driftMul = 1 + (s.drift ?? 0) * (recency - 0.5) * 2; // van (1−drift) naar (1+drift)
     return {
-      client_id: CID, date: dayISO(age), level: "account", entity_urn: "urn:li:account:demo",
+      // level "CAMPAIGN": de sync schrijft demografie uitsluitend op dat niveau
+      // (lib/linkedin/sync.ts:204/217) en alle lezers pinnen er sinds de pariteitsronde op --
+      // een mock op "account" zou precies de rijvorm modelleren die de pins als dubbeltelling
+      // weggooien, en elke gepinde lezer door de mock kreeg dan nul rijen.
+      client_id: CID, date: dayISO(age), level: "CAMPAIGN", entity_urn: LI_CAMPAIGNS[0].urn,
       pivot_type: s.pivot, pivot_value_urn: s.urn,
       impressions: Math.round(1500 * f), clicks: Math.round(20 * f), spend: Math.round(s.spend * f),
       leads: s.leads * f * driftMul, conversions: s.leads * f * driftMul * 0.3, coverage_pct: 0.8,

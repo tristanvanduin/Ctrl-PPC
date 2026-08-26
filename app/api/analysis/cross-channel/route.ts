@@ -182,7 +182,12 @@ export async function POST(request: NextRequest) {
   ]);
 
   const n = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
-  const channels: ChannelMonthlyInput[] = (blendedRes.data ?? []).map((r) => ({
+  // Alleen de kanalen die de view vandaag kán leveren. De view-CASE (migratie 080) heeft geen
+  // ELSE: krijgt fact_core ooit een kanaal dat de CASE niet kent, dan komt dat door als channel
+  // NULL, en zou "null" hier als spookkanaal in elke som en in de 2-kanalen-gate meetellen.
+  const BEKENDE_BLENDED_KANALEN = new Set(["google_ads", "meta_ads", "linkedin_ads", "microsoft_ads"]);
+  const blendedRijen = (blendedRes.data ?? []).filter((r) => BEKENDE_BLENDED_KANALEN.has(String(r.channel)));
+  const channels: ChannelMonthlyInput[] = blendedRijen.map((r) => ({
     channel: String(r.channel),
     month: String(r.month),
     impressions: n(r.impressions),
@@ -192,22 +197,29 @@ export async function POST(request: NextRequest) {
     leads: n(r.leads),
   }));
 
-  // Microsoft-maandrijen uit de dagtabel, in dezelfde vorm als de blended view: alleen volle
-  // maanden (zelfde currentMonthStart-grens als de view-query hierboven), leads 0 -- Microsoft
-  // rekent in conversies, niet in leadvelden.
+  // Microsoft-maandrijen uit de dagtabel, in dezelfde vorm als de blended view -- maar ALLEEN
+  // zolang de view het kanaal zelf nog niet draagt: zodra de fase-3-projectie microsoft in
+  // fact_core zet (en de view-CASE meegaat), zou deze zelf-aggregatie het kanaal dubbel tellen.
+  // Twee grenzen, gespiegeld aan de view-query hierboven: de lopende maand eruit
+  // (currentMonthStart) én de afgekapte oudste maand eruit (maand < sinceMonth valt bij de view
+  // ook weg, want month is daar de eerste van de maand) -- anders werd "26-28 februari" hier een
+  // 'volle maand' van drie dagen. Leads 0: Microsoft rekent in conversies, niet in leadvelden.
+  const blendedHeeftMicrosoft = channels.some((c) => c.channel === "microsoft_ads");
   const msMaanden = new Map<string, { impressions: number; clicks: number; spend: number; conversions: number; conversionValue: number }>();
-  for (const r of msDailyRes.data ?? []) {
-    const datum = String(r.date ?? "");
-    if (datum.length < 7) continue;
-    const month = datum.slice(0, 7) + "-01";
-    if (month >= currentMonthStart) continue;
-    const a = msMaanden.get(month) ?? { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversionValue: 0 };
-    a.impressions += n(r.impressions); a.clicks += n(r.clicks); a.spend += n(r.spend);
-    a.conversions += n(r.conversions); a.conversionValue += n(r.conversion_value);
-    msMaanden.set(month, a);
-  }
-  for (const [month, a] of msMaanden) {
-    channels.push({ channel: "microsoft_ads", month, impressions: a.impressions, clicks: a.clicks, spend: a.spend, conversions: a.conversions, leads: 0 });
+  if (!blendedHeeftMicrosoft) {
+    for (const r of msDailyRes.data ?? []) {
+      const datum = String(r.date ?? "");
+      if (datum.length < 7) continue;
+      const month = datum.slice(0, 7) + "-01";
+      if (month >= currentMonthStart || month < sinceMonth) continue;
+      const a = msMaanden.get(month) ?? { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversionValue: 0 };
+      a.impressions += n(r.impressions); a.clicks += n(r.clicks); a.spend += n(r.spend);
+      a.conversions += n(r.conversions); a.conversionValue += n(r.conversion_value);
+      msMaanden.set(month, a);
+    }
+    for (const [month, a] of msMaanden) {
+      channels.push({ channel: "microsoft_ads", month, impressions: a.impressions, clicks: a.clicks, spend: a.spend, conversions: a.conversions, leads: 0 });
+    }
   }
 
   if (channels.length === 0) {
@@ -230,7 +242,7 @@ export async function POST(request: NextRequest) {
   // Data-volledigheid per kanaal: conversies/spend/waarde over het venster, voor de conversie-
   // waarde-gap-detector (blended ROAS onberekenbaar zonder waarde).
   const valueByChannel = new Map<string, ChannelValueAgg>();
-  for (const r of blendedRes.data ?? []) {
+  for (const r of blendedRijen) {
     const ch = String(r.channel);
     const a = valueByChannel.get(ch) ?? { channel: ch, conversions: 0, conversionValue: 0, spend: 0 };
     a.conversions += n(r.conversions); a.conversionValue += n(r.conversion_value); a.spend += n(r.spend);

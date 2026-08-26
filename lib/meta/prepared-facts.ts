@@ -173,7 +173,13 @@ function buildAdFacts(ads: MetaComputeRow[], accountBenchmark: DerivedMetrics, l
   const byAd = groupBy(ads, (r) => r.entity_id);
   const adFacts = [...byAd.entries()].map(([entity_id, rows]) => {
     const latestRows = rowsInMonth(rows, latestMonth);
-    const d = deriveFromRows(latestRows.length ? latestRows : rows);
+    // De terugval op het volle venster is bewust: een ad die vóór de analysemaand is stopgezet
+    // blijft zo zichtbaar (met zijn historie), in plaats van als rij vol nullen. Maar die
+    // vol-venster-cijfers mogen nooit de stelligheidsvlag voeden -- 12 conversies verspreid over
+    // een jaar zijn geen 10-in-een-maand. actief_in_maand maakt het onderscheid expliciet voor
+    // het model, en de volumegrens-vlag staat voor zo'n ad altijd uit.
+    const actiefInMaand = latestRows.length > 0;
+    const d = deriveFromRows(actiefInMaand ? latestRows : rows);
     const fatigue = fatigueByAd.get(entity_id);
     const vs_average = ENTITY_KPIS.map(({ metric, key }) => computeVsAverage(metric, d[key] as number | null, accountBenchmark[key] as number | null));
     return {
@@ -188,7 +194,8 @@ function buildAdFacts(ads: MetaComputeRow[], accountBenchmark: DerivedMetrics, l
       fatigue: fatigue ? { flag: fatigue.fatigue, baseline_link_ctr_pct: fatigue.baseline_link_ctr_pct, recent_link_ctr_pct: fatigue.recent_link_ctr_pct, ctr_change_pct: fatigue.ctr_change_pct, recent_frequency: fatigue.recent_frequency, days_live: fatigue.days_live } : null,
       classification: classifyAd(d, accountBenchmark, Boolean(fatigue?.fatigue)),
       conversions: d.conversions,
-      boven_volumegrens: d.conversions >= VOLUME_GRENS_CONVERSIES,
+      actief_in_maand: actiefInMaand,
+      boven_volumegrens: actiefInMaand && d.conversions >= VOLUME_GRENS_CONVERSIES,
     };
   });
   adFacts.sort((a, b) => a.entity_id.localeCompare(b.entity_id));

@@ -38,13 +38,23 @@ const adsets: MetaComputeRow[] = [
   { date: "2026-03-15", entity_id: "as_1", entity_name: "Ad set 1", impressions: 8000, spend: 600, link_clicks: 140, conversions: 12, conversion_value: 2400, frequency: 2.3 },
 ];
 
-// Ads: een vermoeide ad (fatigue), een winnaar (hoge ROAS), een stabiele.
+// Ads: een vermoeide ad (fatigue), een winnaar (hoge ROAS), en een vóór de analysemaand
+// gepauzeerde ad met 12 conversies verspreid over februari -- boven de grens als je het volle
+// venster telt, maar nul in de analysemaand: precies het geval waarin de stelligheidsvlag uit
+// moet blijven.
 const adFatigued = [...days("ad_fatigue", "Vermoeide ad", 1, 7, 1000, 20, 1.5), ...days("ad_fatigue", "Vermoeide ad", 8, 7, 1000, 10, 3.0)];
 const adWinner = days("ad_winner", "Winnaar ad", 1, 14, 1000, 20, 1.5, 5, 1000);
-const ads: MetaComputeRow[] = [...adFatigued, ...adWinner];
+const adPaused: MetaComputeRow[] = [1, 2, 3, 4].map((d) => (
+  { date: `2026-02-0${d}`, entity_id: "ad_paused", entity_name: "Gepauzeerde ad", impressions: 1000, spend: 50, link_clicks: 15, conversions: 3, conversion_value: 600, frequency: 1.9 }
+));
+const ads: MetaComputeRow[] = [...adFatigued, ...adWinner, ...adPaused];
 
-// Breakdowns: placement met waste, en demografie met en zonder volume.
+// Breakdowns: placement met waste, en demografie met en zonder volume. De februari-rij is de
+// maand-anker-wacht: met het anker verandert hij NIETS aan de segmentcijfers hieronder (AN blijft
+// 28,57% van de placement-spend); zonder anker zou AN's aandeel naar (200+900)/(700+900) = 68,75%
+// springen en zouden de asserts hieronder omvallen.
 const breakdowns: MetaBreakdownComputeRow[] = [
+  { date: "2026-02-10", breakdown_type: "publisher_platform", breakdown_value: "audience_network", impressions: 4000, spend: 900, link_clicks: 20, conversions: 0, conversion_value: 0 },
   { date: "2026-03-15", breakdown_type: "publisher_platform", breakdown_value: "facebook_feed", impressions: 5000, spend: 500, link_clicks: 100, conversions: 10, conversion_value: 2000 },
   { date: "2026-03-15", breakdown_type: "publisher_platform", breakdown_value: "audience_network", impressions: 2000, spend: 200, link_clicks: 10, conversions: 0, conversion_value: 0 },
   { date: "2026-03-15", breakdown_type: "age_gender", breakdown_value: "25-34|female", impressions: 4000, spend: 400, link_clicks: 90, conversions: 15, conversion_value: 3000 },
@@ -80,11 +90,24 @@ eq(adF.fatigue.flag, true, "pijler 3: vermoeide ad fatigue true");
 eq(adF.classification, "bleeder", "pijler 3: vermoeide ad geclassificeerd als bleeder");
 eq(adW.classification, "winnaar", "pijler 3: hoge-ROAS ad geclassificeerd als winnaar");
 eq(facts[3].visual_patterns.available, false, "pijler 3: visual_patterns markeert geen vision-data zonder creativePatterns");
+// Volumediscipline (pariteitsronde): de winnaar draait in de analysemaand ruim boven de grens;
+// de gepauzeerde ad heeft 12 conversies over het volle venster maar nul in de maand -- zijn
+// vlag moet uit staan, hoe zijn vol-venster-cijfers ook ogen.
+const adP = facts[3].creative_performance.ads.find((a: any) => a.entity_id === "ad_paused");
+eq(adW.boven_volumegrens, true, "pijler 3: winnaar boven de volumegrens in de analysemaand");
+eq(adP.actief_in_maand, false, "pijler 3: gepauzeerde ad is niet actief in de analysemaand");
+eq(adP.boven_volumegrens, false, "pijler 3: gepauzeerde ad nooit boven de grens, ondanks 12 vol-venster-conversies");
 
 // 5. Pijler 4 (Placement & Doelgroep-segmenten): audience_network heeft waste (spend zonder conversies).
 const an = facts[4].placement.segments.find((s: any) => s.breakdown_value === "audience_network");
 eq(facts[4].placement.available, true, "pijler 4: placement beschikbaar");
 eq(an.waste, true, "pijler 4: audience_network is waste");
+// Maand-anker: de februari-AN-rij (900 spend) telt niet mee -- AN's spend is de maart-200, en het
+// blok draagt de analysemaand expliciet. Placement heeft sinds de pariteitsronde dezelfde
+// volumegrens als demografie: AN met 0 conversies is onder de grens.
+eq(facts[4].placement.latest_month, "2026-03", "pijler 4: placement is op de laatste maand geankerd");
+eq(an.spend, 200, "pijler 4: de oudere-maand-rij telt niet mee in het AN-segment");
+eq(an.volume_ok, false, "pijler 4: AN-placement (0 conversies) onder de volumegrens");
 
 // 5b. F5 fase2.3 placement-waste-detector. AN heeft 200 van de 700 publisher_platform-spend
 // (28,57%, > 15%) en 0 van de 10 conversies (0% < 28,57%) -- dus disproportioneel en flagged.
@@ -137,6 +160,16 @@ const lowShareBreakdowns: MetaBreakdownComputeRow[] = [
 const lowShareFacts = buildMetaStepFacts({ account, campaigns: [], adsets: [], ads: [], breakdowns: lowShareBreakdowns }) as Record<number, any>;
 eq(lowShareFacts[4].placement.audience_network_waste.spend_share_pct, 10, "pijler 4: AN spend-aandeel 10% (onder de drempel)");
 eq(lowShareFacts[4].placement.audience_network_waste.flagged, false, "pijler 4: AN niet geflagd onder de 15%-drempel");
+
+// 12b. Maand-anker-degradatie: rijen die ALLEEN buiten de analysemaand vallen zijn geen data
+// voor die maand -- placement degradeert naar available:false en de AN-waste naar null, in
+// plaats van stilletjes op verouderde maanden te rekenen.
+const oudeBreakdowns: MetaBreakdownComputeRow[] = [
+  { date: "2026-02-10", breakdown_type: "publisher_platform", breakdown_value: "facebook_feed", impressions: 9000, spend: 900, link_clicks: 180, conversions: 18, conversion_value: 3600 },
+];
+const oudeFacts = buildMetaStepFacts({ account, campaigns: [], adsets: [], ads: [], breakdowns: oudeBreakdowns }) as Record<number, any>;
+eq(oudeFacts[4].placement.available, false, "pijler 4: alleen oudere-maand-rijen degradeert placement naar available:false");
+eq(oudeFacts[4].placement.audience_network_waste, null, "pijler 4: AN-waste is null zonder rijen in de analysemaand");
 
 // 13. F5 fase2.4: pijler 3 koppelt meta_creative_patterns i.p.v. altijd te degraderen.
 // Deterministic gaat voor inferred; gesorteerd op |lift_pct|; alleen top 10.
