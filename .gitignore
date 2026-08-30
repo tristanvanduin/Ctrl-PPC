@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# design-canvas: de geseede uitvoer heeft de volledige editor ingebakken (~2,5 MB) en is
+# opnieuw te genereren uit de .dc.html-bronnen ernaast. Alleen de bron hoort in git.
+design/*.html
+!design/*.dc.html
