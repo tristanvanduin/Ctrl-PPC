@@ -79,6 +79,20 @@ function heel(w: string | undefined | null): number | null {
   return n === null ? null : Math.round(n);
 }
 
+/**
+ * Conversies met de juiste kolomvoorkeur. De klassieke kolom `Conversions` is sinds 2022
+ * afgeschaft en levert in rapporten structureel "0" (geverifieerd in de v13-docs,
+ * 2026-09-01); `ConversionsQualified` is de opvolger. De terugval op `Conversions` blijft
+ * staan voor het geval een rapport de nieuwe kolom (nog) niet draagt -- dan is een oud
+ * getal eerlijker dan een verzonnen nul. Zelfde voorkeursvolgorde voor Revenue is niet
+ * nodig: die kolom is niet afgeschaft.
+ */
+function conversies(rij: Record<string, string>): number | null {
+  const q = parseGetal(rij.ConversionsQualified);
+  if (q !== null) return q;
+  return parseGetal(rij.Conversions);
+}
+
 /** Monthly-aggregatie levert de maand als datum; normaliseer defensief naar de eerste. */
 function naarMaand(timePeriod: string | undefined): string | null {
   const t = (timePeriod ?? "").trim().slice(0, 10);
@@ -122,6 +136,18 @@ export function normaliseerMatchType(w: string | undefined): string | null {
   return laag || null;
 }
 
+/**
+ * Campagnetypes kleingeschreven, met de rapportwaarde "Search & content" op "search": de
+ * demo en de facts-laag spreken over "search", en het &-label is dezelfde campagnesoort
+ * (v13-rapportdocs: mogelijke waarden Audience, Dynamic search, Search & content, Shopping).
+ */
+export function normaliseerCampagnetype(w: string | undefined): string | null {
+  const laag = (w ?? "").trim().toLowerCase();
+  if (!laag) return null;
+  if (laag === "search & content") return "search";
+  return laag;
+}
+
 // ── Rijmappers ──────────────────────────────────────────────────────────────
 
 /** Dagrij voor microsoft_account_daily / _campaign_daily / _adgroup_daily. */
@@ -142,7 +168,7 @@ export function naarDagRij(
     impressions,
     clicks,
     spend: rond(spend),
-    conversions: parseGetal(rij.Conversions) ?? 0,
+    conversions: conversies(rij) ?? 0,
     conversion_value: parseGetal(rij.Revenue) ?? 0,
     // Afgeleid en niet uit de rapportkolommen: die zijn al afgerond aangeleverd, en twee
     // bronnen voor hetzelfde getal gaan uit elkaar lopen.
@@ -171,7 +197,7 @@ export function naarBreakdownRij(
     impressions: heel(rij.Impressions) ?? 0,
     clicks: heel(rij.Clicks) ?? 0,
     spend: rond(parseGetal(rij.Spend) ?? 0),
-    conversions: parseGetal(rij.Conversions) ?? 0,
+    conversions: conversies(rij) ?? 0,
     conversion_value: parseGetal(rij.Revenue) ?? 0,
   };
 }
@@ -183,7 +209,7 @@ export function naarKeywordMaandRij(rij: Record<string, string>, clientId: strin
   const impressions = heel(rij.Impressions) ?? 0;
   const clicks = heel(rij.Clicks) ?? 0;
   const cost = parseGetal(rij.Spend) ?? 0;
-  const conversions = parseGetal(rij.Conversions) ?? 0;
+  const conversions = conversies(rij) ?? 0;
   return {
     client_id: clientId,
     month,
@@ -213,7 +239,7 @@ export function naarZoektermMaandRij(rij: Record<string, string>, clientId: stri
   if (!month || !term) return null;
   const impressions = heel(rij.Impressions) ?? 0;
   const clicks = heel(rij.Clicks) ?? 0;
-  const conversions = parseGetal(rij.Conversions) ?? 0;
+  const conversions = conversies(rij) ?? 0;
   return {
     client_id: clientId,
     month,
@@ -255,12 +281,12 @@ export function naarImpressieAandeelRij(
     client_id: clientId,
     campaign_id: campaignId,
     campaign_name: (rij.CampaignName ?? "").trim(),
-    campaign_type: ((rij.CampaignType ?? "").trim() || null)?.toLowerCase() ?? null,
+    campaign_type: normaliseerCampagnetype(rij.CampaignType),
     month,
     impressions: heel(rij.Impressions) ?? 0,
     clicks: heel(rij.Clicks) ?? 0,
     cost: rond(cost),
-    conversions: parseGetal(rij.Conversions) ?? 0,
+    conversions: conversies(rij) ?? 0,
     impression_share: parseFractie(rij.ImpressionSharePercent),
     budget_lost_is: parseFractie(rij.ImpressionLostToBudgetPercent),
     rank_lost_is: parseFractie(rij.ImpressionLostToRankAggPercent),
@@ -280,26 +306,47 @@ export function dagenInMaandTot(month: string, vensterEinde: string): number {
   return vensterEinde > month ? laatste : 0;
 }
 
-/** Profielrij (LinkedIn-targeting: industry/company/job_function) voor microsoft_profile_monthly. */
-export function naarProfielRij(
-  rij: Record<string, string>,
-  clientId: string,
-  pivotType: "industry" | "company" | "job_function",
-  waardeKolom: string
-): Record<string, unknown> | null {
-  const month = naarMaand(rij.TimePeriod);
-  const waarde = (rij[waardeKolom] ?? "").trim();
-  if (!month || !waarde) return null;
-  return {
-    client_id: clientId,
-    month,
-    pivot_type: pivotType,
-    pivot_value: waarde,
-    impressions: heel(rij.Impressions) ?? 0,
-    clicks: heel(rij.Clicks) ?? 0,
-    spend: rond(parseGetal(rij.Spend) ?? 0),
-    conversions: parseGetal(rij.Conversions) ?? 0,
-  };
+/**
+ * Profielrijen (LinkedIn-targeting) voor microsoft_profile_monthly.
+ *
+ * Het ProfessionalDemographics-rapport eist zijn drie naamkolommen (CompanyName,
+ * IndustryName, JobFunctionName) plus AccountName/AdGroupName VERPLICHT SAMEN (geverifieerd
+ * in de v13-docs, 2026-09-01) -- losse pivots opvragen kan dus niet. Elke rapportrij is één
+ * cel in het kruisproduct van de drie dimensies; per pivot sommeren over de andere twee (en
+ * over de adgroups) is exact, want elke impressie zit in precies één combinatie.
+ */
+export const PROFIEL_PIVOTS = [
+  { pivot: "company" as const, kolom: "CompanyName" },
+  { pivot: "industry" as const, kolom: "IndustryName" },
+  { pivot: "job_function" as const, kolom: "JobFunctionName" },
+];
+
+export function aggregeerProfielRijen(rijen: Record<string, string>[], clientId: string): Record<string, unknown>[] {
+  interface Som { impressions: number; clicks: number; spend: number; conversions: number }
+  const sommen = new Map<string, Som>();
+  for (const rij of rijen) {
+    const month = naarMaand(rij.TimePeriod);
+    if (!month) continue;
+    for (const { pivot, kolom } of PROFIEL_PIVOTS) {
+      const waarde = (rij[kolom] ?? "").trim();
+      if (!waarde) continue;
+      const sleutel = `${month}~~${pivot}~~${waarde}`;
+      const som = sommen.get(sleutel) ?? { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
+      som.impressions += heel(rij.Impressions) ?? 0;
+      som.clicks += heel(rij.Clicks) ?? 0;
+      som.spend += parseGetal(rij.Spend) ?? 0;
+      som.conversions += conversies(rij) ?? 0;
+      sommen.set(sleutel, som);
+    }
+  }
+  return [...sommen.entries()].map(([sleutel, som]) => {
+    const [month, pivot_type, pivot_value] = sleutel.split("~~");
+    return {
+      client_id: clientId, month, pivot_type, pivot_value,
+      impressions: som.impressions, clicks: som.clicks,
+      spend: rond(som.spend), conversions: rond(som.conversions, 3),
+    };
+  });
 }
 
 // ── Entiteiten (Campaign Management) ────────────────────────────────────────

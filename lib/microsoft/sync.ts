@@ -15,8 +15,8 @@ import {
 } from "./api";
 import {
   parseReportCsv, naarDagRij, naarBreakdownRij, naarKeywordMaandRij, naarZoektermMaandRij,
-  naarImpressieAandeelRij, naarProfielRij, naarCampagneRij, naarAdGroupRij,
-  normaliseerNetwerk, normaliseerApparaat,
+  naarImpressieAandeelRij, aggregeerProfielRijen, naarCampagneRij, naarAdGroupRij,
+  normaliseerNetwerk, normaliseerApparaat, PROFIEL_PIVOTS,
 } from "./transform";
 // Kanaal-agnostische datumvensters; ze wonen bij Meta omdat ze daar het eerst nodig waren.
 // Een eigen kopie hier zou precies de dubbele-hulpjes-val zijn die de hygienepoort bewaakt.
@@ -38,8 +38,11 @@ export interface MicrosoftSyncOutcome {
   error?: string;
 }
 
-// De gedeelde metriekkolommen van elk performance-rapport.
-const METRIEKEN = ["Impressions", "Clicks", "Spend", "Conversions", "Revenue"];
+// De gedeelde metriekkolommen van elk performance-rapport. ConversionsQualified en niet
+// Conversions: de klassieke kolom is sinds 2022 afgeschaft en levert structureel "0"
+// (geverifieerd in de v13-docs; zie ook conversies() in transform.ts). Beide worden
+// opgevraagd zodat de transform kan terugvallen als de nieuwe kolom leeg blijkt.
+const METRIEKEN = ["Impressions", "Clicks", "Spend", "ConversionsQualified", "Conversions", "Revenue"];
 
 async function upsert(
   ctx: MicrosoftSyncContext,
@@ -174,30 +177,19 @@ export async function syncMicrosoftMaandtabellen(
         dedupe(aandeel.rijen.map((r) => naarImpressieAandeelRij(r, ctx.clientId, budgetPerCampagne, until)).filter((r): r is Record<string, unknown> => r !== null), ["client_id", "campaign_id", "month"]),
         "client_id,campaign_id,month", "impression_share");
 
-  // Profiel (LinkedIn-targeting): drie losse pivots; een pivot die faalt degradeert dat
-  // deel van de analyse maar houdt de andere twee niet tegen -- exact hoe de facts-laag
-  // met een ontbrekend profiel omgaat.
-  const PIVOTS = [
-    { pivot: "industry" as const, kolom: "IndustryName" },
-    { pivot: "company" as const, kolom: "CompanyName" },
-    { pivot: "job_function" as const, kolom: "JobFunctionName" },
-  ];
-  let profielRijen = 0;
-  const profielFouten: string[] = [];
-  for (const p of PIVOTS) {
-    const res = await rapportRijen(ctx, `profile:${p.pivot}`, bouwReportRequest({
-      type: "ProfessionalDemographicsAudienceReportRequest", aggregation: "Monthly", accountId: ctx.cfg.accountId, since, until,
-      columns: ["TimePeriod", p.kolom, ...METRIEKEN],
-    }));
-    if (res.fout) { profielFouten.push(p.pivot); continue; }
-    const rijen = res.rijen.map((r) => naarProfielRij(r, ctx.clientId, p.pivot, p.kolom)).filter((r): r is Record<string, unknown> => r !== null);
-    const uitkomst = await upsert(ctx, "microsoft_profile_monthly",
-      dedupe(rijen, ["client_id", "month", "pivot_type", "pivot_value"]),
-      "client_id,month,pivot_type,pivot_value", `profile:${p.pivot}`);
-    if (!uitkomst.success) profielFouten.push(p.pivot);
-    profielRijen += uitkomst.rows;
-  }
-  uitkomsten.profile = { rows: profielRijen, success: profielFouten.length === 0, error: profielFouten.length ? `pivots mislukt: ${profielFouten.join(", ")}` : undefined };
+  // Profiel (LinkedIn-targeting): ÉÉN rapport, geen drie -- de v13-docs eisen de drie
+  // naamkolommen plus AccountName/AdGroupName verplicht samen (zie aggregeerProfielRijen in
+  // transform.ts). De rapportrijen zijn het kruisproduct van de dimensies; de aggregatie
+  // per pivot gebeurt in de transform.
+  const profiel = await rapportRijen(ctx, "profile", bouwReportRequest({
+    type: "ProfessionalDemographicsAudienceReportRequest", aggregation: "Monthly", accountId: ctx.cfg.accountId, since, until,
+    columns: ["TimePeriod", "AccountName", "AdGroupName", ...PROFIEL_PIVOTS.map((p) => p.kolom), ...METRIEKEN],
+  }));
+  uitkomsten.profile = profiel.fout
+    ? { rows: 0, success: false, error: profiel.fout }
+    : await upsert(ctx, "microsoft_profile_monthly",
+        aggregeerProfielRijen(profiel.rijen, ctx.clientId),
+        "client_id,month,pivot_type,pivot_value", "profile");
 
   return uitkomsten;
 }

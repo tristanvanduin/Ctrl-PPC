@@ -5,6 +5,7 @@ import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
 import { synckandidaten } from "@/lib/tenancy/klanten";
 import { credentialsVoorBureau } from "@/lib/tenancy/credentials";
+import { kanaalKoppelingen, KANAAL_RUNS, type SyncKanaal } from "@/lib/sync/kanaal-runs";
 
 /**
  * GET /api/sync/cron — Nightly scheduled sync for all active clients.
@@ -15,11 +16,18 @@ import { credentialsVoorBureau } from "@/lib/tenancy/credentials";
  * - External cron service (e.g., cron-job.org)
  * - Supabase Edge Functions
  *
- * Syncs all Google Ads-connected clients sequentially to avoid
- * rate limit issues with the Google Ads API.
+ * Eerst alle Google Ads-klanten sequentieel (rate-limit-vriendelijk), daarna de
+ * kanaalkoppelingen (Meta/LinkedIn/Microsoft) via exact dezelfde runs als de handmatige
+ * routes (lib/sync/kanaal-runs.ts). De kanaalrondes staan onder een tijdbudget: een
+ * Meta-daily kost minuten aan async-rapportpolling, en een run die niet meer past wordt
+ * als "doorgeschoven" gerapporteerd in plaats van halverwege door maxDuration te sneuvelen.
+ * Groeit het klantenbestand voorbij wat één invocatie past, dan is de volgende stap de
+ * bestaande queue-mechaniek (zie app/api/cron/process-action-queue) -- niet een langere
+ * timeout.
  */
 
-export const maxDuration = 300; // 5 minutes max
+export const maxDuration = 600;
+const KANAAL_TIJDBUDGET_MS = 480_000; // kanaalrondes stoppen ruim voor maxDuration
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -53,8 +61,12 @@ export async function GET(request: NextRequest) {
   const agencyFilter = request.nextUrl.searchParams.get("agency_id");
   const clients = await synckandidaten(supabase, { bron: "google-ads", agencyId: agencyFilter });
 
-  if (clients.length === 0) {
-    return Response.json({ error: "Geen clients met Google Ads koppeling" }, { status: 404 });
+  // De kanaalkoppelingen (Meta/LinkedIn/Microsoft) staan los van de Google-lijst: een klant
+  // kan best alleen een Microsoft-koppeling hebben. Alleen als BEIDE leeg zijn is er niets
+  // te doen.
+  const koppelingen = await kanaalKoppelingen(supabase);
+  if (clients.length === 0 && koppelingen.length === 0) {
+    return Response.json({ error: "Geen clients met een advertentiekoppeling" }, { status: 404 });
   }
 
   // Sync clients sequentially (rate limit friendly)
@@ -126,11 +138,54 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ── DE KANAALRONDES: META, LINKEDIN, MICROSOFT ────────────────────────────
+  //
+  // Daily-scope, dezelfde runs als de handmatige routes. Fouten per (klant, kanaal) stoppen
+  // de ronde niet: elk paar administreert zijn eigen uitkomst in zijn *_sync_runs-tabel, en
+  // deze respons vat samen. agency_id-filter geldt hier niet -- de koppelingstabellen dragen
+  // geen agency_id; de credential-resolutie per klant pakt vanzelf het juiste bureau.
+  const rondeStart = Date.now();
+  const kanaalResults: Array<{ clientId: string; kanaal: SyncKanaal; status: string; detail?: string }> = [];
+  let kanaalGeslaagd = 0;
+  let kanaalGefaald = 0;
+  let doorgeschoven = 0;
+
+  for (const { clientId, kanaal } of koppelingen) {
+    if (Date.now() - rondeStart > KANAAL_TIJDBUDGET_MS) {
+      doorgeschoven++;
+      kanaalResults.push({ clientId, kanaal, status: "doorgeschoven", detail: "tijdbudget op; volgende nacht opnieuw" });
+      continue;
+    }
+    try {
+      const uitkomst = await KANAAL_RUNS[kanaal](supabase, clientId, "daily");
+      if (uitkomst.soort === "klaar" && uitkomst.ok) {
+        kanaalGeslaagd++;
+        kanaalResults.push({ clientId, kanaal, status: "success" });
+      } else {
+        kanaalGefaald++;
+        kanaalResults.push({
+          clientId, kanaal, status: "failed",
+          detail: uitkomst.soort === "klaar" ? uitkomst.failed.join("; ").slice(0, 300) : uitkomst.melding,
+        });
+      }
+    } catch (err) {
+      kanaalGefaald++;
+      kanaalResults.push({ clientId, kanaal, status: "failed", detail: err instanceof Error ? err.message : "Onbekende fout" });
+    }
+  }
+
   return Response.json({
     timestamp: new Date().toISOString(),
     totalClients: clients.length,
     succeeded,
     failed,
     results,
+    kanalen: {
+      totaal: koppelingen.length,
+      geslaagd: kanaalGeslaagd,
+      gefaald: kanaalGefaald,
+      doorgeschoven,
+      results: kanaalResults,
+    },
   });
 }

@@ -3,8 +3,9 @@
 
 import {
   parseReportCsv, parseGetal, parseFractie, normaliseerNetwerk, normaliseerApparaat,
-  normaliseerMatchType, naarDagRij, naarBreakdownRij, naarKeywordMaandRij, naarZoektermMaandRij,
-  naarImpressieAandeelRij, naarProfielRij, naarCampagneRij, naarAdGroupRij, dagenInMaandTot,
+  normaliseerMatchType, normaliseerCampagnetype, naarDagRij, naarBreakdownRij,
+  naarKeywordMaandRij, naarZoektermMaandRij, naarImpressieAandeelRij, aggregeerProfielRijen,
+  naarCampagneRij, naarAdGroupRij, dagenInMaandTot,
 } from "./transform";
 import { bouwReportRequest, unzipEersteBestand } from "./api";
 import { deflateRawSync } from "node:zlib";
@@ -46,6 +47,15 @@ assert(normaliseerNetwerk("Syndicated search partners") === "Syndicated search p
 assert(normaliseerApparaat("Computer") === "Desktop", "apparaat: Computer → Desktop");
 assert(normaliseerApparaat("Smartphone") === "Mobile", "apparaat: Smartphone → Mobile");
 assert(normaliseerMatchType("Exact") === "exact", "matchtype kleingeschreven");
+assert(normaliseerCampagnetype("Search & content") === "search", "campagnetype: rapportlabel Search & content → search");
+assert(normaliseerCampagnetype("Shopping") === "shopping", "campagnetype: overige kleingeschreven");
+
+// ── ConversionsQualified boven de afgeschafte Conversions-kolom ─────────────
+
+const metBeide = naarDagRij({ TimePeriod: "2026-08-14", Impressions: "100", Clicks: "10", Spend: "5", ConversionsQualified: "3.5", Conversions: "0", Revenue: "70" }, "klant", "e");
+approx(metBeide?.conversions, 3.5, "ConversionsQualified wint van de afgeschafte nul");
+const zonderNieuw = naarDagRij({ TimePeriod: "2026-08-14", Impressions: "100", Clicks: "10", Spend: "5", Conversions: "2", Revenue: "40" }, "klant", "e");
+approx(zonderNieuw?.conversions, 2, "terugval op Conversions als de nieuwe kolom ontbreekt");
 
 // ── Dagrij ──────────────────────────────────────────────────────────────────
 
@@ -99,10 +109,17 @@ approx(isRij?.budget_utilization, 1, "maand-tot-nu benutting: 190 / (19 × 10)")
 assert(dagenInMaandTot("2026-08-01", "2026-09-15") === 31, "afgesloten maand telt vol");
 assert(dagenInMaandTot("2026-08-01", "2026-07-15") === 0, "toekomstige maand telt nul dagen");
 
-// ── Profielrij ──────────────────────────────────────────────────────────────
+// ── Profiel: kruisproduct-rijen per pivot geaggregeerd ──────────────────────
 
-const prof = naarProfielRij({ TimePeriod: "2026-08-01", IndustryName: "Tuinbouw & Agri", Impressions: "5200", Clicks: "210", Spend: "200", Conversions: "18" }, "klant", "industry", "IndustryName");
-assert(prof?.pivot_type === "industry" && prof?.pivot_value === "Tuinbouw & Agri", "profielpivot gemapt");
+const profRijen = aggregeerProfielRijen([
+  { TimePeriod: "2026-08-01", CompanyName: "Acme", IndustryName: "Tuinbouw & Agri", JobFunctionName: "Operations", Impressions: "3000", Clicks: "120", Spend: "110", ConversionsQualified: "10" },
+  { TimePeriod: "2026-08-01", CompanyName: "Beta", IndustryName: "Tuinbouw & Agri", JobFunctionName: "Inkoop", Impressions: "2200", Clicks: "90", Spend: "90", ConversionsQualified: "8" },
+], "klant");
+const agri = profRijen.find((r) => r.pivot_type === "industry" && r.pivot_value === "Tuinbouw & Agri");
+assert(!!agri && agri.impressions === 5200 && agri.conversions === 18, "industrie gesommeerd over bedrijven en functies");
+assert(profRijen.filter((r) => r.pivot_type === "company").length === 2, "elk bedrijf zijn eigen pivotrij");
+const ops = profRijen.find((r) => r.pivot_type === "job_function" && r.pivot_value === "Operations");
+assert(!!ops && ops.spend === 110, "functie-pivot draagt alleen zijn eigen som");
 
 // ── Entiteiten ──────────────────────────────────────────────────────────────
 
