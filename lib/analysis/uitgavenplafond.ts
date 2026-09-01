@@ -158,6 +158,28 @@ export function schatCallKosten(model: string, promptTokens: number, completionT
 }
 
 /**
+ * Wat een complete SOP-run naar verwachting kost, per cadans. Voor de plafondcheck aan het
+ * BEGIN van de analyse-routes: een maandanalyse is tientallen calls, en wie pas per call
+ * controleert laat een halve run door voordat het plafond dichtgaat (zie keuze 1).
+ *
+ * De tokengetallen zijn gemeten aan de rookproef op demo-greentech (1 september 2026:
+ * de Google-monthly deed ~66k prompt- plus ~25k completion-tokens over 8 calls; weekly en
+ * biweekly zitten daar ruim onder) en bewust naar boven afgerond: een plafond dat iets te
+ * vroeg dichtgaat is vervelend, één die te laat dichtgaat is precies het gat waarvoor hij
+ * bestaat. Gerekend met het sterke catalogusmodel; echte accounts zijn groter dan de demo,
+ * ook daarom de ruime kant.
+ */
+export function schatSopRunKosten(cadans: "monthly" | "weekly" | "biweekly"): number {
+  const TOKENS: Record<typeof cadans, { prompt: number; completion: number }> = {
+    monthly: { prompt: 120_000, completion: 40_000 },
+    biweekly: { prompt: 60_000, completion: 20_000 },
+    weekly: { prompt: 40_000, completion: 12_000 },
+  };
+  const t = TOKENS[cadans];
+  return schatCallKosten("google/gemini-3.7-flash", t.prompt, t.completion);
+}
+
+/**
  * Het verbruik van de lopende kalendermaand uit llm_usage.
  *
  * Bij een leesfout: 0 besteed en 0 onbekend, dus het plafond blokkeert niet. Dat is de veilige

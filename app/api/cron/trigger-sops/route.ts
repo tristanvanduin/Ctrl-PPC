@@ -242,10 +242,18 @@ export async function GET(request: NextRequest) {
 // app/api/analysis/cross-channel/route.ts) -- dus geen budgetimpact, alleen een handvol extra
 // Supabase-reads. Gooit door bij een fout; de aanroeper vangt en logt, zonder de kanaalanalyse
 // als mislukt te markeren.
+// Alle interne aanroepen op de eigen origin dragen het CRON_SECRET als Bearer: geen
+// browsersessie, en zodra O1_AUTH_ENFORCED aangaat is dit geheim de doorgang langs de
+// middleware en de route-eigen toegangscheck (vereisKlantToegangUitBody). Deze route draait
+// zelf alleen met een geldig CRON_SECRET, dus het geheim is hier per definitie aanwezig.
+function interneHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return { ...extra, ...(process.env.CRON_SECRET ? { Authorization: `Bearer ${process.env.CRON_SECRET}` } : {}) };
+}
+
 async function triggerCrossChannel(origin: string, clientId: string): Promise<void> {
   const res = await fetch(`${origin}/api/analysis/cross-channel`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: interneHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ client_id: clientId }),
   });
   if (!res.ok) {
@@ -262,7 +270,7 @@ async function triggerCrossChannel(origin: string, clientId: string): Promise<vo
 async function triggerCrossChannelSynthesis(origin: string, clientId: string): Promise<void> {
   const res = await fetch(`${origin}/api/analysis/cross-channel-synthesis`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: interneHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ client_id: clientId }),
   });
   if (!res.ok && res.status !== 409) {
@@ -362,7 +370,8 @@ async function triggerMonthlyPdfIfComplete(
   if (bestaandeFiles && bestaandeFiles.length > 0) return;
 
   const res = await fetch(
-    `${origin}/api/analysis/pdf?${new URLSearchParams({ client_id: clientId, sop_type: "monthly" })}`
+    `${origin}/api/analysis/pdf?${new URLSearchParams({ client_id: clientId, sop_type: "monthly" })}`,
+    { headers: interneHeaders() }
   );
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -385,7 +394,7 @@ async function voerSopUit(
   const jobId = crypto.randomUUID();
   const res = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: interneHeaders({ "Content-Type": "application/json" }),
     // `automatisch: true` markeert dit als een AUTOMATISCHE run. Alleen dan geldt de
     // sops_enabled-dekkingsgate in de analyse-routes; de handmatige knop laat de vlag weg en
     // blijft dus altijd werken, ook voor accounts die buiten de dekking zijn gezet.

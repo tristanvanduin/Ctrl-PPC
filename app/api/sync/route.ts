@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
 import { createClient } from "@supabase/supabase-js";
 import { syncClient } from "@/lib/sync/orchestrator";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
@@ -37,6 +38,12 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ error: "Verwacht: { client_id: string }" }, { status: 400 });
   }
+
+  // Toegang: het beurs-id zit in de body, dus de middleware kan de scope niet zien; dit is
+  // het route-eigen slot dat samen met O1_AUTH_ENFORCED aangaat (zie vereisKlantToegangUitBody
+  // in lib/auth/server.ts).
+  const toegang = await vereisKlantToegangUitBody(request, "sync:run", clientId);
+  if (toegang) return toegang;
 
   // Het customer-id uit accounts, niet uit het globale app_settings-blob. Zie de kop van
   // lib/tenancy/klanten.ts: dat blob kent geen bureau, dus elke vraag erover was platformbreed.

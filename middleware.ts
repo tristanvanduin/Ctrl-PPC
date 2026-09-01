@@ -64,6 +64,18 @@ export async function middleware(request: NextRequest) {
   // Cron blijft op het bestaande CRON_SECRET-headerpatroon: de route valideert zelf.
   if (isCronPath(pathname)) return NextResponse.next();
 
+  // Interne server-naar-server-aanroepen dragen geen browsersessie maar wel het CRON_SECRET:
+  // trigger-sops fetcht de analyse-routes op de eigen origin, en zonder deze doorgang zou het
+  // AANZETTEN van de vlag alle automatische SOP-runs op de inlogwal laten stuklopen — precies
+  // het soort activatieverrassing dat de /api/cron-paden al eens raakte (zie de bugfix-notitie
+  // van 17 augustus in lib/auth/roles.ts). Zonder secret in de omgeving bestaat deze doorgang
+  // niet (fail-closed);
+  // de route-eigen checks (vereisKlantToegangUitBody) hanteren hetzelfde geheim.
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && request.headers.get("authorization") === `Bearer ${cronSecret}`) {
+    return NextResponse.next();
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) {

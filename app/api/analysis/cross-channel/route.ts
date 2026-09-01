@@ -9,6 +9,7 @@
 // =====================================================================
 
 import { NextRequest } from "next/server";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
 import { getSupabase, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { buildCrossChannelSignals, type ChannelMonthlyInput, type BrandMonthlyInput } from "@/lib/signals/cross-channel";
 import { buildCrossChannelFunnelSignals } from "@/lib/signals/cross-channel-funnel";
@@ -109,6 +110,12 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ error: "client_id is verplicht" }, { status: 400 });
   }
+
+  // Toegang: het beurs-id zit in de body, dus de middleware kan de scope niet zien; dit is
+  // het route-eigen slot dat samen met O1_AUTH_ENFORCED aangaat (zie vereisKlantToegangUitBody
+  // in lib/auth/server.ts). Geen plafondcheck: deze route is deterministisch, geen LLM-call.
+  const toegang = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (toegang) return toegang;
 
   const monthsAgo = new Date();
   monthsAgo.setMonth(monthsAgo.getMonth() - MONTHS_BACK);

@@ -98,3 +98,30 @@ export async function requireClientAccess(
   }
   return user;
 }
+
+/**
+ * Recht + scope voor routes die het beurs-id uit de BODY halen, als één aanroep die bij een
+ * weigering een Response geeft en anders null. Drie uitkomsten, in deze volgorde:
+ *
+ *   1. O1_AUTH_ENFORCED staat niet aan → doorlaten. DEZELFDE schakelaar als middleware.ts:
+ *      de toegangscontrole gaat in één bewuste WL.3-stap aan, niet half — route-checks die
+ *      eerder aangaan dan de poortwachter zouden de activatievolgorde uit de middleware-kop
+ *      stilzwijgend omdraaien.
+ *   2. Het verzoek draagt het CRON_SECRET als Bearer → doorlaten. Interne server-naar-
+ *      server-aanroepen (app/api/cron/trigger-sops fetcht de analyse-routes op de eigen
+ *      origin) hebben geen browsersessie; dit is hetzelfde fail-closed geheim waarmee de
+ *      cron-routes zichzelf al bewaken. Zonder secret in de omgeving bestaat deze doorgang
+ *      niet.
+ *   3. Anders: de gewone sessie-check met recht en bureau-scope (requireClientAccess).
+ */
+export async function vereisKlantToegangUitBody(
+  request: Request,
+  capability: Capability,
+  clientId: string | null | undefined,
+): Promise<Response | null> {
+  if (process.env.O1_AUTH_ENFORCED !== "true") return null;
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && request.headers.get("authorization") === `Bearer ${cronSecret}`) return null;
+  const auth = await requireClientAccess(capability, clientId);
+  return auth instanceof Response ? auth : null;
+}

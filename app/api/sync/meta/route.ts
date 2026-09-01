@@ -5,6 +5,7 @@
 // =====================================================================
 
 import { NextRequest } from "next/server";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { draaiMetaSync } from "@/lib/sync/kanaal-runs";
@@ -38,6 +39,12 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ error: 'Verwacht: { client_id: string, scope?: "backfill" | "daily" }' }, { status: 400 });
   }
+
+  // Toegang: het beurs-id zit in de body, dus de middleware kan de scope niet zien; dit is
+  // het route-eigen slot dat samen met O1_AUTH_ENFORCED aangaat (zie vereisKlantToegangUitBody
+  // in lib/auth/server.ts).
+  const toegang = await vereisKlantToegangUitBody(request, "sync:run", clientId);
+  if (toegang) return toegang;
 
   try {
     const uitkomst = await draaiMetaSync(supabase, clientId, scope);

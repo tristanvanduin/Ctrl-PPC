@@ -32,6 +32,10 @@ import {
 import { buildGeheugenMetTaken, alsContextBlok } from "@/lib/analysis/geheugen-grounding";
 import { ALLE_SOP_CHANNELS, type SopChannel } from "@/lib/analysis/sop-channel-config";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
+import { controleerPlafond, schatSopRunKosten } from "@/lib/analysis/uitgavenplafond";
+import { klantVanId } from "@/lib/tenancy/klanten";
+import { logger } from "@/lib/logger";
 import { resolveTargets, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -1456,6 +1460,20 @@ export async function POST(request: NextRequest) {
   // automatische SOP's (zie de kop van lib/tenancy/sop-dekking.ts); handmatig triggeren is testen en
   // hoort altijd te kunnen. Vóór deze scheiding blokkeerde een dekkingskeuze -- "SOP's uitzetten voor
   // de accounts die niet meer passen" -- ook de knop in de UI, op 66 van de 74 accounts.
+
+  // Toegang: het beurs-id zit in de body, dus de middleware kan de scope niet zien; dit is
+  // het route-eigen slot dat samen met O1_AUTH_ENFORCED aangaat (zie vereisKlantToegangUitBody
+  // in lib/auth/server.ts -- interne cron-aanroepen passeren op het CRON_SECRET).
+  const toegang = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (toegang) return toegang;
+
+  // Het uitgavenplafond, VOOR er ook maar een LLM-call de deur uit gaat: een run is
+  // meerdere calls, en de duurste plek om een plafond te ontdekken is halverwege. Geteld
+  // per bureau (zie leesMaandverbruik); zonder ingesteld plafond blokkeert dit nooit.
+  const plafond = await controleerPlafond(supabase, schatSopRunKosten("biweekly"), new Date(), (await klantVanId(supabase, clientId))?.agencyId ?? null);
+  if (plafond.blokkeert) return Response.json({ error: plafond.tekst }, { status: 429 });
+  if (plafond.toestand === "bijna") logger.warn(`[plafond] ${plafond.tekst}`);
+
   if (automatisch && !(await magSopDraaien(supabase, clientId))) {
     return Response.json({ error: "Automatische SOP's staan uit voor dit account (dekking). Handmatig triggeren kan wel." }, { status: 403 });
   }

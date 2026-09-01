@@ -5,7 +5,7 @@
 // eentje door, of hij telt een onbekende prijs als nul en meldt dat je ruim zit.
 
 import {
-  beoordeelPlafond, leesPlafond, maandStart, resetDatum, schatCallKosten,
+  beoordeelPlafond, leesPlafond, maandStart, resetDatum, schatCallKosten, schatSopRunKosten,
   WAARSCHUWINGSGRENS, PLAFOND_ENV, leesMaandverbruik,
 } from "./uitgavenplafond";
 
@@ -160,6 +160,16 @@ async function main() {
     "bureau-b betaalt niet mee aan het plafond van bureau-a",
     (await leesMaandverbruik(nepClient(rijen) as never, new Date(), "bureau-b")).besteed === 40
   );
+
+  // schatSopRunKosten: de vaste run-schattingen waarmee de analyse-routes het plafond
+  // VOORAF controleren. De ordening is de kern (een maandrun is het duurst) en de schatting
+  // moet positief zijn -- een catalogusmodel zonder prijs zou hier stil 0 opleveren en de
+  // plafondcheck de facto uitschakelen.
+  const maandRun = schatSopRunKosten("monthly");
+  const tweewekelijks = schatSopRunKosten("biweekly");
+  const wekelijks = schatSopRunKosten("weekly");
+  check("maandrun duurder dan biweekly, biweekly duurder dan weekly", maandRun > tweewekelijks && tweewekelijks > wekelijks, `${maandRun} / ${tweewekelijks} / ${wekelijks}`);
+  check("de run-schatting is positief (het catalogusmodel heeft een prijs)", wekelijks > 0, String(wekelijks));
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);
   if (failed > 0) process.exit(1);
