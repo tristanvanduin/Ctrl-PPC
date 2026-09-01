@@ -1,5 +1,10 @@
 # SOP Kanaalanalyse — weekly, bi-weekly en monthly over drie kanalen
 
+> **Dit is de oorspronkelijke audit-notitie van 24 augustus, bewust bevroren als nulmeting.**
+> Het levende rapport — met fase 6 t/m 10: het vierde kanaal (Microsoft), de pariteitsronde, de
+> sync-aansluitpunten met bring-your-own-key, de sloten op toegang en kosten, en de eindcheck met
+> dertien live runs — staat in `docs/sop-kanaal-analyse-rapport.html`.
+
 Codeaudit, 24 augustus 2026. Broncode-analyse: geen SOP gedraaid, geen opgeslagen runs gelezen.
 Elke bevinding is nagelopen in het genoemde bestand op de genoemde regel. Regelnummers verwijzen
 naar de staat van `claude/sop-kanaal-analyse-9na6v3` op het moment van lezen.

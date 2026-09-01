@@ -1,0 +1,2389 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>SOP Kanaalanalyse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --paper:      #F1F3F0;
+    --surface:    #FFFFFF;
+    --surface-2:  #E8ECE7;
+    --ink:        #131A1C;
+    --ink-2:      #3D4A4B;
+    --ink-3:      #6B7877;
+    --rule:       #D2DAD5;
+    --rule-soft:  #E1E7E2;
+    --accent:     #0E6E6B;
+    --accent-ink: #0A5250;
+    --accent-wash:#DCEAE7;
+    --crit:       #96231E;
+    --crit-wash:  #F4DFDD;
+    --warn:       #A8541B;
+    --warn-wash:  #F5E4D6;
+    --good:       #4C6B36;
+    --good-wash:  #E1EBD9;
+
+    --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --f-body:    "Source Serif 4", Georgia, "Times New Roman", serif;
+    --f-mono:    "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+
+    --col: 68ch;
+    --wide: 1120px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0E1416;
+      --surface:    #161E20;
+      --surface-2:  #1D2729;
+      --ink:        #E6EDEA;
+      --ink-2:      #B3C0BD;
+      --ink-3:      #849693;
+      --rule:       #2A3739;
+      --rule-soft:  #212C2E;
+      --accent:     #4FB3AC;
+      --accent-ink: #7FCFC8;
+      --accent-wash:#123330;
+      --crit:       #E08079;
+      --crit-wash:  #351A18;
+      --warn:       #D89253;
+      --warn-wash:  #33210F;
+      --good:       #98BC7C;
+      --good-wash:  #1D2A15;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0E1416;
+    --surface:    #161E20;
+    --surface-2:  #1D2729;
+    --ink:        #E6EDEA;
+    --ink-2:      #B3C0BD;
+    --ink-3:      #849693;
+    --rule:       #2A3739;
+    --rule-soft:  #212C2E;
+    --accent:     #4FB3AC;
+    --accent-ink: #7FCFC8;
+    --accent-wash:#123330;
+    --crit:       #E08079;
+    --crit-wash:  #351A18;
+    --warn:       #D89253;
+    --warn-wash:  #33210F;
+    --good:       #98BC7C;
+    --good-wash:  #1D2A15;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell {
+    max-width: var(--wide);
+    margin: 0 auto;
+    padding: 0 28px 96px;
+  }
+
+  .col { max-width: var(--col); }
+
+  /* ── Masthead ─────────────────────────────────────────── */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 56px 0 26px;
+    margin-bottom: 44px;
+  }
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(2.4rem, 6vw, 3.9rem);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    max-width: 62ch;
+    font-size: 1.16rem;
+    line-height: 1.55;
+    color: var(--ink-2);
+    margin: 0 0 30px;
+  }
+  .runinfo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 34px;
+    font-family: var(--f-mono);
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .runinfo b {
+    font-weight: 500;
+    color: var(--ink-2);
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Sections ─────────────────────────────────────────── */
+
+  section { margin: 0 0 64px; }
+
+  h2 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.62rem;
+    letter-spacing: -0.012em;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 0 0 8px;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+  }
+  .sectionnote {
+    font-family: var(--f-display);
+    font-size: 0.87rem;
+    color: var(--ink-3);
+    max-width: 68ch;
+    margin: 0 0 28px;
+    line-height: 1.5;
+  }
+
+  h3 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: 0.005em;
+    margin: 34px 0 10px;
+  }
+
+  p { margin: 0 0 16px; }
+  .col p:last-child { margin-bottom: 0; }
+
+  code, .path {
+    font-family: var(--f-mono);
+    font-size: 0.83em;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    padding: 0.12em 0.4em;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  strong { font-weight: 600; }
+
+  /* ── Verdict panel ────────────────────────────────────── */
+
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    padding: 28px 30px;
+    margin-bottom: 22px;
+  }
+  .verdict p { max-width: 66ch; }
+  .verdict p:last-child { margin-bottom: 0; }
+
+  /* ── Score meters ─────────────────────────────────────── */
+
+  .scoregrid {
+    display: grid;
+    gap: 1px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule);
+  }
+  .scorehead, .scorerow {
+    display: grid;
+    grid-template-columns: minmax(150px, 1.5fr) 78px 1fr repeat(3, 58px);
+    align-items: center;
+    gap: 14px;
+    background: var(--surface);
+    padding: 13px 18px;
+  }
+  .scorehead {
+    background: var(--surface-2);
+    font-family: var(--f-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+  .scorehead span:nth-child(n+4),
+  .scorerow .sub { text-align: center; }
+
+  .axis {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 0.93rem;
+    line-height: 1.3;
+  }
+  .axis small {
+    display: block;
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--ink-3);
+    letter-spacing: 0;
+  }
+  .big {
+    font-family: var(--f-mono);
+    font-weight: 600;
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+  .big em {
+    font-style: normal;
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--ink-3);
+  }
+
+  .meter {
+    display: flex;
+    gap: 2px;
+    height: 13px;
+  }
+  .meter i {
+    flex: 1;
+    background: var(--rule-soft);
+    border-radius: 1px;
+  }
+  .meter i.on { background: var(--accent); }
+  .meter.lo i.on { background: var(--crit); }
+  .meter.mid i.on { background: var(--warn); }
+
+  .sub {
+    font-family: var(--f-mono);
+    font-size: 0.94rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+  }
+  .sub.weak { color: var(--crit); font-weight: 600; }
+
+  /* ── Channel matrix ───────────────────────────────────── */
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 660px;
+    background: var(--surface);
+    font-family: var(--f-display);
+    font-size: 0.9rem;
+  }
+  th, td {
+    padding: 12px 14px;
+    text-align: center;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  thead th {
+    background: var(--surface-2);
+    font-family: var(--f-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+  tbody th {
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody th small {
+    display: block;
+    font-family: var(--f-mono);
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--ink-3);
+    letter-spacing: 0.02em;
+  }
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom: none; }
+  td.n {
+    font-family: var(--f-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  td.n[data-band="hi"]  { background: var(--good-wash); color: var(--good); }
+  td.n[data-band="mid"] { background: var(--warn-wash); color: var(--warn); }
+  td.n[data-band="lo"]  { background: var(--crit-wash); color: var(--crit); }
+
+  /* ── Findings ─────────────────────────────────────────── */
+
+  .findings { display: flex; flex-direction: column; gap: 20px; }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--ink-3);
+    padding: 22px 26px;
+  }
+  .finding[data-sev="crit"] { border-left-color: var(--crit); }
+  .finding[data-sev="warn"] { border-left-color: var(--warn); }
+  .finding[data-sev="note"] { border-left-color: var(--accent); }
+
+  .fhead {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .rank {
+    font-family: var(--f-mono);
+    font-size: 0.98rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+    letter-spacing: -0.02em;
+  }
+  .ftitle {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.09rem;
+    line-height: 1.28;
+    letter-spacing: -0.005em;
+    flex: 1 1 320px;
+    text-wrap: balance;
+  }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .chip.crit { background: var(--crit-wash); color: var(--crit); }
+  .chip.warn { background: var(--warn-wash); color: var(--warn); }
+  .chip.note { background: var(--accent-wash); color: var(--accent-ink); }
+  .chip.eff  { background: var(--surface-2); color: var(--ink-3); }
+
+  .finding p { max-width: 74ch; margin-bottom: 12px; }
+  .finding p:last-child { margin-bottom: 0; }
+
+  .evidence {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    line-height: 1.75;
+    color: var(--ink-3);
+    background: var(--surface-2);
+    padding: 11px 14px;
+    margin: 14px 0;
+    border-radius: 2px;
+    overflow-x: auto;
+  }
+  .evidence b { color: var(--ink-2); font-weight: 500; }
+
+  .fix {
+    font-family: var(--f-display);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--ink-2);
+    border-top: 1px solid var(--rule-soft);
+    padding-top: 12px;
+    margin-top: 14px;
+    max-width: 74ch;
+  }
+  .fix b {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+
+  /* ── Keep / limits lists ──────────────────────────────── */
+
+  .keep { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .keepcard {
+    background: var(--good-wash);
+    border-left: 3px solid var(--good);
+    padding: 18px 20px;
+  }
+  .keepcard h4 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 0.98rem;
+    margin: 0 0 8px;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .keepcard p { font-size: 0.94rem; color: var(--ink-2); margin: 0; }
+
+  ul.plain { margin: 0; padding-left: 1.15em; max-width: 72ch; }
+  ul.plain li { margin-bottom: 9px; }
+  ul.plain li::marker { color: var(--accent); }
+
+  /* ── Doel-keten ───────────────────────────────────────── */
+
+  .keten { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin-bottom: 26px; }
+  .lus {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--accent);
+    padding: 20px 22px;
+  }
+  .lus .cad {
+    font-family: var(--f-mono);
+    font-size: 10.5px; letter-spacing: 0.11em; text-transform: uppercase;
+    color: var(--accent); font-weight: 500; margin: 0 0 4px;
+  }
+  .lus .freq { font-family: var(--f-mono); font-size: 11px; color: var(--ink-3); margin: 0 0 12px; }
+  .lus h4 { font-family: var(--f-display); font-size: 1.02rem; font-weight: 600; margin: 0 0 10px; line-height: 1.3; }
+  .lus p { font-size: 0.93rem; margin: 0 0 10px; }
+  .lus p:last-child { margin: 0; }
+  .lus .bron {
+    font-family: var(--f-mono); font-size: 10.5px; color: var(--ink-3);
+    border-top: 1px solid var(--rule-soft); padding-top: 9px; margin-top: 12px; line-height: 1.6;
+  }
+  .breuk {
+    background: var(--crit-wash);
+    border-left: 3px solid var(--crit);
+    padding: 16px 20px;
+    font-size: 0.95rem;
+    max-width: 78ch;
+  }
+  .breuk b { font-family: var(--f-display); }
+
+  /* ── Fasen ────────────────────────────────────────────── */
+
+  .fase {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 22px 26px;
+    margin-bottom: 16px;
+  }
+  .fasehead { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .fasenr {
+    font-family: var(--f-mono); font-size: 0.95rem; font-weight: 600;
+    color: var(--accent); letter-spacing: -0.02em;
+  }
+  .fasehead h4 { font-family: var(--f-display); font-size: 1.09rem; font-weight: 600; margin: 0; flex: 1 1 300px; line-height: 1.28; }
+  .effect {
+    font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--accent-wash); color: var(--accent-ink); padding: 4px 8px; border-radius: 2px;
+  }
+  .fase > p { max-width: 76ch; font-size: 0.96rem; margin: 10px 0 0; }
+  .fase ul { margin: 12px 0 0; padding-left: 1.15em; max-width: 76ch; font-size: 0.95rem; }
+  .fase ul li { margin-bottom: 7px; }
+  .fase ul li::marker { color: var(--accent); }
+
+  .gedaan {
+    background: var(--good-wash);
+    border-left: 3px solid var(--good);
+    padding: 16px 20px;
+    margin-top: 16px;
+    font-size: 0.95rem;
+    max-width: 78ch;
+  }
+  .gedaan b { font-family: var(--f-display); }
+  .gedaan ul { margin: 10px 0 0; padding-left: 1.15em; }
+  .gedaan li { margin-bottom: 6px; }
+  .gedaan li::marker { color: var(--good); }
+  .klaar {
+    font-family: var(--f-mono);
+    font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--good-wash); color: var(--good); padding: 4px 8px; border-radius: 2px;
+  }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    line-height: 1.8;
+    color: var(--ink-3);
+    max-width: 78ch;
+  }
+
+  @media (max-width: 760px) {
+    body { font-size: 16px; }
+    .shell { padding: 0 18px 64px; }
+
+    /* Inline code staat op nowrap zodat een naam als sop_recommendations niet middenin
+       breekt. Bij de langere spans -- "expectedStepNumbers: [1, 6, 7, 8, 9, 10, 12, 13]"
+       is met 394px de breedste -- duwde dat op een telefoon de hele PAGINA breder: 21px
+       horizontale schuif bij 420px, 121px bij 320px. Een leesbare naam is die schuif niet
+       waard, dus onder deze grens mag een span wel afbreken. In volgorde van voorkeur:
+       eerst op een spatie die er al staat (die zitten alleen in de lange spans), en pas
+       als één woord zelf breder is dan de kolom middenin dat woord. Boven deze grens
+       verandert er niets -- daar past alles. */
+    code, .path { white-space: normal; overflow-wrap: break-word; }
+    .scorehead { display: none; }
+    .scorerow {
+      grid-template-columns: 1fr 70px;
+      grid-template-areas: "axis big" "meter meter" "s1 s1";
+      gap: 8px 12px;
+    }
+    .scorerow .axis { grid-area: axis; }
+    .scorerow .big { grid-area: big; text-align: right; }
+    .scorerow .meter { grid-area: meter; }
+    .scorerow .sub { display: none; }
+  }
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <p class="eyebrow">Ctrl-PPC · codeaudit · 24–25 augustus 2026</p>
+    <h1>SOP Kanaalanalyse</h1>
+    <p class="standfirst">
+      Negen SOP-combinaties — drie kanalen maal drie cadansen — gelezen op logica, kwaliteit,
+      reproduceerbaarheid, leercyclus, geheugen, volwassenheid en dekking. De maandanalyse is
+      volwassen en kanaal-eigen. De weekly en bi-weekly zijn dat niet. Onderaan staat het stappenplan
+      naar 8+ op elke as — bijna volledig bedrading, geen herbouw. Sinds 25 augustus is er een
+      vierde kanaal: Microsoft Ads (Bing), gebouwd óp de vorm die dit rapport afdwong — twaalf
+      combinaties, zie fase 7 -- en fase 8 trok Meta en LinkedIn op datzelfde niveau. Fase 9
+      bouwde vervolgens de aanvoer: sync-aansluitpunten voor alle vier de kanalen op eigen
+      klantsleutels, met sloten op toegang en kosten. Fase 10 is de eindcheck — 105
+      deterministische checks en dertien live runs, met wat die nog ving.
+    </p>
+    <div class="runinfo">
+      <span><b>Repo</b> tristanvanduin/Ctrl-PPC</span>
+      <span><b>Branch</b> claude/sop-kanaal-analyse-9na6v3</span>
+      <span><b>Methode</b> broncode gelezen, elke bevinding met bestand:regel</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Kernoordeel</h2>
+    <p class="sectionnote">De stand in zes zinnen.</p>
+    <div class="verdict">
+      <p>
+        De <strong>monthly</strong> is een serieus product. Alle drie de kanalen hebben een eigen,
+        vakinhoudelijk kloppende zes- tot dertienstaps-analyse met eigen drempelwaarden, eigen
+        issue-taxonomie en eerlijke datalimieten die in de prompt zelf staan. Meta kent hook rate,
+        Advantage+ en Audience Network; LinkedIn kent ICP-fit, form completion en het feit dat
+        LinkedIn geen frequency per creative geeft. Dat is geen Google-sjabloon met andere woorden.
+      </p>
+      <p>
+        De <strong>weekly en bi-weekly</strong> zijn dat wel, en dat is waar het geld ligt. Ze draaien
+        het vaakst (52 en 26 keer per jaar per kanaal, tegen 12 voor de monthly), ze zijn het
+        dunst onderbouwd, en de hele verrijkingslaag — strategische context, sectorbenchmarks,
+        wijzigingshistorie, hypothese-tracking — bereikt daar alléén Google. Meta en LinkedIn
+        krijgen in beide cadansen exact twee contextblokken waar Google er acht krijgt.
+      </p>
+      <p>
+        Het ene ding dat het meest zou opleveren: <strong>de verrijkingslaag doortrekken naar Meta
+        en LinkedIn</strong>. De code bestaat al, is kanaalneutraal geschreven en wordt in zes van de
+        negen combinaties simpelweg niet aangeroepen.
+      </p>
+      <p>
+        Eerst is wel een kleinere, hardere reparatie nodig. De LinkedIn-sync eindigt bij de laatste
+        afgesloten kalendermaand, terwijl de LinkedIn-weekly de laatste veertien dagen opvraagt. Die
+        twee vensters raken elkaar het grootste deel van de maand niet, en de weekly geeft dan een 404
+        die de gebruiker vertelt te syncen — terwijl de sync correct heeft gedraaid.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Scorekaart</h2>
+    <p class="sectionnote">
+      Zeven assen, 1–10, voor het systeem als geheel. De drie kolommen rechts splitsen dezelfde as
+      uit naar cadans, want daar zit vrijwel het hele verschil. <b>Dit is de NULMETING</b> — de stand
+      bij het lezen, vóór het stappenplan onderaan. Ze zijn bewust niet bijgesteld: zonder een echte
+      run is een hogere score een verwachting en geen meting, en dat onderscheid is de helft waard
+      van wat hier staat.
+    </p>
+
+    <div class="scoregrid">
+      <div class="scorehead">
+        <span>As</span><span>Systeem</span><span></span>
+        <span>Wk</span><span>2-wk</span><span>Mnd</span>
+      </div>
+
+      <div class="scorerow">
+        <div class="axis">Logica<small>klopt de redeneerketen, kan de stap zijn eigen vraag beantwoorden</small></div>
+        <div class="big">6<em>/10</em></div>
+        <div class="meter mid"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        <div class="sub weak">4</div><div class="sub">5</div><div class="sub">8</div>
+      </div>
+
+      <div class="scorerow">
+        <div class="axis">Kwaliteit<small>vakinhoudelijke diepte, drempelwaarden, output-discipline</small></div>
+        <div class="big">7<em>/10</em></div>
+        <div class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+        <div class="sub">5</div><div class="sub">5</div><div class="sub">8</div>
+      </div>
+
+      <div class="scorerow">
+        <div class="axis">Consistentie<small>kans dat twee runs op dezelfde data hetzelfde opleveren</small></div>
+        <div class="big">6<em>/10</em></div>
+        <div class="meter mid"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        <div class="sub">5</div><div class="sub">5</div><div class="sub">7</div>
+      </div>
+
+      <div class="scorerow">
+        <div class="axis">Leercyclus<small>hypothese → actie → meting → conclusie, gesloten of niet</small></div>
+        <div class="big">4<em>/10</em></div>
+        <div class="meter lo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sub weak">1</div><div class="sub">4</div><div class="sub">6</div>
+      </div>
+
+      <div class="scorerow">
+        <div class="axis">Agency memory<small>onthoudt het systeem wat het eerder zei en wat werkte</small></div>
+        <div class="big">4<em>/10</em></div>
+        <div class="meter lo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sub weak">1</div><div class="sub">3</div><div class="sub">6</div>
+      </div>
+
+      <div class="scorerow">
+        <div class="axis">Volwassenheid<small>draait het vanzelf, faalt het zichtbaar, blokkeert de poort</small></div>
+        <div class="big">5<em>/10</em></div>
+        <div class="meter mid"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sub">5</div><div class="sub">5</div><div class="sub">7</div>
+      </div>
+
+      <div class="scorerow">
+        <div class="axis">Dekking<small>bestaan alle negen combinaties, dekt de analyse het kanaal</small></div>
+        <div class="big">6<em>/10</em></div>
+        <div class="meter mid"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        <div class="sub weak">3</div><div class="sub">6</div><div class="sub">8</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Per kanaal</h2>
+    <p class="sectionnote">
+      Gemiddeld over de drie cadansen. Het patroon is stelselmatig: Google wint op context en
+      handhaving, Meta en LinkedIn winnen op datagranulariteit in de weekly — en verliezen overal
+      waar de verrijkingslaag telt.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col" style="text-align:left">Kanaal</th>
+            <th scope="col">Logica</th>
+            <th scope="col">Kwaliteit</th>
+            <th scope="col">Consistentie</th>
+            <th scope="col">Leercyclus</th>
+            <th scope="col">Memory</th>
+            <th scope="col">Volwassen&shy;heid</th>
+            <th scope="col">Dekking</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Google Ads<small>SEA · 13 stappen</small></th>
+            <td class="n" data-band="hi">7</td>
+            <td class="n" data-band="hi">7</td>
+            <td class="n" data-band="hi">7</td>
+            <td class="n" data-band="mid">6</td>
+            <td class="n" data-band="mid">6</td>
+            <td class="n" data-band="hi">7</td>
+            <td class="n" data-band="hi">8</td>
+          </tr>
+          <tr>
+            <th scope="row">Meta Ads<small>6 pijlers</small></th>
+            <td class="n" data-band="mid">6</td>
+            <td class="n" data-band="hi">7</td>
+            <td class="n" data-band="mid">5</td>
+            <td class="n" data-band="lo">3</td>
+            <td class="n" data-band="lo">3</td>
+            <td class="n" data-band="mid">5</td>
+            <td class="n" data-band="mid">6</td>
+          </tr>
+          <tr>
+            <th scope="row">LinkedIn Ads<small>6 pijlers</small></th>
+            <td class="n" data-band="mid">6</td>
+            <td class="n" data-band="hi">7</td>
+            <td class="n" data-band="mid">5</td>
+            <td class="n" data-band="lo">3</td>
+            <td class="n" data-band="lo">3</td>
+            <td class="n" data-band="lo">4</td>
+            <td class="n" data-band="lo">4</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+
+  <section>
+    <h2>Waar elke SOP voor bedoeld is</h2>
+    <p class="sectionnote">
+      Drie regellussen met een verschillende tijdconstante. Dit staat zo in de prompts zelf en in
+      <code>docs/ANALYSE-LOGICA.md</code> §5 — het is geen reconstructie achteraf.
+    </p>
+
+    <div class="keten">
+      <div class="lus">
+        <p class="cad">Weekly</p>
+        <p class="freq">52× per jaar per kanaal · venster 14 dagen</p>
+        <h4>De rookmelder</h4>
+        <p>
+          Vroeg signaleren van anomalieën en ad waste. Bleeders, spend-afwijkingen, en vóór alles een
+          tracking-verificatie die de rest van de week gijzelt: bij een vermoedelijke break mag er geen
+          enkel performance-advies volgen.
+        </p>
+        <p>Expliciet géén diepe analyse. Wat kan wachten, gaat door naar de bi-weekly.</p>
+        <p class="bron">sop-prompts.ts:1688 "vroeg signaleren van anomalies en ad waste. Geen diepe analyse."<br>ANALYSE-LOGICA.md §5.2 "snelle actie op urgente problemen"</p>
+      </div>
+
+      <div class="lus">
+        <p class="cad">Bi-weekly</p>
+        <p class="freq">26× per jaar per kanaal · venster 3 maanden</p>
+        <h4>De tussentijdse toetsing</h4>
+        <p>
+          Ontwikkelt de maand zich zoals de maandanalyse voorspelde? Elke stap moet expliciet
+          terugverwijzen ("Zoals geïdentificeerd in de maandanalyse…"), een maandeindprognose geven, en
+          beoordelen of doorgevoerde hypotheses al meetbaar effect tonen.
+        </p>
+        <p>Halverwege bijsturen, niet opnieuw diagnosticeren.</p>
+        <p class="bron">sop-prompts.ts:1465 "ontwikkelt de maand zich zoals verwacht?"<br>ANALYSE-LOGICA.md §5.3 "Checkt of geïmplementeerde hypotheses meetbaar effect tonen"</p>
+      </div>
+
+      <div class="lus">
+        <p class="cad">Monthly</p>
+        <p class="freq">12× per jaar per kanaal · venster 13 maanden</p>
+        <h4>De diagnose en het plan</h4>
+        <p>
+          De volledige doorloop per kanaal, eindigend in de pijler die alles draagt: hypotheses en
+          sprintplanning. Elke hypothese krijgt een actie, een meetbare verwachting, een metric, een
+          tijdshorizon en een ICE-score.
+        </p>
+        <p>Dit is het enige moment waarop het systeem een <em>belofte</em> doet die later afgerekend kan worden.</p>
+        <p class="bron">adapters/{meta,linkedin}-ads.ts stap 6, monthly-v2.ts:590 "Hypotheses &amp; Sprintplanning"<br>sop-prompts.ts:196-276 HYPOTHESE_INSTRUCTIES (ICE, tijdshorizon, verantwoordelijke)</p>
+      </div>
+    </div>
+
+    <p class="col" style="max-width:76ch">
+      Zo bedoeld is dit een geneste regelkring: de monthly stelt het plan op, de bi-weekly toetst het
+      plan halverwege, de weekly vangt wat niet tot de volgende toetsing kan wachten. Elke lus voedt de
+      volgende. <strong>De implementatie breekt beide koppelingen.</strong>
+    </p>
+
+    <div class="breuk">
+      <p style="margin:0 0 10px">
+        <b>Monthly → bi-weekly.</b> De koppeling bestaat, maar via de verkeerde bron: de bi-weekly leest
+        het narratieve <code>full</code>-document in plaats van de gestructureerde hypotheses uit
+        <code>structured_monthly_v2</code>. Het model krijgt dus proza waarin de beloftes ergens staan,
+        niet de beloftes als velden. En de hypothese-tracking bereikt alleen Google.
+      </p>
+      <p style="margin:0 0 10px">
+        <b>Monthly/bi-weekly → weekly.</b> Deze koppeling bestaat niet. De weekly leest geen enkele
+        eerdere SOP-output, geen hypotheses, geen open acties. Van de drie lussen is de lus die het
+        vaakst draait de enige die volledig losstaat.
+      </p>
+      <p style="margin:0">
+        <b>Terug omhoog.</b> De monthly ziet niet wat de weekly die maand heeft gevlagd, en de
+        hypothese-evaluator die de belofte zou afrekenen is nooit gedraaid. De kring is dus nergens
+        rond — niet omdat de onderdelen ontbreken, maar omdat ze niet aan elkaar geknoopt zijn.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Bevindingen en kansen</h2>
+    <p class="sectionnote">
+      Gerangschikt op impact gedeeld door inspanning. Elke bevinding is in de broncode nagelopen;
+      het bewijsblok geeft de exacte regels waar het zichtbaar is.
+    </p>
+
+    <div class="findings">
+
+      <article class="finding" data-sev="crit">
+        <div class="fhead">
+          <span class="rank">01</span>
+          <h3 class="ftitle" style="margin:0">Elke SOP-run wist de openstaande voorstellen van de vorige</h3>
+          <span class="chips"><span class="klaar">Opgelost</span><span class="chip crit">Hoog</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          Alle zes weekly- en bi-weekly-varianten schrijven hun hypotheses weg onder één en dezelfde
+          bron: <code>"analysis"</code>. En die schrijfweg heeft vervang-semantiek —
+          <code>saveProposalsReplacingPending</code> verwijdert eerst alle bestaande
+          <code>pending</code>-rijen van die bron voor die klant.
+        </p>
+        <p>
+          Het gevolg is direct dataverlies: draait de Meta-weekly ná de Google-weekly, dan zijn de
+          openstaande voorstellen van Google weg. Van de zes varianten houdt alleen de laatst
+          gedraaide iets over. Dat is geen degradatie maar actieve schade, en het is het enige
+          mechanisme in dit rapport dat werk vernietigt in plaats van het te missen.
+        </p>
+        <p>
+          Opvallend: de 22 kleinere deelanalyses kregen juist élk een eigen bron —
+          <code>meta_signals</code>, <code>linkedin_icp</code>, <code>geo_markets</code> en zo verder —
+          precies om dit te voorkomen. De zes hoofd-SOP's zijn de uitzondering.
+        </p>
+        <div class="evidence">
+extract-structured.ts:331   saveProposalsReplacingPending(supabase, clientId, <b>"analysis"</b>, hypotheseRows)<br>
+extract-structured.ts:54    sopType: "weekly" | "biweekly" | "monthly" | "meta_weekly" | "linkedin_weekly" | "meta_biweekly" | "linkedin_biweekly"<br>
+findings-to-hypotheses.ts:157-168  "Leg de bestaande pending-ids van deze bron vast" → daarna verwijderen<br>
+findings-to-hypotheses.ts:117-140  ProposalSource kent al 23 bronnen; de zes SOP-varianten delen er één
+        </div>
+        <p class="fix"><b>Opgelost</b>
+          Elke variant schrijft nu onder zijn eigen <code>sop_type</code>; <code>"analysis"</code>
+          blijft gereserveerd voor de maand. Bij het bouwen kwam er een tweede fout in dezelfde regel
+          boven water: omdat <code>"analysis"</code> de maandbron is en de wachtrij die bewust uitsluit,
+          werden weekly- en bi-weekly-voorstellen weggeschreven <em>en daarna verborgen</em>. Ze
+          verschijnen nu voor het eerst — geen neveneffect maar het herstel.
+        </p>
+        <div class="gedaan" style="margin-top:12px">
+          <p style="margin:0 0 8px"><b>En nog een derde, in de kanaalafleiding.</b>
+          <code>channelOfSource()</code> werkte met handmatig bijgehouden sleutellijsten waar
+          <code>meta_weekly</code> en <code>linkedin_biweekly</code> niet in stonden. Die zouden in de
+          wachtrij als Google gelabeld zijn — een verkeerde badge is erger dan geen badge, want hij
+          beweert iets. Er staat nu een prefixregel naast de lijsten, dezelfde afleiding die
+          <code>extract-structured.ts</code> al deed.</p>
+          <p style="margin:0">
+            De mapping stond op het punt op twee plekken te ontstaan; dat is nu één
+            <code>proposalSourceForSopType()</code> — precies waar de hygiënepoort voor bestaat, en
+            hier zwaarder dan gewoonlijk: lopen twee kopieën uiteen, dan wist de een weer de
+            voorstellen van de ander.
+          </p>
+          <p style="margin:10px 0 0">
+            <b>De aangekondigde opruiming, en wat de meting ervan zei.</b> Ik schreef hierboven dat de
+            pending rijen van vóór deze wijziging door niets meer worden opgeruimd. Dat klopte als
+            mechanisme, maar niet als omvang — en dat is precies het verschil tussen een redenering en
+            een query. Van de 121 rijen onder <code>"analysis"</code> zijn er 84 pending en terecht
+            zo gelabeld (het zijn maandvoorstellen), 36 al beslist (accepted, rejected, completed —
+            die blijven staan, wat er ook op hun label staat), en is er <b>één</b> echte wees: een
+            bi-weekly-voorstel, op de demo-klant.
+          </p>
+          <p style="margin:10px 0 0">
+            Herstellen dus, niet verwijderen. "Wees" betekent hier verkeerd geëtiketteerd, niet
+            waardeloos: de rij draagt een volledige hypothese met ICE-score uit een analyse die echt
+            gedraaid heeft. Met de bron rechtgezet verschijnt hij alsnog in de wachtrij en vervangt de
+            eerstvolgende bi-weekly hem netjes — precies het gedrag dat de splitsing beoogde. De
+            migratie is geschreven op de <em>vorm</em> van het probleem en niet op die ene rij: op een
+            database waar de zes varianten wél vaak gedraaid hebben, herstelt hij ze allemaal.
+          </p>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="crit">
+        <div class="fhead">
+          <span class="rank">02</span>
+          <h3 class="ftitle" style="margin:0">De LinkedIn-weekly kan op live data niet draaien: de sync stopt bij vorige maand</h3>
+          <span class="chips"><span class="chip crit">Hoog</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          De LinkedIn-sync zet zijn eindpunt op <code>lastCompleteMonthEnd()</code> — de laatste dag van
+          de vorige <em>afgesloten</em> kalendermaand — en haalt daarvandaan een venster van 30 dagen
+          terug. Zowel de backfill als de dagelijkse sync gebruiken diezelfde einddatum. De
+          LinkedIn-weekly vraagt intussen om <code>daysAgo(14)</code> tot vandaag.
+        </p>
+        <p>
+          Op 24 augustus betekent dat: de sync vult 2 juli tot en met 31 juli, de weekly vraagt 10 tot
+          24 augustus. Geen enkele overlap. <code>accountRows.length === 0</code>, en de route geeft een
+          404 met "Sync de data via POST /api/sync" — terwijl de sync precies heeft gedaan wat hij hoort
+          te doen. Alleen in de eerste twee weken van een maand is er gedeeltelijke overlap; de rest van
+          de maand kán deze SOP niet draaien.
+        </p>
+        <p>
+          Er zijn vandaag geen live klanten, dus dit is nooit als storing zichtbaar geweest. Het is wel
+          aantoonbaar uit de code alleen, en het is geen ontwerpkeuze: <code>sync-windows.ts</code>
+          exporteert <code>todayUTC()</code> en legt in zijn eigen kop uit waarom de dagelijkse sync een
+          trailing venster tot vandaag nodig heeft (LinkedIn herschrijft conversies met terugwerkende
+          kracht binnen 30 dagen). Die functie wordt buiten tests nergens gebruikt. De maandgrens hoort
+          bij de <em>backfill</em>, en is per ongeluk ook de einddatum van de daily geworden.
+        </p>
+        <p>
+          Naast dit staat een tweede leveringsprobleem, van een andere orde: <code>lib/meta/sync.ts</code>
+          wordt door geen enkele productiecode geïmporteerd en staat als toegestane wees in
+          <code>check-hygiene.mjs</code>, met de reden "orkestratie gebouwd, HTTP-calls live-ongetest en
+          gated op MDP-approval". De Meta-entiteitstabellen worden dus door niets gevuld, waardoor
+          <code>fetchNameMap</code> leeg terugkomt en de Meta-analyses campagnes en ad sets bij hun kale
+          Facebook-ID noemen. Dat is een gedocumenteerde, externe blokkade — geen fout — maar het
+          betekent wel dat het Meta-oordeel in dit rapport over de code gaat en niet over live output.
+        </p>
+        <div class="evidence">
+sync/linkedin/route.ts:52-57,135   lastCompleteMonthEnd() → endDate, voor backfill én daily<br>
+linkedin/sync-windows.ts:26-30     trailingWindow(endDate, 30) — 30 dagen <b>eindigend</b> op die datum<br>
+weekly/route.ts:545-548            periodStart = daysAgo(14), periodEnd = vandaag<br>
+weekly/route.ts:576-585            accountRows.length === 0 → <b>404</b> "Sync de data via POST /api/sync"<br>
+check-hygiene.mjs:163              lib/meta/sync.ts — "gated op MDP-approval", nul productie-imports
+        </div>
+        <p class="fix"><b>Kans</b>
+          Laat de dagelijkse LinkedIn-sync tot gisteren lopen in plaats van tot het einde van de vorige
+          maand; alleen de <em>backfill</em> heeft een maandgrens nodig. Het is één functie-aanroep op
+          regel 135. Zolang dat niet kan, hoort de LinkedIn-weekly niet als beschikbare combinatie in de
+          UI te staan — een 404 die "sync je data" zegt terwijl de sync correct heeft gedraaid, kost
+          iemand een middag zoeken.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="crit">
+        <div class="fhead">
+          <span class="rank">03</span>
+          <h3 class="ftitle" style="margin:0">De verrijkingslaag bereikt alleen Google — in alle negen combinaties</h3>
+          <span class="chips"><span class="chip crit">Hoog</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          <code>buildEnrichmentContext</code> levert strategische context, dimensiebeschikbaarheid,
+          leading indicators, sectorbenchmarks, wijzigingshistorie, geo-context en hypothese-tracking.
+          Hij wordt in elke route precies één keer aangeroepen: binnen de Google-tak. Meta en
+          LinkedIn krijgen twee contextblokken waar Google er acht krijgt.
+        </p>
+        <div class="breuk" style="margin:14px 0">
+          <p style="margin:0"><b>Correctie na het bouwen.</b> Deze bevinding stond er eerst met de
+          conclusie "de laag is kanaalneutraal geschreven, hij wordt alleen niet aangeroepen" en met
+          de inschatting dat doortrekken de grootste opbrengst per regel code zou zijn. Dat klopte
+          niet. De <em>matrix</em> is op cadans gesleuteld, maar zes van de acht <em>lagen</em>
+          bevragen <code>ads_*</code>-tabellen — Google Ads-tabellen. Ze zomaar aanroepen voor Meta
+          of LinkedIn levert geen lege laag op maar een <strong>verkeerde</strong>: Google-data
+          gepresenteerd als context van een ander kanaal. Het scherpste geval is
+          <code>sectorBenchmarks</code>, dat "Bron: WordStream/LocaliQ/Triple Whale" draagt —
+          Search-benchmarks. Een Meta-feed-CTR van 1,2% is gezond en zou daartegen als ver
+          ondergemiddeld lezen, terwijl de preambule voor dat kanaal al <code>META_BENCHMARKS</code>
+          injecteert. Twee elkaar tegensprekende benchmarkblokken in dezelfde prompt is erger dan
+          één ontbrekend blok.</p>
+        </div>
+        <div class="evidence">
+weekly/route.ts:148  <b>google</b>   strategicContext + targetText + dimAvail + reliability + leadingIndicators + sectorBenchmarks + changeHistory + geoContext<br>
+weekly/route.ts:385  <b>meta</b>     targetText + reliability<br>
+weekly/route.ts:611  <b>linkedin</b> targetText + reliability<br>
+biweekly/route.ts:205 <b>google</b>   idem + hypothesisTracking<br>
+biweekly/route.ts:469 <b>meta</b>     targetText + reliability<br>
+biweekly/route.ts:736 <b>linkedin</b> targetText + reliability<br>
+monthly/route.ts:1876 <b>google</b>   — Meta returnt op 1597, LinkedIn op 1600, ruim vóór deze regel
+        </div>
+        <p class="fix"><b>Kans</b>
+          Maak de laag kanaalbewust in plaats van hem simpelweg aan te roepen: de zes Google-only
+          lagen worden overgeslagen <em>en gemeld</em>, zodat de afwezigheid als structureel leest en
+          niet als "er was niets te melden". De echte opbrengst voor Meta en LinkedIn is daarmee
+          klein: de twee overgebleven kanaalneutrale lagen —
+          <code>sop_client_context</code> en <code>sop_hypothesis_tracking</code> — hebben in de hele
+          codebase <strong>geen enkele schrijver</strong> en leveren vandaag dus niets. Wat de ingreep
+          wél oplevert is de plek waar een kanaaleigen equivalent ingeplugd kan worden, en de zekerheid
+          dat er geen Search-benchmark in een Meta-analyse belandt.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="crit">
+        <div class="fhead">
+          <span class="rank">04</span>
+          <h3 class="ftitle" style="margin:0">Drie stappen vragen om cijfers die hun route nooit meestuurt</h3>
+          <span class="chips"><span class="chip crit">Hoog</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          Dit is geen incident maar een patroon: een stap-prompt vraagt om een concreet getal, het
+          output-format eist dat getal ("[metric] steeg van [waarde] naar [waarde]"), en de route stuurt
+          de data waaruit dat getal zou volgen niet mee. Onder <code>NUMBER_DISCIPLINE</code> moet het
+          model dan weigeren of iets verzinnen. Drie gevallen, alle drie nagelopen:
+        </p>
+        <p>
+          <strong>Google weekly, stap 3.</strong> Gevraagd: campagnes met meer dan 30% spend-afwijking
+          week-over-week, plus campagnes die minder dan de helft van hun dagbudget opmaken. Geleverd:
+          <code>ads_campaign_monthly</code> — maandrijen, geen budgetkolom. Uit maandtotalen komt geen
+          weekdelta en geen budgetbenutting. De prompt geeft het zelf toe met "(laatste 2 maanden als proxy)".
+        </p>
+        <p>
+          <strong>Google bi-weekly, stap 4.</strong> De stap heet "Device &amp; Engagement" en vraagt om
+          device-specifieke afwijkingen met een waarde ervoor en erna. De userMessage bevat de conclusies
+          van stap 1 tot en met 3 en verder niets — geen enkele device-rij. De monthly-route haalt
+          <code>ads_device_performance_monthly</code> wél op; de bi-weekly-route bevraagt die tabel niet.
+        </p>
+        <p>
+          <strong>LinkedIn bi-weekly, stap 4.</strong> "Bidding &amp; Pacing" vraagt of een campagne vroeg
+          leegloopt of onderbesteed blijft, en of een CPL-stijging op een te laag bod wijst. Geleverd:
+          maandelijks geaggregeerde campagnerijen. Uit een maandtotaal is geen pacingcurve af te lezen, en
+          <code>daily_budget</code>, <code>unit_cost</code> en <code>bid_strategy</code> — die in
+          <code>linkedin_campaigns</code> gewoon bestaan — worden nergens geselecteerd.
+        </p>
+        <p>
+          Omgekeerd valt op dat Meta en LinkedIn in de weekly juist <em>wel</em> dagelijkse campagnerijen
+          krijgen, expliciet gelabeld "voor spend-anomalie WoW-check". De scheefheid loopt dus niet één
+          kant op — het is geen kanaalprobleem maar een koppelingsprobleem tussen prompt en route.
+        </p>
+        <div class="evidence">
+sop-prompts.ts:1842,1845,1847  <b>google weekly 3</b>  "campaign_monthly (laatste 2 maanden als proxy)" / "&gt;30% WoW" / "&lt;50% van het budget"<br>
+weekly/route.ts:82,215         geleverd: ads_campaign_monthly, gte month = daysAgo(60) — geen budgetkolom<br>
+sop-prompts.ts:1630            <b>google bi-weekly 4</b>  "Gebruik: device performance data indien beschikbaar"<br>
+biweekly/route.ts:280-293      userMessage stap 4: alleen de conclusies 1-3 — <b>geen device-blok</b><br>
+monthly/route.ts:1663          ads_device_performance_monthly — de monthly haalt hem wél op<br>
+biweekly-channel-content.ts:61-69  <b>linkedin bi-weekly 4</b>  "loopt vroeg leeg dan wel blijft onderbesteed"<br>
+biweekly/route.ts:817-820      geleverd: campaignMonthly (maandaggregatie)<br>
+linkedin/entities.ts:107-110   daily_budget, unit_cost, bid_strategy, cost_type — bestaan, worden niet geselecteerd<br>
+weekly/route.ts:440,666        <b>meta/linkedin weekly 3</b>  wél daily: "voor spend-anomalie WoW-check"
+        </div>
+        <p class="fix"><b>Kans</b>
+          Per geval een kleine, losstaande ingreep: voeg een wekelijkse campagne-aggregatie plus de
+          dagbudgetkolom toe aan de Google-weekly; voeg <code>ads_device_performance_monthly</code> toe aan
+          de <code>Promise.all</code> van de Google bi-weekly; en vervang de LinkedIn-naamlookup door een
+          select die <code>daily_budget</code>, <code>unit_cost</code> en <code>bid_strategy</code>
+          meeneemt, met de dagrijen van de lopende maand erbij. Waar dat niet kan, haal de vraag uit de
+          prompt in plaats van hem te laten staan als iets wat alleen met een gok te beantwoorden is.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="crit">
+        <div class="fhead">
+          <span class="rank">05</span>
+          <h3 class="ftitle" style="margin:0">De kwaliteitspoort blokkeert niet bij opslaan, en bij export alleen voor Google</h3>
+          <span class="chips"><span class="chip crit">Hoog</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          <code>buildMonthlyQualityGate</code> berekent netjes <code>passed</code>,
+          <code>state</code> en <code>blocking_reasons</code>. Daarna schrijft de route
+          <code>full</code>, <code>structured_monthly_v2</code> en de findings/recommendations/tasks
+          onvoorwaardelijk weg — er staat nergens een <code>if (!qualityGate.passed)</code>. De enige
+          echte blokkade zit in de PDF-route, achter <code>if (sopType === "monthly")</code>. Meta en
+          LinkedIn slaan hun output op onder <code>meta_monthly</code> en <code>linkedin_monthly</code>,
+          dus die tak vuurt voor hen nooit.
+        </p>
+        <p>
+          Er is een tweede laag aan dezelfde asymmetrie: Meta en LinkedIn geven een lege
+          <code>stepValidations</code> mee, waardoor de <code>blocked_invalid_steps</code>-tak van de
+          poort bij hen structureel niet kan afgaan. De P0 uit <code>sop_audit.md</code> —
+          "maak step validation hard-blocking voor structured save en PDF-export" — is dus voor één
+          kanaal en één van de twee uitgangen geïmplementeerd.
+        </p>
+        <div class="evidence">
+monthly/route.ts:1079      qualityGate = buildMonthlyQualityGate(...)<br>
+monthly/route.ts:1092,1099,1100,1125 save("quality_gate…"), save("full"), save("structured_monthly_v2"), persistMonthlyStructuredData — <b>onvoorwaardelijk</b><br>
+monthly/route.ts:828       "Meta/LinkedIn draaien (nog) zonder checkpoints en zonder per-stap step-validations, dus die gaan als leeg mee"<br>
+monthly/route.ts:1116,1118 checkpoints: [], step_validations: []<br>
+pdf/route.ts:102           if (sopType === "monthly") { … 409 … }  — meta_monthly / linkedin_monthly vallen erbuiten
+        </div>
+        <p class="fix"><b>Kans</b>
+          Twee kleine ingrepen. Laat de PDF-poort op de drie monthly-sleutels matchen in plaats van op
+          de letterlijke string <code>"monthly"</code> — <code>CHANNEL_CONFIG</code> heeft die tabel al.
+          En geef Meta/LinkedIn per-stap-validaties: de adapters dragen al
+          <code>logFormatSkeletons</code> en <code>purityRules</code>, dus de validator kan er
+          ongewijzigd overheen.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="crit">
+        <div class="fhead">
+          <span class="rank">06</span>
+          <h3 class="ftitle" style="margin:0">De weekly heeft geen enkel geheugen — 52 keer per jaar blanco beginnen</h3>
+          <span class="chips"><span class="chip crit">Hoog</span><span class="chip eff">Middel</span></span>
+        </div>
+        <p>
+          De weekly-route bevraagt <code>sop_analysis_output</code> nergens, roept
+          <code>getClientMemory</code> niet aan, en de verrijkingsmatrix zet
+          <code>hypothesisTracking</code> voor weekly expliciet op <code>false</code>. Een
+          bleeder die de vorige week ook al gevlagd werd, komt deze week opnieuw als nieuw binnen —
+          er is geen bron waaruit het model kan weten dat het niet nieuw is. De bi-weekly en monthly
+          hebben dit wel.
+        </p>
+        <p>
+          De prompt vraagt bovendien om iets wat de route voor twee van de drie kanalen niet levert:
+          stap 3 zegt "[Indien change history]: Mogelijk gerelateerd aan [wijziging] op [datum]" —
+          maar <code>enrichment.changeHistory</code> zit alleen in Google's contextblok. Voor Meta en
+          LinkedIn is dat een vraag zonder bron.
+        </p>
+        <div class="evidence">
+weekly/route.ts        <b>geen</b> treffer op sop_analysis_output, getClientMemory of recordMemoryEvent<br>
+enrichment.ts:81-88    weekly: { portfolioAnalysis: false, hypothesisTracking: <b>false</b>, … }<br>
+sop-prompts.ts:1862    "[Indien change history]: Mogelijk gerelateerd aan [wijziging] op [datum]."<br>
+monthly/route.ts:1187,1400,1680  getClientMemory — <b>wel</b> voor alle drie de kanalen in de monthly
+        </div>
+        <p class="fix"><b>Kans</b>
+          Geef de weekly de goedkoopste vorm van geheugen die er is: de vorige weekly-conclusie plus
+          de open acties. Eén extra query op <code>sop_analysis_output</code> met
+          <code>sop_type</code> per kanaal, en een regel in de preambule in de trant van
+          "deze punten stonden vorige week al open — meld herhaling expliciet". Dat verandert de
+          weekly van een detector in een opvolger, tegen bijna geen tokens.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="warn">
+        <div class="fhead">
+          <span class="rank">07</span>
+          <h3 class="ftitle" style="margin:0">De bi-weekly leest de verkeerde bron en injecteert die vier keer ongefilterd</h3>
+          <span class="chips"><span class="chip warn">Midden</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          De bi-weekly haalt de laatste maandanalyse op als <code>section = "full"</code>: het
+          narratieve markdown-document dat volgens <code>sop_audit.md</code> als PDF eenentwintig
+          pagina's telt. Dat gaat ongetruncateerd in de <em>systemPrompt</em> van alle vier de
+          stappen. Vier keer, per kanaal, per run.
+        </p>
+        <p>
+          Ondertussen bestaat <code>structured_monthly_v2</code>: hetzelfde resultaat als object, met
+          de hypotheses, threads, root causes en aanbevelingen als velden. P7 heeft de insights-leespad
+          daar juist hard op gezet. De bi-weekly — de plek die letterlijk "toets terug op de
+          maandanalyse" als taak heeft — leest nog de losse tekst.
+        </p>
+        <p>
+          Bijkomend: de query haalt <code>analysis_date</code> gewoon mee op, maar geen van de drie
+          kanaalfuncties gebruikt hem. Er is dus geen enkele controle op de ouderdom van de referentie. Een
+          maandanalyse van tien weken oud wordt met precies dezelfde stelligheid als "de verwachting"
+          gepresenteerd als een van vorige week.
+        </p>
+        <div class="evidence">
+biweekly/route.ts:106,427,695  .eq("section", "full")  ← per kanaal<br>
+biweekly/route.ts:220,240,258,279  buildBiWeeklyStep1/2/3/4Prompt(…, previousMonthlyOutput)  ← 4× volledige tekst<br>
+biweekly/route.ts:106,427,695   select("output, analysis_date") — maar :142,:446,:714 lezen alleen .output<br>
+p7_hypotheses_insights_push_pass.md  "insights read-path hard op structured_monthly_v2 zetten"<br>
+AGENTS.md  "KOSTENBEWUST (expliciete eis, eigenaar, 12 aug 2026)"
+        </div>
+        <p class="fix"><b>Kans</b>
+          Lees <code>structured_monthly_v2</code> en geef de bi-weekly alleen de velden die hij nodig
+          heeft: <code>hypotheses</code>, <code>final_sop.primary_thread</code> en de openstaande
+          <code>recommendations</code>. Dat is scherper terugkoppelen op minder tokens, en het maakt de
+          "Zoals geïdentificeerd in de maandanalyse…"-instructie voor het eerst controleerbaar.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="warn">
+        <div class="fhead">
+          <span class="rank">08</span>
+          <h3 class="ftitle" style="margin:0">De bi-weekly rekent naïef vooruit en vergelijkt met de verkeerde maand</h3>
+          <span class="chips"><span class="chip warn">Midden</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          De preambule instrueert: prognose maandeinde = huidige waarde gedeeld door verstreken dagen,
+          maal het aantal dagen in de maand. Rechte lijn. Twee regels verderop staat de waarschuwing
+          "let op maandeinde effect: conversies zijn vaak hoger in de laatste week" — zonder correctie
+          erbij. Het model moet dus een fout maken en die zelf in proza nuanceren.
+        </p>
+        <p>
+          <code>lib/forecast.ts</code> berekent intussen <code>monthlyExpected</code> met een gewogen
+          meerjarig seizoenspatroon, expliciet gecorrigeerd zodat een groeicurve niet als seizoen wordt
+          gelezen. Die waarde gaat al mee in de prompt als maandtarget — maar niet als prognosemethode.
+          Dit is precies het patroon dat <code>AGENTS.md</code> elders wél afdwingt: laat het model niet
+          rekenen wat je deterministisch kunt aanleveren.
+        </p>
+        <p>
+          Er is een tweede, scherpere versie van hetzelfde probleem. Het enige deterministisch
+          voorgerekende vergelijkingsblok in de Google bi-weekly — <code>computeComparisonFacts</code>,
+          juist gebouwd zodat het model geen rekenwerk hoeft te doen — krijgt
+          <code>lastCompleteMonth: lastMonth</code> mee: de vorige, <em>afgesloten</em> kalendermaand. Een
+          bi-weekly check-in gaat per definitie over hoe de <em>lopende</em> maand zich ontwikkelt. De
+          enige harde cijfers in het prompt beschrijven dus een andere periode dan de vraag.
+        </p>
+        <div class="evidence">
+sop-prompts.ts:1486  "Prognose maandeinde = (huidige waarde / verstreken dagen) × totaal dagen in maand"<br>
+sop-prompts.ts:1492  "Let op maandeinde effect: conversies zijn vaak hoger in laatste week"<br>
+forecast.ts:719      "This avoids treating a growth curve as seasonality."<br>
+forecast.ts:752-761  monthlyExpected, seizoensgewogen en genormaliseerd op het jaardoel<br>
+biweekly/route.ts:162,192  <b>lastMonth = currentMonth - 1</b> → computeComparisonFacts(lastCompleteMonth: lastMonth)<br>
+comparison-facts.ts:1-11   "so the LLM does NOT need to compute arithmetic"
+        </div>
+        <p class="fix"><b>Kans</b>
+          Reken de maandeindprognose deterministisch voor met de forecast-engine, lever hem als getal
+          aan, en vervang de rekenregel in de preambule door de instructie om die aangeleverde prognose
+          te duiden. Zelfde ingreep als bij de voorgerekende feiten van Meta en LinkedIn. Geef daarnaast
+          een month-to-date-vergelijkingsblok mee (deze maand tot dag N tegen vorige maand tot dag N) — of
+          zet er op zijn minst een kop boven die zegt dat het bestaande blok over de afgesloten maand gaat.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="warn">
+        <div class="fhead">
+          <span class="rank">09</span>
+          <h3 class="ftitle" style="margin:0">Vier cron-routes, nul actief — de lerende lus wordt nooit gesloten</h3>
+          <span class="chips"><span class="chip warn">Midden</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          <code>vercel.json</code> bevat één cron: <code>/api/sync/cron</code>. De vier andere —
+          <code>trigger-sops</code>, <code>evaluate-hypotheses</code>, <code>evaluate-code-rood</code>
+          en <code>process-action-queue</code> — staan er niet in. Dat is een gedocumenteerde
+          eigenaarskeuze van 17 augustus 2026, geen vergissing, en de kopcommentaren zeggen het
+          onomwonden.
+        </p>
+        <p>
+          Dat is een juiste keuze bij deze stand: zonder echte klanten zou een nachtelijke run alleen
+          maar geld kosten. Het punt is dan ook niet dat de cron uit staat, maar dat niemand kan
+          vaststellen wat er gebeurt als hij aan gaat — de hele cadanslogica in
+          <code>sop-cadence.ts</code> is nooit in werking geweest.
+        </p>
+        <p>
+          En hij zou bij activering meteen struikelen: <code>trigger-sops</code> draagt
+          <code>maxDuration = 300</code>, terwijl de monthly-route zelf documenteert dat alleen de
+          Google-hoofdanalyse live 284 tot 313 seconden duurde — precies de reden dat díe route zijn
+          eigen budget op 600 zette met de notitie "300s liet dus al geen marge meer over". De cron
+          zou een maandanalyse dus halverwege afkappen. Dat is geen reden om hem aan te zetten voor
+          de rest klopt, maar het is wel het eerste dat de activeringsstap moet repareren. En
+          <code>evaluate-hypotheses</code> is de stap die de leercyclus sluit: aangenomen hypotheses
+          waarvan het meetvenster verstreken is tegen de realisatie leggen en het verdict via de
+          geheugenlaag terug de prompts in sturen. Zolang die niet vuurt, is de leercyclus wel
+          gebouwd maar nooit gedraaid — de route zelf staat als <code>LIVE-ONGETEST</code> gemarkeerd.
+          Dat is de reden dat leercyclus en agency memory op 4 staan en niet hoger: de architectuur
+          verdient een 7, de werkelijkheid een 2.
+        </p>
+        <div class="evidence">
+vercel.json                       crons: [ { path: "/api/sync/cron" } ]  — meer niet<br>
+cron/trigger-sops/route.ts:1      "Klaargezet, bewust NIET actief (17 augustus, op verzoek van de eigenaar…)"<br>
+cron/evaluate-hypotheses/route.ts:30  "NIET IN vercel.json (17 augustus 2026…)" + "LIVE-ONGETEST"<br>
+cron/trigger-sops/route.ts:72         <b>maxDuration = 300</b><br>
+monthly/route.ts:104-109              "alleen de Google-hoofdanalyse al 4m44s-5m13s (284-313s)" → eigen maxDuration = <b>600</b><br>
+period-evaluation/route.ts:7      "zolang de hypothese-evaluator niet gewired is, levert deze route geen outcomes mee"
+        </div>
+        <p class="fix"><b>Kans</b>
+          De kostenzorg gold de nachtelijke analyse-runs, niet de evaluator.
+          <code>evaluate-hypotheses</code> doet geen analyse: het legt bestaande weekcijfers naast
+          eerder aangenomen hypotheses. Zet die één als eerste aan, wekelijks in plaats van dagelijks,
+          met <code>dry_run</code> als eerste stap. Dat sluit de leercyclus tegen verwaarloosbare
+          kosten en zonder iets aan de SOP-triggering te veranderen.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="warn">
+        <div class="fhead">
+          <span class="rank">10</span>
+          <h3 class="ftitle" style="margin:0">De bi-weekly kanaalinhoud verwijst naar een stappenstructuur die niet meer bestaat</h3>
+          <span class="chips"><span class="chip warn">Midden</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          De kop van <code>biweekly-channel-content.ts</code> onderbouwt zijn stap 3 en 4 met een
+          verwijzing naar "Meta stap 3 en stap 9 van elf" en "LinkedIn stap 4 en stap 8 van negen".
+          Die structuren bestaan niet meer: F5 fase3 heeft beide adapters naar zes pijlers
+          geconsolideerd. De inhoud mapt inhoudelijk nog wel — Meta's ad set-analyse zit nu in pijler 2
+          niveau B, frequency in pijler 5 niveau B — maar de onderbouwing is niet meer na te lopen.
+        </p>
+        <p>
+          Dieper hetzelfde probleem: Google draagt <code>stepCount: 13</code> met
+          <code>expectedStepNumbers: [1, 6, 7, 8, 9, 10, 12, 13]</code> — acht pijlers onder dertien
+          oude labels — terwijl Meta en LinkedIn netjes 1 tot en met 6 tellen. Drie kanalen, drie
+          nummeringsstelsels. Elke verwijzing naar "stap N" over kanalen heen is daarmee dubbelzinnig.
+        </p>
+        <div class="evidence">
+biweekly-channel-content.ts:4-9   "lib/meta/step-message.ts (11 stappen, stap 3 … stap 9)" / "lib/linkedin/step-message.ts (9 stappen…)"<br>
+meta/step-message.ts:7            "F5 fase3: 6 pijlers (was 11 stappen)"<br>
+linkedin/step-message.ts:6        "F5 fase3: 6 pijlers (was 9 stappen)"<br>
+adapters/google-ads.ts:14-20      stepCount: 13, expectedStepNumbers: [1, 6, 7, 8, 9, 10, 12, 13]
+        </div>
+        <p class="fix"><b>Kans</b>
+          Werk de verwijzingen bij naar de pijlernummers, en overweeg Google's nummering te
+          normaliseren naar 1–8. De reden om 13 te houden was "labels en gate-teksten ongewijzigd";
+          dat is een migratie van een handvol strings tegenover een taxonomie die over drie kanalen
+          weer één taal spreekt.
+        </p>
+      </article>
+
+
+      <article class="finding" data-sev="warn">
+        <div class="fhead">
+          <span class="rank">11</span>
+          <h3 class="ftitle" style="margin:0">De number-gate toetst LLM-tekst aan LLM-tekst</h3>
+          <span class="chips"><span class="chip warn">Midden</span><span class="chip eff">Middel</span></span>
+        </div>
+        <p>
+          De weekly en bi-weekly schrappen ongegronde percentages en bedragen uit hun aanbevelingen:
+          <code>extractGroundedNumbers</code> bouwt de toegestane verzameling, en wat daar niet in zit
+          wordt vervangen door "[percentage niet uit data]". Goed bedoeld en netjes gebouwd — maar de
+          verzameling wordt opgebouwd uit <code>result.output</code>, en dat is de narratieve tekst die
+          het model zelf net heeft geschreven.
+        </p>
+        <p>
+          Een getal dat in stap 1 is verzonnen, is daarmee in de aanbeveling "gegrond". De poort
+          bewaakt dus interne consistentie tussen twee modelteksten, niet de verankering in data — het
+          kopcommentaar noemt de bron "de gegronde analyse-output", en juist die aanname doet het
+          werk. Voor de monthly speelt dit minder: die krijgt voorgerekende feiten mee.
+        </p>
+        <div class="evidence">
+weekly-number-gate.ts:5-6   "de routes halen de toegestane cijfers uit <b>de gegronde analyse-output</b>"<br>
+weekly-number-gate.ts:17-23 extractGroundedNumbers(text) — regex over vrije tekst<br>
+weekly/route.ts:258         analysisOutput: result.output  ← de zojuist gegenereerde narratieve tekst
+        </div>
+        <p class="fix"><b>Kans</b>
+          Bouw de toegestane verzameling uit de aangeleverde datatabellen in plaats van uit de
+          modeloutput — die tabellen gaan al door <code>toPromptTable</code> en zijn dus exact bekend.
+          Dan wordt het een echte grondingscontrole. Zolang dat niet kan, is de eerlijke formulering in
+          het commentaar "consistent met de analysetekst", niet "gegrond".
+        </p>
+      </article>
+
+      <article class="finding" data-sev="note">
+        <div class="fhead">
+          <span class="rank">12</span>
+          <h3 class="ftitle" style="margin:0">Elke prompt zegt "SEA", ook voor Meta en LinkedIn — en de hypothese-instructie is puur Google</h3>
+          <span class="chips"><span class="chip note">Laag</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          Alle vier de rolregels openen met "Je bent een senior SEA specialist" of "SEA strateeg",
+          ongeacht kanaal. Vervelender is <code>HYPOTHESE_INSTRUCTIES</code>: dat blok bepaalt wat
+          bureau en klant elk oppakken, en somt daarbij Merchant Center, Tag Manager, PMax, tROAS,
+          Shopping Labelizer en Dynamic Search Ads op. Het gaat ongewijzigd mee in stap 4 van de
+          bi-weekly — dus ook wanneer het onderwerp LinkedIn Lead Gen Forms is.
+        </p>
+        <div class="evidence">
+sop-prompts.ts:281,1226,1463,1686   "Je bent een senior SEA specialist / strateeg"<br>
+sop-prompts.ts:196-276              HYPOTHESE_INSTRUCTIES: Merchant Center, Tag Manager, PMax, tROAS, Shopping…<br>
+sop-prompts.ts:1663                 buildBiWeeklyStep4Prompt — ongefilterd, voor alle drie de kanalen
+        </div>
+        <p class="fix"><b>Kans</b>
+          Maak de rolregel en de bureau/klant-voorbeeldenlijst kanaalafhankelijk, langs precies dezelfde
+          lijn die <code>weekly-channel-content.ts</code> al hanteert: gedeelde structuur, kanaaleigen
+          inhoud. De ICE-scoring, het hypotheseformaat en de afhankelijkheidsredenering zijn wél
+          kanaalneutraal en kunnen ongewijzigd blijven.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="note">
+        <div class="fhead">
+          <span class="rank">13</span>
+          <h3 class="ftitle" style="margin:0">Twee kleinere scheefheden: onbekend kanaal valt terug op Google, Google's clusters worden niet gevalideerd</h3>
+          <span class="chips"><span class="chip note">Laag</span><span class="chip eff">Klein</span></span>
+        </div>
+        <p>
+          De weekly- en bi-weekly-routes lezen <code>channel = body.channel || "google_ads"</code> en
+          vergelijken daarna alleen op <code>"meta_ads"</code> en <code>"linkedin_ads"</code>. Een
+          typefout of een toekomstig kanaal draait dus stilzwijgend de volledige Google-analyse op
+          Google-tabellen. De monthly doet het beter: die gaat via <code>getAdapter()</code>, dat een
+          onbekend kanaal afwijst.
+        </p>
+        <p>
+          En omgekeerd: bij het canonicaliseren van findings krijgen Meta en LinkedIn hun
+          issue-cluster-lijst als validatieset mee, Google expliciet <code>undefined</code>. Google's
+          negentien clusters staan dus wel in de prompt maar worden achteraf nergens tegen getoetst,
+          terwijl de zeventien van Meta en LinkedIn dat wel worden.
+        </p>
+        <div class="evidence">
+weekly/route.ts:759 &amp; biweekly/route.ts:915   channel = body.channel || "google_ads", daarna alleen twee gelijkheidstests<br>
+monthly/route.ts:1578                          getAdapter(body.channel || "google_ads")  ← wél streng<br>
+monthly/route.ts:3035                          validClusters: adapter.channel === "google_ads" ? undefined : adapter.issueClusters
+        </div>
+        <p class="fix"><b>Kans</b>
+          Valideer <code>channel</code> in beide routes tegen <code>ALLE_SOP_CHANNELS</code> uit
+          <code>sop-channel-config.ts</code> en geef een 400 bij een onbekende waarde. Geef Google
+          daarnaast zijn eigen <code>issueClusters</code> als validatieset mee — de lijst staat er al,
+          hij wordt alleen niet gebruikt.
+        </p>
+      </article>
+
+    </div>
+  </section>
+
+
+  <section>
+    <h2>Stappenplan naar 8+ op elke as</h2>
+    <p class="sectionnote">
+      Zes fasen, op volgorde van afhankelijkheid — niet van moeite. Fase 0 gaat eerst omdat zonder
+      meetbaarheid geen enkele andere fase te bewijzen valt, en er geen live klanten zijn om het
+      vanzelf zichtbaar te maken.
+    </p>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 0</span>
+        <h4>Bewijsbaar maken zonder klanten — het kritieke pad</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">volwassenheid · consistentie</span>
+      </div>
+      <p>
+        Zonder live accounts is "het werkt" een aanname. Het gereedschap om dat om te draaien ligt er
+        al: <code>lib/demo/</code> vult ook <code>meta_account_daily</code> en
+        <code>linkedin_account_daily</code>, en <code>app/api/eval/replay</code> speelt gecapturede
+        fixtures string-gelijk opnieuw af met een expliciet model op temperatuur 0, met een
+        <code>confirm</code>-rem tegen onbedoelde kosten. Wat ontbreekt is de brug ertussen.
+      </p>
+      <p>
+        De demo-data is al opvallend compleet — 22 Google-tabellen, plus <code>meta_account_daily</code>,
+        <code>meta_campaign_daily</code>, <code>meta_ad_daily</code>, <code>meta_breakdown_daily</code>,
+        <code>linkedin_campaign_daily</code>, <code>linkedin_creative_daily</code> en
+        <code>linkedin_demographic_daily</code>. Er is één echt gat, en het zit precies op het niveau
+        dat er bij Meta het meest toe doet:
+      </p>
+      <ul>
+        <li>
+          <strong><code>meta_adsets</code> en <code>meta_adset_daily</code> ontbreken volledig in de
+          demo</strong> — terwijl alle drie de cadansen ze lezen: de weekly voor de bleeder-check
+          (<code>weekly/route.ts:335</code>), de bi-weekly voor stap 3
+          (<code>biweekly/route.ts:424</code>) en de monthly voor pijler 2 niveau B
+          (<code>meta/analysis-data.ts:149</code>). Ad set is bij Meta het niveau waar budget en
+          doelgroep leven; zonder deze twee tabellen is het waardevolste deel van de Meta-analyse niet
+          te bewijzen. Af te leiden uit <code>meta_campaign_daily</code> met dezelfde
+          <code>splitInt</code>-methode die <code>google-sop-demo.ts</code> al gebruikt, zodat de som
+          exact terugkomt op het campagnetotaal.
+        </li>
+        <li>
+          <strong><code>client_settings.linkedin_icp</code> invullen in de demo-rij.</strong> Dat is geen
+          tabel maar een configuratieveld; zonder dat blijft LinkedIn pijler 4 beschrijvend zonder
+          fit-score. Eén waarde.
+        </li>
+      </ul>
+      <p>
+        De rest van de ontbrekende bronnen — <code>meta_creative_patterns</code>,
+        <code>meta_creative_visual_features</code>, <code>meta_change_log</code>,
+        <code>linkedin_lead_forms</code> — mag leeg blijven. Die hebben een uitgeschreven
+        geen-data-uitweg in de prompt ("Bij onvoldoende vision-data: exact 1 zin", "Geen
+        leadgen-campagnes: 1 regel en door"). Sterker nog, dat is de scherpere test.
+      </p>
+      <ul>
+        <li>
+          <strong>Rookproef-script</strong> dat alle negen combinaties op de demo-klant draait en faalt
+          op een 404, een 500, een lege stap of een niet-gehaalde quality gate. Buiten
+          <code>gates.sh</code> houden — die moet snel blijven — net als
+          <code>check-kaartoverloop.mjs</code>.
+        </li>
+        <li>
+          <strong>De rookproef eist niet dat alles gevuld is, maar dat leegte eerlijk landt:</strong>
+          waar een bron ontbreekt, moet de gedocumenteerde uitwijkzin verschijnen en géén bewering met
+          cijfers. Dat toetst precies de faalwijze die tsc, de tests en de build niet zien.
+        </li>
+        <li>
+          <strong>Eén fixture-set per kanaal per cadans</strong>, zodat een promptwijziging voortaan
+          tegen een vaste invoer te vergelijken is in plaats van tegen een herinnering.
+        </li>
+        <li>
+          <strong>Replay twee keer op dezelfde fixture</strong> en de spreiding rapporteren. Dat is de
+          enige eerlijke meting van de as "consistentie", en hij kost één handmatige aanroep.
+        </li>
+      </ul>
+      <p>
+        Hierna is elke volgende fase af te tekenen met een groen resultaat in plaats van een oordeel.
+      </p>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>Gebouwd en gepusht.</b> Het demo-gat is gedicht en er staat een poort omheen.</p>
+        <ul>
+          <li><code>meta_adsets</code> en <code>meta_adset_daily</code> afgeleid uit
+            <code>meta_campaign_daily</code>, met vier patronen die een detector in de code echt zoekt:
+            een bleeder ruim boven de weekly-drempel, twee ad sets met dezelfde
+            <code>targeting_summary</code> voor het overlap-risico, een frequency die van 2,4 naar 4,3
+            klimt en de benchmark van 3,5 kruist, en een set op <code>LEARNING_LIMITED</code>.</li>
+          <li><code>client_settings.linkedin_icp</code> ingevuld — in URN's, want
+            <code>computeIcpFitForPivot</code> vergelijkt op <code>pivotValueUrn</code> en labels zouden
+            stil 0% fit opleveren.</li>
+          <li><code>lib/demo/__demo_sop_dekking_test.ts</code>: leidt per combinatie uit de broncode van
+            de routes zelf af welke tabellen die leest, zodat de test niet kan verouderen. Uitzonderingen
+            dragen een reden, en de test faalt óók als een uitzondering inmiddels gevuld is.</li>
+        </ul>
+        <p style="margin:10px 0 0">
+          De test vond meteen zes tabellen die niemand had opgemerkt. Vier hebben een echte uitweg in de
+          prompt en staan met die reden genoteerd; twee waren echte gaten. <code>client_targets</code>
+          stond leeg terwijl het sinds migratie 082 de bron voor doelstellingen is — de demo droeg
+          alleen het oude <code>kpi_targets</code>, dus <code>resolveTargets</code> gaf roas en cpa als
+          <b>0</b> door en de analyse vergeleek tegen een doel van nul. Zonder foutmelding.
+        </p>
+      </div>
+      <div class="breuk" style="margin-top:14px">
+        <p style="margin:0 0 8px"><b>Nagekomen: de dekkingstest zat één laag te hoog.</b> Op de vraag
+        of een testrun een <em>volledige</em> SOP zou halen, bleek de test van hierboven te grof. Hij
+        toetste of de TABEL rijen had. Alle negen combinaties kwamen groen door terwijl drie stappen
+        op een lege of tegenstrijdige uitkomst uitliepen, omdat de tabel er wel was maar de
+        <em>kolom</em> erin niet.</p>
+        <p style="margin:0 0 8px">Gevonden door de echte feitenbouwers —
+        <code>buildMetaStepFacts</code> en <code>buildLinkedinStepFacts</code>, dezelfde functies die
+        de route aanroept — op de demo-data te draaien in plaats van te tellen of de tabel gevuld was:</p>
+        <ul style="margin:0 0 8px; padding-left:1.15em">
+          <li><strong>Meta pijler 3</strong> gaf <code>hook_rate_pct: 0</code> en
+            <code>hold_rate_pct: null</code> — <code>meta_ad_daily</code> droeg geen videokolommen.
+            Dat raakt drie plekken tegelijk: de pijler vraagt letterlijk om de funnel-metrics tegen
+            het accountgemiddelde, <code>META_BENCHMARKS</code> noemt een band van 25–40% hook en
+            10–20% hold, en de weekly-bleeder-check kijkt naar "hook rate dalend WoW".</li>
+          <li><strong>LinkedIn pijler 5 sprak zichzelf tegen</strong> in één antwoord:
+            <code>cpl 43,33</code> en <code>leads 131,6</code> náást <code>has_leadgen: false</code>
+            en "Geen leadgen-campagnes in deze periode". Eén regel in
+            <code>prepared-facts.ts</code> — <code>has_leadgen: latest.form_opens &gt; 0</code> — en
+            <code>one_click_lead_form_opens</code> ontbrak in alle drie de LinkedIn-dagtabellen.</li>
+          <li><strong><code>ads_campaign_impression_share</code> had drie rijen</strong>, alle drie in
+            de lopende maand. De competitor-dimensie gold daarmee als beschikbaar, maar de maandstap
+            vraagt om auction insights <em>over de tijd</em> en de route haalt zes maanden op.</li>
+        </ul>
+        <p style="margin:0 0 8px">De reparatie volgt de productieformules in plaats van ze te
+        benaderen: <code>hook = video_3s / impressions</code>, <code>hold = video_p100 / video_3s</code>,
+        <code>open rate = form_opens / clicks</code>, <code>completion = leads / form_opens</code>.
+        Alleen de hero-advertentie is video; bij de twee statische blijven de kolommen <em>afwezig</em>
+        in plaats van nul — een statische banner heeft geen hook rate, en een nul leest als een
+        gemeten nul. Het accountcijfer telt de advertenties op en valt daardoor lager uit dan de hero
+        zelf (8,3% tegen 24,9%), precies zoals Meta's accountrapportage door statische plaatsingen
+        verdund wordt.</p>
+        <p style="margin:0">De les zit niet in de drie kolommen maar in de vorm van de test: een
+        dekkingscheck die telt of een tabel bestaat, meet de aanwezigheid van een bron en niet de
+        bruikbaarheid ervan. De test draait nu de echte feitenbouwers en toetst de ratio's waar de
+        prompts op leunen — inclusief de eis dat pijler 5 niet tegelijk leads kan rapporteren en
+        <code>has_leadgen</code> op false kan zetten. <b>61 geslaagd, 0 gefaald.</b></p>
+      </div>
+      <div class="breuk" style="margin-top:14px">
+        <p style="margin:0 0 8px"><b>En nóg een laag: zes van de negen hadden helemaal geen
+        feitenbouwer.</b> De laag hierboven draait <code>buildMetaStepFacts</code> en
+        <code>buildLinkedinStepFacts</code> — maar die bestaan alleen voor de <em>maand</em>analyse.
+        De kanaaleigen inhoud van de weekly en de bi-weekly is promptTEKST
+        (<code>weekly-channel-content.ts</code>), en de route levert er tabellen bij. Voor die zes
+        combinaties stond er dus nog steeds alleen de tabeltelling.</p>
+        <p style="margin:0 0 8px">Wat daar fout gaat is niet "de functie rekent verkeerd" maar
+        <strong>"de vraag is onbeantwoordbaar met deze data"</strong> — en dat ziet er in de uitvoer
+        identiek uit aan een account zonder problemen. Twee echte gaten, allebei op LinkedIn:</p>
+        <ul style="margin:0 0 8px; padding-left:1.15em">
+          <li><code>linkedin_campaigns</code> droeg geen <code>daily_budget</code>,
+            <code>unit_cost</code>, <code>bid_strategy</code> of <code>cost_type</code>. De weekly
+            selecteert die vier voor de "Budget vs. Vraag"-tak en de bi-weekly bouwt er zijn hele
+            stap 4 op — "pacing t.o.v. budget". Zonder budget is er geen noemer en dus geen pacing.</li>
+          <li><strong>Geen enkele campagne zonder leads</strong>, dus de bleeder-stap kon niets
+            vinden. LinkedIn kent daarbij een rem die de andere kanalen niet hebben: nul leads onder
+            €50 spend geldt als "te vroeg om te beoordelen", niet als bleeder — anders vlagt elke
+            rustige week vals. Die regel was op de demo niet te toetsen.</li>
+        </ul>
+        <p style="margin:0 0 8px">De demo heeft nu twee campagnes aan weerszijden van die drempel:
+        €106 met nul leads (bleeder) en €30 met nul leads (terecht géén bleeder). <strong>Zonder die
+        tweede zou een test die de rem wéghaalt nog steeds slagen</strong>, en dan bewaakt hij hem
+        niet. De budgetten staan in verhouding tot wat er werkelijk uitgaat, zodat elke uitkomst die
+        stap 4 kent ook een geval heeft: op schema, volledig besteed bij de slechtste CPL van het
+        account (budget is daar niet het probleem, bod en targeting wel), en structureel onderbesteed
+        met handmatig bieden en een laag bod als verklaring.</p>
+
+        <div class="evidence" style="margin:10px 0; background:var(--surface); color:var(--ink-2); white-space:pre">Wat elke kanaalcheck nu te pakken heeft:
+
+  google weekly
+     2 campagnes boven de 10%-drempel
+     budgetverlies 0,28 tegen positieverlies 0,05
+  meta weekly
+     bleeder €977 tegen een drempel van €70
+     één ad set op LEARNING_LIMITED
+     frequency 4,25 boven de benchmark van 3,5
+     hook rate dalend week-over-week
+  linkedin weekly
+     bleeder €106, én het geval van €30 dat er terecht geen is
+  bi-weekly
+     device-performance over apparaten én maanden
+     Meta-frequency oplopend 2,26 → 3,09
+     LinkedIn-pacing met twee verschillende uitkomsten</div>
+
+        <p style="margin:0 0 8px">De rest was al gedekt — dat is nu vastgelegd in plaats van
+        aangenomen. Elke check heeft bovendien een <strong>tegenhanger</strong> — niet elke ad set
+        is bleeder, niet elke campagne zit krap, niet alle ad sets staan op
+        <code>LEARNING_LIMITED</code>. Zonder die kant is "boven de drempel" geen bevinding maar een
+        eigenschap van de dataset. De drempels zelf komen uit de prompts en de adapters en niet uit de
+        test: 10% impressieaandeel, frequency 3,5 uit <code>META_BENCHMARKS</code>, tweemaal de
+        account-CPA, en die €50.</p>
+        <p style="margin:0">Geverifieerd door de demo tijdelijk terug te zetten: zeven checks vallen
+        dan om. Dat bracht ook een fout in mijn <em>eigen</em> check boven water — de
+        onderbestedings-check slaagde op een campagne die helemaal niet draaide, want nul uitgaven van
+        nul budget leest als 0% benutting. Nu tellen alleen campagnes mee met budget én uitgaven.
+        <b>83 geslaagd, 0 gefaald</b> — was 61.</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 1</span>
+        <h4>De vijf harde koppelfouten</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">logica 6 → 8</span>
+      </div>
+      <p>Alle vijf mechanisch, alle vijf los te testen, samen goed voor de hele logica-achterstand.</p>
+      <ul>
+        <li><strong>LinkedIn dagelijkse sync.</strong> <code>route.ts:135</code> geeft
+          <code>lastCompleteMonthEnd()</code> mee aan zowel backfill als daily. <code>todayUTC()</code>
+          bestaat, is geëxporteerd en wordt buiten tests nergens gebruikt — terwijl de kop van
+          <code>sync-windows.ts</code> juist uitlegt waarom de daily een trailing venster tot vandaag
+          nodig heeft. Eén regel.</li>
+        <li><strong>De lopende, halve week.</strong> <code>refresh_rollups</code> groepeert op
+          <code>date_trunc('week', …)</code> zonder volledigheidsfilter, dus de laatste weekrij is een
+          deelweek. Stap 1 vergelijkt die week-over-week en rapporteert bij meer dan 20% afwijking —
+          wat op elke volumemetriek gegarandeerd afgaat. Sluit de lopende week uit, of markeer hem als
+          onvolledig in de tabel.</li>
+        <li><strong>Google weekly stap 3.</strong> Weekaggregatie per campagne plus de dagbudgetkolom,
+          of anders de budgetbenuttings-tak uit de prompt halen.</li>
+        <li><strong>Google bi-weekly stap 4.</strong> <code>ads_device_performance_monthly</code> aan de
+          <code>Promise.all</code> toevoegen. <strong>LinkedIn bi-weekly stap 4:</strong>
+          <code>daily_budget</code>, <code>unit_cost</code> en <code>bid_strategy</code> meeselecteren.</li>
+        <li><strong>De periode-fouten.</strong> <code>computeComparisonFacts</code> op month-to-date in
+          plaats van de vorige afgesloten maand, en de maandeindprognose deterministisch uit de
+          forecast-engine in plaats van de rechte lijn in de preambule.</li>
+      </ul>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>Gebouwd en gepusht.</b> Drie ervan liepen anders dan gepland, en dat is de winst.</p>
+        <ul>
+          <li><strong>De WoW-vraag aan Google is teruggetrokken in plaats van gerepareerd.</strong>
+            <code>ads_campaign_weekly</code> bestaat niet, en de dagrijen die zo'n rollup zouden voeden
+            evenmin — Google's campagnedata is aan de bron maandelijks. De Google-tak van stap 3 zegt nu
+            expliciet dat de korrel maandelijks is en dat een WoW-uitspraak per campagne niet geschat
+            mag worden. Meta en LinkedIn krijgen wél dagrijen en houden de vraag.</li>
+          <li><strong>De budgetvraag bleek voor alle drie de kanalen ongegrond, niet alleen voor Google.</strong>
+            Alle drie leveren nu een dagbudget: Google uit <code>ads_campaign_metadata</code>, Meta uit
+            <code>meta_adsets.daily_budget</code> (bij Meta zit budget op ad set-niveau), LinkedIn uit
+            <code>linkedin_campaigns</code> mét <code>bid_strategy</code> — in een B2B-auctie is het
+            biedregime vaak de eigenlijke verklaring van onderbesteding.</li>
+          <li><strong>Geen seizoenscorrectie op de maandprognose, en dat is bewust.</strong>
+            <code>lib/forecast.ts</code> kent een patroon over maanden héén, niet binnen een maand. Die
+            binnen-maand-curve bestaat nergens in deze codebase, en hem verzinnen zou een getal opleveren
+            dat preciezer oogt dan het is. De prognose wordt nu voorberekend en als
+            <em>ondergrens</em> gelabeld, met de aanname er hardop bij — getest op dag 1, februari, de
+            schrikkeldag en een target van nul.</li>
+        </ul>
+        <p style="margin:10px 0 0">
+          Het vergelijkingsblok draagt nu zijn periode in de kop, en de preambule verbiedt expliciet
+          "deze maand" te schrijven bij een cijfer dat uit de afgesloten maand komt. De halve lopende
+          week gaat niet meer de WoW-vergelijking in maar blijft als apart blok bestaan: signaleren mag
+          op halve data, vergelijken niet.
+        </p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 2</span>
+        <h4>Kanaalpariteit in context</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">kwaliteit 7 → 8 · dekking → 8</span>
+      </div>
+      <p>
+        De grootste opbrengst per regel code in het hele plan: de laag bestaat, is kanaalneutraal, en
+        wordt in zes van de negen combinaties niet aangeroepen.
+      </p>
+      <ul>
+        <li><code>buildEnrichmentContext</code> uit de Google-tak naar een gedeelde voorbereiding, in
+          alle drie de routes voor alle drie de kanalen.</li>
+        <li><s><code>failedLayers</code> zichtbaar maken.</s> <strong>Bleek al gedaan.</strong> Bij het
+          bouwen bleek de melding al in de prompt te worden gezet, aangehaakt aan het
+          dimensiebeschikbaarheids-blok. De bevinding kwam uit de achtergrondsweep en was niet
+          nagelopen voordat hij hier belandde. Wat wél nodig was: dat blok bereikte Meta en LinkedIn
+          niet, omdat die de verrijkingslaag helemaal niet aanriepen.</li>
+        <li><code>getClientMemory</code> ook in weekly en bi-weekly; de monthly heeft hem al voor alle
+          drie de kanalen.</li>
+        <li><code>channel</code> valideren tegen <code>ALLE_SOP_CHANNELS</code> met een 400, in plaats
+          van stil terugvallen op de Google-analyse.</li>
+      </ul>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>Gebouwd en gepusht — met een andere ingreep dan gepland.</b></p>
+        <ul>
+          <li>De laag is <strong>kanaalbewust</strong> gemaakt in plaats van simpelweg aangeroepen.
+            <code>ALLEEN_GOOGLE</code> somt de zes Google-only lagen op met per stuk de reden; die
+            worden overgeslagen én gemeld — een aparte mededeling naast <code>failedLayers</code>,
+            want "niet gecontroleerd" en "bestaat niet voor dit kanaal" leiden tot verschillende
+            conclusies.</li>
+          <li>De compositie van <code>sharedContext</code> is nu woordelijk gelijk in alle negen
+            combinaties. De Google-only velden komen elders als lege string terug, dus dezelfde regel
+            levert vanzelf de juiste, kortere context op — één vorm om te onderhouden in plaats van drie.</li>
+          <li><code>getClientMemory</code> in weekly en bi-weekly voor alle drie de kanalen, en de
+            hypothese-instructie bij stap 2 hangt niet langer alleen in de Google-tak: die hoort bij de
+            laag, niet bij het kanaal.</li>
+          <li>Een test die de <em>eigenschap</em> bewaakt en niet de lijst: een supabase-dubbel
+            registreert welke tabellen werkelijk worden bevraagd, en de test faalt zodra een laag voor
+            Meta of LinkedIn alsnog een <code>ads_*</code>-tabel leest — ook als die laag buiten
+            <code>ALLEEN_GOOGLE</code> is vergeten.</li>
+        </ul>
+        <p style="margin:10px 0 0">
+          <strong>Eerlijk over de opbrengst:</strong> wat er voor Meta en LinkedIn feitelijk bij komt is
+          vandaag klein, want de twee overgebleven kanaalneutrale lagen hebben geen schrijver. De winst
+          zit in wat er níét gebeurt (een Search-benchmark in een Meta-analyse), in de melding die
+          voorkomt dat het model gaat gissen, en in de plek waar een kanaaleigen equivalent nu ingeplugd
+          kan worden.
+        </p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 3</span>
+        <h4>De regelkring sluiten</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">leercyclus 4 → 8 · memory → 8</span>
+      </div>
+      <p>
+        Hier zit de grootste sprong in de scorekaart, en het is precies het herstel van de nesting uit
+        het hoofdstuk hierboven.
+      </p>
+      <ul>
+        <li>De bi-weekly leest <code>structured_monthly_v2</code> — <code>hypotheses</code>,
+          <code>final_sop.primary_thread</code>, open <code>recommendations</code> — in plaats van het
+          narratieve <code>full</code>-document. Scherper terugkoppelen op minder tokens, en voor het
+          eerst controleerbaar.</li>
+        <li>De weekly krijgt de open punten van vorige week plus de lopende maandhypotheses, met de
+          instructie herhaling expliciet te benoemen. Dat maakt de weekly van detector een opvolger.</li>
+        <li><code>evaluate-hypotheses</code> op fixtures bewijzen (fase 0), daarna <em>handmatig
+          maandelijks</em> draaien. Deze cron doet geen analyse — hij legt bestaande weekcijfers naast
+          eerder aangenomen hypotheses — dus de kostenzorg die de nachtelijke SOP-triggering pauzeert,
+          geldt hier niet.</li>
+        <li>Afgewezen advies onthouden, zodat het niet elke maand terugkomt. De
+          <code>agency_memory_events</code>-laag ligt er al.</li>
+      </ul>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>Drie van de vier gebouwd en gepusht.</b></p>
+        <ul>
+          <li>Nieuwe module <code>monthly-handoff.ts</code> met <strong>twee vormen</strong>. De
+            bi-weekly moet toetsen en krijgt de hele redenering; de weekly is expliciet "geen diepe
+            analyse" en krijgt de diagnose plus waar we op letten — zonder onderbouwing en zonder
+            succescriteria. Een weekly die de hele maandanalyse meekrijgt gaat hem overdoen, en dat
+            verbiedt zijn eigen preambule.</li>
+          <li>De weekly krijgt daarnaast <strong>zijn eigen openstaande punten</strong> uit
+            <code>sop_recommendations</code> — dat draagt een <code>sop_type</code>-kolom, dus binnen
+            hetzelfde kanaal én dezelfde cadans, zonder migratie. Hij kan nu zeggen "dit is de derde
+            week" in plaats van hetzelfde drie keer als nieuw te melden.</li>
+          <li><strong>Afgewezen advies wordt onthouden.</strong> Het geheugenblok gaf voorrang aan
+            hypotheses met een <em>uitkomst</em> — en een afwijzing heeft er geen, want er is niets
+            uitgevoerd. Afwijzingen verdwenen dus zodra er acht met een uitkomst stonden, terwijl het
+            blok in zijn slotregel juist belooft "niet herhalen wat al is geprobeerd". Ze krijgen nu
+            een gegarandeerde plek en een eigen formulering: "afgewezen, niet uitgevoerd", want
+            "uitkomst: rejected" leest als een mislukte poging terwijl het een keuze was.</li>
+        </ul>
+        <p style="margin:10px 0 0">
+          Onderweg bleek de terugval zelf ook oneerlijk: ontbrak de maandanalyse, dan stond er
+          <em>"Voer de analyse uit zonder referentie aan eerdere bevindingen"</em> — een uitnodiging
+          om de maandanalyse over te doen. Nu: de vergelijking bestaat niet, doe er dus geen uitspraak
+          over. En de narratieve terugval draagt voortaan het label <code>NARRATIEVE TERUGVAL</code>
+          in plaats van als volwaardige bron door te gaan.
+        </p>
+      </div>
+      <div class="gedaan" style="margin-top:14px">
+        <p style="margin:0 0 8px"><b>En de evaluator is alsnog toetsbaar gemaakt en getoetst.</b>
+        Dit stond eerst als "niet gedaan" — het is er in een aparte ronde bijgekomen.</p>
+        <p style="margin:0 0 8px">
+          De beslissing is uit de cron-route getild naar
+          <code>lib/learning/evaluate-hypothesis-row.ts</code>, puur en op fixtures te draaien —
+          dezelfde opzet die <code>replay-core.ts</code> in zijn eigen kop al motiveert. De route
+          ging van 250 naar 167 regels en houdt wat een route hoort te houden: autoriseren, lezen,
+          schrijven.
+        </p>
+        <p style="margin:0 0 8px">
+          Getoetst op twee soorten invoer: geconstrueerde weken waar de uitkomst bekend is, én de 26
+          echte weekrijen uit de demo-data. Inclusief de vier manieren waarop er géén oordeel komt —
+          die betekenen alle vier iets anders, en door elkaar halen is precies de fout die de module
+          voorkomt. Een lopend venster levert bewust geen oordeel op: anders wordt een te vroege
+          evaluatie definitief weggeschreven en kijkt niemand er ooit nog naar.
+        </p>
+        <p style="margin:0">
+          <strong>De test wees een misvatting van mijzelf aan.</strong> Drie asserties op het
+          metriekoordeel faalden, en terecht: de hypothesetekst noemde "dagbudget", dus zonder
+          bijpassend change-event slaat de uitvoeringsdetectie het verdict om naar
+          <code>niet_uitgevoerd</code>. Geen bug maar de kern van de evaluator — een beweging die
+          niet aan een interventie is toe te schrijven zegt niets over die interventie. Wat nog
+          ongetoetst blijft is de schil: de reads en <code>writeVerdict</code>. Die vergt een echte
+          database en is bewust klein gehouden.
+        </p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 4</span>
+        <h4>Handhaving hard maken</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">consistentie 6 → 8 · volwassenheid → 8</span>
+      </div>
+      <ul>
+        <li>De quality gate blokkeert de <em>save</em>, niet alleen de PDF-export. Nu wordt hij berekend,
+          opgeslagen, en daarna genegeerd.</li>
+        <li>De PDF-poort op alle drie de monthly-sleutels laten matchen in plaats van op de letterlijke
+          string <code>"monthly"</code>.</li>
+        <li>Per-stap-validaties voor Meta en LinkedIn — de adapters dragen <code>logFormatSkeletons</code>
+          en <code>purityRules</code> al, dus de validator kan er ongewijzigd overheen.</li>
+        <li>Cluster-validatie ook voor Google; de negentien clusters staan in de prompt maar worden
+          nergens tegen getoetst.</li>
+      </ul>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>Gebouwd en gepusht — twee van de vier bleken geen werk.</b></p>
+        <ul>
+          <li><strong>De poort blokkeert nu de save.</strong> Het oordeel wordt bewaard
+            (<code>quality_gate_monthly_v2</code>, met de blocking_reasons), het product niet. De losse
+            stap-outputs blijven staan: die zijn al weggeschreven en kosten geld, en ze weggooien maakt
+            diagnose duurder zonder iets veiliger te maken. Beide aanroepers geven nu 422 in plaats van
+            <code>ok:true</code> met een <code>passed:false</code>-veld dat niemand las.</li>
+          <li><strong>De exportpoort dekt alle drie de kanalen</strong> via
+            <code>isMonthlySopType()</code>, afgeleid uit <code>CHANNEL_CONFIG</code> — dezelfde tabel
+            die de knoppen en de cron al gebruiken, zodat een vierde kanaal er vanzelf in valt.</li>
+          <li><s>Per-stap-validaties voor Meta en LinkedIn.</s> <strong>Bleek al gedaan.</strong> Die
+            worden gewoon berekend en doorgegeven; wat ik eerder zag was de standaardwaarde van de
+            parameter, niet de aanroep.</li>
+          <li><s>Cluster-validatie voor Google.</s> <strong>Berustte op een misvatting.</strong>
+            <code>validClusters</code> is geen validator maar een <em>doorlaat-lijst</em>: staat een
+            cluster erin, dan gaat hij ongemoeid door in plaats van door Google's
+            <code>CLUSTER_ALIASES</code> te worden herschreven. <code>undefined</code> voor Google is
+            dus juist correct — hier hoorde niets te gebeuren, en dat is ook wat er is gebeurd.</li>
+        </ul>
+        <p style="margin:10px 0 0">
+          Eén observatie voor het vervolg: de <code>tsc</code>-poort miste een fout die de build wél
+          ving (een niet-geëxporteerd type importeren). Voor een nieuw bestand is alleen
+          <code>gates.sh tsc</code> draaien dus niet genoeg.
+        </p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 5</span>
+        <h4>Vakinhoud bijtrekken</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">kwaliteit → 9 · dekking → 9</span>
+      </div>
+      <p>
+        Pas hier, want dit is het enige deel dat echt redactiewerk is in plaats van bedrading. Zonder
+        fase 0 is het bovendien niet te beoordelen of een promptwijziging iets verbeterde.
+      </p>
+      <p>
+        Eén grens is hier eerlijk te benoemen: zolang de MDP-goedkeuring uitblijft, kan Meta op
+        demo-data wél alle bedrading en handhaving halen, maar niet de bevestiging dat de benchmarks en
+        drempels tegen echte Meta-cijfers kloppen. Meta-specifiek promptwerk is daarmee de enige post in
+        dit plan die je beter kunt uitstellen tot de data loopt — al het overige Meta-werk zit in fase 2
+        en 4 en is nu al af te ronden.
+      </p>
+      <ul>
+        <li>Kanaalspecifieke rolregel en bureau/klant-voorbeelden, langs de lijn die
+          <code>weekly-channel-content.ts</code> al hanteert. Het hypotheseformaat en de ICE-scoring
+          blijven gedeeld.</li>
+        <li>De ontbrekende weekcheck per kanaal: voor Google impression share verloren aan budget, voor
+          Meta delivery- en learning-limited-status, voor LinkedIn de objective/format-mismatch.</li>
+        <li>De bi-weekly stap 3 en 4 hermappen op de zes pijlers, en het kopcommentaar bijwerken.</li>
+        <li>Google's nummering normaliseren naar 1–8, zodat "stap N" over drie kanalen één betekenis heeft.</li>
+      </ul>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>Gebouwd en gepusht — met één punt bewust laten liggen.</b></p>
+        <ul>
+          <li>De rol is nu kanaaleigen, en de "denk breed"-catalogus ook. Die somde Performance Max,
+            Dynamic Search Ads en Merchant Center op — als aanmoediging om breed te denken, aan een
+            model dat een LinkedIn-account analyseert. Wat gedeeld <em>blijft</em> is het vakmanschap
+            dat niet per platform verschilt: hypotheseformaat, ICE, bureau/klant-verdeling. De test
+            legt dat expliciet vast, want "kanaalspecifiek" mag geen excuus worden om drie
+            kwaliteitslatten te hanteren.</li>
+          <li>De Google-weekly krijgt <code>search_budget_lost_is</code>. De "Budget vs. Vraag"-vraag
+            moest tot nu toe uit spend versus dagbudget worden afgeleid — een omweg die niet
+            onderscheidt tussen "budget op" en "te weinig vraag". Het impressieaandeel zegt het
+            rechtstreeks, en de prompt scheidt nu budget- van positieverlies: daar helpen
+            tegengestelde ingrepen.</li>
+          <li>Meta's learning-limited-check verwees naar "check in Ads Manager", terwijl de route
+            sinds fase 1 <code>learning_stage_info</code> per ad set meestuurt. LinkedIn had zijn
+            objective/format-check al staan — daar was niets te repareren.</li>
+        </ul>
+        <p style="margin:10px 0 0">
+          <strong>De test vond twee lekken die ik zelf niet zag</strong>, en allebei zaten ze in de
+          <em>gedeelde</em> tekst, waar je ze niet zoekt: het voorbeeld bij de "wees specifiek"-regel
+          noemde een PMax-campagne en een tROAS-doel, en de slotregel van de catalogus zei opnieuw
+          "gebruik je expertise als senior SEA specialist". Eén keer had de test óók zelf ongelijk:
+          "Advantage+ Shopping" is een Meta-product, dus mijn verbod op het kale woord "Shopping"
+          keurde een terecht advies af.
+        </p>
+      </div>
+      <div class="breuk" style="margin-top:14px">
+        <p style="margin:0"><b>Google's nummering blijft zoals hij is.</b> Dit stond als laatste punt
+        op het plan, maar bij het bekijken bleek het een bewuste keuze met opgeslagen gevolgen:
+        <code>expectedStepNumbers</code> is <code>[1, 6, 7, 8, 9, 10, 12, 13]</code> met
+        <code>stepCount: 13</code>, en de kop van <code>google-ads.ts</code> legt uit dat de labels
+        en gate-teksten daarom ongewijzigd blijven. Hernummeren raakt de instructiemap, de
+        logformats, de purity-contracten, de validator-skeletons, het 1–13-filter in de poort én de
+        <code>step_number</code>-waarden die al in <code>sop_analysis_output</code> staan. Dat is
+        risico zonder evenredige opbrengst — de winst zou leesbaarheid zijn, en die is met een
+        hernoeming van de labels ook te halen.</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 6</span>
+        <h4>De taakhistorie: één kolom, vier lezers, negen combinaties</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">leercyclus · memory, nu op alle negen</span>
+      </div>
+      <p>
+        Dit stond niet in het plan hierboven. Het stond onderaan dit rapport, bij wat ik wél had
+        vastgesteld maar niet gerepareerd: <code>sop_tasks</code> draagt geen kanaalkolom, dus de
+        Google-maandprompt krijgt ongelabeld de taken van de Meta- en LinkedIn-runs binnen. Dat vergt
+        een migratie, en die is er nu — met drie gevolgen die ik bij het schrijven niet had gezien.
+      </p>
+      <p>
+        <code>sop_insights</code> en <code>sop_recommendations</code> dragen allebei een
+        <code>sop_type</code>. <code>sop_tasks</code> als enige niet. <strong>Vier lezers moesten daar
+        iets voor verzinnen, en alle vier verzonnen ze hetzelfde: Google.</strong>
+      </p>
+      <ul>
+        <li>
+          <strong>De maandprompt.</strong> <code>priorTasksVoorGrounding</code> kon alleen op
+          <code>client_id</code> en datum filteren, en het blok komt mét de instructie afgeronde taken
+          niet te herhalen. Een Google-analyse las dus dat een LinkedIn-formulierwijziging al
+          uitgevoerd was, en liet een echte Google-actie liggen. Op de demo-klant: <b>230 taken waar
+          er 30 van dat kanaal waren</b>.
+        </li>
+        <li>
+          <strong>De PDF-export.</strong> Die filtert <code>sop_insights</code> en
+          <code>sop_recommendations</code> wél op <code>sop_type</code> — en de taken niet, want dat
+          kon niet. Een Meta-export op een dag waarop ook de Google-maandanalyse liep, zette Google's
+          taken onder Meta's bevindingen. Dat is het document dat de klant krijgt.
+        </li>
+        <li>
+          <strong>Het takenscherm.</strong> <code>tasks-block.tsx</code> leidde het kanaal af via de
+          aanbeveling van de taak, en viel terug op "google" als die ontbrak. Van de 1156 taken hebben
+          er <b>768 geen <code>recommendation_id</code></b> — de koppeling is optioneel en breekt bij
+          een index buiten bereik. Twee derde kreeg dus een Google-badge, ongeacht het echte kanaal.
+        </li>
+        <li>
+          <strong>De demo zelf.</strong> Daar stond een Meta-taak ("Nieuwe Meta-creatives briefen")
+          met een Google-badge. De fout was zichtbaar op precies het scherm dat hem hoort te tonen.
+        </li>
+      </ul>
+      <p>
+        Het werd <code>sop_type</code> en niet <code>channel</code>. Die kolom draagt kanaal én cadans,
+        is al de sleutel die de rest van de keten gebruikt, en het kanaal volgt eruit via
+        <code>channelOfSopType()</code> — dat er al stond. Een tweede, grovere as ernaast zou betekenen
+        dat "welk kanaal is dit" op twee manieren te beantwoorden valt.
+      </p>
+      <p>
+        De grens ligt bewust bij het <strong>kanaal</strong> en niet bij de cadans: een Google-maand
+        hoort te zien wat de Google-weekly heeft aangedragen — dat is de doorgeefketen uit fase 3 —
+        maar niet wat er op LinkedIn is gebeurd.
+      </p>
+
+      <div class="evidence" style="white-space:pre">De backfill van 1156 taken, van precies naar minder precies:
+
+  <b>388</b>  via recommendation_id → sop_recommendations.sop_type
+  <b>582</b>  via (client_id, analysis_date), waar die dag eenduidig is
+  <b>186</b>  niet te herleiden, blijft null
+
+Die 186 staan allemaal op demo-klanten, op dagen waarop alle kanalen tegelijk draaiden.
+<b>Elke productietaak is gelabeld.</b></div>
+
+      <p>
+        Nullable en zonder default: een verzonnen <code>sop_type</code> is erger dan een lege kolom,
+        want hij leest als een meting. Een taak zonder label valt uit elk kanaalfilter in plaats van
+        bij Google te worden gerekend — dat is de goede kant om fout te gaan.
+      </p>
+
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>En toen bleek de kolom maar het halve verhaal.</b></p>
+        <p style="margin:0 0 10px">
+          <code>buildTaskStatusGrounding</code> had één aanroeper, en die stond ná de vroege branch in
+          <code>POST</code> die Meta en LinkedIn naar hun eigen functie stuurt. Het blok zat dus in het
+          Google-<em>maand</em>pad. <strong>Acht van de negen combinaties kregen helemaal geen
+          taakhistorie</strong> — de weekly en de bi-weekly bouwden een halve versie (wél het
+          client-geheugen, geen taken), en juist zij draaien het vaakst. Een weekly die niet weet dat
+          een taak is afgerond, beveelt hem 52 keer per jaar opnieuw aan.
+        </p>
+        <ul>
+          <li>Het openstaande-punten-blok dekte dat niet: dat toont de eigen nog <em>open</em>
+            aanbevelingen, niet wat er daadwerkelijk is uitgevoerd. Juist "dit is gedaan" is de helft
+            die herhaling voorkomt.</li>
+          <li>Alle negen paden lopen nu via één <code>buildGeheugenMetTaken</code> in
+            <code>lib/analysis/</code>. Op de demo-klant ziet de Google-maand 30 taken, de Meta-maand 9
+            en de LinkedIn-maand 14 — elk uit de weekly en bi-weekly van hun eigen kanaal.</li>
+          <li><strong>De limiet is nu per cadans en niet meer stil:</strong> 12 voor de weekly, 20 voor
+            de bi-weekly, 40 voor de monthly (ongewijzigd). Het blok eindigt met "Verzin geen taken die
+            hier niet staan" — bij een stille afkapping leest het model dat als "die taak bestaat
+            niet". De query vraagt daarom één rij méér op dan hij toont, en wat wegvalt wordt gemeld.
+            Dat gold al voor de veertig van de monthly; met kleinere limieten wordt het waarschijnlijk
+            in plaats van theoretisch.</li>
+        </ul>
+      </div>
+
+      <div class="breuk" style="margin-top:14px">
+        <p style="margin:0 0 8px"><b>Een opmaakfout die er al zat.</b> De weekly en de bi-weekly plakken
+        hun contextblokken achter elkaar zónder scheiding, dus draagt elk blok zijn eigen lege regel
+        vooraf. <code>fetchStrategicContext</code> doet dat, de andere lagen ook —
+        <code>buildClientMemoryGrounding</code> als enige niet: die begint direct met een kop.</p>
+        <div class="evidence" style="margin:10px 0; background:var(--surface); color:var(--ink-2); white-space:pre">- [2026-08-01] Bod verlagen (meet op cpa; verwacht: lagere CPA)<b>## Eerdere analyses en hypotheses</b></div>
+        <p style="margin:0">Een <code>##</code> middenin een regel is geen kop meer; het model leest hem
+        als staart van die bullet. In de bi-weekly plakte hij aan de <code>Periode:</code>-regel. Dat
+        gold al voor het kale geheugenblok en zou met de taakstatus erbij alleen langer worden. De
+        monthly heeft het niet nodig — <code>buildMonthlyStepPrompt</code> zet er zelf al een lege regel
+        voor, en twee zouden daar de prompt veranderen.</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 7</span>
+        <h4>Het vierde kanaal: Microsoft Ads (Bing) — twaalf combinaties</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">dekking · 9 → 12 combinaties</span>
+      </div>
+      <p>
+        Niet uit dit rapport voortgekomen maar er wél op gebouwd: het verzoek was een vierde kanaal
+        "op extreem hoog niveau", en de fases hierboven bepaalden wat dat betekent. De
+        <strong>machinerie</strong> volgt Meta en LinkedIn — de zes-pijler-vorm met NIVEAU A/B/C, het
+        hard-skip-contract, de gedeelde synthese met kwaliteitspoort, taakhistorie op alle drie de
+        cadansen. De <strong>vakinhoud</strong> volgt Google (keywords, zoektermen, impressieaandeel,
+        quality score) plus LinkedIn (profieldimensies als pijler 4) plus wat alleen dít kanaal heeft.
+      </p>
+      <p>
+        Drie kanaal-eigen assen, elk als <em>berekend feit</em> in de datalaag en niet als promptwens:
+      </p>
+      <ul>
+        <li><strong>Import-pariteit.</strong> Microsoft-accounts worden vrijwel altijd als
+          Google-import geboren; de standaardfout is drift — verouderde negatives, niet-vertaalde
+          bid-mapping. <code>buildImportParityFacts</code> zet de import-CPA naast de native-CPA en is
+          alleen <em>stellig</em> als beide groepen de volumegrens halen.</li>
+        <li><strong>Het Audience Network-lek.</strong> Meer dan 10% van spend bij een CPA boven 2×
+          search is een lek-vlag uit de data, met search als expliciete noemer.</li>
+        <li><strong>De volumerem.</strong> Bing-volumes zijn een orde kleiner dan Google;
+          elk segment draagt zijn conversievolume en een boven/onder-de-grens-vlag
+          (10 conversies), en de weekly kent de EUR&nbsp;25-rem — de LinkedIn-les in searchvorm.</li>
+      </ul>
+      <p>
+        De dagtabellen volgen bewust het Meta-patroon (dagkorrel): daarmee krijgt de Microsoft-weekly
+        échte week-op-week-vergelijkingen — de beperking die Google's weekly gedocumenteerd heeft
+        ("de korrel is maandelijks") erft dit kanaal niet. Keywords, zoektermen, impressieaandeel en
+        profiel zijn maandkorrel: hoge kardinaliteit, en de lezers lezen ze per maand.
+      </p>
+      <div class="evidence" style="white-space:pre">Vijf commits, elk groen door de poorten:
+
+  <b>M0</b>  adapter + kanaaleigen prompts       6 pijlers, MICROSOFT_BENCHMARKS, 8 ternaries → 2 opzoektabellen
+  <b>M1</b>  migratie 106 + lib/microsoft/       10 tabellen, live gedraaid, idempotent, RLS geverifieerd
+  <b>M3</b>  drie routes                          monthly (checkpoint + synthese), weekly (volumerem + lek), bi-weekly
+  <b>M2</b>  demo-data [S14–S20]                 één generator voor seed én mock; ad-group-niveau is grondwaarheid
+  <b>M4</b>  tests 9 → 12                         taakgrounding, rookproef (105 checks), kanaaltaal
+  <b>M5</b>  UI-bedrading                         tabs, chips, KPI-rij, MicrosoftView, kleuren, master-synthesis
+  <b>M6</b>  adversariële review                  5 dimensies × sceptici over de hele diff; 14 reparaties
+
+Demo-patronen, bewezen via dezelfde mappers en feitenbouwers als de routes, op volle maanden:
+  import-CPA <b>18,11</b> vs native <b>11,03</b> (+64%, stellig) · Audience Network <b>18%</b> spend op <b>24×</b> search-CPA
+  Tuinbouw &amp; Agri −21% CPA boven de grens · Inkoop CPA 6 <b>onder</b> de grens (de rem remt)
+  budgetverlies import 0,10 → 0,26 over de reeks · bleeder EUR 68 naast de EUR 12-tegenhanger die "te vroeg" blijft</div>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>De les uit fase 6 werkte door.</b> De twee dekkingsstests die de
+        combinaties tellen gingen van negen naar twaalf zonder nieuwe inventaris: de
+        taakgrounding-test en de rookproef leiden hun paden uit de broncode van de routes af, dus een
+        vierde kanaal is daar drie regels, geen nieuwe lijst. De kanaaltaaltest leerde wél een nieuw
+        onderscheid — en ving meteen iets echts:</p>
+        <ul>
+          <li>De <code>GOOGLE_ONLY</code>-verbodslijst geldt bewust <em>niet</em> voor Microsoft: dit
+            IS search — zoekwoorden, tROAS, Dynamic Search Ads, een eigen Merchant Center en een eigen
+            Performance Max bestaan er echt. Wat er niet bestaat staat in een eigen lijst: ad sets,
+            Advantage+, Matched Audiences, YouTube, Demand Gen.</li>
+          <li>Die lijst vond dat het <em>gedeelde</em> bureau/klant-voorbeeldenblok "Demand Gen" — een
+            Google-productnaam — aan álle kanalen meegaf, ook aan Meta en LinkedIn, waar niemand er
+            ooit op had getoetst. De term is uit het gedeelde blok gehaald en aan
+            <code>GOOGLE_ONLY</code> toegevoegd; Google's eigen catalogus behoudt hem.</li>
+        </ul>
+      </div>
+      <div class="breuk" style="margin-top:14px">
+        <p style="margin:0 0 8px"><b>Nagekomen: de adversariële review, en wat die overeind liet.</b>
+        Vijf reviewdimensies over de volledige diff, elke bevinding voorgelegd aan een scepticus die
+        haar moest weerleggen. Veertien reparaties bleven overeind; de twee die er het meest toe
+        deden zaten in mijn eigen M5-bedrading, en tsc kon ze allebei niet zien:</p>
+        <ul style="margin:0 0 8px; padding-left:1.15em">
+          <li><strong>De hypothesen-workflow kende "microsoft" niet</strong> en viel stil terug op
+            Google's maand-SOP (<code>CHANNEL_TO_SOP_TYPE</code> is <code>Record&lt;string,string&gt;</code>,
+            dus geen type-fout) -- de Microsoft-workflow toonde Google-hypotheses onder een
+            Microsoft-kop. En <strong>de PDF-export weigerde alle drie de microsoft-sop_types</strong>
+            met een 400: dezelfde soort stille lijst, <code>VALID_SOP_TYPES</code>.</li>
+          <li><strong>De datalaag kreeg zijn maand-anker recht:</strong> de breakdown-feiten
+            aggregeerden als enige builder over 13 maanden tegen een 1-maands accountbenchmark, het
+            impressieaandeel werd over 13 maanden gehaald waar de prompt 6 belooft en groepeerde op
+            campagnenaam waar campaign_id de sleutel is (een import kopieert Google-namen), en de
+            level-kolom van de breakdowns werd genegeerd -- latent dubbeltellen zodra de sync meer
+            dan één level schrijft.</li>
+          <li><strong>Eén echte flake, empirisch bewezen:</strong> de stellig-check van [S14] ankerde
+            op de lopende, halve maand en zou de 1e t/m ±12e van elke maand rood staan. De rookproef
+            en <code>--check</code> draaien nu op volle maanden, zoals de maandroute zelf, en de
+            maandtabellen dragen voor de lopende maand een eerlijke maand-tot-nu-stand. Bewezen met
+            een bevroren klok op 1 september: stellig, +93%, lek gevlagd.</li>
+        </ul>
+        <p style="margin:0">De rest: de T-minus-beursforecast haalt het kanaal nu op, de
+        <code>&lt;30</code>-klik-guardrail geldt voor beide kleinvolumekanalen, twee promptclaims
+        vragen niet langer om data die de laag niet levert (demografie/geo, dagdeel-korrel), en het
+        impressieaandeel-volume in de demo wordt uit de dagsommen afgeleid in plaats van verzonnen --
+        de budgetbenutting reconcilieert nu met budget en spend.</p>
+      </div>
+
+      <p style="margin-top:14px">
+        Wat er bewust <strong>niet</strong> is: een syncclient (die volgt als gated module zodra er
+        een echt Microsoft-account met developer token is — zelfde route als Meta destijds), een
+        <code>fact_core</code>-projectie (die hoort bij het bevroren fase-3-project en volgt daar;
+        sinds fase 8 aggregeert de cross-channel-route het kanaal zelf, mét wapening tegen
+        dubbeltelling zodra die projectie er wél komt), en
+        een "Bing Ads"-vinkje op de marketingpagina — dat blijft eerlijk "coming soon" zolang de
+        koppeling niet bestaat. De routes dragen een <code>LIVE-ONGETEST</code>-markering: alles is
+        bewezen op de demo-data via de rookproef; het eerste echte account is de volgende toets.
+      </p>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 8</span>
+        <h4>Cross-channel-sluiting en de pariteitsronde: Meta en LinkedIn op Microsoft-niveau</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">consistentie · kwaliteit, over alle vier</span>
+      </div>
+      <p>
+        Twee vragen dreven deze fase: is Bing óók in de cross-channel-analyse aangesloten, en wat
+        tilt Meta/LinkedIn naar het niveau dat Microsoft in fase 7 kreeg? Het antwoord op de eerste
+        was "de synthese-laag wel, de fact_core-laag niet" -- <code>blended_account_monthly</code>
+        leest fact_core en microsoft heeft daar bewust geen projectie. De cross-channel-route
+        aggregeert <code>microsoft_account_daily</code> daarom nu zelf tot maandrijen in dezelfde
+        vorm, zodat de maanddetectors (mix-shift, CPL-arbitrage), de datagap-detector en de snelle
+        verzadigingsdetectie het vierde kanaal zien. Onderweg viel een echte semantiekfout op: de
+        zaai-oogst-detector telde <em>alles behalve Google</em> als "social" -- met een tweede
+        searchkanaal in huis was dat stil fout geworden; er is nu een expliciete social-set.
+      </p>
+      <p>
+        De pariteitsronde porteerde de fase-7-discipline terug: Meta's breakdown-facts en de
+        Audience Network-waste ankeren op de laatste maand (ze waren de enige builders die dat niet
+        deden -- exact de fout die de Microsoft-review daar vond), de level-kolommen van
+        <code>meta_breakdown_daily</code> en <code>linkedin_demographic_daily</code> zijn overal
+        gepind tegen latent dubbeltellen, en de berekende volumediscipline
+        (<code>boven_volumegrens</code> als feit, met de grens ernaast) zit nu ook op
+        Meta-entiteiten, -advertenties en -segmenten en op LinkedIn-campagnes, -creatives en
+        -ICP-pivots. De ICP-fit benoemt expliciet zijn bewust bredere 13-maandsvenster -- breder
+        mag, maar dan moet het model het weten.
+      </p>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>En de ronde reviewde zichzelf.</b> Dezelfde adversariële opzet
+        als fase 7, nu over deze diff: drie dimensies, elke bevinding door een scepticus. Zes
+        bevindingen, zes bevestigd, nul verworpen -- en alle zes gerepareerd:</p>
+        <ul>
+          <li>De microsoft-maandaggregatie maakte van drie afgekapte februari-dagen een "volle
+            maand" die geen ander kanaal had; de ondergrens spiegelt nu de view-query. En er staat
+            wapening tegen de dag dat fase 3 wél projecteert: bekende-kanalen-filter (de view-CASE
+            zonder ELSE zou anders een "null"-spookkanaal doorlaten) plus een
+            zelf-aggregatie-overslag zodra de view het kanaal draagt.</li>
+          <li>Meta's ad-facts hadden een onbecommentarieerde vol-venster-terugval voor gepauzeerde
+            ads die de nieuwe stelligheidsvlag voedde -- 12 conversies over een jaar lazen als
+            boven-de-grens. <code>actief_in_maand</code> maakt het expliciet en de vlag blijft uit.</li>
+          <li>De LinkedIn-demografie-mock schreef level "account" waar sync, seed en alle gepinde
+            lezers CAMPAIGN hanteren; en het maand-anker plus de placementgrens hadden nul
+            testdekking. De meta-facts-test draagt nu een oudere-maand-wachtrij die omvalt zodra
+            het anker verdwijnt, plus het degradatiepad en de gepauzeerde-ad-vlaggen (59 asserts).</li>
+        </ul>
+        <p style="margin:10px 0 0">
+          Slotproef: de volledige rookproef (105 checks) draait groen met een bevroren klok op
+          1 september én 1 januari -- de maand- en jaargrens, de twee dagen waarop vensterlogica
+          omvalt.
+        </p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 9</span>
+        <h4>De aanvoer: echte data voor alle vier de kanalen, op eigen klantsleutels</h4>
+        <span class="klaar">Gebouwd</span><span class="effect">aanvoer · sloten op toegang en kosten</span>
+      </div>
+      <p>
+        De analyses waren af, maar alleen Google had een volledige weg van echte data naar de
+        tabellen: LinkedIn's sync was live-ongetest, Meta's synclaag had geen enkele aanroeper, en
+        Microsoft had niets. Het pilotmodel bepaalde de vorm: de eerste klant draait op zijn
+        <strong>eigen</strong> platform-sleutels (bring your own key), want de eigen apps wachten
+        op platformgoedkeuring. De bestaande kluis per bureau × provider draagt nu een
+        JSON-geheim met de eigen-app-velden erbij; een geroteerd refresh token wordt direct
+        teruggeschreven — Microsoft roteert bij elk gebruik, en niet terugschrijven laat de
+        volgende nachtrun op een dood token draaien.
+      </p>
+      <ul>
+        <li><strong>Microsoft</strong> kreeg de volledige module: REST Reporting én Campaign
+          Management, rapport indienen → pollen → zip/CSV met de hand uitpakken, en een
+          transformlaag die Microsofts labels vertaalt naar de vocabulaire van de lezers
+          ("Computer"→"Desktop", IS-procenten→fracties). Migratie 107, live gedraaid.</li>
+        <li><strong>Meta</strong> had de synclaag al (unit-getest, nul aanroepers): nu een route,
+          de ontbrekende breakdown-schrijver voor exact de zeven dimensies die de analyse leest,
+          en een preflight die een dode token vangt vóór er vier async-rapportjobs draaien.</li>
+        <li><strong>LinkedIn</strong> ging van omgevingssleutels naar de bureau-kluis, met een
+          tokencache per sleutel — twee bureaus kunnen niet meer stil op elkaars token syncen.</li>
+        <li><strong>Ingest-invarianten</strong> na elke run toetsen wat alleen op echte data kan
+          breken: de level-pins van de lezers, de fractieschalen, negatieve metrics. Een
+          schending maakt de run luid mislukt in plaats van stil scheef.</li>
+        <li><strong>De nachtcron</strong> (05:00 UTC) synct nu alle vier de kanalen, via exact
+          dezelfde runs als de handmatige knoppen — de orkestratie is uit de routes naar één
+          module getild, dus er bestaat geen tweede kopie die uit elkaar kan groeien.</li>
+      </ul>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>Elke benaming is tegen de officiële v13-documentatie
+        gelegd in plaats van op parate kennis vertrouwd — en dat ving drie echte fouten,</b>
+        alle drie van de soort die op demo-data onzichtbaar blijft en op echte data stil
+        verkeerde cijfers geeft:</p>
+        <ul>
+          <li>De kolom <code>Conversions</code> is sinds 2022 afgeschaft en levert structureel
+            "0"; de sync vraagt nu <code>ConversionsQualified</code> met een terugval. Zonder
+            deze vangst had de eerste echte backfill nul conversies laten zien — en de analyse
+            had dat keurig als bevinding opgeschreven.</li>
+          <li>Het LinkedIn-profielrapport eist zijn zes kolommen verplicht sámen; drie losse
+            pivots opvragen zou geweigerd zijn. Nu één rapport, met exacte
+            kruisproduct-aggregatie per pivot in de transform.</li>
+          <li>Rapportlabel "Search &amp; content" wordt "search" — de taal van de facts-laag.</li>
+        </ul>
+        <p style="margin:10px 0 0">Woordelijk bevestigd correct: de Submit/Poll-REST-vormen met
+        <code>Type</code>-discriminator, de drie impressieaandeel-kolommen, de Network- en
+        DeviceType-waarden, <code>BidMatchType</code> en <code>QualityScore</code> ("--" bij
+        onberekend → null).</p>
+      </div>
+      <div class="gedaan" style="margin-top:14px">
+        <p style="margin:0 0 8px"><b>De adversariële review over deze diff vond zeven
+        bevindingen; alle zeven gefixt.</b> De drie zwaarste zaten in de verse synclaag zelf:
+        de meta-breakdown-faaldetectie was inert buiten zijn collector-scope (een mislukte pull
+        telde als "0 rijen door leegte" en de run meldde zich completed), een gegooide fout
+        liet de run-rij eeuwig op "running" staan, en het cron-tijdbudget was verankerd ná de
+        Google-ronde — samen ruim voorbij de platformtimeout. Verder: de weekly serveerde bij
+        een gloednieuw account de lopende week onder de kop "alleen afgesloten weken", een
+        bleeder-keyword kreeg een CPA van €0 in plaats van null, en het maandlabel van de
+        bi-weekly mengde twee klokken rond de jaarwisseling.</p>
+      </div>
+      <p style="margin-top:14px">
+        En de twee sloten uit de risico-analyse staan er: <strong>het toegangsslot</strong> op
+        elke route die zijn klant-id uit de body leest (zelfde schakelaar als de middleware,
+        met een <code>CRON_SECRET</code>-doorgang zodat de vlag aan kan zonder de interne
+        cron-aanroepen te breken), en <strong>het kostenplafond</strong> in de SOP-routes zelf —
+        per cadans geschat, per bureau geteld, een nette 429 met uitleg in plaats van een
+        rekening achteraf. Wat rest is één handmatige stap buiten deze sessie:
+        <code>O1_AUTH_ENFORCED=true</code> en een plafondbedrag in de Vercel-omgeving zetten.
+      </p>
+    </div>
+
+    <div class="fase">
+      <div class="fasehead">
+        <span class="fasenr">Fase 10</span>
+        <h4>De eindcheck: dertien live runs, en wat die nog ving</h4>
+        <span class="klaar">Gedraaid</span><span class="effect">bewijs · 4/4 kwaliteitspoorten</span>
+      </div>
+      <p>
+        Na al het bouwwerk van fase 9 de volledige proef: eerst de deterministische rookproef
+        (<strong>105 van 105 groen</strong>), daarna alle twaalf kanaal×cadans-combinaties als
+        echte route-runs tegen de live demoklant, plus cross-channel als dertiende.
+      </p>
+      <div class="evidence" style="white-space:pre">weekly     google 3/3/6 · meta 5/4/4 · linkedin 2/0/4* · microsoft 2/4/4     (findings/aanbevelingen/taken)
+biweekly   google 7/7/9 · meta 14/8/8 · linkedin 10/11/12 · microsoft 6 van 7 stappen**
+monthly    google 14/3/7*** · meta 18/2/5 · linkedin 14/3/7 · microsoft 8/3/6
+cross      alle vier kanalen actief · 6 signalen uit 27 checks
+
+   * 0 aanbevelingen — de vangst van deze eindcheck, zie hieronder; herbewezen met 2
+  ** laatste stap gestrand op het OpenRouter-saldo, niet op de code
+ *** client-timeout in het testscript; run server-side volledig afgerond en opgeslagen
+     (deliverable 30k tekens, structured 232k, kwaliteitspoort passed — bewezen in de database)</div>
+      <div class="gedaan">
+        <p style="margin:0 0 8px"><b>De vangst: een validator die te hard strafte.</b> Het model
+        leverde bij de LinkedIn-weekly de <em>som</em> van de drie ICE-delen (tot 30) in plaats
+        van het gemiddelde, en het schema gooide daarop alle vier de verder valide aanbevelingen
+        weg — waarna ook alle taken hun referent kwijt waren. Een vormfout is geen inhoudsfout:
+        de validator normaliseert nu (som ÷ 3, klem op 1–10) in plaats van weg te gooien.
+        Dezelfde dag gefixt, met vier nieuwe test-asserts, en live herbewezen: de herhaalrun
+        droeg weer aanbevelingen.</p>
+        <p style="margin:10px 0 0">De kwaliteit verder: <strong>alle vier de maandanalyses
+        passeerden de kwaliteitspoort</strong> — geen invalid steps, geen blocking reasons, alle
+        acceptatiecriteria groen. De outputvolumes zijn stabiel tussen ochtend- en middagrun van
+        dezelfde combinatie, en de vangrails deden zichtbaar hun werk: de number-gate ving één
+        ongegrond cijfer, één maandstap triggerde zijn reparatiepad en herstelde.</p>
+      </div>
+      <div class="breuk" style="margin-top:14px">
+        <p style="margin:0 0 8px"><b>De enige openstaande bewijsrun wacht op saldo, niet op
+        code.</b> De Microsoft-biweekly strandde bij zijn laatste stap en bij beide herkansingen
+        op OpenRouter's 402 — het in-flight-budget krimpt mee met een vrijwel leeg tegoed.
+        Dezelfde route draaide 's ochtends nog volledig groen (15 findings, 11 aanbevelingen,
+        11 taken), dus functioneel is hij bewezen; de herhaling kan zodra het saldo is
+        aangevuld.</p>
+        <p style="margin:0">Onbedoeld is dit ook de bevestiging van de risico-analyse: verbruik
+        zonder plafond loopt geruisloos tegen de bodem. Het plafond uit fase 9 bestaat precies
+        hiervoor — met een bedrag ingesteld was dit een nette 429 mét resetdatum geweest, ruim
+        vóór de bodem. Het kostengrootboek registreerde vandaag 73 calls voor €1,59, zonder één
+        call zonder modelprijs; dat de twee volle rondes méér calls deden dan het grootboek
+        telt, staat genoteerd als dekkingvraag voor de kostenbewaking.</p>
+      </div>
+    </div>
+
+    <p class="col" style="max-width:76ch; margin-top:26px">
+      Op fase 5 na is dit vrijwel volledig bedrading: bestaande modules aan bestaande aanroepers
+      knopen. Dat is ook waarom 8+ op elke as haalbaar was zonder herbouw — de onderdelen waren er, ze
+      stonden alleen niet met elkaar in verbinding. Fase 6 kwam er pas bij toen dit rapport al stond,
+      en heeft dezelfde vorm: één kolom die ontbrak, en vier lezers die er stilzwijgend Google van
+      maakten. Fase 7 is de omgekeerde proef: een héél kanaal erbij, en dankzij de afgeleide
+      configuratie en de tests die hun eigen doelwit uit de bron lezen was het optellen, geen
+      herbouwen. Fase 8 sloot de cirkel: de discipline die het nieuwe kanaal afdwong, teruggeporteerd
+      naar de kanalen waar de kopieerfouten vandaan kwamen. Fase 9 en 10 keerden de vraag om — niet
+      "klopt de analyse" maar "haalt echte data de analyse, en houdt het geheel onder druk": de
+      aanvoer bestaat nu voor alle vier de kanalen, en de eindcheck heeft elke combinatie minstens
+      één keer volledig door de poorten zien komen.
+    </p>
+  </section>
+
+  <section>
+    <h2>Wat aantoonbaar goed zit</h2>
+    <p class="sectionnote">Niet aanraken. Dit is het fundament waar de rest op kan leunen.</p>
+    <div class="keep">
+      <div class="keepcard">
+        <h4>De monthly is per kanaal echt kanaal-eigen</h4>
+        <p>
+          Meta kent hook en hold rate, learning-status per adset, Advantage+ versus lookalike,
+          Audience Network-lekkage en een FTIR-verzadigingsclassificatie. LinkedIn kent ICP-fit per
+          functie en senioriteit, form completion rate, document ads, en benoemt expliciet dat
+          LinkedIn geen frequency per creative geeft zodat tijdsverval de proxy is. Dat is
+          vakinhoud, geen vertaalde Google-tekst.
+        </p>
+      </div>
+      <div class="keepcard">
+        <h4>De determinismelaag is serieus</h4>
+        <p>
+          Temperatuur 0 als standaard, een echt strict JSON Schema via <code>response_format</code>,
+          deterministisch voorgerekende feiten in plaats van laten narekenen, en een replay-harnas dat
+          gecapturede prompts string-gelijk opnieuw draait met een expliciet model — bewust langs de
+          keten-fallback heen, omdat die de vergelijking zou corrumperen.
+        </p>
+      </div>
+      <div class="keepcard">
+        <h4>Beperkingen staan in de code, niet in een la</h4>
+        <p>
+          De hypothese-evaluator schrijft zelf op dat hij alleen op accountniveau kan meten en waarom.
+          De dekkingsgetallen staan als "indicatief, niet definitief" met de datum erbij. Een niet
+          uitgevoerde hypothese levert "niet_uitgevoerd" op in plaats van een verworpen verdict. Die
+          eerlijkheid is zeldzaam en is precies waarom de bevindingen hierboven zo scherp te maken zijn.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Wat ik niet heb kunnen vaststellen</h2>
+    <p class="sectionnote">Grenzen van deze analyse, zodat niemand er meer uit leest dan erin zit.</p>
+    <ul class="plain">
+      <li>
+        <strong>Er zijn geen live klanten.</strong> Geen enkele sync of SOP is op echte accountdata
+        gedraaid, dus elke bevinding hier komt uit de code en niet uit waargenomen gedrag. Dat maakt de
+        bevindingen niet zachter — een datumvenster dat niet overlapt is uit twee regels te bewijzen —
+        maar het verklaart wel waarom ze nog niet eerder zijn opgevallen.
+      </li>
+      <li>
+        <strong>Feitelijke outputkwaliteit.</strong> Dit is een codeanalyse. Ik heb geen SOP gedraaid en
+        geen opgeslagen runs uit de database gelezen, dus alle uitspraken gaan over wat de code
+        <em>vraagt</em> en <em>aanlevert</em>, niet over wat er daadwerkelijk uitkomt. De
+        <em>deterministische</em> helft is inmiddels wel afgetekend, al is dat per cadans iets anders:
+        bij de maandanalyse draaien de feitenbouwers op demo-data en leveren ze gevulde, onderling
+        consistente pijlers op; bij de weekly en de bi-weekly bestaan die bouwers niet — daar is
+        getoetst dat elke kanaalcheck iets te pakken heeft in plaats van op een lege tabel te stuiten.
+        (Een eerdere versie van deze regel zei "voor alle negen combinaties de feitenbouwers"; dat
+        klopte alleen voor de drie maandvarianten.) <strong>Sinds fase 10 is dit deels
+        ingehaald:</strong> elke combinatie heeft minstens één volledige live run op de demoklant
+        gedraaid, met vier van vier kwaliteitspoorten passed. Wat overeind blijft: dit meet de
+        pijplijn en de vorm — of de oordelen tegen een écht account raak zijn, is precies wat de
+        schaduwfase bij de eerste pilotklant moet toetsen.
+      </li>
+      <li>
+        <strong>De taakhistorie vermengde kanalen — dit is inmiddels gerepareerd.</strong> Het stond
+        hier als geverifieerd-maar-niet-gerepareerd, want het vergde een kolom en dus een migratie.
+        Die is er (fase 6), en bij het bouwen bleek het geen prompt-detail: dezelfde ontbrekende kolom
+        zette Google's taken in Meta's PDF en gaf twee derde van alle taken een verkeerde kanaalbadge.
+        Wat hier stond klopte, maar dekte een derde van wat eronder zat.
+      </li>
+      <li>
+        <strong>Meta beoordeel ik op code, niet op output.</strong> <code>lib/meta/sync.ts</code> is een
+        gedocumenteerde wees, gated op MDP-approval, dus de Meta-entiteitstabellen worden door niets
+        gevuld. De Meta-scores in dit rapport gaan dus over de kwaliteit van de analyse zoals hij
+        geschreven staat; wat er live uitkomt zodra die goedkeuring er is, kan ik niet voorspellen.
+      </li>
+      <li>
+        <strong>De feitelijke omvang van de bi-weekly promptinjectie.</strong> Dat
+        <code>section = "full"</code> vier keer ongefilterd meegaat is hard; hoeveel tokens dat per run
+        kost hangt af van echte outputs die ik niet heb ingezien. De eenentwintig PDF-pagina's komen uit
+        <code>sop_audit.md</code>, niet uit een eigen meting.
+      </li>
+      <li>
+        <strong>Of de openstaande P0's uit <code>sop_audit.md</code> elders zijn opgelost.</strong> Ik heb
+        de gating-P0 nagelopen en die is deels open. De threadselectie-stabiliteit en de
+        diagnose-naar-actie-continuïteit heb ik niet opnieuw getoetst — daar is een run voor nodig.
+      </li>
+      <li>
+        <strong>Of de weekly/bi-weekly-drempels empirisch kloppen.</strong> Dat 20% WoW en 30% spend
+        kanaalneutraal zijn terwijl LinkedIn-volumes structureel lager liggen, is een redenering; of het
+        in de praktijk valse alarmen geeft is alleen uit echte runs af te leiden.
+      </li>
+    </ul>
+  </section>
+
+  <footer>
+    Broncode-audit van tristanvanduin/Ctrl-PPC op branch claude/sop-kanaal-analyse-9na6v3, 24 augustus 2026;
+    fase 6 en de metingen daarin toegevoegd op 25 augustus; fase 9 en 10 (aanvoer, sloten en de
+    eindcheck) op 1 september. De runcijfers in fase 10 komen uit de routelogs en de database van
+    1 september.<br>
+    Elke bevinding is nagelopen in het genoemde bestand op de genoemde regel. Regelnummers verwijzen naar
+    de staat van de branch op het moment van lezen en verschuiven bij latere wijzigingen. De rijaantallen
+    in fase 6 en bij bevinding 01 komen uit query&#39;s op de database van 25 augustus.
+  </footer>
+
+</div>
+
+</body>
+</html>
