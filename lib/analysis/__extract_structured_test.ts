@@ -91,6 +91,22 @@ check("de bovengrens 365 mag", TaskSchema.safeParse(taak("X", { due_date_days: 3
 // schema. Buiten bereik werd de koppeling stil null, en dan staat er een aanbeveling in de
 // database zonder de bevinding waar hij uit voortkomt.
 
+// ice_total wordt genormaliseerd in plaats van hard geweigerd: het model levert soms de SOM
+// van de drie ICE-delen (tot 30) in plaats van het gemiddelde, en de harde max(10) gooide
+// daarop live 4 van de 4 aanbevelingen van een LinkedIn-weekly weg (1 september 2026).
+console.log("\nice_total-normalisatie");
+{
+  const som = RecommendationSchema.safeParse(aanbeveling({ ice_total: 21 }));
+  check("som van de delen (21) wordt gemiddelde (7)", som.success && som.data.ice_total === 7,
+    som.success ? String(som.data.ice_total) : "parse faalde");
+  const netjes = RecommendationSchema.safeParse(aanbeveling({ ice_total: 7.3 }));
+  check("een waarde binnen de schaal blijft ongemoeid", netjes.success && netjes.data.ice_total === 7.3);
+  const onder = RecommendationSchema.safeParse(aanbeveling({ ice_total: 0.4 }));
+  check("onder de schaal klemt naar 1", onder.success && onder.data.ice_total === 1);
+  const onzin = RecommendationSchema.safeParse(aanbeveling({ ice_total: "hoog" }));
+  check("tekst blijft een parse-fout", !onzin.success);
+}
+
 console.log("\nDe koppelingsindexen");
 {
   const r = RecommendationSchema.safeParse(aanbeveling({ finding_index: 99 }));

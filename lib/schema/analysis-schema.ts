@@ -269,7 +269,20 @@ export const RecommendationSchema = z.object({
   ice_impact: z.number().min(1).max(10),
   ice_confidence: z.number().min(1).max(10),
   ice_ease: z.number().min(1).max(10),
-  ice_total: z.number().min(1).max(10),
+  // Genormaliseerd in plaats van hard geweigerd: het model levert soms de SOM van de drie
+  // ICE-delen (tot 30) in plaats van het gemiddelde, en een harde max(10) gooide daarop een
+  // complete, verder valide aanbeveling weg -- live gezien bij de LinkedIn-weekly (1 september
+  // 2026: 4 van de 4 aanbevelingen weggevallen op "ice_total: Too big", waarna alle taken hun
+  // referent kwijt waren en de run met 0 aanbevelingen opleverde). Een som boven de schaal is
+  // een vormfout, geen inhoudsfout: delen door 3 herstelt hem, en de klem [1, 10] vangt de
+  // rest. Dit schema wordt alleen voor het PARSEN van modeloutput gebruikt (safeParse), nooit
+  // als response_format-JSON-schema, dus de preprocess kan geen strict-schema breken.
+  ice_total: z.preprocess((w) => {
+    const n = typeof w === "number" ? w : NaN;
+    if (!Number.isFinite(n)) return w;
+    const genormaliseerd = n > 10 ? n / 3 : n;
+    return Math.min(10, Math.max(1, Math.round(genormaliseerd * 10) / 10));
+  }, z.number().min(1).max(10)),
   // Action gating (optional for backward compatibility)
   action_readiness: ActionReadinessEnum.optional(),
   evidence_level: EvidenceLevelEnum.optional(),
