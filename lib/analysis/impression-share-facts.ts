@@ -5,6 +5,15 @@
 //
 // IS-waarden worden overgenomen zoals de sync ze opslaat (fracties uit de Google Ads API).
 // De classificatie vergelijkt budget-lost tegen rank-lost en is daarmee schaal-onafhankelijk.
+//
+// Herbouwd 1 september 2026: alle campagnes worden nu in DEZELFDE peilmaand beoordeeld —
+// de jongste maand in de aangeleverde rijen. De oude versie nam per campagne "de laatste
+// maand", waardoor een gepauzeerde campagne stilzwijgend op een maanden-oude rij werd
+// beoordeeld naast een actuele, zonder dat het model dat kon zien. Campagnes zonder rij in
+// de peilmaand tellen apart (buitenPeilmaand) en de MoM vergelijkt uitsluitend tegen de
+// échte vorige kalendermaand, nooit over een gat heen.
+
+import { monthIndex, monthFromIndex } from "@/lib/period/period-range";
 
 export type LossDriver = "budget" | "rank" | "mixed" | "none";
 export type ActionCandidate = "raise_budget" | "improve_bid_or_quality" | "both" | "none";
@@ -61,11 +70,16 @@ export interface CampaignISFact {
   conversions: number;
   cost: number;
   cpa: number | null;
+  /** Tegen de échte vorige kalendermaand; null als die maand er niet is. */
   impressionShareMoM: number | null;
 }
 
 export interface ImpressionShareSummary {
+  /** De maand waarin ALLE onderstaande campagnes zijn beoordeeld ("YYYY-MM"). */
+  peilmaand: string;
   campaignsAnalysed: number;
+  /** Campagnes met alleen oudere rijen dan de peilmaand (gepauzeerd of gestopt). */
+  buitenPeilmaand: number;
   budgetDriven: number;
   rankDriven: number;
   mixed: number;
@@ -78,27 +92,45 @@ function num(v: number | null | undefined): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
-// Analyseert de campagne-IS-rijen: neemt per campagne de laatste maand, classificeert de
-// oorzaak, bepaalt de actie, rekent de MoM tegen de vorige maand, en rangschikt op het
-// grootste zichtbaarheidsverlies zodat de belangrijkste campagnes bovenaan staan.
+function maandKey(month: string): string {
+  return String(month).slice(0, 7);
+}
+
+// Analyseert de campagne-IS-rijen: iedereen in dezelfde peilmaand (de jongste maand in de
+// data), classificeert de oorzaak, bepaalt de actie, rekent de MoM tegen de vorige
+// kalendermaand, en rangschikt op het grootste zichtbaarheidsverlies.
 export function analyzeCampaignImpressionShare(rows: CampaignImpressionShareRow[]): {
   campaigns: CampaignISFact[];
   summary: ImpressionShareSummary;
 } {
-  const byCampaign = new Map<string, CampaignImpressionShareRow[]>();
-  for (const row of rows) {
-    if (!row.campaign_id || !row.month) continue;
-    const list = byCampaign.get(row.campaign_id) ?? [];
-    list.push(row);
-    byCampaign.set(row.campaign_id, list);
+  const geldig = rows.filter((r) => r.campaign_id && r.month);
+  if (geldig.length === 0) {
+    return {
+      campaigns: [],
+      summary: {
+        peilmaand: "", campaignsAnalysed: 0, buitenPeilmaand: 0,
+        budgetDriven: 0, rankDriven: 0, mixed: 0, healthy: 0,
+        raiseBudgetCandidates: 0, bidOrQualityCandidates: 0,
+      },
+    };
+  }
+
+  const peilmaand = geldig.map((r) => maandKey(r.month)).sort().at(-1) as string;
+  const vorigeMaand = monthFromIndex(monthIndex(peilmaand) - 1);
+
+  const inPeilmaand = new Map<string, CampaignImpressionShareRow>();
+  const inVorige = new Map<string, CampaignImpressionShareRow>();
+  const alleCampagnes = new Set<string>();
+  for (const row of geldig) {
+    alleCampagnes.add(row.campaign_id);
+    const key = maandKey(row.month);
+    if (key === peilmaand) inPeilmaand.set(row.campaign_id, row);
+    if (key === vorigeMaand) inVorige.set(row.campaign_id, row);
   }
 
   const campaigns: CampaignISFact[] = [];
-  for (const [campaignId, list] of byCampaign) {
-    list.sort((a, b) => String(a.month).localeCompare(String(b.month)));
-    const latest = list[list.length - 1];
-    const prior = list.length >= 2 ? list[list.length - 2] : null;
-
+  for (const [campaignId, latest] of inPeilmaand) {
+    const prior = inVorige.get(campaignId) ?? null;
     const budgetLostIs = num(latest.search_budget_lost_is);
     const rankLostIs = num(latest.search_rank_lost_is);
     const conversions = num(latest.conversions);
@@ -127,7 +159,9 @@ export function analyzeCampaignImpressionShare(rows: CampaignImpressionShareRow[
   campaigns.sort((a, b) => b.totalLostIs - a.totalLostIs);
 
   const summary: ImpressionShareSummary = {
+    peilmaand,
     campaignsAnalysed: campaigns.length,
+    buitenPeilmaand: alleCampagnes.size - campaigns.length,
     budgetDriven: campaigns.filter((c) => c.driver === "budget").length,
     rankDriven: campaigns.filter((c) => c.driver === "rank").length,
     mixed: campaigns.filter((c) => c.driver === "mixed").length,
@@ -156,32 +190,30 @@ export interface CountryISFact {
   cost: number;
 }
 
-// Vat de geo-laag samen: per land de laatste maand, geclassificeerd, gerangschikt op het
-// grootste verlies, zodat zichtbaar wordt waar de zichtbaarheid regionaal wegvalt.
-export function analyzeGeoImpressionShare(rows: CountryImpressionShareRow[], topN = 10): CountryISFact[] {
-  const byCountry = new Map<string, CountryImpressionShareRow[]>();
-  for (const row of rows) {
-    if (!row.country_code || !row.month) continue;
-    const list = byCountry.get(row.country_code) ?? [];
-    list.push(row);
-    byCountry.set(row.country_code, list);
-  }
+// Vat de geo-laag samen: alle landen in dezelfde peilmaand (de jongste maand in de
+// geo-rijen), geclassificeerd en gerangschikt op het grootste verlies.
+export function analyzeGeoImpressionShare(
+  rows: CountryImpressionShareRow[],
+  topN = 10
+): { countries: CountryISFact[]; peilmaand: string } {
+  const geldig = rows.filter((r) => r.country_code && r.month);
+  if (geldig.length === 0) return { countries: [], peilmaand: "" };
 
+  const peilmaand = geldig.map((r) => maandKey(r.month)).sort().at(-1) as string;
   const countries: CountryISFact[] = [];
-  for (const [countryCode, list] of byCountry) {
-    list.sort((a, b) => String(a.month).localeCompare(String(b.month)));
-    const latest = list[list.length - 1];
-    const budgetLostIs = num(latest.search_budget_lost_is);
-    const rankLostIs = num(latest.search_rank_lost_is);
+  for (const row of geldig) {
+    if (maandKey(row.month) !== peilmaand) continue;
+    const budgetLostIs = num(row.search_budget_lost_is);
+    const rankLostIs = num(row.search_rank_lost_is);
     countries.push({
-      countryCode,
-      impressionShare: num(latest.search_impression_share),
+      countryCode: row.country_code,
+      impressionShare: num(row.search_impression_share),
       totalLostIs: Math.round((budgetLostIs + rankLostIs) * 10000) / 10000,
       driver: classifyLossDriver(budgetLostIs, rankLostIs),
-      cost: num(latest.total_cost),
+      cost: num(row.total_cost),
     });
   }
 
   countries.sort((a, b) => b.totalLostIs - a.totalLostIs);
-  return countries.slice(0, topN);
+  return { countries: countries.slice(0, topN), peilmaand };
 }

@@ -24,7 +24,7 @@ function assert(cond: boolean, msg: string) {
 const opts = { clientId: "c1", analysisId: null };
 const bfact = (name: string): BudgetFact => ({
   campaignId: name, campaignName: name, efficiency: "beating", hasHeadroom: true, rankLimited: false, action: "scale_up",
-  cpa: 10, roas: 5, cost: 100, budgetLostIs: 0.2, rankLostIs: 0.1, marginalScore: 1, reason: "",
+  cpa: 10, roas: 5, cost: 100, conversions: 10, budgetLostIs: 0.2, rankLostIs: 0.1, marginalScore: 1, reason: "",
 });
 
 console.log("budgetallocatie:");
@@ -47,9 +47,14 @@ console.log("budgetallocatie:");
 
 console.log("biedstrategie:");
 {
-  const mk = (name: string, fit: BidFact["fit"]): BidFact => ({ campaignId: name, campaignName: name, strategy: "manual", kind: "manual", conversions: 30, hasValue: false, fit, recommendation: "" });
+  const mk = (name: string, fit: BidFact["fit"]): BidFact => ({
+    campaignId: name, campaignName: name, strategy: "manual", kind: "manual",
+    conversions: 30, conversionsPerMaand: 30, cost: 300, hasValue: false,
+    cpa: 10, roas: null, target: null, targetRatio: null, fit, recommendation: "",
+  });
+  const byFitLeeg = { fit: 0, upgrade_to_smart: 0, switch_to_value: 0, insufficient_volume: 0, value_missing: 0, review_target: 0, review_non_conversion: 0, unknown: 0 };
   const rows = bidStrategyToHypotheses(
-    { summary: { campaignsAnalysed: 3, fit: 1, mismatches: 2, byFit: { fit: 1, upgrade_to_smart: 1, switch_to_value: 1, insufficient_volume: 0, value_missing: 0, review_non_conversion: 0, unknown: 0 } },
+    { summary: { campaignsAnalysed: 3, fit: 1, mismatches: 2, byFit: { ...byFitLeeg, fit: 1, upgrade_to_smart: 1, switch_to_value: 1 }, maandenInVenster: 3 },
       campaigns: [mk("A", "fit"), mk("B", "upgrade_to_smart"), mk("C", "switch_to_value")] },
     opts
   );
@@ -57,22 +62,31 @@ console.log("biedstrategie:");
   assert(/2 campagne/.test(rows[0].hypothesis), "benoemt 2 mismatches");
   assert(!/1× fit/.test(rows[0].rationale), "fit-campagnes tellen niet als mismatch in de rationale");
 
-  const allFit = bidStrategyToHypotheses({ summary: { campaignsAnalysed: 1, fit: 1, mismatches: 0, byFit: { fit: 1, upgrade_to_smart: 0, switch_to_value: 0, insufficient_volume: 0, value_missing: 0, review_non_conversion: 0, unknown: 0 } }, campaigns: [mk("A", "fit")] }, opts);
+  const allFit = bidStrategyToHypotheses({ summary: { campaignsAnalysed: 1, fit: 1, mismatches: 0, byFit: { ...byFitLeeg, fit: 1 }, maandenInVenster: 3 }, campaigns: [mk("A", "fit")] }, opts);
   assert(allFit.length === 0, "alles fit => leeg");
+
+  // De unknown-consistentie (audit 1 sep 2026): een onherkende strategie is een
+  // verificatievraag, geen mismatch — dus ook géén voorstel in de wachtrij, precies zoals
+  // summary.mismatches hem telt.
+  const alleenUnknown = bidStrategyToHypotheses(
+    { summary: { campaignsAnalysed: 1, fit: 0, mismatches: 0, byFit: { ...byFitLeeg, unknown: 1 }, maandenInVenster: 3 }, campaigns: [mk("R", "unknown")] },
+    opts
+  );
+  assert(alleenUnknown.length === 0, "alleen unknown => geen voorstel (spoort met summary.mismatches)");
 }
 
 console.log("impression share:");
 {
   const mk = (name: string, lost: number): CampaignISFact => ({ campaignId: name, campaignName: name, campaignType: null, impressionShare: 0.5, budgetLostIs: lost, rankLostIs: 0, totalLostIs: lost, lossDriver: "budget", actionCandidate: "raise_budget", conversions: 5, cost: 100, cpa: 20, impressionShareMoM: null } as unknown as CampaignISFact);
   const rows = impressionShareToHypotheses(
-    { summary: { campaignsAnalysed: 3, budgetDriven: 2, rankDriven: 1, mixed: 0, healthy: 0, raiseBudgetCandidates: 2, bidOrQualityCandidates: 1 }, campaigns: [mk("A", 0.3), mk("B", 0.2)] },
+    { summary: { peilmaand: "2026-08", buitenPeilmaand: 0, campaignsAnalysed: 3, budgetDriven: 2, rankDriven: 1, mixed: 0, healthy: 0, raiseBudgetCandidates: 2, bidOrQualityCandidates: 1 }, campaigns: [mk("A", 0.3), mk("B", 0.2)] },
     opts
   );
   assert(rows.length === 1 && rows[0].source === "impression_share", "één voorstel, bron impression_share");
   assert(rows[0].ice_confidence === 8, "vertrouwen 8 (harde IS-meting)");
   assert(/3 campagne/.test(rows[0].hypothesis), "totaal 3 kandidaten");
 
-  const none = impressionShareToHypotheses({ summary: { campaignsAnalysed: 1, budgetDriven: 0, rankDriven: 0, mixed: 0, healthy: 1, raiseBudgetCandidates: 0, bidOrQualityCandidates: 0 }, campaigns: [] }, opts);
+  const none = impressionShareToHypotheses({ summary: { peilmaand: "2026-08", buitenPeilmaand: 0, campaignsAnalysed: 1, budgetDriven: 0, rankDriven: 0, mixed: 0, healthy: 1, raiseBudgetCandidates: 0, bidOrQualityCandidates: 0 }, campaigns: [] }, opts);
   assert(none.length === 0, "geen kandidaten => leeg");
 }
 

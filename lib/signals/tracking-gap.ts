@@ -21,8 +21,13 @@ const ev = (metric: string, value: string): SignalEvidence => ({ metric, value }
 
 export function buildTrackingGapSignals(daily: TrackingGapRow[], opts: { channelLabel: string; idPrefix: string }): DetectionResult {
   const id = `${opts.idPrefix}_tracking_gap`;
-  const now = Date.now();
-  const ageOf = (date: string): number => (now - Date.parse(date)) / 86_400_000;
+  if (daily.length === 0) return { triggered: [], checked: [] };
+  // Anker op de laatste datadatum, niet op de wandklok: bij sync-lag zou het recente venster
+  // anders (deels) leeg zijn en de vergelijking scheeftrekken. De vraag "conversies nul
+  // terwijl klikken doorlopen" is een vergelijking BINNEN de data; een gestopte aanvoer is
+  // het spend-velocity-achterstandssignaal, niet dit.
+  const anchorMs = Date.parse(daily.map((r) => r.date).sort().at(-1)!);
+  const ageOf = (date: string): number => (anchorMs - Date.parse(date)) / 86_400_000;
 
   let recClicks = 0, recConv = 0, baseClicks = 0, baseConv = 0;
   for (const r of daily) {

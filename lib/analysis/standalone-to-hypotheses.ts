@@ -79,18 +79,20 @@ export function budgetAllocationToHypotheses(
 }
 
 // ── 2. Biedstrategie ────────────────────────────────────────
-// Actie zodra er mismatches zijn (alles behalve fit). Ease matig: een strategiewissel heeft een
+// Actie zodra er mismatches zijn. "unknown" telt niet mee: dat is een verificatievraag, geen
+// oordeel — en zo telt dit voorstel exact hetzelfde als summary.mismatches, in plaats van
+// stiller of luider te zijn dan de prompt. Ease matig: een strategiewissel heeft een
 // leerperiode, dus niet als quick win scoren.
 export function bidStrategyToHypotheses(
   input: { summary: BidStrategySummary; campaigns: BidFact[] },
   opts: MapOpts
 ): SprintHypothesisRow[] {
-  const mismatches = input.campaigns.filter((c) => c.fit !== "fit");
+  const mismatches = input.campaigns.filter((c) => c.fit !== "fit" && c.fit !== "unknown");
   if (mismatches.length === 0) return [];
 
   const examples = mismatches.slice(0, 3).map((c) => `${c.campaignName} (${c.fit})`).join(", ");
   const byFit = Object.entries(input.summary.byFit)
-    .filter(([fit, n]) => fit !== "fit" && n > 0)
+    .filter(([fit, n]) => fit !== "fit" && fit !== "unknown" && n > 0)
     .map(([fit, n]) => `${n}× ${fit}`)
     .join(", ");
 

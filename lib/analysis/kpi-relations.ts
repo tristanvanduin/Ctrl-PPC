@@ -51,9 +51,33 @@ export interface KpiWindow {
   conversions: number;
   conversionsValue?: number | null;
   avgFrequency?: number | null;    // impressie-gewogen dag-gemiddelde (Meta)
-  impressionShare?: number | null; // impressie-gewogen (Google)
+  impressionShare?: number | null; // impressie-gewogen (Google/Microsoft)
   engagement?: number | null;      // post_engagement / total_engagements
 }
+
+// De kanaaltaal: op LinkedIn heet de kost per conversie een CPL en is de conversie een
+// lead; en het K4-gevolg van een verwaterde CTR verschilt per kanaal (Google/Microsoft
+// hebben kwaliteitsscores, LinkedIn en Meta een relevantie-veiling). Zonder dit sprak elke
+// kanaalvariant Google-taal, terwijl de catalogus voor LinkedIn CPL/formulier-taal belooft.
+export interface KpiTaal {
+  kost: string;       // "CPA" of "CPL"
+  conversies: string; // "conversies" of "leads"
+  ratio: string;      // "conversieratio" of "lead-ratio"
+  k4Gevolg: string;   // wat een verwaterde CTR op dit kanaal kost
+}
+
+export const KPI_TAAL_GOOGLE: KpiTaal = {
+  kost: "CPA", conversies: "conversies", ratio: "conversieratio",
+  k4Gevolg: "voordat de verwaterde CTR de kwaliteitsscores drukt",
+};
+export const KPI_TAAL_META: KpiTaal = {
+  kost: "CPA", conversies: "conversies", ratio: "conversieratio",
+  k4Gevolg: "voordat de verwaterde CTR de veilingpositie en de leveringskwaliteit drukt",
+};
+export const KPI_TAAL_LINKEDIN: KpiTaal = {
+  kost: "CPL", conversies: "leads", ratio: "lead-ratio",
+  k4Gevolg: "voordat de verwaterde CTR de relevantie en de veilingpositie drukt",
+};
 
 const div = (a: number, b: number): number | null => (b > 0 ? a / b : null);
 const rel = (cur: number | null, base: number | null): number | null =>
@@ -67,7 +91,7 @@ function ev(metric: string, value: string, prev?: string): SignalEvidence {
 }
 
 // ── [K1] CPA-decompositie ──────────────────────────────────────────────────
-export function decomposeCpa(recent: KpiWindow, prior: KpiWindow): DetectionResult {
+export function decomposeCpa(recent: KpiWindow, prior: KpiWindow, taal: KpiTaal = KPI_TAAL_GOOGLE): DetectionResult {
   const id = "kpi_cpa_decompositie";
   if (recent.clicks < MIN_CLICKS || prior.clicks < MIN_CLICKS || recent.conversions < MIN_CONVERSIONS || prior.conversions < MIN_CONVERSIONS) {
     return { triggered: [], checked: [id] };
@@ -96,29 +120,29 @@ export function decomposeCpa(recent: KpiWindow, prior: KpiWindow): DetectionResu
     driver = `vooral doordat de KLIK duurder werd (CPC draagt ${Math.round(cpcShare * 100)}% van de beweging)`;
     action = "dit is een veiling/concurrentie-vraag: kijk naar biedingen, impression-share-verlies en concurrentiedruk, niet naar de landingspagina";
   } else if (cvrShare >= DOMINANT_SHARE) {
-    driver = `vooral doordat de klik SLECHTER CONVERTEERT (conversieratio draagt ${Math.round(cvrShare * 100)}% van de beweging)`;
+    driver = `vooral doordat de klik SLECHTER CONVERTEERT (${taal.ratio} draagt ${Math.round(cvrShare * 100)}% van de beweging)`;
     action = "dit is een landing/doelgroep-vraag: kijk naar de post-klik-keten en verkeerskwaliteit, niet naar de biedingen";
   } else {
-    driver = `door een combinatie: CPC draagt ${Math.round(cpcShare * 100)}%, conversieratio ${Math.round(cvrShare * 100)}%`;
+    driver = `door een combinatie: CPC draagt ${Math.round(cpcShare * 100)}%, ${taal.ratio} ${Math.round(cvrShare * 100)}%`;
     action = "beide knoppen bewegen: adresseer prijs (veiling) en kwaliteit (landing/doelgroep) als aparte sporen";
   }
 
   const story: SignalStory = {
     id, category: "kwaliteit", scope: `${prior.label} → ${recent.label}`,
-    story: `De CPA ${richting} ${dS(move)} (${eurS(cpaP)} → ${eurS(cpaR)}), ${driver}.`,
+    story: `De ${taal.kost} ${richting} ${dS(move)} (${eurS(cpaP)} → ${eurS(cpaR)}), ${driver}.`,
     actionDirection: action,
     certainty: "bewezen_binnen_platform",
     evidence: [
-      ev("CPA", eurS(cpaR), eurS(cpaP)),
+      ev(taal.kost, eurS(cpaR), eurS(cpaP)),
       ev("CPC", eurS(cpcR), eurS(cpcP)),
-      ev("conversieratio", pctS(cvrR), pctS(cvrP)),
+      ev(taal.ratio, pctS(cvrR), pctS(cvrP)),
     ],
   };
   return { triggered: [story], checked: [id] };
 }
 
 // ── [K2] Belofte-kloof (clickbait) ─────────────────────────────────────────
-export function detectPromiseGap(recent: KpiWindow, prior: KpiWindow): DetectionResult {
+export function detectPromiseGap(recent: KpiWindow, prior: KpiWindow, taal: KpiTaal = KPI_TAAL_GOOGLE): DetectionResult {
   const id = "kpi_belofte_kloof";
   if (recent.clicks < MIN_CLICKS || prior.clicks < MIN_CLICKS) return { triggered: [], checked: [id] };
   const ctrMove = rel(div(recent.clicks, recent.impressions), div(prior.clicks, prior.impressions));
@@ -128,19 +152,19 @@ export function detectPromiseGap(recent: KpiWindow, prior: KpiWindow): Detection
   }
   const story: SignalStory = {
     id, category: "kwaliteit", scope: `${prior.label} → ${recent.label}`,
-    story: `De CTR steeg ${dS(ctrMove)} TERWIJL de conversieratio ${dS(cvrMove)} zakte: de advertentie trekt meer klikken die minder waarmaken — het belofte-kloof-patroon.`,
-    actionDirection: "leg de advertentiebelofte naast de landingservaring; een scherpere maar eerlijkere boodschap kost CTR en levert conversies",
+    story: `De CTR steeg ${dS(ctrMove)} TERWIJL de ${taal.ratio} ${dS(cvrMove)} zakte: de advertentie trekt meer klikken die minder waarmaken — het belofte-kloof-patroon.`,
+    actionDirection: `leg de advertentiebelofte naast de landingservaring; een scherpere maar eerlijkere boodschap kost CTR en levert ${taal.conversies}`,
     certainty: "indicatie",
     evidence: [
       ev("CTR", pctS(div(recent.clicks, recent.impressions)), pctS(div(prior.clicks, prior.impressions))),
-      ev("conversieratio", pctS(div(recent.conversions, recent.clicks)), pctS(div(prior.conversions, prior.clicks))),
+      ev(taal.ratio, pctS(div(recent.conversions, recent.clicks)), pctS(div(prior.conversions, prior.clicks))),
     ],
   };
   return { triggered: [story], checked: [id] };
 }
 
 // ── [K3] Verzadiging (marginale efficiëntie) ───────────────────────────────
-export function detectSaturation(recent: KpiWindow, prior: KpiWindow): DetectionResult {
+export function detectSaturation(recent: KpiWindow, prior: KpiWindow, taal: KpiTaal = KPI_TAAL_GOOGLE): DetectionResult {
   const id = "kpi_verzadiging";
   if (prior.cost <= 0 || prior.conversions < MIN_CONVERSIONS) return { triggered: [], checked: [id] };
   const spendMove = rel(recent.cost, prior.cost);
@@ -153,10 +177,10 @@ export function detectSaturation(recent: KpiWindow, prior: KpiWindow): Detection
   if (dConv <= 0) {
     const story: SignalStory = {
       id, category: "budget_pacing", scope: `${prior.label} → ${recent.label}`,
-      story: `De spend steeg ${dS(spendMove)} (${eurS(prior.cost)} → ${eurS(recent.cost)}) zonder extra conversies (${Math.round(prior.conversions)} → ${Math.round(recent.conversions)}): de extra euro's kochten niets bij.`,
-      actionDirection: "bevries de verhoging tot duidelijk is waar het extra budget landde (duurdere klikken? breder bereik zonder intentie?) — zie de CPA-decompositie",
+      story: `De spend steeg ${dS(spendMove)} (${eurS(prior.cost)} → ${eurS(recent.cost)}) zonder extra ${taal.conversies} (${Math.round(prior.conversions)} → ${Math.round(recent.conversions)}): de extra euro's kochten niets bij.`,
+      actionDirection: `bevries de verhoging tot duidelijk is waar het extra budget landde (duurdere klikken? breder bereik zonder intentie?) — zie de ${taal.kost}-decompositie`,
       certainty: "indicatie",
-      evidence: [ev("spend", eurS(recent.cost), eurS(prior.cost)), ev("conversies", String(Math.round(recent.conversions)), String(Math.round(prior.conversions)))],
+      evidence: [ev("spend", eurS(recent.cost), eurS(prior.cost)), ev(taal.conversies, String(Math.round(recent.conversions)), String(Math.round(prior.conversions)))],
     };
     return { triggered: [story], checked: [id] };
   }
@@ -165,16 +189,16 @@ export function detectSaturation(recent: KpiWindow, prior: KpiWindow): Detection
   if (avgCpa == null || marginalCpa < avgCpa * MARGINAL_FACTOR) return { triggered: [], checked: [id] };
   const story: SignalStory = {
     id, category: "budget_pacing", scope: `${prior.label} → ${recent.label}`,
-    story: `De extra spend leverde wel conversies, maar tegen een marginale CPA van ${eurS(marginalCpa)} — ${Math.round(marginalCpa / avgCpa * 10) / 10}× de gemiddelde CPA (${eurS(avgCpa)}): verzadiging, de volgende euro rendeert steeds minder.`,
+    story: `De extra spend leverde wel ${taal.conversies}, maar tegen een marginale ${taal.kost} van ${eurS(marginalCpa)} — ${Math.round(marginalCpa / avgCpa * 10) / 10}× de gemiddelde ${taal.kost} (${eurS(avgCpa)}): verzadiging, de volgende euro rendeert steeds minder.`,
     actionDirection: "overweeg het extra budget te herverdelen naar een kanaal of campagne met kop-ruimte (zie budgetallocatie) in plaats van dieper in de verzadiging te duwen",
     certainty: "indicatie",
-    evidence: [ev("marginale CPA", eurS(marginalCpa)), ev("gemiddelde CPA", eurS(avgCpa)), ev("spend-delta", dS(spendMove))],
+    evidence: [ev(`marginale ${taal.kost}`, eurS(marginalCpa)), ev(`gemiddelde ${taal.kost}`, eurS(avgCpa)), ev("spend-delta", dS(spendMove))],
   };
   return { triggered: [story], checked: [id] };
 }
 
 // ── [K4] Bereik-verdunning ─────────────────────────────────────────────────
-export function detectReachDilution(recent: KpiWindow, prior: KpiWindow): DetectionResult {
+export function detectReachDilution(recent: KpiWindow, prior: KpiWindow, taal: KpiTaal = KPI_TAAL_GOOGLE): DetectionResult {
   const id = "kpi_bereik_verdunning";
   if (prior.impressions <= 0 || recent.clicks < MIN_CLICKS) return { triggered: [], checked: [id] };
   const impMove = rel(recent.impressions, prior.impressions);
@@ -185,7 +209,7 @@ export function detectReachDilution(recent: KpiWindow, prior: KpiWindow): Detect
   const story: SignalStory = {
     id, category: "zichtbaarheid_vraag", scope: `${prior.label} → ${recent.label}`,
     story: `De vertoningen stegen ${dS(impMove)} TERWIJL de CTR ${dS(ctrMove)} zakte: de verbreding bereikt publiek dat de boodschap minder relevant vindt.`,
-    actionDirection: "beoordeel of de verbreding bewust was (nieuwe doelgroepen/zoektermen); zo niet, scherp de targeting aan voordat de verwaterde CTR de kwaliteitsscores drukt",
+    actionDirection: `beoordeel of de verbreding bewust was (nieuwe doelgroepen/zoektermen); zo niet, scherp de targeting aan ${taal.k4Gevolg}`,
     certainty: "indicatie",
     evidence: [ev("vertoningen", String(Math.round(recent.impressions)), String(Math.round(prior.impressions))), ev("CTR", pctS(div(recent.clicks, recent.impressions)), pctS(div(prior.clicks, prior.impressions)))],
   };
@@ -195,8 +219,14 @@ export function detectReachDilution(recent: KpiWindow, prior: KpiWindow): Detect
 // ── [K5] Waarde-mix ────────────────────────────────────────────────────────
 export function detectValueMix(recent: KpiWindow, prior: KpiWindow): DetectionResult {
   const id = "kpi_waarde_mix";
-  const vR = recent.conversionsValue ?? 0;
-  const vP = prior.conversionsValue ?? 0;
+  // Zonder waarde-tracking is deze verhouding niet gecontroleerd — dan hoort hij ook niet
+  // in de "gecontroleerd, niet getriggerd"-lijst te staan (audit 1 sep 2026: die lijst
+  // claimde alle acht detectors, ook op kanalen waar de input per constructie ontbrak).
+  if (recent.conversionsValue == null || prior.conversionsValue == null) {
+    return { triggered: [], checked: [] };
+  }
+  const vR = recent.conversionsValue;
+  const vP = prior.conversionsValue;
   if (vP <= 0 || recent.conversions < MIN_CONVERSIONS || prior.conversions < MIN_CONVERSIONS) {
     return { triggered: [], checked: [id] };
   }
@@ -220,7 +250,9 @@ export function detectFrequencyDrivenGrowth(recent: KpiWindow, prior: KpiWindow)
   const id = "kpi_herhaling_vs_bereik";
   const fR = recent.avgFrequency ?? null;
   const fP = prior.avgFrequency ?? null;
-  if (fR == null || fP == null || fP <= 0 || prior.impressions <= 0) return { triggered: [], checked: [id] };
+  // Geen frequentiedata (search-kanalen): niet gecontroleerd, dus ook niet zo rapporteren.
+  if (fR == null || fP == null) return { triggered: [], checked: [] };
+  if (fP <= 0 || prior.impressions <= 0) return { triggered: [], checked: [id] };
   const impMove = rel(recent.impressions, prior.impressions);
   if (impMove == null || impMove < IMP_UP) return { triggered: [], checked: [id] };
   // vertoningen = bereik x frequentie => ln-aandeel van de frequentie in de groei.
@@ -243,7 +275,9 @@ export function detectPaidVisibility(recent: KpiWindow, prior: KpiWindow): Detec
   const id = "kpi_dure_zichtbaarheid";
   const isR = recent.impressionShare ?? null;
   const isP = prior.impressionShare ?? null;
-  if (isR == null || isP == null || recent.clicks < MIN_CLICKS || prior.clicks < MIN_CLICKS) {
+  // Zonder impression-share-data is er niets gecontroleerd.
+  if (isR == null || isP == null) return { triggered: [], checked: [] };
+  if (recent.clicks < MIN_CLICKS || prior.clicks < MIN_CLICKS) {
     return { triggered: [], checked: [id] };
   }
   const cpcMove = rel(div(recent.cost, recent.clicks), div(prior.cost, prior.clicks));
@@ -259,11 +293,13 @@ export function detectPaidVisibility(recent: KpiWindow, prior: KpiWindow): Detec
 }
 
 // ── [K8] Vanity-engagement ─────────────────────────────────────────────────
-export function detectVanityEngagement(recent: KpiWindow, prior: KpiWindow): DetectionResult {
+export function detectVanityEngagement(recent: KpiWindow, prior: KpiWindow, taal: KpiTaal = KPI_TAAL_GOOGLE): DetectionResult {
   const id = "kpi_vanity_engagement";
   const eR = recent.engagement ?? null;
   const eP = prior.engagement ?? null;
-  if (eR == null || eP == null || eP <= 0 || prior.conversions < MIN_CONVERSIONS) return { triggered: [], checked: [id] };
+  // Geen engagement-as (search-kanalen): niet gecontroleerd.
+  if (eR == null || eP == null) return { triggered: [], checked: [] };
+  if (eP <= 0 || prior.conversions < MIN_CONVERSIONS) return { triggered: [], checked: [id] };
   const engMove = rel(eR, eP);
   const convMove = rel(recent.conversions, prior.conversions);
   if (engMove == null || convMove == null || engMove < ENGAGEMENT_UP || convMove > CONV_DOWN) {
@@ -271,24 +307,29 @@ export function detectVanityEngagement(recent: KpiWindow, prior: KpiWindow): Det
   }
   const story: SignalStory = {
     id, category: "creative", scope: `${prior.label} → ${recent.label}`,
-    story: `Engagement steeg ${dS(engMove)} TERWIJL de conversies ${dS(convMove)} daalden: het publiek reageert, maar koopt niet — de creative optimaliseert richting interactie in plaats van intentie.`,
+    story: `Engagement steeg ${dS(engMove)} TERWIJL de ${taal.conversies} ${dS(convMove)} daalden: het publiek reageert, maar koopt niet — de creative optimaliseert richting interactie in plaats van intentie.`,
     actionDirection: "check de campagne-doelstelling en de creative-hook: stuurt die op reacties of op de klik met intentie? engagement is hier geen voorloper van conversie",
     certainty: "indicatie",
-    evidence: [ev("engagement", String(Math.round(eR)), String(Math.round(eP))), ev("conversies", dS(convMove))],
+    evidence: [ev("engagement", String(Math.round(eR)), String(Math.round(eP))), ev(taal.conversies, dS(convMove))],
   };
   return { triggered: [story], checked: [id] };
 }
 
 // ── Bundel per kanaal ──────────────────────────────────────────────────────
-export function buildKpiRelations(recent: KpiWindow, prior: KpiWindow): DetectionResult {
+//
+// checked bevat sinds de herbouw alleen detectors waarvan de INPUT er echt was: K5-K8
+// melden zich niet als "gecontroleerd" wanneer waarde, frequentie, impression share of
+// engagement op dit kanaal ontbreekt. "Gecontroleerd, stil gebleven" betekent nu wat het
+// zegt.
+export function buildKpiRelations(recent: KpiWindow, prior: KpiWindow, taal: KpiTaal = KPI_TAAL_GOOGLE): DetectionResult {
   return mergeDetections([
-    decomposeCpa(recent, prior),
-    detectPromiseGap(recent, prior),
-    detectSaturation(recent, prior),
-    detectReachDilution(recent, prior),
+    decomposeCpa(recent, prior, taal),
+    detectPromiseGap(recent, prior, taal),
+    detectSaturation(recent, prior, taal),
+    detectReachDilution(recent, prior, taal),
     detectValueMix(recent, prior),
     detectFrequencyDrivenGrowth(recent, prior),
     detectPaidVisibility(recent, prior),
-    detectVanityEngagement(recent, prior),
+    detectVanityEngagement(recent, prior, taal),
   ]);
 }

@@ -36,5 +36,31 @@ const thin: SpendDailyRow[] = [{ date: day(10), spend: 5 }, { date: day(2), spen
 const thinRes = buildSpendVelocitySignals(thin, opts);
 assert(thinRes.triggered.length === 0 && thinRes.checked.includes("meta_budget_spend_velocity"), "onder de basislijn-drempel geen oordeel, wel gecontroleerd");
 
+// ── Het data-anker (herbouw 1 sep 2026) ──
+//
+// Zes dagen sync-lag bij een verder kerngezond stabiel tempo: de oude wandklok-versie las
+// het halflege recente venster als -86% "inzakking" (live gezien op de demo). Met het anker
+// op de laatste datadatum blijft het tempo-oordeel schoon, en meldt een apart signaal dat
+// de AANVOER achterloopt.
+{
+  const lag: SpendDailyRow[] = [];
+  // Stabiel €100/dag, maar de jongste rij is 6 dagen oud.
+  for (let a = 6; a < 6 + SV_RECENT_DAYS + SV_BASELINE_DAYS; a++) lag.push({ date: day(a), spend: 100 });
+  const vandaag = day(0);
+  const res = buildSpendVelocitySignals(lag, { ...opts, vandaag });
+  assert(!res.triggered.some((s) => s.id === "meta_budget_spend_inzakking"), "sync-lag is geen inzakking meer");
+  const achterstand = res.triggered.find((s) => s.id === "meta_budget_data_achterstand");
+  assert(achterstand !== undefined, "de achterstand zelf wordt wél gemeld");
+  assert(/6 dagen/.test(achterstand?.story ?? ""), "met het aantal dagen erbij");
+
+  // Zonder vandaag-parameter (oude aanroepen): geen achterstandssignaal, ook geen vals alarm.
+  const zonder = buildSpendVelocitySignals(lag, opts);
+  assert(zonder.triggered.length === 0, "zonder vandaag-parameter alleen het schone tempo-oordeel");
+
+  // Lege invoer: niets gecontroleerd (er wás niets om te controleren).
+  const leeg = buildSpendVelocitySignals([], opts);
+  assert(leeg.checked.length === 0 && leeg.triggered.length === 0, "lege invoer telt niet als gecontroleerd");
+}
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

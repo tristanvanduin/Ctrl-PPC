@@ -3,8 +3,17 @@
 // impression-share-facts.ts, temperatuur 0 en de repair zijn zaak van runStep. De prompt
 // beschrijft niet, hij laat het model de al berekende diagnose interpreteren en vertalen
 // naar acties, wat de analyse scherper maakt dan een checklist.
+//
+// Sinds de herbouw (1 september 2026) draagt de prompt de peilmaand expliciet — alle
+// campagnes zijn in dezelfde afgesloten maand beoordeeld — en is het campagneblok gecapt
+// op de grootste verliezers, zodat een account met honderden campagnes geen onbeheerst
+// promptblok oplevert.
 
 import type { CampaignISFact, ImpressionShareSummary, CountryISFact, LossDriver, ActionCandidate } from "@/lib/analysis/impression-share-facts";
+
+// Meer campagneregels dan dit voegt geen prioriteit toe, alleen promptkosten; de summary
+// draagt de totalen, dus niets verdwijnt stil.
+export const MAX_CAMPAGNES_IN_PROMPT = 25;
 
 const DRIVER_LABEL: Record<LossDriver, string> = {
   budget: "budget-gedreven",
@@ -27,34 +36,47 @@ function pct(v: number): string {
 // Bouwt het feitenblok voor de campagnes (al gerangschikt op grootste verlies).
 function campaignFactsBlock(campaigns: CampaignISFact[]): string {
   if (campaigns.length === 0) return "Geen campagne-impression-share-data beschikbaar.";
-  const lines = campaigns.map((c) => {
+  const getoond = campaigns.slice(0, MAX_CAMPAGNES_IN_PROMPT);
+  const lines = getoond.map((c) => {
     const mom = c.impressionShareMoM === null ? "" : ` (MoM ${c.impressionShareMoM >= 0 ? "+" : ""}${pct(c.impressionShareMoM)})`;
-    const cpa = c.cpa === null ? "geen conversies" : `CPA ${c.cpa}`;
+    const cpa = c.cpa === null ? "geen conversies" : `CPA €${c.cpa}`;
     return `- ${c.campaignName}: IS ${pct(c.impressionShare)}${mom}, verloren door budget ${pct(c.budgetLostIs)}, door rang ${pct(c.rankLostIs)}. Diagnose: ${DRIVER_LABEL[c.driver]}, ${ACTION_LABEL[c.action]}. ${c.conversions} conversies, ${cpa}.`;
   });
+  const rest = campaigns.length - getoond.length;
+  if (rest > 0) lines.push(`- (en ${rest} campagnes met kleiner verlies, niet uitgeschreven; de samenvatting telt ze wel mee)`);
   return lines.join("\n");
 }
 
-function geoFactsBlock(geo: CountryISFact[]): string {
+function geoFactsBlock(geo: CountryISFact[], geoPeilmaand: string): string {
   if (geo.length === 0) return "";
   const lines = geo.map((g) => `- ${g.countryCode}: IS ${pct(g.impressionShare)}, totaal verlies ${pct(g.totalLostIs)}, ${DRIVER_LABEL[g.driver]}.`);
-  return `\n\n## Zichtbaarheid per land (voorgerekend)\n${lines.join("\n")}`;
+  return `\n\n## Zichtbaarheid per land (voorgerekend, maand ${geoPeilmaand})\n${lines.join("\n")}`;
 }
 
 export function buildImpressionSharePrompt(input: {
   summary: ImpressionShareSummary;
   campaigns: CampaignISFact[];
   geo: CountryISFact[];
+  geoPeilmaand?: string;
+  /** Waarschuwing wanneer de peilmaand ouder is dan de laatste afgesloten maand. */
+  verouderd?: boolean;
   goalsSection?: string;
 }): string {
   const s = input.summary;
+  const stale = input.verouderd
+    ? `\nLET OP: de jongste data is van ${s.peilmaand}; recentere maanden ontbreken in de sync. Benoem dit in de analyse en presenteer de conclusies als momentopname van die maand.`
+    : "";
+  const buiten = s.buitenPeilmaand > 0
+    ? ` ${s.buitenPeilmaand} campagne(s) hebben alleen oudere data (gepauzeerd of gestopt) en zijn buiten beschouwing gelaten.`
+    : "";
   return `Je bent een senior Google Ads-specialist. Analyseer de zichtbaarheid (impression share) van dit account. De diagnose per campagne is al deterministisch voorgerekend; jouw taak is interpreteren en vertalen naar concrete, geprioriteerde acties, niet herrekenen.
 
 ## Voorgerekende samenvatting
+Peilmaand: ${s.peilmaand} (alle campagnes hieronder zijn in deze afgesloten maand beoordeeld).${buiten}${stale}
 Campagnes geanalyseerd: ${s.campaignsAnalysed}. Budget-gedreven verlies: ${s.budgetDriven}. Rang-gedreven verlies: ${s.rankDriven}. Gemengd: ${s.mixed}. Gezond: ${s.healthy}. Kandidaten voor budgetverhoging: ${s.raiseBudgetCandidates}. Kandidaten voor bod of kwaliteit: ${s.bidOrQualityCandidates}.
 
 ## Campagnes, gerangschikt op grootste zichtbaarheidsverlies (voorgerekend)
-${campaignFactsBlock(input.campaigns)}${geoFactsBlock(input.geo)}
+${campaignFactsBlock(input.campaigns)}${geoFactsBlock(input.geo, input.geoPeilmaand ?? s.peilmaand)}
 ${input.goalsSection ? `\n\n## Doelstellingen en targets\n${input.goalsSection}` : ""}
 
 ## Jouw analyse

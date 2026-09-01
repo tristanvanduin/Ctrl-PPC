@@ -35,7 +35,12 @@ export function renderSignalSection(merged: DetectionResult, channelLabel: strin
     ...stories.map(renderStory),
     "",
     "### Gecontroleerd, niet getriggerd",
-    merged.checked.filter((id) => !stories.some((s) => s.id === id)).join(", ") || "geen",
+    // Story-ids dragen soms een suffix op het gecontroleerde id (geo_country_geen_conversies_US
+    // op check-id geo_country_geen_conversies); zonder de prefix-vergelijking stond een
+    // getriggerde categorie hier óók als "niet getriggerd" — de sectie sprak zichzelf tegen.
+    merged.checked
+      .filter((id) => !stories.some((s) => s.id === id || s.id.startsWith(`${id}_`)))
+      .join(", ") || "geen",
   ];
   return { section: lines.join("\n"), triggeredCount: stories.length, checkedIds: merged.checked };
 }

@@ -5,7 +5,7 @@
 import {
   decomposeCpa, detectPromiseGap, detectSaturation, detectReachDilution,
   detectValueMix, detectFrequencyDrivenGrowth, detectPaidVisibility, detectVanityEngagement,
-  buildKpiRelations, type KpiWindow,
+  buildKpiRelations, KPI_TAAL_LINKEDIN, type KpiWindow,
 } from "./kpi-relations";
 
 let failed = 0;
@@ -97,9 +97,35 @@ console.log("[K8] vanity-engagement:");
 
 console.log("bundel:");
 {
-  const merged = buildKpiRelations(win("jun"), win("mei"));
-  assert(merged.checked.length === 8, "alle acht verhoudingen gecheckt");
-  assert(merged.triggered.length === 0, "identieke vensters: alles stil");
+  // Eerlijke dekking (herbouw 1 sep 2026): zonder waarde, frequentie, impression share en
+  // engagement zijn K5-K8 niet gecontroleerd — dus tellen ze ook niet mee in "gecontroleerd,
+  // niet getriggerd". De oude versie claimde alle acht, ook op kanalen waar de input per
+  // constructie ontbrak.
+  const kaal = buildKpiRelations(win("jun"), win("mei"));
+  assert(kaal.checked.length === 4, `zonder extra assen zijn vier verhoudingen echt gecheckt (was ${kaal.checked.length})`);
+  assert(kaal.triggered.length === 0, "identieke vensters: alles stil");
+
+  const vol = buildKpiRelations(
+    win("jun", { conversionsValue: 5000, avgFrequency: 2.1, impressionShare: 0.6, engagement: 1000 }),
+    win("mei", { conversionsValue: 5000, avgFrequency: 2.1, impressionShare: 0.6, engagement: 1000 })
+  );
+  assert(vol.checked.length === 8, "met alle assen aanwezig zijn alle acht gecheckt");
+  assert(vol.triggered.length === 0, "identieke volle vensters: alles stil");
+}
+
+console.log("kanaaltaal:");
+{
+  // LinkedIn spreekt CPL/lead-taal (catalogusbelofte); Google houdt CPA-taal.
+  const li = decomposeCpa(win("jun", { clicks: 2000, cost: 4000, conversions: 50 }), win("mei"), KPI_TAAL_LINKEDIN);
+  assert(li.triggered.length === 1 && /CPL/.test(li.triggered[0].story), "LinkedIn-decompositie zegt CPL");
+  assert(/lead-ratio/.test(li.triggered[0].story), "en lead-ratio in plaats van conversieratio");
+  const gg = decomposeCpa(win("jun", { clicks: 2000, cost: 4000, conversions: 50 }), win("mei"));
+  assert(/CPA/.test(gg.triggered[0].story), "Google-decompositie blijft CPA zeggen");
+  // K4-gevolg is kanaaleigen: LinkedIn heeft geen kwaliteitsscores.
+  const k4 = detectReachDilution(win("jun", { impressions: 130000, clicks: 2000 }), win("mei"), KPI_TAAL_LINKEDIN);
+  if (k4.triggered.length === 1) {
+    assert(!/kwaliteitsscores/.test(k4.triggered[0].actionDirection), "LinkedIn-K4 noemt geen kwaliteitsscores");
+  }
 }
 
 if (failed > 0) { console.error(`\n${failed} assertie(s) gefaald`); process.exit(1); }

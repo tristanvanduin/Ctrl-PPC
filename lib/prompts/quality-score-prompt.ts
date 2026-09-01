@@ -36,9 +36,17 @@ function flagsBlock(facts: QualityScoreFacts): string {
   return facts.flags.map((f) => `- [${f.kind}] ${f.detail}`).join("\n");
 }
 
-export function buildQualityScorePrompt(input: { facts: QualityScoreFacts; goalsSection: string }): string {
+export function buildQualityScorePrompt(input: {
+  facts: QualityScoreFacts;
+  /** True wanneer de analysemaand ouder is dan de laatste afgesloten maand (sync loopt achter). */
+  verouderd?: boolean;
+  goalsSection: string;
+}): string {
   const { facts } = input;
-  return `Je bent een senior Google Ads specialist. Je analyseert de quality-score-situatie van een account op basis van UITSLUITEND de onderstaande, voorgerekende feiten.
+  const stale = input.verouderd
+    ? `\nLET OP: de jongste keyword-data is van ${facts.analysisMonth ?? "onbekend"}; recentere maanden ontbreken in de sync. Presenteer de conclusies als momentopname van die maand en benoem dit expliciet.`
+    : "";
+  return `Je bent een senior Google Ads specialist. Je analyseert de quality-score-situatie van een account op basis van UITSLUITEND de onderstaande, voorgerekende feiten.${stale}
 
 ## Klantdoelen en context
 ${input.goalsSection}

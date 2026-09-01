@@ -13,16 +13,27 @@ const cpaT: BudgetTarget = { targetCpa: 25 };
 assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 200, conversions: 10 }, cpaT) === "beating", "CPA 20 onder target 25: beating");
 assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 250, conversions: 10 }, cpaT) === "on_target", "CPA 25 precies op target: on_target");
 assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 350, conversions: 10 }, cpaT) === "missing", "CPA 35 boven target: missing");
-assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 200, conversions: 0 }, cpaT) === "unknown", "geen conversies: unknown");
+// Het nul-oordeel (herbouw 1 sep 2026): €200 uitgeven op een doel-CPA van €25 zonder één
+// conversie is geen "unknown" maar de hardste misser — de oude versie liet dit lopen.
+assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 200, conversions: 0 }, cpaT) === "missing", "grootspender zonder conversies: missing");
+assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 40, conversions: 0 }, cpaT) === "unknown", "kleine spender zonder conversies: te weinig bewijs, unknown");
+assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 90, conversions: 2 }, cpaT) === "unknown", "2 conversies is ruis, geen oordeel");
 
 // ── Efficientie tegen ROAS-target (hoger is beter), target 4 ──
 const roasT: BudgetTarget = { targetRoas: 4 };
 assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 100, conversionsValue: 500 }, roasT) === "beating", "ROAS 5 boven target 4: beating");
 assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 100, conversionsValue: 400 }, roasT) === "on_target", "ROAS 4 op target: on_target");
 assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 100, conversionsValue: 300 }, roasT) === "missing", "ROAS 3 onder target: missing");
-assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 100 }, roasT) === "unknown", "geen conversiewaarde: unknown");
-// ROAS krijgt voorrang boven CPA als beide targets er zijn
-assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 100, conversionsValue: 500, conversions: 1 }, { targetCpa: 25, targetRoas: 4 }) === "beating", "ROAS krijgt voorrang bij beide targets");
+// Zonder waarde en zonder conversie-info geldt het nul-oordeel vanaf de absolute drempel.
+assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 100 }, roasT) === "missing", "ROAS-doel, €100 spend, nul waarde: missing (nul-oordeel)");
+assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 40 }, roasT) === "unknown", "ROAS-doel met kleine spend en nul waarde: unknown");
+// ROAS krijgt voorrang boven CPA als beide targets er zijn (met genoeg volume).
+assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 100, conversionsValue: 500, conversions: 10 }, { targetCpa: 25, targetRoas: 4 }) === "beating", "ROAS krijgt voorrang bij beide targets");
+// Maar één conversie met waarde is ruis: de volumepoort wint van de ROAS-tak.
+assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 100, conversionsValue: 500, conversions: 1 }, { targetCpa: 25, targetRoas: 4 }) === "unknown", "1 conversie met waarde blijft te weinig volume");
+// De leadgen-val uit de audit: waarde-kolom bestaat maar is 0 en er is per ongeluk ook een
+// ROAS-target — de CPA-tak hoort dan te winnen in plaats van alles "missing" te maken.
+assert(efficiencyStatus({ campaignId: "a", campaignName: "a", cost: 200, conversions: 10, conversionsValue: 0 }, { targetCpa: 25, targetRoas: 4 }) === "beating", "waarde 0 valt terug op de CPA-tak (leadgen)");
 
 // ── Budgetbeslissing ──
 // Efficient plus groeiruimte plus niet rang-beperkt: scale_up
@@ -37,9 +48,11 @@ assert(down.action === "scale_down" && down.marginalScore === 0, "haalt de targe
 // Efficient maar geen groeiruimte: hold
 const noHead = budgetActionFor({ campaignId: "D", campaignName: "D", cost: 200, conversions: 10, budgetLostIs: 0.02, rankLostIs: 0.02, budgetUtilization: 0.5 }, cpaT);
 assert(noHead.action === "hold", "efficient zonder groeiruimte: hold");
-// Hoge budgetbenutting telt ook als groeiruimte
-const capped = budgetActionFor({ campaignId: "E", campaignName: "E", cost: 200, conversions: 10, budgetLostIs: 0.03, rankLostIs: 0.02, budgetUtilization: 0.95 }, cpaT);
+// Hoge budgetbenutting telt ook als groeiruimte — en de score krijgt de headroom-vloer,
+// zodat deze kandidaat niet met score 0 onderaan de ranking belandt (audit 1 sep 2026).
+const capped = budgetActionFor({ campaignId: "E", campaignName: "E", cost: 200, conversions: 10, budgetLostIs: 0, rankLostIs: 0.02, budgetUtilization: 0.95 }, cpaT);
 assert(capped.action === "scale_up", "efficient en tegen het budgetplafond: scale_up");
+assert(capped.marginalScore > 0, "de benuttings-kandidaat heeft een positieve marginale score");
 // Geen target: hold met unknown
 const noTarget = budgetActionFor({ campaignId: "F", campaignName: "F", cost: 200, conversions: 10, budgetLostIs: 0.30 }, {});
 assert(noTarget.action === "hold" && noTarget.efficiency === "unknown", "zonder target geen budgetbeslissing");
@@ -68,12 +81,18 @@ if (failed > 0) process.exit(1);
 import { buildBudgetAllocationPrompt } from "@/lib/prompts/budget-allocation-prompt";
 {
   const r = analyzeBudgetAllocation(campaigns, cpaT);
-  const prompt = buildBudgetAllocationPrompt({ summary: r.summary, scaleUp: r.scaleUp, scaleDown: r.scaleDown, target: cpaT, goalsSection: "CPA target 25" });
+  const prompt = buildBudgetAllocationPrompt({
+    summary: r.summary, scaleUp: r.scaleUp, scaleDown: r.scaleDown, target: cpaT,
+    dekking: { peilmaand: "2026-08", buitenDekkingCampagnes: 2, buitenDekkingKosten: 850 },
+    goalsSection: "CPA target 25",
+  });
   let p2 = 0, f2 = 0;
   const a2 = (c: boolean, l: string) => { if (c) p2++; else { f2++; console.error(`  FAIL: ${l}`); } };
   a2(prompt.includes("Winnaar groot") && prompt.includes("Meer budget"), "prompt bevat de scale_up-kandidaten");
   a2(prompt.includes("Verliezer") && prompt.includes("Minder budget"), "prompt bevat de scale_down-bron");
-  a2(prompt.includes("CPA-target 25"), "prompt noemt het target");
+  a2(prompt.includes("CPA-target \u20ac25"), "prompt noemt het target met euroteken");
+  a2(prompt.includes("Peilmaand: 2026-08"), "prompt noemt de peilmaand");
+  a2(prompt.includes("dekkingsgrens") && prompt.includes("\u20ac850"), "prompt benoemt de Search-only-dekkingsgrens met de spend erbuiten");
   a2(prompt.includes("UITSLUITEND naar campagnes met bewezen efficientie"), "prompt draagt de herallocatie-no-go");
   a2(!/\u2014/.test(prompt), "geen em-dash in de prompt");
   console.log(`\n=== Prompt: ${p2} passed, ${f2} failed ===\n`);

@@ -56,19 +56,49 @@ assert(D.driver === "budget" && D.action === "none", "D is budget-gedreven maar 
 assert(D.cpa === null, "D zonder conversies heeft geen CPA");
 
 assert(summary.campaignsAnalysed === 4, "summary telt vier campagnes");
+assert(summary.peilmaand === "2026-03", "de peilmaand is de jongste maand in de data");
+assert(summary.buitenPeilmaand === 0, "alle campagnes zitten in de peilmaand");
 assert(summary.budgetDriven === 2 && summary.rankDriven === 1 && summary.healthy === 1, "summary verdeelt de oorzaken correct");
 assert(summary.raiseBudgetCandidates === 1, "alleen A is een echte budget-kandidaat, niet D");
 assert(summary.bidOrQualityCandidates === 1, "B is de bod-of-kwaliteit-kandidaat");
 
+// ── De peilmaand-discipline (herbouw 1 september 2026) ──
+//
+// Een gepauzeerde campagne met alleen oude rijen mag niet stilzwijgend op die oude maand
+// beoordeeld worden naast actuele campagnes; hij telt apart. En een MoM over een gat heen
+// (januari → maart) is geen month-over-month en hoort null te zijn.
+{
+  const metGepauzeerd = analyzeCampaignImpressionShare([
+    rij("ACTIEF", "2026-03", 0.60, 0.30, 0.10),
+    rij("GEPAUZEERD", "2025-11", 0.40, 0.40, 0.10),
+  ]);
+  assert(metGepauzeerd.campaigns.length === 1, "alleen de campagne in de peilmaand wordt beoordeeld");
+  assert(metGepauzeerd.summary.buitenPeilmaand === 1, "de gepauzeerde telt als buiten de peilmaand");
+
+  const metGat = analyzeCampaignImpressionShare([
+    rij("X", "2026-01", 0.50, 0.30, 0.10),
+    rij("X", "2026-03", 0.60, 0.30, 0.10),
+  ]);
+  assert(metGat.campaigns[0].impressionShareMoM === null, "MoM over een gat heen is null, geen vergelijking met januari");
+}
+
 // Lege invoer degradeert netjes
-assert(analyzeCampaignImpressionShare([]).campaigns.length === 0, "lege invoer geeft geen campagnes");
+{
+  const leeg = analyzeCampaignImpressionShare([]);
+  assert(leeg.campaigns.length === 0 && leeg.summary.peilmaand === "", "lege invoer geeft geen campagnes en een lege peilmaand");
+}
 
 // ── Geo-samenvatting ──
-const geo = analyzeGeoImpressionShare([
+const geoUitkomst = analyzeGeoImpressionShare([
   { country_code: "NL", month: "2026-03", search_impression_share: 0.80, search_budget_lost_is: 0.15, search_rank_lost_is: 0.05, total_cost: 1000 },
   { country_code: "BE", month: "2026-03", search_impression_share: 0.50, search_budget_lost_is: 0.10, search_rank_lost_is: 0.40, total_cost: 500 },
   { country_code: "DE", month: "2026-03", search_impression_share: 0.98, search_budget_lost_is: 0.01, search_rank_lost_is: 0.01, total_cost: 200 },
+  // Een oude rij van een land dat niet meer draait hoort niet tussen de actuele maanden.
+  { country_code: "FR", month: "2025-12", search_impression_share: 0.30, search_budget_lost_is: 0.50, search_rank_lost_is: 0.10, total_cost: 900 },
 ]);
+const geo = geoUitkomst.countries;
+assert(geoUitkomst.peilmaand === "2026-03", "geo draagt zijn eigen peilmaand");
+assert(geo.length === 3 && !geo.some((g) => g.countryCode === "FR"), "een land met alleen oude data valt buiten de peilmaand");
 assert(geo[0].countryCode === "BE" && geo[0].driver === "rank", "BE verliest het meest en is rang-gedreven");
 assert(geo[geo.length - 1].countryCode === "DE" && geo[geo.length - 1].driver === "none", "DE is gezond en staat onderaan");
 
@@ -84,15 +114,30 @@ import { buildImpressionSharePrompt } from "@/lib/prompts/impression-share-promp
   const geoFacts = analyzeGeoImpressionShare([
     { country_code: "BE", month: "2026-03", search_impression_share: 0.5, search_budget_lost_is: 0.1, search_rank_lost_is: 0.4, total_cost: 500 },
   ]);
-  const prompt = buildImpressionSharePrompt({ summary: analysis.summary, campaigns: analysis.campaigns, geo: geoFacts, goalsSection: "CPA target: 25 euro" });
+  const prompt = buildImpressionSharePrompt({
+    summary: analysis.summary, campaigns: analysis.campaigns,
+    geo: geoFacts.countries, geoPeilmaand: geoFacts.peilmaand,
+    verouderd: true, goalsSection: "CPA target: 25 euro",
+  });
   let p2 = 0, f2 = 0;
   const a2 = (c: boolean, l: string) => { if (c) p2++; else { f2++; console.error(`  FAIL: ${l}`); } };
   a2(prompt.includes("Campagne A") && prompt.includes("budget-gedreven"), "prompt bevat de voorgerekende campagne-diagnose");
+  a2(prompt.includes("Peilmaand: 2026-03"), "prompt noemt de peilmaand");
+  a2(prompt.includes("LET OP: de jongste data is van 2026-03"), "prompt waarschuwt bij verouderde data");
   a2(prompt.includes("BE") && prompt.includes("per land"), "prompt bevat de geo-laag");
+  a2(prompt.includes("CPA \u20ac20"), "CPA draagt een euroteken");
   a2(prompt.includes("CPA target: 25 euro"), "prompt bevat de doelstellingen");
-  a2(prompt.includes("UITSLUITEND bij een campagne met gezonde conversie-economie") || prompt.includes("UITSLUITEND"), "prompt draagt de budget-no-go");
+  a2(prompt.includes("UITSLUITEND"), "prompt draagt de budget-no-go");
   a2(prompt.includes("Verzin geen cijfers"), "prompt draagt de anti-hallucinatie-regel");
-  a2(!prompt.includes("--") || !/\u2014/.test(prompt), "geen em-dash in de prompt");
+  a2(!/\u2014/.test(prompt), "geen em-dash in de prompt");
+
+  // De cap: bij meer dan MAX_CAMPAGNES_IN_PROMPT verliezers blijft het blok begrensd en
+  // meldt de laatste regel hoeveel er niet zijn uitgeschreven.
+  const veel = analyzeCampaignImpressionShare(
+    Array.from({ length: 40 }, (_, i) => rij(`veel${i}`, "2026-03", 0.5, 0.2 + i * 0.001, 0.1))
+  );
+  const promptVeel = buildImpressionSharePrompt({ summary: veel.summary, campaigns: veel.campaigns, geo: [] });
+  a2(promptVeel.includes("15 campagnes met kleiner verlies"), "de cap meldt het aantal niet-uitgeschreven campagnes");
   console.log(`\n=== Prompt: ${p2} passed, ${f2} failed ===\n`);
   if (f2 > 0) process.exit(1);
 }
