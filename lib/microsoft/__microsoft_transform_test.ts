@@ -84,6 +84,15 @@ assert(kwRij?.quality_score === 8, "quality score als geheel getal");
 approx(kwRij?.conversion_rate, 0.1429, "conversion_rate afgeleid (4 decimalen)");
 approx(kwRij?.cost_per_conversion, 9.5, "cost_per_conversion afgeleid");
 
+// Een bleeder (spend, nul conversies) krijgt null en geen 0: een CPA van €0 op het duurste
+// keyword is de verzonnen gemeten nul die de getallendoctrine verbiedt.
+const bleeder = naarKeywordMaandRij({
+  TimePeriod: "2026-08-01", CampaignId: "101", CampaignName: "C", AdGroupId: "9", AdGroupName: "AG",
+  KeywordId: "666", Keyword: "greenhouse solutions", BidMatchType: "Broad",
+  Impressions: "1400", Clicks: "60", Spend: "68", ConversionsQualified: "0", Revenue: "0",
+}, "klant");
+assert(bleeder?.cost_per_conversion === null, "cost_per_conversion null bij nul conversies");
+
 // ── Zoekterm-maandrij ───────────────────────────────────────────────────────
 
 const st = naarZoektermMaandRij({

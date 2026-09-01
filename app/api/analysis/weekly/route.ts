@@ -143,7 +143,13 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const lopendeWeek = weeklyData.filter((r) => !weekIsCompleet(r as Record<string, unknown>));
   // Valt er door het filter niets over (een gloednieuw account met alleen deze week), dan is een
   // WoW-vergelijking sowieso niet te maken; dan is de halve week beter dan niets, mits gelabeld.
+  // De KOP verandert dan mee: de terugval-tabel onder de kop "alleen AFGESLOTEN weken" zetten
+  // zou het model precies de zekerheid geven die de data niet draagt -- het zelfverzekerd
+  // verkeerde antwoord waarvoor dit filter juist is gebouwd.
   const weekTabel = volledigeWeken.length > 0 ? volledigeWeken : weeklyData;
+  const weekTabelKop = volledigeWeken.length > 0
+    ? "## Account Performance (wekelijks, alleen AFGESLOTEN weken -- dit is de basis voor de WoW-vergelijking)"
+    : "## Account Performance (wekelijks; LET OP: er is nog GEEN enkele afgesloten week -- deze cijfers dekken alleen de lopende, onvolledige week. Maak geen week-over-week-vergelijking; benoem hooguit acute signalen, met dit voorbehoud erbij)";
   const lopendeWeekBlok = lopendeWeek.length > 0 && volledigeWeken.length > 0
     ? `\n\n## Lopende week (NOG NIET COMPLEET -- niet gebruiken voor de week-over-week-vergelijking)\nDeze week is nog bezig; de cijfers dekken alleen de dagen tot nu toe. Gebruik hem hooguit om een acuut signaal te noemen, nooit als vergelijkingsbasis.\n\`\`\`\n${toPromptTable(lopendeWeek)}\n\`\`\``
     : "";
@@ -267,7 +273,7 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
     userMessage: `Voer stap 1 (Account Health Check & Tracking Verificatie) uit voor client "${clientId}".
 Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 
-## Account Performance (wekelijks, alleen AFGESLOTEN weken -- dit is de basis voor de WoW-vergelijking)
+${weekTabelKop}
 \`\`\`
 ${toPromptTable(weekTabel)}
 \`\`\`${lopendeWeekBlok}`,
@@ -985,9 +991,10 @@ ${step3.output}`),
   });
 }
 
-function withMicrosoftNames(rows: Array<Record<string, unknown>>, names: Map<string, string>): Array<Record<string, unknown>> {
-  return rows.map((r) => ({ ...r, entity_name: names.get(String(r.entity_id ?? "")) ?? r.entity_id }));
-}
+// Microsoft-daily's dragen entity_id net als Meta -- zelfde naamverrijking, ander kanaal.
+// Alias en geen eigen kopie (de bi-weekly-route doet hetzelfde): twee identieke lokale
+// helpers groeien uit elkaar, de median/safeDiv-les die de hygienepoort bewaakt.
+const withMicrosoftNames = withMetaNames;
 
 // Microsoft route-wiring (Bing): de wekelijkse health check als search-variant. Zelfde
 // drie-stappenvorm als de andere kanalen, met twee kanaaleigen accenten: de VOLUMEREM in stap 2

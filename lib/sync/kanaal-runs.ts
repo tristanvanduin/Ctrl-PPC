@@ -73,6 +73,28 @@ async function startRun(supabase: SupabaseClient, tabel: string, clientId: strin
   return (data as { id?: string } | null)?.id ?? null;
 }
 
+/**
+ * Vangnet tussen startRun en schrijfRun: een gegooide fout (netwerk, DNS, een Supabase-hik
+ * in de invariantencheck) is een MISLUKTE run en hoort zo geadministreerd. Zonder dit bleef
+ * de run-rij eeuwig op "running" staan -- een spook-sync op de statuspagina en in elke
+ * vastgelopen-run-bewaking. De fout gaat daarna gewoon door naar de aanroeper (route: 500;
+ * cron: zijn eigen samenvatting), alleen de administratie klopt nu eerst.
+ */
+async function metRunAdministratie(
+  supabase: SupabaseClient,
+  runTabel: string,
+  runId: string | null,
+  fn: () => Promise<KanaalRunUitkomst>
+): Promise<KanaalRunUitkomst> {
+  try {
+    return await fn();
+  } catch (e) {
+    const melding = e instanceof Error ? e.message : String(e);
+    await schrijfRun(supabase, runTabel, runId, false, { exception: melding.slice(0, 500) }, [melding]);
+    throw e;
+  }
+}
+
 async function schrijfConnectie(
   supabase: SupabaseClient,
   tabel: string,
@@ -116,43 +138,45 @@ export async function draaiMetaSync(supabase: SupabaseClient, clientId: string, 
   }
 
   const runId = await startRun(supabase, "meta_sync_runs", clientId, scope);
-  const ctx: MetaSyncContext = { supabase, clientId, accountId, accessToken: creds.accessToken };
-  const backfillEnd = lastCompleteMonthEnd();
-  const dailyEnd = todayUTC();
+  return metRunAdministratie(supabase, "meta_sync_runs", runId, async () => {
+    const ctx: MetaSyncContext = { supabase, clientId, accountId, accessToken: creds.accessToken };
+    const backfillEnd = lastCompleteMonthEnd();
+    const dailyEnd = todayUTC();
 
-  let rowsUpserted: Record<string, unknown>;
-  const failed: string[] = [];
-  if (scope === "backfill") {
-    const outcome = await syncMetaBackfill(ctx, backfillEnd);
-    // Breakdowns alleen over de laatste twee afgesloten maanden: de lezers zijn
-    // maand-verankerd (alleen latestMonth telt), dus diepere breakdown-historie heeft geen
-    // afnemer en zou de backfill met tientallen extra async-jobs belasten.
-    const { since } = trailingWindow(backfillEnd, 62);
-    const breakdowns = await syncMetaBreakdowns(ctx, since, backfillEnd);
-    rowsUpserted = { backfill: outcome.rows, breakdowns: breakdowns.rows };
-    failed.push(...outcome.failedChunks, ...breakdowns.failed.map((t) => `breakdown:${t}`));
-  } else {
-    const outcome = await syncMetaDaily(ctx, dailyEnd);
-    const { since, until } = trailingWindow(dailyEnd, 28);
-    const breakdowns = await syncMetaBreakdowns(ctx, since, until);
-    rowsUpserted = Object.fromEntries((Object.keys(outcome) as MetaLevel[]).map((level) => [level, outcome[level].rows]));
-    rowsUpserted.breakdowns = breakdowns.rows;
-    failed.push(
-      ...(Object.keys(outcome) as MetaLevel[]).filter((level) => !outcome[level].success).map((level) => `${level}: ${outcome[level].error ?? "onbekende fout"}`),
-      ...breakdowns.failed.map((t) => `breakdown:${t}`),
-    );
-  }
+    let rowsUpserted: Record<string, unknown>;
+    const failed: string[] = [];
+    if (scope === "backfill") {
+      const outcome = await syncMetaBackfill(ctx, backfillEnd);
+      // Breakdowns alleen over de laatste twee afgesloten maanden: de lezers zijn
+      // maand-verankerd (alleen latestMonth telt), dus diepere breakdown-historie heeft geen
+      // afnemer en zou de backfill met tientallen extra async-jobs belasten.
+      const { since } = trailingWindow(backfillEnd, 62);
+      const breakdowns = await syncMetaBreakdowns(ctx, since, backfillEnd);
+      rowsUpserted = { backfill: outcome.rows, breakdowns: breakdowns.rows };
+      failed.push(...outcome.failedChunks, ...breakdowns.failed.map((t) => `breakdown:${t}`));
+    } else {
+      const outcome = await syncMetaDaily(ctx, dailyEnd);
+      const { since, until } = trailingWindow(dailyEnd, 28);
+      const breakdowns = await syncMetaBreakdowns(ctx, since, until);
+      rowsUpserted = Object.fromEntries((Object.keys(outcome) as MetaLevel[]).map((level) => [level, outcome[level].rows]));
+      rowsUpserted.breakdowns = breakdowns.rows;
+      failed.push(
+        ...(Object.keys(outcome) as MetaLevel[]).filter((level) => !outcome[level].success).map((level) => `${level}: ${outcome[level].error ?? "onbekende fout"}`),
+        ...breakdowns.failed.map((t) => `breakdown:${t}`),
+      );
+    }
 
-  // Ingest-invarianten over het venster van deze run (zie lib/sync/invarianten.ts).
-  const invariantVenster = scope === "backfill" ? trailingWindow(backfillEnd, 62).since : trailingWindow(dailyEnd, 28).since;
-  const invarianten = await controleerIngest(supabase, clientId, metaIngestChecks(invariantVenster));
-  if (!invarianten.ok) failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
-  rowsUpserted.invarianten = { ok: invarianten.ok, gecontroleerd: invarianten.gecontroleerd };
+    // Ingest-invarianten over het venster van deze run (zie lib/sync/invarianten.ts).
+    const invariantVenster = scope === "backfill" ? trailingWindow(backfillEnd, 62).since : trailingWindow(dailyEnd, 28).since;
+    const invarianten = await controleerIngest(supabase, clientId, metaIngestChecks(invariantVenster));
+    if (!invarianten.ok) failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
+    rowsUpserted.invarianten = { ok: invarianten.ok, gecontroleerd: invarianten.gecontroleerd };
 
-  const success = failed.length === 0;
-  await schrijfRun(supabase, "meta_sync_runs", runId, success, rowsUpserted, failed);
-  await schrijfConnectie(supabase, "meta_connections", clientId, success, failed);
-  return { soort: "klaar", ok: success, rowsUpserted, failed, bron: creds.bron };
+    const success = failed.length === 0;
+    await schrijfRun(supabase, "meta_sync_runs", runId, success, rowsUpserted, failed);
+    await schrijfConnectie(supabase, "meta_connections", clientId, success, failed);
+    return { soort: "klaar", ok: success, rowsUpserted, failed, bron: creds.bron };
+  });
 }
 
 // ── LinkedIn ────────────────────────────────────────────────────────────────
@@ -194,61 +218,63 @@ export async function draaiLinkedinSync(supabase: SupabaseClient, clientId: stri
   }
 
   const runId = await startRun(supabase, "linkedin_sync_runs", clientId, scope);
-  const ctx: LinkedInSyncContext = { supabase, clientId, accessToken };
-  const entityCtx = { accessToken };
+  return metRunAdministratie(supabase, "linkedin_sync_runs", runId, async () => {
+    const ctx: LinkedInSyncContext = { supabase, clientId, accessToken };
+    const entityCtx = { accessToken };
 
-  // Entiteiten ophalen en upserten; verzamel de URNs voor de analytics-sync.
-  const groups = await fetchCampaignGroups(entityCtx, accountUrn);
-  if (groups.length > 0) await supabase.from("linkedin_campaign_groups").upsert(groups.map((g) => campaignGroupToDbRow(g, clientId)), { onConflict: "group_urn" });
+    // Entiteiten ophalen en upserten; verzamel de URNs voor de analytics-sync.
+    const groups = await fetchCampaignGroups(entityCtx, accountUrn);
+    if (groups.length > 0) await supabase.from("linkedin_campaign_groups").upsert(groups.map((g) => campaignGroupToDbRow(g, clientId)), { onConflict: "group_urn" });
 
-  const campaigns = await fetchCampaigns(entityCtx, accountUrn);
-  if (campaigns.length > 0) await supabase.from("linkedin_campaigns").upsert(campaigns.map((c) => campaignToDbRow(c, clientId)), { onConflict: "campaign_urn" });
-  const campaignUrns = campaigns.map((c) => String(c.id ?? c.urn)).filter(Boolean);
+    const campaigns = await fetchCampaigns(entityCtx, accountUrn);
+    if (campaigns.length > 0) await supabase.from("linkedin_campaigns").upsert(campaigns.map((c) => campaignToDbRow(c, clientId)), { onConflict: "campaign_urn" });
+    const campaignUrns = campaigns.map((c) => String(c.id ?? c.urn)).filter(Boolean);
 
-  const creativeUrns: string[] = [];
-  for (const campaignUrn of campaignUrns) {
-    const creatives = await fetchCreatives(entityCtx, campaignUrn);
-    if (creatives.length > 0) {
-      await supabase.from("linkedin_creatives").upsert(creatives.map((cr) => creativeToDbRow(cr, clientId)), { onConflict: "creative_urn" });
-      creativeUrns.push(...creatives.map((cr) => String(cr.id ?? cr.urn)).filter(Boolean));
+    const creativeUrns: string[] = [];
+    for (const campaignUrn of campaignUrns) {
+      const creatives = await fetchCreatives(entityCtx, campaignUrn);
+      if (creatives.length > 0) {
+        await supabase.from("linkedin_creatives").upsert(creatives.map((cr) => creativeToDbRow(cr, clientId)), { onConflict: "creative_urn" });
+        creativeUrns.push(...creatives.map((cr) => String(cr.id ?? cr.urn)).filter(Boolean));
+      }
     }
-  }
 
-  const entitiesByLevel: Record<LinkedInLevel, string[]> = {
-    account: [accountUrn],
-    campaign: campaignUrns,
-    creative: creativeUrns,
-  };
+    const entitiesByLevel: Record<LinkedInLevel, string[]> = {
+      account: [accountUrn],
+      campaign: campaignUrns,
+      creative: creativeUrns,
+    };
 
-  // Twee einddatums, en dat is het hele punt: de backfill stopt bij de laatste afgesloten
-  // maand; de daily loopt tot vandaag omdat LinkedIn conversies met terugwerkende kracht
-  // herschrijft binnen het attributievenster (zie lib/linkedin/sync-windows.ts).
-  const backfillEnd = lastCompleteMonthEnd();
-  const dailyEnd = linkedinTodayUTC();
+    // Twee einddatums, en dat is het hele punt: de backfill stopt bij de laatste afgesloten
+    // maand; de daily loopt tot vandaag omdat LinkedIn conversies met terugwerkende kracht
+    // herschrijft binnen het attributievenster (zie lib/linkedin/sync-windows.ts).
+    const backfillEnd = lastCompleteMonthEnd();
+    const dailyEnd = linkedinTodayUTC();
 
-  let rowsUpserted: Record<string, unknown>;
-  let failed: string[] = [];
-  if (scope === "backfill") {
-    const outcome = await syncLinkedinBackfill(ctx, backfillEnd, entitiesByLevel);
-    rowsUpserted = { backfill: outcome.rows };
-    failed = outcome.failedChunks;
-  } else {
-    const outcome = await syncLinkedinDaily(ctx, dailyEnd, entitiesByLevel);
-    rowsUpserted = Object.fromEntries(Object.entries(outcome).map(([level, o]) => [level, o.rows]));
-    failed = Object.entries(outcome).filter(([, o]) => !o.success).map(([level, o]) => `${level}: ${o.error ?? "onbekende fout"}`);
-  }
+    let rowsUpserted: Record<string, unknown>;
+    let failed: string[] = [];
+    if (scope === "backfill") {
+      const outcome = await syncLinkedinBackfill(ctx, backfillEnd, entitiesByLevel);
+      rowsUpserted = { backfill: outcome.rows };
+      failed = outcome.failedChunks;
+    } else {
+      const outcome = await syncLinkedinDaily(ctx, dailyEnd, entitiesByLevel);
+      rowsUpserted = Object.fromEntries(Object.entries(outcome).map(([level, o]) => [level, o.rows]));
+      failed = Object.entries(outcome).filter(([, o]) => !o.success).map(([level, o]) => `${level}: ${o.error ?? "onbekende fout"}`);
+    }
 
-  const invariantVenster = scope === "backfill" ? addDaysISO(backfillEnd, -62) : addDaysISO(dailyEnd, -30);
-  const invarianten = await controleerIngest(supabase, clientId, linkedinIngestChecks(invariantVenster));
-  if (!invarianten.ok) failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
+    const invariantVenster = scope === "backfill" ? addDaysISO(backfillEnd, -62) : addDaysISO(dailyEnd, -30);
+    const invarianten = await controleerIngest(supabase, clientId, linkedinIngestChecks(invariantVenster));
+    if (!invarianten.ok) failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
 
-  const success = failed.length === 0;
-  await schrijfRun(supabase, "linkedin_sync_runs", runId, success, rowsUpserted, failed);
-  await schrijfConnectie(supabase, "linkedin_connections", clientId, success, failed);
-  return {
-    soort: "klaar", ok: success, rowsUpserted, failed, bron: creds.bron,
-    entities: { campaigns: campaignUrns.length, creatives: creativeUrns.length },
-  };
+    const success = failed.length === 0;
+    await schrijfRun(supabase, "linkedin_sync_runs", runId, success, rowsUpserted, failed);
+    await schrijfConnectie(supabase, "linkedin_connections", clientId, success, failed);
+    return {
+      soort: "klaar", ok: success, rowsUpserted, failed, bron: creds.bron,
+      entities: { campaigns: campaignUrns.length, creatives: creativeUrns.length },
+    };
+  });
 }
 
 // ── Microsoft ───────────────────────────────────────────────────────────────
@@ -281,25 +307,27 @@ export async function draaiMicrosoftSync(supabase: SupabaseClient, clientId: str
 
   const cfg: MicrosoftApiConfig = { accessToken: token.accessToken, developerToken: creds.developerToken, customerId, accountId };
   const runId = await startRun(supabase, "microsoft_sync_runs", clientId, scope);
-  const ctx: MicrosoftSyncContext = { supabase, clientId, cfg };
+  return metRunAdministratie(supabase, "microsoft_sync_runs", runId, async () => {
+    const ctx: MicrosoftSyncContext = { supabase, clientId, cfg };
 
-  const einde = scope === "backfill" ? lastCompleteMonthEnd() : todayUTC();
-  const uitkomst = scope === "backfill"
-    ? await syncMicrosoftBackfill(ctx, einde)
-    : await syncMicrosoftDaily(ctx, todayUTC());
+    const einde = scope === "backfill" ? lastCompleteMonthEnd() : todayUTC();
+    const uitkomst = scope === "backfill"
+      ? await syncMicrosoftBackfill(ctx, einde)
+      : await syncMicrosoftDaily(ctx, todayUTC());
 
-  const invarianten = await controleerIngest(supabase, clientId, microsoftIngestChecks(
-    trailingWindow(einde, 28).since, `${einde.slice(0, 7)}-01`
-  ));
-  if (!invarianten.ok) uitkomst.failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
+    const invarianten = await controleerIngest(supabase, clientId, microsoftIngestChecks(
+      trailingWindow(einde, 28).since, `${einde.slice(0, 7)}-01`
+    ));
+    if (!invarianten.ok) uitkomst.failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
 
-  const success = uitkomst.failed.length === 0;
-  const rowsUpserted: Record<string, unknown> = Object.fromEntries(Object.entries(uitkomst.perOnderdeel).map(([naam, o]) => [naam, o.rows]));
-  rowsUpserted.invarianten = { ok: invarianten.ok, gecontroleerd: invarianten.gecontroleerd };
+    const success = uitkomst.failed.length === 0;
+    const rowsUpserted: Record<string, unknown> = Object.fromEntries(Object.entries(uitkomst.perOnderdeel).map(([naam, o]) => [naam, o.rows]));
+    rowsUpserted.invarianten = { ok: invarianten.ok, gecontroleerd: invarianten.gecontroleerd };
 
-  await schrijfRun(supabase, "microsoft_sync_runs", runId, success, rowsUpserted, uitkomst.failed);
-  await schrijfConnectie(supabase, "microsoft_connections", clientId, success, uitkomst.failed);
-  return { soort: "klaar", ok: success, rowsUpserted, failed: uitkomst.failed, bron: creds.bron };
+    await schrijfRun(supabase, "microsoft_sync_runs", runId, success, rowsUpserted, uitkomst.failed);
+    await schrijfConnectie(supabase, "microsoft_connections", clientId, success, uitkomst.failed);
+    return { soort: "klaar", ok: success, rowsUpserted, failed: uitkomst.failed, bron: creds.bron };
+  });
 }
 
 // ── Voor de nachtcron: welke klanten hebben welke kanaalkoppeling ───────────

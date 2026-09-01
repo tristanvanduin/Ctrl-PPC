@@ -216,8 +216,12 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
     lastCompleteMonth: lastMonth,
   });
   // De maandnaam van het blok expliciet meegeven: dit gaat over de laatste AFGESLOTEN maand,
-  // terwijl de bi-weekly over de lopende maand gaat.
-  const afgeslotenMaand = `${lastMonth === 12 ? Number(today().slice(0, 4)) - 1 : today().slice(0, 4)}-${String(lastMonth).padStart(2, "0")}`;
+  // terwijl de bi-weekly over de lopende maand gaat. Maand ÉN jaar uit dezelfde klok (`now`,
+  // waar lastMonth ook uit komt): het jaar kwam hier eerst uit today() (Amsterdam) naast de
+  // maand uit de serverklok, wat in het uur rond de jaarwisseling een niet-bestaande maand
+  // opleverde ("2027-11") -- precies in het blok waarvan de promptregel eist dat de periode
+  // letterlijk wordt overgenomen.
+  const afgeslotenMaand = `${lastMonth === 12 ? now.getFullYear() - 1 : now.getFullYear()}-${String(lastMonth).padStart(2, "0")}`;
   const bwComparisonText = formatComparisonFacts(bwComparisonFacts, `${afgeslotenMaand} (de laatste afgesloten maand)`);
 
   // De maandpacing: waar komt de LOPENDE maand uit? Voorberekend, want de preambule liet dit tot nu

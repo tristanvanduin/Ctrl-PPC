@@ -228,7 +228,10 @@ export function naarKeywordMaandRij(rij: Record<string, string>, clientId: strin
     ctr: impressions > 0 ? rond(clicks / impressions, 4) : 0,
     avg_cpc: clicks > 0 ? rond(cost / clicks) : 0,
     conversion_rate: clicks > 0 ? rond(conversions / clicks, 4) : 0,
-    cost_per_conversion: conversions > 0 ? rond(cost / conversions) : 0,
+    // Null en geen 0 bij nul conversies: een bleeder-keyword met spend en nul conversies zou
+    // anders een CPA van €0 tonen -- de verzonnen gemeten nul die parseGetal hierboven
+    // verbiedt. De demo-generator schrijft voor dit geval ook null.
+    cost_per_conversion: conversions > 0 ? rond(cost / conversions) : null,
     quality_score: heel(rij.QualityScore),
   };
 }

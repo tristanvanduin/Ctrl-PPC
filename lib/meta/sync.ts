@@ -220,8 +220,18 @@ function str(w: unknown): string | null {
  * zijn eigen fetch-source en zijn eigen upsert, zodat het sync-run-verslag kan zeggen wélke
  * dimensie ontbrak. Schrijft naar de letterlijke tabelnaam: meta_breakdown_daily heeft geen
  * kandidaat-view in fase 3 (zie lib/data-access/feitentabellen.ts, "wat hier niet in staat").
+ *
+ * Met een EIGEN withFetchFailures-collector, net als syncMetaDaily/Backfill: hasFetchFailure
+ * leest uit de actieve collector, en de aanroepers (kanaal-runs) roepen deze functie los aan.
+ * Zonder eigen scope registreerde een mislukte pull niets en telde hij als "0 rijen door
+ * leegte" -- de run meldde zich dan completed terwijl meta_breakdown_daily stil verouderde.
  */
 export async function syncMetaBreakdowns(ctx: SyncContext, since: string, until: string): Promise<{ rows: number; success: boolean; failed: string[] }> {
+  const { result } = await withFetchFailures(() => syncMetaBreakdownsBinnenScope(ctx, since, until));
+  return result;
+}
+
+async function syncMetaBreakdownsBinnenScope(ctx: SyncContext, since: string, until: string): Promise<{ rows: number; success: boolean; failed: string[] }> {
   let total = 0;
   const failed: string[] = [];
   for (const spec of BREAKDOWN_SPECS) {
