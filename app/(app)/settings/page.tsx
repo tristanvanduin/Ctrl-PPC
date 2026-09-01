@@ -614,6 +614,7 @@ const OAUTH_PROVIDER_LABEL: Record<Provider, string> = {
   google_ads: "Google Ads",
   meta: "Meta Ads",
   linkedin: "LinkedIn Ads",
+  microsoft_ads: "Microsoft Advertising",
   google_analytics: "Google Analytics 4",
   search_console: "Google Search Console",
 };

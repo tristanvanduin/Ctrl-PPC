@@ -1,18 +1,24 @@
 // =====================================================================
-// STATUS: LIVE-ONGETEST EN GATED OP MDP-APPROVAL. Spiegelt het Google-sync-route-patroon
-// (env-credentials, admin-client via service_role, in-memory token-refresh). Pas tegen een
-// goedgekeurde app en een echt account te verifieren.
+// STATUS: LIVE-ONGETEST EN GATED OP MDP-APPROVAL (van de eigen app) OF EEN BYO-KOPPELING.
+// Spiegelt het Google-sync-route-patroon (admin-client via service_role, in-memory
+// token-refresh). Pas tegen een goedgekeurde app en een echt account te verifieren.
 //
-// TOKEN-ROTATIE: dit env-pad gebruikt een LinkedIn refresh token uit de omgeving, net als de
-// Google-koppeling. LET OP: LinkedIn refresh tokens roteren (circa 60 dagen access, 12 maanden
-// refresh), anders dan Google's permanente token. Voor productie-automatisering hoort de
-// opgeslagen-token-weg met cron (auth.ts: ensureFreshToken plus refreshDueConnections) gebruikt
-// te worden zodra de token-opslagkeuze gemaakt is. Tot dan: de env-token periodiek hernieuwen.
+// CREDENTIALS: bring your own key (lib/tenancy/kanaal-credentials.ts). Het bureau levert
+// zijn eigen app plus refresh token via scripts/koppel-byo.ts; de omgeving
+// (LINKEDIN_CLIENT_ID/SECRET/REFRESH_TOKEN) blijft de terugval voor de dag dat de eigen
+// app zijn MDP-goedkeuring heeft.
+//
+// TOKEN-ROTATIE: LinkedIn kan bij een refresh een geroteerd refresh token teruggeven
+// (circa 60 dagen access, 12 maanden refresh). Voor een kluis-koppeling wordt dat hier
+// direct teruggeschreven; voor de omgevings-terugval kan dat niet en blijft handmatig
+// hernieuwen de discipline.
 // =====================================================================
 
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { refreshAccessToken, type LinkedInOAuthConfig } from "@/lib/linkedin/auth";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { refreshAccessToken } from "@/lib/linkedin/auth";
+import { linkedinCredentialsVoorKlant, bewaarGeroteerdRefreshToken, type LinkedInSyncCredentials } from "@/lib/tenancy/kanaal-credentials";
+import { logger } from "@/lib/logger";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import {
   syncLinkedinBackfill, syncLinkedinDaily, type LinkedInLevel, type SyncContext,
@@ -21,7 +27,8 @@ import {
   fetchCampaignGroups, fetchCampaigns, fetchCreatives,
   campaignGroupToDbRow, campaignToDbRow, creativeToDbRow,
 } from "@/lib/linkedin/entities";
-import { todayUTC } from "@/lib/linkedin/sync-windows";
+import { controleerIngest, linkedinIngestChecks } from "@/lib/sync/invarianten";
+import { todayUTC, addDaysISO } from "@/lib/linkedin/sync-windows";
 
 export const maxDuration = 300; // backfill kan lang duren
 
@@ -32,21 +39,31 @@ function getSupabase() {
   return createClient(url, key);
 }
 
-function getCredentials(): (LinkedInOAuthConfig & { refreshToken: string }) | null {
-  const clientId = process.env.LINKEDIN_CLIENT_ID;
-  const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
-  const refreshToken = process.env.LINKEDIN_REFRESH_TOKEN;
-  if (!clientId || !clientSecret || !refreshToken) return null;
-  return { clientId, clientSecret, refreshToken };
-}
+const log = logger.child("linkedin-sync-route");
 
-// In-memory access-token-cache, zelfde idee als de Google-koppeling (60s buffer).
-let cachedToken: { token: string; expiresAt: number } | null = null;
-async function getAccessToken(creds: LinkedInOAuthConfig & { refreshToken: string }): Promise<string | null> {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.token;
-  const refreshed = await refreshAccessToken(creds.refreshToken, creds);
+// In-memory access-token-cache, zelfde idee als de Google-koppeling (60s buffer). Gekeyd op
+// het refresh token: sinds de BYO-koppeling kunnen verschillende bureaus verschillende
+// sleutels dragen, en een globale cache zou bureau B stilletjes op het token van bureau A
+// laten syncen -- precies de verwisseling waarvoor de bron-administratie bestaat.
+const cachedTokens = new Map<string, { token: string; expiresAt: number }>();
+async function getAccessToken(
+  supabase: SupabaseClient,
+  creds: LinkedInSyncCredentials
+): Promise<string | null> {
+  const bestaand = cachedTokens.get(creds.refreshToken);
+  if (bestaand && bestaand.expiresAt > Date.now() + 60_000) return bestaand.token;
+  const refreshed = await refreshAccessToken(creds.refreshToken, { clientId: creds.clientId, clientSecret: creds.clientSecret });
   if (!refreshed) return null;
-  cachedToken = { token: refreshed.accessToken, expiresAt: Date.now() + refreshed.expiresIn * 1000 };
+  cachedTokens.set(creds.refreshToken, { token: refreshed.accessToken, expiresAt: Date.now() + refreshed.expiresIn * 1000 });
+  // Geroteerd refresh token direct terugschrijven (alleen mogelijk bij een kluis-koppeling).
+  if (refreshed.refreshToken && refreshed.refreshToken !== creds.refreshToken) {
+    if (creds.bron === "bureau" && creds.agencyId) {
+      const bewaard = await bewaarGeroteerdRefreshToken(supabase, creds.agencyId, "linkedin", refreshed.refreshToken);
+      if (!bewaard.ok) log.error(`geroteerd refresh token NIET bewaard voor bureau ${creds.agencyId}: ${bewaard.fout}`);
+    } else {
+      log.warn("LinkedIn roteerde het refresh token maar de bron is de omgeving; werk LINKEDIN_REFRESH_TOKEN handmatig bij.");
+    }
+  }
   return refreshed.accessToken;
 }
 
@@ -67,9 +84,6 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
 
-  const creds = getCredentials();
-  if (!creds) return Response.json({ error: "LinkedIn credentials niet geconfigureerd" }, { status: 500 });
-
   let clientId: string;
   let scope: "backfill" | "daily";
   try {
@@ -80,6 +94,11 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ error: 'Verwacht: { client_id: string, scope?: "backfill" | "daily" }' }, { status: 400 });
   }
+
+  // Na het parsen van de body: de resolver heeft de client nodig om het bureau te vinden.
+  const creds = await linkedinCredentialsVoorKlant(supabase, clientId);
+  if (!creds) return Response.json({ error: "LinkedIn-credentials niet geconfigureerd (kluis noch omgeving)" }, { status: 500 });
+  log.info(`credentials voor ${clientId}: bron=${creds.bron}, eigenApp=${creds.eigenApp}`);
 
   // Het ad-account-URN voor deze client uit de connectie.
   const { data: conn } = await supabase
@@ -92,7 +111,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: `Client "${clientId}" heeft geen LinkedIn-koppeling` }, { status: 404 });
   }
 
-  const accessToken = await getAccessToken(creds);
+  const accessToken = await getAccessToken(supabase, creds);
   if (!accessToken) {
     await supabase.from("linkedin_connections").update({ status: "expired", last_error: "Token-refresh faalde", updated_at: new Date().toISOString() }).eq("client_id", clientId);
     return Response.json({ error: "LinkedIn token-refresh faalde" }, { status: 502 });
@@ -170,6 +189,13 @@ export async function POST(request: NextRequest) {
       rowsUpserted = Object.fromEntries(Object.entries(outcome).map(([level, o]) => [level, o.rows]));
       failed = Object.entries(outcome).filter(([, o]) => !o.success).map(([level, o]) => `${level}: ${o.error ?? "onbekende fout"}`);
     }
+    // Ingest-invarianten over het venster van deze run (zie lib/sync/invarianten.ts): de
+    // CAMPAIGN-level-pin van de demographic-lezers en niet-negatieve metrics -- aannames die
+    // alleen op echte data kunnen breken.
+    const invariantVenster = scope === "backfill" ? addDaysISO(backfillEnd, -62) : addDaysISO(dailyEnd, -30);
+    const invarianten = await controleerIngest(supabase, clientId, linkedinIngestChecks(invariantVenster));
+    if (!invarianten.ok) failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
+
     const success = failed.length === 0;
 
     if (runId) {

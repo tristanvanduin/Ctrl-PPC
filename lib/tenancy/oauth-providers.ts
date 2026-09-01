@@ -10,7 +10,7 @@
 
 import type { Provider } from "./koppelingen";
 
-export type ProviderFamilie = "google" | "meta" | "linkedin";
+export type ProviderFamilie = "google" | "meta" | "linkedin" | "microsoft";
 
 export interface OAuthProviderConfig {
   provider: Provider;
@@ -83,6 +83,19 @@ export const OAUTH_PROVIDERS: Record<Provider, OAuthProviderConfig> = {
     scope: "r_ads,r_ads_reporting",
     clientId: () => process.env.LINKEDIN_CLIENT_ID,
     clientSecret: () => process.env.LINKEDIN_CLIENT_SECRET,
+  },
+  microsoft_ads: {
+    provider: "microsoft_ads",
+    familie: "microsoft",
+    label: "Microsoft Advertising",
+    authorizeUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    // offline_access levert het refresh token; msads.manage dekt Reporting én Campaign
+    // Management (leesgebruik). Zolang het product geen eigen goedgekeurde app heeft, blijven
+    // de env-variabelen leeg en meldt providerHeeftClient() false -- de BYO-weg
+    // (scripts/koppel-byo.ts) is dan de enige koppelroute, en dat is het pilotmodel.
+    scope: "https://ads.microsoft.com/msads.manage offline_access",
+    clientId: () => process.env.MICROSOFT_ADS_CLIENT_ID,
+    clientSecret: () => process.env.MICROSOFT_ADS_CLIENT_SECRET,
   },
 };
 

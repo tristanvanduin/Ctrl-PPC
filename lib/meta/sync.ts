@@ -14,7 +14,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MetaInsightsRow } from "./types";
 import { mapInsightsRow } from "./transform";
-import { metaDailyToDbRow, META_DAILY_CONFLICT } from "./rows";
+import { metaDailyToDbRow, metaBreakdownToDbRow, META_DAILY_CONFLICT, META_BREAKDOWN_CONFLICT } from "./rows";
 import { trailingWindow, backfillWindow, monthlyChunks } from "./sync-windows";
 import { logger } from "@/lib/logger";
 import { META_GRAPH_BASE } from "./api-version";
@@ -74,12 +74,14 @@ export interface SyncContext {
 // te verifieren; tot dan een dunne, expliciet gemarkeerde grens.
 export async function fetchInsightsAsync(
   ctx: SyncContext,
-  opts: { level: MetaLevel; since: string; until: string; breakdowns?: string }
+  opts: { level: MetaLevel; since: string; until: string; breakdowns?: string; source?: string }
 ): Promise<MetaInsightsRow[]> {
   // Bron-naam per niveau, niet één "fetchInsightsAsync" voor alle vier: syncMetaLevel moet per
   // niveau kunnen zien of ZIJN ophaal mislukte, anders trekt een mislukte account-pull ook de
-  // (misschien wel geslaagde) campaign/adset/ad-pulls mee als "onbetrouwbaar".
-  const source = `meta:${opts.level}`;
+  // (misschien wel geslaagde) campaign/adset/ad-pulls mee als "onbetrouwbaar". De breakdown-sync
+  // geeft een eigen source mee: al zijn pulls draaien op level "account" en zouden anders onder
+  // één noemer vallen.
+  const source = opts.source ?? `meta:${opts.level}`;
   const params = new URLSearchParams({
     level: opts.level,
     time_increment: "1",
@@ -182,6 +184,75 @@ export async function syncMetaDaily(ctx: SyncContext, endDate: string): Promise<
     return result;
   });
   return result;
+}
+
+// ── Breakdowns ──────────────────────────────────────────────────────────────
+//
+// De analyse leest meta_breakdown_daily op level "account" met exact deze types (zie de
+// assemblage in prepared-facts.ts: plaatsing ["publisher_platform","platform_position",
+// "impression_device"], demografie ["age_gender","country","region","dma"]). De sync vraagt
+// dus precies die dimensies; een type syncen dat geen lezer heeft is opslag zonder afnemer.
+//
+// Twee vertaalslagen die de Graph API afdwingt:
+//   - platform_position is alleen samen met publisher_platform op te vragen; we bewaren de
+//     positie-waarde en laten het platform los (dat heeft zijn eigen type).
+//   - age_gender bestaat niet als één breakdown; Meta levert "age" en "gender" apart. We
+//     combineren ze tot één segmentwaarde ("25-34 female") zodat de waarde-as van de tabel
+//     eendimensionaal blijft, zoals de lezers verwachten.
+const BREAKDOWN_SPECS: { type: string; breakdowns: string; value: (r: Record<string, unknown>) => string | null }[] = [
+  { type: "publisher_platform", breakdowns: "publisher_platform", value: (r) => str(r.publisher_platform) },
+  { type: "platform_position", breakdowns: "publisher_platform,platform_position", value: (r) => str(r.platform_position) },
+  { type: "impression_device", breakdowns: "impression_device", value: (r) => str(r.impression_device) },
+  { type: "age_gender", breakdowns: "age,gender", value: (r) => (str(r.age) && str(r.gender) ? `${str(r.age)} ${str(r.gender)}` : null) },
+  { type: "country", breakdowns: "country", value: (r) => str(r.country) },
+  { type: "region", breakdowns: "region", value: (r) => str(r.region) },
+  { type: "dma", breakdowns: "dma", value: (r) => str(r.dma) },
+];
+
+function str(w: unknown): string | null {
+  return typeof w === "string" && w.trim() ? w.trim() : null;
+}
+
+/**
+ * Synct alle breakdown-dimensies voor één venster naar meta_breakdown_daily (level "account").
+ *
+ * Eén mislukte dimensie maakt de run mislukt maar stopt de andere niet: elke dimensie heeft
+ * zijn eigen fetch-source en zijn eigen upsert, zodat het sync-run-verslag kan zeggen wélke
+ * dimensie ontbrak. Schrijft naar de letterlijke tabelnaam: meta_breakdown_daily heeft geen
+ * kandidaat-view in fase 3 (zie lib/data-access/feitentabellen.ts, "wat hier niet in staat").
+ */
+export async function syncMetaBreakdowns(ctx: SyncContext, since: string, until: string): Promise<{ rows: number; success: boolean; failed: string[] }> {
+  let total = 0;
+  const failed: string[] = [];
+  for (const spec of BREAKDOWN_SPECS) {
+    const source = `meta:breakdown:${spec.type}`;
+    const insights = await fetchInsightsAsync(ctx, { level: "account", since, until, breakdowns: spec.breakdowns, source });
+    if (hasFetchFailure(source)) {
+      failed.push(spec.type);
+      continue;
+    }
+    const dbRows: Record<string, unknown>[] = [];
+    for (const raw of insights) {
+      const value = spec.value(raw as unknown as Record<string, unknown>);
+      // Een rij zonder segmentwaarde is niet toewijsbaar; overslaan is eerlijker dan een
+      // verzonnen "unknown"-emmer die met Meta's echte "unknown"-segmenten zou vermengen.
+      if (!value) continue;
+      dbRows.push(metaBreakdownToDbRow(mapInsightsRow(raw), ctx.clientId, {
+        level: "account", entityId: ctx.accountId, breakdownType: spec.type, breakdownValue: value,
+      }));
+    }
+    const deduped = dedupeByKey(dbRows, ["client_id", "date", "level", "entity_id", "breakdown_type", "breakdown_value"]);
+    if (deduped.length === 0) continue;
+    const { error } = await ctx.supabase.from("meta_breakdown_daily").upsert(deduped, { onConflict: META_BREAKDOWN_CONFLICT, ignoreDuplicates: false });
+    if (error) {
+      recordFetchFailure(`${source}:upsert`, error.message, "meta");
+      log.error("Breakdown-upsert mislukt voor", spec.type, error.message);
+      failed.push(spec.type);
+      continue;
+    }
+    total += deduped.length;
+  }
+  return { rows: total, success: failed.length === 0, failed };
 }
 
 // Initiele backfill: 13 maanden, in maand-chunks om de async-pulls behapbaar te houden.

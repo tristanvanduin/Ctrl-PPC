@@ -102,11 +102,19 @@ export async function GET(req: NextRequest, context: { params: Promise<{ provide
       refreshToken = result.accessToken;
       expiresAt = new Date(result.expiresAt).toISOString();
       scopes = cfg.scope.split(",");
-    } else {
+    } else if (cfg.familie === "linkedin") {
       const result = await exchangeLinkedInAuthCode(clientId, clientSecret, code, redirectUri);
       refreshToken = result.refreshToken ?? result.accessToken;
       expiresAt = new Date(result.expiresAt).toISOString();
       scopes = cfg.scope.split(",");
+    } else {
+      // microsoft: de product-app-flow is er nog niet -- de koppelroute is bring your own key
+      // (scripts/koppel-byo.ts). Deze tak is alleen bereikbaar als iemand
+      // MICROSOFT_ADS_CLIENT_ID/SECRET zet zonder de flow af te bouwen; expliciet weigeren is
+      // dan eerlijker dan stilzwijgend de token-wissel van een ander platform draaien.
+      const res = settingsRedirect(origin, `oauth_error=${provider}_flow_niet_beschikbaar`);
+      res.cookies.delete(`oauth_state_${provider}`);
+      return res;
     }
 
     if (!refreshToken) {
