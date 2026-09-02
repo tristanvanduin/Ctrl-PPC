@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   const { data } = await supabase
     .from("sop_analysis_output")
-    .select("output, model_used, analysis_date")
+    .select("output, model_used, analysis_date, period_start, period_end")
     .eq("client_id", clientId)
     .eq("sop_type", SOURCE)
     .eq("section", SECTION)

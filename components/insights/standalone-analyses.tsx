@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Calendar, CheckCircle2, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Calendar, CheckCircle2, AlertCircle, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { today } from "@/lib/reporting-date";
+import { dekkingUitPeriode, waarschuwingenUitDekking, type DekkingRegel } from "@/lib/analysis/dekking-tekst";
 
 // De losse (standalone) Google-analyses. Elk endpoint deelt hetzelfde contract:
 // GET ?client_id= levert de laatst opgeslagen analyse, POST { client_id } draait hem opnieuw
@@ -33,10 +34,15 @@ interface AnalysisState {
   creditBlocked: boolean;
   success: boolean;
   expanded: boolean;
+  /** De dataperiode van de laatst opgeslagen analyse (uit GET), met verouderd-vlag. */
+  dekking: DekkingRegel | null;
+  /** Waarschuwingen uit het dekkingsblok van de laatste POST (afgekapt, verouderd, ...). */
+  waarschuwingen: string[];
 }
 
 const EMPTY: AnalysisState = {
   running: false, lastDate: null, output: null, error: null, creditBlocked: false, success: false, expanded: false,
+  dekking: null, waarschuwingen: [],
 };
 
 export function StandaloneAnalyses({ clientId }: { clientId: string }) {
@@ -56,7 +62,11 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
       const data = await res.json();
       const analysis = data?.analysis;
       if (analysis) {
-        patch(a.key, { lastDate: analysis.analysis_date ?? null, output: analysis.output ?? null });
+        patch(a.key, {
+          lastDate: analysis.analysis_date ?? null,
+          output: analysis.output ?? null,
+          dekking: dekkingUitPeriode(analysis.period_start, analysis.period_end),
+        });
       }
     } catch {
       // stil: geen laatste run is geen fout
@@ -69,7 +79,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
   }, [clientId, fetchLatest]);
 
   async function run(a: AnalysisConfig) {
-    patch(a.key, { running: true, error: null, creditBlocked: false, success: false });
+    patch(a.key, { running: true, error: null, creditBlocked: false, success: false, waarschuwingen: [] });
     try {
       const res = await fetch(a.endpoint, {
         method: "POST",
@@ -90,6 +100,9 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
         running: false,
         success: true,
         lastDate: data.analysisDate ?? today(),
+        // Wat de route zelf over zijn dekking zegt: afgekapte rijen, verouderde data, campagnes
+        // buiten beeld. Zonder dit leest een groene kaart als "alles klopt".
+        waarschuwingen: waarschuwingenUitDekking(data.dekking),
       });
       // Verse output ophalen zodat "Bekijk resultaat" meteen klopt.
       await fetchLatest(a);
@@ -142,9 +155,22 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                     Laatst: {s.lastDate}
                   </div>
                 )}
+                {s.dekking && (
+                  <div className={`flex items-center gap-1 mt-0.5 text-micro ${s.dekking.verouderd ? "text-amber-700" : "text-muted-foreground"}`}>
+                    {s.dekking.verouderd && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                    <span className="truncate">{s.dekking.tekst}</span>
+                  </div>
+                )}
                 {s.error && !s.creditBlocked && <p className="text-micro text-red-500 mt-1 truncate">{s.error}</p>}
                 {s.running && <p className="text-micro text-brand-blue-ink mt-1">Bezig...</p>}
               </button>
+              {s.waarschuwingen.length > 0 && (
+                <ul className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-micro text-amber-800 space-y-0.5">
+                  {s.waarschuwingen.map((w) => (
+                    <li key={w} className="flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />{w}</li>
+                  ))}
+                </ul>
+              )}
               {s.creditBlocked && (
                 <div className="rounded-md border border-copper/30 bg-copper/5 px-3 py-2 text-micro text-brand-gray">
                   <p>{s.error}</p>

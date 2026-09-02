@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Sparkles, Calendar, AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { Loader2, Sparkles, Calendar, AlertCircle, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import { isDemoClient } from "@/lib/demo/demo-mode";
+import { dekkingUitPeriode, type DekkingRegel } from "@/lib/analysis/dekking-tekst";
 
 // Master Synthesis (Pijler 6): kanaaloverstijgende hypotheses uit de al-berekende
 // kanaal-aanbevelingen (Pijler 1-5) plus de cross-channel-feiten (zie CrossChannelAnalyses
@@ -23,6 +24,17 @@ interface RunResponse {
   hypothesesSaved?: number;
   tasksSaved?: number;
   evidenceChannels?: string[];
+  /** Wat de route over zijn evidence zegt: rundatums, spreiding, verouderd (lib/decision/evidence/build-payload.ts). */
+  dekking?: { runDatums?: { channel: string; analysisDate: string }[]; spreidingDagen?: number; verouderd?: boolean; nieuwsteRun?: string | null };
+}
+
+/** De waarschuwingen uit het dekkingsblok van een run: alleen wat de lezer moet weten. */
+function dekkingWaarschuwingen(d: RunResponse["dekking"]): string[] {
+  if (!d) return [];
+  const uit: string[] = [];
+  if (d.verouderd) uit.push(`De nieuwste kanaalrun (${d.nieuwsteRun ?? "?"}) ligt vóór het einde van de periode: de synthese gaat over een eerdere maand.`);
+  if ((d.spreidingDagen ?? 0) > 10) uit.push(`De kanaalruns liggen ${d.spreidingDagen} dagen uit elkaar; ze zijn niet in dezelfde cyclus geanalyseerd.`);
+  return uit;
 }
 
 const KANAAL_LABEL_KORT: Record<string, string> = { google_ads: "Google", meta_ads: "Meta", linkedin_ads: "LinkedIn", microsoft_ads: "Microsoft" };
@@ -33,6 +45,10 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [lastDate, setLastDate] = useState<string | null>(null);
   const [lastNarrative, setLastNarrative] = useState<string | null>(null);
+  // De dataperiode van de laatst opgeslagen synthese (uit GET) en wat de laatste run over zijn
+  // evidence zei (uit POST). "Laatst:" is de datum van de RUN; dit is de datum van de DATA.
+  const [dekking, setDekking] = useState<DekkingRegel | null>(null);
+  const [waarschuwingen, setWaarschuwingen] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   // isDemoMode() leest window.location, dus in een effect en niet in de eerste render --
   // anders rendert de server iets anders dan de client en klapt de hydratie eruit (zelfde
@@ -49,6 +65,7 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
       if (analysis) {
         setLastDate(analysis.analysis_date);
         setLastNarrative(analysis.output);
+        setDekking(dekkingUitPeriode(analysis.period_start, analysis.period_end));
       }
     } catch {
       // Geen laatste run is geen fout, zelfde principe als CrossChannelAnalyses.
@@ -58,7 +75,7 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
   }, [clientId]);
 
   useEffect(() => {
-    setLoaded(false); setError(null); setStatusMessage(null);
+    setLoaded(false); setError(null); setStatusMessage(null); setDekking(null); setWaarschuwingen([]);
     fetchLatest();
   }, [fetchLatest]);
 
@@ -66,7 +83,7 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
     // Master Synthesis roept een echte LLM aan (masterplan Pijler 6) -- geen live analyses
     // starten in demo-modus, ook niet als iemand de knop toch bereikt.
     if (demoModus) return;
-    setRunning(true); setError(null); setStatusMessage(null);
+    setRunning(true); setError(null); setStatusMessage(null); setWaarschuwingen([]);
     try {
       const res = await fetch("/api/analysis/monthly-decision", {
         method: "POST",
@@ -77,6 +94,7 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "Master Synthesis mislukt");
       }
+      setWaarschuwingen(dekkingWaarschuwingen(data.dekking));
       if (data.status === "geen_data") {
         setStatusMessage(data.message || "Geen kanaal-aanbevelingen of cross-channel-signalen binnen de periode.");
       } else if (data.status === "opgeslagen") {
@@ -122,6 +140,23 @@ export function MasterSynthesisAnalysis({ clientId }: { clientId: string }) {
           {error && <span className="flex items-center gap-1 text-red-500"><AlertCircle className="w-3.5 h-3.5" /> {error}</span>}
           {loaded && !demoModus && !lastDate && !statusMessage && !error && <span className="text-muted-foreground">Nog niet gedraaid.</span>}
         </div>
+        {(dekking || waarschuwingen.length > 0) && (
+          <div className="px-5 pb-3 space-y-1">
+            {dekking && (
+              <div className={`flex items-center gap-1 text-micro ${dekking.verouderd ? "text-amber-700" : "text-muted-foreground"}`}>
+                {dekking.verouderd && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                <span>{dekking.tekst}</span>
+              </div>
+            )}
+            {waarschuwingen.length > 0 && (
+              <ul className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-micro text-amber-800 space-y-0.5">
+                {waarschuwingen.map((w) => (
+                  <li key={w} className="flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />{w}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {lastNarrative && (

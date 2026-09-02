@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Radar, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Radar, Calendar, AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { dekkingUitPeriode, waarschuwingenUitDekking, type DekkingRegel } from "@/lib/analysis/dekking-tekst";
 
 // Gedeelde kaart voor de deterministische signaal-analyses (Meta, LinkedIn, cross-channel).
 // Zelfde contract als de losse analyses: GET ?client_id= voor de laatste opgeslagen sectie,
@@ -23,6 +24,10 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
   const [lastDate, setLastDate] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  // De dataperiode van de laatst opgeslagen run (GET) en wat de route over zijn dekking zei
+  // bij de laatste POST. "Laatst:" is de datum van de RUN; dit is de datum van de DATA.
+  const [dekking, setDekking] = useState<DekkingRegel | null>(null);
+  const [waarschuwingen, setWaarschuwingen] = useState<string[]>([]);
 
   const extraKey = JSON.stringify(extra ?? {});
 
@@ -35,17 +40,19 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
       if (data?.analysis) {
         setLastDate(data.analysis.analysis_date ?? null);
         setOutput(data.analysis.output ?? null);
+        setDekking(dekkingUitPeriode(data.analysis.period_start, data.analysis.period_end));
       }
     } catch { /* geen laatste run is geen fout */ }
   }, [clientId, endpoint, extraKey]);
 
   useEffect(() => {
     setLastDate(null); setOutput(null); setError(null); setSuccess(null); setExpanded(false);
+    setDekking(null); setWaarschuwingen([]);
     fetchLatest();
   }, [fetchLatest]);
 
   async function run() {
-    setRunning(true); setError(null); setSuccess(null);
+    setRunning(true); setError(null); setSuccess(null); setWaarschuwingen([]);
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -61,6 +68,7 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
           ? data.actionNeeded ? "Analyse klaar: bijsturing nodig (voorstel in de wachtrij)" : "Analyse klaar: op koers"
           : "Analyse uitgevoerd en opgeslagen"
       );
+      setWaarschuwingen(waarschuwingenUitDekking(data.dekking));
       await fetchLatest();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Onbekende fout");
@@ -95,6 +103,19 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
           {error && <span className="flex items-center gap-1 text-red-500"><AlertCircle className="w-3.5 h-3.5" /> {error}</span>}
           {!lastDate && !success && !error && <span className="text-muted-foreground">Nog niet gedraaid.</span>}
         </div>
+        {dekking && (
+          <div className={`flex items-center gap-1 text-micro ${dekking.verouderd ? "text-amber-700" : "text-muted-foreground"}`}>
+            {dekking.verouderd && <AlertTriangle className="w-3 h-3 shrink-0" />}
+            <span>{dekking.tekst}</span>
+          </div>
+        )}
+        {waarschuwingen.length > 0 && (
+          <ul className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-micro text-amber-800 space-y-0.5">
+            {waarschuwingen.map((w) => (
+              <li key={w} className="flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />{w}</li>
+            ))}
+          </ul>
+        )}
         {output && (
           <>
             <button
