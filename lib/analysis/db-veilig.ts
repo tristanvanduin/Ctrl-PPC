@@ -116,6 +116,21 @@ export function lopendeMaandStart(): string {
   return `${volgend}-01`;
 }
 
+/**
+ * Begin en eind (inclusief) van de laatste afgesloten kalendermaand, als DATE-strings.
+ *
+ * De einddag wordt via Date.UTC gebouwd. `new Date(j, m, 0).toISOString()` — de vorm die
+ * drie synthese-modules elk apart hadden — is een LOKALE middernacht die als UTC wordt
+ * geserialiseerd: in Europe/Amsterdam gaf dat "2026-08-30" voor augustus, één dag te vroeg,
+ * en elke `.lte("date", eind)` op een dagtabel sneed zo de laatste dag van de maand eraf.
+ */
+export function laatsteAfgeslotenMaandGrenzen(): { start: string; eind: string } {
+  const sleutel = lastCompleteMonth();
+  const [jaar, maand] = sleutel.split("-").map(Number);
+  const eind = new Date(Date.UTC(jaar, maand, 0)).toISOString().slice(0, 10);
+  return { start: `${sleutel}-01`, eind };
+}
+
 /** De eerste dag van de maand `terug` maanden vóór de laatste afgesloten maand. */
 export function afgeslotenMaandenTerugStart(terug: number): string {
   const [jaar, maand] = lastCompleteMonth().split("-").map(Number);

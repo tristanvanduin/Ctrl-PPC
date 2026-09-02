@@ -1,9 +1,16 @@
-// Master Synthesis (Pijler 6), Fase B: validatie bovenop de Zod-schemacontrole
-// (master-synthesis-schema.ts). Zod toetst de VORM; dit toetst de INHOUD tegen het evidence_payload
-// -- het kan syntactisch geldige JSON zijn die toch een kanaal noemt dat niet is aangeleverd, en
-// dat is precies de hallucinatie die het purity-contract verbiedt (zie master-synthesis-prompt.ts).
-// Zelfde rol als validateStepOutput() in lib/analysis/step-validator.ts, maar voor deze eigen vorm.
+// Master Synthesis, Fase B: validatie bovenop de Zod-schemacontrole (master-synthesis-schema.ts).
+// Zod toetst de VORM; dit toetst de INHOUD tegen het evidence_payload -- het kan syntactisch
+// geldige JSON zijn die toch een kanaal noemt dat niet is aangeleverd, of een percentage dat in
+// geen enkele bevinding staat. Beide zijn de hallucinatie die het purity-contract verbiedt.
+// Zelfde rol als validateStepOutput() in lib/analysis/step-validator.ts, maar voor deze vorm.
+//
+// CIJFERPOORT (herbouw 2 september 2026): de prompt VERBOOD verzonnen cijfers, maar niets toetste
+// het. De weekly/biweekly-cadans heeft daar al een deterministische poort voor
+// (lib/analysis/weekly-number-gate.ts: percentages en eurobedragen tegen de gegronde set); die
+// draait nu ook hier. Een ongegrond cijfer is een fout die de repair-lus terugkrijgt, geen
+// waarschuwing die niemand leest.
 
+import { gateUngroundedNumbers } from "@/lib/analysis/weekly-number-gate";
 import type { MasterSynthesisOutput } from "./master-synthesis-schema";
 import { MASTER_SYNTHESIS_LOG_FORMAT } from "./master-synthesis-prompt";
 
@@ -19,7 +26,9 @@ const LOG_FORMAT_SKELETON = [/hypothese/i, /google_ads|meta_ads|linkedin_ads|mic
 
 export function validateMasterSynthesisOutput(
   output: MasterSynthesisOutput,
-  availableChannels: readonly string[]
+  availableChannels: readonly string[],
+  /** Percentages/bedragen die letterlijk in het evidence_payload staan. Weggelaten = geen cijferpoort. */
+  toegestaneCijfers?: readonly number[]
 ): MasterSynthesisValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -39,6 +48,31 @@ export function validateMasterSynthesisOutput(
     }
     if (t.hypothesis_index >= output.hypotheses.length) {
       errors.push(`Taak "${t.title}" heeft hypothesis_index ${t.hypothesis_index}, maar er zijn maar ${output.hypotheses.length} hypothese(s).`);
+    } else {
+      // Een taak hoort bij een hypothese die minstens één van zijn kanalen deelt; anders is de
+      // koppeling (en straks sprint_items.hypothesis_id) betekenisloos.
+      const hyp = output.hypotheses[t.hypothesis_index];
+      if (!t.contributing_channels.some((c) => hyp.contributing_channels.includes(c))) {
+        warnings.push(`Taak "${t.title}" deelt geen kanaal met hypothese ${t.hypothesis_index}.`);
+      }
+    }
+  }
+
+  // Cijferpoort: percentages en eurobedragen alleen uit het evidence_payload.
+  if (toegestaneCijfers) {
+    const toegestaan = [...toegestaneCijfers];
+    const velden: [string, string][] = [["narrative", output.narrative], ["step_conclusion", output.step_conclusion]];
+    output.hypotheses.forEach((h, i) => {
+      velden.push([`hypotheses.${i}.hypothesis`, h.hypothesis], [`hypotheses.${i}.expected_result`, h.expected_result], [`hypotheses.${i}.rationale`, h.rationale]);
+    });
+    output.tasks.forEach((t, i) => {
+      velden.push([`tasks.${i}.title`, t.title], [`tasks.${i}.description`, t.description]);
+    });
+    for (const [veld, tekst] of velden) {
+      const r = gateUngroundedNumbers(tekst, toegestaan);
+      if (r.hadUngrounded) {
+        errors.push(`Ongegrond cijfer in ${veld}: ${r.ungrounded.join(", ")} staat niet in het evidence_payload (percentages en bedragen alleen uit de aangeleverde bevindingen; anders omschrijven zonder cijfer).`);
+      }
     }
   }
 

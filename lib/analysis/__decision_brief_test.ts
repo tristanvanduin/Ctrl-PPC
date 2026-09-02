@@ -1,14 +1,17 @@
 // Test voor de twee Decision Brief-documenten (masterplan 17.22-17.23). Deterministisch, geen IO
-// -- test de pure buildClientDecisionBrief()/buildAgencyPortfolioBrief(), niet de generate*()-
-// functies die zelf Supabase aanroepen.
+// -- test de pure buildClientDecisionBrief()/buildAgencyPortfolioBrief(), en sinds de herbouw van
+// 2 september 2026 ook de generate*()-functies tegen een in-memory FakeSupabase.
 // Draaien: npx tsx lib/analysis/__decision_brief_test.ts
 
 import {
   buildClientDecisionBrief, buildAgencyPortfolioBrief,
   renderClientDecisionBriefMarkdown, renderAgencyPortfolioBriefMarkdown,
-  wordCountForClientBrief, countWords, truncateWords,
+  wordCountForClientBrief, countWords, truncateWords, formatPeriod,
+  generateClientDecisionBrief, generateAgencyPortfolioBrief,
   type ClientBriefInput,
 } from "./decision-brief";
+import { FakeSupabase } from "../decision/__fake_supabase";
+import { DataLaagFout } from "./db-veilig";
 import type { FinalSopSynthesis, OperatingDetailLayer } from "./monthly-structured";
 import type { PortfolioSynthesisResult } from "./portfolio-synthesis";
 
@@ -199,5 +202,79 @@ console.log("\nKlantdocument-markdown volgt het gevraagde format letterlijk");
   check("bevat geen QA-scores of tokenaantallen", !/why.?score|actionability.?score|tokens?:/i.test(md));
 }
 
-console.log(`\n${passed} geslaagd, ${failed} gefaald`);
-if (failed > 0) process.exit(1);
+console.log("\nformatPeriod: nooit 'Invalid Date'");
+{
+  check("één maand", formatPeriod("2026-08-01", "2026-08-31") === "Augustus 2026", formatPeriod("2026-08-01", "2026-08-31"));
+  check("korte maandvorm", formatPeriod("2026-08", null) === "Augustus 2026");
+  check("meerdere maanden", formatPeriod("2026-06-01", "2026-08-31") === "Juni 2026 t/m Augustus 2026", formatPeriod("2026-06-01", "2026-08-31"));
+  check("leeg is 'onbekend'", formatPeriod("", null) === "onbekend" && formatPeriod(null, undefined) === "onbekend");
+  check("geen datum komt letterlijk terug", formatPeriod("Q3", "Q4") === "Q3 t/m Q4");
+  check("nergens 'Invalid Date'", ![formatPeriod("", ""), formatPeriod("x", ""), formatPeriod(null, "2026-13-99")].some((t) => t.includes("Invalid")));
+}
+
+console.log("\nPrioriteit 'Onbekend' zonder zelfscore, geen crash op ontbrekende velden van oude rijen");
+{
+  const zonderQa = maakFinalSop({ routes: ["containment"] });
+  delete (zonderQa as Partial<FinalSopSynthesis>).qa_self_check;
+  const brief = buildClientDecisionBrief({ clientId: "o", accountName: "Oud", finalSop: zonderQa }, { period: "" });
+  check("geen qa_self_check -> Onbekend, niet stil 'Laag'", brief.priority === "Onbekend");
+  const kaal = { primary_thread: "alleen een draad" } as unknown as FinalSopSynthesis;
+  let crash = false;
+  let kaalBrief: ReturnType<typeof buildClientDecisionBrief> | null = null;
+  try { kaalBrief = buildClientDecisionBrief({ clientId: "k", accountName: "Kaal", finalSop: kaal }, { period: "" }); } catch { crash = true; }
+  check("rij zonder recommendations/what_is_not_the_problem crasht niet", crash === false);
+  check("fase is dan 'Onbekend' en sprintacties zijn null", kaalBrief?.phase === "Onbekend" && kaalBrief?.sprintActions.containment === null);
+  const md = renderClientDecisionBriefMarkdown(buildClientDecisionBrief({ clientId: "m", accountName: "Meta-klant", finalSop: maakFinalSop({ routes: ["validation"] }) }, { period: "Augustus 2026", channel: "Meta Ads", analysisDate: "2026-09-01" }));
+  check("markdown-kop noemt kanaal en analysedatum", md.includes("**Kanaal:** Meta Ads") && md.includes("**Analyse van:** 2026-09-01"));
+}
+
+console.log("\nAgency brief: periode/kanaal per rij, verouderd-vlag, klanten zonder analyse benoemd");
+{
+  const finalSop = maakFinalSop({ routes: ["containment"] });
+  const clients: ClientBriefInput[] = [
+    { clientId: "a", accountName: "Actueel", finalSop, channel: "SEA", periodStart: "2026-08-01", periodEnd: "2026-08-31" },
+    { clientId: "b", accountName: "Achter", finalSop, channel: "Meta Ads", periodStart: "2026-01-01", periodEnd: "2026-01-31" },
+  ];
+  const brief = buildAgencyPortfolioBrief("Testbureau", clients, null, "2026-09-02", { zonderAnalyse: ["Zonder Data BV"], nu: "2026-08" });
+  check("actuele rij is niet verouderd", brief.macroMatrix[0].verouderd === false && brief.macroMatrix[0].period === "Augustus 2026" && brief.macroMatrix[0].channel === "SEA");
+  check("rij van januari is verouderd t.o.v. augustus", brief.macroMatrix[1].verouderd === true);
+  const md = renderAgencyPortfolioBriefMarkdown(brief);
+  check("matrix toont periode · kanaal met (verouderd)", md.includes("Januari 2026 · Meta Ads (verouderd)"), md);
+  check("sectie 'Zonder analyse' noemt de klant", md.includes("## Zonder analyse") && md.includes("Zonder Data BV"));
+}
+
+console.log("\ngenerate*: alle kanalen, fout is fout (FakeSupabase)");
+{
+  const finalSop = maakFinalSop({ routes: ["containment"] });
+  const sb = new FakeSupabase();
+  sb.seed("accounts", [
+    { id: "acc-1", client_id: "meta-klant", name: "Meta-only", agency_id: "bureau-1", sops_enabled: true },
+    { id: "acc-2", client_id: "zonder", name: "Zonder analyse", agency_id: "bureau-1", sops_enabled: true },
+  ]);
+  sb.seed("agencies", [{ id: "bureau-1", name: "Bureau Eén" }]);
+  sb.seed("sop_analysis_output", [{
+    id: "out-1", client_id: "meta-klant", sop_type: "meta_monthly", section: "structured_monthly_v2",
+    analysis_date: "2026-09-01", period_start: "2026-08-01", period_end: "2026-08-31", created_at: "2026-09-01T08:00:00Z",
+    output: JSON.stringify({ final_sop: finalSop }),
+  }]);
+  void (async () => {
+    const klant = await generateClientDecisionBrief(sb as never, "meta-klant");
+    check("Meta-only klant krijgt een brief (niet alleen sop_type 'monthly')", klant !== null && klant.channel === "Meta Ads", JSON.stringify(klant?.channel));
+    check("periode uit de rij", klant?.period === "Augustus 2026");
+    check("klant zonder rij: null, geen verzonnen brief", (await generateClientDecisionBrief(sb as never, "zonder")) === null);
+
+    const bureau = await generateAgencyPortfolioBrief(sb as never, "bureau-1");
+    check("bureaudocument bevat de Meta-klant in de matrix", bureau?.macroMatrix.length === 1 && bureau.macroMatrix[0].channel === "Meta Ads", JSON.stringify(bureau?.macroMatrix));
+    check("en noemt de klant zonder analyse", bureau?.zonderAnalyse.includes("Zonder analyse") === true, JSON.stringify(bureau?.zonderAnalyse));
+
+    const kapot = new FakeSupabase();
+    kapot.seed("accounts", [{ id: "acc-1", client_id: "meta-klant", name: "x", agency_id: "bureau-1", sops_enabled: true }]);
+    kapot.faalOp("sop_analysis_output", "column created_at does not exist");
+    let fout: unknown = null;
+    try { await generateClientDecisionBrief(kapot as never, "meta-klant"); } catch (e) { fout = e; }
+    check("een queryfout gooit DataLaagFout, geen 404 'geen analyse'", fout instanceof DataLaagFout, String(fout));
+
+    console.log(`\n${passed} geslaagd, ${failed} gefaald`);
+    if (failed > 0) process.exit(1);
+  })().catch((e) => { console.error(e); process.exit(1); });
+}

@@ -36,6 +36,12 @@ console.log("classify: custom_pattern alleen als discovery hem al zo tagde, nooi
   assert(classify(nietGetagd) === null, "zonder tag geen automatische custom_pattern-gok");
 }
 
+console.log("classify: een tag uit de gesloten lijst wint van de tekst, een vreemde tag niet:");
+{
+  assert(classify({ ...basis, statement: "Geen trefwoord hier.", category: "tracking" }) === "tracking", "getagde categorie wordt overgenomen zonder tekstmatch");
+  assert(classify({ ...basis, statement: "Het budget staat te laag.", category: "onzin" }) === "budget", "vreemde tag wordt genegeerd, de tekst beslist");
+}
+
 console.log("HYPOTHESIS_CATEGORIES: gesloten lijst van twaalf, custom_pattern inbegrepen:");
 {
   assert(HYPOTHESIS_CATEGORIES.length === 12, "twaalf categorieen, zoals de blueprint voorschrijft");

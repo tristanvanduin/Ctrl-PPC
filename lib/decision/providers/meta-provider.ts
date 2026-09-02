@@ -1,12 +1,11 @@
-// Fase 2, Task 2: lean stub. De bestaande Meta-signalen (lib/signals/meta-breakdown.ts,
-// meta-creative.ts) draaien vandaag alleen als pure functies op rijen die een component al
-// heeft opgehaald (zie components/dashboard/channel-structure-analysis.tsx); een server-side
-// I/O-schil zoals bij Google is later werk, geen aanname voor deze stap.
+// Meta-provider: beschikbaarheid is echt (dezelfde KANAAL_BRON-check als Google), detectie is
+// er nog niet. De bestaande Meta-signalen (lib/signals/meta-breakdown.ts, meta-creative.ts)
+// draaien vandaag alleen als pure functies op rijen die een component al heeft opgehaald; een
+// server-side I/O-schil zoals bij Google is later werk.
 //
-// isAvailable() checkt wel echt of er Meta-data is (hergebruik van dezelfde KANAAL_BRON-check
-// als Google), want dat is een feit dat al bekend is en niets kost om eerlijk te beantwoorden.
-// collectSignals() geeft altijd een lege array: geen detector aangesloten, dus niets te melden
-// in plaats van iets te verzinnen.
+// collectSignals() geeft daarom null: NIET GEMETEN. De oude stub gaf een lege lijst, en dat las
+// stroomopwaarts als "gemeten, niets gevonden" -- precies het onderscheid waarvoor
+// channel-provider.ts tiktok/shopify géén provider geeft. Zelfde regel, nu ook hier.
 
 import { heeftKanaalData } from "./beschikbaarheid";
 import type { ChannelProvider } from "../channel-provider";
@@ -14,20 +13,21 @@ import type { ChannelProvider } from "../channel-provider";
 export const metaProvider: ChannelProvider = {
   channel: "meta",
 
-  isAvailable(accountId) {
-    return heeftKanaalData("meta", accountId);
+  isAvailable(supabase, accountId) {
+    return heeftKanaalData(supabase, "meta", accountId);
   },
 
   async collectSignals() {
-    return [];
+    return null;
   },
 
-  async analyze(input) {
+  async analyze(_supabase, input) {
     return {
       channel: "meta",
       accountId: input.accountId,
+      gemeten: false,
       signals: [],
-      summary: "Meta-provider is nog een stub: geen detector aangesloten.",
+      summary: "Meta: geen detector aangesloten, niet gemeten.",
     };
   },
 };

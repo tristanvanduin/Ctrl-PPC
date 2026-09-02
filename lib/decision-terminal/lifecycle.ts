@@ -36,6 +36,10 @@ export type LifecycleStage =
   | "executed_gehaald"
   | "executed_niet_gehaald"
   | "niet_uitgevoerd"
+  /** Metriekoordeel is er (gehaald/niet gehaald), maar of de interventie is uitgevoerd kon de
+   *  evaluator niet vaststellen. Eigen stadium: "uitgevoerd" claimen zonder bewijs is precies
+   *  de toeschrijving die de evaluator zelf weigerde (lib/learning/evaluate-hypothesis-row.ts). */
+  | "evaluated_uitvoering_onbekend"
   | "evaluated_onbekend"
   | "completed";
 
@@ -68,9 +72,12 @@ export function lifecycleOf(h: HypothesisRecord): LifecycleInfo {
     case "unmeasurable":
       return { stage: "evaluated_onbekend", label: "Geevalueerd: niet meetbaar" };
     default:
-      // Oudere of onbekende outcome-waarde: geen gok, terugvallen op result_met als die er is.
-      if (h.result_met === true) return { stage: "executed_gehaald", label: "Uitgevoerd: doel gehaald" };
-      if (h.result_met === false) return { stage: "executed_niet_gehaald", label: "Uitgevoerd: doel niet gehaald" };
+      // "accepted"/"rejected" is het vocabulaire van de evaluator voor "metriekoordeel zonder
+      // uitvoeringsbewijs" (evaluate-hypothesis-row.ts: uitvoering niet vast te stellen). Ook een
+      // oudere of onbekende outcome met een result_met valt hier: het doel is beoordeeld, de
+      // uitvoering niet. Nooit "Uitgevoerd" labelen op wat niet is gezien.
+      if (h.result_met === true) return { stage: "evaluated_uitvoering_onbekend", label: "Doel gehaald, uitvoering niet vastgesteld" };
+      if (h.result_met === false) return { stage: "evaluated_uitvoering_onbekend", label: "Doel niet gehaald, uitvoering niet vastgesteld" };
       return { stage: "evaluated_onbekend", label: "Geevalueerd" };
   }
 }

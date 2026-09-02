@@ -2,14 +2,6 @@ import type { IssueCluster } from "@/lib/analysis/canonicalize";
 import type { AnalysisThread, Confidence, ProblemClassification } from "@/lib/schema/analysis-schema";
 import type { ThreadRecommendation } from "@/lib/analysis/monthly-structured";
 
-export interface ThreadSynthesisContext {
-  account_type?: string | null;
-  total_spend?: number | null;
-  total_revenue?: number | null;
-  primary_kpi?: "roas" | "cpa" | null;
-  period_label?: string | null;
-}
-
 export interface FalsePositiveThread {
   title: string;
   explanation: string;
@@ -36,7 +28,13 @@ export function rankRecommendationsByIce<T extends Pick<ThreadRecommendation, "i
   // important; manufacturing a gap would misrepresent the analysis. A genuinely
   // weak top recommendation is allowed to keep its low score. Pure: the input
   // objects are not mutated.
-  return [...recommendations].sort((a, b) => b.ice_total - a.ice_total);
+  //
+  // NaN-bescherming: een ice_total die geen getal is (ontbrekend veld, tekst uit het model)
+  // maakt de vergelijking NaN en daarmee de sortering ongedefinieerd -- de volgorde hangt dan
+  // af van de sorteerimplementatie, niet van de scores. Zo'n waarde telt als 0 en zakt naar
+  // onderen; de invoer zelf blijft ongewijzigd.
+  const totaal = (r: T) => Number(r.ice_total) || 0;
+  return [...recommendations].sort((a, b) => totaal(b) - totaal(a));
 }
 
 function unique<T>(values: T[]): T[] {
@@ -295,10 +293,7 @@ function deterministicFallback(clusters: IssueCluster[]): ThreadSynthesisOutput 
   };
 }
 
-export function synthesizeThreads(
-  clusters: IssueCluster[],
-  _context: ThreadSynthesisContext = {}
-): ThreadSynthesisOutput {
+export function synthesizeThreads(clusters: IssueCluster[]): ThreadSynthesisOutput {
   if (clusters.length === 0) return deterministicFallback([]);
 
   const grouped = new Map<string, IssueCluster[]>();

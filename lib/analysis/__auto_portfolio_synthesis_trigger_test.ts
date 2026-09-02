@@ -27,10 +27,14 @@ function mockSupabase(perTabel: Record<string, TableResponse>, opts: { faalOp?: 
     aangeroepen.push(tabel);
     if (opts.faalOp === tabel) throw new Error(`gesimuleerde databasefout op ${tabel}`);
     const respons = perTabel[tabel] ?? { data: null, error: null };
+    // De trigger leest sinds 2 september 2026 via eis() op een .limit(1)-keten (arrays), niet
+    // meer via .maybeSingle(); de fixtures hieronder zijn daarom rijenlijsten.
     const chain = {
       select() { return chain; },
       eq() { return chain; },
       in() { return chain; },
+      order() { return chain; },
+      limit() { return chain; },
       maybeSingle: () => Promise.resolve(respons),
       then: (resolve: (v: TableResponse) => void) => resolve(respons),
     };
@@ -56,7 +60,7 @@ async function main() {
   console.log("\nMet sleutel, geen accounts-rij (geen bureau gekoppeld): skipt vóór de licentie-check");
   {
     process.env.OPENROUTER_API_KEY = "test-sleutel";
-    const { supabase, aangeroepen } = mockSupabase({ accounts: { data: null } });
+    const { supabase, aangeroepen } = mockSupabase({ accounts: { data: [] } });
     let threw = false;
     try { await triggerPortfolioSynthesisIfReady(supabase, "client-zonder-bureau"); } catch { threw = true; }
     check("geen exception zonder bureau", threw === false);
@@ -67,8 +71,8 @@ async function main() {
   {
     process.env.OPENROUTER_API_KEY = "test-sleutel";
     const { supabase, aangeroepen } = mockSupabase({
-      accounts: { data: { agency_id: "bureau-1" } },
-      agencies: { data: { licentie: "basis" } },
+      accounts: { data: [{ agency_id: "bureau-1" }] },
+      agencies: { data: [{ licentie: "basis" }] },
     });
     let threw = false;
     try { await triggerPortfolioSynthesisIfReady(supabase, "client-basis-tier"); } catch { threw = true; }
@@ -82,12 +86,22 @@ async function main() {
   {
     process.env.OPENROUTER_API_KEY = "test-sleutel";
     const { supabase } = mockSupabase({
-      accounts: { data: { agency_id: "bureau-2", client_id: "solo-klant" } },
-      agencies: { data: { licentie: "growth" } },
+      accounts: { data: [{ agency_id: "bureau-2", client_id: "solo-klant" }] },
+      agencies: { data: [{ licentie: "growth" }] },
     });
     let threw = false;
     try { await triggerPortfolioSynthesisIfReady(supabase, "solo-klant"); } catch { threw = true; }
     check("geen exception bij minder dan 2 klanten", threw === false);
+  }
+
+  console.log("\nEen queryfout (error in de respons) is een DataLaagFout: faalt zacht, maar niet stil");
+  {
+    process.env.OPENROUTER_API_KEY = "test-sleutel";
+    const { supabase, aangeroepen } = mockSupabase({ accounts: { data: null, error: { message: "column agency_id does not exist" } } });
+    let threw = false;
+    try { await triggerPortfolioSynthesisIfReady(supabase, "client-queryfout"); } catch { threw = true; }
+    check("geen exception bij een queryfout", threw === false);
+    check("stopt bij de falende query, raakt agencies niet", !aangeroepen.includes("agencies"), aangeroepen.join(","));
   }
 
   console.log("\nEen databasefout in de eerste stap (accounts) laat de wrapper nooit gooien");

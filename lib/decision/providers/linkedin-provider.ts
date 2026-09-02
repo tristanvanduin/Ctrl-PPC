@@ -1,6 +1,7 @@
-// Fase 2, Task 2: lean stub. Zelfde status als meta-provider.ts: de bestaande LinkedIn-signalen
-// (lib/signals/linkedin-signals.ts, linkedin-demographic.ts) draaien vandaag alleen als pure
-// functies op al-opgehaalde rijen; een server-side I/O-schil is later werk.
+// LinkedIn-provider: zelfde status en dezelfde regel als meta-provider.ts. De bestaande
+// LinkedIn-signalen (lib/signals/linkedin-signals.ts, linkedin-demographic.ts) draaien alleen
+// als pure functies op al-opgehaalde rijen; collectSignals() geeft null (niet gemeten), geen
+// lege lijst die als "niets gevonden" zou lezen.
 
 import { heeftKanaalData } from "./beschikbaarheid";
 import type { ChannelProvider } from "../channel-provider";
@@ -8,20 +9,21 @@ import type { ChannelProvider } from "../channel-provider";
 export const linkedinProvider: ChannelProvider = {
   channel: "linkedin",
 
-  isAvailable(accountId) {
-    return heeftKanaalData("linkedin", accountId);
+  isAvailable(supabase, accountId) {
+    return heeftKanaalData(supabase, "linkedin", accountId);
   },
 
   async collectSignals() {
-    return [];
+    return null;
   },
 
-  async analyze(input) {
+  async analyze(_supabase, input) {
     return {
       channel: "linkedin",
       accountId: input.accountId,
+      gemeten: false,
       signals: [],
-      summary: "LinkedIn-provider is nog een stub: geen detector aangesloten.",
+      summary: "LinkedIn: geen detector aangesloten, niet gemeten.",
     };
   },
 };

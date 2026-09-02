@@ -2,7 +2,7 @@
 // Zonder deze test zegt "shadow mode is veilig" niets -- zie AGENTS.md: deze codebase heeft
 // eerder een controle gehad die iets anders verifieerde dan hij beweerde.
 
-import { GATES, runGates, type GateInput } from "./quality-gates";
+import { GATES, runGates, gewogenRankLostIs, type GateInput } from "./quality-gates";
 import type { RecommendationLike } from "@/lib/analysis/contradiction-resolver";
 import type { Finding, Recommendation } from "@/lib/schema/analysis-schema";
 
@@ -124,6 +124,32 @@ const sprintUitkomst = runGates({ ...basisInvoer, actionGating: { findings: [kle
 check("een klein bedrag (<€50) wordt afgewaardeerd van direct_action, niet 'input ontbreekt'",
   sprintUitkomst?.status === "warn" && !(sprintUitkomst.reason ?? "").includes("input ontbreekt"),
   JSON.stringify(sprintUitkomst));
+
+console.log("\nlege invoer is geen pass: aanwezig-maar-leeg telt als 'input ontbreekt'");
+const leeg = runGates({
+  ...basisInvoer,
+  rankLoss: { keywords: [], rankLostIs: 0 },
+  claimCheck: { stepNumber: 1, findings: [], campaignRows: [], accountRows: [], periodStart: "2026-07-01", periodEnd: "2026-07-31" },
+  contradiction: { recommendations: [], tasks: [] },
+  coverageReport: [],
+  actionGating: { findings: [], recommendations: [] },
+});
+for (const naam of ["Math Gate", "Evidence Gate", "Contradiction Gate", "Coverage Gate", "Sprint Readiness Gate"]) {
+  const r = leeg.find((x) => x.gateName === naam);
+  check(`${naam} met lege lijst is warn 'input ontbreekt', geen pass`, r?.status === "warn" && (r.reason ?? "").includes("input ontbreekt"), JSON.stringify(r));
+}
+const causaal = runGates({
+  ...basisInvoer,
+  kpiChain: { previousMonth: { conversions: 10, clicks: 100, impressions: 1000, cost: 100 }, currentMonth: { conversions: 12, clicks: 110, impressions: 1100, cost: 110 }, resultMetric: "conversions" },
+}).find((x) => x.gateName === "Causal Chain Gate");
+check("Causal Chain Gate zegt in zijn reden dat hij beschrijvend is", (causaal?.reason ?? "").includes("beschrijvend"), JSON.stringify(causaal));
+
+console.log("\ngewogenRankLostIs: gewogen naar impressies, null zonder rijen");
+check("zonder rijen null (geen data is geen 0%)", gewogenRankLostIs([]) === null);
+check("gewogen: 40.000 impressies wegen zwaarder dan 40",
+  Math.abs((gewogenRankLostIs([{ search_rank_lost_is: 0.5, impressions: 40000 }, { search_rank_lost_is: 0.1, impressions: 40 }]) ?? 0) - 0.4996) < 0.001,
+  String(gewogenRankLostIs([{ search_rank_lost_is: 0.5, impressions: 40000 }, { search_rank_lost_is: 0.1, impressions: 40 }])));
+check("zonder impressies valt terug op het gewone gemiddelde", gewogenRankLostIs([{ search_rank_lost_is: 0.2 }, { search_rank_lost_is: 0.4 }]) === 0.30000000000000004 || Math.abs((gewogenRankLostIs([{ search_rank_lost_is: 0.2 }, { search_rank_lost_is: 0.4 }]) ?? 0) - 0.3) < 1e-9);
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

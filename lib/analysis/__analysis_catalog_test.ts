@@ -69,9 +69,18 @@ const UIT_TEMPLATE = new Map<string, string>([
   ["kpi_relations_microsoft_v1", "`kpi_relations_${"],
 ]);
 
+// Secties waarvan de schrijver een module onder lib/ is die de route aanroept (de route zelf
+// draagt dan alleen de geïmporteerde constante). Expliciet per sectie, zodat een sectie die
+// nergens meer wordt geschreven niet achter een te ruime zoekopdracht kan verdwijnen.
+const UIT_MODULE = new Map<string, string>([
+  ["master_synthesis_v1", join("lib", "decision", "master-synthesis-storage.ts")],
+]);
+
 for (const sectie of secties) {
   const template = UIT_TEMPLATE.get(sectie);
-  const gevonden = template ? routeBron.includes(template) : routeBron.includes(`"${sectie}"`);
+  const module = UIT_MODULE.get(sectie);
+  const bron = module ? readFileSync(join(process.cwd(), module), "utf8") : routeBron;
+  const gevonden = template ? routeBron.includes(template) : bron.includes(`"${sectie}"`);
   assert(gevonden, `sectie ${sectie} wordt door een route weggeschreven`);
 }
 

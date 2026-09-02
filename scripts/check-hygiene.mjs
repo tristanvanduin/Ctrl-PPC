@@ -186,10 +186,6 @@ const TOEGESTANE_WEZEN = new Map([
   ["lib/context/context-engine.ts",
     "EXECUTION_PLAN.md Stap 5: het ContextEngine-contract, met opzet zonder implementatie. " +
     "Hoort bij lib/context/context-types.ts hierboven."],
-  ["lib/decision/hypothesis-discovery.ts",
-    "EXECUTION_PLAN.md Stap 6: HypothesisDiscovery-contract plus classify(), alleen door zijn " +
-    "eigen test geraakt. Discovery-implementatie en een route die hypotheses aanlevert komen na " +
-    "deze stap; tot dan geen productieconsument."],
 
   // NAGEKEKEN 2026-08-05. Deze drie stonden hier als "vermoedelijk ingehaald door een opvolger",
   // en dat hield geen van de drie stand. Ik heb de exports naast elkaar gelegd:

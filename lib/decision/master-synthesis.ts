@@ -1,15 +1,26 @@
-// Master Synthesis (Pijler 6), Fase B: de orchestratie die Fase A (evidence_payload) en de
-// LLM-synthese-call samenbrengt tot één herbruikbare kernfunctie -- run bare, geen route- of
-// Next.js-koppeling hier, zodat hij zowel vanuit een toekomstige route (Fase D, nog niet
-// geautoriseerd) als vanuit een verificatiescript aan te roepen is.
+// Master Synthesis, Fase B: de orchestratie die Fase A (evidence_payload) en de LLM-synthese-call
+// samenbrengt tot één herbruikbare kernfunctie -- geen route- of Next.js-koppeling hier, zodat
+// hij zowel vanuit de route als vanuit een test met een geïnjecteerde callFn draait.
 //
-// Bewust GEEN createProgressJob/saveAnalysisOutputSection/persistentie hier: Fase C (opslag naar
-// sprint_hypotheses) is een aparte, nog niet geimplementeerde stap. Deze functie retourneert het
-// gevalideerde resultaat; de aanroeper beslist wat ermee gebeurt.
+// Bewust GEEN persistentie hier: Fase C (master-synthesis-storage.ts) is een aparte stap. Deze
+// functie retourneert het gevalideerde resultaat; de aanroeper beslist wat ermee gebeurt.
+//
+// HERBOUW 2 SEPTEMBER 2026
+// - Cijferpoort: de toegestane percentages/bedragen komen uit de prompttekst zelf (dus exact
+//   wat het model te zien kreeg) en gaan mee naar de validator; een ongegrond cijfer is een
+//   fout die de repair-lus terugkrijgt.
+// - maxTokens 4096 → 8192: "minstens 300 woorden" narratief plus vijf hypotheses en vijf taken
+//   in JSON-mode werd afgekapt, gaf "Geen geldige JSON", en de repair kreeg dezelfde limiet met
+//   een langere prompt -- dezelfde afkapping. Niets logde de ruwe uitvoer, dus dit was niet te
+//   zien. Nu is de limiet ruimer en komt de kop van de ruwe uitvoer mee bij een schemafout.
+// - pickBetterAttempt woog een schemafout (geen output) als één validatiefout, waardoor een
+//   reparatie die geldig JSON met één inhoudsfout opleverde werd weggegooid ten gunste van
+//   niets. Een schemafout weegt nu zwaarder dan elke inhoudsfout.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callRouted } from "@/lib/analysis/llm-router";
 import type { OpenRouterRequest, OpenRouterResponse } from "@/lib/analysis/openrouter-client";
+import { extractGroundedNumbers } from "@/lib/analysis/weekly-number-gate";
 import { fetchChannelSynthesis } from "./evidence/channel-synthesis";
 import { fetchCrossChannelFacts } from "./evidence/cross-channel-facts";
 import { buildEvidencePayload, isEvidencePayloadEmpty, type EvidencePayload } from "./evidence/build-payload";
@@ -18,6 +29,12 @@ import { MasterSynthesisOutputSchema, type MasterSynthesisOutput } from "./maste
 import { validateMasterSynthesisOutput, type MasterSynthesisValidation } from "./master-synthesis-validator";
 
 const MAX_REPAIR_ATTEMPTS = 1;
+const MAX_TOKENS = 8192;
+// Hoeveel van de ruwe modeluitvoer meekomt bij een schemafout: genoeg om afkapping of een
+// verkeerde vorm te herkennen, te weinig om een respons op te blazen.
+const RAW_KOP_TEKENS = 400;
+// Een schemafout (geen bruikbare output) weegt zwaarder dan welk aantal inhoudsfouten ook.
+const SCHEMAFOUT_GEWICHT = 1000;
 
 function extractJsonBlock(raw: string): string {
   let text = raw.trim();
@@ -33,7 +50,7 @@ interface ParseAttempt {
   validation: MasterSynthesisValidation | null;
 }
 
-function parseAndValidate(raw: string, availableChannels: readonly string[]): ParseAttempt {
+function parseAndValidate(raw: string, availableChannels: readonly string[], toegestaneCijfers: readonly number[]): ParseAttempt {
   let json: unknown;
   try {
     json = JSON.parse(extractJsonBlock(raw));
@@ -45,14 +62,17 @@ function parseAndValidate(raw: string, availableChannels: readonly string[]): Pa
     const eersteIssue = result.error.issues[0];
     return { raw, output: null, schemaError: `${eersteIssue?.path.join(".")}: ${eersteIssue?.message}`, validation: null };
   }
-  return { raw, output: result.data, schemaError: null, validation: validateMasterSynthesisOutput(result.data, availableChannels) };
+  return { raw, output: result.data, schemaError: null, validation: validateMasterSynthesisOutput(result.data, availableChannels, toegestaneCijfers) };
+}
+
+function foutgewicht(a: ParseAttempt): number {
+  if (a.schemaError) return SCHEMAFOUT_GEWICHT;
+  return a.validation?.errors.length ?? 0;
 }
 
 /** Kiest de betere van twee pogingen: minste fouten wint; bij gelijke fouten blijft het origineel. */
 function pickBetterAttempt(original: ParseAttempt, repaired: ParseAttempt): ParseAttempt {
-  const origErrors = original.validation?.errors.length ?? (original.schemaError ? 1 : 0);
-  const repairErrors = repaired.validation?.errors.length ?? (repaired.schemaError ? 1 : 0);
-  return repairErrors < origErrors ? repaired : original;
+  return foutgewicht(repaired) < foutgewicht(original) ? repaired : original;
 }
 
 export interface MasterSynthesisResult {
@@ -62,6 +82,10 @@ export interface MasterSynthesisResult {
   output: MasterSynthesisOutput | null;
   validation: MasterSynthesisValidation | null;
   schemaError: string | null;
+  /** De kop van de ruwe modeluitvoer bij een schemafout, voor diagnose. */
+  rawKop: string | null;
+  /** Hoeveel percentages/bedragen het evidence_payload droeg (de cijferpoort-set). */
+  toegestaneCijfers: number;
   model: string | null;
   tokensUsed: number;
   repaired: boolean;
@@ -72,41 +96,43 @@ export async function runMasterSynthesis(opts: {
   apiKey: string;
   clientId: string;
   periodEnd: string;
-  /** Injecteerbaar voor tests, zelfde patroon als callRouted() zelf ("de caller is
-   *  injecteerbaar voor tests"). Onbenoemd => de echte OpenRouter-keten. */
+  /** Injecteerbaar voor tests, zelfde patroon als callRouted() zelf. Onbenoemd => de echte OpenRouter-keten. */
   callFn?: (req: OpenRouterRequest) => Promise<OpenRouterResponse>;
 }): Promise<MasterSynthesisResult> {
   const { supabase, apiKey, clientId, periodEnd, callFn } = opts;
 
-  // Fase A: evidence_payload.
+  // Fase A: evidence_payload. Een datalaagfout gooit door (DataLaagFout) -- de route meldt hem
+  // als storing; hij mag nooit als "geen_data" lezen.
   const [channels, crossChannel] = await Promise.all([
     fetchChannelSynthesis(supabase, clientId, periodEnd),
     fetchCrossChannelFacts(supabase, clientId, periodEnd),
   ]);
   const evidencePayload = buildEvidencePayload({ clientId, periodEnd, channels, crossChannel });
 
-  // Hard-skip: niets om te synthetiseren, geen LLM-call op een lege payload (zelfde discipline
-  // als F5 fase1.4 voor de kanaal-stappen).
+  const basis = {
+    evidencePayload, output: null, validation: null, schemaError: null, rawKop: null,
+    toegestaneCijfers: 0, model: null, tokensUsed: 0, repaired: false,
+  };
+
+  // Hard-skip: niets om te synthetiseren, geen LLM-call op een lege payload.
   if (isEvidencePayloadEmpty(evidencePayload)) {
     return {
-      evidencePayload, skipped: true,
+      ...basis, skipped: true,
       skipReason: "Geen kanaal-aanbevelingen/taken en geen getriggerde cross-channel-signalen binnen de periode.",
-      output: null, validation: null, schemaError: null, model: null, tokensUsed: 0, repaired: false,
     };
   }
 
-  // Fase B: de synthese-call, met repair-lus bij een fout (zelfde patroon als de kanaal-SOP's:
-  // shouldRepairStep/buildStepRepairUserMessage/pickBetterStepAttempt in monthly/route.ts, hier
-  // lokaal herimplementeerd omdat die functies privé zijn aan die route en een ander
-  // validatieresultaat-type hebben dan MasterSynthesisValidation).
+  // Fase B: de synthese-call, met repair-lus bij een fout.
   const systemPrompt = buildMasterSynthesisSystemPrompt();
   const userMessage = buildMasterSynthesisUserMessage(evidencePayload);
+  // De cijferpoort-set uit precies de tekst die het model te zien krijgt.
+  const toegestaneCijfers = extractGroundedNumbers(userMessage);
 
   const first = await callRouted({
-    apiKey, systemPrompt, userMessage, jsonMode: true, temperature: 0, maxTokens: 4096,
+    apiKey, systemPrompt, userMessage, jsonMode: true, temperature: 0, maxTokens: MAX_TOKENS,
     label: "master-synthesis",
   }, callFn);
-  let attempt = parseAndValidate(first.output, evidencePayload.availableChannels);
+  let attempt = parseAndValidate(first.output, evidencePayload.availableChannels, toegestaneCijfers);
   let model = first.model;
   let tokensUsed = first.tokensUsed;
   let repaired = false;
@@ -119,10 +145,10 @@ export async function runMasterSynthesis(opts: {
     for (let poging = 0; poging < MAX_REPAIR_ATTEMPTS; poging++) {
       const repairMessage = `${userMessage}\n\n## REPAIR FEEDBACK\nJe vorige output is afgekeurd. Los exact deze punten op en lever opnieuw volledig JSON:\n${feedback.map((line) => `- ${line}`).join("\n")}`;
       const repairRes = await callRouted({
-        apiKey, systemPrompt, userMessage: repairMessage, jsonMode: true, temperature: 0, maxTokens: 4096,
+        apiKey, systemPrompt, userMessage: repairMessage, jsonMode: true, temperature: 0, maxTokens: MAX_TOKENS,
         label: "master-synthesis-repair",
       }, callFn);
-      const repairedAttempt = parseAndValidate(repairRes.output, evidencePayload.availableChannels);
+      const repairedAttempt = parseAndValidate(repairRes.output, evidencePayload.availableChannels, toegestaneCijfers);
       const beste = pickBetterAttempt(attempt, repairedAttempt);
       if (beste === repairedAttempt) {
         attempt = repairedAttempt;
@@ -134,8 +160,10 @@ export async function runMasterSynthesis(opts: {
   }
 
   return {
-    evidencePayload, skipped: false, skipReason: null,
+    ...basis, skipped: false, skipReason: null,
     output: attempt.output, validation: attempt.validation, schemaError: attempt.schemaError,
+    rawKop: attempt.schemaError ? attempt.raw.slice(0, RAW_KOP_TEKENS) : null,
+    toegestaneCijfers: toegestaneCijfers.length,
     model, tokensUsed, repaired,
   };
 }

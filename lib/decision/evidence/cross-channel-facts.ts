@@ -1,10 +1,14 @@
-// Master Synthesis (Pijler 6), Fase A: leest de deterministische cross-channel-feiten die
+// Master Synthesis, Fase A: leest de deterministische cross-channel-feiten die
 // app/api/analysis/cross-channel/route.ts al berekent en opslaat (sop_type "cross_channel",
 // section "cross_channel_groups_v1") -- zelfde select als die route's eigen GET-handler, hier
 // hergebruikt in plaats van opnieuw uitgevonden. periodEnd is een bovengrens (period_end <=
-// periodEnd), zelfde reden als in channel-synthesis.ts: geen toekomstige data lekken.
+// periodEnd): geen toekomstige data lekken.
+//
+// Herbouw 2 september 2026: een queryfout gooit (eis); alleen een onleesbare opgeslagen blob
+// levert nog null, en die situatie is geen databankfout maar een oude of kapotte rij.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { eis } from "@/lib/analysis/db-veilig";
 
 export interface CrossChannelGroup {
   key: string;
@@ -27,27 +31,31 @@ interface StoredGroupsPayload {
   degradations?: string[];
 }
 
+interface FeitenRij { output: unknown; analysis_date: unknown; period_start: unknown; period_end: unknown }
+
 export async function fetchCrossChannelFacts(
   supabase: SupabaseClient,
   clientId: string,
   periodEnd: string
 ): Promise<CrossChannelFacts | null> {
-  const { data } = await supabase
-    .from("sop_analysis_output")
-    .select("output, analysis_date, period_start, period_end")
-    .eq("client_id", clientId)
-    .eq("sop_type", "cross_channel")
-    .eq("section", "cross_channel_groups_v1")
-    .lte("period_end", periodEnd)
-    .order("analysis_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
+  const rijen = eis(
+    await supabase
+      .from("sop_analysis_output")
+      .select("output, analysis_date, period_start, period_end")
+      .eq("client_id", clientId)
+      .eq("sop_type", "cross_channel")
+      .eq("section", "cross_channel_groups_v1")
+      .lte("period_end", periodEnd)
+      .order("analysis_date", { ascending: false })
+      .limit(1),
+    "sop_analysis_output (cross_channel_groups_v1)"
+  ) as FeitenRij[];
+  const data = rijen[0];
   if (!data?.output) return null;
 
   let parsed: StoredGroupsPayload;
   try {
-    parsed = JSON.parse(data.output as string) as StoredGroupsPayload;
+    parsed = JSON.parse(String(data.output)) as StoredGroupsPayload;
   } catch {
     return null;
   }

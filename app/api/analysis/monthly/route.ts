@@ -32,6 +32,7 @@ import { buildMicrosoftAnalysisData, thirteenMonthStart as microsoftThirteenMont
 import { buildMicrosoftStepMessage, microsoftStepName } from "@/lib/microsoft/step-message";
 import { resolveTargets, targetActualsFromMonthly, buildConfiguredTargetsBlock, bureauVanKlant, type TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { recordGateObservations } from "@/lib/decision/gate-observations";
+import { gewogenRankLostIs } from "@/lib/decision/quality-gates";
 import type { GateInput } from "@/lib/decision/quality-gates";
 import type { KeywordQsRow } from "@/lib/analysis/metric-cross-checks";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
@@ -3711,7 +3712,9 @@ ${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannel
             cost: Number(k.cost ?? 0),
             quality_score: k.quality_score == null ? null : Number(k.quality_score),
           })),
-          rankLostIs: isRijenLaatsteMaand.reduce((som, r) => som + Number(r.search_rank_lost_is ?? 0), 0) / isRijenLaatsteMaand.length,
+          // Gewogen naar impressies (quality-gates.ts): het ongewogen gemiddelde liet een campagne
+          // met 40 impressies even zwaar tellen als een met 40.000.
+          rankLostIs: gewogenRankLostIs(isRijenLaatsteMaand) ?? 0,
         } : undefined,
         claimCheck: curatedFindings.length > 0 ? {
           stepNumber: 1,

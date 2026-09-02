@@ -1,12 +1,13 @@
-// Test voor de portfolio-synthese-stap (masterplan 17.15). Deterministisch; supabase en de
-// LLM-call zijn gemockt.
+// Test voor de portfolio-synthese-stap (masterplan 17.15), herbouwd 2 september 2026.
+// Deterministisch: FakeSupabase (lib/decision/__fake_supabase.ts) en een geïnjecteerde callFn.
 // Draaien: npx tsx lib/analysis/__portfolio_synthesis_test.ts
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { FakeSupabase } from "../decision/__fake_supabase";
 import {
   fetchPortfolioSummaries, buildPortfolioSynthesisPrompt, parsePortfolioSynthesisOutput,
-  alreadyPortfolioSynthesized, runPortfolioSynthesis, type ClientSummary, type PortfolioSynthesizedAction,
+  alreadyPortfolioSynthesized, runPortfolioSynthesis, type ClientSummary,
 } from "./portfolio-synthesis";
+import { DataLaagFout } from "./db-veilig";
 import type { OpenRouterResponse } from "./openrouter-client";
 
 let passed = 0, failed = 0;
@@ -15,85 +16,72 @@ function check(label: string, cond: boolean, detail = ""): void {
   else { failed += 1; console.error(`  FAIL  ${label}  ${detail}`); }
 }
 
-interface Row { output: string; analysis_date: string }
-function mockSupabase(opts: {
-  crossChannelByClient?: Record<string, Row | null>;
-  channelByClient?: Record<string, Partial<Record<string, Row>>>; // clientId -> sopTypeKey -> row
-  alreadySynthesized?: boolean;
-}): SupabaseClient {
-  const { crossChannelByClient = {}, channelByClient = {}, alreadySynthesized = false } = opts;
-  const from = (table: string) => {
-    let filters: Record<string, string> = {};
-    const b = {
-      select() { return b; },
-      eq(col: string, val: string) { filters = { ...filters, [col]: val }; return b; },
-      in() { return Promise.resolve({ data: [], error: null }); },
-      gte() { return b; },
-      order() { return b; },
-      limit() { return b; },
-      maybeSingle() {
-        if (table === "agency_analysis_output") {
-          return Promise.resolve({ data: alreadySynthesized ? { id: "existing" } : null, error: null });
-        }
-        if (table === "sop_analysis_output") {
-          if (filters.sop_type === "cross_channel" && filters.section === "cross_channel_synthesis_v1") {
-            const row = crossChannelByClient[filters.client_id] ?? null;
-            return Promise.resolve({ data: row, error: null });
-          }
-          if (filters.section === "structured_monthly_v2") {
-            const row = channelByClient[filters.client_id]?.[filters.sop_type] ?? null;
-            return Promise.resolve({ data: row ?? null, error: null });
-          }
-        }
-        return Promise.resolve({ data: null, error: null });
-      },
-      upsert() { return Promise.resolve({ data: null, error: null }); },
-    };
-    return b;
-  };
-  return { from } as unknown as SupabaseClient;
-}
+const VANDAAG = "2026-08-17";
+const BUREAU = "agency-1";
 
-function crossChannelRow(headline: string, actions: string[] = []): Row {
-  return { output: JSON.stringify({ headline, narrative: `narratief: ${headline}`, synthesized_actions: actions.map((a) => ({ action: a })) }), analysis_date: "2026-08-01" };
+function crossChannelRij(clientId: string, headline: string, analysisDate = "2026-08-10", actions: string[] = []) {
+  return {
+    client_id: clientId, sop_type: "cross_channel", section: "cross_channel_synthesis_v1", analysis_date: analysisDate,
+    output: JSON.stringify({ headline, narrative: `narratief: ${headline}`, synthesized_actions: actions.map((a) => ({ action: a })) }),
+  };
 }
-function structuredRow(primaryThread: string, recs: string[] = []): Row {
-  return { output: JSON.stringify({ final_sop: { primary_thread: primaryThread, root_cause: `oorzaak: ${primaryThread}`, recommendations: recs.map((h) => ({ handeling: h })) } }), analysis_date: "2026-08-01" };
+function structuredRij(clientId: string, sopType: string, primaryThread: string, analysisDate = "2026-08-01", recs: string[] = []) {
+  return {
+    client_id: clientId, sop_type: sopType, section: "structured_monthly_v2", analysis_date: analysisDate,
+    output: JSON.stringify({ final_sop: { primary_thread: primaryThread, root_cause: `oorzaak: ${primaryThread}`, recommendations: recs.map((h) => ({ handeling: h })) } }),
+  };
+}
+function portfolioRij(analysisDate: string) {
+  return { agency_id: BUREAU, section: "portfolio_synthesis_v1", analysis_date: analysisDate, output: "{}" };
+}
+/** Telt de queries per tabel, om te bewijzen dat de ophaling gebundeld is. */
+function tellend(sb: FakeSupabase): Record<string, number> {
+  const tellingen: Record<string, number> = {};
+  const orig = sb.from.bind(sb);
+  sb.from = (t: string) => { tellingen[t] = (tellingen[t] ?? 0) + 1; return orig(t); };
+  return tellingen;
+}
+function llm(output: string): () => Promise<OpenRouterResponse> {
+  return async () => ({ output, model: "fake-model", tokensUsed: 555, promptTokens: 400, completionTokens: 155, latencyMs: 300, retries: 0, cachedPromptTokens: 0, parseStatus: "ok" });
+}
+const KLANTEN = [{ clientId: "client-a", clientName: "Broedservice" }, { clientId: "client-b", clientName: "Wobblez" }];
+function run(sb: FakeSupabase, extra: Partial<Parameters<typeof runPortfolioSynthesis>[0]> = {}) {
+  return runPortfolioSynthesis({
+    supabase: sb as never, apiKey: "x", agencyId: BUREAU, clients: KLANTEN,
+    analysisDate: VANDAAG, periodStart: "2026-07-01", periodEnd: "2026-07-31", ...extra,
+  });
 }
 
 async function main() {
-  // ── fetchClientSummary: cross-channel-synthese heeft voorrang boven een los kanaal ──
-  console.log("fetchPortfolioSummaries: voorkeur voor cross-channel-synthese");
+  console.log("fetchPortfolioSummaries: gebundeld, voorkeur voor cross-channel-synthese, terugval op nieuwste kanaal");
   {
-    const sb = mockSupabase({
-      crossChannelByClient: { "client-a": crossChannelRow("A heeft een gesynthetiseerd verhaal") },
-      channelByClient: { "client-a": { monthly: structuredRow("los Google-verhaal, zou nooit gekozen mogen worden") } },
-    });
-    const summaries = await fetchPortfolioSummaries(sb, [{ clientId: "client-a", clientName: "Client A" }]);
-    const a = summaries.get("client-a");
-    check("cross-channel-synthese wint van het losse kanaal", a?.primaryThread === "A heeft een gesynthetiseerd verhaal", JSON.stringify(a));
-    check("fromCrossChannelSynthesis is true", a?.fromCrossChannelSynthesis === true);
+    const sb = new FakeSupabase();
+    sb.seed("sop_analysis_output", [
+      crossChannelRij("client-a", "A heeft een gesynthetiseerd verhaal"),
+      structuredRij("client-a", "monthly", "los Google-verhaal, mag nooit winnen"),
+      structuredRij("client-b", "meta_monthly", "Meta-only klant", "2026-08-03"),
+      structuredRij("client-b", "monthly", "oudere Google-run", "2026-07-20"),
+      structuredRij("client-d", "monthly", "te oud", "2026-06-01"),
+    ]);
+    sb.seed("client_settings", [{ client_id: "client-a", bedrijfsmodel: "b2c", niche: null }]);
+    const tellingen = tellend(sb);
+    const klanten = [...KLANTEN, { clientId: "client-c", clientName: "C" }, { clientId: "client-d", clientName: "D" }];
+    const f = await fetchPortfolioSummaries(sb as never, klanten, VANDAAG);
+    check("cross-channel-synthese wint van het losse kanaal", f.summaries.get("client-a")?.primaryThread === "A heeft een gesynthetiseerd verhaal");
+    check("fromCrossChannelSynthesis is true", f.summaries.get("client-a")?.fromCrossChannelSynthesis === true);
+    check("bedrijfsmodel komt uit client_settings", f.summaries.get("client-a")?.bedrijfsmodel === "b2c");
+    check("zonder synthese: het nieuwste kanaal, over alle kanalen heen (Meta wint van oudere Google)", f.summaries.get("client-b")?.primaryThread === "Meta-only klant" && f.summaries.get("client-b")?.fromCrossChannelSynthesis === false);
+    check("klant zonder enige bron: null", f.summaries.get("client-c") === null);
+    check("klant met alleen een run buiten het versheidsvenster: null", f.summaries.get("client-d") === null);
+    check("hoogstens 1 query op client_settings en 2 op sop_analysis_output, ongeacht het aantal klanten", tellingen.client_settings === 1 && tellingen.sop_analysis_output === 2, JSON.stringify(tellingen));
+
+    const kapot = new FakeSupabase();
+    kapot.faalOp("client_settings", "relation does not exist");
+    let fout: unknown = null;
+    try { await fetchPortfolioSummaries(kapot as never, KLANTEN, VANDAAG); } catch (e) { fout = e; }
+    check("een queryfout gooit DataLaagFout", fout instanceof DataLaagFout, String(fout));
   }
 
-  console.log("fetchPortfolioSummaries: terugval op het beste losse kanaal zonder cross-channel-synthese");
-  {
-    const sb = mockSupabase({
-      channelByClient: { "client-b": { monthly: structuredRow("Google-only klant") } },
-    });
-    const summaries = await fetchPortfolioSummaries(sb, [{ clientId: "client-b", clientName: "Client B" }]);
-    const b = summaries.get("client-b");
-    check("valt terug op het losse kanaal", b?.primaryThread === "Google-only klant", JSON.stringify(b));
-    check("fromCrossChannelSynthesis is false", b?.fromCrossChannelSynthesis === false);
-  }
-
-  console.log("fetchPortfolioSummaries: geen enkele bron -> null, geen verzonnen klant");
-  {
-    const sb = mockSupabase({});
-    const summaries = await fetchPortfolioSummaries(sb, [{ clientId: "client-c", clientName: "Client C" }]);
-    check("null zonder enige recente data", summaries.get("client-c") === null);
-  }
-
-  // ── parsePortfolioSynthesisOutput ──
   console.log("parsePortfolioSynthesisOutput");
   const clients: ClientSummary[] = [
     { clientId: "client-a", clientName: "Broedservice", analysisDate: "2026-08-01", primaryThread: "x", rootCause: "y", topRecommendations: [], bedrijfsmodel: null, niche: null, fromCrossChannelSynthesis: false },
@@ -104,136 +92,88 @@ async function main() {
       headline: "Kop", narrative: "Verhaal", recurring_patterns: ["patroon 1"], outliers: ["client-a valt op"],
       synthesized_actions: [
         { clientId: "client-a", action: "actie A", rationale: "r", priority: "hoog" },
-        { clientId: "portfolio", action: "bureaubrede checklist", rationale: "r", priority: "midden" },
+        { clientId: "portfolio", action: "bureaubrede checklist", rationale: "r", priority: "URGENT" },
+        { clientId: "Wobblez", action: "actie via naam", rationale: "r", priority: "laag" },
+        { clientId: "client-nooit-aangeleverd", action: "verzonnen", rationale: "r", priority: "laag" },
       ],
       markdown: "# Kop",
     });
     const r = parsePortfolioSynthesisOutput(geldig, clients);
-    check("headline geparsed", r.headline === "Kop");
-    check("recurring_patterns geparsed", r.recurring_patterns.length === 1);
-    check("outliers geparsed", r.outliers.length === 1);
-    check("actie met geldige clientId blijft staan", r.synthesized_actions.some((a) => a.clientId === "client-a"));
-    check("het letterlijke woord 'portfolio' is toegestaan als clientId", r.synthesized_actions.some((a) => a.clientId === "portfolio"), JSON.stringify(r.synthesized_actions));
-    check("clientName wordt erbij gezet voor de UI (niet door het model, maar bij het parsen)", r.synthesized_actions.find((a) => a.clientId === "client-a")?.clientName === "Broedservice");
-    check("'portfolio' krijgt de leesbare naam 'Hele portfolio'", r.synthesized_actions.find((a) => a.clientId === "portfolio")?.clientName === "Hele portfolio");
-
-    // Verzonnen clientId wordt gefilterd.
-    const metVerzonnen = JSON.stringify({
-      headline: "Kop", narrative: "Verhaal", recurring_patterns: [], outliers: [],
-      synthesized_actions: [
-        { clientId: "client-a", action: "geldig", rationale: "r", priority: "hoog" },
-        { clientId: "client-nooit-aangeleverd", action: "verzonnen", rationale: "r", priority: "laag" },
-      ],
-      markdown: "x",
-    });
-    const r2 = parsePortfolioSynthesisOutput(metVerzonnen, clients);
-    check("verzonnen clientId wordt gefilterd", r2.synthesized_actions.length === 1, JSON.stringify(r2.synthesized_actions));
-
-    // Model geeft de klantnaam terug i.p.v. de id (zelfde les als cross-channel-synthesis.ts).
-    const metNaam = JSON.stringify({
-      headline: "Kop", narrative: "Verhaal", recurring_patterns: [], outliers: [],
-      synthesized_actions: [{ clientId: "Wobblez", action: "actie via naam", rationale: "r", priority: "hoog" }],
-      markdown: "x",
-    });
-    const r3 = parsePortfolioSynthesisOutput(metNaam, clients);
-    check("klantnaam wordt teruggemapt naar de clientId", r3.synthesized_actions[0]?.clientId === "client-b", JSON.stringify(r3.synthesized_actions));
-
-    // Code-fence en kapotte JSON.
-    const metCodeFence = "```json\n" + geldig + "\n```";
-    const r4 = parsePortfolioSynthesisOutput(metCodeFence, clients);
-    check("code-fence wordt gestript", r4.headline === "Kop");
+    check("parseOk en velden geparsed", r.parseOk && r.result.headline === "Kop" && r.result.recurring_patterns.length === 1 && r.result.outliers.length === 1);
+    check("'portfolio' is toegestaan en krijgt 'Hele portfolio'", r.result.synthesized_actions.find((a) => a.clientId === "portfolio")?.clientName === "Hele portfolio");
+    check("onbekende prioriteit wordt 'midden'", r.result.synthesized_actions.find((a) => a.clientId === "portfolio")?.priority === "midden");
+    check("klantnaam wordt teruggemapt naar de clientId", r.result.synthesized_actions.some((a) => a.clientId === "client-b"));
+    check("verzonnen clientId wordt gefilterd", r.result.synthesized_actions.length === 3, JSON.stringify(r.result.synthesized_actions));
     const kapot = parsePortfolioSynthesisOutput("geen json {", clients);
-    check("kapotte JSON valt terug op narrative-only, geen crash", kapot.narrative === "geen json {" && kapot.synthesized_actions.length === 0);
+    check("kapotte JSON: parseOk false, geen crash", kapot.parseOk === false && kapot.result.narrative === "geen json {");
   }
 
-  // ── buildPortfolioSynthesisPrompt ──
   console.log("buildPortfolioSynthesisPrompt");
   {
     const summaries = new Map<string, ClientSummary | null>([
-      ["client-a", { clientId: "client-a", clientName: "Broedservice", analysisDate: "2026-08-01", primaryThread: "CPA loopt op", rootCause: "verzadiging", topRecommendations: ["verhoog budget"], bedrijfsmodel: "b2c", niche: null, fromCrossChannelSynthesis: false }],
-      ["client-b", { clientId: "client-b", clientName: "Wobblez", analysisDate: "2026-08-01", primaryThread: "Frequency hoog", rootCause: "klein publiek", topRecommendations: ["verbreed doelgroep"], bedrijfsmodel: null, niche: null, fromCrossChannelSynthesis: false }],
+      ["client-a", { ...clients[0], primaryThread: "CPA loopt op", rootCause: "verzadiging", bedrijfsmodel: "b2c" }],
+      ["client-b", { ...clients[1], primaryThread: "Frequency hoog", rootCause: "klein publiek" }],
     ]);
     const { systemPrompt, userMessage } = buildPortfolioSynthesisPrompt(summaries);
     check("systemPrompt eist patronen bij minstens 2 klanten", systemPrompt.toLowerCase().includes("minstens twee klanten"));
-    check("systemPrompt noemt de geldige clientIds expliciet", systemPrompt.includes('"client-a"') && systemPrompt.includes('"client-b"'));
-    check("systemPrompt staat 'portfolio' toe als clientId", systemPrompt.includes('"portfolio"'));
-    check("systemPrompt waarschuwt tegen vergelijken over bedrijfsmodellen heen", systemPrompt.toLowerCase().includes("bedrijfsmodel"));
-    check("userMessage bevat beide klantnamen", userMessage.includes("Broedservice") && userMessage.includes("Wobblez"));
-    check("userMessage bevat beide hoofddraden", userMessage.includes("CPA loopt op") && userMessage.includes("Frequency hoog"));
-    check("userMessage toont bedrijfsmodel van client-a", userMessage.includes("b2c"));
-    check("userMessage toont 'onbekend' voor client-b zonder bedrijfsmodel", userMessage.includes("onbekend"));
+    check("systemPrompt verbiedt ongegronde cijfers", systemPrompt.toLowerCase().includes("percentages en bedragen"));
+    check("userMessage bevat beide klantnamen en hoofddraden", userMessage.includes("Broedservice") && userMessage.includes("Wobblez") && userMessage.includes("CPA loopt op"));
+    check("userMessage toont bedrijfsmodel en 'onbekend'", userMessage.includes("b2c") && userMessage.includes("onbekend"));
   }
 
-  // ── alreadyPortfolioSynthesized ──
-  console.log("alreadyPortfolioSynthesized");
+  console.log("alreadyPortfolioSynthesized: dekt het nieuwste klantverhaal?");
   {
-    check("nog niet gedaan geeft false", await alreadyPortfolioSynthesized(mockSupabase({}), "agency-1", "2026-08-17") === false);
-    check("al gedaan geeft true", await alreadyPortfolioSynthesized(mockSupabase({ alreadySynthesized: true }), "agency-1", "2026-08-17") === true);
+    check("zonder rij: false", (await alreadyPortfolioSynthesized(new FakeSupabase() as never, BUREAU, "2026-08-10")) === false);
+    const nieuwer = new FakeSupabase(); nieuwer.seed("agency_analysis_output", [portfolioRij("2026-08-12")]);
+    check("synthese van ná het nieuwste verhaal: true", (await alreadyPortfolioSynthesized(nieuwer as never, BUREAU, "2026-08-10")) === true);
+    const ouder = new FakeSupabase(); ouder.seed("agency_analysis_output", [portfolioRij("2026-08-01")]);
+    check("synthese van vóór het nieuwste verhaal: false", (await alreadyPortfolioSynthesized(ouder as never, BUREAU, "2026-08-10")) === false);
   }
 
-  // ── runPortfolioSynthesis: skip-paden ──
   console.log("runPortfolioSynthesis: skip-paden");
   {
-    const teWeinig = await runPortfolioSynthesis({
-      supabase: mockSupabase({}), apiKey: "x", agencyId: "agency-1",
-      clients: [{ clientId: "client-a", clientName: "Broedservice" }],
-      analysisDate: "2026-08-17", periodStart: "2026-07-01", periodEnd: "2026-07-31",
-    });
+    const teWeinig = await run(new FakeSupabase(), { clients: [KLANTEN[0]] });
     check("< 2 klanten: skipped", teWeinig.skipped === true);
-
-    const alGedaan = await runPortfolioSynthesis({
-      supabase: mockSupabase({ alreadySynthesized: true }), apiKey: "x", agencyId: "agency-1",
-      clients: [{ clientId: "client-a", clientName: "A" }, { clientId: "client-b", clientName: "B" }],
-      analysisDate: "2026-08-17", periodStart: "2026-07-01", periodEnd: "2026-07-31",
-    });
-    check("al gesynthetiseerd: skipped", alGedaan.skipped === true);
-
-    const nietGenoegVers = await runPortfolioSynthesis({
-      supabase: mockSupabase({ crossChannelByClient: { "client-a": crossChannelRow("A") } }),
-      apiKey: "x", agencyId: "agency-1",
-      clients: [{ clientId: "client-a", clientName: "A" }, { clientId: "client-b", clientName: "B" }],
-      analysisDate: "2026-08-17", periodStart: "2026-07-01", periodEnd: "2026-07-31",
-    });
-    check("maar 1 van de 2 heeft vers data: skipped", nietGenoegVers.skipped === true, JSON.stringify(nietGenoegVers));
+    const sb = new FakeSupabase();
+    sb.seed("sop_analysis_output", [crossChannelRij("client-a", "A")]);
+    const nietVers = await run(sb);
+    check("maar 1 van de 2 met vers verhaal: skipped, reden noemt de klant zonder", nietVers.skipped === true && nietVers.reason.includes("Wobblez"), nietVers.skipped ? nietVers.reason : "");
+    const sb2 = new FakeSupabase();
+    sb2.seed("sop_analysis_output", [crossChannelRij("client-a", "A"), structuredRij("client-b", "monthly", "B")]);
+    sb2.seed("agency_analysis_output", [portfolioRij("2026-08-12")]);
+    const gedaan = await run(sb2);
+    check("bestaande synthese dekt het nieuwste verhaal: skipped", gedaan.skipped === true && gedaan.reason.includes("dekt"));
   }
 
-  // ── runPortfolioSynthesis: succesvol pad met gemockte LLM-call ──
-  console.log("runPortfolioSynthesis: succesvol pad");
+  console.log("runPortfolioSynthesis: succes, cijferpoort en opslag; onleesbaar niet opgeslagen");
   {
-    const mockOutput = JSON.stringify({
-      headline: "Drie klanten verspillen budget op hetzelfde broad-match-patroon",
-      narrative: "Zowel Broedservice als Wobblez lekken budget aan niet-commerciële zoektermen.",
+    const sb = new FakeSupabase();
+    sb.seed("sop_analysis_output", [crossChannelRij("client-a", "Broedservice lekt €120 aan broad match"), structuredRij("client-b", "monthly", "Wobblez-verhaal")]);
+    const output = JSON.stringify({
+      headline: "Twee klanten verspillen budget op hetzelfde broad-match-patroon",
+      narrative: "Zowel Broedservice (€120) als Wobblez lekken budget; dat is 40% van de spend.",
       recurring_patterns: ["broad-match-verspilling komt bij beide klanten terug"],
       outliers: [],
-      synthesized_actions: [{ clientId: "portfolio", action: "voer een negatieve-zoekwoorden-audit uit op alle klanten", rationale: "r", priority: "hoog" }],
-      markdown: "# Drie klanten...",
+      synthesized_actions: [{ clientId: "portfolio", action: "voer een negatieve-zoekwoorden-audit uit", rationale: "r", priority: "hoog" }],
+      markdown: "# Twee klanten...",
     });
-    let callFnAangeroepen = false;
-    const mockCallFn = async (): Promise<OpenRouterResponse> => {
-      callFnAangeroepen = true;
-      return { output: mockOutput, model: "x-ai/grok-4.6", tokensUsed: 555, promptTokens: 400, completionTokens: 155, latencyMs: 300, retries: 0, cachedPromptTokens: 0, parseStatus: "ok" };
-    };
-    const sb = mockSupabase({
-      crossChannelByClient: { "client-a": crossChannelRow("Broedservice-verhaal") },
-      channelByClient: { "client-b": { monthly: structuredRow("Wobblez-verhaal") } },
-    });
-    const result = await runPortfolioSynthesis({
-      supabase: sb, apiKey: "x", agencyId: "agency-1",
-      clients: [{ clientId: "client-a", clientName: "Broedservice" }, { clientId: "client-b", clientName: "Wobblez" }],
-      analysisDate: "2026-08-17", periodStart: "2026-07-01", periodEnd: "2026-07-31",
-      callFn: mockCallFn,
-    });
+    const result = await run(sb, { callFn: llm(output) });
     check("niet geskipt", result.skipped === false);
-    check("de gemockte LLM-call is aangeroepen", callFnAangeroepen);
     if (!result.skipped) {
-      check("recurring_patterns bevat het gevonden patroon", result.result.recurring_patterns.length === 1);
-      check("portfolio-actie blijft staan", (result.result.synthesized_actions[0] as PortfolioSynthesizedAction)?.clientId === "portfolio");
-      check("clients_used bevat beide klanten", result.result.clients_used.length === 2);
+      check("gegrond bedrag blijft, ongegrond percentage gemarkeerd", result.result.narrative.includes("€120") && result.result.narrative.includes("[percentage niet uit data]"));
+      check("ongegronde_cijfers noemt 40", JSON.stringify(result.result.ongegronde_cijfers) === "[40]");
+      check("dekking noemt beide klanten en het nieuwste verhaal", result.dekking.klantenMetVersVerhaal.length === 2 && result.dekking.nieuwsteVerhaal === "2026-08-10");
+      check("opgeslagen in agency_analysis_output", (sb.tables["agency_analysis_output"] ?? []).length === 1);
     }
+    const sb2 = new FakeSupabase();
+    sb2.seed("sop_analysis_output", [crossChannelRij("client-a", "A"), structuredRij("client-b", "monthly", "B")]);
+    let fout: unknown = null;
+    try { await run(sb2, { callFn: llm("geen json") }); } catch (e) { fout = e; }
+    check("onleesbaar gooit en slaat niets op", fout instanceof Error && fout.message.includes("onleesbaar") && (sb2.tables["agency_analysis_output"] ?? []).length === 0);
   }
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);
   if (failed > 0) process.exit(1);
 }
 
-main();
+main().catch((e) => { console.error(e); process.exit(1); });

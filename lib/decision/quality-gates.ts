@@ -6,6 +6,13 @@
 // opnieuw geschreven. Wat wél nieuw is: een uniforme QualityGateResult eromheen, en een
 // try/catch-vangnet in runGates() zodat een falende poort de pijplijn nooit kan meeslepen.
 //
+// ── LEGE INVOER IS GEEN PASS (herbouw 2 september 2026) ──────────────────────
+//
+// Zes van de negen poorten gaven "pass" op een AANWEZIGE-MAAR-LEGE invoer: nul findings wijken
+// nooit af, nul aanbevelingen spreken elkaar nooit tegen, nul dimensies zijn "gedekt". Zo
+// kleurde quality_gate_observations groen op runs waar niets te toetsen viel. Een lege lijst is
+// nu, net als `undefined`, "input ontbreekt" (warn) -- pass betekent weer: getoetst en goed.
+//
 // ── FASE 2: DE VIJF ONTBREKENDE POORTEN BLIJKEN AL GEVOED TE WORDEN ─────────
 //
 // Fase 1 concludeerde dat vijf poorten hun invoer alleen als in-memory object tijdens een
@@ -122,6 +129,7 @@ function dataQualityGate(input: GateInput): QualityGateResult {
 // 2. Math Gate — rank-verlies: kwaliteit of bod. ads_campaign_impression_share + ads_keyword_performance_monthly.
 function mathGate(input: GateInput): QualityGateResult {
   if (!input.rankLoss) return ontbrekendeInvoer("Math Gate", "geen rank_lost_is / keyword-QS meegegeven");
+  if (input.rankLoss.keywords.length === 0) return ontbrekendeInvoer("Math Gate", "keyword-lijst is leeg (wel meegegeven, niets te wegen)");
   const qs = spendWeightedQualityScore(input.rankLoss.keywords);
   const diagnose = classifyRankLossCause(input.rankLoss.rankLostIs, qs);
   const status: GateStatus = diagnose.cause === "geen_qs_data" ? "warn" : "pass";
@@ -132,6 +140,7 @@ function mathGate(input: GateInput): QualityGateResult {
 function evidenceGate(input: GateInput): QualityGateResult {
   if (!input.claimCheck) return ontbrekendeInvoer("Evidence Gate", "geen findings/canonical rijen meegegeven");
   const { stepNumber, findings, campaignRows, accountRows, periodStart, periodEnd } = input.claimCheck;
+  if (findings.length === 0) return ontbrekendeInvoer("Evidence Gate", "geen findings om te toetsen (lege lijst is geen bewijs van consistentie)");
   const map = buildCanonicalMetricMap(campaignRows, accountRows, periodStart, periodEnd);
   const issues = validateFindingClaims(stepNumber, findings, map);
   if (issues.length === 0) return resultaat("Evidence Gate", "pass", "geen claims wijken af van de canonical cijfers");
@@ -146,7 +155,9 @@ function evidenceGate(input: GateInput): QualityGateResult {
 function causalChainGate(input: GateInput): QualityGateResult {
   if (!input.kpiChain) return ontbrekendeInvoer("Causal Chain Gate", "geen currentMonth/previousMonth meegegeven");
   const chain = computeKpiChain(input.kpiChain);
-  return resultaat("Causal Chain Gate", "pass", chain.formattedChain);
+  // Beschrijvend, geen toets: computeKpiChain legt uit welke metric de verandering draagt en kan
+  // niet "falen". Dat staat in de reden, zodat een groene rij hier nooit als bewijs leest.
+  return resultaat("Causal Chain Gate", "pass", `beschrijvend (geen toets): ${chain.formattedChain}`);
 }
 
 // 5. Contradiction Gate — botsende aanbevelingen op dezelfde entiteit/metriek. Draait voor het
@@ -156,6 +167,9 @@ function causalChainGate(input: GateInput): QualityGateResult {
 function contradictionGate(input: GateInput): QualityGateResult {
   if (!input.contradiction) {
     return ontbrekendeInvoer("Contradiction Gate", "geen ThreadRecommendation[]/ThreadTask[] meegegeven");
+  }
+  if (input.contradiction.recommendations.length === 0) {
+    return ontbrekendeInvoer("Contradiction Gate", "geen aanbevelingen om tegen elkaar te houden");
   }
   const opgelost = resolveContradictions(input.contradiction.recommendations, input.contradiction.tasks);
   const samengevoegd = input.contradiction.recommendations.length - opgelost.recommendations.length;
@@ -191,6 +205,7 @@ function stepPurityGate(input: GateInput): QualityGateResult {
 function coverageGate(input: GateInput): QualityGateResult {
   if (input.coverageReport) {
     const rijen = input.coverageReport;
+    if (rijen.length === 0) return ontbrekendeInvoer("Coverage Gate", "de opgeslagen run bevat geen dekkingsrapport");
     const ontbrekend = rijen.filter((r) => r.status === "no_signal" && r.data_available);
     const gedekt = rijen.filter((r) => r.status === "covered");
     if (ontbrekend.length > 0) {
@@ -216,6 +231,9 @@ function sprintReadinessGate(input: GateInput): QualityGateResult {
   if (!input.actionGating) {
     return ontbrekendeInvoer("Sprint Readiness Gate", "geen NormalizedFinding[]/ThreadRecommendation[] meegegeven");
   }
+  if (input.actionGating.recommendations.length === 0) {
+    return ontbrekendeInvoer("Sprint Readiness Gate", "geen aanbevelingen om te toetsen");
+  }
   const voor = input.actionGating.recommendations.filter((r) => (r as Record<string, unknown>).action_readiness === "direct_action").length;
   const na = applyActionGating(input.actionGating.findings, input.actionGating.recommendations)
     .filter((r) => (r as Record<string, unknown>).action_readiness === "direct_action").length;
@@ -237,6 +255,23 @@ function publishGate(input: GateInput): QualityGateResult {
   const rapport = buildMonthlyQualityGate({ stepValidations: input.monthlyAcceptance.stepValidations ?? [], acceptance });
   if (rapport.passed) return resultaat("Publish Gate", "pass", "alle acceptatiecriteria gehaald");
   return resultaat("Publish Gate", rapport.state === "blocked_invalid_steps" ? "fail" : "warn", rapport.blocking_reasons.join(" | "));
+}
+
+/**
+ * Het rank-verlies van de laatste maand, gewogen naar impressies per campagne. Het ongewogen
+ * gemiddelde (dat monthly/route.ts en het admin-scherm elk apart uitrekenden) liet een campagne
+ * met 40 impressies even zwaar tellen als een met 40.000 -- precies de ongewogen wiskunde die
+ * de sloop-audit overal wegwerkte. Zonder impressies valt hij terug op het gewone gemiddelde,
+ * en zonder rijen op null: "geen data" is geen 0% rankverlies.
+ */
+export function gewogenRankLostIs(rijen: ReadonlyArray<Record<string, unknown>>): number | null {
+  if (rijen.length === 0) return null;
+  const metGewicht = rijen.map((r) => ({ verlies: Number(r.search_rank_lost_is ?? 0), gewicht: Number(r.impressions ?? 0) }));
+  const totaalGewicht = metGewicht.reduce((som, r) => som + (r.gewicht > 0 ? r.gewicht : 0), 0);
+  if (totaalGewicht > 0) {
+    return metGewicht.reduce((som, r) => som + r.verlies * Math.max(r.gewicht, 0), 0) / totaalGewicht;
+  }
+  return metGewicht.reduce((som, r) => som + r.verlies, 0) / metGewicht.length;
 }
 
 export const GATES: ReadonlyArray<{ name: string; run: (input: GateInput) => QualityGateResult }> = [

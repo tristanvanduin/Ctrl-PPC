@@ -41,7 +41,8 @@ check("uitgevoerd_en_niet_gehaald wordt correct herkend", lifecycleOf(basis({ st
 check("niet_uitgevoerd is een eigen stadium, geen rejected", lifecycleOf(basis({ status: "accepted", evaluated_at: "2026-05-01", outcome: "niet_uitgevoerd" })).stage === "niet_uitgevoerd");
 check("unmeasurable is evaluated_onbekend, geen gok", lifecycleOf(basis({ status: "accepted", evaluated_at: "2026-05-01", outcome: "unmeasurable" })).stage === "evaluated_onbekend");
 check("expired is ook evaluated_onbekend", lifecycleOf(basis({ status: "accepted", evaluated_at: "2026-05-01", outcome: "expired" })).stage === "evaluated_onbekend");
-check("onbekende outcome valt terug op result_met=true", lifecycleOf(basis({ status: "accepted", evaluated_at: "2026-05-01", outcome: "accepted", result_met: true })).stage === "executed_gehaald");
+check("outcome accepted zonder uitvoeringsbewijs is GEEN uitgevoerd-stadium", lifecycleOf(basis({ status: "accepted", evaluated_at: "2026-05-01", outcome: "accepted", result_met: true })).stage === "evaluated_uitvoering_onbekend");
+check("outcome rejected met result_met=false idem, label zegt niet vastgesteld", lifecycleOf(basis({ status: "accepted", evaluated_at: "2026-05-01", outcome: "rejected", result_met: false })).label.includes("niet vastgesteld"));
 check("onbekende outcome zonder result_met is evaluated_onbekend", lifecycleOf(basis({ status: "accepted", evaluated_at: "2026-05-01", outcome: "iets_nieuws" })).stage === "evaluated_onbekend");
 
 console.log("\nProvenance");

@@ -256,6 +256,21 @@ export type StepOutput = z.infer<typeof StepOutputSchema>;
 
 // ── Recommendation schema (step 8 output — recommendations part) ──────────
 
+/**
+ * ice_total zoals een model het teruggeeft: soms het gemiddelde (1-10), soms de SOM van de
+ * drie ICE-delen (tot 30). Een som boven de schaal is een vormfout, geen inhoudsfout: delen
+ * door 3 herstelt hem, de klem [1, 10] vangt de rest. Eén definitie voor elk schema dat
+ * ICE-scores parseert (aanbevelingen én Master Synthesis) — de tweede kopie zonder deze
+ * normalisatie gooide op 1 september vier geldige LinkedIn-aanbevelingen weg op "Too big".
+ * Alleen voor het PARSEN van modeloutput (safeParse), nooit als response_format-JSON-schema.
+ */
+export const IceTotalSchema = z.preprocess((w) => {
+  const n = typeof w === "number" ? w : NaN;
+  if (!Number.isFinite(n)) return w;
+  const genormaliseerd = n > 10 ? n / 3 : n;
+  return Math.min(10, Math.max(1, Math.round(genormaliseerd * 10) / 10));
+}, z.number().min(1).max(10));
+
 export const RecommendationSchema = z.object({
   finding_index: z.number().int().nullable(),
   cluster_id: z.string().min(1).default("cluster_unknown"),
@@ -277,12 +292,7 @@ export const RecommendationSchema = z.object({
   // een vormfout, geen inhoudsfout: delen door 3 herstelt hem, en de klem [1, 10] vangt de
   // rest. Dit schema wordt alleen voor het PARSEN van modeloutput gebruikt (safeParse), nooit
   // als response_format-JSON-schema, dus de preprocess kan geen strict-schema breken.
-  ice_total: z.preprocess((w) => {
-    const n = typeof w === "number" ? w : NaN;
-    if (!Number.isFinite(n)) return w;
-    const genormaliseerd = n > 10 ? n / 3 : n;
-    return Math.min(10, Math.max(1, Math.round(genormaliseerd * 10) / 10));
-  }, z.number().min(1).max(10)),
+  ice_total: IceTotalSchema,
   // Action gating (optional for backward compatibility)
   action_readiness: ActionReadinessEnum.optional(),
   evidence_level: EvidenceLevelEnum.optional(),

@@ -9,10 +9,10 @@
 // categorie en geen fout. Dat is de blueprint-regel "classificatie mag nooit blokkeren".
 //
 // classify() is een echte, werkende implementatie (trefwoorden in het statement tegen elke
-// categorie), geen fake-happy-path die altijd hetzelfde teruggeeft. custom_pattern is daarbij
-// een uitzondering met opzet: dat is de "past nergens anders"-categorie, en die heeft geen eigen
-// trefwoordenveld om op te matchen. classify() kent hem alleen toe als discovery een hypothese
-// al expliciet zo getagd heeft, nooit als tekstgok.
+// categorie), geen fake-happy-path die altijd hetzelfde teruggeeft. Een tag die discovery al
+// meegaf (uit de detector) gaat vóór de tekstmatch. custom_pattern is de "past nergens
+// anders"-categorie zonder eigen trefwoorden: die wordt alleen via zo'n tag toegekend, nooit
+// als tekstgok.
 //
 // FASE 2-CORRECTIE OP HET CONTRACT: discover() kreeg agencyId/accountId als expliciete invoer
 // erbij. Zonder die twee kon een implementatie de tenant-scoping op Hypothesis (TenantScoped)
@@ -61,9 +61,17 @@ const TREFWOORDEN: Record<MatchbareCategorie, readonly string[]> = {
   opportunity: ["kans", "opportunity", "upsell", "groeikans"],
 };
 
-/** Geeft null terug als niets past. Dat is een geldige uitkomst, geen fout. Muteert h niet. */
+/**
+ * Geeft null terug als niets past. Dat is een geldige uitkomst, geen fout. Muteert h niet.
+ *
+ * Een categorie die discovery al meegaf (uit de detector, zie signal-hypothesis-discovery.ts)
+ * wint van de tekstmatch: die is gemeten, de trefwoorden zijn een gok. Alleen een tag die in de
+ * gesloten lijst staat telt; een vreemde string wordt genegeerd en de tekst beslist.
+ */
 export function classify(h: Hypothesis): HypothesisCategory | null {
-  if (h.category === "custom_pattern") return "custom_pattern";
+  if (h.category && (HYPOTHESIS_CATEGORIES as readonly string[]).includes(h.category)) {
+    return h.category as HypothesisCategory;
+  }
 
   const tekst = h.statement.toLowerCase();
   for (const categorie of HYPOTHESIS_CATEGORIES) {

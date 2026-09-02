@@ -1,11 +1,16 @@
-// Test voor de kanaaloverstijgende synthese voor weekly/biweekly (masterplan 17.30).
-// Deterministisch; supabase en de LLM-call zijn gemockt.
+// Test voor de kanaaloverstijgende synthese voor weekly/biweekly (masterplan 17.30), herbouwd
+// 2 september 2026. Deterministisch: FakeSupabase (lib/decision/__fake_supabase.ts) en een
+// geïnjecteerde callFn. De severity-fixtures zijn de ECHTE waarden van sop_insights.severity
+// (SeverityEnum, Engels) -- de vorige test fabriceerde Nederlandse labels en slaagde daardoor
+// terwijl productie andersom sorteerde.
 // Draaien: npx tsx lib/analysis/__cross_channel_synthesis_lite_test.ts
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { FakeSupabase } from "../decision/__fake_supabase";
 import {
-  fetchLiteChannelSummaries, liteAlreadySynthesized, buildLiteSynthesisPrompt, runLiteCrossChannelSynthesis,
+  fetchLiteChannelSummaries, liteAlreadySynthesized, buildLiteSynthesisPrompt, runLiteCrossChannelSynthesis, SEVERITY_RANK,
 } from "./cross-channel-synthesis-lite";
+import { SeverityEnum } from "@/lib/schema/analysis-schema";
+import { DataLaagFout } from "./db-veilig";
 import type { SopChannel } from "./sop-channel-config";
 import type { OpenRouterResponse } from "./openrouter-client";
 
@@ -15,148 +20,127 @@ function check(label: string, cond: boolean, detail = ""): void {
   else { failed += 1; console.error(`  FAIL  ${label}  ${detail}`); }
 }
 
-interface Finding { severity: string; description: string }
-interface Rec { hypothesis: string; expected_result: string; ice_total: number }
+const KLANT = "demo-greentech";
+const DATUM = "2026-08-18";
 
-function mockSupabase(opts: {
-  // sopType -> "heeft dit kanaal deze cyclus een afgeronde run?" (section="full" bestaat)
-  fullByType?: Partial<Record<string, boolean>>;
-  findingsByType?: Partial<Record<string, Finding[]>>;
-  recsByType?: Partial<Record<string, Rec[]>>;
-  synthesisExists?: boolean;
-}): SupabaseClient {
-  const { fullByType = {}, findingsByType = {}, recsByType = {}, synthesisExists = false } = opts;
-  const from = (table: string) => {
-    let filters: Record<string, string> = {};
-    const arrayResult = (rows: unknown[]) => Promise.resolve({ data: rows, error: null });
-    const b = {
-      select() { return b; },
-      eq(col: string, val: string) { filters = { ...filters, [col]: val }; return b; },
-      maybeSingle() {
-        if (table !== "sop_analysis_output") return Promise.resolve({ data: null, error: null });
-        if (filters.section === "full") {
-          const heeft = fullByType[filters.sop_type] ?? false;
-          return Promise.resolve({ data: heeft ? { id: "x" } : null, error: null });
-        }
-        // liteAlreadySynthesized: sectionFor(cadence) is nooit "full"
-        return Promise.resolve({ data: synthesisExists ? { id: "existing" } : null, error: null });
-      },
-      // sop_insights/sop_recommendations eindigen zonder .maybeSingle() -- awaitable via .then().
-      then(resolve: (v: { data: unknown[]; error: null }) => void) {
-        if (table === "sop_insights") return resolve(arrayResult(findingsByType[filters.sop_type] ?? []) as never);
-        if (table === "sop_recommendations") return resolve(arrayResult(recsByType[filters.sop_type] ?? []) as never);
-        return resolve({ data: [], error: null });
-      },
-      // saveAnalysisOutputSection() zonder opts.select: await de upsert-query direct.
-      upsert() { return { then: (resolve: (v: { data: null; error: null }) => void) => resolve({ data: null, error: null }) }; },
-    };
-    return b;
-  };
-  return { from } as unknown as SupabaseClient;
+function fullRij(sopType: string, analysisDate = DATUM) {
+  return { client_id: KLANT, sop_type: sopType, section: "full", analysis_date: analysisDate, output: "# rapport" };
+}
+function finding(sopType: string, severity: string, description: string) {
+  return { client_id: KLANT, sop_type: sopType, analysis_date: DATUM, severity, description };
+}
+function rec(sopType: string, hypothesis: string, expected_result: string, ice_total: number) {
+  return { client_id: KLANT, sop_type: sopType, analysis_date: DATUM, hypothesis, expected_result, ice_total };
+}
+function llm(output: string): (req: { label?: string }) => Promise<OpenRouterResponse> {
+  return async () => ({ output, model: "fake-model", tokensUsed: 900, promptTokens: 700, completionTokens: 200, latencyMs: 300, retries: 0, cachedPromptTokens: 0, parseStatus: "ok" });
+}
+function run(sb: FakeSupabase, extra: Partial<Parameters<typeof runLiteCrossChannelSynthesis>[0]> = {}) {
+  return runLiteCrossChannelSynthesis({
+    supabase: sb as never, apiKey: "x", clientId: KLANT, cadence: "weekly",
+    beschikbareKanalen: ["google", "meta"], analysisDate: DATUM, periodStart: "2026-08-04", periodEnd: DATUM,
+    ...extra,
+  });
 }
 
 async function main() {
+  console.log("SEVERITY_RANK dekt exact de enum, ernstigste eerst");
+  {
+    check("elke enum-waarde heeft een rang", SeverityEnum.options.every((s) => typeof SEVERITY_RANK[s] === "number"));
+    check("critical < high < medium < low < positive", SEVERITY_RANK.critical < SEVERITY_RANK.high && SEVERITY_RANK.high < SEVERITY_RANK.medium && SEVERITY_RANK.medium < SEVERITY_RANK.low && SEVERITY_RANK.low < SEVERITY_RANK.positive);
+  }
+
   console.log("liteAlreadySynthesized");
   {
-    const nog = await liteAlreadySynthesized(mockSupabase({ synthesisExists: false }), "demo-greentech", "weekly", "2026-08-18");
-    check("nog niet gedaan geeft false", nog === false);
-    const wel = await liteAlreadySynthesized(mockSupabase({ synthesisExists: true }), "demo-greentech", "weekly", "2026-08-18");
-    check("al gedaan geeft true", wel === true);
+    const leeg = new FakeSupabase();
+    check("nog niet gedaan geeft false", (await liteAlreadySynthesized(leeg as never, KLANT, "weekly", DATUM)) === false);
+    const wel = new FakeSupabase();
+    wel.seed("sop_analysis_output", [{ client_id: KLANT, sop_type: "cross_channel", section: "cross_channel_synthesis_weekly_v1", analysis_date: DATUM, output: "{}" }]);
+    check("al gedaan (dit slot, deze datum) geeft true", (await liteAlreadySynthesized(wel as never, KLANT, "weekly", DATUM)) === true);
+    check("het biweekly-slot is een ander slot", (await liteAlreadySynthesized(wel as never, KLANT, "biweekly", DATUM)) === false);
   }
 
-  console.log("\nfetchLiteChannelSummaries: haalt findings/recommendations op per kanaal, null als section=full ontbreekt");
+  console.log("fetchLiteChannelSummaries: echte severities, ernstigste eerst, null zonder section=full");
   {
-    const sb = mockSupabase({
-      fullByType: { weekly: true, meta_weekly: false },
-      findingsByType: {
-        weekly: [
-          { severity: "laag", description: "kleine afwijking" },
-          { severity: "kritiek", description: "CPA schiet omhoog" },
-          { severity: "medium", description: "CTR daalt licht" },
-        ],
-      },
-      recsByType: {
-        weekly: [
-          { hypothesis: "verlaag bod", expected_result: "CPA daalt", ice_total: 5 },
-          { hypothesis: "sluit zoekterm uit", expected_result: "minder waste", ice_total: 8 },
-        ],
-      },
-    });
-    const summaries = await fetchLiteChannelSummaries(sb, "demo-greentech", ["google", "meta"], "weekly", "2026-08-18");
+    const sb = new FakeSupabase();
+    sb.seed("sop_analysis_output", [fullRij("weekly")]);
+    sb.seed("sop_insights", [
+      finding("weekly", "low", "kleine afwijking"),
+      finding("weekly", "positive", "CTR verbeterd"),
+      finding("weekly", "medium", "CTR daalt licht"),
+      finding("weekly", "critical", "CPA schiet omhoog"),
+      finding("weekly", "high", "budget bijna op"),
+    ]);
+    sb.seed("sop_recommendations", [rec("weekly", "verlaag bod", "CPA daalt", 5), rec("weekly", "sluit zoekterm uit", "minder waste", 8)]);
+    const summaries = await fetchLiteChannelSummaries(sb as never, KLANT, ["google", "meta"], "weekly", DATUM);
     const google = summaries.get("google_ads");
-    check("Google-samenvatting is opgehaald", google !== null && google !== undefined);
-    check("kritiek-finding staat vooraan (severity-sortering)", google?.topFindings[0]?.severity === "kritiek", JSON.stringify(google?.topFindings));
-    check("aanbeveling met hoogste ice_total staat vooraan", google?.topRecommendations[0]?.hypothesis === "sluit zoekterm uit", JSON.stringify(google?.topRecommendations));
-    check("Meta is null (section=full ontbreekt deze cyclus)", summaries.get("meta_ads") === null);
+    check("Google-samenvatting is opgehaald", !!google);
+    check("volgorde critical, high, medium, low, positive", google?.topFindings.map((f) => f.severity).join(",") === "critical,high,medium,low,positive", JSON.stringify(google?.topFindings));
+    check("aanbeveling met hoogste ice_total staat vooraan", google?.topRecommendations[0]?.hypothesis === "sluit zoekterm uit");
+    check("Meta is null (geen section=full deze cyclus)", summaries.get("meta_ads") === null);
+
+    const kapot = new FakeSupabase();
+    kapot.seed("sop_analysis_output", [fullRij("weekly")]);
+    kapot.faalOp("sop_insights", "permission denied");
+    let fout: unknown = null;
+    try { await fetchLiteChannelSummaries(kapot as never, KLANT, ["google"], "weekly", DATUM); } catch (e) { fout = e; }
+    check("een kapotte sop_insights-query gooit DataLaagFout, geen lege bevindingenlijst", fout instanceof DataLaagFout, String(fout));
   }
 
-  console.log("\nbuildLiteSynthesisPrompt: bevat beide kanalen, ander taalgebruik dan monthly (perspectief, geen root-cause-eis)");
+  console.log("buildLiteSynthesisPrompt");
   {
     const summaries = new Map<SopChannel, { channel: SopChannel; topFindings: { severity: string; description: string }[]; topRecommendations: { hypothesis: string; expectedResult: string }[] }>([
-      ["google_ads", { channel: "google_ads", topFindings: [{ severity: "kritiek", description: "CPA schiet omhoog" }], topRecommendations: [{ hypothesis: "verlaag bod", expectedResult: "CPA daalt" }] }],
-      ["meta_ads", { channel: "meta_ads", topFindings: [{ severity: "hoog", description: "Frequency te hoog" }], topRecommendations: [] }],
+      ["google_ads", { channel: "google_ads", topFindings: [{ severity: "critical", description: "CPA schiet omhoog" }], topRecommendations: [{ hypothesis: "verlaag bod", expectedResult: "CPA daalt" }] }],
+      ["meta_ads", { channel: "meta_ads", topFindings: [{ severity: "high", description: "Frequency te hoog" }], topRecommendations: [] }],
     ]);
     const { systemPrompt, userMessage } = buildLiteSynthesisPrompt(summaries, "weekly");
-    check("systemPrompt noemt beide kanaalnamen", systemPrompt.includes("SEA") && systemPrompt.includes("Meta Ads"), systemPrompt);
-    check("systemPrompt vraagt om perspectief (marktbreed vs. kanaal-specifiek)", systemPrompt.toLowerCase().includes("perspectief"));
+    check("systemPrompt noemt beide kanaalnamen", systemPrompt.includes("SEA") && systemPrompt.includes("Meta Ads"));
+    check("systemPrompt vraagt om perspectief", systemPrompt.toLowerCase().includes("perspectief"));
     check("userMessage bevat de bevindingen van beide kanalen", userMessage.includes("CPA schiet omhoog") && userMessage.includes("Frequency te hoog"));
   }
 
-  console.log("\nrunLiteCrossChannelSynthesis: skip-paden");
+  console.log("runLiteCrossChannelSynthesis: skip-paden");
   {
-    const teWeinigKanalen = await runLiteCrossChannelSynthesis({
-      supabase: mockSupabase({}), apiKey: "x", clientId: "demo-greentech", cadence: "weekly",
-      beschikbareKanalen: ["google"], analysisDate: "2026-08-18", periodStart: "2026-08-04", periodEnd: "2026-08-18",
-    });
-    check("< 2 kanalen: skipped", teWeinigKanalen.skipped === true);
-
-    const alGedaan = await runLiteCrossChannelSynthesis({
-      supabase: mockSupabase({ synthesisExists: true }), apiKey: "x", clientId: "demo-greentech", cadence: "weekly",
-      beschikbareKanalen: ["google", "meta"], analysisDate: "2026-08-18", periodStart: "2026-08-04", periodEnd: "2026-08-18",
-    });
-    check("al gesynthetiseerd (dit cadence-slot): skipped", alGedaan.skipped === true);
-
-    const nogNietAlleKlaar = await runLiteCrossChannelSynthesis({
-      supabase: mockSupabase({ fullByType: { weekly: true, meta_weekly: false } }), apiKey: "x", clientId: "demo-greentech", cadence: "weekly",
-      beschikbareKanalen: ["google", "meta"], analysisDate: "2026-08-18", periodStart: "2026-08-04", periodEnd: "2026-08-18",
-    });
-    check("niet alle kanalen klaar: skipped, wacht i.p.v. gedeeltelijk te draaien", nogNietAlleKlaar.skipped === true);
+    const teWeinig = await run(new FakeSupabase(), { beschikbareKanalen: ["google"] });
+    check("< 2 kanalen: skipped", teWeinig.skipped === true);
+    const sb = new FakeSupabase();
+    sb.seed("sop_analysis_output", [fullRij("weekly")]);
+    const nietKlaar = await run(sb);
+    check("niet alle kanalen klaar: skipped", nietKlaar.skipped === true);
   }
 
-  console.log("\nrunLiteCrossChannelSynthesis: succesvol pad met gemockte LLM-call, weekly EN biweekly hebben een eigen slot");
+  console.log("runLiteCrossChannelSynthesis: succes met cijferpoort, en onleesbaar wordt niet opgeslagen");
   {
-    const mockLlmOutput = JSON.stringify({
+    const sb = new FakeSupabase();
+    sb.seed("sop_analysis_output", [fullRij("weekly"), fullRij("meta_weekly")]);
+    sb.seed("sop_insights", [finding("weekly", "high", "CPA +30%"), finding("meta_weekly", "high", "CPA +28%")]);
+    const output = JSON.stringify({
       headline: "CPA-stijging is marktbreed, geen paniek",
-      narrative: "Beide kanalen zien dezelfde week een vergelijkbare CPA-stijging op hetzelfde publiek.",
+      narrative: "Beide kanalen zien dezelfde week een CPA-stijging van 30% (Google) en 28% (Meta); verlaag budgetten met 15%.",
       contradictions: [],
-      synthesized_actions: [{ channel: "meta_ads", action: "wacht een week af voor budgetwijziging", rationale: "patroon lijkt marktbreed, niet kanaal-specifiek", priority: "midden" }],
-      markdown: "# CPA-stijging is marktbreed\n\n...",
+      synthesized_actions: [{ channel: "meta_ads", action: "wacht een week af", rationale: "patroon lijkt marktbreed", priority: "midden" }],
+      markdown: "# CPA-stijging is marktbreed",
     });
     const captured: { label: string | null } = { label: null };
-    const mockCallFn = async (req: { label?: string }): Promise<OpenRouterResponse> => {
-      captured.label = req.label ?? null;
-      return { output: mockLlmOutput, model: "x-ai/grok-4.6", tokensUsed: 900, promptTokens: 700, completionTokens: 200, latencyMs: 300, retries: 0, cachedPromptTokens: 0, parseStatus: "ok" };
-    };
-    const sb = mockSupabase({
-      fullByType: { weekly: true, meta_weekly: true },
-      findingsByType: { weekly: [{ severity: "hoog", description: "CPA +30%" }], meta_weekly: [{ severity: "hoog", description: "CPA +28%" }] },
-      recsByType: { weekly: [], meta_weekly: [] },
-    });
-    const result = await runLiteCrossChannelSynthesis({
-      supabase: sb, apiKey: "x", clientId: "demo-greentech", cadence: "weekly",
-      beschikbareKanalen: ["google", "meta"], analysisDate: "2026-08-18", periodStart: "2026-08-04", periodEnd: "2026-08-18",
-      callFn: mockCallFn,
-    });
-    check("niet geskipt: alle gates gehaald", result.skipped === false);
-    check("het label identificeert de cadence (weekly, niet monthly)", captured.label?.includes("weekly") ?? false, String(captured.label));
+    const result = await run(sb, { callFn: async (req) => { captured.label = req.label ?? null; return llm(output)(req); } });
+    check("niet geskipt", result.skipped === false);
+    check("het label identificeert de cadence", captured.label?.includes("weekly") ?? false);
     if (!result.skipped) {
-      check("headline uit de synthese", result.result.headline.includes("marktbreed"));
-      check("tokensUsed komt uit de response", result.tokensUsed === 900);
+      check("gegronde percentages (30%, 28%) blijven staan", result.result.narrative.includes("30%") && result.result.narrative.includes("28%"));
+      check("ongegrond percentage (15%) is gemarkeerd", result.result.narrative.includes("[percentage niet uit data]") && JSON.stringify(result.result.ongegronde_cijfers) === "[15]");
+      check("opgeslagen in het weekly-slot", (sb.tables["sop_analysis_output"] ?? []).some((r) => r.section === "cross_channel_synthesis_weekly_v1"));
     }
+
+    const sb2 = new FakeSupabase();
+    sb2.seed("sop_analysis_output", [fullRij("weekly"), fullRij("meta_weekly")]);
+    let fout: unknown = null;
+    try { await run(sb2, { callFn: llm("geen json") }); } catch (e) { fout = e; }
+    check("onleesbare uitkomst gooit", fout instanceof Error && fout.message.includes("onleesbaar"));
+    check("en is niet opgeslagen", (sb2.tables["sop_analysis_output"] ?? []).every((r) => r.section !== "cross_channel_synthesis_weekly_v1"));
   }
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);
   if (failed > 0) process.exit(1);
 }
 
-main();
+main().catch((e) => { console.error(e); process.exit(1); });

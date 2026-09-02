@@ -11,6 +11,7 @@ import {
 import { checkStepDataAvailability, type StepDataAvailability } from "@/lib/analysis/data-availability";
 import {
   computeDecisionRules,
+  standaardResultMetric,
   type DecisionRulesOutput,
   type DecisionRuleCampaignRow,
   type DecisionRuleDeviceRow,
@@ -366,6 +367,14 @@ export async function buildPreparedContextRow(
     sectorBenchmarks: benchmarks,
     lastCompleteMonth: inputs.lastCompleteMonth,
   });
+  // De uitkomstmetriek volgt het accounttype en niet de vraag of er toevallig data is.
+  // Eerder werd hij afgeleid uit `conversions_value > 0` van de huidige maand: ontbrak die
+  // maand, dan sloeg de keten stilzwijgend om van waarde naar conversies. En de campagneketens
+  // stonden hardgecodeerd op conversiewaarde, ook voor leadgen-accounts die die niet hebben —
+  // die kregen acht ketens die openden met "Conversiewaarde +0%" terwijl de conversies stegen.
+  // Dezelfde keuze gaat naar de beslisregels: de geo-regels kozen eerder per land tussen
+  // euro's en aantallen, en telden die in één som op.
+  const resultMetric = standaardResultMetric(inputs.accountType);
   const decisionRules = computeDecisionRules({
     accountType: inputs.accountType,
     currentAccount,
@@ -379,14 +388,8 @@ export async function buildPreparedContextRow(
       cpaTarget: Number((comparisonFacts.targetComparisons.find((item) => item.metric === "CPA")?.benchmark) || 0),
       conversionsTarget: Number(targetMonth?.conversions || 0),
     },
+    resultMetric,
   });
-  // De uitkomstmetriek volgt het accounttype en niet de vraag of er toevallig data is.
-  // Eerder werd hij afgeleid uit `conversions_value > 0` van de huidige maand: ontbrak die
-  // maand, dan sloeg de keten stilzwijgend om van waarde naar conversies. En de campagneketens
-  // stonden hardgecodeerd op conversiewaarde, ook voor leadgen-accounts die die niet hebben —
-  // die kregen acht ketens die openden met "Conversiewaarde +0%" terwijl de conversies stegen.
-  const resultMetric: "conversion_value" | "conversions" =
-    inputs.accountType.startsWith("ecommerce") ? "conversion_value" : "conversions";
 
   const kpiChainAccount = (currentAccountRow && previousAccountRow) ? computeKpiChain({
     currentMonth: {

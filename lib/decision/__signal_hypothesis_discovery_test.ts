@@ -22,7 +22,7 @@ console.log("discover: elk signaal wordt exact een hypothese:");
   assert(result.length === 2, "twee signalen leveren twee hypotheses, geen samenvoeging en geen verlies");
   assert(result[0].statement === signals[0].description, "de statement is de ongewijzigde signaalomschrijving");
   assert(result.every((h) => h.agencyId === "bureau-1" && h.accountId === "klant-1"), "elke hypothese draagt de meegegeven tenant-scope, niet verzonnen");
-  assert(result.every((h) => h.category === undefined), "category blijft ongezet: discovery classificeert zelf niets");
+  assert(result.every((h) => h.category === undefined), "zonder detectorcategorie blijft category ongezet: discovery raadt niets");
   assert(new Set(result.map((h) => h.id)).size === 2, "elke hypothese krijgt een eigen id, geen hergebruik");
 }
 
@@ -49,6 +49,22 @@ console.log("discover -> classify: de keten werkt, discovery classificeert niet 
   const [hypothese] = signalHypothesisDiscovery.discover({ ...basisInput, signals, causes: [] });
   assert(hypothese.category === undefined, "voor classify() draait is category nog leeg");
   assert(classify(hypothese) === "budget", "classify() herkent budget uit dezelfde tekst die discovery opleverde");
+}
+
+console.log("discover: de categorie van de detector reist mee en wint van de tekstmatch:");
+{
+  // De echte verhaaltekst van schedule_waste (lib/signals/google-schedule.ts) bevat geen enkel
+  // trefwoord uit TREFWOORDEN; zonder de meegereisde categorie kwam dit signaal als null binnen.
+  const signals: Signal[] = [{
+    id: "schedule_waste", channel: "google", category: "budget_pacing",
+    description: "zondag 02 tot 05 uur: In dit dagdeel ging 84.20 aan kosten (3.1% van het accounttotaal) naar 61 klikken zonder een enkele conversie. toets de biedaanpassing of uitsluiting voor dit dagdeel.",
+  }];
+  const [hypothese] = signalHypothesisDiscovery.discover({ ...basisInput, signals, causes: [] });
+  assert(hypothese.category === "budget", "budget_pacing wordt de gesloten categorie budget");
+  assert(classify(hypothese) === "budget", "classify() honoreert de meegereisde categorie, ook zonder trefwoord in de tekst");
+  const zonderTag: Signal[] = [{ id: "x", channel: "google", category: "cross_channel", description: "Iets zonder trefwoord." }];
+  const [los] = signalHypothesisDiscovery.discover({ ...basisInput, signals: zonderTag, causes: [] });
+  assert(los.category === undefined && classify(los) === null, "cross_channel heeft geen vaste categorie: geen tag, en de tekst beslist (null)");
 }
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

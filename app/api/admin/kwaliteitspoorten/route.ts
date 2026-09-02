@@ -15,7 +15,7 @@
 import { requireCapability } from "@/lib/auth/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { klantVanId } from "@/lib/tenancy/klanten";
-import { runGates, type GateInput } from "@/lib/decision/quality-gates";
+import { runGates, gewogenRankLostIs, type GateInput } from "@/lib/decision/quality-gates";
 import type { KeywordQsRow } from "@/lib/analysis/metric-cross-checks";
 import type { RecommendationLike, TaskLike } from "@/lib/analysis/contradiction-resolver";
 import type { StepValidationResult } from "@/lib/analysis/step-validator";
@@ -114,9 +114,8 @@ export async function GET(request: Request) {
   const accountRijen = (accountMonthly ?? []).slice().reverse(); // oud → nieuw voor de KPI-chain
   const laatsteMaand = impressionShare?.[0]?.month as string | undefined;
   const isRijenLaatsteMaand = (impressionShare ?? []).filter((r) => r.month === laatsteMaand);
-  const gemiddeldRankLostIs = isRijenLaatsteMaand.length > 0
-    ? isRijenLaatsteMaand.reduce((som, r) => som + Number(r.search_rank_lost_is ?? 0), 0) / isRijenLaatsteMaand.length
-    : 0;
+  // Gewogen naar impressies, dezelfde helper als de live maandrun (quality-gates.ts).
+  const gemiddeldRankLostIs = gewogenRankLostIs(isRijenLaatsteMaand as Record<string, unknown>[]) ?? 0;
   const qsLaatsteMaand = (keywords ?? []).filter((k) => k.month === keywords?.[0]?.month);
 
   const gateInput: GateInput = {

@@ -1,75 +1,52 @@
-// EXECUTION_PLAN.md Stap 4: de gedeelde kern achter de drie decision-route-skeletons
-// (weekly-decision, biweekly-decision, monthly-decision). Een functie in plaats van drie
-// bijna-identieke routehandlers: het echte GateInput (lib/decision/quality-gates.ts) kent geen
-// runType-veld, dus er is ook geen aparte tak per cadans nodig in de logica zelf, alleen in het
-// antwoord.
+// De gedeelde kern achter de twee decision-routes (weekly-decision, biweekly-decision). Eén
+// functie in plaats van twee bijna-identieke routehandlers.
 //
 // Wat deze skeleton NIET doet, met opzet:
 // 1. geen createProgressJob: dat schrijft in generation_jobs en die tabel voedt de UI;
 // 2. geen saveAnalysisOutputSection: geen enkele schrijfactie in deze stap;
 // 3. geen OpenRouter-aanroep, dus ook geen controleerPlafond uit lib/analysis/uitgavenplafond.ts;
 // 4. geen wijziging aan lib/analysis/analysis-catalog.ts: deze routes horen nog niet in de UI.
+//
+// HERBOUW 2 SEPTEMBER 2026 (sloop-audit beslislaag)
+//
+// - Toegang: dezelfde vereisKlantToegangUitBody(...) als elke andere analyse-POST. Zonder die
+//   kon, zodra O1_AUTH_ENFORCED aangaat, iedere ingelogde met analysis:run het client_id van een
+//   ander bureau posten en diens bureau-id, kanalen en signalen terugkrijgen.
+// - Demo-bewust: supabaseForClient(clientId) in plaats van getSupabase(), en de client gaat MEE
+//   naar de providers. De demo-klant las eerder altijd de echte database (leeg voor hem).
+// - De respons zei "providers: google, meta, linkedin" voor ELKE klant -- dat waren de
+//   registry-sleutels, niet wat deze klant heeft. Nu: gemeten / niet gemeten / niet beschikbaar,
+//   elk uit een echte isAvailable()- en collectSignals()-uitkomst.
+// - runGates() met alleen runId/agencyId/accountId/analysisDate gaf per constructie negen keer
+//   "warn: input ontbreekt". Dode uitvoer die als "poorten draaiden" las: weg.
+// - Een providerfout was "geen signalen". Nu gooit de datalaag (DataLaagFout) en antwoordt de
+//   route met een 500 die de bron noemt. Eén kapot kanaal verbergen achter een lege lijst is
+//   precies de stilte die de audit overal vond.
+// - Het venster: de schedule-detector werkt op het GESYNCTE venster van ads_ad_schedule_
+//   performance, niet op de cadans van 7 of 14 dagen. Dat staat nu letterlijk in `dekking`.
 
 import type { NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabase } from "@/lib/analysis/helpers";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
 import { klantVanId } from "@/lib/tenancy/klanten";
-import { runGates, type GateInput } from "./quality-gates";
-import { availableProviders, getProvider, registerProvider } from "./channel-provider";
+import { dataFoutNaarResponse } from "@/lib/analysis/db-veilig";
+import { registerProvider } from "./channel-provider";
 import { googleProvider } from "./providers/google-provider";
 import { metaProvider } from "./providers/meta-provider";
 import { linkedinProvider } from "./providers/linkedin-provider";
 import { signalHypothesisDiscovery } from "./signal-hypothesis-discovery";
 import { classify } from "./hypothesis-discovery";
-import type { Signal } from "./types";
+import { verzamelSignalen, VENSTER_DAGEN, type DecisionRunType } from "./signaal-oogst";
 import { today, daysAgo } from "@/lib/reporting-date";
 
-// Fase 2, Task 3: registratie bij import, hetzelfde patroon als registerAdapter() in
-// lib/analysis/channel-adapter.ts (elke adapter registreert zichzelf bij het laden van zijn
-// module; de consumerende route importeert de modules en triggert zo de registratie). Hier is
-// handleDecisionSkeleton die consument: elke aanroep van een van de drie decision-routes laadt
-// dit bestand, en dus de drie providers hieronder.
+// Registratie bij import, hetzelfde patroon als registerAdapter() in lib/analysis/channel-
+// adapter.ts: de consumerende route importeert dit bestand en triggert zo de registratie.
 registerProvider(googleProvider);
 registerProvider(metaProvider);
 registerProvider(linkedinProvider);
 
-export type DecisionRunType = "weekly" | "biweekly" | "monthly";
-
-// Het venster per cadans. google-provider.ts gebruikt periodStart/periodEnd vandaag niet (zie de
-// kop van dat bestand), maar het contract vraagt ze wel, dus dit is de eerlijke invulling zonder
-// op een specifieke provider-implementatie te leunen.
-const VENSTER_DAGEN: Record<DecisionRunType, number> = { weekly: 7, biweekly: 14, monthly: 30 };
-
-/** Haalt signalen op bij elke geregistreerde, beschikbare provider en zet ze om in
- *  kandidaat-hypotheses via signalHypothesisDiscovery, elk voorzien van zijn classify()-
- *  categorie. Faalt een provider, dan telt hij mee als "geen signalen" en niet als harde fout --
- *  één kapotte kanaalkoppeling hoort de andere twee niet te blokkeren. */
-async function verzamelHypotheses(
-  agencyId: string,
-  accountId: string,
-  runType: DecisionRunType,
-): Promise<{ id: string; statement: string; category: string | null }[]> {
-  const periodEnd = today();
-  const periodStart = daysAgo(VENSTER_DAGEN[runType]);
-
-  const signalen: Signal[] = [];
-  for (const channel of availableProviders()) {
-    const provider = getProvider(channel);
-    if (!provider) continue;
-    try {
-      const beschikbaar = await provider.isAvailable(accountId);
-      if (!beschikbaar) continue;
-      const kanaalSignalen = await provider.collectSignals({ agencyId, accountId, runType, periodStart, periodEnd });
-      signalen.push(...kanaalSignalen);
-    } catch {
-      // Eén kanaal dat faalt (netwerk, ontbrekende tabel) blokkeert de andere niet.
-      continue;
-    }
-  }
-
-  const hypotheses = signalHypothesisDiscovery.discover({ agencyId, accountId, signals: signalen, causes: [] });
-  return hypotheses.map((h) => ({ id: h.id, statement: h.statement, category: classify(h) }));
-}
+export type { DecisionRunType };
 
 async function leesClientId(request: NextRequest): Promise<string | { fout: Response }> {
   try {
@@ -91,38 +68,50 @@ async function bepaalTenant(supabase: SupabaseClient, clientId: string): Promise
   return { agencyId: klant.agencyId };
 }
 
-/** De gedeelde afhandeling voor alle drie de decision-routes. Tenant-context komt uit de
- *  database via klantVanId, nooit uit de request-body zelf. */
+/** De gedeelde afhandeling voor de decision-routes. Tenant-context komt uit de database via
+ *  klantVanId, nooit uit de request-body zelf; de toegang wordt tegen de sessie getoetst. */
 export async function handleDecisionSkeleton(request: NextRequest, runType: DecisionRunType): Promise<Response> {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
-
   const clientIdOfFout = await leesClientId(request);
   if (typeof clientIdOfFout !== "string") return clientIdOfFout.fout;
   const clientId = clientIdOfFout;
 
+  const geweigerd = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (geweigerd) return geweigerd;
+
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
+
   const tenant = await bepaalTenant(supabase, clientId);
   if ("fout" in tenant) return tenant.fout;
 
-  const runId = crypto.randomUUID();
-  const input: GateInput = {
-    runId,
-    agencyId: tenant.agencyId,
-    accountId: clientId,
-    analysisDate: today(),
-  };
+  try {
+    const runId = crypto.randomUUID();
+    const oogst = await verzamelSignalen(supabase, tenant.agencyId, clientId, runType);
+    const hypotheses = signalHypothesisDiscovery
+      .discover({ agencyId: tenant.agencyId, accountId: clientId, signals: oogst.signalen, causes: [] })
+      .map((h) => ({ id: h.id, statement: h.statement, category: classify(h) }));
 
-  const hypotheses = await verzamelHypotheses(tenant.agencyId, clientId, runType);
-
-  return Response.json({
-    runId,
-    runType,
-    agencyId: tenant.agencyId,
-    accountId: clientId,
-    status: "skeleton",
-    providers: availableProviders(),
-    hypotheses,
-    gates: runGates(input),
-    note: "Fase 2: providers en discovery leveren echte hypotheses, nog steeds geen schrijfactie en geen LLM-aanroep.",
-  });
+    return Response.json({
+      runId,
+      runType,
+      accountId: clientId,
+      status: "skeleton",
+      // `providers` blijft de naam die de UI leest (decision-terminal.tsx), maar draagt nu de
+      // kanalen waar echt gemeten is -- niet de registry.
+      providers: oogst.gemeten.map((k) => k.channel),
+      nietGemeten: oogst.nietGemeten,
+      nietBeschikbaar: oogst.nietBeschikbaar,
+      hypotheses,
+      dekking: {
+        gevraagdVenster: { start: daysAgo(VENSTER_DAGEN[runType]), eind: today() },
+        kanalen: oogst.gemeten,
+        opmerking: "De schedule-detector werkt op het gesyncte venster van ads_ad_schedule_performance (zie kanalen[].venster), niet op de cadans.",
+      },
+      note: "Vers berekend, niet opgeslagen, geen LLM-aanroep.",
+    });
+  } catch (e) {
+    const dataFout = dataFoutNaarResponse(e);
+    if (dataFout) return dataFout;
+    throw e;
+  }
 }

@@ -26,9 +26,22 @@ import { TrackrecordView } from "./trackrecord-view";
 
 type Tab = "board" | "attribution" | "log" | "trackrecord";
 
-// Zelfde vorm als verzamelHypotheses() in lib/decision/decision-skeleton.ts teruggeeft.
+// Zelfde vorm als handleDecisionSkeleton() in lib/decision/decision-skeleton.ts teruggeeft.
 interface LiveSignal { id: string; statement: string; category: string | null }
-interface LiveSignalsResult { runType: string; providers: string[]; hypotheses: LiveSignal[] }
+interface LiveKanaalDekking { channel: string; venster: { start: string | null; eind: string | null }; rijenAfgekapt: boolean; signalen: number }
+interface LiveSignalsResult {
+  runType: string;
+  /** Kanalen waar echt gemeten is (data én detector). */
+  providers: string[];
+  nietGemeten?: string[];
+  nietBeschikbaar?: string[];
+  hypotheses: LiveSignal[];
+  dekking?: { kanalen: LiveKanaalDekking[]; opmerking?: string };
+}
+
+// De read-policy leest via PostgREST en die kapt stil op 1000 rijen af. Een expliciete grens
+// houdt dat zichtbaar: staat de teller op de grens, dan is de lijst niet compleet.
+const MAX_RIJEN = 1000;
 
 const HYPOTHESIS_SELECT =
   "id, hypothesis, expected_result, measurement_metric, timeframe, status, source, ice_total, created_at, accepted_at, decided_at, decided_by, decision_reason, outcome, result_met, learning, verdict_metrics, evaluated_at";
@@ -50,15 +63,22 @@ export function DecisionTerminal({ clientId }: { clientId: string }) {
         select: HYPOTHESIS_SELECT,
         clientId,
         order: { column: "created_at", ascending: false },
+        limit: MAX_RIJEN,
       }),
       dbSelect<RawChangeHistoryRow>("ads_change_history", {
         select: "resource_type, change_type, campaign_name, change_datetime, old_value, new_value",
         clientId,
         order: { column: "change_datetime", ascending: false },
+        limit: MAX_RIJEN,
       }),
     ]).then(([hypRes, changeRes]) => {
       if (cancelled) return;
       if (hypRes.error) { setError(hypRes.error.message); return; }
+      // Een kapotte wijzigingshistorie is een fout, geen lege log: anders leest het Decision Log
+      // als "geen wijzigingen" terwijl de bron faalde.
+      if (changeRes.error) { setError(`Wijzigingshistorie niet leesbaar: ${changeRes.error.message}`); return; }
+      const afgekapt = (hypRes.data?.length ?? 0) >= MAX_RIJEN || (changeRes.data?.length ?? 0) >= MAX_RIJEN;
+      if (afgekapt) setError(`Meer dan ${MAX_RIJEN} rijen: alleen de nieuwste ${MAX_RIJEN} worden getoond.`);
       const events = classificeerChangeHistory(changeRes.data ?? []);
       setHypotheses(hypRes.data);
       setTimeline(buildTimeline(events, hypRes.data));
@@ -163,7 +183,16 @@ function LiveSignalsPanel({ clientId }: { clientId: string }) {
       {error && <p className="text-meta text-amber-700">{error}</p>}
       {result && (
         <div className="space-y-1.5">
-          <p className="text-micro text-muted-foreground">Beschikbare providers: {result.providers.join(", ") || "geen"}</p>
+          <p className="text-micro text-muted-foreground">
+            Gemeten: {result.providers.join(", ") || "geen"}
+            {result.nietGemeten && result.nietGemeten.length > 0 && <> · niet gemeten (geen detector): {result.nietGemeten.join(", ")}</>}
+            {result.nietBeschikbaar && result.nietBeschikbaar.length > 0 && <> · geen data: {result.nietBeschikbaar.join(", ")}</>}
+          </p>
+          {result.dekking?.kanalen.map((k) => (
+            <p key={k.channel} className="text-micro text-muted-foreground">
+              {k.channel}: data {k.venster.start ?? "?"} t/m {k.venster.eind ?? "?"}{k.rijenAfgekapt ? " (rijen afgekapt)" : ""}
+            </p>
+          ))}
           {result.hypotheses.length === 0 ? (
             <p className="text-body text-muted-foreground">Geen signalen gevonden in het huidige venster.</p>
           ) : (

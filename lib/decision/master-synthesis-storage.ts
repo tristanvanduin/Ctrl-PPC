@@ -1,35 +1,49 @@
-// Master Synthesis (Pijler 6), Fase C: het schrijfpad. Twee bestemmingen:
-//   1. sprint_hypotheses (via het bestaande saveProposalsReplacingPending-patroon, source
-//      "master_synthesis") -- de goedkeuringswachtrij, zelfde tabel als second_opinion,
-//      cross_channel, meta_funnel, etc.
-//   2. sprint_items (nieuw hier bedraad) -- de gecombineerde sprinttaken, gekoppeld via
-//      hypothesis_id aan de zojuist geschreven sprint_hypotheses-rij.
-// Plus een sop_analysis_output-record (section "master_synthesis_v1") zodat de analysecatalogus
-// (analysis-catalog.ts) "is dit al gedraaid" kan tonen, net als cross_channel_v1.
+// Master Synthesis, Fase C: het schrijfpad. Drie bestemmingen, in deze volgorde:
+//   1. sop_analysis_output (section "master_synthesis_v1"): de leesbare uitkomst voor de kaart,
+//      en zijn id is de analysis_id op de sprint_hypotheses-rijen -- zelfde volgorde als
+//      persistMonthlyStructuredData() in monthly/route.ts.
+//   2. sprint_hypotheses via saveProposalsReplacingPending (source "master_synthesis"): de
+//      goedkeuringswachtrij, dezelfde tabel als second_opinion, cross_channel, meta_funnel.
+//   3. sprint_items: de gecombineerde sprinttaken, gekoppeld via hypothesis_id.
 //
-// saveProposalsReplacingPending() geeft geen ids terug (gedeeld met ~15 andere aanroepers,
-// bewust niet gewijzigd voor dit ene gebruik); de rijen die na een geslaagde call pending staan
-// voor source="master_synthesis" ZIJN exact de rijen die net zijn ingevoegd (dat garandeert de
-// replace-pending-semantiek), dus een her-select op de hypothesis-tekst is de betrouwbare
-// koppeling naar de gegenereerde id.
+// HERBOUW 2 SEPTEMBER 2026
+// - Elke schrijffout werd geslikt en de route meldde "opgeslagen". Zo kon de kaart groen staan
+//   terwijl de tabel leeg bleef -- de meest waarschijnlijke verklaring voor nul
+//   master_synthesis-rijen in de database. Nu gooit elke stap (DataLaagFout) en de route
+//   antwoordt met een 500 die de tabel noemt.
+// - sprint_items viel buiten de replace-pending-semantiek: bij een herrun werden de oude
+//   pending-hypotheses vervangen (ON DELETE SET NULL op sprint_items.hypothesis_id) en de
+//   nieuwe taken erbíj gezet. Elke herrun liet N weestaken "todo" achter in de sprintplanning.
+//   Nu worden de weestaken van deze bron eerst opgeruimd.
+// - saveProposalsReplacingPending() geeft geen ids terug (gedeeld met ~15 bronnen, bewust niet
+//   gewijzigd); de pending rijen van source "master_synthesis" ná een geslaagde call ZIJN de
+//   zojuist ingevoegde rijen, dus een her-select op de hypothese-tekst is de koppeling.
+//   Gelijke teksten worden gemeld (tasksUnlinked), niet stil verkeerd gekoppeld.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
 import { saveAnalysisOutputSection } from "@/lib/analysis/helpers";
+import { OWNER_TEAM } from "@/lib/branding/brand";
+import { DataLaagFout, eis } from "@/lib/analysis/db-veilig";
 import type { MasterSynthesisOutput } from "./master-synthesis-schema";
+
+export const MASTER_SYNTHESIS_SOP_TYPE = "master_synthesis";
+export const MASTER_SYNTHESIS_SECTION = "master_synthesis_v1";
+const BRON = "master_synthesis";
 
 export interface MasterSynthesisStorageResult {
   hypothesesSaved: number;
   tasksSaved: number;
-  /** Taken die wel zijn opgeslagen maar zonder hypothesis_id-koppeling (zou niet moeten
-   *  voorkomen na een geldige validatie; nooit stil verzwijgen als het toch gebeurt). */
+  /** Taken die wel zijn opgeslagen maar zonder hypothesis_id-koppeling (gelijke hypothese-
+   *  teksten of een ontbrekende rij). Nooit stil verzwijgen. */
   tasksUnlinked: number;
+  /** Weestaken van een eerdere run die zijn opgeruimd vóór het schrijven. */
+  wezenOpgeruimd: number;
 }
 
-// Puur, apart getest (__master_synthesis_storage_test.ts) -- de rest van dit bestand is de
-// LIVE-ONGETESTE grens (Supabase-writes), zelfde laagverdeling als elders in deze codebase.
+// Puur, apart getest (__master_synthesis_storage_test.ts).
 export function renderMasterSynthesisMarkdown(output: MasterSynthesisOutput): string {
-  const lines: string[] = ["## Master Synthesis (Pijler 6)", "", output.narrative, "", "### Hypotheses"];
+  const lines: string[] = ["## Master Synthesis", "", output.narrative, "", "### Hypotheses"];
   output.hypotheses.forEach((h, i) => {
     lines.push(`${i + 1}. **${h.hypothesis}** — kanalen: ${h.contributing_channels.join(", ")}, ICE ${h.ice_total}`);
     lines.push(`   ${h.rationale}`);
@@ -56,18 +70,17 @@ export async function saveMasterSynthesis(opts: {
 }): Promise<MasterSynthesisStorageResult> {
   const { supabase, clientId, analysisDate, periodStart, periodEnd, output, model, tokensUsed } = opts;
 
-  // 1. sop_analysis_output eerst, want zijn id is de analysis_id op de sprint_hypotheses-rijen
-  // hieronder -- zelfde volgorde als persistMonthlyStructuredData() in monthly/route.ts.
-  const { data: savedOutput } = await saveAnalysisOutputSection({
+  // 1. sop_analysis_output.
+  const { data: savedOutput, error: saveError } = await saveAnalysisOutputSection({
     supabase,
     select: "id",
     row: {
       client_id: clientId,
-      sop_type: "master_synthesis",
+      sop_type: MASTER_SYNTHESIS_SOP_TYPE,
       analysis_date: analysisDate,
       period_start: periodStart,
       period_end: periodEnd,
-      section: "master_synthesis_v1",
+      section: MASTER_SYNTHESIS_SECTION,
       output: renderMasterSynthesisMarkdown(output),
       model_used: model,
       tokens_used: tokensUsed,
@@ -75,11 +88,12 @@ export async function saveMasterSynthesis(opts: {
       step_name: "Master Synthesis",
     },
   });
+  if (saveError) throw new DataLaagFout("sop_analysis_output (master_synthesis_v1)", saveError.message);
   const analysisId = savedOutput && typeof savedOutput === "object" && "id" in savedOutput
     ? String((savedOutput as { id: unknown }).id)
     : null;
 
-  // 2. Hypotheses -> sprint_hypotheses.
+  // 2. Hypotheses -> sprint_hypotheses (vervangt de pending van deze bron).
   const hypothesisRows: SprintHypothesisRow[] = output.hypotheses.map((h) => ({
     client_id: clientId,
     analysis_id: analysisId,
@@ -93,32 +107,69 @@ export async function saveMasterSynthesis(opts: {
     ice_ease: h.ice_ease,
     ice_total: h.ice_total,
     status: "pending",
-    source: "master_synthesis",
+    source: BRON,
     metadata: { contributing_channels: h.contributing_channels },
   }));
-  const hypothesesSaved = await saveProposalsReplacingPending(supabase, clientId, "master_synthesis", hypothesisRows);
+  const hypothesesSaved = await saveProposalsReplacingPending(supabase, clientId, BRON, hypothesisRows);
+  // Het schema eist minstens één hypothese; nul opgeslagen betekent dus dat de lees- of
+  // insertstap faalde (saveProposalsReplacingPending logt en geeft 0). Niet als succes melden.
+  if (hypothesisRows.length > 0 && hypothesesSaved === 0) {
+    throw new DataLaagFout("sprint_hypotheses (master_synthesis)", "voorstellen niet opgeslagen: lees- of insertfout, oude pending bleef staan (zie serverlog)");
+  }
 
-  // 2. Taken -> sprint_items, gekoppeld via hypothesis_id.
+  // 3. Weestaken van deze bron opruimen: de vervangen pending-hypotheses hebben hun taken net
+  // losgekoppeld (ON DELETE SET NULL). Alleen rijen van deze bron zonder koppeling.
+  const bestaandeWezen = eis(
+    await supabase
+      .from("sprint_items")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("metadata->>source", BRON)
+      .is("hypothesis_id", null)
+      .limit(500),
+    "sprint_items (wezen tellen)"
+  ) as { id: string }[];
+  let wezenOpgeruimd = 0;
+  if (bestaandeWezen.length > 0) {
+    const del = await supabase.from("sprint_items").delete().in("id", bestaandeWezen.map((r) => r.id));
+    if (del.error) throw new DataLaagFout("sprint_items (wezen opruimen)", del.error.message);
+    wezenOpgeruimd = bestaandeWezen.length;
+  }
+
+  // 4. Taken -> sprint_items, gekoppeld via hypothesis_id.
   let tasksSaved = 0;
   let tasksUnlinked = 0;
   if (hypothesesSaved > 0 && output.tasks.length > 0) {
-    const { data: pendingRows } = await supabase
-      .from("sprint_hypotheses")
-      .select("id, hypothesis")
-      .eq("client_id", clientId)
-      .eq("source", "master_synthesis")
-      .eq("status", "pending");
-    const idByHypothesisText = new Map((pendingRows ?? []).map((r) => [String(r.hypothesis), String(r.id)]));
+    const pendingRows = eis(
+      await supabase
+        .from("sprint_hypotheses")
+        .select("id, hypothesis")
+        .eq("client_id", clientId)
+        .eq("source", BRON)
+        .eq("status", "pending")
+        .limit(100),
+      "sprint_hypotheses (koppeling master_synthesis)"
+    ) as { id: unknown; hypothesis: unknown }[];
+    const idByHypothesisText = new Map<string, string>();
+    const dubbeleTeksten = new Set<string>();
+    for (const r of pendingRows) {
+      const tekst = String(r.hypothesis);
+      if (idByHypothesisText.has(tekst)) dubbeleTeksten.add(tekst);
+      idByHypothesisText.set(tekst, String(r.id));
+    }
 
     const itemRows = output.tasks.map((t) => {
       const hypothesisText = output.hypotheses[t.hypothesis_index]?.hypothesis;
-      const hypothesisId = hypothesisText ? (idByHypothesisText.get(hypothesisText) ?? null) : null;
+      // Bij gelijke teksten is de koppeling een gok; dan liever geen koppeling en tellen.
+      const hypothesisId = hypothesisText && !dubbeleTeksten.has(hypothesisText)
+        ? (idByHypothesisText.get(hypothesisText) ?? null)
+        : null;
       return {
         client_id: clientId,
         hypothesis_id: hypothesisId,
         task: `${t.title}: ${t.description}`,
         status: "todo",
-        owner: "Bureau",
+        owner: OWNER_TEAM,
         review_timeframe: `${t.frequency}, binnen ${t.due_date_days} dagen`,
         metadata: {
           contributing_channels: t.contributing_channels,
@@ -126,15 +177,16 @@ export async function saveMasterSynthesis(opts: {
           priority: t.priority,
           frequency: t.frequency,
           due_date_days: t.due_date_days,
-          source: "master_synthesis",
+          source: BRON,
         },
       };
     });
     tasksUnlinked = itemRows.filter((r) => r.hypothesis_id === null).length;
 
-    const { error } = await supabase.from("sprint_items").insert(itemRows);
-    if (!error) tasksSaved = itemRows.length;
+    const ins = await supabase.from("sprint_items").insert(itemRows);
+    if (ins.error) throw new DataLaagFout("sprint_items (master_synthesis)", ins.error.message);
+    tasksSaved = itemRows.length;
   }
 
-  return { hypothesesSaved, tasksSaved, tasksUnlinked };
+  return { hypothesesSaved, tasksSaved, tasksUnlinked, wezenOpgeruimd };
 }

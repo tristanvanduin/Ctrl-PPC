@@ -7,7 +7,7 @@
 // plaats van geimporteerd.
 
 import { toPromptTable } from "@/lib/analysis/prompt-table";
-import type { EvidencePayload } from "./evidence/build-payload";
+import { SPREIDING_WAARSCHUWING_DAGEN, type EvidencePayload } from "./evidence/build-payload";
 
 export const MASTER_SYNTHESIS_LOG_FORMAT =
   'Log-formaat per hypothese: "Hypothese: {causale claim} - kanalen: {contributing_channels} - onderbouwing: {kanaal A: bevinding, kanaal B: bevinding} - evidence: deterministic/inferred/hypothesis."';
@@ -22,7 +22,7 @@ export const MASTER_SYNTHESIS_PURITY_CONTRACT = `### Step-Purity Contract
 export const MASTER_SYNTHESIS_INSTRUCTION = `## Pijler 6: Master Synthesis (kanaaloverstijgend)
 
 Je krijgt het evidence_payload van deze klant: de sterkste aanbevelingen en taken uit de laatste
-monthly-run van elk actief kanaal (Google Ads, Meta Ads, LinkedIn Ads), plus de deterministische
+monthly-run van elk actief kanaal (Google Ads, Meta Ads, LinkedIn Ads, Microsoft Ads), plus de deterministische
 cross-channel-feiten (zaai-oogst, CPL-arbitrage, mix-shift, funnel, KPI-verhoudingen,
 doelgroep-samenhang, GA4 CRO, data-volledigheid, bereikkosten/verzadiging).
 
@@ -85,6 +85,8 @@ REGELS:
 - tasks: maximaal 5, mogen leeg zijn als er geen concrete kanaaloverstijgende actie is.
 - contributing_channels bevat UITSLUITEND kanalen die in het aangeleverde evidence_payload voorkomen. Nooit een kanaal noemen dat niet is aangeleverd.
 - narrative en rationale MOETEN concreet verwijzen naar de aangeleverde kanaal- of cross-channel-bevindingen, nooit naar cijfers die niet in het evidence_payload staan.
+- Percentages en eurobedragen gebruik je UITSLUITEND als ze letterlijk in het evidence_payload staan; een cijferpoort keurt elk ander percentage of bedrag af. Kun je iets niet met een aangeleverd cijfer onderbouwen, omschrijf het dan zonder cijfer.
+- Staat in de dekking dat de kanaalruns ver uit elkaar liggen of verouderd zijn, benoem dat dan expliciet in het narratief en trek geen conclusie die gelijktijdigheid veronderstelt.
 `;
 
 export function buildMasterSynthesisSystemPrompt(): string {
@@ -104,14 +106,52 @@ export function buildMasterSynthesisSystemPrompt(): string {
   ].join("\n");
 }
 
+/** De payload zonder ruis: `status` is in de hele database altijd "open" en `truncated` is
+ *  zonder uitleg onleesbaar; wat het model wel moet weten staat in de dekking hieronder. */
+function compactePayload(payload: EvidencePayload): unknown {
+  return {
+    availableChannels: payload.availableChannels,
+    channels: payload.channels.map((c) => ({
+      channel: c.channel,
+      analysisDate: c.analysisDate,
+      recommendations: c.recommendations.map(({ hypothesis, expected_result, measurement_metric, timeframe, ice_total }) => ({
+        hypothesis, expected_result, measurement_metric, timeframe, ice_total,
+      })),
+      tasks: c.tasks.map(({ title, description, action_type, priority }) => ({ title, description, action_type, priority })),
+    })),
+    crossChannel: payload.crossChannel,
+  };
+}
+
+function dekkingRegels(payload: EvidencePayload): string[] {
+  const d = payload.dekking;
+  const regels = [
+    "## Dekking (feiten over de aangeleverde runs)",
+    d.runDatums.length > 0
+      ? `- Kanaalruns: ${d.runDatums.map((r) => `${r.channel} ${r.analysisDate}`).join(", ")}`
+      : "- Kanaalruns: geen",
+    `- Spreiding tussen de kanaalruns: ${d.spreidingDagen} dag(en)${d.spreidingDagen > SPREIDING_WAARSCHUWING_DAGEN ? " -- LET OP: de kanalen zijn niet in dezelfde cyclus geanalyseerd; behandel ze niet als gelijktijdig" : ""}`,
+    d.verouderd
+      ? `- Verouderd: de nieuwste kanaalrun (${d.nieuwsteRun}) ligt op of vóór het einde van de gevraagde periode (${payload.periodEnd}); de bevindingen gaan over een eerdere periode. Zeg dat in het narratief.`
+      : "- Verouderd: nee, de kanaalruns liggen na de gevraagde periode.",
+    `- Cross-channel-feiten: ${d.crossChannelDatum ? `run van ${d.crossChannelDatum}` : "geen"}`,
+  ];
+  if (d.afgekapteKanalen.length > 0) {
+    regels.push(`- Afgekapt: van ${d.afgekapteKanalen.join(", ")} zijn alleen de sterkste 5 aanbevelingen/taken meegegeven.`);
+  }
+  return regels;
+}
+
 export function buildMasterSynthesisUserMessage(payload: EvidencePayload): string {
   return [
     `Client: ${payload.clientId}. Periode t/m ${payload.periodEnd}.`,
     `Beschikbare kanalen in dit evidence_payload: ${payload.availableChannels.join(", ") || "geen"}.`,
     "",
+    ...dekkingRegels(payload),
+    "",
     "## Evidence payload",
     "Reken uitsluitend met de onderstaande, al voorgerekende gegevens. Verzin geen kanalen, cijfers of bevindingen die hier niet in staan.",
     "",
-    toPromptTable(payload),
+    toPromptTable(compactePayload(payload)),
   ].join("\n");
 }

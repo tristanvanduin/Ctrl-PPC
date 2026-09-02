@@ -7,7 +7,8 @@ import { BRAND_LOGO_FILE, BRAND_NAME } from "@/lib/branding/brand";
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import * as fs from "fs";
 import * as path from "path";
-import type { ClientDecisionBrief, AgencyPortfolioBrief, MacroMatrixRow } from "./decision-brief";
+import { periodeKanaalTekst, type ClientDecisionBrief, type AgencyPortfolioBrief, type MacroMatrixRow } from "./decision-brief";
+import { opsomming } from "@/lib/util/tekst";
 
 const e = React.createElement;
 
@@ -25,10 +26,13 @@ const gray = "#6b7280";
 const grayLight = "#f9fafb";
 const grayBorder = "#e5e7eb";
 
+// "Onbekend" (geen zelfscore in de analyse) krijgt bewust dezelfde grijstint als de fallback
+// hieronder: het is geen oordeel en hoort er ook niet als een uit te zien.
 const PRIORITY_COLOR: Record<string, string> = {
   Hoog: "#dc2626",
   Midden: "#d97706",
   Laag: "#6b7280",
+  Onbekend: gray,
 };
 
 const s = StyleSheet.create({
@@ -48,6 +52,7 @@ const s = StyleSheet.create({
   tableHeaderText: { fontSize: 6.5, fontWeight: "bold", color: "white" },
   tableRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: grayBorder, paddingVertical: 4, paddingHorizontal: 3, minHeight: 16 },
   cellText: { fontSize: 7 },
+  cellSub: { fontSize: 5.5, color: gray, marginTop: 1 },
   priorityBadge: { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, alignSelf: "flex-start" },
   priorityText: { fontSize: 6.5, fontWeight: "bold", color: "white" },
   card: { padding: 8, borderRadius: 4, borderWidth: 0.5, borderColor: grayBorder, backgroundColor: grayLight, marginBottom: 8 },
@@ -100,6 +105,8 @@ export async function renderClientDecisionBriefPdf(brief: ClientDecisionBrief): 
         View,
         { style: s.metaRow },
         e(Text, { style: s.metaText }, e(Text, { style: s.bold }, "Periode: "), brief.period),
+        e(Text, { style: s.metaText }, e(Text, { style: s.bold }, "Kanaal: "), brief.channel),
+        brief.analysisDate ? e(Text, { style: s.metaText }, e(Text, { style: s.bold }, "Analyse van: "), brief.analysisDate) : null,
         e(Text, { style: s.metaText }, e(Text, { style: s.bold }, "Fase: "), brief.phase),
         e(
           View,
@@ -167,7 +174,14 @@ function macroMatrix(rows: readonly MacroMatrixRow[]) {
     e(
       View,
       { style: s.tableRow, key: i },
-      e(Text, { style: { ...s.cellText, width: `${widths[0] * 100}%`, fontWeight: "bold" } }, r.accountName),
+      // Periode en kanaal als subregel onder de accountnaam: een analyse van januari naast een
+      // van augustus is anders niet van elkaar te onderscheiden.
+      e(
+        View,
+        { style: { width: `${widths[0] * 100}%` } },
+        e(Text, { style: { ...s.cellText, fontWeight: "bold" } }, r.accountName),
+        e(Text, { style: s.cellSub }, periodeKanaalTekst(r))
+      ),
       e(Text, { style: { ...s.cellText, width: `${widths[1] * 100}%` } }, r.primaryBlockage),
       e(Text, { style: { ...s.cellText, width: `${widths[2] * 100}%` } }, r.phase),
       e(Text, { style: { ...s.cellText, width: `${widths[3] * 100}%` } }, r.coreAction),
@@ -200,6 +214,12 @@ export async function renderAgencyPortfolioBriefPdf(brief: AgencyPortfolioBrief)
 
       e(Text, { style: s.sectionTitle }, "Macro Matrix"),
       macroMatrix(brief.macroMatrix),
+      brief.macroMatrix.length === 0
+        ? e(Text, { style: { ...s.bullet, marginTop: 4 } }, "Geen enkele klant heeft een maandanalyse.")
+        : null,
+      brief.zonderAnalyse.length > 0
+        ? e(Text, { style: { ...s.bullet, marginTop: 4, color: gray } }, `Zonder analyse: ${opsomming(brief.zonderAnalyse)}.`)
+        : null,
 
       e(Text, { style: s.sectionTitle }, "Portfolio Synthese"),
       synBullets.length > 0

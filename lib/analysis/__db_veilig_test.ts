@@ -8,7 +8,7 @@
 import {
   eis, alleRijen, DataLaagFout, dataFoutNaarResponse,
   maandStart, maandSleutel, laatsteAfgeslotenMaandStart, lopendeMaandStart,
-  afgeslotenMaandenTerugStart,
+  afgeslotenMaandenTerugStart, laatsteAfgeslotenMaandGrenzen,
 } from "./db-veilig";
 import { lastCompleteMonth } from "../period/period-range";
 
@@ -85,6 +85,16 @@ async function asyncDeel(): Promise<void> {
 }
 
 asyncDeel().then(() => {
-  console.log(`\n${passed} geslaagd, ${failed} gefaald`);
+  console.log("\nlaatsteAfgeslotenMaandGrenzen: begin en echte laatste dag, tijdzone-onafhankelijk");
+{
+  const g = laatsteAfgeslotenMaandGrenzen();
+  check("start is de eerste van de laatste afgesloten maand", g.start === laatsteAfgeslotenMaandStart());
+  check("eind ligt in dezelfde maand", g.eind.slice(0, 7) === g.start.slice(0, 7), g.eind);
+  const [j, m] = g.start.split("-").map(Number);
+  const verwachtEind = new Date(Date.UTC(j, m, 0)).getUTCDate();
+  check("eind is de laatste kalenderdag (28/29/30/31), niet een dag te vroeg", Number(g.eind.slice(8, 10)) === verwachtEind, g.eind);
+}
+
+console.log(`\n${passed} geslaagd, ${failed} gefaald`);
   if (failed > 0) process.exit(1);
 });

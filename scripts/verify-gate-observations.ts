@@ -9,7 +9,6 @@ import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { recordGateObservations } from "../lib/decision/gate-observations";
 import type { GateInput } from "../lib/decision/quality-gates";
-import type { KeywordQsRow } from "../lib/analysis/metric-cross-checks";
 
 try { readFileSync(".env.local", "utf8"); } catch { /* dan de omgeving zelf */ }
 for (const regel of (() => { try { return readFileSync(".env.local", "utf8").split("\n"); } catch { return []; } })()) {
@@ -58,11 +57,6 @@ async function main(): Promise<void> {
 
   const runId = `verify-${Date.now()}`;
   const accountRijen = accountMonthly ?? [];
-  const kwMaand = (keywordRows ?? []).reduce<string | undefined>((max, r) => {
-    const m = String(r.month ?? "");
-    return m && (!max || m > max) ? m : max;
-  }, undefined);
-  const kwLaatsteMaand = kwMaand ? (keywordRows ?? []).filter((k) => String(k.month ?? "") === kwMaand) : [];
 
   const gateInput: GateInput = {
     runId,
@@ -82,10 +76,9 @@ async function main(): Promise<void> {
       lastCompleteMonth: accountRijen.length > 0 ? new Date(String(accountRijen[accountRijen.length - 1].month)).getUTCMonth() + 1 : 0,
       hasKpiTargets: true,
     } : undefined,
-    rankLoss: kwLaatsteMaand.length > 0 ? {
-      keywords: kwLaatsteMaand.map((k): KeywordQsRow => ({ cost: Number(k.cost ?? 0), quality_score: k.quality_score == null ? null : Number(k.quality_score) })),
-      rankLostIs: 0,
-    } : undefined,
+    // Geen impression-share-rijen in dit script: dan ook geen rankLoss-invoer. Een verzonnen
+    // rankLostIs van 0 zette de Math Gate eerder altijd op pass ("geen materieel rankverlies").
+    rankLoss: undefined,
     kpiChain: accountRijen.length >= 2 ? {
       previousMonth: accountRijen[accountRijen.length - 2] as unknown as Record<string, number>,
       currentMonth: accountRijen[accountRijen.length - 1] as unknown as Record<string, number>,

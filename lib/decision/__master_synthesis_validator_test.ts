@@ -65,5 +65,13 @@ assert(enkelKanaal.warnings.some((w) => w.includes("kanaaloverstijgend")), "waar
 const slechtFormat = validateMasterSynthesisOutput(output({ log_entries: ["Iets gebeurde ergens."] }), ["google_ads", "meta_ads"]);
 assert(slechtFormat.warnings.some((w) => w.toLowerCase().includes("log-format")), "niet-conform log-format geeft een warning");
 
+// 6. Cijferpoort: alleen als de toegestane set wordt meegegeven; percentages en bedragen buiten die set zijn fouten.
+const metCijfer = output({ narrative: "x".repeat(60) + " De CPA stijgt 12% en kost €40." });
+assert(validateMasterSynthesisOutput(metCijfer, ["google_ads", "meta_ads"]).valid === true, "zonder toegestane set geen cijferpoort (achterwaarts compatibel)");
+const poort = validateMasterSynthesisOutput(metCijfer, ["google_ads", "meta_ads"], [12]);
+assert(poort.valid === false && poort.errors.some((e) => e.includes("40")), "€40 staat niet in de set: fout die 40 noemt");
+// De fixture-hypothese zelf zegt "CPA daalt 10%": ook dat cijfer moet in de set staan.
+assert(validateMasterSynthesisOutput(metCijfer, ["google_ads", "meta_ads"], [12, 40, 10]).valid === true, "alle cijfers in de set: geldig");
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

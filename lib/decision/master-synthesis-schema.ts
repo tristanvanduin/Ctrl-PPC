@@ -7,7 +7,7 @@
 // plaats van een eigen vocabulaire te verzinnen.
 
 import { z } from "zod";
-import { ActionTypeEnum, FrequencyEnum, PriorityEnum } from "@/lib/schema/analysis-schema";
+import { ActionTypeEnum, FrequencyEnum, IceTotalSchema, PriorityEnum } from "@/lib/schema/analysis-schema";
 
 export const ContributingChannelEnum = z.enum(["google_ads", "meta_ads", "linkedin_ads", "microsoft_ads"]);
 export type ContributingChannel = z.infer<typeof ContributingChannelEnum>;
@@ -23,7 +23,10 @@ export const MasterSynthesisHypothesisSchema = z.object({
   ice_impact: z.number().min(1).max(10),
   ice_confidence: z.number().min(1).max(10),
   ice_ease: z.number().min(1).max(10),
-  ice_total: z.number().min(1).max(10),
+  // Gedeeld met RecommendationSchema: normaliseert een som-van-drie (tot 30) naar het gemiddelde.
+  // Deze kopie zonder die normalisatie was de ice_total-valkuil die de kanaal-SOP's op 1 september
+  // al hadden gedicht -- hier stond hij nog open.
+  ice_total: IceTotalSchema,
 });
 export type MasterSynthesisHypothesis = z.infer<typeof MasterSynthesisHypothesisSchema>;
 
