@@ -62,9 +62,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const clientId = request.nextUrl.searchParams.get("client_id");
+  // client_id uit de JSON-body (het contract van signal-analysis-card, zoals elke zusterroute)
+  // met de query als terugval. De oude versie las ALLEEN de query, terwijl de dashboardkaart
+  // altijd een body post — elke klik op deze kaart eindigde dus in een 400. Gevonden door de
+  // deep-dive-rookproef van 2 september 2026, niet door de audit: precies waarom die proef er is.
+  let body: { client_id?: string; channel?: string } = {};
+  try { body = await request.json(); } catch { /* geen body: query-terugval */ }
+  const clientId = (typeof body.client_id === "string" && body.client_id) || request.nextUrl.searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
-  const channel = parseChannel(request.nextUrl.searchParams.get("channel"));
+  const channel = parseChannel((typeof body.channel === "string" && body.channel) || request.nextUrl.searchParams.get("channel"));
 
   // Het toegangsslot: deze route is LLM-loos maar schrijft wél (sop_analysis_output en de
   // wachtrij), dus hetzelfde slot als de kern-routes (sloop-audit 1 sep 2026).

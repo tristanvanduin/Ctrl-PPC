@@ -9,6 +9,17 @@
 // slaat haar uitvoer op in sop_analysis_output onder die naam, dus daarmee is per analyse te
 // zien of en wanneer hij gedraaid heeft — met één query in plaats van twintig losse fetches.
 //
+// WAT HIER BEWUST NIET IN STAAT (sloop-audit 1 september 2026, contractvraag): analyses
+// zonder sop_analysis_output-sectie kúnnen niet in deze lijst, want de sleutel is de sectie.
+// - De vier scorecards (search/display/shopping/pmax): live GET-lezers zonder opslag; hun
+//   "laatste stand" is per definitie nu.
+// - search-terms: bewaart zijn oordelen in search_term_analysis (eigen tabel met historie).
+// - meta-creatives: schrijft features/patronen (meta_creative_visual_features/_patterns);
+//   zichtbaar via de creative-briefing die erop bouwt.
+// - geo-clone: dynamische secties (geo_clone_<afkorting>_v1), per beursvariant — geen vaste
+//   catalogusregel mogelijk.
+// - channel-forecast en event-pacing: live berekeningen zonder opslag.
+//
 // IO-vrij en los getest.
 
 export type AnalyseKanaal = "google" | "meta" | "linkedin" | "microsoft" | "blended";

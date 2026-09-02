@@ -67,7 +67,11 @@ const n = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ?
 const s = (v: unknown): string => (v == null ? "" : String(v));
 
 export async function POST(request: NextRequest) {
-  const clientId = request.nextUrl.searchParams.get("client_id");
+  // Body eerst, query als terugval — zelfde reparatie als geo-markets: de dashboardkaart
+  // post een JSON-body en kreeg hier altijd een 400 (deep-dive-rookproef, 2 sep 2026).
+  let body: { client_id?: string } = {};
+  try { body = await request.json(); } catch { /* geen body: query-terugval */ }
+  const clientId = (typeof body.client_id === "string" && body.client_id) || request.nextUrl.searchParams.get("client_id");
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
 
   // Het toegangsslot: LLM-loos maar schrijvend, dus hetzelfde slot als de kern-routes

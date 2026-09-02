@@ -13,6 +13,7 @@
 # Gebruik:
 #   scripts/gates.sh            alles
 #   scripts/gates.sh hygiene    alleen de hygienecontrole
+#   scripts/gates.sh datagrond  alleen de query-vs-schema-controle
 #   scripts/gates.sh rpc        alleen de rechten op databasefuncties
 #   scripts/gates.sh tsc        alleen typecheck
 #   scripts/gates.sh test       alleen tests
@@ -64,6 +65,15 @@ falen=0
 # precies de dingen die stilzwijgend teruggroeien omdat niets ze tegenhoudt.
 if [ "$doel" = "alles" ] || [ "$doel" = "hygiene" ]; then
   stap hygiene "$HYGIENE_TIMEOUT" node scripts/check-hygiene.mjs || falen=$?
+fi
+
+# Even snel en offline als de hygiene, en hij vangt de klasse waarmee de deep dives maanden
+# onzichtbaar kapot stonden: een query met een kolom die niet bestaat is geen compilefout en
+# geen testfout, maar een runtime-400 die als "geen data" leest. Elke .from()-keten wordt
+# tegen scripts/schema-snapshot.json gelegd (verversen: check-datagrond.mjs --vernieuw). Zo
+# ving hij de dode bidding_strategy-kolom waarop bid-strategy élke run in een 404 smoorde.
+if [ "$doel" = "alles" ] || [ "$doel" = "datagrond" ]; then
+  stap datagrond "$HYGIENE_TIMEOUT" node scripts/check-datagrond.mjs || falen=$?
 fi
 
 # Vlak na de hygiene, want hij is net zo snel en vangt iets dat de andere poorten per definitie
