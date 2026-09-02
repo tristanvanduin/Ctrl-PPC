@@ -19,7 +19,11 @@
  *                           CUSTOM/REMARKETING). Aandeel spend in segmenten die naar verhouding
  *                           meer kosten dan opleveren -- zelfde soort "aandeel in een duur segment"-
  *                           vraag als PMax' Netwerkmix-factor, maar op EIGEN data (doelgroepen, geen
- *                           netwerken) en een eigen, hier geschreven aggregatie.
+ *                           netwerken) en een eigen, hier geschreven aggregatie. Op ROAS waar
+ *                           conversiewaarde bestaat, op conversies-per-euro waar die overal nul is
+ *                           (lead-gen trackt geen waarde), en ONBEOORDEELD zonder enige
+ *                           conversiebasis -- puur op ROAS kon een lead-gen-account nooit een duur
+ *                           segment hebben en kreeg gegarandeerd 20/20 (sloop-audit 1 september).
  *   Viewability             Geen kolom in dit schema (geen viewable_impressions/measurable_
  *                           impressions op ads_network_performance_monthly of elders, geverifieerd
  *                           21 augustus). Altijd assessed:false tot die koppeling er is -- regel 3
@@ -29,6 +33,7 @@
 import type { HealthScore, HealthFactor } from "./health-score";
 import { samenvatFactoren } from "./health-score";
 import { trendOver } from "./analysis/trend";
+import { trendScoreDalendIsGoed, trendScoreStijgendIsGoed, aandeelScoreOmgekeerd } from "./util/scorecard-scores";
 
 export interface DisplayCampaignMonthlyRow {
   campaign_name: string;
@@ -65,28 +70,6 @@ function perMaand(rows: readonly DisplayCampaignMonthlyRow[]): MaandTotaal[] {
     map.set(r.month, bestaand);
   }
   return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
-}
-
-// Zelfde vier-banden-vorm als search-scorecard.ts, voor een gelijk schaalgevoel tussen de
-// scorecards -- onafhankelijk hier neergezet, niet geïmporteerd (search-scorecard.ts's versies
-// zijn module-privé, en PMax herhaalt zijn eigen bandvorm ook liever dan een gedeelde import).
-function trendScoreDalendIsGoed(trendPct: number): number {
-  if (trendPct < -10) return 20;
-  if (trendPct < 5) return 16;
-  if (trendPct < 20) return 10;
-  return 4;
-}
-function trendScoreStijgendIsGoed(trendPct: number): number {
-  if (trendPct > 10) return 20;
-  if (trendPct > -10) return 14;
-  if (trendPct > -25) return 8;
-  return 4;
-}
-function aandeelScoreOmgekeerd(aandeel: number): number {
-  if (aandeel < 0.10) return 20;
-  if (aandeel < 0.25) return 14;
-  if (aandeel < 0.40) return 8;
-  return 4;
 }
 
 /**
@@ -144,6 +127,13 @@ export function computeDisplayScorecard(
   });
 
   // ── 4. DOELGROEP-MIX (20pt) ──
+  //
+  // Drie regimes, naar wat de data draagt. Puur op ROAS beoordelen was een vals-groen-gat: bij
+  // een lead-gen-klant is conversions_value overal 0, dan is elke segment-ROAS 0 en de
+  // gemiddelde ROAS ook 0, dus kon geen segment ooit onder "de helft van het gemiddelde" zakken
+  // — gegarandeerd 20/20, hoe scheef de mix ook was. Zijn er wel conversies maar geen waarde,
+  // dan is conversies-per-euro dezelfde vraag in de eenheid die er wél is; is er geen van
+  // beide, dan valt er niets af te wegen en is onbeoordeeld het eerlijke antwoord.
   const perAudienceType = new Map<string, { cost: number; conversions: number; conversionsValue: number }>();
   for (const r of audienceRows) {
     const type = r.audience_type ?? "ONBEKEND";
@@ -151,13 +141,20 @@ export function computeDisplayScorecard(
     a.cost += r.cost; a.conversions += r.conversions; a.conversionsValue += r.conversions_value;
     perAudienceType.set(type, a);
   }
-  const totaalAudienceCost = [...perAudienceType.values()].reduce((s, a) => s + a.cost, 0);
-  const doelgroepBeoordeeld = totaalAudienceCost > 0;
-  // Gemiddelde ROAS over alle segmenten, als referentie voor "naar verhouding meer kost dan oplevert".
-  const totaalWaarde = [...perAudienceType.values()].reduce((s, a) => s + a.conversionsValue, 0);
-  const gemiddeldeRoas = totaalAudienceCost > 0 ? totaalWaarde / totaalAudienceCost : 0;
+  const segmenten = [...perAudienceType.entries()];
+  const totaalAudienceCost = segmenten.reduce((s, [, a]) => s + a.cost, 0);
+  const totaalWaarde = segmenten.reduce((s, [, a]) => s + a.conversionsValue, 0);
+  const totaalConversies = segmenten.reduce((s, [, a]) => s + a.conversions, 0);
+
+  // "Duur" = het segment haalt minder dan de helft van het gemiddelde rendement per euro —
+  // gemeten in waarde als die er is, anders in conversies.
+  const opWaarde = totaalWaarde > 0;
+  const doelgroepBeoordeeld = totaalAudienceCost > 0 && (opWaarde || totaalConversies > 0);
+  const gemiddeldPerEuro = doelgroepBeoordeeld
+    ? (opWaarde ? totaalWaarde : totaalConversies) / totaalAudienceCost
+    : 0;
   const dureSegmenten = doelgroepBeoordeeld
-    ? [...perAudienceType.entries()].filter(([, a]) => a.cost > 0 && (a.conversionsValue / a.cost) < gemiddeldeRoas * 0.5)
+    ? segmenten.filter(([, a]) => a.cost > 0 && ((opWaarde ? a.conversionsValue : a.conversions) / a.cost) < gemiddeldPerEuro * 0.5)
     : [];
   const dureAandeel = doelgroepBeoordeeld ? dureSegmenten.reduce((s, [, a]) => s + a.cost, 0) / totaalAudienceCost : 0;
   factors.push({
@@ -166,9 +163,11 @@ export function computeDisplayScorecard(
     maxScore: 20,
     description: doelgroepBeoordeeld
       ? dureSegmenten.length > 0
-        ? `${Math.round(dureAandeel * 100)}% van de spend zit in doelgroepsegmenten die minder dan de helft van de gemiddelde ROAS halen (${dureSegmenten.map(([t]) => t).join(", ")})`
-        : "Geen doelgroepsegment presteert materieel onder het gemiddelde"
-      : "Geen doelgroepdata — niet beoordeeld",
+        ? `${Math.round(dureAandeel * 100)}% van de spend zit in doelgroepsegmenten die minder dan de helft van ${opWaarde ? "de gemiddelde ROAS" : "het gemiddelde aantal conversies per euro (geen conversiewaarde getrackt)"} halen (${dureSegmenten.map(([t]) => t).join(", ")})`
+        : `Geen doelgroepsegment presteert materieel onder het gemiddelde (beoordeeld op ${opWaarde ? "ROAS" : "conversies per euro; geen conversiewaarde getrackt"})`
+      : totaalAudienceCost > 0
+        ? "Doelgroepsegmenten hebben spend maar geen conversies of conversiewaarde om ze tegen af te wegen — niet beoordeeld"
+        : "Geen doelgroepdata — niet beoordeeld",
     assessed: doelgroepBeoordeeld,
   });
 

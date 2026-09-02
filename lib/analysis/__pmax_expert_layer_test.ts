@@ -12,7 +12,9 @@
 import { createDemoSupabase } from "../demo/mock-supabase";
 import { demoRows } from "../demo/demo-rows";
 import { DEMO_GREENTECH_ID } from "../demo/greentech-mock";
-import { computePmaxInsights, aggregateByEntity } from "./pmax-expert-layer";
+import { computePmaxInsights, aggregateByEntity, detecteerCannibalisatie } from "./pmax-expert-layer";
+import { lopendeMaandStart } from "./db-veilig";
+import { lastCompleteMonth, addMonths } from "../period/period-range";
 
 let passed = 0, failed = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -53,6 +55,32 @@ async function main() {
     zonderKosten.map((c) => c.label).join(",")
   );
 
+  console.log("\ndetecteerCannibalisatie: de lopende deelmaand telt niet mee");
+  {
+    // Twee afgesloten maanden zonder cannibalisatie, plus de lopende deelmaand waarin PMax
+    // schijnbaar explodeert terwijl Search instort — zoals elke deelmaand er halverwege uitziet.
+    // Vóór de fix was die deelmaand "de laatste maand" en kwam hier severity "hoog" uit.
+    const m1 = `${addMonths(lastCompleteMonth(), -1)}-01`;
+    const m2 = `${lastCompleteMonth()}-01`;
+    const lopend = lopendeMaandStart();
+    const rijen = [
+      { campaign_name: "PMax", month: m1, cost: 1000, conversions: 20 },
+      { campaign_name: "Search", month: m1, cost: 1000, conversions: 40 },
+      { campaign_name: "PMax", month: m2, cost: 1100, conversions: 24 },
+      { campaign_name: "Search", month: m2, cost: 1050, conversions: 44 },
+      { campaign_name: "PMax", month: lopend, cost: 400, conversions: 35 },
+      { campaign_name: "Search", month: lopend, cost: 100, conversions: 5 },
+    ];
+    const uit = detecteerCannibalisatie(rijen, ["PMax"]);
+    check("levert een uitkomst op de afgesloten maanden", uit !== null);
+    check("geen cannibalisatie-alarm uit de deelmaand", uit?.severity === null, String(uit?.severity));
+    check("de groei is die van de afgesloten maanden (+20%)", Math.abs((uit?.pmaxConvGrowth ?? 0) - 0.2) < 1e-9, String(uit?.pmaxConvGrowth));
+
+    // Zonder tweede afgesloten maand valt er niets te vergelijken: null, geen oordeel.
+    const teWeinig = detecteerCannibalisatie(rijen.filter((r) => r.month !== m1), ["PMax"]);
+    check("één afgesloten maand plus deelmaand geeft null", teWeinig === null);
+  }
+
   console.log("\nDe expertlaag tegen de demo");
   const sb = createDemoSupabase(null, demoRows()) as never;
   const insights = await computePmaxInsights(sb, DEMO_GREENTECH_ID);
@@ -63,6 +91,17 @@ async function main() {
 
   const dilution = insights.signals.find((s) => s.type === "search_dilution");
   check("meldt zoekverdunning", !!dilution, insights.signals.map((s) => s.type).join(","));
+
+  // De demo-placements dragen (net als elke echte klant) geen kosten: Google publiceert die
+  // niet per PMax-placement. Dan hoort de laag te zéggen dat er niet gekeken kon worden, in
+  // plaats van stilzwijgend geen waste te melden alsof er gecontroleerd is.
+  const nietControleerbaar = insights.signals.find((s) => s.type === "placement_waste_niet_controleerbaar");
+  check("meldt dat placement-waste niet controleerbaar is", !!nietControleerbaar, insights.signals.map((s) => s.type).join(","));
+  check(
+    "en niet allebei tegelijk (wél waste én niet-controleerbaar)",
+    !insights.signals.some((s) => s.type === "placement_waste"),
+    insights.signals.map((s) => s.type).join(",")
+  );
 
   if (dilution) {
     // De demo heeft vier consumententhema's zonder conversies, over vier maanden = 16 rijen.

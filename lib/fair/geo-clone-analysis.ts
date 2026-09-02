@@ -250,9 +250,13 @@ function renderMarkdown(
   ];
 
   if (conversions.comparable) {
+    // De spend-vergelijking komt uit de Google-maandrijen; de extra kanalen leveren alleen
+    // conversiepunten. Zodra die meedoen hoort de regel dat te zeggen in plaats van
+    // stilzwijgend een deekbedrag als totaal te presenteren (sloop-audit 1 sep 2026).
+    const spendDekking = (input.channelConvPoints ?? []).length > 0 ? " (alleen Google-spend; de andere kanalen leveren hier geen kosten aan)" : "";
     lines.push(
       `- Conversies opgebouwd tot nu: **${fmtNum(conversions.currentCumulative)}** vs **${fmtNum(conversions.previousCumulativeAtSameDaysOut)}** op hetzelfde punt voor de vorige editie: **${fmtPct(conversions.deltaPct)}**.`,
-      `- Spend opgebouwd tot nu: **${fmtNum(cost.currentCumulative)}** vs **${fmtNum(cost.previousCumulativeAtSameDaysOut)}**: **${fmtPct(cost.deltaPct)}**.`
+      `- Spend opgebouwd tot nu: **${fmtNum(cost.currentCumulative)}** vs **${fmtNum(cost.previousCumulativeAtSameDaysOut)}**: **${fmtPct(cost.deltaPct)}**${spendDekking}.`
     );
     if (conversions.deltaPct != null && cost.deltaPct != null && conversions.deltaPct < 0 && cost.deltaPct >= 0) {
       lines.push("- De aanloop ligt achter TERWIJL de spend gelijk of hoger ligt: de achterstand is geen investeringskwestie maar een effectiviteitsvraag.");

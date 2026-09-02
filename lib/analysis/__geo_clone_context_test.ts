@@ -15,11 +15,14 @@ function check(label: string, cond: boolean, detail = ""): void {
 interface Row { campaign_name: string; month: string; impressions?: number; clicks?: number; cost?: number; conversions?: number; conversions_value?: number }
 
 function mockSupabase(rows: Row[]): SupabaseClient {
+  // De keten eindigt sinds de herbouw op .lt (afgesloten-maanden-filter); de stub bootst de
+  // volledige keten na en levert de rijen pas aan het eind.
   const from = () => ({
     select() {
       const b = {
         eq() { return b; },
-        gte() { return Promise.resolve({ data: rows, error: null }); },
+        gte() { return b; },
+        lt() { return Promise.resolve({ data: rows, error: null }); },
       };
       return b;
     },

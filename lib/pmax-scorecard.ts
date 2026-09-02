@@ -18,30 +18,41 @@
  *                          doctrine: dit is het eerlijke antwoord, geen ontbrekende bouw.
  *   Netwerkmix-efficiëntie buildNetworkSplit()/findImbalances() (lib/pmax/network-split.ts) — al
  *                          gebouwd voor de netwerkkaart. Aandeel budget in netwerken die naar
- *                          verhouding meer kosten dan opleveren.
- *   Placement-efficiëntie  aggregateByEntity() (lib/analysis/pmax-expert-layer.ts) — al gebruikt
- *                          voor het placement-waste-signaal. Aandeel spend op plaatsingen zonder
- *                          conversie.
+ *                          verhouding meer kosten dan opleveren. Zonder één conversie in het
+ *                          venster is er niets om tegen af te wegen: dan onbeoordeeld, geen
+ *                          gratis 20 punten (sloop-audit 1 september: 0 conversies gaf "geen
+ *                          netwerk kost meer dan het oplevert" — groen zonder bewijs).
+ *   Placement-efficiëntie  Google publiceert per PMax-placement UITSLUITEND vertoningen — geen
+ *                          kosten, geen conversies (zie pmaxPlacementRows in lib/demo/
+ *                          pmax-video-demo.ts) — en ads_pmax_placements is in de echte database
+ *                          leeg. De oude euro-drempel kon dus nooit iets vinden en las als
+ *                          "geen verspilling". Altijd assessed:false, met in de tekst wat er wél
+ *                          zichtbaar is (vertoningen). Zelfde vertrouwensregel als Feed Health.
  *   Cannibalisatie         detecteerCannibalisatie() (lib/analysis/pmax-expert-layer.ts) — losge-
  *                          trokken uit signaal 7 zodat dezelfde maand-op-maand-vergelijking hier
  *                          en in de SOP-signalen identiek blijft.
  *
- * Vier van de vijf factoren zijn dus geen nieuwe berekening maar een herschaling van een bestaande
- * naar 0-20 punten. Dat is met opzet: twee versies van "hoeveel budget zit in een dure asset-
- * groep" die uiteen kunnen lopen is precies het soort bug dat de mediaan/safeDiv-hygiënecontrole
- * al een keer boven water haalde voor andere functies.
+ * Asset Health, Netwerkmix en Cannibalisatie zijn dus geen nieuwe berekening maar een herschaling
+ * van een bestaande naar 0-20 punten. Dat is met opzet: twee versies van "hoeveel budget zit in
+ * een dure assetgroep" die uiteen kunnen lopen is precies het soort bug dat de mediaan/safeDiv-
+ * hygiënecontrole al een keer boven water haalde voor andere functies. Feed Health en Placement-
+ * efficiëntie rekenen helemaal niet: daar ontbreekt de data, en dat zeggen ze.
  */
 
 import type { HealthScore, HealthFactor } from "./health-score";
 import { samenvatFactoren } from "./health-score";
 import { analyseerAssetdekking, type AssetRegel } from "./pmax/assetdekking";
 import { buildNetworkSplit, findImbalances, type NetworkRow } from "./pmax/network-split";
-import { aggregateByEntity, detecteerCannibalisatie } from "./analysis/pmax-expert-layer";
+import { detecteerCannibalisatie } from "./analysis/pmax-expert-layer";
+import { aandeelScoreOmgekeerd } from "./util/scorecard-scores";
 
 export interface PmaxPlacementRow {
   placement: string;
-  cost: number;
-  conversions: number;
+  /**
+   * Het enige dat Google per PMax-placement publiceert. Kosten, klikken en conversies bestaan
+   * hier niet (zie de kop van pmaxPlacementRows in lib/demo/pmax-video-demo.ts) — wie ze hier
+   * toevoegt, bouwt een oordeel op een kolom die altijd leeg is.
+   */
   impressions: number;
 }
 
@@ -63,16 +74,6 @@ export interface PmaxScorecardInput {
   campMonthlyRows: readonly PmaxCampaignMonthlyRow[];
   /** Campagnenamen van de PMax-campagnes in dit account, voor de cannibalisatie-vergelijking. */
   pmaxCampaignNames: readonly string[];
-}
-
-// Zelfde vier-banden-vorm als search-scorecard.ts en health-score.ts, voor een gelijk
-// schaalgevoel tussen de scorecards. Hier op een AANDEEL (0-1) in plaats van een trendpercentage.
-function aandeelScoreOmgekeerd(aandeel: number): number {
-  // Voor een "slecht aandeel" (verspilling, dure netwerken): laag is goed.
-  if (aandeel < 0.10) return 20;
-  if (aandeel < 0.25) return 14;
-  if (aandeel < 0.40) return 8;
-  return 4;
 }
 
 export function computePmaxScorecard(input: PmaxScorecardInput): HealthScore {
@@ -106,7 +107,12 @@ export function computePmaxScorecard(input: PmaxScorecardInput): HealthScore {
   // ── 3. NETWERKMIX-EFFICIËNTIE (20pt) ──
   const slices = buildNetworkSplit(input.networkRows as NetworkRow[]);
   const totalCost = slices.reduce((s, n) => s + n.cost, 0);
-  const networkBeoordeeld = slices.length > 0 && totalCost > 0;
+  const totalNetworkConversies = slices.reduce((s, n) => s + n.conversions, 0);
+  const heeftNetwerkData = slices.length > 0 && totalCost > 0;
+  // Zonder één conversie in het venster kan geen netwerk ooit "duur" zijn (findImbalances laat
+  // shareGap dan null): dat gaf 20/20 met de tekst "geen netwerk kost meer dan het oplevert",
+  // terwijl er niets afgewogen ís. Onbekend is geen goede score.
+  const networkBeoordeeld = heeftNetwerkData && totalNetworkConversies > 0;
   const dureImbalances = networkBeoordeeld ? findImbalances(slices).filter((i) => i.kind === "duur") : [];
   const dureAandeel = networkBeoordeeld ? dureImbalances.reduce((s, i) => s + i.slice.costShare, 0) : 0;
   factors.push({
@@ -117,27 +123,25 @@ export function computePmaxScorecard(input: PmaxScorecardInput): HealthScore {
       ? dureImbalances.length > 0
         ? `${Math.round(dureAandeel * 100)}% van de spend zit in netwerken die naar verhouding meer kosten dan opleveren (${dureImbalances.map((i) => i.slice.label).join(", ")})`
         : "Geen netwerk kost naar verhouding meer dan het oplevert"
-      : "Geen netwerkverdeling bekend — niet beoordeeld",
+      : heeftNetwerkData
+        ? "Geen conversies om netwerken tegen af te wegen — niet beoordeeld"
+        : "Geen netwerkverdeling bekend — niet beoordeeld",
     assessed: networkBeoordeeld,
   });
 
-  // ── 4. PLACEMENT-EFFICIËNTIE (20pt) ──
-  const placements = aggregateByEntity(input.placementRows as unknown as Array<Record<string, unknown>>, "placement");
-  const placementTotalCost = placements.reduce((s, p) => s + p.cost, 0);
-  const placementBeoordeeld = placementTotalCost > 0;
-  const wastePlacements = placements.filter((p) => p.cost > 20 && p.conversions === 0);
-  const wasteCost = wastePlacements.reduce((s, p) => s + p.cost, 0);
-  const wasteRatio = placementBeoordeeld ? wasteCost / placementTotalCost : 0;
+  // ── 4. PLACEMENT-EFFICIËNTIE (20pt) ── — zie de kop: Google levert per PMax-placement alleen
+  // vertoningen, dus "aandeel spend/vertoningen op plaatsingen zonder conversie" is niet meetbaar.
+  // De factor zegt wat er wél zichtbaar is (vertoningen) en blijft eerlijk onbeoordeeld.
+  const uniekePlacements = new Set(input.placementRows.map((p) => p.placement).filter((p) => p.trim() !== ""));
+  const placementImpressies = input.placementRows.reduce((s, p) => s + p.impressions, 0);
   factors.push({
     name: "Placement-efficiëntie",
-    score: placementBeoordeeld ? aandeelScoreOmgekeerd(wasteRatio) : 0,
+    score: 0,
     maxScore: 20,
-    description: placementBeoordeeld
-      ? wastePlacements.length > 0
-        ? `${Math.round(wasteRatio * 100)}% van de placementspend (${wastePlacements.length} plaatsingen) zonder conversie`
-        : "Geen plaatsingen met spend zonder conversie"
-      : "Geen placementdata — niet beoordeeld",
-    assessed: placementBeoordeeld,
+    description: input.placementRows.length === 0
+      ? "Google publiceert geen kosten of conversies per PMax-placement, en er zijn geen placementrijen gesynct — niet beoordeeld"
+      : `${uniekePlacements.size} plaatsingen met samen ${placementImpressies.toLocaleString("nl-NL")} vertoningen, maar Google publiceert geen kosten of conversies per PMax-placement — efficiëntie niet te beoordelen`,
+    assessed: false,
   });
 
   // ── 5. CANNIBALISATIE MET SEARCH/SHOPPING (20pt) ──

@@ -73,26 +73,55 @@ export function selectBriefingPatterns(input: {
   return { status: "voldoende_bewijs", positives, donts, gaps, experiment, replacements: input.replacements };
 }
 
-// De gap-matrix: attribuut-waarde-combinaties die in de data voorkomen als patroonrij maar
-// met 0 of 1 ads (nog niet echt geprobeerd). De redenatie leunt op de tegenhanger: als een
-// andere waarde van hetzelfde attribuut een bewezen lift heeft, is het gat het testen waard.
+// De gap-matrix: attribuut-waarde-combinaties die nog niet echt beproefd zijn. De redenatie
+// leunt op de tegenhanger: als een andere waarde van hetzelfde attribuut een bewezen lift
+// heeft, is het gat het testen waard.
+//
+// Herbouwd 1 september 2026 (sloop-audit): de oude versie zocht uitsluitend rijen met 0 of
+// 1 ads, maar de patroontabel BEVAT die per constructie niet — aggregatePattern slaat onder
+// MIN_PATTERN_ADS=3 niets op. De matrix was dus altijd leeg, terwijl het schema precies één
+// experiment mét gap-redenatie afdwingt: het model moest er een verzinnen of de validatie
+// faalde. Nu: eerst echte gaten (mochten die er ooit komen), anders de DUNST bewezen
+// combinatie per attribuut — de minste ads, wél opgeslagen — als eerlijk "hier weten we het
+// minst van"-experiment.
 export function buildGapMatrix(patterns: PatternAggregate[]): GapCandidate[] {
-  const gaps: GapCandidate[] = [];
-  for (const p of patterns) {
-    if (p.nAds > GAP_MAX_ADS) continue;
+  const kandidaat = (p: PatternAggregate, dun: boolean): GapCandidate => {
     const counterpart = patterns
       .filter((other) => other.attribute === p.attribute && other.value !== p.value && other.evidenceLevel === "deterministic" && Math.abs(other.liftPct) > 0)
       .sort((a, b) => Math.abs(b.liftPct) - Math.abs(a.liftPct))[0];
-    gaps.push({
+    const basis = dun
+      ? `de waarde ${p.value} is met ${p.nAds} ad(s) het dunst bewezen deel van de matrix`
+      : `de waarde ${p.value} is met ${p.nAds} ad(s) nog vrijwel onbeproefd`;
+    return {
       attribute: p.attribute,
       value: p.value,
       nAds: p.nAds,
       reasoning: counterpart
-        ? `${p.attribute} is bewezen relevant (${counterpart.value}: ${counterpart.liftPct > 0 ? "plus" : "min"} ${Math.round(Math.abs(counterpart.liftPct) * 1000) / 10}% op ${counterpart.metric}); de waarde ${p.value} is met ${p.nAds} ad(s) nog vrijwel onbeproefd`
-        : `${p.attribute} = ${p.value} heeft met ${p.nAds} ad(s) nog vrijwel niet gedraaid; onbekend terrein`,
-    });
+        ? `${p.attribute} is bewezen relevant (${counterpart.value}: ${counterpart.liftPct > 0 ? "plus" : "min"} ${Math.round(Math.abs(counterpart.liftPct) * 1000) / 10}% op ${counterpart.metric}); ${basis}`
+        : `${p.attribute} = ${p.value}: ${basis}; onbekend terrein`,
+    };
+  };
+
+  const echteGaten = patterns.filter((p) => p.nAds <= GAP_MAX_ADS).map((p) => kandidaat(p, false));
+  if (echteGaten.length > 0) {
+    return echteGaten.sort((a, b) => (b.reasoning.includes("bewezen relevant") ? 1 : 0) - (a.reasoning.includes("bewezen relevant") ? 1 : 0));
   }
-  return gaps.sort((a, b) => (b.reasoning.includes("bewezen relevant") ? 1 : 0) - (a.reasoning.includes("bewezen relevant") ? 1 : 0));
+
+  // Geen echte gaten in de opslag: per attribuut de dunst bewezen waarde, mits het
+  // attribuut meerdere waarden kent (anders valt er niets te kiezen).
+  const perAttribuut = new Map<string, PatternAggregate[]>();
+  for (const p of patterns) {
+    const lijst = perAttribuut.get(p.attribute) ?? [];
+    lijst.push(p);
+    perAttribuut.set(p.attribute, lijst);
+  }
+  const dunste: GapCandidate[] = [];
+  for (const lijst of perAttribuut.values()) {
+    if (lijst.length < 2) continue;
+    const dun = [...lijst].sort((a, b) => a.nAds - b.nAds)[0];
+    dunste.push(kandidaat(dun, true));
+  }
+  return dunste.sort((a, b) => (b.reasoning.includes("bewezen relevant") ? 1 : 0) - (a.reasoning.includes("bewezen relevant") ? 1 : 0) || a.nAds - b.nAds);
 }
 
 // Precies een bewust experiment: het gat met de sterkste tegenhanger-redenatie wint.

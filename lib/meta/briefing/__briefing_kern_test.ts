@@ -60,6 +60,27 @@ assert(gaps.length === 1 && gaps[0].value === "3d", "een attribuut-waarde met 1 
 assert(gaps[0].reasoning.includes("bewezen relevant") && gaps[0].reasoning.includes("50%"), "de gap-redenatie draagt de tegenhanger-lift als leesbaar procent");
 assert(pickExperiment(gaps)!.value === "3d", "het experiment kiest het gat met de sterkste tegenhanger-redenatie");
 
+// ── De dunst-bewezen-terugval (herbouw 1 sep 2026) ──
+//
+// De patroontabel bevat per constructie GEEN rijen onder 3 ads (aggregatePattern slaat die
+// niet op), dus de oude gap-matrix was in de praktijk altijd leeg terwijl het schema wél
+// precies één experiment mét gap-redenatie afdwingt. Zonder echte gaten hoort de dunst
+// bewezen waarde per attribuut het experiment te dragen — nooit een lege matrix.
+{
+  const zonderGaten: PatternAggregate[] = [
+    patroon({ attribute: "stijl", value: "ugc", nAds: 8, liftPct: 0.5 }),
+    patroon({ attribute: "stijl", value: "studio", nAds: 3, liftPct: -0.1 }),
+    patroon({ attribute: "kleur", value: "warm", nAds: 6, liftPct: 0.2 }),
+  ];
+  const terugval = buildGapMatrix(zonderGaten);
+  assert(terugval.length === 1 && terugval[0].value === "studio", "zonder echte gaten wint de dunst bewezen waarde van een meerwaardig attribuut");
+  assert(terugval[0].reasoning.includes("dunst bewezen"), "de redenatie zegt eerlijk dat dit dun bewijs is, geen onbeproefd gat");
+  assert(pickExperiment(terugval) !== null, "er is dus altijd een experiment-kandidaat zodra er patronen zijn");
+  // Een attribuut met maar één waarde heeft niets te kiezen en levert geen kandidaat.
+  const eenWaarde = buildGapMatrix([patroon({ attribute: "kleur", value: "warm", nAds: 6 })]);
+  assert(eenWaarde.length === 0, "een attribuut met één waarde geeft geen experiment-kandidaat");
+}
+
 // ── Het briefing-schema: de geldige factory ──
 function concept(o: Partial<CreativeBriefing["concepten"][number]> = {}): CreativeBriefing["concepten"][number] {
   return {

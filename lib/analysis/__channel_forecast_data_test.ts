@@ -19,6 +19,9 @@ function rij(date: string, spend: number, conv: number, revenue: number): Channe
 }
 const rows: ChannelForecastRow[] = [
   ...Array.from({ length: 28 }, (_, i) => rij(`2025-08-${String(i + 1).padStart(2, "0")}`, 100, 2, 300)),
+  // Juli 2026 is op peildatum 23 augustus de laatste AFGESLOTEN maand.
+  ...Array.from({ length: 31 }, (_, i) => rij(`2026-07-${String(i + 1).padStart(2, "0")}`, 110, 3, 380)),
+  // De lopende maand (augustus, 23 dagen): mag NIET als gerealiseerd meetellen.
   ...Array.from({ length: 23 }, (_, i) => rij(`2026-08-${String(i + 1).padStart(2, "0")}`, 120, 3, 400)),
 ];
 
@@ -31,8 +34,12 @@ if (data) {
   assert(aug2025?.conversions === 56, `augustus 2025 telt conversies op tot 56 (kreeg ${aug2025?.conversions})`);
   assert((aug2025?.weeks.reduce((s, w) => s + w.adSpend, 0) ?? 0) === 2800, "de weken van augustus 2025 tellen op tot dezelfde maandspend");
 
-  const aug2026 = data.currentYearData[7]; // index 7 = augustus
-  assert(aug2026?.adSpend === 2760, `augustus 2026 (huidig jaar) telt spend op tot 2760 (kreeg ${aug2026?.adSpend})`);
+  // De herbouw van 1 sep 2026: de lopende (deel)maand telde als gerealiseerde eindstand en
+  // drukte met het zwaarste recency-gewicht de jaarprognose. Nu telt alleen de afgesloten
+  // maand; augustus (23/31 dagen) is null tot hij voorbij is.
+  const jul2026 = data.currentYearData[6]; // index 6 = juli
+  assert(jul2026?.adSpend === 3410, `juli 2026 (afgesloten) telt spend op tot 3410 (kreeg ${jul2026?.adSpend})`);
+  assert(data.currentYearData[7] === null, "augustus 2026 is de lopende maand en telt niet als gerealiseerd");
   assert(data.currentYearData[8] === null, "september 2026 is nog niet gerealiseerd (null)");
   assert(data.currentYearData[0] === null, "januari 2026 heeft geen data en is null, niet nul-gevuld");
 }

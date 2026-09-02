@@ -22,7 +22,10 @@ import { supabaseForClient } from "@/lib/demo/server-supabase";
 const SOP_TYPE = "geo_clone";
 const sectionFor = (geoClone: string) => `geo_clone_${geoClone.toLowerCase()}_v1`;
 
-interface FairEventCfg { abbrev?: string; cadence?: Cadence; editions?: Edition[] }
+// Parse-vorm van client_settings.rai_events; conversionsTarget is het EVENT-eigen doel
+// (zie lib/fair/fair-weeks' FairEventCfg) — de enige toegestane account-terugval voor het
+// beursdoel, nooit het jaardoel.
+interface FairEventCfg { abbrev?: string; cadence?: Cadence; editions?: Edition[]; conversionsTarget?: number | null }
 
 function parseParams(clientId: string | null, geoClone: string | null): { clientId: string; geoClone: string } | null {
   if (!clientId || !geoClone || !geoClone.trim()) return null;
@@ -65,8 +68,19 @@ async function runGeoCloneAnalysis(
     { cadence: accountEvent?.cadence ?? variant?.cadence ?? null, editions: accountEvent?.editions ?? [] },
     (gcRes.data?.event as { cadence?: Cadence | null; editions?: Edition[] | null } | null) ?? null
   );
+  // De account-terugval draagt alleen VERHOUDINGS-doelen (CPA/ROAS gelden op elke
+  // tijdschaal), en het event-eigen conversiedoel uit rai_events als dat er is. Het
+  // JAARdoel (kpi_targets.conversionsAbsolute) is bewust geen terugval meer: een
+  // beursaanloop tegen een jaardoel afmeten gaf vrijwel altijd "MIST het doel", mét
+  // wachtrij-gevolg (sloop-audit 1 sep 2026).
   const goals = resolveGoals(
-    { conversionsAbsolute: typeof kpi?.conversionsAbsolute === "number" && kpi.conversionsAbsolute > 0 ? kpi.conversionsAbsolute : null },
+    {
+      conversionsAbsolute: typeof accountEvent?.conversionsTarget === "number" && accountEvent.conversionsTarget > 0
+        ? accountEvent.conversionsTarget
+        : null,
+      cpaTarget: typeof kpi?.cpaTarget === "number" && kpi.cpaTarget > 0 ? kpi.cpaTarget : null,
+      roasTarget: typeof kpi?.roasTarget === "number" && kpi.roasTarget > 0 ? kpi.roasTarget : null,
+    },
     (gcRes.data?.goals as { conversionsAbsolute?: number | null } | null) ?? null
   );
 

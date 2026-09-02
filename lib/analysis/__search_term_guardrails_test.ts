@@ -138,6 +138,42 @@ console.log("\nDe kernregels");
   check("de aanbeveling blijft phrase", v[0].recommendedAction === "negative_phrase", v[0].recommendedAction);
 }
 
+// ── Regel 14: al uitgesloten termen (status EXCLUDED) ─────────────────────
+//
+// search_term_view.status werd genegeerd (sloop-audit 1 sep 2026), waardoor termen waar al
+// een negative op staat opnieuw als uitsluitings-advies terugkwamen — een dubbel voorstel in
+// de wachtrij, elke run weer.
+
+console.log("\nAl uitgesloten termen (status EXCLUDED)");
+{
+  const v = [uitsluiten("gokkasten online", { status: "EXCLUDED" })];
+  applySearchTermGuardrails(v);
+  check("een EXCLUDED term wordt niet opnieuw als negative geadviseerd",
+    v[0].recommendedAction === "monitor", acties(v));
+  check("met de reden erbij", /al uitgesloten/i.test(v[0].reason), v[0].reason);
+  check("en het originele advies als spoor", v[0].saferAlternativeAction === "negative_exact",
+    String(v[0].saferAlternativeAction));
+  check("readiness volgt de nieuwe actie", v[0].actionReadiness === "monitor", String(v[0].actionReadiness));
+}
+{
+  const v = [uitsluiten("gratis spellen", { status: "EXCLUDED", recommendedAction: "negative_phrase" })];
+  applySearchTermGuardrails(v);
+  check("ook phrase-uitsluitingen op EXCLUDED termen worden tegengehouden",
+    v[0].recommendedAction === "monitor", acties(v));
+}
+{
+  const v = [t("beursstand huren", { status: "ADDED" }), uitsluiten("iets ongerelateerds", { status: "NONE" })];
+  applySearchTermGuardrails(v);
+  check("ADDED raakt niets", v[0].recommendedAction === "keep", acties(v));
+  check("NONE blokkeert een terechte uitsluiting niet", v[1].recommendedAction === "negative_exact", acties(v));
+}
+{
+  // Zonder status-veld (oudere aanroepers) verandert er niets — het veld is optioneel.
+  const v = [uitsluiten("nog iets ongerelateerds")];
+  applySearchTermGuardrails(v);
+  check("zonder status blijft het advies staan", v[0].recommendedAction === "negative_exact", acties(v));
+}
+
 // ── actionReadiness volgt de uiteindelijke aanbeveling ────────────────────
 //
 // Dit veld bepaalt in action-gating.ts of iets zonder mens toegepast mag worden. Het werd

@@ -99,8 +99,15 @@ export function useChannelRunRateModel(clientId: string, channel: ChannelKind): 
       a.spend += r.spend; a.conv += r.conv;
       byMonth.set(m, a);
     }
-    const fullSpend: MonthValue[] = [...byMonth.entries()].filter(([m]) => m < curMonth).sort().map(([month, a]) => ({ month, value: a.spend }));
-    const fullConv: MonthValue[] = [...byMonth.entries()].filter(([m]) => m < curMonth).sort().map(([month, a]) => ({ month, value: a.conv }));
+    // De 220-dagengrens snijdt de oudste maand vrijwel altijd halverwege af; die deelmaand
+    // als "volle maand" laten meetellen gaf een kunstmatig lage eerste waarde en dus een
+    // opwaartse helling in de trend (sloop-audit 1 sep 2026). De maand waarin de grens
+    // valt doet daarom niet mee, tenzij de grens precies op de 1e lag.
+    const grens = new Date(Date.now() - 220 * 86_400_000).toISOString().slice(0, 10);
+    const eersteVolleMaand = grens.endsWith("-01") ? grens.slice(0, 7) : null;
+    const isVol = (m: string) => m < curMonth && (eersteVolleMaand !== null ? m >= eersteVolleMaand : m > grens.slice(0, 7));
+    const fullSpend: MonthValue[] = [...byMonth.entries()].filter(([m]) => isVol(m)).sort().map(([month, a]) => ({ month, value: a.spend }));
+    const fullConv: MonthValue[] = [...byMonth.entries()].filter(([m]) => isVol(m)).sort().map(([month, a]) => ({ month, value: a.conv }));
     const cur = byMonth.get(curMonth) ?? { spend: 0, conv: 0 };
 
     const spendF = forecastChannelMetric({ fullMonths: fullSpend, mtd: cur.spend, dayOfMonth, daysInMonth });

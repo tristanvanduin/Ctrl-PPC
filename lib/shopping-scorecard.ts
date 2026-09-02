@@ -30,6 +30,7 @@ import type { HealthScore, HealthFactor } from "./health-score";
 import { samenvatFactoren } from "./health-score";
 import { trendOver } from "./analysis/trend";
 import { aggregateByEntity } from "./analysis/pmax-expert-layer";
+import { trendScoreDalendIsGoed, trendScoreStijgendIsGoed, aandeelScoreOmgekeerd } from "./util/scorecard-scores";
 
 export interface ShoppingCampaignMonthlyRow {
   campaign_name: string;
@@ -41,6 +42,8 @@ export interface ShoppingCampaignMonthlyRow {
 }
 
 export interface ShoppingProductRow {
+  /** De echte identiteit van een product; null of leeg bij oude syncs en de demo. */
+  product_id: string | null;
   product_title: string;
   cost: number;
   clicks: number;
@@ -67,27 +70,6 @@ function perMaand(rows: readonly ShoppingCampaignMonthlyRow[]): MaandTotaal[] {
     map.set(r.month, bestaand);
   }
   return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
-}
-
-// Zelfde vier-banden-vorm als search-scorecard.ts/display-scorecard.ts, onafhankelijk hier
-// neergezet (zie de toelichting in display-scorecard.ts voor waarom niet gedeeld).
-function trendScoreDalendIsGoed(trendPct: number): number {
-  if (trendPct < -10) return 20;
-  if (trendPct < 5) return 16;
-  if (trendPct < 20) return 10;
-  return 4;
-}
-function trendScoreStijgendIsGoed(trendPct: number): number {
-  if (trendPct > 10) return 20;
-  if (trendPct > -10) return 14;
-  if (trendPct > -25) return 8;
-  return 4;
-}
-function aandeelScoreOmgekeerd(aandeel: number): number {
-  if (aandeel < 0.10) return 20;
-  if (aandeel < 0.25) return 14;
-  if (aandeel < 0.40) return 8;
-  return 4;
 }
 
 /**
@@ -146,7 +128,25 @@ export function computeShoppingScorecard(
   });
 
   // ── 4. PRODUCT-EFFICIËNTIE (20pt) ──
-  const producten = aggregateByEntity(productRows as unknown as Array<Record<string, unknown>>, "product_title");
+  //
+  // Aggregatie op product_id, niet op titel: titels zijn geen identiteit. Twee varianten delen
+  // vaak dezelfde titel (dan smolt hun spend tot één regel) en een hernoemde titel splitst de
+  // historie van hetzelfde product in tweeën. Bij een lege id — oude syncs en de demo schrijven
+  // product_id null — valt de rij terug op de titel: een benaderde groepering is daar het beste
+  // dat de data draagt, en beter dan de rij weggooien. De titel blijft het label voor mensen.
+  const rijenMetSleutel = productRows.map((r) => ({
+    ...r,
+    productSleutel: r.product_id && r.product_id.trim() !== "" ? r.product_id : r.product_title,
+  }));
+  const producten = aggregateByEntity(rijenMetSleutel as unknown as Array<Record<string, unknown>>, "productSleutel");
+  // Label terug naar de titel (aggregateByEntity zet de sleutel als label, en een kale
+  // product_id zegt een lezer niets). Eerste titel per sleutel wint; bij een id-sleutel zijn
+  // titels per definitie varianten van dezelfde naam.
+  const titelPerSleutel = new Map<string, string>();
+  for (const r of rijenMetSleutel) {
+    if (!titelPerSleutel.has(r.productSleutel)) titelPerSleutel.set(r.productSleutel, r.product_title);
+  }
+  for (const p of producten) p.label = titelPerSleutel.get(p.label) ?? p.label;
   const productTotalCost = producten.reduce((s, p) => s + p.cost, 0);
   const productBeoordeeld = productTotalCost > 0;
   const wasteProducten = producten.filter((p) => p.cost > 20 && p.conversions === 0);

@@ -47,7 +47,10 @@ export function findChannelGaps(
 
   // Zelfde voorkeursvolgorde als findBestGodViewCell in god-view-context.ts: combinatie eerst,
   // dan niche, dan model — maar hier per ONTBREKEND kanaal, niet per aangevraagd kanaal.
-  const kandidatenPerKanaal = new Map<string, GodViewCel>();
+  // De LAAGSTE rang wint expliciet. De oude versie hield de eerste match in cel-volgorde
+  // vast, en bouwGodViewCellen levert per rij de bréédste cel het eerst — precies het
+  // omgekeerde van de beloofde voorkeur (sloop-audit 1 sep 2026).
+  const kandidatenPerKanaal = new Map<string, { cel: GodViewCel; rang: number }>();
   const volgorde: { model: Bedrijfsmodel | null; niche: string | null }[] = [
     ...(bedrijfsmodel && niche ? [{ model: bedrijfsmodel, niche }] : []),
     ...(niche ? [{ model: null, niche }] : []),
@@ -57,14 +60,14 @@ export function findChannelGaps(
   for (const cel of cellen) {
     if (!cel.metrics) continue;
     if (actief.has(cel.sleutel.channel)) continue;
-    if (kandidatenPerKanaal.has(cel.sleutel.channel)) continue; // eerste (beste) match per kanaal wint
     const rang = volgorde.findIndex((k) => k.model === cel.sleutel.model && k.niche === cel.sleutel.niche);
     if (rang === -1) continue;
-    kandidatenPerKanaal.set(cel.sleutel.channel, cel);
+    const huidig = kandidatenPerKanaal.get(cel.sleutel.channel);
+    if (!huidig || rang < huidig.rang) kandidatenPerKanaal.set(cel.sleutel.channel, { cel, rang });
   }
 
   const resultaat: ChannelGap[] = [];
-  for (const [channel, cel] of kandidatenPerKanaal) {
+  for (const [channel, { cel }] of kandidatenPerKanaal) {
     const label = cel.sleutel.model && cel.sleutel.niche
       ? `${cel.sleutel.model.toUpperCase()} + ${nicheLabel(cel.sleutel.niche)}`
       : cel.sleutel.niche ? (nicheLabel(cel.sleutel.niche) ?? cel.sleutel.niche) : cel.sleutel.model!.toUpperCase();

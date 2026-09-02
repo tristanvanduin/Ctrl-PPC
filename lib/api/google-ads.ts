@@ -95,6 +95,13 @@ const VIDEO_METRIC_FIELDS = `
  * zodat ze net als ctr/conversion_rate met een percent-formatter te tonen zijn.
  */
 function readVideoMetrics(m: Record<string, number>) {
+  // WAARSCHUWING (sloop-audit 1 sep 2026): de /100 hieronder is NOOIT tegen echte data
+  // geverifieerd — de videokolommen staan in de hele database op 0 omdat er nog geen
+  // VIDEO-sync heeft gedraaid. De Google Ads API documenteert deze rates als fractie (0-1),
+  // niet als percentage; als dat klopt, deelt dit een fractie nóg eens door 100 en komt elke
+  // kijkdiepte een factor 100 te laag binnen. Verifieer dit tegen de eerste echte videosync
+  // vóórdat er op de kijkdiepte-analyse wordt gestuurd. Bewust NIET op de gok gerepareerd:
+  // een omkering zonder echte data ruilt de ene onbewezen aanname voor de andere.
   const pct = (v: number | undefined) => (v ? v / 100 : 0);
   return {
     avgCpm: (m.averageCpm || m.average_cpm || 0) / 1_000_000,

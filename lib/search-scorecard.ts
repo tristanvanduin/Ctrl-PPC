@@ -36,6 +36,7 @@ import type { HealthScore, HealthFactor } from "./health-score";
 import { samenvatFactoren } from "./health-score";
 import { spendWeightedQualityScore, type KeywordQsRow } from "./analysis/metric-cross-checks";
 import { trendOver } from "./analysis/trend";
+import { trendScoreDalendIsGoed, trendScoreStijgendIsGoed } from "./util/scorecard-scores";
 
 export interface SearchImpressionShareRow {
   campaignId: string;
@@ -72,27 +73,10 @@ function perMaand(rows: readonly SearchImpressionShareRow[]): MaandTotaal[] {
   return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
 }
 
-// Drempels voor de vier score-op-trend-factoren. Zelfde bandbreedtes als de Efficiency-factor in
-// health-score.ts voor Conversion Efficiency (letterlijk hergebruikt voor consistentie); Auction
-// Pressure en Demand Capture zijn onafhankelijk gekozen omdat het andere metrics zijn, met dezelfde
-// vier-banden-vorm zodat de schermen niet drie verschillende schaalgevoelens naast elkaar tonen.
-
-function trendScoreCpaStijl(trendPct: number): number {
-  // Voor CPA en CPC: DALEND is goed. < betekent hier "stijgt minder dan", dus een daling scoort
-  // altijd in de beste band.
-  if (trendPct < -10) return 20;
-  if (trendPct < 5) return 16;
-  if (trendPct < 20) return 10;
-  return 4;
-}
-
-function trendScoreCtrStijl(trendPct: number): number {
-  // Voor CTR: STIJGEND is goed, dus het teken draait om t.o.v. trendScoreCpaStijl.
-  if (trendPct > 10) return 20;
-  if (trendPct > -10) return 14;
-  if (trendPct > -25) return 8;
-  return 4;
-}
+// Drempels voor de vier score-op-trend-factoren: de gedeelde banden uit lib/util/scorecard-scores.ts
+// (zelfde bandbreedtes als de Efficiency-factor in health-score.ts), zodat de vier scorecards niet
+// vier schaalgevoelens naast elkaar tonen. Alleen de twee niveaudrempels hieronder zijn van deze
+// scorecard zelf: impression share en quality score zijn standen, geen trends.
 
 function impressionShareScore(iS: number): number {
   if (iS >= 0.80) return 20;
@@ -114,11 +98,16 @@ function qualityScoreNaarPunten(qs: number): number {
  * Bouwt de Search-scorecard. `rows` zijn ads_campaign_impression_share-rijen, vooraf gefilterd
  * op campaign_type = 'SEARCH' door de aanroeper (deze functie kent geen campaign_type-veld en
  * gokt dus niets over welke rijen erbij horen). `keywords` zijn ads_keyword_performance_monthly-
- * rijen voor dezelfde Search-campagnes, in de laatst beschikbare maand.
+ * rijen voor dezelfde Search-campagnes, uit de jongste maand die de keywordtabel zélf heeft.
+ *
+ * `keywordMaand` ("YYYY-MM") is die maand, en hoort in de factortekst: de keywordtabel loopt
+ * live maanden achter op de impression-share-tabel, en een quality score zonder maand erbij
+ * leest als "van nu" terwijl hij van maanden geleden kan zijn.
  */
 export function computeSearchScorecard(
   rows: readonly SearchImpressionShareRow[],
   keywords: readonly KeywordQsRow[],
+  keywordMaand?: string | null,
 ): HealthScore {
   const factors: HealthFactor[] = [];
   const maanden = perMaand(rows);
@@ -144,7 +133,7 @@ export function computeSearchScorecard(
     score: spendGewogenQs !== null ? qualityScoreNaarPunten(spendGewogenQs) : 0,
     maxScore: 20,
     description: spendGewogenQs !== null
-      ? `Spend-gewogen quality score ${spendGewogenQs}/10`
+      ? `Spend-gewogen quality score ${spendGewogenQs}/10${keywordMaand ? ` (keyworddata van ${keywordMaand})` : ""}`
       : "Geen quality-score-data voor deze keywords — niet beoordeeld",
     assessed: spendGewogenQs !== null,
   });
@@ -155,7 +144,7 @@ export function computeSearchScorecard(
   const cpaTrend = efficiencyBeoordeeld ? trendOver(cpaReeks) : 0;
   factors.push({
     name: "Conversion Efficiency",
-    score: efficiencyBeoordeeld ? trendScoreCpaStijl(cpaTrend) : 0,
+    score: efficiencyBeoordeeld ? trendScoreDalendIsGoed(cpaTrend) : 0,
     maxScore: 20,
     description: efficiencyBeoordeeld
       ? `CPA-trend ${cpaTrend >= 0 ? "+" : ""}${Math.round(cpaTrend)}% over de laatste maanden`
@@ -169,7 +158,7 @@ export function computeSearchScorecard(
   const cpcTrend = auctionBeoordeeld ? trendOver(cpcReeks) : 0;
   factors.push({
     name: "Auction Pressure",
-    score: auctionBeoordeeld ? trendScoreCpaStijl(cpcTrend) : 0,
+    score: auctionBeoordeeld ? trendScoreDalendIsGoed(cpcTrend) : 0,
     maxScore: 20,
     description: auctionBeoordeeld
       ? `Gemiddelde CPC-trend ${cpcTrend >= 0 ? "+" : ""}${Math.round(cpcTrend)}% (stijgend = meer concurrentiedruk)`
@@ -183,7 +172,7 @@ export function computeSearchScorecard(
   const ctrTrend = demandBeoordeeld ? trendOver(ctrReeks) : 0;
   factors.push({
     name: "Demand Capture",
-    score: demandBeoordeeld ? trendScoreCtrStijl(ctrTrend) : 0,
+    score: demandBeoordeeld ? trendScoreStijgendIsGoed(ctrTrend) : 0,
     maxScore: 20,
     description: demandBeoordeeld
       ? `CTR-trend ${ctrTrend >= 0 ? "+" : ""}${Math.round(ctrTrend)}% over de laatste maanden`

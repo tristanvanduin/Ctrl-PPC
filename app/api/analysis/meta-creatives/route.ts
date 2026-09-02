@@ -11,6 +11,8 @@ import { NextRequest } from "next/server";
 import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { getSupabase, getOpenRouterKey } from "@/lib/analysis/helpers";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
+import { alleRijen } from "@/lib/analysis/db-veilig";
 import { callOpenRouter } from "@/lib/analysis/openrouter-client";
 import { buildVisionPrompt, parseVisionResponse, VISION_PROMPT_VERSION, type CreativeVisionFeatures } from "@/lib/meta/vision/semantic";
 import { analyzeAssetBuffer } from "@/lib/meta/vision/pixel";
@@ -45,11 +47,6 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
-  const apiKey = getOpenRouterKey();
-  if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
-
   let body: { client_id?: string; mode?: "analyze" | "aggregate" | "both"; max_new?: number };
   try {
     body = await request.json();
@@ -58,6 +55,15 @@ export async function POST(request: NextRequest) {
   }
   const clientId = typeof body.client_id === "string" ? body.client_id : "";
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
+
+  const geweigerd = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (geweigerd) return geweigerd;
+
+  const supabase = getSupabase();
+  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
+  const apiKey = getOpenRouterKey();
+  if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
+
   const mode = body.mode ?? "both";
   const maxNew = typeof body.max_new === "number" && body.max_new > 0 ? Math.floor(body.max_new) : DEFAULT_MAX_NEW;
 
@@ -243,13 +249,17 @@ async function runAggregate(supabase: NonNullable<ReturnType<typeof getSupabase>
   const firstOfThisMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   const lastMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
   const lastMonthEnd = new Date(firstOfThisMonth.getTime() - 24 * 3600 * 1000);
-  const d90Start = new Date(today.getTime() - 90 * 24 * 3600 * 1000);
-  const yesterday = new Date(today.getTime() - 24 * 3600 * 1000);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+  // Beide periodes zijn op MAANDGRENS gesnapt: period_start is de upsert-sleutel, en met
+  // een wandklok-start ("vandaag minus 90 dagen") kreeg elke run een nieuwe sleutel en
+  // stapelden de patroonrijen per dag op zonder ooit vervangen te worden (sloop-audit
+  // 1 sep 2026). Nu verschuiven de sleutels alleen bij een maandwissel, en ruimt de
+  // opruimregel hieronder de oude periodes op.
+  const d90Start = new Date(lastMonthEnd.getTime() - 89 * 24 * 3600 * 1000);
   const periods = [
     { label: "laatste_volle_maand", start: iso(lastMonthStart), end: iso(lastMonthEnd) },
-    { label: "laatste_90_dagen", start: iso(d90Start), end: iso(yesterday) },
+    { label: "laatste_90_dagen", start: iso(d90Start), end: iso(lastMonthEnd) },
   ];
 
   const [{ data: ads }, { data: features }] = await Promise.all([
@@ -261,14 +271,25 @@ async function runAggregate(supabase: NonNullable<ReturnType<typeof getSupabase>
 
   const output: Record<string, unknown> = {};
   for (const period of periods) {
-    const { data: daily, error: dailyError } = await supabase
-      .from("meta_ad_daily")
-      .select("entity_id, impressions, link_clicks, spend, conversions, conversion_value, video_3s_views, video_thruplay, video_p100")
-      .eq("client_id", clientId)
-      .gte("date", period.start)
-      .lte("date", period.end);
-    if (dailyError) {
-      output[period.label] = { error: dailyError.message };
+    // Gepagineerd: 90 dagen × ads overschrijdt de PostgREST-cap al bij twaalf ads, en een
+    // stille afkap maakt elke patroonwaarde zwijgend fout (sloop-audit 1 sep 2026).
+    let daily: Array<Record<string, unknown>>;
+    try {
+      const fetchUitkomst = await alleRijen<Record<string, unknown>>(
+        (van, tot) => supabase
+          .from("meta_ad_daily")
+          .select("entity_id, date, impressions, link_clicks, spend, conversions, conversion_value, video_3s_views, video_thruplay, video_p100")
+          .eq("client_id", clientId)
+          .gte("date", period.start)
+          .lte("date", period.end)
+          .order("date", { ascending: false })
+          .order("entity_id", { ascending: true })
+          .range(van, tot),
+        "meta_ad_daily"
+      );
+      daily = fetchUitkomst.rijen;
+    } catch (e) {
+      output[period.label] = { error: String(e instanceof Error ? e.message : e) };
       continue;
     }
 
@@ -340,5 +361,16 @@ async function runAggregate(supabase: NonNullable<ReturnType<typeof getSupabase>
     }
     output[period.label] = { ads_met_features: adsWithFeatures.length, patronen_geschreven: written, periode: `${period.start} tot ${period.end}` };
   }
+
+  // Opruimen: patroonrijen van periodes die niet meer de huidige twee zijn — inclusief de
+  // per-dag-sleutels die het oude wandklok-schema heeft achtergelaten. Zonder dit leest
+  // meta-briefing "de nieuwste periode" mogelijk uit een halfoude restsleutel.
+  const { error: opruimError } = await supabase
+    .from("meta_creative_patterns")
+    .delete()
+    .eq("client_id", clientId)
+    .not("period_start", "in", `(${periods.map((p) => `"${p.start}"`).join(",")})`);
+  output.opgeruimd = opruimError ? { error: opruimError.message } : true;
+
   return output;
 }

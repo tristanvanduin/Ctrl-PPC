@@ -50,8 +50,17 @@ export function computeIcpFitForPivot(
 ): IcpPivotFit {
   const rows = segments.filter((s) => s.pivotType === pivotType);
   const realSegments = rows.filter((s) => s.pivotValueUrn !== "TOTAL" && s.pivotValueUrn !== "UNKNOWN");
-  const totalRow = rows.find((s) => s.pivotValueUrn === "TOTAL");
-  const coveragePct = totalRow?.coveragePct ?? null;
+  // Dekking spend-gewogen over ALLE rijen die haar dragen — de oude versie pakte de eerste
+  // TOTAL-rij, dus één dag van één campagne stond model voor het hele venster, en een seed
+  // zonder TOTAL-rij toonde "n.v.t." terwijl de kolom gevuld was (sloop-audit 1 sep 2026).
+  const totalRows = rows.filter((s) => s.pivotValueUrn === "TOTAL" && s.coveragePct != null);
+  const dekkingsBron = totalRows.length > 0 ? totalRows : realSegments.filter((s) => s.coveragePct != null);
+  const dekkingGewicht = dekkingsBron.reduce((sum, s) => sum + Math.max(s.spend ?? 0, 0), 0);
+  const coveragePct = dekkingsBron.length === 0
+    ? null
+    : dekkingGewicht > 0
+      ? round(dekkingsBron.reduce((sum, s) => sum + (s.coveragePct as number) * Math.max(s.spend ?? 0, 0), 0) / dekkingGewicht)
+      : round(dekkingsBron.reduce((sum, s) => sum + (s.coveragePct as number), 0) / dekkingsBron.length);
 
   const totalSpend = realSegments.reduce((sum, s) => sum + (s.spend ?? 0), 0);
   const totalLeads = realSegments.reduce((sum, s) => sum + (s.leads ?? 0), 0);

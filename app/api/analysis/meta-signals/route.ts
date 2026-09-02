@@ -4,10 +4,22 @@
 // data van de laatste twee 28-dagen-vensters voedt fatigue/saturatie/ranking/hook-detecties;
 // de getriggerde verhalen landen als een voorstel in de goedkeuringswachtrij (SI8) en de
 // sectie wordt opgeslagen zodat het maandwerk en de UI dezelfde bevinding zien.
+//
+// Herbouwd 1 september 2026 na de sloop-audit:
+// - De dayparting-detector draait alleen nog als er úúrdata is: meta_hourly_performance is
+//   in de hele database leeg en heeft geen schrijver, maar stond wel elke run in
+//   "gecontroleerd, niet getriggerd" — alsof er iets gecheckt was.
+// - spend-velocity en tracking-gap ankeren op de laatste datadatum (lib-fix); de route
+//   geeft "vandaag" mee zodat een sync-achterstand een eigen signaal wordt in plaats van
+//   een vals inzakkingsalarm (live gezien: 6 dagen lag gaf -86%).
+// - De dagqueries pagineren langs de PostgREST-cap (de demo-breakdown zat al op 780 van de
+//   1000) en queryfouten lezen niet langer als "draai eerst de sync".
+// - Budget-concentratie telt het recente 28-dagen-venster in plaats van de volle 70 dagen,
+//   en de demografie-drift ankert op de data in plaats van op de wandklok.
 // =====================================================================
 
 import { NextRequest } from "next/server";
-import { getSupabase, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
+import { saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { buildMetaCreativeSignals } from "@/lib/signals/meta-creative";
 import { buildMetaBreakdownSignals, metaBreakdownTypeLabel, type MetaBreakdownRow } from "@/lib/signals/meta-breakdown";
 import { buildBudgetConcentrationSignals, type BudgetEntityRow } from "@/lib/signals/budget-concentration";
@@ -18,10 +30,12 @@ import { buildTrackingGapSignals, type TrackingGapRow } from "@/lib/signals/trac
 import { buildHourlyDaypartingSignals, type HourlyRow } from "@/lib/signals/hourly-dayparting";
 import { renderSignalSection } from "@/lib/signals/render-section";
 import { mergeDetections } from "@/lib/signals/types";
-import { shapeMetaAdInputs, shapeMetaLevelInputs, type MetaDailyRow } from "@/lib/analysis/channel-signal-data";
+import { shapeMetaAdInputs, shapeMetaLevelInputs, splitWindows, type MetaDailyRow } from "@/lib/analysis/channel-signal-data";
 import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
-import { today } from "@/lib/reporting-date";
+import { today, addDays } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
+import { eis, alleRijen, dataFoutNaarResponse } from "@/lib/analysis/db-veilig";
 
 const SECTION = "meta_signals_v1";
 const SOP_TYPE = "meta_signals";
@@ -49,9 +63,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
-
   let clientId: string;
   try {
     const body = await request.json();
@@ -61,57 +72,91 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "client_id is verplicht" }, { status: 400 });
   }
 
-  const since = new Date(Date.now() - FETCH_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const [adRes, campRes, adNamesRes, campNamesRes, breakdownRes, accountRes, hourlyRes] = await Promise.all([
-    supabase
-      .from("meta_ad_daily")
-      .select("entity_id, date, impressions, link_clicks, spend, conversions, conversion_value, frequency, hook_rate, hold_rate, quality_ranking, engagement_rate_ranking, conversion_rate_ranking")
-      .eq("client_id", clientId)
-      .gte("date", since),
-    supabase
-      .from("meta_campaign_daily")
-      .select("entity_id, date, impressions, frequency, spend, conversions")
-      .eq("client_id", clientId)
-      .gte("date", since),
-    supabase.from("meta_ads").select("ad_id, name, campaign_id").eq("client_id", clientId),
-    supabase.from("meta_campaigns").select("campaign_id, name").eq("client_id", clientId),
-    supabase
-      .from("meta_breakdown_daily")
-      .select("breakdown_type, breakdown_value, date, impressions, link_clicks, spend, conversions")
-      .eq("client_id", clientId)
-      // Alleen account-level: de unieke sleutel draagt een level-kolom; zonder dit filter tellen
-      // de segment-sommen dubbel zodra een sync ook campagne-/adset-level breakdowns schrijft.
-      .eq("level", "account")
-      .gte("date", since),
+  const geweigerd = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (geweigerd) return geweigerd;
+
+  // Demo-bewust, net als de GET: mock-writes horen no-ops te zijn.
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
+
+  try {
+  const since = addDays(today(), -FETCH_DAYS);
+  const [adFetch, campFetch, adNamesRes, campNamesRes, breakdownFetch, accountRes, hourlyRes] = await Promise.all([
+    alleRijen<MetaDailyRow>(
+      (van, tot) => supabase
+        .from("meta_ad_daily")
+        .select("entity_id, date, impressions, link_clicks, spend, conversions, conversion_value, frequency, hook_rate, hold_rate, quality_ranking, engagement_rate_ranking, conversion_rate_ranking")
+        .eq("client_id", clientId)
+        .gte("date", since)
+        .order("date", { ascending: false })
+        .order("entity_id", { ascending: true })
+        .range(van, tot),
+      "meta_ad_daily"
+    ),
+    alleRijen<MetaDailyRow>(
+      (van, tot) => supabase
+        .from("meta_campaign_daily")
+        .select("entity_id, date, impressions, frequency, spend, conversions")
+        .eq("client_id", clientId)
+        .gte("date", since)
+        .order("date", { ascending: false })
+        .order("entity_id", { ascending: true })
+        .range(van, tot),
+      "meta_campaign_daily"
+    ),
+    supabase.from("meta_ads").select("ad_id, name, campaign_id").eq("client_id", clientId).limit(2000),
+    supabase.from("meta_campaigns").select("campaign_id, name").eq("client_id", clientId).limit(2000),
+    alleRijen<Record<string, unknown>>(
+      (van, tot) => supabase
+        .from("meta_breakdown_daily")
+        .select("breakdown_type, breakdown_value, date, impressions, link_clicks, spend, conversions")
+        .eq("client_id", clientId)
+        // Alleen account-level: de unieke sleutel draagt een level-kolom; zonder dit filter tellen
+        // de segment-sommen dubbel zodra een sync ook campagne-/adset-level breakdowns schrijft.
+        .eq("level", "account")
+        .gte("date", since)
+        .order("date", { ascending: false })
+        .order("breakdown_type", { ascending: true })
+        .order("breakdown_value", { ascending: true })
+        .range(van, tot),
+      "meta_breakdown_daily"
+    ),
     supabase
       .from("meta_account_daily")
       .select("date, spend, conversions, link_clicks")
       .eq("client_id", clientId)
-      .gte("date", since),
+      .gte("date", since)
+      .order("date", { ascending: false })
+      .limit(1000),
     supabase
       .from("meta_hourly_performance")
       .select("hour, spend, conversions")
       .eq("client_id", clientId)
-      .gte("date", since),
+      .gte("date", since)
+      .limit(1000),
   ]);
 
-  const adRows = (adRes.data ?? []) as MetaDailyRow[];
+  const adRows = adFetch.rijen;
   if (adRows.length === 0) {
-    return Response.json({ error: "Geen Meta-dagdata voor deze klant; draai eerst de Meta-sync" }, { status: 404 });
+    return Response.json({ error: "Geen Meta-dagdata voor deze klant; draai eerst de Meta-sync. Bron: meta_ad_daily." }, { status: 404 });
   }
+  const campRows = campFetch.rijen;
+  const breakdownData = breakdownFetch.rijen;
+  const accountRows = eis(accountRes, "meta_account_daily");
+  const hourlyData = eis(hourlyRes, "meta_hourly_performance");
 
-  const campName = new Map((campNamesRes.data ?? []).map((c) => [c.campaign_id as string, c.name as string]));
+  const campName = new Map((eis(campNamesRes, "meta_campaigns")).map((c) => [c.campaign_id as string, c.name as string]));
   const adNames = new Map(
-    (adNamesRes.data ?? []).map((a) => [a.ad_id as string, { adName: (a.name as string) ?? (a.ad_id as string), campaignName: campName.get(a.campaign_id as string) ?? null }])
+    (eis(adNamesRes, "meta_ads")).map((a) => [a.ad_id as string, { adName: (a.name as string) ?? (a.ad_id as string), campaignName: campName.get(a.campaign_id as string) ?? null }])
   );
   const levelNames = new Map([...campName.entries()].map(([id, name]) => [id, { adName: name }]));
 
   const ads = shapeMetaAdInputs(adRows, adNames);
-  const levels = shapeMetaLevelInputs((campRes.data ?? []) as MetaDailyRow[], levelNames);
+  const levels = shapeMetaLevelInputs(campRows, levelNames);
   // Structuur naast creative: waar landt het budget binnen plaatsing/leeftijd/device en
   // converteert dat mee (segment-waste + schaalkansen).
   const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
-  const breakdownRows: MetaBreakdownRow[] = (breakdownRes.data ?? []).map((r) => ({
+  const breakdownRows: MetaBreakdownRow[] = breakdownData.map((r) => ({
     breakdownType: String(r.breakdown_type ?? ""),
     breakdownValue: String(r.breakdown_value ?? ""),
     impressions: num(r.impressions),
@@ -119,9 +164,11 @@ export async function POST(request: NextRequest) {
     spend: num(r.spend),
     conversions: num(r.conversions),
   }));
-  // Budget-concentratie per campagne: stapelt het budget in één (onderpresterende) campagne?
+  // Budget-concentratie per campagne over het RECENTE 28-dagen-venster: dit signaal gaat
+  // over waar het budget nú stapelt, niet over het gemiddelde van tien weken.
+  const { recent: campRecent } = splitWindows(campRows);
   const campTotals = new Map<string, { spend: number; conversions: number }>();
-  for (const r of (campRes.data ?? []) as Record<string, unknown>[]) {
+  for (const r of campRecent as unknown as Record<string, unknown>[]) {
     const eid = String(r.entity_id);
     const t = campTotals.get(eid) ?? { spend: 0, conversions: 0 };
     t.spend += num(r.spend); t.conversions += num(r.conversions);
@@ -129,27 +176,34 @@ export async function POST(request: NextRequest) {
   }
   const budgetEntities: BudgetEntityRow[] = [...campTotals.entries()].map(([eid, t]) => ({ name: campName.get(eid) ?? eid, spend: t.spend, conversions: t.conversions }));
 
-  // Meta demografie-/segment-drift over de tijd + spend-velocity op accountniveau.
-  const asOfDate = today();
+  // Meta demografie-/segment-drift + spend-velocity op accountniveau. De drift ankert op de
+  // laatste DATAdatum: bij sync-lag verschoven de vensters anders stil naar halflege dagen.
+  const laatsteDataDatum = accountRows.length > 0
+    ? accountRows.map((r) => String(r.date)).sort().at(-1)!
+    : adRows.map((r) => r.date).sort().at(-1)!;
   const metaDriftRows: DemographicDriftRow[] = breakdownRows.length > 0
-    ? (breakdownRes.data ?? [])
+    ? breakdownData
         .filter((r) => r.breakdown_type && r.breakdown_value && r.date)
         .map((r) => ({ dimension: metaBreakdownTypeLabel(String(r.breakdown_type)), value: String(r.breakdown_value), date: String(r.date), leads: num(r.conversions) }))
     : [];
-  const metaSpendDaily: SpendDailyRow[] = (accountRes.data ?? []).map((r) => ({ date: String(r.date), spend: num(r.spend) }));
-  const metaWeekdayRows: WeekdayRow[] = (accountRes.data ?? []).map((r) => ({ date: String(r.date), spend: num(r.spend), conversions: num(r.conversions) }));
-  const metaTrackingRows: TrackingGapRow[] = (accountRes.data ?? []).map((r) => ({ date: String(r.date), clicks: num(r.link_clicks), conversions: num(r.conversions) }));
-  const metaHourlyRows: HourlyRow[] = (hourlyRes.data ?? []).map((r) => ({ hour: num(r.hour), spend: num(r.spend), conversions: num(r.conversions) }));
+  const metaSpendDaily: SpendDailyRow[] = accountRows.map((r) => ({ date: String(r.date), spend: num(r.spend) }));
+  const metaWeekdayRows: WeekdayRow[] = accountRows.map((r) => ({ date: String(r.date), spend: num(r.spend), conversions: num(r.conversions) }));
+  const metaTrackingRows: TrackingGapRow[] = accountRows.map((r) => ({ date: String(r.date), clicks: num(r.link_clicks), conversions: num(r.conversions) }));
+  const metaHourlyRows: HourlyRow[] = hourlyData.map((r) => ({ hour: num(r.hour), spend: num(r.spend), conversions: num(r.conversions) }));
 
   const merged = mergeDetections([
     buildMetaCreativeSignals({ ads, levels }),
     buildMetaBreakdownSignals(breakdownRows),
     buildBudgetConcentrationSignals(budgetEntities, { channelLabel: "Meta", idPrefix: "meta_budget" }),
-    buildDemographicDriftSignals(metaDriftRows, asOfDate, { outcomeLabel: "conversie", idPrefix: "meta_demographic_drift" }),
-    buildSpendVelocitySignals(metaSpendDaily, { channelLabel: "Meta", idPrefix: "meta_budget" }),
+    buildDemographicDriftSignals(metaDriftRows, laatsteDataDatum, { outcomeLabel: "conversie", idPrefix: "meta_demographic_drift" }),
+    buildSpendVelocitySignals(metaSpendDaily, { channelLabel: "Meta", idPrefix: "meta_budget", vandaag: today() }),
     buildWeekdayEfficiencySignals(metaWeekdayRows, { channelLabel: "Meta", idPrefix: "meta_budget" }),
     buildTrackingGapSignals(metaTrackingRows, { channelLabel: "Meta", idPrefix: "meta_budget" }),
-    buildHourlyDaypartingSignals(metaHourlyRows, { channelLabel: "Meta", idPrefix: "meta_budget" }),
+    // Alleen als er echt uurdata is: meta_hourly_performance heeft (nog) geen schrijver, en
+    // een lege tabel als "gecontroleerd" rapporteren wekt de indruk dat er iets gecheckt is.
+    ...(metaHourlyRows.length > 0
+      ? [buildHourlyDaypartingSignals(metaHourlyRows, { channelLabel: "Meta", idPrefix: "meta_budget" })]
+      : []),
   ]);
   const { section, triggeredCount, checkedIds } = renderSignalSection(merged, "Meta");
 
@@ -178,5 +232,20 @@ export async function POST(request: NextRequest) {
   // Voed de goedkeuringswachtrij (vervangt alleen de eigen pending; leeg = verversen).
   await saveSignalHypotheses(supabase, merged.triggered, "meta_signals", { clientId, analysisId: null });
 
-  return Response.json({ analysis: output, signals: triggeredCount, checked: checkedIds.length, adsAnalysed: ads.length });
+  return Response.json({
+    analysis: output,
+    signals: triggeredCount,
+    checked: checkedIds.length,
+    adsAnalysed: ads.length,
+    dekking: {
+      laatsteDataDatum,
+      uurdata: metaHourlyRows.length > 0,
+      rijenAfgekapt: adFetch.afgekapt || campFetch.afgekapt || breakdownFetch.afgekapt,
+    },
+  });
+  } catch (e) {
+    const dataFout = dataFoutNaarResponse(e);
+    if (dataFout) return dataFout;
+    throw e;
+  }
 }

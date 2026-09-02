@@ -10,9 +10,13 @@
 // =====================================================================
 
 import { NextRequest } from "next/server";
-import { getSupabase, getOpenRouterKey, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
+import { getOpenRouterKey, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { callRouted } from "@/lib/analysis/llm-router";
 import { extractGroundedNumbers, gateUngroundedNumbers } from "@/lib/analysis/weekly-number-gate";
+import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
+import { alleRijen, dataFoutNaarResponse } from "@/lib/analysis/db-veilig";
+import { addDays } from "@/lib/reporting-date";
 import { isActionable } from "@/lib/learning/hypothesis-status";
 import { selectBriefingPatterns } from "@/lib/meta/briefing/selection";
 import { BriefingSchema, buildBriefingPrompt, type CreativeBriefing } from "@/lib/meta/briefing/schema";
@@ -32,12 +36,24 @@ function stripFences(text: string): string {
   return text.replace(/```json/gi, "").replace(/```/g, "").trim();
 }
 
-export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
-  const apiKey = getOpenRouterKey();
-  if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
+// De toegestane-getallen-set voor de number-gate. De gate herkent alleen "N%" en "€N",
+// maar de prompt draagt de patroonwaarden als kale JSON-getallen (liftPct 0.345): de
+// toegestane set was daardoor vrijwel leeg — "34,5%" werd een valse 422 en "34,5" zonder
+// teken ontsnapte juist (sloop-audit 1 sep 2026). Daarom: elk getal uit de prompt-input,
+// in beide gedaanten (afgerond, en als fractie×100), bovenop de letterlijke %/€-vondsten.
+// Zo blijft elk geciteerd getal herleidbaar tot de input en blokkeert de gate nog steeds
+// verzonnen cijfers.
+function toegestaneGetallenUitInput(promptUser: string): number[] {
+  const uit = extractGroundedNumbers(promptUser);
+  for (const m of promptUser.matchAll(/-?\d+(?:[.,]\d+)?/g)) {
+    const v = Math.abs(parseFloat(m[0].replace(",", ".")));
+    if (!Number.isFinite(v)) continue;
+    uit.push(Math.round(v), Math.round(v * 100));
+  }
+  return uit;
+}
 
+export async function POST(request: NextRequest) {
   let body: { client_id?: string; funnelfocus?: string; hypothesis_id?: string };
   try {
     body = await request.json();
@@ -47,6 +63,16 @@ export async function POST(request: NextRequest) {
   const clientId = typeof body.client_id === "string" ? body.client_id : "";
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
 
+  const geweigerd = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (geweigerd) return geweigerd;
+
+  // Demo-bewust: mock-writes horen no-ops te zijn.
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
+  const apiKey = getOpenRouterKey();
+  if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
+
+  try {
   // ── SI5: de gate tussen analyse en briefing. ──
   // Een briefing zet designers en editors aan het werk, dus hij hoort een GENOMEN
   // beslissing uit te voeren en niet zelf een voorstel te zijn. De aanroeper wijst daarom
@@ -119,17 +145,33 @@ export async function POST(request: NextRequest) {
       evidenceLevel: r.evidence_level as PatternAggregate["evidenceLevel"],
     }));
 
-  // ── 2. Vervangingsurgentie: recent (14 dagen) tegen prior (30 dagen ervoor). ──
-  const today = new Date();
-  const iso = (offsetDays: number) => new Date(today.getTime() - offsetDays * 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const loadWindow = async (fromOffset: number, toOffset: number): Promise<AdDailyRow[]> => {
-    const { data } = await supabase
-      .from("meta_ad_daily")
-      .select("entity_id, impressions, link_clicks, conversions, frequency")
-      .eq("client_id", clientId)
-      .gte("date", iso(fromOffset))
-      .lte("date", iso(toOffset));
-    return (data ?? []).map((r) => ({
+  // ── 2. Vervangingsurgentie: recent (14 dagen) tegen prior (30 dagen ervoor), geankerd op
+  // de laatste DATAdatum. Op de wandklok besloegen de vensters bij sync-lag deels lege
+  // dagen, waardoor de impressie-drempel zelden werd gehaald en de urgentie systematisch
+  // leeg bleef (sloop-audit 1 sep 2026).
+  const ankerRes = await supabase
+    .from("meta_ad_daily")
+    .select("date")
+    .eq("client_id", clientId)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (ankerRes.error) return Response.json({ error: `meta_ad_daily: ${ankerRes.error.message}` }, { status: 500 });
+  const anker = ankerRes.data?.date ? String(ankerRes.data.date) : vandaag();
+  const loadWindow = async (vanTerug: number, totTerug: number): Promise<AdDailyRow[]> => {
+    const { rijen } = await alleRijen<Record<string, unknown>>(
+      (van, tot) => supabase
+        .from("meta_ad_daily")
+        .select("entity_id, date, impressions, link_clicks, conversions, frequency")
+        .eq("client_id", clientId)
+        .gte("date", addDays(anker, -vanTerug))
+        .lte("date", addDays(anker, -totTerug))
+        .order("date", { ascending: false })
+        .order("entity_id", { ascending: true })
+        .range(van, tot),
+      "meta_ad_daily"
+    );
+    return rijen.map((r) => ({
       adId: r.entity_id as string,
       impressions: Number(r.impressions ?? 0),
       linkClicks: Number(r.link_clicks ?? 0),
@@ -137,7 +179,7 @@ export async function POST(request: NextRequest) {
       frequency: r.frequency == null ? null : Number(r.frequency),
     }));
   };
-  const [recentRows, priorRows] = await Promise.all([loadWindow(14, 1), loadWindow(44, 15)]);
+  const [recentRows, priorRows] = await Promise.all([loadWindow(13, 0), loadWindow(43, 14)]);
   const replacements = flagFatiguedWinners(buildFatigueInputs(aggregateAdWindow(recentRows), aggregateAdWindow(priorRows)));
 
   // ── 3. De selectie beslist het pad. ──
@@ -177,8 +219,10 @@ export async function POST(request: NextRequest) {
       "meta_ads",
       periodEnd
     );
-    if (kpi.cpa) kop.doelstelling = `CPA-target ${kpi.cpa}`;
-    else if (kpi.roas) kop.doelstelling = `ROAS-target ${kpi.roas}`;
+    // Het target komt NAAST het mandaat, niet in de plaats ervan: de briefing voert een
+    // aangenomen hypothese uit, en dat hoort de kop te blijven zeggen.
+    if (kpi.cpa) kop.doelstelling = `${kop.doelstelling} (CPA-target €${kpi.cpa})`;
+    else if (kpi.roas) kop.doelstelling = `${kop.doelstelling} (ROAS-target ${kpi.roas})`;
   } catch {
     // geen settings of kolom: de lege gids volstaat, de briefing benoemt dan geen merkregels
   }
@@ -218,7 +262,7 @@ export async function POST(request: NextRequest) {
     ...briefing.vervangingsurgentie.map((v) => v.instructie),
     ...briefing.concepten.map((c) => c.experimentRedenatie ?? ""),
   ].join("\n");
-  const allowed = extractGroundedNumbers(prompt.user);
+  const allowed = toegestaneGetallenUitInput(prompt.user);
   const gate = gateUngroundedNumbers(claimsText, allowed);
   if (gate.hadUngrounded) {
     return Response.json({ error: "De briefing bevat bewijs-claims met getallen die niet in de input staan; niets opgeslagen", ongegrond: gate.ungrounded }, { status: 422 });
@@ -233,4 +277,9 @@ export async function POST(request: NextRequest) {
   if (saveError) return Response.json({ error: "Opslaan mislukt", detail: saveError }, { status: 500 });
 
   return Response.json({ status: "briefing", markdown, concepten: briefing.concepten.length, replacements: replacements.length, hypothesis_id: hypothesisId });
+  } catch (e) {
+    const dataFout = dataFoutNaarResponse(e);
+    if (dataFout) return dataFout;
+    throw e;
+  }
 }

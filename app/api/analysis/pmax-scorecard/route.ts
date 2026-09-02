@@ -9,6 +9,7 @@ import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { computePmaxScorecard, type PmaxCampaignMonthlyRow, type PmaxPlacementRow } from "@/lib/pmax-scorecard";
 import type { AssetRegel } from "@/lib/pmax/assetdekking";
 import type { NetworkRow } from "@/lib/pmax/network-split";
+import { eis, dataFoutNaarResponse, lopendeMaandStart } from "@/lib/analysis/db-veilig";
 
 // Zelfde venster als lib/analysis/pmax-expert-layer.ts: twaalf maanden voor asset-/netwerk-/
 // placementdata, zodat deze route niet stilzwijgend afwijkt van de signalen die dezelfde tabellen
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
   const supabase = supabaseForClient(clientId);
   if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
 
+  try {
   const { data: pmaxMeta, error: metaError } = await supabase
     .from("ads_campaign_metadata")
     .select("campaign_id, campaign_name")
@@ -47,27 +49,36 @@ export async function GET(request: NextRequest) {
     supabase.from("ads_pmax_network_breakdown")
       .select("network_type, cost, conversions, conversions_value, impressions, clicks")
       .eq("client_id", clientId).gte("month", vanaf),
+    // Zonder expliciete order was de .limit() een willekeurige greep: welke 2000 rijen je kreeg
+    // hing af van de fysieke opslagvolgorde, en dat maakt twee runs op dezelfde data
+    // onvergelijkbaar. Kosten eerst (de audit-afspraak voor elke afkap), maar omdat Google per
+    // PMax-placement geen kosten publiceert is die kolom hier overal gelijk — vertoningen als
+    // tweede sleutel houdt dan de grootste plaatsingen binnen de afkap, id als vaste tiebreak.
     supabase.from("ads_pmax_placements")
-      .select("placement, cost, conversions, impressions")
-      .eq("client_id", clientId).gte("month", vanaf).limit(2000),
+      .select("placement, impressions")
+      .eq("client_id", clientId).gte("month", vanaf)
+      .order("cost", { ascending: false })
+      .order("impressions", { ascending: false })
+      .order("id", { ascending: true })
+      .limit(2000),
+    // Voor de cannibalisatie-vergelijking: alleen AFGESLOTEN maanden. De lopende deelmaand zou
+    // als "laatste maand" meedoen en elke vergelijking scheeftrekken; detecteerCannibalisatie
+    // filtert zelf ook nog, maar de rijen hoeven niet eens over de lijn.
     supabase.from("ads_campaign_monthly")
       .select("campaign_name, month, cost, conversions")
       .eq("client_id", clientId)
-      .gte("month", new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)),
+      .gte("month", new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+      .lt("month", lopendeMaandStart()),
   ]);
-  if (assetData.error) return Response.json({ error: assetData.error.message }, { status: 500 });
-  if (networkData.error) return Response.json({ error: networkData.error.message }, { status: 500 });
-  if (placementData.error) return Response.json({ error: placementData.error.message }, { status: 500 });
-  if (campMonthlyData.error) return Response.json({ error: campMonthlyData.error.message }, { status: 500 });
 
-  const assetRows: AssetRegel[] = (assetData.data ?? []).map((r) => ({
+  const assetRows: AssetRegel[] = eis(assetData, "ads_pmax_asset_performance").map((r) => ({
     asset_group_name: r.asset_group_name as string | null,
     asset_id: r.asset_id as string | null,
     asset_type: r.asset_type as string | null,
     performance_label: r.performance_label as string | null,
     month: r.month as string | null,
   }));
-  const networkRows: NetworkRow[] = (networkData.data ?? []).map((r) => ({
+  const networkRows: NetworkRow[] = eis(networkData, "ads_pmax_network_breakdown").map((r) => ({
     networkType: String(r.network_type ?? "UNKNOWN"),
     cost: Number(r.cost ?? 0),
     conversions: Number(r.conversions ?? 0),
@@ -75,13 +86,11 @@ export async function GET(request: NextRequest) {
     impressions: Number(r.impressions ?? 0),
     clicks: Number(r.clicks ?? 0),
   }));
-  const placementRows: PmaxPlacementRow[] = (placementData.data ?? []).map((r) => ({
+  const placementRows: PmaxPlacementRow[] = eis(placementData, "ads_pmax_placements").map((r) => ({
     placement: String(r.placement ?? ""),
-    cost: Number(r.cost ?? 0),
-    conversions: Number(r.conversions ?? 0),
     impressions: Number(r.impressions ?? 0),
   }));
-  const campMonthlyRows: PmaxCampaignMonthlyRow[] = (campMonthlyData.data ?? []).map((r) => ({
+  const campMonthlyRows: PmaxCampaignMonthlyRow[] = eis(campMonthlyData, "ads_campaign_monthly").map((r) => ({
     campaign_name: String(r.campaign_name ?? ""),
     month: String(r.month ?? ""),
     cost: Number(r.cost ?? 0),
@@ -90,4 +99,9 @@ export async function GET(request: NextRequest) {
 
   const health = computePmaxScorecard({ assetRows, networkRows, placementRows, campMonthlyRows, pmaxCampaignNames });
   return Response.json({ health, campaignCount: pmaxCampaigns.length });
+  } catch (e) {
+    const dataFout = dataFoutNaarResponse(e);
+    if (dataFout) return dataFout;
+    throw e;
+  }
 }

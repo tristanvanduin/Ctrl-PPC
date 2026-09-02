@@ -12,7 +12,7 @@ import { buildChannelForecast } from "@/lib/analysis/channel-forecast-data";
 import type { TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { actieveMetrics, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
 import type { ClientHistoricalData } from "@/lib/types";
-import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas, formatterFor, METRIC_LABELS } from "@/lib/forecast-format";
+import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas, formatterFor, isLowerBetter, METRIC_LABELS } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
@@ -102,7 +102,13 @@ function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
   };
   const kpi = forecast[metric].kpi;
   const format = formatterFor(metric);
-  const isPositive = kpi.diffPct >= 0;
+  // isLowerBetter, net als elke andere metric-consument: zonder deze check kleurde een
+  // sléchtere CPA (diffPct >= 0) groen — precies de "gemiste plek kleurt rood groen" waar
+  // lib/forecast-format.ts voor waarschuwt (sloop-audit 1 sep 2026).
+  const isPositive = isLowerBetter(metric) ? kpi.diffPct <= 0 : kpi.diffPct >= 0;
+  // De voortgangsbalk "X% van het jaardoel gerealiseerd" is voor een verhoudingsmetric
+  // (CPA, ROAS) betekenisloos: je realiseert geen 60% van een doel-CPA. Verberg hem daar.
+  const toonVoortgang = metric === "conversions" || metric === "revenue";
   const realizedPct = kpi.annualTarget > 0 ? (kpi.ytdRealized / kpi.annualTarget) * 100 : 0;
 
   return (
@@ -130,15 +136,17 @@ function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
       {kpi.annualTarget > 0 && (
         <div>
           <div className="flex justify-between text-micro mb-1.5">
-            <span className="text-muted-foreground">{Math.round(realizedPct)}% gerealiseerd</span>
+            <span className="text-muted-foreground">{toonVoortgang ? `${Math.round(realizedPct)}% gerealiseerd` : "t.o.v. doel"}</span>
             <span className={`font-bold ${isPositive ? "text-green-600" : "text-red-500"}`}>{formatDeltaPercent(kpi.diffPct)}</span>
           </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${isPositive ? "bg-gradient-to-r from-green-400 to-green-500" : "bg-gradient-to-r from-red-400 to-red-500"}`}
-              style={{ width: `${Math.min(realizedPct, 100)}%` }}
-            />
-          </div>
+          {toonVoortgang && (
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${isPositive ? "bg-gradient-to-r from-green-400 to-green-500" : "bg-gradient-to-r from-red-400 to-red-500"}`}
+                style={{ width: `${Math.min(realizedPct, 100)}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
     </KlikbareKaart>

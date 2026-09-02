@@ -26,6 +26,11 @@ interface TermWithData extends SearchTermVerdict {
   conversionsValue: number;
   campaignName: string;
   adGroupName: string;
+  /**
+   * search_term_view.status uit Google Ads (ADDED, EXCLUDED, NONE). Optioneel omdat oudere
+   * aanroepers hem niet meegeven; alleen EXCLUDED heeft hier betekenis (regel 14).
+   */
+  status?: string;
 }
 
 // ── Intent normalization ───────────────────────────────────────────────────
@@ -187,6 +192,20 @@ export function applySearchTermGuardrails(verdicts: TermWithData[]): TermWithDat
       if (v.conversions > 0) v.evidenceLevel = "deterministic";
       else if (v.confidence === "high") v.evidenceLevel = "inferred";
       else v.evidenceLevel = "weak_signal";
+    }
+
+    // ── Rule 14: Al uitgesloten termen niet opnieuw als uitsluiting adviseren ──
+    //
+    // search_term_view.status EXCLUDED betekent dat er al een negative op deze term staat; die
+    // nog eens als negative adviseren zet een dubbel voorstel in de wachtrij en laat de lijst
+    // "openstaande uitsluitingen" nooit leeglopen (sloop-audit 1 sep 2026, de status werd
+    // volledig genegeerd). Bewust als LAATSTE regel in de lus, zodat hij ook uitsluitingen
+    // vangt die eerdere regels lieten staan; keep/monitor/investigate blijven onaangeroerd.
+    if (v.status === "EXCLUDED" && isNegative(v)) {
+      v.saferAlternativeAction = v.recommendedAction;
+      v.saferAlternativeReason = `Origineel: ${v.recommendedAction}. Term is al uitgesloten in Google Ads (search_term_view.status EXCLUDED).`;
+      v.recommendedAction = "monitor";
+      v.reason = `Al uitgesloten in Google Ads (status EXCLUDED); geen nieuwe uitsluiting nodig. ${v.reason}`;
     }
   }
 

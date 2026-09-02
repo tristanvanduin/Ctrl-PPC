@@ -59,13 +59,39 @@ console.log("\nZwak account: stijgende CPA/CPC, dalende CTR");
 console.log("\nProduct-efficiëntie: producten met spend zonder conversie tellen als waste");
 {
   const products: ShoppingProductRow[] = [
-    { product_title: "Bestseller", cost: 800, clicks: 300, conversions: 40, impressions: 8000 },
-    { product_title: "Dooie voorraad", cost: 200, clicks: 60, conversions: 0, impressions: 4000 },
+    { product_id: "sku-1", product_title: "Bestseller", cost: 800, clicks: 300, conversions: 40, impressions: 8000 },
+    { product_id: "sku-2", product_title: "Dooie voorraad", cost: 200, clicks: 60, conversions: 0, impressions: 4000 },
   ];
   const out = computeShoppingScorecard([], products);
   const factor = out.factors.find((f) => f.name === "Product-efficiëntie")!;
   check("productdata wordt beoordeeld", factor.assessed);
   check("het zwakke product wordt genoemd in de beschrijving", factor.description.includes("1 product") || factor.description.includes("20%"), factor.description);
+}
+
+console.log("\nProduct-efficiëntie aggregeert op product_id, met de titel alleen als label");
+{
+  // Titels zijn geen identiteit. Drie gevallen in één invoer:
+  //   - sku-h in twee maandrijen met een hernoemde titel: één product, samen €30 zonder
+  //     conversie → waste. Op titel geaggregeerd waren dit twee losse producten van €15, en
+  //     €15 haalt de €20-drempel niet: de waste was dan onzichtbaar geweest.
+  //   - "Variant" als titel op twee verschillende sku's, elk €15 zonder conversie: twee
+  //     producten onder de drempel. Op titel gesmolten was dit één product van €30 → vals
+  //     alarm. Er mag dus precies ÉÉN waste-product uitkomen (sku-h), niet twee.
+  //   - een rij zonder product_id (oude syncs, demo): valt terug op de titel en telt gewoon mee
+  //     in het totaal.
+  const products: ShoppingProductRow[] = [
+    { product_id: "sku-h", product_title: "Oude naam", cost: 15, clicks: 5, conversions: 0, impressions: 500 },
+    { product_id: "sku-h", product_title: "Nieuwe naam", cost: 15, clicks: 5, conversions: 0, impressions: 500 },
+    { product_id: "sku-a", product_title: "Variant", cost: 15, clicks: 5, conversions: 0, impressions: 500 },
+    { product_id: "sku-b", product_title: "Variant", cost: 15, clicks: 5, conversions: 0, impressions: 500 },
+    { product_id: null, product_title: "Zonder id", cost: 400, clicks: 100, conversions: 20, impressions: 4000 },
+  ];
+  const out = computeShoppingScorecard([], products);
+  const factor = out.factors.find((f) => f.name === "Product-efficiëntie")!;
+  check("beoordeeld", factor.assessed);
+  // €30 waste (sku-h) op €460 totaal = 6,5% → beste band; en de telling noemt één product.
+  check("precies één waste-product (het hernoemde sku, niet de gesmolten titel)", factor.description.includes("(1 producten)"), factor.description);
+  check("waste-aandeel klopt met id-aggregatie (7%)", factor.description.includes("7%"), factor.description);
 }
 
 console.log("\nGeen productdata: Product-efficiëntie blijft eerlijk onbeoordeeld, de rest niet");

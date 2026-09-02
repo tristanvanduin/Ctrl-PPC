@@ -75,6 +75,16 @@ assert(basis.summary.includes("2 RSA's") || basis.summary.includes("RSA"), "de s
 // ════ W1 ════
 // ── Prijs-normalisatie en claim-extractie ──
 assert(normalizePrice("€14,95") === "14.95" && normalizePrice("£14.95") === "14.95", "prijzen normaliseren over valuta en komma-punt heen");
+
+// ── Nederlandse duizendtallen (sloop-audit 1 sep 2026): "€1.299" is 1299, geen 1.29 ──
+assert(normalizePrice("€1.299") === "1299.00", `NL-duizendtal zonder decimalen: €1.299 -> 1299.00 (kreeg ${normalizePrice("€1.299")})`);
+assert(normalizePrice("€1.299,50") === "1299.50", `NL-duizendtal met decimalen: €1.299,50 -> 1299.50 (kreeg ${normalizePrice("€1.299,50")})`);
+assert(normalizePrice("€12,50") === "12.50", `NL-komma-decimaal: €12,50 -> 12.50 (kreeg ${normalizePrice("€12,50")})`);
+assert(normalizePrice("$1,299.50") === "1299.50", "EN-duizendtal met decimalen: $1,299.50 -> 1299.50");
+const nlClaims = extractAdClaims(["Nu voor €1.299 bij ons"]);
+assert(nlClaims.some((c) => c.type === "prijs" && c.normalized === "1299.00"), `de regex leest €1.299 volledig, niet afgekapt tot €1.29 (kreeg ${JSON.stringify(nlClaims.filter((c) => c.type === "prijs").map((c) => c.normalized))})`);
+const nlChecks = checkClaimsOnPage(nlClaims, "Bestel vandaag. De prijs is €1.299,- inclusief btw en gratis bezorging in heel Nederland, met twee jaar garantie op alle onderdelen van dit product.");
+assert(nlChecks.find((c) => c.claim.type === "prijs")!.status === "gevonden_letterlijk", `hetzelfde NL-bedrag op de pagina is een match, geen valse prijs-afwijking (kreeg ${nlChecks.find((c) => c.claim.type === "prijs")!.status})`);
 const claims = extractAdClaims(["Get yours for just £14.95", "Same day shipment", "Gratis verzending en 30 dagen retour", "Nu 20% korting", "Gratis case erbij"]);
 assert(claims.some((c) => c.type === "prijs" && c.normalized === "14.95"), "de prijs-claim wordt herkend en genormaliseerd");
 assert(claims.some((c) => c.type === "snelheid_levering") && claims.some((c) => c.type === "percentage" && c.normalized === "20%") && claims.some((c) => c.type === "garantie"), "snelheid, percentage en garantie worden als typen herkend");
@@ -93,6 +103,10 @@ const overlap = headlineH1Overlap(["Personaliseer je telefoonhoesje vandaag"], "
 assert(overlap.ratio >= 0.6 && overlap.bestHeadline !== null, "de kop-overlap meet de token-dekking van de beste headline");
 const facts = buildMessageMatchFacts({ headlines: ["Same day shipment"], descriptions: ["Gratis verzending"], pageText: pagina, h1: "Personaliseer je hoesje" });
 assert(facts.status === "leesbaar" && facts.coveragePct === 100 && facts.priceMismatch === false, "de facts bundelen coverage en de mismatch-vlag");
+
+// ── Geen claims gedetecteerd → coverage null, geen valse 100% (sloop-audit 1 sep 2026) ──
+const claimloos = buildMessageMatchFacts({ headlines: ["Bezoek onze mooie winkel"], descriptions: ["De beste keuze voor uw telefoon"], pageText: pagina, h1: "Winkel" });
+assert(claimloos.status === "leesbaar" && claimloos.coveragePct === null && claimloos.claims.length === 0, `zonder toetsbare claims is de coverage null in plaats van 100 (kreeg ${claimloos.status === "leesbaar" ? claimloos.coveragePct : claimloos.status})`);
 
 // ── Het degradatiepad ──
 const dood = buildMessageMatchFacts({ headlines: ["x"], descriptions: [], pageText: "Access denied", h1: null });

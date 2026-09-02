@@ -23,7 +23,10 @@ import { buildEditionCurves, deriveCpaCurve } from "@/lib/analysis/event-curves"
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 
-interface FairEventCfg { id?: string; name?: string; abbrev?: string; cadence?: Cadence | null; editions?: Edition[] | null }
+// Parse-vorm van client_settings.rai_events. conversionsTarget is het EVENT-eigen doel
+// (zelfde veld als lib/fair/fair-weeks' FairEventCfg documenteert): alleen dat mag als
+// event-doel dienen, nooit het jaardoel uit kpi_targets.
+interface FairEventCfg { id?: string; name?: string; abbrev?: string; cadence?: Cadence | null; editions?: Edition[] | null; conversionsTarget?: number | null }
 
 function parseParams(clientId: string | null, eventId: string | null): { clientId: string; eventId: string } | null {
   if (!clientId || !eventId || !eventId.trim()) return null;
@@ -51,8 +54,13 @@ export async function GET(request: NextRequest) {
   const event = events.find((e) => e.id === eventId) ?? null;
   if (!event) return Response.json({ error: `Event ${eventId} niet gevonden bij deze klant` }, { status: 404 });
 
-  const kpi = (settingsRes.data?.kpi_targets ?? null) as Record<string, unknown> | null;
-  const conversionsTarget = typeof kpi?.conversionsAbsolute === "number" && kpi.conversionsAbsolute > 0 ? kpi.conversionsAbsolute : null;
+  // Alleen een EVENT-eigen doel telt. De oude versie viel terug op
+  // kpi_targets.conversionsAbsolute — het JAARdoel (sop-prompts: "conversies per jaar") —
+  // waardoor een eventprojectie vrijwel altijd "MIST het doel" kreeg. Zonder event-doel
+  // degradeert de analyse netjes (account-event-analysis benoemt het ontbrekende doel).
+  const conversionsTarget = typeof event.conversionsTarget === "number" && event.conversionsTarget > 0
+    ? event.conversionsTarget
+    : null;
   const convConfig = resolveChannelConversionConfig(
     (settingsRes.data?.channel_conversion_config ?? null) as Partial<Record<"meta_ads" | "linkedin_ads", unknown>> | null
   );

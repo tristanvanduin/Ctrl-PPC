@@ -85,8 +85,17 @@ export function renderFunnelMarkdown(facts: FunnelFacts, opts: { title: string; 
     return lines.join("\n");
   }
   lines.push(opts.windowNote, "");
+  let bovenHonderd = false;
   for (const s of facts.stages) {
-    lines.push(`- ${s.from} → ${s.to}: **${fmtPct(s.recentRate)}** (was ${fmtPct(s.priorRate)}, ${fmtDelta(s.deltaPct)})${facts.worst === s ? " ← grootste materiele verslechtering" : ""}`);
+    // Een rate boven 100% is geen funnel maar een metingsmix: de doelstap telt gebeurtenissen
+    // die niet allemaal uit de vorige stap komen (bijv. Meta-conversies die niet door de
+    // checkout gingen). Zonder dit label leest 160% als een prestatie (sloop-audit 1 sep 2026).
+    const mix = s.recentRate != null && s.recentRate > 1 ? " [>100%: metingsmix, geen echte doorstroom]" : "";
+    if (mix) bovenHonderd = true;
+    lines.push(`- ${s.from} → ${s.to}: **${fmtPct(s.recentRate)}**${mix} (was ${fmtPct(s.priorRate)}, ${fmtDelta(s.deltaPct)})${facts.worst === s ? " ← grootste materiele verslechtering" : ""}`);
+  }
+  if (bovenHonderd) {
+    lines.push("", "Let op: een fase boven 100% betekent dat de doelstap ook gebeurtenissen telt die niet uit de vorige stap komen (metingsmix). Vergelijk zulke fasen alleen met zichzelf over tijd, niet als absolute doorstroom.");
   }
   if (facts.worst) {
     lines.push("", "## Duiding", `De overgang **${facts.worst.from} → ${facts.worst.to}** verslechterde ${fmtDelta(facts.worst.deltaPct)}; onderzoek wat er in die fase veranderde voordat er aan andere knoppen gedraaid wordt.`);

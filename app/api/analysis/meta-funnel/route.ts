@@ -6,11 +6,13 @@
 // =====================================================================
 
 import { NextRequest } from "next/server";
-import { getSupabase, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
+import { saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { analyzeMetaFunnel, renderMetaFunnelMarkdown, type MetaFunnelDailyRow } from "@/lib/analysis/meta-funnel-facts";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
-import { today } from "@/lib/reporting-date";
+import { today, addDays } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
+import { eis, dataFoutNaarResponse } from "@/lib/analysis/db-veilig";
 
 const SECTION = "meta_funnel_v1";
 const SOP_TYPE = "meta_funnel";
@@ -38,9 +40,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
-
   let clientId: string;
   try {
     const body = await request.json();
@@ -50,16 +49,26 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "client_id is verplicht" }, { status: 400 });
   }
 
-  const since = new Date(Date.now() - FETCH_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const { data: rows } = await supabase
+  const geweigerd = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (geweigerd) return geweigerd;
+
+  // Demo-bewust, net als de GET (sloop-audit 1 sep 2026: POST gebruikte de echte client
+  // terwijl GET demo-bewust was).
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
+
+  try {
+  const since = addDays(today(), -FETCH_DAYS);
+  const rowsRes = await supabase
     .from("meta_account_daily")
     .select("date, impressions, link_clicks, landing_page_views, add_to_cart, initiate_checkout, conversions")
     .eq("client_id", clientId)
-    .gte("date", since);
-
-  const daily = (rows ?? []) as MetaFunnelDailyRow[];
+    .gte("date", since)
+    .order("date", { ascending: false })
+    .limit(1000);
+  const daily = eis(rowsRes, "meta_account_daily") as MetaFunnelDailyRow[];
   if (daily.length === 0) {
-    return Response.json({ error: "Geen Meta-dagdata voor deze klant; draai eerst de Meta-sync" }, { status: 404 });
+    return Response.json({ error: "Geen Meta-dagdata voor deze klant; draai eerst de Meta-sync. Bron: meta_account_daily." }, { status: 404 });
   }
 
   const facts = analyzeMetaFunnel(daily);
@@ -67,11 +76,14 @@ export async function POST(request: NextRequest) {
   const actionNeeded = facts.worst !== null;
 
   const analysisDate = today();
+  // De echte grenzen van wat geanalyseerd is: splitWindows ankert op de laatste datadatum,
+  // dus de periode is de dagspan van de data — niet "70 dagen wandklok tot vandaag".
+  const datums = daily.map((r) => r.date).sort();
   const { error: saveError } = await saveAnalysisOutputSection({
     supabase,
     row: {
       client_id: clientId, sop_type: SOP_TYPE, analysis_date: analysisDate,
-      period_start: since, period_end: analysisDate, section: SECTION,
+      period_start: datums[0], period_end: datums[datums.length - 1], section: SECTION,
       output, model_used: "deterministisch", tokens_used: 0, step_number: 1, step_name: "Meta funnel",
     },
   });
@@ -80,7 +92,8 @@ export async function POST(request: NextRequest) {
   const proposals: SprintHypothesisRow[] = facts.worst
     ? [{
         client_id: clientId, analysis_id: null,
-        hypothesis: `Onderzoek de Meta-funnelfase ${facts.worst.from} → ${facts.worst.to} (${Math.round((facts.worst.deltaPct ?? 0) * 100)}% verslechterd)`,
+        // deltaPct is negatief bij een verslechtering; Math.abs voorkomt "-24% verslechterd".
+        hypothesis: `Onderzoek de Meta-funnelfase ${facts.worst.from} → ${facts.worst.to} (${Math.round(Math.abs(facts.worst.deltaPct ?? 0) * 100)}% verslechterd)`,
         expected_result: "De oorzaak van de fase-verslechtering is gevonden (creative, doelgroep of landingservaring) en de overgangsrate herstelt richting het prior-venster.",
         measurement_metric: "De overgangsrate van deze fase in de volgende funnel-analyse.",
         timeframe: "2 weken",
@@ -93,4 +106,9 @@ export async function POST(request: NextRequest) {
   await saveProposalsReplacingPending(supabase, clientId, "meta_funnel", proposals);
 
   return Response.json({ analysis: output, actionNeeded, stages: facts.stages.length, skipped: facts.skippedStages });
+  } catch (e) {
+    const dataFout = dataFoutNaarResponse(e);
+    if (dataFout) return dataFout;
+    throw e;
+  }
 }

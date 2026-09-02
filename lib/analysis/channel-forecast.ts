@@ -21,7 +21,8 @@ export function projectCurrentMonth(mtd: number, dayOfMonth: number, daysInMonth
 
 // Lichte lineaire trend (kleinste kwadraten) over de recente volle maanden, één stap vooruit.
 // Geklemd op niet-negatief en binnen een band rond de laatste maand, zodat een korte reeks
-// geen wilde extrapolatie geeft. Onder 2 maanden: de laatste maand (vlak).
+// geen wilde extrapolatie geeft. Onder 3 maanden: de laatste maand (vlak) — een helling uit
+// twee punten is ruis.
 export const TREND_BAND = 0.5; // max +/-50% t.o.v. de laatste maand
 
 export function projectNextMonth(months: MonthValue[]): { projected: number | null; method: "trend" | "laatste" | "geen" } {

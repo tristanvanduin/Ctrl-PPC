@@ -36,10 +36,22 @@ export interface CpaCurvePoint {
  * zegt "nog geen basis").
  */
 export function deriveCpaCurve(convCurve: CurvePoint[], costCurve: CurvePoint[]): CpaCurvePoint[] {
-  const costPerDag = new Map(costCurve.map((p) => [p.daysToFair, p.cumulative]));
-  return convCurve.map((p) => {
-    const cost = costPerDag.get(p.daysToFair);
-    const cpa = cost != null && p.cumulative > 0 ? Math.round((cost / p.cumulative) * 100) / 100 : null;
-    return { daysToFair: p.daysToFair, cpa };
+  // Beide curves per daysToFair tot ÉÉN punt reduceren (de laatste = volledige cumulatief):
+  // bij blended curves leveren meerdere kanalen punten op dezelfde x, en zonder deze
+  // reductie deelde een volledige kostenstand door een tussenstand van de conversies —
+  // zaagtand-CPA-punten op dezelfde as-positie (sloop-audit 1 sep 2026).
+  const laatstePerDag = (curve: CurvePoint[]): Map<number, number> => {
+    const uit = new Map<number, number>();
+    for (const p of curve) uit.set(p.daysToFair, p.cumulative); // latere punten overschrijven
+    return uit;
+  };
+  const costPerDag = laatstePerDag(costCurve);
+  const convPerDag = laatstePerDag(convCurve);
+  const dagen = [...convPerDag.keys()].sort((a, b) => b - a);
+  return dagen.map((daysToFair) => {
+    const cost = costPerDag.get(daysToFair);
+    const conv = convPerDag.get(daysToFair) ?? 0;
+    const cpa = cost != null && conv > 0 ? Math.round((cost / conv) * 100) / 100 : null;
+    return { daysToFair, cpa };
   });
 }

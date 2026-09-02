@@ -21,6 +21,7 @@ import {
 import {
   parseSearchTermBatch,
   findMissingTerms,
+  SearchTermVerdictSchema,
   type SearchTermVerdict,
   type BatchResult,
   type RunCoverage,
@@ -39,6 +40,7 @@ import { logger } from "@/lib/logger";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
 import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
 
 export const maxDuration = 300; // 5 minutes for full analysis with many batches
 
@@ -50,6 +52,9 @@ export const maxDuration = 300; // 5 minutes for full analysis with many batches
 // labelveld.
 const OPENROUTER_MODEL = "google/gemini-2.5-flash-lite";
 const BATCH_SIZE = 100; // Smaller batches = less token overflow risk with enhanced schema
+// De expliciete leesgrens van de GET: gelijk aan de oude, stille PostgREST-cap, maar nu
+// benoemd — het echte totaal komt uit count: "exact" en een afkap wordt gemeld.
+const GET_MAX_RIJEN = 1000;
 
 
 interface AiVerdict {
@@ -67,7 +72,39 @@ type VerdictWithData = SearchTermVerdict & {
   cost: number;
   conversions: number;
   conversionsValue: number;
+  /** search_term_view.status (ADDED/EXCLUDED/NONE) — de vangrails weren dubbele uitsluitingen. */
+  status: string;
 };
+
+/**
+ * Her-parse van de ruwe LLM-uitvoer, met EXACT dezelfde opschoning en validatie als
+ * parseSearchTermBatch — maar dan mét de velden die het schema stript. Waarom dit bestaat
+ * (sloop-audit 1 sep 2026): de verdict-merge sleutelde op alléén searchTerm, dus dezelfde term
+ * in meerdere ad-groepen kreeg altijd de data van de eerste rij en de tegenspraak-vangrail
+ * ("hier keep, daar negative") kon per constructie nooit vuren. We vragen het model daarom de
+ * campaignName en adGroupName te echoën; het Zod-schema stript onbekende velden, dus die echo
+ * halen we hier uit de ruwe items. Omdat beide parses dezelfde array in dezelfde volgorde
+ * doorlopen en op hetzelfde schema filteren, hoort item i hier exact bij verdict i.
+ */
+function geldigeRuweItems(raw: string): Array<Record<string, unknown>> {
+  let text = raw.trim();
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+  }
+  if (!text.startsWith("[")) {
+    const arrayMatch = text.match(/\[[\s\S]*\]/);
+    if (!arrayMatch) return [];
+    text = arrayMatch[0];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((item): item is Record<string, unknown> => SearchTermVerdictSchema.safeParse(item).success);
+}
 
 // ── GET: Fetch cached analysis results ─────────────────────────────────────
 
@@ -99,15 +136,28 @@ export async function GET(request: NextRequest) {
   // viel waren de kolommen — de mapper hieronder leest er elf, select("*") haalde ook model_used,
   // created_at en id op om ze weg te gooien. Dit antwoord gaat naar de browser, dus dat zijn
   // bytes over de lijn per bezoek.
-  const { data: results } = await supabase
+  //
+  // Expliciete limiet plus count: "exact" (sloop-audit 1 sep 2026): zonder limiet kapte de
+  // PostgREST-cap stil op 1000 rijen af, terwijl totalResults dat afgekapte aantal als het
+  // totaal meldde. Nu draagt totalResults het échte totaal en meldt `afgekapt` eerlijk dat er
+  // meer rijen zijn dan het antwoord bevat. De volgorde krijgt een vaste vervolgsleutel (id),
+  // anders is de afkap bij gelijke kosten loterij.
+  const { data: results, count, error: resultatenFout } = await supabase
     .from("search_term_analysis")
-    .select("search_term, campaign_name, ad_group_name, clicks, cost, conversions, conversions_value, relevance_score, verdict, recommended_action, reason")
+    .select("search_term, campaign_name, ad_group_name, clicks, cost, conversions, conversions_value, relevance_score, verdict, recommended_action, reason", { count: "exact" })
     .eq("client_id", clientId)
     .eq("analysis_date", analysisDate)
-    .order("cost", { ascending: false });
+    .order("cost", { ascending: false })
+    .order("id", { ascending: true })
+    .limit(GET_MAX_RIJEN);
+  if (resultatenFout) {
+    return Response.json({ error: "Databron faalde (search_term_analysis)", detail: resultatenFout.message }, { status: 500 });
+  }
 
+  const rijen = results ?? [];
+  const totaal = typeof count === "number" ? count : rijen.length;
   return Response.json({
-    results: (results ?? []).map((r: Record<string, unknown>) => ({
+    results: rijen.map((r: Record<string, unknown>) => ({
       searchTerm: r.search_term,
       campaignName: r.campaign_name,
       adGroupName: r.ad_group_name,
@@ -121,7 +171,8 @@ export async function GET(request: NextRequest) {
       reason: r.reason,
     })),
     analysisDate,
-    totalResults: (results ?? []).length,
+    totalResults: totaal,
+    afgekapt: totaal > rijen.length,
   });
 }
 
@@ -147,6 +198,11 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ error: "Verwacht: { client_id, customerId }" }, { status: 400 });
   }
+
+  // Het toegangsslot, zelfde patroon als de kern-routes (sloop-audit 1 sep 2026): deze route
+  // draait LLM-calls, verbruikt credits en schrijft in search_term_analysis en de wachtrij.
+  const geweigerd = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (geweigerd) return geweigerd;
 
   try {
     const analysisDate = fmt(new Date());
@@ -332,7 +388,9 @@ ${productList || "Geen productdata beschikbaar"}`;
       const userMessage = `${contextBlock}
 
 ## Zoektermen om te beoordelen (batch ${batchNum})
-${toPromptTable(termsJson)}`;
+${toPromptTable(termsJson)}
+
+BELANGRIJK voor de koppeling: neem in ELK output-item naast "searchTerm" ook "campaignName" en "adGroupName" LETTERLIJK over uit de invoerrij hierboven. Dezelfde zoekterm kan in meerdere ad-groepen voorkomen en elk voorkomen verdient een eigen oordeel; zonder deze twee velden is jouw oordeel niet aan de juiste rij te koppelen.`;
 
       try {
         const response = await callLayer("triage", {
@@ -381,11 +439,27 @@ ${toPromptTable(termsJson)}`;
           logger.warn(`[search-terms] Batch ${batchNum}: ${missing.length} terms missing from LLM output`);
         }
 
-        // Merge verdicts with original performance data
+        // Merge verdicts with original performance data.
+        //
+        // Sleutel op (searchTerm, campaignName, adGroupName), niet op term alleen (sloop-audit
+        // 1 sep 2026): dezelfde term in meerdere ad-groepen kreeg anders altijd de data van de
+        // eerste rij, waardoor de tegenspraak-vangrail nooit kon vuren. De drievoudige sleutel
+        // komt uit de geëchode velden in de ruwe uitvoer (zie geldigeRuweItems); alleen bij een
+        // UNIEK zoektermvoorkomen in de batch is term-alleen nog een veilige terugval. Geen
+        // veilige koppeling → het oordeel telt als missing, niet als gok.
+        const ruweItems = geldigeRuweItems(rawOutput);
+        const echoKlopt = ruweItems.length === parseResult.verdicts.length;
         const results: VerdictWithData[] = [];
-        for (const verdict of parseResult.verdicts) {
-          const original = batch.find((t) => t.searchTerm === verdict.searchTerm);
-          if (!original) continue;
+        parseResult.verdicts.forEach((verdict, index) => {
+          const kandidaten = batch.filter((t) => t.searchTerm === verdict.searchTerm);
+          let original: (typeof batch)[number] | undefined;
+          if (kandidaten.length === 1) {
+            original = kandidaten[0];
+          } else if (kandidaten.length > 1 && echoKlopt) {
+            const echo = ruweItems[index];
+            original = kandidaten.find((t) => t.campaignName === echo.campaignName && t.adGroupName === echo.adGroupName);
+          }
+          if (!original) return;
           results.push({
             searchTerm: verdict.searchTerm,
             relevanceScore: verdict.relevanceScore,
@@ -398,8 +472,9 @@ ${toPromptTable(termsJson)}`;
             cost: original.cost,
             conversions: original.conversions,
             conversionsValue: original.conversionsValue,
+            status: original.status,
           });
-        }
+        });
 
         batchResults.push({
           batchNum,
@@ -491,9 +566,12 @@ ${toPromptTable(termsJson)}`;
 
       // Aggregeer de geadviseerde negatives als voorstel in de goedkeuringswachtrij.
       await saveSearchTermVerdictsAsHypotheses(supabase, allVerdicts, { clientId, analysisId: null });
-    }
 
-    await verbruikCredit(supabase, { clientId, label: "search_terms", runKey: `search-terms-${clientId}-${analysisDate}` });
+      // Credit alleen verbruiken als er werkelijk iets is geanalyseerd (sloop-audit 1 sep
+      // 2026): een run waarin elke batch faalde leverde nul termen op maar kostte wél een
+      // credit. Daarom bínnen dit blok, niet erbuiten.
+      await verbruikCredit(supabase, { clientId, label: "search_terms", runKey: `search-terms-${clientId}-${analysisDate}` });
+    }
 
     return Response.json({
       results: allVerdicts.map((v) => ({
@@ -514,6 +592,7 @@ ${toPromptTable(termsJson)}`;
         recommendedScope: v.recommendedScope,
         exclusionSafety: v.exclusionSafety,
         matchedContext: v.matchedContext,
+        status: v.status,
       })),
       analysisDate,
       totalTerms: searchTerms.length,

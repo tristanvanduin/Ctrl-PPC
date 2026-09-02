@@ -4,9 +4,9 @@
  * Methodology:
  *
  * 1. EXPECTED per month = gewogen gemiddelde van dezelfde maand over voorgaande jaren
- *    - 3 jaar beschikbaar: 50% vorig jaar, 30% jaar daarvoor, 20% twee jaar daarvoor
- *    - 2 jaar: 65% / 35%
- *    - 1 jaar: 100%
+ *    - Exponentieel verval met factor 1,8: het recentste jaar weegt ~1,8x het jaar ervoor
+ *      (bij 3 jaar: ~53% / 29% / 16%; bij 2 jaar: ~64% / 36%; bij 1 jaar: 100%) —
+ *      zie DECAY_FACTOR in computeMonthWeights, de code is de waarheid
  *    - Maanden zonder data worden overgeslagen (niet als 0 geteld)
  *
  * 2. PERFORMANCE FACTOR per metric (conversions, revenue, adSpend elk apart)
@@ -1144,10 +1144,6 @@ export function computeForecast(data: ClientHistoricalData): ClientForecast {
 
   // Derived metrics
   const roas = deriveForecast(revenue, adSpend, "roas", true);   // revenue / adSpend
-  const cpa = deriveForecast(adSpend, conversions, "cpa", false); // adSpend / conversions → we want spend/conv
-
-  // Actually CPA = adSpend / conversions, which is denPt / numPt when numOverDenom=false
-  // Let me recalculate: CPA needs adSpend in numerator, conversions in denominator
   const cpaResult = deriveForecast(adSpend, conversions, "cpa", true); // adSpend / conversions
 
   // Budget recommendation

@@ -153,8 +153,10 @@ const isIngang = (f) =>
  */
 const TOEGESTANE_WEZEN = new Map([
   // Wacht op een beslissing van de eigenaar.
-  ["lib/analysis/dimensional-queries.ts",
-    "queryhelpers die de routes al inline doen; voorstel is verwijderen"],
+  //
+  // lib/analysis/dimensional-queries.ts stond hier met "voorstel is verwijderen" en is op
+  // 1 september 2026 daadwerkelijk verwijderd (sloop-audit): niets importeerde hem, de routes
+  // doen de queries al inline. De lijst hoort te krimpen — dit is er één.
   ["components/dashboard/report-export.tsx",
     "gebouwde feature, nooit aangesloten; productbeslissing: afbouwen of weg"],
 

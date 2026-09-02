@@ -87,11 +87,20 @@ export function buildGeoSignals(rows: GeoAgg[], level: GeoLevel, channelLabel: s
   // Zonder een handvol vergelijkbare markten is er geen zinnige mediaan en dus geen norm.
   if (markets.length < GEO_MIN_MARKETS) return { triggered: [], checked };
 
-  const medCpa = median(markets.map((m) => m.cpa).filter((v): v is number => v != null));
-  const medConvRate = median(markets.map((m) => m.convRate).filter((v): v is number => v != null));
+  // De norm per markt is de mediaan over de ANDERE markten — exclusief de markt zelf. De
+  // verhalen hieronder zeiden dat altijd al ("mediaan over de andere markten"), maar de
+  // berekening telde de markt zelf mee, waardoor een grote uitschieter zijn eigen norm optrok
+  // en zichzelf zo deels vrijpleitte (sloop-audit 1 sep 2026). Met minimaal GEO_MIN_MARKETS
+  // markten blijven er na uitsluiting altijd genoeg waarden over voor een mediaan.
+  const medCpaZonder = (zelf: Market) =>
+    median(markets.filter((x) => x !== zelf).map((m) => m.cpa).filter((v): v is number => v != null));
+  const medConvRateZonder = (zelf: Market) =>
+    median(markets.filter((x) => x !== zelf).map((m) => m.convRate).filter((v): v is number => v != null));
   const scope = (m: Market) => `${channelLabel} — ${m.label}`;
 
   for (const m of [...markets].sort((a, b) => b.cost - a.cost)) {
+    const medCpa = medCpaZonder(m);
+    const medConvRate = medConvRateZonder(m);
     // 1. Betaald verkeer dat nergens toe leidt. Het scherpst omdat er geen afweging aan zit.
     if (m.conversions === 0) {
       triggered.push({

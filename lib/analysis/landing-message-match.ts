@@ -19,7 +19,13 @@ export interface AdClaim {
   normalized: string;
 }
 
-const PRICE_PATTERN = /(?:€|£|\$)\s?\d{1,4}(?:[.,]\d{2})?|\b\d{1,4}[.,]\d{2}\s?(?:€|euro)\b/gi;
+// Prijzen inclusief Nederlandse duizendtallen (sloop-audit 1 sep 2026): het oude patroon
+// stond alleen "[.,]\d{2}" toe, waardoor "€1.299" als "€1.29" werd gelezen — en dat leverde
+// valse prijs-afwijkingen op zodra de pagina hetzelfde bedrag anders noteerde. Nu mogen er
+// duizendtalgroepen ([.,]\d{3}) vóór de decimalen staan, en bewaakt (?!\d) dat een match
+// nooit midden in een getal eindigt. De suffixvorm ("14,95 euro") eist nog steeds minstens
+// één separator, zodat "vanaf 20 euro" geen prijs-claim wordt.
+const PRICE_PATTERN = /(?:€|£|\$)\s?\d{1,4}(?:[.,]\d{3})*(?:[.,]\d{1,2})?(?!\d)|\b\d{1,4}(?:(?:[.,]\d{3})+(?:[.,]\d{2})?|[.,]\d{2})(?!\d)\s?(?:€|euro)\b/gi;
 const PERCENT_PATTERN = /\b\d{1,2}\s?%/g;
 const SPEED_PATTERN = /\b(same[- ]day|next[- ]day|vandaag (?:besteld|verzonden)|morgen in huis|binnen \d+ (?:uur|dagen)|24 uur|snelle levering|gratis verzending)\b/gi;
 const FREE_PATTERN = /\b(gratis|free)\b/gi;
@@ -29,9 +35,25 @@ function normalize(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+// Normaliseert een prijs naar "1299.50", over NL- en EN-notatie heen (sloop-audit 1 sep 2026).
+// De oude versie deed `replace(",", ".")` en parseFloat, waardoor "€1.299" op 1.299 → "1.30"
+// uitkwam. De regel hier: de LAATSTE separator met één of twee cijfers erachter is de
+// decimaal ("1.299,50" en "1,299.50" worden allebei 1299.50); een separator met drie cijfers
+// erachter is een duizendtal ("1.299" wordt 1299).
 export function normalizePrice(raw: string): string {
-  const digits = raw.replace(/[^\d.,]/g, "").replace(",", ".");
-  const value = Number.parseFloat(digits);
+  const cijfers = raw.replace(/[^\d.,]/g, "");
+  const laatsteSep = Math.max(cijfers.lastIndexOf(","), cijfers.lastIndexOf("."));
+  let genormaliseerd: string;
+  if (laatsteSep < 0) {
+    genormaliseerd = cijfers;
+  } else if (cijfers.length - laatsteSep - 1 <= 2) {
+    // Decimaal-separator; alle eerdere separators zijn duizendtallen.
+    genormaliseerd = cijfers.slice(0, laatsteSep).replace(/[.,]/g, "") + "." + cijfers.slice(laatsteSep + 1);
+  } else {
+    // Drie (of meer) cijfers achter de laatste separator: duizendtal-notatie zonder decimalen.
+    genormaliseerd = cijfers.replace(/[.,]/g, "");
+  }
+  const value = Number.parseFloat(genormaliseerd);
   return Number.isFinite(value) ? value.toFixed(2) : normalize(raw);
 }
 
@@ -79,7 +101,9 @@ export function checkClaimsOnPage(claims: AdClaim[], pageText: string): ClaimChe
   return claims.map((claim) => {
     if (claim.type === "prijs") {
       if (pagePrices.has(claim.normalized)) {
-        return { claim, status: "gevonden_letterlijk" as const, evidence: excerptAround(pageNorm, claim.normalized.replace(".", ",").replace(/\.00$/, "")) || claim.normalized };
+        // Voor het bewijs-fragment: eerst ".00" strippen (hele bedragen staan op de pagina
+        // zonder decimalen), dan de decimale punt naar een komma (NL-weergave).
+        return { claim, status: "gevonden_letterlijk" as const, evidence: excerptAround(pageNorm, claim.normalized.replace(/\.00$/, "").replace(".", ",")) || claim.normalized };
       }
       if (pagePrices.size > 0) {
         return { claim, status: "prijs_wijkt_af" as const, evidence: `ad zegt ${claim.normalized}, pagina toont ${[...pagePrices].join(", ")}` };
@@ -117,7 +141,10 @@ export type MessageMatchFacts =
   | {
       status: "leesbaar";
       claims: ClaimCheck[];
-      coveragePct: number; // aandeel claims gevonden (letterlijk of deels)
+      // Aandeel claims gevonden (letterlijk of deels). Null wanneer er geen enkele claim is
+      // gedetecteerd: "100% dekking" zonder iets te toetsen was een schijnzekerheid
+      // (sloop-audit 1 sep 2026).
+      coveragePct: number | null;
       priceMismatch: boolean;
       h1Overlap: { ratio: number; bestHeadline: string | null };
     }
@@ -138,7 +165,9 @@ export function buildMessageMatchFacts(input: { headlines: string[]; description
   return {
     status: "leesbaar",
     claims: checks,
-    coveragePct: checks.length > 0 ? Math.round((found / checks.length) * 1000) / 10 : 100,
+    // Geen claims gedetecteerd → null, niet 100: er is dan niets getoetst en dus ook geen
+    // dekking om te rapporteren (sloop-audit 1 sep 2026).
+    coveragePct: checks.length > 0 ? Math.round((found / checks.length) * 1000) / 10 : null,
     priceMismatch: checks.some((c) => c.status === "prijs_wijkt_af"),
     h1Overlap: headlineH1Overlap(input.headlines, input.h1),
   };

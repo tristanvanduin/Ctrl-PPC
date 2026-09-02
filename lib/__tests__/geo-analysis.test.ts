@@ -74,6 +74,17 @@ console.log("\n4. Structureel dure markt");
   check("actie weegt strategie mee, roept niet meteen 'stoppen'", /weeg|strategisch/i.test(t?.actionDirection ?? ""));
 }
 
+console.log("\n4b. De mediaan is exclusief de markt zelf (sloop-audit 1 sep 2026)");
+{
+  // CPA's 40, 50, 60 en een uitschieter van 200. Inclusief de uitschieter zou de mediaan op
+  // (50+60)/2 = 55 liggen; exclusief — zoals de verhalen altijd al beloofden — is hij 50.
+  const rows = [mk("NL", 500, 0.04, 40), mk("BE", 400, 0.04, 50), mk("DE", 300, 0.04, 60), mk("CH", 300, 0.04, 200)];
+  const r = buildGeoSignals(rows, "country", "Google");
+  const t = r.triggered.find((x) => x.id === "geo_country_dure_markt_CH");
+  check("de uitschieter wordt gemarkeerd", t != null, ids(r));
+  check("de norm is de mediaan van de ANDERE markten (50, niet 55)", /€\s50\b/.test(t?.story ?? ""), t?.story);
+}
+
 console.log("\n5. Goedkoop en klein → schaalkans, maar eerlijk gelabeld");
 {
   // Genoeg volume om de efficientie te dragen (12 conversies), maar klein aandeel van het budget.

@@ -81,7 +81,12 @@ export function buildChannelHistoricalData(
   if (rows.length === 0) return null;
 
   const currentYear = Number(todayIso.slice(0, 4));
-  const realizedThroughMonth = Number(todayIso.slice(5, 7));
+  // De LOPENDE maand is niet gerealiseerd: tot en met vorige maand telt. De oude versie
+  // nam de huidige maand mee, waardoor een halfvolle maand (a) als eindstand meetelde in
+  // adjustedAnnual — de rest van die maand werd nooit geprojecteerd — en (b) met het
+  // zwaarste recency-gewicht de hele jaarprognose omlaag drukte. Het Google-pad
+  // (compute-targets) sloot de lopende maand altijd al uit (sloop-audit 1 sep 2026).
+  const realizedThroughMonth = Number(todayIso.slice(5, 7)) - 1;
   const byYear = aggregateByYear(rows);
 
   const historicalYearsInput: YearDataInput[] = [...byYear.entries()]
@@ -90,9 +95,13 @@ export function buildChannelHistoricalData(
     .map(([year, { monthly, weekly }]) => ({ year, monthly, weekly }));
 
   const current = byYear.get(currentYear) ?? { monthly: [], weekly: [] };
+  // De rijen van de lopende maand horen ook niet in de "gerealiseerde" reeks zelf.
+  const lopendeMaand = Number(todayIso.slice(5, 7));
+  const monthly = current.monthly.filter((m) => m.month < lopendeMaand);
+  const weekly = current.weekly.filter((w) => w.month < lopendeMaand);
 
   return buildClientDataFromApi(
-    clientId, historicalYearsInput, current.monthly, current.weekly,
+    clientId, historicalYearsInput, monthly, weekly,
     targetCurrentYear, currentYear, realizedThroughMonth,
   );
 }

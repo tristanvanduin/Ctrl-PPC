@@ -71,6 +71,38 @@ console.log("\nDoelgroep-mix: een segment ver onder het gemiddelde wordt herkend
   check("score laag door het dure segment", factor.score <= 8, `${factor.score}`);
 }
 
+console.log("\nLead-gen (conversiewaarde overal 0): beoordeeld op conversies per euro, geen gratis 20/20");
+{
+  // Het vals-groen-gat uit de sloop-audit: zonder conversiewaarde was elke segment-ROAS 0 en
+  // kon geen segment ooit "duur" zijn — gegarandeerd 20/20. Met conversies als basis moet het
+  // niet-converterende segment gewoon herkend worden.
+  const audience: DisplayAudienceRow[] = [
+    { audience_type: "IN_MARKET", cost: 4000, conversions: 40, conversions_value: 0 },
+    { audience_type: "AFFINITY", cost: 4000, conversions: 40, conversions_value: 0 },
+    { audience_type: "REMARKETING", cost: 4000, conversions: 0, conversions_value: 0 }, // 33% van de spend, nul conversies
+  ];
+  const out = computeDisplayScorecard([], audience);
+  const factor = out.factors.find((f) => f.name === "Doelgroep-mix")!;
+  check("wordt beoordeeld (er zijn conversies)", factor.assessed);
+  check("NIET de volle 20 punten", factor.score < 20, `${factor.score}`);
+  check("het niet-converterende segment wordt genoemd", factor.description.includes("REMARKETING"), factor.description);
+  check("de tekst zegt dat er op conversies is beoordeeld", factor.description.includes("conversies per euro"), factor.description);
+  check("score laag door het dure segment (33% spend)", factor.score <= 8, `${factor.score}`);
+}
+
+console.log("\nLead-gen zonder énige conversie: geen basis, dus onbeoordeeld — niet 20/20");
+{
+  const audience: DisplayAudienceRow[] = [
+    { audience_type: "IN_MARKET", cost: 4000, conversions: 0, conversions_value: 0 },
+    { audience_type: "AFFINITY", cost: 2000, conversions: 0, conversions_value: 0 },
+  ];
+  const out = computeDisplayScorecard([], audience);
+  const factor = out.factors.find((f) => f.name === "Doelgroep-mix")!;
+  check("niet beoordeeld zonder conversiebasis", !factor.assessed);
+  check("score is 0, niet gegokt", factor.score === 0, `${factor.score}`);
+  check("de tekst legt uit waarom", factor.description.includes("geen conversies of conversiewaarde"), factor.description);
+}
+
 console.log("\nGeen doelgroepdata: Doelgroep-mix blijft eerlijk onbeoordeeld, de rest niet");
 {
   const rows: DisplayCampaignMonthlyRow[] = [

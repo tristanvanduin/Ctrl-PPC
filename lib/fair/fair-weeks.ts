@@ -32,6 +32,12 @@ export interface FairEventCfg {
   abbrev?: string;
   cadence?: Cadence | null;
   editions?: Edition[] | null;
+  /**
+   * Het conversiedoel voor ÉÉN editie van dit event. Alleen een event-eigen doel telt:
+   * het jaardoel uit kpi_targets als event-doel gebruiken gaf vrijwel elke aanloop een
+   * vals "MIST het doel" (sloop-audit 1 sep 2026).
+   */
+  conversionsTarget?: number | null;
 }
 
 export interface UpcomingEdition {

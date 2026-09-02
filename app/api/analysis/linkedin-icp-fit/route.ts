@@ -7,12 +7,14 @@
 // =====================================================================
 
 import { NextRequest } from "next/server";
-import { getSupabase, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
+import { saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { computeIcpFit, isIcpEmpty, type LinkedInIcp } from "@/lib/linkedin/icp-fit";
 import { mapLinkedinDemographicToComputeRow } from "@/lib/linkedin/analysis-data";
 import { saveProposalsReplacingPending, type SprintHypothesisRow } from "@/lib/second-opinion/findings-to-hypotheses";
-import { today } from "@/lib/reporting-date";
+import { today, addDays } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
+import { eis, alleRijen, dataFoutNaarResponse } from "@/lib/analysis/db-veilig";
 
 const SECTION = "linkedin_icp_v1";
 const SOP_TYPE = "linkedin_icp";
@@ -45,9 +47,6 @@ const pct = (v: number | null): string => (v == null ? "n.v.t." : `${Math.round(
 const eur = (v: number | null): string => (v == null ? "n.v.t." : `€${Math.round(v)}`);
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
-
   let clientId: string;
   try {
     const body = await request.json();
@@ -57,29 +56,46 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "client_id is verplicht" }, { status: 400 });
   }
 
-  const since = new Date(Date.now() - FETCH_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const [demoRes, settingsRes, labelRes] = await Promise.all([
-    supabase
-      .from("linkedin_demographic_daily")
-      .select("date, level, entity_urn, pivot_type, pivot_value_urn, impressions, clicks, spend, leads, conversions, coverage_pct")
-      .eq("client_id", clientId)
-      // De sync schrijft demografie uitsluitend op CAMPAIGN-level (lib/linkedin/sync.ts); de som
-      // over campagnes IS de accountweergave. Zonder deze pin zou een toekomstige ACCOUNT-level
-      // rij alles dubbel laten tellen.
-      .eq("level", "CAMPAIGN")
-      .gte("date", since),
+  const geweigerd = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (geweigerd) return geweigerd;
+
+  // Demo-bewust, net als de GET (sloop-audit 1 sep 2026).
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
+
+  try {
+  const since = addDays(today(), -FETCH_DAYS);
+  const [demoFetch, settingsRes, labelRes] = await Promise.all([
+    // Gepagineerd: 90 dagen × pivots × segmenten × campagnes overschrijdt de 1000-rijen-cap
+    // bij elk echt account, en een stille afkap vertekent alle aandelen.
+    alleRijen<Record<string, unknown>>(
+      (van, tot) => supabase
+        .from("linkedin_demographic_daily")
+        .select("date, level, entity_urn, pivot_type, pivot_value_urn, impressions, clicks, spend, leads, conversions, coverage_pct")
+        .eq("client_id", clientId)
+        // De sync schrijft demografie uitsluitend op CAMPAIGN-level (lib/linkedin/sync.ts); de som
+        // over campagnes IS de accountweergave. Zonder deze pin zou een toekomstige ACCOUNT-level
+        // rij alles dubbel laten tellen.
+        .eq("level", "CAMPAIGN")
+        .gte("date", since)
+        .order("date", { ascending: false })
+        .order("pivot_type", { ascending: true })
+        .order("pivot_value_urn", { ascending: true })
+        .range(van, tot),
+      "linkedin_demographic_daily"
+    ),
     supabase.from("client_settings").select("linkedin_icp").eq("client_id", clientId).maybeSingle(),
-    supabase.from("linkedin_urn_labels").select("urn, label"),
+    supabase.from("linkedin_urn_labels").select("urn, label").limit(5000),
   ]);
 
-  const raw = demoRes.data ?? [];
+  const raw = demoFetch.rijen;
   if (raw.length === 0) {
-    return Response.json({ error: "Geen LinkedIn-demografiedata voor deze klant; draai eerst de LinkedIn-sync" }, { status: 404 });
+    return Response.json({ error: "Geen LinkedIn-demografiedata voor deze klant; draai eerst de LinkedIn-sync. Bron: linkedin_demographic_daily." }, { status: 404 });
   }
 
   const segments = raw.map((r) => mapLinkedinDemographicToComputeRow(r as Parameters<typeof mapLinkedinDemographicToComputeRow>[0]));
   const icp = (settingsRes.data?.linkedin_icp as LinkedInIcp | null) ?? null;
-  const labels = new Map((labelRes.data ?? []).map((l) => [String(l.urn), String(l.label)]));
+  const labels = new Map(eis(labelRes, "linkedin_urn_labels").map((l) => [String(l.urn), String(l.label)]));
   const fits = computeIcpFit(segments, icp);
 
   const lines: string[] = ["# LinkedIn ICP-fit", "", `Venster: laatste ${FETCH_DAYS} dagen demografiedata.`, ""];
@@ -89,37 +105,43 @@ export async function POST(request: NextRequest) {
       "Er is geen ideaal klantprofiel geconfigureerd (client_settings.linkedin_icp); de analyse is daarom alleen beschrijvend. Stel het ICP in om de fit-score en de waste-berekening te activeren."
     );
   }
-  let materialWaste = 0;
+  // Eén bedrag voor de wachtrij: de GROOTSTE pivot-waste, niet de som. De vier pivots zijn
+  // vier doorsnedes van dezelfde euro's; ze optellen telde dezelfde spend tot vier keer
+  // dubbel (sloop-audit 1 sep 2026). Het maximum is de meest conservatieve zekere ondergrens.
+  let grootsteWaste = 0;
   const weakPivots: string[] = [];
+  const leadsTekst = (v: number): string => String(Math.round(v * 10) / 10);
   for (const f of fits) {
     lines.push(`## ${f.pivotType}`);
     if (f.degraded) {
-      lines.push("- geen ICP-definitie voor deze dimensie: alleen beschrijvend", `- totaal: ${eur(f.totalSpend)} spend, ${f.totalLeads} leads${f.coveragePct != null ? `, demografie-dekking ${pct(f.coveragePct)}` : ""}`, "");
+      lines.push("- geen ICP-definitie voor deze dimensie: alleen beschrijvend", `- totaal: ${eur(f.totalSpend)} spend, ${leadsTekst(f.totalLeads)} leads${f.coveragePct != null ? `, demografie-dekking ${pct(f.coveragePct)}` : ""}`, "");
       continue;
     }
     lines.push(
       `- spend binnen ICP: **${pct(f.spendInIcpPct)}**; leads binnen ICP: **${pct(f.leadsInIcpPct)}**`,
-      `- waste op niet-ICP-segmenten: **${eur(f.wasteSpend)}**${f.largestWasteSegment ? ` (grootste: ${labels.get(f.largestWasteSegment.urn) ?? f.largestWasteSegment.urn} met ${eur(f.largestWasteSegment.spend)} en ${f.largestWasteSegment.leads} leads)` : ""}`,
+      `- waste op niet-ICP-segmenten: **${eur(f.wasteSpend)}**${f.largestWasteSegment ? ` (grootste: ${labels.get(f.largestWasteSegment.urn) ?? f.largestWasteSegment.urn} met ${eur(f.largestWasteSegment.spend)} en ${leadsTekst(f.largestWasteSegment.leads)} leads)` : ""}`,
       `- CPL binnen ICP: **${eur(f.icpCpl)}** vs buiten ICP: **${eur(f.nonIcpCpl)}**${f.coveragePct != null ? `; demografie-dekking ${pct(f.coveragePct)}` : ""}`,
       ""
     );
     if (f.spendInIcpPct != null && f.spendInIcpPct < ICP_SPEND_WEAK && f.wasteSpend >= WASTE_MATERIAL_EUR) {
-      materialWaste += f.wasteSpend;
+      grootsteWaste = Math.max(grootsteWaste, f.wasteSpend);
       weakPivots.push(`${f.pivotType} (${pct(f.spendInIcpPct)} in ICP, ${eur(f.wasteSpend)} waste)`);
     }
   }
   const actionNeeded = weakPivots.length > 0;
   if (actionNeeded) {
-    lines.push("## Duiding", `Op ${weakPivots.length} dimensie(s) valt minder dan ${ICP_SPEND_WEAK * 100}% van de spend binnen het ICP met materiele waste: ${weakPivots.join("; ")}. Scherp de targeting aan of herzie het ICP als deze segmenten bewust zijn.`);
+    lines.push("## Duiding", `Op ${weakPivots.length} dimensie(s) valt minder dan ${ICP_SPEND_WEAK * 100}% van de spend binnen het ICP met materiele waste: ${weakPivots.join("; ")}. De dimensies zijn doorsnedes van dezelfde euro's; tel ze niet op. Scherp de targeting aan of herzie het ICP als deze segmenten bewust zijn.`);
   }
   const output = lines.join("\n");
 
   const analysisDate = today();
+  // De echte dagspan van de gebruikte demografierijen.
+  const datums = raw.map((r) => String(r.date)).sort();
   const { error: saveError } = await saveAnalysisOutputSection({
     supabase,
     row: {
       client_id: clientId, sop_type: SOP_TYPE, analysis_date: analysisDate,
-      period_start: since, period_end: analysisDate, section: SECTION,
+      period_start: datums[0], period_end: datums[datums.length - 1], section: SECTION,
       output, model_used: "deterministisch", tokens_used: 0, step_number: 1, step_name: "LinkedIn ICP-fit",
     },
   });
@@ -128,17 +150,25 @@ export async function POST(request: NextRequest) {
   const proposals: SprintHypothesisRow[] = actionNeeded
     ? [{
         client_id: clientId, analysis_id: null,
-        hypothesis: `Scherp de LinkedIn-targeting aan: ${eur(materialWaste)} spend valt buiten het ICP`,
+        hypothesis: `Scherp de LinkedIn-targeting aan: minstens ${eur(grootsteWaste)} spend valt buiten het ICP (grootste dimensie)`,
         expected_result: "Een groter aandeel spend en leads binnen het ICP bij gelijkblijvend budget, en een lagere effectieve CPL op de doelgroep die telt.",
         measurement_metric: "Spend-in-ICP-percentage en waste per dimensie in de volgende ICP-fit-analyse.",
         timeframe: "2 weken",
-        rationale: weakPivots.join("; "),
-        ice_impact: materialWaste >= 1000 ? 8 : 5, ice_confidence: 7, ice_ease: 6,
-        ice_total: Math.round((((materialWaste >= 1000 ? 8 : 5) + 7 + 6) / 3) * 10) / 10,
+        rationale: `${weakPivots.join("; ")}. De dimensies overlappen (zelfde euro's, andere doorsnede); het bedrag is de grootste enkele dimensie.`,
+        ice_impact: grootsteWaste >= 1000 ? 8 : 5, ice_confidence: 7, ice_ease: 6,
+        ice_total: Math.round((((grootsteWaste >= 1000 ? 8 : 5) + 7 + 6) / 3) * 10) / 10,
         status: "pending", source: "linkedin_icp",
       }]
     : [];
   await saveProposalsReplacingPending(supabase, clientId, "linkedin_icp", proposals);
 
-  return Response.json({ analysis: output, actionNeeded, pivots: fits.length, icpConfigured: !isIcpEmpty(icp) });
+  return Response.json({
+    analysis: output, actionNeeded, pivots: fits.length, icpConfigured: !isIcpEmpty(icp),
+    dekking: { rijenAfgekapt: demoFetch.afgekapt, dagen: { van: datums[0], tot: datums[datums.length - 1] } },
+  });
+  } catch (e) {
+    const dataFout = dataFoutNaarResponse(e);
+    if (dataFout) return dataFout;
+    throw e;
+  }
 }

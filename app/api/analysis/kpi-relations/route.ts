@@ -139,42 +139,42 @@ function windowsFromDaily(
   };
 }
 
-// Maandtotalen + impressie-gewogen impression share voor de maand-kanalen (Google en
-// Microsoft): twee afgesloten maanden, IS uit de campagne-IS-tabel van het kanaal.
+// Maandtotalen + impressie-gewogen impression share voor het Google-maandpad: twee
+// afgesloten maanden, IS uit ads_campaign_impression_share. (Microsoft heeft zijn eigen
+// tak in de POST: zelfde principe, eigen tabellen.)
 async function maandVensters(
   supabase: SupabaseClient,
-  clientId: string,
-  bron: { maandTabel: string; isTabel: string; isKolom: string }
+  clientId: string
 ): Promise<VensterUitkomst | null> {
   const grens = lopendeMaandStart();
   const monthlyRes = await supabase
-    .from(bron.maandTabel)
+    .from("ads_account_monthly")
     .select("month, impressions, clicks, cost, conversions, conversions_value")
     .eq("client_id", clientId)
     .lt("month", grens)
     .order("month", { ascending: false })
     .limit(2);
-  const months = eis(monthlyRes, bron.maandTabel) as Array<Record<string, unknown>>;
+  const months = eis(monthlyRes, "ads_account_monthly") as Array<Record<string, unknown>>;
   if (months.length < 2) return null;
   const maandSleutels = months.map((m) => maandSleutel(String(m.month)));
 
-  const isRijen = await alleRijen<{ month: string; impressions: number | null } & Record<string, unknown>>(
+  const isRijen = await alleRijen<{ month: string; impressions: number | null; search_impression_share: number | null }>(
     (van, tot) => supabase
-      .from(bron.isTabel)
-      .select(`month, impressions, ${bron.isKolom}`)
+      .from("ads_campaign_impression_share")
+      .select("month, impressions, search_impression_share")
       .eq("client_id", clientId)
       .in("month", months.map((m) => String(m.month)))
       .order("month", { ascending: false })
       .order("id", { ascending: true })
       .range(van, tot),
-    bron.isTabel
+    "ads_campaign_impression_share"
   );
 
   const weightedIs = (maand: string): number | null => {
-    const rows = isRijen.rijen.filter((r) => maandSleutel(String(r.month)) === maand && r[bron.isKolom] != null);
+    const rows = isRijen.rijen.filter((r) => maandSleutel(String(r.month)) === maand && r.search_impression_share != null);
     const w = rows.reduce((s, r) => s + n(r.impressions), 0);
     if (w <= 0) return null;
-    return rows.reduce((s, r) => s + n(r[bron.isKolom]) * n(r.impressions), 0) / w;
+    return rows.reduce((s, r) => s + n(r.search_impression_share) * n(r.impressions), 0) / w;
   };
   const toWin = (m: Record<string, unknown>): KpiWindow => ({
     label: maandSleutel(String(m.month)),
@@ -210,11 +210,7 @@ export async function POST(request: NextRequest) {
     let windows: VensterUitkomst | null = null;
 
     if (kanaal === "google") {
-      windows = await maandVensters(supabase, clientId, {
-        maandTabel: "ads_account_monthly",
-        isTabel: "ads_campaign_impression_share",
-        isKolom: "search_impression_share",
-      });
+      windows = await maandVensters(supabase, clientId);
       if (!windows) return Response.json({ error: "Minimaal twee afgesloten maanden Google-data nodig (ads_account_monthly)" }, { status: 404 });
     } else if (kanaal === "microsoft") {
       // Microsoft heeft dezelfde maand-IS-laag als Google; door op afgesloten maanden te

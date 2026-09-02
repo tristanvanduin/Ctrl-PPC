@@ -13,7 +13,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aggregateAllGeoClones, type CampaignMonthlyRow, type GeoCloneSummary } from "@/lib/fair/geo-clone-aggregate";
-import { monthsAgo } from "@/lib/reporting-date";
+import { afgeslotenMaandenTerugStart, lopendeMaandStart } from "@/lib/analysis/db-veilig";
 
 export interface GeoCloneContextBlock {
   available: boolean;
@@ -27,15 +27,19 @@ function fmt(s: GeoCloneSummary): string {
   const t = s.totals;
   const cpa = t.cpa !== null ? `€${t.cpa.toFixed(2)}` : "n.v.t.";
   const roas = t.roas !== null ? t.roas.toFixed(2) : "n.v.t.";
-  return `${s.campaignCount} campagne${s.campaignCount === 1 ? "" : "s"}, kosten €${t.cost.toFixed(0)}, conversies ${t.conversions}, CPA ${cpa}, ROAS ${roas}`;
+  return `${s.campaignCount} campagne${s.campaignCount === 1 ? "" : "s"}, kosten €${t.cost.toFixed(0)}, conversies ${Math.round(t.conversions * 10) / 10}, CPA ${cpa}, ROAS ${roas}`;
 }
 
 export async function geoCloneContext(supabase: SupabaseClient, clientId: string): Promise<GeoCloneContextBlock> {
+  // Alleen AFGESLOTEN maanden: "laatste 3 maanden" beloofde de prompt, maar gte(monthsAgo(3))
+  // leverde tot vier maandrijen mét de lopende deelmaand — halve cijfers in het promptblok
+  // (sloop-audit 1 sep 2026).
   const { data } = await supabase
     .from("ads_campaign_monthly")
     .select("campaign_name, month, impressions, clicks, cost, conversions, conversions_value")
     .eq("client_id", clientId)
-    .gte("month", monthsAgo(LOOKBACK_MONTHS));
+    .gte("month", afgeslotenMaandenTerugStart(LOOKBACK_MONTHS - 1))
+    .lt("month", lopendeMaandStart());
 
   const rows = (data ?? []) as CampaignMonthlyRow[];
   if (rows.length === 0) return { available: false, geoCloneCount: 0, promptContext: "" };
@@ -49,7 +53,7 @@ export async function geoCloneContext(supabase: SupabaseClient, clientId: string
   const lines: string[] = [
     "## SUB-ACCOUNTS (geo-clones binnen dit account — elk een unieke, losse eenheid)",
     "",
-    `Dit account bevat ${breakdown.perGeoClone.length} sub-account${breakdown.perGeoClone.length === 1 ? "" : "s"}, herkend aan de campagnenaam-afkorting. Laatste ${LOOKBACK_MONTHS} maanden:`,
+    `Dit account bevat ${breakdown.perGeoClone.length} sub-account${breakdown.perGeoClone.length === 1 ? "" : "s"}, herkend aan de campagnenaam-afkorting. Laatste ${LOOKBACK_MONTHS} afgesloten maanden:`,
     "",
     ...breakdown.perGeoClone.map((e) => `- **${e.brand} ${e.location} (${e.geoClone})**: ${fmt(e.summary)}`),
   ];

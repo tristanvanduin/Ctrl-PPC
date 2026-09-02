@@ -15,6 +15,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildNetworkSplit, isBrowseNetwork } from "@/lib/pmax/network-split";
+import { lopendeMaandStart } from "./db-veilig";
 
 // ── Maandrijen samenvoegen per entiteit ────────────────────────────────────
 // De PMax-tabellen dragen één rij per entiteit PER MAAND. Wie daar direct overheen filtert telt
@@ -113,14 +114,22 @@ export interface CannibalisatieUitkomst {
 /**
  * `campMonthly` zijn ads_campaign_monthly-rijen (campaign_name, month, cost, conversions) over de
  * laatste ~90 dagen; `pmaxCampaignNames` de namen van de PMax-campagnes uit hetzelfde account.
- * Vergelijkt de laatste twee kalendermaanden in de rijen — geen venster-parameter, want de
- * aanroeper bepaalt via zijn eigen query al hoever terug hij kijkt.
+ * Vergelijkt de laatste twee AFGESLOTEN kalendermaanden in de rijen — geen venster-parameter,
+ * want de aanroeper bepaalt via zijn eigen query al hoever terug hij kijkt.
+ *
+ * De lopende maand wordt hier gefilterd, niet bij de aanroepers. Een 90-dagenquery haalt de
+ * lopende deelmaand gewoon binnen, en die deed vóór deze filter mee als "laatste maand": op dag
+ * drie van een maand staat elke campagne op een fractie van zijn normale conversies, dus daalde
+ * "Search/Shopping" schijnbaar hard en groeide of kromp PMax willekeurig — een
+ * cannibalisatie-oordeel over een maand die nog niet bestaat. Sloop-audit 1 september.
  */
 export function detecteerCannibalisatie(
   campMonthly: Array<Record<string, unknown>>,
   pmaxCampaignNames: readonly string[],
 ): CannibalisatieUitkomst | null {
-  const months = [...new Set(campMonthly.map((r) => String(r.month).slice(0, 7)))].sort();
+  const lopendeGrens = lopendeMaandStart();
+  const afgesloten = campMonthly.filter((r) => String(r.month) < lopendeGrens);
+  const months = [...new Set(afgesloten.map((r) => String(r.month).slice(0, 7)))].sort();
   if (months.length < 2) return null;
 
   const latestMonth = months[months.length - 1];
@@ -129,7 +138,7 @@ export function detecteerCannibalisatie(
   let pmaxCostCur = 0, pmaxCostPrev = 0, pmaxConvCur = 0, pmaxConvPrev = 0;
   let otherCostCur = 0, otherCostPrev = 0, otherConvCur = 0, otherConvPrev = 0;
 
-  for (const r of campMonthly) {
+  for (const r of afgesloten) {
     const m = String(r.month).slice(0, 7);
     const isPmax = pmaxNames.has(String(r.campaign_name));
     const cost = Number(r.cost) || 0;
@@ -393,9 +402,28 @@ export async function computePmaxInsights(
 
   // ── Signal 4: Placement Waste ──
 
-  if (placements.length > 0) {
+  // ── DEZE CONTROLE KAN MEESTAL NIET KIJKEN, EN DAT HOORT ZE TE ZEGGEN ──────
+  //
+  // Google publiceert per PMax-placement UITSLUITEND vertoningen — geen kosten, geen conversies
+  // (zie de kop van pmaxPlacementRows in lib/demo/pmax-video-demo.ts). In de echte database is
+  // ads_pmax_placements bovendien leeg. De euro-drempel hieronder kon dus nooit iets vinden, en
+  // dat las als "gecontroleerd, geen verspilling" — een detector die stilzwijgend niets doet is
+  // erger dan geen detector, want er wordt op vertrouwd dat er gekeken is. Bij een lege of
+  // kostenloze bron melden we daarom expliciet dat dit NIET gecontroleerd is.
+  const byPlacement = aggregateByEntity(placements, "placement");
+  const placementCost = byPlacement.reduce((s, p) => s + p.cost, 0);
+  if (placements.length === 0 || placementCost === 0) {
+    signals.push({
+      type: "placement_waste_niet_controleerbaar",
+      severity: "info",
+      title: "Placement-verspilling niet gecontroleerd",
+      description: placements.length === 0
+        ? "Er zijn geen PMax-placementrijen; Google publiceert per PMax-placement alleen vertoningen (geen kosten of conversies), dus verspilling per plaatsing is hier niet te beoordelen."
+        : `${placements.length} placementrijen zonder kostendata: Google publiceert per PMax-placement alleen vertoningen, dus verspilling per plaatsing is niet te beoordelen.`,
+      confidence: "high",
+    });
+  } else {
     const wasteThreshold = 20; // €20+ over het hele venster
-    const byPlacement = aggregateByEntity(placements, "placement");
     const wastePlacements = byPlacement.filter((p) => p.cost > wasteThreshold && p.conversions === 0);
     const totalWaste = wastePlacements.reduce((s, p) => s + p.cost, 0);
 

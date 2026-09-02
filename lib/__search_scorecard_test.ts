@@ -71,6 +71,29 @@ console.log("\nGeen quality-score-data: Search Quality blijft eerlijk onbeoordee
   check("assessedCount is 4 (vijf min Search Quality)", out.assessedCount === 4);
 }
 
+console.log("\nDe keywordmaand staat in de factortekst, zodat veroudering zichtbaar is");
+{
+  // Live loopt ads_keyword_performance_monthly maanden achter op de IS-tabel; de route geeft
+  // daarom de maand mee waar de quality-score-data werkelijk vandaan komt. Zonder dat label
+  // leest een quality score van april als een van nu.
+  const rows: SearchImpressionShareRow[] = [
+    rij({ month: "2026-07-01", cost: 1000, conversions: 20 }),
+    rij({ month: "2026-08-01", cost: 1000, conversions: 22 }),
+  ];
+  const keywords: KeywordQsRow[] = [{ cost: 1000, quality_score: 7 }];
+  const out = computeSearchScorecard(rows, keywords, "2026-04");
+  const factor = out.factors.find((f) => f.name === "Search Quality")!;
+  check("beoordeeld met keyworddata", factor.assessed);
+  check("de maand van de keyworddata staat in de tekst", factor.description.includes("2026-04"), factor.description);
+
+  const zonderMaand = computeSearchScorecard(rows, keywords);
+  check(
+    "zonder maandlabel geen loze haakjes",
+    !zonderMaand.factors.find((f) => f.name === "Search Quality")!.description.includes("("),
+    zonderMaand.factors.find((f) => f.name === "Search Quality")!.description
+  );
+}
+
 console.log("\nMeerdere campagnes in dezelfde maand: spend-gewogen, niet simpel gemiddeld");
 {
   const rows: SearchImpressionShareRow[] = [

@@ -10,13 +10,15 @@
 // =====================================================================
 
 import { NextRequest } from "next/server";
-import { getSupabase, getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
+import { getOpenRouterKey, fetchClientContext, saveAnalysisOutputSection } from "@/lib/analysis/helpers";
 import { callLayer } from "@/lib/analysis/llm-router";
 import { recordUsage } from "@/lib/analysis/o2-targets-cost";
 import { buildPeriodEvaluation, renderPeriodEvaluationSection, type PeriodHypothesis, type PeriodMonthRow } from "@/lib/analysis/period-evaluation";
 import { today as vandaag } from "@/lib/reporting-date";
+import { lastCompleteMonth, addMonths } from "@/lib/period/period-range";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { verbruikCredit, controleerSaldo } from "@/lib/analysis/credit-costs";
+import { vereisKlantToegangUitBody } from "@/lib/auth/server";
 
 const SECTION = "period_evaluation_v1";
 const SOP_TYPE = "period_evaluation";
@@ -46,11 +48,6 @@ export async function GET(request: NextRequest) {
 // POST: draai een nieuwe periode-evaluatie. Body: client_id plus from en to (YYYY-MM), of
 // months (een aantal maanden terug vanaf de laatste volle maand).
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
-  const apiKey = getOpenRouterKey();
-  if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
-
   let body: { client_id?: string; from?: string; to?: string; months?: number; label?: string };
   try {
     body = await request.json();
@@ -60,28 +57,41 @@ export async function POST(request: NextRequest) {
   const clientId = typeof body.client_id === "string" ? body.client_id : "";
   if (!clientId) return Response.json({ error: "client_id is verplicht" }, { status: 400 });
 
+  const geweigerd = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
+  if (geweigerd) return geweigerd;
+
+  // Demo-bewust, net als de GET.
+  const supabase = supabaseForClient(clientId);
+  if (!supabase) return Response.json({ error: "Supabase is niet geconfigureerd" }, { status: 500 });
+  const apiKey = getOpenRouterKey();
+  if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
+
   const creditOordeel = await controleerSaldo(supabase, { clientId, label: SOP_TYPE });
   if (creditOordeel.blokkeert) {
     return Response.json({ error: creditOordeel.tekst }, { status: 402 });
   }
 
   // De periode: expliciet from en to, of een aantal maanden terug (default een kwartaal).
-  const today = new Date();
-  const lastCompleteEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
-  const toMonth = typeof body.to === "string" && /^\d{4}-\d{2}$/.test(body.to) ? body.to : lastCompleteEnd.toISOString().slice(0, 7);
+  // De maandgrens via de rapportage-tijdzone, niet server-UTC: rond de maandwissel om
+  // middernacht Amsterdamse tijd week toMonth anders af van de rest van de app.
+  const toMonth = typeof body.to === "string" && /^\d{4}-\d{2}$/.test(body.to) ? body.to : lastCompleteMonth();
   let fromMonth: string;
   if (typeof body.from === "string" && /^\d{4}-\d{2}$/.test(body.from)) {
     fromMonth = body.from;
   } else {
     const count = typeof body.months === "number" && body.months > 0 ? Math.floor(body.months) : 3;
-    const [y, m] = toMonth.split("-").map(Number);
-    const start = new Date(Date.UTC(y, m - 1 - (count - 1), 1));
-    fromMonth = start.toISOString().slice(0, 7);
+    fromMonth = addMonths(toMonth, -(count - 1));
   }
   if (fromMonth > toMonth) return Response.json({ error: "from ligt na to" }, { status: 400 });
 
   const periodStart = `${fromMonth}-01`;
-  const periodEndExclusive = `${toMonth}-31`; // maandkolom is een datum; deze bovengrens dekt elke maandlengte
+  // De maandkolom is een DATE die altijd op de 1e valt; de inclusieve bovengrens is dus
+  // gewoon de 1e van de eindmaand. De oude bovengrens "${toMonth}-31" was in maanden met
+  // minder dan 31 dagen een ongeldige datum: Postgres weigerde hem en elke run in maart,
+  // mei, juli, oktober en december eindigde in een 500 (sloop-audit 1 sep 2026).
+  const periodEindeMaandStart = `${toMonth}-01`;
+  // Voor created_at (timestamp) is de exclusieve bovengrens de 1e van de vólgende maand.
+  const volgendeMaandStart = `${addMonths(toMonth, 1)}-01`;
 
   const [monthlyRes, hypothesisRes, clientCtx] = await Promise.all([
     supabase
@@ -89,18 +99,19 @@ export async function POST(request: NextRequest) {
       .select("month, cost, conversions, conversions_value")
       .eq("client_id", clientId)
       .gte("month", periodStart)
-      .lte("month", periodEndExclusive)
+      .lte("month", periodEindeMaandStart)
       .order("month"),
     supabase
       .from("sprint_hypotheses")
       .select("id, hypothesis, measurement_metric, status, created_at, accepted_at")
       .eq("client_id", clientId)
       .gte("created_at", periodStart)
-      .lte("created_at", `${periodEndExclusive}T23:59:59`),
+      .lt("created_at", volgendeMaandStart),
     fetchClientContext(supabase, clientId),
   ]);
 
   if (monthlyRes.error) return Response.json({ error: `Maanddata laden faalde: ${monthlyRes.error.message}` }, { status: 500 });
+  if (hypothesisRes.error) return Response.json({ error: `Hypotheses laden faalde: ${hypothesisRes.error.message}` }, { status: 500 });
   const months: PeriodMonthRow[] = (monthlyRes.data ?? []).map((r) => ({
     month: String(r.month).slice(0, 7),
     cost: Number(r.cost ?? 0),
@@ -135,6 +146,9 @@ export async function POST(request: NextRequest) {
 ## Klantdoelen en context
 ${clientCtx.goalsSection}
 
+## Dekking van de cijfers
+De kosten en conversies hieronder komen UITSLUITEND uit Google Ads (bron: ads_account_monthly). Spend op Meta, LinkedIn of Microsoft valt buiten dit periodebeeld; presenteer het oordeel dus als Google-oordeel, niet als totaalbeeld van de klant.
+
 ${factsSection}
 
 ## Regels
@@ -142,7 +156,8 @@ ${factsSection}
 2. Dit is een PERIODE-oordeel, geen maandmomentopname: schrijf over de ontwikkeling binnen de periode (de trend tussen de helften), niet alleen over het eindpunt.
 3. Neem de verdict-labels letterlijk over. Bij geen_target of te_weinig_volume vel je GEEN oordeel; benoem dan expliciet dat het niet af te rekenen viel en wat er nodig is om dat volgende periode wel te kunnen.
 4. Als hypotheses niet afgerekend zijn, benoem dat als een gat in het proces, niet als een succes of een mislukking.
-5. Schrijf in het Nederlands, mobiel leesbaar, conclusies boven datadumps.
+5. Benoem de Google-dekking uit de dekkingssectie expliciet in het oordeel.
+6. Schrijf in het Nederlands, mobiel leesbaar, conclusies boven datadumps.
 
 ## Gevraagde output
 Kort: (1) het oordeel over de periode in twee zinnen, (2) wat het plan was en wat ervan terechtkwam, (3) de ontwikkeling binnen de periode, (4) wat dit betekent voor de volgende periode, (5) wat er ontbrak om scherper te kunnen oordelen.`;
