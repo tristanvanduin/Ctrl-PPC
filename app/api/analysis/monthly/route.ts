@@ -66,6 +66,7 @@ import { checkStepDataAvailability } from "@/lib/analysis/data-availability";
 import type { StepDataAvailability } from "@/lib/analysis/data-availability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { datastandVoorKlant, datastandBlokkade } from "@/lib/sync/datastand";
+import { kanaalMaandDataOntbreekt } from "@/lib/analysis/kanaal-datapoort";
 import { canonicalizeFindings, clusterFindings, type CoverageDimension, type NormalizedFinding, type IssueCluster } from "@/lib/analysis/canonicalize";
 import { enforceSopCoverage, deriveDimensionAvailabilityFromClusters } from "@/lib/analysis/coverage-enforcer";
 import { buildStructuredMonthlyOutput, type ParsedStepOutput } from "@/lib/analysis/monthly-structured";
@@ -1195,6 +1196,12 @@ async function runMetaMonthlyAnalysis(
     message: "Meta-data en voorgerekende feiten laden...",
   });
 
+  // Maandstand-poort (3 september 2026): zonder rijen in de analysemaand draaide deze pijplijn
+  // door op lege tabellen, schreef per stap een "runtime-fallback"-rij weg en meldde de run als
+  // voltooid. Zelfde harde stop als bij Google; zie lib/analysis/kanaal-datapoort.ts.
+  const maandPoort = await kanaalMaandDataOntbreekt(supabase, clientId, jobId, "meta");
+  if (maandPoort) return maandPoort;
+
   const clientCtx = await fetchClientContext(supabase, clientId);
   const { goalsSection, accountType } = clientCtx;
 
@@ -1454,6 +1461,10 @@ async function runLinkedinMonthlyAnalysis(
     phaseKey: "load_linkedin_data",
     message: "LinkedIn-data en voorgerekende feiten laden...",
   });
+
+  // Maandstand-poort, zelfde reden als bij Meta hierboven.
+  const maandPoort = await kanaalMaandDataOntbreekt(supabase, clientId, jobId, "linkedin");
+  if (maandPoort) return maandPoort;
 
   const clientCtx = await fetchClientContext(supabase, clientId);
   const { goalsSection, accountType } = clientCtx;
@@ -1721,6 +1732,10 @@ async function runMicrosoftMonthlyAnalysis(
     phaseKey: "load_microsoft_data",
     message: "Microsoft-data en voorgerekende feiten laden...",
   });
+
+  // Maandstand-poort, zelfde reden als bij Meta hierboven.
+  const maandPoort = await kanaalMaandDataOntbreekt(supabase, clientId, jobId, "microsoft");
+  if (maandPoort) return maandPoort;
 
   const clientCtx = await fetchClientContext(supabase, clientId);
   const { goalsSection, accountType } = clientCtx;

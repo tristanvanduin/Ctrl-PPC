@@ -5,7 +5,9 @@
 import {
   beoordeelDatastand, beoordeelWeekstand, datastandBlokkade, weekstandBlokkade, datastandVoorKlant, weekstandVoorKlant, DOOD_VANAF_MAANDEN,
   beoordeelDagstand, dagstandBlokkade, dagstandVoorKlant, DAG_ACHTER_VANAF_DAGEN, DAG_DOOD_VANAF_DAGEN,
+  kanaalMaandstandVoorKlant,
 } from "./datastand";
+import { lastCompleteMonth } from "../period/period-range";
 import { FakeSupabase } from "../decision/__fake_supabase";
 import { DataLaagFout } from "../analysis/db-veilig";
 
@@ -97,6 +99,42 @@ async function main() {
     const b = dagstandBlokkade(dood);
     check("dood blokkeert, met het kanaal in de tekst", b !== null && b.startsWith("Geen bruikbare Microsoft-dagdata"), String(b));
     check("geen blokkeert", dagstandBlokkade(geen) !== null);
+  }
+
+  console.log("beoordeelDatastand met bron en dagen: de kanaalmaandstand");
+  {
+    const NU = "2026-09-03";
+    const google = beoordeelDatastand({ laatsteMaand: null, nu: NU });
+    check("standaard bron is Google", google.bron === "Google" && google.tekst.startsWith("Geen Google-data"));
+    const geen = beoordeelDatastand({ laatsteMaand: null, bron: "Meta", nu: NU });
+    check("kanaal zonder data: tekst en blokkade noemen het kanaal", geen.tekst.startsWith("Geen Meta-data") && String(datastandBlokkade(geen)).startsWith("Geen Meta-data voor deze klant"), String(datastandBlokkade(geen)));
+    const deels = beoordeelDatastand({ laatsteMaand: "2026-08", bron: "LinkedIn", dagenInLaatsteMaand: 12, nu: NU });
+    check("aanwezige maand met 12 dagen: actueel, dekking in de tekst", deels.toestand === "actueel" && deels.tekst.includes("(12 dagen met data)") && deels.dagenInLaatsteMaand === 12, deels.tekst);
+    const een = beoordeelDatastand({ laatsteMaand: "2026-08", bron: "Meta", dagenInLaatsteMaand: 1, nu: NU });
+    check("enkelvoud", een.tekst.includes("(1 dag met data)"), een.tekst);
+    const dood = beoordeelDatastand({ laatsteMaand: "2026-04", bron: "Microsoft", dagenInLaatsteMaand: 17, nu: NU });
+    check("dood: blokkade noemt het kanaal en de analysemaand", String(datastandBlokkade(dood)).startsWith("Geen Microsoft-data voor de analysemaand Augustus 2026"), String(datastandBlokkade(dood)));
+  }
+
+  console.log("kanaalMaandstandVoorKlant: maand en dagen uit de dagtabel");
+  {
+    const m = lastCompleteMonth();
+    const sb = new FakeSupabase();
+    sb.seed("meta_account_daily", [
+      { client_id: "k1", date: `${m}-01` }, { client_id: "k1", date: `${m}-02` }, { client_id: "k1", date: `${m}-02` },
+      { client_id: "k1", date: "2025-12-31" }, { client_id: "ander", date: `${m}-15` },
+    ]);
+    sb.seed("meta_connections", [{ client_id: "k1", last_sync_at: `${m}-03T04:00:00Z`, status: "active" }]);
+    const stand = await kanaalMaandstandVoorKlant(sb as never, "k1", "meta");
+    check("nieuwste maand is de analysemaand, twee unieke dagen, bron Meta", stand.laatsteMaand === m && stand.dagenInLaatsteMaand === 2 && stand.bron === "Meta" && stand.toestand === "actueel", JSON.stringify(stand));
+    check("geen blokkade bij een aanwezige maand", datastandBlokkade(stand) === null);
+    const leeg = await kanaalMaandstandVoorKlant(sb as never, "k1", "linkedin");
+    check("lege dagtabel: geen, met blokkade", leeg.toestand === "geen" && datastandBlokkade(leeg) !== null);
+    const kapot = new FakeSupabase();
+    kapot.faalOp("microsoft_connections", "permission denied");
+    let fout: unknown = null;
+    try { await kanaalMaandstandVoorKlant(kapot as never, "k1", "microsoft"); } catch (e) { fout = e; }
+    check("queryfout op de koppelingsrij is een DataLaagFout", fout instanceof DataLaagFout);
   }
 
   console.log("dagstandVoorKlant: nieuwste dag van DEZE klant, sync uit de koppelingsrij");

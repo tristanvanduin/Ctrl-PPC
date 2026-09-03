@@ -25,8 +25,14 @@ import { eis } from "@/lib/analysis/db-veilig";
 export type DatastandToestand = "actueel" | "achter" | "dood" | "geen";
 
 export interface Datastand {
+  /** Waar de data van is: "Google" (ads_account_monthly) of een kanaal ("Meta", "LinkedIn",
+   *  "Microsoft", uit de dagtabel). Stuurt de teksten; voorheen zei elke melding "Google". */
+  bron: string;
   /** Nieuwste maand met een accountrij, "YYYY-MM"; null als er niets staat. */
   laatsteMaand: string | null;
+  /** Alleen bij dagbronnen: hoeveel dagen van de nieuwste maand er rijen hebben. Een maand
+   *  met 3 van 31 dagen is aanwezig maar niet compleet, en dat hoort in de tekst. */
+  dagenInLaatsteMaand?: number | null;
   /** De laatste afgesloten kalendermaand: wat een maandanalyse verwacht. */
   verwachteMaand: string;
   maandenAchter: number | null;
@@ -60,8 +66,12 @@ export function beoordeelDatastand(inp: {
   laatsteGeslaagdeSync?: string | null;
   /** Vandaag (YYYY-MM-DD); alleen de test zet hem vast. */
   nu?: string;
+  /** "Google" (standaard) of een kanaallabel; zie Datastand.bron. */
+  bron?: string;
+  dagenInLaatsteMaand?: number | null;
 }): Datastand {
   const nu = inp.nu ?? today();
+  const bron = inp.bron ?? "Google";
   const verwachteMaand = lastCompleteMonth(nu.slice(0, 7));
   const sync = inp.laatsteGeslaagdeSync ?? null;
   const dagenSindsSync = sync ? dagenTussen(sync, nu) : null;
@@ -72,21 +82,23 @@ export function beoordeelDatastand(inp: {
   const ruw = inp.laatsteMaand ? String(inp.laatsteMaand).slice(0, 7) : null;
   if (!ruw || !isValidMonth(ruw)) {
     return {
-      laatsteMaand: null, verwachteMaand, maandenAchter: null, laatsteGeslaagdeSync: sync, dagenSindsSync,
-      toestand: "geen", tekst: `Geen Google-data gesynct; ${syncTekst}.`,
+      bron, laatsteMaand: null, dagenInLaatsteMaand: null, verwachteMaand, maandenAchter: null, laatsteGeslaagdeSync: sync, dagenSindsSync,
+      toestand: "geen", tekst: `Geen ${bron}-data gesynct; ${syncTekst}.`,
     };
   }
+  const dagen = inp.dagenInLaatsteMaand ?? null;
+  const dagenTekst = dagen != null ? ` (${dagen} dag${dagen === 1 ? "" : "en"} met data)` : "";
   const maandenAchter = Math.max(0, monthIndex(verwachteMaand) - monthIndex(ruw));
-  const basis = { laatsteMaand: ruw, verwachteMaand, maandenAchter, laatsteGeslaagdeSync: sync, dagenSindsSync };
+  const basis = { bron, laatsteMaand: ruw, dagenInLaatsteMaand: dagen, verwachteMaand, maandenAchter, laatsteGeslaagdeSync: sync, dagenSindsSync };
   if (maandenAchter === 0) {
-    return { ...basis, toestand: "actueel", tekst: `Data t/m ${maandTekst(ruw)}; ${syncTekst}.` };
+    return { ...basis, toestand: "actueel", tekst: `Data t/m ${maandTekst(ruw)}${dagenTekst}; ${syncTekst}.` };
   }
   if (maandenAchter < DOOD_VANAF_MAANDEN) {
-    return { ...basis, toestand: "achter", tekst: `Data t/m ${maandTekst(ruw)}; ${maandTekst(verwachteMaand)} ontbreekt nog; ${syncTekst}.` };
+    return { ...basis, toestand: "achter", tekst: `Data t/m ${maandTekst(ruw)}${dagenTekst}; ${maandTekst(verwachteMaand)} ontbreekt nog; ${syncTekst}.` };
   }
   return {
     ...basis, toestand: "dood",
-    tekst: `De sync draait niet: data t/m ${maandTekst(ruw)}, ${maandenAchter} maanden achter op ${maandTekst(verwachteMaand)}; ${syncTekst}.`,
+    tekst: `De sync draait niet: data t/m ${maandTekst(ruw)}${dagenTekst}, ${maandenAchter} maanden achter op ${maandTekst(verwachteMaand)}; ${syncTekst}.`,
   };
 }
 
@@ -94,8 +106,8 @@ export function beoordeelDatastand(inp: {
  *  een lege analysemaand. Geeft de blokkadetekst, of null als er gewoon gedraaid kan worden. */
 export function datastandBlokkade(stand: Datastand): string | null {
   if (stand.toestand === "actueel") return null;
-  if (stand.toestand === "geen") return `Geen Google-data voor deze klant. ${stand.tekst}`;
-  return `Geen Google-data voor de analysemaand ${maandTekst(stand.verwachteMaand)}. ${stand.tekst}`;
+  if (stand.toestand === "geen") return `Geen ${stand.bron}-data voor deze klant. ${stand.tekst}`;
+  return `Geen ${stand.bron}-data voor de analysemaand ${maandTekst(stand.verwachteMaand)}. ${stand.tekst}`;
 }
 
 // ── Weekstand, voor de weekly ────────────────────────────────────────────
@@ -229,4 +241,26 @@ export async function dagstandVoorKlant(supabase: SupabaseClient, clientId: stri
   const laatsteDag = rijen.map((r) => String(r.date ?? "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop() ?? null;
   const sync = connRijen[0]?.last_sync_at ? String(connRijen[0].last_sync_at) : null;
   return beoordeelDagstand({ kanaal, laatsteDag, laatsteGeslaagdeSync: sync });
+}
+
+/**
+ * De MAANDstand van een kanaal, voor de maandanalyse: dezelfde beoordeling als bij Google
+ * (verwachte maand = laatste afgesloten maand), maar afgeleid uit de dagtabel, met erbij hoeveel
+ * dagen van die nieuwste maand er rijen hebben. Blokkeert via datastandBlokkade zodra de
+ * analysemaand geen enkele rij heeft; een maand met weinig dagen draait wél, met het aantal in
+ * de tekst, zodat de lezer de dekking kent.
+ */
+export async function kanaalMaandstandVoorKlant(supabase: SupabaseClient, clientId: string, kanaal: Dagkanaal): Promise<Datastand> {
+  const [dagen, conn] = await Promise.all([
+    supabase.from(`${kanaal}_account_daily`).select("date").eq("client_id", clientId).order("date", { ascending: false }).limit(400),
+    supabase.from(`${kanaal}_connections`).select("last_sync_at").eq("client_id", clientId).limit(1),
+  ]);
+  const rijen = eis(dagen, `${kanaal}_account_daily (maandstand)`) as { date: unknown }[];
+  const connRijen = eis(conn, `${kanaal}_connections (maandstand)`) as { last_sync_at: unknown }[];
+  const datums = rijen.map((r) => String(r.date ?? "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const laatsteDag = datums.length > 0 ? datums[datums.length - 1] : null;
+  const laatsteMaand = laatsteDag ? laatsteDag.slice(0, 7) : null;
+  const dagenInLaatsteMaand = laatsteMaand ? new Set(datums.filter((d) => d.startsWith(laatsteMaand))).size : null;
+  const sync = connRijen[0]?.last_sync_at ? String(connRijen[0].last_sync_at) : null;
+  return beoordeelDatastand({ laatsteMaand, laatsteGeslaagdeSync: sync, bron: DAGKANAAL_LABEL[kanaal], dagenInLaatsteMaand });
 }

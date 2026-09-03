@@ -12,17 +12,48 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { markProgressFailed } from "@/lib/progress/server";
-import { dagstandVoorKlant, dagstandBlokkade, DAGKANAAL_LABEL, type Dagkanaal, type Dagstand } from "@/lib/sync/datastand";
+import {
+  dagstandVoorKlant, dagstandBlokkade, kanaalMaandstandVoorKlant, datastandBlokkade, DAGKANAAL_LABEL,
+  type Dagkanaal, type Dagstand, type Datastand, type DatastandToestand,
+} from "@/lib/sync/datastand";
+
+/** De weg naar herstel, afhankelijk van of er ooit iets gekoppeld is. */
+function kanaalActie(kanaal: Dagkanaal, toestand: DatastandToestand): string {
+  const label = DAGKANAAL_LABEL[kanaal];
+  return toestand === "geen"
+    ? `Koppel het ${label}-account aan deze klant (Instellingen → Kanaalkoppelingen per klant) en start een backfill.`
+    : `Start een sync via POST /api/sync/${kanaal} of controleer de ${label}-koppeling van het bureau (Instellingen → Koppelingen).`;
+}
 
 /** Puur: melding en HTTP-status uit de dagstand, los getest. */
 export function kanaalDatapoort(stand: Dagstand): { melding: string; status: 404 | 409; action: string } {
   const label = DAGKANAAL_LABEL[stand.kanaal];
   const blokkade = dagstandBlokkade(stand);
-  const action = stand.toestand === "geen"
-    ? `Koppel het ${label}-account aan deze klant (Instellingen → Kanaalkoppelingen per klant) en start een backfill.`
-    : `Start een sync via POST /api/sync/${stand.kanaal} of controleer de ${label}-koppeling van het bureau (Instellingen → Koppelingen).`;
+  const action = kanaalActie(stand.kanaal, stand.toestand);
   if (blokkade) return { melding: blokkade, status: 409, action };
   return { melding: `Geen ${label}-dagdata in het analysevenster. ${stand.tekst}`, status: 404, action };
+}
+
+/** Puur: de maandpoort van de kanaalmaandanalyse. Null als er gedraaid kan worden. */
+export function kanaalMaandpoort(stand: Datastand, kanaal: Dagkanaal): { melding: string; action: string } | null {
+  const blokkade = datastandBlokkade(stand);
+  if (!blokkade) return null;
+  return { melding: blokkade, action: kanaalActie(kanaal, stand.toestand) };
+}
+
+/**
+ * De maandpoort voor de kanaalmaandanalyses (monthly voor Meta, LinkedIn, Microsoft). Tot
+ * 3 september 2026 hadden die geen poort: op een lege tabel maakten ze een voortgangsjob aan,
+ * schreven per stap een "runtime-fallback"-rij weg en meldden de run als voltooid -- een holle
+ * analyse die de cross-channel-synthese en de beslislaag vervolgens als echt lazen. Null als de
+ * analysemaand data heeft; anders de 409 met de stand, en de job op failed.
+ */
+export async function kanaalMaandDataOntbreekt(supabase: SupabaseClient, clientId: string, jobId: string, kanaal: Dagkanaal): Promise<Response | null> {
+  const stand = await kanaalMaandstandVoorKlant(supabase, clientId, kanaal);
+  const poort = kanaalMaandpoort(stand, kanaal);
+  if (!poort) return null;
+  await markProgressFailed(supabase, { jobId, errorMessage: poort.melding });
+  return Response.json({ error: poort.melding, datastand: stand, action: poort.action }, { status: 409 });
 }
 
 export async function kanaalDataOntbreekt(supabase: SupabaseClient, clientId: string, jobId: string, kanaal: Dagkanaal): Promise<Response> {
