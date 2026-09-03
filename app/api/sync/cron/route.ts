@@ -7,6 +7,8 @@ import { synckandidaten } from "@/lib/tenancy/klanten";
 import { credentialsVoorBureau } from "@/lib/tenancy/credentials";
 import { kanaalKoppelingen, KANAAL_RUNS, type SyncKanaal } from "@/lib/sync/kanaal-runs";
 import { noteerOvergeslagenSync, meldSyncStilstand } from "@/lib/sync/cron-sporen";
+import { sorteerOpStaleness, verdeelTijdbudget, draaiMetPool, GOOGLE_GELIJKTIJDIG } from "@/lib/sync/cron-planning";
+import { eis, dataFoutNaarResponse } from "@/lib/analysis/db-veilig";
 
 /**
  * GET /api/sync/cron — Nightly scheduled sync for all active clients.
@@ -17,22 +19,22 @@ import { noteerOvergeslagenSync, meldSyncStilstand } from "@/lib/sync/cron-spore
  * - External cron service (e.g., cron-job.org)
  * - Supabase Edge Functions
  *
- * Eerst alle Google Ads-klanten sequentieel (rate-limit-vriendelijk), daarna de
- * kanaalkoppelingen (Meta/LinkedIn/Microsoft) via exact dezelfde runs als de handmatige
- * routes (lib/sync/kanaal-runs.ts). De kanaalrondes staan onder een tijdbudget dat vanaf de
- * INVOCATIESTART telt (de Google-ronde eet dus van hetzelfde budget): een nieuw
- * (klant, kanaal)-paar start alleen als er nog ruim marge onder maxDuration zit, en wat niet
- * meer past wordt als "doorgeschoven" gerapporteerd. Dat VERKLEINT de kans dat maxDuration
- * midden in een run valt; een garantie is het niet -- een Meta-daily kost in het slechtste
- * geval meer dan de marge (elf async-rapportjobs met elk een pollplafond van een minuut).
- * Wordt dat doorschuiven of afbreken structureel, dan is de volgende stap de bestaande
- * queue-mechaniek (zie app/api/cron/process-action-queue) -- niet een langere timeout.
+ * Eerst de Google Ads-klanten (stalest-first, drie tegelijk, binnen Googles deel van het
+ * tijdbudget), daarna de kanaalkoppelingen (Meta/LinkedIn/Microsoft) via exact dezelfde runs
+ * als de handmatige routes (lib/sync/kanaal-runs.ts), in hun eigen venster. Beide vensters
+ * tellen vanaf de INVOCATIESTART en liggen binnen maxDuration; wat niet meer past wordt als
+ * "doorgeschoven" gerapporteerd en staat door de staleness-volgorde de volgende nacht vooraan.
+ * De verdeling en de pool staan in lib/sync/cron-planning.ts, met de reden erbij (zeventig
+ * klanten, tien minuten). Een garantie tegen maxDuration midden in een run is het niet -- een
+ * Meta-daily kost in het slechtste geval meer dan de eindmarge (elf async-rapportjobs met elk
+ * een pollplafond van een minuut). Wordt dat doorschuiven of afbreken structureel, dan is de
+ * volgende stap de bestaande queue-mechaniek (zie app/api/cron/process-action-queue) -- niet
+ * een langere timeout.
  */
 
 export const maxDuration = 600;
-// Na dit punt start geen nieuw kanaalpaar meer: de resterende ~420s dekken het gangbare
-// geval (rapportjobs zijn doorgaans in seconden klaar) met ruime marge.
-const KANAAL_TIJDBUDGET_MS = 180_000;
+// Het tijdbudget wordt per run verdeeld (lib/sync/cron-planning.ts): Google en de kanalen
+// krijgen elk een venster binnen maxDuration, stalest-first, drie Google-klanten tegelijk.
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -69,7 +71,25 @@ export async function GET(request: NextRequest) {
   // ?agency_id=; zonder dat blijft het gedrag platformbreed, zoals het vandaag is. Zie de kop
   // van lib/tenancy/klanten.ts.
   const agencyFilter = request.nextUrl.searchParams.get("agency_id");
-  const clients = await synckandidaten(supabase, { bron: "google-ads", agencyId: agencyFilter });
+  const kandidaten = await synckandidaten(supabase, { bron: "google-ads", agencyId: agencyFilter });
+
+  // Stalest-first (zie lib/sync/cron-planning.ts): wie het langst niet gesynct is gaat voor,
+  // en wat vannacht buiten het tijdbudget valt staat morgen vooraan. Een onleesbare
+  // statustabel is een fout die de hele run stopt -- zonder volgorde zou dezelfde staart elke
+  // nacht buiten de boot vallen, en dat is precies wat deze cron niet meer mag.
+  const laatsteSync = new Map<string, string | null>();
+  if (kandidaten.length > 0) {
+    const statusRes = await supabase.from("client_sync_status").select("client_id, last_successful_sync_at")
+      .in("client_id", kandidaten.map((k) => k.clientId)).limit(2000);
+    try {
+      for (const r of eis(statusRes, "client_sync_status (cronvolgorde)") as { client_id: unknown; last_successful_sync_at: unknown }[]) {
+        laatsteSync.set(String(r.client_id ?? ""), r.last_successful_sync_at ? String(r.last_successful_sync_at) : null);
+      }
+    } catch (e) {
+      return dataFoutNaarResponse(e) ?? Response.json({ error: e instanceof Error ? e.message : "Onbekende fout" }, { status: 500 });
+    }
+  }
+  const clients = sorteerOpStaleness(kandidaten, laatsteSync);
 
   // De kanaalkoppelingen (Meta/LinkedIn/Microsoft) staan los van de Google-lijst: een klant
   // kan best alleen een Microsoft-koppeling hebben. Alleen als BEIDE leeg zijn is er niets
@@ -79,7 +99,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "Geen clients met een advertentiekoppeling" }, { status: 404 });
   }
 
-  // Sync clients sequentially (rate limit friendly)
+  const budget = verdeelTijdbudget({ maxDurationMs: maxDuration * 1000, kanaalParen: koppelingen.length });
   const results: Array<{ clientId: string; status: string; rows: number; error?: string }> = [];
   let succeeded = 0;
   let failed = 0;
@@ -92,31 +112,36 @@ export async function GET(request: NextRequest) {
   // Map en geen "vorige".
   // In een lokale constante, want binnen de geneste functie hieronder houdt TypeScript de
   // vernauwing van de vroege return niet vast.
+  // De cache bewaart de BELOFTE, niet de uitkomst: drie klanten van hetzelfde bureau starten
+  // tegelijk, en zonder dat zouden ze alle drie de kluis raadplegen voordat de eerste klaar is.
   const db = supabase;
-  const credPerBureau = new Map<string, Awaited<ReturnType<typeof credentialsVoorBureau>>>();
-  async function credsVoor(agencyId: string | null) {
+  const credPerBureau = new Map<string, Promise<Awaited<ReturnType<typeof credentialsVoorBureau>>>>();
+  function credsVoor(agencyId: string | null) {
     const sleutel = agencyId ?? "(geen bureau)";
-    if (!credPerBureau.has(sleutel)) {
-      credPerBureau.set(sleutel, await credentialsVoorBureau(db, agencyId));
+    let belofte = credPerBureau.get(sleutel);
+    if (!belofte) {
+      belofte = credentialsVoorBureau(db, agencyId);
+      credPerBureau.set(sleutel, belofte);
     }
-    return credPerBureau.get(sleutel) ?? null;
+    return belofte;
   }
 
-  for (const client of clients) {
+  type KlantUitkomst = { clientId: string; status: string; rows: number; error?: string };
+  async function syncEenKlant(client: (typeof clients)[number]): Promise<KlantUitkomst> {
     try {
       const cred = await credsVoor(client.agencyId);
       if (!cred) {
         // Een spoor in sync_runs en client_sync_status, anders staat de tabel maanden op
         // "laatste run geslaagd" terwijl er elke nacht niets gebeurt (zie lib/sync/cron-sporen.ts).
         const reden = "geen credentials: het bureau heeft geen actieve Google Ads-koppeling (agency_connections) en de omgeving heeft geen terugval-token";
-        failed++;
-        const spoor = await noteerOvergeslagenSync(supabase, { clientId: client.clientId, customerId: client.externId ?? null, reden });
-        results.push({ clientId: client.clientId, status: "failed", rows: 0, error: spoor.ok ? reden : `${reden}; spoor niet geschreven: ${spoor.fout}` });
-        continue;
+        const spoor = await noteerOvergeslagenSync(db, { clientId: client.clientId, customerId: client.externId ?? null, reden });
+        return { clientId: client.clientId, status: "failed", rows: 0, error: spoor.ok ? reden : `${reden}; spoor niet geschreven: ${spoor.fout}` };
       }
 
+      // `db` en niet `supabase`: binnen deze geneste functie houdt TypeScript de vernauwing
+      // van de vroege return hierboven niet vast.
       const result: SyncResult = await syncClient({
-        supabase,
+        supabase: db,
         credentials: cred.credentials,
         clientId: client.clientId,
         customerId: client.externId!,
@@ -125,36 +150,35 @@ export async function GET(request: NextRequest) {
       });
 
       await syncMerchantProductSnapshots({
-        supabase,
+        supabase: db,
         clientId: client.clientId,
         credentials: cred.credentials,
       });
 
-      results.push({
-        clientId: client.clientId,
-        status: result.status,
-        rows: result.totalRowsWritten,
-      });
-
-      if (result.status === "success" || result.status === "partial") {
-        succeeded++;
-      } else {
-        failed++;
-      }
+      return { clientId: client.clientId, status: result.status, rows: result.totalRowsWritten };
     } catch (err) {
-      failed++;
-      results.push({
-        clientId: client.clientId,
-        status: "failed",
-        rows: 0,
-        error: err instanceof Error ? err.message : "Onbekende fout",
-      });
+      return { clientId: client.clientId, status: "failed", rows: 0, error: err instanceof Error ? err.message : "Onbekende fout" };
     }
   }
 
-  // Een hele ronde zonder één geslaagde Google-sync is een storing, geen rustige nacht.
-  if (clients.length > 0 && succeeded === 0) {
-    await meldSyncStilstand(supabase, { totaal: clients.length, gefaald: failed, voorbeeld: results.find((r) => r.error)?.error ?? null });
+  // Drie tegelijk, stalest-first, en geen nieuwe klant meer zodra Googles deel van het budget
+  // op is. Wat overblijft is "doorgeschoven": geen mislukking, morgen vooraan.
+  const google = await draaiMetPool(clients, GOOGLE_GELIJKTIJDIG, () => Date.now() - invocatieStart < budget.googleStopMs, syncEenKlant);
+  for (const uitkomst of google.uitkomsten) {
+    results.push(uitkomst);
+    if (uitkomst.status === "success" || uitkomst.status === "partial") succeeded++;
+    else failed++;
+  }
+  for (const client of google.doorgeschoven) {
+    results.push({ clientId: client.clientId, status: "doorgeschoven", rows: 0, error: "tijdbudget op; volgende nacht als eerste aan de beurt" });
+  }
+  const googleGestart = google.uitkomsten.length;
+
+  // Een hele ronde zonder één geslaagde Google-sync is een storing, geen rustige nacht. Alleen
+  // over de klanten die echt gestart zijn: een ronde die door het budget niets kon starten is
+  // een ander verhaal (en staat als doorgeschoven in het antwoord).
+  if (googleGestart > 0 && succeeded === 0) {
+    await meldSyncStilstand(supabase, { totaal: googleGestart, gefaald: failed, voorbeeld: results.find((r) => r.error)?.error ?? null });
   }
 
   // ── DE KANAALRONDES: META, LINKEDIN, MICROSOFT ────────────────────────────
@@ -169,7 +193,7 @@ export async function GET(request: NextRequest) {
   let doorgeschoven = 0;
 
   for (const { clientId, kanaal } of koppelingen) {
-    if (Date.now() - invocatieStart > KANAAL_TIJDBUDGET_MS) {
+    if (Date.now() - invocatieStart > budget.kanaalStopMs) {
       doorgeschoven++;
       kanaalResults.push({ clientId, kanaal, status: "doorgeschoven", detail: "tijdbudget op; volgende nacht opnieuw" });
       continue;
@@ -195,8 +219,11 @@ export async function GET(request: NextRequest) {
   return Response.json({
     timestamp: new Date().toISOString(),
     totalClients: clients.length,
+    gestart: googleGestart,
     succeeded,
     failed,
+    doorgeschoven: google.doorgeschoven.length,
+    planning: { volgorde: "stalest-first", gelijktijdig: GOOGLE_GELIJKTIJDIG, googleStopMs: budget.googleStopMs, kanaalStopMs: budget.kanaalStopMs, duurMs: Date.now() - invocatieStart },
     results,
     kanalen: {
       totaal: koppelingen.length,
