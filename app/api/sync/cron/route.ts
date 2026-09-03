@@ -6,6 +6,7 @@ import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
 import { synckandidaten } from "@/lib/tenancy/klanten";
 import { credentialsVoorBureau } from "@/lib/tenancy/credentials";
 import { kanaalKoppelingen, KANAAL_RUNS, type SyncKanaal } from "@/lib/sync/kanaal-runs";
+import { noteerOvergeslagenSync, meldSyncStilstand } from "@/lib/sync/cron-sporen";
 
 /**
  * GET /api/sync/cron — Nightly scheduled sync for all active clients.
@@ -105,8 +106,12 @@ export async function GET(request: NextRequest) {
     try {
       const cred = await credsVoor(client.agencyId);
       if (!cred) {
+        // Een spoor in sync_runs en client_sync_status, anders staat de tabel maanden op
+        // "laatste run geslaagd" terwijl er elke nacht niets gebeurt (zie lib/sync/cron-sporen.ts).
+        const reden = "geen credentials: het bureau heeft geen actieve Google Ads-koppeling (agency_connections) en de omgeving heeft geen terugval-token";
         failed++;
-        results.push({ clientId: client.clientId, status: "failed", rows: 0, error: "geen credentials" });
+        const spoor = await noteerOvergeslagenSync(supabase, { clientId: client.clientId, customerId: client.externId ?? null, reden });
+        results.push({ clientId: client.clientId, status: "failed", rows: 0, error: spoor.ok ? reden : `${reden}; spoor niet geschreven: ${spoor.fout}` });
         continue;
       }
 
@@ -145,6 +150,11 @@ export async function GET(request: NextRequest) {
         error: err instanceof Error ? err.message : "Onbekende fout",
       });
     }
+  }
+
+  // Een hele ronde zonder één geslaagde Google-sync is een storing, geen rustige nacht.
+  if (clients.length > 0 && succeeded === 0) {
+    await meldSyncStilstand(supabase, { totaal: clients.length, gefaald: failed, voorbeeld: results.find((r) => r.error)?.error ?? null });
   }
 
   // ── DE KANAALRONDES: META, LINKEDIN, MICROSOFT ────────────────────────────

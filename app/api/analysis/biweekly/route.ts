@@ -17,6 +17,7 @@ import { computeDataReliability } from "@/lib/analysis/data-reliability";
 import { computeMetaReliability, computeLinkedinReliability, computeMicrosoftReliability } from "@/lib/analysis/channel-reliability";
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { checkDataFreshness } from "@/lib/sync/freshness";
+import { datastandVoorKlant, datastandBlokkade } from "@/lib/sync/datastand";
 import { computeComparisonFacts, formatComparisonFacts, computePacingFacts, formatPacingFacts } from "@/lib/analysis/comparison-facts";
 import { buildMonthlyHandoff } from "@/lib/analysis/monthly-handoff";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
@@ -140,6 +141,16 @@ async function runGoogleBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
       lastSyncAt: freshness.lastSyncAt,
       action: "Sync de data via POST /api/sync",
     }, { status: 404 });
+  }
+
+  // Datastand-poort: rijen in het venster zijn niet genoeg, de laatste afgesloten maand moet
+  // erin staan -- anders vergelijkt de bi-weekly een oude maand met zichzelf (zie
+  // lib/sync/datastand.ts voor de stilstand van 2026 die dit blootlegde).
+  const datastand = await datastandVoorKlant(supabase, clientId);
+  const datastandFout = datastandBlokkade(datastand);
+  if (datastandFout) {
+    await markProgressFailed(supabase, { jobId, errorMessage: datastandFout });
+    return Response.json({ error: datastandFout, datastand, action: "Sync de data via POST /api/sync, of herstel de Google Ads-koppeling van het bureau." }, { status: 409 });
   }
 
   // Phase 2: Build enrichment context via matrix (parallel)

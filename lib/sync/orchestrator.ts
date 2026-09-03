@@ -337,8 +337,9 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
   const now = new Date().toISOString();
   const datasetResults: DatasetResult[] = [];
 
-  // Create sync run record
-  const { data: runRow } = await supabase
+  // Create sync run record. Een run die niet geregistreerd kan worden is een mislukte stap:
+  // zonder rij in sync_runs is de sync later niet van "nooit gedraaid" te onderscheiden.
+  const { data: runRow, error: runFout } = await supabase
     .from("sync_runs")
     .insert({
       client_id: clientId,
@@ -351,6 +352,10 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     })
     .select("id")
     .single();
+  if (runFout) {
+    console.error(`[sync] sync_runs-rij aanmaken mislukt voor ${clientId}: ${runFout.message}`);
+    datasetResults.push({ name: "sync_runs", rows: 0, success: false, error: `run niet geregistreerd: ${runFout.message}` });
+  }
 
   const runId = runRow?.id ?? null;
 

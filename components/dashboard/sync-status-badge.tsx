@@ -80,6 +80,10 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<"success" | "error" | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  // De datastand uit de data zelf (/api/sync GET): tot welke maand er rijen staan en wanneer de
+  // laatste sync slaagde. De uren-teller hierboven zegt hoe oud de laatste RUN is; dit zegt hoe
+  // oud de DATA is -- op 3 september 2026 stond de eerste op "fresh" en de tweede op april.
+  const [datastand, setDatastand] = useState<{ toestand: string; tekst: string } | null>(null);
 
   const loadStatus = useCallback(async () => {
     if (!supabase) return;
@@ -116,6 +120,16 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
       });
     } else {
       setStatus((prev) => ({ ...prev, freshnessStatus: "missing" }));
+    }
+
+    try {
+      const res = await fetch(`/api/sync?client_id=${encodeURIComponent(clientId)}`);
+      if (res.ok) {
+        const body = await res.json();
+        setDatastand(body?.datastand ?? (body?.datastandFout ? { toestand: "geen", tekst: `Datastand niet leesbaar: ${body.datastandFout}` } : null));
+      }
+    } catch {
+      // Geen datastand is geen fout van de badge zelf; de uren-teller blijft staan.
     }
   }, [clientId]);
 
@@ -196,6 +210,15 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
           </span>
         )}
       </div>
+
+      {datastand && (
+        <span
+          className={`text-micro ${datastand.toestand === "dood" || datastand.toestand === "geen" ? "text-red-600 font-semibold" : datastand.toestand === "achter" ? "text-amber-700" : "text-muted-foreground"}`}
+          title={datastand.tekst}
+        >
+          {datastand.tekst}
+        </span>
+      )}
 
       {/* Sync button */}
       <button

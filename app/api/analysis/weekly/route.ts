@@ -17,6 +17,7 @@ import { computeDataReliability } from "@/lib/analysis/data-reliability";
 import { computeMetaReliability, computeLinkedinReliability, computeMicrosoftReliability } from "@/lib/analysis/channel-reliability";
 import { fetchMicrosoftDaily, fetchMicrosoftNameMap } from "@/lib/microsoft/analysis-data";
 import { checkDataFreshness } from "@/lib/sync/freshness";
+import { weekstandVoorKlant, weekstandBlokkade } from "@/lib/sync/datastand";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
 import { today, addDays } from "@/lib/reporting-date";
 import { buildMonthlyHandoff, buildOpenPointsBlock } from "@/lib/analysis/monthly-handoff";
@@ -112,17 +113,23 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const weeklyData = weeklyResult.data ?? [];
 
   if (weeklyData.length === 0) {
+    // Geen weekrij in de laatste veertien dagen. Zeg WAAR de data wel ophoudt: "Data is 3300
+    // uur oud" stuurt iemand naar de sync-knop, "laatste week van 13 april" zegt dat de sync
+    // al maanden niet draait (lib/sync/datastand.ts).
+    const weekstand = await weekstandVoorKlant(supabase, clientId);
     const freshness = await checkDataFreshness(supabase, clientId, ["ads_account_weekly"]);
+    const melding = weekstandBlokkade(weekstand) ?? freshness.message;
     await markProgressFailed(supabase, {
       jobId,
-      errorMessage: freshness.message,
+      errorMessage: melding,
     });
     return Response.json({
-      error: freshness.message,
+      error: melding,
+      weekstand,
       freshnessStatus: freshness.freshnessStatus,
       lastSyncAt: freshness.lastSyncAt,
-      action: "Sync de data via POST /api/sync",
-    }, { status: 404 });
+      action: "Sync de data via POST /api/sync, of herstel de Google Ads-koppeling van het bureau.",
+    }, { status: weekstand.toestand === "dood" || weekstand.toestand === "geen" ? 409 : 404 });
   }
 
   // ── De lopende, halve week eruit ────────────────────────────────────────────

@@ -8,9 +8,10 @@
 // =====================================================================
 
 import { createClient } from "@supabase/supabase-js";
-import { evaluateChannelHealth, evaluateConversionTrackingQuality, assembleClientHealth, type ChannelHealth, type ChannelHealthInput, type HealthStatus } from "@/lib/health";
+import { evaluateChannelHealth, evaluateConversionTrackingQuality, assembleClientHealth, type ChannelHealth, type ChannelHealthInput, type HealthCheck, type HealthStatus } from "@/lib/health";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
+import { datastandVoorKlant } from "@/lib/sync/datastand";
 
 function getClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -63,15 +64,26 @@ export async function GET(request: Request) {
       asOfDate: today(),
     });
 
-    const allChecks = [...googleHealth.checks, ...convChecks];
+    // De datastand uit de data zelf (tot welke maand er rijen staan), naast de sync-versheid
+    // uit client_sync_status: die laatste bleef "fresh" zeggen terwijl de data bij april stopte.
+    const stand = await datastandVoorKlant(supabase, clientId);
+    const standCheck: HealthCheck = {
+      key: "data_stand",
+      status: stand.toestand === "actueel" ? "ok" : stand.toestand === "achter" ? "warn" : "fail",
+      detail: stand.tekst,
+    };
+
+    const allChecks = [...googleHealth.checks, standCheck, ...convChecks];
     const worstStatus: HealthStatus = allChecks.some((c) => c.status === "fail")
       ? "fail"
       : allChecks.some((c) => c.status === "warn")
         ? "warn"
         : "ok";
     channels.push({ channel: "google_ads", status: worstStatus, checks: allChecks });
-  } catch {
-    channels.push(evaluateChannelHealth({ channel: "google_ads", connected: true, lastSuccessfulSyncAt: null }));
+  } catch (e) {
+    // Een bron die faalt is geen "nooit gesynct": de check zegt welke bron het was.
+    const detail = e instanceof Error ? e.message : String(e);
+    channels.push({ channel: "google_ads", status: "fail", checks: [{ key: "bron", status: "fail", detail: `health-bron faalde: ${detail}` }] });
   }
 
   // Meta en LinkedIn: connected zodra er een koppeling is. De daily-volume- en

@@ -8,6 +8,7 @@ import { klantVanId } from "@/lib/tenancy/klanten";
 import { credentialsVoorBureau } from "@/lib/tenancy/credentials";
 import { logger } from "@/lib/logger";
 import { checkDataFreshness } from "@/lib/sync/freshness";
+import { datastandVoorKlant, type Datastand } from "@/lib/sync/datastand";
 
 export const maxDuration = 120; // 2 minutes for full sync
 
@@ -116,11 +117,22 @@ export async function GET(request: NextRequest) {
   // zoals SyncStatusBadge dat client-side ook al doet; deze route deed dat niet en gaf de rauwe
   // kolom door aan wie hem ook maar aanroept. Zie docs/MASTERPLAN.md sectie 2.1.
   const freshness = await checkDataFreshness(supabase, clientId);
+  // De stand uit de data zelf (tot welke maand er rijen staan), zie lib/sync/datastand.ts. Faalt
+  // die bron, dan zegt het antwoord dat in plaats van de stand weg te laten.
+  let datastand: Datastand | null = null;
+  let datastandFout: string | null = null;
+  try {
+    datastand = await datastandVoorKlant(supabase, clientId);
+  } catch (e) {
+    datastandFout = e instanceof Error ? e.message : String(e);
+  }
 
   return Response.json({
     syncStatus: status
       ? { ...status, freshness_status: freshness.freshnessStatus }
       : { client_id: clientId, freshness_status: freshness.freshnessStatus, last_sync_at: null },
     recentRuns: runs ?? [],
+    datastand,
+    datastandFout,
   });
 }

@@ -65,6 +65,7 @@ import { geoCloneContext } from "@/lib/analysis/geo-clone-context";
 import { checkStepDataAvailability } from "@/lib/analysis/data-availability";
 import type { StepDataAvailability } from "@/lib/analysis/data-availability";
 import { checkDataFreshness } from "@/lib/sync/freshness";
+import { datastandVoorKlant, datastandBlokkade } from "@/lib/sync/datastand";
 import { canonicalizeFindings, clusterFindings, type CoverageDimension, type NormalizedFinding, type IssueCluster } from "@/lib/analysis/canonicalize";
 import { enforceSopCoverage, deriveDimensionAvailabilityFromClusters } from "@/lib/analysis/coverage-enforcer";
 import { buildStructuredMonthlyOutput, type ParsedStepOutput } from "@/lib/analysis/monthly-structured";
@@ -2136,6 +2137,22 @@ export async function POST(request: NextRequest) {
     }).section;
 
     const accountData = accountRes.data ?? [];
+
+    // Datastand-poort (3 september 2026). De analysemaand is de laatste afgesloten maand; staat
+    // die niet in ads_account_monthly, dan draait de hele dertienstappenpijplijn op een lege
+    // maand -- en dat gebeurde: de sync stond sinds april stil en de augustusanalyse liep gewoon
+    // door, tegen betaalde modelcalls. Geen data voor de analysemaand is een harde stop met de
+    // reden erbij, geen waarschuwing die niemand leest.
+    const datastand = await datastandVoorKlant(supabase, clientId);
+    const datastandFout = datastandBlokkade(datastand);
+    if (datastandFout) {
+      await markProgressFailed(supabase, { jobId, errorMessage: datastandFout });
+      return Response.json({
+        error: datastandFout,
+        datastand,
+        action: "Sync de data via POST /api/sync, of herstel de Google Ads-koppeling van het bureau.",
+      }, { status: 409 });
+    }
 
     // Fase 2 (docs/MASTERPLAN.md): cpa/roas-targets en hun plausibiliteit komen sinds
     // 2026-08-15 uitsluitend nog uit client_targets, nooit meer uit kpi_targets. Tot dan
