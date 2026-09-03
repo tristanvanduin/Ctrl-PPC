@@ -111,6 +111,25 @@ async function main() {
   globalThis.fetch = echteFetch;
   zonderOmgevingsCredentials();
 
+  console.log("bedrading: de projectie naar fact_core zit in elke kanaalsync en in de Google-sync");
+  {
+    // Een volledige Meta-run nabootsen vergt elf async-rapportjobs; deze bedradingstest bewaakt
+    // het ene dat er niet uit mag vallen: sinds migratie 054 ziet de app een sync pas na de
+    // projectie (lib/sync/projectie.ts).
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    // __dirname bestaat in de CJS-modus van tsx; anders vanaf de repo-root (de testrunner).
+    const hier = typeof __dirname === "string" ? __dirname : path.join(process.cwd(), "lib", "sync");
+    const kanaalBron = fs.readFileSync(path.join(hier, "kanaal-runs.ts"), "utf8");
+    const aanroepen = kanaalBron.split("projecteerNaarFactCore(").length - 1;
+    check("kanaal-runs: Meta én LinkedIn projecteren (twee aanroepen)", aanroepen === 2, String(aanroepen));
+    const metaNaProjectie = kanaalBron.indexOf("projecteerNaarFactCore(") < kanaalBron.indexOf('schrijfRun(supabase, "meta_sync_runs"');
+    check("meta: de projectie loopt vóór de run-administratie, zodat een projectiefout de run failed maakt", metaNaProjectie);
+    const orchestratorBron = fs.readFileSync(path.join(hier, "orchestrator.ts"), "utf8");
+    check("google: de projectie is een dataset-resultaat vóór de statusberekening", orchestratorBron.indexOf('name: "fact_core_projectie"') > 0 && orchestratorBron.indexOf('name: "fact_core_projectie"') < orchestratorBron.indexOf("// ── Compute result ──"));
+    check("google: geen losse rpc-aanroep meer die alleen logt", !orchestratorBron.includes('supabase.rpc("refresh_fact_from_legacy"'));
+  }
+
   console.log("kanaalKoppelingen: paren zonder disabled, en een onleesbare tabel als fout");
   {
     const sb = new FakeSupabase();

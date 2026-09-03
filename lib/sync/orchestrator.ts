@@ -60,6 +60,7 @@ import { negativesToDbRows } from "../api/google-ads-negatives-transform";
 import { syncMerchantProductSnapshots } from "../api/merchant-products";
 import { logger } from "@/lib/logger";
 import { schrijftabel } from "@/lib/data-access/feitentabellen";
+import { projecteerNaarFactCore } from "./projectie";
 import { withFetchFailures, hasFetchFailure } from "../api/fetch-failures";
 import { buildRegionRows, overslaanSamenvatting } from "@/lib/geo/region-rows";
 
@@ -927,6 +928,18 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
 
   await upsertBatch(supabase, "ads_dimension_availability", dimRows, "client_id,dimension");
 
+  // ── Projectie naar fact_core ──
+  //
+  // Sinds migratie 054 leest de app ads_account_monthly en ads_campaign_monthly als views over
+  // fact_core; wat hierboven in de *_legacy-tabellen is geschreven bestaat voor de app pas na
+  // deze projectie (lib/sync/projectie.ts). Daarom telt hij mee als dataset: mislukt hij, dan
+  // is de run partial/failed en zegt de foutsamenvatting waarom -- in plaats van een "geslaagde"
+  // sync waar niemand iets van ziet. Tot 3 september 2026 werd een mislukking hier alleen
+  // gelogd, met als reden dat de nieuwe tabellen "nog nergens gelezen worden"; sinds 054 is dat
+  // precies andersom.
+  const projectie = await projecteerNaarFactCore(supabase, clientId);
+  datasetResults.push({ name: "fact_core_projectie", rows: 0, success: projectie.ok, error: projectie.ok ? undefined : projectie.fout });
+
   // ── Compute result ──
 
   const succeeded = datasetResults.filter((d) => d.success).length;
@@ -971,26 +984,9 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     updated_at: finishedAt,
   }, { onConflict: "client_id" });
 
-  // De nieuwe feitentabellen bijwerken vanuit wat er zojuist is weggeschreven.
-  //
-  // Bewust GEEN dubbel schrijven in de sync zelf. De sync blijft precies doen wat hij deed — naar
-  // de oude tabellen — en één databasefunctie projecteert die daarna naar fact_core,
-  // fact_dimension en de kanaalmetrieken. Zie scripts/migrations/044_projectie.sql.
-  //
-  // Twee redenen. Ten eerste kon dubbelschrijf-code hier niet één keer getest worden: er zijn nu
-  // geen werkende API-sleutels, dus die code zou wekenlang ongedraaid in de sync zitten. De
-  // projectie is wél te testen, en dat is gebeurd: een waarde in ads_account_monthly gewijzigd,
-  // de functie gedraaid, en fact_core volgde.
-  //
-  // Ten tweede blijft het risico nul voor wat nu werkt. Faalt de projectie, dan is de sync zelf
-  // gewoon geslaagd en lopen alleen de nieuwe tabellen achter — en die worden nog nergens gelezen.
-  // Vandaar dat een fout hier de sync niet laat mislukken maar wel wordt gemeld.
-  const { error: projectieFout } = await supabase.rpc("refresh_fact_from_legacy", {
-    p_client_id: clientId,
-  });
-  if (projectieFout) {
-    console.error(`[sync] projectie naar fact_core mislukt voor ${clientId}: ${projectieFout.message}`);
-  }
+  // De projectie naar fact_core is hierboven als dataset meegelopen (zie "Projectie naar
+  // fact_core"); hier staat hij niet meer los, zodat een mislukking in de run-status en de
+  // foutsamenvatting terechtkomt in plaats van alleen in een logregel.
 
   // Zoekterm-niveau data ouder dan twee maanden opruimen (migratie 077). Verankerd op DEZE
   // klant se eigen laatste maand, niet op de kalenderdatum van vandaag -- dat onderscheid bleek

@@ -33,6 +33,7 @@ import { refreshMicrosoftToken, type MicrosoftApiConfig } from "@/lib/microsoft/
 import { syncMicrosoftBackfill, syncMicrosoftDaily, type MicrosoftSyncContext } from "@/lib/microsoft/sync";
 import { controleerIngest, metaIngestChecks, linkedinIngestChecks, microsoftIngestChecks } from "@/lib/sync/invarianten";
 import { DataLaagFout, eis } from "@/lib/analysis/db-veilig";
+import { projecteerNaarFactCore } from "./projectie";
 import { logger } from "@/lib/logger";
 
 const log = logger.child("kanaal-runs");
@@ -232,6 +233,13 @@ export async function draaiMetaSync(supabase: SupabaseClient, clientId: string, 
     if (!invarianten.ok) failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
     rowsUpserted.invarianten = { ok: invarianten.ok, gecontroleerd: invarianten.gecontroleerd };
 
+    // Projectie naar fact_core (lib/sync/projectie.ts): de app leest meta_account_daily en
+    // consorten sinds migratie 054 als views over fact_core, dus zonder deze stap ziet niemand
+    // wat hierboven is geschreven. Geen projectie is geen sync.
+    const projectie = await projecteerNaarFactCore(supabase, clientId);
+    if (!projectie.ok) failed.push(projectie.fout);
+    rowsUpserted.projectie = projectie.ok;
+
     const success = failed.length === 0;
     await schrijfRun(supabase, "meta_sync_runs", runId, success, rowsUpserted, failed);
     await schrijfConnectie(supabase, "meta_connections", clientId, success, failed);
@@ -333,6 +341,10 @@ export async function draaiLinkedinSync(supabase: SupabaseClient, clientId: stri
     const invariantVenster = scope === "backfill" ? addDaysISO(backfillEnd, -62) : addDaysISO(dailyEnd, -30);
     const invarianten = await controleerIngest(supabase, clientId, linkedinIngestChecks(invariantVenster));
     if (!invarianten.ok) failed.push(...invarianten.schendingen.map((s) => `invariant: ${s}`));
+
+    // Zelfde projectie als bij Meta: de LinkedIn-views lezen uit fact_core.
+    const projectie = await projecteerNaarFactCore(supabase, clientId);
+    if (!projectie.ok) failed.push(projectie.fout);
 
     const success = failed.length === 0;
     await schrijfRun(supabase, "linkedin_sync_runs", runId, success, rowsUpserted, failed);

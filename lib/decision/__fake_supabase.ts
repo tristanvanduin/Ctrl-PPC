@@ -132,9 +132,20 @@ export class FakeSupabase {
     this.tables[table] = [...(this.tables[table] ?? []), ...metId];
   }
 
-  /** Laat elke query op deze tabel met een fout terugkomen, zoals een ontbrekende kolom doet. */
+  /** Laat elke query op deze tabel met een fout terugkomen, zoals een ontbrekende kolom doet.
+   *  Voor een databasefunctie: `faalOp("rpc:naam")`. */
   faalOp(table: string, bericht = "relation does not exist"): void {
     this.fouten[table] = bericht;
+  }
+
+  /** Aangeroepen databasefuncties, in volgorde (projectieronde 3 september 2026). */
+  rpcAanroepen: { naam: string; args: Record<string, unknown> | undefined }[] = [];
+
+  /** Een databasefunctie: geen uitvoering, alleen registratie en een injecteerbare fout. */
+  async rpc(naam: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }> {
+    this.rpcAanroepen.push({ naam, args });
+    const fout = this.fouten[`rpc:${naam}`];
+    return fout ? { data: null, error: { message: fout } } : { data: null, error: null };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
