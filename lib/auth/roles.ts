@@ -229,6 +229,10 @@ const API_RULES: readonly { prefix: string; read?: Capability; write?: Capabilit
   // meekijker de lijst kunnen ophalen — de route weigert dat zelf ook, maar dan pas erna.
   { prefix: "/api/team", read: "sprint:write", write: "sprint:write" },
   { prefix: "/api/connections", read: "connection:manage", write: "connection:manage" },
+  // De kanaalkoppeling per klant (Meta/LinkedIn/Microsoft-account aan een klant hangen): ook
+  // het LEZEN toont accountlijsten onder het bureautoken, dus hetzelfde recht als de
+  // bureaukoppelingen zelf.
+  { prefix: "/api/kanaal-koppeling", read: "connection:manage", write: "connection:manage" },
   { prefix: "/api/health", read: "system:ops", write: "system:ops" },
   { prefix: "/api/eval", read: "system:ops", write: "system:ops" },
   { prefix: "/api/generation-jobs", read: "system:ops", write: "system:ops" },

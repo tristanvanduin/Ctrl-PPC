@@ -11,7 +11,8 @@ import { createClient } from "@supabase/supabase-js";
 import { evaluateChannelHealth, evaluateConversionTrackingQuality, assembleClientHealth, type ChannelHealth, type ChannelHealthInput, type HealthCheck, type HealthStatus } from "@/lib/health";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
-import { datastandVoorKlant } from "@/lib/sync/datastand";
+import { datastandVoorKlant, dagstandVoorKlant } from "@/lib/sync/datastand";
+import { eis } from "@/lib/analysis/db-veilig";
 
 function getClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -86,18 +87,40 @@ export async function GET(request: Request) {
     channels.push({ channel: "google_ads", status: "fail", checks: [{ key: "bron", status: "fail", detail: `health-bron faalde: ${detail}` }] });
   }
 
-  // Meta en LinkedIn: connected zodra er een koppeling is. De daily-volume- en
-  // coverage-metrieken worden hier toegevoegd zodra de kanaaltabellen in productie staan
-  // (uitbreiding conform het extractiepatroon; nu leveren ze connected:false, dus geen ruis).
-  for (const [channel, table] of [["meta_ads", "meta_connections"], ["linkedin_ads", "linkedin_connections"]] as const) {
-    let connected = false;
+  // Meta, LinkedIn en Microsoft: connected zodra er een koppelingsrij is die niet op disabled
+  // staat (kanaalronde 3 september 2026). De sync-versheid komt uit last_sync_at op die rij
+  // (alleen bij een geslaagde run gezet), de tokenstatus uit status, en de datastand uit de
+  // dagtabel zelf. Een bron die faalt is een fail-check, geen "niet gekoppeld".
+  for (const kanaal of ["meta", "linkedin", "microsoft"] as const) {
+    const channel = `${kanaal}_ads`;
     try {
-      const { data } = await supabase.from(table).select("client_id").eq("client_id", clientId).maybeSingle();
-      connected = Boolean(data);
-    } catch {
-      connected = false;
+      const rijRes = await supabase.from(`${kanaal}_connections`).select("status, last_sync_at, last_error").eq("client_id", clientId).limit(1);
+      const rij = (eis(rijRes, `${kanaal}_connections (health)`) as { status?: string | null; last_sync_at?: string | null; last_error?: string | null }[])[0] ?? null;
+      const connected = rij !== null && rij.status !== "disabled";
+      if (!connected) {
+        channels.push(evaluateChannelHealth({ channel, connected: false }));
+        continue;
+      }
+      const basis = evaluateChannelHealth({
+        channel,
+        connected: true,
+        lastSuccessfulSyncAt: rij?.last_sync_at ?? null,
+        tokenStatus: rij?.status === "expired" ? "expired" : "ok",
+      });
+      const stand = await dagstandVoorKlant(supabase, clientId, kanaal);
+      const checks: HealthCheck[] = [
+        ...basis.checks,
+        { key: "data_stand", status: stand.toestand === "actueel" ? "ok" : stand.toestand === "achter" ? "warn" : "fail", detail: stand.tekst },
+      ];
+      if (rij?.status === "error" || rij?.last_error) {
+        checks.push({ key: "koppeling", status: rij.status === "error" ? "fail" : "warn", detail: `koppeling ${rij.status ?? "?"}: ${rij.last_error ?? "zonder detail"}` });
+      }
+      const worst: HealthStatus = checks.some((c) => c.status === "fail") ? "fail" : checks.some((c) => c.status === "warn") ? "warn" : "ok";
+      channels.push({ channel, status: worst, checks });
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      channels.push({ channel, status: "fail", checks: [{ key: "bron", status: "fail", detail: `health-bron faalde: ${detail}` }] });
     }
-    channels.push(evaluateChannelHealth({ channel, connected }));
   }
 
   return Response.json(assembleClientHealth(clientId, channels));

@@ -18,6 +18,7 @@ import { computeMetaReliability, computeLinkedinReliability, computeMicrosoftRel
 import { fetchMicrosoftDaily, fetchMicrosoftNameMap } from "@/lib/microsoft/analysis-data";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { weekstandVoorKlant, weekstandBlokkade } from "@/lib/sync/datastand";
+import { kanaalDataOntbreekt } from "@/lib/analysis/kanaal-datapoort";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
 import { today, addDays } from "@/lib/reporting-date";
 import { buildMonthlyHandoff, buildOpenPointsBlock } from "@/lib/analysis/monthly-handoff";
@@ -474,14 +475,7 @@ async function runMetaWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, c
   const { goalsSection, accountType } = clientCtx;
 
   if (accountResult.length === 0) {
-    const freshness = await checkDataFreshness(supabase, clientId, ["meta_account_daily"]);
-    await markProgressFailed(supabase, { jobId, errorMessage: freshness.message });
-    return Response.json({
-      error: freshness.message,
-      freshnessStatus: freshness.freshnessStatus,
-      lastSyncAt: freshness.lastSyncAt,
-      action: "Sync de data via POST /api/sync",
-    }, { status: 404 });
+    return kanaalDataOntbreekt(supabase, clientId, jobId, "meta");
   }
 
   const now = new Date();
@@ -771,14 +765,7 @@ async function runLinkedinWeeklyAnalysis(supabase: SupabaseClient, apiKey: strin
   const { goalsSection, accountType } = clientCtx;
 
   if (accountRows.length === 0) {
-    const freshness = await checkDataFreshness(supabase, clientId, ["linkedin_account_daily"]);
-    await markProgressFailed(supabase, { jobId, errorMessage: freshness.message });
-    return Response.json({
-      error: freshness.message,
-      freshnessStatus: freshness.freshnessStatus,
-      lastSyncAt: freshness.lastSyncAt,
-      action: "Sync de data via POST /api/sync",
-    }, { status: 404 });
+    return kanaalDataOntbreekt(supabase, clientId, jobId, "linkedin");
   }
 
   const now = new Date();
@@ -1065,14 +1052,7 @@ async function runMicrosoftWeeklyAnalysis(supabase: SupabaseClient, apiKey: stri
   const { goalsSection, accountType } = clientCtx;
 
   if (accountResult.length === 0) {
-    const freshness = await checkDataFreshness(supabase, clientId, ["microsoft_account_daily"]);
-    await markProgressFailed(supabase, { jobId, errorMessage: freshness.message });
-    return Response.json({
-      error: freshness.message,
-      freshnessStatus: freshness.freshnessStatus,
-      lastSyncAt: freshness.lastSyncAt,
-      action: "Sync de data via POST /api/sync",
-    }, { status: 404 });
+    return kanaalDataOntbreekt(supabase, clientId, jobId, "microsoft");
   }
 
   const now = new Date();

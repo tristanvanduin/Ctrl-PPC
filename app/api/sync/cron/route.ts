@@ -74,8 +74,8 @@ export async function GET(request: NextRequest) {
   // De kanaalkoppelingen (Meta/LinkedIn/Microsoft) staan los van de Google-lijst: een klant
   // kan best alleen een Microsoft-koppeling hebben. Alleen als BEIDE leeg zijn is er niets
   // te doen.
-  const koppelingen = await kanaalKoppelingen(supabase);
-  if (clients.length === 0 && koppelingen.length === 0) {
+  const { paren: koppelingen, fouten: koppelingFouten } = await kanaalKoppelingen(supabase);
+  if (clients.length === 0 && koppelingen.length === 0 && koppelingFouten.length === 0) {
     return Response.json({ error: "Geen clients met een advertentiekoppeling" }, { status: 404 });
   }
 
@@ -200,6 +200,9 @@ export async function GET(request: NextRequest) {
     results,
     kanalen: {
       totaal: koppelingen.length,
+      // Een koppelingstabel die niet gelezen kon worden: die kanalen zijn deze nacht NIET
+      // gedraaid, en dat hoort in de samenvatting, niet als "0 koppelingen".
+      koppelingFouten,
       geslaagd: kanaalGeslaagd,
       gefaald: kanaalGefaald,
       doorgeschoven,

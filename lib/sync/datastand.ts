@@ -154,3 +154,79 @@ export async function weekstandVoorKlant(supabase: SupabaseClient, clientId: str
   const laatste = rijen.map((r) => String(r.week_start ?? "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop() ?? null;
   return beoordeelWeekstand({ laatsteWeekStart: laatste });
 }
+
+// ── Dagstand, voor de kanalen (Meta, LinkedIn, Microsoft) ───────────────────
+//
+// De kanaalsyncs schrijven DAGrijen (meta_account_daily, linkedin_account_daily,
+// microsoft_account_daily) en de weekly/biweekly lezen daar een venster van 7 of 14 dagen uit.
+// "Actueel" is hier dus: de nieuwste dag ligt hooguit een paar dagen terug (de nachtcron van
+// vannacht, plus het attributievenster waarin het platform nog herschrijft). Tot twee weken is
+// het achterstand; daarna staat de sync stil. De laatste geslaagde sync komt uit
+// <kanaal>_connections.last_sync_at, dat sinds deze ronde alleen bij een GESLAAGDE run wordt
+// gezet (lib/sync/kanaal-runs.ts).
+
+export type Dagkanaal = "meta" | "linkedin" | "microsoft";
+
+/** Tot zoveel dagen achter is dagdata actueel (nachtcron + attributievenster). */
+export const DAG_ACHTER_VANAF_DAGEN = 3;
+/** Vanaf zoveel dagen achter draait de sync niet meer. */
+export const DAG_DOOD_VANAF_DAGEN = 14;
+
+export const DAGKANAAL_LABEL: Record<Dagkanaal, string> = { meta: "Meta", linkedin: "LinkedIn", microsoft: "Microsoft" };
+
+export interface Dagstand {
+  kanaal: Dagkanaal;
+  /** Nieuwste dag met een accountrij, "YYYY-MM-DD"; null als er niets staat. */
+  laatsteDag: string | null;
+  dagenAchter: number | null;
+  laatsteGeslaagdeSync: string | null;
+  toestand: DatastandToestand;
+  tekst: string;
+}
+
+export function beoordeelDagstand(inp: {
+  kanaal: Dagkanaal;
+  laatsteDag: string | null | undefined;
+  laatsteGeslaagdeSync?: string | null;
+  nu?: string;
+}): Dagstand {
+  const nu = inp.nu ?? today();
+  const label = DAGKANAAL_LABEL[inp.kanaal];
+  const sync = inp.laatsteGeslaagdeSync ?? null;
+  const syncTekst = sync ? `laatste geslaagde sync ${sync.slice(0, 10)}` : "nog nooit een geslaagde sync geregistreerd";
+  const dag = inp.laatsteDag ? String(inp.laatsteDag).slice(0, 10) : null;
+  if (!dag || !/^\d{4}-\d{2}-\d{2}$/.test(dag)) {
+    return { kanaal: inp.kanaal, laatsteDag: null, dagenAchter: null, laatsteGeslaagdeSync: sync, toestand: "geen", tekst: `Geen ${label}-dagdata gesynct; ${syncTekst}.` };
+  }
+  const dagenAchter = dagenTussen(dag, nu) ?? 0;
+  const basis = { kanaal: inp.kanaal, laatsteDag: dag, dagenAchter, laatsteGeslaagdeSync: sync };
+  if (dagenAchter <= DAG_ACHTER_VANAF_DAGEN) {
+    return { ...basis, toestand: "actueel", tekst: `${label}-data t/m ${dag}; ${syncTekst}.` };
+  }
+  if (dagenAchter <= DAG_DOOD_VANAF_DAGEN) {
+    return { ...basis, toestand: "achter", tekst: `${label}-data loopt achter: t/m ${dag}, ${dagenAchter} dagen geleden; ${syncTekst}.` };
+  }
+  return { ...basis, toestand: "dood", tekst: `De ${label}-sync draait niet: data t/m ${dag}, ${dagenAchter} dagen geleden; ${syncTekst}.` };
+}
+
+/** Weekly/biweekly lezen een venster van 7-14 dagen; "achter" kan nog rijen in dat venster
+ *  hebben, "dood" en "geen" per definitie niet. */
+export function dagstandBlokkade(stand: Dagstand): string | null {
+  if (stand.toestand === "actueel" || stand.toestand === "achter") return null;
+  return `Geen bruikbare ${DAGKANAAL_LABEL[stand.kanaal]}-dagdata. ${stand.tekst}`;
+}
+
+export async function dagstandVoorKlant(supabase: SupabaseClient, clientId: string, kanaal: Dagkanaal): Promise<Dagstand> {
+  // Nieuwste eerst en afgekapt op 400 rijen (ruim een jaar dagdata); het maximum wordt daarna in
+  // het geheugen bepaald, zodat de uitkomst niet afhangt van hoe strikt een bron de sortering
+  // toepast.
+  const [dagen, conn] = await Promise.all([
+    supabase.from(`${kanaal}_account_daily`).select("date").eq("client_id", clientId).order("date", { ascending: false }).limit(400),
+    supabase.from(`${kanaal}_connections`).select("last_sync_at").eq("client_id", clientId).limit(1),
+  ]);
+  const rijen = eis(dagen, `${kanaal}_account_daily (dagstand)`) as { date: unknown }[];
+  const connRijen = eis(conn, `${kanaal}_connections (dagstand)`) as { last_sync_at: unknown }[];
+  const laatsteDag = rijen.map((r) => String(r.date ?? "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop() ?? null;
+  const sync = connRijen[0]?.last_sync_at ? String(connRijen[0].last_sync_at) : null;
+  return beoordeelDagstand({ kanaal, laatsteDag, laatsteGeslaagdeSync: sync });
+}

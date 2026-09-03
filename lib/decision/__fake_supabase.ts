@@ -43,12 +43,14 @@ class FakeQueryBuilder {
   private rangeTot: number | null = null;
   private wantSingle = false;
   private pendingInsert: Row[] | null = null;
+  private pendingUpdate: Row | null = null;
   private pendingDelete = false;
 
   constructor(private store: FakeSupabase, private table: string) {}
 
   select(_cols?: string): this { return this; }
   eq(col: string, val: unknown): this { this.filters.push((r) => matchesEq(r, col, val)); return this; }
+  neq(col: string, val: unknown): this { this.filters.push((r) => !matchesEq(r, col, val)); return this; }
   is(col: string, val: unknown): this { this.filters.push((r) => (r[col] ?? null) === val); return this; }
   lte(col: string, val: unknown): this { this.filters.push((r) => matchesLte(r, col, val)); return this; }
   gte(col: string, val: unknown): this { this.filters.push((r) => matchesGte(r, col, val)); return this; }
@@ -62,6 +64,11 @@ class FakeQueryBuilder {
   limit(n: number): this { this.limitN = n; return this; }
   range(van: number, tot: number): this { this.rangeVan = van; this.rangeTot = tot; return this; }
   maybeSingle(): this { this.wantSingle = true; return this; }
+  single(): this { this.wantSingle = true; return this; }
+
+  /** Kanaalronde 3 september 2026: `update(patch)` past de patch toe op de rijen die de filters
+   *  matchen (de echte builder doet dat ook pas bij het awaiten, na de .eq()-aanroepen). */
+  update(patch: Row): this { this.pendingUpdate = patch; return this; }
 
   insert(rows: Row | Row[]): this {
     this.pendingInsert = (Array.isArray(rows) ? rows : [rows]).map((r) => ({ id: crypto.randomUUID(), created_at: "2026-03-01T00:00:00Z", ...r }));
@@ -87,6 +94,12 @@ class FakeQueryBuilder {
       this.store.tables[this.table] = [...(this.store.tables[this.table] ?? []), ...this.pendingInsert];
       const inserted = this.pendingInsert;
       return Promise.resolve(resolve({ data: this.wantSingle ? (inserted[0] ?? null) : inserted, error: null }));
+    }
+    if (this.pendingUpdate) {
+      const patch = this.pendingUpdate;
+      const geraakt = this.matching();
+      for (const r of geraakt) Object.assign(r, patch);
+      return Promise.resolve(resolve({ data: this.wantSingle ? (geraakt[0] ?? null) : geraakt, error: null }));
     }
     if (this.pendingDelete) {
       const toRemove = new Set(this.matching());

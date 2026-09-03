@@ -220,3 +220,43 @@ export async function fetchMicrosoftAdGroups(cfg: MicrosoftApiConfig, campaignId
   );
   return data.AdGroups ?? [];
 }
+
+// ── Customer Management: de accounts onder een customer (voor de koppelflow) ─
+//
+// LIVE-ONGETEST, zelfde grens als de rest van dit bestand. GetAccountsInfo levert de
+// accountnummers waar microsoft_connections.account_id naar verwijst; het customer-id komt uit
+// de kluis-payload van het bureau. Geen CustomerAccountId-header: die hoort bij een account, en
+// dat is precies wat hier nog gekozen moet worden.
+
+const CUSTOMER_BASE = "https://clientcenter.api.bingads.microsoft.com/CustomerManagement/v13";
+
+export interface MicrosoftAccountInfo {
+  Id?: number;
+  Name?: string;
+  Number?: string;
+  AccountLifeCycleStatus?: string;
+  PauseReason?: number | null;
+}
+
+export async function fetchMicrosoftAccounts(cfg: Omit<MicrosoftApiConfig, "accountId">): Promise<MicrosoftAccountInfo[]> {
+  const url = `${CUSTOMER_BASE}/AccountsInfo/Query`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${cfg.accessToken}`,
+      "DeveloperToken": cfg.developerToken,
+      "CustomerId": cfg.customerId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ CustomerId: Number(cfg.customerId), OnlyParentAccounts: false }),
+  });
+  const tekst = await res.text();
+  if (!res.ok) throw new Error(`Microsoft API ${res.status} op AccountsInfo/Query: ${tekst.slice(0, 300)}`);
+  let data: { AccountsInfo?: MicrosoftAccountInfo[] | null };
+  try {
+    data = JSON.parse(tekst) as { AccountsInfo?: MicrosoftAccountInfo[] | null };
+  } catch {
+    throw new Error(`Microsoft API gaf geen JSON op AccountsInfo/Query: ${tekst.slice(0, 200)}`);
+  }
+  return data.AccountsInfo ?? [];
+}

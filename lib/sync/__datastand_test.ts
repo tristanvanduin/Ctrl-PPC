@@ -2,7 +2,10 @@
 // waarop de aanvoer-audit van 3 september 2026 stukliep (data t/m april, "fresh" in de status).
 // Draaien: npx tsx lib/sync/__datastand_test.ts
 
-import { beoordeelDatastand, beoordeelWeekstand, datastandBlokkade, weekstandBlokkade, datastandVoorKlant, weekstandVoorKlant, DOOD_VANAF_MAANDEN } from "./datastand";
+import {
+  beoordeelDatastand, beoordeelWeekstand, datastandBlokkade, weekstandBlokkade, datastandVoorKlant, weekstandVoorKlant, DOOD_VANAF_MAANDEN,
+  beoordeelDagstand, dagstandBlokkade, dagstandVoorKlant, DAG_ACHTER_VANAF_DAGEN, DAG_DOOD_VANAF_DAGEN,
+} from "./datastand";
 import { FakeSupabase } from "../decision/__fake_supabase";
 import { DataLaagFout } from "../analysis/db-veilig";
 
@@ -71,6 +74,49 @@ async function main() {
     let fout: unknown = null;
     try { await datastandVoorKlant(kapot as never, "k1"); } catch (e) { fout = e; }
     check("een queryfout gooit DataLaagFout, geen 'geen data'", fout instanceof DataLaagFout);
+  }
+
+  console.log("beoordeelDagstand: de kanalen op dagkorrel");
+  {
+    const NU = "2026-09-03";
+    const actueel = beoordeelDagstand({ kanaal: "meta", laatsteDag: "2026-09-02", laatsteGeslaagdeSync: "2026-09-03T03:10:00Z", nu: NU });
+    check("gisteren als nieuwste dag: actueel", actueel.toestand === "actueel" && actueel.dagenAchter === 1, JSON.stringify(actueel));
+    check("tekst noemt het kanaal, de dag en de sync", actueel.tekst.startsWith("Meta-data t/m 2026-09-02") && actueel.tekst.includes("2026-09-03"), actueel.tekst);
+    const grens = beoordeelDagstand({ kanaal: "linkedin", laatsteDag: "2026-08-31", nu: NU });
+    check(`${DAG_ACHTER_VANAF_DAGEN} dagen achter is nog actueel (attributievenster)`, grens.toestand === "actueel" && grens.dagenAchter === 3, JSON.stringify(grens));
+    const achter = beoordeelDagstand({ kanaal: "linkedin", laatsteDag: "2026-08-25", nu: NU });
+    check("negen dagen achter: achter", achter.toestand === "achter" && achter.dagenAchter === 9 && achter.tekst.includes("LinkedIn-data loopt achter"), JSON.stringify(achter));
+    const dood = beoordeelDagstand({ kanaal: "microsoft", laatsteDag: "2026-04-17", laatsteGeslaagdeSync: null, nu: NU });
+    check(`meer dan ${DAG_DOOD_VANAF_DAGEN} dagen achter: dood, met 'nooit' als er geen sync was`, dood.toestand === "dood" && dood.dagenAchter === 139 && dood.tekst.includes("Microsoft-sync draait niet") && dood.tekst.includes("nooit"), dood.tekst);
+    const geen = beoordeelDagstand({ kanaal: "meta", laatsteDag: null, nu: NU });
+    check("zonder rijen: geen", geen.toestand === "geen" && geen.tekst.startsWith("Geen Meta-dagdata"));
+    const kapot = beoordeelDagstand({ kanaal: "meta", laatsteDag: "2026-9-2", nu: NU });
+    check("ongeldige datumwaarde telt als geen data, geen crash", kapot.toestand === "geen");
+
+    check("actueel en achter blokkeren niet (het venster kan nog rijen hebben)", dagstandBlokkade(actueel) === null && dagstandBlokkade(achter) === null);
+    const b = dagstandBlokkade(dood);
+    check("dood blokkeert, met het kanaal in de tekst", b !== null && b.startsWith("Geen bruikbare Microsoft-dagdata"), String(b));
+    check("geen blokkeert", dagstandBlokkade(geen) !== null);
+  }
+
+  console.log("dagstandVoorKlant: nieuwste dag van DEZE klant, sync uit de koppelingsrij");
+  {
+    const sb = new FakeSupabase();
+    sb.seed("meta_account_daily", [
+      { client_id: "k1", date: "2026-04-15" }, { client_id: "k1", date: "2026-04-17" }, { client_id: "k1", date: "2026-04-16" },
+      { client_id: "ander", date: "2026-09-02" },
+    ]);
+    sb.seed("meta_connections", [{ client_id: "k1", last_sync_at: "2026-04-17T04:00:00Z", status: "active" }]);
+    const stand = await dagstandVoorKlant(sb as never, "k1", "meta");
+    check("nieuwste dag van k1 is 17 april", stand.laatsteDag === "2026-04-17", JSON.stringify(stand));
+    check("laatste geslaagde sync uit meta_connections", stand.laatsteGeslaagdeSync === "2026-04-17T04:00:00Z");
+    const leeg = await dagstandVoorKlant(sb as never, "k1", "linkedin");
+    check("zonder tabelrijen: geen, zonder crash", leeg.toestand === "geen" && leeg.laatsteGeslaagdeSync === null);
+    const kapot = new FakeSupabase();
+    kapot.faalOp("microsoft_account_daily", "relation does not exist");
+    let fout: unknown = null;
+    try { await dagstandVoorKlant(kapot as never, "k1", "microsoft"); } catch (e) { fout = e; }
+    check("een queryfout op de dagtabel gooit DataLaagFout", fout instanceof DataLaagFout && String((fout as Error).message).includes("microsoft_account_daily"));
   }
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);

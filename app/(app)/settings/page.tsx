@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Loader2, ExternalLink, Copy, Check, Eye, EyeOff,
 import { Button } from "@/components/ui/button";
 import { AgencyBrandingSection } from "@/components/dashboard/agency-branding-section";
 import { KoppelingKaart, type KoppelingWeergave } from "@/components/settings/koppeling-kaart";
+import { KanaalKoppelingenSectie } from "@/components/settings/kanaal-koppelingen-sectie";
 import type { Provider } from "@/lib/tenancy/koppelingen";
 import { getAllClients, saveApiClients, type Client } from "@/lib/clients";
 import { getVisibleClientIds, setVisibleClientIds } from "@/lib/visible-clients";
@@ -894,6 +895,9 @@ export default function SettingsPage() {
           }
         />
       </div>
+
+      {/* ── Kanaalkoppelingen per klant (Meta / LinkedIn / Microsoft) ─────── */}
+      <KanaalKoppelingenSectie />
 
       {/* Architecture info */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">

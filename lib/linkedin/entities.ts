@@ -168,3 +168,45 @@ export async function fetchCampaigns(ctx: FetchContext, accountUrn: string): Pro
 export async function fetchCreatives(ctx: FetchContext, campaignUrn: string): Promise<Record<string, unknown>[]> {
   return getJson(ctx, `creatives?q=criteria&campaign=${encodeURIComponent(campaignUrn)}`);
 }
+
+// ── Ad-accounts onder het bureautoken (voor de koppelflow per klant) ─────────
+//
+// LIVE-ONGETEST, zelfde grens als hierboven. Anders dan getJson gooit deze bij een niet-OK
+// antwoord: een 401 op de accountlijst betekent "token dood", en dat mag in Instellingen niet
+// als "geen accounts gevonden" verschijnen.
+
+export interface LinkedInAdAccount {
+  id: string;
+  /** urn:li:sponsoredAccount:<id> -- de vorm die linkedin_connections.ad_account_urn verwacht. */
+  urn: string;
+  name: string;
+  currency: string | null;
+  status: string | null;
+}
+
+export async function fetchAdAccounts(ctx: FetchContext): Promise<LinkedInAdAccount[]> {
+  const res = await fetch(`${REST_BASE}/adAccounts?q=search&pageSize=100`, {
+    headers: {
+      Authorization: `Bearer ${ctx.accessToken}`,
+      "LinkedIn-Version": LINKEDIN_API_VERSION,
+      "X-Restli-Protocol-Version": "2.0.0",
+    },
+  });
+  if (!res.ok) {
+    const tekst = await res.text().catch(() => "");
+    throw new Error(`LinkedIn adAccounts ${res.status}: ${tekst.slice(0, 200)}`);
+  }
+  const body = (await res.json()) as { elements?: Record<string, unknown>[] };
+  return (Array.isArray(body.elements) ? body.elements : [])
+    .map((el) => {
+      const id = el.id == null ? "" : String(el.id);
+      return {
+        id,
+        urn: `urn:li:sponsoredAccount:${id}`,
+        name: typeof el.name === "string" && el.name.trim() ? el.name : id,
+        currency: typeof el.currency === "string" ? el.currency : null,
+        status: typeof el.status === "string" ? el.status : null,
+      };
+    })
+    .filter((a) => a.id !== "");
+}

@@ -18,6 +18,7 @@ import { computeMetaReliability, computeLinkedinReliability, computeMicrosoftRel
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { checkDataFreshness } from "@/lib/sync/freshness";
 import { datastandVoorKlant, datastandBlokkade } from "@/lib/sync/datastand";
+import { kanaalDataOntbreekt } from "@/lib/analysis/kanaal-datapoort";
 import { computeComparisonFacts, formatComparisonFacts, computePacingFacts, formatPacingFacts } from "@/lib/analysis/comparison-facts";
 import { buildMonthlyHandoff } from "@/lib/analysis/monthly-handoff";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
@@ -540,14 +541,7 @@ async function runMetaBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const { goalsSection, accountType } = clientCtx;
 
   if (accountRows.length === 0) {
-    const freshness = await checkDataFreshness(supabase, clientId, ["meta_account_daily"]);
-    await markProgressFailed(supabase, { jobId, errorMessage: freshness.message });
-    return Response.json({
-      error: freshness.message,
-      freshnessStatus: freshness.freshnessStatus,
-      lastSyncAt: freshness.lastSyncAt,
-      action: "Sync de data via POST /api/sync",
-    }, { status: 404 });
+    return kanaalDataOntbreekt(supabase, clientId, jobId, "meta");
   }
 
   // De overdracht uit de maandanalyse. Ging voorheen als het volledige narratieve document
@@ -873,14 +867,7 @@ async function runLinkedinBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: str
   const { goalsSection, accountType } = clientCtx;
 
   if (accountRows.length === 0) {
-    const freshness = await checkDataFreshness(supabase, clientId, ["linkedin_account_daily"]);
-    await markProgressFailed(supabase, { jobId, errorMessage: freshness.message });
-    return Response.json({
-      error: freshness.message,
-      freshnessStatus: freshness.freshnessStatus,
-      lastSyncAt: freshness.lastSyncAt,
-      action: "Sync de data via POST /api/sync",
-    }, { status: 404 });
+    return kanaalDataOntbreekt(supabase, clientId, jobId, "linkedin");
   }
 
   // De overdracht uit de maandanalyse. Ging voorheen als het volledige narratieve document
@@ -1178,14 +1165,7 @@ async function runMicrosoftBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: st
   const { goalsSection, accountType } = clientCtx;
 
   if (accountRows.length === 0) {
-    const freshness = await checkDataFreshness(supabase, clientId, ["microsoft_account_daily"]);
-    await markProgressFailed(supabase, { jobId, errorMessage: freshness.message });
-    return Response.json({
-      error: freshness.message,
-      freshnessStatus: freshness.freshnessStatus,
-      lastSyncAt: freshness.lastSyncAt,
-      action: "Sync de data via POST /api/sync",
-    }, { status: 404 });
+    return kanaalDataOntbreekt(supabase, clientId, jobId, "microsoft");
   }
 
   // De overdracht uit de maandanalyse. Zelfde gestructureerde vorm als Meta/LinkedIn, met de
