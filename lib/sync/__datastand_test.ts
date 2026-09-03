@@ -5,7 +5,7 @@
 import {
   beoordeelDatastand, beoordeelWeekstand, datastandBlokkade, weekstandBlokkade, datastandVoorKlant, weekstandVoorKlant, DOOD_VANAF_MAANDEN,
   beoordeelDagstand, dagstandBlokkade, dagstandVoorKlant, DAG_ACHTER_VANAF_DAGEN, DAG_DOOD_VANAF_DAGEN,
-  kanaalMaandstandVoorKlant,
+  kanaalMaandstandVoorKlant, samenvatDatastanden, datastandVoorBureau,
 } from "./datastand";
 import { lastCompleteMonth } from "../period/period-range";
 import { FakeSupabase } from "../decision/__fake_supabase";
@@ -135,6 +135,44 @@ async function main() {
     let fout: unknown = null;
     try { await kanaalMaandstandVoorKlant(kapot as never, "k1", "microsoft"); } catch (e) { fout = e; }
     check("queryfout op de koppelingsrij is een DataLaagFout", fout instanceof DataLaagFout);
+  }
+
+  console.log("samenvatDatastanden: het bureauoordeel voor de banner");
+  {
+    const NU = "2026-09-03";
+    const dood = (id: string, maand: string, sync: string | null) => ({ clientId: id, naam: id, stand: beoordeelDatastand({ laatsteMaand: maand, laatsteGeslaagdeSync: sync, nu: NU }) });
+    const leeg = samenvatDatastanden([]);
+    check("zonder klanten: ok, geen tekst", leeg.toestand === "ok" && leeg.tekst === null && leeg.totaal === 0);
+    const alles = samenvatDatastanden([dood("a", "2026-04", "2026-04-17T15:14:13Z"), dood("b", "2026-04", "2026-04-16T10:00:00Z"), dood("c", "2026-04", null)]);
+    check("alle klanten dood: stilstand, 'alle 3 klanten', één maand, nieuwste sync", alles.toestand === "stilstand" && alles.dood === 3 && /alle 3 klanten/.test(alles.tekst ?? "") && /data t\/m April 2026,/.test(alles.tekst ?? "") && (alles.tekst ?? "").includes("2026-04-17"), alles.tekst ?? "");
+    const deels = samenvatDatastanden([dood("a", "2026-03", null), dood("b", "2026-04", null), dood("c", "2026-08", "2026-09-02T04:00:00Z")]);
+    check("twee van drie dood, verschillende maanden: bereik in de tekst", deels.toestand === "stilstand" && deels.dood === 2 && deels.actueel === 1 && /2 van 3 klanten/.test(deels.tekst ?? "") && /Maart 2026 tot April 2026/.test(deels.tekst ?? "") && (deels.tekst ?? "").includes("nog nooit"), deels.tekst ?? "");
+    const nooit = samenvatDatastanden([dood("a", "", null), dood("b", "", null)]);
+    check("niemand ooit data: nooit (amber), niet stilstand", nooit.toestand === "nooit" && nooit.geen === 2 && (nooit.tekst ?? "").includes("alle 2 klanten"), nooit.tekst ?? "");
+    const eenAchter = samenvatDatastanden([dood("a", "2026-07", "2026-08-01T04:00:00Z"), dood("b", "2026-08", "2026-09-02T04:00:00Z")]);
+    check("één klant een maand achter: geen banner (dat is een badge)", eenAchter.toestand === "ok" && eenAchter.achter === 1 && eenAchter.tekst === null);
+  }
+
+  console.log("datastandVoorBureau: twee queries voor alle klanten");
+  {
+    const sb = new FakeSupabase();
+    sb.seed("ads_account_monthly", [
+      { client_id: "a", month: "2026-03-01" }, { client_id: "a", month: "2026-04-01" },
+      { client_id: "b", month: "2026-08-01" }, { client_id: "b", month: "2026-07-01" },
+      { client_id: "buiten", month: "2026-08-01" },
+    ]);
+    sb.seed("client_sync_status", [{ client_id: "a", last_successful_sync_at: "2026-04-17T15:14:13Z" }, { client_id: "buiten", last_successful_sync_at: "2026-09-01T00:00:00Z" }]);
+    const standen = await datastandVoorBureau(sb as never, [{ clientId: "a", naam: "A" }, { clientId: "b", naam: "B" }, { clientId: "c", naam: "C" }]);
+    const per = Object.fromEntries(standen.map((s) => [s.clientId, s.stand]));
+    check("a: nieuwste maand april met sync", per.a.laatsteMaand === "2026-04" && per.a.laatsteGeslaagdeSync === "2026-04-17T15:14:13Z", JSON.stringify(per.a));
+    check("b: augustus zonder statusrij", per.b.laatsteMaand === "2026-08" && per.b.laatsteGeslaagdeSync === null);
+    check("c: geen rijen → geen; 'buiten' telt niet mee", per.c.toestand === "geen" && standen.length === 3);
+    check("lege klantenlijst: geen query, lege lijst", (await datastandVoorBureau(sb as never, [])).length === 0);
+    const kapot = new FakeSupabase();
+    kapot.faalOp("client_sync_status", "permission denied");
+    let fout: unknown = null;
+    try { await datastandVoorBureau(kapot as never, [{ clientId: "a", naam: "A" }]); } catch (e) { fout = e; }
+    check("queryfout is een DataLaagFout", fout instanceof DataLaagFout);
   }
 
   console.log("dagstandVoorKlant: nieuwste dag van DEZE klant, sync uit de koppelingsrij");

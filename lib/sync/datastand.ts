@@ -264,3 +264,89 @@ export async function kanaalMaandstandVoorKlant(supabase: SupabaseClient, client
   const sync = connRijen[0]?.last_sync_at ? String(connRijen[0].last_sync_at) : null;
   return beoordeelDatastand({ laatsteMaand, laatsteGeslaagdeSync: sync, bron: DAGKANAAL_LABEL[kanaal], dagenInLaatsteMaand });
 }
+
+// ── Bureaubreed: staat de sync stil voor iedereen? ──────────────────────────
+//
+// De stand per klant staat in de badge op het klantdashboard; wie daar niet kijkt, ziet niets.
+// Op 3 september 2026 stond de Google-sync al vier en een halve maand stil voor ELKE klant, en
+// de app toonde gewoon dashboards met aprildata. Dit hulpje telt de standen van alle klanten
+// van het bureau op tot één oordeel voor een banner boven elke pagina.
+
+export interface KlantDatastand {
+  clientId: string;
+  naam: string;
+  stand: Datastand;
+}
+
+export interface BureauDatastand {
+  toestand: "ok" | "nooit" | "stilstand";
+  totaal: number;
+  actueel: number;
+  achter: number;
+  dood: number;
+  geen: number;
+  /** Eén zin voor de banner; null als er niets te melden is. */
+  tekst: string | null;
+}
+
+/** Puur: het bureauoordeel uit de klantstanden. "stilstand" zodra één klant dood is; "nooit"
+ *  als geen enkele klant ooit data kreeg; anders ok (één klant achter is een badge, geen banner). */
+export function samenvatDatastanden(standen: KlantDatastand[]): BureauDatastand {
+  const telling = { actueel: 0, achter: 0, dood: 0, geen: 0 };
+  for (const k of standen) telling[k.stand.toestand] += 1;
+  const totaal = standen.length;
+  const basis = { totaal, ...telling };
+  if (totaal === 0) return { ...basis, toestand: "ok", tekst: null };
+
+  if (telling.dood > 0) {
+    const doden = standen.filter((k) => k.stand.toestand === "dood");
+    const maanden = doden.map((k) => k.stand.laatsteMaand).filter((m): m is string => !!m).sort();
+    const oudste = maanden[0], nieuwste = maanden[maanden.length - 1];
+    const maandDeel = oudste === nieuwste ? `data t/m ${maandTekst(nieuwste)}` : `data t/m ${maandTekst(oudste)} tot ${maandTekst(nieuwste)}`;
+    const syncs = doden.map((k) => k.stand.laatsteGeslaagdeSync).filter((s): s is string => !!s).sort();
+    const syncDeel = syncs.length > 0 ? `laatste geslaagde sync ${syncs[syncs.length - 1].slice(0, 10)}` : "nog nooit een geslaagde sync geregistreerd";
+    const wie = telling.dood === totaal ? `alle ${totaal} klanten` : `${telling.dood} van ${totaal} klanten`;
+    return {
+      ...basis, toestand: "stilstand",
+      tekst: `De Google-sync staat stil voor ${wie}: ${maandDeel}, ${syncDeel}. Analyses over recentere maanden worden geblokkeerd tot de sync weer draait.`,
+    };
+  }
+  if (telling.geen === totaal) {
+    return {
+      ...basis, toestand: "nooit",
+      tekst: `Nog geen Google-data gesynct voor ${totaal === 1 ? "de enige klant" : `alle ${totaal} klanten`}; verbind Google Ads en start een sync.`,
+    };
+  }
+  return { ...basis, toestand: "ok", tekst: null };
+}
+
+/** De standen van een lijst klanten in twee queries (niet één per klant), via `in`. */
+export async function datastandVoorBureau(
+  supabase: SupabaseClient,
+  klanten: { clientId: string; naam: string }[]
+): Promise<KlantDatastand[]> {
+  if (klanten.length === 0) return [];
+  const ids = klanten.map((k) => k.clientId);
+  const [maanden, status] = await Promise.all([
+    supabase.from("ads_account_monthly").select("client_id, month").in("client_id", ids).limit(10_000),
+    supabase.from("client_sync_status").select("client_id, last_successful_sync_at").in("client_id", ids).limit(1000),
+  ]);
+  const maandRijen = eis(maanden, "ads_account_monthly (bureaustand)") as { client_id: unknown; month: unknown }[];
+  const statusRijen = eis(status, "client_sync_status (bureaustand)") as { client_id: unknown; last_successful_sync_at: unknown }[];
+  const nieuwste = new Map<string, string>();
+  for (const r of maandRijen) {
+    const id = String(r.client_id ?? ""), m = String(r.month ?? "").slice(0, 7);
+    if (!isValidMonth(m)) continue;
+    const huidig = nieuwste.get(id);
+    if (!huidig || m > huidig) nieuwste.set(id, m);
+  }
+  const sync = new Map<string, string>();
+  for (const r of statusRijen) {
+    if (r.last_successful_sync_at) sync.set(String(r.client_id ?? ""), String(r.last_successful_sync_at));
+  }
+  return klanten.map((k) => ({
+    clientId: k.clientId,
+    naam: k.naam,
+    stand: beoordeelDatastand({ laatsteMaand: nieuwste.get(k.clientId) ?? null, laatsteGeslaagdeSync: sync.get(k.clientId) ?? null }),
+  }));
+}

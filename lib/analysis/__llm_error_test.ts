@@ -20,6 +20,7 @@ const abort = classifyLLMError(mk("AbortError", "The operation was aborted"));
 check("AbortError is timeout, retrybaar", abort.type === "timeout" && abort.retryable === true);
 
 check("401 is auth, niet retrybaar", (() => { const c = classifyLLMError(new Error("OpenRouter 401: invalid key")); return c.type === "auth" && c.retryable === false; })());
+check("402 is credits (tegoed op), niet retrybaar, met de handeling in de boodschap", (() => { const c = classifyLLMError(new Error('OpenRouter 402: {"error":{"message":"Insufficient credits"}}')); return c.type === "credits" && c.retryable === false && c.userMessage.includes("tegoed") && c.userMessage.includes("openrouter.ai"); })());
 check("403 is permission, niet retrybaar", (() => { const c = classifyLLMError(new Error("OpenRouter 403: forbidden")); return c.type === "permission" && c.retryable === false; })());
 check("429 is rate_limit, retrybaar", (() => { const c = classifyLLMError(new Error("OpenRouter 429: too many requests")); return c.type === "rate_limit" && c.retryable === true; })());
 check("400 is bad_request, niet retrybaar", (() => { const c = classifyLLMError(new Error("OpenRouter 400: bad payload")); return c.type === "bad_request" && c.retryable === false; })());

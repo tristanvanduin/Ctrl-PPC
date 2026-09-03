@@ -12,6 +12,9 @@
 export type LLMErrorType =
   | "auth"
   | "permission"
+  /** HTTP 402: het OpenRouter-tegoed is op. Niet retrybaar -- drie pogingen op een lege
+   *  portemonnee kosten alleen tijd -- en de melding zegt wat er moet gebeuren. */
+  | "credits"
   | "rate_limit"
   | "provider"
   | "network"
@@ -28,6 +31,7 @@ export interface LLMErrorClassification {
 const MESSAGES: Record<LLMErrorType, string> = {
   auth: "Authenticatie bij de AI-provider mislukt. De analyse kan nu niet draaien.",
   permission: "Geen toegang bij de AI-provider voor deze aanvraag.",
+  credits: "Het OpenRouter-tegoed is op: vul het tegoed aan op openrouter.ai en start de analyse opnieuw.",
   rate_limit: "De AI-provider is tijdelijk overbelast. Opnieuw proberen.",
   provider: "De AI-provider gaf een serverfout. Opnieuw proberen.",
   network: "Geen verbinding met de AI-provider. Opnieuw proberen.",
@@ -59,6 +63,7 @@ export function classifyLLMError(error: unknown): LLMErrorClassification {
   if (statusMatch) {
     const status = Number(statusMatch[1]);
     if (status === 401) return build("auth", false);
+    if (status === 402) return build("credits", false);
     if (status === 403) return build("permission", false);
     if (status === 429) return build("rate_limit", true);
     if (status === 400 || status === 422) return build("bad_request", false);

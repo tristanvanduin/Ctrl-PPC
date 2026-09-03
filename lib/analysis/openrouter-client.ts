@@ -374,7 +374,14 @@ export async function callOpenRouter(opts: OpenRouterRequest): Promise<OpenRoute
 
   const finalError = lastError ?? new Error(`OpenRouter call failed after ${MAX_RETRIES + 1} attempts`);
   // SEC3: hang de getypeerde classificatie aan de fout voor een fallback-laag.
-  (finalError as Error & { llmError?: LLMErrorClassification }).llmError = classifyLLMError(finalError);
+  const classificatie = classifyLLMError(finalError);
+  (finalError as Error & { llmError?: LLMErrorClassification }).llmError = classificatie;
+  // Een leeg tegoed is geen technische fout maar een handeling voor de eigenaar: de routes
+  // geven err.message door aan de voortgangsjob en het scherm, dus daar hoort de handeling
+  // vooraan te staan, niet de rauwe JSON van de provider.
+  if (classificatie.type === "credits") {
+    finalError.message = `${classificatie.userMessage} (${finalError.message.slice(0, 200)})`;
+  }
   throw finalError;
 }
 

@@ -2,6 +2,7 @@ import { Ubuntu } from "next/font/google";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { SopDekkingBanner } from "@/components/layout/sop-dekking-banner";
+import { DatastandBanner } from "@/components/layout/datastand-banner";
 import { SidebarMobileProvider } from "@/components/layout/sidebar-mobile-context";
 import { SidebarBackdrop } from "@/components/layout/sidebar-backdrop";
 
@@ -43,6 +44,7 @@ export default function AppLayout({
         <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:ml-72">
           <TopBar />
           <SopDekkingBanner />
+          <DatastandBanner />
           {/* max-w + mx-auto: zonder maximumbreedte rekt de inhoud oneindig mee met het venster.
               Gemeten op een uitgezoomd/breed scherm: bij een effectieve viewport van 3840px werd de
               content 3552px breed, en dan verliezen de verhoudingen het -- KPI-kaarten worden
