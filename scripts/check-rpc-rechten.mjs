@@ -45,6 +45,7 @@
 
 import { readFileSync } from "node:fs";
 import { sql } from "./supabase-sql.mjs";
+import { MUTATIE, alleenCode } from "./rpc-mutatie.mjs";
 
 // Zonder databasegegevens overslaan in plaats van falen.
 //
@@ -65,21 +66,10 @@ import { sql } from "./supabase-sql.mjs";
   }
 }
 
-/** Woorden die alleen in een statement voorkomen dat iets verandert. */
-const MUTATIE = /\b(insert\s+into|update\s+\w|delete\s+from|truncate|drop\s+(table|view|function|schema|index)|alter\s+(table|view|function|schema|default)|create\s+(table|view|function|index|or\s+replace)|grant\s|revoke\s)\b/i;
-
-/**
- * Commentaar en tekstliteralen weg, zodat alleen echte code overblijft.
- *
- * Volgorde is significant: eerst de blokken, dan de regels, dan de literalen. Andersom zou een
- * apostrof in een commentaarregel de literaal-verwijdering laten ontsporen.
- */
-function alleenCode(bron) {
-  return String(bron ?? "")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/--[^\n]*/g, " ")
-    .replace(/'(?:[^']|'')*'/g, "''");
-}
+// De herkenning van een muterende functie staat in een eigen module met een test ernaast
+// (lib/security/__rpc_mutatie_test.ts). Hier stond hij inline, en daar hield `update\s+\w` gevolgd
+// door \b alleen stand bij een tabelnaam van één letter: `update generation_jobs` werd niet
+// herkend, en claim_generation_job -- die een job op 'running' zet -- telde als leesfunctie.
 
 const ROLLEN_DIE_ER_TOE_DOEN = ["anon", "authenticated"];
 

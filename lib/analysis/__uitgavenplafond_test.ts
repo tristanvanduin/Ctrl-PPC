@@ -120,16 +120,23 @@ check("over de jaargrens heen klopt hij ook",
 // De query wordt hier nagebootst, want het punt is nét welke filters erop komen te staan: met
 // twee bureaus in dezelfde tabel betaalt het ene het plafond van het andere op als agency_id
 // ontbreekt, en dat is de eerste dag dat er een tweede klant is -- geen randgeval.
-function nepClient(rijen: Array<{ cost_eur: number | null; agency_id: string | null }>) {
+function nepClient(rijen: Array<{ cost_eur: number | null; agency_id: string | null }>, opties: { fout?: string } = {}) {
   const gebruikt: string[] = [];
-  const bouw = (filter: (r: (typeof rijen)[number]) => boolean) => ({
+  // Doet wat PostgREST doet: hooguit `.range()` rijen per verzoek, in de volgorde van `.order()`.
+  // Zonder range levert hij ALLES -- de oude fake deed dat ook, en daardoor zag geen test dat de
+  // echte database na 1000 rijen ophoudt.
+  const bouw = (filter: (r: (typeof rijen)[number]) => boolean, van = 0, tot = Infinity) => ({
     gte(_kolom: string, _waarde: string) { gebruikt.push("gte:created_at"); return this; },
     eq(kolom: string, waarde: string) {
       gebruikt.push(`eq:${kolom}`);
-      return bouw((r) => filter(r) && (r as Record<string, unknown>)[kolom] === waarde);
+      return bouw((r) => filter(r) && (r as Record<string, unknown>)[kolom] === waarde, van, tot);
     },
-    then(res: (v: { data: unknown; error: null }) => void) {
-      res({ data: rijen.filter(filter).map((r) => ({ cost_eur: r.cost_eur })), error: null });
+    order(kolom: string) { gebruikt.push(`order:${kolom}`); return bouw(filter, van, tot); },
+    range(a: number, b: number) { gebruikt.push(`range:${a}-${b}`); return bouw(filter, a, Math.min(b, a + 999)); },
+    then(res: (v: { data: unknown; error: { message: string } | null }) => void) {
+      if (opties.fout) { res({ data: null, error: { message: opties.fout } }); return; }
+      const alle = rijen.filter(filter).map((r) => ({ cost_eur: r.cost_eur }));
+      res({ data: alle.slice(van, Math.min(tot, van + 999) + 1), error: null });
     },
   });
   return { from: () => ({ select: () => bouw(() => true) }), gebruikt };
@@ -160,6 +167,17 @@ async function main() {
     "bureau-b betaalt niet mee aan het plafond van bureau-a",
     (await leesMaandverbruik(nepClient(rijen) as never, new Date(), "bureau-b")).besteed === 40
   );
+
+  // Voorbij de PostgREST-cap: 2500 calls van EUR 0,01 in één maand. De oude query las er 1000 en
+  // telde EUR 10 in plaats van EUR 25 -- het plafond blokkeerde dan anderhalve keer te laat.
+  const veel = Array.from({ length: 2500 }, () => ({ cost_eur: 0.01, agency_id: "bureau-a" }));
+  const groot = nepClient(veel);
+  const somGroot = await leesMaandverbruik(groot as never, new Date(), "bureau-a");
+  check("voorbij 1000 rijen telt hij alles", Math.abs(somGroot.besteed - 25) < 1e-6, JSON.stringify(somGroot));
+  check("en pagineert hij in drie verzoeken", groot.gebruikt.filter((g) => g.startsWith("range:")).length === 3, groot.gebruikt.join(","));
+  check("op een vaste volgorde", groot.gebruikt.includes("order:id"));
+  const kapot = await leesMaandverbruik(nepClient(rijen, { fout: "permission denied" }) as never);
+  check("een leesfout blokkeert bewust niet (0 besteed)", kapot.besteed === 0 && kapot.onbekend === 0, JSON.stringify(kapot));
 
   // schatSopRunKosten: de vaste run-schattingen waarmee de analyse-routes het plafond
   // VOORAF controleren. De ordening is de kern (een maandrun is het duurst) en de schatting

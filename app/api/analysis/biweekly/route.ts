@@ -413,6 +413,7 @@ ${step4.output}`),
   const extraction = await extractStructuredData({
     supabase,
     apiKey,
+    runKey: jobId,
     clientId,
     sopType: "biweekly",
     analysisDate: result.analysisDate,
@@ -732,7 +733,7 @@ ${step4.output}`),
   await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
-    supabase, apiKey, clientId, sopType: "meta_biweekly",
+    supabase, apiKey, runKey: jobId, clientId, sopType: "meta_biweekly",
     analysisDate: result.analysisDate, periodStart, periodEnd,
     analysisOutput: result.output,
     findingsSystemPrompt: BIWEEKLY_FINDINGS_SYSTEM,
@@ -1065,7 +1066,7 @@ ${step4.output}`),
   await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
-    supabase, apiKey, clientId, sopType: "linkedin_biweekly",
+    supabase, apiKey, runKey: jobId, clientId, sopType: "linkedin_biweekly",
     analysisDate: result.analysisDate, periodStart, periodEnd,
     analysisOutput: result.output,
     findingsSystemPrompt: BIWEEKLY_FINDINGS_SYSTEM,
@@ -1370,7 +1371,7 @@ ${step4.output}`),
   await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
-    supabase, apiKey, clientId, sopType: "microsoft_biweekly",
+    supabase, apiKey, runKey: jobId, clientId, sopType: "microsoft_biweekly",
     analysisDate: result.analysisDate, periodStart, periodEnd,
     analysisOutput: result.output,
     findingsSystemPrompt: BIWEEKLY_FINDINGS_SYSTEM,

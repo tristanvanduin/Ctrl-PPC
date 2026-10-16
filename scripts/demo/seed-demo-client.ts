@@ -46,6 +46,7 @@
 // ============================================================================
 
 import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
+import { wisDemoProjectie } from "../../lib/demo/projectie-opruimen";
 import { createClient } from "@supabase/supabase-js";
 import type { MetaObjective } from "../../lib/meta/campaign-types";
 import type { LinkedInObjective } from "../../lib/linkedin/campaign-types";
@@ -776,6 +777,16 @@ async function insertViaSupabase(tables: Record<string, Row[]>) {
   // meta_account_daily/linkedin_account_daily/ads_account_monthly toonden nog data van de vórige
   // seed-run, ook al meldde deze functie hierboven "160 rijen" succesvol). Migratie 050/078
   // riep dit destijds handmatig aan voor demo-greentech; nu hoort het bij de seed zelf.
+  // Eerst de oude projectie van dit account weg, dan opnieuw projecteren. De projectie wist zelf
+  // nooit iets, en het venster hierboven schuift mee met de rundatum: zonder deze stap bleef elke
+  // dag die uit het venster viel als wees in fact_core staan (zie lib/demo/projectie-opruimen.ts).
+  try {
+    const opruim = await wisDemoProjectie(db, DEMO_CLIENT);
+    console.log(`✓ oude projectie gewist (${opruim.accountIds.length} account, ${opruim.tabellen.length} tabelwissingen)`);
+  } catch (e) {
+    console.error(`✗ oude projectie wissen: ${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  }
   const { error: refreshError } = await db.rpc("refresh_fact_from_legacy", { p_client_id: DEMO_CLIENT });
   if (refreshError) { console.error(`✗ refresh_fact_from_legacy: ${refreshError.message}`); process.exit(1); }
   console.log(`✓ refresh_fact_from_legacy(${DEMO_CLIENT}) -- fact_core/meta_metrics/linkedin_metrics geprojecteerd`);

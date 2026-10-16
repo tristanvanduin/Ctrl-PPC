@@ -50,11 +50,17 @@ export async function GET(request: NextRequest) {
   // Google-ronde -- samen ruim voorbij maxDuration.
   const invocatieStart = Date.now();
 
-  // Verify cron secret
+  // Fail-closed, zoals de /api/cron/*-routes. Dit stond op `if (cronSecret && ...)`: zonder
+  // CRON_SECRET in de omgeving liet de route iedereen door, en kon elke bezoeker de volledige
+  // nachtsync voor alle klanten starten (Google Ads-quota, databaseschrijfwerk, tien minuten
+  // rekentijd). Vercel stuurt het geheim zelf mee met de geplande aanroep zodra de variabele
+  // gezet is; zonder variabele draait de nachtsync dus bewust niet, met een melding die zegt waarom.
   const cronSecret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization");
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cronSecret) {
+    return Response.json({ error: "CRON_SECRET niet geconfigureerd; de nachtsync weigert bewust te draaien" }, { status: 500 });
+  }
+  if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return Response.json({ error: "niet geautoriseerd" }, { status: 401 });
   }
 
   const supabase = getSupabase();

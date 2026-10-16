@@ -69,9 +69,24 @@ interface ExtractionOptions {
   reliability?: DataReliabilityAssessment;
   /** Optional: TOP 3 BEVINDINGEN text extracted from analysis steps */
   topFindings?: string;
+  /**
+   * Run-sleutel (jobId) voor de llm_usage-kostenregistratie. Zonder deze sleutel logt runStep
+   * niets, en dan stonden de twee extractiestappen -- de enige JSON-stappen van 16.000 tokens --
+   * buiten het uitgavenplafond, dat juist op llm_usage telt.
+   */
+  runKey?: string;
   /** Optional progress callback */
   onPhase?: (phaseKey: "extract_findings" | "extract_recommendations" | "save_outputs", message?: string) => Promise<void>;
 }
+
+// ── Uitvoerplafond van de twee extractiestappen ──────────────────────────
+//
+// De standaard voor een JSON-stap is 8192 tokens. Op 1 september 2026 liep de Microsoft-biweekly
+// daar in stap 6 ("Aanbevelingen & Taken") tegenaan: het antwoord werd afgekapt na 26.809 tekens,
+// de JSON was onleesbaar en de hele run mislukte. Deze stap zet ALLE bevindingen van de analyse om
+// in aanbevelingen plus taken; hoe rijker de analyse, hoe langer de JSON. Het plafond verhogen kost
+// alleen iets bij een langer antwoord -- de prijs is per geschreven token, niet per plafond.
+export const EXTRACTIE_MAX_TOKENS = 16000;
 
 // ── Main extraction function ──────────────────────────────────────────────
 
@@ -81,10 +96,10 @@ export async function extractStructuredData(opts: ExtractionOptions): Promise<Ex
     analysisDate, periodStart, periodEnd,
     analysisOutput, findingsSystemPrompt, recsSystemPrompt,
     stepOffset, analysisId, reliability, topFindings,
-    onPhase,
+    runKey, onPhase,
   } = opts;
 
-  const shared = { supabase, apiKey, clientId, sopType, periodStart, periodEnd };
+  const shared = { supabase, apiKey, clientId, sopType, periodStart, periodEnd, runKey };
   const steps: StepResult[] = [];
 
   // ── Step A: Extract findings (JSON mode) ─────────────────────────
@@ -110,6 +125,7 @@ ${analysisOutput}`;
     systemPrompt: findingsSystemPrompt,
     userMessage: findingsUserMessage,
     jsonMode: true,
+    maxTokens: EXTRACTIE_MAX_TOKENS,
   });
   steps.push(findingsStep);
 
@@ -140,6 +156,7 @@ ${toPromptTable(findings.map((f, i) => ({ finding_index: i, ...f })))}
 ## Volledige analyse tekst
 ${analysisOutput}`,
     jsonMode: true,
+    maxTokens: EXTRACTIE_MAX_TOKENS,
   });
   steps.push(recsStep);
 

@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
+import { wisDemoProjectie, GEPROJECTEERDE_TABELLEN } from "../../lib/demo/projectie-opruimen";
 import { createClient } from "@supabase/supabase-js";
 
 const DEMO_CLIENT = "demo-greentech";
@@ -28,6 +29,7 @@ const TABLES = [
 function printSql() {
   console.log(`-- DEMO-TEARDOWN voor ${DEMO_CLIENT}`);
   for (const t of TABLES) console.log(`delete from ${fysiekeTabel(t)} where client_id='${DEMO_CLIENT}';`);
+  for (const t of GEPROJECTEERDE_TABELLEN) console.log(`delete from ${t} where account_id in (select id from accounts where client_id='${DEMO_CLIENT}');`);
   console.log(`delete from linkedin_urn_labels where urn like 'urn:li:function:demo-%';`);
   console.log(`update app_settings set value = coalesce((select jsonb_agg(e) from jsonb_array_elements(value) e where e->>'id' <> '${DEMO_CLIENT}'), '[]'::jsonb), updated_at=now() where key='api_clients';`);
 }
@@ -44,6 +46,15 @@ async function run() {
     // 17 augustus 2026 bij een herseed na de Meta/LinkedIn-objective-uitbreiding).
     const { error } = await db.from(fysiekeTabel(t)).delete().eq("client_id", DEMO_CLIENT);
     console.log(error ? `✗ ${t}: ${error.message}` : `✓ ${t}`);
+  }
+  // De projectie in fact_core en de kanaalmetrieken: zonder dit toonden de views na een teardown
+  // nog alle demodata, want de app leest ads_account_monthly, meta_account_daily enz. als views
+  // over fact_core en niet uit de *_legacy-tabellen hierboven.
+  try {
+    const opruim = await wisDemoProjectie(db, DEMO_CLIENT);
+    console.log(`✓ projectie gewist (${opruim.accountIds.length} account, ${opruim.tabellen.length} tabelwissingen)`);
+  } catch (e) {
+    console.log(`✗ projectie wissen: ${e instanceof Error ? e.message : String(e)}`);
   }
   await db.from("linkedin_urn_labels").delete().like("urn", "urn:li:function:demo-%");
   const { data } = await db.from("app_settings").select("value").eq("key", "api_clients").maybeSingle();

@@ -37,6 +37,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { fysiekeTabel } from "../../lib/data-access/feitentabellen";
+import { wisDemoProjectie } from "../../lib/demo/projectie-opruimen";
 import { GEOCLONE_CLIENTS } from "../../lib/demo/geoclone-clients";
 
 type Row = Record<string, unknown>;
@@ -182,6 +183,15 @@ async function run(check: boolean) {
 
     // Projectie naar fact_core -- zonder deze stap lezen ads_campaign_monthly/ads_account_monthly
     // (de views) niets, want die staan over fact_core, niet over de *_legacy-tabellen hierboven.
+    // Eerst de oude projectie van dit account weg: de projectie wist zelf nooit iets, dus een
+    // maand die bij een herseed uit de reeks valt, bleef anders als wees in fact_core staan (zie
+    // lib/demo/projectie-opruimen.ts).
+    try {
+      await wisDemoProjectie(db, g.clientId);
+    } catch (e) {
+      console.error(`✗ ${g.clientId}: oude projectie wissen (${e instanceof Error ? e.message : String(e)}), overgeslagen`);
+      continue;
+    }
     const { error: rpcErr } = await db.rpc("refresh_fact_from_legacy", { p_client_id: g.clientId });
     if (rpcErr) console.error(`  ⚠ ${g.clientId}: projectie naar fact_core mislukt (${rpcErr.message}) -- rijen staan er, maar de leeskant kan ze nog niet zien.`);
 

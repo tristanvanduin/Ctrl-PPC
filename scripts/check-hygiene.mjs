@@ -160,10 +160,9 @@ const TOEGESTANE_WEZEN = new Map([
   ["components/dashboard/report-export.tsx",
     "gebouwde feature, nooit aangesloten; productbeslissing: afbouwen of weg"],
 
-  // Wacht op toegang die er nog niet is: koppelingen, sleutels of een sync die niet gedraaid
-  // kan worden. Aansluiten heeft pas zin als er data doorheen kan.
-  ["lib/meta/sync.ts", "orkestratie gebouwd, HTTP-calls live-ongetest en gated op MDP-approval"],
-  ["lib/notifications.ts", "webhook en alerts_log vergen de echte koppeling"],
+  // lib/meta/sync.ts en lib/notifications.ts stonden hier ("wacht op toegang") en zijn sinds
+  // september aangesloten: de kanaalruns (lib/sync/kanaal-runs.ts) en de cron-sporen
+  // (lib/sync/cron-sporen.ts). Live-ongetest blijven ze wel; dat staat in hun eigen kop.
 
   // Gebouwd en getest, wacht op een consument. Dit is de bak waar het meeste in zit; hij hoort
   // te krimpen. Zie het gesprek van 2026-07-28 voor de beoordeling per stuk.
@@ -211,34 +210,12 @@ const TOEGESTANE_WEZEN = new Map([
     "geraakt. comparison-facts.ts is GEEN opvolger: dat rekent vergelijkingen, geen bevindingen. " +
     "De vraag is of de prepared-context-pijplijn deze bevindingen al elders produceert"],
 
-  // 17 augustus 2026, masterplan sectie 16.3: op expliciet verzoek van de eigenaar vooruitgebouwd
-  // ("niet wachten op een klant") -- de objective/eval-criteria-taxonomie per kanaal, het
-  // Meta/LinkedIn-equivalent van lib/campaign-types.ts (die WEL een consument heeft via
-  // campaign-analysis.ts hierboven). De bevindingen-engine die deze twee bestanden consumeert
-  // (het Meta/LinkedIn-equivalent van campaign-analysis.ts) is de logische vervolgstap, nog niet
-  // gebouwd in dezelfde sessie. Beide bestanden hebben al wel een eigen `objective`/`objective_type`
-  // -kolom die al gevuld wordt (meta_campaigns.objective, linkedin_campaigns.objective_type) --
-  // het is dus geen taxonomie die op iets ongebouwds wacht, alleen op de regelmachine erboven.
-  ["lib/meta/campaign-types.ts",
-    "Meta ODAX-objective-taxonomie en eval-criteria; consument is lib/meta/campaign-analysis.ts " +
-    "hieronder, die zelf nog geen eigen consument heeft (route/UI)"],
-  ["lib/linkedin/campaign-types.ts",
-    "LinkedIn objectiveType-taxonomie en eval-criteria; consument is " +
-    "lib/linkedin/campaign-analysis.ts hieronder, die zelf nog geen eigen consument heeft (route/UI)"],
-
-  // 17 augustus 2026: de bevindingen-engines die de twee taxonomiebestanden hierboven
-  // daadwerkelijk consumeren, gebouwd in dezelfde sessie als vervolgstap. Beide zijn zelf nog
-  // niet aangesloten op een route of UI-component -- exact dezelfde status als
-  // lib/campaign-analysis.ts (Google) al langer heeft. Wacht op een productbeslissing: waar in
-  // de app deze bevindingen getoond worden, en of de prepared-context/SOP-pijplijn (die WEL live
-  // is, app/api/analysis/monthly/route.ts) ze rechtstreeks moet consumeren of dat dit een apart
-  // bevindingen-scherm wordt.
-  ["lib/meta/campaign-analysis.ts",
-    "regelmachine met findings/manualChecks per Meta-objective, mirrort lib/campaign-analysis.ts " +
-    "zonder het te kopieren (CPA/ROAS-baselines per objective, niet account-breed). Wacht op consument"],
-  ["lib/linkedin/campaign-analysis.ts",
-    "regelmachine met findings/manualChecks per LinkedIn-objectiveType, zelfde status als " +
-    "lib/meta/campaign-analysis.ts hierboven. Wacht op consument"],
+  // lib/meta/campaign-types.ts, lib/linkedin/campaign-types.ts en de twee regelmachines die ze
+  // consumeren (lib/meta/campaign-analysis.ts, lib/linkedin/campaign-analysis.ts) stonden hier
+  // tot 16 oktober 2026. De taxonomieen zijn aangesloten via lib/{meta,linkedin}/objective-
+  // breakdown.ts; de regelmachines alleen via de --check van scripts/demo/seed-demo-client.ts,
+  // en dat telt in deze poort als aangesloten. Waar hun bevindingen in de app terechtkomen is een
+  // open productbeslissing: MASTERPLAN sectie 16.3.
 
   // 11 augustus 2026: op beide homepage-plekken losgekoppeld nadat bleek dat de enige echte
   // productbeelden een Nederlandstalige UI tonen onder een Engelstalige, wereldwijd gepositioneerde
@@ -248,17 +225,8 @@ const TOEGESTANE_WEZEN = new Map([
   ["components/marketing/product-video.tsx",
     "wacht op Engelstalige productbeelden; zie de koptekst voor waarom de Nederlandse video eruit is"],
 
-  // 11 augustus 2026: Code Rood/Amber per account (niet te verwarren met stoplicht.ts, dat is
-  // per bureau). Kernlogica en getest, gebouwd vooruitlopend op zijn UI/API-consument -- die is
-  // een apart, nog te scopen vervolgstuk (waar dit in de app getoond wordt, en de queries die
-  // ForecastAfwijkingSignaal/de change-history-rijen echt vullen). Zie de koptekst van het
-  // bestand voor de combinatie-regel en waarom rood zeldzaam moet blijven.
-  ["lib/adoptie/account-stoplicht.ts",
-    "Code Rood/Amber per account; kernlogica en getest, wacht op de UI/API-consument"],
-  ["lib/adoptie/code-rood.ts",
-    "combineert account-stoplicht.ts met health-score.ts's critical-anomalies (best of both " +
-    "worlds, besluit eigenaar 11-08-2026); kernlogica en getest, wacht op dezelfde UI/API-" +
-    "consument als account-stoplicht.ts"],
+  // lib/adoptie/account-stoplicht.ts en lib/adoptie/code-rood.ts stonden hier ("wacht op de
+  // UI/API-consument") en zijn aangesloten: app/api/cron/evaluate-code-rood en de God View-churn.
 ]);
 
 for (const f of bestanden) {
@@ -276,6 +244,24 @@ for (const f of bestanden) {
     (alleenTest ? ", alleen door een test" : "") +
     `. Sluit hem aan, verwijder hem, of zet hem met een reden in TOEGESTANE_WEZEN.`
   );
+}
+
+// ── 2b. Uitzonderingen die niet meer nodig zijn ───────────────────────────
+//
+// TOEGESTANE_WEZEN hoort te krimpen, maar niets dwong dat af: een wees die later wél werd
+// aangesloten bleef gewoon op de lijst staan, met een reden die niet meer klopte. Op 16 oktober 2026
+// stonden er zo acht van de twintig onterecht op. Een uitzondering die niet meer nodig is, is nu
+// een fout -- zo wordt de lijst vanzelf korter zodra iets aangesloten wordt, in plaats van dat
+// iemand eraan moet denken.
+for (const f of TOEGESTANE_WEZEN.keys()) {
+  if (!inhoud.has(f)) {
+    fouten.push(`${f} staat in TOEGESTANE_WEZEN maar bestaat niet meer. Haal hem van de lijst.`);
+    continue;
+  }
+  const stam = f.replace(/\.tsx?$/, "");
+  if (doorProd.has(normalize(stam)) || doorProd.has(normalize(f))) {
+    fouten.push(`${f} staat in TOEGESTANE_WEZEN maar wordt inmiddels wél door productiecode geïmporteerd. Haal hem van de lijst.`);
+  }
 }
 
 // ── 3. Stuurtekens die een bestand onvindbaar maken ────────────────────────

@@ -371,6 +371,7 @@ ${step3.output}`),
   const extraction = await extractStructuredData({
     supabase,
     apiKey,
+    runKey: jobId,
     clientId,
     sopType: "weekly",
     analysisDate: result.analysisDate,
@@ -657,7 +658,7 @@ ${step3.output}`),
   await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
-    supabase, apiKey, clientId, sopType: "meta_weekly",
+    supabase, apiKey, runKey: jobId, clientId, sopType: "meta_weekly",
     analysisDate: result.analysisDate, periodStart, periodEnd,
     analysisOutput: result.output,
     findingsSystemPrompt: WEEKLY_FINDINGS_SYSTEM,
@@ -947,7 +948,7 @@ ${step3.output}`),
   await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
-    supabase, apiKey, clientId, sopType: "linkedin_weekly",
+    supabase, apiKey, runKey: jobId, clientId, sopType: "linkedin_weekly",
     analysisDate: result.analysisDate, periodStart, periodEnd,
     analysisOutput: result.output,
     findingsSystemPrompt: WEEKLY_FINDINGS_SYSTEM,
@@ -1223,7 +1224,7 @@ ${step3.output}`),
   await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
-    supabase, apiKey, clientId, sopType: "microsoft_weekly",
+    supabase, apiKey, runKey: jobId, clientId, sopType: "microsoft_weekly",
     analysisDate: result.analysisDate, periodStart, periodEnd,
     analysisOutput: result.output,
     findingsSystemPrompt: WEEKLY_FINDINGS_SYSTEM,

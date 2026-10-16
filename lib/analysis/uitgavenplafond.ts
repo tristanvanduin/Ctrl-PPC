@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MODEL_PRICES, computeCallCost } from "./o2-targets-cost";
+import { alleRijen } from "./db-veilig";
 
 // ============================================================================
 // HET UITGAVENPLAFOND OP HET LLM-VERBRUIK
@@ -201,13 +202,26 @@ export async function leesMaandverbruik(
     //
     // Zonder agencyId blijft het gedrag platformbreed. Dat is met opzet: er zijn calls zonder
     // bureau (zie migratie 061), en die horen ergens tegen afgezet te worden.
-    let q = supabase.from("llm_usage").select("cost_eur").gte("created_at", maandStart(nu));
-    if (agencyId) q = q.eq("agency_id", agencyId);
-    const { data, error } = await q;
-    if (error || !data) return { besteed: 0, onbekend: 0 };
+    //
+    // ── GEPAGINEERD ───────────────────────────────────────────────────────────
+    //
+    // Eén query levert hooguit 1000 rijen (de PostgREST-cap). Bij zeventig klanten met weekly,
+    // biweekly en monthly per kanaal is dat binnen een maand overschreden, en dan telde de som te
+    // laag en blokkeerde het plafond te laat. alleRijen pagineert op id; een leesfout blijft hier
+    // bewust "niet blokkeren" (zie de functiekop), dus de worp van alleRijen gaat naar de catch.
+    const { rijen, afgekapt } = await alleRijen<{ cost_eur: number | null }>(
+      (van, tot) => {
+        let q = supabase.from("llm_usage").select("cost_eur").gte("created_at", maandStart(nu));
+        if (agencyId) q = q.eq("agency_id", agencyId);
+        return q.order("id", { ascending: true }).range(van, tot);
+      },
+      "llm_usage (maandverbruik)",
+      { max: 200_000 },
+    );
+    if (afgekapt) console.error("[uitgavenplafond] meer dan 200.000 llm_usage-rijen deze maand; de som is onvolledig");
     let besteed = 0;
     let onbekend = 0;
-    for (const r of data as Array<{ cost_eur: number | null }>) {
+    for (const r of rijen) {
       if (r.cost_eur == null) onbekend++;
       else besteed += Number(r.cost_eur) || 0;
     }

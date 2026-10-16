@@ -40,6 +40,9 @@ registreert elke toegepaste migratie met checksum in schema_migrations.
   van 001 naar het rechtenmodel (admin, performance_marketeer, beurs_manager,
   brand_strateeg, it, viewer) en voegt user_clients toe: welke beurs iemand mag zien.
   Levert ook app_can_read_client(), de bouwsteen voor de scope-policies bij 017.
+- 108 claim_generation_job_afgeschermd: NOG NIET GEDRAAID, wacht op akkoord van de eigenaar.
+  Trekt EXECUTE op claim_generation_job in voor anon en authenticated (alleen de action-queue
+  roept hem aan, met service_role). Tot hij gedraaid is staat de poort rpc-rechten terecht rood.
 
 ## De volgorde bij de O1-deploy
 

@@ -364,6 +364,12 @@ export async function runStep(opts: {
   stepName: string;
   /** Request JSON mode for structured output steps */
   jsonMode?: boolean;
+  /**
+   * Plafond voor de uitvoer, als de standaard (8192 in JSON-modus, 4096 anders, 16000 bij een
+   * laag met reasoning-budget) te krap is. Een hoger plafond kost alleen iets als het model ook
+   * echt meer schrijft; een afgekapt antwoord kost de hele aanroep en laat de run mislukken.
+   */
+  maxTokens?: number;
   /** Optioneel: tilt jsonMode naar echte schema-afdwinging. Zie openrouter-client.ts. */
   jsonSchema?: { name: string; schema: Record<string, unknown> };
   /** W1.1: run-sleutel (jobId) voor de llm_usage-kostenregistratie; zonder runKey wordt niets gelogd. */
@@ -414,7 +420,7 @@ export async function runStep(opts: {
   // (masterplan 17.28 -- te weinig ruimte na de reasoning-reservering gaf lege content terug).
   const layer = opts.layer ?? (stepNumber === 13 ? "reasoning" : null);
   const reservesReasoningBudget = layer === "narrative" || layer === "strategic";
-  const stepMaxTokens = reservesReasoningBudget ? 16000 : (jsonMode ? 8192 : 4096);
+  const stepMaxTokens = opts.maxTokens ?? (reservesReasoningBudget ? 16000 : (jsonMode ? 8192 : 4096));
   const response = layer
     ? await callLayer(layer, {
         apiKey,
