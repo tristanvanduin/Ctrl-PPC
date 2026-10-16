@@ -443,10 +443,24 @@
      verwijderd van zowel `--kaart-leeg` (#191d25) als het paginavlak (#0f1115) -- een land met
      wat data en een land zonder data waren in het donker vrijwel niet te onderscheiden ("donker
      valt weg"). Een duidelijke stap lichter/blauwer gezet, zodat de eerste trede van de ramp
-     zichtbaar begint waar hij hoort te beginnen: net boven het kaartvlak, niet erin verstopt. */
-  --kaart-laag: #2a3348;
+     zichtbaar begint waar hij hoort te beginnen: net boven het kaartvlak, niet erin verstopt.
+
+     TWEEDE RONDE (feedback "in dark mode is het contrast net niet goed"): dezelfde klacht een
+     laag dieper. `--kaart-leeg` stond op #191d25 en het kaartvlak eronder is #171a21 -- een
+     contrastverhouding van 1,03. Dat is geen zwak verschil, dat is geen verschil: de landen
+     zonder data hadden effectief geen vorm, en dan zie je niet WAAR de kaart geen data heeft.
+     Nu 1,19 tegen het vlak: nog steeds rustig, maar de contouren staan er.
+
+     Daarmee moest de ramp mee omhoog, anders begint hij ónder het nieuwe grondniveau: een land
+     met een handvol conversies zou lichter zijn dan een land zonder data, en dat leest precies
+     verkeerd om. `--kaart-laag` van #2a3348 naar #36435f zet de eerste trede op 1,48 tegen leeg
+     -- een zichtbare stap, en de bovenkant van de ramp verandert niet, dus de bovenste landen
+     blijven staan waar ze stonden. */
+  --kaart-laag: #36435f;
   --kaart-hoog: #7ba6ff;
-  --kaart-leeg: #191d25;
+  --kaart-leeg: #232935;
+  /* De grens blijft de paginakleur en wordt geen lichte lijn: nu de landen zelf zichtbaar zijn,
+     doet een donkere scheiding het werk, en witte lijntjes zouden er weer een net van maken. */
   --kaart-rand: #0f1115;
   --kaart-hover: #ffffff;
   --preview-vlak: #e9ecf1;

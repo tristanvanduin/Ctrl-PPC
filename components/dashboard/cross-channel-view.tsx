@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Globe, Info, Layers, Loader2, TrendingUp, TriangleAlert } from "lucide-react";
+import { CalendarClock, Globe, Info, Layers, Loader2, Target, TrendingUp } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
+import { CampaignTypeSplit } from "./campaign-type-split";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
 import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
@@ -11,7 +12,18 @@ import { RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
 import { maandLabel } from "./chart-chrome";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Sectie } from "@/components/ui/sectie";
-import { GeoBreakdown } from "./geo-breakdown";
+import { GeoMapCard } from "./geo-map-card";
+import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
+import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
+import { KanaalHealthRanking } from "./kanaal-health-ranking";
+import { useBlendedClientData } from "@/lib/use-blended-client-data";
+import { computeForecast, type ForecastMetric } from "@/lib/forecast";
+import { FairWeeksView } from "./fair-weeks-overview";
+import { MetricCardsView } from "./metric-cards";
+import { PerformanceChartView } from "./performance-chart";
+import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
+import { BlendedPacing } from "./blended-pacing";
+import type { Kanaal } from "@/lib/kanalen/beschikbaar";
 
 // Cross-channel (blended) tab. Leest de blended_account_monthly-view over Google, Meta en
 // LinkedIn heen. De view levert de bouwstenen; de attributie-voetnoot is verplicht, want elk
@@ -49,8 +61,23 @@ function fmt(n: number | null): string {
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(n);
 }
 
-export function CrossChannelView({ clientId }: { clientId: string }) {
+export function CrossChannelView({ clientId, kanalen = [], edition }: {
+  clientId: string;
+  kanalen?: Kanaal[];
+  edition?: UpcomingEdition | null;
+}) {
   const [maandenOpen, toggleMaanden] = useRememberedOpen("cross-maanden", false);
+  // Eén hook-aanroep voor beide geo-kaarten: de kaart en de cijfers eronder delen dezelfde
+  // metric-keuze en dezelfde VS-drilldown. Twee aanroepen zouden twee losse states geven.
+  const geo = useGeoBreakdown({ clientId, channel: "blended" });
+  // De blended historie voedt zowel de beurs-sectie als het jaaroverzicht. Eén hook, één forecast:
+  // twee aanroepen zouden dezelfde route twee keer bevragen en twee keer dezelfde som uitrekenen.
+  const blended = useBlendedClientData(clientId);
+  const blendedForecast = useMemo(
+    () => (blended.data ? { data: blended.data, forecast: computeForecast(blended.data) } : null),
+    [blended.data],
+  );
+  const [jaaroverzichtMetric, setJaaroverzichtMetric] = useState<ForecastMetric>("conversions");
   const [rows, setRows] = useState<BlendedRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,8 +158,54 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
         titel="Markten"
         bijschrift="Waar het verkeer en de conversies vandaan komen, over alle kanalen samen"
       >
-        <GeoBreakdown clientId={clientId} channel="blended" />
+        {/* DEZELFDE TWEE KAARTEN ALS DE KANAALTABBLADEN, en niet meer GeoBreakdown.
+            GeoBreakdown is de oude, ongesplitste vorm: kaart links en ranglijst rechts in één
+            kaart, met een `max-w-6xl` (1152px) die op een scherm van 1920px gecentreerd in een
+            kaart van 1584px stond -- 216px wit aan weerszijden en een projectie van 760px in het
+            midden. Dat viel niet op zolang alle tabbladen zo waren; nu de kanaaltabbladen de
+            gesplitste vorm hebben (projectie plus balken in de kaart, cijfers in een eigen kaart
+            eronder) las het als "er is iets met de kaart gebeurd". Zelfde componenten, zelfde
+            volgorde, zelfde breedtegedrag. */}
+        {/* Dezelfde asymmetrische hero als de kanaaltabbladen: links de gezondheid, rechts de
+            wereldkaart, en de linkerkolom vangt het hoogteverschil op. Zie google-view.tsx voor
+            de volledige redenering achter de 1800px-grens. */}
+        <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+          <div className="flex flex-col gap-4">
+            <KanaalHealthRanking clientId={clientId} kanalen={kanalen} />
+            {/* De opvanger van deze kolom. Pacing hoort hier ook inhoudelijk: de rangschikking
+                zegt hoe gezond elk kanaal is, pacing zegt of het geheel op tempo ligt. */}
+            <div className="flex flex-1 flex-col">
+              <BlendedPacing rows={rows} />
+            </div>
+          </div>
+          <div className="flex flex-1 flex-col">
+            <GeoMapCard state={geo} channel="blended" verdieping={<GeoRanglijstInKaart state={geo} />} />
+          </div>
+        </div>
+
+        {/* Over de volle breedte: zes tegels naast elkaar vullen die breedte, in een halve kolom
+            stonden ze in twee rijen van drie met een lege onderhelft. */}
+        <div className="mt-4">
+          <GeoRanglijstCard state={geo} zonderBalken />
+        </div>
       </Sectie>
+
+      {/* DEZELFDE TWEE SECTIES ALS DE KANAALTABBLADEN, gevoed uit de blended historie.
+          "Waarom heeft alle kanalen deze sectie niet?" -- omdat FairWeeksOverview, MetricCards en
+          PerformanceChart hun data uit ClientDataProvider haalden, en die is Google-only. Alle
+          drie zijn nu gesplitst in een Google-ingang en een weergave die data + forecast als props
+          neemt; useBlendedClientData levert exact dezelfde twee vormen over Google, Meta en
+          LinkedIn samen, inclusief hetzelfde jaardoel-mechanisme (vorig jaar plus groei zolang er
+          niets is ingevoerd, zie lib/analysis/standaard-jaardoel.ts). */}
+      {blendedForecast && edition && (
+        <Sectie
+          icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Prestaties richting de beurs"
+          bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+        >
+          <FairWeeksView data={blendedForecast.data} forecast={blendedForecast.forecast} edition={edition} />
+        </Sectie>
+      )}
 
       {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
           vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
@@ -142,9 +215,55 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
         <Sectie
           icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
           titel="Verdeling over de kanalen"
-          bijschrift="Spend per kanaal per maand — welk kanaal draagt welk deel van het budget"
+          bijschrift="Spend per kanaal per maand en over de laatste 90 dagen"
         >
-          <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} />
+          {/* De staven en de ringen naast elkaar, want het zijn twee helften van dezelfde vraag:
+              de staven tonen het VERLOOP per maand, de ringen de VERDELING nu -- en de ringen ook
+              voor conversies, wat de staven niet doen. "Waarom heeft alle kanalen geen donuts?"
+              was terecht: de kaart bestond al (dezelfde die op Google onder "Spend per kanaal"
+              staat) en las hier alleen niemand.
+
+              Alleen de kanaal-uitsplitsing: campagnetype en campagnenaam komen uit
+              ads_campaign_monthly, en die tabel kent enkel Google-campagnes. Twee tabbladen die
+              een Google-verdeling tonen onder een kop die alle kanalen belooft, is precies de
+              soort halve waarheid die dit tabblad moet vermijden. */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+            <div className="lg:col-span-2">
+              <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} groeit />
+            </div>
+            <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} />
+          </div>
+        </Sectie>
+      )}
+
+      {blendedForecast && (
+        <Sectie
+          icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Jaaroverzicht"
+          bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend, over alle kanalen samen"
+        >
+          {/* Het voorbehoud hoort hier en niet alleen bij de tabel verderop: elk kanaal claimt
+              zijn eigen conversies met zijn eigen attributievenster, dus de blended som is een
+              BOVENGRENS, en een prognose die daarop rekent erft dat. Maar als voetnoot en niet in
+              alarmkleur: dit is hoe blended rekenen werkt, niet iets wat vandaag is misgegaan en
+              wat je kunt verhelpen. */}
+          <p className="text-meta leading-snug text-muted-foreground">
+            De conversies hieronder zijn de som over de kanalen, elk met zijn eigen
+            attributievenster: een bovengrens, geen exacte telling.
+          </p>
+          <MetricCardsView
+            clientId={clientId}
+            data={blendedForecast.data}
+            forecast={blendedForecast.forecast}
+            selected={jaaroverzichtMetric}
+            onSelect={setJaaroverzichtMetric}
+          />
+          <PerformanceChartView
+            clientData={blendedForecast.data}
+            forecast={blendedForecast.forecast}
+            metric={jaaroverzichtMetric}
+            onMetricChange={setJaaroverzichtMetric}
+          />
         </Sectie>
       )}
 
@@ -321,23 +440,25 @@ export function CrossChannelView({ clientId }: { clientId: string }) {
 
           {/* De twee voorbehouden, naast de cijfers waar ze over gaan. */}
           <aside className="flex flex-col gap-3 lg:col-span-4">
-            {betrouwbaarheid && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-meta leading-snug text-amber-900">
-                <p className="mb-1 flex items-center gap-1.5 font-semibold">
-                  <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
-                  Dubbeltelling
-                </p>
-                Over de laatste {chartMonths.length} maanden claimen de kanalen samen{" "}
-                <strong>{fmt(betrouwbaarheid.blendedSum)} conversies</strong>. {betrouwbaarheid.detail}
-              </div>
-            )}
+            {/* EEN NEUTRAAL BLOK, GEEN AMBER WAARSCHUWING. Hier stonden er twee die hetzelfde
+                zeiden: "Dubbeltelling" in alarmkleur en "Waarom blended indicatief is" in grijs.
+                Het eerste stond er ALTIJD -- overlappende attributie is geen incident maar hoe
+                blended rekenen werkt. Een waarschuwing die nooit weggaat leert je de kleur
+                negeren, en daarmee ook de waarschuwing die er wel toe doet. Het cijfer blijft
+                staan, de alarmkleur niet. */}
             <div className="rounded-lg border border-border bg-gray-50/70 px-4 py-3 text-meta leading-snug text-muted-foreground">
               <p className="mb-1 flex items-center gap-1.5 font-semibold text-brand-gray">
                 <Info className="h-3.5 w-3.5 shrink-0" />
                 Waarom &quot;blended&quot; indicatief is
               </p>
-              Elk kanaal meet zijn eigen attributie, dus de som is geen exacte verdeling. Bedragen
-              alleen optellen over kanalen met gelijke valuta.
+              Elk kanaal meet zijn eigen attributie, dus de som is geen exacte verdeling: dezelfde
+              aankoop kan door twee kanalen geclaimd zijn.
+              {betrouwbaarheid && (
+                <> Over de laatste {chartMonths.length} maanden claimen de kanalen samen{" "}
+                <strong className="text-brand-gray">{fmt(betrouwbaarheid.blendedSum)} conversies</strong>;
+                dat is een bovengrens.</>
+              )}{" "}
+              Bedragen alleen optellen over kanalen met gelijke valuta.
             </div>
             {/* De weggevallen kolom, één keer uitgelegd in plaats van zes keer een streepje.
                 Zie de opmerking bij `heeftWaarde` hierboven. */}

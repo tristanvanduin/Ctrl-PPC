@@ -50,7 +50,7 @@ export function GeoRanglijstCard({ state, zonderBalken = false }: { state: GeoBr
     // niets toe. In een flex-KOLOM (de Google-hero) zou het wél iets doen, en precies het
     // verkeerde: dan rekt élke kaart in de kolom mee en heeft de aangewezen opvanger niets meer
     // op te vangen. Zie google-view.tsx voor waarom er per kolom precies één opvanger is.
-    <div className="@container bg-card flex flex-col rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="@container bg-card flex h-full flex-col rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <ListOrdered className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{metric.label} per {geoWord}</h3>

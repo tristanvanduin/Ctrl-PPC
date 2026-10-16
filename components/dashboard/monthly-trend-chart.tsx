@@ -7,7 +7,7 @@ import { categoricalColor, CHART_LINE_SECONDARY } from "@/lib/branding/chart-col
 import {
   Raster, AsX, AsY, Tip, Legenda, PLOT_MARGE,
   BALK_RADIUS, BALK_GAP, GROEP_GAP,
-  kortEuro, kortEuroLabel, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte,
+  kortEuro, kortEuroLabel, volledigEuro, volledigGetal, maandLabel, asSchaal, asSchaalLijn, balkBreedte, BALK_MAX,
   PLOT_MARGE_LABELS, PLOT_MARGE_WAARDEN, PLOT_MARGE_EIND, plotBreedte,
   BalkVerloop, VlakWas, verloopId, type LegendaItem,
 } from "./chart-chrome";
@@ -235,12 +235,16 @@ function SerieNaam({ x, y, width, index, naam, laatste }: LabelProps & { naam: s
 // Gegroepeerde maandbalken per serie (bijv. spend per kanaal): categorische vergelijking, dus het
 // gevalideerde categorische palet (kleurenblind-veilig, merk-onafhankelijk).
 
-export function GroupedMonthlyBars({ title, months, series, data, height = 260 }: {
+export function GroupedMonthlyBars({ title, months, series, data, height = 260, groeit = false }: {
   title: string;
   months: string[];
   series: string[];
   data: Record<string, number | string>[];
   height?: number;
+  /** Vul de hoogte van de rastercel in plaats van `height` aan te houden. Voor als deze kaart
+   *  naast een hogere staat: een staafgrafiek WORDT beter van meer hoogte, dus dan is meegroeien
+   *  beter dan een gat eronder. Zelfde afspraak als `groeit` in monthly-trend-bars.tsx. */
+  groeit?: boolean;
 }) {
   if (months.length < 1 || series.length === 0) return null;
 
@@ -291,7 +295,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
     .map((x) => ({ ...x, maand: maandLabel(String(data[x.vanaf].maand ?? "")) }));
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className={`bg-card rounded-xl border border-border shadow-sm overflow-hidden ${groeit ? "flex h-full flex-col" : ""}`}>
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{title}</h3>
@@ -301,16 +305,18 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
       {/* Plot links, de cijfers ertegenaan — dezelfde indeling als MonthlyTrendChart hierboven,
           en om dezelfde reden.
 
-          De plot is zo breed als zijn data (zie plotBreedte). Bij zes maanden bleef er ruim een
-          derde kaart over, en die stond leeg: een grafiek die in witruimte zweeft leest als een
-          kaart die niet af is, hoe netjes de balken zelf ook zijn. Dat was ook de terugkoppeling
-          -- "straalt geen premium uit" ging niet over de marks maar over de leegte eromheen.
-
           Wat er rechts staat is geen opvulling maar de vraag die deze grafiek oproept en niet
           beantwoordt: hoeveel draagt elk kanaal nou eigenlijk? Dat tel je niet op uit achttien
           balkjes. Het kleurblokje bindt de regel aan zijn balken. */}
-      <div className="flex items-stretch">
-      <div className="min-w-0 flex-1 px-3 py-4" style={{ height, maxWidth: plotBreedte(data.length) }}>
+      <div className={`flex items-stretch ${groeit ? "flex-1" : ""}`}>
+      {/* GEEN plafond op de plotbreedte hier, anders dan bij MonthlyTrendChart hierboven.
+          plotBreedte() rekent 130px per categorie; bij zes maanden is dat 852px in een kaart van
+          1584px, dus bleef er ruim 500px leeg tussen de plot en de cijferkolom -- "waarom is dit
+          zo extreem leeg". Het plafond bestaat om te voorkomen dat balken absurd breed worden bij
+          weinig categorieen, maar dat regelt recharts hier zelf: zonder vaste `barSize` verdeelt
+          hij elke maandgroep over de beschikbare band, met `barCategoryGap` als lucht ertussen.
+          De balken worden dus dikker in plaats van dat de kaart leger wordt. */}
+      <div className="min-w-0 flex-1 px-3 py-4" style={groeit ? undefined : { height }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={PLOT_MARGE_LABELS} barCategoryGap={GROEP_GAP} barGap={BALK_GAP}>
             <Raster />
@@ -319,7 +325,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260 }
             <Tip formatter={volledigEuro} />
             {series.map((s, i) => <BalkVerloop key={`v-${s}`} id={verloopId(s, i)} kleur={kleurVan(i)} />)}
             {series.map((s, i) => (
-              <Bar key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} filter={`url(#${verloopId(s, i)}-gloed)`} radius={BALK_RADIUS} barSize={balkBreedte(data.length * series.length)}>
+              <Bar key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} filter={`url(#${verloopId(s, i)}-gloed)`} radius={BALK_RADIUS} maxBarSize={BALK_MAX}>
                 {/* Alleen de grootste serie draagt een naam, boven zijn laatste balk. Zie
                     `grootsteSerie` hierboven voor waarom het er één is en niet drie. */}
                 {s === grootsteSerie && (

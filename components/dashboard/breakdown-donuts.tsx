@@ -257,11 +257,23 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
         </div>
       </div>
 
-      {/* De scheefheid eerst: dat is waarom deze kaart bestaat. */}
+      {/* De scheefheid eerst: dat is waarom deze kaart bestaat.
+
+          HET VLAK IS NEUTRAAL, DE REGEL DRAAGT DE TOON. Dit blok stond op een amber vlak, ook als
+          de enige bevinding was dat een segment het juist góéd doet -- "Dit segment trekt het
+          account" in alarmkleur. En op een account met een scheve verdeling (die is er bijna
+          altijd, dat is normaal) stond het er elke dag. Nu zegt een stip per regel wat voor soort
+          bevinding het is: amber als een segment meer kost dan het oplevert, groen als het het
+          account trekt. Zo blijft het signaal staan zonder dat de kaart permanent alarm slaat. */}
       {scheefheid.length > 0 && (
-        <div className="px-5 py-3 border-b border-border bg-amber-50/50 space-y-1">
+        <div className="px-5 py-3 border-b border-border bg-muted/40 space-y-1">
           {scheefheid.slice(0, 2).map(({ slice, kind }) => (
-            <p key={slice.networkType} className="text-body text-brand-gray">
+            <p key={slice.networkType} className="text-body text-brand-gray flex items-start gap-2">
+              <span
+                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${kind === "duur" ? "bg-amber-500" : "bg-green-500"}`}
+                aria-hidden
+              />
+              <span>
               <strong>{slice.label}</strong>{" "}
               {kind === "duur" ? (
                 <>krijgt {pct(slice.costShare)} van het budget maar levert {pct(slice.conversionShare)} van de {conversieWoord}
@@ -272,6 +284,7 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
                   {slice.cpa != null && <> (kosten per {conversieWoord === "leads" ? "lead" : "conversie"} {eur(slice.cpa)})</>}.
                   Dit segment trekt het account.</>
               )}
+              </span>
             </p>
           ))}
         </div>

@@ -2,9 +2,8 @@
 
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { FairWeeksView } from "./fair-weeks-overview";
-import { useChannelForecast } from "./channel-forecast-overview";
+import { useKanaalData } from "./channel-data-provider";
 import { Laadvlak } from "@/components/ui/laadvlak";
-import type { ChannelKind } from "./channel-performance";
 
 // "Prestaties richting de beurs" voor Meta en LinkedIn.
 //
@@ -18,12 +17,8 @@ import type { ChannelKind } from "./channel-performance";
 // Geen countryFilter-prop: die filtert Google's dagdata per land (useCountryFilteredData), en dat
 // pad bestaat voor Meta en LinkedIn niet. Zodra het er is, hoort hij hier ook.
 
-export function ChannelFairWeeks({ clientId, channel, edition }: {
-  clientId: string;
-  channel: ChannelKind;
-  edition: UpcomingEdition;
-}) {
-  const gebouwd = useChannelForecast(clientId, channel);
+export function ChannelFairWeeks({ edition }: { edition: UpcomingEdition }) {
+  const { forecast: gebouwd } = useKanaalData();
 
   if (gebouwd === null) return <Laadvlak vorm="grafiek" hoogte={280} titel="Weken tot het event" />;
   // Geen dagcijfers gesynced: niets tonen in plaats van een leeg weekraster. Zelfde keuze als

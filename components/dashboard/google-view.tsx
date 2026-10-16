@@ -240,19 +240,16 @@ export function GoogleView({
             </div>
           </div>
 
-          {/* DRIE GRAFIEKKAARTEN OP EEN RIJ. Alle drie tonen een verdeling of een verloop, en dat
-              is precies waarom ze samen een rij kunnen zijn zonder dat er iets uitgerekt hoeft te
-              worden: een lijn en een staafreeks WORDEN beter van meer hoogte (hun grafiekvlak is
-              `flex-1`), dus als de donut ernaast hoger uitvalt, vullen ze dat met een grotere
-              grafiek in plaats van met wit. Bij een tegelkaart of een tekstblok kan dat niet, en
-              dat is het verschil tussen "opvullen" en "uitrekken". */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
-            <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
-            <CampaignTypeSplit clientId={clientId} />
-          </div>
-
+          {/* De landencijfers direct onder de hero: ze horen bij de wereldkaart erboven ("waar
+              komt het vandaan" / "wat leverde het per land op"), en stonden een scherm verderop. */}
           <GeoRanglijstCard state={geo} zonderBalken />
+
+          {/* DE BEURS-SECTIE BOVEN DE GRAFIEKENRIJ, HET JAAROVERZICHT ERONDER. De beurs draagt de
+              vraag van het tabblad -- lopen we op schema -- en die stel je als eerste. De
+              grafiekkaarten eronder tonen het verloop en de verdeling, en het jaaroverzicht sluit
+              af met waar dat het jaar brengt; die twee horen bij elkaar en bij het detailwerk dat
+              daaronder doorloopt. Dezelfde volgorde op alle vier de tabbladen, zodat een tabwissel
+              niets verplaatst. */}
 
           <Sectie
             icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -269,6 +266,18 @@ export function GoogleView({
               ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} />
               : <MonthlyOverview clientId={clientId} countryFilter={countryFilter} />}
           </Sectie>
+
+          {/* DRIE GRAFIEKKAARTEN OP EEN RIJ. Alle drie tonen een verdeling of een verloop, en dat
+              is precies waarom ze samen een rij kunnen zijn zonder dat er iets uitgerekt hoeft te
+              worden: een lijn en een staafreeks WORDEN beter van meer hoogte (hun grafiekvlak is
+              `flex-1`), dus als de donut ernaast hoger uitvalt, vullen ze dat met een grotere
+              grafiek in plaats van met wit. Bij een tegelkaart of een tekstblok kan dat niet, en
+              dat is het verschil tussen "opvullen" en "uitrekken". */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+            <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
+            <CampaignTypeSplit clientId={clientId} />
+          </div>
 
           <Sectie
             icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}

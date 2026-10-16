@@ -12,7 +12,8 @@ import {
 import { useState } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { actieveMetrics, computeForecast, ForecastMetric, MONTH_LABELS } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, ForecastMetric, MONTH_LABELS, type ClientForecast } from "@/lib/forecast";
+import type { ClientHistoricalData } from "@/lib/types";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
@@ -39,11 +40,36 @@ function formatYAxis(metric: ForecastMetric) {
 type ViewMode = "weekly" | "monthly";
 type CoreMetric = "conversions" | "revenue" | "adSpend";
 
-export function PerformanceChart({ clientId, countryFilter, metric: metricProp, onMetricChange }: {
+/**
+ * De Google-ingang. Gesplitst om dezelfde reden als MetricCards en FairWeeksOverview: "Alle
+ * kanalen" krijgt dezelfde grafiek, gevoed uit de blended historie.
+ */
+export function PerformanceChart({ clientId, countryFilter, metric, onMetricChange }: {
   clientId: string;
   countryFilter?: string | null;
   /** Optioneel: laat een ouder (bv. de klikbare Jaaroverzicht-kaartjes) de metric-keuze delen.
    *  Zonder deze props beheert de grafiek zijn eigen selectie, zoals voorheen. */
+  metric?: ForecastMetric;
+  onMetricChange?: (metric: ForecastMetric) => void;
+}) {
+  const fullData = useClientHistoricalData(clientId);
+  const clientData = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
+  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
+  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  const gedeeld = useForecast();
+  return (
+    <PerformanceChartView
+      clientData={clientData}
+      forecast={gedeeld ?? computeForecast(clientData)}
+      metric={metric}
+      onMetricChange={onMetricChange}
+    />
+  );
+}
+
+export function PerformanceChartView({ clientData, forecast, metric: metricProp, onMetricChange }: {
+  clientData: ClientHistoricalData;
+  forecast: ClientForecast;
   metric?: ForecastMetric;
   onMetricChange?: (metric: ForecastMetric) => void;
 }) {
@@ -54,12 +80,6 @@ export function PerformanceChart({ clientId, countryFilter, metric: metricProp, 
   const [showYoY, setShowYoY] = useState(false);
   const { theme } = useBrandTheme();
 
-  const fullData = useClientHistoricalData(clientId);
-  const clientData = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
-  // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
-  // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
-  const gedeeld = useForecast();
-  const forecast = gedeeld ?? computeForecast(clientData);
   const result = forecast[metric];
 
   // Previous year data for YoY overlay

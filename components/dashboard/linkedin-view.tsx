@@ -16,6 +16,7 @@ import { ChannelHealthBadge } from "./channel-health-badge";
 import { ChannelPacing } from "./channel-pacing";
 import { ChannelMonthlyChart } from "./channel-monthly-chart";
 import { ChannelFairWeeks } from "./channel-fair-weeks";
+import { ChannelDataProvider } from "./channel-data-provider";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
@@ -47,6 +48,10 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
   // en VS-drilldown-state (zelfde patroon als Google 17.36 en Meta 17.38).
   const geo = useGeoBreakdown({ clientId, channel: "linkedin" });
   return (
+    // Eén provider om alle kaarten heen: pacing, maandverloop, de beurs-sectie en het
+    // jaaroverzicht lezen allemaal dezelfde dagrijen en dezelfde forecast. Zie
+    // channel-data-provider.tsx voor wat er zonder gebeurde.
+    <ChannelDataProvider clientId={clientId} channel="linkedin">
     <div className="space-y-6">
       <ChannelViewHeader
         icon={<Briefcase className="w-5 h-5 text-brand-blue-ink" />}
@@ -108,7 +113,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           {/* Pacing direct onder Account Health, net als op Google en Meta, en tegelijk de
               opvanger van deze kolom. */}
           <div className="flex flex-1 flex-col">
-            <ChannelPacing clientId={clientId} channel="linkedin" edition={edition} />
+            <ChannelPacing edition={edition} />
           </div>
         </div>
         <div className="flex flex-1 flex-col">
@@ -120,15 +125,8 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           onafhankelijke kolommen -- zie meta-view.tsx voor de redenering. LinkedIn heeft hier maar
           twee kaarten: alleen MEMBER_JOB_FUNCTION heeft demografiedata (nagemeten in
           linkedin_demographic_daily), dus een tweede doelgroep-donut zou leeg zijn. */}
-      {/* LinkedIn heeft maar één ringkaart (alleen MEMBER_JOB_FUNCTION is gevuld; leeftijd en
-          gender levert LinkedIn niet), dus staat de landenkaart ernaast in plaats van een tweede
-          ring. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
-        <GeoRanglijstCard state={geo} zonderBalken />
-      </div>
-
-      <ChannelMonthlyChart clientId={clientId} channel="linkedin" />
+      {/* Zelfde volgorde als Google en Meta: hero, landencijfers, dan de kaartenrij. */}
+      <GeoRanglijstCard state={geo} zonderBalken />
 
       {/* "Prestaties richting de beurs" -- de sectie die Google al had en deze kanalen niet.
           Alleen als er een event gekozen is; zonder event is "nog N weken tot" een lege zin.
@@ -139,9 +137,28 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           titel="Prestaties richting de beurs"
           bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
         >
-          <ChannelFairWeeks clientId={clientId} channel="linkedin" edition={edition} />
+          <ChannelFairWeeks edition={edition} />
         </Sectie>
       )}
+
+      {/* Twee in plaats van drie: LinkedIn levert alleen MEMBER_JOB_FUNCTION als doelgroepdata
+          (leeftijd en gender komen er niet uit), dus er is geen tweede ringkaart om naast te
+          zetten. Een lege derde kolom zou beloven dat die data er wel is. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
+        <ChannelMonthlyChart />
+      </div>
+
+      {/* LinkedIn-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde
+          toelichting als bij Meta: computeForecast is al kanaalneutraal, dit levert alleen de
+          LinkedIn-databron en het client_targets-jaardoel. Zie channel-forecast-overview.tsx. */}
+      <Sectie
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Jaaroverzicht 2026"
+        bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+      >
+        <ChannelForecastOverview />
+      </Sectie>
 
       {/* Wat er van de prestatie-view overblijft: de kerncijfers over 28 dagen en de maandtabel.
           Pacing staat nu in de hero en het maandverloop naast de landencijfers -- allebei
@@ -154,17 +171,6 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} />
       </Sectie>
 
-      {/* LinkedIn-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde
-          toelichting als bij Meta: computeForecast is al kanaalneutraal, dit levert alleen de
-          LinkedIn-databron en het client_targets-jaardoel. Zie channel-forecast-overview.tsx. */}
-      <Sectie
-        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Jaaroverzicht 2026"
-        bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
-      >
-        <ChannelForecastOverview clientId={clientId} channel="linkedin" />
-      </Sectie>
-
       {/* LinkedIn-equivalent van Google's "Waar het budget landt" (23 augustus 2026) -- alleen het
           campagne-niveau videodeel, zelfde toelichting als bij Meta. */}
       <Sectie
@@ -175,6 +181,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         <ChannelVideoPerformance clientId={clientId} channel="linkedin" />
       </Sectie>
     </div>
+    </ChannelDataProvider>
   );
 }
 

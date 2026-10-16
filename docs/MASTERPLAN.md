@@ -8391,3 +8391,282 @@ conversie" tellen.
 **Opgeruimd:** "Maandprestaties" stond twee keer op het scherm (de sectiekop en de maandtabel
 erbinnen); de tabel heet nu "Per maand", en het bijschrift van de sectie klopt weer nu pacing en
 maandverloop eruit zijn.
+
+### 17.121 Vier losse kaarten, vier keer dezelfde query (24 augustus 2026)
+
+Een schermafdruk van het Meta-tabblad met de beurs-sectie nog op zijn skelet. Nagemeten in de
+browser: **54 data-verzoeken per paginabezoek**, waarvan `meta_account_daily` **elf keer** en
+`client_targets` vier keer — allemaal dezelfde rijen.
+
+Dat is mijn eigen werk van de vorige twee entries. Toen pacing, het maandverloop en de beurs-sectie
+losse kaarten werden, kreeg elke kaart zijn eigen ophaalcode: `ChannelPacing` (70 dagen),
+`ChannelMonthlyChart` (200 dagen), `ChannelFairWeeks` (volle historie), `ChannelForecastOverview`
+(volle historie) en `ChannelPerformance` (200 dagen plus campagnes). Losse kaarten zijn goed;
+losse fetches per kaart zijn dat niet.
+
+`ChannelDataProvider` haalt het nu één keer op — dagrijen, conversie-selectie en doelen — en bouwt
+de forecast één keer. Alle vier de kaarten lezen mee. Google doet dit al zo (ClientDataProvider +
+ForecastContext); dit is de tegenhanger voor Meta en LinkedIn.
+
+**Gemeten na afloop:** 54 → 22 verzoeken, en de beurs-sectie staat binnen zes seconden op zijn
+cijfers in plaats van na twintig seconden nog op zijn skelet. Wat er nog dubbel staat is
+StrictMode (dev verdubbelt elk effect) plus `ChannelPerformance`, dat naast de accountrijen ook
+campagnerijen en -namen nodig heeft; in productie is `meta_account_daily` twee verzoeken in plaats
+van elf.
+
+**En de volgorde is nu op alle drie de tabbladen dezelfde.** Google, Meta en LinkedIn hadden er
+elk een andere, en dan moet je bij elke tabwissel opnieuw zoeken waar iets staat:
+
+1. hero — Account Health met Pacing eronder, naast de wereldkaart
+2. Conversies per land, over de volle breedte (hoort bij de kaart erboven: "waar komt het vandaan"
+   en "wat leverde het per land op" is één vraag in twee kaarten)
+3. een rij grafiek- en diagramkaarten — Google drie (CPA-lijn, maandstaven, campagnetype-ringen),
+   Meta drie (levering, doelgroep, maandverloop), LinkedIn twee
+4. Prestaties richting de beurs
+5. Maandprestaties en Jaaroverzicht
+
+LinkedIn heeft er twee in plaats van drie omdat LinkedIn alleen `MEMBER_JOB_FUNCTION` als
+doelgroepdata levert; een lege derde kolom zou beloven dat leeftijd en gender er wel zijn.
+
+### 17.122 Een rangschikking in plaats van een blended score (24 augustus 2026)
+
+"Moeten we anders niet een algemene accounthealth nemen en die naast de wereldkaart zetten zodat
+alles uniform is? Ook alle kanalen?"
+
+**Eerst wat er met die kaart gebeurd was.** Niets — en dat is de pointe. `git diff` bevestigde dat
+ik `geo-breakdown.tsx` niet had aangeraakt. "Alle kanalen" gebruikte nog de ÓÚDE, ongesplitste vorm:
+kaart links en ranglijst rechts in één kaart, met een `max-w-6xl` (1152px) die op een scherm van
+1920px gecentreerd stond in een kaart van 1584px — 216px wit aan weerszijden en een projectie van
+760px in het midden. Dat viel niet op zolang alle tabbladen zo waren. Nu de kanaaltabbladen de
+gesplitste vorm hebben (projectie plus balken in de kaart, cijfers in een eigen kaart eronder) las
+het als "er is iets met de kaart gebeurd". `GeoBreakdown` is verwijderd; "Alle kanalen" gebruikt nu
+dezelfde `GeoMapCard` en `GeoRanglijstCard` als de rest.
+
+**En toen de vraag die ik niet zelf kon beantwoorden.** Een blended Account Health moet ergens
+tegenaan meten, en `client_targets` is voor deze klanten leeg: Meta en LinkedIn hebben geen enkel
+jaardoel (daarom zegt hun beurs-sectie ook "geen jaardoel ingesteld"), en Google's doelen komen uit
+een ander pad. Drie voorstellen voorgelegd — alleen de gemeten assen, Google's doel als anker, of
+eerst een doelen-scherm bouwen — en de eigenaar kwam met een vierde die beter is dan alle drie:
+**"Waarom niet gewoon een health score die de health scores van de kanalen weergeeft? Een ranking
+voor google, meta, linkedin, later bing, tiktok, snapchat, chatgpt, etc."**
+
+Dat omzeilt het probleem in plaats van het op te lossen, en dat is hier precies goed: een
+rangschikking hoeft nergens tegenaan te meten. Elk kanaal wordt beoordeeld tegen zijn eigen
+maatstaf — exact zoals op zijn eigen tabblad — en naast elkaar zetten beantwoordt de vraag die je
+op "Alle kanalen" stelt: waar zit de zwakke plek.
+
+`kanaal-health-ranking.tsx` toont per kanaal de score-ring, de zwakste beoordeelde factor, de vijf
+factoren als staafjes op een gedeelde schaal, en de zwaarste anomalie. Gemeten in de demo: Google
+Ads 88, Meta 55, LinkedIn 20 — en de staafjes laten zien dat Meta en LinkedIn allebei op Trend
+vastlopen terwijl Meta's Efficiency nog op 16/20 staat. Dát is wat een rangschikking bruikbaar
+maakt: twee kanalen met een andere score kunnen op dezelfde as zwak zijn, en twee met dezelfde
+score op verschillende.
+
+Drie dingen die de eerlijkheid bewaken:
+
+- **Google krijgt dezelfde hygiëne-correctie als de rest.** `zonderKanaalSpecifiekeHygiene` zet die
+  factor op "niet beoordeeld", want de Google-specifieke argumenten (impressionShare, zoektermen,
+  ad groups) zijn hier niet beschikbaar en `computeHealthScore` zou de factor dan stilzwijgend vol
+  punten geven. Zonder die correctie scoort Google hoger dan de rest om een reden die niets met het
+  account te maken heeft.
+- **Geen balk bij een niet-beoordeelde factor.** Een balk op nul leest als "score nul" terwijl er
+  niet gemeten is.
+- **Kanalen zonder cijfer onderaan.** Een onbekende score is geen nul, maar hij hoort ook niet
+  tussen de beoordeelde kanalen in te dringen.
+
+**Uitbreiden naar Bing, TikTok en de rest** is drie regels per kanaal: een `useChannelForecast`-
+aanroep met `enabled` op de beschikbaarheid en een regel in de opbouw. De hooks staan bewust plat
+naast elkaar en niet in een lus — een hook mag niet voorwaardelijk aangeroepen worden, en een
+dynamische lijst zou een component per kanaal vragen dat zijn score naar boven rapporteert. Dat is
+meer machinerie dan het probleem groot is.
+
+**Gemeten hoogtes op 1920px:** rangschikking 454 + landencijfers 383 = 853, wereldkaart 853. De
+landencijfers zijn de opvanger van die kolom en niet de rangschikking: zes tegels die in wat meer
+hoogte gecentreerd staan lezen als ruimte, terwijl drie kanaalregels die 200px uit elkaar getrokken
+worden als een gat lezen — dat was de eerste versie, en die zag er precies zo uit.
+
+**En daarna: "waar is de hexagon ding?"** De eerste versie toonde per kanaal alleen een ring en
+staafjes — de radar van het kanaaltabblad was weg. Terecht gemist, en de oplossing is beter dan
+teruggeven wat er stond: één radar met een polygoon PER KANAAL, over elkaar heen op dezelfde vijf
+assen. Drie losse vijfhoeken naast elkaar vergelijk je namelijk niet; dan kijk je per as heen en
+weer tussen drie figuren. Over elkaar heen is de vergelijking zelf de vorm — waar de lijnen uit
+elkaar lopen zit het verschil.
+
+De lijnkleur is met opzet NIET de statuskleur (groen/oranje/rood): die zit al in de ring en het
+cijfer ernaast, en met drie polygonen over elkaar moet de kleur zeggen wélk kanaal je ziet. Een
+kleurstip voor de kanaalnaam koppelt de regel aan zijn polygoon; zonder die koppeling is een radar
+met drie lijnen drie anonieme vormen. De geometrie komt uit dezelfde `lib/health-radar.ts` als de
+enkelvoudige radar — twee radars op hetzelfde scherm krijgen anders vroeg of laat een andere
+nulhoek of een andere schaal.
+
+**Wat er nog niet is: pacing op "Alle kanalen".** Ook gevraagd, en het antwoord is niet "vergeten"
+maar "kan nog niet eerlijk". Blended pacing zou "maand tot nu tegen vorige maand op dezelfde dag"
+moeten zijn, en dat vraagt DAGdata over alle kanalen samen. Die is er niet als één bron:
+`blended_account_monthly` is per maand (de lopende maand is dus partieel, en een partiële maand
+tegen een volle vergelijken is precies de fout die de kanaal-pacing vermijdt), en er is geen
+`blended_account_daily`. Meta en LinkedIn hebben elk een dagtabel, Google loopt via
+ClientDataProvider en niet via een leesbare dagtabel. Optellen kan dus wel, maar het is drie
+verschillende paden bij elkaar rapen — een eigen bouwstuk, geen kaartje erbij.
+
+
+### 17.123 Vijf terugmeldingen op "Alle kanalen", en een ring die de verkeerde vorm was (24 augustus 2026)
+
+**"Dit leest heel slordig, niet dan?"** — de rangschikking. Klopte: per kanaal een ring van 64px,
+de naam ernaast, en de vijf factoren daar weer naast, drie keer onder elkaar. Drie kolommen van
+verschillende hoogte per rij; dat las als een tabel die geen tabel is. Nu per kanaal een blokje met
+een kopregel (stip, naam, cijfer, zwakste factor, anomalie) en daaronder een vaste rij van vijf
+gelijke kolommen. Dezelfde vijf op dezelfde plek bij elk kanaal, dus je kunt verticaal vergelijken
+— en dat is het hele punt van een rangschikking.
+
+**"Waarom is dit geen pacing?"** — voor de tweede keer gevraagd, en de vorige keer had ik geantwoord
+dat het niet eerlijk kon. Dat antwoord was te smal. Het klopt dat maand-op-maand pacing dagdata over
+alle kanalen vraagt en die er niet is (`blended_account_monthly` is per maand, er is geen
+`blended_account_daily`, en Google heeft geen leesbare dagtabel). Maar pacing hoeft niet
+maand-op-maand te zijn: **het jaar tot nu tegen hetzelfde deel van vorig jaar** kan wél, met exact
+de data die dit tabblad toch al ophaalt. Beide kanten zijn even lang, en er is geen doel voor nodig
+— wat de kern was, want `client_targets` is leeg.
+
+De vergelijking loopt tot en met de laatste VOLLEDIG gemeten maand. De lopende maand is aan beide
+kanten anders ver, en meenemen zou de vergelijking scheeftrekken op precies het moment dat je ernaar
+kijkt.
+
+**En daar ging ik meteen de mist in met de vorm.** De eerste versie zette er twee ringen in, net als
+de kanaal-pacing. Resultaat: een volle ring met "255%" erin. Een ring codeert een DEEL VAN EEN
+GEHEEL — hij loopt van leeg naar vol en stopt daar. Deze verhouding heeft geen plafond, dus zei de
+ring niets meer dan "meer dan honderd". Nu staat het verschil er als getal (+68% / +155%) met beide
+absolute waarden eronder. Het verschil en niet de verhouding: "+68%" is wat je wilt weten, "168%"
+moet je zelf nog omrekenen, en bij een halvering leest "-50%" meteen goed waar "50%" dubbelzinnig is.
+
+**"Dit kan over de breedte van de pagina"** — de landencijfers stonden in een halve kolom met zes
+tegels in twee rijen van drie en een lege onderhelft. Nu over de volle breedte, zes naast elkaar.
+Pacing is de opvanger van die kolom geworden.
+
+**"Waarom is dit zo extreem leeg?"** — de gegroepeerde maandstaven. `plotBreedte()` rekent 130px per
+categorie; bij zes maanden is dat 852px in een kaart van 1584px, dus bleef er ruim 500px leeg tussen
+de plot en de cijferkolom. Dat plafond bestaat om te voorkomen dat balken absurd breed worden bij
+weinig categorieën, maar dat regelt recharts zelf: zonder vaste `barSize` (nu `maxBarSize`) verdeelt
+hij elke maandgroep over de beschikbare band. De balken worden dus dikker in plaats van dat de kaart
+leger wordt.
+
+**"Maak deze stappen kleiner zodat de CPA meer fluctueert"** — de CPA-lijn liep zes maanden tussen
+€66,80 en €68,10 op een as van €0 tot €75: kaarsrecht in beeld, terwijl er beweging in zit.
+
+Hier zit een regel achter die het waard is te noteren: **bij een balk of een vlak codeert de LENGTE
+de waarde, en die moet bij nul beginnen. Bij een lijn die een verhouding over tijd toont (CPA, ROAS,
+CTR) codeert alleen de hoogte-verándering iets** — dan is nul geen betekenisvol nulpunt maar een
+lege onderste helft. `asSchaalVenster()` legt de as om de data heen; `asSchaal`/`asSchaalLijn`
+blijven vanaf nul voor alles wat een magnitude toont.
+
+Twee dingen die daarbij misgingen en pas op de schermafdruk zichtbaar waren:
+
+1. `tickCount` is voor recharts een WENS, geen opdracht. Hij rondt zelf naar "mooie" waarden en rekt
+   het domein daarvoor desnoods op — de as kwam uit op 63, 66, 69, 72 én 73: vier gelijke stappen
+   met een vijfde streepje van één euro erbovenop. `AsY` accepteert nu een expliciete `ticks`-lijst.
+2. Een stap van 2,5 gaf streepjes op 62,5 / 65 / 67,5 met labels "€ 63", "€ 65", "€ 68" — een
+   rasterlijn met "€ 68" erop die in werkelijkheid op €67,50 ligt, want de as staat op
+   `allowDecimals={false}` en de formatter rondt af. 2,5 is uit de stapreeks gehaald: liever een
+   stap grover dan een label dat niet klopt.
+
+**Gemeten na afloop, kolomhoogtes op 1920px:** Google 765/765, Meta 794/794, LinkedIn 841/841, en
+geen enkele pagefout op de drie tabbladen.
+
+**Naschrift: één blended lijn in plaats van drie.** "Ik wil 1 blended lijn zien in de matrix. Niet
+3 lijnen." De drie polygonen waren leesbaar zolang ze uit elkaar lagen; bij vijf of tien kanalen
+wordt dat een kluwen, en de cijfers per kanaal staan er rechts toch al uitgesplitst naast. De radar
+zegt nu "hoe staat het account ervoor", de regels ernaast "en waar zit het verschil".
+
+Dat mag hier, terwijl een blended TOTAALCIJFER dat niet mag, en het verschil is precies aan te
+wijzen: **de factorscores zijn al genormaliseerd.** Elke as loopt van 0 tot 20 en is per kanaal
+tegen de eigen maatstaf bepaald. Middelen betekent dan "hoe staat het account er gemiddeld voor op
+deze as" — niet "meet alle spend tegen één doel", en dát was het bezwaar.
+
+Twee dingen die de gemiddelde lijn eerlijk houden:
+
+- **Een as telt alleen mee voor de kanalen die hem beoordeeld hebben.** Budget en Hygiëne staan
+  voor Meta en LinkedIn op "niet beoordeeld"; die als nul meenemen zou het gemiddelde omlaag
+  trekken om een reden die niets met de prestatie te maken heeft.
+- **De dekking staat in het aslabel** zodra niet elk kanaal die as meet: "Budget 1/3". Zonder dat
+  stond Budget op de volle 20 omdat alleen Google hem beoordeelt, en dan zegt de vorm "het budget
+  van dit account is perfect" terwijl dat een uitspraak over één van de drie kanalen is. De as
+  helemaal weglaten zou Google's budgetcijfer weggooien om een misverstand te vermijden; het erbij
+  zetten laat het cijfer staan en vertelt waar het vandaan komt.
+
+Het radar-component blijft meervoudig — dat kost niets en houdt de vergelijkingsvorm beschikbaar.
+
+
+### 17.124 De beurs-sectie op "Alle kanalen", en waarom Meta/LinkedIn er anders uitzien (24 augustus 2026)
+
+"Ligt het aan mij of zijn deze niet uniform? Die van Google vind ik de mooiste. Waarom heeft alle
+kanalen deze sectie niet?"
+
+**Het lag niet aan de gebruiker.** Google's beurs-sectie toont per week een verwachting, een ratio
+en een gekleurde balk; dezelfde sectie op Meta en LinkedIn toonde alleen het gerealiseerde. Bij het
+uitzoeken bleek er één oorzaak met twee heel verschillende helften.
+
+**De helft die een bug was.** `toFairWeeks` spreidt het jaardoel over de weken, dus zonder jaardoel
+is elke week "verwacht 0" en elke ratio 0%. Google heeft dat doel wél, en niet omdat er een doel is
+ingevoerd — `client_targets` is leeg — maar omdat zijn API-route een TERUGVAL kent: het laatst
+volledige jaar plus tien procent (spend plus vijf). Diezelfde terugval stond ook in
+`lib/api/blended-historical.ts`, los uitgeschreven. Op de derde plek, `buildChannelForecast` voor
+Meta en LinkedIn, stond hij niet en viel het doel op nul.
+
+Drie plekken, twee kopieën, één gat. De regel staat nu één keer in
+`lib/analysis/standaard-jaardoel.ts` en alle drie gebruiken hem. De terugval is per METRIC: een
+klant die alleen een conversiedoel invoert, hoort voor omzet en spend niet op nul te vallen — dat
+leest als "doel gehaald" terwijl er niets is ingevuld.
+
+**De helft die geen bug is.** Meta en LinkedIn tonen nog steeds geen ratio, en dat is correct: hun
+dagdata begint op **2026-03-13**. Er is geen 2025 om tien procent bovenop te doen. De terugval kan
+niets afleiden uit een jaar dat niet bestaat, en een verwachting verzinnen zou precies de fout zijn
+die de rest van dit hoofdstuk vermijdt. De sectie zegt dat ook ronduit: "geen jaardoel ingesteld
+voor dit kanaal, dus alleen het gerealiseerde". Zodra die kanalen een vol jaar historie hebben —
+of er een doel wordt ingevoerd — verschijnt de ratio vanzelf, zonder codewijziging.
+
+**En "Alle kanalen" heeft nu beide secties.** Ook daar was de oorzaak dezelfde soort koppeling als
+bij de beurs-sectie eerder: `MetricCards` en `PerformanceChart` haalden hun data uit
+`ClientDataProvider`, en die is Google-only. Alle drie de componenten zijn nu gesplitst in een
+Google-ingang en een weergave die `data` + `forecast` als props neemt. `useBlendedClientData`
+levert exact dezelfde twee vormen over Google, Meta en LinkedIn samen — inclusief hetzelfde
+jaardoel-mechanisme, en inclusief Google's 2025-historie, dus daar is de ratio er wél.
+
+Bij het blended jaaroverzicht staat een waarschuwing die bij de blended tabel al stond: elk kanaal
+claimt zijn eigen conversies met zijn eigen attributievenster, dus de som is een BOVENGRENS. Een
+prognose die daarop rekent erft dat, en dan hoort het erbij te staan — niet alleen bij de tabel
+twee secties verderop.
+
+**Gemeten op "Alle kanalen":** jaardoel 2.600 conversies, 79% gerealiseerd, prognose 3.431, en de
+weekkolommen tonen ratio's tussen 132% en 170%. Dezelfde vorm als Google, andere cijfers.
+
+**De test die meeveranderde.** `__channel_forecast_data_test.ts` had de oude uitkomst vastgelegd:
+"geen omzetdoel ingesteld: blijft 0". Die assertie is nu de nieuwe waarde (vorig jaar +10% = 9240
+op de fixture), en er staat een tweede geval bij dat de situatie van Meta en LinkedIn vastlegt:
+**zonder vorig jaar valt er ook niets terug te vallen** en blijft het doel nul. Dat tweede geval is
+het belangrijkste van de twee — het legt vast dat de terugval niets verzint als er niets is.
+
+
+## 17.121 Openstaand: wat als de klant niet naar een moment toe werkt? (25 augustus 2026)
+
+De beurs-sectie ("Prestaties richting de beurs") staat nu op alle vier de tabbladen bovenaan,
+direct onder de opener. Dat klopt voor een beursorganisatie: de beursdag is de mijlpaal waar
+alles naartoe rekent, en "nog drie weken" is dan de eerste vraag van de dag.
+
+**Maar niet elke klant werkt naar een moment toe.** Een webshop die het hele jaar door verkoopt
+heeft geen beursdag, en dan is een sectie die de hele breedte pakt om "nog N weken tot X" te
+zeggen niet alleen leeg maar misleidend prominent. Vandaag valt hij in dat geval terug op
+"Maandprestaties" (de Weken/Maanden-keuze in `google-view.tsx`), en op Meta en LinkedIn
+verschijnt hij helemaal niet zolang er geen editie gekozen is.
+
+Wat we hier nog moeten beslissen, op een rustiger moment:
+
+- Is "geen beurs" een **andere volgorde** (dan hoort het maandverloop bovenaan en zakt de
+  beurs-sectie weg) of een **andere sectie** (een periode-doel dat de klant zelf kiest:
+  kwartaal, campagneperiode, seizoen)?
+- Wie bepaalt dat? Nu is het impliciet: het bestaan van `rai_events` in `client_settings`. Een
+  expliciete keuze per klant ("wij sturen op beurzen / op kwartalen / op niets") is eerlijker dan
+  een lege lijst die toevallig hetzelfde effect heeft.
+- De drie tabbladen moeten dezelfde keuze volgen. De reden dat ze nu uniform zijn, is precies
+  dat een tabwissel niets mag verplaatsen; een klantafhankelijke volgorde mag dat niet stukmaken.
+
+Genoteerd op verzoek van de eigenaar, tijdens de ronde waarin de volgorde werd vastgezet:
+"wat doen we als het geen beurzen zijn en niet naar momenten toe werkt? Dan is die sectie niet
+belangrijk."
