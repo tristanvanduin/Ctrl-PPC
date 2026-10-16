@@ -39,12 +39,28 @@ export interface Datastand {
   laatsteGeslaagdeSync: string | null;
   dagenSindsSync: number | null;
   toestand: DatastandToestand;
+  /** Zie SYNC_DRAAIT_BINNEN_DAGEN: de data loopt achter, maar de sync slaagt wel. */
+  syncDraait: boolean;
   /** Eén zin voor het scherm en de foutmelding. */
   tekst: string;
 }
 
 /** Vanaf zoveel maanden achter is het geen ouderdom meer maar een sync die niet draait. */
 export const DOOD_VANAF_MAANDEN = 2;
+
+// ── Achter, maar de sync draait ──────────────────────────────────────────────
+//
+// "Achter" en "dood" zeiden altijd "de sync draait niet". Maar een account dat sinds juni
+// gepauzeerd staat, levert na juni geen rijen meer, ook als de sync elke nacht slaagt: dan stond
+// er een bureaubrede rode banner ("De Google-sync staat stil") voor een klant die gewoon geen
+// besteding heeft. De TOESTAND blijft hetzelfde -- er is geen data voor de analysemaand, dus de
+// blokkades (datastandBlokkade, dagstandBlokkade, kanaal-datapoort) blijven precies zo -- maar
+// `syncDraait` zegt erbij dat de oorzaak niet de sync is: de laatste geslaagde sync is hooguit
+// zoveel dagen oud (de nachtcron plus één gemiste nacht) en ligt NA de ontbrekende periode.
+// Het scherm toont zo'n stand gedempt, en samenvatDatastanden telt hem niet als stilstand --
+// behalve als ALLE klanten met data zo staan, want een sync die "slaagt" zonder dat er iets in
+// de views terechtkomt, moet zichtbaar blijven.
+export const SYNC_DRAAIT_BINNEN_DAGEN = 3;
 
 function maandTekst(m: string): string {
   const naam = formatMonth(m);
@@ -79,11 +95,14 @@ export function beoordeelDatastand(inp: {
     ? `laatste geslaagde sync ${sync.slice(0, 10)} (${dagenSindsSync} dagen geleden)`
     : "nog nooit een geslaagde sync geregistreerd";
 
+  // Na de verwachte maand: een sync op de laatste dagen van die maand zelf kon hem nog niet compleet zien.
+  const syncDraait = sync != null && dagenSindsSync != null && dagenSindsSync <= SYNC_DRAAIT_BINNEN_DAGEN && sync.slice(0, 7) > verwachteMaand;
+
   const ruw = inp.laatsteMaand ? String(inp.laatsteMaand).slice(0, 7) : null;
   if (!ruw || !isValidMonth(ruw)) {
     return {
       bron, laatsteMaand: null, dagenInLaatsteMaand: null, verwachteMaand, maandenAchter: null, laatsteGeslaagdeSync: sync, dagenSindsSync,
-      toestand: "geen", tekst: `Geen ${bron}-data gesynct; ${syncTekst}.`,
+      toestand: "geen", syncDraait: false, tekst: `Geen ${bron}-data gesynct; ${syncTekst}.`,
     };
   }
   const dagen = inp.dagenInLaatsteMaand ?? null;
@@ -91,13 +110,19 @@ export function beoordeelDatastand(inp: {
   const maandenAchter = Math.max(0, monthIndex(verwachteMaand) - monthIndex(ruw));
   const basis = { bron, laatsteMaand: ruw, dagenInLaatsteMaand: dagen, verwachteMaand, maandenAchter, laatsteGeslaagdeSync: sync, dagenSindsSync };
   if (maandenAchter === 0) {
-    return { ...basis, toestand: "actueel", tekst: `Data t/m ${maandTekst(ruw)}${dagenTekst}; ${syncTekst}.` };
+    return { ...basis, toestand: "actueel", syncDraait, tekst: `Data t/m ${maandTekst(ruw)}${dagenTekst}; ${syncTekst}.` };
+  }
+  if (syncDraait) {
+    return {
+      ...basis, toestand: maandenAchter < DOOD_VANAF_MAANDEN ? "achter" : "dood", syncDraait,
+      tekst: `Geen ${bron}-data na ${maandTekst(ruw)}${dagenTekst}, terwijl de sync wel draait (${syncTekst}): vermoedelijk geen besteding sinds dan.`,
+    };
   }
   if (maandenAchter < DOOD_VANAF_MAANDEN) {
-    return { ...basis, toestand: "achter", tekst: `Data t/m ${maandTekst(ruw)}${dagenTekst}; ${maandTekst(verwachteMaand)} ontbreekt nog; ${syncTekst}.` };
+    return { ...basis, toestand: "achter", syncDraait, tekst: `Data t/m ${maandTekst(ruw)}${dagenTekst}; ${maandTekst(verwachteMaand)} ontbreekt nog; ${syncTekst}.` };
   }
   return {
-    ...basis, toestand: "dood",
+    ...basis, toestand: "dood", syncDraait,
     tekst: `De sync draait niet: data t/m ${maandTekst(ruw)}${dagenTekst}, ${maandenAchter} maanden achter op ${maandTekst(verwachteMaand)}; ${syncTekst}.`,
   };
 }
@@ -193,6 +218,8 @@ export interface Dagstand {
   dagenAchter: number | null;
   laatsteGeslaagdeSync: string | null;
   toestand: DatastandToestand;
+  /** Zie SYNC_DRAAIT_BINNEN_DAGEN: de data loopt achter, maar de sync slaagt wel. */
+  syncDraait: boolean;
   tekst: string;
 }
 
@@ -208,12 +235,20 @@ export function beoordeelDagstand(inp: {
   const syncTekst = sync ? `laatste geslaagde sync ${sync.slice(0, 10)}` : "nog nooit een geslaagde sync geregistreerd";
   const dag = inp.laatsteDag ? String(inp.laatsteDag).slice(0, 10) : null;
   if (!dag || !/^\d{4}-\d{2}-\d{2}$/.test(dag)) {
-    return { kanaal: inp.kanaal, laatsteDag: null, dagenAchter: null, laatsteGeslaagdeSync: sync, toestand: "geen", tekst: `Geen ${label}-dagdata gesynct; ${syncTekst}.` };
+    return { kanaal: inp.kanaal, laatsteDag: null, dagenAchter: null, laatsteGeslaagdeSync: sync, toestand: "geen", syncDraait: false, tekst: `Geen ${label}-dagdata gesynct; ${syncTekst}.` };
   }
   const dagenAchter = dagenTussen(dag, nu) ?? 0;
-  const basis = { kanaal: inp.kanaal, laatsteDag: dag, dagenAchter, laatsteGeslaagdeSync: sync };
+  const dagenSindsSync = sync ? dagenTussen(sync, nu) : null;
+  const syncDraait = sync != null && dagenSindsSync != null && dagenSindsSync <= SYNC_DRAAIT_BINNEN_DAGEN && sync.slice(0, 10) > dag;
+  const basis = { kanaal: inp.kanaal, laatsteDag: dag, dagenAchter, laatsteGeslaagdeSync: sync, syncDraait };
   if (dagenAchter <= DAG_ACHTER_VANAF_DAGEN) {
     return { ...basis, toestand: "actueel", tekst: `${label}-data t/m ${dag}; ${syncTekst}.` };
+  }
+  if (syncDraait) {
+    return {
+      ...basis, toestand: dagenAchter <= DAG_DOOD_VANAF_DAGEN ? "achter" : "dood",
+      tekst: `Geen ${label}-data na ${dag}, terwijl de sync wel draait (${syncTekst}): vermoedelijk geen besteding sinds dan.`,
+    };
   }
   if (dagenAchter <= DAG_DOOD_VANAF_DAGEN) {
     return { ...basis, toestand: "achter", tekst: `${label}-data loopt achter: t/m ${dag}, ${dagenAchter} dagen geleden; ${syncTekst}.` };
@@ -289,8 +324,10 @@ export interface BureauDatastand {
   tekst: string | null;
 }
 
-/** Puur: het bureauoordeel uit de klantstanden. "stilstand" zodra één klant dood is; "nooit"
- *  als geen enkele klant ooit data kreeg; anders ok (één klant achter is een badge, geen banner). */
+/** Puur: het bureauoordeel uit de klantstanden. "stilstand" zodra één klant dood is waarvan de
+ *  sync niet draait (een gepauzeerd account met een werkende sync is geen stilstand, zie
+ *  SYNC_DRAAIT_BINNEN_DAGEN), of zodra ALLE klanten met data dood zijn; "nooit" als geen enkele
+ *  klant ooit data kreeg; anders ok (één klant achter is een badge, geen banner). */
 export function samenvatDatastanden(standen: KlantDatastand[]): BureauDatastand {
   const telling = { actueel: 0, achter: 0, dood: 0, geen: 0 };
   for (const k of standen) telling[k.stand.toestand] += 1;
@@ -298,14 +335,24 @@ export function samenvatDatastanden(standen: KlantDatastand[]): BureauDatastand 
   const basis = { totaal, ...telling };
   if (totaal === 0) return { ...basis, toestand: "ok", tekst: null };
 
-  if (telling.dood > 0) {
-    const doden = standen.filter((k) => k.stand.toestand === "dood");
+  const metData = standen.filter((k) => k.stand.toestand !== "geen");
+  const allesMetDataDood = metData.length > 0 && metData.every((k) => k.stand.toestand === "dood");
+  const doden = standen.filter((k) => k.stand.toestand === "dood" && (allesMetDataDood || !k.stand.syncDraait));
+  if (doden.length > 0) {
     const maanden = doden.map((k) => k.stand.laatsteMaand).filter((m): m is string => !!m).sort();
     const oudste = maanden[0], nieuwste = maanden[maanden.length - 1];
     const maandDeel = oudste === nieuwste ? `data t/m ${maandTekst(nieuwste)}` : `data t/m ${maandTekst(oudste)} tot ${maandTekst(nieuwste)}`;
     const syncs = doden.map((k) => k.stand.laatsteGeslaagdeSync).filter((s): s is string => !!s).sort();
     const syncDeel = syncs.length > 0 ? `laatste geslaagde sync ${syncs[syncs.length - 1].slice(0, 10)}` : "nog nooit een geslaagde sync geregistreerd";
-    const wie = telling.dood === totaal ? `alle ${totaal} klanten` : `${telling.dood} van ${totaal} klanten`;
+    const wie = doden.length === totaal ? `alle ${totaal} klanten` : `${doden.length} van ${totaal} klanten`;
+    // Slaagt de sync wél voor al deze klanten, dan is "staat stil" niet waar; de banner blijft,
+    // want bij alle klanten tegelijk is "allemaal gepauzeerd" de minst waarschijnlijke uitleg.
+    if (doden.every((k) => k.stand.syncDraait)) {
+      return {
+        ...basis, toestand: "stilstand",
+        tekst: `Geen nieuwe Google-data voor ${wie} (${maandDeel}), terwijl de sync wel slaagt (${syncDeel}). Staan niet al deze accounts stil, dan komt de gesyncte data niet in de app terecht. Analyses over recentere maanden worden geblokkeerd.`,
+      };
+    }
     return {
       ...basis, toestand: "stilstand",
       tekst: `De Google-sync staat stil voor ${wie}: ${maandDeel}, ${syncDeel}. Analyses over recentere maanden worden geblokkeerd tot de sync weer draait.`,

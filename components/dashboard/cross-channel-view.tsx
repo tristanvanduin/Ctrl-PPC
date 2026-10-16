@@ -166,6 +166,20 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
             gesplitste vorm hebben (projectie plus balken in de kaart, cijfers in een eigen kaart
             eronder) las het als "er is iets met de kaart gebeurd". Zelfde componenten, zelfde
             volgorde, zelfde breedtegedrag. */}
+        {/* Microsoft telt in de blokken van dit tabblad nog niet mee: de ranking, de pacing, de
+            markten, de verdeling, de beurs-sectie en het jaaroverzicht lezen de gezamenlijke
+            feitentabel, en daar staat Microsoft bewust niet in (migratie 106). De kerncijfers
+            bovenaan lezen microsoft_account_daily wél (lib/use-channel-period-data.ts). Zonder deze
+            regel ontbrak Microsoft stil onder koppen die "alle kanalen" beloven. Gedempt en niet
+            amber: er valt vandaag niets aan te doen (de kleurregel van 82cde2d). Eén regel hier dekt
+            alle blokken; KanaalHealthRanking zelf kan "geen score" niet van "nog aan het laden"
+            onderscheiden. */}
+        {kanalen.includes("microsoft") && (
+          <p className="mb-3 text-meta leading-snug text-muted-foreground">
+            Microsoft Ads telt in de blokken op dit tabblad nog niet mee; de kerncijfers bovenaan wel. De
+            eigen Microsoft-cijfers staan op het tabblad Microsoft.
+          </p>
+        )}
         {/* Dezelfde asymmetrische hero als de kanaaltabbladen: links de gezondheid, rechts de
             wereldkaart, en de linkerkolom vangt het hoogteverschil op. Zie google-view.tsx voor
             de volledige redenering achter de 1800px-grens. */}

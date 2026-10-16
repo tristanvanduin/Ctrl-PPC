@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Calendar, CheckCircle2, AlertCircle, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { today } from "@/lib/reporting-date";
-import { dekkingUitPeriode, waarschuwingenUitDekking, type DekkingRegel } from "@/lib/analysis/dekking-tekst";
+import { dekkingUitPeriode, waarschuwingenUitDekking, voorbehoudenUitDekking, type DekkingRegel } from "@/lib/analysis/dekking-tekst";
 
 // De losse (standalone) Google-analyses. Elk endpoint deelt hetzelfde contract:
 // GET ?client_id= levert de laatst opgeslagen analyse, POST { client_id } draait hem opnieuw
@@ -38,11 +38,13 @@ interface AnalysisState {
   dekking: DekkingRegel | null;
   /** Waarschuwingen uit het dekkingsblok van de laatste POST (afgekapt, verouderd, ...). */
   waarschuwingen: string[];
+  /** Vaste voorbehouden van de analyse (beëindigde campagnes, buiten de dekking): neutraal. */
+  voorbehouden: string[];
 }
 
 const EMPTY: AnalysisState = {
   running: false, lastDate: null, output: null, error: null, creditBlocked: false, success: false, expanded: false,
-  dekking: null, waarschuwingen: [],
+  dekking: null, waarschuwingen: [], voorbehouden: [],
 };
 
 export function StandaloneAnalyses({ clientId }: { clientId: string }) {
@@ -79,7 +81,7 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
   }, [clientId, fetchLatest]);
 
   async function run(a: AnalysisConfig) {
-    patch(a.key, { running: true, error: null, creditBlocked: false, success: false, waarschuwingen: [] });
+    patch(a.key, { running: true, error: null, creditBlocked: false, success: false, waarschuwingen: [], voorbehouden: [] });
     try {
       const res = await fetch(a.endpoint, {
         method: "POST",
@@ -101,8 +103,10 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
         success: true,
         lastDate: data.analysisDate ?? today(),
         // Wat de route zelf over zijn dekking zegt: afgekapte rijen, verouderde data, campagnes
-        // buiten beeld. Zonder dit leest een groene kaart als "alles klopt".
+        // buiten beeld. Zonder dit leest een groene kaart als "alles klopt". Alleen de incidenten
+        // in amber; de vaste voorbehouden staan er elke run en dus neutraal (82cde2d).
         waarschuwingen: waarschuwingenUitDekking(data.dekking),
+        voorbehouden: voorbehoudenUitDekking(data.dekking),
       });
       // Verse output ophalen zodat "Bekijk resultaat" meteen klopt.
       await fetchLatest(a);
@@ -169,6 +173,11 @@ export function StandaloneAnalyses({ clientId }: { clientId: string }) {
                   {s.waarschuwingen.map((w) => (
                     <li key={w} className="flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />{w}</li>
                   ))}
+                </ul>
+              )}
+              {s.voorbehouden.length > 0 && (
+                <ul className="px-1 text-micro text-muted-foreground space-y-0.5">
+                  {s.voorbehouden.map((v) => <li key={v}>{v}</li>)}
                 </ul>
               )}
               {s.creditBlocked && (

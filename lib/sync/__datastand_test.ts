@@ -153,6 +153,33 @@ async function main() {
     check("één klant een maand achter: geen banner (dat is een badge)", eenAchter.toestand === "ok" && eenAchter.achter === 1 && eenAchter.tekst === null);
   }
 
+  console.log("achter, maar de sync draait: gepauzeerd account is geen stilstand");
+  {
+    const NU = "2026-09-03";
+    const gepauzeerd = beoordeelDatastand({ laatsteMaand: "2026-06-01", laatsteGeslaagdeSync: "2026-09-02T04:00:00Z", nu: NU });
+    check("data t/m juni, sync gisteren: toestand blijft dood, syncDraait waar", gepauzeerd.toestand === "dood" && gepauzeerd.syncDraait === true, JSON.stringify(gepauzeerd));
+    check("tekst zegt dat de sync draait, niet dat hij stilstaat", gepauzeerd.tekst.includes("terwijl de sync wel draait") && !gepauzeerd.tekst.includes("De sync draait niet"), gepauzeerd.tekst);
+    check("de blokkade blijft: er is geen data voor de analysemaand", datastandBlokkade(gepauzeerd) !== null);
+    const opLaatsteDag = beoordeelDatastand({ laatsteMaand: "2026-07-01", laatsteGeslaagdeSync: "2026-08-31T04:00:00Z", nu: "2026-09-02" });
+    check("sync op de laatste dag van de verwachte maand telt niet: die kon de maand nog niet compleet zien", opLaatsteDag.toestand === "achter" && opLaatsteDag.syncDraait === false, JSON.stringify(opLaatsteDag));
+    const oudeSync = beoordeelDatastand({ laatsteMaand: "2026-04-01", laatsteGeslaagdeSync: "2026-04-17T15:14:13Z", nu: NU });
+    check("sync van april: syncDraait onwaar, oude tekst", oudeSync.syncDraait === false && oudeSync.tekst.startsWith("De sync draait niet"), oudeSync.tekst);
+
+    const dagGepauzeerd = beoordeelDagstand({ kanaal: "meta", laatsteDag: "2026-07-01", laatsteGeslaagdeSync: "2026-09-03T03:10:00Z", nu: NU });
+    check("dagstand: data t/m 1 juli, sync vannacht: dood met syncDraait", dagGepauzeerd.toestand === "dood" && dagGepauzeerd.syncDraait === true && dagGepauzeerd.tekst.includes("terwijl de sync wel draait"), JSON.stringify(dagGepauzeerd));
+    check("dagstand: de blokkade blijft", dagstandBlokkade(dagGepauzeerd) !== null);
+    const dagDood = beoordeelDagstand({ kanaal: "meta", laatsteDag: "2026-07-01", laatsteGeslaagdeSync: "2026-07-02T03:10:00Z", nu: NU });
+    check("dagstand: sync van juli is geen draaiende sync", dagDood.syncDraait === false && dagDood.tekst.includes("draait niet"), dagDood.tekst);
+
+    const k = (id: string, maand: string, sync: string | null) => ({ clientId: id, naam: id, stand: beoordeelDatastand({ laatsteMaand: maand, laatsteGeslaagdeSync: sync, nu: NU }) });
+    const eenGepauzeerd = samenvatDatastanden([k("a", "2026-06", "2026-09-02T04:00:00Z"), k("b", "2026-08", "2026-09-02T04:00:00Z")]);
+    check("één gepauzeerde klant met een sync van gisteren: geen banner", eenGepauzeerd.toestand === "ok" && eenGepauzeerd.tekst === null && eenGepauzeerd.dood === 1, JSON.stringify(eenGepauzeerd));
+    const allemaal = samenvatDatastanden([k("a", "2026-06", "2026-09-02T04:00:00Z"), k("b", "2026-05", "2026-09-02T04:00:00Z")]);
+    check("ALLE klanten met data 'gepauzeerd' terwijl de sync slaagt: wel een banner, eerlijk verwoord", allemaal.toestand === "stilstand" && (allemaal.tekst ?? "").includes("terwijl de sync wel slaagt") && !(allemaal.tekst ?? "").includes("staat stil"), allemaal.tekst ?? "");
+    const gemengd = samenvatDatastanden([k("a", "2026-06", "2026-09-02T04:00:00Z"), k("b", "2026-04", "2026-04-17T15:14:13Z"), k("c", "2026-08", "2026-09-02T04:00:00Z")]);
+    check("één echt dode klant naast een gepauzeerde: stilstand voor 1 van 3", gemengd.toestand === "stilstand" && /1 van 3 klanten/.test(gemengd.tekst ?? "") && /data t\/m April 2026,/.test(gemengd.tekst ?? ""), gemengd.tekst ?? "");
+  }
+
   console.log("datastandVoorBureau: twee queries voor alle klanten");
   {
     const sb = new FakeSupabase();

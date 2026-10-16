@@ -38,8 +38,10 @@ export function dekkingUitPeriode(
 }
 
 /**
- * Waarschuwingen uit het `dekking`-blok van een POST-respons. Onbekende vormen leveren niets;
- * de kaart hoort er niet op te breken.
+ * Waarschuwingen uit het `dekking`-blok van een POST-respons: incidenten van DEZE run (verouderde
+ * sync, afgekapte bron), getoond in amber. Een nieuwe dekkingsvlag die om actie vraagt hoort hier;
+ * een vaste eigenschap van de analyse hoort in voorbehoudenUitDekking. Onbekende vormen leveren
+ * niets; de kaart hoort er niet op te breken.
  */
 export function waarschuwingenUitDekking(dekking: unknown): string[] {
   if (!dekking || typeof dekking !== "object") return [];
@@ -52,14 +54,26 @@ export function waarschuwingenUitDekking(dekking: unknown): string[] {
   if (d.rijenAfgekapt === true || d.prestatieRijenAfgekapt === true) {
     uit.push("De bron leverde meer rijen dan het plafond; de cijfers zijn op een deelverzameling berekend.");
   }
+  return uit;
+}
+
+/**
+ * Vaste voorbehouden uit het dekkingsblok: eigenschappen van de analyse, geen incident van deze
+ * run. Ze staan er (bijna) elke run en er is niets aan te doen, dus neutraal en niet amber: amber
+ * is voor wat vandaag om actie vraagt (82cde2d). In hetzelfde vlak als een afgekapte bron leren
+ * ze je dat vlak negeren. Vraagt een nieuwe vlag wél om actie, dan hoort hij niet hier maar in
+ * waarschuwingenUitDekking.
+ */
+export function voorbehoudenUitDekking(dekking: unknown): string[] {
+  if (!dekking || typeof dekking !== "object") return [];
+  const d = dekking as Record<string, unknown>;
+  const uit: string[] = [];
   if (typeof d.buitenDekkingCampagnes === "number" && d.buitenDekkingCampagnes > 0) {
     uit.push(`${d.buitenDekkingCampagnes} campagne(s) vallen buiten de dekking van deze analyse.`);
   }
   if (typeof d.beeindigdeCampagnes === "number" && d.beeindigdeCampagnes > 0) {
     uit.push(`${d.beeindigdeCampagnes} beëindigde campagne(s) buiten beschouwing gelaten.`);
   }
-  if (d.uurdata === false) {
-    uit.push("Geen uurdata beschikbaar: dagdeel-analyse niet uitgevoerd.");
-  }
+  if (d.uurdata === false) uit.push("Geen uurdata beschikbaar: dagdeel-analyse niet uitgevoerd.");
   return uit;
 }

@@ -15,7 +15,10 @@ const STAGE_STYLE: Record<LifecycleStage, string> = {
   executed_gehaald: "border-emerald-200 bg-emerald-50 text-emerald-700",
   executed_niet_gehaald: "border-red-200 bg-red-50 text-red-700",
   niet_uitgevoerd: "border-orange-200 bg-orange-50 text-orange-700",
-  evaluated_uitvoering_onbekend: "border-amber-200 bg-amber-50 text-amber-800",
+  // Neutraal, net als evaluated_onbekend: een afgesloten oordeel dat niet meer verandert en
+  // waar op dit board niets aan te doen is. Het label draagt de nuance. Amber betekent hier
+  // "geaccepteerd, nog uit te voeren" (82cde2d: amber alleen voor wat om actie vraagt).
+  evaluated_uitvoering_onbekend: "border-gray-200 bg-gray-50 text-gray-600",
   evaluated_onbekend: "border-gray-200 bg-gray-50 text-gray-600",
   completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };

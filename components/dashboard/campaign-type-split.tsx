@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PieChart, X } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
-import { CHART_CATEGORICAL, CHANNEL_CHART_COLOR } from "@/lib/branding/chart-colors";
+import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
+import { KANAAL_KLEUR, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
@@ -44,10 +45,13 @@ function typeLabel(t: string): string {
 // ring, omdat de ring op volgorde van spend kleurt en de staven op identiteit. Dezelfde fout die
 // lib/branding/chart-colors.ts beschrijft, twee kaarten naast elkaar. Een kanaal houdt nu overal
 // zijn eigen kleur, ook als het van plek wisselt in de verdeling.
+//
+// Op de SLEUTEL (google_ads, microsoft_ads, ...) en via KANAAL_KLEUR, niet via het schermlabel:
+// "Google Ads" en "Microsoft Ads" bestaan niet als sleutel in CHANNEL_CHART_COLOR, dus die twee
+// vielen terug op hun positie in de ring. KANAAL_KLEUR is de ene kanaaltabel (lib/kanalen/beschikbaar.ts).
 function colorFor(uitsplitsing: Uitsplitsing, sleutel: string, order: string[]): string {
   if (uitsplitsing === "kanaal") {
-    const naam = KANAAL_LABEL_BLENDED[sleutel];
-    const vast = naam ? CHANNEL_CHART_COLOR[naam as keyof typeof CHANNEL_CHART_COLOR] : undefined;
+    const vast = KANAAL_KLEUR[sleutel.replace(/_ads$/, "") as Kanaal];
     if (vast) return vast;
   }
   const i = order.indexOf(sleutel);

@@ -70,7 +70,8 @@ export async function GET(request: Request) {
     const stand = await datastandVoorKlant(supabase, clientId);
     const standCheck: HealthCheck = {
       key: "data_stand",
-      status: stand.toestand === "actueel" ? "ok" : stand.toestand === "achter" ? "warn" : "fail",
+      // Dood terwijl de sync slaagt (gepauzeerd account) is een waarschuwing, geen storing.
+      status: stand.toestand === "actueel" ? "ok" : stand.toestand === "achter" || stand.syncDraait ? "warn" : "fail",
       detail: stand.tekst,
     };
 
@@ -110,7 +111,7 @@ export async function GET(request: Request) {
       const stand = await dagstandVoorKlant(supabase, clientId, kanaal);
       const checks: HealthCheck[] = [
         ...basis.checks,
-        { key: "data_stand", status: stand.toestand === "actueel" ? "ok" : stand.toestand === "achter" ? "warn" : "fail", detail: stand.tekst },
+        { key: "data_stand", status: stand.toestand === "actueel" ? "ok" : stand.toestand === "achter" || stand.syncDraait ? "warn" : "fail", detail: stand.tekst },
       ];
       if (rij?.status === "error" || rij?.last_error) {
         checks.push({ key: "koppeling", status: rij.status === "error" ? "fail" : "warn", detail: `koppeling ${rij.status ?? "?"}: ${rij.last_error ?? "zonder detail"}` });

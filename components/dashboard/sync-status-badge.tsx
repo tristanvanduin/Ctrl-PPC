@@ -67,9 +67,11 @@ interface Props {
   clientId: string;
   /** Called after a successful sync so the dashboard can refresh its data */
   onSyncComplete?: () => void;
+  /** De kanalen met data (lib/kanalen/beschikbaar.ts); null = nog onbekend. */
+  kanalen?: readonly string[] | null;
 }
 
-export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
+export function SyncStatusBadge({ clientId, onSyncComplete, kanalen = null }: Props) {
   const [status, setStatus] = useState<SyncStatus>({
     freshnessStatus: "unknown",
     lastSyncAt: null,
@@ -83,7 +85,7 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
   // De datastand uit de data zelf (/api/sync GET): tot welke maand er rijen staan en wanneer de
   // laatste sync slaagde. De uren-teller hierboven zegt hoe oud de laatste RUN is; dit zegt hoe
   // oud de DATA is -- op 3 september 2026 stond de eerste op "fresh" en de tweede op april.
-  const [datastand, setDatastand] = useState<{ toestand: string; tekst: string } | null>(null);
+  const [datastand, setDatastand] = useState<{ toestand: string; tekst: string; bron?: string; syncDraait?: boolean } | null>(null);
 
   const loadStatus = useCallback(async () => {
     if (!supabase) return;
@@ -187,6 +189,13 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
   const config = STATUS_CONFIG[status.freshnessStatus];
   const needsSync = status.freshnessStatus === "stale" || status.freshnessStatus === "missing" || status.freshnessStatus === "partial";
   const isUrgent = status.freshnessStatus === "missing" || (status.hoursSinceSync != null && status.hoursSinceSync > 48);
+  // Een klant die alleen Meta/LinkedIn/Microsoft draait heeft nooit Google-rijen: "geen Google-data"
+  // is daar een eigenschap van het account, geen storing (zelfde regel als de conversielag-chip).
+  // Alleen bij een echte lezing -- de leesfout-variant hierboven heeft geen `bron` -- en alleen als
+  // de kanalen bekend zijn. "dood" en "achter" houden hun kleur: dan stáán er Google-rijen.
+  const geenGoogleKanaal =
+    datastand?.toestand === "geen" && datastand.bron === "Google" &&
+    !!kanalen && kanalen.length > 0 && !kanalen.includes("google");
 
   return (
     <div className="flex items-center gap-2">
@@ -213,7 +222,10 @@ export function SyncStatusBadge({ clientId, onSyncComplete }: Props) {
 
       {datastand && (
         <span
-          className={`text-micro ${datastand.toestand === "dood" || datastand.toestand === "geen" ? "text-red-600 font-semibold" : datastand.toestand === "achter" ? "text-amber-700" : "text-muted-foreground"}`}
+          // Gedempt als de sync wél slaagt en er alleen geen nieuwe data is (gepauzeerd account):
+          // daar valt vandaag niets te herstellen (lib/sync/datastand.ts, SYNC_DRAAIT_BINNEN_DAGEN).
+          // Ook gedempt bij een klant zonder Google-kanaal; zie geenGoogleKanaal hierboven.
+          className={`text-micro ${datastand.syncDraait || geenGoogleKanaal ? "text-muted-foreground" : datastand.toestand === "dood" || datastand.toestand === "geen" ? "text-red-600 font-semibold" : datastand.toestand === "achter" ? "text-amber-700" : "text-muted-foreground"}`}
           title={datastand.tekst}
         >
           {datastand.tekst}

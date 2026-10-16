@@ -289,8 +289,9 @@ export function ClientDashboard({ client }: { client: Client }) {
         niets aan gerekend wordt. Zolang de kanalen nog niet bekend zijn (null) blijft de balk weg
         in plaats van te gokken; bij nul kanalen staat de amberkleurige melding er al.
 
-        Alleen dít bijschrift hangt aan de kanalen. De synchronisatieknop blijft staan, juist ook
-        bij een klant zonder data -- dat is de klant die hem het hardst nodig heeft. */}
+        Dit bijschrift hangt aan de kanalen, en de kleur van de datastand in de syncbadge ook: zonder
+        Google-kanaal is "geen Google-data" geen storing. De synchronisatieknop blijft staan, juist
+        ook bij een klant zonder data -- dat is de klant die hem het hardst nodig heeft. */}
       {clientData.source === "api" && !clientData.loading && !clientData.error && (
         <div className="flex items-center gap-2 flex-wrap">
           {/* "Live" alleen als het live IS. In demo-modus komen deze cijfers uit
@@ -331,6 +332,7 @@ export function ClientDashboard({ client }: { client: Client }) {
           {!demoModus && (
             <SyncStatusBadge
               clientId={client.id}
+              kanalen={kanalen}
               onSyncComplete={() => setRefreshKey((k) => k + 1)}
             />
           )}

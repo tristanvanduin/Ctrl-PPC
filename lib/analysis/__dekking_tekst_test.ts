@@ -1,7 +1,8 @@
-// De dekkingsregel voor de kaarten: periode → tekst + verouderd-vlag, dekking-blok → waarschuwingen.
+// De dekkingsregel voor de kaarten: periode → tekst + verouderd-vlag, dekking-blok → waarschuwingen
+// (incidenten, amber) en voorbehouden (vaste eigenschappen van de analyse, neutraal).
 // Draaien: npx tsx lib/analysis/__dekking_tekst_test.ts
 
-import { dekkingUitPeriode, waarschuwingenUitDekking } from "./dekking-tekst";
+import { dekkingUitPeriode, waarschuwingenUitDekking, voorbehoudenUitDekking } from "./dekking-tekst";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -29,12 +30,23 @@ console.log("waarschuwingenUitDekking");
 {
   check("niets bij lege input", waarschuwingenUitDekking(null).length === 0 && waarschuwingenUitDekking("x").length === 0);
   const w = waarschuwingenUitDekking({ verouderd: true, peilmaand: "2026-04", rijenAfgekapt: true, buitenDekkingCampagnes: 2, uurdata: false });
-  check("vier waarschuwingen", w.length === 4, String(w.length));
+  check("twee waarschuwingen (alleen de incidenten)", w.length === 2, String(w.length));
   check("verouderd noemt de peilmaand", /2026-04/.test(w[0]));
   check("afkap wordt gemeld", w.some((t) => /plafond/.test(t)));
-  check("dekkingsgrens wordt gemeld", w.some((t) => /2 campagne/.test(t)));
-  check("uurdata=true geeft geen waarschuwing", waarschuwingenUitDekking({ uurdata: true }).length === 0);
   check("verouderd zonder maand blijft leesbaar", /ouder dan/.test(waarschuwingenUitDekking({ verouderd: true })[0]));
+  // De regel uit 82cde2d: een vaste eigenschap van de analyse is geen alarm.
+  check("voorbehoud is geen waarschuwing", waarschuwingenUitDekking({ uurdata: false, buitenDekkingCampagnes: 3, beeindigdeCampagnes: 1 }).length === 0);
+}
+
+console.log("voorbehoudenUitDekking");
+{
+  check("niets bij lege input", voorbehoudenUitDekking(null).length === 0 && voorbehoudenUitDekking("x").length === 0);
+  const v = voorbehoudenUitDekking({ buitenDekkingCampagnes: 2, beeindigdeCampagnes: 1, uurdata: false });
+  check("drie voorbehouden", v.length === 3, String(v.length));
+  check("dekkingsgrens is voorbehoud", v.some((t) => /2 campagne/.test(t)));
+  check("beëindigde campagnes zijn voorbehoud", v.some((t) => /1 beëindigde/.test(t)));
+  check("uurdata=true geeft geen voorbehoud", voorbehoudenUitDekking({ uurdata: true }).length === 0);
+  check("incidenten zijn geen voorbehoud", voorbehoudenUitDekking({ verouderd: true, rijenAfgekapt: true }).length === 0);
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

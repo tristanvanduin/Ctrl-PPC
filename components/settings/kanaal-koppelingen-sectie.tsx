@@ -10,7 +10,7 @@
 // /api/sync/<kanaal> (backfill starten).
 
 import { useState, useEffect, useCallback } from "react";
-import { CheckCircle2, XCircle, AlertTriangle, Loader2, RefreshCw, Link2, Unlink, DownloadCloud } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, Info, Loader2, RefreshCw, Link2, Unlink, DownloadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAllClients, type Client } from "@/lib/clients";
 
@@ -28,7 +28,7 @@ interface KanaalStand {
   laatsteFout: string | null;
   valuta: string | null;
   laatsteRun: { status: string | null; gestart: string | null; fout: string | null } | null;
-  dagstand: { toestand: "actueel" | "achter" | "dood" | "geen"; tekst: string };
+  dagstand: { toestand: "actueel" | "achter" | "dood" | "geen"; tekst: string; laatsteDag: string | null; syncDraait?: boolean };
 }
 interface Overzicht {
   client_id: string;
@@ -135,8 +135,10 @@ export function KanaalKoppelingenSectie() {
 }
 
 function DagstandRegel({ dagstand }: { dagstand: KanaalStand["dagstand"] }) {
-  const kleur = dagstand.toestand === "actueel" ? "text-green-700" : dagstand.toestand === "achter" ? "text-amber-700" : "text-red-700";
-  const Icoon = dagstand.toestand === "actueel" ? CheckCircle2 : dagstand.toestand === "achter" ? AlertTriangle : XCircle;
+  // Achter of dood terwijl de sync wél slaagt: geen besteding, geen storing. Gedempt, met Info.
+  const gedempt = dagstand.syncDraait === true && dagstand.toestand !== "actueel";
+  const kleur = gedempt ? "text-muted-foreground" : dagstand.toestand === "actueel" ? "text-green-700" : dagstand.toestand === "achter" ? "text-amber-700" : "text-red-700";
+  const Icoon = gedempt ? Info : dagstand.toestand === "actueel" ? CheckCircle2 : dagstand.toestand === "achter" ? AlertTriangle : XCircle;
   return (
     <p className={`flex items-start gap-1.5 text-xs ${kleur}`}>
       <Icoon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -246,6 +248,11 @@ function KanaalKaart({ clientId, stand, bureau, onGewijzigd }: { clientId: strin
   const bureauTekst = bureau.bruikbaar
     ? `Bureautoken: ${bureau.bron === "bureau" ? "verbonden via OAuth" : "uit de omgevingsvariabelen"}`
     : `Geen bruikbaar ${hint.bureauLabel}-token voor het bureau (status: ${bureau.status ?? "niet verbonden"}). Verbind het platform eerst hierboven.`;
+  // Amber alleen als er iets stuk is of vandaag om actie vraagt (82cde2d): de bureaukoppeling is
+  // verlopen, fout of staat op actief zonder token, of deze klant IS gekoppeld en de nachtsync heeft
+  // geen token. Een kanaal dat het bureau nooit verbond of zelf introk is een keuze en geen alarm;
+  // anders staat het hier bij elke klant permanent amber en verdwijnt een echte storing ertussen.
+  const bureauVraagtActie = !bureau.bruikbaar && (stand.gekoppeld || (bureau.status !== null && bureau.status !== "ingetrokken"));
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-3">
@@ -258,7 +265,7 @@ function KanaalKaart({ clientId, stand, bureau, onGewijzigd }: { clientId: strin
         )}
       </div>
 
-      <p className={`text-xs ${bureau.bruikbaar ? "text-muted-foreground" : "text-amber-700"}`}>{bureauTekst}</p>
+      <p className={`text-xs ${bureauVraagtActie ? "text-amber-700" : "text-muted-foreground"}`}>{bureauTekst}</p>
 
       {stand.gekoppeld && (
         <div className="space-y-1.5 text-xs">
@@ -285,7 +292,7 @@ function KanaalKaart({ clientId, stand, bureau, onGewijzigd }: { clientId: strin
       {!stand.gekoppeld && (
         <div className="space-y-2">
           {stand.status === "disabled" && stand.accountId && (
-            <p className="text-xs text-muted-foreground">Eerder gekoppeld aan <code className="font-mono">{stand.accountId}</code>, nu uitgezet.</p>
+            <p className="text-xs text-muted-foreground">Eerder gekoppeld aan <code className="font-mono">{stand.accountId}</code>, nu uitgezet{stand.dagstand.laatsteDag ? `; data t/m ${stand.dagstand.laatsteDag}, daarna komt er niets meer bij` : ""}.</p>
           )}
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => void haalAccounts()} disabled={bezig !== null || !bureau.bruikbaar}>
@@ -331,7 +338,10 @@ function KanaalKaart({ clientId, stand, bureau, onGewijzigd }: { clientId: strin
             {bezig === "koppelen" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
             Koppelen
           </Button>
-          {stand.dagstand.toestand !== "geen" && <DagstandRegel dagstand={stand.dagstand} />}
+          {/* Bewust ontkoppeld (disabled) is geen storing: de stilstaande data staat neutraal in de
+              regel "Eerder gekoppeld" hierboven. Amber/rood alleen als er geen koppelingsrij is
+              maar wel stilgevallen data (82cde2d). */}
+          {stand.dagstand.toestand !== "geen" && stand.status !== "disabled" && <DagstandRegel dagstand={stand.dagstand} />}
         </div>
       )}
 

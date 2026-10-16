@@ -83,6 +83,25 @@ if (zonderVorigJaar) {
   assert(zonderVorigJaar.data.targetCurrentYear.adSpend === 0, "zonder vorig jaar geen spenddoel");
 }
 
+// ── Zonder doel: het tempo is het dagtempo van de laatste AFGESLOTEN maand ──
+//
+// data2026 bevat alleen afgesloten maanden. Het tempo stond eerst op "de laatste vier weekbakken,
+// zonder de laatste" -- dat liet na de merge de laatste AFGESLOTEN week vallen. Hier is dat de
+// bak van 22 t/m 30 juni (9 dagen à 4), terwijl 1 t/m 21 juni 1 per dag liep. De oude regel nam
+// alleen de drie bakken van 7 en kwam op 7 per week; het dagtempo van juni is 57/30 x 7 = 13,3.
+const tempoRijen: ChannelForecastRow[] = Array.from({ length: 30 }, (_, i) =>
+  rij(`2026-06-${String(i + 1).padStart(2, "0")}`, 100, i < 21 ? 1 : 4, 0));
+const opTempo = buildChannelForecast("c1", tempoRijen, [], "meta_ads", "2026-07-20");
+assert(opTempo !== null, "tempo-fixture levert een forecast op");
+if (opTempo) {
+  const conv = opTempo.forecast.conversions;
+  assert(conv.kpi.annualTarget <= 0, `tempo-fixture verwacht geen doel (kreeg ${conv.kpi.annualTarget})`);
+  const toekomstWeek = conv.weeklyPoints.find((w) => w.forecast !== null);
+  assert(toekomstWeek?.forecast === 13, `weekprognose zonder doel = dagtempo juni x 7 = 13 (kreeg ${toekomstWeek?.forecast})`);
+  const sept = conv.points.find((p) => p.month === 9);
+  assert(sept?.forecast === Math.round((57 / 30) * 7 * (52 / 12)), `maandprognose = weektempo x 52/12 = 58 (kreeg ${sept?.forecast})`);
+}
+
 // Zonder doel: computeForecast valt terug op het historisch totaal (zelfde gedrag als Google).
 const withoutTarget = buildChannelForecast("c1", rows, [], "meta_ads", "2026-08-23");
 assert(withoutTarget !== null, "forecast zonder doelen levert nog steeds data op");

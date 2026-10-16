@@ -833,21 +833,27 @@ function forecastCoreMetric(
   // terwijl er niets voorspeld wás. De eigenaar zag het naast elkaar: "Screenshot 1: Google,
   // screenshot 2: Meta. Dit is niet gelijk toch?"
   //
-  // Zonder doel projecteren we daarom op het eigen tempo: het gemiddelde van de laatste vier
-  // AFGESLOTEN weken. De laatste gerealiseerde week telt niet mee -- die loopt nog, en een halve
-  // week als tempo nemen halveert de hele prognose (in de demo: 6 tegen 42). Wat hier NIET
-  // verandert is de verwachting: `expected` blijft nul, dus er komt geen ratio, geen balk en geen
-  // doellijn bij. Een tempo is geen doel, en het scherm blijft zeggen dat er geen doel staat.
+  // Zonder doel projecteren we daarom op het eigen tempo: het dagtempo van de laatste AFGESLOTEN
+  // maand, maal zeven. data2026 bevat sinds de merge met main alleen afgesloten maanden
+  // (channel-forecast-data.ts, client-data/route.ts, blended-historical.ts); de lopende maand komt
+  // er niet meer in. Hier stond eerst "de laatste vier weken, zonder de laatste" -- dat was juist
+  // toen de lopende maand nog meetelde, en liet daarna de laatste AFGESLOTEN week vallen. De
+  // weekbakken zijn bovendien ongelijk (3 tot 9 dagen), dus een gemiddelde van bakken is geen
+  // weektempo. Wat hier NIET verandert is de verwachting: `expected` blijft nul, dus er komt geen
+  // ratio, geen balk en geen doellijn bij. Een tempo is geen doel, en het scherm blijft zeggen dat
+  // er geen doel staat.
+  //
+  // `realized` en niet `rec[metric]`: dan telt een conversionOverride mee, net als in de rest van
+  // deze functie. Bekend randgeval (ook in de oude aanpak): een account dat midden in die maand
+  // begon, krijgt een te laag tempo.
   const zonderDoel = annualTarget <= 0;
   let weekTempo = 0;
   if (zonderDoel) {
-    const gerealiseerdeWeken: number[] = [];
-    for (const rec of data2026) {
-      if (rec === null) continue;
-      for (const wk of rec.weeks) gerealiseerdeWeken.push(wk[metric]);
+    const laatste = data2026.reduce((acc, rec, i) => (rec === null ? acc : i), -1);
+    if (laatste >= 0) {
+      const dagen = new Date(Date.UTC(data.currentYear, laatste + 1, 0)).getUTCDate();
+      weekTempo = ((realized[laatste] ?? 0) / dagen) * 7;
     }
-    const basis = gerealiseerdeWeken.slice(0, -1).slice(-4);
-    weekTempo = basis.length > 0 ? basis.reduce((s, v) => s + v, 0) / basis.length : 0;
   }
   // 52 weken op 12 maanden: een maand is gemiddeld 4,33 week. Niet 4, want dan zou de
   // maandprognose structureel 8% te laag staan tegen de weekprognose ernaast.

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Radar, Calendar, AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
-import { dekkingUitPeriode, waarschuwingenUitDekking, type DekkingRegel } from "@/lib/analysis/dekking-tekst";
+import { dekkingUitPeriode, waarschuwingenUitDekking, voorbehoudenUitDekking, type DekkingRegel } from "@/lib/analysis/dekking-tekst";
 
 // Gedeelde kaart voor de deterministische signaal-analyses (Meta, LinkedIn, cross-channel).
 // Zelfde contract als de losse analyses: GET ?client_id= voor de laatste opgeslagen sectie,
@@ -28,6 +28,9 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
   // bij de laatste POST. "Laatst:" is de datum van de RUN; dit is de datum van de DATA.
   const [dekking, setDekking] = useState<DekkingRegel | null>(null);
   const [waarschuwingen, setWaarschuwingen] = useState<string[]>([]);
+  // Vaste voorbehouden van de analyse (geen uurdata, beëindigde campagnes): neutraal, los van het
+  // amberen vlak -- anders staat dat vlak na elke run en leer je het negeren (82cde2d).
+  const [voorbehouden, setVoorbehouden] = useState<string[]>([]);
 
   const extraKey = JSON.stringify(extra ?? {});
 
@@ -47,12 +50,12 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
 
   useEffect(() => {
     setLastDate(null); setOutput(null); setError(null); setSuccess(null); setExpanded(false);
-    setDekking(null); setWaarschuwingen([]);
+    setDekking(null); setWaarschuwingen([]); setVoorbehouden([]);
     fetchLatest();
   }, [fetchLatest]);
 
   async function run() {
-    setRunning(true); setError(null); setSuccess(null); setWaarschuwingen([]);
+    setRunning(true); setError(null); setSuccess(null); setWaarschuwingen([]); setVoorbehouden([]);
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -69,6 +72,7 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
           : "Analyse uitgevoerd en opgeslagen"
       );
       setWaarschuwingen(waarschuwingenUitDekking(data.dekking));
+      setVoorbehouden(voorbehoudenUitDekking(data.dekking));
       await fetchLatest();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Onbekende fout");
@@ -114,6 +118,11 @@ export function SignalAnalysisCard({ clientId, endpoint, title, description, ext
             {waarschuwingen.map((w) => (
               <li key={w} className="flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />{w}</li>
             ))}
+          </ul>
+        )}
+        {voorbehouden.length > 0 && (
+          <ul className="text-micro text-muted-foreground space-y-0.5">
+            {voorbehouden.map((v) => <li key={v}>{v}</li>)}
           </ul>
         )}
         {output && (

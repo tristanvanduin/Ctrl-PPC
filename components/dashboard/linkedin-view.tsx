@@ -28,8 +28,10 @@ import { buildLinkedInObjectiveBreakdown } from "@/lib/linkedin/objective-breakd
 import { ObjectiveInsights, type ObjectiveGroupLike } from "./objective-insights";
 
 // LinkedIn Ads-tab. Zelfde opbouw als de Google- en Meta-weergave via de gedeelde
-// ChannelViewHeader. Buiten demo is er nog geen gesyncte data; dan toont de header een eerlijke
-// lege staat en de prestatie-view eronder blijft leeg tot de sync draait.
+// ChannelViewHeader. Het tabblad bestaat alleen als er LinkedIn-data is (lib/kanalen/beschikbaar.ts),
+// dus de kop zegt "Data aanwezig" en niet "Gekoppeld": een klant met oude rijen en een
+// verwijderde koppeling houdt zijn tabblad, en dan zou "Gekoppeld" onwaar zijn. Hier stond eerst
+// altijd "Nog geen data" met een amber vlak -- juist boven een gevulde kaart.
 //
 // Gesplitst om dezelfde reden als meta-view: deze view stond in zijn geheel op Overzicht én op
 // Campagnes met dezelfde props, en toonde daar elf identieke koppen. Zie de toelichting daar.
@@ -57,7 +59,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
         icon={<Briefcase className="w-5 h-5 text-brand-blue-ink" />}
         title="LinkedIn Ads"
         geoClone={geoClone}
-        status={demo ? { kind: "connected", label: "Gekoppeld (demo)" } : { kind: "warning", label: "Nog geen data" }}
+        status={demo ? { kind: "connected", label: "Gekoppeld (demo)" } : { kind: "connected", label: "Data aanwezig" }}
         blurb={
           geoClone
             ? <>Cijfers hieronder zijn <strong>her-geaggregeerd per beurs</strong> ({geoClone}) uit de campagnes waarvan de naam bij deze beurs hoort. Ratio&apos;s (CPL, CTR) komen uit de venstertotalen, niet uit dag-gemiddelden.</>
@@ -73,12 +75,6 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
             ? <>De LinkedIn-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong> → LinkedIn.</>
             : <>De LinkedIn-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong>.</>
         }
-        warning={!demo ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
-            Het LinkedIn-datamodel en de sync-laag staan klaar. Zodra de LinkedIn-koppeling live is en de
-            sync draait, vult dit tabblad met onderstaande secties.
-          </div>
-        ) : undefined}
       />
 
       {/* DE OPENER (23 augustus 2026, teruggezet naar 50/50): Account Health naast de wereldkaart,

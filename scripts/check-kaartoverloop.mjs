@@ -118,6 +118,7 @@ const SCHERMEN = [
   ["google", KLANT_URL, [/^Google Ads$/]],
   ["meta", KLANT_URL, [/^Meta$/]],
   ["linkedin", KLANT_URL, [/^LinkedIn$/]],
+  ["microsoft", KLANT_URL, [/^Microsoft$/]],
   ["campagnes", KLANT_URL, [/^Campagnes$/]],
   ["prognose", KLANT_URL, [/^Prognose$/]],
   ["analyse", KLANT_URL, [/Analyse & advies/]],

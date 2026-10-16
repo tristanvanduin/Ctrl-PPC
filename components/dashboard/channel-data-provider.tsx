@@ -69,7 +69,11 @@ export function ChannelDataProvider({ clientId, channel, children }: {
     setRijen(null);
     setTargets(null);
     Promise.all([
-      dbSelect<Record<string, unknown>>(cfg.accountTable, { select: cfg.select, clientId }),
+      // Nieuwste eerst: een read levert hooguit 1000 rijen (de PostgREST-cap). Zonder volgorde
+      // bepaalt de database welke dagen wegvallen, en dat kan de lopende maand zijn. Zo raakt een
+      // cap alleen de oudste dagen; 1000 dagen dekt het lopende jaar plus twee volle vorige jaren.
+      // Geen afnemer leunt op de volgorde (pacing, maandgrafiek en forecast groeperen zelf).
+      dbSelect<Record<string, unknown>>(cfg.accountTable, { select: cfg.select, clientId, order: { column: "date", ascending: false } }),
       dbSelect<{ channel: string; metric: string; target_value: number; valid_from: string; valid_to: string | null }>(
         "client_targets", { select: "channel, metric, target_value, valid_from, valid_to", clientId },
       ),

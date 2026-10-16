@@ -49,20 +49,35 @@ import { ObjectiveInsights, type ObjectiveGroupLike } from "./objective-insights
 const SECTIONS = ["Campagnes", "Ad sets", "Advertenties & creatives", "Breakdowns (leeftijd, plaatsing, device)"];
 
 export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
-  const [connected, setConnected] = useState<boolean | null>(null);
   // Eén hook-aanroep voor de opener: GeoMapCard en GeoRanglijstCard delen dezelfde metric-keuze
   // en VS-drilldown-state (zelfde reden als Google's opener, 17.36).
   const geo = useGeoBreakdown({ clientId, channel: "meta" });
 
+  // De koppelstatus van DEZE klant, uit dezelfde rij als de nachtsync (meta_connections). Hier
+  // stond eerst of de omgeving een Meta-token had: een bureau dat met eigen sleutels synct kreeg
+  // dan permanent "Niet gekoppeld" boven een volle kaart. Amber alleen bij een toestand die om
+  // actie vraagt (82cde2d); groen alleen bij een actieve rij zonder fout.
+  type Koppeling = { status: string | null; lastSyncAt: string | null; faalt: boolean };
+  const [koppeling, setKoppeling] = useState<Koppeling | "fout" | null>(null);
   useEffect(() => {
-    if (isDemoClient(clientId)) { setConnected(true); return; } // demo: geen live status-call
+    if (isDemoClient(clientId)) { setKoppeling({ status: "active", lastSyncAt: null, faalt: false }); return; } // demo: geen live status-call
     let cancelled = false;
-    fetch("/api/meta-ads?action=status")
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setConnected(Boolean(d?.connected)); })
-      .catch(() => { if (!cancelled) setConnected(false); });
+    setKoppeling(null);
+    fetch(`/api/meta-ads?action=status&client_id=${encodeURIComponent(clientId)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: Koppeling) => { if (!cancelled) setKoppeling(d); })
+      .catch(() => { if (!cancelled) setKoppeling("fout"); });
     return () => { cancelled = true; };
   }, [clientId]);
+  const probleem: { label: string; tekst: string } | null =
+    koppeling === null || koppeling === "fout" ? null
+    : koppeling.status === null || koppeling.status === "disabled"
+      ? { label: "Niet gekoppeld", tekst: "Meta is voor deze klant niet gekoppeld, dus de cijfers hieronder worden niet bijgewerkt. Koppel het advertentieaccount onder Instellingen." }
+    : koppeling.status === "expired"
+      ? { label: "Toegang verlopen", tekst: "De toegang tot Meta is verlopen; sinds dat moment komen er geen nieuwe cijfers binnen. Koppel Meta opnieuw onder Instellingen." }
+    : koppeling.status === "error" || koppeling.faalt
+      ? { label: "Bijwerken mislukt", tekst: "De laatste keer bijwerken vanuit Meta is mislukt; de cijfers hieronder kunnen achterlopen. Controleer de Meta-koppeling onder Instellingen." }
+    : null;
 
   return (
     // Eén provider om alle kaarten heen: pacing, maandverloop, de beurs-sectie en het
@@ -74,7 +89,7 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
         icon={<Megaphone className="w-5 h-5 text-brand-blue-ink" />}
         title="Meta Ads"
         geoClone={geoClone}
-        status={connected === null ? { kind: "loading" } : connected ? { kind: "connected" } : { kind: "warning", label: "Niet gekoppeld" }}
+        status={koppeling === null ? { kind: "loading" } : koppeling === "fout" ? { kind: "warning", label: "Status onbekend" } : probleem ? { kind: "warning", label: probleem.label } : { kind: "connected" }}
         blurb={
           geoClone
             ? <>Cijfers hieronder zijn <strong>her-geaggregeerd per beurs</strong> ({geoClone}) uit de campagnes waarvan de naam bij deze beurs hoort. Ratio&apos;s (CPA, CTR) komen uit de venstertotalen, niet uit dag-gemiddelden.</>
@@ -90,10 +105,8 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
             ? <>De Meta-analyses (maand-SOP, creative vision, briefing, signalen) draai je via het tabblad <strong>Analyses</strong> → Meta.</>
             : <>De Meta-analyses (maand-SOP, creative vision, briefing, signalen) draai je via het tabblad <strong>Analyses</strong>.</>
         }
-        warning={connected === false ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
-            Meta is nog niet gekoppeld. Configureer de Meta-credentials (env) en draai de sync; daarna vult dit tabblad met campagnes, ad sets, creatives en breakdowns.
-          </div>
+        warning={probleem ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{probleem.tekst}</div>
         ) : undefined}
       />
 

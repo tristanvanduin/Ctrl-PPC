@@ -24,6 +24,9 @@ import { isDemoClient } from "@/lib/demo/demo-mode";
 // netwerk/device-splitsing leeft in de analyses, waar het lek-criterium erbij staat). Wat hier
 // staat is wat de microsoft_*-tabellen vandaag echt dragen -- liever een kleinere eerlijke view
 // dan lege kaarten met een belofte.
+//
+// De kop zegt "Data aanwezig", geen "Gekoppeld" en geen "Nog geen data": het tabblad bestaat
+// alleen als er Microsoft-data is (lib/kanalen/beschikbaar.ts), ook na een verwijderde koppeling.
 
 const SECTIONS = [
   "Campagnes & ad groups",
@@ -44,7 +47,7 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
         icon={<Search className="w-5 h-5 text-brand-blue-ink" />}
         title="Microsoft Ads (Bing)"
         geoClone={geoClone}
-        status={demo ? { kind: "connected", label: "Gekoppeld (demo)" } : { kind: "warning", label: "Nog geen data" }}
+        status={demo ? { kind: "connected", label: "Gekoppeld (demo)" } : { kind: "connected", label: "Data aanwezig" }}
         blurb={
           geoClone
             ? <>Cijfers hieronder zijn <strong>her-geaggregeerd per beurs</strong> ({geoClone}) uit de campagnes waarvan de naam bij deze beurs hoort. Ratio&apos;s (CPA, CTR) komen uit de venstertotalen, niet uit dag-gemiddelden.</>
@@ -58,26 +61,23 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
             ? <>De Microsoft-analyses (maand-SOP, weekly, bi-weekly) draai je via het tabblad <strong>Analyses</strong> → Microsoft.</>
             : <>De Microsoft-analyses (maand-SOP, weekly, bi-weekly) draai je via het tabblad <strong>Analyses</strong>.</>
         }
-        warning={!demo ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
-            Het Microsoft-datamodel en de analyses staan klaar. Zodra de Microsoft Advertising-koppeling
-            live is en de sync draait, vult dit tabblad met onderstaande secties.
-          </div>
-        ) : undefined}
       />
 
       {/* Geen geo-kaart naast Account Health (Microsoft levert geen geodata): health en pacing
-          naast elkaar in plaats van gestapeld, zodat de opener geen halve lege kolom draagt. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+          naast elkaar pas vanaf 1800px, zelfde grens als Google/Meta/LinkedIn; daaronder staat
+          Health gestapeld en zou hij Pacing ~300px uitrekken. Twee directe cellen en geen
+          linkerkolom zoals bij Meta: zonder kaart rechts zou die de rechterhelft leeg laten. */}
+      <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
         <ChannelHealthBadge clientId={clientId} channel="microsoft" />
         <div className="flex flex-col">
           <ChannelPacing edition={edition} />
         </div>
       </div>
 
-      <ChannelMonthlyChart />
+      {/* Dezelfde volgorde als google-view.tsx en meta-view.tsx: hero, beurs, maandverloop,
+          jaaroverzicht, maandprestaties -- zodat een tabwissel niets verplaatst.
 
-      {/* "Prestaties richting de beurs" -- alleen als er een event gekozen is, zelfde regel als
+          "Prestaties richting de beurs" -- alleen als er een event gekozen is, zelfde regel als
           Meta en LinkedIn. */}
       {edition && (
         <Sectie
@@ -89,13 +89,7 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
         </Sectie>
       )}
 
-      <Sectie
-        icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Maandprestaties"
-        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
-      >
-        <ChannelPerformance clientId={clientId} channel="microsoft" geoClone={geoClone} />
-      </Sectie>
+      <ChannelMonthlyChart />
 
       <Sectie
         icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
@@ -103,6 +97,14 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
         bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
       >
         <ChannelForecastOverview />
+      </Sectie>
+
+      <Sectie
+        icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Maandprestaties"
+        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
+      >
+        <ChannelPerformance clientId={clientId} channel="microsoft" geoClone={geoClone} />
       </Sectie>
     </div>
     </ChannelDataProvider>

@@ -45,7 +45,10 @@ import type { RadarFactor } from "@/lib/health-radar";
  *
  * Wat er BUITEN dit bestand nog nodig is voor een echt vierde kanaal: een `Kanaal`-waarde met zijn
  * bron, naam en kleur in lib/kanalen/beschikbaar.ts, en herkenning in computeAnalysisTargets
- * (AnalysisChannel). Daarna verschijnt het kanaal hier vanzelf.
+ * (AnalysisChannel). Daarna verschijnt het kanaal hier vanzelf -- MITS computeAnalysisTargets ook
+ * rijen voor dat kanaal vindt. Voor Microsoft is dat nog niet zo: die functie leest fact_core, en
+ * Microsoft heeft daar bewust geen projectie (migratie 106). Microsoft valt hier dus weg; de regel
+ * bovenaan CrossChannelView zegt dat hardop.
  */
 
 /** Vanaf hoeveel kanalen de compacte lijst aangaat. Zie punt 2 hierboven. */
