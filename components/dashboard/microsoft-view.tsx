@@ -11,6 +11,7 @@ import { ChannelHealthBadge } from "./channel-health-badge";
 import { ChannelPacing } from "./channel-pacing";
 import { ChannelMonthlyChart } from "./channel-monthly-chart";
 import { ChannelFairWeeks } from "./channel-fair-weeks";
+import { ChannelDataProvider } from "./channel-data-provider";
 import { Sectie } from "@/components/ui/sectie";
 import { isDemoClient } from "@/lib/demo/demo-mode";
 
@@ -34,6 +35,10 @@ const SECTIONS = [
 export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
   const demo = isDemoClient(clientId);
   return (
+    // Eén provider om alle kaarten heen, zoals Meta en LinkedIn sinds "een fetch per
+    // kanaaltabblad": pacing, maandverloop, de beurs-sectie en het jaaroverzicht lezen dezelfde
+    // dagrijen en dezelfde forecast. Zie channel-data-provider.tsx.
+    <ChannelDataProvider clientId={clientId} channel="microsoft">
     <div className="space-y-6">
       <ChannelViewHeader
         icon={<Search className="w-5 h-5 text-brand-blue-ink" />}
@@ -66,11 +71,11 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
         <ChannelHealthBadge clientId={clientId} channel="microsoft" />
         <div className="flex flex-col">
-          <ChannelPacing clientId={clientId} channel="microsoft" edition={edition} />
+          <ChannelPacing edition={edition} />
         </div>
       </div>
 
-      <ChannelMonthlyChart clientId={clientId} channel="microsoft" />
+      <ChannelMonthlyChart />
 
       {/* "Prestaties richting de beurs" -- alleen als er een event gekozen is, zelfde regel als
           Meta en LinkedIn. */}
@@ -80,7 +85,7 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
           titel="Prestaties richting de beurs"
           bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
         >
-          <ChannelFairWeeks clientId={clientId} channel="microsoft" edition={edition} />
+          <ChannelFairWeeks edition={edition} />
         </Sectie>
       )}
 
@@ -97,9 +102,10 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
         titel="Jaaroverzicht"
         bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
       >
-        <ChannelForecastOverview clientId={clientId} channel="microsoft" />
+        <ChannelForecastOverview />
       </Sectie>
     </div>
+    </ChannelDataProvider>
   );
 }
 

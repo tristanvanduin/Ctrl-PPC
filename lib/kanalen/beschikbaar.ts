@@ -70,6 +70,7 @@ export const KANAAL_KLEUR: Record<Kanaal, string> = {
   google: CHANNEL_CHART_COLOR.Google,
   meta: CHANNEL_CHART_COLOR.Meta,
   linkedin: CHANNEL_CHART_COLOR.LinkedIn,
+  microsoft: CHANNEL_CHART_COLOR.Microsoft,
 };
 
 /**
