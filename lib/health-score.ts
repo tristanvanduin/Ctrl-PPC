@@ -33,7 +33,7 @@
 
 import type { ClientForecast } from "./forecast";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "./use-client-data";
-import { cpaTrendFrom } from "./analysis/trend";
+import { cpaTrendFrom, TREND_WINDOW } from "./analysis/trend";
 import { formatPercent } from "@/lib/forecast-format";
 
 export interface HealthScore {
@@ -135,10 +135,25 @@ export function computeHealthScore(
   const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
   // Zonder twee gerealiseerde maanden valt er geen trend te zien. Hier stond 14 als
   // "standaard: redelijk", en dat is een oordeel over een account waarover niets bekend is.
-  const efficiencyBeoordeeld = cpaPoints.length >= 2;
+  //
+  // Een maand met kosten en geen enkele conversie (geenNoemer) heeft geen CPA en viel daardoor uit
+  // de trend: na juni gepauzeerd en juli € 2.000 zonder conversie zei de score "CPA stabiel of
+  // dalend". Valt zo'n maand in het recente venster van de trend, dan is de efficiency op zijn
+  // slechtst, en dat zegt een waarschuwing erbij.
+  const metKosten = forecast.cpa.points.filter((p) => p.realized !== null || p.geenNoemer);
+  const zonderConversies = metKosten.slice(-TREND_WINDOW).filter((p) => p.geenNoemer);
+  const efficiencyBeoordeeld = cpaPoints.length >= 2 || zonderConversies.length > 0;
   let efficiencyScore = 0;
 
-  if (cpaPoints.length >= 2) {
+  if (zonderConversies.length > 0) {
+    efficiencyScore = 4;
+    const maanden = zonderConversies.map((p) => p.monthLabel).join(", ");
+    anomalies.push({
+      severity: "warning",
+      title: "Kosten zonder conversies",
+      description: `In ${maanden} waren er kosten zonder één conversie: daar is geen CPA te berekenen, en slechter wordt de efficiency niet.`,
+    });
+  } else if (cpaPoints.length >= 2) {
     // Gedeelde berekening en drempels (lib/analysis/trend.ts). Hier stond een eigen kopie die
     // de eerste maand met de laatste vergeleek; zes plekken deden dat, met vier verschillende
     // drempels, waardoor twee blokken op hetzelfde scherm elkaar konden tegenspreken.
@@ -174,6 +189,7 @@ export function computeHealthScore(
     maxScore: 20,
     description: !efficiencyBeoordeeld
       ? "Te weinig maanden voor een CPA-trend — niet beoordeeld"
+      : zonderConversies.length > 0 ? "Kosten zonder conversies"
       : efficiencyScore >= 16 ? "CPA stabiel of dalend" : efficiencyScore >= 10 ? "CPA licht stijgend" : "CPA stijgt significant",
     assessed: efficiencyBeoordeeld,
   });

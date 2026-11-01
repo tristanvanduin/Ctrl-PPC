@@ -5,7 +5,7 @@ import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider
 import { useBlendedClientData } from "@/lib/use-blended-client-data";
 import { actieveMetrics, computeForecast, MONTH_LABELS, type ForecastMetric, type ClientForecast } from "@/lib/forecast";
 import { dbSelectOne } from "@/lib/data-access/client-read";
-import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor } from "@/lib/forecast-format";
+import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, geenWaardeLabel, zonderData } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalVoet, VoetRij, TotaalCel } from "./data-table";
 
 const METRICS: { id: ForecastMetric; label: string; format: (v: number) => string }[] =
@@ -17,16 +17,20 @@ const METRICS: { id: ForecastMetric; label: string; format: (v: number) => strin
  * hook (Google+Meta+LinkedIn uit fact_core) -- zie lib/api/blended-historical.ts voor waarom dit
  * nu ook voor "alle kanalen" mag: computeMonthlyExpected negeert toch al maanden zonder data
  * (mv > 0), dus een periode voordat Meta/LinkedIn liepen levert gewoon Google's eigen totaal op.
- * Beide hooks worden onvoorwaardelijk aangeroepen (React-regel), alleen het resultaat wisselt.
+ * Beide hooks worden onvoorwaardelijk aangeroepen (React-regel), alleen het resultaat wisselt. De
+ * blended hook haalt alleen op als hij gebruikt wordt: de route leest per aanroep drie gepagineerde
+ * dagtabellen plus de datastand per kanaal, en op de Google-weergave (bij een Google-only klant een
+ * 404) was dat een zwaar verzoek waarvan niemand het antwoord las.
  */
 function useChannelForecast(clientId: string, channel: "google" | "blended"): { forecast: ClientForecast | null; loading: boolean; error: string | null } {
   const googleData = useClientHistoricalData(clientId);
   const googleForecast = useForecast();
-  const blended = useBlendedClientData(clientId);
+  const blended = useBlendedClientData(clientId, channel === "blended");
 
   if (channel === "blended") {
     return {
-      forecast: blended.data ? computeForecast(blended.data) : null,
+      // De som per kanaal uit de hook (lib/forecast-som.ts), niet computeForecast op de optelling.
+      forecast: blended.forecast,
       loading: blended.loading,
       error: blended.error,
     };
@@ -212,6 +216,9 @@ export function ForecastTable({ clientId, channel = "google" }: { clientId: stri
             const ratio = pt.monthRatio;
             const isPositive = isInverted ? ratio <= 1 : ratio >= 1;
             const isRealized = pt.realized !== null;
+            // Zonder realisatie en zonder prognose is de ratio de projectiefactor: niets gemeten.
+            // In groen of rood las "— — 130%" als een prestatie, dus hier een streep.
+            const geenData = zonderData(pt);
 
             return (
               // Maanden die nog moeten komen krijgen een lichter vlak: dat onderscheid tussen
@@ -219,10 +226,13 @@ export function ForecastTable({ clientId, channel = "google" }: { clientId: stri
               <Rij key={pt.month} className={isRealized ? "" : "bg-gray-50/40"}>
                 <NaamCel>{pt.monthLabel}</NaamCel>
                 <GetalCel zacht>{fmt(pt.expected)}</GetalCel>
-                <GetalCel className="font-semibold">{pt.realized !== null ? fmt(pt.realized) : "—"}</GetalCel>
+                {/* Kosten zonder conversies: geen getal, wel gemeten (geenNoemer), in de kleur van het oordeel. */}
+                <GetalCel className={pt.geenNoemer ? (isInverted ? "font-semibold text-red-500" : "font-semibold text-green-600") : "font-semibold"}>
+                  {pt.realized !== null ? fmt(pt.realized) : pt.geenNoemer ? geenWaardeLabel(pt, selectedMetric).toLowerCase() : "—"}
+                </GetalCel>
                 <GetalCel className="text-brand-blue-ink font-medium">{pt.forecast !== null ? fmt(pt.forecast) : "—"}</GetalCel>
-                <GetalCel className={`font-bold ${isPositive ? "text-green-600" : "text-red-500"}`}>
-                  {formatPercent(ratio, 0)}
+                <GetalCel className={geenData ? "text-muted-foreground" : `font-bold ${isPositive ? "text-green-600" : "text-red-500"}`}>
+                  {geenData ? "—" : formatPercent(ratio, 0)}
                 </GetalCel>
               </Rij>
             );

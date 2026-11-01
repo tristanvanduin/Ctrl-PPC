@@ -58,30 +58,68 @@ export function googleAdsMonthlyToApiData(
   }));
 }
 
+/**
+ * Weekrijen (segments.week: de maandag van de week) naar ApiWeeklyData: per kalendermaand een
+ * volgnummer 1..5, in datumvolgorde.
+ *
+ * Het volgnummer IS de positie in de rij, dus de volgorde van de invoer bepaalt welke week welk
+ * nummer krijgt. De query had geen ORDER BY, en de rijen werden genummerd zoals ze binnenkwamen:
+ * week 3 kon dan de laatste maandag van de maand zijn. Daarom eerst sorteren (op een kopie; de
+ * aanroeper houdt zijn array).
+ *
+ * Genummerd wordt per JAAR en maand, niet per maandnummer alleen. Kreeg deze functie vijf jaar
+ * weekrijen in één keer, dan werden alle maarten samen één maart met tweeëntwintig "weken", en
+ * dat rooster liep door tot in de beursweekstrook. De uitvoer heeft geen jaarveld, dus wie meer
+ * dan één jaar heeft, splitst eerst: googleAdsWeeklyByYear.
+ */
 export function googleAdsWeeklyToApiData(
   metrics: GoogleAdsMetrics[]
 ): ApiWeeklyData[] {
-  // Group by month, assign week number within each month
-  const byMonth = new Map<number, GoogleAdsMetrics[]>();
-  for (const m of metrics) {
-    const month = parseMonth(m.date);
-    if (!byMonth.has(month)) byMonth.set(month, []);
-    byMonth.get(month)!.push(m);
-  }
+  const opDatum = [...metrics].sort((a, b) => a.date.localeCompare(b.date));
+  const volgnummer = new Map<string, number>();
+  return opDatum.map((wm) => {
+    const jaarMaand = wm.date.slice(0, 7);
+    const week = (volgnummer.get(jaarMaand) ?? 0) + 1;
+    volgnummer.set(jaarMaand, week);
+    return {
+      week,
+      month: parseMonth(wm.date),
+      conversions: Math.round(wm.conversions),
+      revenue: Math.round(wm.conversionsValue),
+      adSpend: Math.round(wm.cost),
+    };
+  });
+}
 
-  const result: ApiWeeklyData[] = [];
-  for (const [month, weekMetrics] of byMonth) {
-    weekMetrics.forEach((wm, i) => {
-      result.push({
-        week: i + 1,
-        month,
-        conversions: Math.round(wm.conversions),
-        revenue: Math.round(wm.conversionsValue),
-        adSpend: Math.round(wm.cost),
-      });
-    });
+/**
+ * Weekrijen over meerdere jaren, per jaar omgezet: jaar -> ApiWeeklyData[] (oplopend op jaar).
+ *
+ * Splitsen gebeurt op de RUWE rij, vóór de omzetting. De route zette eerst alles om en zocht
+ * daarna het jaar erbij via de index (raw[i] bij mapped[i]), maar de omzetting groepeerde per
+ * maand en gooide de volgorde om: mapped[i] was dan een andere week dan raw[i]. Met vijf jaar
+ * historie kwamen er zo 22 weekrecords in één oktober terecht, en de strook rond de beurs liet
+ * septembercijfers zien in een novemberweek.
+ *
+ * Een week hoort bij het jaar van zijn maandag, net zoals hij bij de maand van zijn maandag hoort:
+ * de week van maandag 30 december 2024 is december 2024, ook al lopen er januaridagen in mee.
+ * Rijen zonder leesbaar jaar vallen weg; ze hebben geen plek in een jaarrooster.
+ */
+export function googleAdsWeeklyByYear(
+  metrics: GoogleAdsMetrics[]
+): Map<number, ApiWeeklyData[]> {
+  const perJaar = new Map<number, GoogleAdsMetrics[]>();
+  for (const r of metrics) {
+    const jaar = parseInt(r.date.slice(0, 4), 10);
+    if (!Number.isInteger(jaar)) continue;
+    const rijen = perJaar.get(jaar);
+    if (rijen) rijen.push(r);
+    else perJaar.set(jaar, [r]);
   }
-  return result;
+  return new Map(
+    [...perJaar.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([jaar, rijen]) => [jaar, googleAdsWeeklyToApiData(rijen)] as const),
+  );
 }
 
 // ── Meta Ads → Dashboard Format ──────────────────────────────────────────────
@@ -202,6 +240,9 @@ function apiDataToMonthlyRecords(
   realizedThroughMonth?: number
 ): (MonthlyRecord | null)[] {
   const records: (MonthlyRecord | null)[] = [];
+  // De eerste maand van het lopende jaar met een rij: daarvóór liep het account (of kanaal) nog
+  // niet, daarna is een maand zonder rij binnen de gerealiseerde grens een gemeten nul.
+  const eersteMaand = monthlyData.reduce((min, d) => (d.month >= 1 && d.month < min ? d.month : min), 13);
 
   for (let m = 1; m <= 12; m++) {
     if (realizedThroughMonth !== undefined && m > realizedThroughMonth) {
@@ -233,8 +274,14 @@ function apiDataToMonthlyRecords(
         adSpend: monthData.adSpend,
         weeks,
       });
-    } else if (realizedThroughMonth === undefined) {
-      // Historical year with no data for this month — fill with zeros
+    } else if (realizedThroughMonth === undefined || m > eersteMaand) {
+      // Historical year with no data for this month — fill with zeros.
+      //
+      // In het lopende jaar ook, voor een maand ná de eerste rij en t/m de grens (die grens is
+      // hierboven al afgevangen). De API vult niet aan: een gepauzeerde maand, of de maanden nadat
+      // een beursklant stilviel, hebben geen rij. Als null kregen ze een prognose voor een maand
+      // die al voorbij was, of telden ze als "geen data" waar de pacing ze als nul rekent. Een
+      // nulmaand is gemeten (gepauzeerd = echt nul), net als in de vergelijking van de KPI-band.
       records.push({
         month: m,
         conversions: 0,
@@ -243,7 +290,8 @@ function apiDataToMonthlyRecords(
         weeks: generateEvenWeeks(m, 0, 0, 0),
       });
     } else {
-      // Current year, future month — null means "not yet realized"
+      // Lopend jaar, vóór de eerste rij: het account liep nog niet. Null, zodat de forecast er
+      // geen prognose en geen gemeten nul van maakt. (Toekomstige maanden zijn hierboven al null.)
       records.push(null);
     }
   }

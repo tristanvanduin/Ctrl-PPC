@@ -1,3 +1,5 @@
+import type { DataStandSamen } from "./sync/datastand";
+
 export interface WeeklyRecord {
   week: number;    // 1-based week within the month (1–5)
   month: number;   // 1–12
@@ -35,6 +37,26 @@ export interface ClientHistoricalData {
   currentYear: number;
   /** Manual conversion overrides for months with broken tracking. Key = "YYYY-MM", value = estimated conversions */
   conversionOverrides?: Record<string, number>;
+  /**
+   * Tot welke dag de data definitief is en welke maand de laatste volle is, zoals de bron die
+   * vaststelt (de Google client-data-route zet hem mee). Het venster van de KPI-band eindigt
+   * hierop in plaats van op de kalender. Ontbreekt hij (null of weggelaten), dan volgen de presets
+   * de kalender, zoals vroeger.
+   */
+  dataStand?: DataStandSamen | null;
+  /**
+   * De eerste dag met data ("YYYY-MM-DD") van een kanaal dat midden in een maand begon. Alleen voor
+   * het tempo zonder jaardoel: is die partiële maand de laatste gerealiseerde, dan telt het tempo
+   * de dagen vanaf deze dag en niet de hele maand. Weglaten: de hele maand, zoals voorheen.
+   */
+  eersteDag?: string | null;
+  /**
+   * Het jaardoel is een deeljaar op jaarbasis (kanaalHistorieUitMaanden, voor een kanaal dat vorig
+   * jaar later begon): het hoort bij twaalf maanden, ook die zonder historie. Dan vult de
+   * verwachting zo'n maand zonder realisatie (januari) met het gemiddelde van de historie, en niet
+   * met nul. Weglaten: nul, zoals voorheen.
+   */
+  doelOpJaarbasis?: boolean;
 }
 
 // ── Backwards compatibility: map old field names to new structure ──

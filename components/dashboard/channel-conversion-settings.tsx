@@ -5,6 +5,8 @@ import { Loader2, Save, CheckCircle2, Target } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
 import { dbSelectOne } from "@/lib/data-access/client-read";
+import { vergeetBlendedClientData } from "@/lib/use-blended-client-data";
+import { meldKanaalselectieOpgeslagen } from "@/lib/use-channel-period-data";
 import {
   conversionSourcesFor,
   resolveChannelConversionConfig,
@@ -60,7 +62,14 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
     const { error } = await dbUpsert("client_settings", clientId, { channel_conversion_config: clean });
     setSaving(false);
     if (error) setError(error.message);
-    else { setConfig(clean); setSaved(true); setTimeout(() => setSaved(false), 4000); }
+    else {
+      // Het Jaaroverzicht en de Pacing op "Alle kanalen" tellen met deze selectie; hun cache zou
+      // anders nog vijf minuten de oude tonen. De KPI-band erboven blijft gemount terwijl je hier
+      // bent, en leest pas opnieuw op dit seintje: zonder stond daar tot een herlaadbeurt de oude.
+      vergeetBlendedClientData(clientId);
+      meldKanaalselectieOpgeslagen(clientId);
+      setConfig(clean); setSaved(true); setTimeout(() => setSaved(false), 4000);
+    }
   }
 
   if (error && !config) {

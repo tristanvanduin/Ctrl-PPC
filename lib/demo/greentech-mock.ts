@@ -1,12 +1,18 @@
-// Curated GreenTech demo-dataset — geserveerd vanuit de data-invoerpunten (client-data +
-// overview) zodat de klant-cockpit (Overzicht/Campagnes/Prognose) en de portfolio-cel zonder
-// Google Ads API of keys werken. Scoped op de demo-klant "demo-greentech" + de geo-clones
-// (GRT/GRA/GRN, via campagnenamen). Puur presentatie; raakt geen echte data of berekening.
+// Curated GreenTech demo-dataset (JS-fixture).
 //
-// De cijfers sluiten aan op scripts/demo/seed-demo-client.ts (dezelfde fictieve GreenTech-wereld),
-// maar dit pad vraagt géén seed en géén backend — het is hardcoded voor review/presentatie.
+// WAT ER NOG UIT GELEZEN WORDT. De client-data-route serveerde demo-greentech hieruit; sinds stap 0
+// komt de Google-data van de demo uit de database (seededDemoClientData in geoclone-demo-data.ts),
+// net als Meta, LinkedIn en Microsoft. Uit deze fixture komen alleen nog `conversionActions` en
+// `wastefulSearchTerms`: die staan niet in de seed. Daarnaast DEMO_GREENTECH_ID/-NAME en
+// isGreentechDemo, die overal gebruikt worden.
+//
+// De maand-, week- en campagnegeneratoren en buildGreentechOverview hebben geen productie-afnemer
+// meer: alleen __greentech_klok_test raakt ze nog. Kandidaat om weg te halen zodra de twee
+// fixturelijsten een eigen plek hebben.
 
 import { demoGeoCountries, geoMonthlyRows } from "./geo-demo";
+import { today } from "../reporting-date";
+import { lastCompleteMonth, isValidMonth } from "../period/period-range";
 
 export const DEMO_GREENTECH_ID = "demo-greentech";
 export const DEMO_GREENTECH_NAME = "GreenTech (demo)";
@@ -53,8 +59,9 @@ function weeks(monthly: Monthly[], upToMonth: number): Weekly[] {
 // vóór 2026 (campaignsHistorical blijft leeg, zoals ook hieronder).
 const BASE_2024 = { conv: 82, spend: 6800, clicks: 3900, imp: 78000 };
 const BASE_2025 = { conv: 95, spend: 7400, clicks: 4300, imp: 85000 };
+const DEMO_JAAR = 2026;
 /**
- * Tot welke maand de demo "gerealiseerd" is.
+ * Tot welke maand van het demo-jaar de demo "gerealiseerd" is.
  *
  * ── WAAROM DIT MEELOOPT MET DE KLOK ─────────────────────────────────────────
  *
@@ -66,20 +73,31 @@ const BASE_2025 = { conv: 95, spend: 7400, clicks: 4300, imp: 85000 };
  * Dat is het eerste blok dat iemand ziet. In een demonstratie leest dat als een kapotte app,
  * terwijl er alleen een getal was blijven staan.
  *
- * Nu: gerealiseerd tot en met de laatste AFGESLOTEN maand. De lopende maand blijft eruit, want
+ * Gerealiseerd is tot en met de laatste AFGESLOTEN maand. De lopende maand blijft eruit, want
  * die is per definitie incompleet -- dat is de bedoeling van de constante, en dat blijft zo.
+ *
+ * ── PER AANROEP, IN AMSTERDAMSE TIJD ────────────────────────────────────────
+ *
+ * De vervanger van `= 6` was zelf weer een constante: een module-const, eenmaal uitgerekend bij
+ * het laden. Een server die op 31 oktober opstartte, zei in december nog steeds "t/m september"
+ * -- dezelfde stilstand, alleen later. En hij rekende in UTC: tussen middernacht en 02:00 op de
+ * eerste van de maand is het in UTC nog de vorige maand, en viel de net afgesloten maand weg. Nu
+ * per aanroep, uit today() (Amsterdam), dezelfde klok als de rest van het dashboard.
+ *
+ * @param nu vandaag als "YYYY-MM-DD" (standaard today()); alleen tests zetten hem.
  */
-const DEMO_JAAR = 2026;
-function gerealiseerdeMaanden(): number {
-  const nu = new Date();
-  const jaar = nu.getUTCFullYear();
+function gerealiseerdeMaanden(nu: string = today()): number {
+  const maand = String(nu).slice(0, 7);
+  if (!isValidMonth(maand)) throw new Error(`greentech-mock: nu moet een datum zijn (YYYY-MM-DD), kreeg ${JSON.stringify(nu)}`);
+  const afgesloten = lastCompleteMonth(maand);
+  const jaar = Number(afgesloten.slice(0, 4));
   // Het demo-jaar ligt volledig in het verleden: dan is er niets meer aan de gang.
   if (jaar > DEMO_JAAR) return 12;
-  // getUTCMonth() is nul-gebaseerd, dus in augustus (7) is dat precies "t/m juli".
-  // Minimaal 1: bij nul zou months[REALIZED_MONTH - 1] verderop undefined opleveren.
-  return Math.min(12, Math.max(1, jaar < DEMO_JAAR ? 1 : nu.getUTCMonth()));
+  // Minimaal 1, ook vóór en in januari van het demo-jaar: bij nul zou prev[gerealiseerd - 1] in
+  // buildGreentechOverview undefined opleveren.
+  if (jaar < DEMO_JAAR) return 1;
+  return Math.max(1, Number(afgesloten.slice(5, 7)));
 }
-const REALIZED_MONTH = gerealiseerdeMaanden();
 
 // Elke beurs zijn eigen basis, eigen aov en eigen koers over het jaar (trend), in plaats van een
 // vaste "share" van één gedeelde accountcurve -- dat liet GRT/GRA/GRN altijd exact dezelfde vorm
@@ -119,10 +137,10 @@ const CAMPAIGN_DEFS: CampaignDef[] = [
 const monthKey = (m: number) => `2026-${String(m).padStart(2, "0")}`;
 const seasonFactor = (m: number) => 1 + 0.18 * Math.sin(((m - 3) / 12) * 2 * Math.PI);
 
-function campaignRows() {
+function campaignRows(gerealiseerd: number) {
   const rows = [];
   for (const c of CAMPAIGN_DEFS) {
-    for (let m = 1; m <= REALIZED_MONTH; m++) {
+    for (let m = 1; m <= gerealiseerd; m++) {
       const f = c.trend(m) * seasonFactor(m);
       if (f <= 0) continue; // nog niet actief deze maand (GRN vóór april)
       const conversions = Math.round(c.base.conv * f);
@@ -171,8 +189,10 @@ const DEMO_COUNTRY_MONTHLY = geoMonthlyRows(demoGeoCountries("google"), GEO_MONT
 }));
 
 // De volledige respons zoals /api/google-ads/client-data die teruggeeft (mock-variant).
-export function buildGreentechClientData(customerId: string) {
-  const campaigns = campaignRows();
+// `nu` ("YYYY-MM-DD", standaard today()) is er voor tests; elke aanroep rekent opnieuw.
+export function buildGreentechClientData(customerId: string, nu?: string) {
+  const gerealiseerd = gerealiseerdeMaanden(nu);
+  const campaigns = campaignRows(gerealiseerd);
   const cur = accountMonthlyFromCampaigns(campaigns);
   const target = { conversions: 1500, revenue: 180000, adSpend: 100000 };
   // Laatste rij per campagne -- niet meer een gedeeld accounttotaal keer share, elke beurs heeft
@@ -190,14 +210,14 @@ export function buildGreentechClientData(customerId: string) {
   return {
     customerId,
     currentYear: 2026,
-    realizedThroughMonth: REALIZED_MONTH,
+    realizedThroughMonth: gerealiseerd,
     targetCurrentYear: target,
     historicalYears: [
       { year: 2024, monthly: months(BASE_2024), weekly: weeks(months(BASE_2024), 12) },
       { year: 2025, monthly: months(BASE_2025), weekly: weeks(months(BASE_2025), 12) },
     ],
     currentYearMonthly: cur,
-    currentYearWeekly: weeks(cur, REALIZED_MONTH),
+    currentYearWeekly: weeks(cur, gerealiseerd),
     campaigns,
     campaignsHistorical: [],
     impressionShare,
@@ -233,23 +253,24 @@ export function buildGreentechClientData(customerId: string) {
 }
 
 // De overview-vorm zoals /api/google-ads/overview per account teruggeeft (mock-variant).
-export function buildGreentechOverview(customerId: string) {
-  const cur = accountMonthlyFromCampaigns(campaignRows());
+export function buildGreentechOverview(customerId: string, nu?: string) {
+  const gerealiseerd = gerealiseerdeMaanden(nu);
+  const cur = accountMonthlyFromCampaigns(campaignRows(gerealiseerd));
   const prev = months(BASE_2025);
   const sum = (arr: Monthly[], upto: number, key: keyof Monthly) => arr.filter((m) => m.month <= upto).reduce((s, m) => s + (m[key] as number), 0);
-  const ytdConv = sum(cur, REALIZED_MONTH, "conversions");
-  const ytdRev = sum(cur, REALIZED_MONTH, "revenue");
-  const ytdSpend = sum(cur, REALIZED_MONTH, "adSpend");
-  const prevConv = sum(prev, REALIZED_MONTH, "conversions");
-  const prevRev = sum(prev, REALIZED_MONTH, "revenue");
-  const prevSpend = sum(prev, REALIZED_MONTH, "adSpend");
+  const ytdConv = sum(cur, gerealiseerd, "conversions");
+  const ytdRev = sum(cur, gerealiseerd, "revenue");
+  const ytdSpend = sum(cur, gerealiseerd, "adSpend");
+  const prevConv = sum(prev, gerealiseerd, "conversions");
+  const prevRev = sum(prev, gerealiseerd, "revenue");
+  const prevSpend = sum(prev, gerealiseerd, "adSpend");
   const pct = (c: number, p: number) => (p > 0 ? ((c - p) / p) * 100 : null);
   const last = cur[cur.length - 1];
   return {
     customerId,
     ytd: { conversions: ytdConv, revenue: ytdRev, adSpend: ytdSpend, roas: ytdSpend > 0 ? ytdRev / ytdSpend : 0, cpa: ytdConv > 0 ? ytdSpend / ytdConv : 0 },
     yoy: { convChange: pct(ytdConv, prevConv), revChange: pct(ytdRev, prevRev), spendChange: pct(ytdSpend, prevSpend) },
-    lastMonth: { month: REALIZED_MONTH, conversions: last.conversions, revenue: last.revenue, adSpend: last.adSpend, prevYearConv: prev[REALIZED_MONTH - 1].conversions },
+    lastMonth: { month: gerealiseerd, conversions: last.conversions, revenue: last.revenue, adSpend: last.adSpend, prevYearConv: prev[gerealiseerd - 1].conversions },
     monthlyConversions: cur.map((m) => m.conversions),
   };
 }

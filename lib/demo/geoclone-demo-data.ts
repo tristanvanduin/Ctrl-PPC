@@ -8,17 +8,52 @@
 // customerId). Precies dezelfde data die /api/analysis/monthly voor deze klanten al leest (die
 // route gaat rechtstreeks tegen dezelfde tabellen, nooit tegen de live API) wordt hier herbruikt
 // voor de dashboardweergave, zodat het scherm en de SOP-analyse dezelfde cijfers laten zien.
+//
+// Sinds stap 0 loopt GreenTech zelf hier ook doorheen (seededDemoClientData): zijn Google kwam uit
+// een JS-fixture terwijl Meta, LinkedIn, Microsoft en het Jaaroverzicht uit de database lazen, en
+// de KPI-band telde die twee werelden bij elkaar op.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { GEOCLONE_DEMO_IDS } from "./geoclone-clients";
+import { isGreentechDemo, buildGreentechClientData } from "./greentech-mock";
 import { detectCountriesFromCampaigns, detectCountryFromName } from "@/lib/countries";
 import type { ApiMonthlyData, ApiWeeklyData, YearDataInput } from "@/lib/api/adapter";
 import type { CountryMonthlyRow } from "@/lib/use-client-data";
+import { eis } from "@/lib/analysis/db-veilig";
+import { maandbronDataStand, gerealiseerdTotMaand } from "@/lib/api/client-data-stand";
+import { today } from "@/lib/reporting-date";
 
 export function isGeocloneDemo(customerId: string | null | undefined): boolean {
   if (!customerId) return false;
   const id = customerId.replace(/^gads-/, "");
   return GEOCLONE_DEMO_IDS.includes(id);
+}
+
+/** Demoklanten waarvan de Google-reeks uit de geseede database komt: GreenTech en de drie clones. */
+export function isSeededDemo(customerId: string | null | undefined): boolean {
+  return isGreentechDemo(customerId) || isGeocloneDemo(customerId);
+}
+
+/**
+ * Wat /api/google-ads/client-data voor een demoklant teruggeeft. De account-, week- en
+ * campagnereeksen komen ALTIJD uit de database: dezelfde rijen waaruit Meta, LinkedIn en
+ * Microsoft in de KPI-band (lib/use-channel-period-data.ts, via /api/data) en het Jaaroverzicht,
+ * de pacing en de cross-channel-tabel (fact_core) lezen.
+ *
+ * Hiervoor kreeg GreenTech een JS-fixture (lib/demo/greentech-mock.ts): een andere fictieve
+ * wereld, met andere bedragen, vier in plaats van zes campagnes, en september en oktober 2026
+ * die in de database niet bestaan. De band telde die op bij de kanalen uit de database: okt25-sep26
+ * 3.011 conversies, tegen 3.401 voor de kanalen opgeteld.
+ *
+ * Uit de fixture komt alleen nog wat de seed niet heeft en wat nooit in een accounttotaal wordt
+ * opgeteld: de conversieacties (het instellingenpaneel) en de verspilde zoektermen.
+ */
+export async function seededDemoClientData(supabase: SupabaseClient, customerId: string) {
+  const id = customerId.replace(/^gads-/, "");
+  const uitDb = await buildGeocloneClientData(supabase, id);
+  if (!isGreentechDemo(id)) return uitDb;
+  const { conversionActions, wastefulSearchTerms } = buildGreentechClientData(id);
+  return { ...uitDb, conversionActions, wastefulSearchTerms };
 }
 
 interface AccountMonthlyRow {
@@ -33,6 +68,13 @@ interface CampaignMonthlyRow {
   campaign_id: string; campaign_name: string; campaign_status: string; month: string;
   impressions: number; clicks: number; cost: number; conversions: number; conversions_value: number;
   ctr: number; avg_cpc: number; conversion_rate: number;
+  campaign_type?: string | null;
+}
+interface ImpressionShareRow {
+  campaign_id: string; campaign_name: string; campaign_type: string | null; month: string;
+  cost: number; conversions: number;
+  search_impression_share: number; search_budget_lost_is: number; search_rank_lost_is: number;
+  daily_budget: number; budget_utilization: number;
 }
 
 function monthNum(month: string): number {
@@ -145,22 +187,51 @@ function mapCampaign(c: CampaignMonthlyRow) {
   };
 }
 
+/** Het nieuwste impressieaandeel per campagne, in de vorm van de live route (getCampaignImpressionShare). */
+function laatsteImpressieaandeel(rows: ImpressionShareRow[]) {
+  const laatste = new Map<string, ImpressionShareRow>();
+  for (const r of rows) {
+    const eerder = laatste.get(r.campaign_id);
+    if (!eerder || String(r.month) > String(eerder.month)) laatste.set(r.campaign_id, r);
+  }
+  return [...laatste.values()].map((r) => ({
+    campaignId: r.campaign_id,
+    campaignName: r.campaign_name,
+    campaignType: r.campaign_type ?? "SEARCH",
+    cost: Math.round(Number(r.cost) || 0),
+    conversions: Math.round(Number(r.conversions) || 0),
+    searchImpressionShare: Number(r.search_impression_share) || 0,
+    searchBudgetLostIS: Number(r.search_budget_lost_is) || 0,
+    searchRankLostIS: Number(r.search_rank_lost_is) || 0,
+    dailyBudget: Math.round(Number(r.daily_budget) || 0),
+    budgetUtilization: parseFloat((Number(r.budget_utilization) || 0).toFixed(2)),
+  }));
+}
+
 /**
  * Bouwt dezelfde JSON-vorm als de live /api/google-ads/client-data-route, maar uit de geseede
  * database in plaats van de Google Ads API. clientId is het pseudo-client_id ("demo-grt" etc.),
  * niet een echt Google Ads customer ID.
+ *
+ * Een leesfout gooit (eis) in plaats van een lege reeks op te leveren: een kapotte query mag op
+ * het dashboard niet lezen als "deze klant had geen kosten".
  */
 export async function buildGeocloneClientData(supabase: SupabaseClient, clientId: string) {
-  const [{ data: monthlyRows }, { data: weeklyRows }, { data: campaignRows }] = await Promise.all([
-    supabase.from("ads_account_monthly").select("*").eq("client_id", clientId).order("month") as unknown as Promise<{ data: AccountMonthlyRow[] | null }>,
-    supabase.from("ads_account_weekly").select("*").eq("client_id", clientId).order("week_start") as unknown as Promise<{ data: AccountWeeklyRow[] | null }>,
-    supabase.from("ads_campaign_monthly").select("*").eq("client_id", clientId).order("month") as unknown as Promise<{ data: CampaignMonthlyRow[] | null }>,
+  const [monthlyRes, weeklyRes, campaignRes, isRes, syncRes] = await Promise.all([
+    supabase.from("ads_account_monthly").select("*").eq("client_id", clientId).order("month"),
+    supabase.from("ads_account_weekly").select("*").eq("client_id", clientId).order("week_start"),
+    supabase.from("ads_campaign_monthly").select("*").eq("client_id", clientId).order("month"),
+    supabase.from("ads_campaign_impression_share").select("*").eq("client_id", clientId).order("month"),
+    supabase.from("client_sync_status").select("last_successful_sync_at").eq("client_id", clientId).limit(1),
   ]);
 
-  const monthly = monthlyRows ?? [];
-  const campaigns = campaignRows ?? [];
+  const monthly = eis(monthlyRes, "ads_account_monthly (demo)") as AccountMonthlyRow[];
+  const weeklyRows = eis(weeklyRes, "ads_account_weekly (demo)") as AccountWeeklyRow[];
+  const campaigns = eis(campaignRes, "ads_campaign_monthly (demo)") as CampaignMonthlyRow[];
+  const isRows = eis(isRes, "ads_campaign_impression_share (demo)") as ImpressionShareRow[];
+  const syncRows = eis(syncRes, "client_sync_status (demo)") as { last_successful_sync_at?: unknown }[];
   const years = [...new Set(monthly.map((r) => yearNum(r.month)))].sort((a, b) => a - b);
-  const currentYear = years.length > 0 ? years[years.length - 1] : Number(new Date().getFullYear());
+  const currentYear = years.length > 0 ? years[years.length - 1] : Number(today().slice(0, 4));
 
   const historicalYears: YearDataInput[] = [];
   for (const y of years.filter((y) => y !== currentYear)) {
@@ -171,13 +242,16 @@ export async function buildGeocloneClientData(supabase: SupabaseClient, clientId
   }
 
   const currentYearMonthly = monthly.filter((r) => yearNum(r.month) === currentYear).map(toApiMonthly);
-  const currentYearWeekly = toApiWeekly((weeklyRows ?? []).filter((r) => yearNum(r.week_start) === currentYear));
+  const currentYearWeekly = toApiWeekly(weeklyRows.filter((r) => yearNum(r.week_start) === currentYear));
 
-  // Alleen afgesloten maanden tellen als "gerealiseerd" -- zelfde regel als de live route.
-  const now = new Date();
-  const currentMonthNum = now.getFullYear() === currentYear ? now.getMonth() + 1 : 13;
-  const monthsWithData = currentYearMonthly.map((m) => m.month).filter((m) => m < currentMonthNum);
-  const realizedThroughMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 0;
+  // Gerealiseerd is t/m de laatste VOLLE maand met data, niet t/m "vorige kalendermaand". Een
+  // maandrij zegt niet tot welke dag hij gevuld is; het synctijdstip wel. De demo is op 26 augustus
+  // geseed: augustus loopt t/m de 25e en telt dus niet als gerealiseerd, en september en oktober
+  // bestaan niet. Op de kalender telde augustus als vol en liep de band door tot oktober.
+  const laatsteMaand = monthly.map((r) => String(r.month ?? "").slice(0, 7)).sort().pop() ?? null;
+  const laatsteSync = syncRows[0]?.last_successful_sync_at ? String(syncRows[0].last_successful_sync_at) : null;
+  const dataStand = maandbronDataStand(laatsteMaand, laatsteSync);
+  const realizedThroughMonth = gerealiseerdTotMaand(dataStand, currentYear, currentYearMonthly.map((m) => m.month));
 
   const lastFullYear = historicalYears[historicalYears.length - 1] ?? null;
   const prevConv = lastFullYear?.monthly.reduce((s, m) => s + m.conversions, 0) ?? 0;
@@ -215,17 +289,20 @@ export async function buildGeocloneClientData(supabase: SupabaseClient, clientId
     customerId: clientId,
     currentYear,
     realizedThroughMonth,
+    dataStand,
     targetCurrentYear,
     historicalYears,
     currentYearMonthly,
     currentYearWeekly,
     campaigns: campaignsCurrentYear,
     campaignsHistorical,
-    impressionShare: [],
+    // Uit de geseede tabel, zoals de live route het uit de API haalt. De clones hebben er geen rijen
+    // in, en houden dus de lege lijst die ze altijd hadden.
+    impressionShare: laatsteImpressieaandeel(isRows),
     conversionActions: [],
     accountStructure: {
       campaigns: [...latestByCampaign.values()].map((c) => ({
-        id: c.campaign_id, name: c.campaign_name, type: "SEARCH", biddingStrategy: "MAXIMIZE_CONVERSIONS",
+        id: c.campaign_id, name: c.campaign_name, type: c.campaign_type || "SEARCH", biddingStrategy: "MAXIMIZE_CONVERSIONS",
         purpose: "demand_capture", bucketLabel: null, adGroupCount: 1, assetGroupCount: 0, hasFeed: false,
         productGroupCount: 0, cost30d: Math.round(c.cost), conversions30d: Math.round(c.conversions), impressions30d: c.impressions,
       })),

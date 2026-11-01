@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { getAllClients, type Client } from "./clients";
 import { type ClientHistoricalData } from "./types";
 import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "./api/adapter";
+import { today } from "./reporting-date";
 
 export interface ConversionAction {
   id: string;
@@ -197,28 +198,14 @@ export function useClientData(clientId: string): ClientDataState {
 
     const googleAdsCustomerId = clientId.replace("gads-", "");
 
-    // Read selected conversion actions from localStorage
-    const settingsKey = `rm-dashboard-settings-${clientId}`;
-    let convActionIds: string[] | undefined;
-    try {
-      const stored = localStorage.getItem(settingsKey);
-      if (stored) {
-        const settings = JSON.parse(stored);
-        if (settings.conversionActions) {
-          const included = settings.conversionActions
-            .filter((ca: { includedInDashboard: boolean }) => ca.includedInDashboard)
-            .map((ca: { id: string }) => ca.id);
-          if (included.length > 0) {
-            convActionIds = included;
-          }
-        }
-      }
-    } catch { /* ignore */ }
-
     setState({ data: null, loading: true, error: null, source: "api", googleAdsCustomerId });
 
-    const convParam = convActionIds ? `&conversionActionIds=${convActionIds.join(",")}` : "";
-    fetch(`/api/google-ads/client-data?customerId=${googleAdsCustomerId}${convParam}`)
+    // Welke conversieacties meetellen bepaalt de route zelf, uit client_settings. Hier werd eerst
+    // een localStorage-kopie meegestuurd, en die is pas gevuld nadat het dashboard één keer geladen
+    // is: een eerste bezoek zag andere Google-cijfers dan een tweede. De cache blijft op clientId;
+    // na een wijziging in de instellingen ververst invalidateClientCache hem. Dat moet dan wel ná
+    // het opslaan in de database gebeuren: de route leest de selectie daar, niet uit de browser.
+    fetch(`/api/google-ads/client-data?customerId=${googleAdsCustomerId}`)
       .then((res) => res.json())
       .then((apiData) => {
         if (apiData.error) {
@@ -230,15 +217,20 @@ export function useClientData(clientId: string): ClientDataState {
         }
 
         // Convert API data to ClientHistoricalData using the adapter
-        const historicalData = buildClientDataFromApi(
-          clientId,
-          (apiData.historicalYears as YearDataInput[]) ?? [],
-          (apiData.currentYearMonthly as ApiMonthlyData[]) ?? [],
-          (apiData.currentYearWeekly as ApiWeeklyData[]) ?? [],
-          apiData.targetCurrentYear,
-          apiData.currentYear ?? new Date().getFullYear(),
-          apiData.realizedThroughMonth,
-        );
+        const historicalData: ClientHistoricalData = {
+          ...buildClientDataFromApi(
+            clientId,
+            (apiData.historicalYears as YearDataInput[]) ?? [],
+            (apiData.currentYearMonthly as ApiMonthlyData[]) ?? [],
+            (apiData.currentYearWeekly as ApiWeeklyData[]) ?? [],
+            apiData.targetCurrentYear,
+            apiData.currentYear ?? Number(today().slice(0, 4)),
+            apiData.realizedThroughMonth,
+          ),
+          // Tot waar de route de data definitief acht. Het venster van de KPI-band eindigt hierop;
+          // zonder (een oudere route) volgen de presets de kalender.
+          dataStand: apiData.dataStand ?? null,
+        };
 
         const result: ClientDataState = {
           data: historicalData,

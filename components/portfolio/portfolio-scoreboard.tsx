@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { getVisibleClients } from "@/lib/visible-clients";
 import { type Client } from "@/lib/clients";
-import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
+import { PeriodProvider, usePeriod, type PeriodState } from "@/lib/period/period-context";
 import { PeriodSelector } from "@/components/dashboard/period-selector";
-import { formatRange } from "@/lib/period/period-range";
-import { DEMO_GREENTECH_ID, buildGreentechClientData } from "@/lib/demo/greentech-mock";
+import { formatRange, formatMonth, periodeOpEind, resolveComparison, vensterEindMaand } from "@/lib/period/period-range";
+import { DEMO_GREENTECH_ID } from "@/lib/demo/greentech-mock";
 import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "@/lib/api/adapter";
+import type { ClientHistoricalData } from "@/lib/types";
 import { loadClientGroups, type GroupWithMembers } from "@/lib/client-groups";
 import { bouwHierarchie } from "@/lib/groepen/hierarchie";
 import { comparePeriods } from "@/lib/period/apply-period";
-import type { PeriodRange } from "@/lib/period/period-range";
 import { formatRoas } from "@/lib/forecast-format";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Tabel, Kop, KolomKop, SorteerKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "@/components/dashboard/data-table";
@@ -21,19 +21,56 @@ import { Sparkline } from "@/components/ui/sparkline";
 
 // De demo-klant komt niet uit de Google Ads MCC en heeft dus geen gads-id; zonder deze
 // omweg blijft het scorebord in demo-modus leeg terwijl de periodekiezer er wel boven staat.
-// De cijfers lopen door dezelfde adapter en dezelfde periodesnede als het klantdashboard, dus
-// wat je hier ziet is consistent met wat je daar ziet.
-function demoOverview(range: PeriodRange, compareRange: PeriodRange | null): AccountOverview {
-  const api = buildGreentechClientData(DEMO_GREENTECH_ID);
-  const data = buildClientDataFromApi(
-    DEMO_GREENTECH_ID,
-    api.historicalYears as YearDataInput[],
-    api.currentYearMonthly as ApiMonthlyData[],
-    api.currentYearWeekly as ApiWeeklyData[],
-    api.targetCurrentYear,
-    api.currentYear,
-    api.realizedThroughMonth,
-  );
+//
+// Dezelfde route als het klantdashboard (/api/google-ads/client-data, en die leest de demo uit de
+// geseede database), dezelfde adapter en dezelfde periodesnede: wat je hier ziet is wat je daar
+// ziet. Hier stond eerst een eigen aanroep van de GreenTech-fixture. Toen het dashboard naar de
+// database ging, zou deze cel nog de fixture-wereld tonen -- en dit commentaar zou liegen.
+async function haalDemoData(): Promise<ClientHistoricalData | null> {
+  try {
+    const api = await fetch(`/api/google-ads/client-data?customerId=${DEMO_GREENTECH_ID}`).then((r) => r.json());
+    if (!api || api.error) return null;
+    // Zoals lib/use-client-data.ts het antwoord omzet, met de datastand erbij.
+    return {
+      ...buildClientDataFromApi(
+        DEMO_GREENTECH_ID,
+        (api.historicalYears as YearDataInput[]) ?? [],
+        (api.currentYearMonthly as ApiMonthlyData[]) ?? [],
+        (api.currentYearWeekly as ApiWeeklyData[]) ?? [],
+        api.targetCurrentYear,
+        api.currentYear,
+        api.realizedThroughMonth,
+      ),
+      dataStand: api.dataStand ?? null,
+    };
+  } catch {
+    // Geen demo-data is een lege cel, net als een echte klant waarvan de overview faalt.
+    return null;
+  }
+}
+
+/**
+ * De demo-cel, met het venster dat zijn eigen dashboard ook kiest.
+ *
+ * Het scorebord heeft één periode voor alle klanten, op de kalender: de live klanten hebben data
+ * t/m gisteren. De geseede demo stopt eerder (26 augustus 2026). Op het kalendervenster telden
+ * september en oktober dan als maanden zonder conversies, en stond de demo op 1 november op -31%
+ * conversies jaar-op-jaar, waar zijn dashboard (dat op de laatste volle maand eindigt) -7% laat
+ * zien. Dus dezelfde preset op het venster van de demo, met een regel eronder die dat zegt.
+ */
+function demoOverview(
+  data: ClientHistoricalData,
+  periode: Pick<PeriodState, "preset" | "custom" | "comparison" | "range">,
+): AccountOverview {
+  const stand = data.dataStand ?? null;
+  // Dezelfde regel als de PeriodProvider van het dashboard (periodeOpEind): ook "Vorig jaar" op de
+  // kalender en een omgekeerde eigen periode geklemd.
+  const range = periodeOpEind(periode.preset, periode.custom, vensterEindMaand(stand?.laatsteVolleMaand));
+  const compareRange = resolveComparison(range, periode.comparison);
+  const verschoven = range.start !== periode.range.start || range.end !== periode.range.end;
+  const periodeNoot = verschoven && stand?.dataTot
+    ? `Data t/m ${Number(stand.dataTot.slice(8, 10))} ${formatMonth(stand.dataTot.slice(0, 7))}; cijfers over ${formatRange(range)}`
+    : undefined;
   const { current, previous, deltas } = comparePeriods(data, range, compareRange);
   const laatste = current.months[current.months.length - 1];
   const vorigJaarZelfdeMaand = previous?.months.find((m) => m.month === laatste?.month);
@@ -57,6 +94,7 @@ function demoOverview(range: PeriodRange, compareRange: PeriodRange | null): Acc
       prevYearConv: vorigJaarZelfdeMaand?.conversions ?? 0,
     } : null,
     monthlyConversions: current.months.map((m) => m.conversions),
+    periodeNoot,
   };
 }
 
@@ -87,6 +125,49 @@ interface AccountOverview {
   } | null;
   monthlyConversions?: number[];
   error?: string;
+  /** Alleen in de browser gezet: over welk venster deze rij gaat als dat afwijkt van de kop. */
+  periodeNoot?: string;
+}
+
+/**
+ * De accounts uit het antwoord van /api/google-ads/overview, of null als de overview faalde. Een
+ * HTTP-fout telt ook als falen: de route geeft een 500 met { error } als client_settings niet te
+ * lezen is, en r.json() maakte daar [] van. Dan verdwenen de cijfers van alle echte klanten, waar
+ * null ze laat staan.
+ */
+export async function overviewAccounts(r: Pick<Response, "ok" | "json">): Promise<AccountOverview[] | null> {
+  if (!r.ok) return null;
+  const data = (await r.json().catch(() => null)) as { accounts?: AccountOverview[] } | null;
+  return data ? data.accounts || [] : null;
+}
+
+/**
+ * De totalen van de hero en de totaalrij: één venster per som.
+ *
+ * Een rij met een periodeNoot (de demo, op het venster van zijn eigen datastand) gaat over andere
+ * maanden dan de kop. Optellen bij de echte klanten gaf een som over twee vensters onder een kop
+ * die er maar één noemt, en de demo telde mee in "groeiend" en "vragen aandacht". Die rij blijft
+ * gewoon in de tabel, met zijn noot; hij valt alleen buiten de som. Staan er alleen zulke rijen
+ * (demomodus zonder echte klanten), dan is de som die van hen en draagt het totaal hun noot.
+ */
+export function portfolioTotalen(overviews: readonly AccountOverview[]) {
+  const metSpend = overviews.filter((o) => o.ytd && o.ytd.adSpend > 0);
+  const opKop = metSpend.filter((o) => !o.periodeNoot);
+  const rijen = opKop.length > 0 ? opKop : metSpend;
+  const noten = [...new Set(rijen.map((o) => o.periodeNoot).filter((n): n is string => !!n))];
+  const conversions = rijen.reduce((s, o) => s + (o.ytd?.conversions ?? 0), 0);
+  const revenue = rijen.reduce((s, o) => s + (o.ytd?.revenue ?? 0), 0);
+  const adSpend = rijen.reduce((s, o) => s + (o.ytd?.adSpend ?? 0), 0);
+  return {
+    rijen,
+    conversions, revenue, adSpend,
+    roas: adSpend > 0 ? revenue / adSpend : 0,
+    groeiend: rijen.filter((o) => (o.yoy?.convChange ?? 0) > 0).length,
+    aandacht: rijen.filter((o) => (o.yoy?.convChange ?? 0) < -10).length,
+    noot: noten.length === 1 ? noten[0] : undefined,
+    /** Rijen met spend die buiten de som vallen omdat ze over een ander venster gaan. */
+    buitenTotaal: metSpend.length - rijen.length,
+  };
 }
 
 function fmt(v: number): string {
@@ -196,44 +277,63 @@ function PortfolioScoreboardBody() {
 
   useEffect(() => { loadClientGroups().then(setGroepen).catch(() => setGroepen([])); }, []);
 
+  // De demo-data hangt niet van de periode af, alleen de snede erover: één keer ophalen per
+  // bezoek, en bij een andere periode alleen opnieuw snijden.
+  const demoData = useRef<Promise<ClientHistoricalData | null> | null>(null);
+
   useEffect(() => {
+    // Een antwoord dat binnenkomt nadat de periode alweer veranderd is, hoort niet in beeld.
+    let actueel = true;
     const visible = getVisibleClients();
     setClients(visible);
 
-    // Only fetch for Google Ads clients
-    // De demo-klant krijgt zijn cijfers lokaal; de rest komt van de API.
-    const demoMap = new Map<string, AccountOverview>();
+    // De demo-klant via de client-data-route (zie haalDemoData); de rest via de overview.
+    let demo: Promise<AccountOverview | null> = Promise.resolve(null);
     if (visible.some((c) => c.id === DEMO_GREENTECH_ID)) {
-      demoMap.set(DEMO_GREENTECH_ID, demoOverview(periode.range, periode.compareRange));
+      demoData.current ??= haalDemoData();
+      const { preset, custom, comparison, range } = periode;
+      demo = demoData.current.then((d) => {
+        // Mislukt: bij de volgende periodekeuze opnieuw proberen in plaats van leeg te blijven.
+        if (!d) demoData.current = null;
+        return d ? demoOverview(d, { preset, custom, comparison, range }) : null;
+      });
     }
 
     const gadsClients = visible.filter((c) => c.id.startsWith("gads-"));
-    if (gadsClients.length === 0) {
-      setOverviews(demoMap);
-      setLoading(false);
-      return;
+    let accounts: Promise<AccountOverview[] | null> = Promise.resolve([]);
+    if (gadsClients.length > 0) {
+      const customerIds = gadsClients.map((c) => c.id.replace("gads-", "")).join(",");
+      // De periode gaat mee de query in: het scorebord haalt zijn cijfers server-side op, dus
+      // client-side snijden zoals op het klantdashboard kan hier niet.
+      const q = new URLSearchParams({ customerIds, start: periode.range.start, end: periode.range.end });
+      if (periode.compareRange) {
+        q.set("compareStart", periode.compareRange.start);
+        q.set("compareEnd", periode.compareRange.end);
+      }
+      accounts = fetch(`/api/google-ads/overview?${q}`)
+        // null = de overview faalde (netwerk of HTTP-fout): dan blijven de vorige cijfers van de
+        // echte klanten staan, zoals hiervoor.
+        .then(overviewAccounts)
+        .catch(() => null);
     }
 
-    const customerIds = gadsClients.map((c) => c.id.replace("gads-", "")).join(",");
-    // De periode gaat mee de query in: het scorebord haalt zijn cijfers server-side op, dus
-    // client-side snijden zoals op het klantdashboard kan hier niet.
-    const q = new URLSearchParams({ customerIds, start: periode.range.start, end: periode.range.end });
-    if (periode.compareRange) {
-      q.set("compareStart", periode.compareRange.start);
-      q.set("compareEnd", periode.compareRange.end);
-    }
-    fetch(`/api/google-ads/overview?${q}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const map = new Map<string, AccountOverview>(demoMap);
-        for (const account of data.accounts || []) {
-          map.set(`gads-${account.customerId}`, account);
-        }
-        setOverviews(map);
+    Promise.all([demo, accounts])
+      .then(([d, accs]) => {
+        if (!actueel) return;
+        setOverviews((vorige) => {
+          const map = new Map<string, AccountOverview>();
+          if (accs === null) {
+            for (const [k, v] of vorige) if (k !== DEMO_GREENTECH_ID) map.set(k, v);
+          } else {
+            for (const account of accs) map.set(`gads-${account.customerId}`, account);
+          }
+          if (d) map.set(DEMO_GREENTECH_ID, d);
+          return map;
+        });
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [periode.range.start, periode.range.end, periode.compareRange?.start, periode.compareRange?.end]);
+      .finally(() => { if (actueel) setLoading(false); });
+    return () => { actueel = false; };
+  }, [periode.preset, periode.comparison, periode.range.start, periode.range.end, periode.compareRange?.start, periode.compareRange?.end]);
 
   function handleSort(col: typeof sortBy) {
     if (sortBy === col) {
@@ -333,19 +433,26 @@ function PortfolioScoreboardBody() {
     );
   }
 
-  // Portfolio totals
-  const allOverviews = Array.from(overviews.values()).filter((o) => o.ytd && o.ytd.adSpend > 0);
-  const portfolioConv = allOverviews.reduce((s, o) => s + (o.ytd?.conversions ?? 0), 0);
-  const portfolioRev = allOverviews.reduce((s, o) => s + (o.ytd?.revenue ?? 0), 0);
-  const portfolioSpend = allOverviews.reduce((s, o) => s + (o.ytd?.adSpend ?? 0), 0);
-  const portfolioRoas = portfolioSpend > 0 ? portfolioRev / portfolioSpend : 0;
+  // Portfolio totals: over één venster (zie portfolioTotalen).
+  const totalen = portfolioTotalen(Array.from(overviews.values()));
+  const portfolioConv = totalen.conversions;
+  const portfolioRev = totalen.revenue;
+  const portfolioSpend = totalen.adSpend;
+  const portfolioRoas = totalen.roas;
   // Tegen de grootste klant en niet tegen de som: bij twintig klanten is elk aandeel-van-het-
-  // totaal klein, en dan zijn alle streepjes even kort.
-  const grootsteConv = Math.max(0, ...allOverviews.map((o) => o.ytd?.conversions ?? 0));
-  const grootsteSpend = Math.max(0, ...allOverviews.map((o) => o.ytd?.adSpend ?? 0));
-  const activeCount = allOverviews.length;
-  const growingCount = allOverviews.filter((o) => (o.yoy?.convChange ?? 0) > 0).length;
-  const decliningCount = allOverviews.filter((o) => (o.yoy?.convChange ?? 0) < -10).length;
+  // totaal klein, en dan zijn alle streepjes even kort. Over alle rijen met spend, ook die buiten
+  // de som vallen: het streepje staat in elke rij, en mag niet voorbij zijn cel lopen.
+  const metSpend = Array.from(overviews.values()).filter((o) => o.ytd && o.ytd.adSpend > 0);
+  const grootsteConv = Math.max(0, ...metSpend.map((o) => o.ytd?.conversions ?? 0));
+  const grootsteSpend = Math.max(0, ...metSpend.map((o) => o.ytd?.adSpend ?? 0));
+  const activeCount = totalen.rijen.length;
+  const growingCount = totalen.groeiend;
+  const decliningCount = totalen.aandacht;
+  // De regel onder de totalen: welk venster, of wat er buiten de som valt.
+  const totaalNoot = totalen.noot
+    ?? (totalen.buitenTotaal > 0
+      ? `Zonder ${totalen.buitenTotaal === 1 ? "de klant" : `${totalen.buitenTotaal} klanten`} met een eigen venster (zie de regel onder de naam)`
+      : undefined);
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? "Goedemorgen" : now.getHours() < 18 ? "Goedemiddag" : "Goedenavond";
@@ -361,7 +468,7 @@ function PortfolioScoreboardBody() {
 
               return (
                 <Rij key={client.id} className="group">
-                  <NaamCel>
+                  <NaamCel sub={overview?.periodeNoot}>
                     <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-brand-blue-ink transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
                       {/* Health dot */}
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
@@ -439,6 +546,9 @@ function PortfolioScoreboardBody() {
                 : `${clients.length} klanten geconfigureerd`
               }
             </p>
+            {/* De totalen rechts (en de kaarten op een telefoon) gaan over één venster; zegt de
+                kop daar niet alles over, dan staat het hier. */}
+            {activeCount > 0 && totaalNoot && <p className="text-white/60 text-micro mt-1 max-w-lg">{totaalNoot}</p>}
           </div>
           {activeCount > 0 && (
             <div className="hidden lg:grid grid-cols-3 gap-6 text-right">
@@ -520,7 +630,10 @@ function PortfolioScoreboardBody() {
               totalen — een gemiddelde van klant-ROAS'en weegt een klant met € 2.000 spend even
               zwaar als een met € 400.000. */}
           <TotaalRij>
-            <TotaalCel>Alle klanten met spend ({activeCount})</TotaalCel>
+            <TotaalCel>
+              Alle klanten met spend ({activeCount})
+              {totaalNoot && <span className="block text-micro font-normal text-muted-foreground whitespace-normal">{totaalNoot}</span>}
+            </TotaalCel>
             <TotaalCel getal>{num(portfolioConv)}</TotaalCel>
             <TotaalCel getal>{""}</TotaalCel>
             <TotaalCel getal>{fmt(portfolioRev)}</TotaalCel>

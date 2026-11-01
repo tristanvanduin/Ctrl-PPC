@@ -102,6 +102,96 @@ if (opTempo) {
   assert(sept?.forecast === Math.round((57 / 30) * 7 * (52 / 12)), `maandprognose = weektempo x 52/12 = 58 (kreeg ${sept?.forecast})`);
 }
 
+// ── De sync stopte halverwege een maand: gerealiseerd t/m de laatste VOLLE maand ──
+//
+// De vorm van de demo-Meta-reeks: dagdata van 13 maart t/m 26 augustus 2026, bekeken op
+// 1 november. De oude regel ("t/m vorige kalendermaand", hier oktober) liet augustus, 26 van de 31
+// dagen, als volle maand meetellen, met het zwaarste recency-gewicht in de prognose; de oude code
+// gaf hier gerealiseerd t/m 8. Nu loopt de realisatie t/m juli (lib/sync/datastand.ts volleMaand)
+// en wordt augustus geprojecteerd.
+const gestopt: ChannelForecastRow[] = [];
+for (let t = Date.UTC(2026, 2, 13); t <= Date.UTC(2026, 7, 26); t += 86_400_000) {
+  gestopt.push(rij(new Date(t).toISOString().slice(0, 10), 10, 1, 0));
+}
+const gestoptData = buildChannelHistoricalData("c1", gestopt, { conversions: 0, revenue: 0, adSpend: 0 }, "2026-11-01");
+assert(gestoptData !== null, "gestopte reeks levert data op");
+if (gestoptData) {
+  const gevuld = gestoptData.currentYearData.map((m, i) => (m !== null ? i + 1 : 0));
+  const realizedThroughMonth = Math.max(...gevuld);
+  assert(realizedThroughMonth === 7, `data t/m 26 aug op 1 nov: gerealiseerd t/m juli = 7 (kreeg ${realizedThroughMonth})`);
+  assert(gestoptData.currentYearData[6]?.conversions === 31, `juli telt volledig mee: 31 (kreeg ${gestoptData.currentYearData[6]?.conversions})`);
+  assert(gestoptData.currentYearData[7] === null, "augustus (26 van 31 dagen) telt NIET als gerealiseerd");
+  assert(gestoptData.currentYearData[8] === null && gestoptData.currentYearData[9] === null,
+    "september en oktober zijn geen gerealiseerde nullen");
+  assert(gestoptData.currentYearData[2]?.conversions === 19, `maart telt vanaf de 13e: 19 (kreeg ${gestoptData.currentYearData[2]?.conversions})`);
+}
+const gestoptForecast = buildChannelForecast("c1", gestopt, [], "meta_ads", "2026-11-01");
+assert(gestoptForecast !== null, "gestopte reeks levert een forecast op");
+if (gestoptForecast) {
+  const conv = gestoptForecast.forecast.conversions;
+  const aug = conv.points[7];
+  assert(aug?.realized === null, `augustus heeft in de prognose geen realisatie (kreeg ${aug?.realized})`);
+  // Samen met de grens in lib/forecast.ts (de LAATSTE gerealiseerde maand, niet het aantal
+  // niet-lege): 13-31 mrt (19) + apr (30) + mei (31) + jun (30) + jul (31) = 141. HEAD gaf 110
+  // (mrt-jun): de reeks [null, null, mrt..aug] heeft 6 niet-lege maanden, en slice(0, 6) sneed
+  // juli en augustus weg -- in de demo-Meta YTD 660 in plaats van 1.002.
+  assert(Math.round(conv.kpi.ytdRealized) === 141, `YTD = 13 maart t/m 31 juli = 141 (kreeg ${conv.kpi.ytdRealized})`);
+  assert(conv.points[0]?.realized === null && conv.points[0]?.forecast === null,
+    `januari (kanaal liep nog niet) krijgt geen prognose (kreeg ${JSON.stringify(conv.points[0])})`);
+}
+// Een dag die op 31 augustus valt maakt augustus wel vol.
+const totEindAug = [...gestopt, ...[27, 28, 29, 30, 31].map((d) => rij(`2026-08-${d}`, 10, 1, 0))];
+const volAug = buildChannelHistoricalData("c1", totEindAug, { conversions: 0, revenue: 0, adSpend: 0 }, "2026-11-01");
+assert(volAug?.currentYearData[7]?.conversions === 31, `data t/m 31 aug: augustus telt volledig (kreeg ${volAug?.currentYearData[7]?.conversions})`);
+assert(volAug?.currentYearData[8] === null, "en september blijft leeg, niet nul");
+// Een kanaal dat vorig jaar stopte: dit jaar is niets gerealiseerd.
+const vorigJaarGestopt = buildChannelHistoricalData("c1", [rij("2025-12-31", 10, 1, 0)], { conversions: 0, revenue: 0, adSpend: 0 }, "2026-11-01");
+assert(vorigJaarGestopt?.currentYearData.every((m) => m === null) === true, "data t/m vorig jaar: dit jaar niets gerealiseerd");
+
+// ── Gepauzeerd met een gezonde sync: dezelfde stopregel als "Alle kanalen" ──
+//
+// Meta liep 2 conversies per dag t/m 15 augustus 2026 en ligt sindsdien stil; de sync draait, dus
+// de route meet t/m 31 oktober (september en oktober zijn gemeten nullen). "Alle kanalen" telt zo'n
+// kanaal na zijn laatste data als nul (kanaalGestopt in lib/forecast-som.ts); de tab projecteerde
+// november en december op het oude tempo (55 en 57), en dan stonden er twee jaarprognoses voor
+// hetzelfde kanaal op één dashboard: 566 hier, 454 in de som.
+{
+  const stil: ChannelForecastRow[] = [];
+  for (let t = Date.UTC(2025, 0, 1); t <= Date.UTC(2026, 7, 15); t += 86_400_000) stil.push(rij(new Date(t).toISOString().slice(0, 10), 10, 2, 0));
+  const f = buildChannelForecast("c1", stil, [], "meta_ads", "2026-11-01", "2026-10-31");
+  const c = f?.forecast.conversions;
+  assert(c?.kpi.realizedThroughMonth === 10, `gepauzeerd: gerealiseerd t/m oktober (kreeg ${c?.kpi.realizedThroughMonth})`);
+  assert(c?.points[10].forecast === 0 && c?.points[11].forecast === 0, `gepauzeerd: november en december 0, niet het oude tempo (kreeg ${c?.points[10].forecast}/${c?.points[11].forecast})`);
+  assert(c !== undefined && Math.round(c.kpi.adjustedAnnual) === Math.round(c.kpi.ytdRealized) && Math.round(c.kpi.adjustedAnnual) === 454,
+    `gepauzeerd: de jaarprognose is wat er gerealiseerd is, 454 (kreeg ${c?.kpi.adjustedAnnual})`);
+  assert(f?.forecast.adSpend.points[11].forecast === 0, "gepauzeerd: ook geen spend meer");
+  // Een CPA van nul kosten op nul conversies is geen CPA van € 0 (dat kleurt groen).
+  assert(f?.forecast.cpa.points[11].forecast === null, `gepauzeerd: geen CPA-prognose voor december (kreeg ${f?.forecast.cpa.points[11].forecast})`);
+
+  // Een seizoenspauze is geen stop: LinkedIn liep vorig jaar ook niet van april t/m september.
+  const seizoen: ChannelForecastRow[] = [];
+  for (let t = Date.UTC(2025, 0, 1); t <= Date.UTC(2026, 2, 31); t += 86_400_000) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    const m = Number(d.slice(5, 7));
+    if (m <= 3 || m >= 10) seizoen.push(rij(d, 10, 2, 0));
+  }
+  const s = buildChannelForecast("c1", seizoen, [], "linkedin_ads", "2026-10-15", "2026-10-14");
+  assert((s?.forecast.conversions.points[10].forecast ?? 0) > 0, `seizoenspauze: november wordt geprojecteerd (kreeg ${s?.forecast.conversions.points[10].forecast})`);
+}
+
+// ── De partiële eerste maand als laatste gerealiseerde: het tempo over de dagen dat het liep ──
+//
+// Meta sinds 20 juli 2026, 40 conversies in 12 dagen (en verder in augustus). Zonder doel nam het
+// tempo juli gedeeld door 31 dagen: 39 per maand, waar het 103 is.
+{
+  const laat: ChannelForecastRow[] = [];
+  for (let t = Date.UTC(2026, 6, 20); t <= Date.UTC(2026, 7, 26); t += 86_400_000) laat.push(rij(new Date(t).toISOString().slice(0, 10), 10, 40 / 12, 0));
+  const f = buildChannelForecast("c1", laat, [], "meta_ads", "2026-11-01", "2026-08-26");
+  const c = f?.forecast.conversions;
+  assert(c?.kpi.realizedThroughMonth === 7 && Math.round(c.points[6].realized ?? 0) === 40, `start 20 juli: juli gerealiseerd met 40 (kreeg ${c?.points[6].realized})`);
+  assert(c?.points.slice(7).every((p) => p.forecast === 101) === true, `start 20 juli: augustus-december op 40 / 12 dagen, 101 per maand (kreeg ${c?.points.slice(7).map((p) => p.forecast).join("/")})`);
+}
+
 // Zonder doel: computeForecast valt terug op het historisch totaal (zelfde gedrag als Google).
 const withoutTarget = buildChannelForecast("c1", rows, [], "meta_ads", "2026-08-23");
 assert(withoutTarget !== null, "forecast zonder doelen levert nog steeds data op");

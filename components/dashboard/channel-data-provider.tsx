@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
 import { today as vandaag } from "@/lib/reporting-date";
 import { buildChannelForecast } from "@/lib/analysis/channel-forecast-data";
+import { useBlendedClientData } from "@/lib/use-blended-client-data";
 import type { TargetRow } from "@/lib/analysis/o2-targets-cost";
 import {
   resolveChannelConversionConfig,
@@ -63,6 +64,14 @@ export function ChannelDataProvider({ clientId, channel, children }: {
   const [rijen, setRijen] = useState<DailyRow[] | null>(null);
   const [convConfig, setConvConfig] = useState<ChannelConversionConfig>(() => resolveChannelConversionConfig(null));
   const [targets, setTargets] = useState<TargetRow[] | null>(null);
+  // Tot welke dag dit kanaal gemeten is, met de sync erin verwerkt (dataTotVanDagbron). De browser
+  // kan <kanaal>_connections niet lezen, en uit de rijen alleen verloor een gepauzeerd account met
+  // een gezonde sync zijn echte halve maand aan een projectie, terwijl "Alle kanalen" dezelfde
+  // maanden als gemeten telde (review [14]). Hetzelfde verzoek als de KPI-band erboven (de hook
+  // deelt het); faalt het, dan de rijen, zoals voorheen.
+  const route = useBlendedClientData(clientId);
+  const syncDag = route.dataStand?.bronnen?.find((b) => b.bron === channel)?.dataTot ?? null;
+  const routeKlaar = !route.loading;
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +107,9 @@ export function ChannelDataProvider({ clientId, channel, children }: {
     const convVan = (r: DailyRow) => sumSelectedConversions(r.convFields, cfg.channelKey, convConfig);
     const convLabel = selectedConversionLabels(cfg.channelKey, convConfig).join(" + ");
     if (rijen === null || targets === null) return { rijen: null, convVan, convLabel, forecast: null };
+    // Nog geen syncdag: de prognose wacht (laadt), in plaats van eerst op de rijen te tonen en
+    // daarna een maand te verspringen. De pacing en de maandgrafiek hebben hem niet nodig.
+    if (!routeKlaar) return { rijen, convVan, convLabel, forecast: null };
 
     const gebouwd = buildChannelForecast(
       clientId,
@@ -105,9 +117,10 @@ export function ChannelDataProvider({ clientId, channel, children }: {
       targets,
       cfg.channelKey,
       vandaag(),
+      syncDag,
     );
     return { rijen, convVan, convLabel, forecast: gebouwd ?? "leeg" };
-  }, [clientId, cfg.channelKey, convConfig, rijen, targets]);
+  }, [clientId, cfg.channelKey, convConfig, rijen, targets, routeKlaar, syncDag]);
 
   return <KanaalDataContext.Provider value={waarde}>{children}</KanaalDataContext.Provider>;
 }

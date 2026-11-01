@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, ResponsiveContainer, type DotItemDotProps } fro
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { ALLE_FORECAST_METRICS, computeForecast } from "@/lib/forecast";
-import { METRIC_LABELS, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
+import { METRIC_LABELS, formatPercent, formatterFor, geenWaardeLabel, isLowerBetter, zonderData } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Tip, AsY, Raster, asSchaalVenster, kortEuro } from "./chart-chrome";
@@ -112,6 +112,9 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
               {ALLE_FORECAST_METRICS.map((m) => {
                 const p = forecast[m].points[idx];
                 if (!p) return null;
+                // Zoals monthly-trend-bars.tsx: een maand zonder realisatie en zonder prognose
+                // stond hier als "Prognose", waarde 0 en een gekleurde ratio die niets meet.
+                const mGeenData = zonderData(p);
                 const mVal = p.realized ?? p.forecast ?? 0;
                 const mFormat = formatterFor(m);
                 const mInverted = isLowerBetter(m);
@@ -121,14 +124,16 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
                     <div>
                       <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
                       <p className="text-micro text-muted-foreground">
-                        {p.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(p.expected)}
+                        {mGeenData ? geenWaardeLabel(p, m) : p.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(p.expected)}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lead font-bold text-brand-gray">{mFormat(mVal)}</p>
-                      <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>
-                        {formatPercent(p.monthRatio, 0)}
-                      </p>
+                      <p className="text-lead font-bold text-brand-gray">{mGeenData ? "—" : mFormat(mVal)}</p>
+                      {!mGeenData && (
+                        <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>
+                          {formatPercent(p.monthRatio, 0)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );

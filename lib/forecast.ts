@@ -34,6 +34,8 @@ import {
   WeeklyRecord,
 } from "./types";
 import { median, medianAbsoluteDeviation } from "@/lib/util/stats";
+import { safeDiv } from "@/lib/util/math";
+import { isOptelbaar } from "./forecast-format";
 
 export const MONTH_LABELS = [
   "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
@@ -52,6 +54,8 @@ export interface WeeklyPoint {
   expected: number;
   realized: number | null;
   forecast: number | null;
+  /** Zie ForecastPoint.geenNoemer. */
+  geenNoemer?: boolean;
 }
 
 export interface ForecastPoint {
@@ -61,6 +65,12 @@ export interface ForecastPoint {
   realized: number | null;
   forecast: number | null;
   monthRatio: number;
+  /**
+   * Alleen bij ROAS en CPA: gemeten met een teller maar zonder noemer (kosten zonder één conversie,
+   * omzet zonder kosten). `realized` is dan null, want er is geen verhouding, maar het is geen gat
+   * in de data: de weergave zegt "Geen conversies" en geeft er een oordeel bij (geenWaardeLabel).
+   */
+  geenNoemer?: boolean;
 }
 
 export interface ForecastKPI {
@@ -79,6 +89,13 @@ export interface ForecastKPI {
   forecastHigh: number;
   /** Bandbreedte als fractie van de puntprognose; hoger = onzekerder. */
   forecastSpreadPct: number;
+  /**
+   * T/m welke maand (1-12) er gerealiseerd is: de LAATSTE maand met een rij, niet het aantal
+   * maanden met een rij (0 = nog niets). ytdRealized en ytdExpected lopen tot en met deze maand.
+   * Hier zodat de kaarten en de pacing dezelfde grens lezen als de prognose, in plaats van er elk
+   * een eigen te bepalen. ROAS en CPA nemen hem over van de teller.
+   */
+  realizedThroughMonth: number;
 }
 
 /**
@@ -178,6 +195,88 @@ export function actieveMetrics(forecast: ClientForecast): readonly ForecastMetri
   return actief.length > 0 ? actief : ALLE_FORECAST_METRICS;
 }
 
+/**
+ * De cijfers op één jaaroverzicht-kaartje (components/dashboard/metric-cards.tsx), voor alle vier
+ * de metrics op dezelfde manier en rechtstreeks uit de forecast.
+ *
+ * WAAROM DIT HIER STAAT EN NIET IN DE KAART. De CPA-kaart rekende eigen cijfers uit naast de
+ * forecast. "Gerealiseerd" deelde de kosten van januari t/m maart (`currentYearData.slice(0, 3)`)
+ * door de conversies van het hele jaar tot nu; de prognose deelde het BUDGETDOEL door de
+ * geprognotiseerde conversies. Op de demo (t/m augustus) gaf dat € 19 en € 34, terwijl
+ * forecast.cpa.kpi € 63,63 en € 67,60 zegt -- en de rapportexport, die wél forecast.cpa.kpi
+ * leest, schreef die ook. De ROAS-kaart ernaast rekende met de geprognotiseerde spend, de
+ * CPA-kaart met het doelbudget: twee kaartjes, twee verschillende jaarbudgetten. De
+ * verwachtingsstreep stond vast op 25% ("Q1 verwacht"), ook in augustus.
+ *
+ * `verwachtPct`: het deel van het jaardoel dat volgens de seizoensverdeling van de forecast t/m
+ * de laatste gerealiseerde maand binnen had moeten zijn (kpi.ytdExpected). Dezelfde grootheid
+ * waarmee de pacing-kaart en de health-score "op schema" beoordelen. Null zonder doel, zonder
+ * gerealiseerde maand of voor een verhouding (ROAS/CPA): dan is er geen streep om te zetten.
+ *
+ * `diffPct` houdt het echte teken (+50 = prognose 50% boven doel). Of dat goed of slecht is,
+ * beslist de kaart met isLowerBetter() -- dezelfde afspraak als de maand- en weekkaarten.
+ */
+export interface JaarKaartCijfers {
+  annualTarget: number;
+  /** Gerealiseerd YTD (ytdGerealiseerd): null voor een verhouding zonder noemer. */
+  realized: number | null;
+  adjusted: number;
+  diffPct: number;
+  /** Gerealiseerd als % van het jaardoel. Null zonder doel, en voor ROAS/CPA: van een
+   *  verhouding realiseer je geen percentage (zie KpiTegel in channel-forecast-overview.tsx). */
+  realizedPct: number | null;
+  /** Seizoensverwachting t/m `laatsteMaand` als % van het jaardoel; null = geen streep. Ook
+   *  null voor ROAS/CPA, om dezelfde reden. */
+  verwachtPct: number | null;
+  /** Index (0-11) van de laatste gerealiseerde maand, of -1. Altijd kpi.realizedThroughMonth - 1,
+   *  zodat het label "verwacht t/m <maand>" dezelfde grens noemt als waarover ytdExpected loopt. */
+  laatsteMaand: number;
+}
+
+export function jaarKaartCijfers(forecast: ClientForecast, metric: ForecastMetric): JaarKaartCijfers {
+  const { kpi } = forecast[metric];
+  const laatsteMaand = Math.max(-1, kpi.realizedThroughMonth - 1);
+  const optelbaar = isOptelbaar(metric);
+  const gerealiseerd = optelbaar ? safeDiv(kpi.ytdRealized, kpi.annualTarget) : null;
+  const verwacht = optelbaar && laatsteMaand >= 0 ? safeDiv(kpi.ytdExpected, kpi.annualTarget) : null;
+  return {
+    annualTarget: kpi.annualTarget,
+    realized: ytdGerealiseerd(forecast, metric),
+    adjusted: kpi.adjustedAnnual,
+    diffPct: kpi.diffPct,
+    realizedPct: gerealiseerd === null ? null : gerealiseerd * 100,
+    verwachtPct: verwacht === null ? null : verwacht * 100,
+    laatsteMaand,
+  };
+}
+
+/**
+ * Gerealiseerd t/m de grens, zoals de kaarten, de kanaaltegels en het rapport het tonen. Voor ROAS
+ * en CPA de verhouding van de gerealiseerde tellers, en null zonder noemer: kpi.ytdRealized is daar
+ * 0 (calcKpi), en dan stond er "Gerealiseerd YTD € 0" na € 14.000 kosten zonder één conversie,
+ * naast maandpunten die allemaal "geen conversies" zeiden. Dezelfde afronding als deriveForecast.
+ */
+export function ytdGerealiseerd(forecast: ClientForecast, metric: ForecastMetric): number | null {
+  const verhouding = (a: number, b: number) => {
+    const q = safeDiv(a, b);
+    return q === null ? null : parseFloat(q.toFixed(2));
+  };
+  if (metric === "roas") return verhouding(forecast.revenue.kpi.ytdRealized, forecast.adSpend.kpi.ytdRealized);
+  if (metric === "cpa") return verhouding(forecast.adSpend.kpi.ytdRealized, forecast.conversions.kpi.ytdRealized);
+  return forecast[metric].kpi.ytdRealized;
+}
+
+/**
+ * Waar de "Nu"-lijn in een grafiek staat: de index van de laatste gerealiseerde maand (of week).
+ * Uit de conversiereeks en niet uit de reeks van de gekozen metric: een verhouding is null in een
+ * gerealiseerde periode zonder noemer, en dan schoof de lijn bij CPA naar mei terwijl juli gemeten
+ * was. De verhoudingsreeksen lopen een op een met de conversiereeks (deriveForecast).
+ */
+export function nuIndex(forecast: ClientForecast, per: "maand" | "week"): number {
+  const reeks: readonly { realized: number | null }[] = per === "week" ? forecast.conversions.weeklyPoints : forecast.conversions.points;
+  return reeks.findLastIndex((p) => p.realized !== null);
+}
+
 // ── Fallback & data quality constants ───────────────────────────────────────
 
 /** Performance factor is clamped to this range to prevent runaway projections */
@@ -229,7 +328,7 @@ const SCALING_SPEND_FACTOR = 2.0;
 // ── Data sanitization ──────────────────────────────────────────────────────
 
 /** Sanitize a single numeric value: NaN, Infinity, and negatives become 0 */
-function sanitizeValue(v: number): number {
+export function sanitizeValue(v: number): number {
   if (typeof v !== "number" || !isFinite(v) || v < 0) return 0;
   return v;
 }
@@ -251,12 +350,12 @@ function sanitizeMonth(r: MonthlyRecord): MonthlyRecord {
 }
 
 /** Sanitize an entire year of data */
-function sanitizeYear(records: MonthlyRecord[]): MonthlyRecord[] {
+export function sanitizeYear(records: MonthlyRecord[]): MonthlyRecord[] {
   return records.map(sanitizeMonth);
 }
 
 /** Sanitize current year data (nullable months) */
-function sanitizeCurrentYear(records: (MonthlyRecord | null)[]): (MonthlyRecord | null)[] {
+export function sanitizeCurrentYear(records: (MonthlyRecord | null)[]): (MonthlyRecord | null)[] {
   return records.map((r) => (r !== null ? sanitizeMonth(r) : null));
 }
 
@@ -380,7 +479,7 @@ interface DataMaturity {
  * Analyze whether a client is in a scaling/growth phase vs having mature data.
  * Combines all available historical years + current year realized data.
  */
-function analyzeDataMaturity(
+export function analyzeDataMaturity(
   years: MonthlyRecord[][],
   currentYear: (MonthlyRecord | null)[]
 ): DataMaturity {
@@ -489,6 +588,16 @@ function enforceMetricConsistency(records: MonthlyRecord[]): MonthlyRecord[] {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * De gerealiseerd-grens van het lopende jaar: 1-12 voor de laatste maand met een rij, 0 als er
+ * nog geen is. Bewust een positie en geen telling -- lege maanden ervóór (kanaal nog niet actief,
+ * gat in de sync) schuiven de grens niet naar voren. Eén definitie voor de kernmetrics én het
+ * budgetadvies, zodat die niet uit elkaar kunnen lopen.
+ */
+function laatsteGerealiseerdeMaand(records: readonly (MonthlyRecord | null)[]): number {
+  return records.reduce<number>((acc, r, i) => (r !== null ? i + 1 : acc), 0);
+}
 
 /** Count months with actual data (value > 0) */
 function monthsWithData(records: MonthlyRecord[], metric: CoreMetric): number {
@@ -711,8 +820,12 @@ function forecastCoreMetric(
   const data2026 = sanitizeCurrentYear(data.currentYearData);
   const historicalYears = cleanedYears;
 
-  // Determine realized months from actual data
-  const realizedThroughMonth = data2026.filter((m) => m !== null).length;
+  // Tot en met de LAATSTE gerealiseerde maand, niet het aantal niet-lege maanden. Een kanaal dat
+  // in maart begon heeft [null, null, mrt..aug, null...]: "6 niet-leeg" sneed bij slice(0, 6)
+  // juli en augustus uit de YTD (Meta-demo 660 i.p.v. 1.002) en liet januari en februari, toen
+  // het kanaal nog niet liep, een prognose krijgen. computePerformanceFactor loopt ook tot deze
+  // grens en slaat de lege maanden daarbinnen zelf over.
+  const realizedThroughMonth = laatsteGerealiseerdeMaand(data2026);
 
   // Step 1: Expected per month
   // For scaling clients with limited data: use efficiency × spend instead of raw history.
@@ -745,9 +858,19 @@ function forecastCoreMetric(
     const realizedValues = data2026
       .filter((m): m is MonthlyRecord => m !== null && m[metric] > 0)
       .map((m) => m[metric]);
+    // Zonder één gerealiseerde maand (januari) en met een doel op jaarbasis (data.doelOpJaarbasis):
+    // het gemiddelde van de historische maanden met een waarde. Daar stond nul, en dan kreeg een
+    // kanaal dat vorig jaar in april begon in "Alle kanalen" een verwachting van nul voor januari-
+    // maart, dus een prognose van nul, terwijl het gewoon doorloopt (Meta op 180 per maand:
+    // 0/0/0/180/...); en het jaardoel zat dan in negen maanden. In februari vulde januari het gat al.
+    // Alleen met een doel op jaarbasis: is het doel het deeljaar zelf (de kanaaltab, de Google-route),
+    // dan hoort het bij de maanden waarin het gemeten is, en verdunde dit het over twaalf.
+    const historieMetWaarde = data.doelOpJaarbasis ? rawExpected.filter((v) => v > 0) : [];
     const ytdMonthlyAvg = realizedValues.length > 0
       ? realizedValues.reduce((s, v) => s + v, 0) / realizedValues.length
-      : 0;
+      : historieMetWaarde.length > 0
+        ? historieMetWaarde.reduce((s, v) => s + v, 0) / historieMetWaarde.length
+        : 0;
 
     const monthlyExpected = rawExpected.map((v) => {
       if (v > 0) return v;
@@ -844,15 +967,18 @@ function forecastCoreMetric(
   // er geen doel staat.
   //
   // `realized` en niet `rec[metric]`: dan telt een conversionOverride mee, net als in de rest van
-  // deze functie. Bekend randgeval (ook in de oude aanpak): een account dat midden in die maand
-  // begon, krijgt een te laag tempo.
+  // deze functie. Begon het kanaal midden in die maand (`data.eersteDag`), dan alleen over de dagen
+  // dat het liep: Meta sinds 20 juli, 40 conversies in 12 dagen, kreeg over 31 dagen 39 per maand
+  // waar zijn tempo 103 is. Zonder eerste dag (een bron die hem niet kent) blijft dat randgeval.
   const zonderDoel = annualTarget <= 0;
   let weekTempo = 0;
   if (zonderDoel) {
-    const laatste = data2026.reduce((acc, rec, i) => (rec === null ? acc : i), -1);
+    const laatste = realizedThroughMonth - 1;
     if (laatste >= 0) {
-      const dagen = new Date(Date.UTC(data.currentYear, laatste + 1, 0)).getUTCDate();
-      weekTempo = ((realized[laatste] ?? 0) / dagen) * 7;
+      let dagen = new Date(Date.UTC(data.currentYear, laatste + 1, 0)).getUTCDate();
+      const maand = `${data.currentYear}-${String(laatste + 1).padStart(2, "0")}`;
+      if (data.eersteDag?.slice(0, 7) === maand) dagen -= Number(data.eersteDag.slice(8, 10)) - 1;
+      weekTempo = dagen > 0 ? ((realized[laatste] ?? 0) / dagen) * 7 : 0;
     }
   }
   // 52 weken op 12 maanden: een maand is gemiddeld 4,33 week. Niet 4, want dan zou de
@@ -868,6 +994,11 @@ function forecastCoreMetric(
 
   const ytdRealized = realized.slice(0, realizedThroughMonth)
     .reduce<number>((s, v) => s + (v ?? 0), 0);
+  // Elke maand t/m de grens telt als verwacht, ook een lege. annualTarget telt die maanden als
+  // doel en adjustedAnnual met +0; sloeg de verwachting ze over, dan zei de pacing "Op schema"
+  // (250 van 250) naast een jaarkaart op -16,7% (500 van 600). En dan hing het oordeel er ook van
+  // af of een gepauzeerde maand als lege rij of als nulrij binnenkwam, terwijl gepauzeerd een echte
+  // nul is.
   const ytdExpected = scaledExpected.slice(0, realizedThroughMonth)
     .reduce<number>((s, v) => s + v, 0);
 
@@ -887,6 +1018,19 @@ function forecastCoreMetric(
         realized: real,
         forecast: null,
         monthRatio: ratio,
+      });
+    } else if (m < realizedThroughMonth) {
+      // Verleden zonder rij (kanaal liep nog niet, of er was niets): niet projecteren. Een
+      // prognose voor een maand die al achter ons ligt is geen prognose, en hij telde wel mee in
+      // adjustedAnnual. Geen toekomst, dus ook niet in futureExpectedSum.
+      monthlyRatios.push(projectionFactor);
+      points.push({
+        month: m + 1,
+        monthLabel: MONTH_LABELS[m],
+        expected: exp,
+        realized: null,
+        forecast: null,
+        monthRatio: projectionFactor,
       });
     } else {
       const proj = zonderDoel ? Math.round(maandTempo) : Math.round(exp * projectionFactor);
@@ -908,12 +1052,20 @@ function forecastCoreMetric(
   const weeklyPoints: WeeklyPoint[] = [];
   for (let m = 0; m < 12; m++) {
     const weekDist = computeWeeklyDistribution(historicalYears, m, metric);
-    const nWeeks = weekDist.length;
-    const monthExp = scaledExpected[m];
     const monthRecord = data2026[m];
+    // Een gerealiseerde maand levert precies zijn eigen weken. Het aantal kwam eerst uit de
+    // historie, en de weken van dit jaar werden op positie gelezen: live Google-weken zijn
+    // maandagweken, en augustus 2025 heeft er vier waar augustus 2026 er vijf heeft. Dan viel
+    // 31 augustus weg (augustus 40 i.p.v. 50) en kreeg september een prognose-emmer extra, waardoor
+    // de beursstrook vier gemeten septemberweken als "Prognose" toonde. Toekomstige maanden zijn
+    // null in data2026 en houden het aantal uit de historie. Past de historische verdeling niet op
+    // het aantal weken van dit jaar, dan de verwachting gelijk over die weken.
+    const nWeeks = monthRecord !== null && monthRecord.weeks.length > 0 ? monthRecord.weeks.length : weekDist.length;
+    const aandeel = (w: number) => (weekDist.length === nWeeks ? weekDist[w] : 1 / nWeeks);
+    const monthExp = scaledExpected[m];
 
     for (let w = 0; w < nWeeks; w++) {
-      const weekExp = Math.round(monthExp * weekDist[w]);
+      const weekExp = Math.round(monthExp * aandeel(w));
       const label = `W${w + 1} ${MONTH_LABELS[m]}`;
 
       if (monthRecord !== null && monthRecord.weeks[w]) {
@@ -922,6 +1074,15 @@ function forecastCoreMetric(
           month: m + 1, week: w + 1, label,
           expected: weekExp,
           realized: monthRecord.weeks[w][metric],
+          forecast: null,
+        });
+      } else if (monthRecord === null && m < realizedThroughMonth) {
+        // Zelfde regel als bij de maandpunten: een lege maand in het verleden krijgt ook geen
+        // weekprognose, anders toont de beursstrook weken van vóór de start als "prognose".
+        weeklyPoints.push({
+          month: m + 1, week: w + 1, label,
+          expected: weekExp,
+          realized: null,
           forecast: null,
         });
       } else {
@@ -958,19 +1119,28 @@ function forecastCoreMetric(
       forecastLow: band.low,
       forecastHigh: band.high,
       forecastSpreadPct: band.spreadPct,
+      realizedThroughMonth,
     },
   };
 }
 
 // ── Derived metrics: ROAS and CPA ────────────────────────────────────────
 
-function deriveForecast(
+export function deriveForecast(
   numerator: ForecastResult,
   denominator: ForecastResult,
   metric: ForecastMetric,
   /** If true, compute num/denom. If false, compute denom/num */
   numOverDenom: boolean
 ): ForecastResult {
+  // De noemer van de verhouding: bij num/denom de tweede reeks, anders de eerste.
+  const heeftNoemer = (a: number, b: number) => (numOverDenom ? b > 0 : a > 0);
+  // Gemeten, met een teller maar zonder noemer: € 2.000 kosten en 0 conversies is geen gat in de
+  // data maar de slechtst denkbare CPA. Hij kreeg dezelfde null als een gepauzeerde maand (0 / 0),
+  // en dan stond hij overal als "Geen data" in het grijs, waar de ROAS-tab dezelfde maand als een
+  // gemeten 0,00x in het rood toonde. Null blijft (er is geen getal), de vlag zegt wat het is.
+  const geenNoemer = (a: number | null, b: number | null) =>
+    a !== null && b !== null && !heeftNoemer(a, b) && (numOverDenom ? a > 0 : b > 0) ? { geenNoemer: true } : {};
   const points: ForecastPoint[] = numerator.points.map((numPt, i) => {
     const denPt = denominator.points[i];
     const calc = (a: number, b: number) =>
@@ -979,10 +1149,16 @@ function deriveForecast(
         : (a > 0 ? parseFloat((b / a).toFixed(2)) : 0);
 
     const exp = calc(numPt.expected, denPt.expected);
-    const real = numPt.realized !== null && denPt.realized !== null
+    // Een gerealiseerde maand met een noemer van nul heeft geen verhouding: 0 / 0 is geen CPA van
+    // € 0 (dat kleurde groen als topprestatie) en geen ROAS van 0. Sinds de adapter een maand zonder
+    // rij na de eerste rij als nulmaand aanvult (gepauzeerd is een echte nul), kwam dat bij elke
+    // gepauzeerde maand voor; daarvoor was zo'n maand null, "geen data". Dat blijft hij nu ook.
+    const real = numPt.realized !== null && denPt.realized !== null && heeftNoemer(numPt.realized, denPt.realized)
       ? calc(numPt.realized, denPt.realized)
       : null;
-    const fore = numPt.forecast !== null && denPt.forecast !== null
+    // Een prognose zonder noemer ook: een gestopt kanaal (stilgelegd, lib/forecast-som.ts) krijgt
+    // nul kosten op nul conversies, en dat was een CPA-prognose van € 0, groen.
+    const fore = numPt.forecast !== null && denPt.forecast !== null && heeftNoemer(numPt.forecast, denPt.forecast)
       ? calc(numPt.forecast, denPt.forecast)
       : null;
 
@@ -994,6 +1170,7 @@ function deriveForecast(
       realized: real,
       forecast: fore,
       monthRatio: exp > 0 ? actual / exp : 1,
+      ...geenNoemer(numPt.realized, denPt.realized),
     };
   });
 
@@ -1011,10 +1188,13 @@ function deriveForecast(
       week: numWk.week,
       label: numWk.label,
       expected: calc(numWk.expected, denWk.expected),
-      realized: numWk.realized !== null && denWk.realized !== null
+      // Zelfde regels als bij de maanden hierboven: een week zonder noemer heeft geen verhouding,
+      // en met alleen een teller krijgt hij de vlag.
+      realized: numWk.realized !== null && denWk.realized !== null && heeftNoemer(numWk.realized, denWk.realized)
         ? calc(numWk.realized, denWk.realized) : null,
-      forecast: numWk.forecast !== null && denWk.forecast !== null
+      forecast: numWk.forecast !== null && denWk.forecast !== null && heeftNoemer(numWk.forecast, denWk.forecast)
         ? calc(numWk.forecast, denWk.forecast) : null,
+      ...geenNoemer(numWk.realized, denWk.realized),
     };
   });
 
@@ -1047,6 +1227,9 @@ function deriveForecast(
       forecastLow: adjusted,
       forecastHigh: adjusted,
       forecastSpreadPct: 0,
+      // Een verhouding heeft geen eigen gerealiseerde maanden: die van de teller (omzet resp.
+      // spend), wat voor alle kernmetrics dezelfde grens is.
+      realizedThroughMonth: numKpi.realizedThroughMonth,
     },
   };
 }
@@ -1062,7 +1245,7 @@ export function isEfficiencyBottleneck(behindTarget: boolean, currentCpa: number
   return Boolean(behindTarget && cpaTarget != null && cpaTarget > 0 && currentCpa > cpaTarget * CPA_INEFFICIENT_MARGIN);
 }
 
-function computeBudgetRecommendation(
+export function computeBudgetRecommendation(
   conversions: ForecastResult,
   adSpend: ForecastResult,
   realizedThroughMonth: number,
@@ -1145,8 +1328,11 @@ export function computeForecast(data: ClientHistoricalData): ClientForecast {
   if (safeTarget.revenue === 0) safeTarget.revenue = fallbackFromHistory("revenue");
   if (safeTarget.adSpend === 0) safeTarget.adSpend = fallbackFromHistory("adSpend");
 
-  // Determine realized months
-  const realizedThroughMonth = data.currentYearData.filter((m) => m !== null).length;
+  // Gerealiseerd t/m (positie, geen telling): het budgetadvies verdeelt het restant over de
+  // maanden ná de laatste gerealiseerde. Met een telling kreeg een kanaal dat in maart begon er
+  // twee maanden te veel bij, tegen een YTD-spend zonder juli en augustus: een "nodig per maand"
+  // dat nergens op sloeg.
+  const realizedThroughMonth = laatsteGerealiseerdeMaand(data.currentYearData);
 
   // ── Analyze data maturity ───────────────────────────────────────────
   const allHistoricalYears = sortedYears

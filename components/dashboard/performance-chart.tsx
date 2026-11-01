@@ -12,7 +12,7 @@ import {
 import { useState } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { actieveMetrics, computeForecast, ForecastMetric, MONTH_LABELS, type ClientForecast } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, ForecastMetric, MONTH_LABELS, nuIndex, type ClientForecast } from "@/lib/forecast";
 import type { ClientHistoricalData } from "@/lib/types";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
@@ -125,7 +125,8 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
 
   const data = viewMode === "weekly" ? weeklyData : monthlyData;
   const yFormatter = formatYAxis(metric);
-  const lastRealizedIdx = data.findLastIndex((d) => d.gerealiseerd !== null);
+  // Uit de conversiereeks (nuIndex): een CPA zonder conversies is null, en dan schoof de lijn terug.
+  const lastRealizedIdx = nuIndex(forecast, viewMode === "weekly" ? "week" : "maand");
 
   const legendaItems: LegendaItem[] = [
     { label: "Gerealiseerd", kleur: theme.primary },

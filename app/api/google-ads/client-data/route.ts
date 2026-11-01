@@ -1,8 +1,12 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { isGreentechDemo, buildGreentechClientData } from "@/lib/demo/greentech-mock";
-import { isGeocloneDemo, buildGeocloneClientData } from "@/lib/demo/geoclone-demo-data";
-import { today } from "@/lib/reporting-date";
+import { isSeededDemo, seededDemoClientData } from "@/lib/demo/geoclone-demo-data";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { eis } from "@/lib/analysis/db-veilig";
+import { dashboardConversionActionIds } from "@/lib/analysis/channel-conversion-config";
+import { liveDataStand, gerealiseerdTotMaand } from "@/lib/api/client-data-stand";
+import { HISTORIE_JAREN } from "@/lib/api/google-vergelijking";
+import { googleWeekVensters } from "@/lib/api/google-weekvensters";
+import { today, addDays } from "@/lib/reporting-date";
 import {
   getAccountMetricsByMonth,
   getAccountMetricsByWeek,
@@ -18,8 +22,7 @@ import {
 } from "@/lib/api/google-ads";
 import {
   googleAdsMonthlyToApiData,
-  googleAdsWeeklyToApiData,
-  buildClientDataFromApi,
+  googleAdsWeeklyByYear,
   type YearDataInput,
 } from "@/lib/api/adapter";
 import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
@@ -35,22 +38,23 @@ import { standaardJaardoel } from "@/lib/analysis/standaard-jaardoel";
  *   customerId - Google Ads customer ID (no dashes)
  */
 export async function GET(request: NextRequest) {
-  // Demo-klant (GreenTech + geo-clones): serveer de curated mock zonder Google Ads te bellen —
-  // geen keys of accountrechten nodig. Scoped op de demo-klant; echte klanten lopen ongewijzigd door.
   const demoCid = request.nextUrl.searchParams.get("customerId");
   // Ontbreekt de parameter, dan is dat een fout van de aanroeper. Zonder deze regel viel de
   // route door naar de credentials-controle en kwam er een 500 uit: "de server is stuk",
   // terwijl het verzoek zelf niet klopte.
   if (!demoCid) return Response.json({ error: "customerId is verplicht" }, { status: 400 });
-  if (isGreentechDemo(demoCid)) {
-    return Response.json(buildGreentechClientData(demoCid));
-  }
-  if (isGeocloneDemo(demoCid)) {
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!sbUrl || !sbKey) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
-    const sb = createClient(sbUrl, sbKey);
-    return Response.json(await buildGeocloneClientData(sb, demoCid));
+  // Demoklanten (GreenTech en de geo-clones): Google uit de geseede database, zonder Google Ads te
+  // bellen. Dezelfde database waaruit Meta, LinkedIn en Microsoft in de KPI-band komen (/api/data,
+  // service role) -- niet de demo-mock van supabaseForClient, want dan telde de band weer twee
+  // werelden op. GreenTech kreeg hier eerst een JS-fixture; zie seededDemoClientData.
+  if (isSeededDemo(demoCid)) {
+    const sb = getSupabaseAdmin();
+    if (!sb) return Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
+    try {
+      return Response.json(await seededDemoClientData(sb, demoCid));
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Onbekende fout" }, { status: 500 });
+    }
   }
 
   const credentials = credentialsUitOmgeving();
@@ -63,18 +67,34 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "customerId is required" }, { status: 400 });
   }
 
-  // Optional: filter by specific conversion action IDs
-  const convActionIdsParam = request.nextUrl.searchParams.get("conversionActionIds");
-  const convActionIds = convActionIdsParam ? convActionIdsParam.split(",").filter(Boolean) : undefined;
+  const sb = getSupabaseAdmin();
 
   try {
+    // Welke conversieacties meetellen, uit client_settings.conversion_actions: dezelfde lijst
+    // waarmee de sync ads_account_monthly vult (orchestrator). Dit kwam eerst als queryparameter
+    // uit een localStorage-kopie in de browser, en die is pas gevuld nadat het dashboard één keer
+    // geladen is: een eerste bezoek vroeg ongefilterd, een tweede gefilterd. Een leesfout wordt een
+    // 500 en geen stille terugval op "alles": ongefilterde cijfers zien er net zo geloofwaardig uit.
+    // Zonder Supabase-configuratie (lokaal zonder database) is er geen selectie om te lezen.
+    let convActionIds: string[] | undefined;
+    if (sb) {
+      const instellingen = eis(
+        await sb.from("client_settings").select("conversion_actions").eq("client_id", `gads-${customerId}`).limit(1),
+        "client_settings (conversieacties)",
+      ) as { conversion_actions?: unknown }[];
+      convActionIds = dashboardConversionActionIds(instellingen[0]?.conversion_actions);
+    }
+
     // ── Determine year range dynamically ──────────────────────────────
     // Het Amsterdamse jaar: new Date().getFullYear() is het lokale jaar van het serverproces,
     // en dat draait in UTC. Op oudejaarsavond na 23:00 Amsterdamse tijd zou dat het vorige jaar
     // opleveren en het historievenster een jaar mis laten lopen.
     const currentYear = Number(today().slice(0, 4));
-    const MAX_HISTORY_YEARS = 5;
-    const firstHistoricalYear = currentYear - MAX_HISTORY_YEARS;
+    // Gedeeld met het portfolio-scorebord: dat zoekt de start van een account even ver terug.
+    const firstHistoricalYear = currentYear - HISTORIE_JAREN;
+    // De weken gesplitst op een maandag in plaats van op 1 januari: anders valt de week over de
+    // jaarwisseling in twee stukken en verdwijnt het januari-stuk (zie googleWeekVensters).
+    const weekVensters = googleWeekVensters(currentYear, firstHistoricalYear);
 
     // Fetch ALL historical data in 2 bulk calls (one date range) instead of per-year.
     // This reduces API calls from 10+ to just 2 for all history.
@@ -94,15 +114,12 @@ export async function GET(request: NextRequest) {
       changeHistoryRaw,
     ] = await Promise.all([
       getAccountMetricsByMonth(credentials, customerId, `${firstHistoricalYear}-01-01`, `${currentYear - 1}-12-31`, convActionIds),
-      getAccountMetricsByWeek(credentials, customerId, `${firstHistoricalYear}-01-01`, `${currentYear - 1}-12-31`),
+      getAccountMetricsByWeek(credentials, customerId, weekVensters.historie.van, weekVensters.historie.tot, convActionIds),
       getAccountMetricsByMonth(credentials, customerId, `${currentYear}-01-01`, `${currentYear}-12-31`, convActionIds),
-      getAccountMetricsByWeek(credentials, customerId, `${currentYear}-01-01`, `${currentYear}-12-31`),
-      getCampaignMetricsByMonth(credentials, customerId, `${currentYear - 1}-01-01`, `${currentYear - 1}-12-31`),
-      getCampaignMetricsByMonth(credentials, customerId, `${currentYear}-01-01`, `${currentYear}-12-31`),
-      getCampaignImpressionShare(credentials, customerId,
-        new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        today()
-      ),
+      getAccountMetricsByWeek(credentials, customerId, weekVensters.lopend.van, weekVensters.lopend.tot, convActionIds),
+      getCampaignMetricsByMonth(credentials, customerId, `${currentYear - 1}-01-01`, `${currentYear - 1}-12-31`, convActionIds),
+      getCampaignMetricsByMonth(credentials, customerId, `${currentYear}-01-01`, `${currentYear}-12-31`, convActionIds),
+      getCampaignImpressionShare(credentials, customerId, addDays(today(), -90), today()),
       getConversionActions(credentials, customerId),
       getAccountStructure(credentials, customerId),
       getWastefulSearchTerms(credentials, customerId),
@@ -113,7 +130,6 @@ export async function GET(request: NextRequest) {
 
     // Split bulk historical data into per-year buckets
     const allHistoricalMonthly = googleAdsMonthlyToApiData(allHistoricalMonthlyRaw);
-    const allHistoricalWeekly = googleAdsWeeklyToApiData(allHistoricalWeeklyRaw);
 
     // Google Ads returns segments.month as "YYYY-MM-01", parseMonth extracts month number.
     // We need year info too — extract from the raw date strings.
@@ -127,13 +143,11 @@ export async function GET(request: NextRequest) {
       monthlyByYear.get(year)!.push(allHistoricalMonthly[i]);
     }
 
-    // Group weekly data by year
-    const weeklyByYear = new Map<number, typeof allHistoricalWeekly>();
-    for (let i = 0; i < allHistoricalWeeklyRaw.length; i++) {
-      const year = parseYear(allHistoricalWeeklyRaw[i].date);
-      if (!weeklyByYear.has(year)) weeklyByYear.set(year, []);
-      weeklyByYear.get(year)!.push(allHistoricalWeekly[i]);
-    }
+    // Weekrijen per jaar, gesplitst op de ruwe rij vóór de omzetting. Hier stond een koppeling op
+    // index (raw[i] bij mapped[i]), maar de omzetting groepeerde per maand en husselde de volgorde:
+    // weken kwamen in het verkeerde jaar terecht. De maandomzetting hierboven is wel één-op-één
+    // (een map), dus daar mag de index blijven.
+    const weeklyByYear = googleAdsWeeklyByYear(allHistoricalWeeklyRaw);
 
     // Build per-year data, filter out empty years
     const historicalYearsData: YearDataInput[] = [];
@@ -146,15 +160,14 @@ export async function GET(request: NextRequest) {
     }
 
     const currentYearMonthly = googleAdsMonthlyToApiData(currentYearMonthlyRaw);
-    const currentYearWeekly = googleAdsWeeklyToApiData(currentYearWeeklyRaw);
+    const currentYearWeekly = googleAdsWeeklyByYear(currentYearWeeklyRaw).get(currentYear) ?? [];
 
-    // Determine realized months: only count COMPLETE months
-    const now = new Date();
-    const currentMonthNum = now.getFullYear() === currentYear ? now.getMonth() + 1 : 13;
-    const monthsWithData = currentYearMonthly.map((m) => m.month).filter((m) => m < currentMonthNum);
-    const realizedThroughMonth = monthsWithData.length > 0
-      ? Math.max(...monthsWithData)
-      : 0;
+    // Gerealiseerd is t/m de laatste VOLLE maand: de live API levert t/m gisteren. Hier stond
+    // `new Date().getMonth()`, de UTC-maand van de server naast een Amsterdams jaar; op de eerste
+    // van de maand tussen 00:00 en 02:00 viel de net afgesloten maand daardoor weg. dataStand gaat
+    // mee in het antwoord: het venster van de KPI-band eindigt erop (PeriodProvider).
+    const dataStand = liveDataStand();
+    const realizedThroughMonth = gerealiseerdTotMaand(dataStand, currentYear, currentYearMonthly.map((m) => m.month));
 
     // De gedeelde terugval (lib/analysis/standaard-jaardoel.ts) zolang er geen doel is ingevoerd.
     const lastFullYear = historicalYearsData.length > 0
@@ -226,13 +239,10 @@ export async function GET(request: NextRequest) {
       conversionRate: number; roas: number;
       campaignCount: number; spendShare: number;
     }> = [];
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (sbUrl && sbKey) {
+    if (sb) {
       try {
-        const sb = createClient(sbUrl, sbKey);
         const clientId = `gads-${customerId}`;
-        const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+        const sixMonthsAgo = addDays(today(), -180);
 
         // Try pre-aggregated country tables first
         const [{ data: dominantData }, { data: cmData }] = await Promise.all([
@@ -364,6 +374,7 @@ export async function GET(request: NextRequest) {
       customerId,
       currentYear,
       realizedThroughMonth,
+      dataStand,
       targetCurrentYear,
       historicalYears: historicalYearsData,
       currentYearMonthly,

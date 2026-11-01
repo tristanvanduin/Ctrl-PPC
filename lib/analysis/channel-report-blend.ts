@@ -7,8 +7,12 @@
 // blended maandserie. findMonth()/g()/buildChartData() in de route werken zo ongewijzigd door, of
 // de rij nou van Google, Meta, LinkedIn komt of samengeteld is -- ratio's (ctr/avg_cpc/
 // conversion_rate) worden herberekend uit de opgetelde tellers, nooit gemiddeld over ratio's.
+//
+// Sinds 1 november 2026 ook de ene plek waar dagrijen van Meta, LinkedIn en Microsoft maandrijen
+// worden (kanaalMaandenUitDagen, onderaan), voor elke lezer: de KPI-band in de browser, het
+// Jaaroverzicht en de Pacing op de server, en deze rapportage. Daarom puur en client-veilig.
 
-import { sumSelectedConversions, type ChannelConversionChannel, type ChannelConversionConfig } from "./channel-conversion-config";
+import { conversionSourcesFor, sumSelectedConversions, type ChannelConversionChannel, type ChannelConversionConfig } from "./channel-conversion-config";
 
 export interface MonthlyChannelRow {
   month: string; // "YYYY-MM-01"
@@ -92,4 +96,58 @@ export function blendMonthly(sources: Array<Array<Record<string, unknown>>>): Mo
     }
   }
   return [...byMonth.entries()].map(([month, a]) => finalizeMonth(month, a));
+}
+
+// ── De dagbron per kanaal, en dag -> maand met de selectie van de klant ─────────
+//
+// Er waren vier handgeschreven dag->maand-lussen voor Meta, LinkedIn en Microsoft (de KPI-band in
+// de browser, deze rapportage, de cross-channel-analyse, en het Jaaroverzicht dat het via
+// fact_core deed), elk met een eigen select-lijst en een eigen idee van welke kolom de klikken
+// zijn. Het Jaaroverzicht las bovendien fact_core, waar de SQL-projectie de STANDAARDselectie
+// inbakt (migratie 054/078): zodra een klant in Instellingen iets anders koos, telden de KPI-band
+// en het Jaaroverzicht een andere conversie. Hier staat het één keer, en elke lezer van een
+// dagtabel hoort via kanaalMaandenUitDagen te gaan.
+
+/** De dagtabel, de klikkolom en de entiteitkolom per niet-Google-kanaal. Meta's klikken heten
+ *  link_clicks (clicks_all telt ook likes en profielklikken); LinkedIn en Microsoft heten gewoon
+ *  clicks. `entityField` is het advertentieaccount van de rij: de tweede sorteersleutel bij
+ *  gepagineerd lezen. Op datum alleen ligt de volgorde bij twee accounts op één kanaal niet vast,
+ *  en dan kan een rij op de paginagrens dubbel of helemaal niet meekomen (alleRijen in
+ *  db-veilig.ts). Kolomnamen uit scripts/schema-snapshot.json. */
+export const KANAAL_DAGBRON: Record<ChannelConversionChannel, { table: string; clicksField: string; entityField: string }> = {
+  meta_ads: { table: "meta_account_daily", clicksField: "link_clicks", entityField: "entity_id" },
+  linkedin_ads: { table: "linkedin_account_daily", clicksField: "clicks", entityField: "entity_urn" },
+  microsoft_ads: { table: "microsoft_account_daily", clicksField: "clicks", entityField: "entity_id" },
+};
+
+/**
+ * De select-lijst voor die dagtabel: de vaste tellers plus ALLE selecteerbare conversievelden.
+ * De selectie van de klant bepaalt wat meetelt, niet de query: een lijst met alleen de
+ * standaardvelden telt een opgeslagen keuze voor post-click-conversies stil als nul.
+ *
+ * Let op: scripts/check-datagrond.mjs kan een select uit een functie niet lezen. Dat de kolommen
+ * bestaan, bewaakt __channel_report_blend_test.ts tegen scripts/schema-snapshot.json.
+ */
+export function dagbronSelect(channel: ChannelConversionChannel): string {
+  const velden = ["date", "impressions", KANAAL_DAGBRON[channel].clicksField, "spend", "conversion_value",
+    ...conversionSourcesFor(channel).map((s) => s.field)];
+  return [...new Set(velden)].join(", ");
+}
+
+/** Dagrijen van één kanaal (gelezen met dagbronSelect) -> maandrijen, met de conversieselectie
+ *  van de klant. Niet voor Google: die komt per maand uit de sync, met de conversieacties al
+ *  toegepast. */
+export function kanaalMaandenUitDagen(
+  rows: Array<Record<string, unknown>>,
+  channel: ChannelConversionChannel,
+  convConfig: ChannelConversionConfig,
+): MonthlyChannelRow[] {
+  const velden = conversionSourcesFor(channel).map((s) => s.field);
+  return monthlyFromDaily(rows, {
+    dateField: "date",
+    clicksField: KANAAL_DAGBRON[channel].clicksField,
+    convFields: (r) => Object.fromEntries(velden.map((f) => [f, Number(r[f] ?? 0)])),
+    channelKey: channel,
+    convConfig,
+  });
 }

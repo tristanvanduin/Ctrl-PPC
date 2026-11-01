@@ -4,9 +4,13 @@ import {
   type GoogleAdsCredentials,
 } from "@/lib/api/google-ads";
 import { googleAdsMonthlyToApiData } from "@/lib/api/adapter";
+import { HISTORIE_JAREN, googleMaandReeks, jaarOpJaar } from "@/lib/api/google-vergelijking";
 import { today } from "@/lib/reporting-date";
 import { addMonths, isValidMonth, monthIndex, type Month } from "@/lib/period/period-range";
 import { credentialsUitOmgeving } from "@/lib/tenancy/credentials";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { eis } from "@/lib/analysis/db-veilig";
+import { dashboardConversionActionIds } from "@/lib/analysis/channel-conversion-config";
 
 /** De laatste dag van een maand, als YYYY-MM-DD. Dag 0 van de volgende maand. */
 function laatsteDag(m: Month): string {
@@ -55,31 +59,72 @@ export async function GET(request: NextRequest) {
 
   const customerIds = idsParam.split(",").filter(Boolean);
   const { start, end, cmpStart, cmpEnd } = periodeUit(request.nextUrl.searchParams);
+  // De vergelijking wordt opgehaald vanaf het historiebegin van het dashboard, niet vanaf
+  // cmpStart: de paarregel zoekt de eerste maand met data, en die hoort dezelfde te zijn als op het
+  // klantdashboard (zie lib/api/google-vergelijking.ts).
+  const historieBegin: Month = `${Number(today().slice(0, 4)) - HISTORIE_JAREN}-01`;
+  const vanaf = monthIndex(cmpStart) < monthIndex(historieBegin) ? cmpStart : historieBegin;
+  const binnen = (van: Month, tot: Month) => (datum: string) => {
+    const i = monthIndex(datum.slice(0, 7));
+    return i >= monthIndex(van) && i <= monthIndex(tot);
+  };
+  const inPeriode = binnen(start, end);
+  const inVergelijking = binnen(cmpStart, cmpEnd);
+
+  // Welke conversieacties meetellen, per account uit client_settings.conversion_actions: dezelfde
+  // lezing als de client-data-route. Zonder deze stap telde het portfolio ALLE acties en het
+  // dashboard alleen de aangevinkte, en stond één klant in hetzelfde venster op twee getallen. Eén
+  // lezing voor alle accounts in plaats van één per account. Een leesfout wordt een 500 en geen
+  // stille terugval op "alles": ongefilterde cijfers zien er net zo geloofwaardig uit. Zonder
+  // Supabase-configuratie (lokaal zonder database) is er geen selectie om te lezen.
+  const selectie = new Map<string, string[] | undefined>();
+  const sb = getSupabaseAdmin();
+  if (sb) {
+    try {
+      const rijen = eis(
+        await sb.from("client_settings").select("client_id, conversion_actions").in("client_id", customerIds.map((id) => `gads-${id}`)),
+        "client_settings (conversieacties)",
+      ) as { client_id?: string; conversion_actions?: unknown }[];
+      for (const rij of rijen) {
+        if (rij.client_id?.startsWith("gads-")) selectie.set(rij.client_id.slice(5), dashboardConversionActionIds(rij.conversion_actions));
+      }
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Onbekende fout" }, { status: 500 });
+    }
+  }
 
   // Het bereik loopt tot de laatste dag van de eindmaand; anders snijdt een .lte op de eerste
   // van de maand de hele maand eraf.
   const results = await Promise.allSettled(
     customerIds.map(async (customerId) => {
       try {
-        const [monthlyRaw, prevYearRaw] = await Promise.all([
-          getAccountMetricsByMonth(credentials, customerId, `${start}-01`, laatsteDag(end)),
-          getAccountMetricsByMonth(credentials, customerId, `${cmpStart}-01`, laatsteDag(cmpEnd)),
+        const convActionIds = selectie.get(customerId);
+        const [monthlyRaw, historieRaw] = await Promise.all([
+          getAccountMetricsByMonth(credentials, customerId, `${start}-01`, laatsteDag(end), convActionIds),
+          getAccountMetricsByMonth(credentials, customerId, `${vanaf}-01`, laatsteDag(cmpEnd), convActionIds),
         ]);
+        const prevYearRaw = historieRaw.filter((r) => inVergelijking(r.date));
 
         const monthly = googleAdsMonthlyToApiData(monthlyRaw);
         const prevYear = googleAdsMonthlyToApiData(prevYearRaw);
 
-        // Alles binnen het gevraagde bereik telt mee; de lopende maand valt er al buiten omdat
-        // de kiezer hem niet aanbiedt.
+        // Alles binnen het gevraagde bereik telt mee. De kiezer biedt de lopende maand niet aan
+        // (period-range); een eigen bereik dat hem toch bevat, telt hem hier wel mee.
         const completeMonths = monthly;
         const ytdConv = completeMonths.reduce((s, m) => s + m.conversions, 0);
         const ytdRev = completeMonths.reduce((s, m) => s + m.revenue, 0);
         const ytdSpend = completeMonths.reduce((s, m) => s + m.adSpend, 0);
 
-        const prevSamePeriod = prevYear;
-        const prevConv = prevSamePeriod.reduce((s, m) => s + m.conversions, 0);
-        const prevRev = prevSamePeriod.reduce((s, m) => s + m.revenue, 0);
-        const prevSpend = prevSamePeriod.reduce((s, m) => s + m.adSpend, 0);
+        // Het percentage paart maand voor maand, zoals het klantdashboard: een maand van vóór de
+        // eerste maand met data telt aan geen van beide kanten mee. Eerst stond hier som tegen som,
+        // en een account dat in juni vorig jaar begon, groeide dan over januari t/m mei uit het
+        // niets. De historie gaat mee voor de start; geteld wordt alleen binnen de twee perioden.
+        const yoy = jaarOpJaar(
+          // Elke maand één keer: de gekozen periode uit zijn eigen aanroep, de rest uit de historie.
+          googleMaandReeks("google", [...historieRaw.filter((r) => !inPeriode(r.date)), ...monthlyRaw]),
+          { start, end },
+          { start: cmpStart, end: cmpEnd },
+        );
 
         // De laatste maand van de gekozen periode.
         const lastMonth = completeMonths[completeMonths.length - 1];
@@ -94,11 +139,7 @@ export async function GET(request: NextRequest) {
             roas: ytdSpend > 0 ? parseFloat((ytdRev / ytdSpend).toFixed(2)) : 0,
             cpa: ytdConv > 0 ? parseFloat((ytdSpend / ytdConv).toFixed(2)) : 0,
           },
-          yoy: {
-            convChange: prevConv > 0 ? parseFloat((((ytdConv - prevConv) / prevConv) * 100).toFixed(1)) : null,
-            revChange: prevRev > 0 ? parseFloat((((ytdRev - prevRev) / prevRev) * 100).toFixed(1)) : null,
-            spendChange: prevSpend > 0 ? parseFloat((((ytdSpend - prevSpend) / prevSpend) * 100).toFixed(1)) : null,
-          },
+          yoy,
           lastMonth: lastMonth ? {
             month: lastMonth.month,
             conversions: lastMonth.conversions,

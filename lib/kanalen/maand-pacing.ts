@@ -11,6 +11,8 @@
 // kopieën van "vorige maand tot dezelfde dag" gaan vroeg of laat uit elkaar lopen op precies het
 // detail dat ertoe doet: of dag 31 in een maand van 30 dagen wel of niet meetelt.
 
+import { addMonths } from "@/lib/period/period-range";
+
 export interface MaandPacingRij {
   date: string;
   spend: number;
@@ -42,9 +44,11 @@ export function berekenMaandPacing<T extends MaandPacingRij>(
 ): MaandPacing {
   const dagVanMaand = Number(vandaagIso.slice(8, 10));
   const dezeMaand = vandaagIso.slice(0, 7);
-  const vorigeDatum = new Date(vandaagIso);
-  vorigeDatum.setMonth(vorigeDatum.getMonth() - 1);
-  const vorigeMaand = vorigeDatum.toISOString().slice(0, 7);
+  // Rekenen op de maandtekst, niet met Date.setMonth: op de 29e-31e liep "een maand terug" door naar
+  // de lopende maand (31 maart -> "31 februari" -> 3 maart), zodat vorige maand gelijk was aan deze
+  // en de kaart "geen vorige maand" zei. En new Date("2026-03-01") is in een tijdzone ten westen
+  // van UTC nog 28 februari, waardoor de vergelijking twee maanden terug greep.
+  const vorigeMaand = addMonths(dezeMaand, -1);
 
   let mtdSpend = 0, mtdConv = 0, vorigeSpend = 0, vorigeConv = 0;
   for (const r of rijen) {

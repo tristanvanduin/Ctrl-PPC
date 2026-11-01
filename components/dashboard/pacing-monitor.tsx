@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import { Clock, Target, Zap, AlertTriangle, TrendingUp, Calendar, Flag } from "lucide-react";
 import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { computeForecast } from "@/lib/forecast";
-import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
+import { computeForecast, MONTH_LABELS, type ClientForecast } from "@/lib/forecast";
+import { editieNaam, fairCountdown, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
 import { berekenLanding, seizoensduiding } from "@/lib/pacing/landing";
 
@@ -58,6 +58,82 @@ export function PacingRing({ pct, color, size = 128 }: { pct: number; color: str
   );
 }
 
+const DAG_MS = 86_400_000;
+
+/**
+ * Hoeveel dagen van het jaar er gerealiseerd zijn: 1 januari t/m het eind van maand `totMaand`
+ * (1-12; 0 = nog niets), plus de echte lengte van dat jaar.
+ *
+ * WAAROM NIET "VANDAAG". De cijfers waar het tempo uit komt (ytdRealized) lopen t/m de laatste
+ * gerealiseerde maand, niet t/m vandaag. Dit telde de dagen met de browserklok en deelde door 365:
+ * op 31 oktober werd januari t/m september (273 dagen data) gedeeld door 304 dagen. Het tempo
+ * stond dan 10% te laag, "nodig per dag" te hoog, en er bleven 61 dagen over om 92 dagen werk in
+ * te doen. Nu dezelfde grens als de forecast (kpi.realizedThroughMonth), kalenderrekenen in UTC
+ * (dus geen tijdzone of zomertijd van de kijker), en een schrikkeljaar telt 366 dagen.
+ */
+export function gerealiseerdeJaardagen(jaar: number, totMaand: number): { dagen: number; dagenInJaar: number } {
+  const maand = Math.min(Math.max(Math.trunc(totMaand) || 0, 0), 12);
+  const begin = Date.UTC(jaar, 0, 1);
+  return {
+    dagen: Math.round((Date.UTC(jaar, maand, 1) - begin) / DAG_MS),
+    dagenInJaar: Math.round((Date.UTC(jaar + 1, 0, 1) - begin) / DAG_MS),
+  };
+}
+
+/**
+ * De deler van een TEMPO: de dagen vanaf de eerste dag van de eerste maand met een rij t/m het eind
+ * van maand `totMaand`. Zonder enige rij: vanaf 1 januari, zoals gerealiseerdeJaardagen.
+ *
+ * Niet vanaf 1 januari, want ytdRealized begint pas bij de eerste rij. Een account dat in maart
+ * begon en 60 per maand haalt, kreeg over 212 dagen een tempo van 1,4 per dag in plaats van 2,0
+ * over 153: "Geschat tot nu 35" waar 49 klopt, en een landing die een sterk seizoen voorspelde op
+ * een volkomen vlakke reeks. Een lege maand NA de eerste rij blijft in de deler: dat is een
+ * gepauzeerde maand, en die is een echte nul.
+ */
+export function actieveJaardagen(jaar: number, totMaand: number, reeks: readonly unknown[]): number {
+  const eerste = reeks.findIndex((r) => r !== null && r !== undefined);
+  const tot = gerealiseerdeJaardagen(jaar, totMaand).dagen;
+  return Math.max(0, tot - gerealiseerdeJaardagen(jaar, Math.max(eerste, 0)).dagen);
+}
+
+/**
+ * Het dagtempo van de pacingkaart: wat er t/m de grens gerealiseerd is, gedeeld door de dagen
+ * waarover dat loopt (actieveJaardagen, minstens één). De eerste maand komt uit de forecast zelf,
+ * zodat teller en deler altijd uit dezelfde reeks komen. Los van de kaart, zodat een test het
+ * gedrag vastlegt: de broncontrole op de naam van de deler bleef groen toen die deler weer de dag
+ * van het jaar werd.
+ */
+export function pacingTempo(jaar: number, forecast: Pick<ClientForecast, "conversions" | "adSpend">): { dagen: number; conversiesPerDag: number; spendPerDag: number } {
+  const conv = forecast.conversions.kpi;
+  const dagen = Math.max(actieveJaardagen(jaar, conv.realizedThroughMonth, forecast.conversions.points.map((p) => p.realized)), 1);
+  return { dagen, conversiesPerDag: conv.ytdRealized / dagen, spendPerDag: forecast.adSpend.kpi.ytdRealized / dagen };
+}
+
+/**
+ * De beursaftelling in de kop van een pacingkaart: deze (Google) en channel-pacing.tsx
+ * (Meta/LinkedIn/Microsoft). Eén component, zodat beide kaarten dezelfde zin maken uit dezelfde
+ * aftelling (fairCountdown) als de hero en de beurssectie.
+ *
+ * In de beursweek "Beursweek" en niet "Nog 0 weken tot ...": dat las als "de beurs is voorbij"
+ * terwijl hij die week plaatsvindt, en sinds een editie ook na afloop actief blijft (nasleep)
+ * stond het er ook op de dagen ná een woensdagbeurs. In de nasleep niets: dan is de beurs geen
+ * deadline meer, en de beurssectie zegt al dat hij geweest is.
+ */
+export function BeursAftelling({ edition, vandaag }: { edition?: UpcomingEdition | null; vandaag: string }) {
+  const aftelling = edition ? fairCountdown(edition.fairDate, vandaag) : null;
+  if (!edition || !aftelling || aftelling.fase === "nasleep") return null;
+  // "GRN 2026" en niet alleen het label (een jaartal): zie editieNaam. De hero zet de volle
+  // eventnaam ervoor.
+  const naam = editieNaam(edition);
+  return (
+    <span className="font-semibold text-brand-blue-ink mr-1.5">
+      {aftelling.fase === "beursweek"
+        ? `Beursweek ${naam}`
+        : `Nog ${aftelling.weken} ${aftelling.weken === 1 ? "week" : "weken"} tot ${naam}`} ·
+    </span>
+  );
+}
+
 export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: string; countryFilter?: string | null; edition?: UpcomingEdition | null }) {
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
@@ -67,16 +143,13 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
   const spend = forecast.adSpend.kpi;
   const rev = forecast.revenue.kpi;
 
-  const now = new Date();
-
-  // Year progress
-  const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
-  const yearProgressPct = (dayOfYear / 365) * 100;
-
-  // Stuurt de klant op een beurs, dan is "dag 209 van 365" geen ijkpunt maar ruis: het jaar
-  // loopt door, de beurs is een deadline. De doelen blijven jaardoelen — daarom blijft het
-  // jaarverloop erbij staan; alleen de kop leidt met de afstand die er wél toe doet.
-  const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, today()) : null;
+  // Het jaarverloop t/m dezelfde maand als de gerealiseerde cijfers (zie gerealiseerdeJaardagen).
+  // Stuurt de klant op een beurs, dan leidt de kop met de afstand tot de beurs (BeursAftelling):
+  // het jaar loopt door, de beurs is een deadline. De doelen blijven jaardoelen, daarom blijft het
+  // jaarverloop erbij staan.
+  const totMaand = conv.realizedThroughMonth;
+  const { dagen: dayOfYear, dagenInJaar } = gerealiseerdeJaardagen(data.currentYear, totMaand);
+  const yearProgressPct = (dayOfYear / dagenInJaar) * 100;
 
   // Year pacing: compare realized vs EXPECTED for this period (not linear annual %)
   // This accounts for seasonality — Q1 might only be 15% of the annual target, not 25%
@@ -92,11 +165,10 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
   const convPaceRatio = convExpectedYtd > 0 ? conv.ytdRealized / convExpectedYtd : 1;
   const spendPaceRatio = spendExpectedYtd > 0 ? spend.ytdRealized / spendExpectedYtd : 1;
 
-  // Daily run rate
-  const daysElapsed = Math.max(dayOfYear, 1);
-  const dailyConvRate = conv.ytdRealized / daysElapsed;
-  const dailySpendRate = spend.ytdRealized / daysElapsed;
-  const remainingDays = 365 - dayOfYear;
+  // Daily run rate. Het tempo telt vanaf de eerste maand met een rij (actieveJaardagen); de kop en
+  // de resterende dagen blijven op het kalenderjaar, want het doel is een jaardoel.
+  const { conversiesPerDag: dailyConvRate, spendPerDag: dailySpendRate } = pacingTempo(data.currentYear, forecast);
+  const remainingDays = dagenInJaar - dayOfYear;
   // "Nodig per dag" based on remaining target gap (target - realized so far)
   const convGap = Math.max(0, conv.annualTarget - conv.ytdRealized);
   const spendGap = Math.max(0, spend.annualTarget - spend.ytdRealized);
@@ -144,12 +216,10 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing</h3>
         <span className="text-micro text-muted-foreground ml-auto">
-          {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
-            <span className="font-semibold text-brand-blue-ink mr-1.5">
-              Nog {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"} tot {edition!.label} ·
-            </span>
-          )}
-          Dag {dayOfYear} van 365 · {Math.round(yearProgressPct)}% van het jaar
+          <BeursAftelling edition={edition} vandaag={today()} />
+          {totMaand > 0
+            ? <>Gerealiseerd t/m {MONTH_LABELS[totMaand - 1].toLowerCase()} · dag {dayOfYear} van {dagenInJaar} · {Math.round(yearProgressPct)}% van het jaar</>
+            : <>Nog geen gerealiseerde maand in {data.currentYear}</>}
         </span>
       </div>
 

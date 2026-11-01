@@ -30,6 +30,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { demoRows } from "./demo-rows";
+import { today } from "@/lib/reporting-date";
 import { buildMetaStepFacts } from "@/lib/meta/prepared-facts";
 import { buildLinkedinStepFacts } from "@/lib/linkedin/prepared-facts";
 import { buildMicrosoftStepFacts } from "@/lib/microsoft/prepared-facts";
@@ -290,32 +291,38 @@ check("elke pivot houdt een waste-segment over (geen 100% fit)", (() => {
 // De tabellen waren in alle drie de gevallen gevuld. Het waren de KOLOMMEN erin die ontbraken.
 // Daarom draait deze sectie de echte fact-builders van productie en kijkt naar de uitkomst.
 
-const metaFeiten = buildMetaStepFacts({
-  account: (rijen.meta_account_daily ?? []).map((x) => mapMetaDailyToComputeRow(x as Record<string, unknown>)),
-  campaigns: (rijen.meta_campaign_daily ?? []).map((x) => mapMetaDailyToComputeRow(x as Record<string, unknown>)),
-  adsets: (rijen.meta_adset_daily ?? []).map((x) => mapMetaDailyToComputeRow(x as Record<string, unknown>)),
-  ads: (rijen.meta_ad_daily ?? []).map((x) => mapMetaDailyToComputeRow(x as Record<string, unknown>, "demo")),
-  breakdowns: (rijen.meta_breakdown_daily ?? []).map((x) => mapMetaBreakdownToComputeRow(x as Record<string, unknown>)),
-  targets: { roasTarget: 4, cpaTarget: 60 },
-});
-
-const linkedinFeiten = buildLinkedinStepFacts({
-  account: (rijen.linkedin_account_daily ?? []).map((x) => mapLinkedinDailyToComputeRow(x as Record<string, unknown>)),
-  campaigns: (rijen.linkedin_campaign_daily ?? []).map((x) => mapLinkedinDailyToComputeRow(x as Record<string, unknown>)),
-  creatives: (rijen.linkedin_creative_daily ?? []).map((x) => mapLinkedinDailyToComputeRow(x as Record<string, unknown>)),
-  demographics: (rijen.linkedin_demographic_daily ?? []).map((x) => mapLinkedinDemographicToComputeRow(x as Record<string, unknown>)),
-  icp: (settings.linkedin_icp ?? null) as never,
-  targets: { cplTarget: 80 },
-});
-
 // Zelfde venster als de echte maandroute: periodEnd is daar het einde van de laatste VOLLE maand
 // (lastCompleteMonth), dus de feiten horen hier ook op volle maanden te draaien. Zonder deze trim
 // ankert latestMonth op de lopende, halve maand en is de import-pariteit aan het begin van elke
 // maand nooit "stellig" -- deze test zou dan de 1e t/m ±12e van de maand rood staan om een reden
 // die in productie niet bestaat.
-const volleMaandGrens = new Date().toISOString().slice(0, 7) + "-01";
+//
+// Meta en LinkedIn liepen eerst buiten deze trim, en bij LinkedIn gaf dat precies zo'n reden: buildLinkedinAnalysisData
+// leest t/m periodEnd, maar hier ging alles t/m vandaag erin. Op 1 november 2026 was de "laatste
+// maand" van de funnelpijler dus één dag, een zondag, waarop de demo de leads met 0,4
+// vermenigvuldigt en de klikken niet: completion rate 7,5% tegen 14 tot 15% in elke volle maand.
+// De grens is de Amsterdamse kalender (today()), zoals overal waar "welke maand is het" telt.
+const volleMaandGrens = today().slice(0, 7) + "-01";
 const totVolleMaand = (rows: unknown[] | undefined, veld: "date" | "month") =>
   ((rows ?? []) as Record<string, unknown>[]).filter((r) => String(r[veld] ?? "") < volleMaandGrens);
+
+const metaFeiten = buildMetaStepFacts({
+  account: totVolleMaand(rijen.meta_account_daily, "date").map((x) => mapMetaDailyToComputeRow(x)),
+  campaigns: totVolleMaand(rijen.meta_campaign_daily, "date").map((x) => mapMetaDailyToComputeRow(x)),
+  adsets: totVolleMaand(rijen.meta_adset_daily, "date").map((x) => mapMetaDailyToComputeRow(x)),
+  ads: totVolleMaand(rijen.meta_ad_daily, "date").map((x) => mapMetaDailyToComputeRow(x, "demo")),
+  breakdowns: totVolleMaand(rijen.meta_breakdown_daily, "date").map((x) => mapMetaBreakdownToComputeRow(x)),
+  targets: { roasTarget: 4, cpaTarget: 60 },
+});
+
+const linkedinFeiten = buildLinkedinStepFacts({
+  account: totVolleMaand(rijen.linkedin_account_daily, "date").map((x) => mapLinkedinDailyToComputeRow(x)),
+  campaigns: totVolleMaand(rijen.linkedin_campaign_daily, "date").map((x) => mapLinkedinDailyToComputeRow(x)),
+  creatives: totVolleMaand(rijen.linkedin_creative_daily, "date").map((x) => mapLinkedinDailyToComputeRow(x)),
+  demographics: totVolleMaand(rijen.linkedin_demographic_daily, "date").map((x) => mapLinkedinDemographicToComputeRow(x)),
+  icp: (settings.linkedin_icp ?? null) as never,
+  targets: { cplTarget: 80 },
+});
 
 const microsoftFeiten = buildMicrosoftStepFacts({
   account: totVolleMaand(rijen.microsoft_account_daily, "date").map((x) => mapMicrosoftDailyToComputeRow(x)),

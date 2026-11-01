@@ -4,11 +4,11 @@ import { useState } from "react";
 import { FileText, Copy, Check, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
-import { computeForecast, MONTH_LABELS } from "@/lib/forecast";
+import { computeForecast, MONTH_LABELS, ytdGerealiseerd, type ForecastPoint } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { getAllClients } from "@/lib/clients";
 import { fixMojibake } from "@/lib/analysis/sanitize";
-import { formatRoas } from "@/lib/forecast-format";
+import { formatRoas, zonderData } from "@/lib/forecast-format";
 import { BRAND_NAME } from "@/lib/branding/brand";
 
 function fmt(v: number): string {
@@ -26,6 +26,21 @@ function pct(v: number): string {
   return `${v > 0 ? "+" : ""}${Math.round(v)}%`;
 }
 
+/**
+ * Eén regel van het maandoverzicht in het rapport.
+ *
+ * Een maand zonder realisatie en zonder prognose (vóór de start, of een gat) heet "Geen data" en
+ * krijgt geen ratio. Hij stond er als "- | Prognose | 130%": de projectiefactor als ratio van een
+ * maand waarin niets gemeten en niets voorspeld is, in een rapport dat naar de klant gaat.
+ */
+export function maandRegel(pt: ForecastPoint): string {
+  const geenData = zonderData(pt);
+  const value = pt.realized !== null ? num(pt.realized) : pt.forecast !== null ? `*${num(pt.forecast)}*` : "-";
+  const label = geenData ? "Geen data" : pt.realized !== null ? "Gerealiseerd" : "Prognose";
+  const ratio = geenData ? "-" : `${(pt.monthRatio * 100).toFixed(0)}%`;
+  return `| ${pt.monthLabel} | ${num(pt.expected)} | ${value} | ${label} | ${ratio} |`;
+}
+
 export function ReportExport({ clientId }: { clientId: string }) {
   const [copied, setCopied] = useState(false);
   const data = useClientHistoricalData(clientId);
@@ -40,6 +55,10 @@ export function ReportExport({ clientId }: { clientId: string }) {
   const rev = forecast.revenue.kpi;
   const roas = forecast.roas.kpi;
   const cpa = forecast.cpa.kpi;
+  // De YTD-verhouding uit ytdGerealiseerd: zonder noemer geen waarde. kpi.ytdRealized is daar 0, en
+  // dan schreef het rapport "CPA € 0" en "€ 0 gemiddeld YTD" naar de klant na kosten zonder conversie.
+  const roasYtd = ytdGerealiseerd(forecast, "roas");
+  const cpaYtd = ytdGerealiseerd(forecast, "cpa");
   const budget = forecast.budgetRecommendation;
   const realizedMonths = forecast.conversions.points.filter((p) => p.realized !== null);
   const lastMonth = realizedMonths[realizedMonths.length - 1];
@@ -62,8 +81,8 @@ export function ReportExport({ clientId }: { clientId: string }) {
     lines.push("|-----|-----------------|----------|-------------|----------|");
     lines.push(`| Conversies | ${num(conv.ytdRealized)} | ${num(conv.annualTarget)} | ${num(conv.adjustedAnnual)} | ${pct(conv.diffPct)} |`);
     lines.push(`| Omzet | ${fmt(rev.ytdRealized)} | ${fmt(rev.annualTarget)} | ${fmt(rev.adjustedAnnual)} | ${pct(rev.diffPct)} |`);
-    lines.push(`| ROAS | ${formatRoas(roas.ytdRealized)} | ${formatRoas(roas.annualTarget)} | ${formatRoas(roas.adjustedAnnual)} | ${pct(roas.diffPct)} |`);
-    lines.push(`| CPA | ${fmt(cpa.ytdRealized)} | ${fmt(cpa.annualTarget)} | ${fmt(cpa.adjustedAnnual)} | ${pct(cpa.diffPct)} |`);
+    lines.push(`| ROAS | ${roasYtd === null ? "-" : formatRoas(roasYtd)} | ${formatRoas(roas.annualTarget)} | ${formatRoas(roas.adjustedAnnual)} | ${pct(roas.diffPct)} |`);
+    lines.push(`| CPA | ${cpaYtd === null ? "-" : fmt(cpaYtd)} | ${fmt(cpa.annualTarget)} | ${fmt(cpa.adjustedAnnual)} | ${pct(cpa.diffPct)} |`);
     lines.push("");
 
     // Monthly breakdown
@@ -71,11 +90,7 @@ export function ReportExport({ clientId }: { clientId: string }) {
     lines.push("");
     lines.push("| Maand | Verwacht | Gerealiseerd | Prognose | Ratio |");
     lines.push("|-------|---------|-------------|---------|-------|");
-    for (const pt of forecast.conversions.points) {
-      const value = pt.realized !== null ? num(pt.realized) : pt.forecast !== null ? `*${num(pt.forecast)}*` : "-";
-      const label = pt.realized !== null ? "Gerealiseerd" : "Prognose";
-      lines.push(`| ${pt.monthLabel} | ${num(pt.expected)} | ${value} | ${label} | ${(pt.monthRatio * 100).toFixed(0)}% |`);
-    }
+    for (const pt of forecast.conversions.points) lines.push(maandRegel(pt));
     lines.push("");
 
     // Performance factor
@@ -83,7 +98,7 @@ export function ReportExport({ clientId }: { clientId: string }) {
     lines.push("");
     lines.push(`- **Performance factor**: ${(conv.projectionFactor * 100).toFixed(1)}% (gewogen gemiddelde van gerealiseerde maanden)`);
     lines.push(`- **Spend YTD**: ${fmt(forecast.adSpend.kpi.ytdRealized)} van ${fmt(forecast.adSpend.kpi.annualTarget)} (${pct(forecast.adSpend.kpi.diffPct)})`);
-    lines.push(`- **CPA trend**: ${fmt(cpa.ytdRealized)} gemiddeld YTD`);
+    lines.push(cpaYtd === null ? "- **CPA trend**: geen conversies YTD, dus geen CPA" : `- **CPA trend**: ${fmt(cpaYtd)} gemiddeld YTD`);
     lines.push("");
 
     // Budget recommendation

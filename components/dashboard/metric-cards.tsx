@@ -3,20 +3,16 @@
 import { TrendingUp, TrendingDown, Target, DollarSign, BarChart3, Wallet } from "lucide-react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { actieveMetrics, computeForecast, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
-import type { ClientHistoricalData } from "@/lib/types";
-import { getClientSettings } from "@/lib/client-settings";
-import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas } from "@/lib/forecast-format";
+import { actieveMetrics, computeForecast, jaarKaartCijfers, MONTH_LABELS, type ClientForecast, type ForecastMetric, type JaarKaartCijfers } from "@/lib/forecast";
+import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas, isLowerBetter } from "@/lib/forecast-format";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { KlikbareKaart } from "@/components/ui/klikbare-kaart";
 
 interface KpiCardProps {
   label: string;
   icon: React.ReactNode;
-  annualTarget: number;
-  adjusted: number;
-  realized: number;
-  diffPct: number;
+  /** Uit jaarKaartCijfers (lib/forecast.ts): doel, YTD, prognose, verschil en verwachtingsstreep. */
+  cijfers: JaarKaartCijfers;
   format: (v: number) => string;
   /** Subtitle shown below the label */
   subtitle?: string;
@@ -27,11 +23,17 @@ interface KpiCardProps {
   onSelect?: (metric: ForecastMetric) => void;
 }
 
-function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, format, subtitle, metricKey, selected, onSelect }: KpiCardProps) {
-  const yearProgress = 25; // end of Q1
-  const realizedPct = annualTarget > 0 ? (realized / annualTarget) * 100 : 0;
+function KpiCard({ label, icon, cijfers, format, subtitle, metricKey, selected, onSelect }: KpiCardProps) {
+  const { annualTarget, adjusted, realized, diffPct, realizedPct, verwachtPct, laatsteMaand } = cijfers;
+  // De streep en het label stonden hier vast op 25% met "Q1" erbij: het hele jaar op eind maart,
+  // ook in augustus. Nu de seizoensverwachting t/m de laatste gerealiseerde maand, per metric
+  // (zie jaarKaartCijfers).
+  const verwachtLinks = verwachtPct === null ? null : Math.min(Math.max(verwachtPct, 0), 100);
+  const verwachtTot = laatsteMaand >= 0 ? MONTH_LABELS[laatsteMaand].toLowerCase() : null;
 
-  const isPositive = diffPct >= 0;
+  // Het teken van diffPct blijft eerlijk (+ = prognose boven doel); alleen het oordeel draait om
+  // bij een metric waar lager beter is (CPA), zoals op de maand- en weekkaarten.
+  const isPositive = metricKey && isLowerBetter(metricKey) ? diffPct <= 0 : diffPct >= 0;
   const StatusIcon = isPositive ? TrendingUp : TrendingDown;
   const statusColor = isPositive ? "text-green-600" : "text-red-500";
   const statusBg = isPositive ? "bg-green-50" : "bg-red-50";
@@ -57,7 +59,8 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
           hetzelfde soort getal in de periodeband op text-figure staat; dat verschil had geen
           reden. De rest van de kaart (doel, prognose, voortgang) blijft eigen opbouw. */}
       <div className="mb-4">
-        <Kerncijfer label="Gerealiseerd YTD" waarde={format(realized)} />
+        {/* Null voor een CPA zonder één conversie (ytdGerealiseerd): dat is geen € 0. */}
+        <Kerncijfer label="Gerealiseerd YTD" waarde={realized === null ? "—" : format(realized)} />
       </div>
 
       {/* Target + Forecast */}
@@ -72,33 +75,46 @@ function KpiCard({ label, icon, annualTarget, adjusted, realized, diffPct, forma
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div>
-        <div className="flex justify-between text-micro mb-1.5">
-          <span className="text-muted-foreground">{Math.round(realizedPct)}% gerealiseerd</span>
-          <span className={`font-bold ${statusColor}`}>
-            {formatDeltaPercent(diffPct)}
-          </span>
+      {/* Voortgangsbalk. Alleen voor optelbare metrics (realizedPct !== null): "141% van een
+          doel-CPA gerealiseerd" betekent niets. Zelfde keuze als KpiTegel in
+          channel-forecast-overview.tsx (Meta/LinkedIn/Microsoft). Zonder doel geen blok: dan is
+          er geen verschil om te tonen, en een "+0,0%" in het groen is een oordeel zonder grond. */}
+      {annualTarget > 0 && (
+        <div>
+          <div className="flex justify-between text-micro mb-1.5">
+            <span className="text-muted-foreground">
+              {realizedPct !== null ? `${Math.round(realizedPct)}% gerealiseerd` : "t.o.v. doel"}
+            </span>
+            <span className={`font-bold ${statusColor}`}>
+              {formatDeltaPercent(diffPct)}
+            </span>
+          </div>
+          {realizedPct !== null && (
+            <>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden relative">
+                {/* Waar je volgens het seizoen nu had moeten staan */}
+                {verwachtLinks !== null && (
+                  <div
+                    className="absolute top-0 bottom-0 w-px bg-brand-blue/30 z-10"
+                    style={{ left: `${verwachtLinks}%` }}
+                  />
+                )}
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    isPositive ? "bg-gradient-to-r from-green-400 to-green-500" : "bg-gradient-to-r from-red-400 to-red-500"
+                  }`}
+                  style={{ width: `${Math.min(realizedPct, 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-micro text-muted-foreground mt-1">
+                <span>0%</span>
+                <span>{verwachtPct !== null && verwachtTot ? `Verwacht t/m ${verwachtTot} (${Math.round(verwachtPct)}%)` : ""}</span>
+                <span>100%</span>
+              </div>
+            </>
+          )}
         </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden relative">
-          {/* Expected position marker */}
-          <div
-            className="absolute top-0 bottom-0 w-px bg-brand-blue/30 z-10"
-            style={{ left: `${yearProgress}%` }}
-          />
-          <div
-            className={`h-full rounded-full transition-all ${
-              isPositive ? "bg-gradient-to-r from-green-400 to-green-500" : "bg-gradient-to-r from-red-400 to-red-500"
-            }`}
-            style={{ width: `${Math.min(realizedPct, 100)}%` }}
-          />
-        </div>
-        <div className="flex justify-between text-micro text-muted-foreground mt-1">
-          <span>0%</span>
-          <span>Q1 verwacht ({yearProgress}%)</span>
-          <span>100%</span>
-        </div>
-      </div>
+      )}
     </KlikbareKaart>
   );
 }
@@ -122,41 +138,22 @@ export function MetricCards({ clientId, countryFilter, selected, onSelect }: {
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
   // Uit de provider: eerder rekende dit component de forecast bij elke render opnieuw uit
   // (0,566 ms per keer, twaalf componenten). Nu een keer per klant.
+  //
+  // Bekend en nog open: met een landfilter is `gedeeld` de forecast van het hele account, terwijl
+  // de kop een land noemt. Dat gold al voor drie van de vier kaartjes; nu de CPA-kaart ook uit de
+  // forecast komt, geldt het voor alle vier.
   const gedeeld = useForecast();
-  return (
-    <MetricCardsView
-      clientId={clientId}
-      data={data}
-      forecast={gedeeld ?? computeForecast(data)}
-      selected={selected}
-      onSelect={onSelect}
-    />
-  );
+  return <MetricCardsView forecast={gedeeld ?? computeForecast(data)} selected={selected} onSelect={onSelect} />;
 }
 
-export function MetricCardsView({ clientId, data, forecast, selected, onSelect }: {
-  clientId: string;
-  data: ClientHistoricalData;
+export function MetricCardsView({ forecast, selected, onSelect }: {
   forecast: ClientForecast;
   selected?: ForecastMetric;
   onSelect?: (metric: ForecastMetric) => void;
 }) {
-  const settings = getClientSettings(clientId);
-  const kpi = settings.kpiTargets;
-
-  // CPA calculation
-  const forecastedCpa = forecast.conversions.kpi.adjustedAnnual > 0
-    ? data.targetCurrentYear.adSpend / forecast.conversions.kpi.adjustedAnnual
-    : 0;
-  const ytdConversions = forecast.conversions.kpi.ytdRealized;
-  const ytdSpend = data.currentYearData
-    .slice(0, 3)
-    .reduce((s, r) => s + (r?.adSpend ?? 0), 0);
-  const ytdCpa = ytdConversions > 0 ? ytdSpend / ytdConversions : 0;
-  const cpaDiffPct = kpi.cpaTarget > 0
-    ? ((kpi.cpaTarget - forecastedCpa) / kpi.cpaTarget) * 100  // inverted: lower CPA = better
-    : 0;
-
+  // Alle vier de kaartjes uit dezelfde forecast. De CPA rekende hier eerder eigen cijfers uit
+  // (Q1-kosten gedeeld door YTD-conversies; doelbudget gedeeld door geprognotiseerde conversies) --
+  // zie jaarKaartCijfers in lib/forecast.ts voor wat dat opleverde.
   // Feedback #27: alleen de KPI's tonen die deze klant een doel heeft gegeven (client-
   // settings.tsx's "activeer deze KPI"), niet altijd alle vier -- een lege "ROAS: €0"-kaart voor
   // een klant die nooit op ROAS stuurt is ruis, geen inzicht.
@@ -168,10 +165,7 @@ export function MetricCardsView({ clientId, data, forecast, selected, onSelect }
         <KpiCard
           label="Conversies"
           icon={<Target className="w-4 h-4 text-brand-blue-ink" />}
-          annualTarget={forecast.conversions.kpi.annualTarget}
-          adjusted={forecast.conversions.kpi.adjustedAnnual}
-          realized={forecast.conversions.kpi.ytdRealized}
-          diffPct={forecast.conversions.kpi.diffPct}
+          cijfers={jaarKaartCijfers(forecast, "conversions")}
           format={formatNumber}
           subtitle="Totaal aantal"
           metricKey="conversions"
@@ -183,10 +177,7 @@ export function MetricCardsView({ clientId, data, forecast, selected, onSelect }
         <KpiCard
           label="Omzet"
           icon={<DollarSign className="w-4 h-4 text-brand-blue-ink" />}
-          annualTarget={forecast.revenue.kpi.annualTarget}
-          adjusted={forecast.revenue.kpi.adjustedAnnual}
-          realized={forecast.revenue.kpi.ytdRealized}
-          diffPct={forecast.revenue.kpi.diffPct}
+          cijfers={jaarKaartCijfers(forecast, "revenue")}
           format={formatCurrency}
           subtitle="Conversiewaarde"
           metricKey="revenue"
@@ -198,10 +189,7 @@ export function MetricCardsView({ clientId, data, forecast, selected, onSelect }
         <KpiCard
           label="ROAS"
           icon={<BarChart3 className="w-4 h-4 text-brand-blue-ink" />}
-          annualTarget={forecast.roas.kpi.annualTarget}
-          adjusted={forecast.roas.kpi.adjustedAnnual}
-          realized={forecast.roas.kpi.ytdRealized}
-          diffPct={forecast.roas.kpi.diffPct}
+          cijfers={jaarKaartCijfers(forecast, "roas")}
           format={formatRoas}
           subtitle="Return on ad spend"
           metricKey="roas"
@@ -213,10 +201,7 @@ export function MetricCardsView({ clientId, data, forecast, selected, onSelect }
         <KpiCard
           label="CPA"
           icon={<Wallet className="w-4 h-4 text-brand-blue-ink" />}
-          annualTarget={kpi.cpaTarget}
-          adjusted={forecastedCpa}
-          realized={ytdCpa}
-          diffPct={cpaDiffPct}
+          cijfers={jaarKaartCijfers(forecast, "cpa")}
           // Was `€${v.toFixed(2)}`: "€76.00", zonder spatie en met een punt, terwijl de kaart
           // ernaast "€ 143.520" schrijft. Dezelfde grootheid hoort er hetzelfde uit te zien.
           format={formatCurrency}

@@ -59,9 +59,11 @@ import { aggregateSearchTermsByMonth } from "../api/google-ads-search-term-aggre
 import { negativesToDbRows } from "../api/google-ads-negatives-transform";
 import { syncMerchantProductSnapshots } from "../api/merchant-products";
 import { logger } from "@/lib/logger";
+import { dashboardConversionActionIds } from "@/lib/analysis/channel-conversion-config";
 import { schrijftabel } from "@/lib/data-access/feitentabellen";
 import { projecteerNaarFactCore } from "./projectie";
 import { withFetchFailures, hasFetchFailure } from "../api/fetch-failures";
+import { maandagVanWeek } from "../api/google-weekvensters";
 import { buildRegionRows, overslaanSamenvatting } from "@/lib/geo/region-rows";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -367,13 +369,9 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
     .eq("client_id", clientId)
     .maybeSingle();
 
-  let convActionIds: string[] | undefined;
-  if (settingsData?.conversion_actions && Array.isArray(settingsData.conversion_actions)) {
-    const included = (settingsData.conversion_actions as Array<{ id: string; includedInDashboard?: boolean }>)
-      .filter((a) => a.includedInDashboard)
-      .map((a) => a.id);
-    if (included.length > 0) convActionIds = included;
-  }
+  // Dezelfde lezing van de lijst als de client-data-route: anders kunnen sync en dashboard een
+  // ander filter bouwen uit dezelfde instellingen (een id zonder waarde maakte de query hier leeg).
+  const convActionIds = dashboardConversionActionIds(settingsData?.conversion_actions);
   const checkoutActionMap = (settingsData?.checkout_action_map as Partial<Record<"add_to_cart" | "begin_checkout" | "purchase", string>> | null) ?? undefined;
 
   // ── Fetch all data in parallel ──
@@ -428,7 +426,9 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
       adGroupNegRaw, campaignNegRaw, sharedNegRaw,
     ] = await Promise.all([
       getAccountMetricsByMonth(credentials, customerId, startDate, endDate, convActionIds),
-      getAccountMetricsByWeek(credentials, customerId, startDate, endDate),
+      // Vanaf de maandag van de week waarin het venster begint: die week kwam afgekapt terug en
+      // overschreef de hele week die een eerdere run had geschreven (zie maandagVanWeek).
+      getAccountMetricsByWeek(credentials, customerId, maandagVanWeek(startDate), endDate),
       getCampaignMetricsByMonth(credentials, customerId, startDate, endDate, convActionIds),
       getCampaignImpressionShareByMonth(credentials, customerId, startDate, endDate),
       getAdGroupPerformanceByMonth(credentials, customerId, startDate, endDate),

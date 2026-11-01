@@ -144,3 +144,8 @@ async function main() {
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
+
+// Een module en geen script. Zonder import of export deelt dit bestand voor tsc zijn namen (NU,
+// passed, check, main) met elk ander testscript; met incremental bleef die botsing zelfs staan
+// nadat het andere bestand al een module was geworden.
+export {};

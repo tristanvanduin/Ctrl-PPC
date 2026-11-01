@@ -26,6 +26,7 @@ import { OWNER_TEAM, OWNER_CLIENT } from "../branding/brand";
 import { analyseOutputRows } from "./analyses-demo";
 import { splitInt, splitAlong } from "./split";
 import { microsoftDemoRows } from "./microsoft-demo";
+import { DEFAULT_CHANNEL_CONVERSION_CONFIG, sumSelectedConversions } from "@/lib/analysis/channel-conversion-config";
 
 type Row = Record<string, unknown>;
 
@@ -828,6 +829,14 @@ const clientSyncStatus: Row[] = [{ client_id: CID, channel: "google_ads", status
 // blended_account_monthly: per kanaal per maand, zodat de cross-channel-analyse (signalen,
 // funnel, KPI-verhoudingen, pacing) in de demo end-to-end draait. Google uit de maandtotalen,
 // Meta/LinkedIn geaggregeerd uit hun dagreeksen naar dezelfde maand-sleutel (YYYY-MM-01).
+//
+// conversions betekent hier wat het in de echte view betekent: de STANDAARDselectie over de
+// dagvelden, mét de leads. Zo schrijft de SQL-projectie het (migratie 078; de view leest fact_core
+// sinds 080): Meta = conversions + leads, LinkedIn = one_click_leads + external_website_conversions,
+// en leads staat er daarnaast nog eens apart. Eerst telde de mock bij LinkedIn alleen de
+// website-conversies, de betekenis van migratie 014, en daardoor zag de demo niet dat lezers die
+// "conversions + leads" deden de leads dubbel telden. Zie __blended_view_semantiek_test.ts.
+//
 // Vóór blendedAccountMonthly gedeclareerd: die IIFE hieronder telt de Microsoft-dagen mee, en
 // module-constanten evalueren op volgorde. Eén keer berekend, net als de andere constanten --
 // demoRows() kan per render meermaals worden aangeroepen en de generator bouwt duizenden dagrijen.
@@ -849,8 +858,8 @@ const blendedAccountMonthly: Row[] = (() => {
     }
     for (const [month, a] of byMonth) out.push({ client_id: CID, month, channel, impressions: a.imp, clicks: a.clk, spend: a.spend, conversions: a.conv, leads: a.leads });
   };
-  aggDaily(metaAccountDaily, "meta_ads", (r) => ({ imp: r.impressions as number, clk: r.link_clicks as number, spend: r.spend as number, conv: r.conversions as number, leads: 0 }));
-  aggDaily(linkedinAccountDaily, "linkedin_ads", (r) => ({ imp: r.impressions as number, clk: r.clicks as number, spend: r.spend as number, conv: r.external_website_conversions as number, leads: r.one_click_leads as number }));
+  aggDaily(metaAccountDaily, "meta_ads", (r) => ({ imp: r.impressions as number, clk: r.link_clicks as number, spend: r.spend as number, conv: sumSelectedConversions(r, "meta_ads", DEFAULT_CHANNEL_CONVERSION_CONFIG), leads: Number(r.leads ?? 0) }));
+  aggDaily(linkedinAccountDaily, "linkedin_ads", (r) => ({ imp: r.impressions as number, clk: r.clicks as number, spend: r.spend as number, conv: sumSelectedConversions(r, "linkedin_ads", DEFAULT_CHANNEL_CONVERSION_CONFIG), leads: r.one_click_leads as number }));
   aggDaily(microsoftTables.microsoft_account_daily, "microsoft_ads", (r) => ({ imp: r.impressions as number, clk: r.clicks as number, spend: r.spend as number, conv: r.conversions as number, leads: 0 }));
   return out;
 })();

@@ -58,7 +58,9 @@ import { isDemoClient } from "@/lib/demo/demo-mode";
 import { GodViewDemo } from "@/components/terminal/god-view-demo";
 import { ChannelGapCard } from "./channel-gap-card";
 import type { InsightChannel } from "@/lib/insights/channel-of";
-import { PeriodProvider, usePeriod } from "@/lib/period/period-context";
+import { PeriodProvider, usePeriod, type PeriodDataStand } from "@/lib/period/period-context";
+import { bandDataStand } from "@/lib/period/band-stand";
+import { NIET_GOOGLE } from "@/lib/period/kanaal-maanden";
 import { PeriodSelector } from "./period-selector";
 import { PeriodSummary } from "./period-summary";
 import { SprintPlanning } from "../insights/sprint-planning";
@@ -88,6 +90,7 @@ import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
 import { useClientData } from "@/lib/use-client-data";
 import { useChannelPeriodData } from "@/lib/use-channel-period-data";
+import { useBlendedClientData } from "@/lib/use-blended-client-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import { Sectie } from "@/components/ui/sectie";
@@ -201,10 +204,20 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
 
 // Apart component omdat usePeriod alleen binnen de PeriodProvider werkt, en de provider zit
 // om de return van ClientDashboard heen.
-function DashboardPeriodPicker() {
+//
+// jaarlijkseEditie: de kiezer waarschuwt dat "voorgaande periode" bij een jaarlijkse beurs de
+// aanloop met de nasleep vergelijkt. Die waarschuwing bestond, maar de vlag werd hier nooit
+// meegegeven, dus hij kon in productie niet verschijnen. maxMaand: de eindmaand van de presets,
+// zodat je met de hand niet voorbij het eind van de data kunt kiezen. klaar: dezelfde poort als de
+// KPI-band; tot de stand bekend is, is eindMaand de kalender, en dan toonde de kiezer een venster
+// dat even later versprong (review [8]).
+function DashboardPeriodPicker({ jaarlijkseEditie, klaar }: { jaarlijkseEditie: boolean; klaar: boolean }) {
   const periode = usePeriod();
   return (
     <PeriodSelector
+      jaarlijkseEditie={jaarlijkseEditie}
+      laden={!klaar}
+      maxMaand={periode.eindMaand}
       value={{
         preset: periode.preset, custom: periode.custom, comparison: periode.comparison,
         range: periode.range, compareRange: periode.compareRange,
@@ -250,17 +263,29 @@ export function ClientDashboard({ client }: { client: Client }) {
   const [sopErrors, setSopErrors] = useState<SopError[]>([]);
   const clientData = useClientData(client.id);
   // KPI-rij bovenaan: "deze kpi header rij moet standaard alles tonen. bij filtering pas kanaal
-  // specifiek" -- op "blended" (de standaard) telt Google+Meta+LinkedIn op, op een gekozen kanaal
+  // specifiek" -- op "blended" (de standaard) telt hij alle kanalen op, op een gekozen kanaal
   // toont hij alleen dat kanaal. Voorheen las PeriodSummary altijd clientData.data (Google), ook
   // op de Meta/LinkedIn/Alle kanalen-tabs.
-  const periodSummaryData = useChannelPeriodData({ clientId: client.id, channel, googleData: clientData.data });
+  const periodSummary = useChannelPeriodData({ clientId: client.id, channel, googleData: clientData.data });
+  // Voor de datastand van de band: de blended route leest de syncstand per kanaal
+  // (<kanaal>_connections), en die is in de browser niet leesbaar. Nodig zodra de klant een
+  // Meta-, LinkedIn- of Microsoft-kanaal heeft, ook als dat het enige is: anders rekent die tab op
+  // de nieuwste rij alleen, en verliest een gepauzeerd account met een gezonde sync maanden
+  // (review [3]). Dat is de kleinste juiste weg: een eigen route voor alleen de syncstand zou
+  // dezelfde lezers nog eens bouwen. Een klant met alleen Google (de meeste) vraagt hem niet: de
+  // Google-route geeft zijn eigen stand mee. CrossChannelView en de kanaalprovider lezen dezelfde
+  // hook; meerdere mounts geven één verzoek.
+  const blendedAan = (kanalen ?? []).some((k) => k !== "google");
+  const blendedStand = useBlendedClientData(client.id, blendedAan);
   const [lagDays, setLagDays] = useState<number>(3);
   const [refreshKey, setRefreshKey] = useState(0);
   const [countryFilter, setCountryFilter] = useState<string | null>(null);
   // Stuurt deze klant op een beurs, dan is de kalendermaand niet de as die telt. De
   // prestatiekaart schakelt dan naar weken-tot-beurs; de maandweergave blijft een klik ver weg
   // voor wie toch per maand wil kijken.
-  const upcomingEdition = useUpcomingEdition(client.id);
+  // Met de gekozen beurs: zonder geo stond in de hero de naam van de gekozen beurs naast de
+  // aftelling van welke ingestelde beurs toevallig de eerstvolgende was.
+  const upcomingEdition = useUpcomingEdition(client.id, geoClone);
   const [tijdas, setTijdas] = useState<"beurs" | "maand">("beurs");
 
   useEffect(() => {
@@ -268,8 +293,32 @@ export function ClientDashboard({ client }: { client: Client }) {
     setLagDays(settings.conversionLagDays ?? 3);
   }, [client.id]);
 
+  // Tot waar de data van het ACTIEVE kanaal loopt. De presets eindigen daarop (PeriodProvider) en
+  // niet op de kalender: bij een sync die op 26 augustus stopte liep "laatste 12 maanden" op
+  // 1 november t/m oktober, en telden september en oktober mee als maanden zonder kosten en
+  // conversies: de vergelijking zakte in zonder dat er iets gebeurd was.
+  // Per kanaal en niet één stand voor alles: een achterlopend Meta hoort het venster van het
+  // Google-tabblad niet in te korten. Uit de bronnen die de band zelf toont, met de syncstand van de
+  // blended route erbij; zie lib/period/band-stand.ts (review [3], [7], [12]).
+  const dataStand: PeriodDataStand | null = bandDataStand({
+    channel,
+    kanalen: kanalen ?? [],
+    google: clientData.data?.dataStand,
+    laatsteDag: periodSummary.laatsteDag,
+    route: blendedStand.dataStand,
+  });
+  // Geen cijfers (en geen periode in de kiezer) zolang de stand nog niet bekend is: anders staat de
+  // band eerst op het kalendervenster en springt hij daarna, met tussendoor percentages over
+  // maanden die er niet zijn. Bekend is: de kanalen, de eigen bronnen van dit tabblad, en (zodra de
+  // route aan staat) de syncstand. Faalt de route, dan telt hij als bekend en rekent de band op
+  // zijn eigen rijen.
+  const eigenStandBekend = channel === "google" ? !clientData.loading
+    : channel === "blended" ? !clientData.loading && NIET_GOOGLE.every((k) => periodSummary.geladenVanaf[k] !== null)
+      : periodSummary.geladenVanaf[channel] !== null;
+  const bandKlaar = kanalen !== null && eigenStandBekend && (channel === "google" || !blendedStand.loading);
+
   return (
-    <PeriodProvider scope={`client-${client.id}`}>
+    <PeriodProvider scope={`client-${client.id}`} dataStand={dataStand}>
     <BrandThemeProvider clientId={client.id} geoClone={geoClone}>
     <div className="space-y-6">
       {/* Merk-header: logo + merk-/beursnaam, in de huisstijl van de actieve klant/beurs. */}
@@ -279,7 +328,7 @@ export function ClientDashboard({ client }: { client: Client }) {
           op hetzelfde scherm over verschillende maanden gaan. Onder de hero i.p.v. ernaast:
           de hero loopt nu over de volle breedte, en de kiezer ertegenaan geklemd maakte hem smal. */}
       <div className="flex justify-end -mt-3">
-        <DashboardPeriodPicker />
+        <DashboardPeriodPicker klaar={bandKlaar} jaarlijkseEditie={upcomingEdition?.cadence === "annual"} />
       </div>
       {/* Data source indicator + sync status.
 
@@ -426,12 +475,12 @@ export function ClientDashboard({ client }: { client: Client }) {
               {/* Kanaaltabs boven de KPI-rij (17.44): "is het niet onlogisch dat de kanaalfilter
                   onder de hoofd-KPI-rij staat?" -- je kiest eerst welk kanaal je bekijkt, dan pas
                   de cijfers ervoor. De KPI-rij zelf beweegt nu ook echt mee: op "blended" (de
-                  standaard, "Alle kanalen") telt Google+Meta+LinkedIn op via
-                  useChannelPeriodData(); op een gekozen kanaal toont hij alleen dat kanaal. Werkt
-                  op data die de pagina al heeft (Google) of apart ophaalt (Meta/LinkedIn), dus ook
-                  in demo-modus. */}
+                  standaard, "Alle kanalen") telt hij alle kanalen op via useChannelPeriodData();
+                  op een gekozen kanaal toont hij alleen dat kanaal. Werkt op data die de pagina al
+                  heeft (Google) of apart ophaalt (Meta/LinkedIn/Microsoft), dus ook in demo-modus.
+                  De losse kanalen gaan mee als bronnen, zodat de vergelijking per kanaal paart. */}
               <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
-              <PeriodSummary data={periodSummaryData} />
+              <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} />
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
@@ -517,7 +566,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                         eerste
                         icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
                         titel="Waar dit jaar op uitkomt"
-                        bijschrift="Jaarprognose over alle kanalen samen, tegen het geschatte jaardoel (vorig jaar +10%)"
+                        bijschrift="Jaarprognose over alle kanalen samen, tegen het jaardoel (ingevoerd in Instellingen, anders vorig jaar +10%)"
                       >
                         <ForecastSummaryTiles clientId={client.id} channel="blended" />
                       </Sectie>

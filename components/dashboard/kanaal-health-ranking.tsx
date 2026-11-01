@@ -105,7 +105,12 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
     </>
   );
 
-  if (rijen.length === 0) return bronnen;
+  // De bronnen staan in BEIDE takken op dezelfde plek: eerste kind van een fragment, buiten de
+  // kaart. Stonden ze hier los en hieronder binnen de kaart-<div>, dan zag React bij de eerste
+  // score een andere boom, haalde alle KanaalScoreBron-kinderen weg en zette ze opnieuw neer --
+  // met een tweede ronde /api/analysis/channel-forecast (gemeten: 6 verzoeken in plaats van 3).
+  // KanaalScoreBron rendert niets, dus in de DOM verandert er niets.
+  if (rijen.length === 0) return <>{bronnen}</>;
 
   // EEN lijn, niet drie. De radar toont het gemiddelde per as over de kanalen die die as
   // daadwerkelijk METEN.
@@ -160,8 +165,9 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
   const factornamen = rijen[0].health.factors.map((f) => f.name);
 
   return (
+    <>
+    {bronnen}
     <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
-      {bronnen}
       <div className="flex items-center gap-2 mb-4">
         <Activity className="w-4 h-4 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Account Health per kanaal</h3>
@@ -215,6 +221,7 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
         kanaal gezet is zegt niets over het andere.
       </p>
     </div>
+    </>
   );
 }
 

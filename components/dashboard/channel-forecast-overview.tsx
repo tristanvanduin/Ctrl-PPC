@@ -10,9 +10,9 @@ import { today as vandaag } from "@/lib/reporting-date";
 import { resolveChannelConversionConfig, sumSelectedConversions, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
 import { buildChannelForecast } from "@/lib/analysis/channel-forecast-data";
 import type { TargetRow } from "@/lib/analysis/o2-targets-cost";
-import { actieveMetrics, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
+import { actieveMetrics, nuIndex, ytdGerealiseerd, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
 import type { ClientHistoricalData } from "@/lib/types";
-import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas, formatterFor, isLowerBetter, METRIC_LABELS } from "@/lib/forecast-format";
+import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas, formatterFor, isLowerBetter, isOptelbaar, METRIC_LABELS } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
@@ -61,6 +61,7 @@ function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
     cpa: <Wallet className="w-4 h-4 text-brand-blue-ink" />,
   };
   const kpi = forecast[metric].kpi;
+  const ytd = ytdGerealiseerd(forecast, metric);
   const format = formatterFor(metric);
   // isLowerBetter, net als elke andere metric-consument: zonder deze check kleurde een
   // sléchtere CPA (diffPct >= 0) groen — precies de "gemiste plek kleurt rood groen" waar
@@ -68,7 +69,7 @@ function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
   const isPositive = isLowerBetter(metric) ? kpi.diffPct <= 0 : kpi.diffPct >= 0;
   // De voortgangsbalk "X% van het jaardoel gerealiseerd" is voor een verhoudingsmetric
   // (CPA, ROAS) betekenisloos: je realiseert geen 60% van een doel-CPA. Verberg hem daar.
-  const toonVoortgang = metric === "conversions" || metric === "revenue";
+  const toonVoortgang = isOptelbaar(metric);
   const realizedPct = kpi.annualTarget > 0 ? (kpi.ytdRealized / kpi.annualTarget) * 100 : 0;
 
   return (
@@ -81,7 +82,8 @@ function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
         <h3 className="text-title font-semibold text-brand-blue-ink">{METRIC_LABELS[metric]}</h3>
       </div>
       <div className="mb-4">
-        <Kerncijfer label="Gerealiseerd YTD" waarde={format(kpi.ytdRealized)} />
+        {/* ytdGerealiseerd: een CPA zonder één conversie is geen € 0. */}
+        <Kerncijfer label="Gerealiseerd YTD" waarde={ytd === null ? "—" : format(ytd)} />
       </div>
       <div className="space-y-2 mb-4">
         <div className="flex justify-between items-center">
@@ -118,7 +120,8 @@ function ForecastChart({ forecast, metric, onMetricChange }: { forecast: ClientF
   const result = forecast[metric];
   const data = result.points.map((pt) => ({ label: pt.monthLabel, verwacht: pt.expected, gerealiseerd: pt.realized, prognose: pt.forecast }));
   const yFormatter = formatYAxis(metric);
-  const lastRealizedIdx = data.findLastIndex((d) => d.gerealiseerd !== null);
+  // Uit de conversiereeks (nuIndex): een CPA zonder conversies is null, en dan schoof de lijn terug.
+  const lastRealizedIdx = nuIndex(forecast, "maand");
 
   const legendaItems: LegendaItem[] = [
     { label: "Gerealiseerd", kleur: theme.primary },

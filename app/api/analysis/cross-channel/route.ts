@@ -30,7 +30,11 @@ import { buildFastSaturationSignals, type SaturationPoint } from "@/lib/signals/
 import { mergeDetections } from "@/lib/signals/types";
 import { analyzeFunnelOverlap, deriveLinkedInAudienceKind, type CampaignFunnelInput } from "@/lib/cross-channel/funnel-overlap";
 import type { TargetingSummary } from "@/lib/linkedin/entities";
-import { today } from "@/lib/reporting-date";
+import { addDays, today } from "@/lib/reporting-date";
+import { addMonths } from "@/lib/period/period-range";
+import { daysInMonthOf } from "@/lib/analysis/comparison-facts";
+import { kanaalMaandenUitDagen, dagbronSelect } from "@/lib/analysis/channel-report-blend";
+import { resolveChannelConversionConfig, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
 
 const SECTION = "cross_channel_v1";
 // Additieve sectie: de sub-analyses als losse blokken (JSON), zodat de UI de cross-channel-
@@ -117,19 +121,24 @@ export async function POST(request: NextRequest) {
   const toegang = await vereisKlantToegangUitBody(request, "analysis:run", clientId);
   if (toegang) return toegang;
 
-  const monthsAgo = new Date();
-  monthsAgo.setMonth(monthsAgo.getMonth() - MONTHS_BACK);
-  const sinceMonth = monthsAgo.toISOString().slice(0, 10);
-  const sinceDemo = new Date(Date.now() - DEMO_DAYS * 86_400_000).toISOString().slice(0, 10);
+  // Alle grenzen vanaf de Amsterdamse kalenderdag (today()), niet de UTC-klok van de server: rond
+  // middernacht gaf die op de 1e nog de vorige maand als "lopend". sinceMonth is dezelfde dag
+  // MONTHS_BACK maanden terug, op het maandeinde afgekapt: setMonth rolde "31 februari" door naar
+  // 3 maart en liet dan een maand weg.
+  const vandaag = today();
+  const maandTerug = addMonths(vandaag.slice(0, 7), -MONTHS_BACK);
+  const dagTerug = Math.min(Number(vandaag.slice(8, 10)), daysInMonthOf(`${maandTerug}-01`));
+  const sinceMonth = `${maandTerug}-${String(dagTerug).padStart(2, "0")}`;
+  const sinceDemo = addDays(vandaag, -DEMO_DAYS);
   // De lopende kalendermaand is per definitie onvolledig en vertekent elke
   // maand-op-maand-detector; alleen volle maanden gaan de vergelijking in.
-  const currentMonthStart = new Date().toISOString().slice(0, 8) + "01";
+  const currentMonthStart = `${vandaag.slice(0, 7)}-01`;
 
   // Dag-/weekdata voor de snelle verzadigingsdetectie. Campagnes lopen hier hooguit een paar
   // maanden, dus een maandvergelijking komt te laat om nog te kunnen bijsturen; deze bronnen geven
   // een oordeel binnen weken. Meta levert ook frequency (hoe vaak dezelfde persoon de advertentie
   // zag) — de vroegste waarschuwing dat een publiek opraakt.
-  const sinceFast = new Date(Date.now() - 140 * 86_400_000).toISOString().slice(0, 10);
+  const sinceFast = addDays(vandaag, -140);
 
   const [blendedRes, campaignRes, demoRes, labelRes, settingsRes, metaDailyRes, liDailyRes, gWeeklyRes, liCampaignsRes, metaCampaignsRes, msDailyRes] = await Promise.all([
     supabase
@@ -153,7 +162,7 @@ export async function POST(request: NextRequest) {
       .eq("level", "CAMPAIGN")
       .gte("date", sinceDemo),
     supabase.from("linkedin_urn_labels").select("urn, label"),
-    supabase.from("client_settings").select("audience_profile").eq("client_id", clientId).maybeSingle(),
+    supabase.from("client_settings").select("audience_profile, channel_conversion_config").eq("client_id", clientId).maybeSingle(),
     supabase
       .from("meta_account_daily")
       .select("date, impressions, link_clicks, spend, frequency")
@@ -181,9 +190,11 @@ export async function POST(request: NextRequest) {
     // scripts/migrations/106_microsoft_ads_tabellen.sql). Zonder deze fetch zou het vierde
     // kanaal onzichtbaar zijn voor precies de analyse die kanalen naast elkaar legt. Eén fetch
     // over het maandvenster dekt ook het snellere verzadigingsvenster (6 maanden > 140 dagen).
+    // De kolommen zijn die van de gedeelde dagbron (dagbronSelect), zodat kanaalMaandenUitDagen
+    // hieronder dezelfde velden ziet als de KPI-band en het Jaaroverzicht.
     supabase
       .from("microsoft_account_daily")
-      .select("date, impressions, clicks, spend, conversions, conversion_value")
+      .select(dagbronSelect("microsoft_ads"))
       .eq("client_id", clientId)
       .gte("date", sinceMonth),
   ]);
@@ -211,22 +222,18 @@ export async function POST(request: NextRequest) {
   // (currentMonthStart) én de afgekapte oudste maand eruit (maand < sinceMonth valt bij de view
   // ook weg, want month is daar de eerste van de maand) -- anders werd "26-28 februari" hier een
   // 'volle maand' van drie dagen. Leads 0: Microsoft rekent in conversies, niet in leadvelden.
+  // Dag -> maand via kanaalMaandenUitDagen, de gedeelde omzetting met de conversieselectie van de
+  // klant; hier stond een eigen lus die dezelfde optelling nog eens deed.
   const blendedHeeftMicrosoft = channels.some((c) => c.channel === "microsoft_ads");
-  const msMaanden = new Map<string, { impressions: number; clicks: number; spend: number; conversions: number; conversionValue: number }>();
-  if (!blendedHeeftMicrosoft) {
-    for (const r of msDailyRes.data ?? []) {
-      const datum = String(r.date ?? "");
-      if (datum.length < 7) continue;
-      const month = datum.slice(0, 7) + "-01";
-      if (month >= currentMonthStart || month < sinceMonth) continue;
-      const a = msMaanden.get(month) ?? { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversionValue: 0 };
-      a.impressions += n(r.impressions); a.clicks += n(r.clicks); a.spend += n(r.spend);
-      a.conversions += n(r.conversions); a.conversionValue += n(r.conversion_value);
-      msMaanden.set(month, a);
-    }
-    for (const [month, a] of msMaanden) {
-      channels.push({ channel: "microsoft_ads", month, impressions: a.impressions, clicks: a.clicks, spend: a.spend, conversions: a.conversions, leads: 0 });
-    }
+  const convConfig = resolveChannelConversionConfig(
+    ((settingsRes.data as { channel_conversion_config?: unknown } | null)?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null,
+  );
+  // Een select uit een functie geeft supabase-js geen rijtype; de rijen zijn de dagbronkolommen.
+  const msDagRijen = (msDailyRes.data ?? []) as unknown as Array<Record<string, unknown>>;
+  const msMaanden = blendedHeeftMicrosoft ? [] : kanaalMaandenUitDagen(msDagRijen, "microsoft_ads", convConfig)
+    .filter((m) => m.month < currentMonthStart && m.month >= sinceMonth);
+  for (const m of msMaanden) {
+    channels.push({ channel: "microsoft_ads", month: m.month, impressions: m.impressions, clicks: m.clicks, spend: m.cost, conversions: m.conversions, leads: 0 });
   }
 
   if (channels.length === 0) {
@@ -258,8 +265,8 @@ export async function POST(request: NextRequest) {
   // Microsoft telt hier ook mee: zonder waarde-tracking is de blended ROAS net zo onberekenbaar
   // door een Microsoft-gat als door een Meta-gat.
   {
-    const msTotaal = [...msMaanden.values()].reduce(
-      (a, m) => ({ conversions: a.conversions + m.conversions, conversionValue: a.conversionValue + m.conversionValue, spend: a.spend + m.spend }),
+    const msTotaal = msMaanden.reduce(
+      (a, m) => ({ conversions: a.conversions + m.conversions, conversionValue: a.conversionValue + m.conversions_value, spend: a.spend + m.cost }),
       { conversions: 0, conversionValue: 0, spend: 0 });
     if (msTotaal.spend > 0 || msTotaal.conversions > 0) {
       valueByChannel.set("microsoft_ads", { channel: "microsoft_ads", ...msTotaal });
@@ -340,8 +347,15 @@ export async function POST(request: NextRequest) {
   }
 
   // ── KPI-verhoudingen over de kanalen: per kanaal het laatste volle maandvenster vs het
-  // vorige, geblend en geplafonneerd op indicatie (attributie verschilt per platform). De
-  // conversie-actie is conversies + leads samen, zodat lead-gen- en sale-kanalen samentellen. ──
+  // vorige, geblend en geplafonneerd op indicatie (attributie verschilt per platform). ──
+  //
+  // De conversie-actie is blended_account_monthly.conversions, zonder de leads erbij op te tellen.
+  // Die kolom bevat de leads al sinds de view op fact_core leest (migratie 080): de projectie
+  // schrijft Meta als conversions + leads en LinkedIn als one_click_leads +
+  // external_website_conversions, met leads = one_click_leads (refresh_fact_from_legacy, 078).
+  // Hier stond "conversions + leads", nog uit de tijd van migratie 014, toen leads apart stonden;
+  // dat telde een LinkedIn-lead dubbel (demo augustus: 124 in plaats van 88). Google heeft
+  // leads 0 en Microsoft komt hierboven uit zijn dagtabel met leads 0, dus daar verandert niets.
   const byChannel = new Map<string, ChannelMonthlyInput[]>();
   for (const c of channels) {
     const arr = byChannel.get(c.channel) ?? [];
@@ -359,8 +373,8 @@ export async function POST(request: NextRequest) {
     const prior = sorted[sorted.length - 2];
     kpiRecentLabel = recent.month.slice(0, 7);
     kpiPriorLabel = prior.month.slice(0, 7);
-    kpiRecentWindows.push({ label: channel, impressions: recent.impressions, clicks: recent.clicks, cost: recent.spend, conversions: recent.conversions + recent.leads });
-    kpiPriorWindows.push({ label: channel, impressions: prior.impressions, clicks: prior.clicks, cost: prior.spend, conversions: prior.conversions + prior.leads });
+    kpiRecentWindows.push({ label: channel, impressions: recent.impressions, clicks: recent.clicks, cost: recent.spend, conversions: recent.conversions });
+    kpiPriorWindows.push({ label: channel, impressions: prior.impressions, clicks: prior.clicks, cost: prior.spend, conversions: prior.conversions });
   }
   const kpiRelations = buildCrossChannelKpiRelations(kpiRecentWindows, kpiPriorWindows, { recent: kpiRecentLabel, prior: kpiPriorLabel });
   if (kpiRecentWindows.length < 2) {
@@ -497,7 +511,7 @@ export async function POST(request: NextRequest) {
     })),
     // Microsoft heeft dagkorrel; hetzelfde snelle venster als Meta/LinkedIn (geen frequency,
     // dat is een social-metriek).
-    ...(msDailyRes.data ?? []).filter((r) => String(r.date) >= sinceFast).map((r) => ({
+    ...msDagRijen.filter((r) => String(r.date) >= sinceFast).map((r) => ({
       channel: "microsoft_ads", date: String(r.date),
       impressions: n(r.impressions), clicks: n(r.clicks), spend: n(r.spend),
     })),

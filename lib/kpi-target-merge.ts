@@ -1,5 +1,6 @@
 import { type ClientHistoricalData } from "./types";
 import { getClientSettings } from "./client-settings";
+import { GROEI_CONVERSIES, GROEI_OMZET } from "./analysis/standaard-jaardoel";
 
 /**
  * Merget de door de gebruiker ingestelde KPI-doelen (Instellingen → doelen) in
@@ -12,13 +13,20 @@ export function mergeKpiTargets(clientId: string, data: ClientHistoricalData): C
   const kpi = settings.kpiTargets;
   const originalTarget = data.targetCurrentYear;
 
+  // Het veld in Instellingen heet "% Groei tov vorig jaar", dus het percentage werkt op vorig
+  // jaar. Het doel van de route is al vorig jaar +10% (standaardJaardoel); het percentage daar
+  // bovenop leggen gaf bij "10%" vorig jaar x 1,21. Vorig jaar is dat doel gedeeld door dezelfde
+  // standaardgroei, op afronding na. Groei 0 is "niets ingevoerd": dan blijft het standaarddoel.
+  const opGroei = (doel: number, groeiPct: number, standaardGroei: number): number =>
+    !groeiPct ? doel : Math.round((doel / standaardGroei) * (1 + groeiPct / 100));
+
   const convTarget = kpi.conversionsMode === "absolute"
     ? kpi.conversionsAbsolute
-    : Math.round(originalTarget.conversions * (1 + kpi.conversionsGrowthPct / 100));
+    : opGroei(originalTarget.conversions, kpi.conversionsGrowthPct, GROEI_CONVERSIES);
 
   const revTarget = kpi.revenueMode === "absolute"
     ? kpi.revenueAbsolute
-    : Math.round(originalTarget.revenue * (1 + kpi.revenueGrowthPct / 100));
+    : opGroei(originalTarget.revenue, kpi.revenueGrowthPct, GROEI_OMZET);
 
   // Derive spend target from KPI goals instead of using the API default:
   // Option 1: conversions × CPA (if both are set)

@@ -90,3 +90,33 @@ export function formatterFor(metric: ForecastMetric): (v: number) => string {
 export function isLowerBetter(metric: ForecastMetric): boolean {
   return metric === "cpa";
 }
+
+/**
+ * Telt een metriek op over maanden en weken? Conversies en omzet wel; ROAS en CPA zijn
+ * verhoudingen. Daarvan realiseer je geen percentage van een jaardoel, en over weken verdeel je ze
+ * niet maar houd je het gemiddelde aan. Dezelfde regel stond vijf keer inline, en een gemiste
+ * plek telde een ROAS van 2,4 op tot 3 per week.
+ */
+export function isOptelbaar(metric: ForecastMetric): boolean {
+  return metric === "conversions" || metric === "revenue";
+}
+
+/**
+ * Een maand of week zonder realisatie EN zonder prognose: vóór de start van het kanaal, of een
+ * gat in de data. Dat is geen nul. `realized ?? forecast ?? 0` met het label "Prognose" maakte er
+ * een voorspelde nul van, met een groene of rode ratio die op niets gemeten rust.
+ */
+export function zonderData(p: { realized: number | null; forecast: number | null }): boolean {
+  return p.realized === null && p.forecast === null;
+}
+
+/**
+ * Hoe een maand of week zonder waarde heet. Meestal "Geen data". Maar een verhouding met een teller
+ * en zonder noemer (geenNoemer, deriveForecast) is gemeten: kosten zonder één conversie (CPA), of
+ * omzet zonder kosten (ROAS). Die heette ook "Geen data", in het grijs, terwijl het voor een CPA de
+ * slechtste maand van het jaar was. Het oordeel erbij: slecht voor een CPA, goed voor een ROAS.
+ */
+export function geenWaardeLabel(p: { geenNoemer?: boolean }, metric: ForecastMetric): string {
+  if (!p.geenNoemer) return "Geen data";
+  return metric === "cpa" ? "Geen conversies" : "Geen kosten";
+}

@@ -10,12 +10,12 @@
 // toont laat je niet zien dat de lopende maand er niet in zit. Bij een halve maand naast drie
 // hele maanden lijkt elke trend te dalen, en niets in de interface zou dat verraden.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Calendar, ChevronDown, TriangleAlert } from "lucide-react";
 import {
   PERIOD_PRESETS, COMPARISON_MODES, PRESET_LABEL, COMPARISON_LABEL,
   resolvePeriod, resolveComparison, comparisonWarning, formatRange, monthCount,
-  isValidMonth, addMonths,
+  isValidMonth, lastCompleteMonth,
   type PeriodPreset, type ComparisonMode, type PeriodRange,
 } from "@/lib/period/period-range";
 
@@ -43,23 +43,47 @@ interface Props {
   onChange: (next: PeriodSelection) => void;
   /** Bij een jaarlijkse beurseditie is "voorgaande periode" misleidend; dan waarschuwt hij. */
   jaarlijkseEditie?: boolean;
+  /** De laatste kiesbare eindmaand. Standaard de laatste volle kalendermaand; een pagina met een
+   *  datastand geeft de maand waarop haar presets eindigen (usePeriod().eindMaand). */
+  maxMaand?: string;
+  /** De pagina weet nog niet tot waar de data loopt. Dan staat er geen periode en is hij niet te
+   *  openen: de waarde is tot dan het kalendervenster, en dat sprong zodra de stand binnenkwam
+   *  (review [8]). Wie in die tijd een eindmaand koos, kon ook voorbij de data kiezen. */
+  laden?: boolean;
 }
 
-export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
+export function PeriodSelector({ value, onChange, jaarlijkseEditie, maxMaand, laden }: Props) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
   const waarschuwing = comparisonWarning(value.range, value.comparison, { jaarlijkseEditie });
 
   // Zelfde patroon als components/layout/user-menu.tsx: zonder dit sloot het paneel alleen via
   // de trigger-knop zelf, niet door ergens anders op de pagina te klikken -- inconsistent met
   // elke andere dropdown in de app (gebruikersmenu, command palette, meldingen-bel).
+  // Escape sluit hem ook (zoals components/insights/eigenaar-kiezer.tsx) en geeft de focus terug
+  // aan de knop: wie met het toetsenbord werkt, kon het paneel anders alleen dicht krijgen door
+  // terug te tabben naar de knop, en na sluiten stond de focus nergens. Alleen luisteren zolang
+  // hij open is; dicht hoeft niemand elke klik op de pagina te zien.
   useEffect(() => {
+    if (!open) return;
     function onClick(e: MouseEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   function zet(preset: PeriodPreset, custom: PeriodRange | null, comparison: ComparisonMode) {
     onChange(resolveSelection(preset, custom, comparison));
@@ -76,29 +100,44 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
   return (
     <div className="relative" ref={panelRef}>
       <button
+        ref={triggerRef}
         type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open && !laden}
+        aria-controls={open && !laden ? panelId : undefined}
+        aria-busy={laden || undefined}
+        disabled={laden}
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-body text-brand-gray hover:border-gray-400"
+        className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-body text-brand-gray hover:border-gray-400 disabled:text-muted-foreground disabled:hover:border-border"
       >
         <Calendar className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium">{formatRange(value.range)}</span>
-        {value.compareRange && (
-          <span className="text-micro text-muted-foreground">
-            tegen {formatRange(value.compareRange)}
-          </span>
+        {laden ? (
+          <span className="font-medium">Periode laden…</span>
+        ) : (
+          <>
+            <span className="font-medium">{formatRange(value.range)}</span>
+            {value.compareRange && (
+              <span className="text-micro text-muted-foreground">
+                tegen {formatRange(value.compareRange)}
+              </span>
+            )}
+          </>
         )}
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
-        <div className="absolute right-0 z-20 mt-1 w-80 rounded-lg border border-border bg-card supports-[backdrop-filter]:bg-[var(--zweef-vlak)] supports-[backdrop-filter]:backdrop-blur-md p-3 shadow-lg">
+      {open && !laden && (
+        <div id={panelId} role="dialog" aria-label="Periode en vergelijking" className="absolute right-0 z-20 mt-1 w-80 rounded-lg border border-border bg-card supports-[backdrop-filter]:bg-[var(--zweef-vlak)] supports-[backdrop-filter]:backdrop-blur-md p-3 shadow-lg">
           <p className="mb-1.5 text-micro font-medium uppercase tracking-wide text-muted-foreground">Periode</p>
           <div className="mb-3 grid grid-cols-2 gap-1.5">
             {PERIOD_PRESETS.filter((p) => p !== "custom").map((p) => (
               <button
                 key={p}
                 type="button"
-                onClick={() => zet(p, null, value.comparison)}
+                aria-pressed={value.preset === p}
+                // Een preset is een volledige keuze: daarna dicht. De maandvelden en de
+                // vergelijking houden hem open, die verfijn je.
+                onClick={() => { zet(p, null, value.comparison); setOpen(false); }}
                 className={`rounded-md border px-2 py-1.5 text-left text-body ${
                   value.preset === p
                     ? "border-brand-blue bg-brand-blue/5 font-medium text-brand-blue-ink"
@@ -127,8 +166,11 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
                 type="month"
                 value={value.range.end}
                 min={value.range.start}
-                // De lopende maand is onvolledig en hoort niet kiesbaar te zijn.
-                max={addMonths(new Date().toISOString().slice(0, 7), -1)}
+                // De lopende maand is onvolledig en hoort niet kiesbaar te zijn, en een maand na
+                // het eind van de data ook niet. In Amsterdam, net als resolvePeriod: in UTC liep
+                // dit rond middernacht op de 1e een maand achter, en dan stond de eindmaand boven
+                // zijn eigen max.
+                max={maxMaand ?? lastCompleteMonth()}
                 onChange={(e) => zetMaand("end", e.target.value)}
                 className="w-full rounded-md border border-border px-2 py-1 text-body focus:border-brand-blue focus:outline-none"
               />
@@ -141,6 +183,7 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie }: Props) {
               <button
                 key={m}
                 type="button"
+                aria-pressed={value.comparison === m}
                 onClick={() => zet(value.preset, value.custom, m)}
                 className={`flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-left text-body ${
                   value.comparison === m

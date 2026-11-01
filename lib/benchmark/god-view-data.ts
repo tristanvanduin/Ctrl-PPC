@@ -21,7 +21,7 @@ export async function fetchGodViewInvoerRijen(supabase: SupabaseClient): Promise
     supabase.from("agencies").select("id, benchmark_optin_at"),
     supabase.from("accounts").select("client_id, agency_id"),
     supabase.from("client_settings").select("client_id, bedrijfsmodel, niche"),
-    supabase.from("blended_account_monthly").select("client_id, channel, spend, conversions, conversion_value, leads").eq("month", month),
+    supabase.from("blended_account_monthly").select("client_id, channel, spend, conversions, conversion_value").eq("month", month),
   ]);
 
   const meedoen = new Set((bureaus ?? []).filter((b) => (b as { benchmark_optin_at: string | null }).benchmark_optin_at).map((b) => String((b as { id: string }).id)));
@@ -32,7 +32,7 @@ export async function fetchGodViewInvoerRijen(supabase: SupabaseClient): Promise
 
   const n = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
   const rijen: GodViewInvoerRij[] = [];
-  for (const r of (maandrijen ?? []) as { client_id: string; channel: string; spend: number | null; conversions: number | null; conversion_value: number | null; leads: number | null }[]) {
+  for (const r of (maandrijen ?? []) as { client_id: string; channel: string; spend: number | null; conversions: number | null; conversion_value: number | null }[]) {
     const clientId = String(r.client_id);
     const agencyId = agencyPerKlant.get(clientId);
     if (!agencyId || !meedoen.has(agencyId)) continue;
@@ -46,11 +46,15 @@ export async function fetchGodViewInvoerRijen(supabase: SupabaseClient): Promise
       bedrijfsmodel: (s.bedrijfsmodel as Bedrijfsmodel | null) ?? null,
       niche: s.niche ?? null,
       spend: n(r.spend),
-      // Conversies en leads samen als acquisitie-actie, zelfde conventie als
-      // app/api/analysis/cross-channel/route.ts's KPI-verhoudingen (recent.conversions +
-      // recent.leads) -- anders krijgt een leadgen-account stelselmatig CPA "oneindig" terwijl er
-      // wel degelijk acquisitie plaatsvond.
-      conversions: n(r.conversions) + n(r.leads),
+      // blended_account_monthly.conversions bevat de leads al sinds de view op fact_core leest
+      // (migratie 080): de projectie schrijft Meta als conversions + leads en LinkedIn als
+      // one_click_leads + external_website_conversions, met leads = one_click_leads
+      // (refresh_fact_from_legacy, migratie 078); Google heeft leads 0. Hier stond
+      // "conversions + leads", naar de conventie van de cross-channel-KPI's, die nog uit migratie
+      // 014 stamde, toen leads apart stonden. Sinds 080 telde dat elke LinkedIn-lead twee keer en
+      // kwam de CPA van een leadgen-account te laag uit. Een eindige CPA houdt zo'n account
+      // gewoon: zijn leads zitten in conversions.
+      conversions: n(r.conversions),
       conversionValue: n(r.conversion_value),
     });
   }

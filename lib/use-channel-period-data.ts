@@ -1,205 +1,221 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
+import type { ReadFilter } from "@/lib/data-access/read-policy";
+import { resolveChannelConversionConfig, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
+import { alsBronReeks, type BronReeks } from "@/lib/period/apply-period";
+import { addMonths, type Month } from "@/lib/period/period-range";
+import { monthsAgo } from "@/lib/reporting-date";
 import {
-  resolveChannelConversionConfig, sumSelectedConversions,
-  type ChannelConversionConfig, type ChannelConversionChannel,
-} from "@/lib/analysis/channel-conversion-config";
-import type { ClientHistoricalData, MonthlyRecord } from "@/lib/types";
+  NIET_GOOGLE, kanaalDagbron, kanaalStandUitDagen, samenvoegen,
+  type KanaalStand, type NietGoogleKanaal,
+} from "@/lib/period/kanaal-maanden";
+import type { ClientHistoricalData } from "@/lib/types";
 
 // De KPI-rij (PeriodSummary) toonde altijd Google-cijfers, ook op de Meta/LinkedIn/Alle
 // kanalen-tabs -- niet "blend die niet meebeweegt" maar letterlijk het verkeerde kanaal op drie
 // van de vier tabs. Deze hook berekent hetzelfde ClientHistoricalData-schema (dat comparePeriods()
-// in lib/period/apply-period.ts al kent) voor Meta en LinkedIn, en telt Google+Meta+LinkedIn
+// in lib/period/apply-period.ts al kent) voor Meta, LinkedIn en Microsoft, en telt alle kanalen
 // samen op voor "blended" (de standaardweergave, "Alle kanalen") -- zodat client-dashboard.tsx aan
 // PeriodSummary precies dezelfde vorm data kan geven, welk kanaal er ook actief is.
 //
 // Bewust dezelfde bron als ChannelPerformance (dbSelect, dus altijd de echte database, ook in
-// demo-modus) en dezelfde conversieselectie (resolveChannelConversionConfig/
-// sumSelectedConversions uit lib/analysis/channel-conversion-config.ts) -- zodat de KPI-rij en de
-// kanaal-eigen ChannelPerformance-kaart nooit een ander getal voor dezelfde conversie tonen.
+// demo-modus) en dezelfde conversieselectie: dag -> maand loopt via kanaalMaandenUitDagen
+// (lib/analysis/channel-report-blend.ts), de ene plek waar de selectie van de klant op dagrijen
+// wordt toegepast. De rekenkant staat in lib/period/kanaal-maanden.ts; hier zit alleen het laden.
 //
 // 22 augustus 2026: dit las tot nu toe rechtstreeks met supabase.from(), wat in demo-modus via de
 // demo-mock liep -- de tegenhanger, ChannelPerformance, is in dezelfde ronde net van hetzelfde
 // patroon naar dbSelect omgezet. Was dit blijven staan, dan waren de twee juist uit elkaar gaan
 // lopen: de KPI-rij bovenaan de pagina met een ander cijfer dan de kaart eronder, voor exact
 // dezelfde metriek.
+
+/** Wat de band nodig heeft, voor het actieve kanaal. */
+export interface ChannelPeriodData {
+  /** De reeks voor de cijfers; bij "blended" de optelling van alle kanalen. Null zolang hij laadt. */
+  data: ClientHistoricalData | null;
+  /**
+   * De losse bronnen voor de vergelijking. Bij "blended" de vier kanalen, zodat er per kanaal
+   * gepaard wordt; op een Meta/LinkedIn/Microsoft-tab één bron met de eerste volle maand en de
+   * laadgrens erbij (zonder die bron bouwt comparePeriods er zelf een, en die kent geen van beide).
+   * Op de Google-tab null: een maandbron, de eerste maand met data is daar de start.
+   */
+  bronnen: BronReeks[] | null;
+  /** Per niet-Google-kanaal de laatste dag met een rij, voor het venster van de band. */
+  laatsteDag: Record<NietGoogleKanaal, string | null>;
+  /** Per niet-Google-kanaal de eerste maand die volledig geladen is; null zolang hij laadt. */
+  geladenVanaf: Record<NietGoogleKanaal, Month | null>;
+}
+
+// Het plafond van /api/data: PostgREST levert hooguit 1000 rijen per antwoord (max-rows), en de
+// route kent geen offset. Expliciet als limit meegegeven, zodat een volle pagina herkenbaar is.
+const PAGINA = 1000;
+
+// Hoe ver terug de band laadt: 36 maanden, vanaf de eerste van de maand (Amsterdam). Eerst stond
+// hier "nu min 730 dagen": op elke dag behalve de 1e begon dat midden in een maand, en die
+// afgeknipte maand telde in "laatste 12 maanden tegen vorig jaar" mee alsof hij compleet was.
+// Daarna 24 maanden, en dat was te kort: "Vorig jaar" tegen het jaar daarvoor loopt tot januari van
+// twee jaar terug (35 maanden), en de laatste twaalf maanden schuiven mee terug zodra de data
+// achterloopt. De band noemde de laadgrens dan "de data begint in" (review [5], [41]).
+const MAANDEN_TERUG = 36;
+
+/** Een "YYYY-MM-DD" uit een rij, of "" als hij er niet is. */
+const dagVan = (r: Record<string, unknown>): string => String(r.date ?? "").slice(0, 10);
+
+// De dagrijen van een kanaal, ZONDER conversieselectie. dagbronSelect haalt alle selecteerbare
+// conversievelden op; de selectie bepaalt alleen hoe ze worden opgeteld, niet welke rijen er
+// komen. Stond de selectie in de effect-deps, dan werd elke tabel twee keer opgehaald: eerst met
+// de standaardselectie, dan nog eens zodra client_settings binnen was.
 //
-// `weeks` blijft overal een lege array: comparePeriods()/slicePeriod() (lib/period/apply-period.ts)
-// gebruiken alleen month/conversions/revenue/adSpend uit een MonthlyRecord, nooit .weeks -- die is
-// er puur omdat het type dat vereist.
-
-const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0);
-
-type NietGoogleKanaal = "meta" | "linkedin" | "microsoft";
-
-interface RowConfig {
-  accountTable: string;
-  channelKey: ChannelConversionChannel;
-  select: string;
-  spend: (r: Record<string, unknown>) => number;
-  revenue: (r: Record<string, unknown>) => number;
-}
-
-const CONFIG: Record<NietGoogleKanaal, RowConfig> = {
-  meta: {
-    accountTable: "meta_account_daily",
-    channelKey: "meta_ads",
-    select: "date, spend, conversions, leads, conversion_value",
-    spend: (r) => num(r.spend),
-    revenue: (r) => num(r.conversion_value),
-  },
-  linkedin: {
-    accountTable: "linkedin_account_daily",
-    channelKey: "linkedin_ads",
-    select: "date, spend, one_click_leads, external_website_conversions, post_click_conversions, conversion_value",
-    spend: (r) => num(r.spend),
-    revenue: (r) => num(r.conversion_value),
-  },
-  microsoft: {
-    accountTable: "microsoft_account_daily",
-    channelKey: "microsoft_ads",
-    select: "date, spend, conversions, conversion_value",
-    spend: (r) => num(r.spend),
-    revenue: (r) => num(r.conversion_value),
-  },
-};
-
-interface MaandTotaal { year: number; month: number; conversions: number; revenue: number; adSpend: number }
-
-async function fetchChannelMonths(clientId: string, channel: NietGoogleKanaal, convConfig: ChannelConversionConfig): Promise<MaandTotaal[]> {
-  const cfg = CONFIG[channel];
-  // Twee jaar: genoeg venster voor "vorig jaar"-vergelijkingen waar de data dat toelaat. Minder
-  // diep dan dat levert eerlijk "ontbrekende maanden" op via slicePeriod() -- geen aanname, geen
-  // stille kortere reeks.
-  const since = new Date(Date.now() - 730 * 86_400_000).toISOString().slice(0, 10);
-  const { data } = await dbSelect<Record<string, unknown>>(cfg.accountTable, {
-    select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }],
-  });
-  const rows = data;
-
-  const byMonth = new Map<string, MaandTotaal>();
-  for (const r of rows) {
-    const date = String(r.date ?? "");
-    if (date.length < 7) continue;
-    const year = Number(date.slice(0, 4));
-    const month = Number(date.slice(5, 7));
-    const k = `${year}-${month}`;
-    const a = byMonth.get(k) ?? { year, month, conversions: 0, revenue: 0, adSpend: 0 };
-    a.conversions += sumSelectedConversions(r, cfg.channelKey, convConfig);
-    a.revenue += cfg.revenue(r);
-    a.adSpend += cfg.spend(r);
-    byMonth.set(k, a);
-  }
-  return [...byMonth.values()];
-}
-
-function bouwHistorischeData(clientId: string, maanden: MaandTotaal[]): ClientHistoricalData {
-  const currentYear = new Date().getFullYear();
-  const historicalYears: Record<number, MonthlyRecord[]> = {};
-  const currentYearData: (MonthlyRecord | null)[] = Array(12).fill(null);
-
-  for (const m of maanden) {
-    const record: MonthlyRecord = { month: m.month, conversions: m.conversions, revenue: m.revenue, adSpend: m.adSpend, weeks: [] };
-    if (m.year === currentYear) {
-      currentYearData[m.month - 1] = record;
-    } else {
-      (historicalYears[m.year] ??= []).push(record);
+// PAGINEREN OP DATUM. Eén verzoek zonder paginering gaf bij twee Meta-accounts (een rij per account
+// per dag, ~1460 in twee jaar) de nieuwste 1000 rijen, en de afgeknipte oudste maand paarde als
+// volle maand: +13,3% op vlakke data, met "de data begint in juni 2025" erbij (review [1]). De
+// route kent alleen gte/lte en één sorteerkolom, dus keyset: nieuwste eerst, en na een volle pagina
+// verder t/m de oudste dag van die pagina. Die dag kan half binnen zijn (de grens valt tussen twee
+// accounts), dus hij gaat uit deze pagina en komt in de volgende in zijn geheel terug.
+//
+// Lukt een pagina niet, dan houdt het laden daar op en schuift `geladenVanaf` mee: de band zegt dan
+// dat die maanden niet geladen zijn, in plaats van ze als nul of als start te lezen.
+async function fetchKanaalRijen(clientId: string, kanaal: NietGoogleKanaal): Promise<{ rijen: Record<string, unknown>[]; geladenVanaf: Month }> {
+  const bron = kanaalDagbron(kanaal);
+  const vanaf = monthsAgo(MAANDEN_TERUG);
+  const rijen: Record<string, unknown>[] = [];
+  let tot: string | null = null;
+  for (;;) {
+    const filters: ReadFilter[] = [{ op: "gte", column: "date", value: vanaf }];
+    if (tot) filters.push({ op: "lte", column: "date", value: tot });
+    const { data, error }: { data: Record<string, unknown>[]; error: { message: string } | null } = await dbSelect(bron.table, {
+      select: bron.select, clientId, filters,
+      order: { column: "date", ascending: false },
+      limit: PAGINA,
+    });
+    // Een fout op de eerste pagina is "geen rijen", zoals altijd; daarna is alles vóór `tot` niet
+    // geladen, en de maand van `tot` maar deels.
+    if (error && tot) {
+      console.warn(`[band] ${bron.table} voor ${clientId}: pagina vóór ${tot} niet geladen (${error.message})`);
+      return { rijen, geladenVanaf: addMonths(tot.slice(0, 7), 1) };
     }
-  }
-
-  return {
-    clientId,
-    // Ongebruikt door comparePeriods()/PeriodSummary -- die lezen alleen currentYearData en
-    // historicalYears. Nul in plaats van weglaten omdat het type het veld verplicht stelt.
-    targetCurrentYear: { conversions: 0, revenue: 0, adSpend: 0 },
-    historicalYears,
-    currentYearData,
-    currentYear,
-  };
-}
-
-/** Alle kanalen bij elkaar optellen, maand voor maand, voor de "Alle kanalen"-weergave. */
-function samenvoegen(clientId: string, sets: ClientHistoricalData[]): ClientHistoricalData {
-  const totalen = new Map<string, MaandTotaal>();
-  const optellen = (year: number, m: MonthlyRecord | null) => {
-    if (!m) return;
-    const k = `${year}-${m.month}`;
-    const a = totalen.get(k) ?? { year, month: m.month, conversions: 0, revenue: 0, adSpend: 0 };
-    a.conversions += m.conversions || 0;
-    a.revenue += m.revenue || 0;
-    a.adSpend += m.adSpend || 0;
-    totalen.set(k, a);
-  };
-  let currentYear = new Date().getFullYear();
-  for (const d of sets) {
-    currentYear = d.currentYear || currentYear;
-    for (const [jaarStr, maanden] of Object.entries(d.historicalYears ?? {})) {
-      const jaar = Number(jaarStr);
-      for (const m of maanden ?? []) optellen(jaar, m);
+    if (data.length < PAGINA) {
+      rijen.push(...data);
+      return { rijen, geladenVanaf: vanaf.slice(0, 7) };
     }
-    for (const m of d.currentYearData ?? []) optellen(d.currentYear, m);
+    const oudste: string = data.reduce((m: string, r) => (dagVan(r) < m ? dagVan(r) : m), dagVan(data[0]));
+    if (oudste === tot) {
+      // Eén dag met 1000 of meer rijen: verder komen kan alleen met een tweede sorteersleutel, en
+      // die kent de route niet. Liever een te laag totaal met een spoor dan een lus.
+      rijen.push(...data);
+      console.warn(`[band] ${bron.table} voor ${clientId}: meer dan ${PAGINA} rijen op ${oudste}, afgekapt`);
+      return { rijen, geladenVanaf: addMonths(oudste.slice(0, 7), 1) };
+    }
+    rijen.push(...data.filter((r) => dagVan(r) !== oudste));
+    tot = oudste;
   }
-  return bouwHistorischeData(clientId, [...totalen.values()]);
 }
+
+// Het opslaan van de conversieselectie (Instellingen > Meten) zit in dezelfde ClientDashboard als
+// de band, en de band blijft daarbij gemount. Zonder dit seintje hield hij de oude selectie vast
+// tot een herlaadbeurt, terwijl het Jaaroverzicht eronder de nieuwe toonde (review [4], [22], [40]).
+const KANAALSELECTIE_OPGESLAGEN = "kanaalselectie-opgeslagen";
+
+/** Aan te roepen na het opslaan van de Meta/LinkedIn/Microsoft-selectie: de band leest opnieuw. */
+export function meldKanaalselectieOpgeslagen(clientId: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(KANAALSELECTIE_OPGESLAGEN, { detail: { clientId } }));
+}
+
+/** Een kanaal zoals de band het bewaart: de stand plus tot waar terug hij geladen is. */
+type GeladenKanaal = KanaalStand & { geladenVanaf: Month };
 
 export interface ChannelPeriodDataArgs {
   clientId: string;
   /** De actieve kanaaltab. "blended" = Alle kanalen (de standaardweergave). */
   channel: "google" | "meta" | "linkedin" | "microsoft" | "blended";
-  /** Google's al opgehaalde data -- deze hook haalt alleen Meta/LinkedIn zelf op. */
+  /** Google's al opgehaalde data -- deze hook haalt alleen Meta/LinkedIn/Microsoft zelf op. */
   googleData: ClientHistoricalData | null;
 }
 
-/** De juiste ClientHistoricalData voor de KPI-rij, gegeven het actieve kanaal. */
-export function useChannelPeriodData({ clientId, channel, googleData }: ChannelPeriodDataArgs): ClientHistoricalData | null {
-  const [convConfig, setConvConfig] = useState<ChannelConversionConfig>(() => resolveChannelConversionConfig(null));
-  const [metaData, setMetaData] = useState<ClientHistoricalData | null>(null);
-  const [linkedinData, setLinkedinData] = useState<ClientHistoricalData | null>(null);
-  const [microsoftData, setMicrosoftData] = useState<ClientHistoricalData | null>(null);
-
+/** De juiste data voor de KPI-rij, gegeven het actieve kanaal. */
+export function useChannelPeriodData({ clientId, channel, googleData }: ChannelPeriodDataArgs): ChannelPeriodData {
+  // Met de klant erbij opgeslagen: bij een klantwissel tellen de kanalen van de vorige klant niet
+  // meer, ook niet in de render vóór het nieuwe antwoord binnen is.
+  const [geladen, setGeladen] = useState<{ clientId: string; kanalen: Partial<Record<NietGoogleKanaal, GeladenKanaal>> } | null>(null);
+  // Opgehoogd na het opslaan van de selectie, zodat het effect hieronder opnieuw leest. De oude
+  // cijfers blijven staan tot de nieuwe binnen zijn: het is dezelfde klant, alleen anders geteld.
+  const [versie, setVersie] = useState(0);
   useEffect(() => {
-    let cancelled = false;
-    dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId })
-      .then(({ data }) => {
-        if (!cancelled) setConvConfig(resolveChannelConversionConfig((data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null));
-      });
-    return () => { cancelled = true; };
+    const opOpslaan = (e: Event) => {
+      if ((e as CustomEvent<{ clientId?: string }>).detail?.clientId === clientId) setVersie((v) => v + 1);
+    };
+    window.addEventListener(KANAALSELECTIE_OPGESLAGEN, opOpslaan);
+    return () => window.removeEventListener(KANAALSELECTIE_OPGESLAGEN, opOpslaan);
   }, [clientId]);
 
-  // Altijd allebei ophalen, ongeacht welk kanaal actief is: "blended" heeft ze beide nodig, en
+  // Eén effect, op clientId en `versie` (die alleen een opgeslagen selectie ophoogt). Hier stond de
+  // conversie-config als eigen state, en hadden de drie fetches [clientId, convConfig] als deps.
+  // resolveChannelConversionConfig levert elke keer een NIEUW object, dus zodra client_settings
+  // binnen was startten alle drie opnieuw -- ook als er niets was opgeslagen (vandaag bij elke
+  // klant): 7 verzoeken per paginabezoek waar 4 volstaan.
+  //
+  // Altijd alle drie ophalen, ongeacht welk kanaal actief is: "blended" heeft ze alle drie nodig, en
   // tussen tabs wisselen zonder herhaald fetchen is prettiger dan per tab opnieuw laden.
   useEffect(() => {
     let cancelled = false;
-    fetchChannelMonths(clientId, "meta", convConfig).then((maanden) => {
-      if (!cancelled) setMetaData(bouwHistorischeData(clientId, maanden));
-    });
+    // Parallel aan de dagrijen, maar een kanaal wordt pas gezet als BEIDE binnen zijn. Niet eerder:
+    // tellen met de standaardselectie kan een ander getal geven dan de opgeslagen keuze (LinkedIn met
+    // alleen "Lead-formulieren": 200 in plaats van 387 bij de demo), en dat getal stond dan even in
+    // de KPI-rij. Een mislukte lees valt terug op de standaardselectie, net als voorheen.
+    const config = dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId })
+      .then(({ data }) => resolveChannelConversionConfig((data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null));
+    for (const kanaal of NIET_GOOGLE) {
+      Promise.all([config, fetchKanaalRijen(clientId, kanaal)]).then(([cfg, { rijen, geladenVanaf }]) => {
+        if (cancelled) return;
+        const stand: GeladenKanaal = { ...kanaalStandUitDagen(clientId, rijen, kanaal, cfg), geladenVanaf };
+        setGeladen((g) => ({ clientId, kanalen: { ...(g?.clientId === clientId ? g.kanalen : {}), [kanaal]: stand } }));
+      });
+    }
     return () => { cancelled = true; };
-  }, [clientId, convConfig]);
+  }, [clientId, versie]);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchChannelMonths(clientId, "linkedin", convConfig).then((maanden) => {
-      if (!cancelled) setLinkedinData(bouwHistorischeData(clientId, maanden));
-    });
-    return () => { cancelled = true; };
-  }, [clientId, convConfig]);
+  const kanalen = geladen?.clientId === clientId ? geladen.kanalen : null;
+  const meta = kanalen?.meta ?? null;
+  const linkedin = kanalen?.linkedin ?? null;
+  const microsoft = kanalen?.microsoft ?? null;
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchChannelMonths(clientId, "microsoft", convConfig).then((maanden) => {
-      if (!cancelled) setMicrosoftData(bouwHistorischeData(clientId, maanden));
-    });
-    return () => { cancelled = true; };
-  }, [clientId, convConfig]);
+  const keuze = useMemo((): Pick<ChannelPeriodData, "data" | "bronnen"> => {
+    // Eén kanaal: de data plus één bron met zijn eerste volle maand en laadgrens. "totaal" en geen
+    // kanaalnaam: de band noemt bij één bron geen kanaal (ongepaardTekst in period-summary.tsx).
+    const los = (s: GeladenKanaal | null): Pick<ChannelPeriodData, "data" | "bronnen"> =>
+      (s ? { data: s.data, bronnen: [alsBronReeks("totaal", s.data, s.vanaf, s.geladenVanaf)] } : { data: null, bronnen: null });
+    if (channel === "google") return { data: googleData, bronnen: null };
+    if (channel === "meta") return los(meta);
+    if (channel === "linkedin") return los(linkedin);
+    if (channel === "microsoft") return los(microsoft);
+    // blended: pas tonen zodra alle kanalen binnen zijn -- anders telt een half-geladen kanaal als
+    // nul mee, en dat leest als "dit kanaal presteert niet" in plaats van "nog aan het laden".
+    if (!googleData || !meta || !linkedin || !microsoft) return { data: null, bronnen: null };
+    // De losse kanalen gaan mee, zodat de vergelijking per kanaal kan paren: een kanaal dat in de
+    // vergelijkingsperiode nog niet liep, telde in de optelling anders als groei. Google is een
+    // maandbron zonder dagen: daar is de eerste maand met data de start.
+    return {
+      data: samenvoegen(clientId, [googleData, meta.data, linkedin.data, microsoft.data]),
+      bronnen: [
+        alsBronReeks("google", googleData),
+        alsBronReeks("meta", meta.data, meta.vanaf, meta.geladenVanaf),
+        alsBronReeks("linkedin", linkedin.data, linkedin.vanaf, linkedin.geladenVanaf),
+        alsBronReeks("microsoft", microsoft.data, microsoft.vanaf, microsoft.geladenVanaf),
+      ],
+    };
+  }, [channel, clientId, googleData, meta, linkedin, microsoft]);
 
-  if (channel === "google") return googleData;
-  if (channel === "meta") return metaData;
-  if (channel === "linkedin") return linkedinData;
-  if (channel === "microsoft") return microsoftData;
-  // blended: pas tonen zodra alle kanalen binnen zijn -- anders telt een half-geladen kanaal als
-  // nul mee, en dat leest als "dit kanaal presteert niet" in plaats van "nog aan het laden".
-  if (!googleData || !metaData || !linkedinData || !microsoftData) return null;
-  return samenvoegen(clientId, [googleData, metaData, linkedinData, microsoftData]);
+  const mDag = meta?.laatsteDag ?? null;
+  const lDag = linkedin?.laatsteDag ?? null;
+  const msDag = microsoft?.laatsteDag ?? null;
+  const laatsteDag = useMemo(() => ({ meta: mDag, linkedin: lDag, microsoft: msDag }), [mDag, lDag, msDag]);
+  const mVan = meta?.geladenVanaf ?? null;
+  const lVan = linkedin?.geladenVanaf ?? null;
+  const msVan = microsoft?.geladenVanaf ?? null;
+  const geladenVanaf = useMemo(() => ({ meta: mVan, linkedin: lVan, microsoft: msVan }), [mVan, lVan, msVan]);
+
+  return { ...keuze, laatsteDag, geladenVanaf };
 }

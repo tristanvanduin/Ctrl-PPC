@@ -21,7 +21,9 @@ function assert(condition: boolean, label: string): void {
 assert(weeksToFair("2026-06-10", "2026-06-10") === 0, "op de beursdag is het 0 weken");
 assert(weeksToFair("2026-06-10", "2026-06-08") === 0, "twee dagen ervoor is nog dezelfde week");
 assert(weeksToFair("2026-06-10", "2026-06-03") === 1, "zeven dagen ervoor is 1 week");
-assert(weeksToFair("2026-06-10", "2026-05-28") === 1, "dertien dagen ervoor is nog steeds 1 week");
+// Kalenderweken, net als de strook: een beurs op woensdag 10 juni valt in de week van maandag 8 juni.
+assert(weeksToFair("2026-06-10", "2026-06-07") === 1, "de zondag voor de beursweek is W-1, ook al is het maar drie dagen");
+assert(weeksToFair("2026-06-10", "2026-05-28") === 2, "donderdag 28 mei ligt in de kalenderweek van 25 mei: W-2, net als de strook");
 assert(weeksToFair("2026-06-10", "2026-05-27") === 2, "veertien dagen ervoor is 2 weken");
 assert(weeksToFair("2026-06-10", "2026-06-17") === -1, "een week erna is negatief");
 assert(weeksToFair("kapot", "2026-06-03") === null, "een ongeldige datum geeft null");
@@ -71,6 +73,15 @@ const later: FairEventCfg = { id: "gra", name: "GreenTech Americas", abbrev: "GR
 const vroeger: FairEventCfg = { id: "grt2", name: "GreenTech Amsterdam", abbrev: "GRT", cadence: "annual", editions: [{ date: "2026-09-02", label: "2026" }] };
 assert(selectUpcomingEdition([later, vroeger], "2026-07-28")?.abbrev === "GRT", "van twee beurzen wint de eerstvolgende");
 
+// De cadans reist mee met de editie: de periodekiezer waarschuwt alleen bij een jaarlijkse editie
+// dat "voorgaande periode" de aanloop met de nasleep vergelijkt, en kon dat zonder dit veld niet weten.
+const demoGrt: FairEventCfg = { id: "demo-grt", name: "GreenTech Amsterdam", abbrev: "GRT", cadence: "annual", editions: [{ date: "2026-06-11", label: "2026" }, { date: "2027-06-10", label: "2027" }] };
+const demoGrn: FairEventCfg = { id: "demo-grn", name: "GreenTech North America", abbrev: "GRN", cadence: "custom", editions: [{ date: "2026-11-04", label: "2026" }] };
+assert(selectUpcomingEdition([demoGrt, demoGrn], "2026-11-05")?.cadence === "annual", "de editie draagt de cadans van zijn event mee (jaarlijks)");
+assert(selectUpcomingEdition([demoGrt, demoGrn], "2026-11-01")?.cadence === "custom", "een eenmalige beurs zegt dat ook");
+assert(selectUpcomingEdition([{ ...demoGrt, editions: [{ date: "2025-06-12", label: "2025" }] }], "2026-11-01")?.cadence === "annual", "ook een doorgerekende editie draagt de cadans");
+assert(selectUpcomingEdition([{ id: "q", name: "Q", editions: [{ date: "2027-01-01", label: "2027" }] }], "2026-11-01")?.cadence === null, "zonder ingestelde cadans: null, niet verzonnen");
+
 // ── Weekpunten omzetten ──
 function wp(month: number, week: number, o: Partial<WeeklyPoint> = {}): WeeklyPoint {
   return { month, week, label: `W${week}`, expected: 100, realized: null, forecast: 80, ...o };
@@ -87,9 +98,11 @@ assert(weken[0].monthLabel === "Jul", "de kalendermaand blijft zichtbaar als bij
 assert(weken[0].realized === 120 && weken[1].realized === null, "gerealiseerd en prognose blijven onderscheiden");
 assert(weken.every((w, i) => i === 0 || weken[i - 1].weekStart < w.weekStart), "de weken staan op datum gesorteerd");
 
-// Een maand met een verzonnen vijfde week botst met de eerste week van de maand erna: één telt.
+// Een maand met een verzonnen vijfde week botste met de eerste week van de maand erna. Nu krijgt
+// elke maand zijn eigen maandagen van de kalender, en botst er niets meer.
 const metDubbel = toFairWeeks([wp(2, 5), wp(3, 1)], 2026, "2026-09-02");
-assert(metDubbel.length === 1, "een dubbele startdatum telt maar een keer mee");
+assert(new Set(metDubbel.map((w) => w.weekStart)).size === metDubbel.length, "geen enkele maandag komt twee keer voor");
+assert(metDubbel.length === 4 + 5, "februari 2026 krijgt zijn vier maandagen, maart zijn vijf");
 
 // ── Het ankerpunt "nu" ──
 assert(currentWeekIndex(weken, "2026-07-22") === 2, "vandaag valt in de week die op of voor vandaag begon");

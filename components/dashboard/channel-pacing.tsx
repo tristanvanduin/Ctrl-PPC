@@ -3,11 +3,12 @@
 import { useMemo } from "react";
 import { Zap, TrendingUp, Calendar, Flag, Target } from "lucide-react";
 import { today as vandaag } from "@/lib/reporting-date";
-import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
+import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
+import { daysInMonthOf } from "@/lib/analysis/comparison-facts";
 import { berekenMaandPacing } from "@/lib/kanalen/maand-pacing";
 import { useKanaalData } from "./channel-data-provider";
 import { eur, fmt } from "./channel-performance";
-import { PacingRing } from "./pacing-monitor";
+import { BeursAftelling, PacingRing } from "./pacing-monitor";
 import { Laadvlak } from "@/components/ui/laadvlak";
 
 // Pacing voor Meta en LinkedIn, als eigen kaart in de hero -- naast Account Health, op dezelfde
@@ -35,7 +36,6 @@ export function ChannelPacing({ edition }: { edition?: UpcomingEdition | null })
   if (!pacing) return null;
 
   const { dagVanMaand, mtdSpend, mtdConv, vorigeSpend, vorigeConv, spendRatio, convRatio } = pacing;
-  const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, vandaag()) : null;
 
   // De kleur zegt niet "goed of slecht" maar "in de pas of niet". Boven 115% loopt het kanaal
   // harder dan vorige maand, en dat is een signaal en geen fout: bij spend hoort daar een blik op
@@ -57,7 +57,10 @@ export function ChannelPacing({ edition }: { edition?: UpcomingEdition | null })
   // Rechtdoor tot het einde van de maand: dezelfde "op dit tempo"-vraag als bij Google, maar dan
   // op maandbasis. Bewust géén seizoensmodel -- dat bestaat voor deze kanalen niet, en een
   // prognose suggereren die er niet is, is erger dan een rechte lijn die zichzelf zo noemt.
-  const dagenInMaand = new Date(new Date(vandaag()).getFullYear(), new Date(vandaag()).getMonth() + 1, 0).getDate();
+  // Uit de datumtekst van vandaag (Amsterdam), niet via new Date(): "2026-11-01" wordt als UTC-
+  // middernacht gelezen en getMonth() geeft dan de maand in de tijdzone van de kijker -- ten westen
+  // van UTC is dat nog oktober.
+  const dagenInMaand = daysInMonthOf(vandaag());
   const spendEindeMaand = spendPerDag * dagenInMaand;
   const convEindeMaand = convPerDag * dagenInMaand;
 
@@ -71,11 +74,7 @@ export function ChannelPacing({ edition }: { edition?: UpcomingEdition | null })
         <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing</h3>
         <span className="text-micro text-muted-foreground ml-auto">
-          {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
-            <span className="font-semibold text-brand-blue-ink mr-1.5">
-              Nog {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"} tot {edition!.label}
-            </span>
-          )}
+          <BeursAftelling edition={edition} vandaag={vandaag()} />
           Maand tot nu · dag {dagVanMaand} van {dagenInMaand} · vergeleken met vorige maand op dag {dagVanMaand}
         </span>
       </div>

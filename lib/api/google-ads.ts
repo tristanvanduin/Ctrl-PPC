@@ -363,7 +363,7 @@ export async function getAccountMetricsByMonth(
   // If filtering by conversion actions, we need to segment by conversion_action
   // and aggregate ourselves
   if (conversionActionIds && conversionActionIds.length > 0) {
-    return getFilteredMetricsByMonth(credentials, customerId, startDate, endDate, conversionActionIds);
+    return getFilteredMetricsByPeriod(credentials, customerId, startDate, endDate, conversionActionIds, "month");
   }
 
   const rows = await queryGoogleAds(credentials, customerId, `
@@ -401,22 +401,28 @@ export async function getAccountMetricsByMonth(
 }
 
 /**
- * Fetch metrics filtered by specific conversion actions, aggregated by month.
+ * Fetch metrics filtered by specific conversion actions, aggregated by month or by week.
  * Uses conversion_action segmentation so we only count selected actions.
  * Impressions, clicks, and cost are NOT affected by conversion action filter
  * (they're the same regardless) — we get those from an unsegmented query.
+ *
+ * Ook per week: de weekrijen (beursstrook, weekverdeling) telden anders alle acties terwijl de
+ * maand waar ze in liggen alleen de aangevinkte telde.
  */
-async function getFilteredMetricsByMonth(
+async function getFilteredMetricsByPeriod(
   credentials: GoogleAdsCredentials,
   customerId: string,
   startDate: string,
   endDate: string,
-  conversionActionIds: string[]
+  conversionActionIds: string[],
+  segment: "month" | "week",
 ): Promise<GoogleAdsMetrics[]> {
+  // Weken op datum, zoals de ongefilterde weekvraag: zie getAccountMetricsByWeek.
+  const sortering = segment === "week" ? "ORDER BY segments.week" : "";
   // Get base metrics (impressions, clicks, cost) without conversion segmentation
   const baseRows = await queryGoogleAds(credentials, customerId, `
     SELECT
-      segments.month,
+      segments.${segment},
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
@@ -424,12 +430,13 @@ async function getFilteredMetricsByMonth(
       metrics.average_cpc
     FROM customer
     WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+    ${sortering}
   `);
 
   // Get conversion metrics segmented by conversion action
   const convRows = await queryGoogleAds(credentials, customerId, `
     SELECT
-      segments.month,
+      segments.${segment},
       segments.conversion_action,
       metrics.conversions,
       metrics.conversions_value
@@ -447,7 +454,7 @@ async function getFilteredMetricsByMonth(
     const actionId = actionResource.split("/").pop() || "";
 
     if (conversionActionIds.includes(actionId)) {
-      const month = s.month;
+      const month = s[segment];
       const existing = convByMonth.get(month) || { conversions: 0, conversionsValue: 0 };
       existing.conversions += m.conversions || 0;
       existing.conversionsValue += m.conversionsValue || m.conversions_value || 0;
@@ -459,7 +466,7 @@ async function getFilteredMetricsByMonth(
   return baseRows.map((row) => {
     const m = row.metrics as Record<string, number>;
     const s = row.segments as Record<string, string>;
-    const month = s.month;
+    const month = s[segment];
     const conv = convByMonth.get(month) || { conversions: 0, conversionsValue: 0 };
     const clicks = m.clicks || 0;
 
@@ -481,14 +488,21 @@ async function getFilteredMetricsByMonth(
 }
 
 /**
- * Fetch account-level metrics by week
+ * Fetch account-level metrics by week.
+ * If conversionActionIds is provided, only count those specific conversion actions, like
+ * getAccountMetricsByMonth: anders telden de weken meer dan de maand waar ze in liggen.
  */
 export async function getAccountMetricsByWeek(
   credentials: GoogleAdsCredentials,
   customerId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  conversionActionIds?: string[]
 ): Promise<GoogleAdsMetrics[]> {
+  if (conversionActionIds && conversionActionIds.length > 0) {
+    return getFilteredMetricsByPeriod(credentials, customerId, startDate, endDate, conversionActionIds, "week");
+  }
+
   const rows = await queryGoogleAds(credentials, customerId, `
     SELECT
       segments.week,
@@ -503,7 +517,11 @@ export async function getAccountMetricsByWeek(
       metrics.conversions_from_interactions_rate
     FROM customer
     WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+    ORDER BY segments.week
   `);
+  // ORDER BY: zonder sortering is de volgorde van de API niet gegarandeerd, en de omzetting
+  // (googleAdsWeeklyToApiData) nummert de weken binnen een maand op positie. Die sorteert nu zelf
+  // ook; dit houdt de rijen ook voor andere afnemers van deze functie op datum.
 
   return rows.map((row) => {
     const m = row.metrics as Record<string, number>;

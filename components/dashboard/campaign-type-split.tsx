@@ -10,6 +10,9 @@ import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { buildNetworkSplit, networkTotals, type NetworkRow, type NetworkSlice } from "@/lib/pmax/network-split";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { maandLabel } from "./chart-chrome";
+import { addDays, today } from "@/lib/reporting-date";
+import { maandStart } from "@/lib/analysis/db-veilig";
 
 // De opener-donut (masterplan 17.32): spend per campagnetype (Search/Performance Max/Shopping/
 // Display). Bewust NIET Performance Max' eigen netwerkringen (pmax-network-split.tsx) -- die
@@ -59,6 +62,7 @@ function colorFor(uitsplitsing: Uitsplitsing, sleutel: string, order: string[]):
 }
 
 interface CampaignMonthlyRow {
+  month: string | null;
   campaign_type: string | null;
   campaign_name: string | null;
   cost: number | null;
@@ -69,6 +73,7 @@ interface CampaignMonthlyRow {
 }
 
 interface BlendedMonthlyRow {
+  month: string | null;
   channel: string | null;
   spend: number | null;
   conversions: number | null;
@@ -135,6 +140,32 @@ function normaliseer(u: Uitsplitsing, sleutel: string): string {
 }
 
 /**
+ * Welke maanden er echt in de ring zitten, als bijschrift: "jul '26 – aug '26".
+ *
+ * Hier stond "laatste 90 dagen", maar de bron is per MAAND en het filter pakt hele maanden vanaf
+ * een datum 90 dagen terug. Bij data die op 26 augustus stopt was dat op 1 november alleen
+ * augustus, en dan is een CPA onder "laatste 90 dagen" een ander getal dan hij beweert.
+ */
+function maandenTekst(maanden: readonly (string | null)[]): string | null {
+  const geldig = maanden.filter((m): m is string => !!m && /^\d{4}-\d{2}/.test(m)).map((m) => m.slice(0, 7)).sort();
+  if (geldig.length === 0) return null;
+  const van = geldig[0], tot = geldig[geldig.length - 1];
+  return van === tot ? maandLabel(van) : `${maandLabel(van)} – ${maandLabel(tot)}`;
+}
+
+/**
+ * De eerste maand van het venster: het maandBEGIN van 90 dagen terug.
+ *
+ * De `month`-kolom van beide bronnen is een maandbegin. Een filter op de kale datum van 90 dagen
+ * terug (op 1 november: 3 augustus) laat de rij van augustus ("2026-08-01") vallen; het
+ * kanaaltabblad filterde wel op het maandbegin en zag dus een maand meer dan type en campagne.
+ * Eén begin voor alle drie, zodat maandenTekst eronder ook overal waar is.
+ */
+export function vensterVanaf(vandaag: string): string {
+  return maandStart(addDays(vandaag, -90));
+}
+
+/**
  * @param toon Welke uitsplitsingen deze kaart aanbiedt; de eerste is het starttabblad.
  *   Standaard alle drie -- dat is de Google-weergave. "Alle kanalen" geeft alleen `["kanaal"]`
  *   mee: campagnetype en campagnenaam komen uit `ads_campaign_monthly` en die tabel kent enkel
@@ -149,6 +180,7 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
   const keuzes = UITSPLITSINGEN.filter((u) => toon.includes(u.key));
   const start = keuzes[0]?.key ?? "type";
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
+  const [maanden, setMaanden] = useState<string | null>(null);
   const [uitsplitsing, setUitsplitsing] = useState<Uitsplitsing>(start);
   const [tabelOpen, toggleTabel] = useRememberedOpen("campagnetype-tabel", false);
   // Klik op een ring-segment of een legendaregel selecteert dat campagnetype -- gedeeld tussen
@@ -162,8 +194,9 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
     // Drie maanden: genoeg om een net gestarte campagne niet als "geen data" te tonen, kort
     // genoeg om een verschoven mix (bv. een gestopt PMax-experiment) nog te laten zien --
     // zelfde overweging als PmaxNetworkSplit's eigen venster, alleen op maandrijen i.p.v. dagrijen.
-    const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    const vanaf = vensterVanaf(today());
     setRows(null);
+    setMaanden(null);
 
     // Kanaal komt uit een ANDERE tabel dan campagnetype en campagne. blended_account_monthly is de
     // enige bron die Meta en LinkedIn naast Google zet; ads_campaign_monthly kent per definitie
@@ -171,10 +204,11 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
     // ring die klopt en niets zegt.
     if (uitsplitsing === "kanaal") {
       dbSelect<BlendedMonthlyRow>("blended_account_monthly", {
-        select: "channel, spend, conversions, conversion_value, impressions, clicks",
-        clientId, filters: [{ op: "gte", column: "month", value: since.slice(0, 8) + "01" }],
+        select: "month, channel, spend, conversions, conversion_value, impressions, clicks",
+        clientId, filters: [{ op: "gte", column: "month", value: vanaf }],
       }).then(({ data }) => {
         if (cancelled) return;
+        setMaanden(maandenTekst(data.map((r) => r.month)));
         setRows(data.map((r) => ({
           networkType: r.channel ?? "onbekend",
           cost: Number(r.spend ?? 0),
@@ -188,10 +222,11 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
     }
 
     dbSelect<CampaignMonthlyRow>("ads_campaign_monthly", {
-      select: "campaign_type, campaign_name, cost, conversions, conversions_value, impressions, clicks",
-      clientId, filters: [{ op: "gte", column: "month", value: since }],
+      select: "month, campaign_type, campaign_name, cost, conversions, conversions_value, impressions, clicks",
+      clientId, filters: [{ op: "gte", column: "month", value: vanaf }],
     }).then(({ data }) => {
       if (cancelled) return;
+      setMaanden(maandenTekst(data.map((r) => r.month)));
       setRows(data.map((r) => ({
         networkType: uitsplitsing === "campagne"
           ? (r.campaign_name ?? "Onbekende campagne")
@@ -241,7 +276,9 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
       <div className="flex flex-wrap items-center gap-2">
         <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{actief.titel}</h3>
-        <span className="text-meta text-muted-foreground">laatste 90 dagen</span>
+        {/* De maanden die er echt in zitten; "laatste 90 dagen" alleen zolang dat nog niet bekend is
+            of er niets is (dan is het de vraag, niet de uitkomst). */}
+        <span className="text-meta text-muted-foreground">{maanden ?? "laatste 90 dagen"}</span>
       </div>
       {/* De uitsplitsingskiezer. Radiogroup en geen tabs-rol: er is één paneel eronder dat van
           inhoud wisselt, niet drie panelen waarvan er één zichtbaar is. Bij één keuze helemaal

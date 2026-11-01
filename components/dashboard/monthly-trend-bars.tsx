@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from "recharts";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { ALLE_FORECAST_METRICS, computeForecast } from "@/lib/forecast";
-import { METRIC_LABELS, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
+import { METRIC_LABELS, formatPercent, formatterFor, geenWaardeLabel, isLowerBetter, zonderData } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Tip, AsY, Raster, asSchaal, kortGetal } from "./chart-chrome";
@@ -40,14 +40,16 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
   // dezelfde maand bij de andere drie metrics op, en die arrays lopen 1-op-1 met dit array.
   const offset = alleConversiePunten.length - points.length;
 
+  // Een maand zonder realisatie en zonder prognose (vóór de start, of een gat) krijgt geen staaf:
+  // een staaf van nul zou een gemeten of voorspelde nul zijn.
   const data = points.map((pt) => ({
     label: pt.monthLabel,
-    waarde: pt.realized ?? pt.forecast ?? 0,
+    waarde: zonderData(pt) ? null : (pt.realized ?? pt.forecast ?? 0),
     prognose: pt.realized === null,
   }));
 
   const num = (v: number) => new Intl.NumberFormat("nl-NL", { notation: "compact" }).format(v);
-  const { domain, tickCount } = asSchaal(Math.max(...data.map((d) => d.waarde), 0));
+  const { domain, tickCount } = asSchaal(Math.max(...data.map((d) => d.waarde ?? 0), 0));
 
   return (
     <div className={`bg-card rounded-xl border border-border p-4 shadow-sm ${groeit ? "h-full flex flex-col" : ""}`}>
@@ -92,6 +94,7 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
               {ALLE_FORECAST_METRICS.map((m) => {
                 const p = forecast[m].points[idx];
                 if (!p) return null;
+                const mGeenData = zonderData(p);
                 const mVal = p.realized ?? p.forecast ?? 0;
                 const mFormat = formatterFor(m);
                 const mInverted = isLowerBetter(m);
@@ -101,14 +104,16 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
                     <div>
                       <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
                       <p className="text-micro text-muted-foreground">
-                        {p.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(p.expected)}
+                        {mGeenData ? geenWaardeLabel(p, m) : p.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(p.expected)}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lead font-bold text-brand-gray">{mFormat(mVal)}</p>
-                      <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>
-                        {formatPercent(p.monthRatio, 0)}
-                      </p>
+                      <p className="text-lead font-bold text-brand-gray">{mGeenData ? "—" : mFormat(mVal)}</p>
+                      {!mGeenData && (
+                        <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>
+                          {formatPercent(p.monthRatio, 0)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );

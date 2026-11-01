@@ -13,8 +13,10 @@
 import type { ClientAnnualData, ClientHistoricalData } from "@/lib/types";
 import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "@/lib/api/adapter";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
+import { kanaalGestopt, stilgelegd } from "@/lib/forecast-som";
 import { resolveTargets, type TargetRow } from "./o2-targets-cost";
 import { jaardoelMetTerugval } from "./standaard-jaardoel";
+import { volleMaand, laatsteGeldigeDag } from "@/lib/sync/datastand";
 
 export interface ChannelForecastRow {
   /** YYYY-MM-DD */
@@ -71,23 +73,26 @@ function aggregateByYear(rows: ChannelForecastRow[]): Map<number, { monthly: Api
 
 /**
  * @param todayIso vandaag als YYYY-MM-DD (lib/reporting-date's today()) -- bepaalt het huidige jaar
- *   en hoeveel maanden daarvan als "gerealiseerd" tellen (de rest wordt null, voor projectie).
+ *   en, samen met de laatste dag in `rows`, hoeveel maanden daarvan als "gerealiseerd" tellen (de
+ *   rest wordt null, voor projectie).
+ * @param dataTot de laatste definitieve dag van dit kanaal zoals de blended route hem bepaalde
+ *   (dataTotVanDagbron: na een geslaagde sync de dag vóór die sync). Rijen zeggen niet of de sync na
+ *   de laatste rij nog slaagde, en de syncs schrijven geen nulrijen: zonder deze dag verloor een
+ *   gepauzeerd account met een gezonde sync zijn echte halve maand aan een projectie, terwijl
+ *   "Alle kanalen" dezelfde maanden als gemeten telde (review [10], [14]). Geldt alleen als hij
+ *   later valt dan de nieuwste rij; weglaten = de rijen, zoals voorheen.
  */
 export function buildChannelHistoricalData(
   clientId: string,
   rows: ChannelForecastRow[],
   targetCurrentYear: ClientAnnualData,
   todayIso: string,
+  dataTot?: string | null,
 ): ClientHistoricalData | null {
   if (rows.length === 0) return null;
 
   const currentYear = Number(todayIso.slice(0, 4));
-  // De LOPENDE maand is niet gerealiseerd: tot en met vorige maand telt. De oude versie
-  // nam de huidige maand mee, waardoor een halfvolle maand (a) als eindstand meetelde in
-  // adjustedAnnual — de rest van die maand werd nooit geprojecteerd — en (b) met het
-  // zwaarste recency-gewicht de hele jaarprognose omlaag drukte. Het Google-pad
-  // (compute-targets) sloot de lopende maand altijd al uit (sloop-audit 1 sep 2026).
-  const realizedThroughMonth = Number(todayIso.slice(5, 7)) - 1;
+  const realizedThroughMonth = gerealiseerdTot(rows, todayIso, dataTot);
   const byYear = aggregateByYear(rows);
 
   const historicalYearsInput: YearDataInput[] = [...byYear.entries()]
@@ -96,15 +101,41 @@ export function buildChannelHistoricalData(
     .map(([year, { monthly, weekly }]) => ({ year, monthly, weekly }));
 
   const current = byYear.get(currentYear) ?? { monthly: [], weekly: [] };
-  // De rijen van de lopende maand horen ook niet in de "gerealiseerde" reeks zelf.
-  const lopendeMaand = Number(todayIso.slice(5, 7));
-  const monthly = current.monthly.filter((m) => m.month < lopendeMaand);
-  const weekly = current.weekly.filter((w) => w.month < lopendeMaand);
+  // Rijen na die grens (de partiële maand, en de lopende) horen ook niet in de gerealiseerde reeks.
+  const monthly = current.monthly.filter((m) => m.month <= realizedThroughMonth);
+  const weekly = current.weekly.filter((w) => w.month <= realizedThroughMonth);
 
-  return buildClientDataFromApi(
+  const data = buildClientDataFromApi(
     clientId, historicalYearsInput, monthly, weekly,
     targetCurrentYear, currentYear, realizedThroughMonth,
   );
+  // De eerste dag met data, voor het tempo zonder doel als de partiële eerste maand de laatste
+  // gerealiseerde is (forecastCoreMetric): dezelfde dag die de blended route meegeeft. De rijen zijn
+  // hooguit de nieuwste 1000 dagen; is de echte start ouder, dan valt deze dag in een jaar dat de
+  // regel niet raakt.
+  const eersteDag = rows.reduce<string | null>((acc, r) => {
+    const d = String(r.date ?? "").slice(0, 10);
+    return (r.spend || r.conv || r.revenue) && (acc === null || d < acc) ? d : acc;
+  }, null);
+  return eersteDag ? { ...data, eersteDag } : data;
+}
+
+/** De gerealiseerd-grens (1-12, 0 = nog niets) van een dagreeks, zie buildChannelHistoricalData. */
+function gerealiseerdTot(rows: ChannelForecastRow[], todayIso: string, dataTot?: string | null): number {
+  const currentYear = Number(todayIso.slice(0, 4));
+  // Gerealiseerd is t/m de laatste VOLLE maand met data (volleMaand, lib/sync/datastand.ts), niet
+  // t/m "vorige kalendermaand". Een halfvolle maand telde eerst als eindstand: hij drukte met het
+  // zwaarste recency-gewicht de jaarprognose omlaag en de rest van die maand werd nooit
+  // geprojecteerd (sloop-audit 1 sep 2026: de lopende maand). Dezelfde fout zat er nog in zodra de
+  // sync stilstond: bij data t/m 26 augustus, bekeken op 1 november, telde augustus (26 van de 31
+  // dagen) als volle maand. Nu is augustus partieel en loopt de realisatie t/m juli -- dezelfde
+  // grens als de blended historie en de KPI-band.
+  const laatsteDag = rows.reduce<string | null>((acc, r) => {
+    const d = String(r.date ?? "").slice(0, 10);
+    return acc === null || d > acc ? d : acc;
+  }, null);
+  const vol = volleMaand({ dataTot: laatsteGeldigeDag(laatsteDag, dataTot), nu: todayIso.slice(0, 10) }).laatsteVolleMaand;
+  return vol === null || Number(vol.slice(0, 4)) < currentYear ? 0 : Number(vol.slice(5, 7));
 }
 
 /**
@@ -122,6 +153,8 @@ export function buildChannelForecast(
   targetRows: TargetRow[],
   targetChannel: string,
   todayIso: string,
+  /** Zie buildChannelHistoricalData. */
+  dataTot?: string | null,
 ): { data: ClientHistoricalData; forecast: ClientForecast } | null {
   const targets = resolveTargets(targetRows, targetChannel, todayIso);
 
@@ -148,7 +181,14 @@ export function buildChannelForecast(
     vorigJaar,
   );
 
-  const data = buildChannelHistoricalData(clientId, rows, targetCurrentYear, todayIso);
+  const data = buildChannelHistoricalData(clientId, rows, targetCurrentYear, todayIso, dataTot);
   if (!data) return null;
-  return { data, forecast: computeForecast(data) };
+  // Dezelfde stopregel als "Alle kanalen" (kanaalGestopt): geen data in de laatste gerealiseerde
+  // maand of later, en geen seizoenspauze, dan na het gerealiseerde een prognose van nul. Zonder
+  // regel projecteerde een gepauzeerd account met een gezonde sync november en december op zijn
+  // oude tempo (566 voor het jaar), terwijl de som hetzelfde kanaal op 454 zette.
+  const maanden = [...aggregateByYear(rows)].flatMap(([jaar, { monthly }]) =>
+    monthly.map((m) => ({ month: `${jaar}-${String(m.month).padStart(2, "0")}`, conversions: m.conversions, revenue: m.revenue, adSpend: m.adSpend })));
+  const forecast = computeForecast(data);
+  return { data, forecast: kanaalGestopt(maanden, currentYear, gerealiseerdTot(rows, todayIso, dataTot)) ? stilgelegd(forecast) : forecast };
 }

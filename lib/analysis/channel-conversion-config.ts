@@ -4,8 +4,20 @@
 // en post-click-conversies als aparte kolommen. "Welke conversies tellen mee" is hier dus:
 // welke van die velden je optelt tot de conversie die de KPI's, forecasts en views gebruiken.
 //
-// Eén centrale bron zodat elke leesplek (ChannelPerformance, ChannelForecast, cross-channel,
-// de beurs-forecast) exact dezelfde selectie toepast. Puur, geen IO, los getest.
+// Eén centrale bron voor elke leesplek die de *_daily-tabellen leest: die tellen via
+// sumSelectedConversions met de selectie van de klant, en dag -> maand loopt via
+// kanaalMaandenUitDagen (channel-report-blend.ts). Puur, geen IO, los getest.
+//
+// Wat NIET via deze selectie loopt: fact_core en blended_account_monthly. Die vult de
+// SQL-projectie (refresh_fact_from_legacy, migratie 054/078) met de STANDAARDselectie hieronder,
+// wat de klant ook koos. Hier stond eerst dat cross-channel dezelfde selectie toepaste; dat was
+// niet waar, en daardoor liepen de KPI-band en het Jaaroverzicht uiteen zodra een klant iets
+// anders koos. Lezers van die twee tellen dus de standaard -- voor een bureaubrede vergelijking
+// (god view, benchmarks) is dat bewust, voor het dashboard van één klant niet. Verander
+// DEFAULT_CHANNEL_CONVERSION_CONFIG alleen samen met die SQL.
+//
+// Google kent geen velden maar conversieacties; welke meetellen staat in
+// client_settings.conversion_actions (dashboardConversionActionIds, onderaan).
 
 export type ChannelConversionChannel = "meta_ads" | "linkedin_ads" | "microsoft_ads";
 
@@ -84,4 +96,30 @@ export function sumSelectedConversions(row: Record<string, unknown>, channel: Ch
 export function selectedConversionLabels(channel: ChannelConversionChannel, config: ChannelConversionConfig): string[] {
   const byField = new Map(conversionSourcesFor(channel).map((s) => [s.field, s.label]));
   return config[channel].map((f) => byField.get(f) ?? f);
+}
+
+// ── Google: welke conversieacties tellen mee ────────────────────────────────
+//
+// De sync (orchestrator) las de selectie uit client_settings.conversion_actions, de browser uit
+// een localStorage-kopie die pas gevuld wordt nadat het dashboard geladen is (volgens de
+// mountvolgorde vraagt een nieuwe browser de eerste keer dus ongefilterd). Eén lezing van de
+// opgeslagen lijst, zodat beide paden hetzelfde filter kunnen maken.
+
+/**
+ * De ids van de conversieacties met includedInDashboard, uit client_settings.conversion_actions.
+ * `undefined` betekent "niet filteren": geen lijst, een ongeldige lijst, of geen enkele actie
+ * aangevinkt (zo deed de sync het al -- alles uitvinken gaf nooit nul conversies). Een actie
+ * zonder bruikbaar id telt niet mee: "undefined" als id zou de Google-query stil leeg maken.
+ */
+export function dashboardConversionActionIds(actions: unknown): string[] | undefined {
+  if (!Array.isArray(actions)) return undefined;
+  const ids: string[] = [];
+  for (const a of actions) {
+    if (!a || typeof a !== "object") continue;
+    const { id, includedInDashboard } = a as { id?: unknown; includedInDashboard?: unknown };
+    if (!includedInDashboard) continue;
+    const tekst = typeof id === "string" ? id.trim() : typeof id === "number" && Number.isFinite(id) ? String(id) : "";
+    if (tekst !== "" && !ids.includes(tekst)) ids.push(tekst);
+  }
+  return ids.length > 0 ? ids : undefined;
 }

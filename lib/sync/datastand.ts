@@ -18,11 +18,201 @@
 // draait, en dat is een storing, geen ouderdom.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { lastCompleteMonth, monthIndex, formatMonth, isValidMonth } from "@/lib/period/period-range";
+import { lastCompleteMonth, monthIndex, formatMonth, isValidMonth, addMonths } from "@/lib/period/period-range";
 import { today, addDays } from "@/lib/reporting-date";
 import { eis } from "@/lib/analysis/db-veilig";
+import { daysInMonthOf } from "@/lib/analysis/comparison-facts";
+
+// ── Tot welke maand is de data VOL? ─────────────────────────────────────────
+//
+// Eén antwoord voor de KPI-band, de pacing, het jaaroverzicht en de kanaalprognose. Elk blok
+// stelde die vraag op zijn eigen manier: "vorige kalendermaand", "de laatste maand met een rij",
+// "het aantal niet-lege maanden", dag-van-het-jaar uit de browserklok. Bij demo-greentech (data
+// t/m 26 augustus, bekeken op 1 november) gaf dat op één scherm vier antwoorden: augustus telde
+// als volle maand, en september en oktober werden afhankelijk van het blok meegeteld als nullen,
+// geprojecteerd alsof ze nog moesten komen, of weggelaten.
+//
+// `dataTot` is de laatste DAG waarvan de data definitief is: bij een dagbron de nieuwste datum
+// met een rij, bij een maandbron de dag vóór de laatste geslaagde sync (dataTotVanMaandbron), bij
+// een live bron gisteren. Een maand is vol als dataTot op zijn laatste dag ligt, en nooit later
+// dan de laatste afgesloten kalendermaand.
+//
+// Dit deel is puur en client-veilig: de KPI-band rekent het in de browser uit, de routes op de
+// server. De rest van dit bestand (beoordeelDatastand en de lezers) blijft zoals het was; of de
+// maandanalyse ook op een onvolledige maand moet blokkeren is een aparte beslissing.
+
+export interface VolleMaand {
+  /** Laatste maand die afgesloten is EN t/m zijn laatste dag gemeten, "YYYY-MM"; null zonder data. */
+  laatsteVolleMaand: string | null;
+  /** De maand direct na laatsteVolleMaand, als daar al een deel van gemeten is. */
+  partieel: { maand: string; tmDag: number; dagenInMaand: number } | null;
+  /** lastCompleteMonth(nu): de maand die de kalender als laatste afgesloten maand verwacht. */
+  verwachteMaand: string;
+  /** Hoeveel maanden laatsteVolleMaand achterloopt op verwachteMaand; null zonder data. */
+  maandenAchter: number | null;
+}
+
+/** De datastand over meerdere bronnen samen, zoals een route hem meestuurt: volleMaand over
+ *  gezamenlijkeDataTot, met de dag zelf en de bronnen die niet mochten remmen. */
+export interface DataStandSamen extends VolleMaand {
+  dataTot: string | null;
+  uitgesloten: string[];
+  /**
+   * De invoer van gezamenlijkeDataTot, per bron. Alleen de blended route zet hem. De browser kan
+   * <kanaal>_connections niet lezen, en zonder dit wist de KPI-band op een kanaaltab niet of de
+   * sync na de laatste rij nog geslaagd is; en op "Alle kanalen" leest de band Google live, niet
+   * uit fact_core, dus hoort hij de regel over zijn eigen bronnen te draaien (review [3], [12], [14]).
+   */
+  bronnen?: { bron: string; dataTot: string | null; syncDraait: boolean }[];
+}
+
+/** "YYYY-MM-DD" (ook uit een tijdstip) als het een bestaande dag is, anders null. "2026-02-30"
+ *  is geen dag: die zou februari stilletjes vol verklaren. */
+function alsDag(v: unknown): string | null {
+  if (v == null) return null;
+  const d = String(v).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) && addDays(d, 0) === d ? d : null;
+}
+
+/** De laatste bestaande dag uit een paar kandidaten, of null. Voor een dataTot uit twee bronnen
+ *  (de rijen in de browser en de syncdag van de route): een ongeldige of ontbrekende telt niet. */
+export function laatsteGeldigeDag(...dagen: (string | null | undefined)[]): string | null {
+  let laatste: string | null = null;
+  for (const d of dagen) {
+    const dag = alsDag(d);
+    if (dag && (laatste === null || dag > laatste)) laatste = dag;
+  }
+  return laatste;
+}
+
+/** @param inp.nu vandaag als "YYYY-MM-DD" (standaard today(), Amsterdam); alleen tests en
+ *  routes met een vaste peildatum zetten hem. Een maand ("2026-11") is geen dag en wordt
+ *  geweigerd, in plaats van stil vervangen door vandaag. */
+export function volleMaand(inp: { dataTot: string | null | undefined; nu?: string }): VolleMaand {
+  const nu = inp.nu === undefined ? today() : alsDag(inp.nu);
+  if (!nu) throw new Error(`volleMaand: nu moet een dag zijn (YYYY-MM-DD), kreeg ${JSON.stringify(inp.nu)}`);
+  const verwachteMaand = lastCompleteMonth(nu.slice(0, 7));
+  const ruw = alsDag(inp.dataTot);
+  if (!ruw) return { laatsteVolleMaand: null, partieel: null, verwachteMaand, maandenAchter: null };
+
+  // Vandaag (en later) is per definitie nog niet definitief: de rij van vandaag groeit nog, en een
+  // bron met een andere klok kan al een dag verder staan.
+  const tot = ruw >= nu ? addDays(nu, -1) : ruw;
+  const maand = tot.slice(0, 7);
+  const dagenInMaand = daysInMonthOf(tot);
+  const tmDag = Number(tot.slice(8, 10));
+  const kandidaat = tmDag >= dagenInMaand ? maand : addMonths(maand, -1);
+  const laatsteVolleMaand = monthIndex(kandidaat) > monthIndex(verwachteMaand) ? verwachteMaand : kandidaat;
+  const partieel = tmDag < dagenInMaand && maand === addMonths(laatsteVolleMaand, 1)
+    ? { maand, tmDag, dagenInMaand }
+    : null;
+  return {
+    laatsteVolleMaand,
+    partieel,
+    verwachteMaand,
+    maandenAchter: Math.max(0, monthIndex(verwachteMaand) - monthIndex(laatsteVolleMaand)),
+  };
+}
+
+/**
+ * De laatste definitieve dag van een MAANDbron (ads_account_monthly, fact_core). Een maandrij
+ * zegt niet tot welke dag hij gevuld is; het synctijdstip wel: een rij die op 26 augustus
+ * geschreven is, is augustus t/m de 25e. Dus de dag vóór de laatste geslaagde sync, begrensd
+ * door de maand van de nieuwste rij:
+ * - niet later dan het eind van die maand (een sync in september maakt augustus vol, niet september);
+ * - niet vroeger dan de dag vóór die maand: dat er een rij voor augustus staat, betekent dat er op
+ *   of na 1 augustus gesynct is, ook als client_sync_status dat (nog) niet zegt.
+ * Zonder synctijdstip: het eind van de maand, de oude aanname, alleen nog als terugval.
+ *
+ * Het synctijdstip wordt op zijn UTC-datum gelezen (zoals de rest van dit bestand). De nachtcron
+ * draait om 05:00 UTC, dus dat is dezelfde dag als in Amsterdam; een handmatige sync tussen
+ * middernacht en 02:00 Amsterdamse tijd komt een dag te vroeg uit, en dat is de veilige kant.
+ */
+export function dataTotVanMaandbron(laatsteMaand: string | null | undefined, laatsteSync: string | null | undefined): string | null {
+  const m = laatsteMaand ? String(laatsteMaand).slice(0, 7) : null;
+  if (!m || !isValidMonth(m)) return null;
+  const eind = `${m}-${String(daysInMonthOf(`${m}-01`)).padStart(2, "0")}`;
+  const syncDag = alsDag(laatsteSync);
+  if (!syncDag) return eind;
+  const dagVoorSync = addDays(syncDag, -1);
+  const dagVoorMaand = addDays(`${m}-01`, -1);
+  if (dagVoorSync > eind) return eind;
+  if (dagVoorSync < dagVoorMaand) return dagVoorMaand;
+  return dagVoorSync;
+}
+
+/**
+ * Over kanalen samen: de VROEGSTE dataTot. Een totaal over een maand waarin één kanaal nog niet
+ * volledig gemeten is, is geen totaal: dan telt dat kanaal als nul in een maand waarin het wel
+ * liep.
+ *
+ * Uitzondering: een bron waarvan de sync WEL draait (Datastand/Dagstand.syncDraait) heeft na zijn
+ * dataTot echte nullen, geen ontbrekende data. Een gepauzeerd account mag de rest dan niet
+ * tegenhouden. Zo'n bron telt niet mee voor de rem, en staat in `uitgesloten` als hij anders
+ * had geremd (een stille bron die toch al verder loopt dan de rest, hoeft niemand te noemen).
+ *
+ * De rem is begrensd: een bron die meer dan DOOD_VANAF_MAANDEN x 30 dagen achterloopt op de
+ * nieuwste bron, remt niet meer en staat ook in `uitgesloten`. Zo ver achter wacht hij niet op een
+ * gemiste nacht maar op data die niet komt: een verlopen token, of een koppeling die via
+ * Instellingen is uitgezet en daarom nooit meer synct. Onbegrensd hield een LinkedIn die in maart
+ * 2025 stopte heel "Alle kanalen" op februari 2025, en werden de gemeten Google-maanden erna als
+ * toekomst geprojecteerd (review [9], [36]). Tot die grens remt hij wel: een sync die een paar
+ * nachten of weken mist, hoort de rest tegen te houden. Dezelfde orde als "dood" in
+ * beoordeelDatastand (twee maanden), maar NIET dezelfde maat: die telt hoeveel afgesloten maanden er
+ * ontbreken tegen de kalender, dit hoeveel dagen een bron achterloopt op de andere. Een bron die
+ * daar nog "actueel" is, wordt hier dus ook niet opgegeven.
+ *
+ * Remt er niemand (alle bronnen stil, of alleen stille en opgegeven bronnen), dan de LAATSTE dag.
+ * Hier stond de vroegste, en dan gooide een Meta die tot 15 september gemeten was, mei t/m augustus
+ * weg zodra ook Google stillag (review [11]). Stil betekent: de sync slaagt en na zijn dataTot zijn
+ * het echte nullen, dus de laatste dag van de stille bronnen loopt nooit voorbij gemeten data.
+ *
+ * Een bron zonder bruikbare dataTot (nog nooit data) doet niet mee: die heeft geen maanden om
+ * onvolledig te zijn.
+ *
+ * LET OP bij het vullen van `syncDraait`: geef niet rauw Datastand/Dagstand.syncDraait door, maar
+ * remtNietBijAchterstand(stand). De lezers zetten syncDraait ook bij een bron die gewoon actueel
+ * is, en dan stonden een actuele Google en een gepauzeerde LinkedIn allebei "stil": volgens de
+ * regel hierboven remden ze dan weer allebei, en kreeg het venster dat van LinkedIn (maart in
+ * plaats van oktober).
+ */
+export function gezamenlijkeDataTot(
+  bronnen: { bron: string; dataTot: string | null | undefined; syncDraait?: boolean }[],
+): { dataTot: string | null; uitgesloten: string[] } {
+  const geldig = bronnen
+    .map((b) => ({ bron: b.bron, dag: alsDag(b.dataTot), stil: b.syncDraait === true }))
+    .filter((b): b is { bron: string; dag: string; stil: boolean } => b.dag !== null);
+  if (geldig.length === 0) return { dataTot: null, uitgesloten: [] };
+  const nieuwsteDag = geldig.map((b) => b.dag).sort()[geldig.length - 1];
+  // In dagen, niet in kalendermaanden van de twee dagen: dan was 31 augustus tegen 1 oktober al
+  // "twee maanden" (31 dagen) en 1 september tegen 31 oktober nog "één" (60 dagen), en sprong het
+  // venster in één nacht een maand vooruit zodra een haperende sync over de maandgrens ging.
+  const opgegeven = (b: { dag: string }) => (dagenTussen(b.dag, nieuwsteDag) ?? 0) > DOOD_VANAF_MAANDEN * 30;
+  const remmers = geldig.filter((b) => !b.stil && !opgegeven(b));
+  const dagen = (remmers.length > 0 ? remmers : geldig).map((b) => b.dag).sort();
+  const dataTot = remmers.length > 0 ? dagen[0] : dagen[dagen.length - 1];
+  const uitgesloten = geldig.filter((b) => !remmers.includes(b) && b.dag < dataTot).map((b) => b.bron);
+  return { dataTot, uitgesloten };
+}
+
+/** De bronnen uit `uitgesloten`, elk met de dag waarop zijn data ophoudt (uit `bronnen`). De
+ *  KPI-band, het Jaaroverzicht en de Pacing noemen ze zo met dezelfde dag. */
+export function uitgeslotenMetDag(
+  samen: { uitgesloten?: readonly string[]; bronnen?: readonly { bron: string; dataTot: string | null | undefined }[] } | null | undefined,
+): { bron: string; dataTot: string | null }[] {
+  return (samen?.uitgesloten ?? []).map((bron) => ({ bron, dataTot: samen?.bronnen?.find((b) => b.bron === bron)?.dataTot ?? null }));
+}
 
 export type DatastandToestand = "actueel" | "achter" | "dood" | "geen";
+
+/**
+ * De `syncDraait` voor gezamenlijkeDataTot: alleen een bron die ACHTERloopt terwijl zijn sync
+ * slaagt, heeft na zijn dataTot echte nullen (gepauzeerd) en mag de rest niet remmen. Een actuele
+ * bron remt gewoon mee; hij staat toch al op de nieuwste dag.
+ */
+export function remtNietBijAchterstand(stand: { syncDraait: boolean; toestand: DatastandToestand }): boolean {
+  return stand.syncDraait && stand.toestand !== "actueel";
+}
 
 export interface Datastand {
   /** Waar de data van is: "Google" (ads_account_monthly) of een kanaal ("Meta", "LinkedIn",
@@ -173,7 +363,8 @@ export function weekstandBlokkade(stand: Weekstand): string | null {
 // ~120 weken): de demo-mock past sorteer- en bereikfilters niet toe, dus `.order().limit(1)`
 // zou daar een willekeurige rij geven.
 
-export async function datastandVoorKlant(supabase: SupabaseClient, clientId: string): Promise<Datastand> {
+/** @param nu vandaag als "YYYY-MM-DD" (standaard today()); de blended route geeft zijn eigen peildag mee. */
+export async function datastandVoorKlant(supabase: SupabaseClient, clientId: string, nu?: string): Promise<Datastand> {
   const [maanden, status] = await Promise.all([
     supabase.from("ads_account_monthly").select("month").eq("client_id", clientId).limit(500),
     supabase.from("client_sync_status").select("last_successful_sync_at").eq("client_id", clientId).limit(1),
@@ -182,7 +373,7 @@ export async function datastandVoorKlant(supabase: SupabaseClient, clientId: str
   const statusRijen = eis(status, "client_sync_status (datastand)") as { last_successful_sync_at: unknown }[];
   const laatsteMaand = rijen.map((r) => String(r.month ?? "").slice(0, 7)).filter((m) => isValidMonth(m)).sort().pop() ?? null;
   const sync = statusRijen[0]?.last_successful_sync_at ? String(statusRijen[0].last_successful_sync_at) : null;
-  return beoordeelDatastand({ laatsteMaand, laatsteGeslaagdeSync: sync });
+  return beoordeelDatastand({ laatsteMaand, laatsteGeslaagdeSync: sync, nu });
 }
 
 export async function weekstandVoorKlant(supabase: SupabaseClient, clientId: string): Promise<Weekstand> {
@@ -220,6 +411,12 @@ export interface Dagstand {
   toestand: DatastandToestand;
   /** Zie SYNC_DRAAIT_BINNEN_DAGEN: de data loopt achter, maar de sync slaagt wel. */
   syncDraait: boolean;
+  /**
+   * Er is een koppelingsrij en die staat niet op "disabled" (dezelfde regel als
+   * leesKanaalKoppelingen). Een uitgezette koppeling synct nooit meer (lib/sync/kanaal-runs.ts:
+   * "uitgezet is uitgezet"), dus zijn achterstand is geen storing die bijgewerkt gaat worden.
+   */
+  gekoppeld: boolean;
   tekst: string;
 }
 
@@ -228,19 +425,22 @@ export function beoordeelDagstand(inp: {
   laatsteDag: string | null | undefined;
   laatsteGeslaagdeSync?: string | null;
   nu?: string;
+  /** Standaard true: wie de koppeling niet kent, behandelt het kanaal zoals voorheen. */
+  gekoppeld?: boolean;
 }): Dagstand {
   const nu = inp.nu ?? today();
   const label = DAGKANAAL_LABEL[inp.kanaal];
   const sync = inp.laatsteGeslaagdeSync ?? null;
+  const gekoppeld = inp.gekoppeld ?? true;
   const syncTekst = sync ? `laatste geslaagde sync ${sync.slice(0, 10)}` : "nog nooit een geslaagde sync geregistreerd";
   const dag = inp.laatsteDag ? String(inp.laatsteDag).slice(0, 10) : null;
   if (!dag || !/^\d{4}-\d{2}-\d{2}$/.test(dag)) {
-    return { kanaal: inp.kanaal, laatsteDag: null, dagenAchter: null, laatsteGeslaagdeSync: sync, toestand: "geen", syncDraait: false, tekst: `Geen ${label}-dagdata gesynct; ${syncTekst}.` };
+    return { kanaal: inp.kanaal, laatsteDag: null, dagenAchter: null, laatsteGeslaagdeSync: sync, toestand: "geen", syncDraait: false, gekoppeld, tekst: `Geen ${label}-dagdata gesynct; ${syncTekst}.` };
   }
   const dagenAchter = dagenTussen(dag, nu) ?? 0;
   const dagenSindsSync = sync ? dagenTussen(sync, nu) : null;
   const syncDraait = sync != null && dagenSindsSync != null && dagenSindsSync <= SYNC_DRAAIT_BINNEN_DAGEN && sync.slice(0, 10) > dag;
-  const basis = { kanaal: inp.kanaal, laatsteDag: dag, dagenAchter, laatsteGeslaagdeSync: sync, syncDraait };
+  const basis = { kanaal: inp.kanaal, laatsteDag: dag, dagenAchter, laatsteGeslaagdeSync: sync, syncDraait, gekoppeld };
   if (dagenAchter <= DAG_ACHTER_VANAF_DAGEN) {
     return { ...basis, toestand: "actueel", tekst: `${label}-data t/m ${dag}; ${syncTekst}.` };
   }
@@ -263,19 +463,43 @@ export function dagstandBlokkade(stand: Dagstand): string | null {
   return `Geen bruikbare ${DAGKANAAL_LABEL[stand.kanaal]}-dagdata. ${stand.tekst}`;
 }
 
-export async function dagstandVoorKlant(supabase: SupabaseClient, clientId: string, kanaal: Dagkanaal): Promise<Dagstand> {
+/**
+ * De laatste definitieve dag van een DAGbron: de nieuwste rij, of, als er daarna nog een sync
+ * slaagde, de dag vóór die sync. De syncs schrijven geen nulrijen: een dag zonder levering (geen
+ * advertenties in het weekend, het maandbudget op, een gepauzeerd account) heeft geen rij, ook als
+ * hij gemeten is. Op de nieuwste rij alleen las een Microsoft zonder zaterdag 31 oktober als
+ * "oktober t/m de 30e", en verloor een gepauzeerd account op zijn eigen tab maanden (review [3],
+ * [10], [14]). Zonder geslaagde sync na de nieuwste rij blijft het die rij: ontbrekend is dan geen nul.
+ *
+ * Bewust niet syncDraait: dat eist ook een sync van hooguit SYNC_DRAAIT_BINNEN_DAGEN oud, en dan
+ * verloor een gepauzeerd account de dagen die zijn laatste geslaagde sync wél gemeten had zodra die
+ * sync een dag te oud werd (op 1 november t/m 28 oktober, op 2 november t/m 20 september: het
+ * venster viel van oktober terug naar augustus). Wat gemeten is, blijft gemeten. syncDraait beslist
+ * alleen nog of een bron het gezamenlijke venster mag tegenhouden (remtNietBijAchterstand).
+ */
+export function dataTotVanDagbron(stand: Pick<Dagstand, "laatsteDag" | "laatsteGeslaagdeSync">): string | null {
+  const dag = alsDag(stand.laatsteDag);
+  const syncDag = alsDag(stand.laatsteGeslaagdeSync);
+  if (!dag || !syncDag) return dag;
+  const dagVoorSync = addDays(syncDag, -1);
+  return dagVoorSync > dag ? dagVoorSync : dag;
+}
+
+/** @param nu vandaag als "YYYY-MM-DD" (standaard today()); de blended route geeft zijn eigen peildag mee. */
+export async function dagstandVoorKlant(supabase: SupabaseClient, clientId: string, kanaal: Dagkanaal, nu?: string): Promise<Dagstand> {
   // Nieuwste eerst en afgekapt op 400 rijen (ruim een jaar dagdata); het maximum wordt daarna in
   // het geheugen bepaald, zodat de uitkomst niet afhangt van hoe strikt een bron de sortering
   // toepast.
   const [dagen, conn] = await Promise.all([
     supabase.from(`${kanaal}_account_daily`).select("date").eq("client_id", clientId).order("date", { ascending: false }).limit(400),
-    supabase.from(`${kanaal}_connections`).select("last_sync_at").eq("client_id", clientId).limit(1),
+    supabase.from(`${kanaal}_connections`).select("last_sync_at, status").eq("client_id", clientId).limit(1),
   ]);
   const rijen = eis(dagen, `${kanaal}_account_daily (dagstand)`) as { date: unknown }[];
-  const connRijen = eis(conn, `${kanaal}_connections (dagstand)`) as { last_sync_at: unknown }[];
+  const connRijen = eis(conn, `${kanaal}_connections (dagstand)`) as { last_sync_at: unknown; status?: unknown }[];
   const laatsteDag = rijen.map((r) => String(r.date ?? "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop() ?? null;
   const sync = connRijen[0]?.last_sync_at ? String(connRijen[0].last_sync_at) : null;
-  return beoordeelDagstand({ kanaal, laatsteDag, laatsteGeslaagdeSync: sync });
+  const gekoppeld = connRijen.length > 0 && connRijen[0].status !== "disabled";
+  return beoordeelDagstand({ kanaal, laatsteDag, laatsteGeslaagdeSync: sync, nu, gekoppeld });
 }
 
 /**

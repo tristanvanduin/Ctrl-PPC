@@ -87,6 +87,12 @@ export interface ClientSettings {
 
 // --- Default KPI targets ---
 
+// Groei 10, gelijk aan het standaarddoel van de routes ("vorig jaar +10%", standaardJaardoel in
+// lib/analysis/standaard-jaardoel.ts), zodat Instellingen zonder opgeslagen doel hetzelfde toont als
+// het dashboard. Dat dit niet meer dubbel telt, regelt mergeKpiTargets: het percentage werkt op
+// vorig jaar, niet op het doel dat al +10% is. Eerder gaf deze 10 daar bovenop vorig jaar x 1,21,
+// terwijl het scherm "vorig jaar +10%" zei. Op 0 zetten loste dat ook op, maar dan stond de
+// doelkaart in Instellingen op "uit" terwijl het dashboard wel een doel van +10% toonde.
 const DEFAULT_KPI_TARGETS: KpiTargets = {
   conversionsMode: "growth",
   conversionsGrowthPct: 10,
@@ -197,7 +203,13 @@ export async function loadClientSettings(clientId: string): Promise<ClientSettin
 /**
  * Save settings to Supabase (primary) + localStorage (cache).
  */
-export async function saveClientSettings(settings: ClientSettings): Promise<void> {
+/**
+ * Slaat de instellingen op en geeft de fout van de databaseschrijfactie terug (null = gelukt, of
+ * geen database). De Google client-data-route leest de conversieacties uit client_settings: wie
+ * daarna de cache ververst, moet deze belofte eerst afwachten, anders leest de nieuwe ophaalronde
+ * nog de oude selectie en houdt de cache die vijf minuten vast.
+ */
+export async function saveClientSettings(settings: ClientSettings): Promise<{ error: string | null }> {
   // Always update cache + localStorage immediately
   settingsCache.set(settings.clientId, settings);
   if (typeof window !== "undefined") {
@@ -206,7 +218,7 @@ export async function saveClientSettings(settings: ClientSettings): Promise<void
 
   // Persist to Supabase
   if (supabase) {
-    await dbUpsert("client_settings", settings.clientId, {
+    const { error } = await dbUpsert("client_settings", settings.clientId, {
       conversion_actions: settings.conversionActions,
       kpi_targets: settings.kpiTargets,
       sector: settings.sector ?? null,
@@ -221,7 +233,9 @@ export async function saveClientSettings(settings: ClientSettings): Promise<void
       merchant_channel: settings.merchantChannel ?? null,
       updated_at: new Date().toISOString(),
     });
+    return { error: error?.message ?? null };
   }
+  return { error: null };
 }
 
 export function getDefaultConversionActions(clientId: string): ConversionAction[] {

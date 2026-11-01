@@ -14,7 +14,10 @@ import { logger } from "@/lib/logger";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { laadBeschikbareKanalen, KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { resolveChannelConversionConfig, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
-import { monthlyFromDaily, blendMonthly } from "@/lib/analysis/channel-report-blend";
+import { kanaalMaandenUitDagen, dagbronSelect, blendMonthly } from "@/lib/analysis/channel-report-blend";
+import { addDays, today } from "@/lib/reporting-date";
+import { lastCompleteMonth } from "@/lib/period/period-range";
+import { rapportVenster } from "@/lib/client-reports/rapport-venster";
 
 export const maxDuration = 120;
 
@@ -222,10 +225,12 @@ export async function POST(request: NextRequest) {
       phaseKey: "fetch_inputs",
       message: "Rapport-input, KPI-data en context ophalen...",
     });
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const lastMonthYear = currentMonth === 1 ? now.getFullYear() - 1 : now.getFullYear();
+    // De rapportmaand is de laatste afgesloten maand in Amsterdam, niet die van de serverklok
+    // (UTC): een rapport dat op de 1e tussen 00:00 en 02:00 gestart werd, ging over de maand
+    // daarvoor.
+    const rapportMaand = lastCompleteMonth();
+    const lastMonth = Number(rapportMaand.slice(5, 7));
+    const lastMonthYear = Number(rapportMaand.slice(0, 4));
     const reportMonthLabel = MONTH_NAMES_FULL[lastMonth - 1];
     const reportMonthShort = MONTH_NAMES_SHORT[lastMonth - 1];
 
@@ -240,12 +245,11 @@ export async function POST(request: NextRequest) {
     const prevMonthStr = `${prevMonthYear}-${String(prevMonth).padStart(2, "0")}`;
     const yoyMonthStr = `${yoyYear}-${String(lastMonth).padStart(2, "0")}`;
 
-    // 13 months back for chart data — use string math to avoid timezone issues
-    const startYear = lastMonth <= 13 ? lastMonthYear - 1 : lastMonthYear;
-    const startMonth = ((lastMonth - 14 + 12) % 12) + 1;
-    const thirteenMonthsAgo = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
-    const periodEnd = `${lastMonthYear}-${String(lastMonth).padStart(2, "0")}-31`;
-    const daysAgo60 = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    // 13 maanden terug voor de grafieken, t/m de laatste dag van de rapportmaand. Hier stond
+    // "-31" achter elke maand geplakt en een begin uit een modulo: "2026-11-31" en "2026-00-01"
+    // bestaan niet, en de DATE-kolommen weigeren ze (zie rapportVenster).
+    const { van: thirteenMonthsAgo, tot: periodEnd } = rapportVenster(rapportMaand);
+    const daysAgo60 = addDays(today(), -60);
 
     // 23 augustus 2026: welke kanalen draait deze klant echt? Bepaalt of de rest hieronder
     // ook meta_account_daily/linkedin_account_daily moet meenemen. Zie de kop van
@@ -275,19 +279,35 @@ export async function POST(request: NextRequest) {
       computeAnalysisTargets(supabase, clientId),
       supabase.from("sop_analysis_output").select("output, sop_type, analysis_date").eq("client_id", clientId).order("analysis_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("sprint_hypotheses").select("hypothesis, expected_result, status, ice_total").eq("client_id", clientId).in("status", ["pending", "accepted", "completed"]).order("ice_total", { ascending: false }).limit(15),
+      // De kolommen komen uit dagbronSelect: dezelfde lijst als de KPI-band en het Jaaroverzicht,
+      // met ALLE selecteerbare conversievelden. De tabelnaam blijft hier letterlijk staan, zodat
+      // scripts/check-datagrond.mjs de filterkolommen nog kan controleren; de select zelf bewaakt
+      // __channel_report_blend_test.ts tegen dezelfde schemafoto.
       kanalen.includes("meta")
-        ? supabase.from("meta_account_daily").select("date, impressions, link_clicks, spend, conversions, leads, conversion_value").eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
+        ? supabase.from("meta_account_daily").select(dagbronSelect("meta_ads")).eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
         : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
       kanalen.includes("linkedin")
-        ? supabase.from("linkedin_account_daily").select("date, impressions, clicks, spend, one_click_leads, external_website_conversions, post_click_conversions, conversion_value").eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
+        ? supabase.from("linkedin_account_daily").select(dagbronSelect("linkedin_ads")).eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
         : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
       kanalen.includes("microsoft")
-        ? supabase.from("microsoft_account_daily").select("date, impressions, clicks, spend, conversions, conversion_value").eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
+        ? supabase.from("microsoft_account_daily").select(dagbronSelect("microsoft_ads")).eq("client_id", clientId).gte("date", thirteenMonthsAgo).lte("date", periodEnd)
         : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
       meerdereKanalen
         ? supabase.from("client_settings").select("channel_conversion_config").eq("client_id", clientId).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
+
+    // Een leesfout is geen lege maand. Hieronder telt `data ?? []` een mislukte lezing als "niets
+    // gemeten", en dan staat er een rapport met nul KPI's en lege grafieken zonder enig spoor --
+    // zo bleef een ongeldige datum in het venster onopgemerkt. Het rapport gaat wel door (een
+    // kanaal dat niet te lezen is mag de rest niet tegenhouden), maar de fout staat in de log.
+    const meldLeesfout = (bron: string, res: { data?: unknown; error?: { message: string } | null }) => {
+      if (res.error) logger.error(`[client-reports] ${bron} lezen mislukt, telt in dit rapport als leeg:`, res.error.message);
+    };
+    meldLeesfout("ads_account_monthly", accountMonthlyRes);
+    meldLeesfout("meta_account_daily", metaMonthlyRes);
+    meldLeesfout("linkedin_account_daily", linkedinMonthlyRes);
+    meldLeesfout("microsoft_account_daily", microsoftMonthlyRes);
 
     const accountData = (accountMonthlyRes.data ?? []) as Array<Record<string, unknown>>;
     const isData = (isRes.data ?? []) as Array<Record<string, unknown>>;
@@ -301,34 +321,14 @@ export async function POST(request: NextRequest) {
       ((convConfigRes as { data: { channel_conversion_config: unknown } | null }).data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null,
     );
 
-    // Generiek getypeerd (Record<string, unknown>) i.p.v. het exportte MonthlyChannelRow: de rest
-    // van deze route (findMonth/g/buildChartData, blendMonthly, de kanaalsecties) behandelt Google-
-    // en Meta/LinkedIn-maandrijen al overal als hetzelfde losse-veld-record, nooit met een eigen type.
-    const metaData = monthlyFromDaily((metaMonthlyRes.data ?? []) as Array<Record<string, unknown>>, {
-      dateField: "date",
-      clicksField: "link_clicks",
-      convFields: (r) => ({ conversions: Number(r.conversions ?? 0), leads: Number(r.leads ?? 0) }),
-      channelKey: "meta_ads",
-      convConfig,
-    });
-    const linkedinData = monthlyFromDaily((linkedinMonthlyRes.data ?? []) as Array<Record<string, unknown>>, {
-      dateField: "date",
-      clicksField: "clicks",
-      convFields: (r) => ({
-        one_click_leads: Number(r.one_click_leads ?? 0),
-        external_website_conversions: Number(r.external_website_conversions ?? 0),
-        post_click_conversions: Number(r.post_click_conversions ?? 0),
-      }),
-      channelKey: "linkedin_ads",
-      convConfig,
-    });
-    const microsoftData = monthlyFromDaily((microsoftMonthlyRes.data ?? []) as Array<Record<string, unknown>>, {
-      dateField: "date",
-      clicksField: "clicks",
-      convFields: (r) => ({ conversions: Number(r.conversions ?? 0) }),
-      channelKey: "microsoft_ads",
-      convConfig,
-    });
+    // Dag -> maand via kanaalMaandenUitDagen, de ene plek waar de KPI-band, het Jaaroverzicht en
+    // deze rapportage dezelfde klikkolom en dezelfde conversieselectie gebruiken. Hier stonden drie
+    // eigen monthlyFromDaily-blokken met een eigen veldlijst: dezelfde uitkomst, maar een kopie die
+    // stil kon gaan afwijken van de rest. De maandrijen hebben de vorm van ads_account_monthly, dus
+    // findMonth/g/buildChartData hieronder werken er ongewijzigd op.
+    const metaData = kanaalMaandenUitDagen((metaMonthlyRes.data ?? []) as Array<Record<string, unknown>>, "meta_ads", convConfig);
+    const linkedinData = kanaalMaandenUitDagen((linkedinMonthlyRes.data ?? []) as Array<Record<string, unknown>>, "linkedin_ads", convConfig);
+    const microsoftData = kanaalMaandenUitDagen((microsoftMonthlyRes.data ?? []) as Array<Record<string, unknown>>, "microsoft_ads", convConfig);
 
     // Blended maandrijen: Google + Meta + LinkedIn + Microsoft opgeteld per maand, ratio's
     // herberekend uit de opgetelde tellers (niet de ratio's zelf gemiddeld -- anders weegt een

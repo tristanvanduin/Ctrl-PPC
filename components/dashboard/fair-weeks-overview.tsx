@@ -6,8 +6,8 @@ import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { actieveMetrics, computeForecast, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
 import type { ClientHistoricalData } from "@/lib/types";
-import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, isLowerBetter } from "@/lib/forecast-format";
-import { toFairWeeks, currentWeekIndex, type FairWeek, type UpcomingEdition } from "@/lib/fair/fair-weeks";
+import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, geenWaardeLabel, isLowerBetter, isOptelbaar, zonderData } from "@/lib/forecast-format";
+import { toFairWeeks, currentWeekIndex, editieNaam, fairCountdown, type FairWeek, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
 import { PeriodPopover } from "@/components/ui/period-popover";
 
@@ -23,8 +23,31 @@ const ALLE_METRICS: ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"]
 const STRIP_TERUG = 8;
 const STRIP_VOORUIT = 8;
 
+/**
+ * De weekreeks van één metric op de beurskalender.
+ *
+ * Valt het aantal weekemmers van een maand niet samen met het aantal maandagen, dan verdeelt
+ * toFairWeeks de maand opnieuw over zijn weken. Voor conversies en omzet is dat delen (het
+ * maandtotaal blijft gelijk); een ROAS of CPA is een verhouding en krijgt in elke week de
+ * verhouding van de maand, uit de maandtellers (omzet/kosten, kosten/conversies).
+ * Zonder `additief: false` werden de emmers van een verhouding opgeteld, gedeeld door het aantal
+ * maandagen en tot een heel getal afgerond: een ROAS van 2,4 werd in oktober 2026 (vijf emmers,
+ * vier maandagen) 3 per week en in november (vier emmers, vijf maandagen) 2. Daarna stond er het
+ * gewone gemiddelde van de emmers, en dat telde een emmer van drie dagen even zwaar als een week
+ * en een emmer zonder conversies als CPA 0: oktober kreeg CPA 80 waar de maand 110,71 kostte.
+ */
+export function beursWekenVan(forecast: ClientForecast, metric: ForecastMetric, jaar: number, fairDate: string): FairWeek[] {
+  const verhouding = metric === "roas"
+    ? { teller: forecast.revenue.weeklyPoints, noemer: forecast.adSpend.weeklyPoints }
+    : metric === "cpa"
+      ? { teller: forecast.adSpend.weeklyPoints, noemer: forecast.conversions.weeklyPoints }
+      : undefined;
+  return toFairWeeks(forecast[metric].weeklyPoints, jaar, fairDate, { additief: isOptelbaar(metric), verhouding });
+}
+
 function WeekCard({
   week,
+  metric,
   format,
   variant,
   inverted,
@@ -32,6 +55,7 @@ function WeekCard({
   onOpen,
 }: {
   week: FairWeek;
+  metric: ForecastMetric;
   format: (v: number) => string;
   variant: "previous" | "current" | "next";
   inverted: boolean;
@@ -39,15 +63,21 @@ function WeekCard({
   heeftVerwachting: boolean;
   onOpen: () => void;
 }) {
+  const geenData = zonderData(week);
   const value = week.realized ?? week.forecast ?? 0;
   const diff = week.expected > 0 ? ((value - week.expected) / week.expected) * 100 : 0;
   const ratio = week.expected > 0 ? value / week.expected : 0;
-  const isPositive = inverted ? diff <= 0 : diff >= 0;
+  // Kosten zonder conversies (geenNoemer): geen getal, wel een oordeel, zoals de maandkaart.
+  const isPositive = week.geenNoemer ? !inverted : inverted ? diff <= 0 : diff >= 0;
   const isRealized = week.realized !== null;
+  // Zonder waarde geen verschil en geen ratio; een groen of rood kader alleen bij geenNoemer.
+  const vergelijk = heeftVerwachting && !geenData;
 
   const diffColor = isPositive ? "text-green-600" : "text-red-500";
   const borderColors = {
-    previous: isPositive ? "border-green-200 bg-green-50/50" : "border-red-200 bg-red-50/50",
+    previous: geenData && !week.geenNoemer
+      ? "border-border bg-gray-50/50"
+      : isPositive ? "border-green-200 bg-green-50/50" : "border-red-200 bg-red-50/50",
     current: "border-brand-blue/30 bg-brand-blue/5",
     next: "border-border bg-gray-50/50",
   };
@@ -86,7 +116,7 @@ function WeekCard({
         {/* Het verschil met de verwachting -- dus alleen als er een verwachting is. Zonder
             jaardoel stond hier een groen "+0,0%" met een pijl omhoog, en dat is een uitspraak
             die de data niet draagt. */}
-        {heeftVerwachting && (
+        {vergelijk && (
           <div className="flex items-center gap-1.5">
             {isPositive
               ? <TrendingUp className="w-3.5 h-3.5 text-green-600" />
@@ -103,9 +133,9 @@ function WeekCard({
           andere hoogte en lijken de drie blokken onderling niet uitgelijnd. */}
       <div className="flex-1 space-y-1.5">
         <div className="flex justify-between items-baseline">
-          <span className="text-meta text-muted-foreground">{isRealized ? "Gerealiseerd" : "Prognose"}</span>
+          <span className="text-meta text-muted-foreground">{geenData ? geenWaardeLabel(week, metric) : isRealized ? "Gerealiseerd" : "Prognose"}</span>
           <span className={`text-base font-bold ${variant === "current" ? "text-brand-blue-ink" : "text-brand-gray"}`}>
-            {format(value)}
+            {geenData ? "—" : format(value)}
           </span>
         </div>
         {heeftVerwachting && (
@@ -120,7 +150,7 @@ function WeekCard({
           balk op 0% met "Verwacht 0" erboven, en dat leest als "je haalt niets" terwijl er
           gewoon 42 conversies staan. Een lege plek is eerlijker dan een nul die iets anders
           betekent dan hij lijkt. */}
-      {heeftVerwachting && (
+      {vergelijk && (
         <div className="mt-3">
           <div className="flex justify-between text-micro mb-1">
             <span className="text-muted-foreground">Ratio</span>
@@ -173,15 +203,14 @@ export function FairWeeksView({
 }) {
   const [metric, setMetric] = useState<ForecastMetric>("conversions");
   const [openWeekStart, setOpenWeekStart] = useState<string | null>(null);
-  const result = forecast[metric];
   const format = formatterFor(metric);
   const inverted = isLowerBetter(metric);
 
   const vandaag = today();
   const { weken, nu } = useMemo(() => {
-    const w = toFairWeeks(result.weeklyPoints, data.currentYear, edition.fairDate);
+    const w = beursWekenVan(forecast, metric, data.currentYear, edition.fairDate);
     return { weken: w, nu: currentWeekIndex(w, vandaag) };
-  }, [result.weeklyPoints, data.currentYear, edition.fairDate, vandaag]);
+  }, [forecast, metric, data.currentYear, edition.fairDate, vandaag]);
 
   // Voor de klik-popover: per metric de weekreeks, zodat één week-cel de cijfers van alle
   // vier de metrics kan tonen (net als de maandpopover in monthly-overview.tsx). Elke metric
@@ -189,7 +218,7 @@ export function FairWeeksView({
   const wekenPerMetric = useMemo(() => {
     const out = {} as Record<ForecastMetric, FairWeek[]>;
     for (const m of ALLE_METRICS) {
-      out[m] = toFairWeeks(forecast[m].weeklyPoints, data.currentYear, edition.fairDate);
+      out[m] = beursWekenVan(forecast, m, data.currentYear, edition.fairDate);
     }
     return out;
   }, [forecast, data.currentYear, edition.fairDate]);
@@ -201,7 +230,12 @@ export function FairWeeksView({
   const volgende = weken[nu + 1];
 
   const strip = weken.slice(Math.max(0, nu - STRIP_TERUG), nu + STRIP_VOORUIT + 1);
-  const wekenTotBeurs = huidige?.weeksOut ?? null;
+  // De kop uit dezelfde aftelling als de hero en de pacingkaarten, niet uit de week waar de strook
+  // op staat: die wordt vastgeklemd op de eerste of laatste week zodra vandaag buiten
+  // data.currentYear valt, en dan noemde de kop een afstand vanaf die geklemde week.
+  const aftelling = fairCountdown(edition.fairDate, vandaag);
+  // Dezelfde naam als de pacingkop: "Nog 3 weken tot GRN 2026", niet "tot 2026" (review [28]).
+  const naam = editieNaam(edition);
   // Zonder jaardoel voor deze metric is `expected` overal nul (lib/fair/fair-weeks.ts spreidt het
   // jaardoel over de weken). De toekomstige weken zijn dan niet leeg: computeForecast projecteert
   // in dat geval op het eigen weektempo, dus de strip loopt door. Wat ontbreekt is de VERWACHTING,
@@ -222,9 +256,13 @@ export function FairWeeksView({
             Weken tot {edition.eventName}
           </h3>
           <p className="text-meta text-muted-foreground mt-0.5">
-            {wekenTotBeurs != null && wekenTotBeurs >= 0
-              ? <>Nog <strong className="text-brand-gray">{wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"}</strong> tot {edition.label} ({edition.fairDate})</>
-              : <>{edition.label} ({edition.fairDate}) is geweest</>}
+            {aftelling == null
+              ? <>{naam} ({edition.fairDate})</>
+              : aftelling.fase === "beursweek"
+                ? <><strong className="text-brand-gray">Beursweek</strong>: {naam} ({edition.fairDate})</>
+                : aftelling.fase === "aanloop"
+                  ? <>Nog <strong className="text-brand-gray">{aftelling.weken} {aftelling.weken === 1 ? "week" : "weken"}</strong> tot {naam} ({edition.fairDate})</>
+                  : <>{naam} ({edition.fairDate}) is geweest</>}
             {heeftVerwachting
               ? " · ratio geeft aan of je boven of onder verwachting zit"
               : " · geen jaardoel ingesteld voor dit kanaal: gerealiseerd, en vooruit het huidige tempo"}
@@ -263,9 +301,9 @@ export function FairWeeksView({
 
       <div className="px-5 pb-2">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
-          {vorige && <WeekCard week={vorige} format={format} variant="previous" inverted={inverted} heeftVerwachting={heeftVerwachting} onOpen={() => setOpenWeekStart(vorige.weekStart)} />}
-          {huidige && <WeekCard week={huidige} format={format} variant="current" inverted={inverted} heeftVerwachting={heeftVerwachting} onOpen={() => setOpenWeekStart(huidige.weekStart)} />}
-          {volgende && <WeekCard week={volgende} format={format} variant="next" inverted={inverted} heeftVerwachting={heeftVerwachting} onOpen={() => setOpenWeekStart(volgende.weekStart)} />}
+          {vorige && <WeekCard week={vorige} metric={metric} format={format} variant="previous" inverted={inverted} heeftVerwachting={heeftVerwachting} onOpen={() => setOpenWeekStart(vorige.weekStart)} />}
+          {huidige && <WeekCard week={huidige} metric={metric} format={format} variant="current" inverted={inverted} heeftVerwachting={heeftVerwachting} onOpen={() => setOpenWeekStart(huidige.weekStart)} />}
+          {volgende && <WeekCard week={volgende} metric={metric} format={format} variant="next" inverted={inverted} heeftVerwachting={heeftVerwachting} onOpen={() => setOpenWeekStart(volgende.weekStart)} />}
         </div>
       </div>
 
@@ -273,12 +311,13 @@ export function FairWeeksView({
         <div className="px-5 py-3">
           <div className="flex gap-0.5 overflow-x-auto">
             {strip.map((w) => {
+              const geenData = zonderData(w);
               const value = w.realized ?? w.forecast ?? 0;
               const ratio = w.expected > 0 ? value / w.expected : 0;
               const isFocus = w.weekStart === huidige?.weekStart;
               const isRealized = w.realized !== null;
               const isBeursweek = w.weeksOut === 0;
-              const isPositive = inverted ? ratio <= 1 : ratio >= 1;
+              const isPositive = w.geenNoemer ? !inverted : inverted ? ratio <= 1 : ratio >= 1;
               const ratioColor = isPositive ? "text-green-600" : "text-red-500";
               const barColor = isPositive ? "bg-green-400" : "bg-red-400";
 
@@ -303,17 +342,20 @@ export function FairWeeksView({
                     {w.label}
                   </p>
                   <p className={`text-meta font-semibold ${isFocus ? "text-brand-blue-ink" : "text-brand-gray"}`}>
-                    {format(value)}
+                    {geenData ? "—" : format(value)}
                   </p>
-                  {heeftVerwachting && (
+                  {heeftVerwachting && !geenData && (
                     <div className="mt-1.5 mx-auto w-full max-w-[36px]">
                       <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(ratio * 100, 120)}%` }} />
                       </div>
                     </div>
                   )}
-                  {heeftVerwachting && (
+                  {heeftVerwachting && !geenData && (
                     <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>{formatPercent(ratio, 0)}</p>
+                  )}
+                  {w.geenNoemer && (
+                    <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>{geenWaardeLabel(w, metric).toLowerCase()}</p>
                   )}
                 </button>
               );
@@ -344,6 +386,7 @@ export function FairWeeksView({
               {ALLE_METRICS.map((m) => {
                 const w = wekenPerMetric[m].find((wk) => wk.weekStart === openWeekStart);
                 if (!w) return null;
+                const mGeenData = zonderData(w);
                 const mVal = w.realized ?? w.forecast ?? 0;
                 const mFormat = formatterFor(m);
                 const mInverted = isLowerBetter(m);
@@ -354,13 +397,13 @@ export function FairWeeksView({
                     <div>
                       <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
                       <p className="text-micro text-muted-foreground">
-                        {w.realized !== null ? "Gerealiseerd" : "Prognose"}
+                        {mGeenData ? geenWaardeLabel(w, m) : w.realized !== null ? "Gerealiseerd" : "Prognose"}
                         {heeftVerwachting && <> · verwacht {mFormat(w.expected)}</>}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lead font-bold text-brand-gray">{mFormat(mVal)}</p>
-                      {heeftVerwachting && (
+                      <p className="text-lead font-bold text-brand-gray">{mGeenData ? "—" : mFormat(mVal)}</p>
+                      {heeftVerwachting && !mGeenData && (
                         <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>{formatPercent(mRatio, 0)}</p>
                       )}
                     </div>

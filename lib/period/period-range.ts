@@ -113,6 +113,27 @@ export function lastCompleteMonth(nu: Month = today().slice(0, 7)): Month {
   return addMonths(nu, -1);
 }
 
+/**
+ * De maand waarop de presets eindigen: de laatste volle maand MET DATA, maar nooit later dan de
+ * laatste volle kalendermaand.
+ *
+ * Alleen de kalender volgen liet het venster doorlopen nadat de data stopte: stond de sync stil
+ * op 26 augustus, dan liep "laatste 12 maanden" op 1 november t/m oktober, en telden september en
+ * oktober mee als maanden zonder kosten en conversies. De begrenzing andersom is er omdat een
+ * datastand uit een andere klok (de server, een maandbron die al een rij voor de lopende maand
+ * schreef) de lopende maand anders alsnog binnenhaalt.
+ *
+ * Zonder bruikbare datastand is dit gewoon lastCompleteMonth: dan verandert er niets.
+ */
+export function vensterEindMaand(
+  laatsteVolleMaand?: Month | null,
+  nu: Month = today().slice(0, 7),
+): Month {
+  const kalender = lastCompleteMonth(nu);
+  if (!isValidMonth(laatsteVolleMaand)) return kalender;
+  return monthIndex(laatsteVolleMaand) < monthIndex(kalender) ? laatsteVolleMaand : kalender;
+}
+
 export function resolvePeriod(
   preset: PeriodPreset,
   custom?: PeriodRange | null,
@@ -128,11 +149,17 @@ export function resolvePeriod(
       return { start: addMonths(eind, -5), end: eind };
     case "last_12m":
       return { start: addMonths(eind, -11), end: eind };
-    case "this_year":
+    case "this_year": {
       // Tot en met de laatste volledige maand. In januari is er nog geen volledige maand in
       // dit jaar; dan valt het terug op december van vorig jaar, wat de eerlijkste weergave
       // is van "wat weten we nu".
-      return normalizeRange(`${jaar}-01`, eind);
+      //
+      // Bewust geen normalizeRange: in januari staan de grenzen omgekeerd (januari van dit jaar
+      // ligt na december van vorig jaar), en rechtzetten leverde "december t/m januari" op --
+      // MET de lopende maand erin, precies de maand die elke andere preset weglaat.
+      const start = `${jaar}-01`;
+      return monthIndex(start) <= monthIndex(eind) ? { start, end: eind } : { start: eind, end: eind };
+    }
     case "last_year":
       return { start: `${jaar - 1}-01`, end: `${jaar - 1}-12` };
     case "custom":
@@ -140,6 +167,34 @@ export function resolvePeriod(
         ? normalizeRange(custom.start, custom.end)
         : { start: addMonths(eind, -11), end: eind };
   }
+}
+
+/**
+ * De gekozen periode, geëindigd op `eindMaand` (de laatste volle maand met data, vensterEindMaand):
+ * wat de PeriodProvider uitrekent.
+ *
+ * - De rollende presets rekenen vanaf de maand na eindMaand, zodat ze precies op eindMaand eindigen.
+ * - "Dit jaar" en "Vorig jaar" blijven op de KALENDER en krijgen alleen hun eind geklemd. Rekenden
+ *   ze ook vanaf de maand na eindMaand, dan volgden ze het jaar van de data: in januari 2027 met een
+ *   stand t/m november 2026 was "Vorig jaar" 2025, en een kanaal dat in 2025 stopte toonde onder
+ *   "Vorig jaar" 2024. Heeft het kalenderjaar geen volle maand met data, dan alleen eindMaand.
+ * - Een eigen periode wordt eerst rechtgezet (normalizeRange) en dan geklemd. Andersom ontliep een
+ *   omgekeerde keuze ("Van" oktober, "Tot en met" juli) de klem, en telden augustus-oktober als
+ *   nullen.
+ */
+export function periodeOpEind(
+  preset: PeriodPreset,
+  custom: PeriodRange | null | undefined,
+  eindMaand: Month,
+  nu: Month = today().slice(0, 7),
+): PeriodRange {
+  const klem = (p: PeriodRange): PeriodRange =>
+    monthIndex(p.end) <= monthIndex(eindMaand) ? p
+      : monthIndex(p.start) <= monthIndex(eindMaand) ? { start: p.start, end: eindMaand }
+      : { start: eindMaand, end: eindMaand };
+  if (preset === "this_year" || preset === "last_year") return klem(resolvePeriod(preset, null, nu));
+  const eigen = custom && isValidMonth(custom.start) && isValidMonth(custom.end) ? klem(normalizeRange(custom.start, custom.end)) : null;
+  return resolvePeriod(preset, eigen, addMonths(eindMaand, 1));
 }
 
 // ── De vergelijkingsperiode ────────────────────────────────────────────────

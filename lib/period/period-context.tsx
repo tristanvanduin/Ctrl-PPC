@@ -10,12 +10,36 @@
 // periode, en wie terugkomt vindt hem terug. Bewust localStorage en niet de URL: de periode is
 // een werkvoorkeur, geen deelbare toestand, en in de URL zou hij bij elke gedeelde link
 // meeliften.
+//
+// WAAR DE PERIODE OPHOUDT
+//
+// De presets eindigden op de kalender: "laatste 12 maanden" liep op 1 november t/m oktober, ook
+// als de data op 26 augustus stopte. September en oktober telden dan mee als maanden zonder
+// kosten en conversies, en de vergelijking zakte in zonder dat er iets gebeurd was. De pagina
+// geeft daarom de datastand mee; de presets eindigen op de laatste volle maand MET data
+// (vensterEindMaand). Zonder datastand -- het portfolio -- blijft het de kalender.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
-  resolvePeriod, resolveComparison, PERIOD_PRESETS, COMPARISON_MODES, isValidMonth,
-  type ComparisonMode, type PeriodPreset, type PeriodRange,
+  periodeOpEind, resolveComparison, vensterEindMaand, PERIOD_PRESETS, COMPARISON_MODES,
+  isValidMonth, type ComparisonMode, type Month, type PeriodPreset, type PeriodRange,
 } from "./period-range";
+
+/** Tot waar de data van deze pagina loopt, zoals de pagina die heeft vastgesteld. */
+export interface PeriodDataStand {
+  /** De laatste maand die volledig in de data zit, of null als er geen is. */
+  laatsteVolleMaand: string | null;
+  /** De maand waarvan de data maar een deel dekt (bv. t/m de 26e), of null. */
+  partieel: { maand: string; tmDag: number; dagenInMaand: number } | null;
+  /** De laatste dag met data, "YYYY-MM-DD", of null. */
+  dataTot: string | null;
+  /**
+   * Bronnen die eerder ophouden dan dataTot en het venster toch niet tegenhielden (niet gekoppeld,
+   * al maanden achter, of gepauzeerd met een gezonde sync), met hun eigen laatste dag. Na die dag
+   * tellen ze als nul; de band zegt dat (gezamenlijkeDataTot in lib/sync/datastand.ts).
+   */
+  uitgeslotenBronnen?: readonly { bron: string; dataTot: string | null }[];
+}
 
 export interface PeriodState {
   preset: PeriodPreset;
@@ -25,6 +49,10 @@ export interface PeriodState {
   range: PeriodRange;
   /** De vergelijkingsperiode, of null. */
   compareRange: PeriodRange | null;
+  /** De maand waarop de presets eindigen: de laatste volle maand met data, nooit voorbij de kalender. */
+  eindMaand: Month;
+  /** De meegegeven datastand, voor de melding bij de cijfers; null zonder. */
+  dataStand: PeriodDataStand | null;
   set: (preset: PeriodPreset, custom: PeriodRange | null, comparison: ComparisonMode) => void;
 }
 
@@ -39,6 +67,8 @@ const FALLBACK: PeriodState = {
   comparison: DEFAULT_COMPARISON,
   range: { start: "1970-01", end: "1970-01" },
   compareRange: null,
+  eindMaand: "1970-01",
+  dataStand: null,
   set: () => {},
 };
 
@@ -75,7 +105,12 @@ function lees(scope: string): Pick<PeriodState, "preset" | "custom" | "compariso
   }
 }
 
-export function PeriodProvider({ scope, children }: { scope: string; children: React.ReactNode }) {
+export function PeriodProvider({ scope, dataStand, children }: {
+  scope: string;
+  /** Tot waar de data loopt. Weglaten of null: de presets volgen de kalender. */
+  dataStand?: PeriodDataStand | null;
+  children: React.ReactNode;
+}) {
   // Server en eerste client-render moeten hetzelfde opleveren, anders klaagt React over een
   // hydration mismatch. Daarom start alles op de standaard en komt localStorage er in een
   // effect achteraan.
@@ -102,15 +137,42 @@ export function PeriodProvider({ scope, children }: { scope: string; children: R
     [scope],
   );
 
+  // Op de losse velden en niet op het object: een pagina die elke render een nieuw object
+  // meegeeft, zou anders elke render de hele boom onder de provider opnieuw laten rekenen.
+  const volle = dataStand?.laatsteVolleMaand ?? null;
+  const dataTot = dataStand?.dataTot ?? null;
+  const pMaand = dataStand?.partieel?.maand ?? null;
+  const pTmDag = dataStand?.partieel?.tmDag ?? null;
+  const pDagen = dataStand?.partieel?.dagenInMaand ?? null;
+  // Als tekst, om dezelfde reden: de lijst is elke render een nieuw object.
+  const uitSleutel = JSON.stringify(dataStand?.uitgeslotenBronnen ?? []);
+  const heeftStand = dataStand != null;
+  const stand = useMemo<PeriodDataStand | null>(() => {
+    if (!heeftStand) return null;
+    const partieel = pMaand !== null && pTmDag !== null && pDagen !== null
+      ? { maand: pMaand, tmDag: pTmDag, dagenInMaand: pDagen } : null;
+    const uitgeslotenBronnen = JSON.parse(uitSleutel) as { bron: string; dataTot: string | null }[];
+    return { laatsteVolleMaand: volle, partieel, dataTot, ...(uitgeslotenBronnen.length > 0 ? { uitgeslotenBronnen } : {}) };
+  }, [heeftStand, volle, dataTot, pMaand, pTmDag, pDagen, uitSleutel]);
+
   const waarde = useMemo<PeriodState>(() => {
-    const range = resolvePeriod(staat.preset, staat.custom);
+    const eindMaand = vensterEindMaand(stand?.laatsteVolleMaand);
+    // Een eigen periode wordt op eindMaand geklemd, net als de presets (periodeOpEind). Ongeklemd
+    // telden de maanden na het eind van de data als nullen (de demo: -26,5% conversies waar -1,5%
+    // hoort), en zo'n periode ontstaat vanzelf: opgeslagen onder de kalender als grens, gekozen op
+    // een tab met een latere eindmaand (er is één bewaarde keuze per klant), of terwijl de stand nog
+    // laadde (review [2], [42]). Alleen bij het uitrekenen: de bewaarde keuze blijft staan, en loopt
+    // de data later verder, dan krijg je hem weer heel.
+    const range = periodeOpEind(staat.preset, staat.custom, eindMaand);
     return {
       ...staat,
       range,
       compareRange: resolveComparison(range, staat.comparison),
+      eindMaand,
+      dataStand: stand,
       set,
     };
-  }, [staat, set]);
+  }, [staat, set, stand]);
 
   return <PeriodContext.Provider value={waarde}>{children}</PeriodContext.Provider>;
 }

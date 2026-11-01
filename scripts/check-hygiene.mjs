@@ -80,6 +80,61 @@ const GEDEELD = {
   // De regel waar het hele "geanonimiseerd"-verhaal op rust. Eén plek, met vaste drempels.
   beoordeelCel: "lib/benchmark/cel.ts",
   celoverzicht: "lib/benchmark/cel.ts",
+
+  // ── Stap 0 (rekenfouten, 1 november 2026) ──
+  //
+  // Tot welke maand de data vol is. De band, de pacing, het Jaaroverzicht en de kanaalprognose
+  // hadden elk een eigen grens (UTC getMonth, "de lopende maand", het aantal gevulde maanden), en
+  // met data t/m 26 augustus telde de ene augustus als gerealiseerd en de andere niet. Over
+  // kanalen: de vroegste dataTot, en een gepauzeerd kanaal met gezonde sync remt niet -- maar
+  // alleen via remtNietBijAchterstand, want rauw syncDraait remde een actuele Google af.
+  volleMaand: "lib/sync/datastand.ts",
+  dataTotVanMaandbron: "lib/sync/datastand.ts",
+  gezamenlijkeDataTot: "lib/sync/datastand.ts",
+  remtNietBijAchterstand: "lib/sync/datastand.ts",
+  // De dag->maand-omzetting met de conversieselectie van de klant. Stond vijf keer los, elk met
+  // een eigen select en klikkolom; de KPI-band en het Jaaroverzicht telden daardoor een andere
+  // conversie zodra een klant in Instellingen iets anders koos.
+  kanaalMaandenUitDagen: "lib/analysis/channel-report-blend.ts",
+  dagbronSelect: "lib/analysis/channel-report-blend.ts",
+  monthlyFromDaily: "lib/analysis/channel-report-blend.ts",
+  // Welke conversies tellen. Een tweede lezing van dezelfde opgeslagen lijst gaf de sync en de
+  // Google-route een ander filter (een id zonder waarde maakte de query stil leeg).
+  sumSelectedConversions: "lib/analysis/channel-conversion-config.ts",
+  resolveChannelConversionConfig: "lib/analysis/channel-conversion-config.ts",
+  dashboardConversionActionIds: "lib/analysis/channel-conversion-config.ts",
+  // Hetzelfde op campagneniveau: de campagnetabel telde LinkedIn vast als one_click_leads, terwijl
+  // de rest van het dashboard de selectie van de klant volgde.
+  campagneDagSelect: "components/dashboard/campaigns-per-channel.tsx",
+  campagnesUitDagen: "components/dashboard/campaigns-per-channel.tsx",
+  // Eén vergelijkingsregel: per bron alleen maanden vanaf zijn start paren. De KPI-band, de
+  // blended pacing en het portfolio rekenden elk som tegen som, en een kanaal dat in maart begon
+  // groeide over januari en februari uit het niets.
+  gepaardeTotalen: "lib/period/apply-period.ts",
+  alsBronReeks: "lib/period/apply-period.ts",
+  // Waar het venster van de presets eindigt: de laatste volle maand met data, nooit voorbij de
+  // kalender.
+  vensterEindMaand: "lib/period/period-range.ts",
+  // Eén aftelling naar de beurs. Hero, pacingkop, strook en sectiekop rekenden elk een eigen
+  // afstand (rollende 7 dagen tegen kalenderweken) en zeiden op dezelfde dag "0 weken" en "W-1".
+  fairCountdown: "lib/fair/fair-weeks.ts",
+  weeksToFair: "lib/fair/fair-weeks.ts",
+  selectActiveEdition: "lib/fair/fair-weeks.ts",
+  mondaysInMonth: "lib/fair/fair-weeks.ts",
+  // De beurs bij naam in een aftelregel. De pacingkop had hem, de beurssectie niet: "Nog 3 weken
+  // tot 2026" naast "Nog 3 weken tot GRN 2026" op dezelfde pagina.
+  editieNaam: "lib/fair/fair-weeks.ts",
+  // De cijfers van een jaarkaart. De CPA-kaart rekende zelf (Q1-kosten gedeeld door de
+  // jaarconversies, het budgetdoel gedeeld door de prognose) en zei € 19 waar de prognose € 64 zei.
+  jaarKaartCijfers: "lib/forecast.ts",
+  // Weekrijen per jaar splitsen vóór het nummeren; een tweede splitsing na het nummeren stapelde
+  // twee jaar in één maand (week 6 t/m 10).
+  googleAdsWeeklyByYear: "lib/api/adapter.ts",
+  // Weergaveregels per metriek, naast isLowerBetter: wat optelt (en dus een voortgangsbalk en een
+  // weekverdeling krijgt), en wanneer een punt geen data heeft in plaats van een nul.
+  isLowerBetter: "lib/forecast-format.ts",
+  isOptelbaar: "lib/forecast-format.ts",
+  zonderData: "lib/forecast-format.ts",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────

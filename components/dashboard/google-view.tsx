@@ -463,7 +463,7 @@ export function GoogleForecast({ clientId }: { clientId: string }) {
         eerste
         icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Waar dit jaar op uitkomt"
-        bijschrift="Jaarprognose tegen het geschatte jaardoel (vorig jaar +10%)"
+        bijschrift="Jaarprognose tegen het jaardoel (ingevoerd in Instellingen, anders vorig jaar +10%)"
       >
         <ForecastSummaryTiles clientId={clientId} />
       </Sectie>

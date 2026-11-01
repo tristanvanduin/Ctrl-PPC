@@ -20,6 +20,8 @@ import {
 } from "@/lib/benchmark/segment";
 import { useClientDataState } from "@/lib/client-data-provider";
 import { invalidateClientCache } from "@/lib/use-client-data";
+import { vergeetBlendedClientData } from "@/lib/use-blended-client-data";
+import { today } from "@/lib/reporting-date";
 import { dbUpsert, dbDelete } from "@/lib/data-access/client-write";
 
 /**
@@ -70,6 +72,7 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
 
   const [settings, setSettings] = useState<ClientSettings | null>(null);
   const [saved, setSaved] = useState(false);
+  const [opslaanFout, setOpslaanFout] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState("");
   const dataState = useClientDataState();
 
@@ -262,8 +265,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!settings) return;
+    setOpslaanFout(null);
 
     // Build KPI targets from the separate state
     const kpiTargets: KpiTargets = {
@@ -282,7 +286,10 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       conversionOverrides: Object.keys(convOverrides).length > 0 ? convOverrides : undefined,
     };
 
-    saveClientSettings({
+    // Eerst de opslag afwachten, dan de cache verversen. De client-data-route leest de
+    // conversieacties uit de database; een ophaalronde die vóór de schrijfactie start, leest de
+    // oude selectie en de cache houdt die vijf minuten vast.
+    const { error } = await saveClientSettings({
       ...settings,
       kpiTargets,
       sector: sector || null,
@@ -299,8 +306,17 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       merchantContentLanguage: merchantContentLanguage.trim() || null,
       merchantChannel: merchantChannel.trim() || null,
     });
-    void syncClientTargets(kpiTargets.cpaTarget, kpiTargets.roasTarget);
     invalidateClientCache(clientId);
+    // Eerst de fout: een mislukte opslag mag geen doelen naar client_targets schrijven, anders
+    // stond daar het nieuwe CPA-doel terwijl het paneel "niet opgeslagen" zei.
+    if (error) {
+      setOpslaanFout(error);
+      return;
+    }
+    void syncClientTargets(kpiTargets.cpaTarget, kpiTargets.roasTarget);
+    // De blended cache ("Alle kanalen") bewaart de data met de KPI-doelen al samengevoegd; zonder
+    // dit toonde het Jaaroverzicht daar nog vijf minuten het oude doel.
+    vergeetBlendedClientData(clientId);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -723,8 +739,10 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
             hij terug op twee en dan op één. */}
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           {(() => {
-            const currentYear = new Date().getFullYear();
-            const currentMonth = new Date().getMonth(); // 0-based
+            // De Amsterdamse kalender, niet de browserklok: ten westen van UTC was het op de 1e
+            // nog de vorige maand.
+            const currentYear = Number(today().slice(0, 4));
+            const currentMonth = Number(today().slice(5, 7)) - 1; // 0-based
             const months = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
             // Show only realized months (up to current month)
             return Array.from({ length: currentMonth + 1 }, (_, i) => {
@@ -946,6 +964,9 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
           <RotateCcw className="w-4 h-4" />
           Reset naar standaard
         </Button>
+        {opslaanFout && (
+          <span className="text-meta text-amber-700">Niet opgeslagen in de database: {opslaanFout}</span>
+        )}
       </div>
     </div>
   );

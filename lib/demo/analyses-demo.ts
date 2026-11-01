@@ -14,7 +14,7 @@
 // je op een verzinsel. Deze drie zijn gekozen omdat ze alle drie leunen op cijfers die ELDERS OP
 // HETZELFDE SCHERM staan en dus na te rekenen zijn:
 //
-//   Budgetallocatie   de impression-share-cijfers van de vier searchcampagnes
+//   Budgetallocatie   de impression-share-cijfers van de drie searchcampagnes
 //   Video & PMax      de netwerkverdeling (Maps/Zoeken) en het eerste kwartiel van de video
 //   Landen & staten   de ranglijst naast de wereldkaart
 //
@@ -23,9 +23,13 @@
 //
 // ── DE CIJFERS ZIJN NIET VERZONNEN ──────────────────────────────────────────
 //
-// Ze komen uit dezelfde bronnen als de schermen: greentech-mock (impression share, campagnes),
-// pmax-video-demo (netwerkverdeling, kwartielen) en geo-demo (landen). Wie in de demo doorklikt
-// van de analyse naar de onderliggende kaart, moet daar hetzelfde getal vinden.
+// Ze komen uit dezelfde bronnen als de schermen: de geseede ads_campaign_impression_share
+// (scripts/demo/seed-demo-client.ts; de demo leest Google uit de database, niet meer uit
+// greentech-mock), pmax-video-demo (netwerkverdeling, kwartielen) en geo-demo (landen). Wie in de
+// demo doorklikt van de analyse naar de onderliggende kaart, moet daar hetzelfde getal vinden.
+// Hier stond ook "GRN | Search | Canada verliest 31% aan budget": dat kwam uit de fixture, en de
+// seed heeft voor GRN geen impressieaandeel. Die regel is weg; __analyses_demo_test.ts legt elke
+// genoemde campagne en elk verliespercentage naast de seed.
 
 type Row = Record<string, unknown>;
 
@@ -55,12 +59,10 @@ geld is op. Verlies aan rang is een kwaliteits- of biedprobleem; daar meer budge
 je niets, want de vertoningen worden niet gemist door geldgebrek.
 
 **Voorstel.**
-- Verhoog het dagbudget van GRT | Search | NL met 25% (€ 140 → € 175). Bij een CPA van € 66 en
-  ongewijzigde conversieratio is dat ruwweg 50 extra conversies per maand.
+- Verhoog het dagbudget van GRT | Search | NL met 25% (€ 140 → € 175). Bij een CPA van € 162 en
+  ongewijzigde conversieratio is dat ruwweg 7 extra conversies per maand.
 - Laat het budget van GRA | Search | US ongemoeid. Pak daar eerst de rang aan: advertentierelevantie
   en landingspagina-ervaring, en pas daarna het bod.
-- GRN | Search | Canada verliest 31% aan budget bij 95% benutting — hetzelfde patroon als NL, maar
-  op een kleiner volume. Zelfde beweging, kleinere stap.
 
 **Wat dit niet zegt.** Impressieaandeel zegt niets over de winstgevendheid van het extra volume.
 De aanname is dat de marginale conversie evenveel waard is als de gemiddelde; dat is bij een

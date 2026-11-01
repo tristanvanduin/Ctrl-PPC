@@ -8,6 +8,7 @@ import {
   conversionSourcesFor,
   DEFAULT_CHANNEL_CONVERSION_CONFIG,
 } from "./channel-conversion-config";
+import * as config from "./channel-conversion-config";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {
@@ -46,5 +47,30 @@ assert(sumSelectedConversions({ conversions: "4", leads: "6" }, "meta_ads", reso
 // ── Labels van de selectie ──
 assert(selectedConversionLabels("meta_ads", resolveChannelConversionConfig({ meta_ads: ["leads"] })).join(",") === "Leads", "labels van de geselecteerde velden");
 
+// ── Google: de opgeslagen conversieacties -> het filter voor de Google-query ──
+//
+// De sync en de browser lazen deze lijst elk op hun eigen manier (de browser uit een
+// localStorage-kopie). Eén lezing; de regels zijn die van de sync: alleen aangevinkte acties, en
+// niets aangevinkt of geen lijst = niet filteren (nooit nul conversies).
+const { dashboardConversionActionIds } = config as unknown as { dashboardConversionActionIds?: (actions: unknown) => string[] | undefined };
+assert(typeof dashboardConversionActionIds === "function", "dashboardConversionActionIds bestaat");
+if (typeof dashboardConversionActionIds === "function") {
+  const acties = [
+    { id: "111", name: "Aanvraag", includedInDashboard: true },
+    { id: "222", name: "Telefoon", includedInDashboard: false },
+    { id: "333", name: "Brochure", includedInDashboard: true },
+    { id: "444", name: "Zonder vlag" },
+  ];
+  assert(dashboardConversionActionIds(acties)?.join(",") === "111,333", "alleen de aangevinkte acties, in volgorde");
+  assert(dashboardConversionActionIds([{ id: "1", includedInDashboard: false }]) === undefined, "niets aangevinkt: niet filteren (undefined), geen leeg filter");
+  assert(dashboardConversionActionIds([]) === undefined, "lege lijst: niet filteren");
+  assert(dashboardConversionActionIds(null) === undefined, "geen lijst (null): niet filteren");
+  assert(dashboardConversionActionIds({ id: "1", includedInDashboard: true }) === undefined, "geen array: niet filteren");
+  assert(dashboardConversionActionIds([{ id: 987654321, includedInDashboard: true }])?.[0] === "987654321", "numeriek id wordt tekst");
+  assert(dashboardConversionActionIds([{ includedInDashboard: true }, { id: "", includedInDashboard: true }, null, "x"]) === undefined,
+    "acties zonder bruikbaar id tellen niet: 'undefined' als id zou de query leegmaken");
+  assert(dashboardConversionActionIds([{ id: "5", includedInDashboard: true }, { id: "5", includedInDashboard: true }])?.length === 1, "dubbele ids één keer");
+}
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
-if (failed > 0) process.exit(1);
+process.exit(failed > 0 ? 1 : 0);

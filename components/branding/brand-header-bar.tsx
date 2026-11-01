@@ -3,7 +3,7 @@
 import { CalendarClock } from "lucide-react";
 import { useBrandTheme } from "./brand-theme-provider";
 import { FAIR_GEO_CLONES } from "@/lib/fair/geo-clone-catalog";
-import { weeksToFair, type UpcomingEdition } from "@/lib/fair/fair-weeks";
+import { fairCountdown, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { inkOn } from "@/lib/branding/chart-colors";
 import { today } from "@/lib/reporting-date";
 
@@ -40,7 +40,11 @@ export function BrandHeaderBar({
   const variant = geoClone ? FAIR_GEO_CLONES.find((v) => v.abbreviation === geoClone) ?? null : null;
   const beursLabel = variant ? `${variant.brand} ${variant.location}` : geoClone;
 
-  const wekenTotBeurs = edition ? weeksToFair(edition.fairDate, today()) : null;
+  // Dezelfde aftelling als de beurssectie en de pacingkaarten (fairCountdown). In de nasleep
+  // verdwijnt de chip: de editie blijft dan nog zes weken actief voor de beurssectie, maar "-2
+  // weken tot" is geen aftelling.
+  const aftelling = edition ? fairCountdown(edition.fairDate, today()) : null;
+  const toonAftelling = edition != null && aftelling != null && aftelling.fase !== "nasleep";
 
   // Het verloop loopt van de primaire naar de accentkleur, en die kunnen elk om een andere
   // inktkleur vragen. Vragen ze om dezelfde, dan is de keuze eenvoudig. Verschillen ze — en dat
@@ -102,15 +106,20 @@ export function BrandHeaderBar({
 
         {/* De aftelling in de hero en niet alleen bij de prestatiekaart: het is de context waarin
             elk getal op deze pagina gelezen moet worden. */}
-        {wekenTotBeurs != null && wekenTotBeurs >= 0 && (
+        {toonAftelling && (
           <div className={`shrink-0 rounded-lg ${chipVulling} backdrop-blur-sm px-3.5 py-2 flex items-center gap-2.5`}>
             <CalendarClock className="w-4.5 h-4.5 opacity-80" />
+            {/* In de beursweek "Beursweek" en niet "0 weken tot": in de week waarin de beurs
+                plaatsvindt valt er niets meer af te tellen, en op de dagen na een woensdagbeurs
+                stond er anders nog steeds "0 weken tot" een beurs die al geweest was. */}
             <div className="leading-tight">
               <div className="text-lead font-bold">
-                {wekenTotBeurs} {wekenTotBeurs === 1 ? "week" : "weken"}
+                {aftelling.fase === "beursweek"
+                  ? "Beursweek"
+                  : `${aftelling.weken} ${aftelling.weken === 1 ? "week" : "weken"}`}
               </div>
               <div className="text-micro opacity-90">
-                tot {edition!.eventName} {edition!.label}
+                {aftelling.fase === "beursweek" ? "" : "tot "}{edition.eventName} {edition.label}
               </div>
             </div>
           </div>

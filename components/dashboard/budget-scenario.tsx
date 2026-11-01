@@ -5,6 +5,7 @@ import { Calculator, ArrowRight, DollarSign, Target, AlertTriangle, Info } from 
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
 import { formatDeltaPercent, formatRoas } from "@/lib/forecast-format";
+import { today } from "@/lib/reporting-date";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -17,6 +18,23 @@ function num(v: number): string {
   return new Intl.NumberFormat("nl-NL").format(Math.round(v));
 }
 
+/**
+ * Over hoeveel maanden een budgetwijziging van vandaag nog doorwerkt: de maanden na de
+ * gerealiseerde grens, maar niet meer dan de kalender toelaat.
+ *
+ * Loopt de data achter (de demo: gerealiseerd t/m juli, bekeken op 1 november), dan zijn augustus
+ * t/m oktober niet gemeten maar wel voorbij: een budget van vandaag verandert daar niets meer. Met
+ * 12 - 7 = 5 maanden gaf +50% budget 125 extra conversies waar november en december er 50
+ * opleveren. De lopende maand telt nog mee.
+ *
+ * @param naGrens 12 - kpi.realizedThroughMonth: een POSITIE, geen telling van gevulde maanden.
+ * @param vandaag "YYYY-MM-DD" in Amsterdam (today()); los meegegeven zodat een test de dag kiest.
+ */
+export function scenarioMaanden(naGrens: number, currentYear: number, vandaag: string): number {
+  const kalenderMaand = Number(vandaag.slice(0, 4)) === currentYear ? Number(vandaag.slice(5, 7)) : 1;
+  return Math.max(1, Math.min(naGrens, 13 - kalenderMaand));
+}
+
 export function BudgetScenario({ clientId }: { clientId: string }) {
   const data = useClientHistoricalData(clientId);
   const dataState = useClientDataState();
@@ -26,8 +44,11 @@ export function BudgetScenario({ clientId }: { clientId: string }) {
   const conv = forecast.conversions.kpi;
   const spend = forecast.adSpend.kpi;
   const budget = forecast.budgetRecommendation;
-  const realizedMonths = forecast.conversions.points.filter((p) => p.realized !== null).length;
-  const remainingMonths = Math.max(1, 12 - realizedMonths);
+  // De grens is een POSITIE (t/m welke maand), geen telling van gevulde maanden. Bij een kanaal
+  // dat in maart begon zijn er t/m augustus zes gevulde punten, maar resten er vier maanden, geen
+  // zes — dezelfde regel als het budgetadvies in computeForecast. scenarioMaanden begrenst dat op
+  // de kalender.
+  const remainingMonths = scenarioMaanden(12 - forecast.conversions.kpi.realizedThroughMonth, data.currentYear, today());
 
   // Current actuals — ALL on annual projected basis for consistency
   const currentAnnualConv = conv.adjustedAnnual;
