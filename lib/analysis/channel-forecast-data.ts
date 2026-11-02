@@ -65,6 +65,19 @@ function aggregateByYear(rows: ChannelForecastRow[]): Map<number, { monthly: Api
     bucket.weekly.set(key, w);
   }
 
+  // Elke maand met rijen krijgt AL zijn emmers, een lege met nullen. De forecast leest de weken op
+  // positie (weeks[w] is W(w+1), en het aantal weken is weeks.length): met alleen de emmers van
+  // dagen met rijen had Meta's maart (start 13 maart) [wk2..wk5], en dan stonden 13-14 maart onder
+  // "W1 Mrt", 29-31 maart onder W4 en ontbrak W5. Een lege week in de HISTORIE is dan wel een nul in
+  // de weekvorm; computeWeeklyDistribution (lib/forecast.ts) neemt zo'n maand niet als patroon.
+  for (const bucket of perYear.values()) {
+    for (const month of bucket.monthly.keys()) {
+      for (let week = 1; week <= weeksInMonth(month); week++) {
+        if (!bucket.weekly.has(`${month}-${week}`)) bucket.weekly.set(`${month}-${week}`, { week, month, conversions: 0, revenue: 0, adSpend: 0 });
+      }
+    }
+  }
+
   const out = new Map<number, { monthly: ApiMonthlyData[]; weekly: ApiWeeklyData[] }>();
   for (const [year, bucket] of perYear) {
     out.set(year, { monthly: [...bucket.monthly.values()], weekly: [...bucket.weekly.values()] });

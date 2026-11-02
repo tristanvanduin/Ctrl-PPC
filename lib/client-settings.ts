@@ -83,6 +83,15 @@ export interface ClientSettings {
   merchantFeedLabel?: string | null;
   merchantContentLanguage?: string | null;
   merchantChannel?: string | null;
+  /**
+   * Of `kpiTargets` echt opgeslagen is: een rij met kpi_targets in de database, of een opslag via
+   * saveClientSettings. False: `kpiTargets` is DEFAULT_KPI_TARGETS, en die groei van 10 is het
+   * standaarddoel en geen ingevoerd doel. Zonder deze vlag waren die twee niet uit elkaar te halen,
+   * en zei elk scherm "geschat" (ook naast een ingevoerd doel) of zou het "jaardoel (vorig jaar
+   * +10%)" zeggen waar niemand iets had ingevoerd. Lees hem via kpiDoelenIngevoerd: een vermelding in
+   * localStorage van vóór dit veld heeft hem niet.
+   */
+  kpiDoelenOpgeslagen?: boolean;
 }
 
 // --- Default KPI targets ---
@@ -159,7 +168,29 @@ export function getClientSettings(clientId: string): ClientSettings {
     merchantFeedLabel: null,
     merchantContentLanguage: null,
     merchantChannel: null,
+    kpiDoelenOpgeslagen: false,
   };
+}
+
+/**
+ * Of de KPI-doelen van deze instellingen echt zijn ingevoerd, en niet de standaard zijn die
+ * getClientSettings zonder opgeslagen doel teruggeeft. mergeKpiTargets zet hiermee de herkomst van
+ * het doel (ClientHistoricalData.doelHerkomst), en die bepaalt of een scherm "jaardoel" of "geschat
+ * jaardoel" zegt.
+ *
+ * Een vermelding in localStorage van vóór kpiDoelenOpgeslagen heeft de vlag niet. Wijken haar doelen
+ * af van de standaard, dan zijn ze ingevoerd: de standaard kunnen ze niet zijn. Zijn ze gelijk aan de
+ * standaard, dan is het niet te zeggen; dan de schatting, tot loadClientSettings de rij heeft gelezen
+ * en de vlag zet. Dat getal is in beide gevallen hetzelfde (vorig jaar +10%), alleen het woord
+ * verschilt.
+ */
+export function kpiDoelenIngevoerd(settings: ClientSettings): boolean {
+  if (typeof settings.kpiDoelenOpgeslagen === "boolean") return settings.kpiDoelenOpgeslagen;
+  const kpi = settings.kpiTargets;
+  if (!kpi) return false;
+  const velden = Object.keys(DEFAULT_KPI_TARGETS) as (keyof typeof DEFAULT_KPI_TARGETS)[];
+  return velden.some((veld) => kpi[veld] !== DEFAULT_KPI_TARGETS[veld])
+    || Object.keys(kpi.conversionOverrides ?? {}).length > 0;
 }
 
 /**
@@ -200,6 +231,9 @@ export async function loadClientSettings(clientId: string): Promise<ClientSettin
         merchantFeedLabel: data.merchant_feed_label ?? null,
         merchantContentLanguage: data.merchant_content_language ?? null,
         merchantChannel: data.merchant_channel ?? null,
+        // Een rij kan er zijn om een andere reden (conversieacties, sector) met kpi_targets null.
+        // Dan zijn de doelen hierboven de standaard en is er niets ingevoerd. Een leeg object ook.
+        kpiDoelenOpgeslagen: data.kpi_targets != null && Object.keys(data.kpi_targets).length > 0,
       };
       settingsCache.set(clientId, settings);
 
@@ -226,10 +260,13 @@ export async function loadClientSettings(clientId: string): Promise<ClientSettin
  * nog de oude selectie en houdt de cache die vijf minuten vast.
  */
 export async function saveClientSettings(settings: ClientSettings): Promise<{ error: string | null }> {
-  // Always update cache + localStorage immediately
-  settingsCache.set(settings.clientId, settings);
+  // Always update cache + localStorage immediately. Opgeslagen via Instellingen: de doelen zijn
+  // ingevoerd, ook als ze gelijk zijn aan de standaard (wie "+10%" ziet staan en opslaat, heeft +10%
+  // als doel). De database krijgt kpi_targets hieronder mee, dus het volgende lezen zegt hetzelfde.
+  const opgeslagen: ClientSettings = { ...settings, kpiDoelenOpgeslagen: true };
+  settingsCache.set(settings.clientId, opgeslagen);
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY_PREFIX + settings.clientId, JSON.stringify(settings));
+    localStorage.setItem(STORAGE_KEY_PREFIX + settings.clientId, JSON.stringify(opgeslagen));
   }
 
   // Persist to Supabase

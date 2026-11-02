@@ -25,10 +25,12 @@ function computeTrend(projectionFactor: number, lastRatio: number): {
   const modifier = lastRatio >= 1.0 ? 2 : lastRatio >= 0.85 ? 0 : -2;
   const score = clamp(base + modifier, 0, 20);
 
+  // De titels zoals lib/health-score.ts ze nu geeft: de factor meet de afstand tot een verwachting
+  // die het jaardoel volgt, geen trend. De echte module zelf: lib/__trend_verwachting_test.ts.
   if (projectionFactor < 0.80 && lastRatio < 0.80) {
-    anomalies.push("Sterke neerwaartse trend");
+    anomalies.push("Sterk achter op verwachting");
   } else if (projectionFactor < 0.90 && lastRatio < 0.90) {
-    anomalies.push("Dalende trend");
+    anomalies.push("Achter op verwachting");
   }
 
   return { score, anomalies };
@@ -77,7 +79,7 @@ console.log("\n▸ pf 0.65, last ratio 0.55 (severe underperformance)");
 {
   const r = computeTrend(0.65, 0.55);
   test(`Score should be 0 (got ${r.score})`, () => assert(r.score === 0, `was ${r.score}`));
-  test("Critical anomaly fired", () => assert(r.anomalies.includes("Sterke neerwaartse trend"), `got: ${r.anomalies}`));
+  test("Critical anomaly fired", () => assert(r.anomalies.includes("Sterk achter op verwachting"), `got: ${r.anomalies}`));
 }
 
 // ── Moderate decline ────────────────────────────────────────────────
@@ -85,7 +87,7 @@ console.log("\n▸ pf 0.88, last ratio 0.82 (moderate decline, warning zone)");
 {
   const r = computeTrend(0.88, 0.82);
   test(`Score should be 6 (got ${r.score})`, () => assert(r.score === 6, `was ${r.score}`));
-  test("Warning anomaly fired", () => assert(r.anomalies.includes("Dalende trend"), `got: ${r.anomalies}`));
+  test("Warning anomaly fired", () => assert(r.anomalies.includes("Achter op verwachting"), `got: ${r.anomalies}`));
 }
 
 // ── Recovering from bad ─────────────────────────────────────────────

@@ -181,6 +181,14 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
   const laadgrens = grenzen.length > 0 && !grenzen.includes(null)
     ? (grenzen as string[]).reduce((a, b) => (monthIndex(b) > monthIndex(a) ? b : a)) : null;
   const { nietGeladen, gemetenNul, voorStart, start } = ontbrekendeMaanden(data, current.missing, periode.dataStand?.dataTot, laadgrens);
+  // Een kanaal waarvan voor deze periode NIETS geladen is (de eerste pagina faalde: zijn laadgrens
+  // ligt ná het eind van de periode). Op "Alle kanalen" zweeg de band daarover: zonder rijen geeft
+  // bronStart geen start, dus valt hij uit de paarregel, en Google vult elke maand, dus ontbreekt er
+  // geen maand. Het totaal stond er als "alle kanalen" zonder dat kanaal. Alleen bij een optelling
+  // met kanaalnamen: op een kanaaltab zegt de regel over niet-geladen maanden het al.
+  const nietOpgehaald = (bronnen ?? [])
+    .filter((b) => b.naam in KANAAL_NAAM && b.geladenVanaf != null && monthIndex(b.geladenVanaf) > monthIndex(periode.range.end))
+    .map((b) => KANAAL_NAAM[b.naam as Kanaal]);
   // "Nieuw in deze periode" alleen als de vergelijkingsperiode echt leeg was. Het gepaarde vorige
   // totaal is ook nul als er niets te paren viel terwijl het kanaal er wel was (de demo-Microsoft-tab:
   // negen dagen juli 2025, € 297, en toch drie keer "nieuw", met eronder "de data begint halverwege
@@ -313,6 +321,15 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
           {gemetenNul.length === 1
             ? `Voor ${formatMonth(gemetenNul[0])} is er geen data; na de start van de data is dat een maand zonder activiteit, en die telt hierboven als nul.`
             : `Voor ${gemetenNul.length} maanden is er geen data (${maandenTekst(gemetenNul)}); na de start van de data zijn dat maanden zonder activiteit, en die tellen hierboven als nul.`}
+        </p>
+      )}
+
+      {nietOpgehaald.length > 0 && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-micro text-amber-800">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {nietOpgehaald.length === 1
+            ? `${nietOpgehaald[0]} kon niet geladen worden en telt hierboven niet mee.`
+            : `${opsomming(nietOpgehaald)} konden niet geladen worden en tellen hierboven niet mee.`}
         </p>
       )}
 

@@ -279,6 +279,15 @@ export async function computeAnalysisTargets(
   const clientData: ClientHistoricalData = {
     clientId,
     targetCurrentYear,
+    // De herkomst volgt precies de `||` hierboven, zodat het label altijd het gebruikte getal
+    // beschrijft. Zonder herkomst zei elke health score op dit pad (de kanaalbadges,
+    // KanaalHealthRanking, Code Rood in de cron) "geschat jaardoel (vorig jaar +10%; er is nog geen
+    // doel ingevoerd)", ook bij de 2.600 uit Instellingen, terwijl de Google-tab op hetzelfde getal
+    // "Jaardoel in gevaar" zei. computeForecast geeft hem door aan de prognose.
+    doelHerkomst: {
+      conversions: kpi.conversionsAbsolute > 0 ? { soort: "absoluut" } : { soort: "standaard" },
+      revenue: kpi.revenueAbsolute > 0 ? { soort: "absoluut" } : { soort: "standaard" },
+    },
     historicalYears,
     currentYearData,
     currentYear,

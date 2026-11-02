@@ -22,10 +22,39 @@ export interface ClientAnnualData {
   adSpend: number;
 }
 
+/**
+ * Waar het jaardoel van één metric vandaan komt. Het getal alleen zegt dat niet: een ingevoerde groei
+ * van 10% en het standaarddoel (vorig jaar +10%) geven hetzelfde getal, en toch is het ene een
+ * afspraak en het andere een schatting.
+ *
+ * - `absoluut`: een vast doel, ingevoerd in Instellingen.
+ * - `groei`: een groeipercentage, ingevoerd in Instellingen (vorig jaar + groeiPct).
+ * - `standaard`: niets ingevoerd, dus standaardJaardoel (lib/analysis/standaard-jaardoel.ts).
+ */
+export type DoelHerkomst =
+  | { soort: "absoluut" }
+  | { soort: "groei"; groeiPct: number }
+  | { soort: "standaard" };
+
+/** De herkomst per metric met een eigen doelveld in Instellingen. Spend volgt uit CPA of ROAS. */
+export interface DoelHerkomstPerMetric {
+  conversions: DoelHerkomst;
+  revenue: DoelHerkomst;
+}
+
 export interface ClientHistoricalData {
   clientId: string;
   /** Target for the current year */
   targetCurrentYear: ClientAnnualData;
+  /**
+   * Waar `targetCurrentYear` vandaan komt (mergeKpiTargets zet hem, en computeAnalysisTargets voor
+   * de kanaalbadges, KanaalHealthRanking en Code Rood). De schermen zeggen daarmee "jaardoel" of
+   * "geschat jaardoel"; hier stond alleen het getal, en toen zei elk scherm "geschat ... er is nog
+   * geen doel ingevoerd", ook naast een doel uit Instellingen. Ontbreekt hij (de prognose van de
+   * kanaaltabbladen, buildChannelForecast, die zijn doel uit client_targets haalt), dan de
+   * schatting, zoals voorheen.
+   */
+  doelHerkomst?: DoelHerkomstPerMetric;
   /**
    * Historical years keyed by year number (e.g., { 2022: [...], 2023: [...], 2024: [...], 2025: [...] }).
    * More years = better forecasts. The engine weighs recent years heavier.

@@ -53,6 +53,8 @@ let wachtend: { tabel: string; los: () => void }[] = [];
 let opgeslagen: unknown = null;
 // Tabellen die met een HTTP 500 antwoorden (een netwerkfout, time-out of serverfout).
 const faalt = new Set<string>();
+// Per tabel het verzoek (1 = de eerste pagina) dat met een HTTP 500 antwoordt.
+const faaltVerzoek = new Map<string, number>();
 const RIJEN: Record<string, Record<string, unknown>[]> = {
   // Twee dagen; de laatste dag is wat de band als eind van de data neemt.
   meta_account_daily: [
@@ -79,12 +81,13 @@ globalThis.fetch = ((url: string) => {
   const [pad, zoek] = String(url).split("?");
   const tabel = decodeURIComponent(pad.split("/api/data/")[1]);
   verzoeken[tabel] = (verzoeken[tabel] ?? 0) + 1;
+  const dezeFaalt = faalt.has(tabel) || faaltVerzoek.get(tabel) === verzoeken[tabel];
   const vraag = JSON.parse(decodeURIComponent(zoek.slice("q=".length))) as Vraag;
   vragen[tabel] ??= vraag;
   (alleVragen[tabel] ??= []).push(vraag);
   return new Promise((klaar) => wachtend.push({
     tabel,
-    los: () => klaar(faalt.has(tabel) ? ({ ok: false, status: 500, json: async () => ({ error: "boom" }) } as Response) : {
+    los: () => klaar(dezeFaalt ? ({ ok: false, status: 500, json: async () => ({ error: "boom" }) } as Response) : {
       ok: true, status: 200,
       json: async () => ({ data: tabel === "client_settings" ? { channel_conversion_config: opgeslagen } : alsDeRoute(RIJEN[tabel] ?? [], vraag) }),
     } as Response),
@@ -98,7 +101,12 @@ async function beantwoord(welke: (tabel: string) => boolean): Promise<void> {
   for (const w of nu) w.los();
   await rust();
 }
+// Eerst wachten tot er iets te beantwoorden is (hooguit een seconde). Met alleen de vaste rust van
+// 20 ms had de hook onder load (meerdere testbestanden tegelijk) zijn verzoeken soms nog niet gedaan,
+// en dan beantwoordde dit niets en faalde het eerste scenario helemaal.
 async function beantwoordAlles(): Promise<void> {
+  const eind = Date.now() + 1000;
+  while (wachtend.length === 0 && Date.now() < eind) await new Promise((r) => setTimeout(r, 5));
   for (let i = 0; i < 10 && wachtend.length > 0; i++) await beantwoord(() => true);
 }
 
@@ -525,6 +533,83 @@ async function main() {
       `de band zegt "geen data geladen", niet "nog geen enkele maand met data" (kreeg "${html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 600)}")`);
     faalt.delete("linkedin_account_daily");
     root.unmount();
+  }
+
+  // ── 4c. Op "Alle kanalen" faalt de eerste pagina van één kanaal ─────────────────────────
+  //
+  // Gerepareerd op de kanaaltab (4b), niet op "Alle kanalen": daar heeft Meta dan geen rijen en een
+  // laadgrens ná de periode. bronStart geeft null, gepaardeTotalen slaat hem over, en Google vult elke
+  // maand, dus ontbrekendeMaanden vindt niets. De band toonde een totaal zonder Meta, als "alle
+  // kanalen", zonder één regel erover.
+  {
+    opgeslagen = null;
+    faalt.add("meta_account_daily");
+    const root = mount("blended");
+    await rust();
+    await beantwoordAlles();
+    const uit = nu();
+    const zin = (html: string) => (/<p class="[^"]*amber[^"]*">(?:<svg[^]*?<\/svg>)?([^<]*kon[^<]*niet geladen[^<]*)<\/p>/.exec(html) ?? [])[1] ?? "";
+    const metG = band({ data: uit.data, bronnen: uit.bronnen }, stand);
+    assert(zin(metG) === "Meta kon niet geladen worden en telt hierboven niet mee.",
+      `een mislukte Meta-lezing staat in amber in de band (kreeg "${metG.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 600)}")`);
+    faalt.add("linkedin_account_daily");
+    const root2 = mount("blended");
+    await rust();
+    await beantwoordAlles();
+    const twee = band({ data: nu().data, bronnen: nu().bronnen }, stand);
+    assert(zin(twee) === "Meta en LinkedIn konden niet geladen worden en tellen hierboven niet mee.", `twee kanalen in één zin (kreeg "${zin(twee)}")`);
+    faalt.delete("meta_account_daily");
+    faalt.delete("linkedin_account_daily");
+    // En zonder fout geen regel.
+    const root3 = mount("blended");
+    await rust();
+    await beantwoordAlles();
+    assert(zin(band({ data: nu().data, bronnen: nu().bronnen }, stand)) === "", "zonder leesfout geen regel");
+    root.unmount(); root2.unmount(); root3.unmount();
+  }
+
+  // ── 4d. Een LATERE pagina faalt ──────────────────────────────────────────────────────────
+  //
+  // Dan zijn de rijen nieuwer dan de oudste dag van de vorige pagina binnen, en de maand van die dag
+  // maar deels. Die halve maand bleef staan, met de laadgrens een maand later: de eerste maand met
+  // data lag dan vóór de laadgrens, en de band las de laadfout als de start van de data ("de data
+  // begint halverwege april 2025"), telde de halve maand als een volle, en zei over het jaar ervoor
+  // "er is nog geen data". De eerste maand met data hoort de laadgrens te zijn.
+  {
+    const { bronStart } = await import("./period/apply-period");
+    const eerder = RIJEN.meta_account_daily;
+    const vlak: Record<string, unknown>[] = [];
+    for (let d = new Date(`${monthsAgo(36)}T00:00:00Z`); d <= new Date("2026-08-26T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+      const dag = d.toISOString().slice(0, 10);
+      for (const entity_id of ["a1", "a2"]) vlak.push({ date: dag, entity_id, impressions: 10, link_clicks: 1, spend: 1, conversions: 1, leads: 0, conversion_value: 0 });
+    }
+    RIJEN.meta_account_daily = vlak;
+    opgeslagen = null;
+    faaltVerzoek.set("meta_account_daily", 2);
+    const root = mount("blended");
+    await rust();
+    await beantwoordAlles();
+    const grens = nu().geladenVanaf.meta;
+    const bron = nu().bronnen?.find((b) => b.naam === "meta");
+    assert(grens !== null && grens > monthsAgo(36).slice(0, 7), `voorwaarde: de tweede pagina faalde, de laadgrens schoof op (kreeg ${grens})`);
+    assert(!!bron && bronStart(bron).start === grens, `de eerste maand met data is de laadgrens, geen halve maand ervoor (kreeg start ${bron ? bronStart(bron).start : "-"}, grens ${grens})`);
+    root.unmount();
+
+    // De Meta-tab: één bron, dus de zin zonder kanaalnaam.
+    faaltVerzoek.set("meta_account_daily", 2);
+    const losRoot = createRoot(doc.createElement() as unknown as Element);
+    for (const k of Object.keys(verzoeken)) delete verzoeken[k];
+    wachtend = []; laatst = null;
+    function MetaKpi() { laatst = useChannelPeriodData({ clientId: "t", channel: "meta", googleData: google }); return null; }
+    losRoot.render(createElement(MetaKpi));
+    await rust();
+    await beantwoordAlles();
+    const html = band({ data: nu().data, bronnen: nu().bronnen }, stand).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    assert(!html.includes("halverwege"), `de band noemt de laadfout geen start "halverwege" (kreeg "${(html.match(/[^.]*halverwege[^.]*\./) ?? [""])[0]}")`);
+    assert(html.includes(`de band laadt vanaf ${formatMonth(grens!)}`), `de band zegt vanaf waar hij geladen heeft (kreeg "${html.slice(0, 700)}")`);
+    losRoot.unmount();
+    faaltVerzoek.delete("meta_account_daily");
+    RIJEN.meta_account_daily = eerder;
   }
 
   // ── 5. Zelfde diagnose, ander blok: de bronnen van KanaalHealthRanking ──────────────────

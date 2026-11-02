@@ -274,6 +274,35 @@ const dagen = (van: string, tot: string, perMaand: (maand: string) => number, sp
   assert(w5 !== undefined && w5 !== null && Math.round(w5) === 3, `aflopende rijen: W5 van juli is 29-31 juli, 3 dagen (kreeg ${w5})`);
 }
 
+// ── Een maand met een lege week: elke week op zijn eigen plek ──
+//
+// De forecast leest de weken op POSITIE (weeks[w] is W(w+1)), maar aggregateByYear maakte alleen
+// emmers voor dagen met rijen. Meta begon op 13 maart: maart had [wk2..wk5], en dan stonden de
+// cijfers van 13-14 maart onder "W1 Mrt", die van 29-31 maart onder W4, en ontbrak W5. Op de demo
+// zette de beursstrip zo 23 gerealiseerde conversies in de week vóór de start.
+{
+  const meta = dagen("2026-03-13", "2026-04-19", () => 31, 10).map((r) => ({ ...r, conv: 1, spend: 10, revenue: 100 }));
+  const f = buildChannelForecast("c1", [...meta].reverse(), [], "meta_ads", "2026-04-20", "2026-04-19");
+  const maart = f?.forecast.conversions.weeklyPoints.filter((w) => w.month === 3).map((w) => `${w.label}=${w.realized === null ? "-" : Math.round(w.realized)}`).join(" ");
+  assert(maart === "W1 Mrt=0 W2 Mrt=2 W3 Mrt=7 W4 Mrt=7 W5 Mrt=3",
+    `start op 13 maart: W1 leeg, 13-14 maart in W2, 29-31 maart in W5 (kreeg ${maart})`);
+  const weken = f?.data.currentYearData[2]?.weeks.map((w) => w.week).join(",");
+  assert(weken === "1,2,3,4,5", `start op 13 maart: maart heeft al zijn vijf weken (kreeg ${weken})`);
+  assert(f?.data.currentYearData[2]?.conversions === 19, `het maandtotaal blijft 19 (kreeg ${f?.data.currentYearData[2]?.conversions})`);
+
+  // En een gestarte maand in de HISTORIE is geen weekpatroon. Microsoft begon op 23 juli 2025; met
+  // alleen [wk4, wk5] in die juli kreeg de juli-prognose van 2026 twee weken (W1 en W2, op de vorm
+  // van 22-28 en 29-31 juli), en met die weken opgevuld met nullen kregen de eerste drie weken een
+  // prognose van nul. Het kanaal liep toen nog niet: dan de gelijke verdeling.
+  const ms = dagen("2025-07-23", "2026-05-31", () => 31, 10).map((r) => ({ ...r, conv: 1, spend: 10, revenue: 100 }));
+  const fm = buildChannelForecast("c1", [...ms].reverse(), [], "microsoft_ads", "2026-06-15", "2026-05-31");
+  const juli = fm?.forecast.conversions.weeklyPoints.filter((w) => w.month === 7) ?? [];
+  assert(juli.length === 5, `juli 2026 heeft vijf prognoseweken (kreeg ${juli.length}: ${juli.map((w) => w.label).join(", ")})`);
+  const fc = juli.map((w) => w.forecast ?? 0), ex = juli.map((w) => w.expected);
+  assert(fc.every((x) => x > 0) && Math.max(...fc) - Math.min(...fc) <= 1, `de juli-prognose gelijk over de weken, geen nulweken (kreeg ${fc.join("/")})`);
+  assert(Math.max(...ex) - Math.min(...ex) <= 1, `de juli-verwachting ook (kreeg ${ex.join("/")})`);
+}
+
 // Zonder doel: computeForecast valt terug op het historisch totaal (zelfde gedrag als Google).
 const withoutTarget = buildChannelForecast("c1", rows, [], "meta_ads", "2026-08-23");
 assert(withoutTarget !== null, "forecast zonder doelen levert nog steeds data op");

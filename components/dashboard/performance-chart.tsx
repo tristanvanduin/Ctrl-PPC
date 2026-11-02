@@ -18,6 +18,7 @@ import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
 import { METRIC_LABELS } from "@/lib/forecast-format";
+import { jaardoelTekst } from "@/lib/analysis/standaard-jaardoel";
 
 function formatYAxis(metric: ForecastMetric) {
   if (metric === "revenue") {
@@ -78,6 +79,11 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
   const setMetric = onMetricChange ?? setInternalMetric;
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [showYoY, setShowYoY] = useState(false);
+  // Het budgetadvies rekent op het conversiedoel. Of dat een schatting is, zegt de herkomst (die op
+  // "Alle kanalen" uit de optelling komt); hier stond altijd "het geschatte jaardoel ... er is nog
+  // geen doel ingevoerd", ook naast een doel uit Instellingen.
+  // Met alleen een omzetdoel: "nog geen conversiedoel ingevoerd" (ander), niet "nog geen doel".
+  const conversieDoel = jaardoelTekst(forecast.doelHerkomst?.conversions, { lidwoord: true, lang: true, ander: forecast.doelHerkomst?.revenue });
   const { theme } = useBrandTheme();
 
   const result = forecast[metric];
@@ -201,7 +207,7 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
               ? `Verhoog maandelijks budget met ${Math.round(forecast.budgetRecommendation.spendIncreasePct)}% `
               : ""}
             naar {new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(forecast.budgetRecommendation.requiredMonthlySpend)}/maand
-            om het geschatte jaardoel te halen (vorig jaar +10%; er is nog geen doel ingevoerd).
+            om {conversieDoel.naam} te halen{conversieDoel.toelichting ? ` (${conversieDoel.toelichting})` : ""}.
           </p>
         </div>
       )}

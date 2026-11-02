@@ -136,7 +136,12 @@ async function main() {
       rapport.includes("geen conversies YTD, dus geen CPA") && !rapport.includes("Huidige CPA") && /Gerekend met het CPA-doel\*\* \(nog geen conversies YTD\): € 20/.test(rapport),
       naNa(rapport, "Budget Aanbeveling", 300));
     const inzicht = tekst(React.createElement(InsightsBlock, { clientId: "t" }));
-    check("inzichten: niet 'Bij huidige CPA van € 20'", !/huidige CPA van € 20/.test(inzicht) && /het CPA-doel van € 20/.test(inzicht), naNa(inzicht, "Om het jaardoel", 200));
+    // Hier stond ook "en wel 'het CPA-doel van € 20'". Na zeven maanden kosten zonder één conversie
+    // geeft het budgetblok geen budget meer op een CPA (zie [10b]): het tekort blijft staan, het
+    // budget wacht op de conversiemeting. Het rapport en de DGM noemen het CPA-doel nog wel.
+    check("inzichten: niet 'Bij huidige CPA van € 20'", !/huidige CPA van € 20/.test(inzicht), naNa(inzicht, "Om het jaardoel", 200));
+    check("inzichten: het tekort, en het budget pas na de conversiemeting", /Om het jaardoel te halen zijn nog [\d.]+ conversies nodig/.test(inzicht) && /pas te berekenen als de conversiemeting klopt/.test(inzicht),
+      naNa(inzicht, "Om het jaardoel", 260));
     const dgm = tekst(React.createElement(DgmView, { clientId: "t" }));
     check("DGM: niet 'bij huidige CPA van € 20'", !/huidige CPA van € 20/.test(dgm), (dgm.match(/[^.]*huidige CPA[^.]*\./) ?? [""])[0]);
     // Met conversies YTD blijft het de huidige CPA.
@@ -162,6 +167,56 @@ async function main() {
     zet(G0);
     const echt = tekst(React.createElement(InsightsBlock, { clientId: "t" }));
     check("zonder julimaand: 'CPA daalt' blijft", echt.includes("CPA daalt"), naNa(echt, "Efficiency", 200));
+    open = false;
+  });
+
+  await deel("[10b] Geen budgetadvies op de CPA naast 'controleer eerst de conversiemeting'", async () => {
+    // De waarschuwing zegt "verhoog of verschuif geen budget op basis van de CPA tot dat duidelijk
+    // is"; ernaast stond "Verhoog het maandbudget … Bij de huidige CPA van € 25 levert dit 48 extra
+    // conversies", een target CPA, "vereist dit € 5.895 extra budget" en een taak voor een
+    // budget-voorstel. Dat advies rekent met een CPA die een maand zonder één gemeten conversie bevat.
+    const { TasksBlock } = await import("../components/insights/tasks-block");
+    const budgetAdvies = (adv: string, inzicht: string, taken: string) => ({
+      verhoog: adv.includes("Verhoog het maandbudget"),
+      targetCpa: /target CPA van €/.test(adv),
+      vereist: /vereist dit € [\d.]+ extra budget/.test(inzicht),
+      budgetProbleem: inzicht.includes("het budget is het probleem") || inzicht.includes("Als budget wordt opgeschaald naar plan"),
+      voorstel: taken.includes("budget-voorstel"),
+    });
+    open = true;
+    zet(G);
+    const g = budgetAdvies(tekst(React.createElement(RecommendationsBlock, { clientId: "t" })), tekst(React.createElement(InsightsBlock, { clientId: "t" })), tekst(React.createElement(TasksBlock, { clientId: "t" })));
+    check("met de julimaand zonder conversies: geen 'Verhoog het maandbudget'", !g.verhoog);
+    check("met de julimaand: geen target CPA van € …", !g.targetCpa);
+    check("met de julimaand: geen 'vereist dit … extra budget'", !g.vereist);
+    check("met de julimaand: niet 'het budget is het probleem'", !g.budgetProbleem);
+    check("met de julimaand: geen taak 'budget-voorstel'", !g.voorstel);
+    const taken = tekst(React.createElement(TasksBlock, { clientId: "t" }));
+    check("met de julimaand: wel een taak om de conversiemeting te controleren", /conversiemeting/.test(taken), naNa(taken, "Budget", 200));
+    const inzicht = tekst(React.createElement(InsightsBlock, { clientId: "t" }));
+    check("met de julimaand: het tekort aan conversies blijft genoemd", /Om het jaardoel te halen zijn nog [\d.]+ conversies nodig/.test(inzicht), naNa(inzicht, "Om het jaardoel", 300));
+    zet(G0);
+    const g0 = budgetAdvies(tekst(React.createElement(RecommendationsBlock, { clientId: "t" })), tekst(React.createElement(InsightsBlock, { clientId: "t" })), tekst(React.createElement(TasksBlock, { clientId: "t" })));
+    check("zonder julimaand: het budgetadvies blijft", g0.verhoog && g0.vereist && g0.voorstel, JSON.stringify(g0));
+    // De target CPA staat bij een grotere achterstand (Biedstrategie, conversies > 15% achter): in G
+    // wel, zonder juli niet. Daarom hier apart: G zonder de julimaand-regel zou hem tonen.
+    check("voorwaarde: G is meer dan 15% achter (dan staat de Biedstrategie er)", fc.computeForecast(G).conversions.kpi.diffPct < -15);
+    // Met minder spend (€ 1.500 per maand, 31% onder het doel) zei het spendblok "het budget is het
+    // probleem" en "Als budget wordt opgeschaald naar plan, herstelt de prognose": ook een
+    // budgetadvies op een efficiency met een maand zonder één conversie erin.
+    const laag = (zonderJuli: boolean): ClientHistoricalData => ({
+      ...G,
+      currentYearData: jaar([...[70, 80, 90, 100, 110, 120].map((c, i) => rec(i + 1, wk(i + 1, [c / 4, c / 4, c / 4, c / 4], [375, 375, 375, 375], [c * 25, c * 25, c * 25, c * 25]))),
+        ...(zonderJuli ? [] : [rec(7, wk(7, [0, 0, 0, 0], [375, 375, 375, 375], [0, 0, 0, 0]))])]),
+    });
+    zet(laag(false));
+    const laagMet = tekst(React.createElement(InsightsBlock, { clientId: "t" }));
+    check("minder spend, met de julimaand: niet 'het budget is het probleem' of 'opgeschaald naar plan'",
+      !laagMet.includes("het budget is het probleem") && !laagMet.includes("Als budget wordt opgeschaald naar plan"), naNa(laagMet, "Ad spend ligt", 300));
+    check("minder spend, met de julimaand: de spend onder het doel blijft genoemd", /Ad spend ligt [^ ]+ onder target/.test(laagMet), naNa(laagMet, "Ad spend", 120));
+    zet(laag(true));
+    const laagZonder = tekst(React.createElement(InsightsBlock, { clientId: "t" }));
+    check("minder spend, zonder julimaand: 'het budget is het probleem' blijft", laagZonder.includes("het budget is het probleem"), naNa(laagZonder, "Ad spend ligt", 300));
     open = false;
   });
 

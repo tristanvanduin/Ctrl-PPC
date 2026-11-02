@@ -22,11 +22,12 @@
  * lijn, dan zit je piek nog voor je; loopt hij achter, dan heb je hem gehad. Dat is stuurbare
  * informatie, en het is precies wat een rechte lijn verzwijgt.
  *
- * ── HET DOEL IS NOG STEEDS GESCHAT ──────────────────────────────────────────
+ * ── WAT VOOR DOEL HET IS, ZEGT DE AANROEPER ─────────────────────────────────
  *
- * Het percentage rekent tegen conv.annualTarget, en dat is vorig jaar x 1,10 uit
- * app/api/google-ads/client-data/route.ts -- er is nog geen scherm om een doel in te voeren. De
- * aanroeper hoort dat erbij te zetten; hier komt het als getal binnen en gaat het als getal weer
+ * Het percentage rekent tegen conv.annualTarget. Dat is een doel uit Instellingen, of zonder dat het
+ * standaarddoel (vorig jaar x 1,10 uit app/api/google-ads/client-data/route.ts). Welk van de twee
+ * staat in forecast.doelHerkomst; de aanroeper zet het erbij (jaardoelTekst in
+ * lib/analysis/standaard-jaardoel.ts). Hier komt het als getal binnen en gaat het als getal weer
  * naar buiten.
  */
 

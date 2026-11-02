@@ -183,6 +183,36 @@ async function main() {
       r?.forecast.conversions.kpi.annualTarget === 5000,
       String(r?.forecast.conversions.kpi.annualTarget));
   }
+
+  // ── De herkomst van het jaardoel ─────────────────────────────────────────
+  //
+  // Dit pad (de kanaalbadges, KanaalHealthRanking, Code Rood in de cron) gaf alleen het getal mee.
+  // Elke health score erop zei dan "geschat jaardoel (vorig jaar +10%; er is nog geen doel
+  // ingevoerd)", ook bij de 2.600 die in Instellingen staat, terwijl de Google-tab op hetzelfde
+  // getal "Jaardoel in gevaar" zei. De herkomst volgt precies de keuze van het getal.
+  console.log("\nDe herkomst van het jaardoel");
+  {
+    const { computeHealthScore } = await import("../health-score");
+    const metKpi = async (kpi: unknown) => computeAnalysisTargets(mockSupabase({
+      ads_account_monthly: maanden(), ads_account_weekly: [], client_settings: [{ kpi_targets: kpi }],
+    }), "x");
+    const gevaar = (r: Awaited<ReturnType<typeof metKpi>>) => r ? computeHealthScore(r.forecast).anomalies.find((a) => /jaardoel in gevaar/i.test(a.title)) : undefined;
+
+    const vast = await metKpi({ conversionsAbsolute: 2600 });
+    check("2.600 vast ingevoerd: herkomst conversies 'absoluut'", vast?.forecast.doelHerkomst?.conversions.soort === "absoluut", JSON.stringify(vast?.forecast.doelHerkomst));
+    check("2.600 vast ingevoerd: omzet zonder doel blijft 'standaard'", vast?.forecast.doelHerkomst?.revenue.soort === "standaard", JSON.stringify(vast?.forecast.doelHerkomst));
+    check("2.600 vast ingevoerd: 'Jaardoel in gevaar', zonder 'geschat' en zonder 'nog geen doel ingevoerd'",
+      gevaar(vast)?.title === "Jaardoel in gevaar" && !/geschat|nog geen doel/.test(gevaar(vast)?.description ?? ""), JSON.stringify(gevaar(vast)));
+
+    const omzet = await metKpi({ revenueAbsolute: 900000 });
+    check("omzetdoel vast ingevoerd: herkomst omzet 'absoluut'", omzet?.forecast.doelHerkomst?.revenue.soort === "absoluut", JSON.stringify(omzet?.forecast.doelHerkomst));
+
+    for (const [label, kpi] of [["kpi_targets null", null], ["kpi_targets leeg", {}]] as const) {
+      const r = await metKpi(kpi);
+      check(`${label}: herkomst 'standaard'`, r?.forecast.doelHerkomst?.conversions.soort === "standaard", JSON.stringify(r?.forecast.doelHerkomst));
+      check(`${label}: het getal blijft vorig jaar +10% (264)`, r?.forecast.conversions.kpi.annualTarget === 264, String(r?.forecast.conversions.kpi.annualTarget));
+    }
+  }
 }
 
 main().then(() => {

@@ -99,9 +99,10 @@ console.log("De tab en \"Alle kanalen\" geven een kanaal hetzelfde jaar, ook als
     return [...per.values()];
   };
   const google = (tot: string) => ({ kanaal: "google" as const, vanaf: null, maanden: monthsIn({ start: "2025-01", end: tot }).map((month) => ({ month, conversions: 100, revenue: 0, adSpend: 1000 })) });
-  const deelInSom = (kanaal: "meta" | "linkedin", r: ChannelForecastRow[], stand: Stand, rtm: number, grens: boolean) => {
+  // Google loopt t/m de maand van zijn eigen dag in de stand (anders noemt de stop hem gestopt).
+  const deelInSom = (kanaal: "meta" | "linkedin", r: ChannelForecastRow[], stand: Stand, rtm: number, grens: boolean, googleTot?: string) => {
     const k = { kanaal, vanaf: eersteVolleMaand(r[0].date), eersteDag: r[0].date, maanden: maanden(r) };
-    const g = google(rtm >= 10 ? "2026-10" : "2026-09");
+    const g = google(googleTot ?? (rtm >= 10 ? "2026-10" : "2026-09"));
     const samen = buildClientDataFromApi("c", [], [], [], geenDoel, 2026, rtm);
     const grenzen = grens && eigenGrenzen ? eigenGrenzen(stand.bronnen, 2026, NU) : {};
     const totaal = (som.blendedForecastUitKanalen as (...a: unknown[]) => ReturnType<typeof som.blendedForecastUitKanalen>)("c", [g, k], samen, rtm, stand.uitgesloten, grenzen);
@@ -162,6 +163,33 @@ console.log("De tab en \"Alle kanalen\" geven een kanaal hetzelfde jaar, ook als
     `${jaar(opTab(meta, standG, "meta"))} / ${deelInSom("meta", meta, standG, 9, true)}`);
   // Zonder eigen grenzen (een route zonder bronnen) beslist de som op de gezamenlijke grens.
   check("zonder eigen grenzen: zoals voorheen (701)", deelInSom("meta", meta, standG, 9, false) === 701, String(deelInSom("meta", meta, standG, 9, false)));
+
+  // H. De eigen grens TWEE maanden vóór de gezamenlijke. LinkedIn's token verliep: laatste rij 12
+  // september, 50 dagen achter, dus hij remt nog en de gezamenlijke grens is augustus. Meta pauzeerde
+  // op 20 september met een gezonde sync (eigen grens oktober). De som besliste de stop op oktober
+  // en zette daarna elke prognosemaand op nul, ook september: een maand die Meta's eigen sync mat
+  // (40). De tab zei 526 met september 40, de som 486 met september 0.
+  const standH: Stand = { dataTot: "2026-09-12", uitgesloten: [], bronnen: [{ bron: "google", dataTot: "2026-10-31", syncDraait: false }, { bron: "meta", dataTot: "2026-10-31", syncDraait: true }, { bron: "linkedin", dataTot: "2026-09-12", syncDraait: false }] };
+  const tabH = opTab(meta, standH, "meta");
+  check("eigen grens twee maanden vóór: de tab is 526, september gemeten 40", jaar(tabH) === 526 && tabH?.forecast.conversions.points[8].realized === 40,
+    `${jaar(tabH)} ${JSON.stringify(tabH?.forecast.conversions.points[8])}`);
+  check("eigen grens twee maanden vóór: tab gelijk aan de som (526)", deelInSom("meta", meta, standH, 8, true, "2026-10") === 526, String(deelInSom("meta", meta, standH, 8, true, "2026-10")));
+  {
+    const k = { kanaal: "meta" as const, vanaf: eersteVolleMaand(meta[0].date), eersteDag: meta[0].date, maanden: maanden(meta) };
+    const g = google("2026-10");
+    const met = som.blendedForecastUitKanalen("c", [g, k], buildClientDataFromApi("c", [], [], [], geenDoel, 2026, 8), 8, [], eigenGrenzen?.(standH.bronnen, 2026, NU) ?? {});
+    const alleen = computeForecast(som.kanaalHistorieUitMaanden("c", g, 2026, 8));
+    const deel = (r: "conversions" | "adSpend", i: number) => Math.round((met[r].points[i].forecast ?? 0) - (alleen[r].points[i].forecast ?? 0));
+    check("eigen grens twee maanden vóór: in de som is Meta's september de gemeten 40, oktober-december 0",
+      deel("conversions", 8) === 40 && [9, 10, 11].every((i) => deel("conversions", i) === 0), JSON.stringify([8, 9, 10, 11].map((i) => deel("conversions", i))));
+    check("eigen grens twee maanden vóór: spend ook (september 200)", deel("adSpend", 8) === 200, String(deel("adSpend", 8)));
+    const sepWeken = met.conversions.weeklyPoints.filter((w) => w.month === 9).reduce((s, w) => s + (w.forecast ?? 0), 0);
+    check("en de weken van september tellen op tot de maand", Math.abs(sepWeken - (met.conversions.points[8].forecast ?? 0)) <= 2, `${sepWeken} / ${met.conversions.points[8].forecast}`);
+  }
+  // Een kanaal in uitgesloten blijft na zijn laatste dag nul t/m de gezamenlijke grens, ook met een
+  // eigen grens verder: dat is de zin die de band erbij zet.
+  const standHuit: Stand = { ...standH, uitgesloten: ["meta"] };
+  check("in uitgesloten: geen gemeten maanden na de gezamenlijke grens (486)", deelInSom("meta", meta, standHuit, 8, true, "2026-10") === 486, String(deelInSom("meta", meta, standHuit, 8, true, "2026-10")));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} mislukt`);

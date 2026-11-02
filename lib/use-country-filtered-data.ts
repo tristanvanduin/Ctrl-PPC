@@ -124,6 +124,9 @@ export function landGefilterdeData(
     historicalYears,
     currentYearData,
     conversionOverrides: fullData.conversionOverrides,
+    // Het landdeel van hetzelfde doel, dus dezelfde herkomst: zonder dit veld zei de pacing met een
+    // landfilter "geschat jaardoel" naast een doel uit Instellingen.
+    ...(fullData.doelHerkomst ? { doelHerkomst: fullData.doelHerkomst } : {}),
     // Tot waar de data van het account loopt geldt ook voor één land: dezelfde sync. Zonder dit
     // veld zei de "huidige" maandkaart met een landfilter "Nog niet binnen" voor een maand die
     // voor 25 van de 31 dagen binnen is, terwijl de tak zonder landrijen hierboven hem wel hield.

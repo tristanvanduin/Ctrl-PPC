@@ -17,8 +17,11 @@
  * voor Code Rood/Amber zou de twee systemen alsnog door elkaar heen bouwen voordat Code Oranje
  * er is. Alleen "critical" telt mee: dat zijn op dit moment precies twee gevallen, allebei
  * inhoudelijk churn-relevant --
- *   - "Geschat jaardoel in gevaar" (prognose < 50% van het jaardoel)
- *   - "Sterke neerwaartse trend" (prestatiefactor EN laatste maand allebei < 80% van verwachting)
+ *   - "Jaardoel in gevaar" of "Geschat jaardoel in gevaar" (prognose < 50% van het jaardoel; het
+ *     woord "geschat" alleen zonder ingevoerd doel)
+ *   - "Sterk achter op verwachting" (prestatiefactor EN laatste maand allebei < 80% van een
+ *     verwachting die het jaardoel volgt; heette "Sterke neerwaartse trend", wat het niet meet)
+ * Hieronder telt de ernst, niet de titel: een andere titel verandert het licht niet.
  * -- en dus horen bij dezelfde orde van grootte als "alle hands on deck", niet bij "wees alert".
  *
  * ── DE COMBINATIE ────────────────────────────────────────────────────────────────────────────

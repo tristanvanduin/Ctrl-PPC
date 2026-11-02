@@ -32,6 +32,7 @@ import {
   ClientHistoricalData,
   MonthlyRecord,
   WeeklyRecord,
+  type DoelHerkomstPerMetric,
 } from "./types";
 import { median, medianAbsoluteDeviation } from "@/lib/util/stats";
 import { safeDiv } from "@/lib/util/math";
@@ -179,6 +180,12 @@ export interface ClientForecast {
   budgetRecommendation: BudgetRecommendation;
   /** Data maturity analysis — exposes whether this is a scaling/limited-data client */
   dataMaturity: DataMaturity;
+  /**
+   * Waar het jaardoel vandaan komt (ClientHistoricalData.doelHerkomst), meegegeven zodat de schermen
+   * die alleen de prognose krijgen (health score, pacing, grafiek, rapport) "jaardoel" of "geschat
+   * jaardoel" kunnen zeggen. Ontbreekt hij, dan de schatting, zoals voorheen.
+   */
+  doelHerkomst?: DoelHerkomstPerMetric;
 }
 
 export const ALLE_FORECAST_METRICS: readonly ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"];
@@ -797,9 +804,16 @@ function computeWeeklyDistribution(
   metric: CoreMetric
 ): number[] {
   // Use most recent year with data for this month's weekly pattern
+  //
+  // Behalve een maand met een week zonder enige levering (geen kosten, geen conversies, geen
+  // omzet): daar liep het kanaal nog niet, of het lag stil, en dat is geen weekpatroon. De kanaaltabs
+  // geven elke maand al zijn weken (aggregateByYear), ook de lege; Microsoft begon op 23 juli 2025,
+  // en met die juli als vorm kregen de eerste drie weken van juli 2026 een prognose van nul. Zo'n
+  // maand valt terug op een ouder jaar, of op de gelijke verdeling hieronder.
+  const zonderLevering = (w: WeeklyRecord) => !(w.adSpend > 0) && !(w.conversions > 0) && !(w.revenue > 0);
   for (let yi = years.length - 1; yi >= 0; yi--) {
     const month = years[yi][monthIdx];
-    if (month && month[metric] > 0 && month.weeks.length > 0) {
+    if (month && month[metric] > 0 && month.weeks.length > 0 && !month.weeks.some(zonderLevering)) {
       const total = month.weeks.reduce((s, w) => s + w[metric], 0);
       if (total > 0) {
         return month.weeks.map((w) => w[metric] / total);
@@ -1426,5 +1440,7 @@ export function computeForecast(data: ClientHistoricalData): ClientForecast {
     cpa: cpaResult,
     budgetRecommendation,
     dataMaturity: maturity,
+    // Alleen als hij er is: een prognose zonder herkomst blijft hetzelfde object als voorheen.
+    ...(data.doelHerkomst ? { doelHerkomst: data.doelHerkomst } : {}),
   };
 }

@@ -10,7 +10,7 @@ import { supabase, type KpiSnapshot } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
 import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
-import { cpaTrendFrom } from "@/lib/analysis/trend";
+import { cpaTrendVanForecast } from "@/lib/analysis/trend";
 import { BRAND_NAME } from "@/lib/branding/brand";
 import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
 
@@ -95,14 +95,26 @@ function generateDynamicTasks(forecast: ClientForecast): Task[] {
   const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
   const lastCpa = cpaPoints[cpaPoints.length - 1]?.realized ?? 0;
 
+  // De CPA-trend met de maanden zonder conversies, dezelfde als in de inzichten en aanbevelingen
+  // (lib/analysis/trend.ts). Hier stond cpaTrendFrom op alleen de maanden met een CPA: een maand
+  // met kosten en geen conversie viel weg, en dan gaf deze lijst een budget-voorstel "onderbouwd met
+  // de huidige CPA" terwijl de inzichten ernaast "controleer eerst de conversiemeting … voordat je
+  // budget verschuift" zeiden.
+  const cpaT = cpaTrendVanForecast(forecast);
+
   // ── Budget taken ──
 
   if (budget.behindTarget && budget.extraSpendNeeded > 0) {
     idx++;
-    tasks.push({
-      id: `dyn-${idx}`, step: "Budget", dynamic: true, done: false,
-      text: `Bereid budget-voorstel voor klant voor: verhoog naar ${fmt(budget.requiredMonthlySpend)}/maand (+${Math.round(budget.spendIncreasePct)}%). Onderbouw met ${budgetCpaNaam(budget)} van ${fmt(budget.currentCpa)}${budget.cpaUitDoel ? " (nog geen conversies YTD)" : ""}.`,
-    });
+    tasks.push(cpaT.zonderConversies.length > 0
+      ? {
+        id: `dyn-${idx}`, step: "Budget", dynamic: true, done: false,
+        text: `Controleer eerst de conversiemeting (tag, import, attributie): in ${cpaT.zonderConversies.join(", ")} waren er kosten zonder één conversie. Een budget-onderbouwing op de CPA wacht tot dat duidelijk is.`,
+      }
+      : {
+        id: `dyn-${idx}`, step: "Budget", dynamic: true, done: false,
+        text: `Bereid budget-voorstel voor klant voor: verhoog naar ${fmt(budget.requiredMonthlySpend)}/maand (+${Math.round(budget.spendIncreasePct)}%). Onderbouw met ${budgetCpaNaam(budget)} van ${fmt(budget.currentCpa)}${budget.cpaUitDoel ? " (nog geen conversies YTD)" : ""}.`,
+      });
   }
 
   if (spendDiff < -10) {
@@ -155,7 +167,7 @@ function generateDynamicTasks(forecast: ClientForecast): Task[] {
 
   if (lastCpa > 0 && cpaPoints.length >= 2) {
     // Gedeelde berekening en drempels; zie lib/analysis/trend.ts.
-    const t = cpaTrendFrom(cpaPoints);
+    const t = cpaT;
     const cpaTrend = t.pct ?? 0;
 
     if (t.stijgt) {

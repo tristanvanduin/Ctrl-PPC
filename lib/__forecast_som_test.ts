@@ -19,6 +19,9 @@ import type { BlendedKanaalReeks } from "./api/blended-historical";
 import type { ClientAnnualData, ClientHistoricalData } from "./types";
 import { monthsIn } from "./period/period-range";
 import * as kanaalMaanden from "./period/kanaal-maanden";
+import { eersteVolleMaand } from "./period/kanaal-maanden";
+import { buildChannelForecast, type ChannelForecastRow } from "./analysis/channel-forecast-data";
+import { addDays } from "./reporting-date";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -368,6 +371,34 @@ if (typeof blendedForecastUitKanalen === "function") {
   const aprSepUit = reeks("linkedin", "2024-01", [...rijen("2024-01", "2024-03", 50), ...rijen("2024-10", "2025-03", 50), ...rijen("2025-10", "2026-03", 50)]);
   check("april-september elk jaar uit: op grens 8 een pauze, geen stop", som.kanaalGestopt(aprSepUit.maanden, 2026, 8) === false);
 
+  // Een OUDE historie is geen seizoen. Microsoft liep 80 per maand in 2023 tot het voorjaar van
+  // 2024, kwam op 1 november 2025 terug en ligt sinds 31 maart 2026 stil. "Vorig jaar vóór het gat
+  // al gelopen" keek naar elke maand op of vóór dezelfde maand vorig jaar, ook 2023: dan was de stop
+  // een seizoenspauze, en kreeg een kanaal dat zeven maanden niets deed november-december 80 erbij
+  // (op "Alle kanalen" 1.600 waar 1.440 hoort). Zonder de oude historie gaf hij wél "gestopt": meer
+  // historie gaf weer een andere uitkomst. Drie eindes van die historie, zodat een regel die alleen
+  // op de rand klopt niet slaagt.
+  for (const [label, oud] of [
+    ["oude historie t/m maart 2024", rijen("2023-01", "2024-03", 80)],
+    ["oude historie t/m april 2024", rijen("2023-01", "2024-04", 80)],
+    ["oude historie juni 2023 - september 2024", rijen("2023-06", "2024-09", 80)],
+  ] as const) {
+    const ms = reeks("microsoft", "2023-01", [...oud, ...rijen("2025-11", "2026-03", 80)]);
+    check(`${label}: gestopt`, som.kanaalGestopt(ms.maanden, 2026, 10) === true);
+    const g = vlak("google", "2023-01", "2026-10", 100);
+    const f = blendedForecastUitKanalen("t", [g, ms], optelling([g, ms], 2026, 10), 10);
+    check(`${label}: november-december alleen Google, het jaar 1.200 + 240`, jaarDeel(f, 10).every((v) => v === 100) && f.conversions.kpi.adjustedAnnual === 1440,
+      `${JSON.stringify(jaarDeel(f, 10))} ${f.conversions.kpi.adjustedAnnual}`);
+  }
+  // En de echte seizoenen blijven een pauze, ook als het einde van het seizoen verschuift.
+  for (const [label, r] of [
+    ["november-maart elk jaar sinds 2023", [...rijen("2023-11", "2024-03", 80), ...rijen("2024-11", "2025-03", 80), ...rijen("2025-11", "2026-03", 80)]],
+    ["vorig jaar november-januari, dit jaar november-maart", [...rijen("2023-11", "2024-01", 80), ...rijen("2024-11", "2025-01", 80), ...rijen("2025-11", "2026-03", 80)]],
+    ["vorig jaar november-februari, dit jaar november-maart", [...rijen("2023-11", "2024-02", 80), ...rijen("2024-11", "2025-02", 80), ...rijen("2025-11", "2026-03", 80)]],
+  ] as const) {
+    check(`seizoen ${label}: op grens 10 een pauze`, som.kanaalGestopt(reeks("microsoft", "2023-11", [...r]).maanden, 2026, 10) === false);
+  }
+
   // Een herstart na een oude historie is een deeljaar. Microsoft liep 80 per maand in 2023 en tot
   // maart 2024, lag stil, en draait sinds oktober (of december) 2025 weer. `vanaf` is de eerste
   // volle maand OOIT (2023-01), dus telde 2025 als "het hele jaar gelopen": doel drie maanden x 1,1,
@@ -429,6 +460,89 @@ if (typeof blendedForecastUitKanalen === "function") {
   }
   check("heel vorig jaar gelopen: vorig jaar + 10% (1.056)", heelJaar.targetCurrentYear.conversions === 1056 && heelJaar.doelOpJaarbasis === undefined,
     `${heelJaar.targetCurrentYear.conversions} ${heelJaar.doelOpJaarbasis}`);
+}
+
+// ── Een seizoenskanaal dat in januari en december NIET loopt ────────────────────────────────
+// De herstartregel (vorig jaar telt alleen als heel jaar als het kanaal in zijn januari én zijn
+// december liep) maakte van een zomerkanaal (april-september, elk jaar) een deeljaar. Het kreeg dan
+// zijn zes maanden op jaarbasis als doel (600 x 12 / 6 = 1.200), en doelOpJaarbasis vulde zijn lege
+// maanden met het gemiddelde: "Alle kanalen" projecteerde januari-maart en oktober-december, maanden
+// waarin het nooit liep (+540 in januari), terwijl zijn eigen tab vorig jaar +10% gaf (660). Een
+// terugkerend seizoen is een heel jaar; een herstart na een oude historie blijft een deeljaar.
+console.log("Een seizoenskanaal (april-september) op \"Alle kanalen\" en op zijn tab");
+{
+  const dagRijen = (van: string, tot: string, perMaand: number, actief: (m: number) => boolean): ChannelForecastRow[] => {
+    const uit: ChannelForecastRow[] = [];
+    for (let d = van; d <= tot; d = addDays(d, 1)) {
+      const m = Number(d.slice(5, 7));
+      if (!actief(m)) continue;
+      const c = perMaand / new Date(Date.UTC(Number(d.slice(0, 4)), m, 0)).getUTCDate();
+      uit.push({ date: d, conv: c, revenue: c * 100, spend: c * 10 });
+    }
+    return uit;
+  };
+  // De reeks zoals de route hem per kanaal bouwt: maandtotalen, de eerste volle maand, de eerste dag
+  // van de huidige loop.
+  const alsReeks = (kanaal: BlendedKanaalReeks["kanaal"], r: ChannelForecastRow[]): BlendedKanaalReeks => {
+    const per = new Map<string, { month: string; conversions: number; revenue: number; adSpend: number }>();
+    for (const x of r) {
+      const m = per.get(x.date.slice(0, 7)) ?? { month: x.date.slice(0, 7), conversions: 0, revenue: 0, adSpend: 0 };
+      m.conversions += x.conv; m.revenue += x.revenue; m.adSpend += x.spend;
+      per.set(m.month, m);
+    }
+    const dagen = r.map((x) => x.date).sort();
+    return { kanaal, vanaf: kanaal === "google" ? null : eersteVolleMaand(dagen[0]), eersteDag: kanaal === "google" ? null : kanaalMaanden.startLaatsteLoop(dagen), maanden: [...per.values()].sort((a, b) => a.month.localeCompare(b.month)) };
+  };
+  const optellingVan = (reeksen: BlendedKanaalReeks[], jaar: number, rtm: number): ClientHistoricalData => {
+    const per = new Map<string, [number, number, number]>();
+    for (const r of reeksen) for (const m of r.maanden) {
+      const t = per.get(m.month) ?? [0, 0, 0];
+      per.set(m.month, [t[0] + m.conversions, t[1] + m.revenue, t[2] + m.adSpend]);
+    }
+    const vanJaar = (j: number) => api([...per].filter(([k]) => Number(k.slice(0, 4)) === j && (j < jaar || Number(k.slice(5)) <= rtm))
+      .map(([k, [c, r, s]]) => [Number(k.slice(5)), Math.round(c), Math.round(r), Math.round(s)]));
+    const jaren = [...new Set([...per.keys()].map((k) => Number(k.slice(0, 4))))].filter((j) => j < jaar).sort();
+    const vorig = vanJaar(jaar - 1);
+    const tot = (k: "conversions" | "revenue" | "adSpend") => vorig.reduce((s, m) => s + m[k], 0);
+    return buildClientDataFromApi("t", jaren.map((j) => ({ year: j, monthly: vanJaar(j), weekly: [] })), vanJaar(jaar), [], standaardJaardoel({ conversions: tot("conversions"), revenue: tot("revenue"), adSpend: tot("adSpend") }), jaar, rtm);
+  };
+  const lijn = (f: ClientForecast) => f.conversions.points.map((p) => p.realized ?? p.forecast ?? 0);
+  const zomer = (m: number) => m >= 4 && m <= 9;
+
+  for (const [label, start, vandaag, rtm] of [
+    ["april-september sinds 2024, in januari", "2024-04-01", "2026-01-05", 0],
+    ["april-september sinds 2024, in april", "2024-04-01", "2026-04-02", 3],
+    ["eerste seizoen juni-september 2024, in januari", "2024-06-01", "2026-01-05", 0],
+    ["eerste seizoen juni-september 2024, in april", "2024-06-01", "2026-04-02", 3],
+  ] as const) {
+    const eind = addDays(`2026-${String(rtm + 1).padStart(2, "0")}-01`, -1);
+    const gRijen = dagRijen("2024-01-01", eind, 100, () => true);
+    const zRijen = dagRijen(start, eind, 100, zomer);
+    const google = alsReeks("google", gRijen), seizoensKanaal = alsReeks("linkedin", zRijen);
+    const h = kanaalHistorieUitMaanden!("t", seizoensKanaal, 2026, rtm);
+    check(`${label}: vorig jaar telt als heel jaar (doel 660, niet op jaarbasis)`, h.targetCurrentYear.conversions === 660 && h.doelOpJaarbasis === undefined,
+      `${h.targetCurrentYear.conversions} ${h.doelOpJaarbasis}`);
+    const met = blendedForecastUitKanalen!("t", [google, seizoensKanaal], optellingVan([google, seizoensKanaal], 2026, rtm), rtm);
+    const zonder = blendedForecastUitKanalen!("t", [google], optellingVan([google], 2026, rtm), rtm);
+    const deel = lijn(met).map((x, i) => Math.round(x - lijn(zonder)[i]));
+    const tab = buildChannelForecast("t", [...zRijen].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 1000), [], "linkedin_ads", vandaag, eind);
+    const tabLijn = tab ? lijn(tab.forecast).map((x) => Math.round(x)) : [];
+    check(`${label}: geen prognose in januari-maart en oktober-december`, [0, 1, 2, 9, 10, 11].every((i) => deel[i] === 0), JSON.stringify(deel));
+    check(`${label}: het deel op "Alle kanalen" is de tab`, JSON.stringify(deel) === JSON.stringify(tabLijn), `${JSON.stringify(deel)} / ${JSON.stringify(tabLijn)}`);
+  }
+
+  // De herstartregel blijft voor wat hij bedoeld was. Een seizoenskanaal (oktober-december 2024 en
+  // 2025) dat dit jaar het hele jaar loopt, volgt zijn seizoen niet meer: vorig jaar was een
+  // deeljaar, op jaarbasis 960, en november-december 80 per maand (niet de 66 van een groeidoel op
+  // drie maanden, met de factor tegen de klem).
+  const jaarRond = alsReeks("microsoft", [...dagRijen("2024-10-01", "2025-12-31", 80, (m) => m >= 10), ...dagRijen("2026-01-01", "2026-10-31", 80, () => true)]);
+  const hRond = kanaalHistorieUitMaanden!("t", jaarRond, 2026, 10);
+  check("seizoenskanaal dat jaarrond werd: deeljaar op jaarbasis (960)", hRond.targetCurrentYear.conversions === 960 && hRond.doelOpJaarbasis === true,
+    `${hRond.targetCurrentYear.conversions} ${hRond.doelOpJaarbasis}`);
+  const gRond = alsReeks("google", dagRijen("2024-01-01", "2026-10-31", 100, () => true));
+  const fRond = blendedForecastUitKanalen!("t", [gRond, jaarRond], optellingVan([gRond, jaarRond], 2026, 10), 10);
+  check("seizoenskanaal dat jaarrond werd: november-december 100 + 80", fRond.conversions.points.slice(10).every((p) => p.forecast === 180),
+    JSON.stringify(fRond.conversions.points.slice(10).map((p) => p.forecast)));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

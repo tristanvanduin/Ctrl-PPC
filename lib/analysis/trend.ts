@@ -137,14 +137,21 @@ export function cpaTrendFrom(points: readonly TrendPunt[]): CpaTrend {
  * die het CPA-doel). Drie euro restkosten na een pauze, bij een CPA van € 20, is 0,15 verwachte
  * conversie: die gaf de health-score een cijfer lager en de tekst "slechter wordt de efficiency
  * niet", terwijl dezelfde € 3 met één conversie de beste score kreeg. Zo'n maand valt dan weg,
- * zoals een maand van 0 / 0. Zonder gewone CPA en zonder doel telt hij wel: dan is er niets om
- * hem tegen af te zetten.
+ * zoals een maand van 0 / 0.
+ *
+ * Zonder gewone CPA en zonder doel is er niets om hem tegen af te zetten. Dan telt hij pas als er
+ * minstens twee maanden met kosten zijn, het minimum dat de CPA-trend ook vraagt. Hier telde hij
+ * altijd, en dat was elk nieuw kanaal zonder client_targets: één week restkosten (€ 2,80, 0
+ * conversies) gaf een beoordeelde health van 20 en "slechter wordt de efficiency niet", dezelfde
+ * € 2,80 met één conversie "niet beoordeeld". Twee maanden kosten zonder één conversie blijven
+ * gemarkeerd.
  */
 export function cpaTrendVanForecast(forecast: Pick<ClientForecast, "cpa" | "adSpend">): CpaTrend {
   const punten = forecast.cpa.points;
   const gewoon = median(punten.filter((p) => p.realized !== null).map((p) => p.realized as number))
     ?? (forecast.cpa.kpi.annualTarget > 0 ? forecast.cpa.kpi.annualTarget : null);
+  const maandenMetKosten = punten.filter((p) => p.realized !== null || p.geenNoemer).length;
   const telt = (p: (typeof punten)[number]) =>
-    !p.geenNoemer || gewoon === null || (forecast.adSpend.points[p.month - 1]?.realized ?? 0) >= gewoon;
+    !p.geenNoemer || (gewoon === null ? maandenMetKosten >= 2 : (forecast.adSpend.points[p.month - 1]?.realized ?? 0) >= gewoon);
   return cpaTrendFrom(punten.filter((p) => (p.realized !== null || p.geenNoemer) && telt(p)));
 }

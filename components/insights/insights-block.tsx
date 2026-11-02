@@ -10,6 +10,7 @@ import type { ImpressionShareData, AccountStructureData, WastefulSearchTermData,
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
 import { cpaTrendVanForecast } from "@/lib/analysis/trend";
 import { budgetCpaNaam, formatRoas } from "@/lib/forecast-format";
+import { jaardoelTekst } from "@/lib/analysis/standaard-jaardoel";
 
 type InsightType = "critical" | "warning" | "positive" | "info";
 
@@ -174,6 +175,14 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
 
   // ── 2. Spend Analysis — is budget het probleem? ──
 
+  // De CPA-trend met de maanden zonder conversies (lib/analysis/trend.ts), hier al nodig: na een
+  // maand met kosten en geen enkele conversie zegt sectie 5 "controleer eerst de conversiemeting …
+  // voordat je op de CPA stuurt of budget verschuift". Het budgetadvies van sectie 2 en 3 ("het
+  // budget is het probleem", "Bij de huidige CPA … vereist dit € 5.895 extra budget") rekent met
+  // juist die CPA en efficiency, en stond er gewoon naast.
+  const t = cpaTrendVanForecast(forecast);
+  const metingOnzeker = t.zonderConversies.length > 0;
+
   if (spendDiff < -10) {
     const spendRatio = spendKpi.performanceRatio;
     const convRatio = convKpi.performanceRatio;
@@ -185,13 +194,15 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
       type: "warning",
       level: "Budget",
       text: `Ad spend ligt ${pct(spendDiff)} onder target. YTD ${fmt(spendKpi.ytdRealized)} uitgegeven vs ${fmt(spendKpi.ytdExpected)} verwacht.${
-        efficiencyRatio > 0.9
+        metingOnzeker
+          ? ` Of het budget of de campagne-performance het probleem is, is pas te zeggen als de conversiemeting klopt (zie Efficiency).`
+          : efficiencyRatio > 0.9
           ? ` De efficiency per euro is goed (${Math.round(efficiencyRatio * 100)}%) — het budget is het probleem, niet de campagne-performance.`
           : ` Daarnaast is de efficiency per euro ook lager dan verwacht (${Math.round(efficiencyRatio * 100)}%) — zowel budget als campagne-performance moet aangepakt worden.`
       }`,
     });
 
-    if (convDiff < -10 && efficiencyRatio > 0.85) {
+    if (convDiff < -10 && efficiencyRatio > 0.85 && !metingOnzeker) {
       insights.push({
         type: "info",
         level: "Budget",
@@ -210,10 +221,14 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
 
   if (budget.behindTarget && budget.extraSpendNeeded > 0) {
     const remainingMonths = 12 - realizedMonths.length;
+    // Het tekort aan conversies is gemeten en blijft staan; het budget dat erbij hoort wacht op de
+    // conversiemeting (zie sectie 2).
     insights.push({
       type: "critical",
       level: "Budget",
-      text: `Om het jaardoel te halen zijn nog ${budget.conversionGap.toLocaleString("nl-NL")} conversies nodig in ${remainingMonths} maanden. Bij ${budgetCpaNaam(budget)} van ${fmt(budget.currentCpa)}${budget.cpaUitDoel ? " (nog geen conversies YTD)" : ""} vereist dit ${fmt(budget.extraSpendNeeded)} extra budget — maandelijks ${fmt(budget.requiredMonthlySpend)} i.p.v. ${fmt(budget.currentMonthlySpend)} (${budget.spendIncreasePct > 0 ? `+${Math.round(budget.spendIncreasePct)}%` : "gelijk"}).`,
+      text: metingOnzeker
+        ? `Om het jaardoel te halen zijn nog ${budget.conversionGap.toLocaleString("nl-NL")} conversies nodig in ${remainingMonths} maanden. Hoeveel budget daarvoor nodig is, is pas te berekenen als de conversiemeting klopt: in ${t.zonderConversies.join(", ")} waren er kosten zonder één conversie.`
+        : `Om het jaardoel te halen zijn nog ${budget.conversionGap.toLocaleString("nl-NL")} conversies nodig in ${remainingMonths} maanden. Bij ${budgetCpaNaam(budget)} van ${fmt(budget.currentCpa)}${budget.cpaUitDoel ? " (nog geen conversies YTD)" : ""} vereist dit ${fmt(budget.extraSpendNeeded)} extra budget — maandelijks ${fmt(budget.requiredMonthlySpend)} i.p.v. ${fmt(budget.currentMonthlySpend)} (${budget.spendIncreasePct > 0 ? `+${Math.round(budget.spendIncreasePct)}%` : "gelijk"}).`,
     });
   }
 
@@ -237,8 +252,8 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
     const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
     // Gedeelde berekening en drempels (lib/analysis/trend.ts), met de maanden zonder conversies:
     // zonder die regel zei dit blok "CPA daalt … optimalisaties werken" direct na € 2.000 kosten
-    // zonder één conversie, en de health-score ernaast "Kosten zonder conversies".
-    const t = cpaTrendVanForecast(forecast);
+    // zonder één conversie, en de health-score ernaast "Kosten zonder conversies". (`t` staat boven
+    // sectie 2.)
     if (t.zonderConversies.length > 0) {
       insights.push({
         type: "warning",
@@ -281,6 +296,7 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
   {
     const pf = convKpi.projectionFactor;
     const dm = forecast.dataMaturity;
+    const verwachtingsDoel = jaardoelTekst(forecast.doelHerkomst?.conversions, { lidwoord: true }).naam;
 
     if (dm.isScaling && !dm.isMature) {
       // Scaling client: report on efficiency trend, not raw conversion trend
@@ -305,16 +321,26 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
         });
       }
     } else if (pf > 1.05) {
+      // Volwassen account: pf is gerealiseerd tegen de VERWACHTING, en die volgt het jaardoel. Hier
+      // stond "Opwaartse trend" en "Neerwaartse trend": met een hoog ingevoerd doel las een vlak
+      // account als een dalend account. Dezelfde drempels; de woorden zeggen wat er gemeten is, zoals
+      // de Trend-factor van de health score (lib/health-score.ts).
+      //
+      // Hier stond ook "Houdt dat aan, dan verbetert de jaarprognose": de spiegel van de zin die bij
+      // "Onder verwachting" weg is, en om dezelfde reden onwaar. De prognose rekent deze factor al
+      // mee: een account dat 110% blijft doen, houdt dezelfde jaarprognose.
       insights.push({
         type: "positive",
         level: "Trend",
-        text: `Opwaartse trend: gewogen prestatiefactor ${(pf * 100).toFixed(0)}%. Recente maanden presteren beter dan verwacht. ${convDiff < 0 ? "Trend is positief maar nog onvoldoende om het doel te halen. Versnelling nodig." : "Als trend aanhoudt, verbetert de jaarprognose."}`,
+        text: `Boven verwachting: gewogen prestatiefactor ${(pf * 100).toFixed(0)}%. Recente maanden presteren beter dan de verwachting, en die volgt ${verwachtingsDoel}. ${convDiff < 0 ? "Nog onvoldoende om het doel te halen. Versnelling nodig." : "De jaarprognose rekent dit tempo al mee."}`,
       });
     } else if (pf < 0.90) {
+      // "Zonder ingrijpen verslechtert de prognose verder" is weg: de prognose rekent deze factor al
+      // mee, en een achterstand op het doel is geen daling.
       insights.push({
         type: "warning",
         level: "Trend",
-        text: `Neerwaartse trend: gewogen prestatiefactor ${(pf * 100).toFixed(0)}%. Recente maanden presteren onder verwachting. Zonder ingrijpen verslechtert de prognose verder. Check campagnewijzigingen, concurrentie, en marktomstandigheden.`,
+        text: `Onder verwachting: gewogen prestatiefactor ${(pf * 100).toFixed(0)}%. Recente maanden blijven onder de verwachting, en die volgt ${verwachtingsDoel}: dit meet de achterstand op dat doel, niet of de conversies dalen. Check campagnewijzigingen, concurrentie, en marktomstandigheden.`,
       });
     }
   }

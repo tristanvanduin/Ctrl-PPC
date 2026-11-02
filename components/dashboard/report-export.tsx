@@ -10,6 +10,7 @@ import { getAllClients } from "@/lib/clients";
 import { fixMojibake } from "@/lib/analysis/sanitize";
 import { formatRoas, zonderData } from "@/lib/forecast-format";
 import { BRAND_NAME } from "@/lib/branding/brand";
+import { jaardoelTekst, nogGeenDoelIngevoerd } from "@/lib/analysis/standaard-jaardoel";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -108,7 +109,14 @@ export function ReportExport({ clientId }: { clientId: string }) {
     if (budget.behindTarget) {
       lines.push("## Budget Aanbeveling");
       lines.push("");
-      lines.push(`Het GESCHATTE jaardoel (vorig jaar +10%, automatisch afgeleid \u2014 er is nog geen doel ingevoerd) wordt op basis van de huidige trend niet gehaald. Om dat niveau te bereiken:`);
+      // Het budgetadvies rekent op het conversiedoel. De nadruk op GESCHATTE hoort alleen bij de
+      // schatting; hier stond hij altijd, ook naast een doel uit Instellingen, in een rapport dat
+      // naar de klant gaat.
+      const doel = jaardoelTekst(forecast.doelHerkomst?.conversions);
+      lines.push(doel.ingevoerd
+        ? `Het jaardoel${doel.toelichting ? ` (${doel.toelichting})` : ""} wordt op basis van de huidige trend niet gehaald. Om het te bereiken:`
+        // Met alleen een omzetdoel in Instellingen: "nog geen conversiedoel", niet "nog geen doel".
+        : `Het GESCHATTE jaardoel (vorig jaar +10%, automatisch afgeleid \u2014 ${nogGeenDoelIngevoerd("conversions", forecast.doelHerkomst?.revenue)}) wordt op basis van de huidige trend niet gehaald. Om dat niveau te bereiken:`);
       lines.push("");
       lines.push(`- **Conversie gap**: ${num(budget.conversionGap)} conversies tekort`);
       // Zonder conversies YTD is dit het CPA-doel, geen gemeten CPA: twee regels hierboven staat

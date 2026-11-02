@@ -9,8 +9,9 @@
 // - de regel onder het veld verscheen alleen bij > 0, ook vlak na het intypen van -10;
 // - en omdat de kaart "uit" stond, schreef de volgende opslag van WELK veld ook (alleen de sector,
 //   bijvoorbeeld) groei 0 weg: het doel werd stil het standaarddoel, 1.474 (vorig jaar +10%).
-// De beslissing: krimpdoelen blijven toegestaan. Het veld heeft geen minimum, en een bureau met een
-// klant die bewust afbouwt, hoort dat doel te kunnen zetten.
+// De beslissing: krimpdoelen blijven toegestaan, want een bureau met een klant die bewust afbouwt,
+// hoort dat doel te kunnen zetten. Alleen boven -100%: daaronder is vorig jaar x (1 + groei) geen doel
+// meer (zie het laatste blok hieronder).
 //
 // De module bestaat op de oude code niet; dan per geval een FAIL in plaats van een crash.
 
@@ -86,6 +87,34 @@ async function main() {
   check("een vast doel: aan, in de vaste modus", vast.enabled && vast.inputMode === "absolute" && vast.value === 2600, JSON.stringify(vast));
   check("een vast doel per maand wordt per jaar opgeslagen", groeiDoelUitKaart({ ...vast, period: "month", value: 200 }).absolute === 2400);
   check("een kaart die uit staat, slaat niets op", JSON.stringify(groeiDoelUitKaart({ ...krimp, enabled: false })) === JSON.stringify({ mode: "growth", growthPct: 0, absolute: 0 }));
+
+  // -100% of lager is geen doel: vorig jaar x 0 (of minder) is nul of negatief, en dan valt
+  // mergeKpiTargets terug op het standaarddoel, met "er is nog geen doel ingevoerd". De kaart stond
+  // toch aan met "-100% ten opzichte van vorig jaar" eronder: Instellingen en het dashboard zeiden
+  // over dezelfde invoer twee verschillende dingen.
+  console.log("Krimp tot -100% en lager");
+  const metGroei = (id: string, pct: number, routeConversies: number) => {
+    opslag.set(`rm-dashboard-settings-${id}`, JSON.stringify({
+      clientId: id, conversionActions: [], conversionLagDays: 3, kpiDoelenOpgeslagen: true,
+      kpiTargets: { conversionsMode: "growth", conversionsGrowthPct: pct, conversionsAbsolute: 0, revenueMode: "growth", revenueGrowthPct: 0, revenueAbsolute: 0, roasTarget: 0, cpaTarget: 0 },
+    }));
+    const r = mergeKpiTargets(id, { ...data, clientId: id, targetCurrentYear: { ...data.targetCurrentYear, conversions: routeConversies } });
+    return { doel: r.targetCurrentYear.conversions, herkomst: (r as { doelHerkomst?: { conversions: { soort: string } } }).doelHerkomst?.conversions.soort ?? "standaard" };
+  };
+  for (const pct of [-100, -120]) {
+    const k = groeiKaartUitDoel({ mode: "growth", growthPct: pct, absolute: 0 });
+    check(`${pct}%: de kaart staat uit`, !k.enabled, JSON.stringify(k));
+    check(`${pct}%: geen regel onder het veld`, groeiRegel(pct) === null, String(groeiRegel(pct)));
+    check(`${pct}%: een aangezette kaart slaat geen onmogelijke groei op`, groeiDoelUitKaart({ ...k, enabled: true }).growthPct === 0, JSON.stringify(groeiDoelUitKaart({ ...k, enabled: true })));
+    check(`${pct}%: het dashboard zegt hetzelfde (de standaard)`, metGroei(`krimp${pct}`, pct, 1474).herkomst === "standaard");
+  }
+  // Alles boven -100% is wél een doel, ook als de afronding het op nul zou zetten.
+  check("-99%: aan, met de regel", groeiKaartUitDoel({ mode: "growth", growthPct: -99, absolute: 0 }).enabled && groeiRegel(-99) === "-99% ten opzichte van vorig jaar", String(groeiRegel(-99)));
+  const m99 = metGroei("krimp-99", -99, 1474);
+  check("-99%: het dashboard mikt op een ingevoerd doel (13)", m99.herkomst === "groei" && m99.doel === 13, JSON.stringify(m99));
+  const klein = metGroei("krimp-96-klein", -96, 11);
+  check("-96% op een klein account (route 11): een doel van minstens 1, geen terugval op 11", klein.herkomst === "groei" && klein.doel === 1, JSON.stringify(klein));
+  check("het paneel geeft het groeiveld een ondergrens van -99", /min=\{-99\}/.test(paneel));
 
   klaar();
 }

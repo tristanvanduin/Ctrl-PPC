@@ -55,8 +55,10 @@ export function bandDataStand(inp: {
   const bronnen = [
     ...(inp.kanalen.includes("google") ? [{ bron: "google", dataTot: inp.google?.dataTot ?? null }] : []),
     // Met de nieuwste rij, voor de zin over een uitgesloten kanaal (uitgeslotenMetDag): die noemt de
-    // dag van de laatste rij, niet de dag ervoor.
-    ...NIET_GOOGLE.filter((k) => inp.kanalen.includes(k)).map((k) => ({ bron: k as string, dataTot: dagkanaal(k), laatsteRij: inp.laatsteDag[k] })),
+    // dag van de laatste rij, niet de dag ervoor. Kon de browser het kanaal niet lezen, dan die van
+    // de route: zonder rij viel de zin terug op dataTot (de dag ervoor), en dan noemde de band "geen
+    // data na 30 oktober" waar het Jaaroverzicht op dezelfde pagina "na 31 oktober" zei.
+    ...NIET_GOOGLE.filter((k) => inp.kanalen.includes(k)).map((k) => ({ bron: k as string, dataTot: dagkanaal(k), laatsteRij: inp.laatsteDag[k] ?? vanRoute(k)?.laatsteRij ?? null })),
   ].map((b) => ({ ...b, syncDraait: vanRoute(b.bron)?.syncDraait ?? false }));
   const samen = gezamenlijkeDataTot(bronnen);
   return stand(samen.dataTot, uitgeslotenMetDag({ uitgesloten: samen.uitgesloten, bronnen }));

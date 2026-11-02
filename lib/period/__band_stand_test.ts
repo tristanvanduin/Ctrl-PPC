@@ -18,7 +18,7 @@ function check(label: string, cond: boolean, detail = ""): void {
   else { failed += 1; console.error(`  FAIL  ${label}  ${detail}`); }
 }
 
-type Bron = { bron: string; dataTot: string | null; syncDraait: boolean };
+type Bron = { bron: string; dataTot: string | null; syncDraait: boolean; laatsteRij?: string | null };
 type Stand = { laatsteVolleMaand: string | null; partieel: { maand: string; tmDag: number; dagenInMaand: number } | null; dataTot: string | null; uitgeslotenBronnen?: { bron: string; dataTot: string | null }[] };
 type Invoer = {
   channel: "google" | "blended" | "meta" | "linkedin" | "microsoft";
@@ -138,6 +138,21 @@ async function main() {
     });
     check("demo zonder route: nog steeds juli vol, augustus t/m 25", s?.laatsteVolleMaand === "2026-07" && s?.dataTot === "2026-08-25", JSON.stringify(s));
     check("zonder enige bron met data: geen stand", f({ channel: "blended", kanalen: [], google: null, laatsteDag: geen, route: null, nu: NU }) === null);
+  }
+
+  console.log("Een mislukte browserlezing: dezelfde dag als het Jaaroverzicht");
+  {
+    // Meta ontkoppeld na zijn sync van 31 oktober 05:00 (rij van 31 oktober, de route zegt dataTot
+    // 30 oktober en laatsteRij 31 oktober). De browser kon meta_account_daily niet lezen, dus geen
+    // nieuwste rij. De zin over het uitgesloten kanaal viel dan terug op dataTot: "geen data na 30
+    // oktober" in de KPI-band, en "na 31 oktober" in het Jaaroverzicht en de Pacing (de route) op
+    // dezelfde pagina.
+    const route = { bronnen: [{ bron: "google", dataTot: "2026-11-01", syncDraait: false }, { bron: "meta", dataTot: "2026-10-30", syncDraait: true, laatsteRij: "2026-10-31" }] };
+    const google = { dataTot: "2026-11-01", laatsteVolleMaand: "2026-10", partieel: { maand: "2026-11", tmDag: 1, dagenInMaand: 30 } };
+    const metRij = f({ channel: "blended", kanalen: ["google", "meta"], google, laatsteDag: { ...geen, meta: "2026-10-31" }, route, nu: "2026-11-02" });
+    const zonderRij = f({ channel: "blended", kanalen: ["google", "meta"], google, laatsteDag: geen, route, nu: "2026-11-02" });
+    check("voorwaarde: Meta uitgesloten, de browser las hem: 31 oktober", JSON.stringify(metRij?.uitgeslotenBronnen) === JSON.stringify([{ bron: "meta", dataTot: "2026-10-31" }]), JSON.stringify(metRij?.uitgeslotenBronnen));
+    check("de browser las Meta niet: nog steeds 31 oktober (de laatste rij van de route)", JSON.stringify(zonderRij?.uitgeslotenBronnen) === JSON.stringify([{ bron: "meta", dataTot: "2026-10-31" }]), JSON.stringify(zonderRij?.uitgeslotenBronnen));
   }
 
   console.log("De Google-tab: de stand van de Google-route, ongewijzigd");

@@ -177,6 +177,36 @@ deel("Restkosten zonder conversie onder één gewone CPA tellen niet als slechts
   }
 });
 
+deel("Een nieuw kanaal zonder doel: één week restkosten is nog geen CPA-oordeel", () => {
+  // Meta, 25-31 oktober, € 0,40 per dag, geen doel en geen vorig jaar (zoals de kanaalbadge). Zonder
+  // gemeten CPA en zonder CPA-doel telde een maand met kosten en 0 conversies altijd: € 2,80 gaf een
+  // beoordeelde health van 20 en "slechter wordt de efficiency niet", terwijl dezelfde € 2,80 met één
+  // conversie "niet beoordeeld" was. Zonder referentie telt zo'n maand pas mee als er minstens twee
+  // maanden met kosten zijn, het minimum dat de CPA-trend ook vraagt.
+  const { buildChannelForecast } = req("./analysis/channel-forecast-data") as typeof import("./analysis/channel-forecast-data");
+  const { zonderKanaalSpecifiekeHygiene } = req("./health-score") as typeof import("./health-score");
+  const kanaal = (van: string, tot: string, perDag: number, conv: (d: string) => number) => {
+    const rijen = [];
+    for (let t = Date.parse(`${van}T00:00:00Z`); t <= Date.parse(`${tot}T00:00:00Z`); t += 86_400_000) {
+      const d = new Date(t).toISOString().slice(0, 10);
+      rijen.push({ date: d, spend: perDag, conv: conv(d), revenue: 0 });
+    }
+    const r = buildChannelForecast("t", rijen, [], "meta_ads", "2026-11-01", "2026-10-31");
+    const h = zonderKanaalSpecifiekeHygiene(computeHealthScore(r!.forecast));
+    return { h, e: h.factors.find((x) => x.name === "Efficiency")! };
+  };
+  const nul = kanaal("2026-10-25", "2026-10-31", 0.4, () => 0);
+  const een = kanaal("2026-10-25", "2026-10-31", 0.4, (d) => (d === "2026-10-31" ? 1 : 0));
+  check("€ 2,80 zonder conversie: Efficiency niet beoordeeld", nul.e.assessed === false && nul.e.description === "Te weinig maanden voor een CPA-trend — niet beoordeeld", JSON.stringify(nul.e));
+  check("€ 2,80 met één conversie: idem", een.e.assessed === false, JSON.stringify(een.e));
+  check("en dus dezelfde health", nul.h.total === een.h.total && nul.h.assessedCount === een.h.assessedCount, `${nul.h.total}/${nul.h.assessedCount} tegen ${een.h.total}/${een.h.assessedCount}`);
+  check("geen 'slechter wordt de efficiency niet'", !JSON.stringify(nul.h).includes("slechter wordt de efficiency niet"));
+  // Twee maanden kosten zonder één conversie (september-oktober, € 60 per dag) blijven gemarkeerd.
+  const twee = kanaal("2026-09-01", "2026-10-31", 60, () => 0);
+  check("september-oktober zonder conversies, zonder doel: wel 'Kosten zonder conversies'", twee.e.assessed === true && twee.e.description === "Kosten zonder conversies"
+    && twee.h.anomalies.some((a) => a.title === "Kosten zonder conversies"), JSON.stringify(twee.e));
+});
+
 deel("Een prognose met kosten en zonder verwachte conversies heet niet 'Geen data'", () => {
   // Een kanaal zonder doel en zonder vorig jaar: januari-juli € 2.000 per maand, 0 conversies. De
   // prognose voor augustus-december: kosten op tempo, conversies 0. Die maanden heetten "Geen data".

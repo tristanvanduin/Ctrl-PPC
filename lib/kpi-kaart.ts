@@ -5,7 +5,9 @@
 // een opgeslagen KRIMPdoel (-10%) werd op het dashboard toegepast (mergeKpiTargets: vorig jaar x 0,9),
 // maar het paneel las de kaart alleen als "aan" bij een groei > 0. Dan stond de kaart bij het openen
 // uit, met de velden verborgen, en schreef de volgende opslag van welk veld ook groei 0 weg: het doel
-// werd stil vorig jaar +10%. Krimpdoelen blijven toegestaan; het veld heeft bewust geen minimum.
+// werd stil vorig jaar +10%. Krimpdoelen blijven toegestaan, maar alleen boven -100%: vorig jaar x 0
+// (of minder) is geen doel, en dan valt het dashboard terug op het standaarddoel. Zo'n waarde staat
+// hier dus ook niet als "aan", en wordt niet opgeslagen.
 
 import type { KpiMode } from "./client-settings";
 import { formatDeltaPercent } from "./forecast-format";
@@ -29,12 +31,15 @@ export interface GroeiDoel {
 }
 
 /**
- * Is er een groei ingevoerd? Elke eindige waarde behalve 0, dus ook een negatieve: dezelfde regel als
- * opGroei in mergeKpiTargets ("groei 0 is niets ingevoerd"). Een null of NaN uit een oude rij telt
- * daar ook als niets, en hoort hier dus geen kaart aan te zetten.
+ * Is er een groei ingevoerd? Elke eindige waarde behalve 0 en boven -100, dus ook een krimp: dezelfde
+ * regel als opGroei in mergeKpiTargets ("groei 0 is niets ingevoerd"; een groei van -100% of lager
+ * geeft geen doel). Een null of NaN uit een oude rij telt daar ook als niets, en hoort hier dus geen
+ * kaart aan te zetten. Hier stond geen ondergrens: een opgeslagen -100% zette de kaart aan met
+ * "-100% ten opzichte van vorig jaar", terwijl het dashboard het standaarddoel nam en "er is nog geen
+ * doel ingevoerd" zei.
  */
 function groeiIngevoerd(pct: number): boolean {
-  return Number.isFinite(pct) && pct !== 0;
+  return Number.isFinite(pct) && pct !== 0 && pct > -100;
 }
 
 /** De kaart bij het openen van Instellingen. Aan zodra het dashboard er een doel uit haalt. */
@@ -48,11 +53,15 @@ export function groeiKaartUitDoel(doel: GroeiDoel): KpiConfig {
   };
 }
 
-/** Wat handleSave van de kaart opslaat. Een kaart die uit staat, slaat niets op (groei 0, geen vast doel). */
+/**
+ * Wat handleSave van de kaart opslaat. Een kaart die uit staat, slaat niets op (groei 0, geen vast doel),
+ * en een groei die geen doel kan geven (-100% of lager, zie groeiIngevoerd) ook niet: die zou bij het
+ * volgende openen als "uit" staan, terwijl hij in de database als ingevoerd stond.
+ */
 export function groeiDoelUitKaart(kaart: KpiConfig): GroeiDoel {
   return {
     mode: kaart.inputMode === "growth" ? "growth" : "absolute",
-    growthPct: kaart.enabled ? kaart.growthPct : 0,
+    growthPct: kaart.enabled && groeiIngevoerd(kaart.growthPct) ? kaart.growthPct : 0,
     absolute: kaart.enabled && kaart.inputMode === "absolute"
       ? (kaart.period === "month" ? kaart.value * 12 : kaart.value)
       : 0,

@@ -12,8 +12,9 @@
  *    Stabiel of dalend CPA = goed, stijgend = slecht
  *
  * 3. TREND (20pt)
- *    Verbetert of verslechtert de performance?
- *    Stijgende ratio = goed, dalend = slecht
+ *    Volwassen account: hoe verhoudt het gerealiseerde zich tot de verwachting, die het jaardoel
+ *    volgt? (prestatiefactor + laatste maand; de teksten zeggen "boven/op/onder verwachting")
+ *    Opschalend account: verbetert of verslechtert de efficiency? (dat is wel een trend)
  *
  * 4. BUDGET UTILIZATION (20pt)
  *    Wordt het beschikbare budget benut?
@@ -35,6 +36,7 @@ import type { ClientForecast } from "./forecast";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "./use-client-data";
 import { cpaTrendVanForecast } from "./analysis/trend";
 import { formatPercent } from "@/lib/forecast-format";
+import { jaardoelTekst, metToelichting } from "./analysis/standaard-jaardoel";
 
 export interface HealthScore {
   /** 0–100, geschaald over de factoren die beoordeeld konden worden. */
@@ -103,22 +105,30 @@ export function computeHealthScore(
   // die kreeg deze factor dus altijd als "niet beoordeeld" (assessed: false), en scoorde
   // daardoor op maar 4 van de 5 factoren, ook al was er wel degelijk een doel om tegen af te
   // rekenen. Val terug op omzet zodra er geen conversiedoel is.
-  const doelKpi = conv.annualTarget > 0 ? conv : rev;
+  const doelMetric = conv.annualTarget > 0 ? "conversions" : "revenue";
+  const doelKpi = doelMetric === "conversions" ? conv : rev;
   const heeftDoel = doelKpi.annualTarget > 0;
   const targetRatio = heeftDoel ? doelKpi.adjustedAnnual / doelKpi.annualTarget : 0;
   const targetScore = heeftDoel ? clamp(Math.round(targetRatio * 20), 0, 20) : 0;
+  // HERKOMST ERBIJ. Het doel waar deze factor tegen afrekent is óf ingevoerd in Instellingen (vast
+  // of als groei), óf het standaarddoel: vorig jaar × 1,10 uit de route. Dat laatste is een
+  // extrapolatie met een groeiaanname erin, geen afspraak, en wie vorig jaar exact herhaalt scoort
+  // hier per constructie slecht; daar hoort "geschat" bij, anders leest een berekening als een
+  // belofte. Hier stond die schatting ALTIJD, ook naast een ingevoerd doel ("Prognose 48% van het
+  // geschatte jaardoel (...; er is nog geen doel ingevoerd)" naast 751 / 2.600 op de demo). De
+  // herkomst komt nu met de prognose mee (mergeKpiTargets, ClientForecast.doelHerkomst).
+  const doel = jaardoelTekst(forecast.doelHerkomst?.[doelMetric], { metric: doelMetric });
+  const doelLang = jaardoelTekst(forecast.doelHerkomst?.[doelMetric], {
+    metric: doelMetric, lidwoord: true, lang: true,
+    // Staat het andere doel wel in Instellingen, dan "nog geen conversiedoel" en niet "nog geen doel".
+    ander: forecast.doelHerkomst?.[doelMetric === "conversions" ? "revenue" : "conversions"],
+  });
   factors.push({
     name: "Doelstelling",
     score: targetScore,
     maxScore: 20,
-    // HERKOMST ERBIJ. Er is nog geen scherm om een jaardoel in te voeren: client_targets bestaat
-    // (migratie 002, mét channel-kolom) maar is leeg en wordt door niets geschreven. Het "doel"
-    // waar deze factor tegen afrekent komt uit app/api/google-ads/client-data/route.ts en is
-    // vorig jaar × 1,10. Dat is een extrapolatie met een groeiaanname erin, geen afspraak — en
-    // wie vorig jaar exact herhaalt, scoort hier per constructie slecht. Zolang dat zo is, hoort
-    // het woord "geschat" erbij te staan; anders leest een berekening als een belofte.
     description: heeftDoel
-      ? `Prognose ${Math.round(targetRatio * 100)}% van geschat jaardoel (vorig jaar +10%)`
+      ? `Prognose ${Math.round(targetRatio * 100)}% van ${metToelichting(doel)}`
       : "Geen jaardoel ingesteld — niet beoordeeld",
     assessed: heeftDoel,
   });
@@ -126,8 +136,8 @@ export function computeHealthScore(
   if (targetRatio < 0.5 && heeftDoel) {
     anomalies.push({
       severity: "critical",
-      title: "Geschat jaardoel in gevaar",
-      description: `Prognose is slechts ${Math.round(targetRatio * 100)}% van het geschatte jaardoel (vorig jaar +10%; er is nog geen doel ingevoerd). Zonder ingrijpen wordt dat niveau niet gehaald.`,
+      title: doel.ingevoerd ? "Jaardoel in gevaar" : "Geschat jaardoel in gevaar",
+      description: `Prognose is slechts ${Math.round(targetRatio * 100)}% van ${metToelichting(doelLang)}. Zonder ingrijpen wordt ${doel.ingevoerd ? "het" : "dat niveau"} niet gehaald.`,
     });
   }
 
@@ -206,6 +216,11 @@ export function computeHealthScore(
   // Zonder twee gerealiseerde maanden is er geen trend om te zien.
   const trendBeoordeeld = realizedMonths.length >= 2;
   let trendScore = 10;
+  // Welke modus de score bepaalde: bij een opschalend account meet hij de efficiency, en dat IS een
+  // trend; bij een volwassen account meet hij de afstand tot de verwachting (zie hieronder).
+  let opVerwachting = false;
+  // De factor rekent op conversies (conv.projectionFactor), dus het doel van conversies.
+  const trendDoel = jaardoelTekst(forecast.doelHerkomst?.conversions, { lidwoord: true });
   {
     const dm = forecast.dataMaturity;
     const pf = conv.projectionFactor;
@@ -241,6 +256,7 @@ export function computeHealthScore(
       }
     } else {
       // ── Mature client: use projectionFactor as primary signal ──
+      opVerwachting = true;
       let base: number;
       if (pf > 1.15) base = 18;
       else if (pf > 1.05) base = 16;
@@ -253,17 +269,26 @@ export function computeHealthScore(
       trendScore = clamp(base + modifier, 0, 20);
 
       // Anomalies: only flag genuinely concerning situations
+      //
+      // WAT HIER GEMETEN WORDT. pf en lastRatio zijn gerealiseerd gedeeld door de VERWACHTING, en die
+      // verwachting is het jaardoel over de maanden verdeeld (forecastCoreMetric schaalt hem naar het
+      // doel). Een lage waarde zegt dus dat het account achterloopt op dat doel, niet dat de
+      // conversies dalen. Hier stond "Sterke neerwaartse trend" en "Dalende trend": met een hoog
+      // ingevoerd doel (de demo: 2.600 tegen een tempo van ongeveer 1.300) leek een vlak account zo
+      // in vrije val. De drempels en de ernst blijven; alleen de woorden zeggen nu wat er gemeten is.
+      const verwachting = `Gewogen prestatiefactor ${formatPercent(pf, 0)}, laatste maand ${formatPercent(lastRatio, 0)} van verwachting. `
+        + `De verwachting volgt ${metToelichting(trendDoel)}: dit meet de achterstand op dat doel, niet of de conversies dalen.`;
       if (pf < 0.80 && lastRatio < 0.80) {
         anomalies.push({
           severity: "critical",
-          title: "Sterke neerwaartse trend",
-          description: `Gewogen prestatiefactor ${formatPercent(pf, 0)}, laatste maand ${formatPercent(lastRatio, 0)} van verwachting.`,
+          title: "Sterk achter op verwachting",
+          description: verwachting,
         });
       } else if (pf < 0.90 && lastRatio < 0.90) {
         anomalies.push({
           severity: "warning",
-          title: "Dalende trend",
-          description: `Gewogen prestatiefactor ${formatPercent(pf, 0)}, laatste maand ${formatPercent(lastRatio, 0)} van verwachting.`,
+          title: "Achter op verwachting",
+          description: verwachting,
         });
       }
     }
@@ -291,9 +316,20 @@ export function computeHealthScore(
     name: "Trend",
     score: trendBeoordeeld ? trendScore : 0,
     maxScore: 20,
+    // Dezelfde drempels op de score als altijd. Bij een volwassen account zegt de tekst wat er gemeten
+    // is: "Neerwaartse trend" stond er ook bij een vlak account onder een hoog doel.
+    //
+    // Zonder conversiedoel is er geen verwachting: forecastCoreMetric schaalt de verwachting naar dat
+    // doel, dus is hij overal nul, de factor 1,0 en de score 14. Daar stond "Op verwachting (de
+    // verwachting volgt het geschatte jaardoel)" naast "Geen jaardoel ingesteld" van de Doelstelling-
+    // factor. "Stabiel" (de oude tekst) is ook niet gemeten: een dalend account zonder doel kreeg het.
     description: !trendBeoordeeld
       ? "Te weinig maanden voor een trend — niet beoordeeld"
-      : trendScore >= 16 ? "Opwaartse trend" : trendScore >= 10 ? "Stabiel" : "Neerwaartse trend",
+      : opVerwachting && conv.annualTarget <= 0
+        ? "Geen jaardoel, dus geen verwachting om tegen te meten — neutraal"
+      : opVerwachting
+        ? `${trendScore >= 16 ? "Boven verwachting" : trendScore >= 10 ? "Op verwachting" : "Onder verwachting"} (de verwachting volgt ${trendDoel.naam})`
+        : trendScore >= 16 ? "Opwaartse trend" : trendScore >= 10 ? "Stabiel" : "Neerwaartse trend",
     assessed: trendBeoordeeld,
   });
 

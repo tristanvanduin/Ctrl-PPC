@@ -21,7 +21,7 @@ function health(anomalies: Anomaly[]): HealthScore {
 
 const geenAnomalieen = health([]);
 const alleenWarning = health([{ severity: "warning", title: "CPA stijgt snel", description: "" }]);
-const eenCritical = health([{ severity: "critical", title: "Sterke neerwaartse trend", description: "" }]);
+const eenCritical = health([{ severity: "critical", title: "Sterk achter op verwachting", description: "" }]);
 const criticalEnWarning = health([
   { severity: "warning", title: "Zoekterm verspilling", description: "" },
   { severity: "critical", title: "Geschat jaardoel in gevaar", description: "" },
@@ -39,7 +39,7 @@ check("groen account + een critical anomaly is rood",
 {
   const o = beoordeelCodeRood(groenAccount, eenCritical);
   check("rood via health-score draagt de anomaly-titel als reden",
-    o.redenen.includes("Sterke neerwaartse trend"), JSON.stringify(o));
+    o.redenen.includes("Sterk achter op verwachting"), JSON.stringify(o));
 }
 
 check("amber account + geen anomalieen blijft amber",

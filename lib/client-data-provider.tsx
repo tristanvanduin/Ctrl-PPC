@@ -70,11 +70,17 @@ export function ClientDataProvider({ clientId, children }: { clientId: string; c
   // Merge user's settings targets into the data (gedeelde helper, zie lib/kpi-target-merge.ts --
   // de blended prognosetabel gebruikt dezelfde functie buiten deze context om). instellingenVersie
   // staat in de deps omdat mergeKpiTargets de instellingen zelf leest (getClientSettings).
+  //
+  // En instellingenKlaar ook: de poort kan opengaan op een cache die een ANDERE lezer vulde
+  // (useBlendedClientData leest de instellingen ook) terwijl het eigen verzoek nog loopt, of op de
+  // wachttijd. De samenvoeging was dan al gedaan bij de eerste render, met een lege cache, en de
+  // kinderen kregen het routedoel (1.938) terwijl Instellingen en "Alle kanalen" 2.600 zeiden. Op de
+  // omslag van dicht naar open voegt hij opnieuw samen, met wat de cache dan heeft.
   const enrichedData = useMemo(() => {
     if (!clientData.data) return clientData;
     return { ...clientData, data: mergeKpiTargets(clientId, clientData.data) };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- instellingenVersie: zie hierboven
-  }, [clientData, clientId, instellingenVersie]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- instellingenVersie en instellingenKlaar: zie hierboven
+  }, [clientData, clientId, instellingenVersie, instellingenKlaar]);
 
   // Eén keer per datawijziging, gedeeld met alle kinderen.
   const forecast = useMemo(

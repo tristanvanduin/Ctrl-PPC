@@ -8,6 +8,7 @@ import { computeForecast, MONTH_LABELS, type ClientForecast } from "@/lib/foreca
 import { editieNaam, fairCountdown, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
 import { berekenLanding, seizoensduiding } from "@/lib/pacing/landing";
+import { jaardoelTekst, metToelichting } from "@/lib/analysis/standaard-jaardoel";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -188,6 +189,9 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
     doel: conv.annualTarget,
   });
   const convSeizoen = seizoensduiding(convLanding);
+  // Wat het doel is waartegen "X% van ..." rekent. Bij een ingevoerde groei met het percentage erbij;
+  // de schatting houdt haar korte vorm zonder "(vorig jaar +10%)", zoals deze regel altijd had.
+  const conversieDoel = jaardoelTekst(forecast.doelHerkomst?.conversions);
 
   // Status colors & labels
   // Conversions: straightforward pace check
@@ -333,8 +337,9 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
             rekenen, de prognose weet dat november niet op juli lijkt. Alleen het eerste tonen zou
             de prognosegrafiek elders op het scherm tegenspreken.
 
-            "geschat jaardoel" en niet "jaardoel": dat getal is vorig jaar x 1,10 uit
-            client-data/route.ts, want er is nog geen scherm om een doel in te voeren. */}
+            "geschat jaardoel" alleen als het dat is: het standaarddoel, vorig jaar x 1,10 uit
+            client-data/route.ts. Hier stond het altijd, ook naast een doel uit Instellingen (de ring
+            ernaast zei "751 / 2.600"). De herkomst komt met de prognose mee (jaardoelTekst). */}
         <div className="flex flex-col justify-center border-l border-border pl-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Flag className="w-3.5 h-3.5 text-muted-foreground" />
@@ -343,7 +348,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
           <span className="text-figure font-bold leading-none text-brand-gray">{num(convLanding.opTempo)}</span>
           {convLanding.deelVanDoel !== null && (
             <p className="text-micro mt-1 text-muted-foreground">
-              {Math.round(convLanding.deelVanDoel * 100)}% van geschat jaardoel
+              {Math.round(convLanding.deelVanDoel * 100)}% van {conversieDoel.ingevoerd ? metToelichting(conversieDoel) : conversieDoel.naam}
             </p>
           )}
         </div>

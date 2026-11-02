@@ -156,7 +156,13 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
     });
 
     setSaved(false);
-  }, [clientId, dataState?.conversionActions]);
+    // dataState.data erbij: na INSTELLINGEN_WACHT_MS rendert de provider met de standaard, en komt
+    // het antwoord later alsnog, dan voegt hij opnieuw samen (dat object verandert dan). Op alleen
+    // conversionActions (dezelfde referentie na die samenvoeging) bleef het paneel "+10%" en CPA uit
+    // tonen naast een dashboard met 2.600 en € 45, en schreef een opslag zonder wijziging de standaard
+    // over het opgeslagen doel heen. Het verandert verder alleen bij een nieuwe lezing na een opslag,
+    // en dan mount de provider het paneel toch opnieuw.
+  }, [clientId, dataState?.conversionActions, dataState?.data]);
 
   if (!settings) return null;
 
@@ -1040,9 +1046,12 @@ function KpiCard({
           {config.inputMode === "growth" ? (
             <div>
               <div className="flex items-center gap-2">
+                {/* min -99: een groei van -100% of lager geeft geen doel (lib/kpi-kaart.ts). Alleen een
+                    hint voor de browser; groeiIngevoerd en groeiDoelUitKaart zijn de echte grens. */}
                 <Input
                   type="number"
                   step={1}
+                  min={-99}
                   value={config.growthPct || ""}
                   onChange={(e) => onChange({ ...config, growthPct: parseFloat(e.target.value) || 0 })}
                   placeholder="bijv. 10"

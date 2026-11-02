@@ -78,9 +78,19 @@ globalThis.fetch = ((url: string) => {
 }) as typeof fetch;
 
 const rust = () => new Promise((r) => setTimeout(r, 20));
+/**
+ * Wacht tot `klaar` waar is, hooguit `ms`. Een vaste rust van 20 ms was te kort als de suite vier
+ * bestanden tegelijk draait: dan had de provider zijn verzoek om de instellingen soms nog niet
+ * gedaan, beantwoordde de test niets, en faalde het eerste scenario met alles erna.
+ */
+async function tot(klaar: () => boolean, ms = 3000): Promise<void> {
+  const eind = Date.now() + ms;
+  while (!klaar() && Date.now() < eind) await new Promise((r) => setTimeout(r, 5));
+}
 /** Laat de wachtende verzoeken van één soort los (en wat daaruit volgt), en wacht tot React klaar is. */
 async function beantwoord(soort: Wachtend["soort"], ok = true): Promise<void> {
   await rust();
+  await tot(() => wachtend.some((w) => w.soort === soort));
   const nu = wachtend.filter((w) => w.soort === soort);
   wachtend = wachtend.filter((w) => w.soort !== soort);
   for (const w of nu) w.los(ok);
@@ -92,7 +102,7 @@ interface Doel { conversions: number; revenue: number; adSpend: number }
 async function main() {
   const { createElement } = await import("react");
   const { createRoot } = await import("react-dom/client");
-  const { ClientDataProvider, useClientDataState, useForecast } = await import("./client-data-provider");
+  const { ClientDataProvider, useClientDataState, useForecast, INSTELLINGEN_WACHT_MS } = await import("./client-data-provider");
   const { useClientData } = await import("./use-client-data");
 
   // Wat het blad bij de laatste render zag. Het blad meldt het via een functie, zodat de render zelf
@@ -131,6 +141,7 @@ async function main() {
     alleDoelen = [];
     const root = mount(createElement(Dashboard, { clientId: "gads-111" }));
     await beantwoord("client-data");
+    await tot(() => wachtend.some((w) => w.soort === "instellingen" && w.klant === "gads-111"));
     // De samenvoeging na de instellingen maakte het eindgetal goed, maar de kinderen renderden al met
     // de eerste samenvoeging: de standaard, want de localStorage is leeg. Het Google-tabblad toonde
     // zo bij elk eerste bezoek 1.938 en € 139.860, en sprong daarna naar 2.600 en € 117.000.
@@ -191,11 +202,11 @@ async function main() {
   {
     // De provider omvat elk tabblad, ook Instellingen. Zonder grens bleef een verzoek dat nooit
     // antwoordt het hele dashboard op "Data ophalen..." houden.
-    const { INSTELLINGEN_WACHT_MS } = await import("./client-data-provider");
     gezien.doel = null;
     alleDoelen = [];
     const root = mount(createElement(Dashboard, { clientId: "gads-555" }));
     await beantwoord("client-data");
+    await tot(() => wachtend.some((w) => w.soort === "instellingen" && w.klant === "gads-555"));
     check("voorwaarde: het verzoek om de instellingen hangt", wachtend.some((w) => w.soort === "instellingen" && w.klant === "gads-555"));
     check("eerst nog niets met een doel", alleDoelen.every((d) => d === null), JSON.stringify(alleDoelen));
     await new Promise((r) => setTimeout(r, INSTELLINGEN_WACHT_MS + 100));
@@ -203,6 +214,48 @@ async function main() {
     await beantwoord("instellingen");
     check("komt het antwoord later alsnog, dan het doel uit Instellingen", verwacht(zag()), JSON.stringify(zag()));
     root.unmount();
+  }
+
+  console.log("Een andere lezer vult de cache terwijl de provider nog wacht");
+  {
+    // useBlendedClientData (haal()) leest de instellingen ook, voor elke klant met een ander kanaal
+    // dan Google. Komt dat antwoord eerder dan dat van de provider, dan opent de poort bij de
+    // volgende render van de ouder (heeftGecachteInstellingen), maar de samenvoeging was al gedaan
+    // bij de eerste render, met een lege cache: de standaard. De kinderen zagen zo toch het routedoel
+    // (1.938 en € 139.860), tot het eigen antwoord van de provider binnen was, of nooit als dat hing.
+    const { useState } = await import("react");
+    const { loadClientSettings, heeftGecachteInstellingen } = await import("./client-settings");
+    for (const [label, opent] of [["een herrender van de ouder", "herrender"], ["de wachttijd", "wachttijd"]] as const) {
+      const klant = `gads-66${opent === "herrender" ? 6 : 7}`;
+      gezien.doel = null;
+      alleDoelen = [];
+      let herrender = () => {};
+      function Ouder({ clientId }: { clientId: string }) {
+        const [, zet] = useState(0);
+        herrender = () => zet((v) => v + 1);
+        const clientData = useClientData(clientId);
+        return clientData.data ? createElement(ClientDataProvider, { clientId, children: createElement(Blad) }) : null;
+      }
+      const root = mount(createElement(Ouder, { clientId: klant }));
+      await beantwoord("client-data");
+      await tot(() => wachtend.some((w) => w.soort === "instellingen" && w.klant === klant));
+      const vanProvider = wachtend.filter((w) => w.soort === "instellingen" && w.klant === klant);
+      check(`${label}: voorwaarde: de provider wacht op zijn eigen verzoek`, vanProvider.length === 1, String(vanProvider.length));
+      const ander = loadClientSettings(klant);
+      await tot(() => wachtend.some((w) => w.soort === "instellingen" && w.klant === klant && !vanProvider.includes(w)));
+      const nieuw = wachtend.filter((w) => w.soort === "instellingen" && w.klant === klant && !vanProvider.includes(w));
+      wachtend = wachtend.filter((w) => !nieuw.includes(w));
+      for (const w of nieuw) w.los();
+      await ander;
+      await rust();
+      check(`${label}: voorwaarde: de cache heeft de instellingen`, heeftGecachteInstellingen(klant));
+      if (opent === "herrender") { herrender(); await rust(); }
+      else await new Promise((r) => setTimeout(r, INSTELLINGEN_WACHT_MS + 100));
+      check(`${label}: de kinderen zien het doel uit Instellingen`, verwacht(zag()), JSON.stringify(alleDoelen));
+      check(`${label}: en nooit het routedoel`, !alleDoelen.some(isRoutedoel), JSON.stringify(alleDoelen));
+      await beantwoord("instellingen");
+      root.unmount();
+    }
   }
 
   console.log(`\n${passed} geslaagd, ${failed} mislukt`);

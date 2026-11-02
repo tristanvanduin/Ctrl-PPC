@@ -97,9 +97,16 @@ async function fetchKanaalRijen(clientId: string, kanaal: NietGoogleKanaal): Pro
     // maanden terug" (dbSelect geeft bij een fout data: []), en de band zei daarop "er is nog geen
     // enkele maand met data" bij een kanaal met honderden rijen, in plaats van "geen data geladen".
     // De grens blijft een maand (geen null), zodat de band hem als laadgrens kan lezen.
+    //
+    // Bij een latere pagina ook de rijen van de maand van `tot` weg: die maand is maar deels binnen.
+    // Bleef hij staan, dan lag de eerste maand met data vóór de laadgrens, en las de band de laadfout
+    // als de start van de data ("de data begint halverwege april 2025"), telde hij de halve maand als
+    // een volle, en zei hij over het jaar ervoor "er is nog geen data". Nu is de eerste maand met data
+    // de laadgrens, en zegt de band "de band laadt vanaf mei 2025".
     if (error) {
       console.warn(`[band] ${bron.table} voor ${clientId}: ${tot ? `pagina vóór ${tot}` : "eerste pagina"} niet geladen (${error.message})`);
-      return { rijen, geladenVanaf: tot ? addMonths(tot.slice(0, 7), 1) : addMonths(vanaf.slice(0, 7), MAANDEN_TERUG + 1) };
+      const grens = tot ? addMonths(tot.slice(0, 7), 1) : addMonths(vanaf.slice(0, 7), MAANDEN_TERUG + 1);
+      return { rijen: rijen.filter((r) => dagVan(r).slice(0, 7) >= grens), geladenVanaf: grens };
     }
     if (data.length < PAGINA) {
       rijen.push(...data);
@@ -109,9 +116,11 @@ async function fetchKanaalRijen(clientId: string, kanaal: NietGoogleKanaal): Pro
     if (oudste === tot) {
       // Eén dag met 1000 of meer rijen: verder komen kan alleen met een tweede sorteersleutel, en
       // die kent de route niet. Liever een te laag totaal met een spoor dan een lus.
+      // Ook hier is de maand van `oudste` maar deels binnen: zijn rijen weg, zoals bij een fout.
       rijen.push(...data);
       console.warn(`[band] ${bron.table} voor ${clientId}: meer dan ${PAGINA} rijen op ${oudste}, afgekapt`);
-      return { rijen, geladenVanaf: addMonths(oudste.slice(0, 7), 1) };
+      const grens = addMonths(oudste.slice(0, 7), 1);
+      return { rijen: rijen.filter((r) => dagVan(r).slice(0, 7) >= grens), geladenVanaf: grens };
     }
     rijen.push(...data.filter((r) => dagVan(r) !== oudste));
     tot = oudste;

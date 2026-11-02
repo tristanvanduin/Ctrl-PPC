@@ -58,7 +58,11 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
 
   // ── Budget actions ──
 
-  if (budget.behindTarget && spendDiff < -5) {
+  // Na een maand met kosten en geen enkele conversie staat hieronder "verhoog of verschuif geen
+  // budget op basis van de CPA tot dat duidelijk is" (Conversiemeting). Dit advies rekent met juist
+  // die CPA ("Bij de huidige CPA van € 25 levert dit 48 extra conversies"), dus het wacht ook.
+  const metingOnzeker = cpaT.zonderConversies.length > 0;
+  if (budget.behindTarget && spendDiff < -5 && !metingOnzeker) {
     recs.push({
       priority: "high",
       source: "Budget Opschaling",
@@ -129,12 +133,14 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
   });
 
   // ── Bidding strategy ──
+  // Een target CPA "10% onder huidig" ook pas als de meting klopt (metingOnzeker): die huidige CPA
+  // telt een maand zonder één gemeten conversie mee.
 
   if (convDiff < -15) {
     recs.push({
       priority: "medium",
       source: "Biedstrategie",
-      text: `Evalueer de biedstrategieën per campagne. Overweeg: (1) ${budget.cpaUitDoel ? "Maximize Conversions, met een target CPA pas als er conversies gemeten zijn" : `Maximize Conversions met een target CPA van ${fmt(budget.currentCpa * 0.9)} (10% onder huidig)`}, (2) Bij Shopping/PMax: target ROAS aanpassen op basis van actuele performance, (3) Bij manual bidding: verhoog biedingen op top-converting keywords.`,
+      text: `Evalueer de biedstrategieën per campagne. Overweeg: (1) ${budget.cpaUitDoel || metingOnzeker ? "Maximize Conversions, met een target CPA pas als er conversies gemeten zijn" : `Maximize Conversions met een target CPA van ${fmt(budget.currentCpa * 0.9)} (10% onder huidig)`}, (2) Bij Shopping/PMax: target ROAS aanpassen op basis van actuele performance, (3) Bij manual bidding: verhoog biedingen op top-converting keywords.`,
     });
   }
 
