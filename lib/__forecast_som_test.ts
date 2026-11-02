@@ -18,6 +18,7 @@ import { standaardJaardoel } from "./analysis/standaard-jaardoel";
 import type { BlendedKanaalReeks } from "./api/blended-historical";
 import type { ClientAnnualData, ClientHistoricalData } from "./types";
 import { monthsIn } from "./period/period-range";
+import * as kanaalMaanden from "./period/kanaal-maanden";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -341,6 +342,93 @@ if (typeof blendedForecastUitKanalen === "function") {
   check("en het gerealiseerde van juli blijft 40 + 100", metDag.conversions.points[6].realized === 140, String(metDag.conversions.points[6].realized));
   const zonderDag = blendedForecastUitKanalen("t", [g6, juliStart(null)], optelling([g6, juliStart(null)], 2026, 7), 7);
   check("zonder eerste dag: zoals voorheen (139)", jaarDeel(zonderDag, 7).every((v) => v === 139), JSON.stringify(jaarDeel(zonderDag, 7)));
+
+  // Een gat van vóór de start is geen seizoen. LinkedIn liep 60 per maand van november 2025 t/m
+  // maart 2026 en is daarna gestopt. De seizoensregel keek alleen of het kanaal vorig jaar NA het
+  // gat weer liep (november-december 2025: ja), niet of het er vóór het gat al was. April-oktober
+  // 2025 lagen vóór zijn start, lazen als "vorig jaar ook leeg", en de stop werd een pauze:
+  // november-december kregen 160 waar alleen Google loopt. Een maand eerder starten (oktober)
+  // gaf wel "gestopt": minder historie gaf een andere uitkomst.
+  const g7 = vlak("google", "2025-01", "2026-10", 100);
+  for (const [label, li] of [
+    ["november 2025 - maart 2026", reeks("linkedin", "2025-11", rijen("2025-11", "2026-03", 60))],
+    ["december 2025 - maart 2026", reeks("linkedin", "2025-12", rijen("2025-12", "2026-03", 60))],
+  ] as const) {
+    check(`gat vóór de start (${label}): gestopt`, som.kanaalGestopt(li.maanden, 2026, 10) === true);
+    const f = blendedForecastUitKanalen("t", [g7, li], optelling([g7, li], 2026, 10), 10);
+    check(`gat vóór de start (${label}): november-december alleen Google`, jaarDeel(f, 10).every((v) => v === 100), JSON.stringify(jaarDeel(f, 10)));
+    check(`gat vóór de start (${label}): het jaar 1.200 + 180`, f.conversions.kpi.adjustedAnnual === 1380, String(f.conversions.kpi.adjustedAnnual));
+  }
+  // Nog extremer: alleen november-december 2025, het hele lopende jaar niets.
+  const alleenNajaar = reeks("linkedin", "2025-11", rijen("2025-11", "2025-12", 60));
+  check("alleen najaar 2025, dit jaar niets: gestopt", som.kanaalGestopt(alleenNajaar.maanden, 2026, 10) === true);
+  const fNajaar = blendedForecastUitKanalen("t", [g7, alleenNajaar], optelling([g7, alleenNajaar], 2026, 10), 10);
+  check("alleen najaar 2025: het jaar is Google alleen (1.200)", fNajaar.conversions.kpi.adjustedAnnual === 1200, String(fNajaar.conversions.kpi.adjustedAnnual));
+  // En de echte seizoenen blijven een pauze, ook als het kanaal elk jaar april-september uit staat.
+  const aprSepUit = reeks("linkedin", "2024-01", [...rijen("2024-01", "2024-03", 50), ...rijen("2024-10", "2025-03", 50), ...rijen("2025-10", "2026-03", 50)]);
+  check("april-september elk jaar uit: op grens 8 een pauze, geen stop", som.kanaalGestopt(aprSepUit.maanden, 2026, 8) === false);
+
+  // Een herstart na een oude historie is een deeljaar. Microsoft liep 80 per maand in 2023 en tot
+  // maart 2024, lag stil, en draait sinds oktober (of december) 2025 weer. `vanaf` is de eerste
+  // volle maand OOIT (2023-01), dus telde 2025 als "het hele jaar gelopen": doel drie maanden x 1,1,
+  // factor geklemd op 3,0, en november-december 66 (of 21) waar hij 80 doet. Zonder de oude
+  // historie gaf hetzelfde kanaal 80: meer historie gaf een lagere prognose.
+  const g8 = vlak("google", "2023-01", "2026-10", 100);
+  for (const [label, ms] of [
+    ["herstart oktober 2025", reeks("microsoft", "2023-01", [...rijen("2023-01", "2024-03", 80), ...rijen("2025-10", "2026-10", 80)])],
+    ["herstart december 2025", reeks("microsoft", "2023-01", [...rijen("2023-01", "2024-03", 80), ...rijen("2025-12", "2026-10", 80)])],
+    // Januari van vorig jaar gelopen, maar daarna gestopt en dit jaar herstart: ook geen heel jaar.
+    ["gelopen t/m maart 2025, herstart februari 2026", reeks("microsoft", "2024-01", [...rijen("2024-01", "2025-03", 80), ...rijen("2026-02", "2026-10", 80)])],
+  ] as const) {
+    const h = kanaalHistorieUitMaanden!("t", ms, 2026, 10);
+    check(`${label}: doel op jaarbasis (960), zonder groei`, h.targetCurrentYear.conversions === 960 && h.doelOpJaarbasis === true, `${h.targetCurrentYear.conversions} ${h.doelOpJaarbasis}`);
+    const f = blendedForecastUitKanalen("t", [g8, ms], optelling([g8, ms], 2026, 10), 10);
+    check(`${label}: november-december 100 + 80`, jaarDeel(f, 10).every((v) => v === 180), JSON.stringify(jaarDeel(f, 10)));
+  }
+  // Een kanaal dat vorig jaar wel heel het jaar liep, houdt vorig jaar plus groei.
+  const heelJaar = kanaalHistorieUitMaanden!("t", reeks("microsoft", "2023-01", [...rijen("2023-01", "2024-03", 80), ...rijen("2025-01", "2026-10", 80)]), 2026, 10);
+  // De weken van een maand: gelijk verdeeld, niet op de afrondingsvorm van de adapter. Elk kanaal
+  // komt met `weekly: []` de som in, dus zijn historische weken zijn generateEvenWeeks: per week
+  // afgerond, de rest in de laatste. 12 over 5 is [2,2,2,2,4], en 3 over 5 (een trackingbreuk) is
+  // [1,1,1,1,-1], geschoond tot [1,1,1,1,0]. weekDeel schaalde de maandprognose op die vorm: de
+  // beursstrip gaf de week van 31 augustus een CPA van € 20 tegen € 8,89 voor de weken ervoor.
+  {
+    const g9 = vlak("google", "2025-01", "2026-08", 100);
+    const breuk = reeks("microsoft", null, monthsIn({ start: "2025-01", end: "2026-08" }).map((k): Rij => { const c = k === "2025-08" ? 3 : 100; return [k, c, c * 100, c * 10]; }));
+    const f = blendedForecastUitKanalen("t", [g9, breuk], optelling([g9, breuk], 2026, 7), 7);
+    const weken = (r: ClientForecast["conversions"], m: number) => r.weeklyPoints.filter((w) => w.month === m).map((w) => w.forecast ?? NaN);
+    const aug = weken(f.conversions, 8);
+    check("trackingbreuk vorig jaar: de weken van augustus gelijk", aug.length === 5 && Math.max(...aug) - Math.min(...aug) <= 1, JSON.stringify(aug));
+    const cpaAug = weken(f.cpa, 8);
+    check("trackingbreuk vorig jaar: de week-CPA van augustus overal gelijk", Math.max(...cpaAug) - Math.min(...cpaAug) < 0.5, JSON.stringify(cpaAug));
+    const exp = f.conversions.weeklyPoints.filter((w) => w.month === 8).map((w) => w.expected);
+    check("en de verwachting per week ook", Math.max(...exp) - Math.min(...exp) <= 1, JSON.stringify(exp));
+    const klein = vlak("linkedin", "2025-01", "2026-08", 12);
+    const f2 = blendedForecastUitKanalen("t", [g9, klein], optelling([g9, klein], 2026, 7), 7);
+    for (const m of [8, 10, 12]) {
+      const c = weken(f2.cpa, m);
+      check(`kleine LinkedIn (12 per maand), maand ${m}: de week-CPA gelijk`, Math.max(...c) - Math.min(...c) < 0.5, JSON.stringify(c));
+    }
+  }
+  // Terug na een pauze midden in de laatste gerealiseerde maand: de route geeft de eerste dag van
+  // de HUIDIGE loop mee (startLaatsteLoop), niet de eerste dag ooit. Met 1 januari spreidde het tempo
+  // de 12 dagen juli over 31: Meta 38 per maand waar hij 100 doet.
+  {
+    const { startLaatsteLoop } = kanaalMaanden as Partial<typeof kanaalMaanden>;
+    const dagenVan = (van: string, tot: string) => monthsIn({ start: van.slice(0, 7), end: tot.slice(0, 7) })
+      .flatMap((m) => Array.from({ length: 31 }, (_, i) => `${m}-${String(i + 1).padStart(2, "0")}`)).filter((d) => d >= van && d <= tot && !Number.isNaN(Date.parse(d)) && new Date(d).toISOString().slice(0, 10) === d);
+    const loop = typeof startLaatsteLoop === "function" ? startLaatsteLoop([...dagenVan("2026-01-01", "2026-03-31"), ...dagenVan("2026-07-20", "2026-08-25")]) : null;
+    check("startLaatsteLoop: na een hele lege maand de dag van terugkomst", loop === "2026-07-20", String(loop));
+    check("startLaatsteLoop: zonder hele lege maand de eerste dag ooit",
+      startLaatsteLoop?.([...dagenVan("2026-01-01", "2026-06-30"), ...dagenVan("2026-07-20", "2026-08-25")]) === "2026-01-01");
+    check("startLaatsteLoop: zonder dagen null", startLaatsteLoop?.([]) === null);
+    const g10 = vlak("google", "2025-01", "2026-08", 100);
+    const terug: BlendedKanaalReeks = { ...reeks("meta", "2026-01", [...rijen("2026-01", "2026-03", 100), ["2026-07", 1200 / 31, 3870, 387], ["2026-08", 81, 8100, 810]]), eersteDag: loop };
+    const f = blendedForecastUitKanalen("t", [g10, terug], optelling([g10, terug], 2026, 7), 7);
+    check("terug op 20 juli: augustus-december 100 + Meta op zijn tempo (~98)", jaarDeel(f, 7).every((v) => v !== null && v >= 195 && v <= 201), JSON.stringify(jaarDeel(f, 7)));
+  }
+  check("heel vorig jaar gelopen: vorig jaar + 10% (1.056)", heelJaar.targetCurrentYear.conversions === 1056 && heelJaar.doelOpJaarbasis === undefined,
+    `${heelJaar.targetCurrentYear.conversions} ${heelJaar.doelOpJaarbasis}`);
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

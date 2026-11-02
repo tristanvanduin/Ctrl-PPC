@@ -4,7 +4,7 @@ import { useState } from "react";
 import { FileText, Copy, Check, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
-import { computeForecast, MONTH_LABELS, ytdGerealiseerd, type ForecastPoint } from "@/lib/forecast";
+import { computeForecast, jaarprognoseVerhouding, MONTH_LABELS, ytdGerealiseerd, type ForecastPoint } from "@/lib/forecast";
 import { getClientSettings } from "@/lib/client-settings";
 import { getAllClients } from "@/lib/clients";
 import { fixMojibake } from "@/lib/analysis/sanitize";
@@ -59,6 +59,8 @@ export function ReportExport({ clientId }: { clientId: string }) {
   // dan schreef het rapport "CPA € 0" en "€ 0 gemiddeld YTD" naar de klant na kosten zonder conversie.
   const roasYtd = ytdGerealiseerd(forecast, "roas");
   const cpaYtd = ytdGerealiseerd(forecast, "cpa");
+  const roasPrognose = jaarprognoseVerhouding(forecast, "roas");
+  const cpaPrognose = jaarprognoseVerhouding(forecast, "cpa");
   const budget = forecast.budgetRecommendation;
   const realizedMonths = forecast.conversions.points.filter((p) => p.realized !== null);
   const lastMonth = realizedMonths[realizedMonths.length - 1];
@@ -81,8 +83,9 @@ export function ReportExport({ clientId }: { clientId: string }) {
     lines.push("|-----|-----------------|----------|-------------|----------|");
     lines.push(`| Conversies | ${num(conv.ytdRealized)} | ${num(conv.annualTarget)} | ${num(conv.adjustedAnnual)} | ${pct(conv.diffPct)} |`);
     lines.push(`| Omzet | ${fmt(rev.ytdRealized)} | ${fmt(rev.annualTarget)} | ${fmt(rev.adjustedAnnual)} | ${pct(rev.diffPct)} |`);
-    lines.push(`| ROAS | ${roasYtd === null ? "-" : formatRoas(roasYtd)} | ${formatRoas(roas.annualTarget)} | ${formatRoas(roas.adjustedAnnual)} | ${pct(roas.diffPct)} |`);
-    lines.push(`| CPA | ${cpaYtd === null ? "-" : fmt(cpaYtd)} | ${fmt(cpa.annualTarget)} | ${fmt(cpa.adjustedAnnual)} | ${pct(cpa.diffPct)} |`);
+    // Zonder noemer geen jaarprognose en geen verschil (jaarprognoseVerhouding), zoals de YTD-kolom.
+    lines.push(`| ROAS | ${roasYtd === null ? "-" : formatRoas(roasYtd)} | ${formatRoas(roas.annualTarget)} | ${roasPrognose === null ? "-" : formatRoas(roasPrognose)} | ${roasPrognose === null ? "-" : pct(roas.diffPct)} |`);
+    lines.push(`| CPA | ${cpaYtd === null ? "-" : fmt(cpaYtd)} | ${fmt(cpa.annualTarget)} | ${cpaPrognose === null ? "-" : fmt(cpaPrognose)} | ${cpaPrognose === null ? "-" : pct(cpa.diffPct)} |`);
     lines.push("");
 
     // Monthly breakdown
@@ -108,7 +111,11 @@ export function ReportExport({ clientId }: { clientId: string }) {
       lines.push(`Het GESCHATTE jaardoel (vorig jaar +10%, automatisch afgeleid \u2014 er is nog geen doel ingevoerd) wordt op basis van de huidige trend niet gehaald. Om dat niveau te bereiken:`);
       lines.push("");
       lines.push(`- **Conversie gap**: ${num(budget.conversionGap)} conversies tekort`);
-      lines.push(`- **Huidige CPA**: ${fmt(budget.currentCpa)}`);
+      // Zonder conversies YTD is dit het CPA-doel, geen gemeten CPA: twee regels hierboven staat
+      // dan "geen conversies YTD, dus geen CPA".
+      lines.push(budget.cpaUitDoel
+        ? `- **Gerekend met het CPA-doel** (nog geen conversies YTD): ${fmt(budget.currentCpa)}`
+        : `- **Huidige CPA**: ${fmt(budget.currentCpa)}`);
       lines.push(`- **Extra budget nodig**: ${fmt(budget.extraSpendNeeded)}`);
       lines.push(`- **Benodigd maandbudget**: ${fmt(budget.requiredMonthlySpend)}/maand (huidig: ${fmt(budget.currentMonthlySpend)}/maand)`);
       if (budget.spendIncreasePct > 0) {

@@ -17,6 +17,8 @@ import { FakeSupabase } from "../decision/__fake_supabase";
 import { resolveChannelConversionConfig, sumSelectedConversions } from "../analysis/channel-conversion-config";
 import { DataLaagFout } from "../analysis/db-veilig";
 import { addDays } from "../reporting-date";
+import { uitgeslotenMetDag, type DataStandSamen } from "../sync/datastand";
+import { uitgeslotenZin } from "../../components/dashboard/period-summary";
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -161,6 +163,28 @@ async function main() {
     check("het jaar komt uit `nu` (Amsterdam), niet uit de serverklok", uit?.currentYear === 2026, String(uit?.currentYear));
   }
 
+  console.log("Terug na een pauze: de eerste dag van de huidige loop, en vanaf blijft de start");
+  {
+    // Meta januari-maart, april-juni stil, terug op 20 juli. De eerste dag ging naar het tempo zonder
+    // doel (forecastCoreMetric): met 1 januari spreidde dat de 12 dagen juli over 31.
+    const sb = new FakeSupabase();
+    sb.seed("accounts", [{ id: "acc-1", client_id: "c1", name: "C1", source: "google_ads", external_id: null, agency_id: null }]);
+    sb.seed("client_settings", [{ client_id: "c1", channel_conversion_config: null }]);
+    sb.seed("fact_core", Array.from({ length: 8 }, (_, i) => ({
+      account_id: "acc-1", channel: "google", level: "account", grain: "month",
+      period_start: `2026-${String(i + 1).padStart(2, "0")}-01`, impressions: 0, clicks: 0, cost: 100, conversions: 10, conv_value: 0,
+    })));
+    sb.seed("ads_account_monthly", Array.from({ length: 8 }, (_, i) => ({ client_id: "c1", month: `2026-${String(i + 1).padStart(2, "0")}-01` })));
+    sb.seed("client_sync_status", [{ client_id: "c1", last_successful_sync_at: "2026-08-26T06:44:34Z" }]);
+    const metaDag = (d: string) => ({ client_id: "c1", date: d, entity_id: "m1", impressions: 0, link_clicks: 0, spend: 10, conversions: 1, leads: 0, conversion_value: 0 });
+    sb.seed("meta_account_daily", [...dagen("2026-01-01", "2026-03-31", metaDag), ...dagen("2026-07-20", "2026-08-26", metaDag)]);
+    sb.seed("meta_connections", [{ client_id: "c1", last_sync_at: "2026-08-26T06:44:34Z" }]);
+    const uit = await haal(sb, "c1", NU);
+    const meta = kanaal(uit, "meta") as { vanaf?: string | null; eersteDag?: string | null } | undefined;
+    check("terug op 20 juli: de eerste dag is 20 juli", meta?.eersteDag === "2026-07-20", String(meta?.eersteDag));
+    check("terug op 20 juli: vanaf blijft januari (de historie van vóór de pauze telt)", meta?.vanaf === "2026-01", String(meta?.vanaf));
+  }
+
   console.log("Een gepauzeerd kanaal met een gezonde sync remt de rest niet af");
   {
     const sb = new FakeSupabase();
@@ -222,6 +246,23 @@ async function main() {
     const uit2 = await haal(sb2, "uit", NU);
     check("status disabled (een maand achter): remt niet, LinkedIn uitgesloten",
       stand(uit2)?.laatsteVolleMaand === "2026-10" && stand(uit2)?.uitgesloten.join(",") === "linkedin", JSON.stringify(stand(uit2)));
+
+    // Ontkoppeld (of de sync dood) direct na de sync van 15 mei 05:00, die een rij voor 15 mei
+    // schreef. De route zet LinkedIn t/m 14 mei (de rij van de syncdag is een deel van die dag), en
+    // de zin over het uitgesloten kanaal zei "geen data na 14 mei", terwijl de rij van 15 mei in
+    // het meitotaal staat en de laatste data is die er komt. De zin noemt de rij; het venster niet.
+    for (const status of ["disabled", "active"]) {
+      const id = `syncdag-${status}`;
+      const sb3 = googleTotOktober(id);
+      sb3.seed("linkedin_account_daily", dagen("2026-01-01", "2026-05-15", linkedinRij(id)));
+      sb3.seed("linkedin_connections", [{ client_id: id, last_sync_at: "2026-05-15T05:00:12Z", status }]);
+      const u = await haal(sb3, id, NU);
+      const s = stand(u) as (DataStandSamen | null | undefined);
+      check(`laatste rij op de syncdag (${status}): het venster blijft oktober en LinkedIn t/m 14 mei`,
+        s?.laatsteVolleMaand === "2026-10" && s?.bronnen?.find((b) => b.bron === "linkedin")?.dataTot === "2026-05-14", JSON.stringify(s));
+      const zin = uitgeslotenZin(uitgeslotenMetDag(s));
+      check(`laatste rij op de syncdag (${status}): de zin noemt 15 mei`, zin !== null && zin.includes("geen data na 15 mei 2026"), String(zin));
+    }
   }
 
   console.log("Een gekoppeld kanaal waarvan de sync al lang faalt, remt hooguit tot de grens");
@@ -259,6 +300,21 @@ async function main() {
     check("dataStand.bronnen draagt de dataTot per kanaal, met de sync erin verwerkt",
       ms?.dataTot === "2026-10-31" && ms?.syncDraait === false && stand(uit)?.bronnen?.find((b) => b.bron === "google")?.dataTot === "2026-10-31",
       JSON.stringify(stand(uit)?.bronnen));
+  }
+
+  console.log("De rij van de syncdag is een deel van die dag");
+  {
+    // De nachtcron (05:00 UTC) haalt dagrijen t/m vandaag op. Meta slaagde voor het laatst op
+    // 31 oktober; de rij van die dag is zo'n zes uur. De dag van de sync zelf telde hier als
+    // gemeten, en dan was oktober "vol" op Alle kanalen, in het Jaaroverzicht en de Pacing.
+    const sb = googleTotOktober("syncdag");
+    sb.seed("meta_account_daily", dagen("2026-09-01", "2026-10-31", (d) => ({ client_id: "syncdag", date: d, entity_id: "m1", impressions: 0, link_clicks: 0, spend: 10, conversions: 1, leads: 0, conversion_value: 0 })));
+    sb.seed("meta_connections", [{ client_id: "syncdag", last_sync_at: "2026-10-31T05:00:00Z", status: "active" }]);
+    const uit = await haal(sb, "syncdag", NU);
+    const meta = stand(uit)?.bronnen?.find((b) => b.bron === "meta");
+    check("Meta: dataTot 30 oktober, de dag vóór de sync", meta?.dataTot === "2026-10-30", JSON.stringify(stand(uit)?.bronnen));
+    check("samen: september vol, oktober partieel, realizedThroughMonth 9",
+      stand(uit)?.laatsteVolleMaand === "2026-09" && stand(uit)?.dataTot === "2026-10-30" && uit?.realizedThroughMonth === 9, JSON.stringify(stand(uit)));
   }
 
   console.log("Alles gepauzeerd met gezonde syncs: de laatste dag telt (review [11])");

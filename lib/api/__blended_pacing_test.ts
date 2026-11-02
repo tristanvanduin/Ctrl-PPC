@@ -142,6 +142,30 @@ if (typeof blendedPacingCijfers !== "function" || typeof blendedPacingVoetregel 
   check("en 'nog geen volle maand' in plaats van 'nog niet'",
     metMs.includes("liepen in januari 2025 t/m juli 2025 nog geen volle maand en tellen alleen mee in het tempo."), metMs);
   check("geen 'in beide jaren liep' voor een maand die niet telde", !metMs.includes("in beide jaren liep"), metMs);
+
+  // Zonder gepaard kanaal zei de voetregel altijd "geen van de kanalen liep in ... al". Microsoft
+  // liep in juli 2025 wel, negen dagen (€ 297): dan is dat onwaar. Naast Google zei de buiten-zin
+  // over hetzelfde kanaal "nog geen volle maand"; zonder Google sprak de voetregel zichzelf tegen.
+  const msAlleen: BlendedKanaalReeks = { kanaal: "microsoft", vanaf: "2025-08", maanden: [
+    { month: "2025-07", adSpend: 297, conversions: 23.5, revenue: 0 },
+    ...reeks(2025, 8, Array(5).fill(1000), Array(5).fill(80)),
+    ...reeks(2026, 1, Array(7).fill(1000), Array(7).fill(80)),
+  ] };
+  const alleenMs = blendedPacingVoetregel(blendedPacingCijfers([msAlleen], "2026-07")!, null);
+  check("geen paar, wel een deels gelopen maand: 'al een volle maand'",
+    alleenMs.startsWith("Geen vergelijking: geen van de kanalen liep in januari 2025 t/m juli 2025 al een volle maand."), alleenMs);
+  const metMeta = blendedPacingVoetregel(blendedPacingCijfers([...demo.slice(1), msAlleen], "2026-07")!, null);
+  check("ook met Meta en LinkedIn erbij (die toen helemaal niet liepen)",
+    metMeta.startsWith("Geen vergelijking: geen van de kanalen liep in januari 2025 t/m juli 2025 al een volle maand."), metMeta);
+
+  // De deels-zin zei "telt in het verschil alleen mee vanaf de eigen eerste volle maand, in beide
+  // jaren". Een paar telt pas als ook de maand van VORIG jaar na de start ligt: Google sinds februari
+  // 2025 telt dus ook in 2026 pas vanaf februari, en januari 2026 (90 conversies) viel stil weg.
+  const gFeb: BlendedKanaalReeks = { kanaal: "google", vanaf: null, maanden: [...G25.slice(1), ...G26] };
+  const deelsG = blendedPacingVoetregel(blendedPacingCijfers([gFeb, ...demo.slice(1)], "2026-07")!, null);
+  check("de deels-zin noemt de maanden die echt vergeleken worden",
+    deelsG.includes("Google Ads (sinds februari 2025) telt in het verschil alleen mee over februari 2026 t/m juli 2026 tegen februari 2025 t/m juli 2025."), deelsG);
+  check("niet meer 'vanaf de eigen eerste volle maand, in beide jaren'", !deelsG.includes("in beide jaren"), deelsG);
 }
 
 console.log("Wat er op het scherm komt");

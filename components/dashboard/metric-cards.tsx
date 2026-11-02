@@ -34,9 +34,12 @@ function KpiCard({ label, icon, cijfers, format, subtitle, metricKey, selected, 
   // Het teken van diffPct blijft eerlijk (+ = prognose boven doel); alleen het oordeel draait om
   // bij een metric waar lager beter is (CPA), zoals op de maand- en weekkaarten.
   const isPositive = metricKey && isLowerBetter(metricKey) ? diffPct <= 0 : diffPct >= 0;
+  // Zonder jaarprognose (een CPA zonder één verwachte conversie) is er geen verschil met het doel:
+  // diffPct staat dan op -100% (calcKpi gaf 0), en bij CPA las dat als groen. Dan geen oordeel.
+  const zonderPrognose = adjusted === null;
   const StatusIcon = isPositive ? TrendingUp : TrendingDown;
-  const statusColor = isPositive ? "text-green-600" : "text-red-500";
-  const statusBg = isPositive ? "bg-green-50" : "bg-red-50";
+  const statusColor = zonderPrognose ? "text-muted-foreground" : isPositive ? "text-green-600" : "text-red-500";
+  const statusBg = zonderPrognose ? "bg-gray-50" : isPositive ? "bg-green-50" : "bg-red-50";
   return (
     <KlikbareKaart waarde={metricKey} geselecteerd={selected} onKies={onSelect}>
       {/* Header */}
@@ -71,7 +74,8 @@ function KpiCard({ label, icon, cijfers, format, subtitle, metricKey, selected, 
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground">Jaarprognose</span>
-          <span className="text-xs font-semibold text-brand-blue-ink">{format(adjusted)}</span>
+          {/* Null voor een CPA zonder één verwachte conversie (jaarprognoseVerhouding): geen € 0. */}
+          <span className="text-xs font-semibold text-brand-blue-ink">{adjusted === null ? "—" : format(adjusted)}</span>
         </div>
       </div>
 
@@ -86,7 +90,7 @@ function KpiCard({ label, icon, cijfers, format, subtitle, metricKey, selected, 
               {realizedPct !== null ? `${Math.round(realizedPct)}% gerealiseerd` : "t.o.v. doel"}
             </span>
             <span className={`font-bold ${statusColor}`}>
-              {formatDeltaPercent(diffPct)}
+              {zonderPrognose ? "—" : formatDeltaPercent(diffPct)}
             </span>
           </div>
           {realizedPct !== null && (

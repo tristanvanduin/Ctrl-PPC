@@ -10,7 +10,7 @@ import { today as vandaag } from "@/lib/reporting-date";
 import { resolveChannelConversionConfig, sumSelectedConversions, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
 import { buildChannelForecast } from "@/lib/analysis/channel-forecast-data";
 import type { TargetRow } from "@/lib/analysis/o2-targets-cost";
-import { actieveMetrics, nuIndex, ytdGerealiseerd, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
+import { actieveMetrics, nuIndex, ytdGerealiseerd, jaarprognoseVerhouding, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
 import type { ClientHistoricalData } from "@/lib/types";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas, formatterFor, isLowerBetter, isOptelbaar, METRIC_LABELS } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
@@ -62,6 +62,8 @@ function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
   };
   const kpi = forecast[metric].kpi;
   const ytd = ytdGerealiseerd(forecast, metric);
+  // De tegenhanger voor de jaarprognose: een CPA zonder één verwachte conversie is geen € 0.
+  const prognose = jaarprognoseVerhouding(forecast, metric);
   const format = formatterFor(metric);
   // isLowerBetter, net als elke andere metric-consument: zonder deze check kleurde een
   // sléchtere CPA (diffPct >= 0) groen — precies de "gemiste plek kleurt rood groen" waar
@@ -92,14 +94,15 @@ function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground">Jaarprognose</span>
-          <span className="text-xs font-semibold text-brand-blue-ink">{format(kpi.adjustedAnnual)}</span>
+          <span className="text-xs font-semibold text-brand-blue-ink">{prognose === null ? "—" : format(prognose)}</span>
         </div>
       </div>
       {kpi.annualTarget > 0 && (
         <div>
           <div className="flex justify-between text-micro mb-1.5">
             <span className="text-muted-foreground">{toonVoortgang ? `${Math.round(realizedPct)}% gerealiseerd` : "t.o.v. doel"}</span>
-            <span className={`font-bold ${isPositive ? "text-green-600" : "text-red-500"}`}>{formatDeltaPercent(kpi.diffPct)}</span>
+            {/* Zonder prognose geen verschil: diffPct staat dan op -100%, en dat kleurde bij CPA groen. */}
+            <span className={`font-bold ${prognose === null ? "text-muted-foreground" : isPositive ? "text-green-600" : "text-red-500"}`}>{prognose === null ? "—" : formatDeltaPercent(kpi.diffPct)}</span>
           </div>
           {toonVoortgang && (
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">

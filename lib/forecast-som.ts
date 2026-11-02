@@ -35,6 +35,7 @@ import {
 } from "./forecast";
 import { bronStart, heeftData } from "./period/apply-period";
 import { monthIndex } from "./period/period-range";
+import { volleMaand } from "./sync/datastand";
 import type { ClientAnnualData, ClientHistoricalData } from "./types";
 
 type Kern = "conversions" | "revenue" | "adSpend";
@@ -70,9 +71,9 @@ const apiMaand = (month: number, m: { conversions: number; revenue: number; adSp
  *   twee maanden 39). Bij die klem schaalt een doel niet alleen de verwachting maar ook de prognose;
  *   op jaarbasis blijft de factor bij het eigen tempo. `doelOpJaarbasis` zegt dat erbij, zodat de
  *   verwachting in januari ook de maanden vóór de start van vorig jaar vult (forecastCoreMetric).
- * - `eersteDag` (de eerste dag met data, van de route) gaat mee: is de partiële eerste maand de
- *   laatste gerealiseerde, dan rekent computeForecast zonder doel het tempo over de dagen dat het
- *   kanaal liep, niet over de hele maand.
+ * - `eersteDag` (de eerste dag van de huidige loop, van de route: na een pauze van een hele maand de
+ *   dag van terugkomst) gaat mee: is die partiële maand de laatste gerealiseerde, dan rekent
+ *   computeForecast zonder doel het tempo over de dagen dat het kanaal liep, niet over de hele maand.
  */
 export function kanaalHistorieUitMaanden(
   clientId: string,
@@ -112,8 +113,15 @@ export function kanaalHistorieUitMaanden(
   huidig.sort((a, b) => a.month - b.month);
 
   const vorig = currentYear - 1;
-  const volVorigJaar = vanaf !== null && monthIndex(vanaf) <= monthIndex(`${vorig}-01`);
   const vorigJaar = historicalYears.find((j) => j.year === vorig);
+  // Een heel jaar is: begonnen vóór dat jaar, EN gelopen in zijn januari en zijn december. `vanaf`
+  // alleen is de eerste volle maand OOIT: een Microsoft die in 2023 liep, stilviel en in oktober
+  // 2025 herstartte, telde dan als "heel 2025 gelopen", kreeg drie maanden x 1,1 als doel en een
+  // factor geklemd op 3,0 (66 per maand waar hij 80 doet; zonder de oude historie wel 80). Met
+  // december erbij ook een kanaal dat vorig jaar in januari nog liep en daarna stopte. Een
+  // seizoenskanaal dat in januari en december loopt, houdt vorig jaar plus groei.
+  const liepIn = (maand: number) => vorigJaar?.monthly.some((m) => m.month === maand) ?? false;
+  const volVorigJaar = vanaf !== null && monthIndex(vanaf) <= monthIndex(`${vorig}-01`) && liepIn(1) && liepIn(12);
   const totaal = (k: Kern) => vorigJaar?.monthly.reduce((s, m) => s + m[k], 0) ?? 0;
   const opJaarbasis = (k: Kern) => Math.round((totaal(k) * 12) / (vorigJaar?.monthly.length ?? 1));
   const deeljaar = vorigJaar !== undefined && !volVorigJaar;
@@ -187,19 +195,22 @@ function somKern(
     };
   });
 
-  // De weekprognose van een kanaal, geschaald naar de maandprognose van datzelfde kanaal. Zonder
+  // De weekprognose van een kanaal: zijn maandprognose GELIJK over de weken van die maand. Zonder
   // doel geeft computeForecast elke emmer het weektempo en de maand het tempo x 52/12; opgeteld
   // telde een maand met vijf emmers dan 5 weken en een met vier er 4. Op de demo (Meta en LinkedIn
   // zonder doel) toonde de beursstrip oktober 129 per week en november 85, waar de tabel ernaast
-  // 465 en 452 zei. Met een doel tellen de emmers al op tot de maand, en verandert er op de
-  // afronding na niets.
+  // 465 en 452 zei.
+  //
+  // Gelijk, en niet op de weekvorm van het kanaal: elk kanaal komt met `weekly: []` binnen, dus die
+  // vorm is generateEvenWeeks, per week afgerond met de rest in de laatste week. Dat is geen
+  // seizoen maar afronding: 12 over 5 is [2,2,2,2,4], en een trackingbreuk van 3 is [1,1,1,1,-1],
+  // geschoond tot [1,1,1,1,0]. repairOutliers repareert het maandtotaal maar niet die weken, en dan
+  // gaf de beursstrip de laatste week van augustus een CPA van € 20 tegen € 8,89 ervoor.
   const weekDeel = (d: ForecastResult, j: number): number | null => {
     const w = d.weeklyPoints[j];
     if (w.forecast === null) return null;
     const maandWeken = d.weeklyPoints.filter((x) => x.month === w.month && x.forecast !== null);
-    const somWeken = maandWeken.reduce((s, x) => s + (x.forecast ?? 0), 0);
-    const maand = d.points[w.month - 1].forecast ?? 0;
-    return somWeken > 0 ? (w.forecast * maand) / somWeken : maand / maandWeken.length;
+    return (d.points[w.month - 1].forecast ?? 0) / maandWeken.length;
   };
 
   const weeklyPoints: WeeklyPoint[] = delen[0].weeklyPoints.map((w0, j) => {
@@ -207,8 +218,9 @@ function somKern(
     const forecast = optellen(delen.map((d) => weekDeel(d, j)));
     return {
       month: w0.month, week: w0.week, label: w0.label,
-      expected: gelijk ? Math.round(points[w0.month - 1].expected / perMaand)
-        : Math.round(delen.reduce((s, d) => s + d.weeklyPoints[j].expected, 0) * schaal),
+      // Om dezelfde reden gelijk over de weken: de som van de weekverwachtingen per kanaal had
+      // dezelfde afrondingsvorm.
+      expected: Math.round(points[w0.month - 1].expected / perMaand),
       realized: optellen(delen.map((d) => d.weeklyPoints[j].realized)),
       forecast: forecast === null ? null : Math.round(forecast),
     };
@@ -347,8 +359,33 @@ export function kanaalGestopt(
   if (tot.length === 0) return true;
   const laatsteData = Math.max(...tot);
   for (let i = laatsteData + 1; i <= laatste; i++) if (met.includes(i - 12)) return true;
-  const seizoensPauze = met.some((i) => i > laatste - 12 && i <= monthIndex(`${jaar - 1}-12`));
+  // Alleen een pauze als het kanaal vorig jaar vóór die maanden al liep. Een gat van vóór zijn
+  // start ("vorig jaar ook leeg" omdat hij er nog niet was) zegt niets over een seizoen: anders werd
+  // een kanaal dat vorig najaar begon en in het voorjaar stopte een pauze, en kreeg hij op "Alle
+  // kanalen" en op zijn tab de rest van het jaar een prognose. Eén maand eerder starten gaf wél
+  // "gestopt", dus minder historie gaf een andere uitkomst.
+  const seizoensPauze = met.some((i) => i <= laatsteData - 12)
+    && met.some((i) => i > laatste - 12 && i <= monthIndex(`${jaar - 1}-12`));
   return !seizoensPauze;
+}
+
+/**
+ * De eigen laatste volle maand (1-12) van elk kanaal in `bronnen` (DataStandSamen.bronnen, met de
+ * dag zoals de route hem per kanaal bepaalde), 0 als die in een eerder jaar valt. Dezelfde grens
+ * die de kanaaltab uit diezelfde dag haalt (gerealiseerdTot in channel-forecast-data.ts), zodat de
+ * som en de tab hun stop op dezelfde maand kunnen beslissen.
+ */
+export function eigenGrenzen(
+  bronnen: readonly { bron: string; dataTot: string | null | undefined }[] | null | undefined,
+  jaar: number,
+  nu?: string,
+): Partial<Record<string, number>> {
+  const uit: Partial<Record<string, number>> = {};
+  for (const b of bronnen ?? []) {
+    const vol = volleMaand({ dataTot: b.dataTot, nu }).laatsteVolleMaand;
+    uit[b.bron] = vol === null || Number(vol.slice(0, 4)) < jaar ? 0 : Number(vol.slice(5, 7));
+  }
+  return uit;
 }
 
 /**
@@ -413,6 +450,8 @@ function metVerdeeldeCorrecties(
  * @param realizedThroughMonth de gezamenlijke grens van de route.
  * @param uitgesloten de bronnen die het venster niet tegenhielden (DataStandSamen.uitgesloten):
  *   gestopt, ontkoppeld of dood. Na hun laatste dag tellen ze als nul.
+ * @param eigenGrens per kanaal zijn EIGEN laatste volle maand dit jaar (eigenGrenzen), voor de
+ *   stopbeslissing alleen. Zie hieronder.
  *
  * Een kanaal zonder rij dit jaar binnen die grens dat daarna wel loopt (terug in de partiële maand)
  * telt mee vanaf de grens (vanafGrens): het heeft vorig jaar om op te projecteren. Hier stond dat
@@ -428,6 +467,12 @@ function metVerdeeldeCorrecties(
  * - In januari is de grens 0, en dan had elk kanaal "dezelfde grens", ook een dat sinds 2024 stil
  *   ligt: zijn doel viel terug op 2024 en werd voor dit jaar geprojecteerd. De laatste gerealiseerde
  *   maand is dan december van vorig jaar. Zonder gerealiseerde maand dit jaar valt zo'n kanaal weg.
+ *
+ * De stop wordt beslist op de LAATSTE van twee grenzen: de gezamenlijke en die van het kanaal zelf.
+ * De kanaaltab beslist op zijn eigen grens. Loopt een gepauzeerd kanaal met een gezonde sync een
+ * maand vóór op de rest (Meta handmatig gesynct op 1 november, Google nog niet), dan zag de tab
+ * een gemeten lege oktober en "gestopt" (526), en de som op grens september "loopt nog" (701). De
+ * gerealiseerde maanden blijven op de gezamenlijke grens: alleen de stop verschuift.
  */
 export function blendedForecastUitKanalen(
   clientId: string,
@@ -435,10 +480,11 @@ export function blendedForecastUitKanalen(
   samen: ClientHistoricalData,
   realizedThroughMonth: number,
   uitgesloten: readonly string[] = [],
+  eigenGrens: Readonly<Partial<Record<string, number>>> = {},
 ): ClientForecast {
   const jaar = samen.currentYear;
   const gestopt = (k: Pick<BlendedKanaalReeks, "kanaal" | "maanden">) =>
-    uitgesloten.includes(k.kanaal) || kanaalGestopt(k.maanden, jaar, realizedThroughMonth);
+    uitgesloten.includes(k.kanaal) || kanaalGestopt(k.maanden, jaar, Math.max(realizedThroughMonth, eigenGrens[k.kanaal] ?? 0));
 
   const kanalen = perKanaal
     .map((k) => ({ stil: gestopt(k), historie: kanaalHistorieUitMaanden(clientId, k, jaar, realizedThroughMonth) }))

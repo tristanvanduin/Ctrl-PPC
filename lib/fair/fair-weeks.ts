@@ -368,6 +368,8 @@ export interface FairWeek {
   forecast: number | null;
   /** Gemeten met een teller maar zonder noemer (kosten zonder conversies): zie ForecastPoint.geenNoemer. */
   geenNoemer?: boolean;
+  /** Idem voor een prognose (kosten verwacht, geen conversie verwacht): zie ForecastPoint.geenNoemerPrognose. */
+  geenNoemerPrognose?: boolean;
 }
 
 /**
@@ -494,6 +496,9 @@ export function toFairWeeks(
       ? null
       : maand ? elkeWeek(maand.waarde) : verdeelMaand(pts.map((q) => q.realized ?? 0), n, additief);
     const geenNoemer = !passend && alleGerealiseerd && maand !== null && maand.geenNoemer;
+    // Dezelfde vlag voor een prognosemaand: kosten verwacht en geen conversie. Anders heette die
+    // week "Geen data" terwijl de maandkaart "Geen conversies verwacht" zegt.
+    const geenNoemerPrognose = !passend && !alleGerealiseerd && !geenWaarde && maand !== null && maand.geenNoemer;
     const forecast = passend || alleGerealiseerd || geenWaarde
       ? null
       : maand ? elkeWeek(maand.waarde) : verdeelMaand(pts.map((q) => q.realized ?? q.forecast ?? 0), n, additief);
@@ -512,6 +517,7 @@ export function toFairWeeks(
         realized: p ? p.realized : realized ? realized[i - 1] : null,
         forecast: p ? p.forecast : forecast ? forecast[i - 1] : null,
         ...((p ? p.geenNoemer : geenNoemer) ? { geenNoemer: true } : {}),
+        ...((p ? p.geenNoemerPrognose : geenNoemerPrognose) ? { geenNoemerPrognose: true } : {}),
       });
     }
   }

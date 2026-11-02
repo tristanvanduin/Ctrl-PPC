@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
 import { today as vandaag } from "@/lib/reporting-date";
-import { buildChannelForecast } from "@/lib/analysis/channel-forecast-data";
+import { buildChannelForecast, tabStandUitRoute } from "@/lib/analysis/channel-forecast-data";
 import { useBlendedClientData } from "@/lib/use-blended-client-data";
 import type { TargetRow } from "@/lib/analysis/o2-targets-cost";
 import {
@@ -68,9 +68,11 @@ export function ChannelDataProvider({ clientId, channel, children }: {
   // kan <kanaal>_connections niet lezen, en uit de rijen alleen verloor een gepauzeerd account met
   // een gezonde sync zijn echte halve maand aan een projectie, terwijl "Alle kanalen" dezelfde
   // maanden als gemeten telde (review [14]). Hetzelfde verzoek als de KPI-band erboven (de hook
-  // deelt het); faalt het, dan de rijen, zoals voorheen.
+  // deelt het); faalt het, dan de rijen, zoals voorheen. Een kanaal dat de route in `uitgesloten`
+  // zet (ontkoppeld, of zijn data komt niet meer), krijgt de gezamenlijke dag en de stop van de som
+  // mee (tabStandUitRoute): met zijn eigen, oude dag projecteerde de tab maanden die al voorbij zijn.
   const route = useBlendedClientData(clientId);
-  const syncDag = route.dataStand?.bronnen?.find((b) => b.bron === channel)?.dataTot ?? null;
+  const { dataTot: syncDag, gestopt } = tabStandUitRoute(route.dataStand, channel);
   const routeKlaar = !route.loading;
 
   useEffect(() => {
@@ -81,7 +83,9 @@ export function ChannelDataProvider({ clientId, channel, children }: {
       // Nieuwste eerst: een read levert hooguit 1000 rijen (de PostgREST-cap). Zonder volgorde
       // bepaalt de database welke dagen wegvallen, en dat kan de lopende maand zijn. Zo raakt een
       // cap alleen de oudste dagen; 1000 dagen dekt het lopende jaar plus twee volle vorige jaren.
-      // Geen afnemer leunt op de volgorde (pacing, maandgrafiek en forecast groeperen zelf).
+      // De forecast leest zijn weken op positie; de adapter (apiDataToMonthlyRecords) zet ze daarom
+      // zelf op weeknummer. Hier stond "geen afnemer leunt op de volgorde", en toen stonden de weken
+      // van elke maand omgekeerd.
       dbSelect<Record<string, unknown>>(cfg.accountTable, { select: cfg.select, clientId, order: { column: "date", ascending: false } }),
       dbSelect<{ channel: string; metric: string; target_value: number; valid_from: string; valid_to: string | null }>(
         "client_targets", { select: "channel, metric, target_value, valid_from, valid_to", clientId },
@@ -118,9 +122,10 @@ export function ChannelDataProvider({ clientId, channel, children }: {
       cfg.channelKey,
       vandaag(),
       syncDag,
+      { gestopt },
     );
     return { rijen, convVan, convLabel, forecast: gebouwd ?? "leeg" };
-  }, [clientId, cfg.channelKey, convConfig, rijen, targets, routeKlaar, syncDag]);
+  }, [clientId, cfg.channelKey, convConfig, rijen, targets, routeKlaar, syncDag, gestopt]);
 
   return <KanaalDataContext.Provider value={waarde}>{children}</KanaalDataContext.Provider>;
 }

@@ -354,7 +354,7 @@ export function FairWeeksView({
                   {heeftVerwachting && !geenData && (
                     <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>{formatPercent(ratio, 0)}</p>
                   )}
-                  {w.geenNoemer && (
+                  {(w.geenNoemer || w.geenNoemerPrognose) && (
                     <p className={`text-micro font-bold mt-0.5 ${ratioColor}`}>{geenWaardeLabel(w, metric).toLowerCase()}</p>
                   )}
                 </button>

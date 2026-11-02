@@ -115,6 +115,22 @@ const STORAGE_KEY_PREFIX = "rm-dashboard-settings-";
 const settingsCache = new Map<string, ClientSettings>();
 
 /**
+ * Of er voor deze klant al instellingen bekend zijn zonder de database: in het geheugen (een
+ * eerdere loadClientSettings of saveClientSettings) of in de localStorage van een eerder bezoek.
+ * Zonder is getClientSettings de standaard, en dat is bij een opgeslagen doel een ander getal dan
+ * Instellingen zegt (ClientDataProvider wacht dan op het eerste lezen).
+ */
+export function heeftGecachteInstellingen(clientId: string): boolean {
+  if (settingsCache.has(clientId)) return true;
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(STORAGE_KEY_PREFIX + clientId) != null;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Get client settings (synchronous — reads from cache).
  * Call loadClientSettings() first to populate the cache from Supabase.
  */

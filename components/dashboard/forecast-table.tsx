@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useBlendedClientData } from "@/lib/use-blended-client-data";
-import { actieveMetrics, computeForecast, MONTH_LABELS, type ForecastMetric, type ClientForecast } from "@/lib/forecast";
+import { actieveMetrics, computeForecast, jaarprognoseVerhouding, MONTH_LABELS, type ForecastMetric, type ClientForecast } from "@/lib/forecast";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, geenWaardeLabel, zonderData } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalVoet, VoetRij, TotaalCel } from "./data-table";
@@ -79,7 +79,9 @@ export function ForecastSummaryTiles({ clientId, channel = "google" }: { clientI
 
   const totalExpected = result.points.reduce((s, p) => s + p.expected, 0);
   const isRatio = primaryId === "roas" || primaryId === "cpa";
-  const kpiAdjusted = result.kpi.adjustedAnnual;
+  // Null voor een verhouding zonder noemer (jaarprognoseVerhouding): een CPA zonder één verwachte
+  // conversie is geen € 0, en dan is er ook geen verschil met het doel om te kleuren.
+  const kpiAdjusted = jaarprognoseVerhouding(forecast, primaryId);
   const totalDiffPct = result.kpi.diffPct;
   const isPositive = isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0;
 
@@ -107,15 +109,15 @@ export function ForecastSummaryTiles({ clientId, channel = "google" }: { clientI
                   som van de jaartotalen, niet op een gemiddelde van maandratio's) -- geen isRatio-
                   uitzondering meer nodig, die zette hier eerder juist het DOEL neer i.p.v. het
                   gerealiseerde+voorspelde cijfer waar deze rij naar heet. */}
-              <span className="font-semibold text-brand-gray">{fmt(kpiAdjusted)}</span>
+              <span className="font-semibold text-brand-gray">{kpiAdjusted === null ? "—" : fmt(kpiAdjusted)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">vs. doel</span>
               {/* Bij een ratio-metriek is totalExpected de som van 12 losse maandratio's -- een
                   getal zonder betekenis (tot ~12x te hoog). Wat hier hoort te staan is het doel
                   zelf, dezelfde waarde als diffPct ernaast al tegen afzet. */}
-              <span className={`font-semibold ${isPositive ? "text-green-600" : "text-red-500"}`}>
-                {fmt(isRatio ? result.kpi.annualTarget : totalExpected)} ({formatDeltaPercent(totalDiffPct, 0)})
+              <span className={`font-semibold ${kpiAdjusted === null ? "text-muted-foreground" : isPositive ? "text-green-600" : "text-red-500"}`}>
+                {fmt(isRatio ? result.kpi.annualTarget : totalExpected)} ({kpiAdjusted === null ? "—" : formatDeltaPercent(totalDiffPct, 0)})
               </span>
             </div>
           </div>
@@ -175,7 +177,8 @@ export function ForecastTable({ clientId, channel = "google" }: { clientId: stri
   // For ROAS/CPA totals, use the KPI values (not sum of monthly)
   const isRatio = selectedMetric === "roas" || selectedMetric === "cpa";
   const kpiTarget = result.kpi.annualTarget;
-  const kpiAdjusted = result.kpi.adjustedAnnual;
+  // Zie hierboven: null voor een verhouding zonder noemer.
+  const kpiAdjusted = jaarprognoseVerhouding(forecast, selectedMetric);
   const totalDiffPct = result.kpi.diffPct;
 
   return (
@@ -246,9 +249,9 @@ export function ForecastTable({ clientId, channel = "google" }: { clientId: stri
             <TotaalCel>Totaal</TotaalCel>
             <TotaalCel getal className="text-muted-foreground">{isRatio ? fmt(kpiTarget) : fmt(totalExpected)}</TotaalCel>
             <TotaalCel getal>{isRatio ? "—" : fmt(totalRealized)}</TotaalCel>
-            <TotaalCel getal className="text-brand-blue-ink">{isRatio ? fmt(kpiAdjusted) : fmt(totalForecast)}</TotaalCel>
-            <TotaalCel getal className={(isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"}>
-              {formatDeltaPercent(totalDiffPct, 0)}
+            <TotaalCel getal className="text-brand-blue-ink">{isRatio ? (kpiAdjusted === null ? "—" : fmt(kpiAdjusted)) : fmt(totalForecast)}</TotaalCel>
+            <TotaalCel getal className={kpiAdjusted === null ? "text-muted-foreground" : (isInverted ? totalDiffPct <= 0 : totalDiffPct >= 0) ? "text-green-600" : "text-red-500"}>
+              {kpiAdjusted === null ? "—" : formatDeltaPercent(totalDiffPct, 0)}
             </TotaalCel>
           </VoetRij>
         </TotaalVoet>

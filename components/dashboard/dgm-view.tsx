@@ -9,13 +9,13 @@ import {
 } from "lucide-react";
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
 import { isTeamOwner, OWNER_TEAM, ownerLabel } from "@/lib/branding/brand";
-import { computeForecast, type ClientForecast, type ForecastKPI } from "@/lib/forecast";
+import { computeForecast, jaarprognoseVerhouding, ytdGerealiseerd, type ClientForecast, type ForecastKPI } from "@/lib/forecast";
 import { computeHealthScore, type HealthScore, type Anomaly } from "@/lib/health-score";
 import { getClientSettings } from "@/lib/client-settings";
 import { dbSelect } from "@/lib/data-access/client-read";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "@/lib/use-client-data";
 import { cpaTrendFrom } from "@/lib/analysis/trend";
-import { formatRoas, formatPercent } from "@/lib/forecast-format";
+import { budgetCpaNaam, formatRoas, formatPercent } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { metriekLabel } from "@/lib/util/tekst";
@@ -526,7 +526,7 @@ function computeDecisions(
         decision: `Budget verhogen met ${Math.round(budget.spendIncreasePct)}%`,
         reason: `Huidige budget is ontoereikend om het jaardoel te halen. Er is extra mediabudget nodig van ${fmt(budget.extraSpendNeeded)} verdeeld over de resterende maanden. Het budget wordt goed benut (${Math.round(avgUtilization * 100)}%).`,
         urgency: budget.spendIncreasePct > 20 ? "hoog" : "middel",
-        expectedEffect: `Naar verwachting ${num(budget.conversionGap)} extra conversies bij huidige CPA van ${fmt(budget.currentCpa)}.`,
+        expectedEffect: `Naar verwachting ${num(budget.conversionGap)} extra conversies bij ${budgetCpaNaam(budget)} van ${fmt(budget.currentCpa)}${budget.cpaUitDoel ? " (nog geen conversies YTD)" : ""}.`,
       });
     }
   }
@@ -740,9 +740,12 @@ function KpiCard({
   lagerIsBeter = false,
 }: {
   label: string;
-  realized: number;
+  /** Null voor een verhouding zonder noemer (ytdGerealiseerd): een CPA zonder één conversie is
+   *  geen € 0. Overzicht zei daar "—" en dit tabblad een gemeten CPA van € 0. */
+  realized: number | null;
   target: number;
-  forecast: number;
+  /** Idem voor de jaarprognose: zonder één verwachte conversie geen CPA-prognose van € 0. */
+  forecast: number | null;
   diffPct: number;
   format: "currency" | "number" | "ratio";
   /**
@@ -762,8 +765,9 @@ function KpiCard({
   const isGood = scoreDiff >= -3;
   const isWarning = scoreDiff < -3 && scoreDiff >= -15;
 
-  const statusColor = isGood ? "text-green-600" : isWarning ? "text-amber-600" : "text-red-600";
-  const barPct = target > 0 ? Math.min((realized / target) * 100, 100) : 0;
+  // Zonder prognose geen oordeel: diffPct staat dan tegen een prognose die er niet is.
+  const statusColor = forecastVal === null ? "text-muted-foreground" : isGood ? "text-green-600" : isWarning ? "text-amber-600" : "text-red-600";
+  const barPct = realized !== null && target > 0 ? Math.min((realized / target) * 100, 100) : 0;
   const barColor = isGood ? "bg-green-500" : isWarning ? "bg-amber-500" : "bg-red-500";
 
   return (
@@ -784,7 +788,7 @@ function KpiCard({
 
           De wrapper heeft een automatische hoogte, dus `h-full` erbinnen lost weer op naar auto. */}
       <div>
-        <Kerncijfer label={label} waarde={fmtVal(realized)} />
+        <Kerncijfer label={label} waarde={realized === null ? "—" : fmtVal(realized)} />
       </div>
       <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${barPct}%` }} />
@@ -793,7 +797,7 @@ function KpiCard({
       <div className="flex items-center justify-between mt-1">
         <span className="text-micro text-muted-foreground">Doel: {fmtVal(target)}</span>
         <span className={`text-micro font-semibold ${statusColor}`}>
-          Prognose: {fmtVal(forecastVal)} ({pct(diffPct)})
+          Prognose: {forecastVal === null ? "—" : `${fmtVal(forecastVal)} (${pct(diffPct)})`}
         </span>
       </div>
     </div>
@@ -1002,14 +1006,16 @@ export function DgmView({ clientId }: { clientId: string }) {
           )}
           {cpa.annualTarget > 0 && (() => {
             const cpaTarget = settings.kpiTargets.cpaTarget;
-            const cpaForecast = conv.adjustedAnnual > 0 ? spend.adjustedAnnual / conv.adjustedAnnual : 0;
+            // Zonder noemer null, zoals Overzicht (ytdGerealiseerd, jaarprognoseVerhouding): hier stond
+            // "Kosten per conversie € 0" na € 14.000 kosten zonder één conversie.
+            const cpaForecast = jaarprognoseVerhouding(forecast, "cpa");
             return (
               <KpiCard
                 label={vocab.cpa.charAt(0).toUpperCase() + vocab.cpa.slice(1)}
-                realized={cpa.ytdRealized > 0 ? spend.ytdRealized / conv.ytdRealized : 0}
+                realized={ytdGerealiseerd(forecast, "cpa")}
                 target={cpaTarget}
                 forecast={cpaForecast}
-                diffPct={diffPctVanWeergave(cpaTarget, cpaForecast)}
+                diffPct={cpaForecast === null ? 0 : diffPctVanWeergave(cpaTarget, cpaForecast)}
                 format="currency"
                 lagerIsBeter
               />
@@ -1027,14 +1033,14 @@ export function DgmView({ clientId }: { clientId: string }) {
           )}
           {roas.annualTarget > 0 && settings.kpiTargets.roasTarget > 0 && (() => {
             const roasTarget = settings.kpiTargets.roasTarget;
-            const roasForecast = spend.adjustedAnnual > 0 ? rev.adjustedAnnual / spend.adjustedAnnual : 0;
+            const roasForecast = jaarprognoseVerhouding(forecast, "roas");
             return (
               <KpiCard
                 label="Rendement op advertentiebudget"
-                realized={spend.ytdRealized > 0 ? rev.ytdRealized / spend.ytdRealized : 0}
+                realized={ytdGerealiseerd(forecast, "roas")}
                 target={roasTarget}
                 forecast={roasForecast}
-                diffPct={diffPctVanWeergave(roasTarget, roasForecast)}
+                diffPct={roasForecast === null ? 0 : diffPctVanWeergave(roasTarget, roasForecast)}
                 format="ratio"
               />
             );

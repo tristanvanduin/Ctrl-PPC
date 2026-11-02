@@ -33,7 +33,7 @@
 
 import type { ClientForecast } from "./forecast";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "./use-client-data";
-import { cpaTrendFrom, TREND_WINDOW } from "./analysis/trend";
+import { cpaTrendVanForecast } from "./analysis/trend";
 import { formatPercent } from "@/lib/forecast-format";
 
 export interface HealthScore {
@@ -139,15 +139,17 @@ export function computeHealthScore(
   // Een maand met kosten en geen enkele conversie (geenNoemer) heeft geen CPA en viel daardoor uit
   // de trend: na juni gepauzeerd en juli € 2.000 zonder conversie zei de score "CPA stabiel of
   // dalend". Valt zo'n maand in het recente venster van de trend, dan is de efficiency op zijn
-  // slechtst, en dat zegt een waarschuwing erbij.
-  const metKosten = forecast.cpa.points.filter((p) => p.realized !== null || p.geenNoemer);
-  const zonderConversies = metKosten.slice(-TREND_WINDOW).filter((p) => p.geenNoemer);
+  // slechtst, en dat zegt een waarschuwing erbij. Die regel staat in cpaTrendVanForecast
+  // (lib/analysis/trend.ts), zodat de inzichten en aanbevelingen hetzelfde zeggen; daar ook dat een
+  // maand met restkosten onder één gewone CPA niet meetelt.
+  const t = cpaTrendVanForecast(forecast);
+  const zonderConversies = t.zonderConversies;
   const efficiencyBeoordeeld = cpaPoints.length >= 2 || zonderConversies.length > 0;
   let efficiencyScore = 0;
 
   if (zonderConversies.length > 0) {
     efficiencyScore = 4;
-    const maanden = zonderConversies.map((p) => p.monthLabel).join(", ");
+    const maanden = zonderConversies.join(", ");
     anomalies.push({
       severity: "warning",
       title: "Kosten zonder conversies",
@@ -157,7 +159,6 @@ export function computeHealthScore(
     // Gedeelde berekening en drempels (lib/analysis/trend.ts). Hier stond een eigen kopie die
     // de eerste maand met de laatste vergeleek; zes plekken deden dat, met vier verschillende
     // drempels, waardoor twee blokken op hetzelfde scherm elkaar konden tegenspreken.
-    const t = cpaTrendFrom(cpaPoints);
     const firstCpa = t.vorig;
     const lastCpa = t.huidig;
     const cpaTrend = t.pct ?? 0;

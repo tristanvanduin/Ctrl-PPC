@@ -67,9 +67,10 @@ const ytdConv = J2026.reduce((s, [c]) => s + c, 0);     // 2.418
 assert(cpa.realized !== null && dichtbij(cpa.realized, ytdKosten / ytdConv), `CPA YTD is alle YTD-kosten / YTD-conversies (${cpa.realized} vs ${(ytdKosten / ytdConv).toFixed(2)})`);
 assert(cpa.realized !== null && !dichtbij(cpa.realized, OUDE_YTD_CPA, 1), "CPA YTD telt niet alleen de kosten van januari t/m maart");
 assert(cpa.adjusted === f.cpa.kpi.adjustedAnnual, "CPA-prognose is forecast.cpa.kpi.adjustedAnnual");
-assert(dichtbij(cpa.adjusted, f.adSpend.kpi.adjustedAnnual / f.conversions.kpi.adjustedAnnual),
+// adjusted is null voor een verhouding zonder noemer (jaarprognoseVerhouding); hier zijn er conversies.
+assert(cpa.adjusted !== null && dichtbij(cpa.adjusted, f.adSpend.kpi.adjustedAnnual / f.conversions.kpi.adjustedAnnual),
   "CPA-prognose = geprognotiseerde spend / geprognotiseerde conversies");
-assert(!dichtbij(cpa.adjusted, OUDE_PROGNOSE_CPA, 1), "CPA-prognose deelt niet het budgetdoel door de conversieprognose");
+assert(cpa.adjusted !== null && !dichtbij(cpa.adjusted, OUDE_PROGNOSE_CPA, 1), "CPA-prognose deelt niet het budgetdoel door de conversieprognose");
 assert(dichtbij(cpa.annualTarget, 45), "CPA-doel = budgetdoel / conversiedoel = € 45");
 assert(cpa.diffPct > 0, "prognose-CPA boven doel geeft een positief verschil (het teken blijft eerlijk)");
 assert(cpa.diffPct === f.cpa.kpi.diffPct, "diffPct komt ongewijzigd uit forecast.cpa.kpi");
@@ -78,8 +79,8 @@ assert(cpa.diffPct === f.cpa.kpi.diffPct, "diffPct komt ongewijzigd uit forecast
 const roas = jaarKaartCijfers(f, "roas");
 const omzet = jaarKaartCijfers(f, "revenue");
 const conv = jaarKaartCijfers(f, "conversions");
-const spendUitRoas = omzet.adjusted / roas.adjusted;
-const spendUitCpa = cpa.adjusted * conv.adjusted;
+const spendUitRoas = (omzet.adjusted ?? NaN) / (roas.adjusted ?? NaN);
+const spendUitCpa = (cpa.adjusted ?? NaN) * (conv.adjusted ?? NaN);
 assert(Math.abs(spendUitRoas - spendUitCpa) / spendUitCpa < 0.005, `ROAS- en CPA-kaart impliceren hetzelfde jaarbudget (${Math.round(spendUitRoas)} vs ${Math.round(spendUitCpa)})`);
 
 // Gerealiseerd-percentage voor de optelbare metrics.

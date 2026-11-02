@@ -183,11 +183,17 @@ console.log("\nDe keten draait op de echte demo-weekdata");
 
   // accepted_at ruim binnen het bereik van de demo-weken, zodat baseline én meting gevuld zijn.
   const midden = weekly[Math.floor(weekly.length / 2)].week_start;
+  // De klok hier is het einde van de demodata, niet de vaste NU. demoRows() rekent zijn weken
+  // terug vanaf vandaag, dus met NU (24 augustus) schoof het midden elke maandag een week op tot
+  // het meetvenster van 28 dagen ná NU eindigde ("loopt nog tot 2026-08-31", vanaf 2 november):
+  // dan was het oordeel "overgeslagen" en faalde deze test zonder dat er iets aan de keten veranderd was.
+  const laatsteWeek = weekly.reduce((m, w) => (w.week_start > m ? w.week_start : m), weekly[0].week_start);
+  const demoNu = new Date(Date.parse(`${laatsteWeek}T00:00:00Z`) + 7 * 86_400_000);
   const r = evaluateHypothesisRow({
     row: rij({ accepted_at: `${midden}T00:00:00Z`, hypothesis: "Verhoog het dagbudget van de merkcampagne" }),
     weekly,
     changeEvents: GEEN_EVENTS,
-    now: NU,
+    now: demoNu,
   });
   check("levert een oordeel op echte weekdata", r.soort === "oordeel", JSON.stringify(r));
   check("het oordeel is een bekende waarde", r.soort === "oordeel" &&

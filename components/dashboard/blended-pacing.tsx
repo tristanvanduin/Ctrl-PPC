@@ -121,8 +121,13 @@ export function blendedPacingVoetregel(
       : `${naamVan(b.naam)} (sinds ${formatMonth(b.start)})`);
 
   if (c.vergeleken.length === 0) {
+    // Zelfde toets als de buiten-zin hieronder: data in de vergelijkingsperiode zonder paar betekent
+    // dat een kanaal daar wel liep, alleen geen volle maand. Zonder Google zei dit blok over
+    // Microsoft (negen dagen juli 2025, € 297) "geen van de kanalen liep ... al", terwijl dezelfde
+    // reeks naast Google "nog geen volle maand" kreeg.
+    const deelsGelopen = c.buiten.some((b) => b.ongepaardVorig > 0);
     zinnen.push(
-      `Geen vergelijking: geen van de kanalen liep in ${formatRange(c.vergelijking)} al. ` +
+      `Geen vergelijking: geen van de kanalen liep in ${formatRange(c.vergelijking)} al${deelsGelopen ? " een volle maand" : ""}. ` +
       "Het tempo telt alle kanalen van dit jaar.",
     );
   } else if (c.buiten.length === 0 && c.deels.length === 0) {
@@ -143,13 +148,19 @@ export function blendedPacingVoetregel(
       );
     }
     if (c.deels.length > 0) {
-      const een = c.deels.length === 1;
-      // Niet "de maanden waarin het in beide jaren liep": een maand zonder data ná de eerste volle
-      // maand telt als nul (gepauzeerd is echt niets), en een partiële eerste maand telt niet.
-      zinnen.push(
-        `${opsomming(c.deels.map(metStart))} ${een ? "telt" : "tellen"} in het verschil alleen mee ` +
-        "vanaf de eigen eerste volle maand, in beide jaren.",
-      );
+      // De maanden die echt meetellen (BronPaar.bereik), per bereik gegroepeerd. Hier stond "vanaf
+      // de eigen eerste volle maand, in beide jaren", maar een paar telt pas als ook de maand van
+      // VORIG jaar na die maand ligt: Google sinds februari 2025 telt ook in 2026 pas vanaf
+      // februari, en januari 2026 viel zonder een woord weg. Niet "de maanden waarin het in beide
+      // jaren liep": een maand zonder data ná de eerste volle maand telt als nul, en een partiële
+      // eerste maand telt niet.
+      const groepen = new Map<string, BronPaar[]>();
+      for (const b of c.deels) {
+        const over = `${formatRange(b.bereik!.huidig)} tegen ${formatRange(b.bereik!.vorig)}`;
+        groepen.set(over, [...(groepen.get(over) ?? []), b]);
+      }
+      zinnen.push(`${[...groepen].map(([over, bs]) =>
+        `${opsomming(bs.map(metStart))} ${bs.length === 1 ? "telt" : "tellen"} in het verschil alleen mee over ${over}`).join("; ")}.`);
     }
   }
 

@@ -6,7 +6,7 @@ import { buildClientDataFromApi, type ApiMonthlyData, type YearDataInput } from 
 import type { BlendedKanaalReeks } from "./api/blended-historical";
 import type { DataStandSamen } from "./sync/datastand";
 import type { ClientForecast } from "./forecast";
-import { blendedForecastUitKanalen } from "./forecast-som";
+import { blendedForecastUitKanalen, eigenGrenzen } from "./forecast-som";
 import { loadClientSettings } from "./client-settings";
 import { mergeKpiTargets } from "./kpi-target-merge";
 
@@ -108,8 +108,10 @@ function haal(clientId: string): Promise<Opgehaald> {
         // Eén keer per ophaalronde, met de rest gecachet: elke lezer (Jaaroverzicht, beursstrip,
         // grafiek, Prognose-tabel) krijgt hetzelfde object in plaats van zelf te rekenen.
         // Met de uitgesloten bronnen van de route: een kanaal dat stopte, telt na zijn dag als nul,
-        // ook in de prognose (en niet op zijn oude tempo).
-        forecast: blendedForecastUitKanalen(clientId, perKanaal, data, apiData.realizedThroughMonth, apiData.dataStand?.uitgesloten ?? []),
+        // ook in de prognose (en niet op zijn oude tempo). En met de eigen grens per kanaal, uit
+        // dezelfde dag die zijn tab krijgt: dan beslissen de som en de tab de stop op dezelfde maand.
+        forecast: blendedForecastUitKanalen(clientId, perKanaal, data, apiData.realizedThroughMonth, apiData.dataStand?.uitgesloten ?? [],
+          eigenGrenzen(apiData.dataStand?.bronnen, apiData.currentYear)),
       };
       if ((generatie.get(clientId) ?? 0) === gen) cache.set(clientId, { waarde, timestamp: Date.now() });
       return waarde;

@@ -23,6 +23,7 @@ import { invalidateClientCache } from "@/lib/use-client-data";
 import { vergeetBlendedClientData } from "@/lib/use-blended-client-data";
 import { today } from "@/lib/reporting-date";
 import { dbUpsert, dbDelete } from "@/lib/data-access/client-write";
+import { groeiDoelUitKaart, groeiKaartUitDoel, groeiRegel, type KpiConfig } from "@/lib/kpi-kaart";
 
 /**
  * De acht kaarten in dit paneel, los aan te vragen.
@@ -53,17 +54,6 @@ interface Props {
   clientName: string;
   /** Welke kaarten te tonen. Weglaten toont ze allemaal — het gedrag van vóór deze splitsing. */
   kaarten?: SettingsKaart[];
-}
-
-type KpiPeriod = "year" | "month";
-type KpiInputMode = "absolute" | "growth";
-
-interface KpiConfig {
-  enabled: boolean;
-  value: number;
-  period: KpiPeriod;
-  inputMode: KpiInputMode;
-  growthPct: number;
 }
 
 export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
@@ -144,22 +134,12 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       setDetectedCountries(detectCountriesFromCampaigns(names));
     }
 
-    // Initialize KPI state from settings
+    // Initialize KPI state from settings. Via lib/kpi-kaart: een opgeslagen krimpdoel (-10%) zette de
+    // kaart hier op "uit" (alleen groei > 0 telde), terwijl het dashboard er gewoon op mikte, en de
+    // volgende opslag schreef dan groei 0 weg.
     const kpi = baseSettings.kpiTargets;
-    setKpiConversions({
-      enabled: kpi.conversionsAbsolute > 0 || kpi.conversionsGrowthPct > 0,
-      value: kpi.conversionsAbsolute,
-      period: "year",
-      inputMode: kpi.conversionsMode === "growth" ? "growth" : "absolute",
-      growthPct: kpi.conversionsGrowthPct,
-    });
-    setKpiRevenue({
-      enabled: kpi.revenueAbsolute > 0 || kpi.revenueGrowthPct > 0,
-      value: kpi.revenueAbsolute,
-      period: "year",
-      inputMode: kpi.revenueMode === "growth" ? "growth" : "absolute",
-      growthPct: kpi.revenueGrowthPct,
-    });
+    setKpiConversions(groeiKaartUitDoel({ mode: kpi.conversionsMode, growthPct: kpi.conversionsGrowthPct, absolute: kpi.conversionsAbsolute }));
+    setKpiRevenue(groeiKaartUitDoel({ mode: kpi.revenueMode, growthPct: kpi.revenueGrowthPct, absolute: kpi.revenueAbsolute }));
     setKpiRoas({
       enabled: kpi.roasTarget > 0,
       value: kpi.roasTarget,
@@ -269,18 +249,17 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
     if (!settings) return;
     setOpslaanFout(null);
 
-    // Build KPI targets from the separate state
+    // Build KPI targets from the separate state (de groeikaarten via lib/kpi-kaart, dezelfde module
+    // die ze bij het openen vult: wat geladen is, komt bij een opslag ongewijzigd terug).
+    const conv = groeiDoelUitKaart(kpiConversions);
+    const omzet = groeiDoelUitKaart(kpiRevenue);
     const kpiTargets: KpiTargets = {
-      conversionsMode: kpiConversions.inputMode === "growth" ? "growth" : "absolute",
-      conversionsGrowthPct: kpiConversions.enabled ? kpiConversions.growthPct : 0,
-      conversionsAbsolute: kpiConversions.enabled && kpiConversions.inputMode === "absolute"
-        ? (kpiConversions.period === "month" ? kpiConversions.value * 12 : kpiConversions.value)
-        : 0,
-      revenueMode: kpiRevenue.inputMode === "growth" ? "growth" : "absolute",
-      revenueGrowthPct: kpiRevenue.enabled ? kpiRevenue.growthPct : 0,
-      revenueAbsolute: kpiRevenue.enabled && kpiRevenue.inputMode === "absolute"
-        ? (kpiRevenue.period === "month" ? kpiRevenue.value * 12 : kpiRevenue.value)
-        : 0,
+      conversionsMode: conv.mode,
+      conversionsGrowthPct: conv.growthPct,
+      conversionsAbsolute: conv.absolute,
+      revenueMode: omzet.mode,
+      revenueGrowthPct: omzet.growthPct,
+      revenueAbsolute: omzet.absolute,
       roasTarget: kpiRoas.enabled ? kpiRoas.value : 0,
       cpaTarget: kpiCpa.enabled ? kpiCpa.value : 0,
       conversionOverrides: Object.keys(convOverrides).length > 0 ? convOverrides : undefined,
@@ -1071,9 +1050,10 @@ function KpiCard({
                 />
                 <span className="text-body text-muted-foreground">% groei</span>
               </div>
-              {config.growthPct > 0 && (
+              {/* Met teken, ook bij krimp: hier stond vast "+" en alleen bij een groei > 0. */}
+              {groeiRegel(config.growthPct) && (
                 <p className="text-xs text-muted-foreground mt-2">
-                  +{config.growthPct}% ten opzichte van vorig jaar
+                  {groeiRegel(config.growthPct)}
                 </p>
               )}
             </div>

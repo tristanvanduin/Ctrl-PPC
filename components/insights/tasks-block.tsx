@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { CheckCircle2, Circle, Clock, CalendarDays, CalendarRange, Zap, ChevronDown, ChevronRight } from "lucide-react";
 import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
+import { budgetCpaNaam } from "@/lib/forecast-format";
 import { getClientSettings } from "@/lib/client-settings";
 import { supabase, type KpiSnapshot } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
@@ -100,7 +101,7 @@ function generateDynamicTasks(forecast: ClientForecast): Task[] {
     idx++;
     tasks.push({
       id: `dyn-${idx}`, step: "Budget", dynamic: true, done: false,
-      text: `Bereid budget-voorstel voor klant voor: verhoog naar ${fmt(budget.requiredMonthlySpend)}/maand (+${Math.round(budget.spendIncreasePct)}%). Onderbouw met huidige CPA van ${fmt(budget.currentCpa)}.`,
+      text: `Bereid budget-voorstel voor klant voor: verhoog naar ${fmt(budget.requiredMonthlySpend)}/maand (+${Math.round(budget.spendIncreasePct)}%). Onderbouw met ${budgetCpaNaam(budget)} van ${fmt(budget.currentCpa)}${budget.cpaUitDoel ? " (nog geen conversies YTD)" : ""}.`,
     });
   }
 

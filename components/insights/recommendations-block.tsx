@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import { Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
 import { useClientHistoricalData, useClientDataState, useForecast } from "@/lib/client-data-provider";
 import { computeForecast, type ClientForecast } from "@/lib/forecast";
+import { budgetCpaNaam } from "@/lib/forecast-format";
 import { getClientSettings } from "@/lib/client-settings";
 import { dbSelect } from "@/lib/data-access/client-read";
 import type { ImpressionShareData } from "@/lib/use-client-data";
 import { channelOfSopType, CHANNEL_LABEL, type InsightChannel } from "@/lib/insights/channel-of";
-import { cpaTrendFrom } from "@/lib/analysis/trend";
+import { cpaTrendVanForecast } from "@/lib/analysis/trend";
 
 type Priority = "high" | "medium" | "low";
 
@@ -48,9 +49,9 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
   const efficiencyFactor = spendFactor > 0 ? convFactor / spendFactor : 1;
 
   // CPA trend
-  const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
-  // Gedeelde berekening en drempels; zie lib/analysis/trend.ts.
-  const cpaT = cpaTrendFrom(cpaPoints);
+  // Gedeelde berekening en drempels; zie lib/analysis/trend.ts. Met de maanden zonder conversies:
+  // daarin staan "daalt" en "stijgt" uit, want die maand heeft geen CPA om mee te middelen.
+  const cpaT = cpaTrendVanForecast(forecast);
   const firstCpa = cpaT.vorig;
   const lastCpa = cpaT.huidig;
   const cpaTrend = cpaT.pct ?? 0;
@@ -61,7 +62,7 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
     recs.push({
       priority: "high",
       source: "Budget Opschaling",
-      text: `Verhoog het maandbudget van ${fmt(budget.currentMonthlySpend)} naar ${fmt(budget.requiredMonthlySpend)} (+${Math.round(budget.spendIncreasePct)}%). Bij de huidige CPA van ${fmt(budget.currentCpa)} levert dit naar verwachting ${Math.round(budget.conversionGap / remainingMonths)} extra conversies per maand op. Bespreek dit met de klant als budget-voorstel.`,
+      text: `Verhoog het maandbudget van ${fmt(budget.currentMonthlySpend)} naar ${fmt(budget.requiredMonthlySpend)} (+${Math.round(budget.spendIncreasePct)}%). Bij ${budgetCpaNaam(budget)} van ${fmt(budget.currentCpa)}${budget.cpaUitDoel ? " (nog geen conversies YTD)" : ""} levert dit naar verwachting ${Math.round(budget.conversionGap / remainingMonths)} extra conversies per maand op. Bespreek dit met de klant als budget-voorstel.`,
     });
   }
 
@@ -95,7 +96,15 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
 
   // ── CPA optimization ──
 
-  if (cpaT.stijgt && lastCpa > 0) {
+  if (cpaT.zonderConversies.length > 0) {
+    // Hier gaf de daling van de maanden ervoor het advies om budget te verhogen, direct na een
+    // maand die geld kostte zonder één conversie.
+    recs.push({
+      priority: "high",
+      source: "Conversiemeting",
+      text: `In ${cpaT.zonderConversies.join(", ")} waren er kosten zonder één conversie. Controleer eerst de conversiemeting (tag, import, attributie) en of de campagnes leverden; verhoog of verschuif geen budget op basis van de CPA tot dat duidelijk is.`,
+    });
+  } else if (cpaT.stijgt && lastCpa > 0) {
     recs.push({
       priority: "high",
       source: "CPA Optimalisatie",
@@ -125,7 +134,7 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
     recs.push({
       priority: "medium",
       source: "Biedstrategie",
-      text: `Evalueer de biedstrategieën per campagne. Overweeg: (1) Maximize Conversions met een target CPA van ${fmt(budget.currentCpa * 0.9)} (10% onder huidig), (2) Bij Shopping/PMax: target ROAS aanpassen op basis van actuele performance, (3) Bij manual bidding: verhoog biedingen op top-converting keywords.`,
+      text: `Evalueer de biedstrategieën per campagne. Overweeg: (1) ${budget.cpaUitDoel ? "Maximize Conversions, met een target CPA pas als er conversies gemeten zijn" : `Maximize Conversions met een target CPA van ${fmt(budget.currentCpa * 0.9)} (10% onder huidig)`}, (2) Bij Shopping/PMax: target ROAS aanpassen op basis van actuele performance, (3) Bij manual bidding: verhoog biedingen op top-converting keywords.`,
     });
   }
 

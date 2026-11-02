@@ -12,7 +12,7 @@ import {
 } from "@/lib/analysis/channel-conversion-config";
 import { KANAAL_DAGBRON, dagbronSelect, kanaalMaandenUitDagen } from "@/lib/analysis/channel-report-blend";
 import { alleRijen, eis, DataLaagFout } from "@/lib/analysis/db-veilig";
-import { eersteDagUitRijen, eersteVolleMaand } from "@/lib/period/kanaal-maanden";
+import { eersteDagUitRijen, eersteVolleMaand, startLaatsteLoopUitRijen } from "@/lib/period/kanaal-maanden";
 import {
   datastandVoorKlant,
   dagstandVoorKlant,
@@ -97,8 +97,9 @@ export interface BlendedKanaalReeks {
    */
   vanaf: string | null;
   /**
-   * De eerste dag met data van een dagkanaal (eersteDagUitRijen); null voor Google. Voor het tempo
-   * zonder jaardoel als de partiële eerste maand de laatste gerealiseerde is (forecastCoreMetric).
+   * De eerste dag van de huidige loop van een dagkanaal (startLaatsteLoopUitRijen: na een pauze van
+   * een hele maand de dag waarop het terugkwam, anders de eerste dag ooit); null voor Google. Voor
+   * het tempo zonder jaardoel als die partiële maand de laatste gerealiseerde is (forecastCoreMetric).
    * Optioneel: een antwoord van vóór dit veld werkt als voorheen.
    */
   eersteDag?: string | null;
@@ -228,8 +229,10 @@ export async function fetchBlendedHistoricalData(
       .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop();
     if (laatste) laatsteDagUitRijen[kanaal] = laatste;
     // Alle rijen van het kanaal (alleRijen, vanaf het begin), dus de eerste rij is echt de start.
-    eersteDagPerKanaal[kanaal] = eersteDagUitRijen(rijen, channel);
-    vanafPerKanaal[kanaal] = eersteVolleMaand(eersteDagPerKanaal[kanaal]);
+    // `vanaf` blijft op die start (anders valt de historie van vóór een pauze weg); de eerste dag
+    // voor het tempo is die van de huidige loop, na een pauze van een hele maand (startLaatsteLoop).
+    vanafPerKanaal[kanaal] = eersteVolleMaand(eersteDagUitRijen(rijen, channel));
+    eersteDagPerKanaal[kanaal] = startLaatsteLoopUitRijen(rijen, channel);
   });
   if (rows.length === 0) return null;
 
@@ -348,6 +351,7 @@ export async function fetchBlendedHistoricalData(
  * Twee aanvullingen voor de dagkanalen (review [9], [10], [36]):
  * - dataTot is dataTotVanDagbron: na een geslaagde sync is de dag vóór die sync gemeten, ook zonder
  *   rij, en dat blijft zo als die sync ouder wordt. Een Microsoft zonder levering op zaterdag 31 oktober maakte oktober anders partieel.
+ *   De rij van de syncdag zelf telt niet: de nachtcron haalt t/m zijn eigen dag op, dus die rij is een deel van die dag.
  * - Een kanaal zonder koppeling (geen rij, of uitgezet via Instellingen) remt niet: het synct nooit
  *   meer, dus de rem zou wachten op data die niet komt, zolang de oude rijen er staan. Het staat dan
  *   in `uitgesloten`, en de band noemt het.
@@ -382,8 +386,10 @@ async function blendedDataStand(
           bron: kanaal,
           dataTot: dataTotVanDagbron(s) ?? laatsteDagUitRijen[kanaal] ?? null,
           syncDraait: remtNietBijAchterstand(s) || !s.gekoppeld,
+          // Voor de zin over een uitgesloten kanaal (uitgeslotenMetDag), niet voor het venster.
+          laatsteRij: s.laatsteDag ?? laatsteDagUitRijen[kanaal] ?? null,
         }),
-        () => ({ bron: kanaal, dataTot: laatsteDagUitRijen[kanaal] ?? null, syncDraait: false }),
+        () => ({ bron: kanaal, dataTot: laatsteDagUitRijen[kanaal] ?? null, syncDraait: false, laatsteRij: laatsteDagUitRijen[kanaal] ?? null }),
       )),
   ]);
 

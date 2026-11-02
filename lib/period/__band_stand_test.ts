@@ -54,9 +54,28 @@ async function main() {
     // Zonder route (een klant met één kanaal waarvan de route faalde): de rij, zoals voorheen.
     const zonder = f({ channel: "linkedin", kanalen: ["linkedin"], google: null, laatsteDag: { ...geen, linkedin: "2026-03-15" }, route: null, nu: NU });
     check("zonder route: de nieuwste rij", zonder?.laatsteVolleMaand === "2026-02" && zonder?.dataTot === "2026-03-15", JSON.stringify(zonder));
-    // Een nieuwere rij dan de (gecachete) route wint.
+    // Een nieuwere rij dan de (gecachete) route telt, maar zonder zijn eigen dag: die rij komt van
+    // een sync na het antwoord van de route, en de nachtcron haalt t/m zijn eigen dag op, dus de
+    // nieuwste rij is een deel van die dag (zie dataTotVanDagbron). Hier stond 31 oktober.
     const nieuwer = f({ channel: "meta", kanalen: ["meta"], google: null, laatsteDag: { ...geen, meta: "2026-10-31" }, route: { bronnen: [{ bron: "meta", dataTot: "2026-10-15", syncDraait: false }] }, nu: NU });
-    check("een nieuwere rij wint van een oudere routedag", nieuwer?.dataTot === "2026-10-31", JSON.stringify(nieuwer));
+    check("een nieuwere rij wint van een oudere routedag, t/m de dag ervoor", nieuwer?.dataTot === "2026-10-30", JSON.stringify(nieuwer));
+  }
+
+  console.log("De rij van de syncdag is een deel van die dag, ook in de band");
+  {
+    // Meta slaagde voor het laatst op 31 oktober om 05:00 UTC; de route zegt daarom t/m 30 oktober
+    // (dataTotVanDagbron). De browser ziet dezelfde rij van 31 oktober. Hier won de LAATSTE van de
+    // twee, en dan kwam de correctie van de route nooit in de band: oktober vol, zonder "partieel".
+    const route = { bronnen: [{ bron: "google", dataTot: "2026-10-31", syncDraait: false }, { bron: "meta", dataTot: "2026-10-30", syncDraait: false }] };
+    const tab = f({ channel: "meta", kanalen: ["google", "meta"], google: live, laatsteDag: { ...geen, meta: "2026-10-31" }, route, nu: "2026-11-03" });
+    check("Meta-tab: september vol, oktober partieel t/m 30",
+      tab?.dataTot === "2026-10-30" && tab?.laatsteVolleMaand === "2026-09" && tab?.partieel?.maand === "2026-10" && tab?.partieel?.tmDag === 30, JSON.stringify(tab));
+    const alle = f({ channel: "blended", kanalen: ["google", "meta"], google: live, laatsteDag: { ...geen, meta: "2026-10-31" }, route, nu: NU });
+    check("Alle kanalen: Meta remt op 30 oktober, zoals de route",
+      alle?.dataTot === "2026-10-30" && alle?.laatsteVolleMaand === "2026-09" && alle?.partieel?.tmDag === 30, JSON.stringify(alle));
+    // Zonder synctijdstip in de route (geen koppelingsrij) is de routedag de rij zelf: dan blijft het die rij.
+    const zonderSync = f({ channel: "microsoft", kanalen: ["microsoft"], google: null, laatsteDag: { ...geen, microsoft: "2026-08-26" }, route: { bronnen: [{ bron: "microsoft", dataTot: "2026-08-26", syncDraait: true }] }, nu: NU });
+    check("route zonder sync (routedag = de rij): de rij, ongewijzigd", zonderSync?.dataTot === "2026-08-26", JSON.stringify(zonderSync));
   }
 
   console.log("[12] Alle kanalen rekent over de bronnen die de band leest");
@@ -73,6 +92,24 @@ async function main() {
     });
     check("ontkoppeld LinkedIn remt niet en staat met zijn dag in uitgeslotenBronnen",
       los?.laatsteVolleMaand === "2026-10" && JSON.stringify(los?.uitgeslotenBronnen) === JSON.stringify([{ bron: "linkedin", dataTot: "2026-05-15" }]), JSON.stringify(los));
+
+    // Zoals de route het echt geeft: ontkoppeld na zijn sync van 15 mei 05:00, met een rij van die
+    // dag. dataTotVanDagbron zegt dan t/m 14 mei (de rij van de syncdag is een deel van de dag), en
+    // de zin zei "geen data na 14 mei" terwijl de rij van 15 mei in het meitotaal staat.
+    const syncdag = f({
+      channel: "blended", kanalen: ["google", "linkedin"], google: live, laatsteDag: { ...geen, linkedin: "2026-05-15" },
+      route: { bronnen: [{ bron: "google", dataTot: "2026-10-31", syncDraait: false }, { bron: "linkedin", dataTot: "2026-05-14", syncDraait: true }] }, nu: NU,
+    });
+    check("ontkoppeld na de sync van zijn laatste rij: de zin noemt die rij (15 mei), het venster blijft oktober",
+      syncdag?.laatsteVolleMaand === "2026-10" && JSON.stringify(syncdag?.uitgeslotenBronnen) === JSON.stringify([{ bron: "linkedin", dataTot: "2026-05-15" }]), JSON.stringify(syncdag));
+    // Een gepauzeerd account met een gezonde sync (laatste levering 20 september, sync 31 oktober
+    // terwijl Google al t/m 1 november staat) houdt de dag van de sync: die dagen zijn gemeten nullen.
+    const gepauzeerd = f({
+      channel: "blended", kanalen: ["google", "linkedin"], google: { dataTot: "2026-11-01", laatsteVolleMaand: "2026-10", partieel: null }, laatsteDag: { ...geen, linkedin: "2026-09-20" },
+      route: { bronnen: [{ bron: "google", dataTot: "2026-11-01", syncDraait: false }, { bron: "linkedin", dataTot: "2026-10-30", syncDraait: true }] }, nu: "2026-11-02",
+    });
+    check("gepauzeerd met gezonde sync: de dag van de sync, niet de laatste levering",
+      JSON.stringify(gepauzeerd?.uitgeslotenBronnen) === JSON.stringify([{ bron: "linkedin", dataTot: "2026-10-30" }]), JSON.stringify(gepauzeerd));
 
     // Demo: Google (DB) t/m 25 augustus, de dagkanalen t/m 26 augustus en uitgezet. Onveranderd.
     const demo = f({

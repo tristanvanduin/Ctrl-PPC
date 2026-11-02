@@ -45,7 +45,8 @@ export interface ClientHistoricalData {
    */
   dataStand?: DataStandSamen | null;
   /**
-   * De eerste dag met data ("YYYY-MM-DD") van een kanaal dat midden in een maand begon. Alleen voor
+   * De eerste dag met data ("YYYY-MM-DD") van een kanaal dat midden in een maand begon, of na een
+   * pauze van een hele maand terugkwam (de eerste dag van zijn huidige loop). Alleen voor
    * het tempo zonder jaardoel: is die partiële maand de laatste gerealiseerde, dan telt het tempo
    * de dagen vanaf deze dag en niet de hele maand. Weglaten: de hele maand, zoals voorheen.
    */

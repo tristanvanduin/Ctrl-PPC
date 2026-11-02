@@ -56,6 +56,8 @@ export interface WeeklyPoint {
   forecast: number | null;
   /** Zie ForecastPoint.geenNoemer. */
   geenNoemer?: boolean;
+  /** Zie ForecastPoint.geenNoemerPrognose. */
+  geenNoemerPrognose?: boolean;
 }
 
 export interface ForecastPoint {
@@ -71,6 +73,13 @@ export interface ForecastPoint {
    * in de data: de weergave zegt "Geen conversies" en geeft er een oordeel bij (geenWaardeLabel).
    */
   geenNoemer?: boolean;
+  /**
+   * Hetzelfde voor een PROGNOSE: kosten verwacht, geen enkele conversie verwacht (een kanaal zonder
+   * doel waarvan de laatste maand 0 conversies had). `forecast` is dan null, en zonder vlag heette
+   * zo'n maand "Geen data" naast € 1.820 geprognotiseerde kosten. Bewust een eigen vlag: geenNoemer
+   * betekent "gemeten", en de health-score telt die als een maand met echte kosten.
+   */
+  geenNoemerPrognose?: boolean;
 }
 
 export interface ForecastKPI {
@@ -127,8 +136,14 @@ export interface BudgetRecommendation {
   behindTarget: boolean;
   /** Gap in conversions to close */
   conversionGap: number;
-  /** Current realized CPA */
+  /** Current realized CPA; zonder conversies YTD het CPA-doel (doelkosten / doelconversies). */
   currentCpa: number;
+  /**
+   * true als er nog geen conversies YTD zijn en currentCpa dus het CPA-doel is, geen gemeten CPA.
+   * De teksten noemen hem dan "het CPA-doel" (budgetCpaNaam): het rapport zei "geen conversies YTD,
+   * dus geen CPA" en twee regels later "Huidige CPA: € 20".
+   */
+  cpaUitDoel: boolean;
   /** Extra spend needed to close the gap */
   extraSpendNeeded: number;
   /** Required monthly spend for remaining months to hit target */
@@ -220,7 +235,8 @@ export interface JaarKaartCijfers {
   annualTarget: number;
   /** Gerealiseerd YTD (ytdGerealiseerd): null voor een verhouding zonder noemer. */
   realized: number | null;
-  adjusted: number;
+  /** De jaarprognose (jaarprognoseVerhouding): null voor een verhouding zonder noemer. */
+  adjusted: number | null;
   diffPct: number;
   /** Gerealiseerd als % van het jaardoel. Null zonder doel, en voor ROAS/CPA: van een
    *  verhouding realiseer je geen percentage (zie KpiTegel in channel-forecast-overview.tsx). */
@@ -242,7 +258,7 @@ export function jaarKaartCijfers(forecast: ClientForecast, metric: ForecastMetri
   return {
     annualTarget: kpi.annualTarget,
     realized: ytdGerealiseerd(forecast, metric),
-    adjusted: kpi.adjustedAnnual,
+    adjusted: jaarprognoseVerhouding(forecast, metric),
     diffPct: kpi.diffPct,
     realizedPct: gerealiseerd === null ? null : gerealiseerd * 100,
     verwachtPct: verwacht === null ? null : verwacht * 100,
@@ -257,13 +273,29 @@ export function jaarKaartCijfers(forecast: ClientForecast, metric: ForecastMetri
  * naast maandpunten die allemaal "geen conversies" zeiden. Dezelfde afronding als deriveForecast.
  */
 export function ytdGerealiseerd(forecast: ClientForecast, metric: ForecastMetric): number | null {
+  return kpiVerhouding(forecast, metric, "ytdRealized");
+}
+
+/**
+ * De jaarprognose zoals de kaarten, de kanaaltegels, de Prognose-tabel en het rapport hem tonen: de
+ * tegenhanger van ytdGerealiseerd. Voor ROAS en CPA null zonder noemer: kpi.adjustedAnnual is daar 0
+ * (calcKpi), en dan stond er "Jaarprognose € 0" bij € 23.785 geprognotiseerde kosten zonder één
+ * verwachte conversie, op dezelfde kaart als "Gerealiseerd YTD —".
+ */
+export function jaarprognoseVerhouding(forecast: ClientForecast, metric: ForecastMetric): number | null {
+  return kpiVerhouding(forecast, metric, "adjustedAnnual");
+}
+
+/** Een KPI-veld als getal; voor ROAS en CPA de verhouding van de tellers, null zonder noemer. Dezelfde
+ *  afronding als deriveForecast. */
+function kpiVerhouding(forecast: ClientForecast, metric: ForecastMetric, veld: "ytdRealized" | "adjustedAnnual"): number | null {
   const verhouding = (a: number, b: number) => {
     const q = safeDiv(a, b);
     return q === null ? null : parseFloat(q.toFixed(2));
   };
-  if (metric === "roas") return verhouding(forecast.revenue.kpi.ytdRealized, forecast.adSpend.kpi.ytdRealized);
-  if (metric === "cpa") return verhouding(forecast.adSpend.kpi.ytdRealized, forecast.conversions.kpi.ytdRealized);
-  return forecast[metric].kpi.ytdRealized;
+  if (metric === "roas") return verhouding(forecast.revenue.kpi[veld], forecast.adSpend.kpi[veld]);
+  if (metric === "cpa") return verhouding(forecast.adSpend.kpi[veld], forecast.conversions.kpi[veld]);
+  return forecast[metric].kpi[veld];
 }
 
 /**
@@ -1060,7 +1092,14 @@ function forecastCoreMetric(
     // de beursstrook vier gemeten septemberweken als "Prognose" toonde. Toekomstige maanden zijn
     // null in data2026 en houden het aantal uit de historie. Past de historische verdeling niet op
     // het aantal weken van dit jaar, dan de verwachting gelijk over die weken.
-    const nWeeks = monthRecord !== null && monthRecord.weeks.length > 0 ? monthRecord.weeks.length : weekDist.length;
+    //
+    // Dat aantal uit de historie is getWeeksInMonth, voor elke metric hetzelfde, en niet de lengte
+    // van de verdeling van DEZE metric: die slaat een jaar over waarin de metric nul was. Met een
+    // september 2025 van vijf weken kosten en 0 conversies viel de conversieverdeling terug op vier
+    // gelijke weken en hield de kostenverdeling er vijf; deriveForecast koppelt de weken op positie,
+    // en vanaf september deelde elke week-CPA de kosten van de ene week door de conversies van de
+    // volgende (de beursweek van 28 december: "Geen data, Verwacht € 0").
+    const nWeeks = monthRecord !== null && monthRecord.weeks.length > 0 ? monthRecord.weeks.length : getWeeksInMonth(historicalYears, m);
     const aandeel = (w: number) => (weekDist.length === nWeeks ? weekDist[w] : 1 / nWeeks);
     const monthExp = scaledExpected[m];
 
@@ -1171,6 +1210,7 @@ export function deriveForecast(
       forecast: fore,
       monthRatio: exp > 0 ? actual / exp : 1,
       ...geenNoemer(numPt.realized, denPt.realized),
+      ...(real === null && fore === null && "geenNoemer" in geenNoemer(numPt.forecast, denPt.forecast) ? { geenNoemerPrognose: true } : {}),
     };
   });
 
@@ -1183,18 +1223,21 @@ export function deriveForecast(
         ? (b > 0 ? parseFloat((a / b).toFixed(2)) : 0)
         : (a > 0 ? parseFloat((b / a).toFixed(2)) : 0);
 
+    // Zelfde regels als bij de maanden hierboven: een week zonder noemer heeft geen verhouding,
+    // en met alleen een teller krijgt hij de vlag (gemeten of geprognotiseerd).
+    const realized = numWk.realized !== null && denWk.realized !== null && heeftNoemer(numWk.realized, denWk.realized)
+      ? calc(numWk.realized, denWk.realized) : null;
+    const forecast = numWk.forecast !== null && denWk.forecast !== null && heeftNoemer(numWk.forecast, denWk.forecast)
+      ? calc(numWk.forecast, denWk.forecast) : null;
     return {
       month: numWk.month,
       week: numWk.week,
       label: numWk.label,
       expected: calc(numWk.expected, denWk.expected),
-      // Zelfde regels als bij de maanden hierboven: een week zonder noemer heeft geen verhouding,
-      // en met alleen een teller krijgt hij de vlag.
-      realized: numWk.realized !== null && denWk.realized !== null && heeftNoemer(numWk.realized, denWk.realized)
-        ? calc(numWk.realized, denWk.realized) : null,
-      forecast: numWk.forecast !== null && denWk.forecast !== null && heeftNoemer(numWk.forecast, denWk.forecast)
-        ? calc(numWk.forecast, denWk.forecast) : null,
+      realized,
+      forecast,
       ...geenNoemer(numWk.realized, denWk.realized),
+      ...(realized === null && forecast === null && "geenNoemer" in geenNoemer(numWk.forecast, denWk.forecast) ? { geenNoemerPrognose: true } : {}),
     };
   });
 
@@ -1290,6 +1333,7 @@ export function computeBudgetRecommendation(
     behindTarget,
     conversionGap: Math.round(conversionGap),
     currentCpa: parseFloat(currentCpa.toFixed(2)),
+    cpaUitDoel: !(ytdConv > 0),
     extraSpendNeeded,
     requiredMonthlySpend,
     currentMonthlySpend,

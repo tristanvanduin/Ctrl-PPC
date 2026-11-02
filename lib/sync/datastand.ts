@@ -33,8 +33,9 @@ import { daysInMonthOf } from "@/lib/analysis/comparison-facts";
 // geprojecteerd alsof ze nog moesten komen, of weggelaten.
 //
 // `dataTot` is de laatste DAG waarvan de data definitief is: bij een dagbron de nieuwste datum
-// met een rij, bij een maandbron de dag vóór de laatste geslaagde sync (dataTotVanMaandbron), bij
-// een live bron gisteren. Een maand is vol als dataTot op zijn laatste dag ligt, en nooit later
+// met een rij, of na een geslaagde sync de dag vóór die sync of die rij (dataTotVanDagbron), bij
+// een maandbron de dag vóór de laatste geslaagde sync (dataTotVanMaandbron), bij een live bron
+// gisteren. Een maand is vol als dataTot op zijn laatste dag ligt, en nooit later
 // dan de laatste afgesloten kalendermaand.
 //
 // Dit deel is puur en client-veilig: de KPI-band rekent het in de browser uit, de routes op de
@@ -63,7 +64,18 @@ export interface DataStandSamen extends VolleMaand {
    * sync na de laatste rij nog geslaagd is; en op "Alle kanalen" leest de band Google live, niet
    * uit fact_core, dus hoort hij de regel over zijn eigen bronnen te draaien (review [3], [12], [14]).
    */
-  bronnen?: { bron: string; dataTot: string | null; syncDraait: boolean }[];
+  bronnen?: {
+    bron: string;
+    dataTot: string | null;
+    syncDraait: boolean;
+    /**
+     * Alleen bij een dagkanaal: de nieuwste rij. Niet voor het venster (dat is dataTot), wel voor de
+     * zin over een uitgesloten bron (uitgeslotenMetDag). dataTot is de laatste DEFINITIEVE dag: bij
+     * een kanaal dat na zijn sync van 05:00 op dag D stopte (ontkoppeld, of de sync dood) is dat
+     * D-1, terwijl de rij van D gewoon in de totalen staat en de laatste data is die nog komt.
+     */
+    laatsteRij?: string | null;
+  }[];
 }
 
 /** "YYYY-MM-DD" (ook uit een tijdstip) als het een bestaande dag is, anders null. "2026-02-30"
@@ -74,8 +86,9 @@ function alsDag(v: unknown): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) && addDays(d, 0) === d ? d : null;
 }
 
-/** De laatste bestaande dag uit een paar kandidaten, of null. Voor een dataTot uit twee bronnen
- *  (de rijen in de browser en de syncdag van de route): een ongeldige of ontbrekende telt niet. */
+/** De laatste bestaande dag uit een paar kandidaten, of null: een ongeldige of ontbrekende telt
+ *  niet. Voor de rijen in de browser naast de dag van de route is het dagkanaalDataTot: daar telt
+ *  de nieuwste rij niet als volle dag. */
 export function laatsteGeldigeDag(...dagen: (string | null | undefined)[]): string | null {
   let laatste: string | null = null;
   for (const d of dagen) {
@@ -196,11 +209,20 @@ export function gezamenlijkeDataTot(
 }
 
 /** De bronnen uit `uitgesloten`, elk met de dag waarop zijn data ophoudt (uit `bronnen`). De
- *  KPI-band, het Jaaroverzicht en de Pacing noemen ze zo met dezelfde dag. */
+ *  KPI-band, het Jaaroverzicht en de Pacing noemen ze zo met dezelfde dag.
+ *
+ *  Die dag is de LAATSTE van de nieuwste rij en dataTot (laatsteGeldigeDag). dataTot alleen zei
+ *  "geen data na 14 mei" voor een LinkedIn die na zijn sync van 15 mei stopte, terwijl de rij van
+ *  15 mei in het meitotaal staat; Instellingen en de dagstand noemden 15 mei. De rij alleen zou een
+ *  gepauzeerd account met een gezonde sync terugzetten naar zijn laatste levering, terwijl de sync
+ *  de dagen erna als nul gemeten heeft: dan wint dataTot. Het venster blijft op dataTot. */
 export function uitgeslotenMetDag(
-  samen: { uitgesloten?: readonly string[]; bronnen?: readonly { bron: string; dataTot: string | null | undefined }[] } | null | undefined,
+  samen: { uitgesloten?: readonly string[]; bronnen?: readonly { bron: string; dataTot: string | null | undefined; laatsteRij?: string | null }[] } | null | undefined,
 ): { bron: string; dataTot: string | null }[] {
-  return (samen?.uitgesloten ?? []).map((bron) => ({ bron, dataTot: samen?.bronnen?.find((b) => b.bron === bron)?.dataTot ?? null }));
+  return (samen?.uitgesloten ?? []).map((bron) => {
+    const b = samen?.bronnen?.find((x) => x.bron === bron);
+    return { bron, dataTot: laatsteGeldigeDag(b?.laatsteRij, b?.dataTot) };
+  });
 }
 
 export type DatastandToestand = "actueel" | "achter" | "dood" | "geen";
@@ -476,13 +498,42 @@ export function dagstandBlokkade(stand: Dagstand): string | null {
  * sync een dag te oud werd (op 1 november t/m 28 oktober, op 2 november t/m 20 september: het
  * venster viel van oktober terug naar augustus). Wat gemeten is, blijft gemeten. syncDraait beslist
  * alleen nog of een bron het gezamenlijke venster mag tegenhouden (remtNietBijAchterstand).
+ *
+ * Valt de nieuwste rij OP of NA de dag van de laatste geslaagde sync, dan telt die rij zelf niet. De
+ * nachtcron draait om 05:00 UTC en haalt de dagrijen t/m todayUTC() op (lib/sync/kanaal-runs.ts), dus
+ * de rij van de syncdag is zo'n zes van de 24 uur. Als de nieuwste rij telde, was een oktober waarvan
+ * de sync op de 31e voor het laatst slaagde "vol", met een 31e van zes uur erin, en de maandbron zei
+ * voor dezelfde sync "t/m de 30e" (dataTotVanMaandbron). Bij een rij NA de sync (een run die de
+ * dagrijen schreef en daarna op iets anders faalde, zet last_sync_at niet) is het de dag vóór die
+ * rij, niet de dag vóór de oude sync: ook die run haalde t/m zijn eigen dag op, maar de dagen ervoor
+ * zijn compleet, en anders bleef een kanaal waarvan alleen een bijstap faalt wekenlang op de oude
+ * sync staan en de rest remmen. Zonder bekende sync blijft het de nieuwste rij (de oude aanname).
  */
 export function dataTotVanDagbron(stand: Pick<Dagstand, "laatsteDag" | "laatsteGeslaagdeSync">): string | null {
   const dag = alsDag(stand.laatsteDag);
   const syncDag = alsDag(stand.laatsteGeslaagdeSync);
   if (!dag || !syncDag) return dag;
-  const dagVoorSync = addDays(syncDag, -1);
-  return dagVoorSync > dag ? dagVoorSync : dag;
+  if (dag >= syncDag) return addDays(dag, -1);
+  return addDays(syncDag, -1);
+}
+
+/**
+ * De dataTot van een dagkanaal in de BROWSER: de nieuwste rij die de browser zelf laadde, samen met
+ * de dataTot die de blended route voor dat kanaal gaf (dataTotVanDagbron; de browser kan
+ * <kanaal>_connections niet lezen). Voor de KPI-band en de kanaalprognose, met één regel.
+ *
+ * Hier stond de LAATSTE van de twee (laatsteGeldigeDag). Dan kwam de correctie van de route voor de
+ * rij van de syncdag nooit aan: de browser ziet dezelfde rij van 31 oktober waarvan de route zegt
+ * "t/m de 30e", en die rij won. Een rij die later valt dan de routedag telt nu t/m de dag ervoor: het
+ * is die syncdag-rij zelf, of een rij van een sync ná het antwoord van de route (dat staat vijf
+ * minuten in de cache), en ook die sync haalde t/m zijn eigen dag op. Geeft de route geen dag (hij
+ * faalde, laadt niet, of kent het kanaal niet), dan de rij, zoals voorheen.
+ */
+export function dagkanaalDataTot(laatsteRij: string | null | undefined, routeDataTot: string | null | undefined): string | null {
+  const rij = alsDag(laatsteRij);
+  const route = alsDag(routeDataTot);
+  if (!route) return rij;
+  return laatsteGeldigeDag(rij ? addDays(rij, -1) : null, route);
 }
 
 /** @param nu vandaag als "YYYY-MM-DD" (standaard today()); de blended route geeft zijn eigen peildag mee. */

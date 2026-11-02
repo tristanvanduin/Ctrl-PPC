@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as fc from "./forecast";
 import { computeHealthScore } from "./health-score";
+import * as trend from "./analysis/trend";
 import * as formaat from "./forecast-format";
 import * as maand from "../components/dashboard/monthly-overview";
 import * as beurs from "../components/dashboard/fair-weeks-overview";
@@ -138,6 +139,89 @@ deel("Gerealiseerd YTD bij nul conversies", () => {
   check("het rapport leest de YTD-verhouding uit ytdGerealiseerd", rapportBron.includes("ytdGerealiseerd(") && !/fmt\(cpa\.ytdRealized\)|formatRoas\(roas\.ytdRealized\)/.test(rapportBron));
   const tegelBron = bron("components/dashboard/channel-forecast-overview.tsx");
   check("de kanaaltegel ook", tegelBron.includes("ytdGerealiseerd("));
+});
+
+deel("De CPA-trend kent de maanden zonder conversies (cpaTrendVanForecast)", () => {
+  const { cpaTrendVanForecast } = trend as Partial<typeof trend>;
+  check("lib/analysis/trend.ts exporteert cpaTrendVanForecast", typeof cpaTrendVanForecast === "function");
+  if (typeof cpaTrendVanForecast !== "function") return;
+  // G: CPA daalt januari-juni (70 .. 120 conversies op € 2.000), juli € 2.000 en 0 conversies.
+  const dalend = (c: number, m: number) => rec(m, wk(m, [c / 4, c / 4, c / 4, c / 4], [500, 500, 500, 500], [c * 25, c * 25, c * 25, c * 25]));
+  const conv = [70, 80, 90, 100, 110, 120];
+  const G = fc.computeForecast({ ...data, currentYearData: cur.map((_, i) => (i < 6 ? dalend(conv[i], i + 1) : i === 6 ? rec(7, wk(7, [0, 0, 0, 0], [500, 500, 500, 500], [0, 0, 0, 0])) : null)) });
+  const tG = cpaTrendVanForecast(G);
+  check("G: juli zonder conversies, en geen 'daalt'", tG.daalt === false && tG.stijgt === false && JSON.stringify(tG.zonderConversies) === JSON.stringify(["Jul"]), JSON.stringify(tG));
+  // H: dezelfde daling, juni zonder conversies, juli weer normaal.
+  const H = fc.computeForecast({ ...data, currentYearData: cur.map((_, i) => (i < 5 ? dalend(conv[i], i + 1) : i === 5 ? rec(6, wk(6, [0, 0, 0, 0], [500, 500, 500, 500], [0, 0, 0, 0])) : i === 6 ? dalend(130, 7) : null)) });
+  check("H: juni zonder conversies valt in het venster", JSON.stringify(cpaTrendVanForecast(H).zonderConversies) === JSON.stringify(["Jun"]) && !cpaTrendVanForecast(H).daalt);
+  // G0: zonder die julimaand is de daling echt.
+  const G0 = fc.computeForecast({ ...data, currentYearData: cur.map((_, i) => (i < 6 ? dalend(conv[i], i + 1) : null)) });
+  check("G0: zonder maand zonder conversies daalt de CPA gewoon", cpaTrendVanForecast(G0).daalt === true && cpaTrendVanForecast(G0).zonderConversies.length === 0);
+  // De health-score leest dezelfde regel.
+  const e = computeHealthScore(G).factors.find((x) => x.name === "Efficiency");
+  check("G: de health-score zegt hetzelfde (4/20)", e?.score === 4, JSON.stringify(e));
+});
+
+deel("Restkosten zonder conversie onder één gewone CPA tellen niet als slechtste efficiency", () => {
+  // Januari-juni normaal (CPA € 20), juli: 0 / 0, € 3 en 0 conversies, € 3 en 1 conversie.
+  const juli = (conv: number, kosten: number) => fc.computeForecast({ ...data, currentYearData: cur.map((_, i) => (i < 6 ? vol(i + 1) : i === 6 ? rec(7, wk(7, [conv, 0, 0, 0], [kosten, 0, 0, 0], [0, 0, 0, 0])) : null)) });
+  const eff = (f: fc.ClientForecast) => computeHealthScore(f).factors.find((x) => x.name === "Efficiency");
+  const stil = computeHealthScore(juli(0, 0));
+  const drie = computeHealthScore(juli(0, 3));
+  check("€ 3 zonder conversie: dezelfde score als een stille juli", drie.total === stil.total && eff(juli(0, 3))?.score === eff(juli(0, 0))?.score,
+    `${drie.total} ${eff(juli(0, 3))?.score} tegen ${stil.total} ${eff(juli(0, 0))?.score}`);
+  check("€ 3 zonder conversie: geen waarschuwing 'Kosten zonder conversies'", !drie.anomalies.some((a) => a.title === "Kosten zonder conversies"), JSON.stringify(drie.anomalies.map((a) => a.title)));
+  check("€ 19 (onder één CPA) ook niet", eff(juli(0, 19))?.score === eff(juli(0, 0))?.score);
+  for (const kosten of [20, 300, 2000]) {
+    check(`€ ${kosten} zonder conversie (minstens één CPA): wel de slechtste efficiency`, eff(juli(0, kosten))?.score === 4 && computeHealthScore(juli(0, kosten)).anomalies.some((a) => a.title === "Kosten zonder conversies"));
+  }
+});
+
+deel("Een prognose met kosten en zonder verwachte conversies heet niet 'Geen data'", () => {
+  // Een kanaal zonder doel en zonder vorig jaar: januari-juli € 2.000 per maand, 0 conversies. De
+  // prognose voor augustus-december: kosten op tempo, conversies 0. Die maanden heetten "Geen data".
+  const zonderDoel: ClientHistoricalData = {
+    ...data, targetCurrentYear: { conversions: 0, revenue: 0, adSpend: 0 }, historicalYears: {},
+    currentYearData: Array.from({ length: 12 }, (_, i) => (i < 7 ? rec(i + 1, wk(i + 1, [0, 0, 0, 0], [500, 500, 500, 500], [0, 0, 0, 0])) : null)),
+  };
+  const g = fc.computeForecast(zonderDoel);
+  const aug = g.cpa.points[7] as fc.ForecastPoint & { geenNoemerPrognose?: boolean };
+  check("voorwaarde: augustus kosten geprognotiseerd, conversies 0", (g.adSpend.points[7].forecast ?? 0) > 0 && g.conversions.points[7].forecast === 0,
+    `${g.adSpend.points[7].forecast} / ${g.conversions.points[7].forecast}`);
+  check("augustus: geen waarde, de prognosevlag, en niet de gemeten vlag", aug.forecast === null && aug.geenNoemerPrognose === true && !aug.geenNoemer, JSON.stringify(aug));
+  check("het label: 'Geen conversies verwacht'", formaat.geenWaardeLabel(aug, "cpa") === "Geen conversies verwacht", formaat.geenWaardeLabel(aug, "cpa"));
+  const augWeken = g.cpa.weeklyPoints.filter((w) => w.month === 8) as (fc.WeeklyPoint & { geenNoemerPrognose?: boolean })[];
+  check("en de weken van augustus ook", augWeken.length > 0 && augWeken.every((w) => w.forecast === null && w.geenNoemerPrognose === true && !w.geenNoemer));
+  check("juli blijft gemeten (geenNoemer, geen prognosevlag)", g.cpa.points[6].geenNoemer === true && !(g.cpa.points[6] as { geenNoemerPrognose?: boolean }).geenNoemerPrognose);
+  const weken = beurs.beursWekenVan(g, "cpa", 2026, "2026-10-28") as ({ weekStart: string; geenNoemerPrognose?: boolean; geenNoemer?: boolean })[];
+  const sep = weken.filter((w) => w.weekStart.startsWith("2026-09"));
+  check("de beursweken van september: de prognosevlag", sep.length > 0 && sep.every((w) => w.geenNoemerPrognose === true && !w.geenNoemer), JSON.stringify(sep));
+  const t = metMetric("cpa", () => tekst(React.createElement(maand.MonthlyOverviewView, { data: zonderDoel, forecast: g, vandaag: "2026-08-10" })));
+  check("de maandkaart van augustus: 'Geen conversies verwacht'", t.includes("Geen conversies verwacht") && t.includes("Aug — geen conversies verwacht"), t.slice(0, 400));
+  // Een gestopt kanaal (nul kosten op nul conversies) krijgt geen vlag: daar is echt niets.
+  const som = req("./forecast-som") as typeof import("./forecast-som");
+  const stil = som.stilgelegd(g);
+  check("gestopt kanaal (0 / 0): geen prognosevlag, gewoon 'Geen data'", !(stil.cpa.points[7] as { geenNoemerPrognose?: boolean }).geenNoemerPrognose && formaat.geenWaardeLabel(stil.cpa.points[7], "cpa") === "Geen data");
+});
+
+deel("Een historische maand met kosten en 0 conversies: de weekreeksen blijven gelijk", () => {
+  // September 2025 met vijf weken van € 400 en 0 conversies (de tracking lag eruit). De
+  // weekverdeling van de conversies sloeg dat jaar over en viel terug op vier gelijke weken, die
+  // van de kosten hield er vijf. Het aantal weken kwam uit die verdeling, dus de conversiereeks had
+  // er 48 en de kostenreeks 49, en deriveForecast koppelt op positie: vanaf september deelde elke
+  // week-CPA de kosten van de ene week door de conversies van de volgende.
+  const hist = Array.from({ length: 12 }, (_, i) => vol(i + 1));
+  hist[8] = rec(9, wk(9, [0, 0, 0, 0, 0], [400, 400, 400, 400, 400], [0, 0, 0, 0, 0]));
+  const g = fc.computeForecast({ ...data, historicalYears: { 2025: hist }, currentYearData: cur.map((_, i) => (i < 7 ? vol(i + 1) : null)) });
+  const sleutels = (r: fc.ForecastResult) => r.weeklyPoints.map((w) => `${w.month}-${w.week}`).join(",");
+  check("conversies, kosten en CPA hebben hetzelfde weekraster", sleutels(g.conversions) === sleutels(g.adSpend) && sleutels(g.cpa) === sleutels(g.adSpend),
+    `${g.conversions.weeklyPoints.length} / ${g.adSpend.weeklyPoints.length} / ${g.cpa.weeklyPoints.length}`);
+  // Op (maand, week) opgezocht in elke reeks, niet op positie.
+  const opWeek = (r: fc.ForecastResult) => r.weeklyPoints.find((w) => w.month === 10 && w.week === 1)?.forecast ?? NaN;
+  const eigen = opWeek(g.adSpend) / opWeek(g.conversions);
+  check("de week-CPA van W1 oktober is zijn eigen kosten / zijn eigen conversies", Math.abs(opWeek(g.cpa) - eigen) < 0.01, `${opWeek(g.cpa)} tegen ${eigen}`);
+  const laatste = g.cpa.weeklyPoints[g.cpa.weeklyPoints.length - 1];
+  check("de laatste CPA-week (december) heeft een prognose", laatste.month === 12 && laatste.forecast !== null, JSON.stringify(laatste));
 });
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

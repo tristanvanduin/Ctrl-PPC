@@ -8,8 +8,8 @@ import { getClientSettings } from "@/lib/client-settings";
 import { dbSelect } from "@/lib/data-access/client-read";
 import type { ImpressionShareData, AccountStructureData, WastefulSearchTermData, AdGroupBleederData, ChangeHistoryData } from "@/lib/use-client-data";
 import { channelOfSopType, type InsightChannel } from "@/lib/insights/channel-of";
-import { cpaTrendFrom } from "@/lib/analysis/trend";
-import { formatRoas } from "@/lib/forecast-format";
+import { cpaTrendVanForecast } from "@/lib/analysis/trend";
+import { budgetCpaNaam, formatRoas } from "@/lib/forecast-format";
 
 type InsightType = "critical" | "warning" | "positive" | "info";
 
@@ -213,7 +213,7 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
     insights.push({
       type: "critical",
       level: "Budget",
-      text: `Om het jaardoel te halen zijn nog ${budget.conversionGap.toLocaleString("nl-NL")} conversies nodig in ${remainingMonths} maanden. Bij huidige CPA van ${fmt(budget.currentCpa)} vereist dit ${fmt(budget.extraSpendNeeded)} extra budget — maandelijks ${fmt(budget.requiredMonthlySpend)} i.p.v. ${fmt(budget.currentMonthlySpend)} (${budget.spendIncreasePct > 0 ? `+${Math.round(budget.spendIncreasePct)}%` : "gelijk"}).`,
+      text: `Om het jaardoel te halen zijn nog ${budget.conversionGap.toLocaleString("nl-NL")} conversies nodig in ${remainingMonths} maanden. Bij ${budgetCpaNaam(budget)} van ${fmt(budget.currentCpa)}${budget.cpaUitDoel ? " (nog geen conversies YTD)" : ""} vereist dit ${fmt(budget.extraSpendNeeded)} extra budget — maandelijks ${fmt(budget.requiredMonthlySpend)} i.p.v. ${fmt(budget.currentMonthlySpend)} (${budget.spendIncreasePct > 0 ? `+${Math.round(budget.spendIncreasePct)}%` : "gelijk"}).`,
     });
   }
 
@@ -235,9 +235,17 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
 
   if (realizedMonths.length >= 2) {
     const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
-    if (cpaPoints.length >= 2) {
-      // Gedeelde berekening en drempels (lib/analysis/trend.ts).
-      const t = cpaTrendFrom(cpaPoints);
+    // Gedeelde berekening en drempels (lib/analysis/trend.ts), met de maanden zonder conversies:
+    // zonder die regel zei dit blok "CPA daalt … optimalisaties werken" direct na € 2.000 kosten
+    // zonder één conversie, en de health-score ernaast "Kosten zonder conversies".
+    const t = cpaTrendVanForecast(forecast);
+    if (t.zonderConversies.length > 0) {
+      insights.push({
+        type: "warning",
+        level: "Efficiency",
+        text: `In ${t.zonderConversies.join(", ")} waren er kosten zonder één conversie: daar is geen CPA te berekenen. Controleer eerst de conversiemeting (tag, import, attributie) voordat je op de CPA stuurt of budget verschuift.`,
+      });
+    } else if (cpaPoints.length >= 2) {
       const firstCpa = t.vorig;
       const lastCpa = t.huidig;
       const cpaTrend = t.pct ?? 0;

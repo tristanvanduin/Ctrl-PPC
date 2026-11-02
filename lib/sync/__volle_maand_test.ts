@@ -173,8 +173,33 @@ if (typeof dataTotVanDagbron === "function") {
     dataTotVanDagbron({ laatsteDag: "2026-10-30", laatsteGeslaagdeSync: "2026-11-01T05:10:00Z", syncDraait: true }) === "2026-10-31");
   check("gepauzeerd sinds 15 maart, sync gezond: t/m de dag vóór de sync",
     dataTotVanDagbron({ laatsteDag: "2026-03-15", laatsteGeslaagdeSync: "2026-11-01T05:10:00Z", syncDraait: true }) === "2026-10-31");
-  check("laatste sync op de dag van de nieuwste rij (de demo): de nieuwste rij, ontbrekend is geen nul",
-    dataTotVanDagbron({ laatsteDag: "2026-08-26", laatsteGeslaagdeSync: "2026-08-26T06:44:34Z", syncDraait: false }) === "2026-08-26");
+  // De nachtcron draait om 05:00 UTC en haalt dagrijen t/m todayUTC() op (lib/sync/kanaal-runs.ts):
+  // de rij van de syncdag zelf is dan zo'n zes van de 24 uur. Hier stond "de nieuwste rij", en dan
+  // telde een oktober waarvan de sync op de 31e om 05:00 voor het laatst slaagde als volle maand,
+  // met een 31e van zes uur erin en zonder "partieel" in de band; de maandbron gaf voor dezelfde
+  // sync september vol en oktober t/m de 30e.
+  check("de demo: rij van 26 aug, sync 26 aug 06:44: t/m 25 aug, zoals Google uit dezelfde sync",
+    dataTotVanDagbron({ laatsteDag: "2026-08-26", laatsteGeslaagdeSync: "2026-08-26T06:44:34Z", syncDraait: false }) === "2026-08-25"
+      && dataTotVanMaandbron?.("2026-08", "2026-08-26T06:44:34Z") === "2026-08-25",
+    String(dataTotVanDagbron({ laatsteDag: "2026-08-26", laatsteGeslaagdeSync: "2026-08-26T06:44:34Z", syncDraait: false })));
+  for (const nu of ["2026-11-01", "2026-11-03"]) {
+    const syncdag = beoordeelDagstand({ kanaal: "meta", laatsteDag: "2026-10-31", laatsteGeslaagdeSync: "2026-10-31T05:00:00Z", nu });
+    const dt = dataTotVanDagbron(syncdag);
+    check(`rij van 31 okt, laatste geslaagde sync 31 okt 05:00 (op ${nu}): t/m 30 okt`, dt === "2026-10-30", String(dt));
+    if (typeof volleMaand === "function") {
+      const vm = volleMaand({ dataTot: dt, nu });
+      check(`  en dus september vol, oktober partieel t/m 30 (op ${nu})`,
+        vm.laatsteVolleMaand === "2026-09" && vm.partieel?.maand === "2026-10" && vm.partieel?.tmDag === 30, JSON.stringify(vm));
+    }
+  }
+  // Rijen NA de laatste geslaagde sync: een run die de dagrijen schreef en daarna op iets anders
+  // faalde, zet last_sync_at niet. Ook die run haalde t/m zijn eigen dag op, dus zijn nieuwste rij is
+  // even partieel; de dagen ervoor zijn wel compleet en horen niet terug te vallen naar de oude sync.
+  check("rijen t/m 2 nov, laatste geslaagde sync 31 okt: t/m 1 nov (de nieuwste rij is zelf partieel)",
+    dataTotVanDagbron({ laatsteDag: "2026-11-02", laatsteGeslaagdeSync: "2026-10-31T05:00:00Z", syncDraait: false }) === "2026-11-01",
+    String(dataTotVanDagbron({ laatsteDag: "2026-11-02", laatsteGeslaagdeSync: "2026-10-31T05:00:00Z", syncDraait: false })));
+  check("zonder bekende sync: de nieuwste rij, zoals voorheen",
+    dataTotVanDagbron({ laatsteDag: "2026-08-26", laatsteGeslaagdeSync: null, syncDraait: false }) === "2026-08-26");
   // Wat een geslaagde sync gemeten heeft, blijft gemeten als hij ouder wordt. Hier telde de dag vóór
   // de sync alleen zolang syncDraait gold, en die eist ook een sync van hooguit drie dagen oud: een
   // gepauzeerde Meta (laatste rij 20 september) met een geslaagde sync op 29 oktober en daarna alleen

@@ -28,6 +28,9 @@
 //
 // Periode tegen periode heeft dat probleem niet: één maand kan de uitkomst niet meer bepalen.
 
+import type { ClientForecast } from "@/lib/forecast";
+import { median } from "@/lib/util/stats";
+
 /** Het aantal maanden aan elke kant van de vergelijking. */
 export const TREND_WINDOW = 3;
 
@@ -63,6 +66,8 @@ export const CPA_TREND = {
 export interface TrendPunt {
   realized: number | null;
   monthLabel?: string;
+  /** Kosten zonder één conversie (deriveForecast): geen CPA, wel gemeten. */
+  geenNoemer?: boolean;
 }
 
 export interface CpaTrend {
@@ -77,17 +82,29 @@ export interface CpaTrend {
   stijgt: boolean;
   stijgtHard: boolean;
   daalt: boolean;
+  /**
+   * De maanden in het recente venster (de laatste TREND_WINDOW maanden met kosten) met kosten maar
+   * zonder één conversie. Niet leeg: dan staan daalt, stijgt en stijgtHard uit. Die maand heeft geen
+   * CPA om mee te middelen, en zonder hem las de reeks als "CPA daalt … optimalisaties werken" direct
+   * na € 2.000 zonder één conversie, terwijl de health-score er een waarschuwing voor gaf. Een
+   * "stijgt" met de getallen van de overige maanden zou "van € 25 naar € 18, een stijging van -28%"
+   * schrijven. Elke lezer zegt het dan zelf, met deze maanden erbij.
+   */
+  zonderConversies: string[];
 }
 
 /**
  * De CPA-trend uit een reeks forecast-punten.
  *
  * Punten zonder gerealiseerde waarde vallen weg: een lopende maand hoort niet mee te tellen,
- * en null als nul lezen zou de CPA kunstmatig verlagen.
+ * en null als nul lezen zou de CPA kunstmatig verlagen. Een punt met `geenNoemer` (kosten zonder
+ * conversie) telt niet in de gemiddelden maar wel in `zonderConversies`.
  */
 export function cpaTrendFrom(points: readonly TrendPunt[]): CpaTrend {
   const gerealiseerd = points.filter((p) => p.realized !== null && Number.isFinite(p.realized));
-  const leeg: CpaTrend = { pct: null, vorig: 0, huidig: 0, periode: "", stijgt: false, stijgtHard: false, daalt: false };
+  const metKosten = points.filter((p) => (p.realized !== null && Number.isFinite(p.realized)) || p.geenNoemer);
+  const zonderConversies = metKosten.slice(-TREND_WINDOW).filter((p) => p.geenNoemer).map((p) => p.monthLabel ?? "");
+  const leeg: CpaTrend = { pct: null, vorig: 0, huidig: 0, periode: "", stijgt: false, stijgtHard: false, daalt: false, zonderConversies };
   if (gerealiseerd.length < 2) return leeg;
 
   const waarden = gerealiseerd.map((p) => p.realized as number);
@@ -101,10 +118,33 @@ export function cpaTrendFrom(points: readonly TrendPunt[]): CpaTrend {
   const laatsteLabel = gerealiseerd[gerealiseerd.length - 1]?.monthLabel;
   const periode = eersteLabel && laatsteLabel ? ` (${eersteLabel} t/m ${laatsteLabel})` : "";
 
+  const oordeel = zonderConversies.length === 0;
   return {
     pct, vorig, huidig, periode,
-    stijgt: pct > CPA_TREND.stijgt,
-    stijgtHard: pct > CPA_TREND.stijgtHard,
-    daalt: pct < CPA_TREND.daalt,
+    stijgt: oordeel && pct > CPA_TREND.stijgt,
+    stijgtHard: oordeel && pct > CPA_TREND.stijgtHard,
+    daalt: oordeel && pct < CPA_TREND.daalt,
+    zonderConversies,
   };
+}
+
+/**
+ * De CPA-trend van een forecast, met de regel voor kosten zonder conversies erin: één plek voor de
+ * health-score, de inzichten, de aanbevelingen en de rest.
+ *
+ * Een maand met kosten en geen conversie telt alleen als er minstens één conversie te verwachten
+ * was: zijn kosten zijn minstens een gewone CPA (de mediaan van de gemeten maand-CPA's, zonder
+ * die het CPA-doel). Drie euro restkosten na een pauze, bij een CPA van € 20, is 0,15 verwachte
+ * conversie: die gaf de health-score een cijfer lager en de tekst "slechter wordt de efficiency
+ * niet", terwijl dezelfde € 3 met één conversie de beste score kreeg. Zo'n maand valt dan weg,
+ * zoals een maand van 0 / 0. Zonder gewone CPA en zonder doel telt hij wel: dan is er niets om
+ * hem tegen af te zetten.
+ */
+export function cpaTrendVanForecast(forecast: Pick<ClientForecast, "cpa" | "adSpend">): CpaTrend {
+  const punten = forecast.cpa.points;
+  const gewoon = median(punten.filter((p) => p.realized !== null).map((p) => p.realized as number))
+    ?? (forecast.cpa.kpi.annualTarget > 0 ? forecast.cpa.kpi.annualTarget : null);
+  const telt = (p: (typeof punten)[number]) =>
+    !p.geenNoemer || gewoon === null || (forecast.adSpend.points[p.month - 1]?.realized ?? 0) >= gewoon;
+  return cpaTrendFrom(punten.filter((p) => (p.realized !== null || p.geenNoemer) && telt(p)));
 }

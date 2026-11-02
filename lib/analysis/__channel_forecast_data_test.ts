@@ -179,6 +179,25 @@ assert(vorigJaarGestopt?.currentYearData.every((m) => m === null) === true, "dat
   assert((s?.forecast.conversions.points[10].forecast ?? 0) > 0, `seizoenspauze: november wordt geprojecteerd (kreeg ${s?.forecast.conversions.points[10].forecast})`);
 }
 
+// ── De rij van de syncdag is een deel van die dag ──
+//
+// Meta slaagde voor het laatst op 31 oktober om 05:00 UTC (daarna faalt de sync); de rij van
+// 31 oktober is dus zo'n zes uur. De route zegt t/m 30 oktober (dataTotVanDagbron). Hier won de
+// LAATSTE van de rij en de routedag, en bleef oktober een gerealiseerde maand: met een 31e van zes
+// uur erin, en zonder dat de rest van die dag ooit geprojecteerd werd.
+{
+  const totSyncdag: ChannelForecastRow[] = [];
+  for (let t = Date.UTC(2026, 0, 1); t <= Date.UTC(2026, 9, 31); t += 86_400_000) totSyncdag.push(rij(new Date(t).toISOString().slice(0, 10), 100, 1, 0));
+  const d = buildChannelHistoricalData("c1", totSyncdag, { conversions: 0, revenue: 0, adSpend: 0 }, "2026-11-03", "2026-10-30");
+  assert(d?.currentYearData[8]?.adSpend === 3000, `syncdag-rij: september gerealiseerd (kreeg ${JSON.stringify(d?.currentYearData[8])})`);
+  assert(d?.currentYearData[9] === null, `syncdag-rij: oktober (t/m 30 gemeten) telt NIET als gerealiseerd (kreeg ${JSON.stringify(d?.currentYearData[9])})`);
+  const f = buildChannelForecast("c1", totSyncdag, [], "meta_ads", "2026-11-03", "2026-10-30");
+  assert(f?.forecast.conversions.kpi.realizedThroughMonth === 9, `syncdag-rij: gerealiseerd t/m september (kreeg ${f?.forecast.conversions.kpi.realizedThroughMonth})`);
+  // Zonder routedag (de route faalde): de rijen, zoals voorheen.
+  const zonder = buildChannelHistoricalData("c1", totSyncdag, { conversions: 0, revenue: 0, adSpend: 0 }, "2026-11-03");
+  assert(zonder?.currentYearData[9]?.adSpend === 3100, `zonder routedag: oktober uit de rijen (kreeg ${JSON.stringify(zonder?.currentYearData[9])})`);
+}
+
 // ── De partiële eerste maand als laatste gerealiseerde: het tempo over de dagen dat het liep ──
 //
 // Meta sinds 20 juli 2026, 40 conversies in 12 dagen (en verder in augustus). Zonder doel nam het
@@ -190,6 +209,69 @@ assert(vorigJaarGestopt?.currentYearData.every((m) => m === null) === true, "dat
   const c = f?.forecast.conversions;
   assert(c?.kpi.realizedThroughMonth === 7 && Math.round(c.points[6].realized ?? 0) === 40, `start 20 juli: juli gerealiseerd met 40 (kreeg ${c?.points[6].realized})`);
   assert(c?.points.slice(7).every((p) => p.forecast === 101) === true, `start 20 juli: augustus-december op 40 / 12 dagen, 101 per maand (kreeg ${c?.points.slice(7).map((p) => p.forecast).join("/")})`);
+}
+
+// ── Terug na een pauze, midden in de laatste gerealiseerde maand: hetzelfde tempo ──
+//
+// Meta januari-maart, april-juni stil, terug op 20 juli: 12 conversies in 12 dagen. De eerste dag
+// OOIT (1 januari) viel niet in juli, dus spreidde het tempo die 12 over 31 dagen: 12 per maand
+// voor augustus-december, waar hij 30 doet. Een kanaal dat op 20 juli voor het eerst begon, gaf 30.
+{
+  const terug: ChannelForecastRow[] = [];
+  for (let t = Date.UTC(2026, 0, 1); t <= Date.UTC(2026, 7, 25); t += 86_400_000) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    if (d < "2026-04-01" || d >= "2026-07-20") terug.push(rij(d, 10, 1, 0));
+  }
+  const f = buildChannelForecast("c1", terug, [], "meta_ads", "2026-11-01", "2026-08-25");
+  assert(f?.data.eersteDag === "2026-07-20", `terug op 20 juli: de eerste dag van de huidige loop (kreeg ${f?.data.eersteDag})`);
+  const c = f?.forecast.conversions;
+  assert(c?.points.slice(7).every((p) => p.forecast !== null && Math.round(p.forecast) === 30) === true, `terug op 20 juli: augustus-december op 12 / 12 dagen, 30 per maand (kreeg ${c?.points.slice(7).map((p) => p.forecast).join("/")})`);
+}
+
+// ── Dagrijen per maand, voor de gevallen hieronder ──
+const dagen = (van: string, tot: string, perMaand: (maand: string) => number, spendPerConv = 10): ChannelForecastRow[] => {
+  const uit: ChannelForecastRow[] = [];
+  for (let t = Date.parse(`${van}T00:00:00Z`); t <= Date.parse(`${tot}T00:00:00Z`); t += 86_400_000) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    const dim = new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)), 0)).getUTCDate();
+    const c = perMaand(d.slice(0, 7)) / dim;
+    uit.push(rij(d, c * spendPerConv, c, c * 100));
+  }
+  return uit;
+};
+
+// ── Een gat van vóór de start is geen seizoenspauze (kanaalGestopt) ──
+//
+// LinkedIn 60 per maand van november 2025 t/m maart 2026, daarna niets; de sync is gezond t/m
+// 31 oktober. April-oktober 2025 lagen vóór zijn start en lazen als "vorig jaar ook leeg": de tab
+// projecteerde november en december (246 voor het jaar), waar het kanaal sinds maart stil ligt.
+{
+  const li = dagen("2025-11-01", "2026-03-31", () => 60);
+  const f = buildChannelForecast("c1", li, [], "linkedin_ads", "2026-11-01", "2026-10-31");
+  const c = f?.forecast.conversions;
+  assert(Math.round(c?.kpi.adjustedAnnual ?? -1) === 180, `gat vóór de start: het jaar is januari-maart, 180 (kreeg ${c?.kpi.adjustedAnnual})`);
+  assert(c?.points.slice(10).every((p) => p.forecast === 0) === true, `gat vóór de start: november-december 0 (kreeg ${c?.points.slice(10).map((p) => p.forecast).join("/")})`);
+}
+
+// ── Nieuwste rij eerst (zoals de provider leest): de weken blijven in kalendervolgorde ──
+//
+// channel-data-provider.tsx leest `order date desc`. aggregateByYear bouwde de weken in de volgorde
+// van binnenkomst (W5, W4 .. W1), en de forecast leest ze op POSITIE: de gerealiseerde weken van
+// juli stonden omgekeerd (de drie dagen van W5 vooraan) en de weekverdeling van elke prognosemaand
+// ook, waardoor de beursstrip de korte week in de verkeerde week zette.
+{
+  const oplopend = dagen("2025-01-01", "2026-08-25", () => 31).map((r) => ({ ...r }));
+  const aflopend = [...oplopend].reverse();
+  const op = buildChannelForecast("c1", oplopend, [], "meta_ads", "2026-11-01", "2026-08-25");
+  const af = buildChannelForecast("c1", aflopend, [], "meta_ads", "2026-11-01", "2026-08-25");
+  const juli = af?.data.currentYearData[6]?.weeks.map((w) => w.week).join(",");
+  assert(juli === "1,2,3,4,5", `aflopende rijen: de weken van juli op volgorde (kreeg ${juli})`);
+  const sep25 = af?.data.historicalYears[2025]?.find((m) => m.month === 9)?.weeks.map((w) => w.week).join(",");
+  assert(sep25 === "1,2,3,4", `aflopende rijen: de weken van september 2025 op volgorde (kreeg ${sep25})`);
+  const reeks = (f: typeof op) => f?.forecast.conversions.weeklyPoints.map((w) => `${w.realized === null ? "-" : Math.round(w.realized * 10)}/${w.forecast === null ? "-" : Math.round(w.forecast * 10)}`).join(" ");
+  assert(reeks(af) === reeks(op), `aflopende rijen: dezelfde weekreeks als oplopende (kreeg\n    ${reeks(af)}\n  tegen ${reeks(op)})`);
+  const w5 = af?.forecast.conversions.weeklyPoints.find((w) => w.month === 7 && w.week === 5)?.realized;
+  assert(w5 !== undefined && w5 !== null && Math.round(w5) === 3, `aflopende rijen: W5 van juli is 29-31 juli, 3 dagen (kreeg ${w5})`);
 }
 
 // Zonder doel: computeForecast valt terug op het historisch totaal (zelfde gedrag als Google).

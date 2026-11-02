@@ -51,6 +51,8 @@ const vragen: Record<string, Vraag> = {};
 const alleVragen: Record<string, Vraag[]> = {};
 let wachtend: { tabel: string; los: () => void }[] = [];
 let opgeslagen: unknown = null;
+// Tabellen die met een HTTP 500 antwoorden (een netwerkfout, time-out of serverfout).
+const faalt = new Set<string>();
 const RIJEN: Record<string, Record<string, unknown>[]> = {
   // Twee dagen; de laatste dag is wat de band als eind van de data neemt.
   meta_account_daily: [
@@ -82,7 +84,7 @@ globalThis.fetch = ((url: string) => {
   (alleVragen[tabel] ??= []).push(vraag);
   return new Promise((klaar) => wachtend.push({
     tabel,
-    los: () => klaar({
+    los: () => klaar(faalt.has(tabel) ? ({ ok: false, status: 500, json: async () => ({ error: "boom" }) } as Response) : {
       ok: true, status: 200,
       json: async () => ({ data: tabel === "client_settings" ? { channel_conversion_config: opgeslagen } : alsDeRoute(RIJEN[tabel] ?? [], vraag) }),
     } as Response),
@@ -122,7 +124,7 @@ async function main() {
 
   const google: ClientHistoricalData = { clientId: "t", targetCurrentYear: { conversions: 0, revenue: 0, adSpend: 0 }, historicalYears: {}, currentYearData: Array(12).fill(null), currentYear: 2026 };
 
-  type Kanaal = "linkedin" | "blended";
+  type Kanaal = "linkedin" | "blended" | "google";
   let gezien: (number | null)[] = [];
   let laatst: ChannelPeriodData | null = null;
   function Kpi({ channel, clientId = "t" }: { channel: Kanaal; clientId?: string }) {
@@ -178,6 +180,13 @@ async function main() {
       `de Meta-bron draagt zijn eerste volle maand en de laadgrens (kreeg ${JSON.stringify([bronMeta?.vanaf, bronMeta?.geladenVanaf])})`);
     assert(nu().bronnen?.find((b) => b.naam === "microsoft")?.vanaf === "2026-08",
       "Microsoft begint op 31 juli: zijn eerste volle maand is augustus");
+    // Google heeft ook een laadgrens: de route haalt vanaf 1 januari, HISTORIE_JAREN jaar terug. Zonder
+    // die grens "begon" een account dat al sinds 2015 loopt in januari 2021, en zei de band "Google Ads
+    // (sinds januari 2021) ... liep het nog niet" over een jaar dat niet geladen was.
+    const { HISTORIE_JAREN } = await import("./api/google-vergelijking");
+    const googleGrens = `${google.currentYear - HISTORIE_JAREN}-01`;
+    assert(nu().bronnen?.find((b) => b.naam === "google")?.geladenVanaf === googleGrens,
+      `de Google-bron draagt de laadgrens van de route, ${googleGrens} (kreeg ${JSON.stringify(nu().bronnen?.find((b) => b.naam === "google")?.geladenVanaf)})`);
     // Dezelfde select-lijst als elke andere lezer van de dagtabel (dagbronSelect): alle
     // selecteerbare conversievelden, plus de vaste tellers.
     const metaSelect = vragen.meta_account_daily?.select ?? "";
@@ -204,6 +213,23 @@ async function main() {
     const b = nu().bronnen;
     assert(b?.length === 1 && b[0].naam === "totaal" && b[0].vanaf === "2026-08" && b[0].geladenVanaf === monthsAgo(36).slice(0, 7),
       `op een kanaaltab één bron met vanaf en laadgrens (kreeg ${JSON.stringify(b?.map((x) => [x.naam, x.vanaf, x.geladenVanaf]))})`);
+    root.unmount();
+  }
+
+  // 2a. De Google-tab: één bron met de laadgrens van de route, net als de andere kanaaltabs. Eerst
+  //     null, en dan bouwde comparePeriods zelf een bron zonder grens: "de data begint in januari
+  //     2021" en "nieuw in deze periode" bij een account dat al jaren liep, over 2020, dat de route
+  //     niet ophaalt.
+  {
+    opgeslagen = null;
+    const root = mount("google");
+    await rust();
+    await beantwoordAlles();
+    const { HISTORIE_JAREN } = await import("./api/google-vergelijking");
+    const b = nu().bronnen;
+    assert(nu().data === google, "de Google-tab toont de Google-data");
+    assert(b?.length === 1 && b[0].naam === "totaal" && b[0].geladenVanaf === `${google.currentYear - HISTORIE_JAREN}-01`,
+      `op de Google-tab één bron met de laadgrens van de route (kreeg ${JSON.stringify(b?.map((x) => [x.naam, x.vanaf, x.geladenVanaf]))})`);
     root.unmount();
   }
 
@@ -316,8 +342,14 @@ async function main() {
     assert(tekst.includes(`Microsoft Ads (sinds ${formatMonth(addMonths(M, -15))}) telt in het percentage alleen mee`), `Microsoft als deels gepaard (kreeg "${tekst}")`);
     // Hier stond "alleen mee over de maanden met data in beide perioden". Dat klopt niet zodra een
     // kanaal na zijn start pauzeert: die maanden tellen als nul, en horen dat ook (review [6]).
-    assert(tekst.includes("alleen mee vanaf de eigen eerste volle maand, in beide perioden; een maand zonder data daarna telt als nul."),
-      `de deels-zin zegt dat een lege maand na de start als nul telt (kreeg "${tekst}")`);
+    // Daarna "alleen mee vanaf de eigen eerste volle maand, in beide perioden", en dat was ook
+    // onwaar: een paar telt pas als ook de VERGELIJKINGSmaand na de start ligt, dus van de twaalf
+    // maanden hier tellen er vier. Microsoft begon op M-15; M-11 t/m M-4 liggen daarna en tellen
+    // toch niet. Op de demo draaide het teken om (Google -6,9%, de zin beschreef +4,0%).
+    const ms4 = `${formatRange({ start: addMonths(M, -3), end: M })} tegen ${formatRange({ start: addMonths(M, -15), end: addMonths(M, -12) })}`;
+    assert(tekst.includes(`telt in het percentage alleen mee over ${ms4}; een maand zonder data daarin telt als nul.`),
+      `de deels-zin noemt de maanden die echt vergeleken worden (kreeg "${tekst}")`);
+    assert(!tekst.includes("vanaf de eigen eerste volle maand"), `niet meer "vanaf de eigen eerste volle maand" (kreeg "${tekst}")`);
     assert(!tekst.includes("maanden met data in beide perioden"), `niet meer "maanden met data in beide perioden" (kreeg "${tekst}")`);
     assert(!tekst.includes("LinkedIn") && !tekst.includes("Google"), `kanalen die gewoon meetellen of nooit liepen staan er niet in (kreeg "${tekst}")`);
     const standRegel = `Data t/m 26 ${formatMonth(partieel)}; de periode loopt t/m ${formatMonth(M)}.`;
@@ -334,6 +366,30 @@ async function main() {
     assert(!html.includes("geen vergelijking mogelijk"), "niet \"geen vergelijking mogelijk\"");
     assert(html.includes(`In ${formatRange(vergelijking)} is er nog geen data om tegen af te zetten; de data begint in ${formatMonth(addMonths(M, -5))}.`),
       "bij één bron een regel zonder kanaalnaam");
+    // Met een laadgrens ruim vóór de vergelijkingsperiode: die is geladen en leeg, dus echt nieuw.
+    const geladenLeeg = band({ data: meta, bronnen: [alsBronReeks("totaal", meta, null, addMonths(M, -35))] }, stand);
+    assert((geladenLeeg.match(/nieuw in deze periode/g) ?? []).length === 3, `geladen en leeg: drie keer "nieuw" (kreeg ${(geladenLeeg.match(/nieuw in deze periode/g) ?? []).length})`);
+  }
+
+  {
+    // "nieuw in deze periode" las het GEPAARDE vorige totaal, en dat is ook nul als er niets te
+    // paren viel terwijl het kanaal er wel was. De demo-Microsoft-tab: negen dagen juli 2025 in de
+    // vergelijkingsperiode (€ 297 kosten), en toch drie keer "nieuw", met eronder "de data begint
+    // halverwege juli 2025". Zelfde val op de laadgrens: een vergelijkingsperiode die niet geladen
+    // is, is niet leeg maar onbekend.
+    const tel = (h: string, t: string) => (h.match(new RegExp(t, "g")) ?? []).length;
+    const deelsMaand = bouwHistorischeData("t", maanden(addMonths(M, -12), M, 2));
+    const ms = band({ data: deelsMaand, bronnen: [alsBronReeks("totaal", deelsMaand, addMonths(M, -11), addMonths(M, -35))] }, stand);
+    assert(tel(ms, "nieuw in deze periode") === 0, `data in de vergelijkingsperiode: niet "nieuw" (kreeg ${tel(ms, "nieuw in deze periode")})`);
+    assert(tel(ms, "geen vergelijking mogelijk") === 3, `maar "geen vergelijking mogelijk" (kreeg ${tel(ms, "geen vergelijking mogelijk")})`);
+    assert(ms.includes(`In ${formatRange(vergelijking)} is er nog geen volle maand om tegen af te zetten; de data begint halverwege ${formatMonth(addMonths(M, -12))}.`),
+      `de regel eronder legt het uit (kreeg "${/In [^<]*af te zetten[^<]*/.exec(ms)?.[0]}")`);
+
+    const vanafGrens = bouwHistorischeData("t", maanden(addMonths(M, -11), M, 4));
+    const grens = band({ data: vanafGrens, bronnen: [alsBronReeks("totaal", vanafGrens, null, addMonths(M, -11))] }, stand);
+    assert(tel(grens, "nieuw in deze periode") === 0, `vergelijkingsperiode niet geladen: niet "nieuw" (kreeg ${tel(grens, "nieuw in deze periode")})`);
+    assert(grens.includes(`In ${formatRange(vergelijking)} is geen data geladen; de band laadt vanaf ${formatMonth(addMonths(M, -11))}.`),
+      `de regel eronder zegt dat hij niet geladen is (kreeg "${/In [^<]*geladen[^<]*/.exec(grens)?.[0]}")`);
   }
 
   {
@@ -342,13 +398,18 @@ async function main() {
     // perioden") was onwaar zodra er een pauze in zat (review [6]).
     const start = formatMonth(addMonths(M, -15));
     const html = band({ data: microsoft }, stand);
-    assert(html.includes(`Het percentage telt alleen maanden vanaf ${start} in beide perioden; een maand zonder data daarna telt als nul.`),
-      `één bron: vanaf de start, en nul daarna (kreeg "${/Het percentage[^<]*/.exec(html)?.[0]}")`);
+    // Hier stond "Het percentage telt alleen maanden vanaf <start> in beide perioden", terwijl
+    // alleen de laatste vier maanden meetelden: een paar telt pas als ook de vergelijkingsmaand na
+    // de start ligt. Nu de maanden zelf.
+    const vier = `${formatRange({ start: addMonths(M, -3), end: M })} met ${formatRange({ start: addMonths(M, -15), end: addMonths(M, -12) })}`;
+    assert(html.includes(`Het percentage vergelijkt ${vier}; de data begint in ${start}. Een maand zonder data daarin telt als nul.`),
+      `één bron: de vergeleken maanden, de reden, en nul daarin (kreeg "${/Het percentage[^<]*/.exec(html)?.[0]}")`);
+    assert(!html.includes("in beide perioden"), `niet meer "vanaf ... in beide perioden" (kreeg "${/Het percentage[^<]*/.exec(html)?.[0]}")`);
 
     // De start valt op de laadgrens: dan is dat niet het begin van de data (review [5], [41]).
     const geladen = band({ data: microsoft, bronnen: [alsBronReeks("totaal", microsoft, null, addMonths(M, -15))] }, stand);
-    assert(geladen.includes("Eerdere maanden zijn niet geladen.") && !geladen.includes("de data begint in"),
-      `op de laadgrens: "niet geladen", niet "de data begint in" (kreeg "${/Het percentage[^<]*/.exec(geladen)?.[0]}")`);
+    assert(geladen.includes(`Het percentage vergelijkt ${vier}; de band laadt vanaf ${start}.`) && !geladen.includes("de data begint in"),
+      `op de laadgrens: "de band laadt vanaf", niet "de data begint in" (kreeg "${/Het percentage[^<]*/.exec(geladen)?.[0]}")`);
     const blendGeladen = band({ data: blend, bronnen: [bronnen[0], bronnen[1], bronnen[2], alsBronReeks("microsoft", microsoft, null, addMonths(M, -15))] }, stand);
     assert(blendGeladen.includes(`Microsoft Ads (geladen vanaf ${start})`) && !blendGeladen.includes(`Microsoft Ads (sinds ${start})`),
       `alle kanalen: "geladen vanaf", niet "sinds" (kreeg "${/[^>]*staat wel in de totalen[^<]*/.exec(blendGeladen)?.[0]}")`);
@@ -359,7 +420,8 @@ async function main() {
     assert(partieelBlend.includes(`Microsoft Ads (sinds ${start}, volledig vanaf ${volle})`),
       `partiële eerste maand genoemd (kreeg "${/[^>]*staat wel in de totalen[^<]*/.exec(partieelBlend)?.[0]}")`);
     const partieelTab = band({ data: microsoft, bronnen: [alsBronReeks("totaal", microsoft, addMonths(M, -14))] }, stand);
-    assert(partieelTab.includes(`Het percentage telt alleen maanden vanaf ${volle} in beide perioden`) && partieelTab.includes(`De data begint halverwege ${start}.`),
+    const drie = `${formatRange({ start: addMonths(M, -2), end: M })} met ${formatRange({ start: addMonths(M, -14), end: addMonths(M, -12) })}`;
+    assert(partieelTab.includes(`Het percentage vergelijkt ${drie}; de data begint halverwege ${start}.`) && !partieelTab.includes(volle + " in beide"),
       `op de tab: vanaf de eerste volle maand, met waarom (kreeg "${/Het percentage[^<]*/.exec(partieelTab)?.[0]}")`);
   }
 
@@ -374,7 +436,8 @@ async function main() {
     const pauze = bouwHistorischeData("t", maanden(addMonths(M, -17), M, 10).filter((m) => sleutel(m) !== p1 && sleutel(m) !== p2));
     const html = band({ data: pauze }, stand);
     const tekst = (h: string) => h.replace(/<[^>]+>/g, " | ");
-    assert(html.includes("een maand zonder data daarna telt als nul"), `de zin over het percentage staat er (kreeg "${tekst(html)}")`);
+    // "daarin" en niet meer "daarna": de zin noemt nu de vergeleken maanden zelf (zie hierboven).
+    assert(/een maand zonder data daarin telt als nul/i.test(html), `de zin over het percentage staat er (kreeg "${tekst(html)}")`);
     assert(!html.includes("tellen hierboven niet mee") && !html.includes("geen data geladen"),
       `pauze na de start: niet "geen data geladen ... tellen hierboven niet mee" (kreeg "${tekst(html)}")`);
     const zin = `Voor 2 maanden is er geen data (${formatMonth(p1, true)} t/m ${formatMonth(p2, true)}); na de start van de data zijn dat maanden zonder activiteit, en die tellen hierboven als nul.`;
@@ -389,11 +452,45 @@ async function main() {
     assert(stop.includes(`Voor 7 maanden is er geen data (${formatMonth(addMonths(M, -6), true)} t/m ${formatMonth(M, true)}); na de start van de data zijn dat maanden zonder activiteit`),
       `gestopt: de zeven maanden daarna zijn gemeten nullen (kreeg "${tekst(stop)}")`);
 
-    // Vóór de start blijft het "niet geladen" en telt de maand niet mee (Meta begon pas in de periode).
+    // Vóór de start ZONDER bekende laadgrens blijft het "niet geladen": dan weet de band niet of die
+    // maanden er niet waren of niet zijn opgehaald (Meta begon pas in de periode).
+    const kort = (k: string) => formatMonth(k, true);
     const voor = band({ data: meta }, stand);
-    assert(voor.includes(`Voor 6 maanden is geen data geladen (${formatMonth(addMonths(M, -11), true)} t/m ${formatMonth(addMonths(M, -6), true)}); die tellen hierboven niet mee.`),
-      `vóór de start: de amberregel zoals hij was (kreeg "${tekst(voor)}")`);
+    assert(voor.includes(`Voor 6 maanden is geen data geladen (${kort(addMonths(M, -11))} t/m ${kort(addMonths(M, -6))}); die tellen hierboven niet mee.`),
+      `vóór de start zonder laadgrens: de amberregel zoals hij was (kreeg "${tekst(voor)}")`);
     assert(!voor.includes("maanden zonder activiteit"), "vóór de start geen gemeten nul");
+
+    // MET een laadgrens daarvóór zijn die maanden wel geladen, en is er alleen nog geen data. De
+    // demo-Meta-tab zei "Voor 7 maanden is geen data geladen (aug 2025 t/m feb 2026); die tellen
+    // hierboven niet mee", direct onder "de data begint halverwege maart 2026", terwijl de band
+    // vanaf november 2023 laadt.
+    const geladenVoor = band({ data: meta, bronnen: [alsBronReeks("totaal", meta, null, addMonths(M, -35))] }, stand);
+    const voorZin = `Voor 6 maanden is er geen data (${kort(addMonths(M, -11))} t/m ${kort(addMonths(M, -6))}): de data begint pas in ${formatMonth(addMonths(M, -5))}.`;
+    assert(geladenVoor.includes(voorZin) && !geladenVoor.includes("geen data geladen"), `geladen vóór de start: "${voorZin}" (kreeg "${tekst(geladenVoor)}")`);
+    const voorP = /<p class="([^"]*)">Voor 6 maanden is er geen data/.exec(geladenVoor);
+    assert(!!voorP && !voorP[1].includes("amber"), `die regel is uitleg, niet amber (class "${voorP?.[1]}")`);
+    const metaEen = bouwHistorischeData("t", maanden(addMonths(M, -10), M, 4));
+    const een = band({ data: metaEen, bronnen: [alsBronReeks("totaal", metaEen, null, addMonths(M, -35))] }, stand);
+    assert(een.includes(`Voor ${formatMonth(addMonths(M, -11))} is er geen data: de data begint pas in ${formatMonth(addMonths(M, -10))}.`) && !een.includes("geen data geladen"),
+      `één maand vóór de start (kreeg "${tekst(een)}")`);
+
+    // Valt de laadgrens midden in die maanden, dan is alleen het stuk ervóór "niet geladen".
+    const deels = band({ data: meta, bronnen: [alsBronReeks("totaal", meta, null, addMonths(M, -8))] }, stand);
+    assert(deels.includes(`Voor 3 maanden is geen data geladen (${kort(addMonths(M, -11))} t/m ${kort(addMonths(M, -9))}); die tellen hierboven niet mee.`)
+      && deels.includes(`Voor 3 maanden is er geen data (${kort(addMonths(M, -8))} t/m ${kort(addMonths(M, -6))}): de data begint pas in ${formatMonth(addMonths(M, -5))}.`),
+      `laadgrens in de periode: gesplitst (kreeg "${tekst(deels)}")`);
+
+    // Bij een optelling telt de LAATSTE laadgrens: daarvóór is niet elk kanaal geladen, en weet de
+    // band dus niet of de maand leeg was. Een bron zonder laadgrens maakt het onbekend.
+    const leegKanaal = bouwHistorischeData("t", []);
+    const som = samenvoegen("t", [meta, leegKanaal]);
+    const somBand = band({ data: som, bronnen: [alsBronReeks("meta", meta, null, addMonths(M, -35)), alsBronReeks("linkedin", leegKanaal, null, addMonths(M, -8))] }, stand);
+    assert(somBand.includes(`Voor 3 maanden is geen data geladen (${kort(addMonths(M, -11))} t/m ${kort(addMonths(M, -9))})`)
+      && somBand.includes(`Voor 3 maanden is er geen data (${kort(addMonths(M, -8))} t/m ${kort(addMonths(M, -6))})`),
+      `alle kanalen: de laatste laadgrens (kreeg "${tekst(somBand)}")`);
+    const somOnbekend = band({ data: som, bronnen: [alsBronReeks("meta", meta, null, addMonths(M, -35)), alsBronReeks("linkedin", leegKanaal)] }, stand);
+    assert(somOnbekend.includes(`Voor 6 maanden is geen data geladen (${kort(addMonths(M, -11))} t/m ${kort(addMonths(M, -6))})`) && !somOnbekend.includes("is er geen data ("),
+      `alle kanalen, een bron zonder laadgrens: niet geladen (kreeg "${tekst(somOnbekend)}")`);
   }
 
   {
@@ -405,6 +502,29 @@ async function main() {
     const live = band({ data: g }, { laatsteVolleMaand: kalender, partieel: { maand: lopend, tmDag: 13, dagenInMaand: 30 }, dataTot: `${lopend}-13` });
     assert(!live.includes("Data t/m"), "een gedeeltelijke lopende maand geeft geen datastandregel");
     assert(!live.includes("niet in het percentage") && !live.includes("beide perioden"), "volledige historie: geen paarregel");
+  }
+
+  // ── 4b. De eerste pagina van een dagtabel faalt ─────────────────────────────────────────
+  //
+  // dbSelect geeft dan { data: [], error }. De controle op een fout sloeg de eerste pagina over (er
+  // was nog geen `tot`), en dan las nul rijen als "minder dan een pagina": alles geladen, vanaf de
+  // laadgrens van 36 maanden terug. De band zei daarop "er is nog geen enkele maand met data",
+  // neutraal, direct onder "Data t/m 25 augustus", bij een Meta met 167 rijen in de database. Het
+  // amberkleurige "geen data geladen" van vóór die laadgrens-regel was waar.
+  {
+    opgeslagen = null;
+    faalt.add("linkedin_account_daily");
+    const root = mount("linkedin");
+    await rust();
+    await beantwoordAlles();
+    const grens = nu().geladenVanaf?.linkedin;
+    assert(grens !== undefined && grens !== null && grens > lastCompleteMonth() && grens > addMonths(lastCompleteMonth(), 1),
+      `mislukte eerste pagina: de laadgrens ligt ná de lopende maand, niets is geladen (kreeg ${JSON.stringify(nu().geladenVanaf)})`);
+    const html = band({ data: nu().data, bronnen: nu().bronnen }, stand);
+    assert(html.includes("is geen data geladen") && !html.includes("nog geen enkele maand met data"),
+      `de band zegt "geen data geladen", niet "nog geen enkele maand met data" (kreeg "${html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 600)}")`);
+    faalt.delete("linkedin_account_daily");
+    root.unmount();
   }
 
   // ── 5. Zelfde diagnose, ander blok: de bronnen van KanaalHealthRanking ──────────────────

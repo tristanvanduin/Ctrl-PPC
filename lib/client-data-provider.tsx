@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { type ClientHistoricalData } from "./types";
 import { useClientData, type ClientDataState } from "./use-client-data";
-import { loadClientSettings } from "./client-settings";
+import { heeftGecachteInstellingen, loadClientSettings } from "./client-settings";
 import { computeForecast, type ClientForecast } from "./forecast";
 import { mergeKpiTargets } from "./kpi-target-merge";
 
@@ -23,24 +23,75 @@ const ForecastContext = createContext<ClientForecast | null>(null);
  * Merges user-configured KPI targets into the data so the forecast
  * engine uses the correct targets (not the auto-generated ones).
  */
+/** Hoe lang de provider op het eerste lezen van de instellingen wacht voordat hij met de standaard rendert. */
+export const INSTELLINGEN_WACHT_MS = 3000;
+
 export function ClientDataProvider({ clientId, children }: { clientId: string; children: ReactNode }) {
   const clientData = useClientData(clientId);
 
-  // Load settings from Supabase on mount (populates cache for getClientSettings)
-  useEffect(() => { loadClientSettings(clientId); }, [clientId]);
+  // De instellingen uit de database (vult de cache van getClientSettings), en daarna opnieuw
+  // samenvoegen. Hier werd het verzoek gestart zonder op het antwoord te letten: de samenvoeging
+  // hieronder draaide al bij het mounten, op een eerste bezoek (lege localStorage) met de
+  // standaarddoelen, en niets voegde daarna nog samen. Het dashboard mount deze provider pas als de
+  // data er is, dus bij een klant met alleen Google vertrok dit verzoek altijd na die samenvoeging:
+  // het Google-tabblad toonde het routedoel (1.938) terwijl Instellingen 2.600 zei, en "Alle kanalen"
+  // (dat wel wacht, lib/use-blended-client-data.ts) wel 2.600. Niet de data tegenhouden tot de
+  // instellingen er zijn: useClientHistoricalData gooit zonder data, en de kinderen staan er al.
+  // Mislukt het lezen, dan blijft het bij de cache of de standaard, zoals getClientSettings doet.
+  //
+  // Alleen opnieuw samenvoegen was niet genoeg: de kinderen renderden al met de eerste samenvoeging.
+  // Zonder instellingen in de cache (een eerste bezoek: nieuw apparaat, privévenster, gewiste opslag)
+  // toonde het Google-tabblad, ook de prognosetegels, de hele duur van het verzoek 1.938 conversies
+  // en een kostendoel van € 139.860, en sprong daarna naar 2.600 en € 117.000. Dan wachten de
+  // kinderen op het eerste lezen; met een cache meteen. `instellingenVoor` onthoudt voor welke klant
+  // het lezen klaar is, zodat een klantwissel niet het antwoord van de vorige klant gebruikt.
+  //
+  // Wel met een grens. Deze provider omvat elk tabblad, ook Instellingen zelf: een verzoek dat blijft
+  // hangen (de browser geeft een fetch zonder antwoord geen eigen time-out) hield anders het hele
+  // dashboard op "Data ophalen...". Na INSTELLINGEN_WACHT_MS rendert hij met wat getClientSettings
+  // dan heeft (de standaard); komt het antwoord later alsnog, dan voegt instellingenVersie opnieuw samen.
+  const [instellingenVersie, setInstellingenVersie] = useState(0);
+  const [instellingenVoor, setInstellingenVoor] = useState<string | null>(null);
+  useEffect(() => {
+    let weg = false;
+    const opgegeven = setTimeout(() => { if (!weg) setInstellingenVoor(clientId); }, INSTELLINGEN_WACHT_MS);
+    loadClientSettings(clientId)
+      .catch(() => null)
+      .finally(() => {
+        clearTimeout(opgegeven);
+        if (weg) return;
+        setInstellingenVersie((v) => v + 1);
+        setInstellingenVoor(clientId);
+      });
+    return () => { weg = true; clearTimeout(opgegeven); };
+  }, [clientId]);
+  const instellingenKlaar = instellingenVoor === clientId || heeftGecachteInstellingen(clientId);
 
   // Merge user's settings targets into the data (gedeelde helper, zie lib/kpi-target-merge.ts --
-  // de blended prognosetabel gebruikt dezelfde functie buiten deze context om).
+  // de blended prognosetabel gebruikt dezelfde functie buiten deze context om). instellingenVersie
+  // staat in de deps omdat mergeKpiTargets de instellingen zelf leest (getClientSettings).
   const enrichedData = useMemo(() => {
     if (!clientData.data) return clientData;
     return { ...clientData, data: mergeKpiTargets(clientId, clientData.data) };
-  }, [clientData, clientId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- instellingenVersie: zie hierboven
+  }, [clientData, clientId, instellingenVersie]);
 
   // Eén keer per datawijziging, gedeeld met alle kinderen.
   const forecast = useMemo(
     () => (enrichedData.data ? computeForecast(enrichedData.data) : null),
     [enrichedData.data],
   );
+
+  // Zolang het eerste lezen loopt (en er niets in de cache staat) dezelfde laadregel als het
+  // dashboard, in plaats van de kinderen met het standaarddoel. Ze mounten dan nog niet, dus
+  // useClientHistoricalData gooit ook niet.
+  if (!instellingenKlaar) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <p className="text-sm text-muted-foreground">Data ophalen...</p>
+      </div>
+    );
+  }
 
   return (
     <ClientDataContext.Provider value={enrichedData}>

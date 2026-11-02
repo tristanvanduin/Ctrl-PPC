@@ -41,7 +41,12 @@ function maandenTekst(maanden: readonly string[]): string {
  *  van de bron liggen (gepaardeTotalen); daarbinnen telt een maand zonder data als nul. De grote
  *  getallen gaan over de hele periode. Zonder deze regel leest een kanaal dat vorig jaar nog niet liep
  *  als "wel meegeteld, geen groei", of omgekeerd: in de totalen erbij, in het percentage niet, en
- *  niets dat dat zegt. Neutraal en niet amber: er is niets aan te doen, het is uitleg bij de cijfers. */
+ *  niets dat dat zegt. Neutraal en niet amber: er is niets aan te doen, het is uitleg bij de cijfers.
+ *
+ *  Telt een bron deels mee, dan noemt de zin de maanden zelf (BronPaar.bereik) en niet "vanaf de
+ *  start": omdat ook de vergelijkingsmaand na de start moet liggen, valt ook een deel van de gekozen
+ *  periode ná de start weg. Op de demo stond "telt alleen maanden vanaf september 2024 in beide
+ *  perioden" bij -6,9%, terwijl augustus 2025 niet meetelde; wat de zin beschreef was +4,0%. */
 function ongepaardTekst(perBron: readonly BronPaar[], vergelijking: PeriodRange): string | null {
   const geraakt = perBron.filter((b) => b.ongepaardHuidig + b.ongepaardVorig > 0);
   if (geraakt.length === 0) return null;
@@ -62,14 +67,16 @@ function ongepaardTekst(perBron: readonly BronPaar[], vergelijking: PeriodRange)
       const begin = !b.start ? "" : partieel(b) ? `; de data begint halverwege ${formatMonth(b.start)}` : `; de data begint in ${formatMonth(b.start)}`;
       return `In ${formatRange(vergelijking)} is er nog ${geenVolleMaand(b) ? "geen volle maand" : "geen data"} om tegen af te zetten${begin}.`;
     }
-    // Niet "alleen maanden met data in beide perioden": vanaf de start telt een maand zonder data
-    // als nul (gepauzeerd is echt niets), en dat moet de zin zeggen in plaats van tegenspreken.
-    const vanaf = b.vanaf ?? b.start;
-    const waarom = opLaadgrens(b) ? " Eerdere maanden zijn niet geladen."
-      : partieel(b) ? ` De data begint halverwege ${formatMonth(b.start!)}.` : "";
-    return vanaf
-      ? `Het percentage telt alleen maanden vanaf ${formatMonth(vanaf)} in beide perioden; een maand zonder data daarna telt als nul.${waarom}`
-      : "Het percentage telt alleen maanden in beide perioden; een maand zonder data telt als nul.";
+    // gepaard > 0, dus er is een bereik en een start. De maanden zelf, en waarom het daar begint:
+    // alleen de start van de bron (of de laadgrens) laat paren wegvallen. Hier stond "telt alleen
+    // maanden vanaf <start> in beide perioden", en dat zweeg erover dat ook maanden van de gekozen
+    // periode na de start wegvallen zodra hun tegenhanger ervoor ligt. Niet "alleen maanden met
+    // data in beide perioden": daarbinnen telt een maand zonder data als nul (gepauzeerd is echt
+    // niets), en dat moet de zin zeggen in plaats van tegenspreken (review [6]).
+    const r = b.bereik!;
+    const waarom = opLaadgrens(b) ? `de band laadt vanaf ${formatMonth(b.start!)}`
+      : partieel(b) ? `de data begint halverwege ${formatMonth(b.start!)}` : `de data begint in ${formatMonth(b.start!)}`;
+    return `Het percentage vergelijkt ${formatRange(r.huidig)} met ${formatRange(r.vorig)}; ${waarom}. Een maand zonder data daarin telt als nul.`;
   }
 
   const metStart = (b: BronPaar) => (!b.start ? naam(b)!
@@ -93,9 +100,17 @@ function ongepaardTekst(perBron: readonly BronPaar[], vergelijking: PeriodRange)
     zinnen.push(`${opsomming(nietGeladen.map(metStart))} ${een ? "staat" : "staan"} wel in de totalen, maar niet in het percentage: ${formatRange(vergelijking)} is niet geladen.`);
   }
   if (deels.length > 0) {
-    // Zelfde reden als hierboven: "over de maanden met data in beide perioden" was onwaar zodra
-    // het kanaal na zijn start een maand pauzeerde.
-    zinnen.push(`${opsomming(deels.map(metStart))} ${deels.length === 1 ? "telt" : "tellen"} in het percentage alleen mee vanaf de eigen eerste volle maand, in beide perioden; een maand zonder data daarna telt als nul.`);
+    // De maanden die per bron echt meetellen, gegroepeerd: bronnen met hetzelfde bereik in één zin.
+    // "Vanaf de eigen eerste volle maand, in beide perioden" liet weg dat ook maanden van de gekozen
+    // periode na die maand wegvallen. En niet "over de maanden met data in beide perioden": dat was
+    // onwaar zodra het kanaal na zijn start een maand pauzeerde.
+    const groepen = new Map<string, BronPaar[]>();
+    for (const b of deels) {
+      const over = `${formatRange(b.bereik!.huidig)} tegen ${formatRange(b.bereik!.vorig)}`;
+      groepen.set(over, [...(groepen.get(over) ?? []), b]);
+    }
+    const delen = [...groepen].map(([over, bs]) => `${opsomming(bs.map(metStart))} ${bs.length === 1 ? "telt" : "tellen"} in het percentage alleen mee over ${over}`);
+    zinnen.push(`${delen.join("; ")}; een maand zonder data daarin telt als nul.`);
   }
   return zinnen.join(" ");
 }
@@ -159,7 +174,21 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
   const nietGepaard = periode.compareRange ? ongepaardTekst(perBron, periode.compareRange) : null;
   const standTekst = [dataStandTekst(periode.dataStand, periode.eindMaand, periode.range), uitgeslotenTekst(periode.dataStand, periode.range)]
     .filter(Boolean).join(" ") || null;
-  const { nietGeladen, gemetenNul } = ontbrekendeMaanden(data, current.missing, periode.dataStand?.dataTot);
+  // Vanaf waar de band ALLES geladen heeft. Bij een optelling de laatste grens van de bronnen:
+  // daarvóór is niet elk kanaal opgehaald, en is een lege maand onbekend in plaats van leeg. Zonder
+  // grens bij een van de bronnen (of zonder bronnen) is hij onbekend.
+  const grenzen = (bronnen ?? []).map((b) => b.geladenVanaf ?? null);
+  const laadgrens = grenzen.length > 0 && !grenzen.includes(null)
+    ? (grenzen as string[]).reduce((a, b) => (monthIndex(b) > monthIndex(a) ? b : a)) : null;
+  const { nietGeladen, gemetenNul, voorStart, start } = ontbrekendeMaanden(data, current.missing, periode.dataStand?.dataTot, laadgrens);
+  // "Nieuw in deze periode" alleen als de vergelijkingsperiode echt leeg was. Het gepaarde vorige
+  // totaal is ook nul als er niets te paren viel terwijl het kanaal er wel was (de demo-Microsoft-tab:
+  // negen dagen juli 2025, € 297, en toch drie keer "nieuw", met eronder "de data begint halverwege
+  // juli 2025"), en als de vergelijkingsperiode vóór de laadgrens begint: dan is hij niet leeg maar
+  // onbekend. Dan "geen vergelijking mogelijk", en de regel eronder zegt waarom.
+  const vergelijking = periode.compareRange;
+  const vorigeNietLeeg = !!vergelijking && perBron.some((b) => b.ongepaardVorig > 0
+    || (b.geladenVanaf !== null && monthIndex(vergelijking.start) < monthIndex(b.geladenVanaf)));
 
   // De maanden van deze periode, oud naar nieuw. `current.months` bevat alleen de maanden die er
   // werkelijk zijn (ontbrekende staan in `current.missing`), dus de lijn loopt niet dwars over een
@@ -227,7 +256,7 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
               // niets te paren" (een kanaal dat pas in deze periode begon), en dan staat het grote
               // getal er wel. Daarom op het totaal van de periode en niet op k.d.huidig, dat dan
               // ook nul is.
-              leegTekst: k.d.vorig === 0 && k.totaal > 0 ? "nieuw in deze periode" : undefined,
+              leegTekst: k.d.vorig === 0 && k.totaal > 0 && !vorigeNietLeeg ? "nieuw in deze periode" : undefined,
               // Feedback: het percentage en de sparkline erboven lijken tegenstrijdig, maar zijn
               // twee verschillende vergelijkingen — de lijn is het verloop BINNEN deze periode, dit
               // percentage is de vergelijking MET de vorige periode. Zonder "waartegen" oogt dat als
@@ -264,12 +293,23 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
       {nietGepaard && <p className="mt-3 text-micro text-muted-foreground">{nietGepaard}</p>}
       {standTekst && <p className={`${nietGepaard ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>{standTekst}</p>}
 
+      {/* Een geladen maand vóór de start: er is nog geen data, en er ontbreekt niets. Uitleg, geen
+          waarschuwing. De demo-Meta-tab zei hier in amber "Voor 7 maanden is geen data geladen (aug
+          2025 t/m feb 2026); die tellen hierboven niet mee", onder de eigen zin "de data begint
+          halverwege maart 2026", terwijl de band die maanden wel had opgehaald. */}
+      {voorStart.length > 0 && (
+        <p className={`${nietGepaard || standTekst ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>
+          {`${voorStart.length === 1 ? `Voor ${formatMonth(voorStart[0])} is er geen data` : `Voor ${voorStart.length} maanden is er geen data (${maandenTekst(voorStart)})`}: ${
+            start ? `de data begint pas in ${formatMonth(start)}.` : "er is nog geen enkele maand met data."}`}
+        </p>
+      )}
+
       {/* Een maand zonder rij na de start van de data is een gemeten nul (gepauzeerd, of gestopt
           terwijl de stand doorloopt): uitleg, geen waarschuwing. Hij stond in de amberregel als
           "geen data geladen ... tellen hierboven niet mee", terwijl de zin erboven zei dat zo'n maand
           als nul telt, en de cijfers dat ook doen (review [6]). */}
       {gemetenNul.length > 0 && (
-        <p className={`${nietGepaard || standTekst ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>
+        <p className={`${nietGepaard || standTekst || voorStart.length > 0 ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>
           {gemetenNul.length === 1
             ? `Voor ${formatMonth(gemetenNul[0])} is er geen data; na de start van de data is dat een maand zonder activiteit, en die telt hierboven als nul.`
             : `Voor ${gemetenNul.length} maanden is er geen data (${maandenTekst(gemetenNul)}); na de start van de data zijn dat maanden zonder activiteit, en die tellen hierboven als nul.`}

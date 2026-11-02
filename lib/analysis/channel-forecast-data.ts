@@ -16,7 +16,8 @@ import { computeForecast, type ClientForecast } from "@/lib/forecast";
 import { kanaalGestopt, stilgelegd } from "@/lib/forecast-som";
 import { resolveTargets, type TargetRow } from "./o2-targets-cost";
 import { jaardoelMetTerugval } from "./standaard-jaardoel";
-import { volleMaand, laatsteGeldigeDag } from "@/lib/sync/datastand";
+import { volleMaand, dagkanaalDataTot, type DataStandSamen } from "@/lib/sync/datastand";
+import { startLaatsteLoop } from "@/lib/period/kanaal-maanden";
 
 export interface ChannelForecastRow {
   /** YYYY-MM-DD */
@@ -79,8 +80,9 @@ function aggregateByYear(rows: ChannelForecastRow[]): Map<number, { monthly: Api
  *   (dataTotVanDagbron: na een geslaagde sync de dag vóór die sync). Rijen zeggen niet of de sync na
  *   de laatste rij nog slaagde, en de syncs schrijven geen nulrijen: zonder deze dag verloor een
  *   gepauzeerd account met een gezonde sync zijn echte halve maand aan een projectie, terwijl
- *   "Alle kanalen" dezelfde maanden als gemeten telde (review [10], [14]). Geldt alleen als hij
- *   later valt dan de nieuwste rij; weglaten = de rijen, zoals voorheen.
+ *   "Alle kanalen" dezelfde maanden als gemeten telde (review [10], [14]). Samen met de nieuwste
+ *   rij via dagkanaalDataTot: een rij die later valt dan deze dag telt t/m de dag ervoor (de rij van
+ *   de syncdag is een deel van die dag). Weglaten = de rijen, zoals voorheen.
  */
 export function buildChannelHistoricalData(
   clientId: string,
@@ -109,14 +111,13 @@ export function buildChannelHistoricalData(
     clientId, historicalYearsInput, monthly, weekly,
     targetCurrentYear, currentYear, realizedThroughMonth,
   );
-  // De eerste dag met data, voor het tempo zonder doel als de partiële eerste maand de laatste
-  // gerealiseerde is (forecastCoreMetric): dezelfde dag die de blended route meegeeft. De rijen zijn
-  // hooguit de nieuwste 1000 dagen; is de echte start ouder, dan valt deze dag in een jaar dat de
-  // regel niet raakt.
-  const eersteDag = rows.reduce<string | null>((acc, r) => {
-    const d = String(r.date ?? "").slice(0, 10);
-    return (r.spend || r.conv || r.revenue) && (acc === null || d < acc) ? d : acc;
-  }, null);
+  // De eerste dag van de huidige loop (startLaatsteLoop: na een pauze van een hele maand de dag
+  // waarop het kanaal terugkwam), voor het tempo zonder doel als die partiële maand de laatste
+  // gerealiseerde is (forecastCoreMetric): dezelfde dag die de blended route meegeeft. Met de eerste
+  // dag OOIT kreeg een kanaal dat op 20 juli terugkwam na een pauze, zijn 12 dagen juli over 31
+  // gespreid. De rijen zijn hooguit de nieuwste 1000 dagen; is de echte start ouder, dan valt deze
+  // dag in een jaar dat de regel niet raakt.
+  const eersteDag = startLaatsteLoop(rows.filter((r) => r.spend || r.conv || r.revenue).map((r) => String(r.date ?? "")));
   return eersteDag ? { ...data, eersteDag } : data;
 }
 
@@ -134,7 +135,7 @@ function gerealiseerdTot(rows: ChannelForecastRow[], todayIso: string, dataTot?:
     const d = String(r.date ?? "").slice(0, 10);
     return acc === null || d > acc ? d : acc;
   }, null);
-  const vol = volleMaand({ dataTot: laatsteGeldigeDag(laatsteDag, dataTot), nu: todayIso.slice(0, 10) }).laatsteVolleMaand;
+  const vol = volleMaand({ dataTot: dagkanaalDataTot(laatsteDag, dataTot), nu: todayIso.slice(0, 10) }).laatsteVolleMaand;
   return vol === null || Number(vol.slice(0, 4)) < currentYear ? 0 : Number(vol.slice(5, 7));
 }
 
@@ -155,6 +156,12 @@ export function buildChannelForecast(
   todayIso: string,
   /** Zie buildChannelHistoricalData. */
   dataTot?: string | null,
+  /**
+   * `gestopt`: de route noemt dit kanaal in `uitgesloten` (ontkoppeld, of zijn data komt niet meer),
+   * en dan is het op "Alle kanalen" na zijn laatste dag nul, ook als zijn maanden op een
+   * seizoenspauze lijken. Zie tabStandUitRoute.
+   */
+  opties: { gestopt?: boolean } = {},
 ): { data: ClientHistoricalData; forecast: ClientForecast } | null {
   const targets = resolveTargets(targetRows, targetChannel, todayIso);
 
@@ -190,5 +197,29 @@ export function buildChannelForecast(
   const maanden = [...aggregateByYear(rows)].flatMap(([jaar, { monthly }]) =>
     monthly.map((m) => ({ month: `${jaar}-${String(m.month).padStart(2, "0")}`, conversions: m.conversions, revenue: m.revenue, adSpend: m.adSpend })));
   const forecast = computeForecast(data);
-  return { data, forecast: kanaalGestopt(maanden, currentYear, gerealiseerdTot(rows, todayIso, dataTot)) ? stilgelegd(forecast) : forecast };
+  const stop = opties.gestopt === true || kanaalGestopt(maanden, currentYear, gerealiseerdTot(rows, todayIso, dataTot));
+  return { data, forecast: stop ? stilgelegd(forecast) : forecast };
+}
+
+/**
+ * Welke dag en welke stop de kanaaltab van de blended route overneemt, zodat hij hetzelfde jaar
+ * geeft als het deel van dit kanaal op "Alle kanalen".
+ *
+ * Een kanaal in `uitgesloten` (ontkoppeld, een verlopen token, of zo ver achter dat het venster niet
+ * meer op hem wacht) telt in de som na zijn laatste dag als nul, t/m de GEZAMENLIJKE grens. De tab
+ * kreeg zijn eigen dag mee: bij een LinkedIn die op 15 juni ophield, bleef de tab gerealiseerd t/m
+ * mei, zag kanaalGestopt data in de partiële juni en projecteerde hij juni t/m december, ook de
+ * maanden die al voorbij zijn (730 tegen 332 in de som). Met de gezamenlijke dag zijn die maanden
+ * gemeten nullen, en de stop is dezelfde als in de som: ook als de maanden op een seizoenspauze
+ * lijken, want de som vraagt het dan niet aan kanaalGestopt.
+ *
+ * Elk ander kanaal houdt zijn eigen dag. Zonder stand (de route faalde) geen dag, en dan de rijen.
+ */
+export function tabStandUitRoute(
+  stand: Pick<DataStandSamen, "dataTot" | "uitgesloten" | "bronnen"> | null | undefined,
+  kanaal: string,
+): { dataTot: string | null; gestopt: boolean } {
+  const gestopt = stand?.uitgesloten?.includes(kanaal) ?? false;
+  const dataTot = gestopt ? stand?.dataTot ?? null : stand?.bronnen?.find((b) => b.bron === kanaal)?.dataTot ?? null;
+  return { dataTot, gestopt };
 }

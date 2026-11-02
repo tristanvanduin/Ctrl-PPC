@@ -7,6 +7,7 @@ import { resolveChannelConversionConfig, type ChannelConversionConfig } from "@/
 import { alsBronReeks, type BronReeks } from "@/lib/period/apply-period";
 import { addMonths, type Month } from "@/lib/period/period-range";
 import { monthsAgo } from "@/lib/reporting-date";
+import { HISTORIE_JAREN } from "@/lib/api/google-vergelijking";
 import {
   NIET_GOOGLE, kanaalDagbron, kanaalStandUitDagen, samenvoegen,
   type KanaalStand, type NietGoogleKanaal,
@@ -37,9 +38,9 @@ export interface ChannelPeriodData {
   data: ClientHistoricalData | null;
   /**
    * De losse bronnen voor de vergelijking. Bij "blended" de vier kanalen, zodat er per kanaal
-   * gepaard wordt; op een Meta/LinkedIn/Microsoft-tab één bron met de eerste volle maand en de
-   * laadgrens erbij (zonder die bron bouwt comparePeriods er zelf een, en die kent geen van beide).
-   * Op de Google-tab null: een maandbron, de eerste maand met data is daar de start.
+   * gepaard wordt; op een kanaaltab één bron met de eerste volle maand en de laadgrens erbij (zonder
+   * die bron bouwt comparePeriods er zelf een, en die kent geen van beide). Google is een maandbron:
+   * daar is de eerste maand met data de start, en alleen de laadgrens gaat mee.
    */
   bronnen: BronReeks[] | null;
   /** Per niet-Google-kanaal de laatste dag met een rij, voor het venster van de band. */
@@ -90,11 +91,15 @@ async function fetchKanaalRijen(clientId: string, kanaal: NietGoogleKanaal): Pro
       order: { column: "date", ascending: false },
       limit: PAGINA,
     });
-    // Een fout op de eerste pagina is "geen rijen", zoals altijd; daarna is alles vóór `tot` niet
-    // geladen, en de maand van `tot` maar deels.
-    if (error && tot) {
-      console.warn(`[band] ${bron.table} voor ${clientId}: pagina vóór ${tot} niet geladen (${error.message})`);
-      return { rijen, geladenVanaf: addMonths(tot.slice(0, 7), 1) };
+    // Een fout op een latere pagina: alles vóór `tot` is niet geladen, en de maand van `tot` maar
+    // deels. Een fout op de EERSTE pagina: er is niets geladen, en dan ligt de laadgrens ná de
+    // lopende maand. Hier las een mislukte eerste pagina als "nul rijen, dus alles geladen vanaf 36
+    // maanden terug" (dbSelect geeft bij een fout data: []), en de band zei daarop "er is nog geen
+    // enkele maand met data" bij een kanaal met honderden rijen, in plaats van "geen data geladen".
+    // De grens blijft een maand (geen null), zodat de band hem als laadgrens kan lezen.
+    if (error) {
+      console.warn(`[band] ${bron.table} voor ${clientId}: ${tot ? `pagina vóór ${tot}` : "eerste pagina"} niet geladen (${error.message})`);
+      return { rijen, geladenVanaf: tot ? addMonths(tot.slice(0, 7), 1) : addMonths(vanaf.slice(0, 7), MAANDEN_TERUG + 1) };
     }
     if (data.length < PAGINA) {
       rijen.push(...data);
@@ -187,7 +192,14 @@ export function useChannelPeriodData({ clientId, channel, googleData }: ChannelP
     // kanaalnaam: de band noemt bij één bron geen kanaal (ongepaardTekst in period-summary.tsx).
     const los = (s: GeladenKanaal | null): Pick<ChannelPeriodData, "data" | "bronnen"> =>
       (s ? { data: s.data, bronnen: [alsBronReeks("totaal", s.data, s.vanaf, s.geladenVanaf)] } : { data: null, bronnen: null });
-    if (channel === "google") return { data: googleData, bronnen: null };
+    // Google's laadgrens: /api/google-ads/client-data haalt vanaf 1 januari, HISTORIE_JAREN jaar vóór
+    // het jaar van het antwoord. Zonder die grens "begon" een account dat al sinds 2015 loopt in
+    // januari 2021, en zei de band over 2020 "de data begint in januari 2021" en "nieuw in deze
+    // periode", of op Alle kanalen "Google Ads (sinds januari 2021) ... liep het nog niet". De
+    // demoroute haalt de hele historie; daar is dit een ondergrens, en zegt de band over wat ervóór
+    // ligt alleen dat hij het niet heeft, niet dat het leeg was.
+    const googleGeladen = googleData ? `${googleData.currentYear - HISTORIE_JAREN}-01` : null;
+    if (channel === "google") return { data: googleData, bronnen: googleData ? [alsBronReeks("totaal", googleData, null, googleGeladen)] : null };
     if (channel === "meta") return los(meta);
     if (channel === "linkedin") return los(linkedin);
     if (channel === "microsoft") return los(microsoft);
@@ -200,7 +212,7 @@ export function useChannelPeriodData({ clientId, channel, googleData }: ChannelP
     return {
       data: samenvoegen(clientId, [googleData, meta.data, linkedin.data, microsoft.data]),
       bronnen: [
-        alsBronReeks("google", googleData),
+        alsBronReeks("google", googleData, null, googleGeladen),
         alsBronReeks("meta", meta.data, meta.vanaf, meta.geladenVanaf),
         alsBronReeks("linkedin", linkedin.data, linkedin.vanaf, linkedin.geladenVanaf),
         alsBronReeks("microsoft", microsoft.data, microsoft.vanaf, microsoft.geladenVanaf),

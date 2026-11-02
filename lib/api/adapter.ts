@@ -251,6 +251,10 @@ function apiDataToMonthlyRecords(
     }
 
     const monthData = monthlyData.find((d) => d.month === m);
+    // Op weeknummer gesorteerd: de forecast leest de weken op POSITIE (weeks[w], de weekverdeling).
+    // De kanaaltabs lezen hun dagrijen nieuwste eerst, en dan kwamen de weken hier binnen als W5, W4
+    // .. W1: de gerealiseerde weken van juli stonden omgekeerd, en de beursstrip zette de korte week
+    // van elke prognosemaand in de verkeerde week.
     const monthWeeks = weeklyData
       .filter((w) => w.month === m)
       .map((w): WeeklyRecord => ({
@@ -259,7 +263,8 @@ function apiDataToMonthlyRecords(
         conversions: w.conversions,
         revenue: w.revenue,
         adSpend: w.adSpend,
-      }));
+      }))
+      .sort((a, b) => a.week - b.week);
 
     if (monthData) {
       // If we have no weekly data, generate even splits

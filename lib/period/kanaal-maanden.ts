@@ -17,7 +17,7 @@
 // het type dat vereist.
 
 import { today } from "@/lib/reporting-date";
-import { addMonths, type Month } from "@/lib/period/period-range";
+import { addMonths, monthIndex, type Month } from "@/lib/period/period-range";
 import {
   kanaalMaandenUitDagen, KANAAL_DAGBRON, dagbronSelect, type MonthlyChannelRow,
 } from "@/lib/analysis/channel-report-blend";
@@ -111,15 +111,48 @@ export function laatsteDagUitRijen(rijen: readonly Record<string, unknown>[]): s
  * alleen de selectie: een dag met leads liep, ook als de klant leads niet meetelt.
  */
 export function eersteDagUitRijen(rijen: readonly Record<string, unknown>[], channel: ChannelConversionChannel): string | null {
+  return actieveDagen(rijen, channel)[0] ?? null;
+}
+
+/** De dagen waarop een kanaal iets deed (de regel van eersteDagUitRijen), oplopend en uniek. */
+function actieveDagen(rijen: readonly Record<string, unknown>[], channel: ChannelConversionChannel): string[] {
   const velden = ["spend", "conversion_value", ...conversionSourcesFor(channel).map((s) => s.field)];
-  let eerste: string | null = null;
+  const dagen = new Set<string>();
   for (const r of rijen) {
     const d = String(r.date ?? "").slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
     if (!velden.some((v) => !!Number(r[v] ?? 0))) continue;
-    if (eerste === null || d < eerste) eerste = d;
+    dagen.add(d);
   }
-  return eerste;
+  return [...dagen].sort();
+}
+
+/**
+ * De eerste dag van de HUIDIGE loop van een kanaal: de eerste actieve dag na de laatste hele
+ * kalendermaand zonder activiteit, en zonder zo'n gat de eerste dag ooit. Null zonder actieve dag.
+ *
+ * Voor het tempo zonder doel (forecastCoreMetric, `eersteDag`): begon het kanaal midden in de
+ * laatste gerealiseerde maand, dan telt het tempo de dagen vanaf die dag. Met de eerste dag OOIT
+ * kreeg een Meta die januari-maart liep, april-juni stillag en op 20 juli terugkwam zijn 12 dagen
+ * juli over 31 dagen gespreid: 38 per maand waar hij 100 doet. Bewust niet voor `vanaf` (de eerste
+ * volle maand): daarvóór valt de historie weg, en dan verloor een kanaal dat heel vorig jaar liep
+ * na een zomerpauze zijn vorig jaar en zijn doel.
+ *
+ * Een pauze binnen één maand (geen hele lege kalendermaand) blijft buiten deze regel: een weekend
+ * zonder levering is van een korte pauze niet te onderscheiden.
+ */
+export function startLaatsteLoop(dagen: readonly string[]): string | null {
+  const geldig = [...new Set(dagen.map((d) => String(d).slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
+  let start: string | null = geldig[0] ?? null;
+  for (let i = 1; i < geldig.length; i++) {
+    if (monthIndex(geldig[i].slice(0, 7)) - monthIndex(geldig[i - 1].slice(0, 7)) >= 2) start = geldig[i];
+  }
+  return start;
+}
+
+/** startLaatsteLoop over de actieve dagen van dagrijen (de regel van eersteDagUitRijen). */
+export function startLaatsteLoopUitRijen(rijen: readonly Record<string, unknown>[], channel: ChannelConversionChannel): string | null {
+  return startLaatsteLoop(actieveDagen(rijen, channel));
 }
 
 /**

@@ -18,7 +18,7 @@
 //   en oktober telden mee als nullen, de inzakkende vergelijking die het venster moest voorkomen
 //   (review [7]).
 
-import { gezamenlijkeDataTot, laatsteGeldigeDag, uitgeslotenMetDag, volleMaand, type DataStandSamen } from "@/lib/sync/datastand";
+import { dagkanaalDataTot, gezamenlijkeDataTot, uitgeslotenMetDag, volleMaand, type DataStandSamen } from "@/lib/sync/datastand";
 import { NIET_GOOGLE, type NietGoogleKanaal } from "./kanaal-maanden";
 import type { PeriodDataStand } from "./period-context";
 
@@ -41,9 +41,12 @@ export function bandDataStand(inp: {
     return g ? { laatsteVolleMaand: g.laatsteVolleMaand, partieel: g.partieel, dataTot: g.dataTot } : null;
   }
   const vanRoute = (bron: string) => inp.route?.bronnen?.find((b) => b.bron === bron);
-  // De nieuwste rij in de browser of de dag van de route, welke later is: de route staat vijf
-  // minuten in de cache, en een rij die intussen binnenkwam telt gewoon.
-  const dagkanaal = (k: NietGoogleKanaal) => laatsteGeldigeDag(inp.laatsteDag[k], vanRoute(k)?.dataTot);
+  // De nieuwste rij in de browser naast de dag van de route (dagkanaalDataTot). Een rij die later
+  // valt dan de routedag telt t/m de dag ervoor: het is de rij van de syncdag zelf, of een rij van
+  // een sync na het antwoord van de route (dat staat vijf minuten in de cache). Hier won de laatste
+  // van de twee, en dan was een oktober waarvan de sync op de 31e om 05:00 voor het laatst slaagde
+  // op de kanaaltab "vol", terwijl de route t/m de 30e zei.
+  const dagkanaal = (k: NietGoogleKanaal) => dagkanaalDataTot(inp.laatsteDag[k], vanRoute(k)?.dataTot);
   const stand = (dataTot: string | null, uitgeslotenBronnen: { bron: string; dataTot: string | null }[] = []): PeriodDataStand | null =>
     dataTot ? { ...volleMaand({ dataTot, nu: inp.nu }), dataTot, ...(uitgeslotenBronnen.length > 0 ? { uitgeslotenBronnen } : {}) } : null;
 
@@ -51,7 +54,9 @@ export function bandDataStand(inp: {
 
   const bronnen = [
     ...(inp.kanalen.includes("google") ? [{ bron: "google", dataTot: inp.google?.dataTot ?? null }] : []),
-    ...NIET_GOOGLE.filter((k) => inp.kanalen.includes(k)).map((k) => ({ bron: k as string, dataTot: dagkanaal(k) })),
+    // Met de nieuwste rij, voor de zin over een uitgesloten kanaal (uitgeslotenMetDag): die noemt de
+    // dag van de laatste rij, niet de dag ervoor.
+    ...NIET_GOOGLE.filter((k) => inp.kanalen.includes(k)).map((k) => ({ bron: k as string, dataTot: dagkanaal(k), laatsteRij: inp.laatsteDag[k] })),
   ].map((b) => ({ ...b, syncDraait: vanRoute(b.bron)?.syncDraait ?? false }));
   const samen = gezamenlijkeDataTot(bronnen);
   return stand(samen.dataTot, uitgeslotenMetDag({ uitgesloten: samen.uitgesloten, bronnen }));

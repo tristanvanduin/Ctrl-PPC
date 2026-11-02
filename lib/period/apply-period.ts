@@ -143,6 +143,18 @@ export interface BronPaar {
   ongepaardHuidig: number;
   /** Idem in de vergelijkingsperiode. */
   ongepaardVorig: number;
+  /**
+   * De maanden die voor deze bron werkelijk in het percentage zitten, per kant: van het eerste tot
+   * het laatste paar dat meetelde. Null als er geen paar meetelde.
+   *
+   * Nodig voor de uitleg, omdat "vanaf de start" niet zegt welke maanden tellen: een paar telt pas
+   * als OOK de vergelijkingsmaand op of na de start ligt, dus valt ook een maand van de gekozen
+   * periode na de start weg zodra zijn tegenhanger ervoor ligt. De band schreef "het percentage
+   * telt alleen maanden vanaf september 2024 in beide perioden" bij -6,9%, terwijl augustus 2025 niet
+   * meetelde; met augustus erbij was het +4,0%. Aaneengesloten: beide maanden lopen met het paar op,
+   * dus is een paar eenmaal geldig, dan zijn alle volgende dat ook.
+   */
+  bereik: { huidig: PeriodRange; vorig: PeriodRange } | null;
 }
 
 export interface GepaardeTotalen {
@@ -218,7 +230,7 @@ export function gepaardeTotalen(
     const { start, vanaf: vanafMaand } = bronStart(reeks);
     const paar: BronPaar = {
       naam: reeks.naam, start, vanaf: vanafMaand, geladenVanaf: reeks.geladenVanaf ?? null,
-      gepaard: 0, ongepaardHuidig: 0, ongepaardVorig: 0,
+      gepaard: 0, ongepaardHuidig: 0, ongepaardVorig: 0, bereik: null,
     };
     perBron.push(paar);
     if (vanafMaand === null) continue;
@@ -234,6 +246,8 @@ export function gepaardeTotalen(
         optellen(huidig, x);
         optellen(vorig, y);
         if (heeftData(x) || heeftData(y)) paar.gepaard += 1;
+        if (!paar.bereik) paar.bereik = { huidig: { start: a[i], end: a[i] }, vorig: { start: b[i], end: b[i] } };
+        else { paar.bereik.huidig.end = a[i]; paar.bereik.vorig.end = b[i]; }
       } else {
         if (heeftData(x)) paar.ongepaardHuidig += 1;
         if (heeftData(y)) paar.ongepaardVorig += 1;
@@ -266,23 +280,40 @@ export function bronStart(reeks: Pick<BronReeks, "maanden" | "vanaf">): { start:
  *
  * Een maand zonder rij NA de eerste maand met data en t/m het eind van de data (`dataTot`, anders de
  * laatste maand met data) is een gemeten nul: het kanaal liep niet, en de totalen en gepaardeTotalen
- * tellen hem ook zo. Alleen een maand vóór die start of na dat eind is echt "geen data": niet
- * geladen, of nog niet binnen. De band noemde beide "geen data geladen ... tellen hierboven niet
- * mee", direct onder de zin dat een maand zonder data na de start als nul telt (review [6]).
+ * tellen hem ook zo. De band noemde die "geen data geladen ... tellen hierboven niet mee", direct
+ * onder de zin dat een maand zonder data na de start als nul telt (review [6]).
+ *
+ * Een maand vóór de start is `voorStart` als hij WEL geladen is (op of na `geladenVanaf`): er is dan
+ * gewoon nog geen data. Zonder die grens weet de band niet of zo'n maand leeg was of niet is
+ * opgehaald, en blijft hij `nietGeladen`, net als een maand vóór de grens of na het eind (nog niet
+ * binnen). Hier stond eerst alles vóór de start als "niet geladen": de demo-Meta-tab meldde "Voor 7
+ * maanden is geen data geladen (aug 2025 t/m feb 2026)", terwijl de band vanaf november 2023 laadt
+ * en Meta pas in maart 2026 begon -- vlak onder de eigen zin "de data begint halverwege maart 2026".
+ *
  * Over alle bronnen samen, zoals `data` ze optelt: een maand is pas leeg als geen enkel kanaal er
- * een rij heeft.
+ * een rij heeft. Geef bij een optelling dus de LAATSTE laadgrens mee; daarvóór is niet elk kanaal
+ * geladen. `start` is de eerste maand met data, voor de uitleg; null als die er niet is.
  */
 export function ontbrekendeMaanden(
   data: ClientHistoricalData,
   missing: readonly Month[],
   dataTot?: string | null,
-): { nietGeladen: Month[]; gemetenNul: Month[] } {
+  geladenVanaf?: Month | null,
+): { nietGeladen: Month[]; gemetenNul: Month[]; voorStart: Month[]; start: Month | null } {
   const metData = flattenMonths(data).filter(heeftData).map((m) => m.key);
   const eerste = metData[0];
   const eind = dataTot && /^\d{4}-\d{2}/.test(dataTot) ? dataTot.slice(0, 7) : metData[metData.length - 1];
   const nul = (k: Month) => eerste !== undefined && eind !== undefined
     && monthIndex(k) > monthIndex(eerste) && monthIndex(k) <= monthIndex(eind);
-  return { nietGeladen: missing.filter((k) => !nul(k)), gemetenNul: missing.filter(nul) };
+  // Geladen en vóór de start. Zonder enige maand met data: geladen en niet na het eind.
+  const voor = (k: Month) => !!geladenVanaf && monthIndex(k) >= monthIndex(geladenVanaf)
+    && (eerste !== undefined ? monthIndex(k) < monthIndex(eerste) : eind === undefined || monthIndex(k) <= monthIndex(eind));
+  return {
+    nietGeladen: missing.filter((k) => !nul(k) && !voor(k)),
+    gemetenNul: missing.filter(nul),
+    voorStart: missing.filter(voor),
+    start: eerste ?? null,
+  };
 }
 
 /** ClientHistoricalData als BronReeks, via dezelfde afvlakking als slicePeriod. */

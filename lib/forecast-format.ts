@@ -6,7 +6,7 @@
 // een gemiste plek kleurt rood groen. Daarom staan de labels, de formatters en de richting
 // hier samen — één definitie per metriek.
 
-import type { ForecastMetric } from "./forecast";
+import type { BudgetRecommendation, ForecastMetric } from "./forecast";
 
 export const METRIC_LABELS: Record<ForecastMetric, string> = {
   conversions: "Conversies",
@@ -116,7 +116,20 @@ export function zonderData(p: { realized: number | null; forecast: number | null
  * omzet zonder kosten (ROAS). Die heette ook "Geen data", in het grijs, terwijl het voor een CPA de
  * slechtste maand van het jaar was. Het oordeel erbij: slecht voor een CPA, goed voor een ROAS.
  */
-export function geenWaardeLabel(p: { geenNoemer?: boolean }, metric: ForecastMetric): string {
+export function geenWaardeLabel(p: { geenNoemer?: boolean; geenNoemerPrognose?: boolean }, metric: ForecastMetric): string {
+  // Een prognose met kosten maar zonder één verwachte conversie (geenNoemerPrognose): er is wel
+  // data, € 1.820 verwachte kosten per maand. "Geen data" zei daar het tegendeel.
+  if (p.geenNoemerPrognose) return metric === "cpa" ? "Geen conversies verwacht" : "Geen kosten verwacht";
   if (!p.geenNoemer) return "Geen data";
   return metric === "cpa" ? "Geen conversies" : "Geen kosten";
+}
+
+/**
+ * Hoe het CPA-getal van het budgetadvies heet. Zonder conversies YTD valt computeBudgetRecommendation
+ * terug op doelkosten / doelconversies (cpaUitDoel), en dat is geen "huidige CPA": het rapport zei
+ * "geen conversies YTD, dus geen CPA" en twee regels later "Huidige CPA: € 20", en de CPA-kaart
+ * ernaast "Gerealiseerd YTD —". Eén naam voor elke tekst die dat getal noemt.
+ */
+export function budgetCpaNaam(budget: Pick<BudgetRecommendation, "cpaUitDoel">): string {
+  return budget.cpaUitDoel ? "het CPA-doel" : "de huidige CPA";
 }

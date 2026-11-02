@@ -6,7 +6,7 @@
 // de interface zou dat verraden. Daarom moet missing kloppen, niet alleen months.
 
 import {
-  flattenMonths, slicePeriod, comparePeriods, delta, gepaardeTotalen, alsBronReeks,
+  flattenMonths, slicePeriod, comparePeriods, delta, gepaardeTotalen, alsBronReeks, ontbrekendeMaanden,
   type BronReeks, type Totalen,
 } from "./apply-period";
 import { resolvePeriod, resolveComparison, monthIndex, PERIOD_PRESETS, COMPARISON_MODES } from "./period-range";
@@ -269,6 +269,60 @@ const H1_VJ = { start: "2025-01", end: "2025-06" };
   const r = comparePeriods(data, H1, null);
   check("zonder vergelijking niets ongepaard en geen bronnen",
     r.ongepaard.huidig === 0 && r.ongepaard.vorig === 0 && r.perBron.length === 0);
+}
+
+// Welke maanden het percentage ECHT vergelijkt. Een paar telt pas als ook de vergelijkingsmaand op
+// of na de start ligt, dus vallen ook maanden van de gekozen periode NA de start weg. De band zei
+// "het percentage telt alleen maanden vanaf september 2024 in beide perioden", terwijl augustus 2025
+// niet meetelde: het teken van de demo draaide om (-6,9% tegen +4,0% voor wat de zin beschreef).
+console.log("\nHet bereik van de paren per bron");
+{
+  const reeks = (naam: string, van: string, tot: string): BronReeks => {
+    const maanden = new Map<string, Totalen>();
+    for (let k = van; monthIndex(k) <= monthIndex(tot); k = `${Number(k.slice(0, 4)) + (k.endsWith("-12") ? 1 : 0)}-${String((Number(k.slice(5)) % 12) + 1).padStart(2, "0")}`) {
+      maanden.set(k, { conversions: 1, revenue: 0, adSpend: 10 });
+    }
+    return { naam, maanden };
+  };
+  const g = reeks("google", "2024-09", "2026-07");
+  const r = gepaardeTotalen([g], { start: "2025-08", end: "2026-07" }, { start: "2024-08", end: "2025-07" });
+  const b = r.perBron[0] as typeof r.perBron[0] & { bereik?: { huidig: { start: string; end: string }; vorig: { start: string; end: string } } | null };
+  check("de demo-vorm: september 2025 t/m juli 2026 tegen september 2024 t/m juli 2025",
+    b.bereik?.huidig.start === "2025-09" && b.bereik?.huidig.end === "2026-07" && b.bereik?.vorig.start === "2024-09" && b.bereik?.vorig.end === "2025-07",
+    JSON.stringify(b.bereik));
+  // Meta op de demo, laatste 3 maanden tegen de voorgaande: eerste volle maand april 2026.
+  const meta = { ...reeks("meta", "2026-03", "2026-07"), vanaf: "2026-04" };
+  const kort = gepaardeTotalen([meta], { start: "2026-05", end: "2026-07" }, { start: "2026-02", end: "2026-04" });
+  const km = kort.perBron[0] as typeof b;
+  check("alleen juli tegen april, niet mei en juni", km.bereik?.huidig.start === "2026-07" && km.bereik?.huidig.end === "2026-07"
+    && km.bereik?.vorig.start === "2026-04" && km.bereik?.vorig.end === "2026-04", JSON.stringify(km.bereik));
+  const niets = gepaardeTotalen([meta], { start: "2025-05", end: "2025-07" }, { start: "2025-02", end: "2025-04" });
+  check("geen enkel paar: geen bereik", (niets.perBron[0] as typeof b).bereik === null, JSON.stringify(niets.perBron[0]));
+}
+
+// Ontbrekende maanden vóór de start. Was het kanaal toen al geladen (de band laadt 36 maanden), dan
+// is zo'n maand geen laadprobleem maar "nog geen data". De band zei op de demo-Meta-tab "Voor 7
+// maanden is geen data geladen (aug 2025 t/m feb 2026)", terwijl die maanden wel geladen waren.
+console.log("\nOntbrekende maanden vóór de start");
+{
+  // Via een losse signatuur: op de oude code bestaan de vierde parameter en voorStart niet, en dan
+  // moet de test per geval falen in plaats van op de typen.
+  const ontbrekend = ontbrekendeMaanden as unknown as (d: ClientHistoricalData, missing: readonly string[], dataTot?: string | null, geladenVanaf?: string | null) =>
+    { nietGeladen: string[]; gemetenNul: string[]; voorStart?: string[]; start?: string | null };
+  // Data vanaf april 2026; gevraagd januari t/m juni 2026, dus januari t/m maart ontbreken.
+  const vanApril: ClientHistoricalData = { ...data, historicalYears: {},
+    currentYearData: [null, null, null, ...Array.from({ length: 3 }, (_, i) => m(i + 4, 30, 300, 150)), ...Array(6).fill(null)] } as ClientHistoricalData;
+  const gevraagd = ["2026-01", "2026-02", "2026-03"];
+  const zonder = ontbrekend(vanApril, gevraagd, null);
+  check("zonder laadgrens: niet geladen, zoals voorheen", zonder.nietGeladen.join() === gevraagd.join() && (zonder.voorStart ?? []).length === 0, JSON.stringify(zonder));
+  const geladen = ontbrekend(vanApril, gevraagd, null, "2023-11");
+  check("geladen vanaf 2023-11: vóór de start, niet 'niet geladen'",
+    geladen.nietGeladen.length === 0 && (geladen.voorStart ?? []).join() === gevraagd.join() && geladen.start === "2026-04", JSON.stringify(geladen));
+  const deels = ontbrekend(vanApril, gevraagd, null, "2026-02");
+  check("geladen vanaf februari: januari niet geladen, februari en maart vóór de start",
+    deels.nietGeladen.join() === "2026-01" && (deels.voorStart ?? []).join() === "2026-02,2026-03", JSON.stringify(deels));
+  const na = ontbrekend(vanApril, ["2026-07"], "2026-06-30", "2023-11");
+  check("na het eind van de data blijft het 'niet geladen' (nog niet binnen)", na.nietGeladen.join() === "2026-07" && (na.voorStart ?? []).length === 0, JSON.stringify(na));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
