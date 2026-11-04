@@ -214,7 +214,7 @@ interface ClientSettingsRow {
 
 export async function loadClientSettings(clientId: string): Promise<ClientSettings> {
   if (supabase) {
-    const { data } = await dbSelectOne<ClientSettingsRow>("client_settings", { select: "*", clientId });
+    const { data, error } = await dbSelectOne<ClientSettingsRow>("client_settings", { select: "*", clientId });
 
     if (data) {
       const settings: ClientSettings = {
@@ -244,6 +244,18 @@ export async function loadClientSettings(clientId: string): Promise<ClientSettin
 
       return settings;
     }
+
+    // Geen rij (een nieuwe klant; 10 van de 70 klanten hebben er geen): de terugval ook in het
+    // geheugen zetten. Zonder dat zei heeftGecachteInstellingen na een klantwissel A -> B -> A weer
+    // "nee" voor A, en sloot ClientDataProvider het hele dashboard (ook Instellingen) opnieuw achter
+    // "Data ophalen..." tot deze lezing terug was, bij elke wissel. Alleen na een geslaagde lezing:
+    // na een fout is er niets bekend. Niet naar localStorage: daar hoort wat echt gelezen of
+    // opgeslagen is, en kpiDoelenOpgeslagen blijft zo false (de standaard is geen ingevoerd doel).
+    if (!error) {
+      const terugval = getClientSettings(clientId);
+      settingsCache.set(clientId, terugval);
+      return terugval;
+    }
   }
 
   // Fall back to localStorage / defaults
@@ -260,16 +272,16 @@ export async function loadClientSettings(clientId: string): Promise<ClientSettin
  * nog de oude selectie en houdt de cache die vijf minuten vast.
  */
 export async function saveClientSettings(settings: ClientSettings): Promise<{ error: string | null }> {
-  // Always update cache + localStorage immediately. Opgeslagen via Instellingen: de doelen zijn
-  // ingevoerd, ook als ze gelijk zijn aan de standaard (wie "+10%" ziet staan en opslaat, heeft +10%
-  // als doel). De database krijgt kpi_targets hieronder mee, dus het volgende lezen zegt hetzelfde.
+  // Opgeslagen via Instellingen: de doelen zijn ingevoerd, ook als ze gelijk zijn aan de standaard
+  // (wie "+10%" ziet staan en opslaat, heeft +10% als doel). De database krijgt kpi_targets hieronder
+  // mee, dus het volgende lezen zegt hetzelfde.
   const opgeslagen: ClientSettings = { ...settings, kpiDoelenOpgeslagen: true };
-  settingsCache.set(settings.clientId, opgeslagen);
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY_PREFIX + settings.clientId, JSON.stringify(opgeslagen));
-  }
 
-  // Persist to Supabase
+  // Eerst de database, dan pas de cache en localStorage. Die werden hier VÓÓR de schrijfactie gevuld,
+  // en na een mislukte opslag toonden dashboard en paneel het niet-opgeslagen doel dan als "jaardoel"
+  // tot de volgende lezing, en blijvend als die ook faalde. Mislukt het schrijven, dan blijft wat er
+  // stond (de vorige lezing of opslag) en zegt het paneel "niet opgeslagen". Zonder database (lokaal)
+  // zijn cache en localStorage de opslag zelf.
   if (supabase) {
     const { error } = await dbUpsert("client_settings", settings.clientId, {
       conversion_actions: settings.conversionActions,
@@ -286,7 +298,11 @@ export async function saveClientSettings(settings: ClientSettings): Promise<{ er
       merchant_channel: settings.merchantChannel ?? null,
       updated_at: new Date().toISOString(),
     });
-    return { error: error?.message ?? null };
+    if (error) return { error: error.message };
+  }
+  settingsCache.set(settings.clientId, opgeslagen);
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_KEY_PREFIX + settings.clientId, JSON.stringify(opgeslagen));
   }
   return { error: null };
 }

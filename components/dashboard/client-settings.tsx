@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Save, RotateCcw, Check, CircleDot, CircleOff, Target, TrendingUp, DollarSign, BarChart3, CheckSquare, Square, Filter, Building2, AlertTriangle, Clock, ImageIcon, Upload, Trash2, Globe, X } from "lucide-react";
 import { COUNTRY_MAP, countryLabel, detectCountriesFromCampaigns } from "@/lib/countries";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
@@ -56,6 +56,24 @@ interface Props {
   kaarten?: SettingsKaart[];
 }
 
+/**
+ * Eén tekst per inhoud, los van de sleutelvolgorde en van null tegenover weggelaten. Dezelfde
+ * instellingen komen in drie vormen langs: uit de database (jsonb sorteert sleutels, lege velden zijn
+ * null), uit localStorage (de volgorde van het paneel; een oude vermelding mist latere velden) en uit
+ * saveClientSettings (conversionOverrides undefined). Een gewone JSON.stringify leest die als
+ * verschillend, en dan vult het effect in het paneel opnieuw in terwijl er niets veranderd is.
+ */
+function stabieleTekst(waarde: unknown): string {
+  return JSON.stringify(waarde, (_, v: unknown) => {
+    if (v === null) return undefined;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const o = v as Record<string, unknown>;
+      return Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
+    }
+    return v;
+  });
+}
+
 export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
   const zichtbaar = kaarten ?? ALLE_SETTINGS_KAARTEN;
   const toon = (k: SettingsKaart) => zichtbaar.includes(k);
@@ -65,6 +83,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
   const [opslaanFout, setOpslaanFout] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState("");
   const dataState = useClientDataState();
+  // Wat het effect hieronder de laatste keer in de velden zette (stabieleTekst van de instellingen).
+  const ingevuld = useRef<string | null>(null);
 
   // Separate KPI state with enabled/period toggles
   const [kpiConversions, setKpiConversions] = useState<KpiConfig>({ enabled: false, value: 0, period: "year", inputMode: "absolute", growthPct: 10 });
@@ -111,6 +131,16 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       );
       baseSettings.conversionActions = apiActions;
     }
+
+    // Alleen invullen als er iets anders te laden is dan de vorige keer. Dit effect hangt ook aan
+    // dataState.data (zie onderaan), en de provider voegt opnieuw samen zodra het lezen van
+    // client_settings klaar is, ook als dat niets nieuws bracht of mislukte: bij elke terugkerende
+    // bezoeker (cache aanwezig, lezen loopt nog) en na elke opslag (remount, nieuw lezen). Wie in dat
+    // venster al typte, zag zijn invoer terugspringen naar de opgeslagen waarde. Een late lezing die
+    // WEL iets anders brengt (na INSTELLINGEN_WACHT_MS stond hier de standaard) vult nog steeds in.
+    const geladen = stabieleTekst(baseSettings);
+    if (geladen === ingevuld.current) return;
+    ingevuld.current = geladen;
 
     setSettings(baseSettings);
     setSector(baseSettings.sector ?? "");
@@ -160,8 +190,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
     // het antwoord later alsnog, dan voegt hij opnieuw samen (dat object verandert dan). Op alleen
     // conversionActions (dezelfde referentie na die samenvoeging) bleef het paneel "+10%" en CPA uit
     // tonen naast een dashboard met 2.600 en € 45, en schreef een opslag zonder wijziging de standaard
-    // over het opgeslagen doel heen. Het verandert verder alleen bij een nieuwe lezing na een opslag,
-    // en dan mount de provider het paneel toch opnieuw.
+    // over het opgeslagen doel heen. Het verandert ook bij elke lezing die niets nieuws brengt; de
+    // vergelijking met `ingevuld` hierboven houdt dan de invoer van de gebruiker vast.
   }, [clientId, dataState?.conversionActions, dataState?.data]);
 
   if (!settings) return null;
@@ -291,13 +321,16 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       merchantContentLanguage: merchantContentLanguage.trim() || null,
       merchantChannel: merchantChannel.trim() || null,
     });
-    invalidateClientCache(clientId);
     // Eerst de fout: een mislukte opslag mag geen doelen naar client_targets schrijven, anders
-    // stond daar het nieuwe CPA-doel terwijl het paneel "niet opgeslagen" zei.
+    // stond daar het nieuwe CPA-doel terwijl het paneel "niet opgeslagen" zei. En ook niet verversen:
+    // invalidateClientCache zet de data op null, het dashboard unmount de provider en dit paneel
+    // mee, en de melding stond één frame op een paneel dat meteen verdween; na het ophalen kwam het
+    // terug zonder melding. Nu blijven melding en invoer staan.
     if (error) {
       setOpslaanFout(error);
       return;
     }
+    invalidateClientCache(clientId);
     void syncClientTargets(kpiTargets.cpaTarget, kpiTargets.roasTarget);
     // De blended cache ("Alle kanalen") bewaart de data met de KPI-doelen al samengevoegd; zonder
     // dit toonde het Jaaroverzicht daar nog vijf minuten het oude doel.
