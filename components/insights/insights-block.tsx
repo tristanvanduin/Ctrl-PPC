@@ -385,10 +385,14 @@ function generateInsights(forecast: ClientForecast, clientId: string, extra: Ext
   // ── 10. Concrete Recovery Actions (when significantly behind) ──
 
   if (convDiff < -25) {
+    // Punt (5) verwees naar "de CPA berekening hierboven", en die staat er na een maand met kosten
+    // zonder één conversie niet: sectie 3 zegt dan dat het budget wacht op de conversiemeting.
     insights.push({
       type: "info",
       level: "Actie",
-      text: `Herstelplan nodig. Prioriteiten: (1) Evalueer per campagne welke het meest bijdraagt aan de achterstand, (2) Check Impression Share Lost — is er ruimte om meer vertoningen te pakken?, (3) Controleer conversieratio trend — is de landingspagina nog competitief?, (4) Analyseer zoektermrapporten op verspilling, (5) Overleg budget verhoging met de klant op basis van de CPA berekening hierboven.`,
+      text: `Herstelplan nodig. Prioriteiten: (1) Evalueer per campagne welke het meest bijdraagt aan de achterstand, (2) Check Impression Share Lost — is er ruimte om meer vertoningen te pakken?, (3) Controleer conversieratio trend — is de landingspagina nog competitief?, (4) Analyseer zoektermrapporten op verspilling, (5) ${metingOnzeker
+        ? "Controleer eerst de conversiemeting; een budgetverhoging bespreek je met de klant pas als die klopt"
+        : "Overleg budget verhoging met de klant op basis van de CPA berekening hierboven"}.`,
     });
   }
 

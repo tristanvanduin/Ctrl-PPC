@@ -181,7 +181,11 @@ function generateRecommendations(forecast: ClientForecast, clientId: string, imp
     recs.push({
       priority: "high",
       source: "Klantbespreking",
-      text: `Plan een bespreking met de klant. Agenda: (1) Huidige resultaten vs doelstellingen transparant delen, (2) Oorzaakanalyse presenteren (budget/efficiency/markt), (3) Herstelplan voorleggen met budget-scenario's, (4) Verwachtingen bijstellen indien nodig. Gebruik de budget-aanbeveling als basis voor het gesprek.`,
+      // "Gebruik de budget-aanbeveling" verwees na een maand zonder conversies naar een advies dat
+      // dit blok dan juist niet geeft (zie de aanbeveling Conversiemeting).
+      text: `Plan een bespreking met de klant. Agenda: (1) Huidige resultaten vs doelstellingen transparant delen, (2) Oorzaakanalyse presenteren (budget/efficiency/markt), (3) Herstelplan voorleggen met budget-scenario's, (4) Verwachtingen bijstellen indien nodig. ${metingOnzeker
+        ? "Zet de controle van de conversiemeting bovenaan de agenda: een budget-aanbeveling volgt pas als die klopt."
+        : "Gebruik de budget-aanbeveling als basis voor het gesprek."}`,
     });
   }
 

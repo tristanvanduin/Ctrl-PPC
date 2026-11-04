@@ -14,7 +14,7 @@ import { computeHealthScore, type HealthScore, type Anomaly } from "@/lib/health
 import { getClientSettings } from "@/lib/client-settings";
 import { dbSelect } from "@/lib/data-access/client-read";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "@/lib/use-client-data";
-import { cpaTrendFrom } from "@/lib/analysis/trend";
+import { cpaTrendFrom, cpaTrendVanForecast } from "@/lib/analysis/trend";
 import { budgetCpaNaam, formatRoas, formatPercent } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
@@ -462,7 +462,18 @@ function computeBusinessImpact(forecast: ClientForecast): BusinessImpactStatemen
 
   // Budget recommendation summary — reconciliatie: is de achterstand een efficiëntie- of een
   // budgetkwestie? Bij een efficiëntie-bottleneck spreken we onszelf niet tegen met "+X% budget".
-  if (budget.behindTarget && budget.efficiencyBottleneck) {
+  //
+  // Na een maand met kosten en geen enkele conversie (cpaTrendVanForecast, dezelfde regel als
+  // Inzichten, Aanbevelingen en Taken) geen CPA-budgetgetal: "de CPA (€ 233) ligt boven het doel"
+  // en "+825% budget" rekenen met een CPA waar die maand in de teller zit, en stonden op dezelfde
+  // pagina naast "pas te berekenen als de conversiemeting klopt".
+  const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
+  if (budget.behindTarget && zonderConversies.length > 0) {
+    statements.push({
+      text: `Hoeveel budget nodig is om het jaardoel te halen, is pas te berekenen als de conversiemeting klopt: in ${zonderConversies.join(", ")} waren er kosten zonder één conversie. Controleer eerst de conversiemeting (tag, import, attributie) voordat je op de CPA stuurt of budget verschuift.`,
+      type: "warning",
+    });
+  } else if (budget.behindTarget && budget.efficiencyBottleneck) {
     statements.push({
       text: `Meer budget is niet de oplossing: de CPA (${fmt(budget.currentCpa)}) ligt boven het doel${budget.cpaTarget != null ? ` (${fmt(budget.cpaTarget)})` : ""}. Herstel eerst de efficiëntie en herverdeel budget van dure naar rendabele campagnes; schaal pas op als de CPA richting doel beweegt.`,
       type: "neutral",
@@ -504,8 +515,19 @@ function computeDecisions(
   const budgetUnderutilized = avgUtilization < 0.6;
 
   // Budget decision — context-aware
+  const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
   if (budget.behindTarget && budget.spendIncreasePct > 5) {
-    if (budgetUnderutilized) {
+    if (zonderConversies.length > 0) {
+      // Zie computeBusinessImpact: geen budgetbesluit op een CPA met een maand zonder conversies
+      // erin. De voorwaarde hierboven (spendIncreasePct) komt uit die CPA, en twee van de drie
+      // takken noemen hem.
+      decisions.push({
+        decision: `Conversiemeting controleren vóór een budgetbesluit`,
+        reason: `In ${zonderConversies.join(", ")} waren er kosten zonder één conversie: daar is geen CPA te berekenen, en het budgetadvies rekent ermee. Controleer eerst de conversiemeting (tag, import, attributie) en of de campagnes leverden.`,
+        urgency: "hoog",
+        expectedEffect: `Daarna is te berekenen hoeveel budget het jaardoel vraagt, of dat eerst de efficiëntie hersteld moet worden.`,
+      });
+    } else if (budgetUnderutilized) {
       // Budget is NOT the problem — campaigns aren't spending what they have
       decisions.push({
         decision: `Bestedingscapaciteit verhogen (budget wordt niet opgemaakt)`,
@@ -645,13 +667,23 @@ function computeActions(
   // Fallback: generate from forecast
   if (actions.length === 0) {
     const budget = forecast.budgetRecommendation;
+    // Zie computeBusinessImpact: geen "€ 453.833 extra budget" op een CPA met een maand zonder
+    // conversies erin.
+    const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
     if (budget.behindTarget) {
-      actions.push({
-        title: "Budgetvoorstel voorbereiden",
-        why: `Er is ${fmt(budget.extraSpendNeeded)} extra budget nodig om het jaardoel te halen.`,
-        impact: "hoog",
-        status: "Aanbevolen",
-      });
+      actions.push(zonderConversies.length > 0
+        ? {
+          title: "Conversiemeting controleren",
+          why: `In ${zonderConversies.join(", ")} waren er kosten zonder één conversie. Een budgetvoorstel op de CPA wacht tot duidelijk is of de meting klopt.`,
+          impact: "hoog",
+          status: "Aanbevolen",
+        }
+        : {
+          title: "Budgetvoorstel voorbereiden",
+          why: `Er is ${fmt(budget.extraSpendNeeded)} extra budget nodig om het jaardoel te halen.`,
+          impact: "hoog",
+          status: "Aanbevolen",
+        });
     }
     if (forecast.conversions.kpi.diffPct < -10) {
       actions.push({
@@ -915,6 +947,8 @@ export function DgmView({ clientId }: { clientId: string }) {
   const roas = forecast.roas.kpi;
 
   const businessImpact = computeBusinessImpact(forecast);
+  // Voor de scenariotekst onder "Prognose vs jaardoel"; de regel staat bij computeBusinessImpact.
+  const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
   const causes = computeBusinessCauses(
     forecast, health,
     dataState?.impressionShare,
@@ -1325,10 +1359,21 @@ export function DgmView({ clientId }: { clientId: string }) {
         {forecast.budgetRecommendation.behindTarget && conv.annualTarget > 0 && (
           <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-100">
             <p className="text-xs text-blue-800 leading-relaxed">
-              <strong>Scenario:</strong> Bij een budgetverhoging van {Math.round(forecast.budgetRecommendation.spendIncreasePct)}%
-              (naar {fmt(forecast.budgetRecommendation.requiredMonthlySpend)}/maand) is het jaardoel
-              van {num(conv.annualTarget)} {vocab.conversions} naar verwachting haalbaar.
-              Zonder aanpassing is de verwachting {num(conv.adjustedAnnual)} {vocab.conversions} ({pct(conv.diffPct)} vs doel).
+              {zonderConversies.length > 0 ? (
+                <>
+                  <strong>Scenario:</strong> hoeveel budget nodig is om het jaardoel
+                  van {num(conv.annualTarget)} {vocab.conversions} te halen, is pas te berekenen als de conversiemeting
+                  klopt: in {zonderConversies.join(", ")} waren er kosten zonder één conversie.
+                  Zonder aanpassing is de verwachting {num(conv.adjustedAnnual)} {vocab.conversions} ({pct(conv.diffPct)} vs doel).
+                </>
+              ) : (
+                <>
+                  <strong>Scenario:</strong> Bij een budgetverhoging van {Math.round(forecast.budgetRecommendation.spendIncreasePct)}%
+                  (naar {fmt(forecast.budgetRecommendation.requiredMonthlySpend)}/maand) is het jaardoel
+                  van {num(conv.annualTarget)} {vocab.conversions} naar verwachting haalbaar.
+                  Zonder aanpassing is de verwachting {num(conv.adjustedAnnual)} {vocab.conversions} ({pct(conv.diffPct)} vs doel).
+                </>
+              )}
             </p>
           </div>
         )}

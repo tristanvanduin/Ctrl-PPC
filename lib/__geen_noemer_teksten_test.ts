@@ -8,7 +8,9 @@
 //   (het CPA-doel), en de inzichten en taken noemden dat getal ook "huidige CPA";
 // - het DGM-tabblad toonde "Kosten per conversie € 0" waar Overzicht "—" zei;
 // - de inzichten zeiden "CPA daalt … optimalisaties werken" direct na een maand van € 2.000
-//   zonder één conversie, terwijl de health-score er een waarschuwing voor gaf.
+//   zonder één conversie, terwijl de health-score er een waarschuwing voor gaf;
+// - de grafiekbanner, de DGM en het herstelplan gaven het CPA-budgetgetal ("+825% naar
+//   € 101.767/maand") nog naast "pas te berekenen als de conversiemeting klopt" in de inzichten.
 //
 // De componenten lezen hun data uit contexten (ClientDataProvider, ChannelDataProvider). Die worden
 // hier gevuld door createContext en useContext te omwikkelen vóór de componenten geladen worden:
@@ -217,6 +219,79 @@ async function main() {
     zet(laag(true));
     const laagZonder = tekst(React.createElement(InsightsBlock, { clientId: "t" }));
     check("minder spend, zonder julimaand: 'het budget is het probleem' blijft", laagZonder.includes("het budget is het probleem"), naNa(laagZonder, "Ad spend ligt", 300));
+    open = false;
+  });
+
+  await deel("[10c] Grafiekbanner, DGM en herstelplan zeggen over het budget hetzelfde als Inzichten", async () => {
+    // Inzichten zei na de julimaand "hoeveel budget daarvoor nodig is, is pas te berekenen als de
+    // conversiemeting klopt", en op dezelfde pagina zei de banner boven de grafiek "Verhoog
+    // maandelijks budget met 825% naar € 101.767/maand", de DGM "de CPA (€ 233) ligt boven het
+    // doel", "Budgetvoorstel voorbereiden: € 453.833 extra budget" en "Scenario: bij een
+    // budgetverhoging van 825%", en het herstelplan verwees naar "de CPA berekening hierboven" die
+    // er niet meer stond. Dat getal rekent met een CPA waar die maand in de teller zit.
+    const { PerformanceChartView } = await import("../components/dashboard/performance-chart");
+    const render = (data: ClientHistoricalData) => {
+      const f = zet(data);
+      return {
+        f,
+        banner: naNa(tekst(React.createElement(PerformanceChartView, { clientData: data, forecast: f, metric: "conversions" })), "Budget aanbeveling", 260),
+        dgm: tekst(React.createElement(DgmView, { clientId: "t" })),
+        inzicht: tekst(React.createElement(InsightsBlock, { clientId: "t" })),
+        adv: tekst(React.createElement(RecommendationsBlock, { clientId: "t" })),
+      };
+    };
+    const cpaBudgetGetal = (r: ReturnType<typeof render>) => ({
+      banner: /Verhoog maandelijks budget met \d+%|€ [\d.]+\/maand/.test(r.banner),
+      dgmCpa: /Meer budget is niet de oplossing: de CPA \(€/.test(r.dgm) || /Efficiency verbeteren vóór budget verhogen/.test(r.dgm),
+      dgmVerhoging: /Budget verhogen met \d+%|budgetverhoging van \d+%/.test(r.dgm),
+      dgmVoorstel: /Budgetvoorstel voorbereiden/.test(r.dgm) && /€ [\d.]+ extra budget nodig/.test(r.dgm),
+      herstelplan: /\(5\) Overleg budget verhoging met de klant op basis van de CPA berekening hierboven/.test(r.inzicht),
+      klantbespreking: /Gebruik de budget-aanbeveling als basis voor het gesprek/.test(r.adv),
+    });
+    // G is 18% achter, en het herstelplan (sectie 10) en de klantbespreking staan er pas vanaf 25%:
+    // dezelfde reeks met de helft van de conversies, met en zonder de julimaand.
+    const GV: ClientHistoricalData = {
+      ...G,
+      currentYearData: jaar([...[35, 40, 45, 50, 55, 60].map((c, i) => rec(i + 1, wk(i + 1, [c / 4, c / 4, c / 4, c / 4], [500, 500, 500, 500], [c * 25, c * 25, c * 25, c * 25]))), kostenZonderConv(7)]),
+    };
+    const GV0: ClientHistoricalData = { ...GV, currentYearData: jaar(GV.currentYearData.slice(0, 6)) };
+    open = true;
+    const g = render(GV);
+    check("voorwaarde: GV is achter op doel met een budgetadvies, en meer dan 25% achter (herstelplan)",
+      g.f.budgetRecommendation.behindTarget && g.f.budgetRecommendation.spendIncreasePct > 5 && g.f.conversions.kpi.diffPct < -25,
+      JSON.stringify({ behind: g.f.budgetRecommendation.behindTarget, pct: g.f.budgetRecommendation.spendIncreasePct, diff: g.f.conversions.kpi.diffPct }));
+    const met = cpaBudgetGetal(g);
+    check("met de julimaand: de banner noemt geen percentage en geen maandbedrag", !met.banner, g.banner);
+    check("met de julimaand: de banner zegt dat het budget wacht op de conversiemeting", /pas te berekenen als de conversiemeting klopt: in Jul/.test(g.banner), g.banner);
+    // De herkomst van het doel (lib/__doel_herkomst_test.ts) hoort ook in de wacht-tak: die zei "om
+    // het geschatte jaardoel te halen" zonder "(vorig jaar +10%; er is nog geen doel ingevoerd)", en
+    // bij een groeidoel "het jaardoel" zonder "(vorig jaar +15%)". GV heeft geen doelHerkomst: de schatting.
+    check("met de julimaand: de wacht-banner draagt de herkomst van het geschatte doel",
+      /om het geschatte jaardoel \(vorig jaar \+10%; er is nog geen doel ingevoerd\) te halen, is pas te berekenen/.test(g.banner), g.banner);
+    const gGroei = render({ ...GV, doelHerkomst: { conversions: { soort: "groei", groeiPct: 15 }, revenue: { soort: "groei", groeiPct: 15 } } });
+    check("met de julimaand, groeidoel: 'het jaardoel (vorig jaar +15%)' in de wacht-banner, nergens 'geschat'",
+      /om het jaardoel \(vorig jaar \+15%\) te halen, is pas te berekenen/.test(gGroei.banner) && !/geschat/.test(gGroei.banner), gGroei.banner);
+    const gVast = render({ ...GV, doelHerkomst: { conversions: { soort: "absoluut" }, revenue: { soort: "absoluut" } } });
+    check("met de julimaand, vast doel: 'om het jaardoel te halen', zonder haakjes",
+      /om het jaardoel te halen, is pas te berekenen/.test(gVast.banner) && !/geschat|vorig jaar/.test(gVast.banner), gVast.banner);
+    check("met de julimaand, DGM: niet 'de CPA (€ …) ligt boven het doel' en niet 'Efficiency verbeteren vóór budget verhogen'", !met.dgmCpa, naNa(g.dgm, "Meer budget", 200));
+    check("met de julimaand, DGM: geen 'Budget verhogen met X%' en geen 'budgetverhoging van X%'", !met.dgmVerhoging, naNa(g.dgm, "verhog", 200));
+    check("met de julimaand, DGM: geen 'Budgetvoorstel voorbereiden … € … extra budget nodig'", !met.dgmVoorstel, naNa(g.dgm, "Budgetvoorstel", 200));
+    check("met de julimaand, DGM: wel 'Conversiemeting controleren', en het scenario wacht op de meting",
+      /Conversiemeting controleren/.test(g.dgm) && /Scenario: hoeveel budget nodig is.*?pas te berekenen als de conversiemeting klopt: in Jul/.test(g.dgm), naNa(g.dgm, "Scenario:", 260));
+    check("met de julimaand: herstelplan (5) verwijst niet naar 'de CPA berekening hierboven'", !met.herstelplan && /\(5\) Controleer eerst de conversiemeting/.test(g.inzicht), naNa(g.inzicht, "(5)", 160));
+    check("met de julimaand: de klantbespreking verwijst niet naar 'de budget-aanbeveling'", !met.klantbespreking && /een budget-aanbeveling volgt pas als die klopt/.test(g.adv), naNa(g.adv, "Klantbespreking", 400));
+    // Zonder die maand staat het advies er gewoon, met getal.
+    const g0 = render(GV0);
+    check("voorwaarde: GV0 ook achter op doel met een budgetadvies, en meer dan 25% achter",
+      g0.f.budgetRecommendation.behindTarget && g0.f.budgetRecommendation.spendIncreasePct > 5 && g0.f.conversions.kpi.diffPct < -25,
+      JSON.stringify({ behind: g0.f.budgetRecommendation.behindTarget, pct: g0.f.budgetRecommendation.spendIncreasePct, diff: g0.f.conversions.kpi.diffPct }));
+    const zonder = cpaBudgetGetal(g0);
+    check("zonder julimaand: de banner met percentage, maandbedrag en de herkomst van het doel",
+      /Verhoog maandelijks budget met \d+% naar € [\d.]+\/maand om het geschatte jaardoel te halen \(vorig jaar \+10%; er is nog geen doel ingevoerd\)\./.test(g0.banner), g0.banner);
+    check("zonder julimaand: het DGM-budgetadvies met getal (statement of besluit, voorstel, scenario)",
+      (zonder.dgmCpa || zonder.dgmVerhoging) && zonder.dgmVoorstel && /Scenario: Bij een budgetverhoging van \d+%/.test(g0.dgm), JSON.stringify(zonder));
+    check("zonder julimaand: herstelplan (5) en klantbespreking zoals voorheen", zonder.herstelplan && zonder.klantbespreking, JSON.stringify(zonder));
     open = false;
   });
 

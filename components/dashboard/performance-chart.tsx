@@ -19,6 +19,7 @@ import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
 import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
 import { METRIC_LABELS } from "@/lib/forecast-format";
 import { jaardoelTekst } from "@/lib/analysis/standaard-jaardoel";
+import { cpaTrendVanForecast } from "@/lib/analysis/trend";
 
 function formatYAxis(metric: ForecastMetric) {
   if (metric === "revenue") {
@@ -84,6 +85,11 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
   // geen doel ingevoerd", ook naast een doel uit Instellingen.
   // Met alleen een omzetdoel: "nog geen conversiedoel ingevoerd" (ander), niet "nog geen doel".
   const conversieDoel = jaardoelTekst(forecast.doelHerkomst?.conversions, { lidwoord: true, lang: true, ander: forecast.doelHerkomst?.revenue });
+  // Dezelfde regel als Inzichten, Aanbevelingen en Taken (cpaTrendVanForecast): na een maand met
+  // kosten en geen enkele conversie zeggen die "hoeveel budget nodig is, is pas te berekenen als
+  // de conversiemeting klopt", en deze banner zei op dezelfde pagina "Verhoog maandelijks budget
+  // met 825% naar € 101.767/maand". Dat getal rekent met een CPA waar die maand in de teller zit.
+  const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
   const { theme } = useBrandTheme();
 
   const result = forecast[metric];
@@ -203,11 +209,22 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
       {forecast.budgetRecommendation.behindTarget && metric === "conversions" && (
         <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
           <p className="text-sm text-amber-800 font-medium">
-            Budget aanbeveling: {forecast.budgetRecommendation.spendIncreasePct > 0
-              ? `Verhoog maandelijks budget met ${Math.round(forecast.budgetRecommendation.spendIncreasePct)}% `
-              : ""}
-            naar {new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(forecast.budgetRecommendation.requiredMonthlySpend)}/maand
-            om {conversieDoel.naam} te halen{conversieDoel.toelichting ? ` (${conversieDoel.toelichting})` : ""}.
+            {zonderConversies.length > 0 ? (
+              <>
+                {/* Met de herkomst van het doel, net als de tak hieronder: zonder zei deze tak "om het
+                    geschatte jaardoel te halen" zonder "vorig jaar +10%; er is nog geen doel ingevoerd". */}
+                Budget aanbeveling: hoeveel budget nodig is om {conversieDoel.naam}{conversieDoel.toelichting ? ` (${conversieDoel.toelichting})` : ""} te halen,
+                is pas te berekenen als de conversiemeting klopt: in {zonderConversies.join(", ")} waren er kosten zonder één conversie.
+              </>
+            ) : (
+              <>
+                Budget aanbeveling: {forecast.budgetRecommendation.spendIncreasePct > 0
+                  ? `Verhoog maandelijks budget met ${Math.round(forecast.budgetRecommendation.spendIncreasePct)}% `
+                  : ""}
+                naar {new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(forecast.budgetRecommendation.requiredMonthlySpend)}/maand
+                om {conversieDoel.naam} te halen{conversieDoel.toelichting ? ` (${conversieDoel.toelichting})` : ""}.
+              </>
+            )}
           </p>
         </div>
       )}
