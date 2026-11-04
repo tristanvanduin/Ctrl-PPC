@@ -196,13 +196,35 @@ async function main() {
     const metKpi = async (kpi: unknown) => computeAnalysisTargets(mockSupabase({
       ads_account_monthly: maanden(), ads_account_weekly: [], client_settings: [{ kpi_targets: kpi }],
     }), "x");
-    const gevaar = (r: Awaited<ReturnType<typeof metKpi>>) => r ? computeHealthScore(r.forecast).anomalies.find((a) => /jaardoel in gevaar/i.test(a.title)) : undefined;
+    type Uitkomst = Awaited<ReturnType<typeof metKpi>>;
+    const score = (r: Uitkomst) => r ? computeHealthScore(r.forecast) : undefined;
+    const gevaar = (r: Uitkomst) => score(r)?.anomalies.find((a) => /jaardoel in gevaar/i.test(a.title));
+    const doelstelling = (r: Uitkomst) => score(r)?.factors.find((f) => f.name === "Doelstelling")?.description ?? "";
+    // Klokonafhankelijk: computeAnalysisTargets leest today() zelf, en maanden() geeft dit jaar
+    // MAAND-1 gerealiseerde maanden (20 per maand tegen een doel van 2.600). Met minder dan twee
+    // is er nog geen tempo (computePerformanceFactor blijft op 1 of mengt ernaartoe) en blijft de
+    // prognose bij het doel: dan is er terecht geen "in gevaar", en een test die de anomalie
+    // onvoorwaardelijk eiste stond elke januari en februari rood. De eis volgt daarom de prognose
+    // zelf, en de herkomst-tekst wordt op de factor Doelstelling getoetst, die er op elke klok is.
+    const gerealiseerd = MAAND - 1;
+    const onderDeHelft = (r: Uitkomst) => r !== null && r.forecast.conversions.kpi.adjustedAnnual < 0.5 * r.forecast.conversions.kpi.annualTarget;
 
     const vast = await metKpi({ conversionsAbsolute: 2600 });
     check("2.600 vast ingevoerd: herkomst conversies 'absoluut'", vast?.forecast.doelHerkomst?.conversions.soort === "absoluut", JSON.stringify(vast?.forecast.doelHerkomst));
     check("2.600 vast ingevoerd: omzet zonder doel blijft 'standaard'", vast?.forecast.doelHerkomst?.revenue.soort === "standaard", JSON.stringify(vast?.forecast.doelHerkomst));
-    check("2.600 vast ingevoerd: 'Jaardoel in gevaar', zonder 'geschat' en zonder 'nog geen doel ingevoerd'",
-      gevaar(vast)?.title === "Jaardoel in gevaar" && !/geschat|nog geen doel/.test(gevaar(vast)?.description ?? ""), JSON.stringify(gevaar(vast)));
+    check("2.600 vast ingevoerd: de factor Doelstelling zegt 'van jaardoel', zonder 'geschat' en zonder 'nog geen doel ingevoerd'",
+      /van jaardoel$/.test(doelstelling(vast)) && !/geschat|nog geen doel/.test(doelstelling(vast)), doelstelling(vast));
+    check(`2.600 vast ingevoerd, ${gerealiseerd} gerealiseerde maanden: ${onderDeHelft(vast)
+      ? "'Jaardoel in gevaar', zonder 'geschat' en zonder 'nog geen doel ingevoerd'"
+      : "geen 'Jaardoel in gevaar' zolang de prognose niet onder de helft ligt"}`,
+      onderDeHelft(vast)
+        ? gevaar(vast)?.title === "Jaardoel in gevaar" && !/geschat|nog geen doel/.test(gevaar(vast)?.description ?? "")
+        : gevaar(vast) === undefined,
+      JSON.stringify(gevaar(vast) ?? vast?.forecast.conversions.kpi));
+    // Zodat de eis hierboven niet stilletjes leeg blijft: vanaf twee gerealiseerde maanden op 20
+    // per maand ligt de prognose altijd onder de helft van 2.600, en dan MOET de anomalie er zijn.
+    check("vanaf twee gerealiseerde maanden ligt de prognose onder de helft van het doel",
+      gerealiseerd < 2 || onderDeHelft(vast), String(vast?.forecast.conversions.kpi.adjustedAnnual));
 
     const omzet = await metKpi({ revenueAbsolute: 900000 });
     check("omzetdoel vast ingevoerd: herkomst omzet 'absoluut'", omzet?.forecast.doelHerkomst?.revenue.soort === "absoluut", JSON.stringify(omzet?.forecast.doelHerkomst));
@@ -211,6 +233,7 @@ async function main() {
       const r = await metKpi(kpi);
       check(`${label}: herkomst 'standaard'`, r?.forecast.doelHerkomst?.conversions.soort === "standaard", JSON.stringify(r?.forecast.doelHerkomst));
       check(`${label}: het getal blijft vorig jaar +10% (264)`, r?.forecast.conversions.kpi.annualTarget === 264, String(r?.forecast.conversions.kpi.annualTarget));
+      check(`${label}: de factor Doelstelling zegt 'van geschat jaardoel (vorig jaar +10%)'`, /van geschat jaardoel \(vorig jaar \+10%\)$/.test(doelstelling(r)), doelstelling(r));
     }
   }
 }

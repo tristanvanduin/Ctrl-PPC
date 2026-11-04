@@ -54,7 +54,19 @@ async function main() {
   const { bouwHistorischeData } = await import("./kanaal-maanden");
   type Periode = ReturnType<typeof usePeriod>;
 
-  const juli = { laatsteVolleMaand: "2026-07", partieel: { maand: "2026-08", tmDag: 25, dagenInMaand: 31 }, dataTot: "2026-08-25" };
+  const { today } = await import("../reporting-date");
+  const { addMonths, lastCompleteMonth, formatMonth } = await import("./period-range");
+
+  // Klokonafhankelijk: vensterEindMaand en periodeOpEind lezen today(), dus een stand die vast op
+  // juli 2026 stond lag vanaf januari 2027 in "Vorig jaar" (2026, geklemd op juli, waar de test
+  // 2025 verwachtte) en in februari 2026 in de toekomst (geklemd op de kalender, niet op de data).
+  // Alles hangt daarom aan de laatste volle kalendermaand; de stand ligt daar drie maanden vóór,
+  // zodat de klem die de test ziet van de DATA komt en niet van de kalender.
+  const jaar = Number(today().slice(0, 4));
+  const kalender = lastCompleteMonth();
+  const eind = addMonths(kalender, -3);
+  const dagenIn = (m: string) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
+  const stand = { laatsteVolleMaand: eind, partieel: { maand: addMonths(eind, 1), tmDag: 25, dagenInMaand: dagenIn(addMonths(eind, 1)) }, dataTot: `${addMonths(eind, 1)}-25` };
 
   async function mount(opgeslagen: unknown, dataStand: unknown): Promise<Periode> {
     opslag.clear();
@@ -71,23 +83,24 @@ async function main() {
 
   console.log("[2] [42] Een eigen periode loopt niet voorbij het eind van de data");
   {
-    const p = await mount({ preset: "custom", custom: { start: "2025-11", end: "2026-10" }, comparison: "same_period_last_year" }, juli);
-    check("eindmaand juli: de periode stopt op juli", p.range.start === "2025-11" && p.range.end === "2026-07", JSON.stringify(p.range));
-    check("de vergelijking volgt de geklemde periode", p.compareRange?.start === "2024-11" && p.compareRange?.end === "2025-07", JSON.stringify(p.compareRange));
-    check("de opgeslagen keuze blijft staan (custom t/m oktober)", p.custom?.end === "2026-10" && schrijfacties === 0,
+    // Twaalf maanden t/m de laatste volle kalendermaand: drie maanden voorbij het eind van de data.
+    const p = await mount({ preset: "custom", custom: { start: addMonths(kalender, -11), end: kalender }, comparison: "same_period_last_year" }, stand);
+    check(`eindmaand ${formatMonth(eind)}: de periode stopt daar`, p.range.start === addMonths(kalender, -11) && p.range.end === eind, JSON.stringify(p.range));
+    check("de vergelijking volgt de geklemde periode", p.compareRange?.start === addMonths(kalender, -23) && p.compareRange?.end === addMonths(eind, -12), JSON.stringify(p.compareRange));
+    check(`de opgeslagen keuze blijft staan (custom t/m ${formatMonth(kalender)})`, p.custom?.end === kalender && schrijfacties === 0,
       `${JSON.stringify(p.custom)} schrijfacties=${schrijfacties}`);
 
-    const helemaalErna = await mount({ preset: "custom", custom: { start: "2026-09", end: "2026-10" }, comparison: "none" }, juli);
-    check("begint de periode ook na het eind: alleen de laatste volle maand", helemaalErna.range.start === "2026-07" && helemaalErna.range.end === "2026-07",
+    const helemaalErna = await mount({ preset: "custom", custom: { start: addMonths(eind, 2), end: addMonths(eind, 3) }, comparison: "none" }, stand);
+    check("begint de periode ook na het eind: alleen de laatste volle maand", helemaalErna.range.start === eind && helemaalErna.range.end === eind,
       JSON.stringify(helemaalErna.range));
 
-    const binnen = await mount({ preset: "custom", custom: { start: "2026-01", end: "2026-06" }, comparison: "none" }, juli);
-    check("een periode binnen de data blijft zoals hij is", binnen.range.start === "2026-01" && binnen.range.end === "2026-06", JSON.stringify(binnen.range));
+    const binnen = await mount({ preset: "custom", custom: { start: addMonths(eind, -6), end: addMonths(eind, -1) }, comparison: "none" }, stand);
+    check("een periode binnen de data blijft zoals hij is", binnen.range.start === addMonths(eind, -6) && binnen.range.end === addMonths(eind, -1), JSON.stringify(binnen.range));
 
     // Omgekeerd opgeslagen (zetMaand bewaart "Van" na "Tot en met" zoals hij getypt is): de klem
     // keek alleen naar het eind, en resolvePeriod draaide de grenzen daarna om.
-    const omgekeerd = await mount({ preset: "custom", custom: { start: "2026-10", end: "2026-07" }, comparison: "same_period_last_year" }, juli);
-    check("een omgekeerde eigen periode loopt ook niet voorbij de data", omgekeerd.range.start === "2026-07" && omgekeerd.range.end === "2026-07",
+    const omgekeerd = await mount({ preset: "custom", custom: { start: addMonths(eind, 3), end: eind }, comparison: "same_period_last_year" }, stand);
+    check("een omgekeerde eigen periode loopt ook niet voorbij de data", omgekeerd.range.start === eind && omgekeerd.range.end === eind,
       JSON.stringify(omgekeerd.range));
   }
 
@@ -95,15 +108,17 @@ async function main() {
   {
     // Een kanaal dat vorig kalenderjaar in september stopte (een tab die beschikbaar.ts bewust houdt):
     // "Vorig jaar" was het jaar daarvoor, en "Dit jaar" januari-september van vorig jaar.
-    const { today } = await import("../reporting-date");
-    const jaar = Number(today().slice(0, 4));
     const stopte = { laatsteVolleMaand: `${jaar - 1}-09`, partieel: null, dataTot: `${jaar - 1}-09-30` };
     const vorig = await mount({ preset: "last_year", custom: null, comparison: "none" }, stopte);
     check("vorig jaar: het vorige kalenderjaar, t/m de data", vorig.range.start === `${jaar - 1}-01` && vorig.range.end === `${jaar - 1}-09`, JSON.stringify(vorig.range));
     const dit = await mount({ preset: "this_year", custom: null, comparison: "none" }, stopte);
     check("dit jaar: niet de maanden van vorig jaar", !dit.range.start.startsWith(`${jaar - 1}-01`), JSON.stringify(dit.range));
-    const gewoon = await mount({ preset: "last_year", custom: null, comparison: "none" }, juli);
-    check("met de gewone stand (t/m juli 2026) blijft vorig jaar 2025", gewoon.range.start === "2025-01" && gewoon.range.end === "2025-12", JSON.stringify(gewoon.range));
+    // Met de gewone stand is "Vorig jaar" het vorige KALENDERjaar, t/m de stand als die er nog in
+    // ligt (januari t/m maart: de stand is dan september t/m november van vorig jaar). Volgde de
+    // preset het jaar van de data, dan stond hier in die maanden het jaar daarvóór.
+    const gewoon = await mount({ preset: "last_year", custom: null, comparison: "none" }, stand);
+    const vorigJaarEind = eind < `${jaar - 1}-12` ? eind : `${jaar - 1}-12`;
+    check(`met de gewone stand (t/m ${formatMonth(eind)}) blijft vorig jaar ${jaar - 1}`, gewoon.range.start === `${jaar - 1}-01` && gewoon.range.end === vorigJaarEind, JSON.stringify(gewoon.range));
   }
 
   console.log("[8] De kiezer toont geen kalendervenster zolang de stand laadt");
@@ -132,29 +147,32 @@ async function main() {
 
   console.log("[9] De band noemt een kanaal dat het venster niet tegenhoudt");
   {
+    // De data loopt tot de laatste volle kalendermaand: het jaar ervoor heel, en dit jaar t/m die maand.
+    const [jaarK, maandK] = kalender.split("-").map(Number);
     const maanden = [];
-    for (let m = 1; m <= 10; m++) maanden.push({ year: 2026, month: m, conversions: 10, revenue: 100, adSpend: 50 });
-    for (let m = 1; m <= 12; m++) maanden.push({ year: 2025, month: m, conversions: 10, revenue: 100, adSpend: 50 });
-    const data = bouwHistorischeData("t", maanden, 2026);
-    const stand = {
-      laatsteVolleMaand: "2026-10", partieel: null, dataTot: "2026-10-31",
-      uitgeslotenBronnen: [{ bron: "linkedin", dataTot: "2026-05-15" }],
+    for (let m = 1; m <= maandK; m++) maanden.push({ year: jaarK, month: m, conversions: 10, revenue: 100, adSpend: 50 });
+    for (let m = 1; m <= 12; m++) maanden.push({ year: jaarK - 1, month: m, conversions: 10, revenue: 100, adSpend: 50 });
+    const data = bouwHistorischeData("t", maanden);
+    const totKalender = {
+      laatsteVolleMaand: kalender, partieel: null, dataTot: `${kalender}-${dagenIn(kalender)}`,
+      uitgeslotenBronnen: [{ bron: "linkedin", dataTot: `${addMonths(kalender, -5)}-15` }],
     };
-    const html = renderToStaticMarkup(createElement(PeriodProvider, { scope: "x", dataStand: stand, children: createElement(PeriodSummary, { data }) }));
+    const html = renderToStaticMarkup(createElement(PeriodProvider, { scope: "x", dataStand: totKalender, children: createElement(PeriodSummary, { data }) }));
     const tekst = html.replace(/<[^>]+>/g, " ");
     check("LinkedIn met zijn laatste dag, en dat het daarna als nul telt",
-      tekst.includes("LinkedIn (geen data na 15 mei 2026)") && tekst.includes("als nul"), tekst.slice(-400));
+      tekst.includes(`LinkedIn (geen data na 15 ${formatMonth(addMonths(kalender, -5))})`) && tekst.includes("als nul"), tekst.slice(-400));
 
     // Een kanaal dat al vóór de periode ophield, telt de hele periode als nul: ook noemen.
     opslag.clear();
-    const vroeg = { ...stand, uitgeslotenBronnen: [{ bron: "linkedin", dataTot: "2025-03-20" }] };
+    const vroeg = { ...totKalender, uitgeslotenBronnen: [{ bron: "linkedin", dataTot: `${addMonths(kalender, -19)}-20` }] };
     const html2 = renderToStaticMarkup(createElement(PeriodProvider, { scope: "y", dataStand: vroeg, children: createElement(PeriodSummary, { data }) }));
     check("ook een kanaal dat al vóór de periode ophield wordt genoemd",
-      html2.replace(/<[^>]+>/g, " ").includes("LinkedIn (geen data na 20 maart 2025)"), html2.replace(/<[^>]+>/g, " ").slice(-300));
+      html2.replace(/<[^>]+>/g, " ").includes(`LinkedIn (geen data na 20 ${formatMonth(addMonths(kalender, -19))})`), html2.replace(/<[^>]+>/g, " ").slice(-300));
 
     // Houdt de periode op vóór de maand waarin het kanaal stopt, dan raakt het de cijfers niet. (Met
-    // server-rendering geldt de standaardperiode, t/m oktober; vandaar een kanaal dat in november stopt.)
-    const laat = { ...stand, uitgeslotenBronnen: [{ bron: "linkedin", dataTot: "2026-11-15" }] };
+    // server-rendering geldt de standaardperiode, t/m de laatste volle kalendermaand; vandaar een
+    // kanaal dat in de maand erna stopt.)
+    const laat = { ...totKalender, uitgeslotenBronnen: [{ bron: "linkedin", dataTot: `${addMonths(kalender, 1)}-15` }] };
     const html3 = renderToStaticMarkup(createElement(PeriodProvider, { scope: "w", dataStand: laat, children: createElement(PeriodSummary, { data }) }));
     check("stopt het kanaal pas na het eind van de periode, dan staat er niets", !html3.includes("geen data na"), html3.replace(/<[^>]+>/g, " ").slice(-300));
   }
