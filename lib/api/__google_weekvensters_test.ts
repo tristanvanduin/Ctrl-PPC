@@ -118,8 +118,10 @@ console.log("De sync (lib/sync/orchestrator.ts)");
     check("de eerste weekrij is de hele week van 1 oktober", rijen[0]?.date === "2025-09-29" && rijen[0].conversions === 7, JSON.stringify(rijen[0]));
   }
   const orch = readFileSync(join(import.meta.dirname, "..", "sync", "orchestrator.ts"), "utf8");
+  // Met convActionIds als vijfde argument: de weekvraag draagt dezelfde conversieselectie als de
+  // maandvraag (gedrag: lib/sync/__weeksync_conversieselectie_test.ts).
   check("de sync vraagt de weken vanaf maandagVanWeek(startDate)",
-    /getAccountMetricsByWeek\(credentials,\s*customerId,\s*maandagVanWeek\(startDate\),\s*endDate\)/.test(orch));
+    /getAccountMetricsByWeek\(credentials,\s*customerId,\s*maandagVanWeek\(startDate\),\s*endDate,\s*convActionIds\)/.test(orch));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

@@ -428,7 +428,10 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
       getAccountMetricsByMonth(credentials, customerId, startDate, endDate, convActionIds),
       // Vanaf de maandag van de week waarin het venster begint: die week kwam afgekapt terug en
       // overschreef de hele week die een eerdere run had geschreven (zie maandagVanWeek).
-      getAccountMetricsByWeek(credentials, customerId, maandagVanWeek(startDate), endDate),
+      // Met dezelfde conversieselectie als de maandvraag hierboven: zonder die telde
+      // ads_account_weekly alle conversieacties terwijl ads_account_monthly uit dezelfde run alleen
+      // de aangevinkte telde, en lazen de weekroutes en de forecast meer conversies dan de maand.
+      getAccountMetricsByWeek(credentials, customerId, maandagVanWeek(startDate), endDate, convActionIds),
       getCampaignMetricsByMonth(credentials, customerId, startDate, endDate, convActionIds),
       getCampaignImpressionShareByMonth(credentials, customerId, startDate, endDate),
       getAdGroupPerformanceByMonth(credentials, customerId, startDate, endDate),
