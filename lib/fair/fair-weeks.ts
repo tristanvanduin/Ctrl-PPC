@@ -402,6 +402,53 @@ export interface VerhoudingReeksen {
   noemer: WeeklyPoint[];
 }
 
+/** Wat toFairWeeks van een maandpunt nodig heeft (ForecastPoint past). */
+export interface MaandPunt {
+  month: number;
+  expected: number;
+  realized: number | null;
+  forecast: number | null;
+}
+
+function dagenInMaand(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * Een prognosemaand over zijn maandagweken, naar DAGEN: elke dag van de week draagt het dagtempo
+ * van de maand waarin hij valt (maandwaarde gedeeld door de dagen van die maand). Een week die
+ * over de maandgrens loopt (26 oktober t/m 1 november) krijgt zes dagen oktober en één dag
+ * november; een dag buiten het jaar, of in een maand zonder prognose, telt op het tempo van de
+ * maand van de maandag.
+ *
+ * Gelijk over de maandagen was het niet: oktober 2026 heeft vier maandagen en november vijf, dus
+ * dezelfde maandprognose (182) werd 45 per week in oktober en 36 in november, en bij emmers die
+ * niet tot de maand optelden (vijf weekemmers van 42 in oktober, vier in november) zelfs 52 tegen
+ * 34. Op de Meta-tab stond zo "Vorige week 52, Deze week 34" bij een tempo dat niet verandert, en
+ * op "Alle kanalen" 116 tegen 90 bij maanden die 3% verschillen. Een week is zeven dagen; wat ze
+ * waard is hangt af van de maand waar die dagen in liggen, niet van hoeveel maandagen die maand
+ * toevallig heeft.
+ */
+function verdeelNaarDagen(year: number, month: number, n: number, waarde: (m: number) => number | null): number[] {
+  const eigen = (waarde(month) ?? 0) / dagenInMaand(year, month);
+  const tempo = (m: number): number => {
+    const w = waarde(m);
+    return w === null ? eigen : w / dagenInMaand(year, m);
+  };
+  const uit: number[] = [];
+  for (let i = 1; i <= n; i++) {
+    const start = parseISO(nthMondayOfMonth(year, month, i) ?? "");
+    if (start === null) { uit.push(Math.round(eigen * 7)); continue; }
+    let som = 0;
+    for (let d = 0; d < 7; d++) {
+      const dag = new Date(start + d * DAG_MS);
+      som += dag.getUTCFullYear() === year ? tempo(dag.getUTCMonth() + 1) : eigen;
+    }
+    uit.push(Math.round(som));
+  }
+  return uit;
+}
+
 /**
  * De verhouding van één maand uit de som van zijn tellers en de som van zijn noemers.
  *
@@ -450,15 +497,24 @@ function maandVerhouding(r: VerhoudingReeksen, month: number): { expected: numbe
  * maand de verhouding van de maand (maandVerhouding). Een herverdeelde week is alleen gerealiseerd
  * als de hele maand dat was: anders zou een toekomstige week het etiket "gerealiseerd" lenen van
  * een week die al voorbij is.
+ *
+ * Met `maanden` (de maandpunten van dezelfde reeks) krijgt een PROGNOSEMAAND van een optelbare
+ * metric zijn weken niet uit de emmers maar uit de maandprognose, naar dagen (verdeelNaarDagen):
+ * de emmers van computeForecast tellen zonder doel niet op tot de maand (elke emmer het weektempo,
+ * vijf of vier emmers per maand tegen een maandtempo van 52/12 weken), en gelijk over de maandagen
+ * hangt het weekgetal af van het aantal maandagen. De maandtabel blijft zo leidend en de weken
+ * eromheen zijn zeven dagen op het tempo van hun maand. Gerealiseerde maanden houden hun emmers:
+ * dat zijn gemeten weken.
  */
 export function toFairWeeks(
   points: WeeklyPoint[],
   year: number,
   fairDate: string,
-  opts: { additief?: boolean; verhouding?: VerhoudingReeksen } = {},
+  opts: { additief?: boolean; verhouding?: VerhoudingReeksen; maanden?: readonly MaandPunt[] } = {},
 ): FairWeek[] {
   const additief = opts.additief ?? true;
   const verhouding = additief ? undefined : opts.verhouding;
+  const maandPunt = (m: number): MaandPunt | undefined => opts.maanden?.find((p) => p.month === m);
   const perMaand = new Map<number, WeeklyPoint[]>();
   for (const p of points) {
     if (!Number.isInteger(p.month) || p.month < 1 || p.month > 12) continue;
@@ -485,10 +541,17 @@ export function toFairWeeks(
     // realized EN forecast null. Herverdeeld werd dat "prognose 0" per week: een gemeten nul in
     // een maand waarin niets gemeten is. Dan blijft de week leeg, net als bij passende emmers.
     const geenWaarde = statusPts.every((p) => p.realized === null && p.forecast === null);
+    // Een prognosemaand (geen enkele gemeten emmer) van een optelbare metric met maandpunten: naar
+    // dagen uit de maandprognose, ook als de emmers passen (zie de kop).
+    const punt = maandPunt(month);
+    const opDagen = additief && punt !== undefined && punt.forecast !== null
+      && pts.every((p) => p.realized === null) && pts.some((p) => p.forecast !== null);
     // Alleen het getal komt uit de maandtellers.
     const maand = passend || !verhouding ? null : maandVerhouding(verhouding, month);
     const elkeWeek = <T,>(v: T) => Array.from({ length: n }, () => v);
-    const expected = passend ? null : maand ? elkeWeek(maand.expected) : verdeelMaand(pts.map((q) => q.expected), n, additief);
+    const expected = opDagen
+      ? verdeelNaarDagen(year, month, n, (m) => maandPunt(m)?.expected ?? null)
+      : passend ? null : maand ? elkeWeek(maand.expected) : verdeelMaand(pts.map((q) => q.expected), n, additief);
     // Zonder noemer geen waarde (een streepje), zoals de maandkaart; gerealiseerd met alleen een
     // teller krijgt de vlag. Een prognose zonder noemer ook geen waarde: deriveForecast geeft daar
     // sinds de stopregel (nul kosten op nul conversies) null, geen CPA van € 0.
@@ -499,15 +562,22 @@ export function toFairWeeks(
     // Dezelfde vlag voor een prognosemaand: kosten verwacht en geen conversie. Anders heette die
     // week "Geen data" terwijl de maandkaart "Geen conversies verwacht" zegt.
     const geenNoemerPrognose = !passend && !alleGerealiseerd && !geenWaarde && maand !== null && maand.geenNoemer;
-    const forecast = passend || alleGerealiseerd || geenWaarde
-      ? null
-      : maand ? elkeWeek(maand.waarde) : verdeelMaand(pts.map((q) => q.realized ?? q.forecast ?? 0), n, additief);
+    const forecast = opDagen
+      ? verdeelNaarDagen(year, month, n, (m) => {
+        // Een andere maand telt alleen mee als die ook een prognose is; een gemeten maand of een
+        // maand zonder punt valt terug op het tempo van deze maand.
+        const q = maandPunt(m);
+        return q === undefined || q.realized !== null ? null : q.forecast;
+      })
+      : passend || alleGerealiseerd || geenWaarde
+        ? null
+        : maand ? elkeWeek(maand.waarde) : verdeelMaand(pts.map((q) => q.realized ?? q.forecast ?? 0), n, additief);
 
     for (let i = 1; i <= n; i++) {
       const weekStart = nthMondayOfMonth(year, month, i);
       const weeksOut = weekStart == null ? null : weeksToFair(fairDate, weekStart);
       if (weekStart == null || weeksOut == null) continue;
-      const p = passend ? pts[i - 1] : null;
+      const p = passend && !opDagen ? pts[i - 1] : null;
       weken.push({
         weeksOut,
         label: fairWeekLabel(weeksOut),

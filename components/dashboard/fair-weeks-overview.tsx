@@ -42,7 +42,9 @@ export function beursWekenVan(forecast: ClientForecast, metric: ForecastMetric, 
     : metric === "cpa"
       ? { teller: forecast.adSpend.weeklyPoints, noemer: forecast.conversions.weeklyPoints }
       : undefined;
-  return toFairWeeks(forecast[metric].weeklyPoints, jaar, fairDate, { additief: isOptelbaar(metric), verhouding });
+  // De maandpunten erbij: een prognosemaand van conversies, omzet of kosten gaat naar dagen uit de
+  // maandprognose, niet uit emmers die er niet toe optellen (zie toFairWeeks).
+  return toFairWeeks(forecast[metric].weeklyPoints, jaar, fairDate, { additief: isOptelbaar(metric), verhouding, maanden: forecast[metric].points });
 }
 
 function WeekCard({

@@ -918,8 +918,21 @@ function forecastCoreMetric(
         ? historieMetWaarde.reduce((s, v) => s + v, 0) / historieMetWaarde.length
         : 0;
 
-    const monthlyExpected = rawExpected.map((v) => {
+    // Een TERUGKEREND gat blijft leeg: een maand die in elk historisch jaar met data (twee of meer)
+    // niets had, en waarin het kanaal dit jaar ook niets deed, is geen gat in de data maar een
+    // seizoen. De vulling met het gemiddelde gaf een zomerkanaal (april-september, twee jaar lang)
+    // zodra zijn seizoen gerealiseerd was oktober-december 100 per maand: 900 voor een kanaal dat
+    // 600 doet, op "Alle kanalen" én op zijn tab. Vóór de start van het seizoen ging het goed omdat
+    // er nog niets gerealiseerd was om mee te vullen. Met één historisch jaar niet: dan is een lege
+    // maand net zo goed "het kanaal bestond nog niet" (de herstart in april hierboven), en vult de
+    // doelOpJaarbasis-regel hem terecht. Loopt het kanaal dit jaar wél in zo'n maand, dan volgt het
+    // zijn seizoen niet meer en wordt er gewoon gevuld.
+    const jarenMetData = historicalYears.filter((y) => y.some((r) => r[metric] > 0));
+    const terugkerendGat = (m: number) => jarenMetData.length >= 2 && jarenMetData.every((y) => monthValue(y, m, metric) <= 0);
+    const seizoenIntact = data2026.every((r, i) => r === null || r[metric] <= 0 || !terugkerendGat(i));
+    const monthlyExpected = rawExpected.map((v, i) => {
       if (v > 0) return v;
+      if (seizoenIntact && terugkerendGat(i)) return 0;
       return Math.round(ytdMonthlyAvg);
     });
 
@@ -1025,6 +1038,24 @@ function forecastCoreMetric(
       const maand = `${data.currentYear}-${String(laatste + 1).padStart(2, "0")}`;
       if (data.eersteDag?.slice(0, 7) === maand) dagen -= Number(data.eersteDag.slice(8, 10)) - 1;
       weekTempo = dagen > 0 ? ((realized[laatste] ?? 0) / dagen) * 7 : 0;
+    }
+    // Terug na een pauze NÁ de grens: de eerste dag van de huidige loop ligt in de partiële maand
+    // (of later), dus de laatste gerealiseerde maand is een gemeten nul en de dagcorrectie
+    // hierboven grijpt niet. Dat gaf een tempo van nul voor een kanaal dat weer loopt: Meta dat na
+    // april t/m juli stillag en op 20 augustus terugkwam, kreeg augustus-december 0 en een
+    // jaarprognose gelijk aan de YTD. De partiële maand zelf zit niet in data2026, dus het tempo
+    // komt van de laatste maand MET levering vóór de pauze: het beste wat er over dit kanaal bekend
+    // is tot de maand erna gemeten is.
+    if (weekTempo === 0 && laatste >= 0 && data.eersteDag) {
+      const start = data.eersteDag.slice(0, 7);
+      const naGrens = Number(start.slice(0, 4)) === data.currentYear && Number(start.slice(5, 7)) - 1 > laatste;
+      for (let j = laatste; naGrens && j >= 0; j--) {
+        const v = realized[j] ?? 0;
+        if (v > 0) {
+          weekTempo = (v / new Date(Date.UTC(data.currentYear, j + 1, 0)).getUTCDate()) * 7;
+          break;
+        }
+      }
     }
   }
   // 52 weken op 12 maanden: een maand is gemiddeld 4,33 week. Niet 4, want dan zou de

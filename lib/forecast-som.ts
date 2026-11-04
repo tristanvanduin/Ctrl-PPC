@@ -15,8 +15,9 @@
 //   verdubbeling in juli middelde weg.
 //
 // Samen: conversies en omzet ~9% te hoog, spend ~10% te laag, en de ROAS-kaart stond op +9% boven
-// het doel waar -10% eronder hoort. De factor lag bovendien tegen de klem van 3,0 aan, zodat een
-// ander doel stil een andere prognose gaf.
+// het doel waar -10% eronder hoort. Met het Google-only standaarddoel van de oude route (1.474) lag
+// de factor bovendien tegen de klem van 3,0 aan; met het opgeslagen doel (2.600) niet, dus de
+// doelafhankelijkheid was een randgeval, de kanaalmix in de factor niet.
 //
 // Per kanaal heeft elk zijn eigen historie, zijn eigen doel en (zonder vorig jaar) zijn eigen
 // tempo -- wat de kanaaltabs al doen. De som hangt dan niet af van het blended doel: dat schaalt
@@ -212,9 +213,9 @@ function somKern(
 
   // De weekprognose van een kanaal: zijn maandprognose GELIJK over de weken van die maand. Zonder
   // doel geeft computeForecast elke emmer het weektempo en de maand het tempo x 52/12; opgeteld
-  // telde een maand met vijf emmers dan 5 weken en een met vier er 4. Op de demo (Meta en LinkedIn
-  // zonder doel) toonde de beursstrip oktober 129 per week en november 85, waar de tabel ernaast
-  // 465 en 452 zei.
+  // telde een maand met vijf emmers dan 5 weken en een met vier er 4. In een tussenstand tijdens
+  // de bouw (nooit gecommit) toonde de beursstrip op de demo oktober 129 per week en november 85,
+  // waar de tabel ernaast 465 en 452 zei; op 05659e3 stond er 55 uit de oude route.
   //
   // Gelijk, en niet op de weekvorm van het kanaal: elk kanaal komt met `weekly: []` binnen, dus die
   // vorm is generateEvenWeeks, per week afgerond met de rest in de laatste week. Dat is geen
@@ -376,7 +377,16 @@ export function kanaalGestopt(
   const tot = met.filter((i) => i <= laatste);
   if (tot.length === 0) return true;
   const laatsteData = Math.max(...tot);
-  for (let i = laatsteData + 1; i <= laatste; i++) if (met.includes(i - 12)) return true;
+  // Het gat van dit jaar tegen het seizoensgat van vorig jaar op dezelfde plek, met één maand
+  // speling. Hier stond: elke gatmaand waarin het kanaal vorig jaar wél liep is een stop. Dat
+  // maakte van een seizoen dat één maand eerder eindigde (oktober-maart vorig jaar, oktober-
+  // februari dit jaar) een gestopt kanaal: maart was zo'n maand, en het komende seizoen werd nul
+  // op "Alle kanalen" en op de tab, terwijl hetzelfde seizoen dat t/m maart of april liep zijn
+  // najaar wél kreeg. Liep het kanaal vorig jaar op deze plek gewoon door (geen gat), dan is elk
+  // gat nu een stop; is het gat nu langer dan het seizoensgat van toen plus één maand, ook.
+  const gat = laatste - laatsteData;
+  const vorigGat = seizoensGatVorigJaar(met, laatsteData + 1 - 12, laatste);
+  if (vorigGat === 0 || (vorigGat !== null && gat > vorigGat + 1)) return true;
   // Alleen een pauze als het kanaal vorig jaar vóór die maanden al liep. Een gat van vóór zijn
   // start ("vorig jaar ook leeg" omdat hij er nog niet was) zegt niets over een seizoen: anders werd
   // een kanaal dat vorig najaar begon en in het voorjaar stopte een pauze, en kreeg hij op "Alle
@@ -393,6 +403,32 @@ export function kanaalGestopt(
   const seizoensPauze = met.some((i) => i <= laatsteData - 12 && i > laatsteData - 15)
     && met.some((i) => i > laatste - 12 && i <= monthIndex(`${jaar - 1}-12`));
   return !seizoensPauze;
+}
+
+/**
+ * Hoe lang het gat van vorig jaar was op de plek waar het gat van dit jaar begint (`s`: dezelfde
+ * maand vorig jaar als de eerste lege maand van nu), in maanden.
+ *
+ * - Liep het kanaal in `s`, dan de eerste lege maand in de twaalf maanden erna (niet voorbij de
+ *   grens van nu). Geen lege maand: 0, vorig jaar liep het hier door.
+ * - Ligt het gat vóór de eerste maand met data ooit, dan null: dat zegt niets over een seizoen
+ *   (het kanaal bestond nog niet); kanaalGestopt laat dan de seizoensPauze-regel beslissen.
+ * - Anders de lengte van de aaneengesloten lege reeks waar die maand in valt, ook de lege maanden
+ *   ervoor, tot de eerstvolgende maand met data (hooguit t/m de grens van nu).
+ */
+function seizoensGatVorigJaar(met: readonly number[], s: number, laatste: number): number | null {
+  const eerste = Math.min(...met);
+  let start = s;
+  if (met.includes(start)) {
+    start = -1;
+    for (let i = s + 1; i <= Math.min(s + 11, laatste - 1); i++) if (!met.includes(i)) { start = i; break; }
+    if (start < 0) return 0;
+  }
+  if (start < eerste) return null;
+  while (start - 1 >= eerste && !met.includes(start - 1)) start -= 1;
+  let eind = start;
+  while (eind + 1 <= laatste && !met.includes(eind + 1)) eind += 1;
+  return eind - start + 1;
 }
 
 /**

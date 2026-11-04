@@ -398,6 +398,28 @@ if (typeof blendedForecastUitKanalen === "function") {
   ] as const) {
     check(`seizoen ${label}: op grens 10 een pauze`, som.kanaalGestopt(reeks("microsoft", "2023-11", [...r]).maanden, 2026, 10) === false);
   }
+  // En ook als het seizoen EERDER eindigt dan vorig jaar. Oktober-maart in 2024/25, dit jaar
+  // oktober-februari: op grens 8 was maart een gatmaand waarin het kanaal vorig jaar wél liep, en
+  // dat las als gestopt: het komende seizoen werd nul op "Alle kanalen" en op de tab, terwijl
+  // hetzelfde seizoen dat t/m maart of april liep zijn najaar kreeg. Het gat van nu (maart-augustus,
+  // zes maanden) is niet langer dan het seizoensgat van vorig jaar (april-september, zes) plus één:
+  // een pauze. Twee maanden eerder uit (t/m januari, gat zeven) nog net; drie (t/m december, gat
+  // acht) is een stop, net als een gat dat langer duurt dan vorig jaar überhaupt leeg was.
+  const winter = (tot: string) => reeks("linkedin", "2024-10", [...rijen("2024-10", "2025-03", 60), ...rijen("2025-10", tot, 60)]);
+  check("seizoen oktober-maart, dit jaar t/m februari: op grens 8 een pauze", som.kanaalGestopt(winter("2026-02").maanden, 2026, 8) === false);
+  check("seizoen oktober-maart, dit jaar t/m januari: op grens 8 een pauze", som.kanaalGestopt(winter("2026-01").maanden, 2026, 8) === false);
+  check("seizoen oktober-maart, dit jaar t/m december: op grens 8 gestopt", som.kanaalGestopt(winter("2025-12").maanden, 2026, 8) === true);
+  check("seizoen oktober-maart, dit jaar t/m februari, en in oktober nog niets: op grens 10 gestopt", som.kanaalGestopt(winter("2026-02").maanden, 2026, 10) === true);
+  {
+    const g11 = vlak("google", "2024-10", "2026-08", 100);
+    const w = winter("2026-02");
+    const f = blendedForecastUitKanalen("t", [g11, w], optelling([g11, w], 2026, 8), 8);
+    check("seizoen t/m februari: oktober-december 100 + 60, september alleen Google", JSON.stringify(jaarDeel(f, 8)) === JSON.stringify([100, 160, 160, 160]), JSON.stringify(jaarDeel(f, 8)));
+  }
+  // Een maand vakantie vorig jaar (augustus) is geen seizoensgat waar een stop van vijf maanden in
+  // past: heel 2025 gelopen behalve augustus, gestopt na maart 2026, op grens 8 gestopt.
+  const vakantie = reeks("linkedin", "2025-01", [...rijen("2025-01", "2025-07", 60), ...rijen("2025-09", "2026-03", 60)]);
+  check("een maand vakantie vorig jaar: een gat van vijf maanden is een stop", som.kanaalGestopt(vakantie.maanden, 2026, 8) === true);
 
   // Een herstart na een oude historie is een deeljaar. Microsoft liep 80 per maand in 2023 en tot
   // maart 2024, lag stil, en draait sinds oktober (of december) 2025 weer. `vanaf` is de eerste
@@ -457,6 +479,19 @@ if (typeof blendedForecastUitKanalen === "function") {
     const terug: BlendedKanaalReeks = { ...reeks("meta", "2026-01", [...rijen("2026-01", "2026-03", 100), ["2026-07", 1200 / 31, 3870, 387], ["2026-08", 81, 8100, 810]]), eersteDag: loop };
     const f = blendedForecastUitKanalen("t", [g10, terug], optelling([g10, terug], 2026, 7), 7);
     check("terug op 20 juli: augustus-december 100 + Meta op zijn tempo (~98)", jaarDeel(f, 7).every((v) => v !== null && v >= 195 && v <= 201), JSON.stringify(jaarDeel(f, 7)));
+
+    // Terug ná de grens: Meta liep januari-maart (100 per maand), lag april t/m juli stil en kwam
+    // op 20 augustus terug, de grens is juli. Het tempo kwam uit juli (een gemeten nul) en de
+    // dagcorrectie greep niet (de eerste dag ligt niet in juli): augustus-december 0 voor een kanaal
+    // dat weer loopt, de jaarprognose gelijk aan de YTD. Nu het tempo van de laatste maand MET
+    // levering, maart: 100 / 31 x 7 x 52 / 12 = 98.
+    const terugNaGrens: BlendedKanaalReeks = { ...reeks("meta", "2026-01", [...rijen("2026-01", "2026-03", 100), ["2026-08", 40, 4000, 400]]), eersteDag: "2026-08-20" };
+    const fNa = blendedForecastUitKanalen("t", [g10, terugNaGrens], optelling([g10, terugNaGrens], 2026, 7), 7);
+    check("terug op 20 augustus (na de grens): augustus-december 100 + Meta op het tempo van maart (98)", jaarDeel(fNa, 7).every((v) => v === 198), JSON.stringify(jaarDeel(fNa, 7)));
+    check("en niet gestopt: augustus heeft data", som.kanaalGestopt(terugNaGrens.maanden, 2026, 7) === false);
+    // Zonder eerste dag blijft het een gemeten nul: er is niets dat zegt dat het kanaal terug is.
+    const fZonder = blendedForecastUitKanalen("t", [g10, { ...terugNaGrens, eersteDag: null }], optelling([g10, terugNaGrens], 2026, 7), 7);
+    check("zonder eerste dag: alleen Google", jaarDeel(fZonder, 7).every((v) => v === 100), JSON.stringify(jaarDeel(fZonder, 7)));
   }
   check("heel vorig jaar gelopen: vorig jaar + 10% (1.056)", heelJaar.targetCurrentYear.conversions === 1056 && heelJaar.doelOpJaarbasis === undefined,
     `${heelJaar.targetCurrentYear.conversions} ${heelJaar.doelOpJaarbasis}`);
@@ -509,11 +544,19 @@ console.log("Een seizoenskanaal (april-september) op \"Alle kanalen\" en op zijn
   const lijn = (f: ClientForecast) => f.conversions.points.map((p) => p.realized ?? p.forecast ?? 0);
   const zomer = (m: number) => m >= 4 && m <= 9;
 
+  // Ook MET gerealiseerde seizoensmaanden (grens 5, 7 en 9): de gatvulling in forecastCoreMetric
+  // vulde oktober-december dan met het gemiddelde van april-juli (100 per maand: 900 voor een
+  // kanaal dat 600 doet, op "Alle kanalen" en op de tab). Een maand die in elk historisch jaar leeg
+  // was en dit jaar ook, is een seizoen, geen gat.
   for (const [label, start, vandaag, rtm] of [
     ["april-september sinds 2024, in januari", "2024-04-01", "2026-01-05", 0],
     ["april-september sinds 2024, in april", "2024-04-01", "2026-04-02", 3],
+    ["april-september sinds 2024, in juni", "2024-04-01", "2026-06-02", 5],
+    ["april-september sinds 2024, in augustus", "2024-04-01", "2026-08-02", 7],
+    ["april-september sinds 2024, in oktober", "2024-04-01", "2026-10-02", 9],
     ["eerste seizoen juni-september 2024, in januari", "2024-06-01", "2026-01-05", 0],
     ["eerste seizoen juni-september 2024, in april", "2024-06-01", "2026-04-02", 3],
+    ["eerste seizoen juni-september 2024, in augustus", "2024-06-01", "2026-08-02", 7],
   ] as const) {
     const eind = addDays(`2026-${String(rtm + 1).padStart(2, "0")}-01`, -1);
     const gRijen = dagRijen("2024-01-01", eind, 100, () => true);
@@ -529,6 +572,32 @@ console.log("Een seizoenskanaal (april-september) op \"Alle kanalen\" en op zijn
     const tabLijn = tab ? lijn(tab.forecast).map((x) => Math.round(x)) : [];
     check(`${label}: geen prognose in januari-maart en oktober-december`, [0, 1, 2, 9, 10, 11].every((i) => deel[i] === 0), JSON.stringify(deel));
     check(`${label}: het deel op "Alle kanalen" is de tab`, JSON.stringify(deel) === JSON.stringify(tabLijn), `${JSON.stringify(deel)} / ${JSON.stringify(tabLijn)}`);
+    check(`${label}: het seizoen zelf wordt wel geprojecteerd (april-september samen ~600-660)`,
+      [3, 4, 5, 6, 7, 8].reduce((s, i) => s + deel[i], 0) >= 590 && [3, 4, 5, 6, 7, 8].reduce((s, i) => s + deel[i], 0) <= 670, JSON.stringify(deel));
+  }
+  // Loopt het kanaal dit jaar WEL in zo'n maand, dan volgt het zijn seizoen niet meer en wordt er
+  // gewoon gevuld: april-september in 2024 en 2025, dit jaar ook januari-maart gelopen.
+  {
+    const eind = "2026-07-31";
+    const google = alsReeks("google", dagRijen("2024-01-01", eind, 100, () => true));
+    const breed = alsReeks("linkedin", [...dagRijen("2024-01-01", "2025-12-31", 100, zomer), ...dagRijen("2026-01-01", eind, 100, () => true)]);
+    const met = blendedForecastUitKanalen!("t", [google, breed], optellingVan([google, breed], 2026, 7), 7);
+    const zonder = blendedForecastUitKanalen!("t", [google], optellingVan([google], 2026, 7), 7);
+    const deel = lijn(met).map((x, i) => Math.round(x - lijn(zonder)[i]));
+    check("seizoenskanaal dat dit jaar jaarrond loopt: oktober-december krijgen wel een prognose", [9, 10, 11].every((i) => deel[i] > 0), JSON.stringify(deel));
+  }
+  // De kanaaltab: terug na een pauze ná de grens. Eén conversie per dag januari-maart, niets april-
+  // juli, terug op 20 augustus; de grens (dataTot 25 augustus) is juli. De tab gaf augustus-december
+  // 0 en een jaarprognose gelijk aan de YTD; nu het tempo van maart: 31 / 31 x 7 x 52 / 12 = 30.
+  {
+    const rijen = [...dagRijen("2026-01-01", "2026-03-31", 31, () => true), ...dagRijen("2026-08-20", "2026-08-25", 31, () => true)];
+    const tab = buildChannelForecast("t", rijen, [], "meta_ads", "2026-09-02", "2026-08-25");
+    const prognose = tab ? tab.forecast.conversions.points.slice(7).map((p) => p.forecast) : [];
+    check("tab, terug op 20 augustus na een pauze: augustus-december op het tempo van maart (30)", prognose.every((v) => v === 30), JSON.stringify(prognose));
+    // dagRijen geeft elke maand 31 (ook februari), dus de YTD is 93.
+    const k = tab?.forecast.conversions.kpi;
+    check("tab, terug op 20 augustus: de jaarprognose is YTD plus vijf maanden tempo", k !== undefined && dicht(k.ytdRealized, 93, 1e-6) && dicht(k.adjustedAnnual, k.ytdRealized + 5 * 30, 1e-6),
+      `${k?.adjustedAnnual} / ytd ${k?.ytdRealized}`);
   }
 
   // De herstartregel blijft voor wat hij bedoeld was. Een seizoenskanaal (oktober-december 2024 en

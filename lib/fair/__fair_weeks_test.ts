@@ -104,6 +104,53 @@ const metDubbel = toFairWeeks([wp(2, 5), wp(3, 1)], 2026, "2026-09-02");
 assert(new Set(metDubbel.map((w) => w.weekStart)).size === metDubbel.length, "geen enkele maandag komt twee keer voor");
 assert(metDubbel.length === 4 + 5, "februari 2026 krijgt zijn vier maandagen, maart zijn vijf");
 
+// ── Prognosemaanden naar dagen, uit de maandpunten ──
+// Zonder doel geeft computeForecast elke weekemmer het weektempo (42) en elke maand het tempo
+// x 52/12 (182): oktober 2026 vijf emmers (210) op vier maandagen, november vier (168) op vijf.
+// Gelijk over de maandagen verdeeld werd dat 52 per week in oktober en 34 in november, bij een
+// tempo dat niet verandert; op de Meta-tab stond "Vorige week 52, Deze week 34". Met de
+// maandpunten erbij gaat de maandprognose naar dagen: elke week zeven dagen op het tempo van de
+// maand waarin die dagen vallen.
+{
+  const prognose = (month: number, n: number, v: number) =>
+    Array.from({ length: n }, (_, i) => wp(month, i + 1, { expected: 0, forecast: v }));
+  const maanden = (per: Record<number, number>) =>
+    Object.entries(per).map(([m, v]) => ({ month: Number(m), expected: Math.round(v * 0.9), realized: null, forecast: v }));
+  const emmers = [...prognose(10, 5, 42), ...prognose(11, 4, 42), ...prognose(12, 5, 42)];
+  const vlak = toFairWeeks(emmers, 2026, "2026-11-04", { maanden: maanden({ 10: 182, 11: 182, 12: 182 }) });
+  const w = vlak.map((x) => x.forecast ?? NaN);
+  assert(vlak.length === 4 + 5 + 4, "oktober vier, november vijf, december vier maandagen");
+  assert(w.every((v) => v >= 41 && v <= 43), `een vlak tempo blijft vlak over de maandgrens (${w.join(" ")})`);
+  assert(w.every((v, i) => i === 0 || Math.abs(v - w[i - 1]) <= 1), "geen sprong tussen twee weken");
+  // Opgeteld: de dagen van 5 oktober t/m 3 januari (de week van 28 december loopt het jaar uit op
+  // het tempo van december): 27 x 182/31 + 182 + 182 + 3 x 182/31 = 540, op afronding per week na.
+  const som = w.reduce((s, v) => s + v, 0);
+  assert(Math.abs(som - 540) <= 7, `de weken tellen op tot hun dagen (${som})`);
+  assert(vlak.every((x) => x.realized === null), "een prognosemaand heeft geen gerealiseerde weken");
+  const verwacht = vlak.map((x) => x.expected);
+  assert(verwacht.every((v) => v >= 36 && v <= 38), `de verwachting per week gaat ook naar dagen (${verwacht.join(" ")})`);
+
+  // "Alle kanalen": emmers die wél optellen tot de maand (466 over vijf, 451 over vier), maar vier
+  // tegen vijf maandagen gaf 116 tegen 90 bij maanden die 3% verschillen.
+  const samen = toFairWeeks([...prognose(10, 5, 93), ...prognose(11, 4, 113)], 2026, "2026-11-04", { maanden: maanden({ 10: 466, 11: 451 }) });
+  const ws = samen.map((x) => x.forecast ?? NaN);
+  assert(Math.max(...ws) - Math.min(...ws) <= 2, `maanden die 3% verschillen geven weken die hooguit 2 verschillen (${ws.join(" ")})`);
+
+  // Een gerealiseerde maand houdt zijn emmers: dat zijn gemeten weken, ook met maandpunten erbij.
+  const gemeten = [wp(7, 1, { realized: 120, forecast: null }), wp(7, 2, { realized: 80, forecast: null }), wp(7, 3, { realized: 90, forecast: null }), wp(7, 4, { realized: 110, forecast: null })];
+  const juli = toFairWeeks(gemeten, 2026, "2026-09-02", { maanden: [{ month: 7, expected: 400, realized: 400, forecast: null }] });
+  assert(juli.map((x) => x.realized).join(",") === "120,80,90,110", "gerealiseerde emmers blijven per maandag staan");
+  // Zonder maandpunt voor de maand: zoals voorheen (de emmersom over de maandagen).
+  const zonderPunt = toFairWeeks(prognose(10, 5, 42), 2026, "2026-11-04", { maanden: [] });
+  assert(zonderPunt.map((x) => x.forecast).join(",") === "53,52,53,52", "zonder maandpunt de oude verdeling van de emmersom");
+  // Een verhouding (ROAS, CPA) laat de maandpunten links liggen: die weken dragen de verhouding.
+  const cpaPts = [wp(10, 1, { forecast: 50 }), wp(10, 2, { forecast: 50 }), wp(10, 3, { forecast: 50 }), wp(10, 4, { forecast: 50 }), wp(10, 5, { forecast: 50 })];
+  const verhouding = { teller: prognose(10, 5, 100), noemer: prognose(10, 5, 2) };
+  const metPunt = toFairWeeks(cpaPts, 2026, "2026-11-04", { additief: false, verhouding, maanden: maanden({ 10: 50 }) });
+  const zonder = toFairWeeks(cpaPts, 2026, "2026-11-04", { additief: false, verhouding });
+  assert(JSON.stringify(metPunt) === JSON.stringify(zonder), "een verhouding verandert niet door de maandpunten");
+}
+
 // ── Het ankerpunt "nu" ──
 assert(currentWeekIndex(weken, "2026-07-22") === 2, "vandaag valt in de week die op of voor vandaag begon");
 assert(currentWeekIndex(weken, "2026-07-06") === 0, "op de maandag zelf is dat die week");
