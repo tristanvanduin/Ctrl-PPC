@@ -186,9 +186,7 @@ export function SyncStatusBadge({ clientId, onSyncComplete, kanalen = null }: Pr
     }
   }
 
-  const config = STATUS_CONFIG[status.freshnessStatus];
   const needsSync = status.freshnessStatus === "stale" || status.freshnessStatus === "missing" || status.freshnessStatus === "partial";
-  const isUrgent = status.freshnessStatus === "missing" || (status.hoursSinceSync != null && status.hoursSinceSync > 48);
   // Een klant die alleen Meta/LinkedIn/Microsoft draait heeft nooit Google-rijen: "geen Google-data"
   // is daar een eigenschap van het account, geen storing (zelfde regel als de conversielag-chip).
   // Alleen bij een echte lezing -- de leesfout-variant hierboven heeft geen `bron` -- en alleen als
@@ -197,35 +195,48 @@ export function SyncStatusBadge({ clientId, onSyncComplete, kanalen = null }: Pr
     datastand?.toestand === "geen" && datastand.bron === "Google" &&
     !!kanalen && kanalen.length > 0 && !kanalen.includes("google");
 
+  // De badge volgt de DATA, niet de klok van de laatste run. Hij stond groen op "Data actueel
+  // (3u geleden)" naast een datastand die zei dat de data tot april liep: de run was vers, de
+  // cijfers vier maanden oud. En hij pulseerde zodra een sync nodig was: de enige permanente
+  // beweging op de pagina betekende "er is iets mis", en een pagina die altijd knippert wijst
+  // niets meer aan (bouwplan fase 0). Nu: kleur en woord uit beoordeelDatastand (actueel, achter,
+  // stil, geen), altijd icoon plus woord, de run-tijd als bijzin, en geen pulse. Zonder datastand
+  // (de lezing faalde) de oude run-badge.
+  const config = (() => {
+    if (!datastand) return STATUS_CONFIG[status.freshnessStatus];
+    if (geenGoogleKanaal || (datastand.syncDraait && datastand.toestand !== "actueel")) {
+      // Gepauzeerd account met een gezonde sync, of een klant zonder Google-kanaal: niets te
+      // herstellen, dus geen kleur (lib/sync/datastand.ts, SYNC_DRAAIT_BINNEN_DAGEN).
+      return { ...STATUS_CONFIG.unknown, label: geenGoogleKanaal ? "Geen Google-kanaal" : "Sync draait, geen nieuwe data", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
+    }
+    switch (datastand.toestand) {
+      case "actueel": return { ...STATUS_CONFIG.fresh, label: "Cijfers actueel" };
+      case "achter": return { ...STATUS_CONFIG.stale, label: "Cijfers lopen achter" };
+      case "dood": return { ...STATUS_CONFIG.missing, label: "Sync staat stil" };
+      default: return { ...STATUS_CONFIG.missing, label: "Geen data" };
+    }
+  })();
+
   return (
-    <div className="flex items-center gap-2">
-      {/* Freshness badge */}
-      <div
-        className={`flex items-center gap-1.5 text-xs ${config.color} ${config.bg} border ${config.border} rounded-lg px-3 py-1.5 ${needsSync && !syncing ? "animate-pulse" : ""}`}
-      >
+    <div className="flex flex-wrap items-center gap-2">
+      <div className={`flex items-center gap-1.5 text-xs ${config.color} ${config.bg} border ${config.border} rounded-lg px-3 py-1.5`}>
         {config.icon}
-        <span>{config.label}</span>
+        <span className="font-medium">{config.label}</span>
         {status.hoursSinceSync != null && (
-          <span className="opacity-70">({formatTimeAgo(status.hoursSinceSync)})</span>
+          <span className="opacity-70">· laatste run {formatTimeAgo(status.hoursSinceSync)}</span>
         )}
         {status.datasetsAvailable != null && status.datasetsTotal != null && (
           <span className="opacity-70">
             {status.datasetsAvailable}/{status.datasetsTotal}
           </span>
         )}
-        {needsSync && !syncing && (
-          <span className={`font-semibold ml-0.5 ${isUrgent ? "text-red-600" : "text-amber-600"}`}>
-            — Sync nodig{isUrgent ? "!" : ""}
-          </span>
-        )}
       </div>
 
       {datastand && (
         <span
-          // Gedempt als de sync wél slaagt en er alleen geen nieuwe data is (gepauzeerd account):
-          // daar valt vandaag niets te herstellen (lib/sync/datastand.ts, SYNC_DRAAIT_BINNEN_DAGEN).
-          // Ook gedempt bij een klant zonder Google-kanaal; zie geenGoogleKanaal hierboven.
-          className={`text-micro ${datastand.syncDraait || geenGoogleKanaal ? "text-muted-foreground" : datastand.toestand === "dood" || datastand.toestand === "geen" ? "text-red-600 font-semibold" : datastand.toestand === "achter" ? "text-amber-700" : "text-muted-foreground"}`}
+          // De zin uit de datastand zelf ("Data t/m juli; laatste sync 26 augustus"). Gedempt als de
+          // sync slaagt en er alleen geen nieuwe data is, en bij een klant zonder Google-kanaal.
+          className={`text-micro ${datastand.syncDraait || geenGoogleKanaal ? "text-muted-foreground" : datastand.toestand === "dood" || datastand.toestand === "geen" ? "text-red-700 font-semibold" : datastand.toestand === "achter" ? "text-amber-700" : "text-muted-foreground"}`}
           title={datastand.tekst}
         >
           {datastand.tekst}

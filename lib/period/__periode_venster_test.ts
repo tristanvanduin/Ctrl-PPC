@@ -125,7 +125,14 @@ async function main() {
   {
     const waarde = { preset: "last_12m" as const, custom: null, comparison: "same_period_last_year" as const, range: { start: "2025-11", end: "2026-10" }, compareRange: { start: "2024-11", end: "2025-10" } };
     const laden = renderToStaticMarkup(createElement(PeriodSelector, { value: waarde, onChange: noop, laden: true } as never));
-    check("tijdens het laden: een neutrale tekst, geen maanden", laden.includes("Periode laden") && !laden.includes("2026"), laden);
+    // De maanden mogen er wél in de opmaak staan, maar alleen onzichtbaar (text-transparent, aria-hidden):
+    // de knop reserveert zo zijn eigen breedte en hoogte en springt niet als de stand binnenkomt
+    // (op een telefoon breekt hij in twee regels; CLS 0,14 in zijn eentje). Zichtbaar en voor een
+    // schermlezer is er alleen "Periode laden…".
+    const zichtbaar = laden.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, "");
+    const verborgen = [...laden.matchAll(/<span([^>]*aria-hidden="true"[^>]*)>([^<]*)<\/span>/g)];
+    check("tijdens het laden: een neutrale tekst, geen zichtbare maanden", laden.includes("Periode laden") && !zichtbaar.includes("2026"), zichtbaar);
+    check("de gereserveerde teksten zijn onzichtbaar (text-transparent)", verborgen.length === 2 && verborgen.every((m) => /text-transparent/.test(m[1])), laden);
     check("en niet te openen", /<button[^>]*disabled/.test(laden), laden);
     const klaar = renderToStaticMarkup(createElement(PeriodSelector, { value: waarde, onChange: noop } as never));
     check("daarna gewoon de periode", klaar.includes("oktober 2026") && !klaar.includes("Periode laden"), klaar);

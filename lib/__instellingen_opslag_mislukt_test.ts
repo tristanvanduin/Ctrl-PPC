@@ -15,7 +15,7 @@
 //    nog liep (elke terugkerende bezoeker, en iedereen vlak na een opslag), zag zijn invoer
 //    terugspringen.
 // 3. Een klant zonder client_settings-rij kwam nooit in de cache; na een wissel A -> B -> A sloot de
-//    provider het hele dashboard opnieuw achter "Data ophalen..." tot de lezing terug was.
+//    provider het hele dashboard opnieuw achter het laadvlak tot de lezing terug was.
 //
 // De andere paneeltests hebben een nep-window met dispatchEvent: noop, waardoor het pad via
 // "client-data-refresh" daar nooit draaide. Hier zijn de gebeurtenissen echt: een luisteraarlijst per
@@ -255,20 +255,22 @@ async function main() {
     root.unmount(); await rust(50);
   }
 
-  console.log("Klant zonder rij: na A -> B -> A geen 'Data ophalen...' meer");
+  console.log("Klant zonder rij: na A -> B -> A geen laadvlak meer");
   {
     const A = "gads-zonder-rij", B = "gads-met-rij";
     rijen.set(A, null); rijen.set(B, { kpi_targets: KPI_2600 });
     const { h, root } = monteer(A);
     await rust(200);
-    check("eerste bezoek aan A: de provider wacht op het lezen", /Data ophalen/.test(tekstVan(h)), tekstVan(h).slice(0, 30));
+    // De poort rendert het laadvlak van de pagina (components/ui/laadvlak.tsx); zijn schermlezertekst
+    // is wat ervan in de tekst overblijft.
+    check("eerste bezoek aan A: de provider wacht op het lezen", /cijfers worden geladen/.test(tekstVan(h)), tekstVan(h).slice(0, 30));
     laatLos(A); await rust(150);
     check("na het lezen (geen rij): de terugval staat in de cache", cs.heeftGecachteInstellingen(A));
     check("en geldt niet als ingevoerd doel", cs.kpiDoelenIngevoerd(cs.getClientSettings(A)) === false);
     check("niet in localStorage: daar hoort wat echt gelezen of opgeslagen is", opslag.get(SLEUTEL + A) === undefined);
     zetKlant(B); await rust(200); laatLos(B); await rust(150);
     zetKlant(A); await rust(200);
-    check("terug naar A: het dashboard staat er meteen, geen 'Data ophalen...'", !/Data ophalen/.test(tekstVan(h)) && paneelStaat(h), tekstVan(h).slice(0, 30));
+    check("terug naar A: het dashboard staat er meteen, geen laadvlak", !/cijfers worden geladen/.test(tekstVan(h)) && paneelStaat(h), tekstVan(h).slice(0, 30));
     check("terug naar A: het routedoel (1.938), niet dat van B", doel?.conversions === 1938, JSON.stringify(doel));
     laatLos(A); await rust(100);
     root.unmount(); await rust(50);

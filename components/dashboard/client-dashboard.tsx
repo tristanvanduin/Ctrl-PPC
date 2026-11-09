@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, Settings, Target, Loader2, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown, Search } from "lucide-react";
+import { BarChart3, Settings, Target, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown, Search } from "lucide-react";
 import { SyncStatusBadge } from "./sync-status-badge";
+import { PaginaLaadvlak } from "@/components/ui/laadvlak";
 import { getClientSettings } from "@/lib/client-settings";
 import { SecondOpinionView } from "./second-opinion-view";
 import { AnalysisOverview } from "./analysis-overview";
@@ -341,6 +342,19 @@ export function ClientDashboard({ client }: { client: Client }) {
         Dit bijschrift hangt aan de kanalen, en de kleur van de datastand in de syncbadge ook: zonder
         Google-kanaal is "geen Google-data" geen storing. De synchronisatieknop blijft staan, juist
         ook bij een klant zonder data -- dat is de klant die hem het hardst nodig heeft. */}
+      {/* Zolang de data laadt: dezelfde rij met dezelfde pillen, zonder tekst. De rij verscheen
+          pas na het laden en duwde dan alles eronder omlaag -- op een telefoon 84 px, want het
+          bronbijschrift breekt daar in twee regels. Representatieve teksten, onzichtbaar, zodat de
+          pillen ook al ongeveer de goede breedte hebben en op dezelfde manier omlopen. */}
+      {clientData.source === "api" && clientData.loading && (
+        <div className="flex items-center gap-2 flex-wrap" aria-hidden>
+          <span className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-transparent select-none">Live data uit Google Ads, Meta en LinkedIn</span>
+          <span className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-transparent select-none">Conversielag: 3 dagen</span>
+          {!demoModus && (
+            <span className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-transparent select-none">Cijfers actueel · laatste run 3u geleden</span>
+          )}
+        </div>
+      )}
       {clientData.source === "api" && !clientData.loading && !clientData.error && (
         <div className="flex items-center gap-2 flex-wrap">
           {/* "Live" alleen als het live IS. In demo-modus komen deze cijfers uit
@@ -442,15 +456,11 @@ export function ClientDashboard({ client }: { client: Client }) {
       </div>
       )}
 
-      {/* Loading state */}
-      {clientData.loading && (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-brand-blue-ink" />
-          {/* Geen kanaalnaam hier: tijdens het laden is nog niet bekend wélke kanalen deze klant
-              heeft, dus elke naam zou een gok zijn. "Data ophalen" klopt altijd. */}
-          <p className="text-sm text-muted-foreground">Data ophalen...</p>
-        </div>
-      )}
+      {/* Laden: een vlak op de maten van de band en de eerste kaarten, geen spinner. De spinner
+          stond gecentreerd in een lege pagina en alles wat daarna kwam, schoof 200 px omlaag
+          (CLS 0,14 desktop, 0,58 mobiel). Geen kanaalnaam hier: tijdens het laden is nog niet
+          bekend wélke kanalen deze klant heeft, dus elke naam zou een gok zijn. */}
+      {clientData.loading && <PaginaLaadvlak />}
 
       {/* Error state */}
       {clientData.error && (
@@ -480,7 +490,7 @@ export function ClientDashboard({ client }: { client: Client }) {
                   heeft (Google) of apart ophaalt (Meta/LinkedIn/Microsoft), dus ook in demo-modus.
                   De losse kanalen gaan mee als bronnen, zodat de vergelijking per kanaal paart. */}
               <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
-              <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} />
+              <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} laden={!bandKlaar} />
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}

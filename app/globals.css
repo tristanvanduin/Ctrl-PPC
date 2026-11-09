@@ -15,6 +15,32 @@
 */
 
 @theme inline {
+  /* ── Beweging ──────────────────────────────────────────────────────────────
+     Drie duren en drie curven, en verder niets. Er stonden vijf losse duren met
+     drie curven door elkaar en geen enkel token; elke nieuwe plek koos opnieuw.
+     Tailwind's eigen standaard (150 ms) wordt hier `middel`, zodat de ~100
+     transition-klassen zonder eigen duur vanzelf dezelfde taal spreken.
+     Dezelfde getallen staan in lib/beweging.ts voor recharts.
+
+       kort    120 ms  hover, focus, een kleur die verspringt
+       middel  200 ms  in- en uitklappen, een paneel dat opent
+       lang    300 ms  een wissel van data
+
+       aankomst   iets komt binnen: snel weg, zacht landen
+       vertrek    iets gaat weg: zacht los, snel weg
+       verplaats  iets verschuift of verandert van waarde
+
+     Minder beweging (het systeemvinkje) staat onderaan dit bestand: duren naar
+     nul, de spinner blijft. */
+  --duur-kort: 120ms;
+  --duur-middel: 200ms;
+  --duur-lang: 300ms;
+  --ease-aankomst: cubic-bezier(0, 0, 0.2, 1);
+  --ease-vertrek: cubic-bezier(0.4, 0, 1, 1);
+  --ease-verplaats: cubic-bezier(0.4, 0, 0.2, 1);
+  --default-transition-duration: 200ms;
+  --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+
   /* ── Typografische schaal ──────────────────────────────────────────────────
      Vijf stappen, met een naam in plaats van een pixelwaarde. Dit dashboard is
      informatiedicht, dus de stappen liggen dicht op elkaar; juist dan is een

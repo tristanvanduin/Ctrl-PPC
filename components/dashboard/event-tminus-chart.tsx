@@ -1,6 +1,7 @@
 "use client";
 
 import { ResponsiveContainer, ComposedChart, Line } from "recharts";
+import { useGrafiekBeweging } from "@/lib/beweging";
 import { Raster, AsX, AsY, Tip, PLOT_MARGE, kortGetal, volledigGetal, asSchaalLijn } from "./chart-chrome";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
 
@@ -49,6 +50,7 @@ export function EventTminusChart({
   valueFormatter?: (v: number) => string;
   height?: number;
 }) {
+  const beweging = useGrafiekBeweging();
   const rows = mergeTminusRows(current, previous);
   if (rows.length < 2) {
     return (
@@ -79,6 +81,7 @@ export function EventTminusChart({
                 verhaal. Huidige editie draagt het neon-indigo accent uit het Executive Terminal-
                 thema: dat is de lijn die er nu toe doet. */}
             <Line
+              {...beweging}
               dataKey="vorig"
               name={previousLabel}
               stroke={CHART_AXIS}
@@ -88,6 +91,7 @@ export function EventTminusChart({
               connectNulls
             />
             <Line
+              {...beweging}
               dataKey="huidig"
               name="Deze editie"
               stroke="var(--terminal-accent, var(--color-brand-blue-ink))"

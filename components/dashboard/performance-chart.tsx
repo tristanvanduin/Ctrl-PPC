@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { useGrafiekBeweging } from "@/lib/beweging";
 import { useState } from "react";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
@@ -78,6 +79,7 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
   const [internalMetric, setInternalMetric] = useState<ForecastMetric>("conversions");
   const metric = metricProp ?? internalMetric;
   const setMetric = onMetricChange ?? setInternalMetric;
+  const beweging = useGrafiekBeweging();
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [showYoY, setShowYoY] = useState(false);
   // Het budgetadvies rekent op het conversiedoel. Of dat een schatting is, zegt de herkomst (die op
@@ -267,6 +269,7 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
           {/* Vorig jaar — een aparte categorische tint (violet), op de achtergrond. */}
           {showYoY && (
             <Line
+              {...beweging}
               type="monotone"
               dataKey="vorigJaar"
               stroke={CHART_CATEGORICAL[6]}
@@ -281,6 +284,7 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
 
           {/* Verwacht = de doel-/referentielijn: neutraal, niet met het merk concurreren. */}
           <Line
+            {...beweging}
             type="monotone"
             dataKey="verwacht"
             stroke={CHART_AXIS}
@@ -293,6 +297,7 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
           />
           {/* Gerealiseerd + prognose = dezelfde reeks (echt → geprojecteerd): de merkkleur, solide vs streep. */}
           <Line
+            {...beweging}
             type="monotone"
             dataKey="gerealiseerd"
             stroke={theme.primary}
@@ -302,6 +307,7 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
             connectNulls
           />
           <Line
+            {...beweging}
             type="monotone"
             dataKey="prognose"
             stroke={theme.primary}

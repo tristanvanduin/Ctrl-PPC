@@ -376,6 +376,9 @@ export function Tip({ formatter }: { formatter?: (v: number) => string }) {
       // Een vulling over de hele balkgroep als hover-doel: mikken op een dunne balk is geen
       // interactie maar een test.
       cursor={{ fill: "var(--hover-vlak, rgba(15, 23, 42, 0.04))" }}
+      // Direct bij de cursor. Recharts laat de tip standaard 400 ms van zijn vorige plek glijden,
+      // en onderweg dekt hij de balken af waar je net naar kijkt (bouwplan fase 0).
+      isAnimationActive={false}
       content={(props: unknown) => <TipInhoud {...(props as TipProps)} formatter={formatter} />}
     />
   );

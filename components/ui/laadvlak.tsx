@@ -213,3 +213,59 @@ export function Laadregels({ regels = 3, className = "" }: { regels?: number; cl
     </div>
   );
 }
+
+/**
+ * Het laadvlak van de cijferband bovenaan een pagina: vijf tegels met label, getal, lijntje en
+ * verandering, op de hoogte die de band straks ook heeft (274 px op 1440 px breed, gemeten met
+ * scripts/meet-overzicht.mjs). De band kwam als laatste binnen en duwde dan alles eronder 200 px
+ * omlaag: de grootste verspringing op de pagina (CLS 0,14 desktop, 0,58 mobiel, waar 0,10 de grens
+ * voor "goed" is). `compact` is de variant zonder kopregel, binnen een bestaande kaart.
+ */
+export function BandLaadvlak({ compact = false }: { compact?: boolean }) {
+  const traag = useTraag();
+  return (
+    <div
+      className="bg-card rounded-xl border border-border shadow-sm px-6 py-5"
+      style={{ minHeight: compact ? 160 : 274 }}
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <span className="sr-only">cijfers worden geladen</span>
+      {!compact && (
+        <div className="mb-4 flex items-baseline justify-between" aria-hidden>
+          <Balk breedte="220px" hoogte={14} />
+          <Balk breedte="180px" hoogte={10} />
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 lg:grid-cols-5" aria-hidden>
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="space-y-2">
+            <Balk breedte="64%" hoogte={9} />
+            <Balk breedte="82%" hoogte={30} />
+            <Balk breedte="72px" hoogte={18} />
+            <Balk breedte="56%" hoogte={11} />
+          </div>
+        ))}
+      </div>
+      {traag && <TraagRegel />}
+    </div>
+  );
+}
+
+/**
+ * Het laadvlak van een hele pagina onder de kop: de cijferband plus de eerste rij kaarten, op de
+ * maten van het Overzicht. Vervangt de gecentreerde spinner met "Data ophalen...", die de pagina
+ * leeg liet en alles wat erna kwam liet opspringen.
+ */
+export function PaginaLaadvlak() {
+  return (
+    <div className="space-y-6">
+      <BandLaadvlak />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Laadvlak vorm="grafiek" hoogte={220} titel={<Balk breedte="180px" hoogte={12} />} />
+        <Laadvlak vorm="tekst" regels={6} titel={<Balk breedte="140px" hoogte={12} />} />
+      </div>
+    </div>
+  );
+}

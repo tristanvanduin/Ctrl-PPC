@@ -9,12 +9,13 @@
 import { TriangleAlert } from "lucide-react";
 import type { ClientHistoricalData } from "@/lib/types";
 import { usePeriod, type PeriodDataStand } from "@/lib/period/period-context";
-import { comparePeriods, ontbrekendeMaanden, type BronPaar, type BronReeks } from "@/lib/period/apply-period";
+import { comparePeriods, delta, ontbrekendeMaanden, type BronPaar, type BronReeks } from "@/lib/period/apply-period";
 import { formatRange, formatMonth, lastCompleteMonth, monthIndex, type PeriodRange } from "@/lib/period/period-range";
 import { formatRoas } from "@/lib/forecast-format";
 import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { opsomming } from "@/lib/util/tekst";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { BandLaadvlak } from "@/components/ui/laadvlak";
 
 function euro(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -162,11 +163,30 @@ interface Props {
   compact?: boolean;
   /** De losse kanalen als `data` een optelling is, zodat de vergelijking per kanaal paart. */
   bronnen?: readonly BronReeks[] | null;
+  /** Of `data` nog onderweg is. Dan staat er een vlak op de maat van de band in plaats van niets. */
+  laden?: boolean;
 }
 
-export function PeriodSummary({ data, compact, bronnen }: Props) {
+/**
+ * De verandering van een verhouding (ROAS, CPA). Zonder vergelijkingsperiode niets; zonder vorige
+ * waarde (geen spend, geen conversies toen) de uitleg in plaats van een percentage.
+ */
+function verhoudingDelta(
+  vorig: number | null,
+  huidig: number | null,
+  hogerIsBeter: boolean,
+  opmaak: (v: number) => string,
+) {
+  if (vorig === null && huidig === null) return undefined;
+  if (vorig === null || huidig === null) return { pct: null, hogerIsBeter, leegTekst: "geen vergelijking mogelijk" };
+  return { pct: delta(huidig, vorig).pct, hogerIsBeter, was: opmaak(vorig) };
+}
+
+export function PeriodSummary({ data, compact, bronnen, laden = false }: Props) {
   const periode = usePeriod();
-  if (!data) return null;
+  // Zonder data en nog ladend: de ruimte van de band alvast innemen. De band kwam als laatste
+  // binnen en duwde dan alles eronder 200 px omlaag; dat was de grootste verspringing op de pagina.
+  if (!data) return laden ? <BandLaadvlak compact={compact} /> : null;
 
   // Met de losse kanalen erbij: een kanaal dat in de vergelijkingsperiode nog niet liep, telt dan
   // niet als groei. De grote getallen blijven de hele periode; alleen de percentages zijn gepaard.
@@ -224,6 +244,15 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
 
   const roas = current.totals.adSpend > 0 ? current.totals.revenue / current.totals.adSpend : null;
   const cpa = current.totals.conversions > 0 ? current.totals.adSpend / current.totals.conversions : null;
+  // ROAS en CPA hadden geen verandering onder zich: een verhouding van een verhouding zegt weinig
+  // in procenten alleen. Nu wél, met de vorige waarde erbij ("was 2,41×"), want dát is wat de
+  // lezer wil weten. Uit de GEPAARDE totalen, net als de drie percentages ernaast: een kanaal dat
+  // in de vergelijkingsperiode nog niet liep, trekt de vorige verhouding anders scheef.
+  const verhouding = (teller: number, noemer: number): number | null => (noemer > 0 ? teller / noemer : null);
+  const huidigeRoas = deltas ? verhouding(deltas.revenue.huidig, deltas.adSpend.huidig) : null;
+  const vorigeRoas = deltas ? verhouding(deltas.revenue.vorig, deltas.adSpend.vorig) : null;
+  const huidigeCpa = deltas ? verhouding(deltas.adSpend.huidig, deltas.conversions.huidig) : null;
+  const vorigeCpa = deltas ? verhouding(deltas.adSpend.vorig, deltas.conversions.vorig) : null;
 
   return (
     <div className="rounded-xl border border-border bg-card px-6 py-5 shadow-sm">
@@ -269,7 +298,9 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
               // twee verschillende vergelijkingen — de lijn is het verloop BINNEN deze periode, dit
               // percentage is de vergelijking MET de vorige periode. Zonder "waartegen" oogt dat als
               // dezelfde claim twee keer verteld; met "waartegen" is het duidelijk twee metingen.
-              waartegen: periode.compareRange ? `vs ${formatRange(periode.compareRange)}` : undefined,
+              // In de volle band zegt de kop al "vergeleken met …"; dan is het per tegel herhaald
+              // en concurreert het met het percentage. Alleen in de compacte variant, zonder kop.
+              waartegen: compact && periode.compareRange ? `vs ${formatRange(periode.compareRange)}` : undefined,
             } : undefined}
           />
         ))}
@@ -284,6 +315,7 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
           reeks={reeksVerhouding((m) => (m.adSpend > 0 ? m.revenue / m.adSpend : null))}
           reeksLabel={`ROAS per maand binnen ${formatRange(periode.range)}`}
           reeksBasis="bereik"
+          delta={verhoudingDelta(vorigeRoas, huidigeRoas, true, (v) => formatRoas(v))}
         />
         {/* Geen conversies betekent geen CPA; een bedrag tonen zou een prijs per conversie
             suggereren die niet bestaat. */}
@@ -293,6 +325,7 @@ export function PeriodSummary({ data, compact, bronnen }: Props) {
           reeks={reeksVerhouding((m) => (m.conversions > 0 ? m.adSpend / m.conversions : null))}
           reeksLabel={`CPA per maand binnen ${formatRange(periode.range)}`}
           reeksBasis="bereik"
+          delta={verhoudingDelta(vorigeCpa, huidigeCpa, false, (v) => euro(v))}
         />
       </div>
 

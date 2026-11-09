@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from "recharts";
+import { useGrafiekBeweging } from "@/lib/beweging";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { ALLE_FORECAST_METRICS, computeForecast } from "@/lib/forecast";
@@ -28,6 +29,7 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
    *  buurkolom soms meer ruimte krijgt dan de vaste hoogte nodig heeft. */
   groeit?: boolean;
 }) {
+  const beweging = useGrafiekBeweging();
   const { theme } = useBrandTheme();
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const fullData = useClientHistoricalData(clientId);
@@ -72,7 +74,7 @@ export function MonthlyTrendBars({ clientId, countryFilter, groeit = false }: {
           />
           <AsY formatter={kortGetal} width={36} domain={domain} tickCount={tickCount} />
           <Tip formatter={num} />
-          <Bar dataKey="waarde" radius={[3, 3, 0, 0]} maxBarSize={48} onClick={(_, i) => setOpenIdx(i)} cursor="pointer">
+          <Bar {...beweging} dataKey="waarde" radius={[3, 3, 0, 0]} maxBarSize={48} onClick={(_, i) => setOpenIdx(i)} cursor="pointer">
             {data.map((d, i) => (
               <Cell key={i} fill={theme.primary} opacity={d.prognose ? 0.4 : 1} />
             ))}

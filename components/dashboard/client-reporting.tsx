@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useGrafiekBeweging } from "@/lib/beweging";
 import {
   FileText, Loader2, Pencil, Save, X, Download, Plus, Check, Clock,
   Send, ChevronDown, ChevronUp,
@@ -63,6 +64,7 @@ function fmtValue(v: number, format: string): string {
 // ── Mini chart component ───────────────────────────────────────────────────
 
 function MiniChart({ data, type, label, color = "#E87722", height = 180 }: { data: MetricPoint[]; type: "bar" | "line"; label: string; color?: string; height?: number }) {
+  const beweging = useGrafiekBeweging();
   if (data.length === 0) return null;
   return (
     <div>
@@ -74,7 +76,7 @@ function MiniChart({ data, type, label, color = "#E87722", height = 180 }: { dat
             <AsX dataKey="month" />
             <AsY width={48} />
             <Tip />
-            <Bar dataKey="value" fill={color} radius={BALK_RADIUS} name={label} />
+            <Bar {...beweging} dataKey="value" fill={color} radius={BALK_RADIUS} name={label} />
           </BarChart>
         ) : (
           <LineChart data={data}>
@@ -82,7 +84,7 @@ function MiniChart({ data, type, label, color = "#E87722", height = 180 }: { dat
             <AsX dataKey="month" />
             <AsY width={48} />
             <Tip />
-            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }} name={label} />
+            <Line {...beweging} type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }} name={label} />
           </LineChart>
         )}
       </ResponsiveContainer>

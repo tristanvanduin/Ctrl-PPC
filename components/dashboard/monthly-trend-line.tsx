@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LineChart, Line, XAxis, ResponsiveContainer, type DotItemDotProps } from "recharts";
+import { useGrafiekBeweging } from "@/lib/beweging";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { ALLE_FORECAST_METRICS, computeForecast } from "@/lib/forecast";
@@ -25,6 +26,7 @@ import { PeriodPopover } from "@/components/ui/period-popover";
 // i.p.v. forecast.conversions.
 export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string; countryFilter?: string | null }) {
   const { theme } = useBrandTheme();
+  const beweging = useGrafiekBeweging();
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const fullData = useClientHistoricalData(clientId);
   const clientData = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
@@ -74,6 +76,7 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
           <AsY formatter={kortEuro} width={44} domain={domain} tickCount={tickCount} ticks={ticks} />
           <Tip formatter={eur} />
           <Line
+            {...beweging}
             type="monotone"
             dataKey="waarde"
             stroke={theme.primary}

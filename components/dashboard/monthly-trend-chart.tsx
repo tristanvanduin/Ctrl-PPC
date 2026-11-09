@@ -1,6 +1,7 @@
 "use client";
 
 import { ResponsiveContainer, ComposedChart, Bar, Area, AreaChart, LabelList } from "recharts";
+import { useGrafiekBeweging } from "@/lib/beweging";
 import { TrendingUp } from "lucide-react";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { categoricalColor, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
@@ -39,6 +40,7 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
   height?: number;
 }) {
   const { theme } = useBrandTheme();
+  const beweging = useGrafiekBeweging();
   if (data.length < 2) return null;
 
   const rows = data.map((d) => ({ maand: d.maand, spend: Math.round(d.spend), lijn: Math.round(d.lijn) }));
@@ -123,7 +125,7 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
               <AsY formatter={kortEuro} {...schaalSpend} stil={elkBedragErbij} />
               <Tip formatter={volledigEuro} />
               <BalkVerloop id="balk-verloop-spend" kleur={theme.primary} />
-              <Bar dataKey="spend" name="Spend" fill="url(#balk-verloop-spend)" filter="url(#balk-verloop-spend-gloed)" radius={BALK_RADIUS} barSize={balkBreedte(rows.length)}>
+              <Bar {...beweging} dataKey="spend" name="Spend" fill="url(#balk-verloop-spend)" filter="url(#balk-verloop-spend-gloed)" radius={BALK_RADIUS} barSize={balkBreedte(rows.length)}>
                 {elkBedragErbij && (
                   <LabelList
                     dataKey="spend"
@@ -161,6 +163,7 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
                   - Het laatste getal erbij. Een lijn draagt zijn waarde aan het eind — anders is
                     het enige wat je kunt aflezen "ongeveer tussen 1k en 2k". */}
               <Area
+                {...beweging}
                 dataKey="lijn"
                 name={lineLabel}
                 stroke={CHART_LINE_SECONDARY}
@@ -246,6 +249,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260, 
    *  beter dan een gat eronder. Zelfde afspraak als `groeit` in monthly-trend-bars.tsx. */
   groeit?: boolean;
 }) {
+  const beweging = useGrafiekBeweging();
   if (months.length < 1 || series.length === 0) return null;
 
   // Kleur volgt de serie op zijn vaste plek in het palet, niet zijn rang in deze grafiek: valt er
@@ -325,7 +329,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260, 
             <Tip formatter={volledigEuro} />
             {series.map((s, i) => <BalkVerloop key={`v-${s}`} id={verloopId(s, i)} kleur={kleurVan(i)} />)}
             {series.map((s, i) => (
-              <Bar key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} filter={`url(#${verloopId(s, i)}-gloed)`} radius={BALK_RADIUS} maxBarSize={BALK_MAX}>
+              <Bar {...beweging} key={s} dataKey={s} name={s} fill={`url(#${verloopId(s, i)})`} filter={`url(#${verloopId(s, i)}-gloed)`} radius={BALK_RADIUS} maxBarSize={BALK_MAX}>
                 {/* Alleen de grootste serie draagt een naam, boven zijn laatste balk. Zie
                     `grootsteSerie` hierboven voor waarom het er één is en niet drie. */}
                 {s === grootsteSerie && (

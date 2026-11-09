@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useGrafiekBeweging } from "@/lib/beweging";
 import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine,
 } from "recharts";
@@ -120,6 +121,7 @@ function KpiTegel({ metric, forecast, geselecteerd, onKies }: {
 
 function ForecastChart({ forecast, metric, onMetricChange }: { forecast: ClientForecast; metric: ForecastMetric; onMetricChange: (m: ForecastMetric) => void }) {
   const { theme } = useBrandTheme();
+  const beweging = useGrafiekBeweging();
   const result = forecast[metric];
   const data = result.points.map((pt) => ({ label: pt.monthLabel, verwacht: pt.expected, gerealiseerd: pt.realized, prognose: pt.forecast }));
   const yFormatter = formatYAxis(metric);
@@ -158,9 +160,9 @@ function ForecastChart({ forecast, metric, onMetricChange }: { forecast: ClientF
           {lastRealizedIdx >= 0 && lastRealizedIdx < data.length - 1 && (
             <ReferenceLine x={data[lastRealizedIdx].label} stroke="#64748b" strokeDasharray="4 4" label={{ value: "Nu", position: "top", fontSize: 10, fill: "#64748b" }} />
           )}
-          <Line type="monotone" dataKey="verwacht" stroke={CHART_AXIS} strokeWidth={1.5} strokeDasharray="5 4" dot={{ r: 3 }} name="Verwacht" opacity={0.7} connectNulls />
-          <Line type="monotone" dataKey="gerealiseerd" stroke={theme.primary} strokeWidth={2.5} dot={{ r: 4 }} name="Gerealiseerd" connectNulls />
-          <Line type="monotone" dataKey="prognose" stroke={theme.primary} strokeWidth={2} strokeDasharray="6 3" dot={{ r: 3 }} name="Prognose" connectNulls />
+          <Line {...beweging} type="monotone" dataKey="verwacht" stroke={CHART_AXIS} strokeWidth={1.5} strokeDasharray="5 4" dot={{ r: 3 }} name="Verwacht" opacity={0.7} connectNulls />
+          <Line {...beweging} type="monotone" dataKey="gerealiseerd" stroke={theme.primary} strokeWidth={2.5} dot={{ r: 4 }} name="Gerealiseerd" connectNulls />
+          <Line {...beweging} type="monotone" dataKey="prognose" stroke={theme.primary} strokeWidth={2} strokeDasharray="6 3" dot={{ r: 3 }} name="Prognose" connectNulls />
         </LineChart>
       </ResponsiveContainer>
     </div>

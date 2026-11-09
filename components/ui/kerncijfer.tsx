@@ -34,24 +34,40 @@ export interface KerncijferDelta {
   waartegen?: string;
   /** Tekst als er geen percentage is, bijv. "nieuw in deze periode". */
   leegTekst?: string;
+  /** De vorige waarde in woorden ("€ 57", "2,41×"): bij een verhouding zegt een percentage alleen weinig. */
+  was?: string;
 }
 
-function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst }: KerncijferDelta) {
+/**
+ * De verandering onder het getal. Dit is wat er bewoog, en het stond in de kleinste letter van de
+ * pagina (10 px) in een groen dat op die maat 3,2:1 haalde. Nu een maat groter (text-body, 12 px),
+ * met icoon en teken, in groen-700 en rood-700, en met een woord voor wie geen kleur ziet.
+ * Vanaf tien procent zonder decimaal: "+15%" leest, "+15,3%" telt.
+ */
+function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was }: KerncijferDelta) {
   if (pct === null) {
-    return <span className="text-micro text-muted-foreground">{leegTekst ?? "geen vergelijking mogelijk"}</span>;
+    return (
+      <span className="text-body text-muted-foreground">
+        {leegTekst ?? "geen vergelijking mogelijk"}
+        {was && <span className="ml-1.5">was {was}</span>}
+      </span>
+    );
   }
   // Onder een half procent is geen beweging maar ruis; die een kleur geven maakt van
   // meetonnauwkeurigheid een gebeurtenis.
   const vlak = Math.abs(pct) < 0.5;
   const goed = hogerIsBeter ? pct > 0 : pct < 0;
-  const kleur = vlak ? "text-muted-foreground" : goed ? "text-green-600" : "text-red-600";
+  const kleur = vlak ? "text-muted-foreground" : goed ? "text-green-700" : "text-red-700";
   const Icoon = vlak ? Minus : pct > 0 ? TrendingUp : TrendingDown;
-  const getal = `${pct > 0 ? "+" : ""}${pct.toFixed(1).replace(".", ",")}%`;
+  const decimalen = Math.abs(pct) >= 10 ? 0 : 1;
+  const getal = `${pct > 0 ? "+" : ""}${pct.toFixed(decimalen).replace(".", ",")}%`;
   return (
-    <span className={`flex items-center gap-1 text-micro ${kleur}`}>
-      <Icoon className="h-3 w-3" aria-hidden />
-      {getal}
-      {waartegen && <span className="text-muted-foreground">{waartegen}</span>}
+    <span className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-body font-medium ${kleur}`}>
+      <Icoon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span>{getal}</span>
+      <span className="sr-only">{vlak ? "vrijwel gelijk" : goed ? "gunstig" : "ongunstig"}</span>
+      {was && <span className="font-normal text-muted-foreground">was {was}</span>}
+      {waartegen && <span className="font-normal text-muted-foreground">{waartegen}</span>}
     </span>
   );
 }

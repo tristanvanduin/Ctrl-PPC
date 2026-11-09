@@ -112,7 +112,20 @@ export function PeriodSelector({ value, onChange, jaarlijkseEditie, maxMaand, la
       >
         <Calendar className="h-4 w-4 text-muted-foreground" />
         {laden ? (
-          <span className="font-medium">Periode laden…</span>
+          // Tijdens het laden dezelfde twee teksten, maar onzichtbaar op een grijs vlak: dan heeft de
+          // knop al de breedte en hoogte die hij straks krijgt. "Periode laden…" was één regel; op
+          // een telefoon breekt de echte inhoud in twee, en die groei van 32 naar 50 px schoof de
+          // hele pagina omlaag (CLS 0,14 op mobiel, in zijn eentje boven de grens van 0,10). Het
+          // kalendervenster van nu kan een maand naast het echte zitten, maar is even breed.
+          <>
+            <span className="sr-only">Periode laden…</span>
+            <span className="font-medium rounded bg-muted/70 text-transparent select-none" aria-hidden>{formatRange(value.range)}</span>
+            {value.compareRange && (
+              <span className="text-micro rounded bg-muted/70 text-transparent select-none" aria-hidden>
+                tegen {formatRange(value.compareRange)}
+              </span>
+            )}
+          </>
         ) : (
           <>
             <span className="font-medium">{formatRange(value.range)}</span>

@@ -6,6 +6,7 @@ import { useClientData, type ClientDataState } from "./use-client-data";
 import { heeftGecachteInstellingen, loadClientSettings } from "./client-settings";
 import { computeForecast, type ClientForecast } from "./forecast";
 import { mergeKpiTargets } from "./kpi-target-merge";
+import { PaginaLaadvlak } from "@/components/ui/laadvlak";
 
 const ClientDataContext = createContext<ClientDataState | null>(null);
 
@@ -48,7 +49,7 @@ export function ClientDataProvider({ clientId, children }: { clientId: string; c
   //
   // Wel met een grens. Deze provider omvat elk tabblad, ook Instellingen zelf: een verzoek dat blijft
   // hangen (de browser geeft een fetch zonder antwoord geen eigen time-out) hield anders het hele
-  // dashboard op "Data ophalen...". Na INSTELLINGEN_WACHT_MS rendert hij met wat getClientSettings
+  // dashboard achter het laadvlak. Na INSTELLINGEN_WACHT_MS rendert hij met wat getClientSettings
   // dan heeft (de standaard); komt het antwoord later alsnog, dan voegt instellingenVersie opnieuw samen.
   const [instellingenVersie, setInstellingenVersie] = useState(0);
   const [instellingenVoor, setInstellingenVoor] = useState<string | null>(null);
@@ -92,11 +93,7 @@ export function ClientDataProvider({ clientId, children }: { clientId: string; c
   // dashboard, in plaats van de kinderen met het standaarddoel. Ze mounten dan nog niet, dus
   // useClientHistoricalData gooit ook niet.
   if (!instellingenKlaar) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <p className="text-sm text-muted-foreground">Data ophalen...</p>
-      </div>
-    );
+    return <PaginaLaadvlak />;
   }
 
   return (
