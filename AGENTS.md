@@ -44,6 +44,13 @@ houdt het oude manifest vast en gaat 500's geven op chunks die niet meer bestaan
 uitziet als een kapotte app terwijl er niets mis is. Stop de server eerst, op **PID**: `pkill -f`
 matcht zijn eigen commandoregel en sloopt zijn eigen shell (exitcode 144).
 
+En stop het **juiste** PID. `npx next start &` geeft het PID van de npx-wrapper; die spawnt een
+kindproces `next-server` dat de poort vasthoudt. Een `kill` op de wrapper laat dat kind gewoon
+doorlopen, en `pgrep -f "next start"` ziet het niet, want zijn commandoregel is `next-server (v16…)`.
+Zo stond er na een nieuwe build een oude server op 3190 die 500's gaf op elke chunk, terwijl de
+nieuwe server met EADDRINUSE was gestopt. Controleer na het starten met `pgrep -f next-server` en
+bewaar dát PID.
+
 ## De hygienepoort
 
 `scripts/gates.sh` begint met `check-hygiene.mjs`, en die vangt drie dingen die tsc, de tests
