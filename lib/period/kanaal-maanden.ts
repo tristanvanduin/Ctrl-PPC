@@ -177,7 +177,25 @@ export interface KanaalStand {
   vanaf: Month | null;
 }
 
-/** Dagrijen (gelezen met kanaalDagbron) -> de reeks voor de band, met de selectie van de klant. */
+/**
+ * Maandtotalen plus de twee dagscalairen -> de reeks voor de band. De zuivere kern: de band uit
+ * de dagrijen (kanaalStandUitDagen) en de band uit de maandreeks van de blended route (perKanaal,
+ * met laatsteDag en vanaf erbij) moeten per constructie dezelfde functie zijn -- de route telt
+ * dag -> maand met dezelfde kanaalMaandenUitDagen en dezelfde selectie, dus twee ingangen, één
+ * uitkomst, en geen tweede lezing van de dagtabellen in de browser.
+ */
+export function kanaalStandUitMaanden(
+  clientId: string,
+  maanden: readonly MaandTotaal[],
+  laatsteDag: string | null,
+  vanaf: Month | null,
+  jaar?: number,
+): KanaalStand {
+  return { data: bouwHistorischeData(clientId, maanden, jaar), laatsteDag, vanaf };
+}
+
+/** Dagrijen (gelezen met kanaalDagbron) -> de reeks voor de band, met de selectie van de klant:
+ *  de compositie van kanaalStandUitMaanden over kanaalMaandenUitDagen. */
 export function kanaalStandUitDagen(
   clientId: string,
   rijen: Array<Record<string, unknown>>,
@@ -185,12 +203,14 @@ export function kanaalStandUitDagen(
   convConfig: ChannelConversionConfig,
   jaar?: number,
 ): KanaalStand {
-  const maanden = maandTotalenUitKanaalRijen(kanaalMaandenUitDagen(rijen, CONVERSIE_KANAAL[kanaal], convConfig));
-  return {
-    data: bouwHistorischeData(clientId, maanden, jaar),
-    laatsteDag: laatsteDagUitRijen(rijen),
-    vanaf: eersteVolleMaand(eersteDagUitRijen(rijen, CONVERSIE_KANAAL[kanaal])),
-  };
+  const ck = CONVERSIE_KANAAL[kanaal];
+  return kanaalStandUitMaanden(
+    clientId,
+    maandTotalenUitKanaalRijen(kanaalMaandenUitDagen(rijen, ck, convConfig)),
+    laatsteDagUitRijen(rijen),
+    eersteVolleMaand(eersteDagUitRijen(rijen, ck)),
+    jaar,
+  );
 }
 
 /** Alle kanalen bij elkaar optellen, maand voor maand, voor de "Alle kanalen"-weergave. */

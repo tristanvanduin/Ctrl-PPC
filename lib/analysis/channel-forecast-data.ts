@@ -9,6 +9,17 @@
 // hier al voor bestond (migratie 002/082, fase 2 MASTERPLAN.md) maar nog geen jaardoel-UI heeft. Geen
 // ingevuld doel is geen fout: computeForecast() valt dan terug op het historisch totaal, exact zoals
 // hij dat voor Google ook al doet.
+//
+// TWEE INGANGEN, ÉÉN REKENWEG (fase 1, stap 3)
+//
+// Alles wat de prognose uit de dagrijen haalt, zijn drie dingen: de maand- en weekemmers per jaar
+// (aggregateByYear), de nieuwste dag (de gerealiseerd-grens) en de eerste dag van de huidige loop
+// (het tempo zonder doel). Dat trio heet hier KanaalEmmers, en buildChannelForecastUitEmmers rekent
+// daarop. buildChannelForecast (de dagrij-ingang die de kanaaltab al had) is daar alleen nog een
+// wrapper om: eerst kanaalEmmersUitRijen, dan dezelfde stappen. Zo kan de blended route de emmers
+// per kanaal meesturen (hij heeft de dagrijen toch al in handen) en krijgt de tab hetzelfde object
+// zonder de dagrijen opnieuw op te halen -- en is "tab == Alle kanalen" per constructie, niet per
+// toeval van twee lezers die dezelfde lus overschrijven.
 
 import type { ClientAnnualData, ClientHistoricalData } from "@/lib/types";
 import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "@/lib/api/adapter";
@@ -18,6 +29,9 @@ import { resolveTargets, type TargetRow } from "./o2-targets-cost";
 import { jaardoelMetTerugval } from "./standaard-jaardoel";
 import { volleMaand, dagkanaalDataTot, type DataStandSamen } from "@/lib/sync/datastand";
 import { startLaatsteLoop } from "@/lib/period/kanaal-maanden";
+import {
+  conversionSourcesFor, sumSelectedConversions, type ChannelConversionChannel, type ChannelConversionConfig,
+} from "./channel-conversion-config";
 
 export interface ChannelForecastRow {
   /** YYYY-MM-DD */
@@ -25,6 +39,31 @@ export interface ChannelForecastRow {
   spend: number;
   conv: number;
   revenue: number;
+}
+
+/** De maand- en weekemmers van één jaar, in de vorm die de gedeelde adapter verwacht. */
+export interface JaarEmmers {
+  jaar: number;
+  monthly: ApiMonthlyData[];
+  weekly: ApiWeeklyData[];
+}
+
+/**
+ * Wat buildChannelForecastUitEmmers van een kanaal nodig heeft: alles wat buildChannelForecast uit
+ * de dagrijen haalt, zonder de dagrijen zelf. Platte JSON (geen Map), zodat de blended route het per
+ * kanaal kan meesturen en de hook het ongewijzigd kan doorgeven.
+ *
+ * - `laatsteDag`: de nieuwste datum in de rijen, voor de gerealiseerd-grens (gerealiseerdTot).
+ * - `eersteDag`: de eerste dag van de huidige loop over de dagen met besteding, GESELECTEERDE
+ *   conversie of waarde -- dezelfde regel die buildChannelHistoricalData altijd had. Dat is bewust
+ *   een andere dag dan `eersteDag` op de blended kanaalreeks (startLaatsteLoopUitRijen over ALLE
+ *   conversievelden, voor het tempo in de som): een dag met alleen een niet-geselecteerde conversie
+ *   telt daar wel, hier niet. De tab rekende altijd met deze; de som met die. Beide blijven.
+ */
+export interface KanaalEmmers {
+  jaren: JaarEmmers[];
+  laatsteDag: string | null;
+  eersteDag: string | null;
 }
 
 // Zelfde patroon als lib/api/adapter.ts's generateEvenWeeks: welke maanden vijf periodes van
@@ -43,7 +82,7 @@ function emptyMonthly(month: number): ApiMonthlyData {
 }
 
 /** Groepeert dagrijen per jaar in maand- en weektotalen, in de vorm die de gedeelde adapter verwacht. */
-function aggregateByYear(rows: ChannelForecastRow[]): Map<number, { monthly: ApiMonthlyData[]; weekly: ApiWeeklyData[] }> {
+export function aggregateByYear(rows: ChannelForecastRow[]): Map<number, { monthly: ApiMonthlyData[]; weekly: ApiWeeklyData[] }> {
   const perYear = new Map<number, { monthly: Map<number, ApiMonthlyData>; weekly: Map<string, ApiWeeklyData> }>();
 
   for (const r of rows) {
@@ -86,6 +125,49 @@ function aggregateByYear(rows: ChannelForecastRow[]): Map<number, { monthly: Api
 }
 
 /**
+ * Dagrijen (gelezen met dagbronSelect) -> de rijvorm van de prognose, met de conversieselectie
+ * van de klant: per dag sumSelectedConversions over alle selecteerbare velden, dezelfde optelling
+ * als kanaalMaandenUitDagen per maand doet. Number(x ?? 0) zoals daar, zodat de maandemmers hier
+ * getal-gelijk zijn aan de maandreeks van de blended route.
+ */
+export function forecastRijenUitDagen(
+  rows: ReadonlyArray<Record<string, unknown>>,
+  channel: ChannelConversionChannel,
+  convConfig: ChannelConversionConfig,
+): ChannelForecastRow[] {
+  const velden = conversionSourcesFor(channel).map((s) => s.field);
+  return rows.map((r) => ({
+    date: String(r.date ?? "").slice(0, 10),
+    spend: Number(r.spend ?? 0),
+    conv: sumSelectedConversions(Object.fromEntries(velden.map((f) => [f, Number(r[f] ?? 0)])), channel, convConfig),
+    revenue: Number(r.conversion_value ?? 0),
+  }));
+}
+
+/**
+ * De emmers, de nieuwste dag en de eerste dag van de huidige loop uit dagrijen -- precies wat
+ * buildChannelForecast altijd zelf uit `rows` haalde, nu als één object dat ook zonder de rijen
+ * reist (de blended route stuurt het per kanaal mee).
+ */
+export function kanaalEmmersUitRijen(rows: ChannelForecastRow[]): KanaalEmmers {
+  return {
+    jaren: [...aggregateByYear(rows)].map(([jaar, { monthly, weekly }]) => ({ jaar, monthly, weekly })),
+    // De nieuwste datum, ook als hij geen echte dag is: dezelfde reduce die gerealiseerdTot deed.
+    laatsteDag: rows.reduce<string | null>((acc, r) => {
+      const d = String(r.date ?? "").slice(0, 10);
+      return acc === null || d > acc ? d : acc;
+    }, null),
+    // De eerste dag van de huidige loop (startLaatsteLoop: na een pauze van een hele maand de dag
+    // waarop het kanaal terugkwam), voor het tempo zonder doel als die partiële maand de laatste
+    // gerealiseerde is (forecastCoreMetric): dezelfde dag die de blended route meegeeft. Met de eerste
+    // dag OOIT kreeg een kanaal dat op 20 juli terugkwam na een pauze, zijn 12 dagen juli over 31
+    // gespreid. De rijen zijn hooguit de nieuwste 1000 dagen; is de echte start ouder, dan valt deze
+    // dag in een jaar dat de regel niet raakt.
+    eersteDag: startLaatsteLoop(rows.filter((r) => r.spend || r.conv || r.revenue).map((r) => String(r.date ?? ""))),
+  };
+}
+
+/**
  * @param todayIso vandaag als YYYY-MM-DD (lib/reporting-date's today()) -- bepaalt het huidige jaar
  *   en, samen met de laatste dag in `rows`, hoeveel maanden daarvan als "gerealiseerd" tellen (de
  *   rest wordt null, voor projectie).
@@ -104,18 +186,31 @@ export function buildChannelHistoricalData(
   todayIso: string,
   dataTot?: string | null,
 ): ClientHistoricalData | null {
-  if (rows.length === 0) return null;
+  return buildChannelHistoricalDataUitEmmers(clientId, kanaalEmmersUitRijen(rows), targetCurrentYear, todayIso, dataTot);
+}
+
+/**
+ * De emmer-ingang van buildChannelHistoricalData: dezelfde stappen, zonder de dagrijen. Null zonder
+ * jaar met een geldige dag (een reeks zonder rijen, of alleen rijen zonder datum, is leeg).
+ */
+export function buildChannelHistoricalDataUitEmmers(
+  clientId: string,
+  emmers: KanaalEmmers,
+  targetCurrentYear: ClientAnnualData,
+  todayIso: string,
+  dataTot?: string | null,
+): ClientHistoricalData | null {
+  if (emmers.jaren.length === 0) return null;
 
   const currentYear = Number(todayIso.slice(0, 4));
-  const realizedThroughMonth = gerealiseerdTot(rows, todayIso, dataTot);
-  const byYear = aggregateByYear(rows);
+  const realizedThroughMonth = gerealiseerdTot(emmers.laatsteDag, todayIso, dataTot);
 
-  const historicalYearsInput: YearDataInput[] = [...byYear.entries()]
-    .filter(([year]) => year < currentYear)
-    .sort(([a], [b]) => a - b)
-    .map(([year, { monthly, weekly }]) => ({ year, monthly, weekly }));
+  const historicalYearsInput: YearDataInput[] = emmers.jaren
+    .filter(({ jaar }) => jaar < currentYear)
+    .sort((a, b) => a.jaar - b.jaar)
+    .map(({ jaar, monthly, weekly }) => ({ year: jaar, monthly, weekly }));
 
-  const current = byYear.get(currentYear) ?? { monthly: [], weekly: [] };
+  const current = emmers.jaren.find(({ jaar }) => jaar === currentYear) ?? { monthly: [], weekly: [] };
   // Rijen na die grens (de partiële maand, en de lopende) horen ook niet in de gerealiseerde reeks.
   const monthly = current.monthly.filter((m) => m.month <= realizedThroughMonth);
   const weekly = current.weekly.filter((w) => w.month <= realizedThroughMonth);
@@ -124,18 +219,12 @@ export function buildChannelHistoricalData(
     clientId, historicalYearsInput, monthly, weekly,
     targetCurrentYear, currentYear, realizedThroughMonth,
   );
-  // De eerste dag van de huidige loop (startLaatsteLoop: na een pauze van een hele maand de dag
-  // waarop het kanaal terugkwam), voor het tempo zonder doel als die partiële maand de laatste
-  // gerealiseerde is (forecastCoreMetric): dezelfde dag die de blended route meegeeft. Met de eerste
-  // dag OOIT kreeg een kanaal dat op 20 juli terugkwam na een pauze, zijn 12 dagen juli over 31
-  // gespreid. De rijen zijn hooguit de nieuwste 1000 dagen; is de echte start ouder, dan valt deze
-  // dag in een jaar dat de regel niet raakt.
-  const eersteDag = startLaatsteLoop(rows.filter((r) => r.spend || r.conv || r.revenue).map((r) => String(r.date ?? "")));
-  return eersteDag ? { ...data, eersteDag } : data;
+  // Zie KanaalEmmers.eersteDag: de dag waarop de huidige loop begon, voor het tempo zonder doel.
+  return emmers.eersteDag ? { ...data, eersteDag: emmers.eersteDag } : data;
 }
 
-/** De gerealiseerd-grens (1-12, 0 = nog niets) van een dagreeks, zie buildChannelHistoricalData. */
-function gerealiseerdTot(rows: ChannelForecastRow[], todayIso: string, dataTot?: string | null): number {
+/** De gerealiseerd-grens (1-12, 0 = nog niets) bij een nieuwste dag, zie buildChannelHistoricalData. */
+function gerealiseerdTot(laatsteDag: string | null, todayIso: string, dataTot?: string | null): number {
   const currentYear = Number(todayIso.slice(0, 4));
   // Gerealiseerd is t/m de laatste VOLLE maand met data (volleMaand, lib/sync/datastand.ts), niet
   // t/m "vorige kalendermaand". Een halfvolle maand telde eerst als eindstand: hij drukte met het
@@ -144,10 +233,6 @@ function gerealiseerdTot(rows: ChannelForecastRow[], todayIso: string, dataTot?:
   // sync stilstond: bij data t/m 26 augustus, bekeken op 1 november, telde augustus (26 van de 31
   // dagen) als volle maand. Nu is augustus partieel en loopt de realisatie t/m juli -- dezelfde
   // grens als de blended historie en de KPI-band.
-  const laatsteDag = rows.reduce<string | null>((acc, r) => {
-    const d = String(r.date ?? "").slice(0, 10);
-    return acc === null || d > acc ? d : acc;
-  }, null);
   const vol = volleMaand({ dataTot: dagkanaalDataTot(laatsteDag, dataTot), nu: todayIso.slice(0, 10) }).laatsteVolleMaand;
   return vol === null || Number(vol.slice(0, 4)) < currentYear ? 0 : Number(vol.slice(5, 7));
 }
@@ -160,6 +245,8 @@ function gerealiseerdTot(rows: ChannelForecastRow[], todayIso: string, dataTot?:
  * bewust niet gebruikt -- forecast.cpa/roas leiden hun eigen doel af uit spend/conversions-doelen,
  * consistent met hoe elke andere metric hier werkt. Er is nog geen scherm om deze doelen in te
  * vullen (net als bij Google); zonder doel valt computeForecast() terug op het historisch totaal.
+ *
+ * De dagrij-ingang: kanaalEmmersUitRijen en dan buildChannelForecastUitEmmers, niets anders.
  */
 export function buildChannelForecast(
   clientId: string,
@@ -169,11 +256,30 @@ export function buildChannelForecast(
   todayIso: string,
   /** Zie buildChannelHistoricalData. */
   dataTot?: string | null,
-  /**
-   * `gestopt`: de route noemt dit kanaal in `uitgesloten` (ontkoppeld, of zijn data komt niet meer),
-   * en dan is het op "Alle kanalen" na zijn laatste dag nul, ook als zijn maanden op een
-   * seizoenspauze lijken. Zie tabStandUitRoute.
-   */
+  /** Zie buildChannelForecastUitEmmers. */
+  opties: { gestopt?: boolean } = {},
+): { data: ClientHistoricalData; forecast: ClientForecast } | null {
+  return buildChannelForecastUitEmmers(clientId, kanaalEmmersUitRijen(rows), targetRows, targetChannel, todayIso, dataTot, opties);
+}
+
+/**
+ * De emmer-ingang van buildChannelForecast: dezelfde stappen (resolveTargets, de terugval op vorig
+ * jaar, buildChannelHistoricalData, computeForecast en de stopregel), op KanaalEmmers in plaats van
+ * dagrijen. Vorig jaar is hier de som van de maandemmers in plaats van de som van de dagrijen;
+ * dat is dezelfde optelling in een andere volgorde, en standaardJaardoel rondt het resultaat.
+ *
+ * @param opties.gestopt de route noemt dit kanaal in `uitgesloten` (ontkoppeld, of zijn data komt
+ *   niet meer), en dan is het op "Alle kanalen" na zijn laatste dag nul, ook als zijn maanden op een
+ *   seizoenspauze lijken. Zie tabStandUitRoute.
+ */
+export function buildChannelForecastUitEmmers(
+  clientId: string,
+  emmers: KanaalEmmers,
+  targetRows: TargetRow[],
+  targetChannel: string,
+  todayIso: string,
+  /** Zie buildChannelHistoricalData. */
+  dataTot?: string | null,
   opties: { gestopt?: boolean } = {},
 ): { data: ClientHistoricalData; forecast: ClientForecast } | null {
   const targets = resolveTargets(targetRows, targetChannel, todayIso);
@@ -187,30 +293,27 @@ export function buildChannelForecast(
   // Op Google werkte dezelfde sectie wél, niet omdat dat kanaal anders is maar omdat zijn route
   // de terugval kende en deze niet.
   const currentYear = Number(todayIso.slice(0, 4));
-  const vorigJaar = rows.reduce<{ conversions: number; revenue: number; adSpend: number } | null>((acc, r) => {
-    if (Number(r.date.slice(0, 4)) !== currentYear - 1) return acc;
-    const t = acc ?? { conversions: 0, revenue: 0, adSpend: 0 };
-    t.conversions += r.conv;
-    t.revenue += r.revenue;
-    t.adSpend += r.spend;
-    return t;
-  }, null);
+  const vorig = emmers.jaren.find(({ jaar }) => jaar === currentYear - 1);
+  const vorigJaar = vorig
+    ? vorig.monthly.reduce((t, m) => ({ conversions: t.conversions + m.conversions, revenue: t.revenue + m.revenue, adSpend: t.adSpend + m.adSpend }),
+      { conversions: 0, revenue: 0, adSpend: 0 })
+    : null;
 
   const targetCurrentYear: ClientAnnualData = jaardoelMetTerugval(
     { conversions: targets.conversions, revenue: targets.conversion_value, adSpend: targets.spend },
     vorigJaar,
   );
 
-  const data = buildChannelHistoricalData(clientId, rows, targetCurrentYear, todayIso, dataTot);
+  const data = buildChannelHistoricalDataUitEmmers(clientId, emmers, targetCurrentYear, todayIso, dataTot);
   if (!data) return null;
   // Dezelfde stopregel als "Alle kanalen" (kanaalGestopt): geen data in de laatste gerealiseerde
   // maand of later, en geen seizoenspauze, dan na het gerealiseerde een prognose van nul. Zonder
   // regel projecteerde een gepauzeerd account met een gezonde sync november en december op zijn
   // oude tempo (566 voor het jaar), terwijl de som hetzelfde kanaal op 454 zette.
-  const maanden = [...aggregateByYear(rows)].flatMap(([jaar, { monthly }]) =>
+  const maanden = emmers.jaren.flatMap(({ jaar, monthly }) =>
     monthly.map((m) => ({ month: `${jaar}-${String(m.month).padStart(2, "0")}`, conversions: m.conversions, revenue: m.revenue, adSpend: m.adSpend })));
   const forecast = computeForecast(data);
-  const stop = opties.gestopt === true || kanaalGestopt(maanden, currentYear, gerealiseerdTot(rows, todayIso, dataTot));
+  const stop = opties.gestopt === true || kanaalGestopt(maanden, currentYear, gerealiseerdTot(emmers.laatsteDag, todayIso, dataTot));
   return { data, forecast: stop ? stilgelegd(forecast) : forecast };
 }
 

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { klantVanId } from "../tenancy/klanten";
-import { today } from "../reporting-date";
+import { today, addDays } from "../reporting-date";
+import { addMonths } from "../period/period-range";
 import type { ApiMonthlyData, YearDataInput } from "./adapter";
 import type { ClientAnnualData } from "../types";
 import type { Kanaal } from "../kanalen/beschikbaar";
@@ -13,6 +14,7 @@ import {
 import { KANAAL_DAGBRON, dagbronSelect, kanaalMaandenUitDagen } from "@/lib/analysis/channel-report-blend";
 import { alleRijen, eis, DataLaagFout } from "@/lib/analysis/db-veilig";
 import { eersteDagUitRijen, eersteVolleMaand, startLaatsteLoopUitRijen } from "@/lib/period/kanaal-maanden";
+import { forecastRijenUitDagen, kanaalEmmersUitRijen, type KanaalEmmers } from "@/lib/analysis/channel-forecast-data";
 import {
   datastandVoorKlant,
   dagstandVoorKlant,
@@ -79,6 +81,22 @@ export interface BlendedKanaalMaand {
   conversions: number;
   revenue: number;
   adSpend: number;
+  /**
+   * De tellers, voor de maandtabel en de kanaaltabel die ze tonen (channel-performance,
+   * cross-channel-view). Optioneel: een antwoord of fixture van vóór deze velden werkt als
+   * voorheen; de route vult ze altijd.
+   */
+  impressions?: number;
+  clicks?: number;
+}
+
+/** Eén rij uit client_targets, zoals channel-data-provider hem las (de select van die tab). */
+export interface ClientTargetRij {
+  channel: string;
+  metric: string;
+  target_value: number;
+  valid_from: string;
+  valid_to: string | null;
 }
 
 /**
@@ -104,6 +122,21 @@ export interface BlendedKanaalReeks {
    */
   eersteDag?: string | null;
   maanden: BlendedKanaalMaand[];
+  /** De nieuwste dag met een rij (laatsteDagUitRijen); null voor Google. Optioneel als eersteDag. */
+  laatsteDag?: string | null;
+  /**
+   * Alleen dagkanalen: de maand- en weekemmers met de nieuwste en eerste dag, precies wat de
+   * kanaaltab uit de dagrijen haalde (kanaalEmmersUitRijen over forecastRijenUitDagen met de
+   * selectie van de klant). Daarmee rekent buildChannelForecastUitEmmers de tab zonder een tweede
+   * lezing van de dagtabel. Optioneel: een antwoord van vóór dit veld heeft hem niet.
+   */
+  emmers?: KanaalEmmers;
+  /**
+   * Alleen dagkanalen: de dagrijen (de kolommen van dagbronSelect) vanaf recenteDagenVanaf(nu),
+   * voor wat op de tab echt dagen nodig heeft: de pacing van deze tegen vorige maand en de
+   * kerncijfers over 28 tegen de 28 dagen ervoor. Niet de hele historie: die zit al in `emmers`.
+   */
+  recenteDagen?: Record<string, unknown>[];
 }
 
 export interface BlendedHistoricalData {
@@ -116,6 +149,20 @@ export interface BlendedHistoricalData {
   /** Tot waar de data over alle kanalen samen vol is; null als geen enkel kanaal een datum heeft. */
   dataStand: DataStandSamen | null;
   perKanaal: BlendedKanaalReeks[];
+  /** Alle kanaal-gescoopte doelen van de klant (client_targets), voor het jaardoel per kanaaltab. */
+  clientTargets: ClientTargetRij[];
+}
+
+/**
+ * Vanaf welke dag de route de dagrijen zelf meestuurt (recenteDagen): de 1e van de vorige maand
+ * of 56 dagen terug, wat het vroegst is. De pacing vergelijkt deze maand met vorige maand t/m
+ * dezelfde dag, en de kerncijfers op de tab kijken 28 dagen terug en de 28 daarvoor
+ * (channel-performance.tsx) -- beide vensters vallen hierbinnen.
+ */
+export function recenteDagenVanaf(nu: string): string {
+  const eersteVanVorigeMaand = `${addMonths(nu.slice(0, 7), -1)}-01`;
+  const zesenvijftigTerug = addDays(nu, -56);
+  return eersteVanVorigeMaand < zesenvijftigTerug ? eersteVanVorigeMaand : zesenvijftigTerug;
 }
 
 const DAGKANALEN: { kanaal: Dagkanaal; channel: ChannelConversionChannel }[] = [
@@ -166,7 +213,7 @@ export async function fetchBlendedHistoricalData(
   const klant = await klantVanId(supabase, clientId);
   if (!klant) return null;
 
-  const [googleRes, settingsRes, dagRes] = await Promise.all([
+  const [googleRes, settingsRes, dagRes, targetsRes] = await Promise.all([
     supabase.from("fact_core")
       .select("period_start, impressions, clicks, cost, conversions, conv_value")
       .eq("account_id", klant.id)
@@ -187,6 +234,9 @@ export async function fetchBlendedHistoricalData(
         .range(van, tot) as unknown as PromiseLike<DagUitkomst>,
       `${KANAAL_DAGBRON[channel].table} (blended)`,
     ))),
+    // Het jaardoel per kanaaltab (buildChannelForecastUitEmmers). Eén kleine lezing, zodat de
+    // tab hem niet zelf hoeft te doen; dezelfde select als channel-data-provider had.
+    supabase.from("client_targets").select("channel, metric, target_value, valid_from, valid_to").eq("client_id", clientId),
   ]);
 
   // Zonder de opgeslagen selectie zou hier stil de standaard gelden, en dan telt het Jaaroverzicht
@@ -196,6 +246,7 @@ export async function fetchBlendedHistoricalData(
   const convConfig: ChannelConversionConfig = resolveChannelConversionConfig(opgeslagen as Partial<ChannelConversionConfig> | null);
 
   const googleRijen = eis(googleRes, "fact_core google (blended)") as FactCoreMaandRij[];
+  const clientTargets = eis(targetsRes, "client_targets (blended)") as ClientTargetRij[];
   const rows: KanaalMaandRij[] = googleRijen.map((r) => ({
     kanaal: "google",
     month: String(r.period_start).slice(0, 7),
@@ -208,6 +259,9 @@ export async function fetchBlendedHistoricalData(
   const laatsteDagUitRijen: Partial<Record<Dagkanaal, string>> = {};
   const vanafPerKanaal: Partial<Record<Dagkanaal, string | null>> = {};
   const eersteDagPerKanaal: Partial<Record<Dagkanaal, string | null>> = {};
+  const emmersPerKanaal: Partial<Record<Dagkanaal, KanaalEmmers>> = {};
+  const recenteDagenPerKanaal: Partial<Record<Dagkanaal, Record<string, unknown>[]>> = {};
+  const recentVanaf = recenteDagenVanaf(nu);
   DAGKANALEN.forEach(({ kanaal, channel }, i) => {
     const { rijen, afgekapt } = dagRes[i];
     if (afgekapt) {
@@ -233,6 +287,13 @@ export async function fetchBlendedHistoricalData(
     // voor het tempo is die van de huidige loop, na een pauze van een hele maand (startLaatsteLoop).
     vanafPerKanaal[kanaal] = eersteVolleMaand(eersteDagUitRijen(rijen, channel));
     eersteDagPerKanaal[kanaal] = startLaatsteLoopUitRijen(rijen, channel);
+    // De emmers en de recente dagen uit dezelfde rijen: rekenwerk, geen extra lezing. De tab las
+    // hiervoor de hele dagtabel opnieuw (tot 1000 rijen, zonder paginering); hier zijn het alle
+    // rijen (alleRijen), met de selectie van de klant.
+    if (rijen.length > 0) {
+      emmersPerKanaal[kanaal] = kanaalEmmersUitRijen(forecastRijenUitDagen(rijen, channel, convConfig));
+      recenteDagenPerKanaal[kanaal] = rijen.filter((r) => String(r.date ?? "").slice(0, 10) >= recentVanaf);
+    }
   });
   if (rows.length === 0) return null;
 
@@ -255,22 +316,32 @@ export async function fetchBlendedHistoricalData(
 
   const perKanaal: BlendedKanaalReeks[] = [];
   for (const kanaal of ["google", "meta", "linkedin", "microsoft"] as const) {
-    const maanden = new Map<string, BlendedKanaalMaand>();
+    const maanden = new Map<string, Required<BlendedKanaalMaand>>();
     for (const r of rows) {
       if (r.kanaal !== kanaal) continue;
-      const b = maanden.get(r.month) ?? { month: r.month, conversions: 0, revenue: 0, adSpend: 0 };
+      const b = maanden.get(r.month) ?? { month: r.month, conversions: 0, revenue: 0, adSpend: 0, impressions: 0, clicks: 0 };
       b.conversions += r.conversions;
       b.revenue += r.conversionsValue;
       b.adSpend += r.cost;
+      b.impressions += r.impressions;
+      b.clicks += r.clicks;
       maanden.set(r.month, b);
     }
     if (maanden.size === 0) continue;
-    perKanaal.push({
+    const reeks: BlendedKanaalReeks = {
       kanaal,
       vanaf: kanaal === "google" ? null : vanafPerKanaal[kanaal] ?? null,
       eersteDag: kanaal === "google" ? null : eersteDagPerKanaal[kanaal] ?? null,
+      laatsteDag: kanaal === "google" ? null : laatsteDagUitRijen[kanaal] ?? null,
       maanden: [...maanden.values()].sort((a, b) => a.month.localeCompare(b.month)),
-    });
+    };
+    if (kanaal !== "google") {
+      // Alleen zetten als ze er zijn: zo blijft het antwoord voor Google even plat als voorheen.
+      const emmers = emmersPerKanaal[kanaal];
+      if (emmers) reeks.emmers = emmers;
+      reeks.recenteDagen = recenteDagenPerKanaal[kanaal] ?? [];
+    }
+    perKanaal.push(reeks);
   }
 
   // Amsterdams jaar (zelfde reden als in de Google-route: new Date().getFullYear() draait in
@@ -329,6 +400,7 @@ export async function fetchBlendedHistoricalData(
     currentYearMonthly,
     dataStand,
     perKanaal,
+    clientTargets,
   };
 }
 

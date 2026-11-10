@@ -12,10 +12,12 @@
 // De rijen hieronder gaan door de echte functie, op een in-memory nep-Supabase.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchBlendedHistoricalData } from "./blended-historical";
+import { fetchBlendedHistoricalData, recenteDagenVanaf, type BlendedKanaalReeks } from "./blended-historical";
 import { FakeSupabase } from "../decision/__fake_supabase";
 import { resolveChannelConversionConfig, sumSelectedConversions } from "../analysis/channel-conversion-config";
 import { DataLaagFout } from "../analysis/db-veilig";
+import { forecastRijenUitDagen, kanaalEmmersUitRijen } from "../analysis/channel-forecast-data";
+import { kanaalStandUitDagen, kanaalStandUitMaanden, type MaandTotaal } from "../period/kanaal-maanden";
 import { addDays } from "../reporting-date";
 import { uitgeslotenMetDag, type DataStandSamen } from "../sync/datastand";
 import { uitgeslotenZin } from "../../components/dashboard/period-summary";
@@ -80,8 +82,17 @@ function klantF(config: unknown): FakeSupabase {
     { client_id: "klant-f", date: "2026-01-12", entity_id: "ms1", impressions: 50, clicks: 4, spend: 40, conversions: 2, conversion_value: 20 },
     { client_id: "klant-f", date: "2026-02-28", entity_id: "ms1", impressions: 0, clicks: 0, spend: 0, conversions: 0, conversion_value: 0 },
   ]);
+  // Een kanaal-gescoopt jaardoel (client_targets), zoals de Meta-tab het las.
+  sb.seed("client_targets", [{ client_id: "klant-f", channel: "meta_ads", metric: "conversions", target_value: 1000, valid_from: "2026-01-01", valid_to: null }]);
   return sb;
 }
+
+/** De verrijkte velden van een kanaalreeks, losjes getypeerd: de test moet ook op de oude code draaien. */
+const reeks = (u: Uitkomst, k: string) => (u as { perKanaal?: BlendedKanaalReeks[] } | null)?.perKanaal?.find((x) => x.kanaal === k);
+const doelen = (u: Uitkomst) => (u as { clientTargets?: { channel: string; metric: string; target_value: number }[] } | null)?.clientTargets;
+/** De maandreeks van de route in de vorm die kanaalStandUitMaanden verwacht. */
+const alsMaandTotalen = (maanden: BlendedKanaalReeks["maanden"]): MaandTotaal[] =>
+  maanden.map((m) => ({ year: Number(m.month.slice(0, 4)), month: Number(m.month.slice(5, 7)), conversions: m.conversions, revenue: m.revenue, adSpend: m.adSpend }));
 
 async function main() {
   console.log("Conversieselectie: het Jaaroverzicht telt wat de KPI-band telt");
@@ -112,6 +123,51 @@ async function main() {
     check("perKanaal Google uit fact_core: januari 10, februari 5",
       JSON.stringify(kanaal(uit, "google")?.maanden.map((m) => [m.month, m.conversions])) === JSON.stringify([["2026-01", 10], ["2026-02", 5]]),
       JSON.stringify(kanaal(uit, "google")));
+
+    // ── Stap 3 (fase 1): het verrijkte antwoord, additief ──
+    //
+    // De tellers per kanaal-maand (de tab en de kanaaltabel tonen ze; de route gooide ze weg).
+    const metaJan = meta?.maanden.find((m) => m.month === "2026-01") as { impressions?: number; clicks?: number } | undefined;
+    check("perKanaal Meta januari draagt ook impressions 200 en clicks 20", metaJan?.impressions === 200 && metaJan?.clicks === 20, JSON.stringify(metaJan));
+    const msJan = kanaal(uit, "microsoft")?.maanden.find((m) => m.month === "2026-01") as { impressions?: number; clicks?: number } | undefined;
+    check("perKanaal Microsoft januari: impressions 50, clicks 4", msJan?.impressions === 50 && msJan?.clicks === 4, JSON.stringify(msJan));
+    const googleJan = kanaal(uit, "google")?.maanden.find((m) => m.month === "2026-01") as { impressions?: number; clicks?: number } | undefined;
+    check("perKanaal Google draagt de tellers uit fact_core (hier 0)", googleJan?.impressions === 0 && googleJan?.clicks === 0, JSON.stringify(googleJan));
+
+    // De emmers per dagkanaal: precies wat de tab uit de dagrijen haalde, met de selectie van de
+    // klant -- en ze overleven Response.json (geen Map).
+    for (const [k, tabel, ch] of [["meta", "meta_account_daily", "meta_ads"], ["linkedin", "linkedin_account_daily", "linkedin_ads"], ["microsoft", "microsoft_account_daily", "microsoft_ads"]] as const) {
+      const verwacht = kanaalEmmersUitRijen(forecastRijenUitDagen(sb.tables[tabel] ?? [], ch, cfg));
+      const gekregen = JSON.parse(JSON.stringify(reeks(uit, k)?.emmers ?? null));
+      check(`emmers ${k} == kanaalEmmersUitRijen(forecastRijenUitDagen(dagrijen, selectie)), ook na JSON`,
+        JSON.stringify(gekregen) === JSON.stringify(verwacht), JSON.stringify([gekregen, verwacht]));
+    }
+    check("emmers Meta tellen de selectie (januari 5 leads), niet de standaard (17)",
+      reeks(uit, "meta")?.emmers?.jaren.find((j) => j.jaar === 2026)?.monthly.find((m) => m.month === 1)?.conversions === 5,
+      JSON.stringify(reeks(uit, "meta")?.emmers));
+    check("emmers Meta: laatsteDag 28 februari, eersteDag 5 januari", reeks(uit, "meta")?.emmers?.laatsteDag === "2026-02-28" && reeks(uit, "meta")?.emmers?.eersteDag === "2026-01-05",
+      JSON.stringify(reeks(uit, "meta")?.emmers));
+    check("Google heeft geen emmers en geen recente dagen (maandbron)", reeks(uit, "google")?.emmers === undefined && reeks(uit, "google")?.recenteDagen === undefined && reeks(uit, "google")?.laatsteDag === null,
+      JSON.stringify(reeks(uit, "google")));
+    check("perKanaal Meta: laatsteDag is de nieuwste rij, 28 februari", reeks(uit, "meta")?.laatsteDag === "2026-02-28", String(reeks(uit, "meta")?.laatsteDag));
+    // Op 1 november begint het venster op 6 september (56 dagen terug, vroeger dan 1 oktober):
+    // januari en februari zijn geen recente dagen.
+    check("recenteDagen: op 1 november begint het venster op 6 september, dus hier leeg per dagkanaal",
+      recenteDagenVanaf(NU) === "2026-09-06" && ["meta", "linkedin", "microsoft"].every((k) => Array.isArray(reeks(uit, k)?.recenteDagen) && reeks(uit, k)!.recenteDagen!.length === 0),
+      JSON.stringify([recenteDagenVanaf(NU), ["meta", "linkedin", "microsoft"].map((k) => reeks(uit, k)?.recenteDagen?.length)]));
+    // De doelen komen door, zoals de tab ze las.
+    check("clientTargets komt door: de Meta-conversiedoelrij", doelen(uit)?.length === 1 && doelen(uit)?.[0].channel === "meta_ads" && doelen(uit)?.[0].metric === "conversions" && doelen(uit)?.[0].target_value === 1000,
+      JSON.stringify(doelen(uit)));
+
+    // De band uit de route == de band uit de dagrijen (kanaalStandUitMaanden is de wortel van
+    // kanaalStandUitDagen; de route telt met dezelfde kanaalMaandenUitDagen en dezelfde selectie).
+    for (const [k, tabel] of [["meta", "meta_account_daily"], ["linkedin", "linkedin_account_daily"], ["microsoft", "microsoft_account_daily"]] as const) {
+      const r = reeks(uit, k)!;
+      const uitRoute = kanaalStandUitMaanden("klant-f", alsMaandTotalen(r.maanden), r.laatsteDag ?? null, r.vanaf, 2026);
+      const uitDagen = kanaalStandUitDagen("klant-f", sb.tables[tabel] ?? [], k, cfg, 2026);
+      check(`band ${k} uit de route == band uit de dagrijen (data, laatsteDag, vanaf)`,
+        JSON.stringify(uitRoute) === JSON.stringify(uitDagen), JSON.stringify([uitRoute, uitDagen]));
+    }
 
     const std = resolveChannelConversionConfig(null);
     const zonder = await haal(klantF(null), "klant-f", NU);
@@ -337,6 +393,31 @@ async function main() {
     check("Google, dat eerder ophoudt, wordt genoemd", stand(uit)?.uitgesloten.includes("google") === true, JSON.stringify(stand(uit)));
   }
 
+  console.log("Recente dagen: vanaf de 1e van de vorige maand of 56 dagen terug, wat het vroegst is");
+  {
+    check("recenteDagenVanaf op 1 november: 6 september (56 dagen terug ligt vóór 1 oktober)", recenteDagenVanaf("2026-11-01") === "2026-09-06", recenteDagenVanaf("2026-11-01"));
+    check("recenteDagenVanaf op 20 oktober: 25 augustus (56 dagen terug ligt vóór 1 september)", recenteDagenVanaf("2026-10-20") === "2026-08-25", recenteDagenVanaf("2026-10-20"));
+    check("recenteDagenVanaf op 3 maart: 6 januari (56 dagen terug ligt vóór 1 februari)", recenteDagenVanaf("2026-03-03") === "2026-01-06", recenteDagenVanaf("2026-03-03"));
+    check("recenteDagenVanaf op 28 februari: 1 januari (de 1e van de vorige maand ligt vóór 3 januari)", recenteDagenVanaf("2026-02-28") === "2026-01-01", recenteDagenVanaf("2026-02-28"));
+    const sb = new FakeSupabase();
+    sb.seed("accounts", [{ id: "acc-r", client_id: "recent", name: "R", source: "google_ads", external_id: null, agency_id: null }]);
+    sb.seed("client_settings", [{ client_id: "recent", channel_conversion_config: null }]);
+    // Meta 1 juli t/m 31 oktober; bekeken op 1 november: alles vanaf 6 september hoort erbij, niets ervoor.
+    sb.seed("meta_account_daily", dagen("2026-07-01", "2026-10-31", (d) => ({ client_id: "recent", date: d, entity_id: "m1", impressions: 1, link_clicks: 1, spend: 10, conversions: 1, leads: 0, conversion_value: 0 })));
+    sb.seed("meta_connections", [{ client_id: "recent", last_sync_at: "2026-11-01T05:00:00Z" }]);
+    const uit = await haal(sb, "recent", "2026-11-01");
+    const recent = reeks(uit, "meta")?.recenteDagen ?? [];
+    const dagenErin = recent.map((r) => String(r.date)).sort();
+    check("recenteDagen: alleen de rijen vanaf de grens (6 september t/m 31 oktober = 56 rijen)",
+      dagenErin.length === 56 && dagenErin[0] === "2026-09-06" && dagenErin[dagenErin.length - 1] === "2026-10-31", `${dagenErin.length} ${dagenErin[0]} ${dagenErin.at(-1)}`);
+    check("recenteDagen dragen de dagkolommen zoals gelezen (date, spend, de conversievelden)",
+      recent.every((r) => "date" in r && "spend" in r && "conversions" in r && "leads" in r), JSON.stringify(recent[0]));
+    // De emmers zijn de hele historie, niet alleen de recente dagen.
+    check("emmers dekken de hele reeks (juli t/m oktober, vier maanden)",
+      reeks(uit, "meta")?.emmers?.jaren.find((j) => j.jaar === 2026)?.monthly.map((m) => m.month).join(",") === "7,8,9,10", JSON.stringify(reeks(uit, "meta")?.emmers?.jaren));
+    check("zonder client_targets-rijen: een lege lijst, geen fout", Array.isArray(doelen(uit)) && doelen(uit)!.length === 0, JSON.stringify(doelen(uit)));
+  }
+
   console.log("Pagineren langs de 1000-rijengrens van PostgREST");
   {
     const sb = new FakeSupabase();
@@ -366,6 +447,12 @@ async function main() {
     let fout2: unknown = null;
     try { await haal(sb2, "klant-f", NU); } catch (e) { fout2 = e; }
     check("een dagtabel faalt -> DataLaagFout met de tabelnaam", fout2 instanceof DataLaagFout && String((fout2 as DataLaagFout).context).includes("microsoft_account_daily"), String(fout2));
+
+    const sbT = klantF(null);
+    sbT.faalOp("client_targets", "permission denied");
+    let foutT: unknown = null;
+    try { await haal(sbT, "klant-f", NU); } catch (e) { foutT = e; }
+    check("client_targets faalt -> DataLaagFout, niet stil zonder doelen", foutT instanceof DataLaagFout && String((foutT as DataLaagFout).context).includes("client_targets"), String(foutT));
 
     // De standlezer van een kanaal faalt: het kanaal valt terug op zijn eigen nieuwste dag in
     // plaats van uit de rem te verdwijnen.

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { type ClientHistoricalData } from "./types";
 import { buildClientDataFromApi, type ApiMonthlyData, type YearDataInput } from "./api/adapter";
-import type { BlendedKanaalReeks } from "./api/blended-historical";
+import type { BlendedKanaalReeks, ClientTargetRij } from "./api/blended-historical";
 import type { DataStandSamen } from "./sync/datastand";
 import type { ClientForecast } from "./forecast";
 import { blendedForecastUitKanalen, eigenGrenzen } from "./forecast-som";
@@ -18,6 +18,8 @@ interface BlendedApiResponse {
   currentYearMonthly: ApiMonthlyData[];
   dataStand?: DataStandSamen | null;
   perKanaal?: BlendedKanaalReeks[];
+  /** Sinds fase 1, stap 3; een antwoord van daarvóór heeft hem niet. */
+  clientTargets?: ClientTargetRij[];
 }
 
 export interface BlendedClientDataState {
@@ -32,6 +34,11 @@ export interface BlendedClientDataState {
    * conversies waar 4.782 hoort, en de ROAS-kaart boven het doel waar hij eronder staat).
    */
   forecast: ClientForecast | null;
+  /**
+   * De kanaal-gescoopte doelen uit client_targets, zoals de route ze meestuurt (de kanaaltab las
+   * ze eerder zelf). Hier alleen doorgegeven; de prognose per kanaal eruit is de volgende stap.
+   */
+  clientTargets: ClientTargetRij[] | null;
   loading: boolean;
   error: string | null;
 }
@@ -41,6 +48,7 @@ interface Opgehaald {
   dataStand: DataStandSamen | null;
   perKanaal: BlendedKanaalReeks[];
   forecast: ClientForecast;
+  clientTargets: ClientTargetRij[];
 }
 
 // Zelfde soort cache als use-client-data.ts, geen gedeelde entry: andere route, ander schema.
@@ -69,7 +77,7 @@ export function vergeetBlendedClientData(clientId: string): void {
   generatie.set(clientId, (generatie.get(clientId) ?? 0) + 1);
 }
 
-const LEEG: BlendedClientDataState = { data: null, dataStand: null, perKanaal: null, forecast: null, loading: false, error: null };
+const LEEG: BlendedClientDataState = { data: null, dataStand: null, perKanaal: null, forecast: null, clientTargets: null, loading: false, error: null };
 
 function uitCache(clientId: string): Opgehaald | null {
   const c = cache.get(clientId);
@@ -105,6 +113,7 @@ function haal(clientId: string): Promise<Opgehaald> {
         data,
         dataStand: apiData.dataStand ?? null,
         perKanaal,
+        clientTargets: apiData.clientTargets ?? [],
         // Eén keer per ophaalronde, met de rest gecachet: elke lezer (Jaaroverzicht, beursstrip,
         // grafiek, Prognose-tabel) krijgt hetzelfde object in plaats van zelf te rekenen.
         // Met de uitgesloten bronnen van de route: een kanaal dat stopte, telt na zijn dag als nul,
