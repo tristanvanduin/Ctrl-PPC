@@ -225,6 +225,7 @@ async function main() {
     const SCHRIJVERS = [
       "lib/client-settings.ts", "components/dashboard/channel-conversion-settings.tsx", "components/dashboard/ga4-settings.tsx",
       "components/dashboard/search-console-settings.tsx", "components/dashboard/event-settings.tsx", "components/dashboard/branding-view.tsx",
+      "lib/migrate-to-supabase.ts",
     ];
     for (const f of SCHRIJVERS) {
       const b = bron(f);

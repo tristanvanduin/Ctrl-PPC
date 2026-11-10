@@ -6,6 +6,7 @@
 
 import { supabase } from "./supabase";
 import { dbUpsert } from "./data-access/client-write";
+import { vergeetClientSettingsRij } from "./client-settings";
 
 export async function migrateLocalStorageToSupabase(): Promise<{ migrated: string[]; skipped: string[] }> {
   if (!supabase) return { migrated: [], skipped: ["Supabase not configured"] };
@@ -80,6 +81,8 @@ export async function migrateLocalStorageToSupabase(): Promise<{ migrated: strin
       for (const rij of settingsToMigrate) {
         const { client_id: beurs, ...rest } = rij as Record<string, unknown>;
         await dbUpsert("client_settings", String(beurs), rest);
+        // De rijcache (lib/client-settings.ts) mag de rij van vóór de migratie niet vijf minuten dragen.
+        vergeetClientSettingsRij(String(beurs));
       }
       migrated.push(`client_settings (${settingsToMigrate.length} klanten)`);
     }

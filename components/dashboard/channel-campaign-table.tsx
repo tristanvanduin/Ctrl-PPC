@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
+import { dbSelect } from "@/lib/data-access/client-read";
+import { loadClientSettingsRij } from "@/lib/client-settings";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
 import { Laadvlak } from "@/components/ui/laadvlak";
@@ -34,7 +35,7 @@ export function ChannelCampaignTable({ clientId, channel, geoClone }: { clientId
     Promise.all([
       dbSelect<Record<string, unknown>>(cfg.campaignTable, { select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
       dbSelect<Record<string, unknown>>(cfg.nameTable, { select: `${cfg.nameId}, name`, clientId }),
-      dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId }),
+      loadClientSettingsRij(clientId),
     ]).then(([campRes, nameRes, settingsRes]) => {
       if (cancelled) return;
       if (campRes.error) { setError(campRes.error.message); setCampaign([]); return; }
