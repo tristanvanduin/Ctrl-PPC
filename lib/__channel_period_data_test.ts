@@ -38,7 +38,10 @@ const knoop = (nodeType: number) => ({
   setAttribute: noop, removeAttribute: noop, appendChild: noop, removeChild: noop, insertBefore: noop,
   style: {}, ownerDocument: null as unknown, childNodes: [] as unknown[], firstChild: null,
 });
-const doc = { ...knoop(9), activeElement: null, createElement: () => ({ ...knoop(1), ownerDocument: doc }) };
+// `cookie`: de hook leest de conversieselectie sinds stap 2 uit de gedeelde client_settings-rij
+// (lib/client-settings.ts), en die module laadt de browser-Supabase, die bij het opstarten
+// document.cookie leest.
+const doc = { ...knoop(9), activeElement: null, cookie: "", createElement: () => ({ ...knoop(1), ownerDocument: doc }) };
 // Een echte EventTarget als window: de band luistert naar het opslaan van de kanaalselectie.
 const venster = new EventTarget();
 Object.assign(venster, { document: doc, getSelection: () => null, HTMLIFrameElement: class {} });
@@ -123,6 +126,7 @@ async function main() {
   const { createRoot } = await import("react-dom/client");
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { useChannelPeriodData } = await import("./use-channel-period-data");
+  const { vergeetClientSettingsRij } = await import("./client-settings");
   const { monthsAgo } = await import("./reporting-date");
   const { addMonths, lastCompleteMonth, monthsIn, formatMonth, formatRange, resolveComparison, resolvePeriod } = await import("./period/period-range");
   const { bouwHistorischeData, samenvoegen } = await import("./period/kanaal-maanden");
@@ -147,6 +151,10 @@ async function main() {
     for (const k of Object.keys(vragen)) delete vragen[k];
     for (const k of Object.keys(alleVragen)) delete alleVragen[k];
     wachtend = []; gezien = []; laatst = null;
+    // Elk scenario is een nieuw paginabezoek. De tellers hierboven beginnen dan op nul, en de
+    // gedeelde client_settings-rij (lib/client-settings.ts, vijf minuten gecachet) hoort dan ook
+    // leeg te zijn: anders las scenario 2 de selectie van scenario 1 en telde hij nooit opnieuw.
+    for (const klant of ["t", "u"]) vergeetClientSettingsRij(klant);
     const root = createRoot(doc.createElement() as unknown as Element);
     root.render(createElement(Kpi, { channel }));
     return root;

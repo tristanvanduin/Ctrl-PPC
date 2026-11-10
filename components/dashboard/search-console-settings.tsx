@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Loader2, Save, CheckCircle2, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
+import { vergeetClientSettingsRij } from "@/lib/client-settings";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import type { GscConfig } from "@/lib/search-console/types";
 
@@ -44,6 +45,8 @@ export function SearchConsoleSettings({ clientId }: { clientId: string }) {
     setSaving(true); setError(null);
     const clean: GscConfig = { siteUrl: config.siteUrl.trim(), brandTerms: parseList(brandTermsInput) };
     const { error } = await dbUpsert("client_settings", clientId, { search_console_config: clean });
+    // De gedeelde client_settings-rij (lib/client-settings.ts) na elke schrijfactie vergeten.
+    vergeetClientSettingsRij(clientId);
     setSaving(false);
     if (error) setError(error.message);
     else { setConfig(clean); setSaved(true); setTimeout(() => setSaved(false), 4000); }

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { vergeetBlendedClientData } from "@/lib/use-blended-client-data";
+import { vergeetClientSettingsRij } from "@/lib/client-settings";
 import { meldKanaalselectieOpgeslagen } from "@/lib/use-channel-period-data";
 import {
   conversionSourcesFor,
@@ -60,6 +61,9 @@ export function ChannelConversionSettings({ clientId }: { clientId: string }) {
     // Normaliseer (lege selectie → default) vóór opslaan, zodat de conversie nooit 0 wordt.
     const clean = resolveChannelConversionConfig(config);
     const { error } = await dbUpsert("client_settings", clientId, { channel_conversion_config: clean });
+    // De gedeelde rij (lib/client-settings.ts) is na een schrijfactie niet meer te vertrouwen, ook
+    // na een mislukte: ChannelDataProvider en ChannelPerformance lezen de selectie eruit.
+    vergeetClientSettingsRij(clientId);
     setSaving(false);
     if (error) setError(error.message);
     else {

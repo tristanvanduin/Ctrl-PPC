@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { dbSelectOne } from "@/lib/data-access/client-read";
+import { loadClientSettingsRij } from "@/lib/client-settings";
 import { today } from "@/lib/reporting-date";
 import { NASLEEP_WEKEN, selectActiveEdition, type FairEventCfg, type UpcomingEdition } from "./fair-weeks";
 
@@ -13,7 +13,9 @@ import { NASLEEP_WEKEN, selectActiveEdition, type FairEventCfg, type UpcomingEdi
 // De gekozen beurs (?geo= / GeoCloneScope) gaat mee. Zonder die parameter stond in de hero
 // "Beurs: GreenTech Americas" naast de aftelling van welke ingestelde beurs toevallig de
 // eerstvolgende was. De events worden één keer per klant geladen; wisselen van beurs kiest
-// opnieuw uit wat er al is, zonder nieuw verzoek.
+// opnieuw uit wat er al is, zonder nieuw verzoek. En die ene keer is de gedeelde client_settings-rij
+// (lib/client-settings.ts): dezelfde rij die de provider en de KPI-band lezen, dus geen eigen
+// select rai_events meer naast hun verzoek.
 //
 // Null betekent: deze klant (of de gekozen beurs) stuurt niet op een beurs — geen events, geen
 // event met die afkorting, of een cadans waaruit geen volgende datum te bepalen valt. De
@@ -26,7 +28,7 @@ export function useUpcomingEdition(clientId: string, selectedGeo: string | null 
 
   useEffect(() => {
     let cancelled = false;
-    dbSelectOne<{ rai_events: unknown }>("client_settings", { select: "rai_events", clientId })
+    loadClientSettingsRij(clientId)
       .then(({ data }) => {
         if (cancelled) return;
         const ev = (data?.rai_events as { events?: FairEventCfg[] } | null)?.events;

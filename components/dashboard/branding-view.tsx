@@ -5,6 +5,7 @@ import { Loader2, Palette, Save, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { resolveEventTheme, type BrandVisualIdentity } from "@/lib/branding/theme";
 import { dbUpsert } from "@/lib/data-access/client-write";
+import { vergeetClientSettingsRij } from "@/lib/client-settings";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 
 // Branding-tab: de merk-identiteit per klant/account. Bewerkt client_settings.brand_guide
@@ -51,6 +52,9 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
     if (!sb || !guide) return;
     setSaving(true); setError(null);
     const { error } = await dbUpsert("client_settings", clientId, { brand_guide: guide });
+    // De gedeelde client_settings-rij (lib/client-settings.ts) na elke schrijfactie vergeten: de
+    // huisstijl van het dashboard (BrandThemeProvider) leest de brand guide eruit.
+    vergeetClientSettingsRij(clientId);
     setSaving(false);
     if (error) setError(error.message);
     else { setSaved(true); setTimeout(() => setSaved(false), 4000); }

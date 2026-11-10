@@ -194,10 +194,14 @@ export function kpiDoelenIngevoerd(settings: ClientSettings): boolean {
 }
 
 /**
- * Load settings from Supabase into cache (async).
- * Should be called on component mount.
+ * De client_settings-rij zoals GET /api/data/client_settings hem geeft (select *). Behalve de
+ * kolommen die loadClientSettings omzet, ook de jsonb-kolommen die andere lezers van het Overzicht
+ * nodig hebben: zo volstaat één lezing van de rij voor de huisstijl (brand_guide), de beurzen
+ * (rai_events) en de conversieselectie van Meta/LinkedIn/Microsoft (channel_conversion_config).
+ * Die drie blijven `unknown`: elke lezer kent zijn eigen vorm en controleert die zelf, zoals hij
+ * dat bij zijn losse dbSelectOne ook deed.
  */
-interface ClientSettingsRow {
+export interface ClientSettingsRow {
   conversion_actions?: ConversionAction[] | null;
   kpi_targets?: Partial<KpiTargets> | null;
   sector?: string | null;
@@ -210,11 +214,84 @@ interface ClientSettingsRow {
   merchant_feed_label?: string | null;
   merchant_content_language?: string | null;
   merchant_channel?: string | null;
+  brand_guide?: unknown;
+  rai_events?: unknown;
+  channel_conversion_config?: unknown;
+  full_branding_enabled?: boolean | null;
 }
 
+/** Wat een lezing van de rij oplevert: dezelfde vorm als dbSelectOne, zodat de lezers niet hoeven te veranderen. */
+export type ClientSettingsRijUitkomst = { data: ClientSettingsRow | null; error: { message: string } | null };
+
+// --- De rij één keer per klant ---
+//
+// Bij het laden van het Overzicht lazen VIJF lezers dezelfde rij, met vier verschillende
+// select-lijsten: ClientDataProvider en useBlendedClientData (allebei select * via loadClientSettings,
+// zonder dedupe), de KPI-band (channel_conversion_config), de huisstijl (brand_guide) en de
+// beurs-editie (rai_events); op de wissel naar Meta kwamen er twee bij. Dezelfde 3,4 kB vijf keer,
+// en elk verzoek zijn eigen rondreis. settingsCache hierboven hielp daar niet tegen: die wordt pas
+// NA het antwoord gevuld, en de provider roept loadClientSettings toch aan.
+//
+// Nu één ruwe rij per klant: `onderweg` laat gelijktijdige lezers op hetzelfde verzoek wachten, en
+// `rijCache` bewaart het antwoord vijf minuten (dezelfde termijn als de Google- en blended cache),
+// zodat ook een lezer die later mount (de provider wacht op de Google-route) geen nieuw verzoek
+// doet. Vergeten na elke schrijfactie op client_settings (vergeetClientSettingsRij), zodat niemand
+// vijf minuten een oude instelling leest.
+const RIJ_TTL_MS = 5 * 60 * 1000;
+const rijCache = new Map<string, { rij: ClientSettingsRow | null; timestamp: number }>();
+const onderweg = new Map<string, Promise<ClientSettingsRijUitkomst>>();
+// Per klant een teller die vergeetClientSettingsRij ophoogt. Een lezing die vóór het vergeten vertrok,
+// brengt nog de oude rij mee en mag die dan niet meer in de cache zetten (dezelfde constructie als
+// in lib/use-blended-client-data.ts).
+const rijGeneratie = new Map<string, number>();
+
+/**
+ * De ruwe client_settings-rij van deze klant: uit de cache, of één gedeeld verzoek voor iedereen
+ * die er tegelijk om vraagt. Null als er geen rij is (een nieuwe klant); dat wordt ook gecachet,
+ * want "geen rij" is een geldig antwoord. Een mislukte lezing komt NIET in de cache: na een fout is
+ * er niets bekend, en de volgende lezer probeert het opnieuw.
+ *
+ * Niet achter `if (supabase)`: de lezers die dit vervangt (dbSelectOne) gingen ook zonder
+ * browser-Supabase naar /api/data. loadClientSettings houdt zijn eigen poort.
+ */
+export function loadClientSettingsRij(clientId: string): Promise<ClientSettingsRijUitkomst> {
+  const c = rijCache.get(clientId);
+  if (c && Date.now() - c.timestamp < RIJ_TTL_MS) return Promise.resolve({ data: c.rij, error: null });
+  const lopend = onderweg.get(clientId);
+  if (lopend) return lopend;
+  const gen = rijGeneratie.get(clientId) ?? 0;
+  const verzoek: Promise<ClientSettingsRijUitkomst> = dbSelectOne<ClientSettingsRow>("client_settings", { select: "*", clientId })
+    .then((uitkomst) => {
+      if (!uitkomst.error && (rijGeneratie.get(clientId) ?? 0) === gen) {
+        rijCache.set(clientId, { rij: uitkomst.data, timestamp: Date.now() });
+      }
+      return uitkomst;
+    })
+    .finally(() => { if (onderweg.get(clientId) === verzoek) onderweg.delete(clientId); });
+  onderweg.set(clientId, verzoek);
+  return verzoek;
+}
+
+/**
+ * Gooi de gecachte rij (en een lopend verzoek) van deze klant weg. Aan te roepen na ELKE
+ * schrijfactie op client_settings: saveClientSettings, de conversieselectie, GA4, Search Console,
+ * de beurzen en de huisstijl. Ook na een mislukte schrijfactie: een time-out kan ná een geslaagde
+ * schrijfactie komen, en dan weet de browser niet meer wat er staat. Een extra lezing is goedkoop;
+ * vijf minuten een oude instelling tonen niet.
+ */
+export function vergeetClientSettingsRij(clientId: string): void {
+  rijCache.delete(clientId);
+  onderweg.delete(clientId);
+  rijGeneratie.set(clientId, (rijGeneratie.get(clientId) ?? 0) + 1);
+}
+
+/**
+ * Load settings from Supabase into cache (async).
+ * Should be called on component mount.
+ */
 export async function loadClientSettings(clientId: string): Promise<ClientSettings> {
   if (supabase) {
-    const { data, error } = await dbSelectOne<ClientSettingsRow>("client_settings", { select: "*", clientId });
+    const { data, error } = await loadClientSettingsRij(clientId);
 
     if (data) {
       const settings: ClientSettings = {
@@ -298,6 +375,10 @@ export async function saveClientSettings(settings: ClientSettings): Promise<{ er
       merchant_channel: settings.merchantChannel ?? null,
       updated_at: new Date().toISOString(),
     });
+    // Vóór de foutcontrole: ook na een mislukte schrijfactie is de gecachte rij niet meer te
+    // vertrouwen (zie vergeetClientSettingsRij). De settingsCache hieronder blijft bij een fout wél
+    // ongemoeid: die draagt wat echt gelezen of opgeslagen is.
+    vergeetClientSettingsRij(settings.clientId);
     if (error) return { error: error.message };
   }
   settingsCache.set(settings.clientId, opgeslagen);

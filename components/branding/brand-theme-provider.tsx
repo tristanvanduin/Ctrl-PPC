@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { dbSelectOne } from "@/lib/data-access/client-read";
+import { loadClientSettingsRij } from "@/lib/client-settings";
 import { resolveEventTheme, type BrandVisualIdentity, type EventTheme } from "@/lib/branding/theme";
 import { resolveBranding, type GeoCloneBranding } from "@/lib/fair/geo-clone-settings";
 
@@ -84,9 +85,11 @@ export function BrandThemeProvider({
 
     (async () => {
       // Account-branding uit de brand guide, en of het chrome mee mag kleuren (migratie 101) --
-      // parallel, want geen van beide hangt van de ander af.
+      // parallel, want geen van beide hangt van de ander af. De brand guide komt uit de gedeelde
+      // client_settings-rij (lib/client-settings.ts): dezelfde rij die de provider, de KPI-band en
+      // de beurs-editie lezen, één verzoek voor allemaal in plaats van een eigen select brand_guide.
       const [{ data: cs }, scopeRes] = await Promise.all([
-        dbSelectOne<{ brand_guide: unknown }>("client_settings", { select: "brand_guide", clientId }),
+        loadClientSettingsRij(clientId),
         fetch(`/api/branding/scope?clientId=${encodeURIComponent(clientId)}`).then((r) => r.json()).catch(() => null),
       ]);
       const guide = (cs?.brand_guide ?? {}) as { brandName?: string; visual?: BrandVisualIdentity };

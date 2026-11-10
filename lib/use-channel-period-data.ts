@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
+import { dbSelect } from "@/lib/data-access/client-read";
+import { loadClientSettingsRij, vergeetClientSettingsRij } from "@/lib/client-settings";
 import type { ReadFilter } from "@/lib/data-access/read-policy";
 import { resolveChannelConversionConfig, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
 import { alsBronReeks, type BronReeks } from "@/lib/period/apply-period";
@@ -132,8 +133,13 @@ async function fetchKanaalRijen(clientId: string, kanaal: NietGoogleKanaal): Pro
 // tot een herlaadbeurt, terwijl het Jaaroverzicht eronder de nieuwe toonde (review [4], [22], [40]).
 const KANAALSELECTIE_OPGESLAGEN = "kanaalselectie-opgeslagen";
 
-/** Aan te roepen na het opslaan van de Meta/LinkedIn/Microsoft-selectie: de band leest opnieuw. */
+/**
+ * Aan te roepen na het opslaan van de Meta/LinkedIn/Microsoft-selectie: de band leest opnieuw.
+ * Eerst de gedeelde rij vergeten: de band leest zijn selectie uit de rijcache van
+ * lib/client-settings.ts, en zonder dit kreeg hij op het seintje vijf minuten lang de oude terug.
+ */
 export function meldKanaalselectieOpgeslagen(clientId: string): void {
+  vergeetClientSettingsRij(clientId);
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(KANAALSELECTIE_OPGESLAGEN, { detail: { clientId } }));
 }
@@ -179,7 +185,9 @@ export function useChannelPeriodData({ clientId, channel, googleData }: ChannelP
     // tellen met de standaardselectie kan een ander getal geven dan de opgeslagen keuze (LinkedIn met
     // alleen "Lead-formulieren": 200 in plaats van 387 bij de demo), en dat getal stond dan even in
     // de KPI-rij. Een mislukte lees valt terug op de standaardselectie, net als voorheen.
-    const config = dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId })
+    // Uit de gedeelde client_settings-rij (lib/client-settings.ts): één verzoek met de provider,
+    // de huisstijl en de beurs-editie, in plaats van een eigen select channel_conversion_config.
+    const config = loadClientSettingsRij(clientId)
       .then(({ data }) => resolveChannelConversionConfig((data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null));
     for (const kanaal of NIET_GOOGLE) {
       Promise.all([config, fetchKanaalRijen(clientId, kanaal)]).then(([cfg, { rijen, geladenVanaf }]) => {

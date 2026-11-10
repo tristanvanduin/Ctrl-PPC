@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Calendar, TrendingUp, BarChart3 } from "lucide-react";
-import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
+import { dbSelect } from "@/lib/data-access/client-read";
+import { loadClientSettingsRij } from "@/lib/client-settings";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
 import { today as vandaag } from "@/lib/reporting-date";
@@ -133,7 +134,9 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
       // account-tabel draagt geen campagnenaam en kan dus niet per beurs gesplitst worden.
       dbSelect<Record<string, unknown>>(cfg.campaignTable, { select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
       dbSelect<Record<string, unknown>>(cfg.nameTable, { select: `${cfg.nameId}, name`, clientId }),
-      dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", { select: "channel_conversion_config", clientId }),
+      // De conversieselectie uit de gedeelde client_settings-rij (lib/client-settings.ts), niet een
+      // eigen select: de band en ChannelDataProvider lezen dezelfde rij.
+      loadClientSettingsRij(clientId),
     ]).then(([accRes, campRes, nameRes, settingsRes]) => {
       if (cancelled) return;
       if (accRes.error) { setError(accRes.error.message); setAccount([]); return; }

@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
+import { dbSelect } from "@/lib/data-access/client-read";
+import { loadClientSettingsRij } from "@/lib/client-settings";
 import { today as vandaag } from "@/lib/reporting-date";
 import { buildChannelForecast, tabStandUitRoute } from "@/lib/analysis/channel-forecast-data";
 import { useBlendedClientData } from "@/lib/use-blended-client-data";
@@ -90,9 +91,10 @@ export function ChannelDataProvider({ clientId, channel, children }: {
       dbSelect<{ channel: string; metric: string; target_value: number; valid_from: string; valid_to: string | null }>(
         "client_targets", { select: "channel, metric, target_value, valid_from, valid_to", clientId },
       ),
-      dbSelectOne<{ channel_conversion_config: unknown }>("client_settings", {
-        select: "channel_conversion_config", clientId,
-      }),
+      // De conversieselectie uit de gedeelde client_settings-rij (lib/client-settings.ts): op de
+      // wissel naar een kanaaltab las dit component én ChannelPerformance elk hun eigen rij, terwijl
+      // de band hem bij het laden al had. Nu nul verzoeken binnen de cachetijd.
+      loadClientSettingsRij(clientId),
     ]).then(([accRes, targetRes, settingsRes]) => {
       if (cancelled) return;
       setRijen(((accRes.data ?? []) as unknown as Record<string, unknown>[]).map(cfg.map));

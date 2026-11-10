@@ -61,8 +61,10 @@ const INSTELLINGEN = {
 };
 type Wachtend = { soort: "client-data" | "instellingen"; klant: string; los: (ok?: boolean) => void };
 let wachtend: Wachtend[] = [];
-globalThis.fetch = ((url: string) => {
+globalThis.fetch = ((url: string, init?: { method?: string }) => {
   const u = String(url);
+  // Een schrijfactie (saveClientSettings -> dbUpsert) slaagt meteen; alleen het lezen wacht.
+  if (init?.method && init.method !== "GET") return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [] }) } as Response);
   if (u.startsWith("/api/data/client_settings")) {
     const vraag = JSON.parse(decodeURIComponent(u.split("?q=")[1] ?? "{}")) as { clientId?: string };
     return new Promise((klaar) => wachtend.push({
@@ -161,7 +163,10 @@ async function main() {
     const root = mount(createElement(Dashboard, { clientId: "gads-111" }));
     await beantwoord("client-data");
     check("met instellingen in de cache: meteen het doel uit Instellingen", verwacht(zag()), JSON.stringify(alleDoelen));
-    await beantwoord("instellingen");
+    // De rij zelf is sinds stap 2 vijf minuten gecachet (loadClientSettingsRij): het tweede bezoek
+    // doet geen nieuw verzoek om client_settings. Eerder las de provider hem bij elke mount opnieuw.
+    await rust();
+    check("binnen de cachetijd geen nieuw verzoek om de rij", !wachtend.some((w) => w.soort === "instellingen" && w.klant === "gads-111"), String(wachtend.length));
     check("en nooit het routedoel", !alleDoelen.some(isRoutedoel), JSON.stringify(alleDoelen));
     root.unmount();
   }
@@ -216,15 +221,21 @@ async function main() {
     root.unmount();
   }
 
-  console.log("Een andere lezer vult de cache terwijl de provider nog wacht");
+  console.log("Een andere vuller van de cache terwijl de provider nog wacht: saveClientSettings");
   {
-    // useBlendedClientData (haal()) leest de instellingen ook, voor elke klant met een ander kanaal
-    // dan Google. Komt dat antwoord eerder dan dat van de provider, dan opent de poort bij de
-    // volgende render van de ouder (heeftGecachteInstellingen), maar de samenvoeging was al gedaan
-    // bij de eerste render, met een lege cache: de standaard. De kinderen zagen zo toch het routedoel
-    // (1.938 en € 139.860), tot het eigen antwoord van de provider binnen was, of nooit als dat hing.
+    // Hier stond useBlendedClientData (haal()) als tweede lezer: die las de instellingen ook, en kwam
+    // zijn antwoord eerder dan dat van de provider, dan opende de poort bij de volgende render van de
+    // ouder (heeftGecachteInstellingen), maar de samenvoeging was al gedaan bij de eerste render, met
+    // een lege cache: de standaard. De kinderen zagen zo toch het routedoel (1.938 en € 139.860),
+    // tot het eigen antwoord van de provider binnen was, of nooit als dat hing.
+    //
+    // Sinds stap 2 delen alle lezers één verzoek per klant (loadClientSettingsRij), dus een tweede
+    // LEZER kan niet meer eerder binnen zijn dan de provider. Wat de cache nog wél kan vullen terwijl
+    // het eigen verzoek loopt, is saveClientSettings: Instellingen opslaan zet settingsCache na een
+    // geslaagde schrijfactie, zonder het lopende verzoek af te wachten. Dezelfde omslag van dicht naar
+    // open, dezelfde eis: de kinderen zien het doel uit de cache, en nooit het routedoel.
     const { useState } = await import("react");
-    const { loadClientSettings, heeftGecachteInstellingen } = await import("./client-settings");
+    const { saveClientSettings, getClientSettings, heeftGecachteInstellingen } = await import("./client-settings");
     for (const [label, opent] of [["een herrender van de ouder", "herrender"], ["de wachttijd", "wachttijd"]] as const) {
       const klant = `gads-66${opent === "herrender" ? 6 : 7}`;
       gezien.doel = null;
@@ -241,14 +252,13 @@ async function main() {
       await tot(() => wachtend.some((w) => w.soort === "instellingen" && w.klant === klant));
       const vanProvider = wachtend.filter((w) => w.soort === "instellingen" && w.klant === klant);
       check(`${label}: voorwaarde: de provider wacht op zijn eigen verzoek`, vanProvider.length === 1, String(vanProvider.length));
-      const ander = loadClientSettings(klant);
-      await tot(() => wachtend.some((w) => w.soort === "instellingen" && w.klant === klant && !vanProvider.includes(w)));
-      const nieuw = wachtend.filter((w) => w.soort === "instellingen" && w.klant === klant && !vanProvider.includes(w));
-      wachtend = wachtend.filter((w) => !nieuw.includes(w));
-      for (const w of nieuw) w.los();
-      await ander;
+      // Opslaan met hetzelfde doel als de rij in de database (2.600 conversies, CPA € 45), zodat het
+      // late antwoord van de provider straks niets anders zegt dan de opslag.
+      const huidig = getClientSettings(klant);
+      const { error } = await saveClientSettings({ ...huidig, kpiTargets: { ...huidig.kpiTargets, ...INSTELLINGEN.kpi_targets as Partial<typeof huidig.kpiTargets> } });
       await rust();
-      check(`${label}: voorwaarde: de cache heeft de instellingen`, heeftGecachteInstellingen(klant));
+      check(`${label}: voorwaarde: de opslag slaagt en vult de cache`, error === null && heeftGecachteInstellingen(klant), String(error));
+      check(`${label}: voorwaarde: het eigen verzoek van de provider loopt nog`, wachtend.includes(vanProvider[0]));
       if (opent === "herrender") { herrender(); await rust(); }
       else await new Promise((r) => setTimeout(r, INSTELLINGEN_WACHT_MS + 100));
       check(`${label}: de kinderen zien het doel uit Instellingen`, verwacht(zag()), JSON.stringify(alleDoelen));
