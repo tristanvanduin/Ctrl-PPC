@@ -8,10 +8,16 @@
 // Wegklikbaar voor deze sessie, keert terug bij een nieuwe paginalaad zolang de stand niet
 // klopt. Zelfde kleurregels als SopDekkingBanner: geen dark:-varianten op de kleurklassen,
 // app/globals.css keert de schaal zelf om.
+//
+// Zonder sessie wordt /api/sync/datastand niet aangeroepen: requireCapability("client:read")
+// geeft dan gegarandeerd 401, ongeacht O1_AUTH_ENFORCED (zie SopDekkingBanner, zelfde regel).
+// Pas als het gedeelde /api/me-antwoord een sessie bevestigt komt de vraag; met sessie
+// verschijnt dezelfde banner als voorheen.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { XCircle, AlertTriangle, X } from "lucide-react";
+import { useAccess } from "@/lib/auth/use-access";
 
 interface Samenvatting {
   toestand: "ok" | "nooit" | "stilstand";
@@ -22,17 +28,19 @@ interface Samenvatting {
 }
 
 export function DatastandBanner() {
+  const { loading: toegangLaadt, ingelogd } = useAccess();
   const [samenvatting, setSamenvatting] = useState<Samenvatting | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    if (toegangLaadt || !ingelogd) return;
     let actief = true;
     fetch("/api/sync/datastand")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (actief) setSamenvatting(data?.samenvatting ?? null); })
       .catch(() => { if (actief) setSamenvatting(null); });
     return () => { actief = false; };
-  }, []);
+  }, [toegangLaadt, ingelogd]);
 
   if (!samenvatting || samenvatting.toestand === "ok" || !samenvatting.tekst || dismissed) return null;
 

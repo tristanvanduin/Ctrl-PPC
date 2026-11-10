@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { StickyNote, ListChecks, Plus, Pencil, Trash2, Save } from "lucide-react";
 import { supabase, type ClientNote } from "@/lib/supabase";
 import { dbDelete, dbInsert, dbUpdate } from "@/lib/data-access/client-write";
@@ -146,7 +146,25 @@ export function ClientNotes({ clientId }: { clientId: string }) {
     }
   }, [clientId]);
 
-  useEffect(() => { fetchNotes(); }, [fetchNotes]);
+  // Pas lezen als de kaarten in beeld komen. Ze staan onderaan een pagina van ruim 5.000 px, en
+  // bij het laden van het Overzicht las dit al een verzoek dat de meeste bezoeken nooit te zien
+  // kregen. Een IntersectionObserver met wat voorsprong (200 px) laat het verzoek vertrekken vóór
+  // de kaarten de onderrand halen, zodat wie scrolt geen laadvlak ziet. Zonder observer (oude
+  // browser, test zonder DOM) meteen lezen, zoals voorheen.
+  const wortel = useRef<HTMLDivElement>(null);
+  const [inBeeld, setInBeeld] = useState(false);
+  useEffect(() => {
+    const el = wortel.current;
+    if (!el || typeof IntersectionObserver === "undefined") { setInBeeld(true); return; }
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) { setInBeeld(true); observer.disconnect(); } },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // Eenmaal in beeld blijft hij lezen bij elke klantwissel (fetchNotes wisselt mee met clientId).
+  useEffect(() => { if (inBeeld) fetchNotes(); }, [inBeeld, fetchNotes]);
 
   const editingNote = editingId ? notes.find((n) => n.id === editingId) ?? null : null;
   const noteToDelete = deleteConfirm ? notes.find((n) => n.id === deleteConfirm) ?? null : null;
@@ -269,7 +287,7 @@ export function ClientNotes({ clientId }: { clientId: string }) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div ref={wortel} className="grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* Sectie 1: to-do's -- eigen kaart, eigen toevoegknop. */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">

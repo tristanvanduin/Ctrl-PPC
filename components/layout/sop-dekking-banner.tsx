@@ -9,6 +9,11 @@
 // Onzichtbaar voor wie geen settings:write heeft: /api/tenancy/sop-dekking geeft dan een 403, en
 // die wordt hier stil als "geen banner" gelezen. Dit is geen scherm voor een viewer-rol.
 //
+// Zonder sessie wordt de route niet eens aangeroepen: requireCapability geeft dan gegarandeerd
+// 401, ongeacht O1_AUTH_ENFORCED, dus dat verzoek was dood gewicht bij elke paginalaad (0 kB in
+// de meting). useAccess deelt het ene /api/me-antwoord van de zijbalk; pas als dat een sessie
+// bevestigt (ingelogd) komt de dekkingsvraag. Met sessie verschijnt dezelfde banner als voorheen.
+//
 // GEEN dark:-varianten op de amber-klassen hieronder, met opzet. app/globals.css keert onder
 // `.dark` de hele Tailwind-kleurenschaal om (amber-100 wordt daar de donkere tint, amber-900 de
 // lichte) juist zodat gewone, in licht-modus geschreven combinaties als `bg-amber-50 text-amber-700`
@@ -19,6 +24,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, X } from "lucide-react";
+import { useAccess } from "@/lib/auth/use-access";
 
 interface Account {
   id: string;
@@ -36,6 +42,7 @@ interface Oordeel {
 }
 
 export function SopDekkingBanner() {
+  const { loading: toegangLaadt, ingelogd } = useAccess();
   const [oordeel, setOordeel] = useState<Oordeel | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [open, setOpen] = useState(false);
@@ -55,8 +62,9 @@ export function SopDekkingBanner() {
   }
 
   useEffect(() => {
+    if (toegangLaadt || !ingelogd) return;
     herlaad();
-  }, []);
+  }, [toegangLaadt, ingelogd]);
 
   if (!oordeel || oordeel.toestand !== "overschreden" || dismissed) return null;
 

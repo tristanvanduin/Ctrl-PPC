@@ -8,6 +8,7 @@ import { getVisibleClients, loadVisibleClientIds } from "@/lib/visible-clients";
 import { loadApiClients } from "@/lib/clients";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { useAccess } from "@/lib/auth/use-access";
+import { useCodeRoodMeldingen } from "@/lib/adoptie/use-code-rood";
 import { migrateLocalStorageToSupabase } from "@/lib/migrate-to-supabase";
 import { loadClientGroups, type GroupWithMembers } from "@/lib/client-groups";
 import { bouwHierarchie, beschikbareAssen, type GroepAs, type Tak } from "@/lib/groepen/hierarchie";
@@ -140,7 +141,12 @@ function SidebarInner() {
   // meldingen.sql), pas dan uit hun normale map getrokken -- besluit eigenaar 11 aug 2026, met de
   // volgorde-correctie dat dit NA accepteren gebeurt, niet meteen bij detectie. Standaard OPEN
   // (het omgekeerde van het back-up-mapje hierboven): dit is zeldzaam en urgent, geen archief.
-  const [codeRoodKlanten, setCodeRoodKlanten] = useState<VisibleClient[]>([]);
+  // Dezelfde hook als de dashboardbanner en het Today-paneel: één gedeeld verzoek voor alle
+  // lezers (lib/adoptie/use-code-rood.ts), en geen verzoek zolang er geen sessie is.
+  const { meldingen: codeRoodMeldingen } = useCodeRoodMeldingen();
+  const codeRoodKlanten: VisibleClient[] = codeRoodMeldingen
+    .filter((m) => m.licht === "rood" && m.status === "geaccepteerd")
+    .map((m) => ({ id: m.clientId, name: m.clientNaam }));
   const [codeRoodOpen, setCodeRoodOpen] = useState(true);
   const [groups, setGroups] = useState<GroupWithMembers[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -248,22 +254,6 @@ function SidebarInner() {
     }).catch(() => { if (!cancelled) setBackupClientIds(new Set()); });
     return () => { cancelled = true; };
   }, [zichtbareIds]);
-
-  // Eén lichte fetch, zelfde route als het Today-paneel en de dashboardbanner
-  // (lib/adoptie/use-code-rood.ts) -- hier los aangeroepen omdat de zijbalk buiten elke
-  // React-boom staat die de hook al ergens anders mount.
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/adoptie/code-rood")
-      .then((r) => r.json())
-      .then((json: { meldingen?: { clientId: string; clientNaam: string; licht: string; status: string }[]; error?: string }) => {
-        if (cancelled || json.error) return;
-        const geaccepteerd = (json.meldingen ?? []).filter((m) => m.licht === "rood" && m.status === "geaccepteerd");
-        setCodeRoodKlanten(geaccepteerd.map((m) => ({ id: m.clientId, name: m.clientNaam })));
-      })
-      .catch(() => { if (!cancelled) setCodeRoodKlanten([]); });
-    return () => { cancelled = true; };
-  }, []);
 
   function toggleGroup(groupId: string) {
     setCollapsedGroups((prev) => {

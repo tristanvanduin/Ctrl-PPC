@@ -4,20 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserCircle2, Settings, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAccess, vergeetToegang } from "@/lib/auth/use-access";
 
-// Fase 5, Task 2: het gebruikersmenu in de bovenbalk. E-mail via /api/me -- hetzelfde,
-// bewust lichte patroon dat lib/feed/use-today-feed.ts al gebruikt (geen sessie/enforcement:
-// gewoon geen e-mail, geen foutmelding).
+// Fase 5, Task 2: het gebruikersmenu in de bovenbalk. Het e-mailadres komt uit useAccess, het
+// ene gedeelde /api/me-antwoord van de zijbalk en het logo -- een eigen fetch hier was het derde
+// identieke verzoek bij elke paginalaad. Zonder sessie/enforcement: gewoon geen e-mail, geen
+// foutmelding.
 
 export function UserMenu() {
-  const [email, setEmail] = useState<string | null>(null);
+  const { email } = useAccess();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    fetch("/api/me").then((r) => r.json()).then((d) => setEmail(d?.email ?? null)).catch(() => {});
-  }, []);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -29,6 +27,8 @@ export function UserMenu() {
 
   async function logout() {
     if (supabase) await supabase.auth.signOut();
+    // Het bewaarde /api/me-antwoord hoort bij de sessie die zojuist eindigde.
+    vergeetToegang();
     setOpen(false);
     router.push("/login");
   }
