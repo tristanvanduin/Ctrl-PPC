@@ -116,14 +116,18 @@ async function run(breedte, hoogte, throttle) {
 
   let log = [];
   let inflight = 0, laatste = Date.now();
-  p.on("request", (r) => { if (r.url().includes("/api/")) { inflight++; laatste = Date.now(); } });
+  // Starttijd per verzoek, zodat per pad ook de DUUR bekend is: welke route het eerste kerncijfer
+  // tegenhoudt is uit bytes alleen niet af te leiden (fase 1, stap 0).
+  const gestart = new Map();
+  p.on("request", (r) => { if (r.url().includes("/api/")) { inflight++; laatste = Date.now(); gestart.set(r, Date.now()); } });
   p.on("requestfinished", async (r) => {
     const u = r.url();
     if (!u.includes("/api/")) return;
     inflight--; laatste = Date.now();
+    const ms = gestart.has(r) ? Date.now() - gestart.get(r) : null;
     let bytes = 0; try { bytes = (await (await r.response()).body()).length; } catch {}
     const pad = new URL(u).pathname;
-    log.push({ pad: pad.startsWith("/api/data/") ? "data/" + decodeURIComponent(pad.slice(10)) : pad, bytes });
+    log.push({ pad: pad.startsWith("/api/data/") ? "data/" + decodeURIComponent(pad.slice(10)) : pad, bytes, ms });
   });
   p.on("requestfailed", (r) => { if (r.url().includes("/api/")) inflight--; });
   const rust = async (max = 25000) => {
@@ -133,7 +137,11 @@ async function run(breedte, hoogte, throttle) {
   };
   const perPad = () => {
     const uitk = {};
-    for (const x of log) { uitk[x.pad] ??= { n: 0, kb: 0 }; uitk[x.pad].n++; uitk[x.pad].kb = Math.round((uitk[x.pad].kb + x.bytes / 1024) * 10) / 10; }
+    for (const x of log) {
+      uitk[x.pad] ??= { n: 0, kb: 0, maxMs: 0, somMs: 0 };
+      uitk[x.pad].n++; uitk[x.pad].kb = Math.round((uitk[x.pad].kb + x.bytes / 1024) * 10) / 10;
+      if (x.ms != null) { uitk[x.pad].maxMs = Math.max(uitk[x.pad].maxMs, x.ms); uitk[x.pad].somMs += x.ms; }
+    }
     return Object.fromEntries(Object.entries(uitk).sort((a, b) => b[1].kb - a[1].kb));
   };
   const apiTotaal = () => ({ verzoeken: log.length, kb: Math.round(log.reduce((a, x) => a + x.bytes, 0) / 1024) });
@@ -192,6 +200,9 @@ async function run(breedte, hoogte, throttle) {
     };
     await wissel("kanaal: Alle kanalen -> Meta", () => p.getByRole("button", { name: /^Meta$/ }).first().click());
     await wissel("kanaal: Meta -> Alle kanalen", () => p.getByRole("button", { name: /^Alle kanalen$/ }).first().click());
+    // Het tweede bezoek aan dezelfde tab: wat een cache waard is, zie je pas hier.
+    await wissel("kanaal: Alle kanalen -> Meta (tweede keer)", () => p.getByRole("button", { name: /^Meta$/ }).first().click());
+    await wissel("kanaal: Meta -> Alle kanalen (tweede keer)", () => p.getByRole("button", { name: /^Alle kanalen$/ }).first().click());
     // De periodekiezer: de knop met aria-haspopup="dialog" (zijn naam is de gekozen periode zelf),
     // daarna de preset in het paneel. De knop is uitgeschakeld zolang de band laadt.
     const kiesPreset = async (label) => {
@@ -223,7 +234,7 @@ for (const r of uit.runs) {
   const l = r.laden;
   console.log(`\n## ${r.naam}`);
   console.log(`laden: ${l.api.verzoeken} API-verzoeken, ${l.api.kb} kB · eerste kerncijfer ${f(l.eersteKerncijferMs, " ms")} (y=${f(l.eersteKerncijfer?.y, " px")}, ${l.eersteKerncijfer?.tekst ?? "?"}) · netwerk stil ${f(l.netwerkStilMs, " ms")} · LCP ${f(l.lcpMs, " ms")} · CLS ${l.cls} · lange taken ${l.langeTaken} (${l.blokkeerMs} ms) · hoogte ${l.paginaHoogte} px · ${l.blokken} secties`);
-  for (const [k, v] of Object.entries(l.perPad).slice(0, 8)) console.log(`   ${String(v.n).padStart(2)}x ${String(v.kb).padStart(7)} kB  ${k}`);
+  for (const [k, v] of Object.entries(l.perPad).slice(0, 10)) console.log(`   ${String(v.n).padStart(2)}x ${String(v.kb).padStart(7)} kB  max ${String(v.maxMs ?? "-").padStart(5)} ms  ${k}`);
   for (const w of r.wissels) {
     console.log(`wissel ${w.label}${w.fout ? ` [FOUT ${w.fout}]` : ""}: ${w.api.verzoeken} verzoeken (${w.api.kb} kB) · eerste verandering ${f(w.eersteVeranderingMs, " ms")} · netwerk stil ${f(w.netwerkStilMs, " ms")} · blokken veranderd ${w.blokkenVeranderd}/${w.blokken} · beeldjes ${w.beeldjes} waarvan > 25 ms: ${w.beeldjesBoven25ms} · lange taken ${w.langeTaken} (${w.blokkeerMs} ms)`);
   }
