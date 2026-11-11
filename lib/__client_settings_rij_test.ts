@@ -215,12 +215,20 @@ async function main() {
     const LEZERS = [
       "lib/client-data-provider.tsx", "lib/use-blended-client-data.ts", "lib/use-channel-period-data.ts",
       "components/branding/brand-theme-provider.tsx", "lib/fair/use-upcoming-edition.ts",
-      "components/dashboard/channel-data-provider.tsx", "components/dashboard/channel-performance.tsx",
+      "components/dashboard/channel-data-provider.tsx",
     ];
     for (const f of LEZERS) {
       const b = bron(f);
       check(`${f} leest via de gedeelde rij`, /loadClientSettings(Rij)?\(clientId\)/.test(b));
       check(`${f} heeft geen eigen select op client_settings meer`, !/dbSelectOne<[^>]*>\(\s*"client_settings"/.test(b));
+    }
+    // channel-performance.tsx stond in de lijst hierboven. Sinds fase 1, stap 5 leest hij de rij
+    // helemaal niet meer: de selectie (convVan, convLabel) komt uit ChannelDataProvider, die hem
+    // één keer voor het hele tabblad leest. Bewust meeveranderd: de eis is nu "geen eigen lezing".
+    {
+      const b = bron("components/dashboard/channel-performance.tsx");
+      check("channel-performance.tsx leest client_settings niet meer zelf, ook niet via de gedeelde rij",
+        !/client_settings"|loadClientSettings(Rij)?\(/.test(b) && /useKanaalData\(\)/.test(b));
     }
     const SCHRIJVERS = [
       "lib/client-settings.ts", "components/dashboard/channel-conversion-settings.tsx", "components/dashboard/ga4-settings.tsx",

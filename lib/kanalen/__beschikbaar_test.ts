@@ -6,7 +6,7 @@
 // -- niet een gedachte-experiment met drie gelijkwaardige kanalen.
 
 import {
-  zichtbareTabs, geldigeKeuze, geenDataTekst, laadBeschikbareKanalen, kanalenOpsomming,
+  zichtbareTabs, geldigeKeuze, geenDataTekst, laadBeschikbareKanalen, kanalenOpsomming, kanalenUitBronnen,
   ALLE_KANALEN, type Kanaal,
 } from "./beschikbaar";
 
@@ -139,6 +139,40 @@ async function main(): Promise<void> {
     const k = await laadBeschikbareKanalen(stuk as never, "klant");
     check("één kapotte bron laat de rest staan", k.join(",") === "google", k.join(","));
   }
+
+  // ── De kanalenlijst uit de bronnen van het dashboard (fase 1, stap 4) ─────────────────────────
+  // Het dashboard vraagt bij de mount de Google-route, de blended route en het proefje tegelijk.
+  // kanalenUitBronnen zegt wat er op elk moment bekend is; null = nog niet.
+  const uit = (inp: Parameters<typeof kanalenUitBronnen>[0]) => { const k = kanalenUitBronnen(inp); return k === null ? "null" : k.join(","); };
+  const basis = { googleLaadt: false, google: true as boolean | null, route: null as string[] | null, proefje: null as string[] | null };
+
+  check("niets binnen: onbekend, niet 'geen kanalen'", uit({ ...basis, googleLaadt: true, google: null }) === "null");
+  check("alleen Google binnen: de dagkanalen zijn nog onbekend", uit(basis) === "null");
+  check("de route en het proefje binnen, Google laadt nog: onbekend",
+    uit({ googleLaadt: true, google: null, route: ["google", "meta"], proefje: ["google", "meta"] }) === "null");
+
+  // HET GEVAL VAN 62 VAN DE 71 KLANTEN: alleen Google. Het proefje is er eerder dan de blended
+  // route, en dan hoeft de kanalenlijst (en dus de band op het Google-tabblad) niet op de route.
+  check("alleen Google: bekend zodra het proefje er is, zonder de blended route", uit({ ...basis, proefje: ["google"] }) === "google");
+  check("en hetzelfde als de route er daarna is", uit({ ...basis, route: ["google"], proefje: ["google"] }) === "google");
+  check("alleen de route (het proefje nog onderweg): ook bekend", uit({ ...basis, route: ["google", "meta", "linkedin", "microsoft"] }) === "google,meta,linkedin,microsoft");
+
+  // Google komt uit het Google-antwoord, niet uit de database: een live account zonder gesyncte
+  // rijen is er, een gesynct account zonder één maand met data niet.
+  check("Google live maar niet gesynct: het telt", uit({ ...basis, google: true, proefje: [] }) === "google");
+  check("Google zonder een maand met data: het telt niet, ook al staat er een rij in de database",
+    uit({ ...basis, google: false, route: ["google", "meta"], proefje: ["google", "meta"] }) === "meta");
+  check("geen enkel kanaal: de lege lijst, zodat de melding 'nog geen data' verschijnt", uit({ ...basis, google: false, proefje: [] }) === "");
+  // Faalde de Google-route, dan wat de database van Google weet (de route eerst, anders het proefje).
+  check("Google-route gefaald: Google uit de blended route", uit({ ...basis, google: null, route: ["google", "meta"] }) === "google,meta");
+  check("Google-route gefaald, blended route ook: Google uit het proefje", uit({ ...basis, google: null, proefje: ["google"] }) === "google");
+  check("Google-route gefaald en verder niets binnen: onbekend", uit({ ...basis, google: null }) === "null");
+
+  // De route gaat voor zodra hij er is: hij is ook de bron van de cijfers in de band. Een proefje
+  // dat een kanaal miste (te lang stil telt daar als afwezig) wordt zo gecorrigeerd.
+  check("de route gaat voor het proefje", uit({ ...basis, route: ["google", "meta"], proefje: ["google"] }) === "google,meta");
+  check("een routefout (null): het proefje blijft gelden", uit({ ...basis, route: null, proefje: ["google", "linkedin"] }) === "google,linkedin");
+  check("volgorde is vast, niet die van de bron", uit({ ...basis, route: ["microsoft", "linkedin", "meta", "google"] }) === "google,meta,linkedin,microsoft");
 }
 
 main().then(() => {

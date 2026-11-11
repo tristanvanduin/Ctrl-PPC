@@ -22,18 +22,24 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 //
 // De data komt uit ChannelDataProvider en niet uit een eigen fetch: deze kaart deelt zijn dagrijen
 // met het maandverloop, de beurs-sectie en het jaaroverzicht. Elk daarvan haalde ze eerst zelf op,
-// en dat waren elf identieke meta_account_daily-verzoeken per paginabezoek.
+// en dat waren elf identieke meta_account_daily-verzoeken per paginabezoek. Sinds fase 1, stap 5
+// zijn dat de dagen vanaf de 1e van vorige maand (of 56 dagen terug) uit de blended route: precies
+// de twee maanden die deze vergelijking nodig heeft.
 
 export function ChannelPacing({ edition }: { edition?: UpcomingEdition | null }) {
-  const { rijen, convVan, convLabel } = useKanaalData();
+  const { rijen, convVan, convLabel, fout } = useKanaalData();
 
-  const pacing = useMemo(() => {
-    if (!rijen || rijen.length === 0) return null;
-    return berekenMaandPacing(rijen, convVan, vandaag());
-  }, [rijen, convVan]);
+  // Ook zonder recente dagen rekenen: de ratio's zijn dan null en de kaart zegt "Geen vorige
+  // maand". Hier stond `return null` zodra er geen rijen waren. Dat was goed zolang de provider de
+  // hele historie droeg (geen rijen = geen kanaal), maar met alleen de laatste weken verdween de
+  // kaart dan van elk kanaal waarvan de data een tijd geleden stopte (de demo: t/m 26 augustus),
+  // terwijl de kaart ernaast bleef staan en de kolom zijn opvanger kwijt was.
+  const pacing = useMemo(() => (rijen ? berekenMaandPacing(rijen, convVan, vandaag()) : null), [rijen, convVan]);
 
-  if (rijen === null) return <Laadvlak vorm="grafiek" hoogte={200} titel="Pacing" />;
-  if (!pacing) return null;
+  if (rijen === null || !pacing) return <Laadvlak vorm="grafiek" hoogte={200} titel="Pacing" />;
+  // De route faalde: er is niets gemeten, en "€ 0 deze maand" zou dan een cijfer zijn dat niemand
+  // gelezen heeft. De foutmelding zelf staat bij de maandprestaties (ChannelPerformance).
+  if (fout) return null;
 
   const { dagVanMaand, mtdSpend, mtdConv, vorigeSpend, vorigeConv, spendRatio, convRatio } = pacing;
 

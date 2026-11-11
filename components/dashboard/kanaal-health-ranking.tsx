@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Activity, AlertTriangle } from "lucide-react";
-import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
-import { useChannelForecast } from "@/lib/analysis/use-channel-forecast";
+import { useClientDataState, useForecast } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
 import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore, type HealthFactor } from "@/lib/health-score";
+import { useBlendedClientData, type PerKanaalTab } from "@/lib/use-blended-client-data";
 import { KANAAL_NAAM, KANAAL_KLEUR, type Kanaal } from "@/lib/kanalen/beschikbaar";
+import { Laadvlak } from "@/components/ui/laadvlak";
 import { KanaalHealthRadar, type RadarReeks } from "./kanaal-health-radar";
 import type { RadarFactor } from "@/lib/health-radar";
 
@@ -29,12 +30,17 @@ import type { RadarFactor } from "@/lib/health-radar";
  *
  * Twee dingen klapten uit hun voegen bij een vierde kanaal, en beide zijn hier opgelost.
  *
- * 1. DE HOOKS. Er stond één `useChannelForecast`-regel per kanaal, plat naast elkaar, omdat een
- *    hook niet in een lus mag. Een nieuw kanaal kostte dus een bewerking in dit bestand, en bij
- *    zes kanalen was dat een muur van regels die ook afvuurt voor kanalen die de klant niet heeft.
- *    Nu haalt een KIND per kanaal zijn eigen score op en meldt die naar boven (`KanaalScoreBron`,
- *    onderaan). Elk kind roept precies één keer elke hook aan, dus de LIJST mag dynamisch zijn:
- *    `kanalen.map(...)`. Een nieuw kanaal kost hier niets meer — het komt uit `kanalen` binnen.
+ * 1. DE BRON. Er stond één ophaalregel per kanaal, eerst plat naast elkaar en daarna als een
+ *    onzichtbaar kind per kanaal dat een eigen prognoseroute vroeg en zijn score naar boven
+ *    meldde: drie verzoeken van samen 57,6 kB bij het laden en bij elke terugkeer naar dit
+ *    tabblad, voor drie scores van een paar honderd bytes. En het was een ANDERE prognose dan die
+ *    op het tabblad van het kanaal zelf (fact_core met de standaardselectie, gerealiseerd t/m de
+ *    vorige kalendermaand, het Google-doel als jaardoel). Sinds fase 1, stap 5 leest deze kaart
+ *    het tab-object per kanaal uit useBlendedClientData (perKanaalTab): hetzelfde object dat de
+ *    kanaaltab en zijn health-badge lezen, één keer per ophaalronde berekend en vijf minuten
+ *    bewaard. Nul verzoeken, en de score hier is per constructie de score op de tab
+ *    (lib/__kanaaltab_gelijk_alle_kanalen_test.ts). Een nieuw kanaal kost hier niets: het komt
+ *    uit `kanalen` binnen en zijn score uit de route.
  *
  * 2. DE HOOGTE. Een kanaalblok is ~70px hoog. Drie passen naast de radar (220px); zes zouden de
  *    kaart naar ~430px aan regels duwen, en deze kaart staat in de linkerkolom naast de
@@ -43,12 +49,16 @@ import type { RadarFactor } from "@/lib/health-radar";
  *    kopregel boven de lijst in plaats van bij elk kanaal opnieuw, en een regel is ~34px. Zes
  *    kanalen passen dan in dezelfde hoogte als drie nu.
  *
- * Wat er BUITEN dit bestand nog nodig is voor een echt vierde kanaal: een `Kanaal`-waarde met zijn
- * bron, naam en kleur in lib/kanalen/beschikbaar.ts, en herkenning in computeAnalysisTargets
- * (AnalysisChannel). Daarna verschijnt het kanaal hier vanzelf -- MITS computeAnalysisTargets ook
- * rijen voor dat kanaal vindt. Voor Microsoft is dat nog niet zo: die functie leest fact_core, en
- * Microsoft heeft daar bewust geen projectie (migratie 106). Microsoft valt hier dus weg; de regel
- * bovenaan CrossChannelView zegt dat hardop.
+ * Wat er BUITEN dit bestand nog nodig is voor een echt volgend kanaal: een `Kanaal`-waarde met zijn
+ * bron, naam en kleur in lib/kanalen/beschikbaar.ts, en zijn dagtabel in de blended route
+ * (DAGKANALEN in lib/api/blended-historical.ts, NIET_GOOGLE in lib/period/kanaal-maanden.ts).
+ * Daarna verschijnt het kanaal hier vanzelf. Microsoft staat er daardoor nu ook: de oude route las
+ * de gezamenlijke feitentabel, waar Microsoft bewust geen projectie heeft (migratie 106), en gaf
+ * voor dat kanaal altijd niets terug; de dagtabellen dragen het wel.
+ *
+ * Google leest zijn prognose uit ClientDataProvider (useForecast), niet uit de route: die heeft de
+ * live Google-API al bevraagd, en zo blijft de score hier op dezelfde prognose staan als de
+ * Account Health op het Google-tabblad.
  */
 
 /** Vanaf hoeveel kanalen de compacte lijst aangaat. Zie punt 2 hierboven. */
@@ -62,55 +72,86 @@ const COMPACT_VANAF = 4;
 const COMPACT_RASTER =
   "grid grid-cols-[minmax(5rem,9rem)_2rem_repeat(5,minmax(3rem,1fr))_1rem] items-center gap-x-3";
 
+/** Wat de kaart per kanaal weet: een score, nog onderweg, of niets om te beoordelen. */
+export interface KanaalScores {
+  /** De kanalen met een score, de sterkste bovenaan en "te weinig beoordeeld" onderaan. */
+  rijen: { kanaal: Kanaal; health: HealthScore }[];
+  /** De route is nog onderweg: geen uitspraak, wel een plek in de lijst. */
+  laden: Kanaal[];
+  /** De route is klaar en er is geen score: geen dagcijfers, of de route faalde. */
+  nietBeoordeeld: Kanaal[];
+}
+
+/**
+ * Welk kanaal welke score krijgt. Zuiver, en geëxporteerd voor de invariant-test: de health van een
+ * dagkanaal is HET OBJECT uit perKanaalTab (geen kopie, geen herberekening), dus wat hier staat is
+ * wat ChannelHealthBadge op de tab van dat kanaal toont.
+ *
+ * "Laden" en "geen score" zijn hier twee toestanden. Eerder was een kanaal zonder antwoord gewoon
+ * afwezig, en dan viel een kanaal dat nog onderweg was niet te onderscheiden van een kanaal waar
+ * niets over te zeggen valt (zo ontbrak Microsoft stil onder een kop die "per kanaal" belooft).
+ */
+export function kanaalScores(
+  kanalen: readonly Kanaal[],
+  googleHealth: HealthScore | null,
+  route: { perKanaalTab: PerKanaalTab | null; loading: boolean },
+): KanaalScores {
+  const rijen: KanaalScores["rijen"] = [];
+  const laden: Kanaal[] = [];
+  const nietBeoordeeld: Kanaal[] = [];
+  for (const kanaal of kanalen) {
+    if (kanaal === "google") {
+      if (googleHealth) rijen.push({ kanaal, health: googleHealth });
+      else nietBeoordeeld.push(kanaal);
+      continue;
+    }
+    const tab = route.perKanaalTab?.[kanaal];
+    if (tab && tab !== "leeg") rijen.push({ kanaal, health: tab.health });
+    else if (route.loading) laden.push(kanaal);
+    else nietBeoordeeld.push(kanaal);
+  }
+  // Kanalen zonder cijfer ("?") onderaan, niet bovenaan: een onbekende score is geen nul, maar
+  // hij hoort ook niet tussen de beoordeelde kanalen in te dringen.
+  rijen.sort((a, b) => {
+    if (a.health.grade === "?" && b.health.grade !== "?") return 1;
+    if (b.health.grade === "?" && a.health.grade !== "?") return -1;
+    return b.health.total - a.health.total;
+  });
+  return { rijen, laden, nietBeoordeeld };
+}
+
 export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; kanalen: Kanaal[] }) {
-  const [scores, setScores] = useState<Partial<Record<Kanaal, HealthScore>>>({});
+  // Google uit de provider die de pagina toch al vult. useClientDataState en niet
+  // useClientHistoricalData: die laatste gooit buiten een provider, en dan nam één ontbrekende
+  // Google-bron de scores van de andere kanalen mee.
+  const googleData = useClientDataState()?.data ?? null;
+  const googleForecast = useForecast();
+  const heeftGoogle = kanalen.includes("google");
+  const googleHealth = useMemo(() => {
+    if (!heeftGoogle) return null;
+    const forecast = googleForecast ?? (googleData ? computeForecast(googleData) : null);
+    // Zonder de Google-specifieke hygiëne-argumenten (impressionShare, zoektermen, ad groups):
+    // die zijn hier niet beschikbaar en computeHealthScore zou die factor dan stilzwijgend vol
+    // punten geven. Dezelfde correctie die de hook voor de dagkanalen doet (KanaalTab.health) --
+    // en juist hier moet hij, want anders scoort Google hoger dan de rest om een reden die
+    // niets met het account te maken heeft.
+    return forecast ? zonderKanaalSpecifiekeHygiene(computeHealthScore(forecast)) : null;
+  }, [heeftGoogle, googleForecast, googleData]);
 
-  // Stabiel: de kinderen hebben hem als effect-dependency, dus een nieuwe functie per render zou
-  // elk kind bij elke render opnieuw laten melden.
-  const meld = useCallback((kanaal: Kanaal, health: HealthScore | null) => {
-    setScores((vorig) => {
-      if (health === null) {
-        if (!(kanaal in vorig)) return vorig;
-        const uit = { ...vorig };
-        delete uit[kanaal];
-        return uit;
-      }
-      if (vorig[kanaal] === health) return vorig;
-      return { ...vorig, [kanaal]: health };
-    });
-  }, []);
-
-  const rijen = useMemo(() => {
-    const uit = kanalen.flatMap((k) => {
-      const health = scores[k];
-      return health ? [{ kanaal: k, health }] : [];
-    });
-    // Kanalen zonder cijfer ("?") onderaan, niet bovenaan: een onbekende score is geen nul, maar
-    // hij hoort ook niet tussen de beoordeelde kanalen in te dringen.
-    return uit.sort((a, b) => {
-      if (a.health.grade === "?" && b.health.grade !== "?") return 1;
-      if (b.health.grade === "?" && a.health.grade !== "?") return -1;
-      return b.health.total - a.health.total;
-    });
-  }, [kanalen, scores]);
-
-  // De bronnen renderen niets, maar ze moeten wél in de boom staan — ook als er nog geen enkele
-  // score binnen is. Zaten ze in de kaart die pas verschijnt zodra `rijen` gevuld is, dan werd de
-  // score nooit opgehaald en bleef de kaart voor altijd weg.
-  const bronnen = (
-    <>
-      {kanalen.map((k) => (
-        <KanaalScoreBron key={k} clientId={clientId} kanaal={k} meld={meld} />
-      ))}
-    </>
+  // Hetzelfde verzoek als de KPI-band en het tabblad eromheen (de hook deelt en bewaart het).
+  // Alleen als er een dagkanaal in de lijst staat: Google alleen heeft de route niet nodig.
+  const route = useBlendedClientData(clientId, kanalen.some((k) => k !== "google"));
+  const { rijen, laden, nietBeoordeeld } = useMemo(
+    () => kanaalScores(kanalen, googleHealth, { perKanaalTab: route.perKanaalTab, loading: route.loading }),
+    [kanalen, googleHealth, route.perKanaalTab, route.loading],
   );
 
-  // De bronnen staan in BEIDE takken op dezelfde plek: eerste kind van een fragment, buiten de
-  // kaart. Stonden ze hier los en hieronder binnen de kaart-<div>, dan zag React bij de eerste
-  // score een andere boom, haalde alle KanaalScoreBron-kinderen weg en zette ze opnieuw neer --
-  // met een tweede ronde /api/analysis/channel-forecast (gemeten: 6 verzoeken in plaats van 3).
-  // KanaalScoreBron rendert niets, dus in de DOM verandert er niets.
-  if (rijen.length === 0) return <>{bronnen}</>;
+  if (kanalen.length === 0) return null;
+  // Nog geen enkele score en de route is onderweg: het skelet van de kaart, zodat de kolom zijn
+  // hoogte al heeft. Hier stond niets tot de eerste score er was.
+  if (rijen.length === 0 && laden.length > 0) {
+    return <Laadvlak vorm="tekst" regels={kanalen.length} titel="Account Health per kanaal" />;
+  }
 
   // EEN lijn, niet drie. De radar toont het gemiddelde per as over de kanalen die die as
   // daadwerkelijk METEN.
@@ -122,10 +163,11 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
   // hier niet. Deze vorm is ook de enige die niet meegroeit met het aantal kanalen: één lijn blijft
   // één lijn, of het er nu drie of tien zijn.
   //
-  // Een as telt alleen mee voor de kanalen die hem beoordeeld hebben. Budget en Hygiëne staan voor
-  // Meta en LinkedIn op "niet beoordeeld"; die als nul meenemen zou het gemiddelde omlaag trekken
-  // om een reden die niets met de prestatie te maken heeft. Meet geen enkel kanaal een as, dan is
-  // de as ook voor het gemiddelde niet beoordeeld en tekent de radar er geen punt.
+  // Een as telt alleen mee voor de kanalen die hem beoordeeld hebben. Hygiëne staat in deze
+  // vergelijking voor elk kanaal op "niet beoordeeld", en Budget voor een kanaal zonder budgetdoel
+  // en zonder vorig jaar; die als nul meenemen zou het gemiddelde omlaag trekken om een reden die
+  // niets met de prestatie te maken heeft. Meet geen enkel kanaal een as, dan is de as ook voor
+  // het gemiddelde niet beoordeeld en tekent de radar er geen punt.
   const blended: RadarFactor[] = (rijen[0]?.health.factors ?? []).map((sjabloon, i) => {
     const gemeten = rijen
       .map((r) => r.health.factors[i])
@@ -161,12 +203,16 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
     ? [{ label: "Gemiddeld over de kanalen", kleur: blendedKleur, factoren: blended }]
     : [];
 
-  const compact = rijen.length >= COMPACT_VANAF;
-  const factornamen = rijen[0].health.factors.map((f) => f.name);
+  // Op het aantal REGELS, met en zonder score: de vorm verspringt dan niet als de route
+  // binnenkomt en een wachtende regel zijn score krijgt.
+  const compact = rijen.length + laden.length + nietBeoordeeld.length >= COMPACT_VANAF;
+  const factornamen = rijen[0]?.health.factors.map((f) => f.name) ?? [];
+  const waaromGeenScore = (kanaal: Kanaal): string =>
+    kanaal === "google" ? "niet beoordeeld: geen Google-cijfers geladen"
+      : route.error ? "niet beoordeeld: de kanaalcijfers konden niet geladen worden"
+      : "niet beoordeeld: geen dagcijfers om een prognose op te bouwen";
 
   return (
-    <>
-    {bronnen}
     <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <Activity className="w-4 h-4 text-brand-blue-ink" />
@@ -196,7 +242,7 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
           {/* De factornamen één keer, niet bij elk kanaal opnieuw. Dat is de hele winst van de
               compacte vorm: de namen zijn voor elk kanaal identiek, dus vanaf vier kanalen is het
               herhaalde label puur hoogte. */}
-          {compact && (
+          {compact && factornamen.length > 0 && (
             <div className={`${COMPACT_RASTER} px-3 text-micro text-muted-foreground`}>
               <span />
               <span />
@@ -209,19 +255,40 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
           {rijen.map(({ kanaal, health }) => (
             <KanaalRegel key={kanaal} kanaal={kanaal} health={health} compact={compact} />
           ))}
+          {/* Een kanaal zonder score staat er WEL, met de reden. Weglaten las als "dit kanaal
+              bestaat hier niet", en dat was voor een kanaal dat nog onderweg is en voor een kanaal
+              zonder cijfers hetzelfde lege beeld. */}
+          {laden.map((kanaal) => (
+            <KanaalZonderScore key={kanaal} kanaal={kanaal} tekst="score wordt berekend" compact={compact} />
+          ))}
+          {nietBeoordeeld.map((kanaal) => (
+            <KanaalZonderScore key={kanaal} kanaal={kanaal} tekst={waaromGeenScore(kanaal)} compact={compact} />
+          ))}
         </div>
       </div>
 
       <p className="mt-4 border-t border-border pt-3 text-meta leading-snug text-muted-foreground">
-        De radar is het gemiddelde per as over de kanalen die die as meten — Budget en Hygiëne
-        worden voor Meta en LinkedIn niet beoordeeld en tellen daar dus niet mee. Dat kan omdat de
-        assen al genormaliseerd zijn: elk kanaal is tegen zijn eigen maatstaf beoordeeld, zoals op
-        zijn eigen tabblad. Wat er bewust níét staat is één samengesteld cijfer over de spend van
-        alle kanalen samen: dat zou tegen één doel moeten meten, en een doel dat voor het ene
-        kanaal gezet is zegt niets over het andere.
+        De radar is het gemiddelde per as over de kanalen die die as meten. Een as die voor een
+        kanaal niet beoordeeld is, telt daar niet mee: Hygiëne (verspilling op zoektermen en ad
+        groups) staat alleen op het Google-tabblad, en Budget vraagt een budgetdoel of een vorig
+        jaar. Dat kan omdat de assen al genormaliseerd zijn: elk kanaal is tegen zijn eigen
+        maatstaf beoordeeld, met dezelfde prognose als op zijn eigen tabblad. Wat er bewust níét
+        staat is één samengesteld cijfer over de spend van alle kanalen samen: dat zou tegen één
+        doel moeten meten, en een doel dat voor het ene kanaal gezet is zegt niets over het andere.
       </p>
     </div>
-    </>
+  );
+}
+
+/** Een kanaal waar (nog) geen score voor is: dezelfde stip en naam als een gewone regel, en de
+ *  reden op de plek van het cijfer. Gestippelde rand: dit is een open plek, geen meting. */
+function KanaalZonderScore({ kanaal, tekst, compact }: { kanaal: Kanaal; tekst: string; compact: boolean }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-dashed border-border/70 px-3 ${compact ? "py-1.5" : "py-2.5"}`}>
+      <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: KANAAL_KLEUR[kanaal] }} aria-hidden />
+      <span className={`${compact ? "text-body" : "text-title"} font-semibold text-brand-gray`}>{KANAAL_NAAM[kanaal]}</span>
+      <span className="text-meta text-muted-foreground">{tekst}</span>
+    </div>
   );
 }
 
@@ -346,48 +413,4 @@ function KanaalRegel({ kanaal, health, compact }: { kanaal: Kanaal; health: Heal
       </dl>
     </div>
   );
-}
-
-/**
- * Eén kanaal, één score, geen eigen beeld.
- *
- * Dit is wat de lijst dynamisch maakt (zie "HOE DIT SCHAALT" bovenaan): de hookregels staan hier,
- * in een component dat PER KANAAL bestaat, en niet in de ouder waar ze per kanaal herhaald zouden
- * moeten worden. React's regel is dat een component bij elke render dezelfde hooks in dezelfde
- * volgorde aanroept -- dat mag hier, want dit component gaat maar over één kanaal.
- *
- * Google leest uit de provider die de pagina toch al vult (ClientDataProvider), niet uit een eigen
- * call: die heeft de live Google-API al bevraagd. De andere kanalen gaan via
- * /api/analysis/channel-forecast. `enabled` staat daarom uit voor Google -- anders zou hij zijn
- * eigen data twee keer ophalen.
- */
-function KanaalScoreBron({ clientId, kanaal, meld }: {
-  clientId: string;
-  kanaal: Kanaal;
-  meld: (kanaal: Kanaal, health: HealthScore | null) => void;
-}) {
-  const isGoogle = kanaal === "google";
-  const googleData = useClientHistoricalData(clientId);
-  const googleForecast = useForecast();
-  const { forecast: kanaalForecast } = useChannelForecast(clientId, kanaal, !isGoogle);
-
-  const health = useMemo(() => {
-    // Zonder de Google-specifieke hygiëne-argumenten (impressionShare, zoektermen, ad groups):
-    // die zijn hier niet beschikbaar en computeHealthScore zou die factor dan stilzwijgend vol
-    // punten geven. Dezelfde correctie die channel-health-badge.tsx voor Meta/LinkedIn doet --
-    // en juist hier moet hij, want anders scoort Google hoger dan de rest om een reden die
-    // niets met het account te maken heeft.
-    const forecast = isGoogle
-      ? (googleForecast ?? (googleData ? computeForecast(googleData) : null))
-      : kanaalForecast;
-    if (!forecast) return null;
-    return zonderKanaalSpecifiekeHygiene(computeHealthScore(forecast));
-  }, [isGoogle, googleForecast, googleData, kanaalForecast]);
-
-  useEffect(() => { meld(kanaal, health); }, [meld, kanaal, health]);
-  // Verdwijnt het kanaal (andere klant, andere kanalenlijst), dan moet zijn score mee weg --
-  // anders blijft er een rij staan voor een kanaal dat niet meer wordt opgehaald.
-  useEffect(() => () => meld(kanaal, null), [meld, kanaal]);
-
-  return null;
 }

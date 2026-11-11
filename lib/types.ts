@@ -48,11 +48,11 @@ export interface ClientHistoricalData {
   targetCurrentYear: ClientAnnualData;
   /**
    * Waar `targetCurrentYear` vandaan komt (mergeKpiTargets zet hem, en computeAnalysisTargets voor
-   * de kanaalbadges, KanaalHealthRanking en Code Rood). De schermen zeggen daarmee "jaardoel" of
-   * "geschat jaardoel"; hier stond alleen het getal, en toen zei elk scherm "geschat ... er is nog
-   * geen doel ingevoerd", ook naast een doel uit Instellingen. Ontbreekt hij (de prognose van de
-   * kanaaltabbladen, buildChannelForecast, die zijn doel uit client_targets haalt), dan de
-   * schatting, zoals voorheen.
+   * de rapporten en Code Rood). De schermen zeggen daarmee "jaardoel" of "geschat jaardoel"; hier
+   * stond alleen het getal, en toen zei elk scherm "geschat ... er is nog geen doel ingevoerd",
+   * ook naast een doel uit Instellingen. Ontbreekt hij (de prognose van de kanaaltabbladen, hun
+   * health-badges en KanaalHealthRanking: buildChannelForecast, die zijn doel uit client_targets
+   * haalt), dan de schatting, zoals voorheen.
    */
   doelHerkomst?: DoelHerkomstPerMetric;
   /**

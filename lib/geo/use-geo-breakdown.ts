@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { countryLabel } from "@/lib/countries";
 import { stateLabel } from "@/lib/geo/us-fips";
 import { type GeoAgg } from "@/lib/demo/geo-demo";
+import { maakBronCache } from "@/lib/data-access/bron-cache";
 
 // De gedeelde state achter GeoBreakdown, uitgelicht (17.36) zodat de opener op Google Overzicht de
 // kaart en de ranglijst in TWEE aparte kolommen kan zetten zonder de data twee keer op te halen of
@@ -31,6 +32,30 @@ export const METRICS: MetricDef[] = [
 
 export const CHANNEL_LABEL: Record<Channel, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", blended: "Alle kanalen" };
 
+type GeoNiveau = "country" | "region";
+
+// De landen en de staten per (klant, kanaal), vijf minuten bewaard. Elke kanaalweergave mount deze
+// hook opnieuw, en elke mount haalde beide niveaus opnieuw op: twee verzoeken bij elke wissel van
+// tabblad, ook terug naar een tabblad waar je net was. De rijen veranderen alleen door een sync
+// (het venster is 180 dagen, per maand); die vergeet ze via vergeetBronnen in bron-cache.ts.
+const GEO_TTL = 5 * 60 * 1000;
+const geoCache = maakBronCache<GeoAgg[]>(GEO_TTL);
+const geoSleutel = (clientId: string, channel: Channel, level: GeoNiveau) => `${clientId}|${channel}|${level}`;
+
+function leesGeo(clientId: string, channel: Channel, level: GeoNiveau): Promise<GeoAgg[]> {
+  // /api/geo bepaalt demo vs. echt zelf aan de hand van clientId (lib/geo/geo-source.ts), dus
+  // hier is geen aparte demo-vlag meer nodig.
+  return geoCache.lees(geoSleutel(clientId, channel, level), () =>
+    fetch(`/api/geo?clientId=${encodeURIComponent(clientId)}&channel=${channel}&level=${level}`)
+      .then((r) => {
+        // Gooien, niet "geen rijen" teruggeven: een storing hoort niet vijf minuten lang als een
+        // lege kaart in de cache te staan. De lege kaart maakt de hook er hieronder van.
+        if (!r.ok) throw new Error(`/api/geo gaf HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => (Array.isArray(d?.rows) ? (d.rows as GeoAgg[]) : [])));
+}
+
 export function useGeoBreakdown({ clientId, channel = "google", enabled = true }: {
   clientId: string;
   channel?: Channel;
@@ -43,21 +68,29 @@ export function useGeoBreakdown({ clientId, channel = "google", enabled = true }
   const [focus, setFocus] = useState<"US" | null>(null);
   const metric = METRICS.find((m) => m.key === metricKey)!;
 
-  const [countries, setCountries] = useState<GeoAgg[]>([]);
-  const [states, setStates] = useState<GeoAgg[]>([]);
-  const [laden, setLaden] = useState(true);
+  // De beginstaat uit de cache: een tweede bezoek binnen de cachetijd toont de kaart meteen, zonder
+  // laadvlak en zonder verzoek.
+  const [countries, setCountries] = useState<GeoAgg[]>(() => (enabled ? geoCache.kijk(geoSleutel(clientId, channel, "country")) : undefined) ?? []);
+  const [states, setStates] = useState<GeoAgg[]>(() => (enabled ? geoCache.kijk(geoSleutel(clientId, channel, "region")) : undefined) ?? []);
+  const [laden, setLaden] = useState(() => !enabled
+    || geoCache.kijk(geoSleutel(clientId, channel, "country")) === undefined
+    || geoCache.kijk(geoSleutel(clientId, channel, "region")) === undefined);
 
   useEffect(() => {
     if (!enabled) return;
+    const bewaardLand = geoCache.kijk(geoSleutel(clientId, channel, "country"));
+    const bewaardStaat = geoCache.kijk(geoSleutel(clientId, channel, "region"));
+    if (bewaardLand !== undefined && bewaardStaat !== undefined) {
+      setCountries(bewaardLand);
+      setStates(bewaardStaat);
+      setLaden(false);
+      return;
+    }
     let cancelled = false;
     setLaden(true);
-    // /api/geo bepaalt demo vs. echt zelf aan de hand van clientId (lib/geo/geo-source.ts), dus
-    // hier is geen aparte demo-vlag meer nodig.
-    const haal = (level: "country" | "region") =>
-      fetch(`/api/geo?clientId=${encodeURIComponent(clientId)}&channel=${channel}&level=${level}`)
-        .then((r) => (r.ok ? r.json() : { rows: [] }))
-        .then((d) => (Array.isArray(d?.rows) ? (d.rows as GeoAgg[]) : []))
-        .catch(() => [] as GeoAgg[]);
+    // Een mislukte lezing toont een lege kaart, zoals altijd; hij staat alleen niet in de cache,
+    // dus de volgende mount probeert het opnieuw.
+    const haal = (level: GeoNiveau) => leesGeo(clientId, channel, level).catch(() => [] as GeoAgg[]);
 
     Promise.all([haal("country"), haal("region")]).then(([land, staat]) => {
       if (cancelled) return;

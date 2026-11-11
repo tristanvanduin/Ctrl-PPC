@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useGrafiekBeweging } from "@/lib/beweging";
 import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { Target, DollarSign, BarChart3, Wallet } from "lucide-react";
-import { dbSelect, dbSelectOne } from "@/lib/data-access/client-read";
-import { today as vandaag } from "@/lib/reporting-date";
-import { resolveChannelConversionConfig, sumSelectedConversions, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
-import { buildChannelForecast } from "@/lib/analysis/channel-forecast-data";
-import type { TargetRow } from "@/lib/analysis/o2-targets-cost";
 import { actieveMetrics, nuIndex, ytdGerealiseerd, jaarprognoseVerhouding, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
-import type { ClientHistoricalData } from "@/lib/types";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatRoas, formatterFor, isLowerBetter, isOptelbaar, METRIC_LABELS } from "@/lib/forecast-format";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_CATEGORICAL, CHART_AXIS } from "@/lib/branding/chart-colors";
@@ -21,22 +15,18 @@ import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { useKanaalData } from "./channel-data-provider";
 import { KlikbareKaart } from "@/components/ui/klikbare-kaart";
 import { Laadvlak } from "@/components/ui/laadvlak";
-import { CONFIG, type ChannelKind, type DailyRow } from "./channel-performance";
 
 // Meta/LinkedIn-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). computeForecast()
-// (lib/forecast.ts) is zelf al kanaalneutraal; dit bestand levert het stuk dat dat voor Google nog
-// niet was: de databron (hier de eigen account-tabel van het kanaal, over de volledige historie in
-// plaats van Google's /api/google-ads/client-data) en het jaardoel (hier client_targets, kanaal-
-// gescoopt -- zie channel-forecast-data.ts voor de volledige toelichting).
+// (lib/forecast.ts) is zelf al kanaalneutraal; wat voor deze kanalen anders is, is de databron (de
+// eigen dagtabel van het kanaal over de volledige historie, in plaats van Google's
+// /api/google-ads/client-data) en het jaardoel (client_targets, kanaal-gescoopt -- zie
+// channel-forecast-data.ts voor de volledige toelichting). Dit bestand haalt daar zelf niets van
+// op: de prognose komt kant en klaar uit ChannelDataProvider (useKanaalData). De ophaalcode en
+// haar imports stonden hier nog, ongebruikt, en lazen als een tweede databron.
 //
 // Geen eigen jaardoel-invoerscherm in deze ronde (net als Google trouwens ook geen apart scherm
-// heeft voor client_targets): zonder ingesteld doel valt de forecast terug op het historisch totaal,
-// exact zoals hij dat voor Google ook al doet bij een leeg kpiTargets-doel.
-
-const TARGET_CHANNEL: Record<ChannelKind, string> = { meta: "meta_ads", linkedin: "linkedin_ads", microsoft: "microsoft_ads" };
-
-/** null = nog aan het laden, "leeg" = geen dagcijfers gesynced, anders de opgebouwde forecast. */
-export type ChannelForecastState = { data: ClientHistoricalData; forecast: ClientForecast } | null | "leeg";
+// heeft voor client_targets): zonder ingesteld doel valt de forecast terug op vorig jaar plus
+// groei (jaardoelMetTerugval), dezelfde regel als de Google-route.
 
 function formatYAxis(metric: ForecastMetric) {
   if (metric === "revenue") return (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", notation: "compact", maximumFractionDigits: 0 }).format(v);
@@ -45,7 +35,7 @@ function formatYAxis(metric: ForecastMetric) {
   return (v: number) => new Intl.NumberFormat("nl-NL", { notation: "compact" }).format(v);
 }
 
-// De fetch stond hier (useChannelForecast) en is verhuisd naar channel-data-provider.tsx: hij werd
+// De fetch stond hier (een eigen hook) en is verhuisd naar channel-data-provider.tsx: hij werd
 // door twee secties op dezelfde pagina aangeroepen -- deze en de beurs-sectie -- en haalde dan twee
 // keer de volledige historie op. Zie die provider voor de gemeten aanleiding.
 

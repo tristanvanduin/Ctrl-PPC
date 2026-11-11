@@ -257,11 +257,15 @@ export function BandLaadvlak({ compact = false }: { compact?: boolean }) {
  * Het laadvlak van een hele pagina onder de kop: de cijferband plus de eerste rij kaarten, op de
  * maten van het Overzicht. Vervangt de gecentreerde spinner met "Data ophalen...", die de pagina
  * leeg liet en alles wat erna kwam liet opspringen.
+ *
+ * `metBand` false: alleen de kaartenrij. Op het klantdashboard staat de band sinds fase 1, stap 4
+ * BUITEN de datapoort en rendert hij zijn eigen BandLaadvlak; een tweede band-skelet eronder zou
+ * de pagina 274 px te lang maken en bij het binnenkomen laten verspringen (CLS).
  */
-export function PaginaLaadvlak() {
+export function PaginaLaadvlak({ metBand = true }: { metBand?: boolean } = {}) {
   return (
     <div className="space-y-6">
-      <BandLaadvlak />
+      {metBand && <BandLaadvlak />}
       <div className="grid gap-6 lg:grid-cols-2">
         <Laadvlak vorm="grafiek" hoogte={220} titel={<Balk breedte="180px" hoogte={12} />} />
         <Laadvlak vorm="tekst" regels={6} titel={<Balk breedte="140px" hoogte={12} />} />

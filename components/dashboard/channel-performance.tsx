@@ -2,21 +2,29 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
-import { Calendar, TrendingUp, BarChart3 } from "lucide-react";
+import { Calendar, BarChart3 } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
-import { loadClientSettingsRij } from "@/lib/client-settings";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
-import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig, type ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
+import type { ChannelConversionChannel } from "@/lib/analysis/channel-conversion-config";
+import { KANAAL_DAGBRON, dagbronSelect } from "@/lib/analysis/channel-report-blend";
+import type { BlendedKanaalMaand } from "@/lib/api/blended-historical";
 import { today as vandaag } from "@/lib/reporting-date";
 import { Laadvlak } from "@/components/ui/laadvlak";
-import { useVorige } from "@/lib/use-vorige";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { useKanaalData } from "./channel-data-provider";
 
-// Volwaardige prestatie-view voor Meta en LinkedIn: dezelfde bouwstenen als Google
+// Volwaardige prestatie-view voor Meta, LinkedIn en Microsoft: dezelfde bouwstenen als Google
 // (KPI-kaarten, pacing, maandtabel, grafiek, campagnetabel), gevoed uit de dag-tabellen van
 // het kanaal. Ratio's UIT TOTALEN (venster/maand), nooit uit dag-gemiddelden. Pacing is
 // maand-tot-nu tegen dezelfde dag-telling van de vorige maand: geen doel nodig, wel eerlijk
 // tempo-inzicht. De analyses draaien elders (Analyses-tab); dit is de data-weergave.
+//
+// De data komt uit ChannelDataProvider (fase 1, stap 5): de dagrijen van de laatste weken voor de
+// 28-dagenvensters, en de maanden met tellers voor de maandtabel -- beide uit het ene antwoord van
+// /api/blended/client-data dat de band bij het laden al had. Hier stonden vier eigen lezingen
+// (200 dagen account, 200 dagen campagnes, de campagnenamen en client_settings), waarvan de
+// campagnedagrijen (het grootste verzoek van de tab, 57 kB) zonder gekozen beurs nooit gelezen
+// werden. Die twee komen nu alleen nog als er een beurs gekozen is.
 
 // De maandtabel is de enige plek in dit bestand die de maand als eigen kolom toont (de
 // mini-grafiek en de kaartenrij ernaast gebruiken de korte vorm uit chart-chrome.tsx, waar
@@ -48,7 +56,6 @@ export interface DailyRow {
 }
 
 interface ChannelConfig {
-  accountTable: string;
   campaignTable: string;
   nameTable: string;
   nameId: string;
@@ -60,43 +67,56 @@ interface ChannelConfig {
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
+/**
+ * Dezelfde kolommen als elke andere lezer van de dagtabel (dagbronSelect: de tellers plus ALLE
+ * selecteerbare conversievelden), plus de entiteit voor de campagnetabellen. Hier stond per kanaal
+ * een eigen lijst met dezelfde kolommen in een andere volgorde; twee lijsten voor dezelfde tabel
+ * lopen bij de eerste wijziging uit elkaar. De kolommen staan in scripts/schema-snapshot.json
+ * (de account- en campagnetabellen van een kanaal dragen dezelfde namen).
+ */
+const selectMet = (channelKey: ChannelConversionChannel): string =>
+  `${dagbronSelect(channelKey)}, ${KANAAL_DAGBRON[channelKey].entityField}`;
+
 // Geëxporteerd (22 augustus 2026) zodat channel-campaign-table.tsx dezelfde tabelnamen/mapping
 // gebruikt -- de campagnetabel verhuisde naar de Campagnes-tab (feedback: "structuur exact
 // hetzelfde" tussen kanalen, en de campagnetabel hoort bij "wat draait er", niet bij "hoe loopt
 // het", zelfde tabsplitsing als deze view zelf al documenteert). Eén bron voor de kolomnamen
 // voorkomt dat de twee views ooit een ander veld voor dezelfde kolom lezen.
+//
+// `map` verdraagt een rij zonder entiteit: de recente dagen van de blended route komen zonder
+// (de accountrijen hebben hem op de tab niet nodig). De accounttabel zelf staat hier niet meer:
+// geen component leest hem nog rechtstreeks, de route doet dat (KANAAL_DAGBRON).
 export const CONFIG: Record<ChannelKind, ChannelConfig> = {
   meta: {
-    accountTable: "meta_account_daily",
     campaignTable: "meta_campaign_daily",
     nameTable: "meta_campaigns",
     nameId: "campaign_id",
     entityField: "entity_id",
     channelKey: "meta_ads",
-    select: "date, entity_id, impressions, link_clicks, spend, conversions, leads, conversion_value",
-    map: (r) => ({ date: String(r.date), entity: String(r.entity_id), impressions: num(r.impressions), clicks: num(r.link_clicks), spend: num(r.spend), convFields: { conversions: num(r.conversions), leads: num(r.leads) }, revenue: num(r.conversion_value) }),
+    select: selectMet("meta_ads"),
+    map: (r) => ({ date: String(r.date), entity: String(r.entity_id ?? ""), impressions: num(r.impressions), clicks: num(r.link_clicks), spend: num(r.spend), convFields: { conversions: num(r.conversions), leads: num(r.leads) }, revenue: num(r.conversion_value) }),
   },
   linkedin: {
-    accountTable: "linkedin_account_daily",
     campaignTable: "linkedin_campaign_daily",
     nameTable: "linkedin_campaigns",
     nameId: "campaign_urn",
     entityField: "entity_urn",
     channelKey: "linkedin_ads",
-    select: "date, entity_urn, impressions, clicks, spend, one_click_leads, external_website_conversions, post_click_conversions, conversion_value",
-    map: (r) => ({ date: String(r.date), entity: String(r.entity_urn), impressions: num(r.impressions), clicks: num(r.clicks), spend: num(r.spend), convFields: { one_click_leads: num(r.one_click_leads), external_website_conversions: num(r.external_website_conversions), post_click_conversions: num(r.post_click_conversions) }, revenue: num(r.conversion_value) }),
+    select: selectMet("linkedin_ads"),
+    map: (r) => ({ date: String(r.date), entity: String(r.entity_urn ?? ""), impressions: num(r.impressions), clicks: num(r.clicks), spend: num(r.spend), convFields: { one_click_leads: num(r.one_click_leads), external_website_conversions: num(r.external_website_conversions), post_click_conversions: num(r.post_click_conversions) }, revenue: num(r.conversion_value) }),
   },
   microsoft: {
-    accountTable: "microsoft_account_daily",
     campaignTable: "microsoft_campaign_daily",
     nameTable: "microsoft_campaigns",
     nameId: "campaign_id",
     entityField: "entity_id",
     channelKey: "microsoft_ads",
-    select: "date, entity_id, impressions, clicks, spend, conversions, conversion_value",
-    map: (r) => ({ date: String(r.date), entity: String(r.entity_id), impressions: num(r.impressions), clicks: num(r.clicks), spend: num(r.spend), convFields: { conversions: num(r.conversions) }, revenue: num(r.conversion_value) }),
+    select: selectMet("microsoft_ads"),
+    map: (r) => ({ date: String(r.date), entity: String(r.entity_id ?? ""), impressions: num(r.impressions), clicks: num(r.clicks), spend: num(r.spend), convFields: { conversions: num(r.conversions) }, revenue: num(r.conversion_value) }),
   },
 };
+
+const KANAAL_LABEL: Record<ChannelKind, string> = { meta: "Meta", linkedin: "LinkedIn", microsoft: "Microsoft" };
 
 export const eur = (v: number | null): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v));
 export const fmt = (v: number | null, d = 0): string => (v == null || !Number.isFinite(v) ? "—" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d }).format(v));
@@ -107,51 +127,53 @@ export const pctS = (v: number | null): string => (v == null || !Number.isFinite
 const deltaPct = (cur: number | null, prev: number | null): number | null =>
   cur != null && prev != null && prev > 0 ? ((cur - prev) / prev) * 100 : null;
 
-interface Agg { impressions: number; clicks: number; spend: number; conv: number }
+export interface Agg { impressions: number; clicks: number; spend: number; conv: number }
 const emptyAgg = (): Agg => ({ impressions: 0, clicks: 0, spend: 0, conv: 0 });
+
+/**
+ * De rijen van de maandtabel uit de maanden van de route: alleen VOLLE maanden (vóór `dezeMaand`),
+ * de laatste zes, oplopend. De tellers komen één op één uit perKanaal[kanaal].maanden -- dezelfde
+ * cijfers die "Alle kanalen" voor dit kanaal telt (lib/__kanaaltab_gelijk_alle_kanalen_test.ts).
+ */
+export function volleMaandenUitTellers(maanden: readonly BlendedKanaalMaand[], dezeMaand: string): [string, Agg][] {
+  return maanden
+    .filter((m) => m.month < dezeMaand)
+    .map((m): [string, Agg] => [m.month, { impressions: m.impressions ?? 0, clicks: m.clicks ?? 0, spend: m.adSpend, conv: m.conversions }])
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6);
+}
 
 // `edition` is hier weg: die diende alleen het pacing-blok ("nog N weken tot de beurs"),
 // en dat staat nu in channel-pacing.tsx.
 export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: string; channel: ChannelKind; geoClone?: string | null }) {
   const cfg = CONFIG[channel];
-  const [accountRuw, setAccount] = useState<DailyRow[] | null>(null);
-  // De vorige inhoud blijft staan terwijl de nieuwe binnenkomt: bij een kanaalwissel klapte deze
-  // kaart eerst terug naar een skelet en daarna weer vol. Zie lib/use-vorige.ts.
-  const account = useVorige(accountRuw);
-  const ververst = accountRuw === null && account !== null;
-  const [campaign, setCampaign] = useState<DailyRow[]>([]);
+  const { rijen: account, maanden, convVan, convLabel, fout } = useKanaalData();
+  // Alleen met een gekozen beurs: de account-tabel draagt geen campagnenaam en kan dus niet per
+  // beurs gesplitst worden, dan her-aggregeren we uit de campagne-dagdata (die wél namen draagt).
+  // Zonder beurs werden deze twee lezingen gedaan en nooit gebruikt. null = (nog) niet gelezen.
+  const [campaign, setCampaign] = useState<DailyRow[] | null>(null);
   const [names, setNames] = useState<Map<string, string>>(new Map());
-  const [convConfig, setConvConfig] = useState<ChannelConversionConfig>(() => resolveChannelConversionConfig(null));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Zonder beurs komen de cijfers uit de provider; een campagnefout van een eerder gekozen beurs
+    // hoort dan niet te blijven staan.
+    if (!geoClone) { setError(null); return; }
     let cancelled = false;
-    setAccount(null); setError(null);
+    setCampaign(null); setError(null);
     const since = new Date(Date.now() - 200 * 86_400_000).toISOString().slice(0, 10);
     Promise.all([
-      dbSelect<Record<string, unknown>>(cfg.accountTable, { select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
-      // Campagne-dagdata over het volle venster: nodig zodra een beurs gekozen is, want de
-      // account-tabel draagt geen campagnenaam en kan dus niet per beurs gesplitst worden.
       dbSelect<Record<string, unknown>>(cfg.campaignTable, { select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
       dbSelect<Record<string, unknown>>(cfg.nameTable, { select: `${cfg.nameId}, name`, clientId }),
-      // De conversieselectie uit de gedeelde client_settings-rij (lib/client-settings.ts), niet een
-      // eigen select: de band en ChannelDataProvider lezen dezelfde rij.
-      loadClientSettingsRij(clientId),
-    ]).then(([accRes, campRes, nameRes, settingsRes]) => {
+    ]).then(([campRes, nameRes]) => {
       if (cancelled) return;
-      if (accRes.error) { setError(accRes.error.message); setAccount([]); return; }
-      setAccount(((accRes.data ?? []) as unknown as Record<string, unknown>[]).map(cfg.map));
+      if (campRes.error) { setError(campRes.error.message); setCampaign([]); return; }
       setCampaign(((campRes.data ?? []) as unknown as Record<string, unknown>[]).map(cfg.map));
       setNames(new Map(((nameRes.data ?? []) as unknown as Record<string, unknown>[]).map((r) => [String(r[cfg.nameId]), String(r.name ?? r[cfg.nameId])])));
-      setConvConfig(resolveChannelConversionConfig((settingsRes.data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null));
     });
     return () => { cancelled = true; };
-  }, [clientId, channel, cfg]);
+  }, [clientId, cfg, geoClone]);
 
-  // De conversie is de som van de geselecteerde velden voor dit kanaal (conversie-selectie).
-  const convOf = (r: DailyRow) => sumSelectedConversions(r.convFields, cfg.channelKey, convConfig);
-  const selectedLabels = selectedConversionLabels(cfg.channelKey, convConfig);
-  const convLabel = selectedLabels.join(" + ");
   const useLeadsLabel = cfg.channelKey === "linkedin_ads"; // CPL vs CPA-naamgeving
 
   // Beurs-scope: de entiteiten waarvan de campagnenaam bij de gekozen geo-clone hoort. Zonder
@@ -167,31 +189,37 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
   }, [geoClone, names]);
 
   const derived = useMemo(() => {
-    if (!account) return null;
-    const source: DailyRow[] = geoClone
-      ? campaign.filter((r) => matchedEntities?.has(r.entity))
-      : account;
+    if (!account || !maanden) return null;
+    if (geoClone && campaign === null) return null;
     if (geoClone && matchedEntities && matchedEntities.size === 0) return { empty: true } as const;
-    if (source.length === 0) return null;
     const today = vandaag();
     const curMonth = today.slice(0, 7);
 
-    // Maand-aggregatie (volle maanden, laatste 6).
-    const byMonth = new Map<string, Agg>();
-    for (const r of source) {
-      const m = r.date.slice(0, 7);
-      const a = byMonth.get(m) ?? emptyAgg();
-      a.impressions += r.impressions; a.clicks += r.clicks; a.spend += r.spend; a.conv += convOf(r);
-      byMonth.set(m, a);
+    // Zonder beurs: de 28-dagenvensters uit de recente dagen, de maandtabel uit de tellers van de
+    // route (de recente dagen dekken hooguit één volle maand). Met beurs: beide uit de
+    // campagnedagrijen van 200 dagen, de enige bron die per beurs te splitsen is.
+    const source: DailyRow[] = geoClone ? (campaign ?? []).filter((r) => matchedEntities?.has(r.entity)) : account;
+    let fullMonths: [string, Agg][];
+    if (geoClone) {
+      const byMonth = new Map<string, Agg>();
+      for (const r of source) {
+        const m = r.date.slice(0, 7);
+        const a = byMonth.get(m) ?? emptyAgg();
+        a.impressions += r.impressions; a.clicks += r.clicks; a.spend += r.spend; a.conv += convVan(r);
+        byMonth.set(m, a);
+      }
+      fullMonths = [...byMonth.entries()].filter(([m]) => m < curMonth).sort().slice(-6);
+    } else {
+      fullMonths = volleMaandenUitTellers(maanden, curMonth);
     }
-    const fullMonths = [...byMonth.entries()].filter(([m]) => m < curMonth).sort().slice(-6);
+    if (source.length === 0 && fullMonths.length === 0) return null;
 
     // KPI-vensters: laatste 28 dagen vs de 28 ervoor.
     const win = (from: number, to: number): Agg => {
       const a = emptyAgg();
       for (const r of source) {
         const age = (new Date(today).getTime() - new Date(r.date).getTime()) / 86_400_000;
-        if (age >= from && age < to) { a.impressions += r.impressions; a.clicks += r.clicks; a.spend += r.spend; a.conv += convOf(r); }
+        if (age >= from && age < to) { a.impressions += r.impressions; a.clicks += r.clicks; a.spend += r.spend; a.conv += convVan(r); }
       }
       return a;
     };
@@ -199,17 +227,16 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
     const prior = win(28, 56);
 
     return { empty: false as const, fullMonths, recent, prior };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, campaign, convConfig, geoClone, matchedEntities]);
+  }, [account, maanden, campaign, convVan, geoClone, matchedEntities]);
 
-  if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
-  if (account === null) {
+  if (fout || error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{fout ?? error}</div>;
+  if (account === null || maanden === null || (geoClone && campaign === null)) {
     return <Laadvlak vorm="grafiek" hoogte={220} />;
   }
   if (derived?.empty) {
     return (
       <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
-        Geen {channel === "meta" ? "Meta" : "LinkedIn"}-campagnes die bij de gekozen beurs ({geoClone}) horen. De account-cijfers dragen geen campagnenaam en kunnen niet per beurs gesplitst worden.
+        Geen {KANAAL_LABEL[channel]}-campagnes die bij de gekozen beurs ({geoClone}) horen. De account-cijfers dragen geen campagnenaam en kunnen niet per beurs gesplitst worden.
       </div>
     );
   }
@@ -227,7 +254,7 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
   ];
 
   return (
-    <div className="space-y-6 transition-opacity duration-200" style={{ opacity: ververst ? 0.55 : 1 }} aria-busy={ververst}>
+    <div className="space-y-6">
       {geoClone && (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-meta text-blue-800">
           Beurs-scope <strong>{geoClone}</strong> actief: alle cijfers hieronder zijn her-geaggregeerd uit de

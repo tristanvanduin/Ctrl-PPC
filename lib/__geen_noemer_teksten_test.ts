@@ -87,6 +87,7 @@ const G0: ClientHistoricalData = { ...G, currentYearData: jaar(G.currentYearData
 
 async function main() {
   const fc = await import("./forecast");
+  const { computeHealthScore, zonderKanaalSpecifiekeHygiene } = await import("./health-score");
   const { MetricCardsView } = await import("../components/dashboard/metric-cards");
   const { ReportExport } = await import("../components/dashboard/report-export");
   const { ForecastTable, ForecastSummaryTiles } = await import("../components/dashboard/forecast-table");
@@ -99,7 +100,12 @@ async function main() {
     const forecast = fc.computeForecast(data);
     waarden["lib/client-data-provider.tsx#0"] = { data, loading: false, error: null };
     waarden["lib/client-data-provider.tsx#1"] = forecast;
-    waarden["components/dashboard/channel-data-provider.tsx#0"] = { rijen: [], convVan: () => 0, convLabel: "", forecast: { data, forecast } };
+    // De KanaalData-vorm van de provider (fase 1, stap 5: met `maanden`, en het tab-object draagt
+    // ook de health). Hier leest alleen ChannelForecastOverview hem, en die leest `forecast`.
+    waarden["components/dashboard/channel-data-provider.tsx#0"] = {
+      rijen: [], maanden: [], convVan: () => 0, convLabel: "",
+      forecast: { data, forecast, health: zonderKanaalSpecifiekeHygiene(computeHealthScore(forecast)) },
+    };
     return forecast;
   };
   const naNa = (t: string, van: string, lengte = 160) => { const i = t.indexOf(van); return i < 0 ? "(niet gevonden)" : t.slice(i, i + lengte); };

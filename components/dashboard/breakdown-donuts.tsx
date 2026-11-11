@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PieChart, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbSelect } from "@/lib/data-access/client-read";
+import { maakBronCache } from "@/lib/data-access/bron-cache";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
 import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
@@ -118,8 +119,68 @@ function AandeelRaster({ slices, kleur, toonConversies, conversieWoord }: {
  * op zodra die dimensie voor deze klant geen data heeft. Uitsluiten laat de bestaande
  * `beschikbaar`-filter (alleen dimensies met echte data) gewoon zijn werk doen.
  */
+// De segmenten van ALLE dimensies per (klant, kanaal), vijf minuten bewaard.
+//
+// Op Meta staan twee van deze kaarten naast elkaar (levering en doelgroep), en elk deed bij zijn
+// mount dezelfde query: de groep filtert pas client-side. Met de gedeelde cache wachten ze op één
+// verzoek, en een terugkeer naar het tabblad binnen de cachetijd kost er geen. De rijen veranderen
+// alleen door een sync; die vergeet ze via vergeetBronnen (lib/data-access/bron-cache.ts).
+const SEGMENT_TTL = 5 * 60 * 1000;
+const segmentCache = maakBronCache<Segment[]>(SEGMENT_TTL);
+const segmentSleutel = (clientId: string, channel: Kanaal) => `${clientId}|${channel}`;
+
+/** Eén lezing van de uitsplitsingstabel van het kanaal, opgeteld per (dimensie, waarde). */
+async function laadSegmenten(sb: NonNullable<typeof supabase>, clientId: string, channel: Kanaal): Promise<Segment[]> {
+  const since = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+  const opgeteld = new Map<string, Segment>();
+  const tel = (dimensie: string, waarde: string, label: string, spend: number, conversies: number, impressies: number, klikken: number) => {
+    const sleutel = `${dimensie}|${waarde}`;
+    const a = opgeteld.get(sleutel) ?? { dimensie, waarde, label, spend: 0, conversies: 0, impressies: 0, klikken: 0 };
+    a.spend += spend; a.conversies += conversies; a.impressies += impressies; a.klikken += klikken;
+    opgeteld.set(sleutel, a);
+  };
+
+  if (channel === "meta") {
+    const { data, error } = await dbSelect<Record<string, unknown>>("meta_breakdown_daily", {
+      select: "breakdown_type, breakdown_value, spend, conversions, impressions, link_clicks",
+      clientId, filters: [{ op: "gte", column: "date", value: since }],
+    });
+    // Gooien: een mislukte lezing hoort niet vijf minuten als "geen uitsplitsingen" in de cache
+    // te staan. De kaart toont dan niets, zoals voorheen, en de volgende mount probeert opnieuw.
+    if (error) throw new Error(error.message);
+    for (const r of data) {
+      const waarde = String(r.breakdown_value ?? "");
+      if (!waarde) continue;
+      tel(String(r.breakdown_type ?? ""), waarde, metaWaardeLabel(waarde),
+        Number(r.spend ?? 0), Number(r.conversions ?? 0), Number(r.impressions ?? 0), Number(r.link_clicks ?? 0));
+    }
+  } else {
+    // De pivot-waarden zijn URN's; de leesbare naam staat in een aparte labeltabel. Zonder die
+    // vertaling staat er "urn:li:function:8" in de legenda.
+    const [{ data: rijen, error }, { data: labels }] = await Promise.all([
+      dbSelect<Record<string, unknown>>("linkedin_demographic_daily", {
+        select: "pivot_type, pivot_value_urn, spend, leads, impressions, clicks",
+        clientId, filters: [{ op: "gte", column: "date", value: since }],
+      }),
+      // linkedin_urn_labels is een gedeelde opzoektabel zonder client_id: blijft de
+      // rechtstreekse anon-lezer, buiten migratie 067's scope (zie de kop van die migratie).
+      sb.from("linkedin_urn_labels").select("urn, label"),
+    ]);
+    if (error) throw new Error(error.message);
+    const naam = new Map((labels ?? []).map((l: Record<string, unknown>) => [String(l.urn), String(l.label ?? l.urn)]));
+    for (const r of rijen) {
+      const urn = String(r.pivot_value_urn ?? "");
+      if (!urn) continue;
+      tel(String(r.pivot_type ?? ""), urn, naam.get(urn) ?? urn,
+        Number(r.spend ?? 0), Number(r.leads ?? 0), Number(r.impressions ?? 0), Number(r.clicks ?? 0));
+    }
+  }
+  return [...opgeteld.values()];
+}
+
 export function BreakdownDonuts({ clientId, channel, groep = "levering", overslaan }: { clientId: string; channel: Kanaal; groep?: "levering" | "doelgroep"; overslaan?: readonly string[] }) {
-  const [segmenten, setSegmenten] = useState<Segment[] | null>(null);
+  // De beginstaat uit de cache: bij een tweede bezoek staat de kaart er meteen, zonder laadvlak.
+  const [segmenten, setSegmenten] = useState<Segment[] | null>(() => segmentCache.kijk(segmentSleutel(clientId, channel)) ?? null);
   const [dimensie, setDimensie] = useState<string | null>(null);
   const [tabelOpen, toggleTabel] = useRememberedOpen(`breakdown-tabel-${channel}-${groep}${overslaan?.length ? "-b" : ""}`, false);
 
@@ -127,53 +188,16 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
     const sb = supabase;
     if (!sb) { setSegmenten([]); return; }
     let cancelled = false;
-    setSegmenten(null); setDimensie(null);
-    const since = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+    setDimensie(null);
+    const sleutel = segmentSleutel(clientId, channel);
+    const bewaard = segmentCache.kijk(sleutel);
+    if (bewaard !== undefined) { setSegmenten(bewaard); return; }
+    setSegmenten(null);
 
-    async function laad() {
-      const opgeteld = new Map<string, Segment>();
-      const tel = (dimensie: string, waarde: string, label: string, spend: number, conversies: number, impressies: number, klikken: number) => {
-        const sleutel = `${dimensie}|${waarde}`;
-        const a = opgeteld.get(sleutel) ?? { dimensie, waarde, label, spend: 0, conversies: 0, impressies: 0, klikken: 0 };
-        a.spend += spend; a.conversies += conversies; a.impressies += impressies; a.klikken += klikken;
-        opgeteld.set(sleutel, a);
-      };
-
-      if (channel === "meta") {
-        const { data } = await dbSelect<Record<string, unknown>>("meta_breakdown_daily", {
-          select: "breakdown_type, breakdown_value, spend, conversions, impressions, link_clicks",
-          clientId, filters: [{ op: "gte", column: "date", value: since }],
-        });
-        for (const r of data) {
-          const waarde = String(r.breakdown_value ?? "");
-          if (!waarde) continue;
-          tel(String(r.breakdown_type ?? ""), waarde, metaWaardeLabel(waarde),
-            Number(r.spend ?? 0), Number(r.conversions ?? 0), Number(r.impressions ?? 0), Number(r.link_clicks ?? 0));
-        }
-      } else {
-        // De pivot-waarden zijn URN's; de leesbare naam staat in een aparte labeltabel. Zonder die
-        // vertaling staat er "urn:li:function:8" in de legenda.
-        const [{ data: rijen }, { data: labels }] = await Promise.all([
-          dbSelect<Record<string, unknown>>("linkedin_demographic_daily", {
-            select: "pivot_type, pivot_value_urn, spend, leads, impressions, clicks",
-            clientId, filters: [{ op: "gte", column: "date", value: since }],
-          }),
-          // linkedin_urn_labels is een gedeelde opzoektabel zonder client_id: blijft de
-          // rechtstreekse anon-lezer, buiten migratie 067's scope (zie de kop van die migratie).
-          sb!.from("linkedin_urn_labels").select("urn, label"),
-        ]);
-        const naam = new Map((labels ?? []).map((l: Record<string, unknown>) => [String(l.urn), String(l.label ?? l.urn)]));
-        for (const r of rijen) {
-          const urn = String(r.pivot_value_urn ?? "");
-          if (!urn) continue;
-          tel(String(r.pivot_type ?? ""), urn, naam.get(urn) ?? urn,
-            Number(r.spend ?? 0), Number(r.leads ?? 0), Number(r.impressions ?? 0), Number(r.clicks ?? 0));
-        }
-      }
-      if (!cancelled) setSegmenten([...opgeteld.values()]);
-    }
-
-    laad().catch(() => { if (!cancelled) setSegmenten([]); });
+    segmentCache.lees(sleutel, () => laadSegmenten(sb, clientId, channel)).then(
+      (gelezen) => { if (!cancelled) setSegmenten(gelezen); },
+      () => { if (!cancelled) setSegmenten([]); },
+    );
     return () => { cancelled = true; };
   }, [clientId, channel]);
 

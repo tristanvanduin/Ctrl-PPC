@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { BarChart3, Settings, Target, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown, Search } from "lucide-react";
 import { SyncStatusBadge } from "./sync-status-badge";
@@ -22,9 +22,10 @@ import { ProposalQueue } from "../insights/proposal-queue";
 import { ChannelFilter } from "../insights/channel-filter";
 import { dbSelect } from "@/lib/data-access/client-read";
 import {
-  laadBeschikbareKanalen, zichtbareTabs, geldigeKeuze, geenDataTekst, kanalenOpsomming,
+  laadBeschikbareKanalen, kanalenUitBronnen, zichtbareTabs, geldigeKeuze, geenDataTekst, kanalenOpsomming,
   type Kanaal,
 } from "@/lib/kanalen/beschikbaar";
+import { flattenMonths, heeftData } from "@/lib/period/apply-period";
 
 // laadBeschikbareKanalen() neemt structureel een client aan met .from(); de browser-singleton
 // (lib/supabase.ts) is dat in demo-modus de mock, en die herkent alleen client_id ===
@@ -91,7 +92,7 @@ import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
 import { useClientData } from "@/lib/use-client-data";
 import { useChannelPeriodData } from "@/lib/use-channel-period-data";
-import { useBlendedClientData } from "@/lib/use-blended-client-data";
+import { useBlendedClientData, vergeetBlendedClientData } from "@/lib/use-blended-client-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import { Sectie } from "@/components/ui/sectie";
@@ -231,22 +232,64 @@ function DashboardPeriodPicker({ jaarlijkseEditie, klaar }: { jaarlijkseEditie: 
 export function ClientDashboard({ client }: { client: Client }) {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [channel, setChannel] = useState<Channel>("blended");
-  // null = nog niet geladen. Dat onderscheid telt: "nog niet weten" mag er niet uitzien als
-  // "geen kanalen", anders flitst de lege staat op bij elke navigatie.
-  const [kanalen, setKanalen] = useState<Kanaal[] | null>(null);
   // Alleen gebruikt voor het bronbijschrift verderop. isDemoMode() leest window.location, dus dit
   // hoort in een effect en niet in de eerste render -- anders rendert de server iets anders dan de
   // client en klapt de hydratie eruit.
   const [demoModus, setDemoModus] = useState(false);
   useEffect(() => { setDemoModus(isDemoClient(client.id)); }, [client.id]);
 
+  const clientData = useClientData(client.id);
+  // De blended route, voor ÉLKE klant en meteen bij de mount (fase 1, stap 4). Hij draagt wat het
+  // Overzicht nodig heeft: de maandreeks per kanaal voor de KPI-band, de syncstand per kanaal
+  // (<kanaal>_connections is in de browser niet leesbaar), en welke dagkanalen deze klant heeft.
+  // Eerder startte hij pas nadat vier aanwezigheidsproefjes (laadBeschikbareKanalen) klaar waren,
+  // en alleen bij een niet-Google-kanaal: een waterval proefjes -> route -> band. Een klant zonder
+  // enige data krijgt een 404; dat is de terugvalweg hieronder. CrossChannelView en de
+  // kanaalprovider lezen dezelfde hook; meerdere mounts geven één verzoek.
+  const blendedStand = useBlendedClientData(client.id);
+
+  // Welke kanalen deze klant heeft, per kanaal uit de bron die het al weet:
+  // - Google uit het Google-antwoord zelf (een maand met data): de band toont Google live, dus een
+  //   account dat nog niet in de database gesynct is, is er hier wel.
+  // - De drie dagkanalen uit perKanaal van de blended route (alleen kanalen met rijen staan erin).
+  // - En het proefje laadBeschikbareKanalen (vier verzoeken met limit 1 en één kolom) als RACE
+  //   ernaast, niet erna: het vertrekt bij de mount, tegelijk met de twee routes, en wie het eerst
+  //   antwoordt bepaalt de dagkanalen. Zo hangt de kanalenlijst van een klant met alleen Google
+  //   (62 van de 71) niet aan de duur van de blended route, en is een routefout (404 bij een klant
+  //   zonder fact_core-rijen) geen tweede ronde: het antwoord van het proefje ligt er dan al.
+  //   Hier stond het proefje als eerste schakel van een waterval (proefje -> route -> band).
+  // De route gaat voor zodra hij er is: hij is ook de bron van de cijfers in de band.
+  const [proefje, setProefje] = useState<{ clientId: string; kanalen: Kanaal[] } | null>(null);
+  const routeKlaar = !blendedStand.loading && blendedStand.error === null && blendedStand.perKanaal !== null;
   useEffect(() => {
+    // Kent de route de kanalen al (de cache, bij een terugkeer naar deze klant), dan valt er niets
+    // te racen; een proefje dat nog onderweg is als de route antwoordt, wordt niet meer gelezen.
+    if (routeKlaar || proefje?.clientId === client.id) return;
     let levend = true;
     laadBeschikbareKanalen(dbSelectAlsSupabase, client.id)
-      .then((k) => { if (levend) setKanalen(k); })
-      .catch(() => { if (levend) setKanalen([]); });
+      .then((k) => { if (levend) setProefje({ clientId: client.id, kanalen: k }); })
+      .catch(() => { if (levend) setProefje({ clientId: client.id, kanalen: [] }); });
     return () => { levend = false; };
-  }, [client.id]);
+  }, [client.id, routeKlaar, proefje]);
+  // null = nog niet bekend. Dat onderscheid telt: "nog niet weten" mag er niet uitzien als
+  // "geen kanalen", anders flitst de lege staat op bij elke navigatie.
+  const googleData = clientData.data;
+  const routePerKanaal = blendedStand.perKanaal;
+  // De regel zelf (wie gaat voor, wanneer is het nog onbekend) staat in kanalenUitBronnen
+  // (lib/kanalen/beschikbaar.ts) en is daar getoetst.
+  const kanalenNu = useMemo((): Kanaal[] | null => kanalenUitBronnen({
+    googleLaadt: clientData.loading,
+    google: googleData ? flattenMonths(googleData).some(heeftData) : null,
+    route: routeKlaar ? (routePerKanaal ?? []).map((r) => r.kanaal) : null,
+    proefje: proefje?.clientId === client.id ? proefje.kanalen : null,
+  }), [client.id, clientData.loading, googleData, routeKlaar, routePerKanaal, proefje]);
+  // Eenmaal bekend blijft de lijst staan terwijl een bron opnieuw laadt (de Google-route na het
+  // opslaan van de instellingen zet `loading` weer op true): het zijn dezelfde kanalen, en zonder
+  // dit sprong de periodekiezer bij elke opslag terug naar "laden", ook op een Meta-, LinkedIn- of
+  // Microsoft-tab, die de Google-route niet eens leest.
+  const [kanalenBekend, setKanalenBekend] = useState<{ clientId: string; kanalen: Kanaal[] } | null>(null);
+  useEffect(() => { if (kanalenNu) setKanalenBekend({ clientId: client.id, kanalen: kanalenNu }); }, [client.id, kanalenNu]);
+  const kanalen = kanalenNu ?? (kanalenBekend?.clientId === client.id ? kanalenBekend.kanalen : null);
 
   // De keuze bijstellen zodra bekend is wat er is. Zonder dit blijf je hangen op een kanaal dat
   // deze klant niet heeft: van een Meta-klant doorklikken naar een Google-only klant liet een
@@ -262,24 +305,13 @@ export function ClientDashboard({ client }: { client: Client }) {
   const [geoClone, setGeoClone] = useState<string | null>(geoParam);
   useEffect(() => { setGeoClone(geoParam); }, [geoParam]);
   const [sopErrors, setSopErrors] = useState<SopError[]>([]);
-  const clientData = useClientData(client.id);
   // KPI-rij bovenaan: "deze kpi header rij moet standaard alles tonen. bij filtering pas kanaal
   // specifiek" -- op "blended" (de standaard) telt hij alle kanalen op, op een gekozen kanaal
   // toont hij alleen dat kanaal. Voorheen las PeriodSummary altijd clientData.data (Google), ook
-  // op de Meta/LinkedIn/Alle kanalen-tabs.
-  const periodSummary = useChannelPeriodData({ clientId: client.id, channel, googleData: clientData.data });
-  // Voor de datastand van de band: de blended route leest de syncstand per kanaal
-  // (<kanaal>_connections), en die is in de browser niet leesbaar. Nodig zodra de klant een
-  // Meta-, LinkedIn- of Microsoft-kanaal heeft, ook als dat het enige is: anders rekent die tab op
-  // de nieuwste rij alleen, en verliest een gepauzeerd account met een gezonde sync maanden
-  // (review [3]). Dat is de kleinste juiste weg: een eigen route voor alleen de syncstand zou
-  // dezelfde lezers nog eens bouwen. Een klant met alleen Google (de meeste) vraagt hem niet: de
-  // Google-route geeft zijn eigen stand mee. CrossChannelView en de kanaalprovider lezen dezelfde
-  // hook; meerdere mounts geven één verzoek.
-  const blendedAan = (kanalen ?? []).some((k) => k !== "google");
-  const blendedStand = useBlendedClientData(client.id, blendedAan);
+  // op de Meta/LinkedIn/Alle kanalen-tabs. Meta/LinkedIn/Microsoft komen uit de blended route
+  // (perKanaal); de eigen dagrijen alleen als terugval (zie lib/use-channel-period-data.ts).
+  const periodSummary = useChannelPeriodData({ clientId: client.id, channel, googleData: clientData.data, route: blendedStand });
   const [lagDays, setLagDays] = useState<number>(3);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [countryFilter, setCountryFilter] = useState<string | null>(null);
   // Stuurt deze klant op een beurs, dan is de kalendermaand niet de as die telt. De
   // prestatiekaart schakelt dan naar weken-tot-beurs; de maandweergave blijft een klik ver weg
@@ -310,13 +342,18 @@ export function ClientDashboard({ client }: { client: Client }) {
   });
   // Geen cijfers (en geen periode in de kiezer) zolang de stand nog niet bekend is: anders staat de
   // band eerst op het kalendervenster en springt hij daarna, met tussendoor percentages over
-  // maanden die er niet zijn. Bekend is: de kanalen, de eigen bronnen van dit tabblad, en (zodra de
-  // route aan staat) de syncstand. Faalt de route, dan telt hij als bekend en rekent de band op
-  // zijn eigen rijen.
+  // maanden die er niet zijn. Bekend is: de kanalen en de eigen bronnen van dit tabblad. Google uit
+  // de Google-route; een dagkanaal is `klaar` zodra de blended route er is (zijn maandreeks én de
+  // syncstand komen in hetzelfde antwoord), of in de terugvalweg -- een routefout, of een route die
+  // WACHT_MS stil blijft -- zodra zijn eigen rijen binnen zijn; dan rekent de band daarop.
+  // Het Google-tabblad wacht niet op de blended route: zijn stand komt uit de Google-route zelf.
+  // Een losse `!blendedStand.loading` staat er daarom niet meer bij: die hield het Google-tabblad
+  // van een klant met alleen Google aan de blended route vast, en een route die bleef hangen de
+  // band voor altijd dicht, ook nadat de eigen rijen er al waren.
   const eigenStandBekend = channel === "google" ? !clientData.loading
-    : channel === "blended" ? !clientData.loading && NIET_GOOGLE.every((k) => periodSummary.geladenVanaf[k] !== null)
-      : periodSummary.geladenVanaf[channel] !== null;
-  const bandKlaar = kanalen !== null && eigenStandBekend && (channel === "google" || !blendedStand.loading);
+    : channel === "blended" ? !clientData.loading && NIET_GOOGLE.every((k) => periodSummary.klaar[k])
+      : periodSummary.klaar[channel];
+  const bandKlaar = kanalen !== null && eigenStandBekend;
 
   return (
     <PeriodProvider scope={`client-${client.id}`} dataStand={dataStand}>
@@ -392,11 +429,22 @@ export function ClientDashboard({ client }: { client: Client }) {
               spontaan op drukt.
               Buiten de demo blijft hij staan, juist ook bij een klant zonder data -- dat is de
               klant die hem het hardst nodig heeft. */}
+          {/* Na een geslaagde sync de blended route opnieuw, via de ene vergeet-ingang: de band, de
+              kanalenlijst, het Jaaroverzicht, de ranking en de kanaaltabs lezen hem, en gemounte
+              lezers herladen in stilte (de vorige cijfers blijven staan tot de nieuwe binnen zijn).
+              Hier stond een refreshKey die nergens gelezen werd: na een sync ververste niets.
+              Bewust GEEN invalidateClientCache op dit pad. Die zet de Google-data op null en
+              `loading` op true: deze hele rij staat achter `!clientData.loading`, dus de badge
+              unmount met zijn melding ("N datasets, M rijen") voordat iemand hem leest, en alles
+              onder de datapoort mount opnieuw. En er valt daar niets te halen: de Google-route
+              leest live bij Google en haar datastand is "t/m gisteren" (liveDataStand), geen van
+              beide verandert door een sync naar de database. Haar cache verloopt gewoon na vijf
+              minuten. (De demo, die Google wel uit de database leest, heeft deze knop niet.) */}
           {!demoModus && (
             <SyncStatusBadge
               clientId={client.id}
               kanalen={kanalen}
-              onSyncComplete={() => setRefreshKey((k) => k + 1)}
+              onSyncComplete={() => vergeetBlendedClientData(client.id)}
             />
           )}
         </div>
@@ -456,11 +504,32 @@ export function ClientDashboard({ client }: { client: Client }) {
       </div>
       )}
 
-      {/* Laden: een vlak op de maten van de band en de eerste kaarten, geen spinner. De spinner
-          stond gecentreerd in een lege pagina en alles wat daarna kwam, schoof 200 px omlaag
-          (CLS 0,14 desktop, 0,58 mobiel). Geen kanaalnaam hier: tijdens het laden is nog niet
-          bekend wélke kanalen deze klant heeft, dus elke naam zou een gok zijn. */}
-      {clientData.loading && <PaginaLaadvlak />}
+      {/* De kanaaltabs en de KPI-band staan BUITEN de datapoort hieronder (fase 1, stap 4): ze
+          hebben de Google-route alleen op het Google-tabblad en op Alle kanalen nodig, en de
+          instellingenpoort van ClientDataProvider (tot 3 s) nooit. Zo wacht het eerste kerncijfer
+          op max(Google-route, blended route) in plaats van op de hele keten. Alleen op het
+          Overzicht, en niet bij een fout van de Google-route: dan staat de foutmelding er.
+          Kanaaltabs boven de KPI-rij (17.44): "is het niet onlogisch dat de kanaalfilter onder de
+          hoofd-KPI-rij staat?" -- je kiest eerst welk kanaal je bekijkt, dan pas de cijfers ervoor.
+          De KPI-rij beweegt mee: op "blended" (de standaard, "Alle kanalen") telt hij alle kanalen
+          op via useChannelPeriodData(); op een gekozen kanaal toont hij alleen dat kanaal. De losse
+          kanalen gaan mee als bronnen, zodat de vergelijking per kanaal paart. */}
+      {/* De alarmbanner blijft boven de band, op elk tabblad: hij leest geen providercontext, en
+          onder de band zakte hij driehonderd pixels weg. */}
+      {clientData.data && <CodeRoodBanner clientId={client.id} />}
+      {activeTab === "dashboard" && !clientData.error && (
+        <div className="space-y-6">
+          <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
+          <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} laden={!bandKlaar} />
+        </div>
+      )}
+
+      {/* Laden: een vlak op de maten van de eerste kaarten, geen spinner. De spinner stond
+          gecentreerd in een lege pagina en alles wat daarna kwam, schoof 200 px omlaag (CLS 0,14
+          desktop, 0,58 mobiel). Zonder band-deel: de band hierboven toont zijn eigen laadvlak, en
+          twee band-skeletten onder elkaar verspringen bij het binnenkomen. Geen kanaalnaam hier:
+          tijdens het laden is nog niet bekend wélke kanalen deze klant heeft. */}
+      {clientData.loading && <PaginaLaadvlak metBand={false} />}
 
       {/* Error state */}
       {clientData.error && (
@@ -473,24 +542,15 @@ export function ClientDashboard({ client }: { client: Client }) {
 
       {/* All content wrapped in data provider */}
       {clientData.data && (
-        <ClientDataProvider clientId={client.id}>
+        <ClientDataProvider clientId={client.id} wachtvlak={<PaginaLaadvlak metBand={false} />}>
         <AnalysisProvider>
-          <CodeRoodBanner clientId={client.id} />
           <TrackingAlert clientId={client.id} onNavigateToSettings={() => setActiveTab("settings")} />
 
           <GeoCloneScope value={geoClone} onChange={setGeoClone} />
 
           {activeTab === "dashboard" && (
             <div className="space-y-6">
-              {/* Kanaaltabs boven de KPI-rij (17.44): "is het niet onlogisch dat de kanaalfilter
-                  onder de hoofd-KPI-rij staat?" -- je kiest eerst welk kanaal je bekijkt, dan pas
-                  de cijfers ervoor. De KPI-rij zelf beweegt nu ook echt mee: op "blended" (de
-                  standaard, "Alle kanalen") telt hij alle kanalen op via useChannelPeriodData();
-                  op een gekozen kanaal toont hij alleen dat kanaal. Werkt op data die de pagina al
-                  heeft (Google) of apart ophaalt (Meta/LinkedIn/Microsoft), dus ook in demo-modus.
-                  De losse kanalen gaan mee als bronnen, zodat de vergelijking per kanaal paart. */}
-              <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
-              <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} laden={!bandKlaar} />
+              {/* De kanaaltabs en de KPI-band staan hierboven, buiten de datapoort. */}
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
               {channel === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}

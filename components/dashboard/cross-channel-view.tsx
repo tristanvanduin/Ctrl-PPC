@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { CalendarClock, Globe, Info, Layers, Loader2, Target, TrendingUp } from "lucide-react";
-import { dbSelect } from "@/lib/data-access/client-read";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { CampaignTypeSplit } from "./campaign-type-split";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
 import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
+import { kanaalMaandRijen } from "@/lib/cross-channel/kanaal-maandrijen";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
 import { maandLabel } from "./chart-chrome";
@@ -27,24 +27,13 @@ import { uitgeslotenZin } from "./period-summary";
 import { uitgeslotenMetDag } from "@/lib/sync/datastand";
 import type { Kanaal } from "@/lib/kanalen/beschikbaar";
 
-// Cross-channel (blended) tab. Twee bronnen: de pacing, de beurs-sectie en het jaaroverzicht lezen
-// de blended historie (useBlendedClientData: Google uit fact_core, Meta/LinkedIn/Microsoft uit de
-// dagtabellen met de conversieselectie van de klant); de grafiek, de ringen en de kanaaltabel lezen
-// nog de blended_account_monthly-view over Google, Meta en LinkedIn. De attributie-voetnoot is
-// verplicht, want elk kanaal meet zijn eigen attributie en bedragen zijn alleen optelbaar bij
-// gelijke valuta.
-
-interface BlendedRow {
-  month: string;
-  channel: string;
-  currency: string | null;
-  impressions: number | null;
-  clicks: number | null;
-  spend: number | null;
-  conversions: number | null;
-  conversion_value: number | null;
-  leads: number | null;
-}
+// Cross-channel (blended) tab. Eén bron: de pacing, de beurs-sectie, het jaaroverzicht én de
+// grafiek, de ringen en de kanaaltabel lezen de blended historie (useBlendedClientData: Google uit
+// fact_core, Meta/LinkedIn/Microsoft uit de dagtabellen met de conversieselectie van de klant).
+// De laatste drie lazen tot fase 1, stap 6 de view blended_account_monthly, met de
+// standaardselectie en zonder Microsoft: dezelfde maand kon in de tabel een ander aantal
+// conversies hebben dan in de kerncijfers erboven. De attributie-voetnoot is verplicht, want elk
+// kanaal meet zijn eigen attributie en de bedragen zijn niet naar één valuta omgerekend.
 
 const CHANNEL_LABEL: Record<string, string> = {
   google_ads: "Google",
@@ -94,23 +83,16 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
   // zei het Jaaroverzicht niets over een kanaal dat sinds mei nul levert.
   const jaarUitgesloten = uitgeslotenZin(uitgeslotenMetDag(blended.dataStand));
   const [jaaroverzichtMetric, setJaaroverzichtMetric] = useState<ForecastMetric>("conversions");
-  const [rows, setRows] = useState<BlendedRow[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setRows(null); setError(null);
-    dbSelect<BlendedRow>("blended_account_monthly", {
-      select: "month, channel, currency, impressions, clicks, spend, conversions, conversion_value, leads",
-      clientId,
-      order: { column: "month", ascending: false },
-    }).then(({ data, error }) => {
-      if (cancelled) return;
-      if (error) setError(error.message);
-      else setRows(data);
-    });
-    return () => { cancelled = true; };
-  }, [clientId]);
+  // De maandrijen per kanaal, uit dezelfde ophaalronde als de pacing en het jaaroverzicht: de
+  // tellers van perKanaal, met de selectie van de klant en Microsoft erbij. Geen eigen verzoek
+  // meer, dus een terugkeer naar dit tabblad kost er ook geen. null = nog onderweg (of mislukt:
+  // dan zegt `error` waarom); een lege lijst = er valt niets te tonen, ook als de hook uit staat
+  // omdat er geen twee kanalen (bekend) zijn -- de tabel hieronder staat er dan niet.
+  const error = blended.error;
+  const rows = useMemo(
+    () => (blended.perKanaal ? kanaalMaandRijen(blended.perKanaal) : blended.loading || blended.error ? null : []),
+    [blended.perKanaal, blended.loading, blended.error],
+  );
 
   const months = rows ? [...new Set(rows.map((r) => r.month))] : [];
 
@@ -135,13 +117,13 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
   const betrouwbaarheid = useMemo(() => {
     if (!rows || rows.length === 0) return null;
     const venster = [...new Set(rows.map((r) => r.month))].sort().slice(-RECENT_MONTHS);
-    const perKanaal = new Map<string, number>();
+    const perKanaal = new Map<ChannelKey, number>();
     for (const r of rows.filter((x) => venster.includes(x.month))) {
       perKanaal.set(r.channel, (perKanaal.get(r.channel) ?? 0) + (r.conversions ?? 0));
     }
     if (perKanaal.size < 2) return null; // met één kanaal valt er niets op te tellen
     return blendedReliability(
-      [...perKanaal].map(([channel, conversions]) => ({ channel: channel as ChannelKey, conversions })),
+      [...perKanaal].map(([channel, conversions]) => ({ channel, conversions })),
       null // geen anker beschikbaar in deze weergave
     );
   }, [rows]);
@@ -185,17 +167,16 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
         {/* Microsoft telt op dit tabblad niet overal mee, en dat moet er staan. De pacing, de
             beurs-sectie en het jaaroverzicht lezen sinds 1 november 2026 de dagtabellen (via
             /api/blended/client-data), net als de kerncijfers bovenaan: daar telt Microsoft mee. De
-            ranking, de markten, de verdeling en de cross-channel-tabel lezen nog de gezamenlijke
-            feitentabel, en daar staat Microsoft bewust niet in (migratie 106). Zonder deze regel
-            ontbrak Microsoft stil onder koppen die "alle kanalen" beloven. Gedempt en niet amber: er
-            valt vandaag niets aan te doen (de kleurregel van 82cde2d). Eén regel hier dekt alle
-            blokken; KanaalHealthRanking zelf kan "geen score" niet van "nog aan het laden"
-            onderscheiden. */}
+            ranking (fase 1, stap 5), de verdeling over de kanalen en de cross-channel-tabel (stap 6)
+            ook: die lezen het tab-object en de tellers per kanaal uit dezelfde route. Alleen de
+            markten lezen nog een bron zonder Microsoft. Zonder deze regel ontbrak Microsoft stil
+            onder een kop die "alle kanalen" belooft. Gedempt en niet amber: er valt vandaag niets
+            aan te doen (de kleurregel van 82cde2d). */}
         {kanalen.includes("microsoft") && (
           <p className="mb-3 text-meta leading-snug text-muted-foreground">
-            Microsoft Ads telt mee in de kerncijfers bovenaan, de pacing, de beurs-sectie en het
-            jaaroverzicht. In de ranking, de markten, de verdeling over de kanalen en de
-            cross-channel-tabel nog niet; de eigen Microsoft-cijfers staan op het tabblad Microsoft.
+            Microsoft Ads telt mee in de kerncijfers bovenaan, de ranking, de pacing, de
+            beurs-sectie, het jaaroverzicht, de verdeling over de kanalen en de cross-channel-tabel.
+            In de markten nog niet; de eigen Microsoft-cijfers staan op het tabblad Microsoft.
           </p>
         )}
         {/* Dezelfde asymmetrische hero als de kanaaltabbladen: links de gezondheid, rechts de
@@ -262,12 +243,16 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
               Alleen de kanaal-uitsplitsing: campagnetype en campagnenaam komen uit
               ads_campaign_monthly, en die tabel kent enkel Google-campagnes. Twee tabbladen die
               een Google-verdeling tonen onder een kop die alle kanalen belooft, is precies de
-              soort halve waarheid die dit tabblad moet vermijden. */}
+              soort halve waarheid die dit tabblad moet vermijden.
+
+              De ring krijgt dezelfde rijen als de staven en de tabel (`kanaalRijen`) en kiest er
+              zelf zijn venster uit: geen tweede lezing, en geen ring die een maand anders telt
+              dan de tabel eronder. */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
             <div className="lg:col-span-2">
               <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} groeit />
             </div>
-            <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} />
+            <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} kanaalRijen={rows} />
           </div>
         </Sectie>
       )}
@@ -302,7 +287,15 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
         </Sectie>
       )}
 
-      {/* Data-weergave; de cross-channel-signaalanalyse draait via Analyses → Cross-channel. */}
+      {/* Data-weergave; de cross-channel-signaalanalyse draait via Analyses → Cross-channel.
+
+          Alleen bij meer dan één kanaal, dezelfde voorwaarde als de hook hierboven: de rijen komen
+          daaruit, en zolang hij uit staat is er niets te tonen en ook niets te laden. Dat is het
+          geval bij een klant zonder data (de melding bovenaan het dashboard zegt dat al) en heel
+          even bij het openen, als de kanalen nog niet bekend zijn. Zonder deze voorwaarde zou
+          daar dan een halve tel "nog geen cross-channel data" staan voor een klant die vier
+          kanalen heeft. De secties hierboven verschijnen op dezelfde manier pas met hun data. */}
+      {kanalen.length > 1 && (
       <Sectie
         icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Cross-channel (blended)"
@@ -338,7 +331,7 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
           )}
           {rows && rows.length === 0 && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
-              Nog geen cross-channel data. Zodra minstens één kanaal (Google/Meta/LinkedIn) gesynct is, verschijnt hier de blended maandview.
+              Nog geen cross-channel data. Zodra minstens twee kanalen (Google, Meta, LinkedIn of Microsoft) gesynct zijn, verschijnt hier de blended maandview.
             </div>
           )}
           {rows && rows.length > 0 && (() => {
@@ -463,7 +456,11 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
                       <KolomKop getal>Klikken</KolomKop>
                       <KolomKop getal>Conversies</KolomKop>
                       {heeftWaarde && <KolomKop getal>Conv.waarde</KolomKop>}
-                      <KolomKop>Valuta</KolomKop>
+                      {/* GEEN KOLOM VALUTA MEER. Die kwam uit blended_account_monthly. De route
+                          waar deze rijen nu vandaan komen leest de dagtabellen, en die dragen geen
+                          valuta; hem meesturen zou een extra lezing kosten, voor een kolom die
+                          niets aan de bedragen deed: die stonden er al als euro's, wat er in die
+                          kolom ook stond. Het voorbehoud staat in het blok hiernaast. */}
                     </Kop>
                     <Body>
                       {months.map((m) =>
@@ -477,7 +474,6 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
                             <GetalCel zacht>{fmt(r.clicks)}</GetalCel>
                             <GetalCel>{fmt(r.conversions)}</GetalCel>
                             {heeftWaarde && <GetalCel zacht>{eur(r.conversion_value)}</GetalCel>}
-                            <td className="px-3 py-2 text-muted-foreground">{r.currency ?? "—"}</td>
                           </Rij>
                         ))
                       )}
@@ -509,7 +505,8 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
                 <strong className="text-brand-gray">{fmt(betrouwbaarheid.blendedSum)} conversies</strong>;
                 dat is een bovengrens.</>
               )}{" "}
-              Bedragen alleen optellen over kanalen met gelijke valuta.
+              De bedragen zijn niet omgerekend: het totaal klopt alleen als alle kanalen in
+              dezelfde valuta afrekenen.
             </div>
             {/* De weggevallen kolom, één keer uitgelegd in plaats van zes keer een streepje.
                 Zie de opmerking bij `heeftWaarde` hierboven. */}
@@ -520,14 +517,15 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
                   Geen conversiewaarde
                 </p>
                 Geen van de kanalen levert in deze periode een conversiewaarde, dus die kolom staat
-                er niet. Sturen gaat hier op CPA. Wil je op ROAS sturen, dan moet er in Google,
-                Meta en LinkedIn een waarde aan de conversie hangen.
+                er niet. Sturen gaat hier op CPA. Wil je op ROAS sturen, dan moet er in elk kanaal
+                een waarde aan de conversie hangen.
               </div>
             )}
           </aside>
         </div>
       </div>
       </Sectie>
+      )}
     </div>
   );
 }

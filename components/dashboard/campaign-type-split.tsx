@@ -13,6 +13,8 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 import { maandLabel } from "./chart-chrome";
 import { addDays, today } from "@/lib/reporting-date";
 import { maandStart } from "@/lib/analysis/db-veilig";
+import { kanaalMaandRijen, type KanaalMaandRij } from "@/lib/cross-channel/kanaal-maandrijen";
+import { useBlendedClientData } from "@/lib/use-blended-client-data";
 
 // De opener-donut (masterplan 17.32): spend per campagnetype (Search/Performance Max/Shopping/
 // Display). Bewust NIET Performance Max' eigen netwerkringen (pmax-network-split.tsx) -- die
@@ -72,20 +74,11 @@ interface CampaignMonthlyRow {
   clicks: number | null;
 }
 
-interface BlendedMonthlyRow {
-  month: string | null;
-  channel: string | null;
-  spend: number | null;
-  conversions: number | null;
-  conversion_value: number | null;
-  impressions: number | null;
-  clicks: number | null;
-}
-
-// blended_account_monthly schrijft de kanaalsleutel als google_ads/meta_ads/linkedin_ads (zie
-// lib/demo/demo-rows.ts en lib/benchmark/god-view-data.ts). KANAAL_NAAM uit lib/kanalen gebruikt
-// de korte sleutels (google/meta/linkedin), dus dit is een aparte kaart en geen tweede definitie
-// van dezelfde: het zijn twee verschillende sleutelruimtes voor dezelfde drie kanalen.
+// De kanaalrijen dragen de kanaalsleutel als google_ads/meta_ads/linkedin_ads/microsoft_ads
+// (KanaalMaandRij in lib/cross-channel/kanaal-maandrijen.ts, de sleutelruimte van de
+// cross-channel-laag). KANAAL_NAAM uit lib/kanalen gebruikt de korte sleutels (google/meta/
+// linkedin/microsoft), dus dit is een aparte kaart en geen tweede definitie van dezelfde: het zijn
+// twee verschillende sleutelruimtes voor dezelfde vier kanalen.
 const KANAAL_LABEL_BLENDED: Record<string, string> = {
   google_ads: "Google Ads",
   meta_ads: "Meta",
@@ -99,7 +92,7 @@ const KANAAL_LABEL_BLENDED: Record<string, string> = {
  * Waarom alleen deze drie. De eigenaar vroeg om meer filteropties (campagne, doelgroep, device,
  * kanaal). Nagemeten in de database welke bronnen daadwerkelijk gevuld zijn:
  * `ads_campaign_monthly` heeft 128 rijen voor de demo (campagnetype EN campagnenaam), en de
- * blended maandtabel draagt de kanaalverdeling. `ads_device_monthly`, `ads_audience_monthly`,
+ * blended historie draagt de kanaalverdeling. `ads_device_monthly`, `ads_audience_monthly`,
  * `ads_network_monthly` en `ads_schedule_monthly` bestaan wel maar zijn LEEG -- device en doelgroep
  * vragen dus een sync-uitbreiding, geen extra tabblad. Een knop die op nul rijen uitkomt belooft
  * data die er niet is, en dat is precies wat de kanaalkiezer elders al niet meer doet
@@ -172,15 +165,22 @@ export function vensterVanaf(vandaag: string): string {
  *   Google-campagnes, dus daar zouden die twee tabbladen een Google-verdeling tonen onder een kop
  *   die alle kanalen belooft. Bij één uitsplitsing verdwijnt de kiezer, want er valt niets te
  *   kiezen.
+ * @param kanaalRijen De maandrijen per kanaal voor de uitsplitsing "kanaal", als de aanroeper ze
+ *   al heeft ("Alle kanalen" voedt er ook zijn staven en zijn tabel mee): null zolang hij nog
+ *   laadt. Weggelaten (de Google-weergave) leest de kaart ze zelf uit dezelfde gedeelde historie,
+ *   en pas als iemand het tabblad Kanaal kiest. Het venster kiest de kaart altijd zelf.
  */
-export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u.key) }: {
+export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u.key), kanaalRijen }: {
   clientId: string;
   toon?: readonly Uitsplitsing[];
+  kanaalRijen?: readonly KanaalMaandRij[] | null;
 }) {
   const keuzes = UITSPLITSINGEN.filter((u) => toon.includes(u.key));
   const start = keuzes[0]?.key ?? "type";
-  const [rows, setRows] = useState<NetworkRow[] | null>(null);
-  const [maanden, setMaanden] = useState<string | null>(null);
+  // Wat er uit ads_campaign_monthly gelezen is, met de (klant, uitsplitsing) waar het bij hoort.
+  // Zonder die sleutel stonden na een wissel van tabblad één render lang de rijen van het vorige
+  // tabblad onder de kop van het nieuwe.
+  const [gelezen, setGelezen] = useState<{ sleutel: string; rows: NetworkRow[]; maanden: string | null } | null>(null);
   const [uitsplitsing, setUitsplitsing] = useState<Uitsplitsing>(start);
   const [tabelOpen, toggleTabel] = useRememberedOpen("campagnetype-tabel", false);
   // Klik op een ring-segment of een legendaregel selecteert dat campagnetype -- gedeeld tussen
@@ -189,58 +189,79 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
   const [selected, setSelected] = useState<string | null>(null);
   const toggleSelected = (key: string) => setSelected((cur) => (cur === key ? null : key));
 
-  useEffect(() => {
-    let cancelled = false;
-    // Drie maanden: genoeg om een net gestarte campagne niet als "geen data" te tonen, kort
-    // genoeg om een verschoven mix (bv. een gestopt PMax-experiment) nog te laten zien --
-    // zelfde overweging als PmaxNetworkSplit's eigen venster, alleen op maandrijen i.p.v. dagrijen.
-    const vanaf = vensterVanaf(today());
-    setRows(null);
-    setMaanden(null);
+  // Drie maanden: genoeg om een net gestarte campagne niet als "geen data" te tonen, kort
+  // genoeg om een verschoven mix (bv. een gestopt PMax-experiment) nog te laten zien --
+  // zelfde overweging als PmaxNetworkSplit's eigen venster, alleen op maandrijen i.p.v. dagrijen.
+  // Eén keer bepaald, voor alle drie de tabbladen: het databasefilter van type en campagne en het
+  // filter op de kanaalrijen hieronder gebruiken dezelfde maand.
+  const vanaf = vensterVanaf(today());
 
-    // Kanaal komt uit een ANDERE tabel dan campagnetype en campagne. blended_account_monthly is de
-    // enige bron die Meta en LinkedIn naast Google zet; ads_campaign_monthly kent per definitie
-    // alleen Google-campagnes en zou dus een "kanaalverdeling" van 100% Google opleveren -- een
-    // ring die klopt en niets zegt.
-    if (uitsplitsing === "kanaal") {
-      dbSelect<BlendedMonthlyRow>("blended_account_monthly", {
-        select: "month, channel, spend, conversions, conversion_value, impressions, clicks",
-        clientId, filters: [{ op: "gte", column: "month", value: vanaf }],
-      }).then(({ data }) => {
-        if (cancelled) return;
-        setMaanden(maandenTekst(data.map((r) => r.month)));
-        setRows(data.map((r) => ({
-          networkType: r.channel ?? "onbekend",
-          cost: Number(r.spend ?? 0),
-          conversions: Number(r.conversions ?? 0),
-          conversionsValue: Number(r.conversion_value ?? 0),
-          impressions: Number(r.impressions ?? 0),
-          clicks: Number(r.clicks ?? 0),
-        })));
-      }, () => { if (!cancelled) setRows([]); });
-      return () => { cancelled = true; };
-    }
+  // KANAAL komt uit een ANDERE bron dan campagnetype en campagne: ads_campaign_monthly kent per
+  // definitie alleen Google-campagnes en zou een "kanaalverdeling" van 100% Google opleveren -- een
+  // ring die klopt en niets zegt. De kanaalrijen komen uit de blended historie
+  // (/api/blended/client-data, perKanaal): dezelfde tellers als de kanaaltabel en de kerncijfers,
+  // met de conversieselectie van de klant en Microsoft erbij. Dit las eerder zelf
+  // blended_account_monthly (de standaardselectie, zonder Microsoft), naast de lezing die het
+  // tabblad eromheen al deed.
+  //
+  // Geen eigen verzoek: de aanroeper geeft de rijen mee, of de gedeelde hook levert ze uit zijn
+  // cache (hij staat uit zolang niemand het tabblad Kanaal kiest). En geen effect met state: de
+  // rijen zijn er al, dus een effect zou eerst een laadvlak tonen en dan pas de ring.
+  const zelfLezen = kanaalRijen === undefined && uitsplitsing === "kanaal";
+  const eigenHistorie = useBlendedClientData(clientId, zelfLezen);
+  const kanaalDeel = useMemo(() => {
+    const bron = kanaalRijen !== undefined
+      ? kanaalRijen
+      : eigenHistorie.perKanaal ? kanaalMaandRijen(eigenHistorie.perKanaal) : eigenHistorie.loading ? null : [];
+    if (bron === null) return null;
+    // De rijen dragen het maandbegin, net als de month-kolom waar het databasefilter op staat.
+    const inVenster = bron.filter((r) => r.month >= vanaf);
+    return {
+      maanden: maandenTekst(inVenster.map((r) => r.month)),
+      rows: inVenster.map((r): NetworkRow => ({
+        networkType: r.channel,
+        cost: r.spend,
+        conversions: r.conversions,
+        conversionsValue: r.conversion_value,
+        impressions: r.impressions,
+        clicks: r.clicks,
+      })),
+    };
+  }, [kanaalRijen, eigenHistorie.perKanaal, eigenHistorie.loading, vanaf]);
+
+  const sleutel = `${clientId}|${uitsplitsing}|${vanaf}`;
+  useEffect(() => {
+    if (uitsplitsing === "kanaal") return; // geen lezing: zie kanaalDeel hierboven
+    let cancelled = false;
 
     dbSelect<CampaignMonthlyRow>("ads_campaign_monthly", {
       select: "month, campaign_type, campaign_name, cost, conversions, conversions_value, impressions, clicks",
       clientId, filters: [{ op: "gte", column: "month", value: vanaf }],
     }).then(({ data }) => {
       if (cancelled) return;
-      setMaanden(maandenTekst(data.map((r) => r.month)));
-      setRows(data.map((r) => ({
-        networkType: uitsplitsing === "campagne"
-          ? (r.campaign_name ?? "Onbekende campagne")
-          : (r.campaign_type ?? "ONBEKEND"),
-        cost: Number(r.cost ?? 0),
-        conversions: Number(r.conversions ?? 0),
-        conversionsValue: Number(r.conversions_value ?? 0),
-        impressions: Number(r.impressions ?? 0),
-        clicks: Number(r.clicks ?? 0),
-      })));
-    }, () => { if (!cancelled) setRows([]); });
+      setGelezen({
+        sleutel,
+        maanden: maandenTekst(data.map((r) => r.month)),
+        rows: data.map((r) => ({
+          networkType: uitsplitsing === "campagne"
+            ? (r.campaign_name ?? "Onbekende campagne")
+            : (r.campaign_type ?? "ONBEKEND"),
+          cost: Number(r.cost ?? 0),
+          conversions: Number(r.conversions ?? 0),
+          conversionsValue: Number(r.conversions_value ?? 0),
+          impressions: Number(r.impressions ?? 0),
+          clicks: Number(r.clicks ?? 0),
+        })),
+      });
+    }, () => { if (!cancelled) setGelezen({ sleutel, maanden: null, rows: [] }); });
 
     return () => { cancelled = true; };
-  }, [clientId, uitsplitsing]);
+  }, [clientId, uitsplitsing, vanaf, sleutel]);
+
+  // null = nog onderweg, voor het tabblad dat nu open staat.
+  const campagneDeel = gelezen?.sleutel === sleutel ? gelezen : null;
+  const rows: NetworkRow[] | null = (uitsplitsing === "kanaal" ? kanaalDeel : campagneDeel)?.rows ?? null;
+  const maanden: string | null = (uitsplitsing === "kanaal" ? kanaalDeel : campagneDeel)?.maanden ?? null;
 
   useEffect(() => { setSelected(null); }, [clientId, uitsplitsing]);
 

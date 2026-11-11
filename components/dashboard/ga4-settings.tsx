@@ -5,6 +5,7 @@ import { Loader2, Save, CheckCircle2, LineChart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
 import { vergeetClientSettingsRij } from "@/lib/client-settings";
+import { vergeetBlendedClientData } from "@/lib/use-blended-client-data";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import type { Ga4Config } from "@/lib/ga4/types";
 
@@ -60,7 +61,11 @@ export function Ga4Settings({ clientId }: { clientId: string }) {
     vergeetClientSettingsRij(clientId);
     setSaving(false);
     if (error) setError(error.message);
-    else { setConfig(clean); setSaved(true); setTimeout(() => setSaved(false), 4000); }
+    else {
+      // De ene vergeet-ingang voor de blended route: gemounte lezers halen opnieuw op.
+      vergeetBlendedClientData(clientId);
+      setConfig(clean); setSaved(true); setTimeout(() => setSaved(false), 4000);
+    }
   }
 
   if (error && !config) {

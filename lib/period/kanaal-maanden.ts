@@ -60,6 +60,31 @@ export function maandTotalenUitKanaalRijen(rijen: readonly MonthlyChannelRow[]):
   return uit;
 }
 
+/**
+ * De maandreeks zoals de blended route hem per kanaal meestuurt (perKanaal[].maanden: month
+ * "YYYY-MM", conversions/revenue/adSpend, al met de selectie van de klant geteld) als maandtotalen.
+ * Dezelfde vorm als maandTotalenUitKanaalRijen oplevert, zodat kanaalStandUitMaanden er direct op
+ * rekent: de band uit de route en de band uit de dagrijen gaan door één wortel.
+ */
+export function maandTotalenUitMaandreeks(maanden: readonly { month: string; conversions: number; revenue: number; adSpend: number }[]): MaandTotaal[] {
+  const uit: MaandTotaal[] = [];
+  for (const m of maanden) {
+    const r = /^(\d{4})-(\d{2})/.exec(String(m.month ?? ""));
+    if (!r) continue;
+    uit.push({ year: Number(r[1]), month: Number(r[2]), conversions: m.conversions || 0, revenue: m.revenue || 0, adSpend: m.adSpend || 0 });
+  }
+  return uit;
+}
+
+/**
+ * De laadgrens van een bron waarvan de HELE historie geladen is (de blended route leest alle
+ * dagrijen, zonder datumfilter). De band leest `geladenVanaf: null` als "onbekend tot waar
+ * geladen is" en noemt een maand vóór de start dan "niet geladen" (ontbrekendeMaanden in
+ * apply-period.ts); met een grens die vóór elke mogelijke rij ligt, is zo'n maand gewoon leeg:
+ * "de data begint pas in ...". Vóór 2000 bestond geen van de kanalen.
+ */
+export const HELE_HISTORIE_GELADEN_VANAF: Month = "2000-01";
+
 /** Het jaar van vandaag in Amsterdam. Niet getFullYear(): dat is de klok van de browser, en die
  *  zegt op oudejaarsavond na 23:00 UTC nog het oude jaar terwijl de rest van de app al verder is. */
 function huidigJaar(): number {

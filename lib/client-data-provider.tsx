@@ -27,7 +27,16 @@ const ForecastContext = createContext<ClientForecast | null>(null);
 /** Hoe lang de provider op het eerste lezen van de instellingen wacht voordat hij met de standaard rendert. */
 export const INSTELLINGEN_WACHT_MS = 3000;
 
-export function ClientDataProvider({ clientId, children }: { clientId: string; children: ReactNode }) {
+export function ClientDataProvider({ clientId, children, wachtvlak }: {
+  clientId: string;
+  children: ReactNode;
+  /**
+   * Wat er staat zolang het eerste lezen van de instellingen loopt; standaard het laadvlak van de
+   * hele pagina. Het klantdashboard geeft er een zonder band-deel: daar staat de KPI-band buiten
+   * deze provider, en een tweede band-skelet eronder zou verschijnen en weer verdwijnen (CLS).
+   */
+  wachtvlak?: ReactNode;
+}) {
   const clientData = useClientData(clientId);
 
   // De instellingen uit de database (vult de cache van getClientSettings), en daarna opnieuw
@@ -93,7 +102,7 @@ export function ClientDataProvider({ clientId, children }: { clientId: string; c
   // dashboard, in plaats van de kinderen met het standaarddoel. Ze mounten dan nog niet, dus
   // useClientHistoricalData gooit ook niet.
   if (!instellingenKlaar) {
-    return <PaginaLaadvlak />;
+    return wachtvlak ?? <PaginaLaadvlak />;
   }
 
   return (

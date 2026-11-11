@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveEventTheme, type BrandVisualIdentity } from "@/lib/branding/theme";
 import { dbUpsert } from "@/lib/data-access/client-write";
 import { vergeetClientSettingsRij } from "@/lib/client-settings";
+import { vergeetBlendedClientData } from "@/lib/use-blended-client-data";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 
 // Branding-tab: de merk-identiteit per klant/account. Bewerkt client_settings.brand_guide
@@ -57,7 +58,11 @@ export function BrandingView({ clientId, clientName }: { clientId: string; clien
     vergeetClientSettingsRij(clientId);
     setSaving(false);
     if (error) setError(error.message);
-    else { setSaved(true); setTimeout(() => setSaved(false), 4000); }
+    else {
+      // De ene vergeet-ingang voor de blended route: gemounte lezers halen opnieuw op.
+      vergeetBlendedClientData(clientId);
+      setSaved(true); setTimeout(() => setSaved(false), 4000);
+    }
   }
 
   if (error && !guide) {

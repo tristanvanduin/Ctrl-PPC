@@ -149,5 +149,72 @@ console.log("klok in de geraakte routes en componenten");
   check("maand-pacing rekent een maand terug op de tekst", mp.includes("addMonths(dezeMaand, -1)") && !/setMonth\(/.test(mp));
 }
 
+// ── 8. Fase 1, stap 4: band en kanalen uit de route, band buiten de poort, één vergeet-ingang ──
+// De bedrading in client-dashboard.tsx, die geen test mount (de pagina hangt aan Next-navigatie en
+// een dozijn zware kinderen). Het gedrag eronder is wel gemount getoetst: de band uit de route in
+// lib/__channel_period_data_test.ts (1b), het herladen zonder laadflits in
+// lib/api/__blended_client_data_hook_test.ts, de gelijkheid in lib/__kanaaltab_gelijk_alle_kanalen_test.ts.
+console.log("stap 4: band, kanalen en de vergeet-ingang");
+{
+  const dash = bron("components/dashboard/client-dashboard.tsx");
+  // Zonder commentaar: de uitleg in de bron noemt juist wat er NIET meer staat.
+  const code = dash.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/^\s*\/\/.*$/gm, "");
+  check("de blended route staat voor elke klant aan, zonder waterval achter de kanalen",
+    /useBlendedClientData\(client\.id\)/.test(code) && !/blendedAan/.test(code));
+  check("de band krijgt de route mee", /useChannelPeriodData\(\{[^}]*route: blendedStand[^}]*\}\)/.test(code));
+  // De kanalenlijst: niet alleen de route. Het proefje loopt als race ernaast (geen wachten op een
+  // routefout of een time-out), en Google komt uit het Google-antwoord.
+  // Het effect met precies deze deps; de (?!useEffect) houdt de greep binnen dat ene effect.
+  const proefje = /useEffect\(\(\) => \{((?:(?!useEffect\()[\s\S])*?)\}, \[client\.id, routeKlaar, proefje\]\);/.exec(code)?.[1] ?? "";
+  check("het kanalenproefje vertrekt naast de route, niet na een fout of een time-out",
+    proefje.includes("laadBeschikbareKanalen(dbSelectAlsSupabase, client.id)") && !/error|WACHT_MS|setTimeout/.test(proefje), proefje.slice(0, 160));
+  // De regel zelf (route vóór proefje, null zolang onbekend) is getoetst in lib/kanalen/__beschikbaar_test.ts.
+  check("de kanalenlijst loopt via kanalenUitBronnen", /kanalenUitBronnen\(\{\s*googleLaadt: clientData\.loading,/.test(code));
+  check("Google in de kanalenlijst komt uit het Google-antwoord", /google: googleData \? flattenMonths\(googleData\)\.some\(heeftData\) : null,/.test(code));
+  check("de dagkanalen uit perKanaal van de route", /routePerKanaal \?\? \[\]\)\.map\(\(r\) => r\.kanaal\)/.test(code));
+  // bandKlaar: per tabblad de eigen bron; geen losse wacht op de blended route (het Google-tabblad
+  // van een klant met alleen Google hing daaraan).
+  const klaar = /const bandKlaar = ([^;]*);/.exec(code)?.[1] ?? "";
+  check("bandKlaar wacht niet los op de blended route", klaar === "kanalen !== null && eigenStandBekend", klaar);
+  check("het Google-tabblad is klaar op de Google-route alleen", /const eigenStandBekend = channel === "google" \? !clientData\.loading\b/.test(code));
+  check("de dagkanalen zijn klaar op `klaar` van de band", /NIET_GOOGLE\.every\(\(k\) => periodSummary\.klaar\[k\]\)/.test(code) && /: periodSummary\.klaar\[channel\];/.test(code));
+
+  // De band staat buiten de datapoort, alleen op het Overzicht en niet naast een fout.
+  const band = code.indexOf("<PeriodSummary ");
+  const poort = code.indexOf("<ClientDataProvider ");
+  check("de KPI-band staat vóór (buiten) de ClientDataProvider", band > 0 && poort > band, `${band} / ${poort}`);
+  check("en maar één keer", code.indexOf("<PeriodSummary ", band + 1) === -1);
+  const voorBand = code.slice(0, band);
+  check("alleen op het Overzicht, en verborgen bij een fout van de Google-route",
+    /\{activeTab === "dashboard" && !clientData\.error && \(\s*<div[^>]*>\s*<ChannelTabs [^>]*\/>\s*$/.test(voorBand), voorBand.slice(-200));
+  // Geen dubbel skelet: de band toont zijn eigen laadvlak, dus het paginavlak begint zonder.
+  check("het laadvlak van de pagina begint zonder band-deel", /\{clientData\.loading && <PaginaLaadvlak metBand=\{false\} \/>\}/.test(code));
+  check("ook het wachtvlak van de provider", /<ClientDataProvider clientId=\{client\.id\} wachtvlak=\{<PaginaLaadvlak metBand=\{false\} \/>\}>/.test(code));
+  check("de provider gebruikt het meegegeven wachtvlak", bron("lib/client-data-provider.tsx").includes("return wachtvlak ?? <PaginaLaadvlak />;"));
+
+  // Na een sync: de ene vergeet-ingang, en niets dat de Google-data op null zet (de syncmelding
+  // staat achter `!clientData.loading` en verdween dan voor je hem las).
+  check("na een sync vergeet het dashboard de blended route", /onSyncComplete=\{\(\) => vergeetBlendedClientData\(client\.id\)\}/.test(code));
+  // Alleen binnen ClientDashboard zelf: de Analyseren-tab verderop heeft een eigen, wel gelezen refreshKey.
+  const dashboard = /export function ClientDashboard\([\s\S]*?\n\}\n/.exec(code)?.[0] ?? "";
+  check("de ongelezen refreshKey is weg", dashboard.includes("onSyncComplete=") && !/refreshKey/i.test(dashboard));
+  check("geen invalidateClientCache op het syncpad", !/invalidateClientCache/.test(code));
+
+  // De ene vergeet-ingang: wissen én gemounte lezers laten herladen, bewaakt buiten de browser.
+  const hook = bron("lib/use-blended-client-data.ts");
+  const vergeet = /export function vergeetBlendedClientData\(clientId: string\): void \{([\s\S]*?)\n\}/.exec(hook)?.[1] ?? "";
+  check("vergeetBlendedClientData wist cache, lopend verzoek en generatie",
+    vergeet.includes("cache.delete(clientId)") && vergeet.includes("onderweg.delete(clientId)") && vergeet.includes("generatie.set(clientId"));
+  check("en seint gemounte lezers, achter een guard op dispatchEvent",
+    /typeof window === "undefined" \|\| typeof window\.dispatchEvent !== "function"\) return;\s*window\.dispatchEvent\(new CustomEvent\(BLENDED_VERGETEN/.test(vergeet), vergeet.slice(-220));
+  check("de hook herlaadt op het seintje via zijn effect-deps", /\}, \[clientId, enabled, versie\]\);/.test(hook));
+  // Elke opslag op client_settings die de route of haar lezers raakt, gaat langs die ingang.
+  for (const pad of ["ga4-settings.tsx", "search-console-settings.tsx", "event-settings.tsx", "branding-view.tsx", "channel-conversion-settings.tsx", "client-settings.tsx"]) {
+    const b = bron(`components/dashboard/${pad}`);
+    const opslag = Math.max(b.indexOf('dbUpsert("client_settings"'), b.indexOf("await saveClientSettings("));
+    check(`${pad} vergeet de blended route na het opslaan`, opslag > 0 && b.indexOf("vergeetBlendedClientData(clientId)", opslag) > opslag, String(opslag));
+  }
+}
+
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 process.exit(failed > 0 ? 1 : 0);

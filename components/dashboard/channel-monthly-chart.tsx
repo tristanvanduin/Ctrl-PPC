@@ -16,32 +16,29 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 // De data komt uit ChannelDataProvider, samen met de pacing-kaart, de beurs-sectie en het
 // jaaroverzicht. Dat scheelt niet alleen verzoeken: drie losse fetches betekent drie plekken die
 // elk hun eigen idee kunnen krijgen van "welke velden tellen als conversie".
+//
+// Uit de MAANDEN van de provider, niet uit de dagrijen: sinds fase 1, stap 5 draagt de provider
+// alleen nog de dagen van de laatste weken (hooguit één volle maand), en de maanden komen met de
+// conversieselectie van de klant al toegepast uit dezelfde route. Zes maanden uit dagrijen
+// optellen gaf hier anders één staaf -- en MonthlyTrendChart rendert onder twee punten niets.
 
 export function ChannelMonthlyChart() {
-  const { rijen, convVan, convLabel } = useKanaalData();
+  const { maanden, convLabel } = useKanaalData();
 
-  const maanden = useMemo(() => {
-    if (!rijen || rijen.length === 0) return [];
+  const reeks = useMemo(() => {
+    if (!maanden || maanden.length === 0) return [];
     const dezeMaand = vandaag().slice(0, 7);
-    const perMaand = new Map<string, { spend: number; conv: number }>();
-    for (const r of rijen) {
-      const m = r.date.slice(0, 7);
-      const a = perMaand.get(m) ?? { spend: 0, conv: 0 };
-      a.spend += r.spend;
-      a.conv += convVan(r);
-      perMaand.set(m, a);
-    }
     // Alleen VOLLE maanden: de lopende maand is per definitie lager en zou als een instorting
     // lezen. Zelfde keuze als de maandtabel in channel-performance.tsx.
-    return [...perMaand.entries()]
-      .filter(([m]) => m < dezeMaand)
-      .sort()
+    return [...maanden]
+      .filter((m) => m.month < dezeMaand)
+      .sort((a, b) => a.month.localeCompare(b.month))
       .slice(-6)
-      .map(([m, a]) => ({ maand: m, spend: Math.round(a.spend), lijn: Math.round(a.conv) }));
-  }, [rijen, convVan]);
+      .map((m) => ({ maand: m.month, spend: Math.round(m.adSpend), lijn: Math.round(m.conversions) }));
+  }, [maanden]);
 
-  if (rijen === null) return <Laadvlak vorm="grafiek" hoogte={240} titel="Maandverloop" />;
+  if (maanden === null) return <Laadvlak vorm="grafiek" hoogte={240} titel="Maandverloop" />;
   // MonthlyTrendChart geeft zelf null terug onder twee punten; dat hier herhalen zou betekenen
   // dat twee plekken moeten weten wat "genoeg om een verloop te tonen" is.
-  return <MonthlyTrendChart title="Maandverloop" lineLabel={convLabel} data={maanden} />;
+  return <MonthlyTrendChart title="Maandverloop" lineLabel={convLabel} data={reeks} />;
 }

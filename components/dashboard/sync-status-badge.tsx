@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, CheckCircle2, AlertTriangle, XCircle, Clock, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { dbSelectOne } from "@/lib/data-access/client-read";
+import { vergeetBronnen } from "@/lib/data-access/bron-cache";
 
 type FreshnessStatus = "fresh" | "stale" | "missing" | "partial" | "unknown";
 
@@ -166,6 +167,10 @@ export function SyncStatusBadge({ clientId, onSyncComplete, kanalen = null }: Pr
 
       // Refresh status
       await loadStatus();
+      // De wereldkaart, de uitsplitsingen en de videokaart bewaren hun rijen vijf minuten
+      // (lib/data-access/bron-cache.ts), en een sync is het enige dat die rijen verandert. Hier
+      // en niet in onSyncComplete: de badge weet dát er gesynct is, wie hem ook mount.
+      vergeetBronnen(`${clientId}|`);
       onSyncComplete?.();
 
       // Clear success message after 8 seconds

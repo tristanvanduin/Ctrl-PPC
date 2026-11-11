@@ -1,23 +1,18 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { dbSelect } from "@/lib/data-access/client-read";
 import { loadClientSettingsRij } from "@/lib/client-settings";
-import { today as vandaag } from "@/lib/reporting-date";
-import { buildChannelForecast, tabStandUitRoute } from "@/lib/analysis/channel-forecast-data";
-import { useBlendedClientData } from "@/lib/use-blended-client-data";
-import type { TargetRow } from "@/lib/analysis/o2-targets-cost";
+import { useBlendedClientData, type KanaalTab } from "@/lib/use-blended-client-data";
+import type { BlendedKanaalMaand } from "@/lib/api/blended-historical";
 import {
   resolveChannelConversionConfig,
   sumSelectedConversions,
   selectedConversionLabels,
   type ChannelConversionConfig,
 } from "@/lib/analysis/channel-conversion-config";
-import type { ClientForecast } from "@/lib/forecast";
-import type { ClientHistoricalData } from "@/lib/types";
 import { CONFIG, type ChannelKind, type DailyRow } from "./channel-performance";
 
-// EEN fetch per kanaaltabblad, voor alle kaarten samen.
+// EEN bron per kanaaltabblad, voor alle kaarten samen.
 //
 // Waarom dit er is, en het is een reparatie van mijn eigen werk. Toen pacing, het maandverloop en
 // de beurs-sectie losse kaarten werden, kreeg elk van die kaarten zijn eigen ophaalcode. Gemeten op
@@ -25,27 +20,48 @@ import { CONFIG, type ChannelKind, type DailyRow } from "./channel-performance";
 // client_targets vier keer -- allemaal dezelfde rijen. Zichtbaar gevolg: de beurs-sectie stond na
 // twintig seconden nog op zijn skelet, en dat is precies wat de eigenaar in beeld kreeg.
 //
-// Google lost dit al zo op (ClientDataProvider + ForecastContext); dit is de tegenhanger voor Meta
-// en LinkedIn. Eén provider haalt de dagrijen, de conversie-selectie en de doelen op, bouwt de
-// forecast één keer, en alle kaarten lezen mee.
+// Google lost dit al zo op (ClientDataProvider + ForecastContext); dit is de tegenhanger voor Meta,
+// LinkedIn en Microsoft. Sinds fase 1, stap 5 haalt deze provider NIETS meer zelf op: alles komt
+// uit /api/blended/client-data, dat de KPI-band bij het laden al vroeg en dat de hook
+// (useBlendedClientData) vijf minuten bewaart. Per kanaal draagt dat antwoord de maanden met
+// tellers, de maand- en weekemmers voor de prognose, de dagrijen van de laatste weken en het
+// jaardoel uit client_targets; de hook bouwt daar één keer per ophaalronde het tab-object van
+// (KanaalTab: historie, prognose, health). Daarvoor las elke Meta-mount de hele meta_account_daily
+// (tot 1000 rijen), client_targets en client_settings opnieuw, en de health-badge haalde daarnaast
+// nog een TWEEDE prognose uit fact_core via /api/analysis/channel-forecast -- twee cijfers voor
+// hetzelfde kanaal, met een andere conversieselectie en een andere gerealiseerd-grens.
 //
-// Zonder datumfilter: de forecast heeft de volle historie nodig om jaren te kunnen wegen
-// (lib/forecast.ts's computeMonthlyExpected). De kaarten die maar een paar maanden nodig hebben
-// snijden zelf; dat is goedkoper dan een tweede query.
+// Alleen de conversieselectie (convVan, convLabel) komt nog van de gedeelde client_settings-rij
+// (lib/client-settings.ts, gecachet): de route past diezelfde selectie al toe op de emmers en de
+// maanden, maar de dagrijen reizen ruw, en de pacing en de kerncijfers tellen ze hier op.
 
 export interface KanaalData {
-  /** Alle dagrijen van dit kanaal; null zolang er geladen wordt. */
+  /**
+   * De dagrijen van de laatste weken (recenteDagen van de route: vanaf de 1e van vorige maand of
+   * 56 dagen terug, wat het vroegst is), voor de pacing en de 28-dagenvensters; null zolang er
+   * geladen wordt. Niet de hele historie: die zit in `maanden` en in `forecast`.
+   */
   rijen: DailyRow[] | null;
+  /**
+   * Alle maanden van dit kanaal met tellers (impressions, clicks, spend, conversies, omzet), met
+   * de conversieselectie van de klant al toegepast; null zolang er geladen wordt. Voor het
+   * maandverloop en de maandtabel: recenteDagen bevat hooguit één volle maand.
+   */
+  maanden: BlendedKanaalMaand[] | null;
   /** De som van de geselecteerde conversievelden voor dit kanaal. */
   convVan: (r: DailyRow) => number;
   /** Hoe die conversie op het scherm heet ("Aankopen / conversies + Leads"). */
   convLabel: string;
-  /** null = laden, "leeg" = geen dagcijfers gesynced, anders forecast + historie. */
-  forecast: { data: ClientHistoricalData; forecast: ClientForecast } | null | "leeg";
+  /** null = laden, "leeg" = geen dagcijfers gesynced, anders historie + prognose + health. */
+  forecast: KanaalTab | null | "leeg";
+  /** De foutmelding van de route als die faalde; de kaarten tonen dan geen cijfers maar de fout. */
+  fout?: string | null;
 }
 
-const LEEG: KanaalData = { rijen: null, convVan: () => 0, convLabel: "", forecast: null };
-const KanaalDataContext = createContext<KanaalData>(LEEG);
+const LEEG: KanaalData = { rijen: null, maanden: null, convVan: () => 0, convLabel: "", forecast: null, fout: null };
+/** Geëxporteerd voor de invariant-test (lib/__kanaaltab_gelijk_alle_kanalen_test.ts), die de
+ *  kaarten met een vaste KanaalData rendert; productiecode gebruikt ChannelDataProvider. */
+export const KanaalDataContext = createContext<KanaalData>(LEEG);
 
 /**
  * Buiten een provider valt dit terug op "nog aan het laden" in plaats van te crashen. Dat is
@@ -62,72 +78,54 @@ export function ChannelDataProvider({ clientId, channel, children }: {
   children: ReactNode;
 }) {
   const cfg = CONFIG[channel];
-  const [rijen, setRijen] = useState<DailyRow[] | null>(null);
-  const [convConfig, setConvConfig] = useState<ChannelConversionConfig>(() => resolveChannelConversionConfig(null));
-  const [targets, setTargets] = useState<TargetRow[] | null>(null);
-  // Tot welke dag dit kanaal gemeten is, met de sync erin verwerkt (dataTotVanDagbron). De browser
-  // kan <kanaal>_connections niet lezen, en uit de rijen alleen verloor een gepauzeerd account met
-  // een gezonde sync zijn echte halve maand aan een projectie, terwijl "Alle kanalen" dezelfde
-  // maanden als gemeten telde (review [14]). Hetzelfde verzoek als de KPI-band erboven (de hook
-  // deelt het); faalt het, dan de rijen, zoals voorheen. Een kanaal dat de route in `uitgesloten`
-  // zet (ontkoppeld, of zijn data komt niet meer), krijgt de gezamenlijke dag en de stop van de som
-  // mee (tabStandUitRoute): met zijn eigen, oude dag projecteerde de tab maanden die al voorbij zijn.
+  // De selectie hoort bij één klant. Staat hier nog die van een andere klant (of nog niets), dan
+  // wachten de rijen: anders telde de pacing één render met de verkeerde of de standaardselectie
+  // en sprong hij daarna. De rij is bij het laden al gelezen (de band), dus dit is een microtaak.
+  const [selectie, setSelectie] = useState<{ clientId: string; config: ChannelConversionConfig } | null>(null);
+  const selectieKlaar = selectie?.clientId === clientId;
+  const convConfig = useMemo(
+    () => (selectie?.clientId === clientId ? selectie.config : resolveChannelConversionConfig(null)),
+    [selectie, clientId],
+  );
+  // Hetzelfde verzoek als de KPI-band erboven (de hook deelt het): per kanaal de maanden, de
+  // emmers, de recente dagen en het tab-object, met de syncdag en de stop van de route erin
+  // (tabStandUitRoute in de hook). Een kanaal dat de route in `uitgesloten` zet (ontkoppeld, of
+  // zijn data komt niet meer), krijgt zo de gezamenlijke dag en de stop van de som mee: met zijn
+  // eigen, oude dag projecteerde de tab maanden die al voorbij zijn.
   const route = useBlendedClientData(clientId);
-  const { dataTot: syncDag, gestopt } = tabStandUitRoute(route.dataStand, channel);
-  const routeKlaar = !route.loading;
 
+  // Opnieuw bij elke ophaalronde van de route (route.perKanaal is dan een nieuw object): de route
+  // telt zijn maanden en emmers met de selectie van dát moment, en de dagrijen hier horen met
+  // dezelfde te tellen. De rij is gecachet en wordt bij opslaan vergeten (lib/client-settings.ts),
+  // dus binnen een ronde kost dit geen verzoek. De vorige selectie blijft staan tot de nieuwe er is.
   useEffect(() => {
     let cancelled = false;
-    setRijen(null);
-    setTargets(null);
-    Promise.all([
-      // Nieuwste eerst: een read levert hooguit 1000 rijen (de PostgREST-cap). Zonder volgorde
-      // bepaalt de database welke dagen wegvallen, en dat kan de lopende maand zijn. Zo raakt een
-      // cap alleen de oudste dagen; 1000 dagen dekt het lopende jaar plus twee volle vorige jaren.
-      // De forecast leest zijn weken op positie; de adapter (apiDataToMonthlyRecords) zet ze daarom
-      // zelf op weeknummer. Hier stond "geen afnemer leunt op de volgorde", en toen stonden de weken
-      // van elke maand omgekeerd.
-      dbSelect<Record<string, unknown>>(cfg.accountTable, { select: cfg.select, clientId, order: { column: "date", ascending: false } }),
-      dbSelect<{ channel: string; metric: string; target_value: number; valid_from: string; valid_to: string | null }>(
-        "client_targets", { select: "channel, metric, target_value, valid_from, valid_to", clientId },
-      ),
-      // De conversieselectie uit de gedeelde client_settings-rij (lib/client-settings.ts): op de
-      // wissel naar een kanaaltab las dit component én ChannelPerformance elk hun eigen rij, terwijl
-      // de band hem bij het laden al had. Nu nul verzoeken binnen de cachetijd.
-      loadClientSettingsRij(clientId),
-    ]).then(([accRes, targetRes, settingsRes]) => {
+    const zet = (opgeslagen: unknown) => {
       if (cancelled) return;
-      setRijen(((accRes.data ?? []) as unknown as Record<string, unknown>[]).map(cfg.map));
-      setTargets((targetRes.data ?? []).map((r) => ({
-        channel: r.channel, metric: r.metric, targetValue: Number(r.target_value ?? 0),
-        validFrom: r.valid_from, validTo: r.valid_to,
-      })));
-      setConvConfig(resolveChannelConversionConfig(
-        (settingsRes.data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null,
-      ));
-    }, () => { if (!cancelled) { setRijen([]); setTargets([]); } });
+      setSelectie({ clientId, config: resolveChannelConversionConfig(opgeslagen as Partial<ChannelConversionConfig> | null) });
+    };
+    loadClientSettingsRij(clientId).then((res) => zet(res.data?.channel_conversion_config ?? null), () => zet(null));
     return () => { cancelled = true; };
-  }, [clientId, cfg]);
+  }, [clientId, route.perKanaal]);
 
   const waarde = useMemo<KanaalData>(() => {
     const convVan = (r: DailyRow) => sumSelectedConversions(r.convFields, cfg.channelKey, convConfig);
     const convLabel = selectedConversionLabels(cfg.channelKey, convConfig).join(" + ");
-    if (rijen === null || targets === null) return { rijen: null, convVan, convLabel, forecast: null };
-    // Nog geen syncdag: de prognose wacht (laadt), in plaats van eerst op de rijen te tonen en
-    // daarna een maand te verspringen. De pacing en de maandgrafiek hebben hem niet nodig.
-    if (!routeKlaar) return { rijen, convVan, convLabel, forecast: null };
-
-    const gebouwd = buildChannelForecast(
-      clientId,
-      rijen.map((r) => ({ date: r.date, spend: r.spend, revenue: r.revenue, conv: convVan(r) })),
-      targets,
-      cfg.channelKey,
-      vandaag(),
-      syncDag,
-      { gestopt },
-    );
-    return { rijen, convVan, convLabel, forecast: gebouwd ?? "leeg" };
-  }, [clientId, cfg.channelKey, convConfig, rijen, targets, routeKlaar, syncDag, gestopt]);
+    if (!selectieKlaar || route.loading) return { rijen: null, maanden: null, convVan, convLabel, forecast: null, fout: null };
+    // De route faalde: geen cijfers, en geen eigen lezing als vangnet. Eerder las de provider de
+    // dagtabel zelf en toonde hij bij een fout de lege staat; nu staat de fout erbij.
+    if (route.error) return { rijen: [], maanden: [], convVan, convLabel, forecast: "leeg", fout: route.error };
+    const reeks = route.perKanaal?.find((k) => k.kanaal === channel);
+    return {
+      rijen: (reeks?.recenteDagen ?? []).map(cfg.map),
+      maanden: reeks?.maanden ?? [],
+      convVan,
+      convLabel,
+      // Hetzelfde object dat de ranking op "Alle kanalen" voor dit kanaal leest.
+      forecast: route.perKanaalTab?.[channel] ?? "leeg",
+      fout: null,
+    };
+  }, [cfg, channel, convConfig, selectieKlaar, route.loading, route.error, route.perKanaal, route.perKanaalTab]);
 
   return <KanaalDataContext.Provider value={waarde}>{children}</KanaalDataContext.Provider>;
 }

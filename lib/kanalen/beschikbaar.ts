@@ -179,3 +179,37 @@ export async function laadBeschikbareKanalen(
   );
   return uitkomsten.filter((k): k is Kanaal => k !== null);
 }
+
+/**
+ * De kanalenlijst uit de bronnen die het klantdashboard bij de mount toch al vraagt (fase 1, stap 4).
+ *
+ * Eerder kwam de lijst alleen uit laadBeschikbareKanalen, en startte de blended route pas daarna:
+ * een waterval proefjes -> route -> KPI-band. Nu weet elke bron zijn eigen deel:
+ * - Google uit het Google-antwoord zelf. De band toont Google live, dus een account dat nog niet
+ *   in de database gesynct is, bestaat hier wel -- het proefje (ads_account_monthly) zag dat niet.
+ * - De drie dagkanalen uit perKanaal van de blended route (alleen kanalen met rijen staan erin),
+ *   of uit het proefje als dat eerder antwoordt of de route faalt. Het proefje loopt ernaast, niet
+ *   erna: een klant met alleen Google hangt zo niet aan de duur van de blended route.
+ *
+ * Null zolang van een kanaal nog niets bekend is. Dat onderscheid telt: "nog niet weten" mag er
+ * niet uitzien als "geen kanalen", anders flitst de lege staat op bij elke navigatie.
+ */
+export function kanalenUitBronnen(inp: {
+  /** De Google-route laadt nog: Google is dan onbekend, wat het proefje er ook van zegt (een live
+   *  account zonder gesyncte rijen gaf anders één moment de melding "nog geen data"). */
+  googleLaadt: boolean;
+  /** Heeft het Google-antwoord een maand met data; null als die route faalde (geen antwoord). */
+  google: boolean | null;
+  /** De kanalen in perKanaal van de blended route; null zolang hij laadt of na een fout. */
+  route: readonly string[] | null;
+  /** Het antwoord van laadBeschikbareKanalen; null zolang het er niet is. */
+  proefje: readonly string[] | null;
+}): Kanaal[] | null {
+  // De route gaat voor zodra hij er is: hij is ook de bron van de cijfers in de band.
+  const elders = (k: Kanaal): boolean | null => (inp.route ? inp.route.includes(k) : inp.proefje ? inp.proefje.includes(k) : null);
+  // Faalde de Google-route, dan wat de database van Google weet.
+  const google = inp.googleLaadt ? null : inp.google ?? elders("google");
+  const per: Record<Kanaal, boolean | null> = { google, meta: elders("meta"), linkedin: elders("linkedin"), microsoft: elders("microsoft") };
+  if (ALLE_KANALEN.some((k) => per[k] === null)) return null;
+  return ALLE_KANALEN.filter((k) => per[k] === true);
+}

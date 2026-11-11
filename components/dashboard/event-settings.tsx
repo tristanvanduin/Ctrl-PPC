@@ -5,6 +5,7 @@ import { Loader2, CalendarClock, Save, CheckCircle2, Plus, Trash2 } from "lucide
 import { supabase } from "@/lib/supabase";
 import { dbUpsert } from "@/lib/data-access/client-write";
 import { vergeetClientSettingsRij } from "@/lib/client-settings";
+import { vergeetBlendedClientData } from "@/lib/use-blended-client-data";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { AccountEventPacing } from "./account-event-pacing";
 import { standardB2cEvents } from "@/lib/events/standard-b2c-events";
@@ -86,7 +87,12 @@ export function EventSettings({ clientId }: { clientId: string }) {
     vergeetClientSettingsRij(clientId);
     setSaving(false);
     if (error) setError(error.message.includes("rai_events") ? "Kolom ontbreekt — draai eerst migratie 024_rai_events.sql." : error.message);
-    else { setSaved(true); setSavedTick((t) => t + 1); setTimeout(() => setSaved(false), 4000); }
+    else {
+      // De ene vergeet-ingang voor de blended route: gemounte lezers (de beursstrip op Alle
+      // kanalen leest de editie naast de blended data) halen opnieuw op.
+      vergeetBlendedClientData(clientId);
+      setSaved(true); setSavedTick((t) => t + 1); setTimeout(() => setSaved(false), 4000);
+    }
   }
 
   if (error && !events) {

@@ -28,9 +28,9 @@ export function HealthBadge({ clientId }: { clientId: string }) {
  *
  * Google's HealthBadge hierboven leunt op ClientDataProvider/ForecastContext -- Google-specifiek
  * opgebouwd (customerId, live API-call via /api/google-ads/client-data). Meta en LinkedIn hebben
- * dat pad nooit gehad; hun tegenhanger (components/dashboard/channel-health-badge.tsx) haalt de
- * score via /api/analysis/channel-forecast en rendert hem hiermee, zonder de weergave een tweede
- * keer te bouwen.
+ * dat pad nooit gehad; hun tegenhanger (components/dashboard/channel-health-badge.tsx) leest de
+ * score uit het tab-object van zijn kanaal (ChannelDataProvider) en rendert hem hiermee, zonder de
+ * weergave een tweede keer te bouwen.
  */
 export function HealthBadgeView({
   health,

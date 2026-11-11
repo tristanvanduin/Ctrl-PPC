@@ -278,10 +278,12 @@ async function main() {
   });
 
   await deel("Kanaaltabbladen: geen herkomst, dus de schatting zoals voorheen", () => {
-    // Meta/LinkedIn/Microsoft krijgen hun prognose als JSON uit /api/analysis/channel-forecast, zonder
-    // herkomst. Daar geldt de eigen regel van het kanaal ("geen jaardoel ingesteld voor dit kanaal"
-    // in de beurssectie); de health score blijft de schatting noemen. De kanaalbadges,
-    // KanaalHealthRanking en Code Rood lopen via computeAnalysisTargets, en die geeft de herkomst wel
+    // Meta/LinkedIn/Microsoft krijgen hun prognose uit buildChannelForecastUitEmmers (het tab-object
+    // van useBlendedClientData), zonder herkomst: het doel komt uit client_targets of is vorig jaar
+    // plus groei. Daar geldt de eigen regel van het kanaal ("geen jaardoel ingesteld voor dit
+    // kanaal" in de beurssectie); de health score blijft de schatting noemen. Sinds fase 1, stap 5
+    // geldt dat ook voor de kanaalbadges en KanaalHealthRanking, die hetzelfde object lezen. Alleen
+    // de rapporten en Code Rood lopen nog via computeAnalysisTargets, en die geeft de herkomst wel
     // mee (lib/analysis/__compute_targets_test.ts).
     const kanaalForecast = JSON.parse(JSON.stringify(fc.computeForecast(route("kanaal"))));
     const d = computeHealthScore(kanaalForecast).factors.find((f) => f.name === "Doelstelling")?.description ?? "";

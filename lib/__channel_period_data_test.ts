@@ -18,11 +18,17 @@
 // component dat null rendert. Een pure test van de rekenfuncties had (1) niet gezien: de fout zat
 // in de effect-afhankelijkheden, niet in de som. De band zelf wordt met react-dom/server
 // gerenderd, binnen de echte PeriodProvider.
+//
+// Fase 1, stap 4: de band leest Meta/LinkedIn/Microsoft uit de blended route (`route`) en haalt de
+// dagrijen alleen nog zelf in de TERUGVALWEG (een routefout). De bestaande scenario's hieronder
+// krijgen daarom een routefout mee (ROUTE_FOUT), zodat alle asserties over de eigen lezing (één
+// verzoek per tabel, order/limit, paginering, laadgrens, twee lezingen na opslaan) ongewijzigd
+// gelden; scenario 1b toetst de routeweg: nul verzoeken, en dezelfde band als de terugvalweg.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ClientHistoricalData } from "./types";
-import type { ChannelPeriodData } from "./use-channel-period-data";
+import type { BandRoute, ChannelPeriodData } from "./use-channel-period-data";
 
 let passed = 0, failed = 0;
 function assert(condition: boolean, label: string): void {
@@ -129,18 +135,30 @@ async function main() {
   const { vergeetClientSettingsRij } = await import("./client-settings");
   const { monthsAgo } = await import("./reporting-date");
   const { addMonths, lastCompleteMonth, monthsIn, formatMonth, formatRange, resolveComparison, resolvePeriod } = await import("./period/period-range");
-  const { bouwHistorischeData, samenvoegen } = await import("./period/kanaal-maanden");
+  const {
+    bouwHistorischeData, samenvoegen, CONVERSIE_KANAAL, NIET_GOOGLE, HELE_HISTORIE_GELADEN_VANAF,
+    laatsteDagUitRijen, eersteDagUitRijen, eersteVolleMaand,
+  } = await import("./period/kanaal-maanden");
+  const { kanaalMaandenUitDagen } = await import("./analysis/channel-report-blend");
+  const { resolveChannelConversionConfig } = await import("./analysis/channel-conversion-config");
   const { alsBronReeks } = await import("./period/apply-period");
   const { PeriodProvider } = await import("./period/period-context");
   const { PeriodSummary } = await import("../components/dashboard/period-summary");
 
   const google: ClientHistoricalData = { clientId: "t", targetCurrentYear: { conversions: 0, revenue: 0, adSpend: 0 }, historicalYears: {}, currentYearData: Array(12).fill(null), currentYear: 2026 };
 
+  // De blended route zoals de band hem ziet. Standaard een routefout: dan haalt de band zijn eigen
+  // rijen (de terugvalweg, waar de scenario's hieronder over gaan). Scenario 1b zet er een antwoord.
+  const ROUTE_FOUT: BandRoute = { perKanaal: null, dataStand: null, loading: false, error: "Geen blended data" };
+  let routeStaat: BandRoute = ROUTE_FOUT;
+  // Het antwoord van scenario 1b, voor 1c (eerst laden, dan dit antwoord).
+  let routeAntwoord: BandRoute | null = null;
+
   type Kanaal = "linkedin" | "blended" | "google";
   let gezien: (number | null)[] = [];
   let laatst: ChannelPeriodData | null = null;
   function Kpi({ channel, clientId = "t" }: { channel: Kanaal; clientId?: string }) {
-    const r = useChannelPeriodData({ clientId, channel, googleData: google });
+    const r = useChannelPeriodData({ clientId, channel, googleData: google, route: routeStaat });
     laatst = r;
     const v = conversies(r.data);
     if (gezien.at(-1) !== v) gezien.push(v);
@@ -208,7 +226,102 @@ async function main() {
     const metaSelect = vragen.meta_account_daily?.select ?? "";
     assert(["impressions", "link_clicks", "conversions", "leads"].every((v) => metaSelect.includes(v)), `Meta leest via dagbronSelect (kreeg "${metaSelect}")`);
     assert((vragen.linkedin_account_daily?.select ?? "").includes("post_click_conversions"), "LinkedIn leest ook het niet-standaard conversieveld");
+    assert(NIET_GOOGLE.every((k) => nu().klaar[k] === true), `in de terugvalweg is elk kanaal klaar zodra zijn rijen en de selectie binnen zijn (kreeg ${JSON.stringify(nu().klaar)})`);
     root.unmount();
+  }
+  // De band van de terugvalweg op RIJEN, voor scenario 1b.
+  const terugvalBand = { data: JSON.stringify(nu().data), laatsteDag: JSON.stringify(nu().laatsteDag) };
+
+  // 1b. De routeweg (fase 1, stap 4): de blended route draagt perKanaal (dezelfde maanden, geteld
+  //     met kanaalMaandenUitDagen en de selectie van de klant) en de stand per bron. De band haalt
+  //     dan NIETS zelf: geen dagtabel, geen client_settings. En hij is dezelfde band als de
+  //     terugvalweg op dezelfde rijen -- twee ingangen, één wortel (kanaalStandUitMaanden).
+  {
+    opgeslagen = null;
+    const cfg = resolveChannelConversionConfig(null);
+    const reeks = (k: (typeof NIET_GOOGLE)[number]) => {
+      const rijen = RIJEN[`${k}_account_daily`];
+      return {
+        kanaal: k,
+        vanaf: eersteVolleMaand(eersteDagUitRijen(rijen, CONVERSIE_KANAAL[k])),
+        laatsteDag: laatsteDagUitRijen(rijen),
+        maanden: kanaalMaandenUitDagen(rijen, CONVERSIE_KANAAL[k], cfg)
+          .map((m) => ({ month: String(m.month).slice(0, 7), conversions: m.conversions, revenue: m.conversions_value, adSpend: m.cost })),
+      };
+    };
+    // Zoals het antwoord in de browser aankomt: door JSON.
+    routeStaat = JSON.parse(JSON.stringify({
+      perKanaal: [{ kanaal: "google", vanaf: null, maanden: [] }, ...NIET_GOOGLE.map(reeks)],
+      dataStand: {
+        laatsteVolleMaand: "2026-07", partieel: { maand: "2026-08", tmDag: 26, dagenInMaand: 31 }, verwachteMaand: "2026-08", maandenAchter: 0,
+        dataTot: "2026-08-26", uitgesloten: [],
+        bronnen: NIET_GOOGLE.map((k) => ({ bron: k, dataTot: laatsteDagUitRijen(RIJEN[`${k}_account_daily`]), syncDraait: false, laatsteRij: laatsteDagUitRijen(RIJEN[`${k}_account_daily`]) })),
+      },
+      loading: false, error: null,
+    })) as BandRoute;
+    routeAntwoord = routeStaat;
+    const root = mount("blended");
+    await rust();
+    await beantwoordAlles();
+    for (const t of ["meta_account_daily", "linkedin_account_daily", "microsoft_account_daily", "client_settings"]) {
+      assert((verzoeken[t] ?? 0) === 0, `met de route haalt de band ${t} niet zelf (was ${verzoeken[t] ?? 0})`);
+    }
+    assert(NIET_GOOGLE.every((k) => nu().klaar[k] === true), `uit de route is elk kanaal klaar (kreeg ${JSON.stringify(nu().klaar)})`);
+    assert(gezien.at(-1) === 15 + 27 + 4, `blended uit de route telt Meta + LinkedIn + Microsoft op (kreeg ${gezien.at(-1)})`);
+    assert(JSON.stringify(nu().data) === terugvalBand.data, "de band uit de route is dezelfde band als de terugvalweg op dezelfde rijen");
+    assert(JSON.stringify(nu().laatsteDag) === terugvalBand.laatsteDag, `laatsteDag per kanaal uit de route (kreeg ${JSON.stringify(nu().laatsteDag)})`);
+    const bronMeta = nu().bronnen?.find((b) => b.naam === "meta");
+    assert(bronMeta?.vanaf === "2026-08", `de Meta-bron draagt zijn eerste volle maand uit de route (kreeg ${JSON.stringify(bronMeta?.vanaf)})`);
+    // De route leest de hele tabel: de laadgrens ligt vóór elke mogelijke rij, en niet null -- null
+    // leest de band als "onbekend tot waar geladen", en dan heet een lege maand vóór de start "niet
+    // geladen" (de demo-Meta-tab: "Voor 7 maanden is geen data geladen").
+    assert(NIET_GOOGLE.every((k) => nu().bronnen?.find((b) => b.naam === k)?.geladenVanaf === HELE_HISTORIE_GELADEN_VANAF),
+      `de bronnen uit de route dragen de hele-historie-laadgrens (kreeg ${JSON.stringify(nu().bronnen?.map((b) => [b.naam, b.geladenVanaf]))})`);
+    assert(NIET_GOOGLE.every((k) => nu().geladenVanaf[k] === HELE_HISTORIE_GELADEN_VANAF), `geladenVanaf per kanaal idem (kreeg ${JSON.stringify(nu().geladenVanaf)})`);
+    // Het seintje van de kanaalselectie: in de routeweg leest de band niets opnieuw (de route-hook
+    // herlaadt zelf, via vergeetBlendedClientData).
+    const mod = (await import("./use-channel-period-data")) as { meldKanaalselectieOpgeslagen: (clientId: string) => void };
+    mod.meldKanaalselectieOpgeslagen("t");
+    await rust();
+    await beantwoordAlles();
+    assert((verzoeken.client_settings ?? 0) === 0 && (verzoeken.meta_account_daily ?? 0) === 0, `in de routeweg leest de band op het seintje niets zelf (was ${JSON.stringify(verzoeken)})`);
+    root.unmount();
+
+    // Een kanaal dat de route niet kent (geen rijen): een lege stand, klaar, zonder eigen lezing.
+    routeStaat = { ...routeStaat, perKanaal: routeStaat.perKanaal!.filter((k) => k.kanaal !== "linkedin") };
+    const root2 = mount("linkedin");
+    await rust();
+    await beantwoordAlles();
+    assert((verzoeken.linkedin_account_daily ?? 0) === 0 && nu().klaar.linkedin === true && conversies(nu().data) === 0 && nu().laatsteDag.linkedin === null,
+      `een kanaal zonder reeks in de route: lege stand, klaar, geen eigen lezing (kreeg ${JSON.stringify([verzoeken.linkedin_account_daily, nu().klaar, conversies(nu().data), nu().laatsteDag])})`);
+    root2.unmount();
+    routeStaat = ROUTE_FOUT;
+  }
+
+  // 1c. Zolang de route nog laadt, haalt de band NIETS zelf en is geen kanaal klaar. Haalde hij de
+  //     rijen "alvast", dan kostte elke paginalaad de drie dagtabellen toch en was de route voor de
+  //     band voor niets (de eigen lezing is er voor een routefout, of een route die WACHT_MS stil
+  //     blijft). Komt het antwoord, dan is de band er zonder een enkel eigen verzoek.
+  {
+    opgeslagen = null;
+    routeStaat = { perKanaal: null, dataStand: null, loading: true, error: null };
+    const root = mount("blended");
+    await rust();
+    await rust();
+    assert(Object.keys(verzoeken).length === 0, `zolang de route laadt doet de band geen verzoek (was ${JSON.stringify(verzoeken)})`);
+    assert(NIET_GOOGLE.every((k) => nu().klaar[k] === false) && nu().data === null && nu().bronnen === null,
+      `en is er geen kanaal klaar en geen cijfer (kreeg ${JSON.stringify([nu().klaar, conversies(nu().data)])})`);
+    assert(NIET_GOOGLE.every((k) => nu().geladenVanaf[k] === null && nu().laatsteDag[k] === null), "geen laadgrens en geen laatste dag vóór het antwoord");
+    routeStaat = routeAntwoord!;
+    root.render(createElement(Kpi, { channel: "blended" }));
+    // Wachten op de render zelf (hooguit een seconde): onder load haalt een vaste rust van 20 ms dat niet altijd.
+    for (const eind = Date.now() + 1000; !nu().klaar.meta && Date.now() < eind;) await new Promise((r) => setTimeout(r, 5));
+    await rust();
+    assert(NIET_GOOGLE.every((k) => nu().klaar[k] === true) && gezien.at(-1) === 15 + 27 + 4 && Object.keys(verzoeken).length === 0,
+      `met het antwoord staat de band er, zonder eigen verzoek (kreeg ${JSON.stringify([nu().klaar, gezien.at(-1), verzoeken])})`);
+    assert(JSON.stringify(gezien) === JSON.stringify([null, 46]), `geen tussenstand met een half geladen kanaal (kreeg ${JSON.stringify(gezien)})`);
+    root.unmount();
+    routeStaat = ROUTE_FOUT;
   }
 
   // 2. Een eigen selectie opgeslagen, en de dagrijen zijn eerder binnen dan client_settings.
@@ -608,7 +721,7 @@ async function main() {
     const losRoot = createRoot(doc.createElement() as unknown as Element);
     for (const k of Object.keys(verzoeken)) delete verzoeken[k];
     wachtend = []; laatst = null;
-    function MetaKpi() { laatst = useChannelPeriodData({ clientId: "t", channel: "meta", googleData: google }); return null; }
+    function MetaKpi() { laatst = useChannelPeriodData({ clientId: "t", channel: "meta", googleData: google, route: ROUTE_FOUT }); return null; }
     losRoot.render(createElement(MetaKpi));
     await rust();
     await beantwoordAlles();
@@ -624,14 +737,19 @@ async function main() {
   //
   // Zonder score gaf de ranking de KanaalScoreBron-kinderen los terug, met score zette hij ze
   // BINNEN de kaart-<div>. Andere boom, dus React haalde ze bij de eerste score weg en zette ze
-  // opnieuw neer: een tweede ronde /api/analysis/channel-forecast (6 verzoeken in plaats van 3).
-  // Het onderdeel mounten vraagt de hele ClientDataProvider met de Google-route erachter; dit leest
-  // de bron, als vangnet en niet als gedragstest.
+  // opnieuw neer: een tweede ronde van de prognoseroute (6 verzoeken in plaats van 3). Hier stonden
+  // drie regexen op het fragment-trucje dat dat voorkwam.
+  //
+  // Sinds fase 1, stap 5 zijn die kinderen en hun route er niet meer: de ranking leest het
+  // tab-object per kanaal uit useBlendedClientData en vraagt zelf niets op. De regexen zijn BEWUST
+  // vervangen: wat er nu te bewaken valt is dat er geen bron-kind en geen eigen ophaalcode
+  // terugkomt. De gedragstest (ranking en badge lezen hetzelfde object) staat in
+  // lib/__kanaaltab_gelijk_alle_kanalen_test.ts.
   {
     const ranking = readFileSync(join(import.meta.dirname, "..", "components/dashboard/kanaal-health-ranking.tsx"), "utf8");
-    assert(!/return bronnen;/.test(ranking), "de ranking geeft de bronnen niet los terug zonder fragment");
-    assert(/if \(rijen\.length === 0\) return <>\{bronnen\}<\/>;/.test(ranking), "zonder score: de bronnen als eerste kind van een fragment");
-    assert(/return \(\s*<>\s*\{bronnen\}\s*<div className="@container/.test(ranking), "met score: de bronnen ook als eerste kind van een fragment, vóór de kaart");
+    assert(!/KanaalScoreBron|\{bronnen\}/.test(ranking), "de ranking heeft geen bron-kinderen meer die elk een eigen score ophalen");
+    assert(!/\bfetch\(|dbSelect/.test(ranking), "de ranking haalt zelf niets op");
+    assert(/useBlendedClientData\(clientId,/.test(ranking) && /route\.perKanaalTab/.test(ranking), "de ranking leest het tab-object per kanaal uit de gedeelde hook");
   }
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);

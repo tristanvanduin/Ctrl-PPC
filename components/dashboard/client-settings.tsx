@@ -331,10 +331,12 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       return;
     }
     invalidateClientCache(clientId);
-    void syncClientTargets(kpiTargets.cpaTarget, kpiTargets.roasTarget);
     // De blended cache ("Alle kanalen") bewaart de data met de KPI-doelen al samengevoegd; zonder
-    // dit toonde het Jaaroverzicht daar nog vijf minuten het oude doel.
-    vergeetBlendedClientData(clientId);
+    // het vergeten toonde het Jaaroverzicht daar nog vijf minuten het oude doel. Pas NA het
+    // wegschrijven van client_targets: gemounte lezers herladen meteen, en de route leest die tabel.
+    void syncClientTargets(kpiTargets.cpaTarget, kpiTargets.roasTarget)
+      .catch(() => {})
+      .finally(() => vergeetBlendedClientData(clientId));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }

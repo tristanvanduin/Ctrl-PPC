@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PlayCircle } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
+import { maakBronCache } from "@/lib/data-access/bron-cache";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
@@ -25,49 +26,93 @@ const eurCpv = (v: number | null) => (v == null || !Number.isFinite(v) ? "—" :
 
 function num(v: unknown): number { return typeof v === "number" && Number.isFinite(v) ? v : 0; }
 
-export function ChannelVideoPerformance({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
+type VideoRij = MetaVideoRow | LinkedInVideoRow;
+/** Wat de kaart van één (klant, kanaal) toont: de videototalen per campagne en hun namen. */
+interface VideoBron { rows: VideoRij[]; names: Map<string, string> }
+
+// De videorijen en de campagnenamen per (klant, kanaal), vijf minuten bewaard: bij elke terugkeer
+// naar het tabblad haalde de kaart beide opnieuw op (60 dagen campagnedagrijen plus de naamtabel).
+// Ze veranderen alleen door een sync; die vergeet ze via vergeetBronnen (bron-cache.ts).
+//
+// Twee caches en niet één: de namen mogen mislukken zonder de kaart mee te nemen (dan staan er
+// campagne-id's, zoals voorheen), en een mislukte lezing hoort niet bewaard te worden. Met één
+// antwoord voor allebei was het kiezen tussen de kaart weglaten of vijf minuten id's tonen.
+const VIDEO_TTL = 5 * 60 * 1000;
+const videoCache = maakBronCache<VideoRij[]>(VIDEO_TTL);
+const naamCache = maakBronCache<Map<string, string>>(VIDEO_TTL);
+const videoSleutel = (clientId: string, channel: ChannelKind) => `${clientId}|${channel}`;
+
+/** Campagne-id -> naam, voor alle campagnes van de klant op dit kanaal. Gooit bij een mislukte lezing. */
+async function laadCampagneNamen(clientId: string, channel: ChannelKind): Promise<Map<string, string>> {
   const cfg = CONFIG[channel];
-  const [rows, setRows] = useState<(MetaVideoRow | LinkedInVideoRow)[] | null>(null);
-  const [names, setNames] = useState<Map<string, string>>(new Map());
+  const { data, error } = await dbSelect<Record<string, unknown>>(cfg.nameTable, { select: `${cfg.nameId}, name`, clientId });
+  if (error) throw new Error(error.message);
+  return new Map(data.map((r) => [String(r[cfg.nameId]), String(r.name ?? r[cfg.nameId])]));
+}
+
+/** De videototalen per campagne over de laatste 60 dagen. Gooit bij een mislukte lezing. */
+async function laadVideoRijen(clientId: string, channel: ChannelKind): Promise<VideoRij[]> {
+  const cfg = CONFIG[channel];
+  const since = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+
+  const select = channel === "meta"
+    ? "entity_id, impressions, spend, video_thruplay, hook_rate, hold_rate"
+    : "entity_urn, impressions, spend, video_views, video_completions, video_completion_rate";
+  const entityField = channel === "meta" ? "entity_id" : "entity_urn";
+
+  const { data, error } = await dbSelect<Record<string, unknown>>(cfg.campaignTable, { select, clientId, filters: [{ op: "gte", column: "date", value: since }] });
+  // Gooien: anders staat een storing vijf minuten als "geen video" in de cache.
+  if (error) throw new Error(error.message);
+
+  const byEntity = new Map<string, VideoRij>();
+  for (const r of data) {
+    const entity = String(r[entityField] ?? "");
+    if (!entity) continue;
+    if (channel === "meta") {
+      const a = (byEntity.get(entity) as MetaVideoRow | undefined) ?? { entity, impressions: 0, spend: 0, thruplay: 0, hookRate: 0, holdRate: 0, n: 0 };
+      a.impressions += num(r.impressions); a.spend += num(r.spend); a.thruplay += num(r.video_thruplay);
+      a.hookRate += num(r.hook_rate); a.holdRate += num(r.hold_rate); a.n += 1;
+      byEntity.set(entity, a);
+    } else {
+      const a = (byEntity.get(entity) as LinkedInVideoRow | undefined) ?? { entity, impressions: 0, spend: 0, views: 0, completions: 0, completionRate: 0, n: 0 };
+      a.impressions += num(r.impressions); a.spend += num(r.spend); a.views += num(r.video_views);
+      a.completions += num(r.video_completions); a.completionRate += num(r.video_completion_rate); a.n += 1;
+      byEntity.set(entity, a);
+    }
+  }
+  return [...byEntity.values()];
+}
+
+function videoUitCache(clientId: string, channel: ChannelKind): VideoBron | null {
+  const rows = videoCache.kijk(videoSleutel(clientId, channel));
+  const names = naamCache.kijk(videoSleutel(clientId, channel));
+  return rows !== undefined && names !== undefined ? { rows, names } : null;
+}
+
+const GEEN_NAMEN = new Map<string, string>();
+
+export function ChannelVideoPerformance({ clientId, channel }: { clientId: string; channel: ChannelKind }) {
+  // De beginstaat uit de cache: bij een tweede bezoek staat de kaart er meteen, zonder laadvlak.
+  const [bron, setBron] = useState<VideoBron | null>(() => videoUitCache(clientId, channel));
+  const rows = bron?.rows ?? null;
+  const names = bron?.names ?? GEEN_NAMEN;
 
   useEffect(() => {
+    const bewaard = videoUitCache(clientId, channel);
+    if (bewaard) { setBron(bewaard); return; }
     let cancelled = false;
-    setRows(null);
-    const since = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
-
-    const select = channel === "meta"
-      ? "entity_id, impressions, spend, video_thruplay, hook_rate, hold_rate"
-      : "entity_urn, impressions, spend, video_views, video_completions, video_completion_rate";
-    const entityField = channel === "meta" ? "entity_id" : "entity_urn";
-
+    setBron(null);
+    const sleutel = videoSleutel(clientId, channel);
     Promise.all([
-      dbSelect<Record<string, unknown>>(cfg.campaignTable, { select, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
-      dbSelect<Record<string, unknown>>(cfg.nameTable, { select: `${cfg.nameId}, name`, clientId }),
-    ]).then(([dailyRes, nameRes]) => {
-      if (cancelled) return;
-      setNames(new Map(((nameRes.data ?? []) as Record<string, unknown>[]).map((r) => [String(r[cfg.nameId]), String(r.name ?? r[cfg.nameId])])));
-
-      const byEntity = new Map<string, MetaVideoRow | LinkedInVideoRow>();
-      for (const r of (dailyRes.data ?? []) as Record<string, unknown>[]) {
-        const entity = String(r[entityField] ?? "");
-        if (!entity) continue;
-        if (channel === "meta") {
-          const a = (byEntity.get(entity) as MetaVideoRow | undefined) ?? { entity, impressions: 0, spend: 0, thruplay: 0, hookRate: 0, holdRate: 0, n: 0 };
-          a.impressions += num(r.impressions); a.spend += num(r.spend); a.thruplay += num(r.video_thruplay);
-          a.hookRate += num(r.hook_rate); a.holdRate += num(r.hold_rate); a.n += 1;
-          byEntity.set(entity, a);
-        } else {
-          const a = (byEntity.get(entity) as LinkedInVideoRow | undefined) ?? { entity, impressions: 0, spend: 0, views: 0, completions: 0, completionRate: 0, n: 0 };
-          a.impressions += num(r.impressions); a.spend += num(r.spend); a.views += num(r.video_views);
-          a.completions += num(r.video_completions); a.completionRate += num(r.video_completion_rate); a.n += 1;
-          byEntity.set(entity, a);
-        }
-      }
-      setRows([...byEntity.values()]);
-    }, () => { if (!cancelled) setRows([]); });
-
+      videoCache.lees(sleutel, () => laadVideoRijen(clientId, channel)),
+      // Zonder namen toont de kaart de campagne-id's; dat lege antwoord wordt niet bewaard.
+      naamCache.lees(sleutel, () => laadCampagneNamen(clientId, channel)).catch(() => GEEN_NAMEN),
+    ]).then(
+      ([gelezen, namen]) => { if (!cancelled) setBron({ rows: gelezen, names: namen }); },
+      () => { if (!cancelled) setBron({ rows: [], names: GEEN_NAMEN }); },
+    );
     return () => { cancelled = true; };
-  }, [clientId, channel, cfg]);
+  }, [clientId, channel]);
 
   // Alleen campagnes met echt videosignaal: een lege videokaart onder een account zonder
   // videocreatives is ruis, zelfde afvang als Google's VideoPerformance.

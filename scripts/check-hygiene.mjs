@@ -135,6 +135,14 @@ const GEDEELD = {
   isLowerBetter: "lib/forecast-format.ts",
   isOptelbaar: "lib/forecast-format.ts",
   zonderData: "lib/forecast-format.ts",
+  // De cache voor luie lezers in de browser: een Map met een tijdstempel, een Map met lopende
+  // verzoeken en een generatieteller tegen verouderde antwoorden. Dat patroon stond al vijf keer
+  // los uitgeschreven (use-client-data, use-blended-client-data, client-settings, use-access,
+  // use-code-rood), en de wereldkaart, de uitsplitsingen en de videokaart hadden er elk nog een
+  // van gekregen. De vijf zijn niet gelijk: twee missen de teller, één deelt geen lopende
+  // verzoeken -- het soort verschil waarmee safeDiv aan drie gedragingen kwam. Nieuwe lezers
+  // nemen dit hulpje; een tweede fabriek met deze naam houdt de poort tegen.
+  maakBronCache: "lib/data-access/bron-cache.ts",
 };
 
 // ── Bestanden verzamelen ───────────────────────────────────────────────────

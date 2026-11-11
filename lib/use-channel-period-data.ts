@@ -9,10 +9,12 @@ import { alsBronReeks, type BronReeks } from "@/lib/period/apply-period";
 import { addMonths, type Month } from "@/lib/period/period-range";
 import { monthsAgo } from "@/lib/reporting-date";
 import { HISTORIE_JAREN } from "@/lib/api/google-vergelijking";
+import { WACHT_MS } from "@/lib/kanalen/beschikbaar";
 import {
-  NIET_GOOGLE, kanaalDagbron, kanaalStandUitDagen, samenvoegen,
+  HELE_HISTORIE_GELADEN_VANAF, NIET_GOOGLE, kanaalDagbron, kanaalStandUitDagen, kanaalStandUitMaanden, maandTotalenUitMaandreeks, samenvoegen,
   type KanaalStand, type NietGoogleKanaal,
 } from "@/lib/period/kanaal-maanden";
+import type { BlendedClientDataState } from "@/lib/use-blended-client-data";
 import type { ClientHistoricalData } from "@/lib/types";
 
 // De KPI-rij (PeriodSummary) toonde altijd Google-cijfers, ook op de Meta/LinkedIn/Alle
@@ -32,6 +34,15 @@ import type { ClientHistoricalData } from "@/lib/types";
 // patroon naar dbSelect omgezet. Was dit blijven staan, dan waren de twee juist uit elkaar gaan
 // lopen: de KPI-rij bovenaan de pagina met een ander cijfer dan de kaart eronder, voor exact
 // dezelfde metriek.
+//
+// Fase 1, stap 4: de band leest Meta/LinkedIn/Microsoft uit de blended route (`route`, de hook
+// lib/use-blended-client-data.ts). Die leest server-side ALLE dagrijen van de drie kanalen en vat
+// ze samen met dezelfde kanaalMaandenUitDagen en dezelfde selectie (perKanaal[].maanden), met de
+// nieuwste dag en de eerste volle maand erbij. De band haalde diezelfde rijen nog eens in de
+// browser (36 maanden, drie verzoeken, 89,7 kB) en telde ze nog eens. Nu gaan beide door één
+// wortel, kanaalStandUitMaanden (lib/period/kanaal-maanden.ts). De dagrijen-weg (fetchKanaalRijen)
+// blijft als terugval: faalt de route of blijft hij WACHT_MS stil, dan rekent de band op eigen
+// rijen, zoals lib/period/band-stand.ts eist.
 
 /** Wat de band nodig heeft, voor het actieve kanaal. */
 export interface ChannelPeriodData {
@@ -46,8 +57,17 @@ export interface ChannelPeriodData {
   bronnen: BronReeks[] | null;
   /** Per niet-Google-kanaal de laatste dag met een rij, voor het venster van de band. */
   laatsteDag: Record<NietGoogleKanaal, string | null>;
-  /** Per niet-Google-kanaal de eerste maand die volledig geladen is; null zolang hij laadt. */
+  /**
+   * Per niet-Google-kanaal de eerste maand die volledig geladen is; null zolang hij laadt. Uit de
+   * route is dat HELE_HISTORIE_GELADEN_VANAF: die leest de hele tabel.
+   */
   geladenVanaf: Record<NietGoogleKanaal, Month | null>;
+  /**
+   * Per niet-Google-kanaal of zijn stand bekend is: uit de route zodra die er is, in de terugvalweg
+   * zodra zijn rijen en de selectie binnen zijn. De band mag geen cijfers of kalendervenster tonen
+   * vóór dat zo is (bandKlaar in client-dashboard.tsx).
+   */
+  klaar: Record<NietGoogleKanaal, boolean>;
 }
 
 // Het plafond van /api/data: PostgREST levert hooguit 1000 rijen per antwoord (max-rows), en de
@@ -147,19 +167,64 @@ export function meldKanaalselectieOpgeslagen(clientId: string): void {
 /** Een kanaal zoals de band het bewaart: de stand plus tot waar terug hij geladen is. */
 type GeladenKanaal = KanaalStand & { geladenVanaf: Month };
 
+/** Wat de band van de blended route leest: de maandreeks per kanaal en de stand van de bronnen. */
+export type BandRoute = Pick<BlendedClientDataState, "perKanaal" | "dataStand" | "loading" | "error">;
+
 export interface ChannelPeriodDataArgs {
   clientId: string;
   /** De actieve kanaaltab. "blended" = Alle kanalen (de standaardweergave). */
   channel: "google" | "meta" | "linkedin" | "microsoft" | "blended";
-  /** Google's al opgehaalde data -- deze hook haalt alleen Meta/LinkedIn/Microsoft zelf op. */
+  /** Google's al opgehaalde data -- deze hook haalt Google nooit zelf op. */
   googleData: ClientHistoricalData | null;
+  /**
+   * De blended route (useBlendedClientData in client-dashboard.tsx): Meta/LinkedIn/Microsoft komen
+   * uit perKanaal zodra hij er is. Bij een fout, of als hij WACHT_MS stil blijft, haalt de hook de
+   * dagrijen zelf (fetchKanaalRijen).
+   */
+  route: BandRoute;
+}
+
+/**
+ * De stand van één kanaal uit de route, of een lege stand als de route dat kanaal niet kent.
+ * Geëxporteerd voor de gelijkheidstest (lib/__kanaaltab_gelijk_alle_kanalen_test.ts): die zet
+ * precies deze functie op het antwoord van de echte route tegenover kanaalStandUitDagen op alle
+ * dagrijen. perKanaal[].eersteDag (de start van de huidige loop, voor het tempo in de prognose)
+ * gaat bewust NIET mee: de band paart op `vanaf`, de eerste volle maand sinds de eerste dag ooit.
+ */
+export function kanaalStandUitRoute(clientId: string, kanaal: NietGoogleKanaal, route: BandRoute): GeladenKanaal {
+  const reeks = route.perKanaal?.find((k) => k.kanaal === kanaal);
+  const bron = route.dataStand?.bronnen?.find((b) => b.bron === kanaal);
+  // Een kanaal zonder reeks heeft geen rijen: dezelfde lege stand als kanaalStandUitDagen op [],
+  // dus ook geen nieuwste dag (de route zet een kanaal zonder reeks ook niet in zijn bronnen).
+  // Met reeks: de nieuwste dag uit de reeks zelf (sinds stap 3: laatsteDagUitRijen over ALLE
+  // rijen, wat de eigen lezing ook gaf), of uit de bronnen van de stand bij een ouder antwoord.
+  const stand = kanaalStandUitMaanden(
+    clientId,
+    maandTotalenUitMaandreeks(reeks?.maanden ?? []),
+    reeks ? reeks.laatsteDag ?? bron?.laatsteRij ?? null : null,
+    reeks?.vanaf ?? null,
+  );
+  return { ...stand, geladenVanaf: HELE_HISTORIE_GELADEN_VANAF };
 }
 
 /** De juiste data voor de KPI-rij, gegeven het actieve kanaal. */
-export function useChannelPeriodData({ clientId, channel, googleData }: ChannelPeriodDataArgs): ChannelPeriodData {
+export function useChannelPeriodData({ clientId, channel, googleData, route }: ChannelPeriodDataArgs): ChannelPeriodData {
   // Met de klant erbij opgeslagen: bij een klantwissel tellen de kanalen van de vorige klant niet
   // meer, ook niet in de render vóór het nieuwe antwoord binnen is.
   const [geladen, setGeladen] = useState<{ clientId: string; kanalen: Partial<Record<NietGoogleKanaal, GeladenKanaal>> } | null>(null);
+  // De route is te laat: na WACHT_MS zonder antwoord gaat de band zijn eigen rijen halen, zoals de
+  // kanalenkiezer dat doet (lib/kanalen/beschikbaar.ts). Komt het antwoord daarna alsnog, dan telt
+  // de route weer: dezelfde cijfers, en voortaan zonder eigen lezing.
+  const [routeTeLaat, setRouteTeLaat] = useState(false);
+  useEffect(() => {
+    if (!route.loading) { setRouteTeLaat(false); return; }
+    const t = setTimeout(() => setRouteTeLaat(true), WACHT_MS);
+    return () => clearTimeout(t);
+  }, [route.loading, clientId]);
+  const routeKlaar = !route.loading && route.error === null && route.perKanaal !== null;
+  // De terugvalweg: een routefout, of een route die te lang stil blijft. Niet "zolang de route nog
+  // laadt": dan haalde elke paginalaad de rijen toch, en was de route voor de band voor niets.
+  const terugval = route.error !== null || (route.loading && routeTeLaat);
   // Opgehoogd na het opslaan van de selectie, zodat het effect hieronder opnieuw leest. De oude
   // cijfers blijven staan tot de nieuwe binnen zijn: het is dezelfde klant, alleen anders geteld.
   const [versie, setVersie] = useState(0);
@@ -180,6 +245,7 @@ export function useChannelPeriodData({ clientId, channel, googleData }: ChannelP
   // Altijd alle drie ophalen, ongeacht welk kanaal actief is: "blended" heeft ze alle drie nodig, en
   // tussen tabs wisselen zonder herhaald fetchen is prettiger dan per tab opnieuw laden.
   useEffect(() => {
+    if (!terugval) return;
     let cancelled = false;
     // Parallel aan de dagrijen, maar een kanaal wordt pas gezet als BEIDE binnen zijn. Niet eerder:
     // tellen met de standaardselectie kan een ander getal geven dan de opgeslagen keuze (LinkedIn met
@@ -197,9 +263,23 @@ export function useChannelPeriodData({ clientId, channel, googleData }: ChannelP
       });
     }
     return () => { cancelled = true; };
-  }, [clientId, versie]);
+  }, [clientId, versie, terugval]);
 
-  const kanalen = geladen?.clientId === clientId ? geladen.kanalen : null;
+  // Uit de route zodra die er is: per kanaal de maandreeks door dezelfde wortel als de dagrijen.
+  // Eén keer per routeantwoord (perKanaal is per ophaalronde één object): op een tab- of
+  // periodewissel wordt er niets opnieuw gebouwd.
+  const routePerKanaal = route.perKanaal;
+  const routeStand = route.dataStand;
+  const uitRoute = useMemo((): Partial<Record<NietGoogleKanaal, GeladenKanaal>> | null => {
+    if (!routeKlaar) return null;
+    const uit: Partial<Record<NietGoogleKanaal, GeladenKanaal>> = {};
+    for (const kanaal of NIET_GOOGLE) uit[kanaal] = kanaalStandUitRoute(clientId, kanaal, { perKanaal: routePerKanaal, dataStand: routeStand, loading: false, error: null });
+    return uit;
+  }, [routeKlaar, routePerKanaal, routeStand, clientId]);
+
+  // De route gaat voor; de eigen rijen alleen in de terugvalweg. Een kanaal dat de terugvalweg al
+  // geladen had, blijft staan tot de route er is (dezelfde cijfers, andere bron).
+  const kanalen = uitRoute ?? (terugval && geladen?.clientId === clientId ? geladen.kanalen : null);
   const meta = kanalen?.meta ?? null;
   const linkedin = kanalen?.linkedin ?? null;
   const microsoft = kanalen?.microsoft ?? null;
@@ -245,6 +325,8 @@ export function useChannelPeriodData({ clientId, channel, googleData }: ChannelP
   const lVan = linkedin?.geladenVanaf ?? null;
   const msVan = microsoft?.geladenVanaf ?? null;
   const geladenVanaf = useMemo(() => ({ meta: mVan, linkedin: lVan, microsoft: msVan }), [mVan, lVan, msVan]);
+  const mKlaar = meta !== null, lKlaar = linkedin !== null, msKlaar = microsoft !== null;
+  const klaar = useMemo(() => ({ meta: mKlaar, linkedin: lKlaar, microsoft: msKlaar }), [mKlaar, lKlaar, msKlaar]);
 
-  return { ...keuze, laatsteDag, geladenVanaf };
+  return { ...keuze, laatsteDag, geladenVanaf, klaar };
 }
