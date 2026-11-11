@@ -124,13 +124,20 @@ const CHANNELS: { id: Channel; label: string; icon: React.ReactNode }[] = [
  * een leeg scherm leidden en "Alle kanalen" hetzelfde toonde als het enige kanaal. Bij één kanaal
  * verdwijnt de balk daarom helemaal -- een kiezer met één knop is geen keuze.
  */
-function ChannelTabs({ channel, onChange, beschikbaar }: {
+function ChannelTabs({ channel, onChange, beschikbaar, ladenMetBalk = false }: {
   channel: Channel;
   onChange: (c: Channel) => void;
   beschikbaar: readonly Kanaal[];
+  /** De kanalen zijn nog onbekend en deze klant had de vorige keer een kanaalbalk. */
+  ladenMetBalk?: boolean;
 }) {
   const toegestaan = zichtbareTabs(beschikbaar);
-  if (toegestaan.length === 0) return null;
+  if (toegestaan.length === 0) {
+    // Zolang de kanalen onbekend zijn: de hoogte van de balk reserveren als deze klant er de
+    // vorige keer een had. De balk verscheen anders ná de band en duwde die zestig pixels omlaag
+    // (CLS 0,17). Zonder herinnering niets: de meeste klanten hebben één kanaal en dus geen balk.
+    return ladenMetBalk ? <div className="h-9 w-72 max-w-full rounded-lg bg-gray-100" aria-hidden /> : null;
+  }
   const zichtbaar = CHANNELS.filter((c) => (toegestaan as string[]).includes(c.id));
   return (
     <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
@@ -353,6 +360,16 @@ export function ClientDashboard({ client }: { client: Client }) {
   const eigenStandBekend = channel === "google" ? !clientData.loading
     : channel === "blended" ? !clientData.loading && NIET_GOOGLE.every((k) => periodSummary.klaar[k])
       : periodSummary.klaar[channel];
+  // Had deze klant de vorige keer een kanaalbalk (meer dan één kanaal)? Alleen om tijdens het laden
+  // de hoogte te reserveren; de waarheid komt uit `kanalen`.
+  const [hadKanaalbalk, setHadKanaalbalk] = useState(false);
+  useEffect(() => {
+    try { setHadKanaalbalk(window.localStorage.getItem(`kanaalbalk:${client.id}`) === "1"); } catch { /* geen opslag: dan geen reservering */ }
+  }, [client.id]);
+  useEffect(() => {
+    if (kanalen === null) return;
+    try { window.localStorage.setItem(`kanaalbalk:${client.id}`, zichtbareTabs(kanalen).length > 0 ? "1" : "0"); } catch { /* idem */ }
+  }, [client.id, kanalen]);
   const bandKlaar = kanalen !== null && eigenStandBekend;
 
   return (
@@ -519,7 +536,7 @@ export function ClientDashboard({ client }: { client: Client }) {
       {clientData.data && <CodeRoodBanner clientId={client.id} />}
       {activeTab === "dashboard" && !clientData.error && (
         <div className="space-y-6">
-          <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} />
+          <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} ladenMetBalk={kanalen === null && hadKanaalbalk} />
           <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} laden={!bandKlaar} />
         </div>
       )}
