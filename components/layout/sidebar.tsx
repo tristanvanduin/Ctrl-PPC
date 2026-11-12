@@ -17,6 +17,7 @@ import { visibleGeoClones, type GeoCloneVariant } from "@/lib/fair/geo-clone-cat
 import { BRAND_NAME } from "@/lib/branding/brand";
 import { SidebarLogo } from "@/components/layout/sidebar-logo";
 import { useSidebarMobile } from "@/components/layout/sidebar-mobile-context";
+import { beursAdres, GEO_PARAM } from "@/lib/adresbalk";
 
 interface VisibleClient {
   id: string;
@@ -95,7 +96,7 @@ export function Sidebar() {
 function SidebarInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeGeo = searchParams.get("geo");
+  const activeGeo = searchParams.get(GEO_PARAM);
   const activeClientId = pathname.startsWith("/client/") ? pathname.replace("/client/", "") : null;
   const [geoClones, setGeoClones] = useState<GeoCloneVariant[]>([]);
   const { open: mobielOpen, close: sluitMobiel } = useSidebarMobile();
@@ -314,12 +315,23 @@ function SidebarInner() {
   const totalCount = filtered.length;
 
   function ClientLink({ client }: { client: VisibleClient }) {
-    const isActive = pathname === `/client/${client.id}`;
+    const klantPad = `/client/${client.id}`;
+    const isActive = pathname === klantPad;
     const showGeoClones = isActive && geoClones.length > 0;
+    // Binnen de klant die open staat verzet een klik hier alleen de beurs: het kanaal, de periode,
+    // de vergelijking en ?demo= staan in de adresbalk en gaan mee (beursAdres). Met een vast
+    // `/client/<id>?geo=<afk>` viel wie op Meta stond bij het kiezen van een beurs terug op "Alle
+    // kanalen". Een ANDERE klant krijgt het kale pad: die heeft zijn eigen kanalen en zijn eigen
+    // bewaarde periode, en een periode in het adres zou die keuze overschrijven.
+    const heleEvent = isActive ? beursAdres(klantPad, searchParams, null) : klantPad;
     return (
       <div>
         <Link
-          href={`/client/${client.id}`}
+          href={heleEvent}
+          // Geen prefetch: deze href volgt de zoekparameters, dus elke kanaal- of periodewissel
+          // gaf de link een nieuw adres en Next haalde daar meteen de route-boom voor op. Een
+          // wissel hoort geen verzoek te kosten (bouwplan fase 2).
+          prefetch={false}
           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
             isActive && !activeGeo
               ? "bg-brand-orange text-white font-medium"
@@ -337,7 +349,8 @@ function SidebarInner() {
             {geoClones.map((v) => (
               <Link
                 key={v.abbreviation}
-                href={`/client/${client.id}?geo=${v.abbreviation}`}
+                href={beursAdres(klantPad, searchParams, v.abbreviation)}
+                prefetch={false}
                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-body transition-colors ${
                   activeGeo === v.abbreviation
                     ? "bg-brand-orange text-white font-medium"

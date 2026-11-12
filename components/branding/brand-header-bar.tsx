@@ -29,11 +29,20 @@ export function BrandHeaderBar({
   geoClone,
   fallbackName,
   edition,
+  compact = false,
 }: {
   geoClone?: string | null;
   fallbackName?: string;
   /** De eerstvolgende beurs, als de klant er een heeft. Voedt de aftelling rechts. */
   edition?: UpcomingEdition | null;
+  /**
+   * De merkregel van de nieuwe weergave (bouwplan fase 3): een logo-tegel, de naam met een
+   * merkstreep eronder, en de aftelling, op één regel van 32 pixels. De hero was 94 pixels zonder
+   * één cijfer; zo staat het eerste kerncijfer dat stuk hoger. Dezelfde gegevens uit dezelfde
+   * bronnen (thema, beurs, fairCountdown); alleen de vaste ondertitel "Alle beurzen en campagnes
+   * van dit account" vervalt, want die stond er ook bij klanten zonder beurs.
+   */
+  compact?: boolean;
 }) {
   const { theme, brandName } = useBrandTheme();
   const name = brandName || fallbackName || "Dashboard";
@@ -66,6 +75,50 @@ export function BrandHeaderBar({
   const sluier = eensgezind ? "bg-black/10" : "bg-black/35";
   // De chip moet tegen de inkt afsteken, niet tegen een aangenomen donkere achtergrond.
   const chipVulling = inkt === "#ffffff" ? "bg-white/15" : "bg-black/10";
+
+  if (compact) {
+    // Dezelfde zin als in de hero, op één regel: "2 weken tot GreenTech North America 2026".
+    const aftelTekst = toonAftelling
+      ? aftelling.fase === "beursweek"
+        ? `Beursweek ${edition.eventName} ${edition.label}`
+        : `${aftelling.weken} ${aftelling.weken === 1 ? "week" : "weken"} tot ${edition.eventName} ${edition.label}`
+      : null;
+    return (
+      // Vanaf een tablet een ondergrens: liever de kiezer ernaast naar een eigen regel dan een naam
+      // van drie letters met puntjes.
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:min-w-64">
+        {theme.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={theme.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border border-border bg-white object-contain p-0.5" />
+        ) : (
+          // De tegel in de merkkleur met de inkt die daarop het best leest (inkOn); geen hex, dan wit.
+          <div
+            aria-hidden
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-body font-bold"
+            style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})`, color: isHex(theme.primary) ? inkOn(theme.primary) : "#ffffff" }}
+          >
+            {initials(name)}
+          </div>
+        )}
+        <div className="min-w-0">
+          <h1 className="truncate text-title font-bold leading-tight text-brand-gray" style={{ fontFamily: "var(--font-heading)" }}>{name}</h1>
+          {/* De merkstreep: het verloop van de hero, teruggebracht tot drie pixels onder de naam. */}
+          <span aria-hidden className="mt-0.5 block h-[3px] rounded-full" style={{ background: `linear-gradient(90deg, ${theme.primary}, ${theme.accent})` }} />
+        </div>
+        {beursLabel && (
+          <p className="hidden min-w-0 truncate text-meta text-muted-foreground md:block">
+            Beurs: <span className="font-semibold text-brand-gray">{beursLabel}</span>
+          </p>
+        )}
+        {aftelTekst && (
+          <p title={aftelTekst} className="flex min-w-0 max-w-[11rem] shrink items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-meta font-medium text-brand-gray sm:max-w-none">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+            <span className="truncate">{aftelTekst}</span>
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div

@@ -56,6 +56,30 @@ export const PRESET_LABEL: Record<PeriodPreset, string> = {
   custom: "Aangepast",
 };
 
+/** Waar een pagina op begint zolang niemand iets gekozen heeft. Eén plek: de PeriodProvider, de
+ *  adresbalk (periode-url.ts) en de snelkoppelingen naast de kiezer lezen dezelfde standaard. */
+export const DEFAULT_PRESET: PeriodPreset = "last_12m";
+export const DEFAULT_COMPARISON: ComparisonMode = "same_period_last_year";
+
+/** Wat de gebruiker gekozen heeft: de preset, zijn eigen bereik (alleen bij "custom") en waartegen
+ *  vergeleken wordt. De uitgerekende maanden horen hier niet bij; die volgen uit de datastand. */
+export interface PeriodeKeuze {
+  preset: PeriodPreset;
+  custom: PeriodRange | null;
+  comparison: ComparisonMode;
+}
+
+/**
+ * De snelkoppelingen naast de kiezer: drie, zes en twaalf maanden (bouwplan fase 2). Het zijn de
+ * bestaande presets en geen tweede model: een klik zet dezelfde keuze als de knop in het paneel,
+ * dus ze eindigen op dezelfde laatste volle maand met data en vergelijken op dezelfde manier.
+ */
+export const SNELKOPPELINGEN: readonly { preset: PeriodPreset; kort: string }[] = [
+  { preset: "last_3m", kort: "3 mnd" },
+  { preset: "last_6m", kort: "6 mnd" },
+  { preset: "last_12m", kort: "12 mnd" },
+];
+
 export const COMPARISON_LABEL: Record<ComparisonMode, string> = {
   none: "Geen vergelijking",
   previous_period: "Voorgaande periode",
@@ -235,6 +259,18 @@ export function formatMonth(m: Month, kort = false): string {
   const [y, mm] = m.split("-").map(Number);
   const naam = MAAND_NAAM[mm - 1];
   return `${kort ? naam.slice(0, 3) : naam} ${y}`;
+}
+
+/**
+ * De periode in een paar woorden, voor het vensterlabel in een blokkop: "jun–aug 2026",
+ * "sep 2025–aug 2026", of "aug 2026" bij een enkele maand. Het jaar staat er altijd bij: een label
+ * dat alleen "jun–aug" zegt, is in januari van een ander jaar een ander venster.
+ */
+export function formatRangeKort(p: PeriodRange): string {
+  if (!isValidMonth(p.start) || !isValidMonth(p.end)) return `${p.start}–${p.end}`;
+  if (p.start === p.end) return formatMonth(p.end, true);
+  const zelfdeJaar = p.start.slice(0, 4) === p.end.slice(0, 4);
+  return `${zelfdeJaar ? formatMonth(p.start, true).split(" ")[0] : formatMonth(p.start, true)}–${formatMonth(p.end, true)}`;
 }
 
 /** "maart 2026 t/m juni 2026", of "maart 2026" bij een enkele maand. */

@@ -153,7 +153,7 @@ export function AsX({ dataKey, formatter, basislijn = false }: {
  * de as helemaal weg te laten, want twee panelen boven elkaar moeten links op dezelfde pixel
  * beginnen — anders staan de balken en de lijn eronder niet meer boven elkaar.
  */
-export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5, ticks, stil = false }: {
+export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5, ticks, stil = false, id, rechts = false, kleur }: {
   formatter?: (v: number) => string;
   width?: number;
   domain?: [number | string, number | string];
@@ -167,11 +167,25 @@ export function AsY({ formatter = kortGetal, width = 52, domain, tickCount = 5, 
    */
   ticks?: number[];
   stil?: boolean;
+  /**
+   * De naam van deze as, als er twee in één plot staan (de reeks wijst hem aan met `yAxisId`).
+   * Zonder naam is het de ene as die recharts standaard kent.
+   */
+  id?: string;
+  /** Zet de as rechts van de plot. Alleen voor de tweede as; de eerste blijft links. */
+  rechts?: boolean;
+  /**
+   * De kleur van de getallen. Alleen voor een tweede as: die draagt de kleur van ZIJN reeks, zodat
+   * te zien is welke getallen bij de lijn horen en welke bij de staven. Eén as blijft recessief.
+   */
+  kleur?: string;
 }) {
-  if (stil) return <YAxis tick={false} tickLine={false} axisLine={false} width={width} domain={domain} tickCount={tickCount} ticks={ticks} />;
+  const kant = { yAxisId: id, orientation: rechts ? "right" as const : "left" as const };
+  if (stil) return <YAxis {...(id ? kant : {})} tick={false} tickLine={false} axisLine={false} width={width} domain={domain} tickCount={tickCount} ticks={ticks} />;
   return (
     <YAxis
-      tick={AS_TICK}
+      {...(id ? kant : {})}
+      tick={kleur ? { ...AS_TICK, fill: kleur } : AS_TICK}
       tickLine={false}
       axisLine={false}
       tickMargin={8}
@@ -337,11 +351,20 @@ export const PLOT_MARGE_EIND = { top: 12, right: 52, left: 0, bottom: 4 } as con
 // De tooltip-props van recharts zijn per versie anders getypeerd; deze vorm is wat we er
 // werkelijk uit lezen, en die is stabiel gebleven.
 interface TipDeel { name?: string; value?: number | string; color?: string }
-interface TipProps { active?: boolean; payload?: TipDeel[]; label?: unknown; formatter?: (v: number) => string }
+/** Een regel onder de reeksen: een totaal, of een afgeleide waarde die geen eigen reeks in de lijst hoort te zijn. */
+export interface TipVoetRegel { naam: string; waarde: string; kleur?: string; sterk?: boolean }
+interface TipProps {
+  active?: boolean; payload?: TipDeel[]; label?: unknown;
+  formatter?: (v: number, naam?: string) => string;
+  verberg?: readonly string[];
+  voet?: (label: string) => TipVoetRegel[];
+}
 
-function TipInhoud({ active, payload, label, formatter }: TipProps) {
+function TipInhoud({ active, payload, label, formatter, verberg, voet }: TipProps) {
   if (!active || !payload?.length) return null;
   const fmt = formatter ?? volledigGetal;
+  const regels = verberg?.length ? payload.filter((p) => !verberg.includes(String(p.name))) : payload;
+  const onder = voet && label != null ? voet(String(label)) : [];
   return (
     // `bg-card` en niet `bg-white`. Dat laatste is letterlijk wit en weet niets van het thema, dus
     // in donkere modus stond hier een witte doos met de lichte donkere-modus-inkt erop: grijs op
@@ -356,21 +379,40 @@ function TipInhoud({ active, payload, label, formatter }: TipProps) {
           twee schrijfwijzen voor dezelfde maand, tien pixels uit elkaar. */}
       {label != null && <div className="font-semibold text-brand-gray mb-1">{maandLabel(String(label))}</div>}
       <div className="space-y-0.5">
-        {payload.map((p: TipDeel, i: number) => (
+        {regels.map((p: TipDeel, i: number) => (
           <div key={`${p.name}-${i}`} className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: p.color }} aria-hidden />
             <span className="text-muted-foreground">{p.name}</span>
             <span className="ml-auto font-semibold text-brand-gray tabular-nums">
-              {typeof p.value === "number" ? fmt(p.value) : String(p.value ?? "—")}
+              {typeof p.value === "number" ? fmt(p.value, p.name) : String(p.value ?? "—")}
             </span>
           </div>
         ))}
       </div>
+      {onder.length > 0 && (
+        <div className="mt-1 space-y-0.5 border-t border-border pt-1">
+          {onder.map((r) => (
+            <div key={r.naam} className="flex items-center gap-2">
+              {/* Met kleur een streepje (een lijn), zonder kleur niets: een totaal is geen reeks. */}
+              <span className="h-0.5 w-2 shrink-0 rounded-full" style={{ background: r.kleur ?? "transparent" }} aria-hidden />
+              <span className={r.sterk ? "text-brand-gray" : "text-muted-foreground"}>{r.naam}</span>
+              <span className="ml-auto font-semibold text-brand-gray tabular-nums">{r.waarde}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-export function Tip({ formatter }: { formatter?: (v: number) => string }) {
+export function Tip({ formatter, verberg, voet }: {
+  /** De opmaak van een waarde; de naam van de reeks gaat mee voor een plot met twee grootheden. */
+  formatter?: (v: number, naam?: string) => string;
+  /** Reeksen die wel getekend worden maar niet als regel in de lijst horen (ze staan in de voet). */
+  verberg?: readonly string[];
+  /** Regels onder de reeksen, per categorie op de x-as: een totaal, een afgeleide waarde. */
+  voet?: (label: string) => TipVoetRegel[];
+}) {
   return (
     <Tooltip
       // Een vulling over de hele balkgroep als hover-doel: mikken op een dunne balk is geen
@@ -379,7 +421,7 @@ export function Tip({ formatter }: { formatter?: (v: number) => string }) {
       // Direct bij de cursor. Recharts laat de tip standaard 400 ms van zijn vorige plek glijden,
       // en onderweg dekt hij de balken af waar je net naar kijkt (bouwplan fase 0).
       isAnimationActive={false}
-      content={(props: unknown) => <TipInhoud {...(props as TipProps)} formatter={formatter} />}
+      content={(props: unknown) => <TipInhoud {...(props as TipProps)} formatter={formatter} verberg={verberg} voet={voet} />}
     />
   );
 }

@@ -7,6 +7,7 @@ import { CHANNEL_LABEL, type GeoBreakdownState } from "@/lib/geo/use-geo-breakdo
 import { GeoEnkelLandKaart } from "./geo-empty-state";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import type { ReactNode } from "react";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 const WorldMap = dynamic(() => import("./world-map"), {
   ssr: false,
@@ -50,6 +51,9 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
           Waar komt het vandaan{focus === "US" ? " — Verenigde Staten" : ""}
         </h3>
         <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
+        {/* De landrijen komen uit een eigen lezing over 180 dagen (lib/geo/use-geo-breakdown.ts); de
+            periode laten volgen kost een verzoek per wissel. Tot die tijd staat het venster erbij. */}
+        <Vensterlabel soort="vast" venster="laatste 180 dagen" />
         {focus === "US" && (
           <button
             onClick={() => setFocus(null)}

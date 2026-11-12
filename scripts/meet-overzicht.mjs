@@ -6,7 +6,8 @@
 //   FASE=0-nulmeting node scripts/meet-overzicht.mjs
 //
 // Omgeving: BASIS_URL (http://localhost:3190), DEMO_CLIENT (demo-greentech), FASE (label in de
-// bestandsnaam), THROTTLES ("1,4": CPU-vertraging per run), CHROMIUM (pad naar de browser).
+// bestandsnaam), THROTTLES ("1,4": CPU-vertraging per run), CHROMIUM (pad naar de browser),
+// WEERGAVE ("nieuw": meet de nieuwe bovenkant van fase 3 via ?weergave=nieuw; leeg: de vertrouwde).
 // Uitvoer: scripts/metingen/<datum>-<FASE>.json plus een leesbare samenvatting op stdout.
 //
 // Wat er gemeten wordt, en waarom juist dit:
@@ -16,7 +17,13 @@
 //     het netwerk stil is, beeldjes per seconde, en het aandeel blokken (secties) dat verandert:
 //     een pagina waarvan één blok op twintig beweegt, voelt statisch, hoe mooi dat ene blok ook beweegt;
 //   - eerlijkheid: hoeveel verschillende conversietotalen er op de pagina staan (ieder uit een eigen
-//     venster) en of er iets permanent beweegt (een pulse die nooit stopt wijst niets meer aan).
+//     venster) en of er iets permanent beweegt (een pulse die nooit stopt wijst niets meer aan);
+//   - vensters (fase 2): welk venster elk blok in zijn kop noemt ("volgt periode", "jaarblok", "vast
+//     venster"; het Vensterlabel, data-venster), hoeveel van de blokken met "volgt periode" bij een
+//     periodewissel ook echt veranderen (doel >= 90%), en welke conversietotalen in een blok staan
+//     dat geen venster noemt (doel 0);
+//   - de adresbalk (fase 2): na een kanaal- en een periodewissel de pagina herladen en kijken of
+//     hetzelfde kanaal en dezelfde periode terugkomen.
 //
 // Vaste meetnormen en drempels staan in het bouwplan; dit script oordeelt niet, het meet.
 
@@ -29,7 +36,10 @@ const FASE = process.env.FASE ?? "meting";
 const THROTTLES = (process.env.THROTTLES ?? "1,4").split(",").map(Number);
 const MOBIEL = process.env.MOBIEL !== "0";
 const CHROOM = process.env.CHROMIUM ?? "/opt/pw-browsers/chromium";
-const URL_KLANT = `${BASIS}/client/${KLANT}?demo=1`;
+// De nieuwe weergave staat achter een schakelaar per gebruiker (lib/weergave.ts); een schone
+// browser heeft die keuze niet, dus de meting zet hem aan via de adresbalk.
+const WEERGAVE = process.env.WEERGAVE ?? "";
+const URL_KLANT = `${BASIS}/client/${KLANT}?demo=1${WEERGAVE ? `&weergave=${WEERGAVE}` : ""}`;
 const RUST_MS = 1200;
 
 const browser = await chromium.launch({ executablePath: CHROOM });
@@ -74,6 +84,54 @@ const SNAPSHOT = () => {
     blokken[`${i}. ${schoon(kop).slice(0, 50)}`] = schoon(el.innerText).slice(0, 6000);
   }
   return blokken;
+};
+
+/**
+ * Per blok (dezelfde kaarten als SNAPSHOT): welk venster het noemt en zijn tekst ZONDER dat label.
+ *
+ * Het label van een blok is het Vensterlabel in de kaart zelf, of anders het laatste label in een
+ * kop boven de kaart binnen dezelfde sectie (de sectiekop of een Deelkop: zo dragen de vier
+ * jaartegels en de kanaaltabel hun venster). Zonder label: `soort` null, en dan telt elk
+ * conversietotaal in dat blok als ongelabeld.
+ *
+ * De tekst zonder het label: bij een periodewissel verandert de tekst van het label zelf
+ * ("volgt periode · jun–aug 2026"). Telde die mee, dan "veranderde" elk gelabeld blok vanzelf en
+ * mat de meting het label in plaats van de cijfers.
+ */
+const VENSTERS = () => {
+  const schoon = (t) => t.replace(/\s+/g, " ").trim();
+  const main = document.querySelector("main") ?? document.body;
+  const isKaart = (el) => /rounded-(xl|lg|2xl)/.test(String(el.className)) && /border|shadow|bg-card/.test(String(el.className));
+  const inKaart = (el) => { let q = el.parentElement; while (q && q !== main) { if (isKaart(q)) return true; q = q.parentElement; } return false; };
+  const uit = [];
+  const gezien = {};
+  for (const el of main.querySelectorAll("*")) {
+    if (!isKaart(el) || inKaart(el) || el.getClientRects().length === 0) continue;
+    let label = el.querySelector("[data-venster]");
+    if (!label) {
+      const sectie = el.closest("section") ?? main;
+      for (const l of sectie.querySelectorAll("[data-venster]")) {
+        if (inKaart(l) || isKaart(l)) continue; // het label van een andere kaart
+        if (l.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) label = l; // de laatste vóór deze kaart
+      }
+    }
+    let tekst = el.innerText;
+    for (const l of el.querySelectorAll("[data-venster]")) tekst = tekst.split(l.innerText).join(" ");
+    tekst = schoon(tekst).slice(0, 6000);
+    let kop = el.querySelector("h1, h2, h3, h4")?.innerText ?? tekst.split(" ").slice(0, 6).join(" ");
+    for (const l of el.querySelectorAll("[data-venster]")) kop = kop.split(l.innerText).join(" ");
+    kop = schoon(kop).slice(0, 50);
+    // Dezelfde kop kan vaker voorkomen (vier tegels "Conversies"); het volgnummer houdt ze uit elkaar.
+    gezien[kop] = (gezien[kop] ?? 0) + 1;
+    const totalen = [];
+    for (const m of tekst.matchAll(/(\d{1,3}(?:\.\d{3})+|\d{3,})\s+conversies\b/gi)) totalen.push(m[1]);
+    for (const m of tekst.matchAll(/\bConversies\s+(?:[^\d\s]{0,12}\s)?(\d{1,3}(?:\.\d{3})+|\d{3,})/g)) totalen.push(m[1]);
+    uit.push({
+      sleutel: `${kop} #${gezien[kop]}`, soort: label?.getAttribute("data-venster") ?? null, label: label ? schoon(label.innerText) : null, tekst,
+      conversietotalen: [...new Set(totalen)].filter((v) => !/^20\d\d$/.test(v) && Number(v.replace(/\./g, "")) >= 50),
+    });
+  }
+  return uit;
 };
 
 /** Eerlijkheid: verschillende conversietotalen en permanente animaties. */
@@ -170,39 +228,63 @@ async function run(breedte, hoogte, throttle) {
   res.laden.blokken = Object.keys(await p.evaluate(SNAPSHOT)).length;
   res.eerlijk = await p.evaluate(EERLIJK);
   const basis = await p.evaluate(SNAPSHOT);
+  // De vensters op "Alle kanalen", zoals de pagina opent: hoeveel blokken er per soort zijn, welke
+  // geen venster noemen, en welke conversietotalen daarin staan (het doel van fase 2: geen).
+  const vensterStand = (blokken) => ({
+    blokken: blokken.length,
+    perSoort: blokken.reduce((t, b) => { const k = b.soort ?? "geen"; t[k] = (t[k] ?? 0) + 1; return t; }, {}),
+    zonderVenster: blokken.filter((b) => b.soort === null).map((b) => b.sleutel),
+    conversietotalen: blokken.flatMap((b) => b.conversietotalen.map((v) => ({ totaal: v, blok: b.sleutel, venster: b.label }))),
+    conversietotalenZonderVenster: blokken.filter((b) => b.soort === null).flatMap((b) => b.conversietotalen.map((v) => ({ totaal: v, blok: b.sleutel }))),
+  });
+  res.vensters = vensterStand(await p.evaluate(VENSTERS));
 
   // ── Wissels (alleen op desktop: de tabs staan daar in beeld) ──
   if (breedte >= 1000) {
+    // Terug naar alle kanalen: in de vertrouwde weergave de tab "Alle kanalen", in de nieuwe nog
+    // een klik op de ingedrukte kanaalkaart (de kaart is het filter; er is geen aparte knop).
+    const naarAlleKanalen = () => (WEERGAVE === "nieuw"
+      ? p.locator('main button[aria-pressed="true"][aria-describedby^="kanaalkaart-"]').first().click({ timeout: 3000 })
+      : p.getByRole("button", { name: /^Alle kanalen$/ }).first().click());
     const wissel = async (label, doe) => {
       log = [];
       await p.evaluate(() => { window.__m.lang = 0; window.__m.langN = 0; window.__mark(); });
       const voor = await p.evaluate(SNAPSHOT);
+      const voorVensters = await p.evaluate(VENSTERS);
       const t = Date.now();
       let fout = null;
       try { await doe(); } catch (e) { fout = String(e.message).slice(0, 120); }
       const r = await rust(15000);
       await p.waitForTimeout(1600);
       const na = await p.evaluate(SNAPSHOT);
+      const naVensters = await p.evaluate(VENSTERS);
       const eerste = await p.evaluate(() => window.__eerste);
       const frames = await p.evaluate(() => window.__frames.slice(2));
       const mm = await p.evaluate(() => ({ lang: window.__m.lang, langN: window.__m.langN, cls: window.__m.cls - window.__cls0 }));
       const sleutels = [...new Set([...Object.keys(voor), ...Object.keys(na)])];
       const veranderd = sleutels.filter((k) => voor[k] !== na[k]);
+      // Fase 2: van de blokken die vóór de wissel "volgt periode" droegen, hoeveel hebben daarna
+      // een andere tekst (het label zelf niet meegeteld)? Bij een periodewissel is het doel 90%.
+      const naPerSleutel = new Map(naVensters.map((b) => [b.sleutel, b]));
+      const volgers = voorVensters.filter((b) => b.soort === "periode");
+      const stil = volgers.filter((b) => naPerSleutel.get(b.sleutel)?.tekst === b.tekst).map((b) => b.sleutel);
       res.wissels.push({
         label, fout,
         api: apiTotaal(), perPad: perPad(),
         eersteVeranderingMs: eerste === null ? null : Math.round(eerste),
         netwerkStilMs: r < 0 ? null : Date.now() - t - RUST_MS - 1600,
         blokken: sleutels.length, blokkenVeranderd: veranderd.length, veranderd: veranderd.slice(0, 30),
+        volgtPeriode: { blokken: volgers.length, veranderd: volgers.length - stil.length, stil },
+        url: await p.evaluate(() => location.pathname + location.search),
         beeldjes: frames.length, beeldjesBoven25ms: frames.filter((x) => x > 25).length,
         langeTaken: mm.langN, blokkeerMs: Math.round(mm.lang), cls: Math.round(mm.cls * 1000) / 1000,
       });
     };
     await wissel("kanaal: Alle kanalen -> Meta", () => p.getByRole("button", { name: /^Meta$/ }).first().click());
-    await wissel("kanaal: Meta -> Alle kanalen", () => p.getByRole("button", { name: /^Alle kanalen$/ }).first().click());
+    await wissel("kanaal: Meta -> Alle kanalen", naarAlleKanalen);
     // Het tweede bezoek aan dezelfde tab: wat een cache waard is, zie je pas hier.
     await wissel("kanaal: Alle kanalen -> Meta (tweede keer)", () => p.getByRole("button", { name: /^Meta$/ }).first().click());
-    await wissel("kanaal: Meta -> Alle kanalen (tweede keer)", () => p.getByRole("button", { name: /^Alle kanalen$/ }).first().click());
+    await wissel("kanaal: Meta -> Alle kanalen (tweede keer)", naarAlleKanalen);
     // De periodekiezer: de knop met aria-haspopup="dialog" (zijn naam is de gekozen periode zelf),
     // daarna de preset in het paneel. De knop is uitgeschakeld zolang de band laadt.
     const kiesPreset = async (label) => {
@@ -215,6 +297,45 @@ async function run(breedte, hoogte, throttle) {
     await wissel("periode: -> Laatste 3 maanden", () => kiesPreset("Laatste 3 maanden"));
     await wissel("periode: -> Laatste 12 maanden", () => kiesPreset("Laatste 12 maanden"));
     res.basisBlokken = Object.keys(basis);
+
+    // ── Fase 2: de snelkoppelingen, per kanaalweergave, en de adresbalk ──
+    // De knoppen 3/6/12 mnd naast de kiezer (een groep met aria-label "Periode, snelkoppelingen").
+    const snel = (kort) => p.locator('[role="group"][aria-label^="Periode"] button', { hasText: new RegExp(`^${kort}$`) }).first().click({ timeout: 5000 });
+    await wissel("periode (snelkoppeling): -> 6 mnd", () => snel("6 mnd"));
+    // Elke kanaalweergave heeft eigen blokken; het aandeel "volgt periode" dat echt beweegt, telt
+    // per weergave. Kanalen die deze klant niet heeft, geven een FOUT-regel en geen crash.
+    res.venstersPerKanaal = { "Alle kanalen": res.vensters };
+    for (const kanaal of ["Google Ads", "Meta", "LinkedIn", "Microsoft"]) {
+      // De tab heet "Microsoft", de kanaalkaart "Microsoft Ads" (KANAAL_NAAM): beide tellen.
+      await wissel(`kanaal: -> ${kanaal}`, () => p.getByRole("button", { name: new RegExp(`^${kanaal}( Ads)?$`) }).first().click({ timeout: 3000 }));
+      if (res.wissels.at(-1).fout) continue;
+      res.venstersPerKanaal[kanaal] = vensterStand(await p.evaluate(VENSTERS));
+      await wissel(`periode op ${kanaal}: -> 3 mnd`, () => snel("3 mnd"));
+      await wissel(`periode op ${kanaal}: -> 12 mnd`, () => snel("12 mnd"));
+    }
+    // De adresbalk: Meta over de laatste drie maanden, herladen, en kijken wat er terugkomt. De
+    // actieve knoppen zijn te herkennen aan aria-pressed.
+    const stand = () => p.evaluate(() => ({
+      url: location.pathname + location.search,
+      ingedrukt: [...document.querySelectorAll('main button[aria-pressed="true"]')].map((b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").trim()),
+      periode: document.querySelector('main button[aria-haspopup="dialog"]')?.textContent?.replace(/\s+/g, " ").trim() ?? null,
+    }));
+    try {
+      await p.getByRole("button", { name: /^Meta$/ }).first().click({ timeout: 3000 });
+      await snel("3 mnd");
+      await rust(15000);
+      const voorHerlaad = await stand();
+      log = [];
+      await p.reload({ waitUntil: "domcontentloaded" });
+      await p.waitForFunction(() => !document.querySelector('main button[aria-haspopup="dialog"]')?.disabled, null, { timeout: 30000 });
+      await rust(20000);
+      const naHerlaad = await stand();
+      res.herlaad = {
+        voor: voorHerlaad, na: naHerlaad,
+        zelfdeToestand: voorHerlaad.url === naHerlaad.url && voorHerlaad.periode === naHerlaad.periode
+          && JSON.stringify(voorHerlaad.ingedrukt) === JSON.stringify(naHerlaad.ingedrukt),
+      };
+    } catch (e) { res.herlaad = { fout: String(e.message).slice(0, 160) }; }
   }
   await ctx.close();
   return res;
@@ -237,7 +358,16 @@ for (const r of uit.runs) {
   for (const [k, v] of Object.entries(l.perPad).slice(0, 10)) console.log(`   ${String(v.n).padStart(2)}x ${String(v.kb).padStart(7)} kB  max ${String(v.maxMs ?? "-").padStart(5)} ms  ${k}`);
   for (const w of r.wissels) {
     console.log(`wissel ${w.label}${w.fout ? ` [FOUT ${w.fout}]` : ""}: ${w.api.verzoeken} verzoeken (${w.api.kb} kB) · eerste verandering ${f(w.eersteVeranderingMs, " ms")} · netwerk stil ${f(w.netwerkStilMs, " ms")} · blokken veranderd ${w.blokkenVeranderd}/${w.blokken} · beeldjes ${w.beeldjes} waarvan > 25 ms: ${w.beeldjesBoven25ms} · lange taken ${w.langeTaken} (${w.blokkeerMs} ms)`);
+    // Alleen bij een periodewissel zegt dit iets: een kanaalwissel vervangt de blokken zelf.
+    if (w.label.startsWith("periode") && w.volgtPeriode?.blokken > 0) {
+      const v = w.volgtPeriode;
+      console.log(`   volgt periode: ${v.veranderd}/${v.blokken} veranderd (${Math.round((v.veranderd / v.blokken) * 100)}%)${v.stil.length ? ` · stil: ${v.stil.join("; ")}` : ""} · ${w.url}`);
+    }
   }
+  for (const [kanaal, v] of Object.entries(r.venstersPerKanaal ?? (r.vensters ? { "Alle kanalen": r.vensters } : {}))) {
+    console.log(`vensters ${kanaal}: ${v.blokken} blokken ${JSON.stringify(v.perSoort)} · zonder venster: ${v.zonderVenster.length ? v.zonderVenster.join("; ") : "geen"} · conversietotalen zonder venster: ${v.conversietotalenZonderVenster.length ? JSON.stringify(v.conversietotalenZonderVenster) : "0"}`);
+  }
+  if (r.herlaad) console.log(`herlaad: ${r.herlaad.fout ? `[FOUT ${r.herlaad.fout}]` : `${r.herlaad.zelfdeToestand ? "zelfde toestand" : "ANDERS"} · ${r.herlaad.na.url} · ${JSON.stringify(r.herlaad.na.ingedrukt)} · ${r.herlaad.na.periode}`}`);
   if (r.eerlijk) console.log(`eerlijk: conversietotalen ${JSON.stringify(r.eerlijk.conversietotalen)} · permanente animaties ${r.eerlijk.permanenteAnimaties.length} ${JSON.stringify(r.eerlijk.permanenteAnimaties.slice(0, 3))} · datastand "${r.eerlijk.datastand}"`);
 }
 console.log(`\nopgeslagen: ${bestand}`);

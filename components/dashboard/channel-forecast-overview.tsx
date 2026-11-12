@@ -15,6 +15,7 @@ import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { useKanaalData } from "./channel-data-provider";
 import { KlikbareKaart } from "@/components/ui/klikbare-kaart";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Meta/LinkedIn-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). computeForecast()
 // (lib/forecast.ts) is zelf al kanaalneutraal; wat voor deze kanalen anders is, is de databron (de
@@ -126,8 +127,11 @@ function ForecastChart({ forecast, metric, onMetricChange }: { forecast: ClientF
 
   return (
     <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Prognose per maand</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
+          Prognose per maand
+          <Vensterlabel soort="jaar" />
+        </h3>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
           {actieveMetrics(forecast).map((m) => (
             <button

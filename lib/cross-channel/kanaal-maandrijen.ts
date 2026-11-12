@@ -16,6 +16,7 @@
 import type { BlendedKanaalReeks } from "@/lib/api/blended-historical";
 import type { Kanaal } from "@/lib/kanalen/beschikbaar";
 import type { ChannelKey } from "./lens-facts";
+import type { PeriodRange } from "@/lib/period/period-range";
 
 /**
  * Van de kanaalnaam van het dashboard ("google") naar de kanaalsleutel van de cross-channel-laag
@@ -60,4 +61,23 @@ export function kanaalMaandRijen(perKanaal: readonly BlendedKanaalReeks[]): Kana
   }
   // Stabiel: bij gelijke maand blijft de volgorde van de route staan.
   return rijen.sort((a, b) => b.month.localeCompare(a.month));
+}
+
+/**
+ * De rijen van de gekozen periode (bouwplan fase 2).
+ *
+ * De staven, de ring en de kanaaltabel op "Alle kanalen" hadden elk een eigen vast venster: de
+ * laatste zes maanden, ongeveer negentig dagen, en alle geladen maanden (op de demo vierentwintig).
+ * Drie conversietotalen op één tabblad, geen van drieën gelijk aan de band erboven, en geen dat
+ * bewoog als de periode verzet werd. Ze kiezen nu alle drie hun maanden hiermee, uit rijen die er
+ * al zijn: een periodewissel kost geen verzoek.
+ *
+ * De grenzen tellen mee. `month` is een maandbegin ("YYYY-MM-01") en de periode een maand
+ * ("YYYY-MM"); als tekst vergeleken op de eerste zeven tekens is dat dezelfde volgorde.
+ */
+export function rijenInPeriode<T extends { month: string }>(rijen: readonly T[], periode: PeriodRange): T[] {
+  return rijen.filter((r) => {
+    const maand = r.month.slice(0, 7);
+    return maand >= periode.start && maand <= periode.end;
+  });
 }

@@ -13,6 +13,7 @@ import { BREAKDOWN_DIMENSIES, metaWaardeLabel, type BreakdownKanaal } from "@/li
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { useVorige } from "@/lib/use-vorige";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Waar het budget van Meta en LinkedIn landt, per uitsplitsing.
 //
@@ -265,7 +266,7 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
         <h3 className="text-title font-semibold text-brand-gray">
           {groep === "doelgroep" ? "Doelgroepen — wie we bereiken" : "Waar gaat het budget heen"}
         </h3>
-        <span className="text-meta text-muted-foreground">laatste 60 dagen</span>
+        <Vensterlabel soort="vast" venster="laatste 60 dagen" />
         <div className="ml-auto flex gap-1 bg-gray-100 rounded-lg p-0.5 flex-wrap">
           {beschikbaar.map((d) => (
             <button

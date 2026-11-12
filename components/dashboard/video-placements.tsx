@@ -12,6 +12,7 @@ import {
 import { useTruncatedList, MeerKnop } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Waar het videobudget landde, met een voorstel welke placements uit te sluiten. Bij YouTube kiest
 // Google de plek; dit maakt zichtbaar wat dat oplevert. Bewust een voorstel met onderbouwing en
@@ -109,6 +110,7 @@ export function VideoPlacements({ clientId }: { clientId: string }) {
         <Ban className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">Waar je video&apos;s draaien</h3>
         <span className="text-meta text-muted-foreground">voorstel welke placements uit te sluiten</span>
+        <Vensterlabel soort="vast" venster="laatste 180 dagen" className="ml-auto" />
       </div>
 
       {excluding.length > 0 && (

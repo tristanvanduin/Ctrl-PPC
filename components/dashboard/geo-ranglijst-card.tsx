@@ -5,6 +5,7 @@ import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { GeoRanglijst } from "./geo-ranglijst";
 import { int, eur, pct, nf, type GeoBreakdownState } from "@/lib/geo/use-geo-breakdown";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // De ranglijst-helft van GeoBreakdown, apart (17.36): verhuisd naar de lege ruimte onder de
 // campagnetype-donut, zodat GeoMapCard ernaast de kaart alleen heeft en dus groter kan. Zelfde
@@ -54,6 +55,8 @@ export function GeoRanglijstCard({ state, zonderBalken = false }: { state: GeoBr
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <ListOrdered className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{metric.label} per {geoWord}</h3>
+        {/* Zelfde bron en dus zelfde venster als de kaart erboven. */}
+        <Vensterlabel soort="vast" venster="laatste 180 dagen" />
       </div>
 
       <div className="flex flex-1 flex-col justify-center px-4 py-3">

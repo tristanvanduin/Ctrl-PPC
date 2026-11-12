@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Megaphone, Calendar, CalendarClock, LayoutGrid, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
+import { Megaphone, Calendar, CalendarClock, LayoutGrid, PieChart, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
 import { ChannelBleedersTable } from "./channel-bleeders-table";
@@ -20,7 +20,8 @@ import { ChannelDataProvider } from "./channel-data-provider";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
-import { Sectie } from "@/components/ui/sectie";
+import { Sectie, Deelkop } from "@/components/ui/sectie";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { isDemoClient } from "@/lib/demo/demo-mode";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/meta/campaign-types";
@@ -134,63 +135,87 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
           en pas vanaf 1800px twee kolommen -- daaronder haalt Account Health de 672px
           container-breedte niet die hij nodig heeft om zijn drie stukken naast elkaar te zetten,
           en staat hij gestapeld naast een kaart die door de smalle kolom juist lager wordt. */}
-      <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
-        <div className="flex flex-col gap-4">
-          <ChannelHealthBadge clientId={clientId} channel="meta" />
-          {/* Pacing direct onder Account Health, net als op Google -- en tegelijk de opvanger van
-              deze kolom: zes blokken met een ring worden leesbaarder van hoogte. Dit blok stond
-              tot 23 augustus 2026 onderaan de sectie "Maandprestaties", terwijl het de vraag
-              beantwoordt die je bovenaan stelt. */}
+      {/* ÉÉN KOP VOOR DE BLOKKEN MET EEN VAST VENSTER (bouwplan fase 2). Account Health, het
+          jaaroverzicht en de beurs gaan over het kalenderjaar; de pacing over de lopende maand en
+          de wereldkaart over 180 dagen. Ze stonden verspreid, met ertussen blokken die de
+          periodekiezer horen te volgen: wie de periode verzette zag de halve pagina stilstaan
+          zonder te kunnen zien waarom. Nu staan de blokken die NIET meebewegen bij elkaar onder
+          één kop die dat zegt, en zegt elk blok in zijn kop welk venster het gebruikt
+          (Vensterlabel). Wat een eigen sectie was (de beurs, het jaaroverzicht) is hier een deel
+          met dezelfde titel en hetzelfde bijschrift (Deelkop); er is niets weg. Dezelfde opbouw
+          op alle tabbladen, zodat een tabwissel niets verplaatst. */}
+      <Sectie
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Jaar, beurs en markten"
+        bijschrift="Vaste vensters: het kalenderjaar, de beurs en waar het verkeer vandaan komt. Deze blokken volgen de periodekiezer niet; elk zegt in zijn kop welk venster het gebruikt."
+      >
+        <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+          <div className="flex flex-col gap-4">
+            <ChannelHealthBadge clientId={clientId} channel="meta" />
+            {/* Pacing direct onder Account Health, net als op Google -- en tegelijk de opvanger van
+                deze kolom: zes blokken met een ring worden leesbaarder van hoogte. Dit blok stond
+                tot 23 augustus 2026 onderaan de sectie "Maandprestaties", terwijl het de vraag
+                beantwoordt die je bovenaan stelt. */}
+            <div className="flex flex-1 flex-col">
+              <ChannelPacing edition={edition} />
+            </div>
+          </div>
           <div className="flex flex-1 flex-col">
-            <ChannelPacing edition={edition} />
+            <GeoMapCard state={geo} channel="meta" verdieping={<GeoRanglijstInKaart state={geo} />} />
           </div>
         </div>
-        <div className="flex flex-1 flex-col">
-          <GeoMapCard state={geo} channel="meta" verdieping={<GeoRanglijstInKaart state={geo} />} />
-        </div>
-      </div>
 
-      {/* DEZELFDE VOLGORDE ALS GOOGLE, en dat is het punt: hero, dan de landencijfers, dan een rij
-          grafiek- en diagramkaarten. De drie tabbladen hadden alle drie een andere volgorde, en dan
-          moet je bij elke tabwissel opnieuw zoeken waar iets staat.
+        {/* DEZELFDE VOLGORDE ALS GOOGLE, en dat is het punt: hero, dan de landencijfers, dan een rij
+            grafiek- en diagramkaarten. De drie tabbladen hadden alle drie een andere volgorde, en dan
+            moet je bij elke tabwissel opnieuw zoeken waar iets staat.
 
-          De landencijfers horen direct onder de wereldkaart uit de hero: "waar komt het vandaan"
-          en "wat leverde het per land op" is één vraag in twee kaarten. */}
-      <GeoRanglijstCard state={geo} zonderBalken />
+            De landencijfers horen direct onder de wereldkaart uit de hero: "waar komt het vandaan"
+            en "wat leverde het per land op" is één vraag in twee kaarten. */}
+        <GeoRanglijstCard state={geo} zonderBalken />
 
       {/* "Prestaties richting de beurs" -- de sectie die Google al had en deze kanalen niet.
           Alleen als er een event gekozen is; zonder event is "nog N weken tot" een lege zin.
           Zie channel-fair-weeks.tsx voor waarom hij hier ontbrak: niet de cijfers maar de ingang. */}
-      {edition && (
-        <Sectie
-          icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Prestaties richting de beurs"
-          bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
-        >
-          <ChannelFairWeeks edition={edition} />
-        </Sectie>
-      )}
+        {edition && (
+          <>
+            <Deelkop
+              icoon={<CalendarClock className="w-4 h-4 text-brand-blue-ink" />}
+              titel="Prestaties richting de beurs"
+              bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+            />
+            <ChannelFairWeeks edition={edition} />
+          </>
+        )}
+
+        {/* Meta-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde plek en
+            icoon als bij Google; rendert niets zolang er geen dagcijfers gesynced zijn (demo heeft
+            die wel). Zie channel-forecast-overview.tsx voor de volledige toelichting --
+            computeForecast is al kanaalneutraal, dit levert alleen de Meta-databron en het
+            client_targets-jaardoel. Stond tot fase 2 onder de ringenrij; nu direct bij de andere
+            jaarblokken. */}
+        <Deelkop
+          icoon={<Target className="w-4 h-4 text-brand-blue-ink" />}
+          titel="Jaaroverzicht 2026"
+          bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+          venster={<Vensterlabel soort="jaar" />}
+        />
+        <ChannelForecastOverview />
+      </Sectie>
 
       {/* groep="levering" is plaatsing/platform/device ("waar komt het vandaan"), groep="doelgroep"
           is leeftijd en gender ("wie bereiken we"), en het maandverloop zet dat in de tijd. Drie
           kaarten die alle drie een verdeling of een verloop tonen -- en alle drie inhoudsgestuurd,
           dus er valt niets uit te rekken. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
-        <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
-        <ChannelMonthlyChart />
-      </div>
-
-      {/* Meta-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde plek en icoon
-          als bij Google; renderd niets zolang er geen dagcijfers gesynced zijn (demo heeft die
-          wel). Zie channel-forecast-overview.tsx voor de volledige toelichting -- computeForecast
-          is al kanaalneutraal, dit levert alleen de Meta-databron en het client_targets-jaardoel. */}
       <Sectie
-        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Jaaroverzicht 2026"
-        bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+        icoon={<PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Verdeling en verloop"
+        bijschrift="Waar het budget heen ging en wie we bereikten, en het maandverloop binnen de gekozen periode"
       >
-        <ChannelForecastOverview />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
+          <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
+          <ChannelMonthlyChart />
+        </div>
       </Sectie>
 
       {/* Wat er van de prestatie-view overblijft: de kerncijfers over 28 dagen en de maandtabel.
@@ -199,7 +224,7 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
       <Sectie
         icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Maandprestaties"
-        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
+        bijschrift="Kerncijfers over 28 dagen, en de maanden van de gekozen periode"
       >
         <ChannelPerformance clientId={clientId} channel="meta" geoClone={geoClone} />
       </Sectie>

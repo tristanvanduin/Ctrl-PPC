@@ -15,7 +15,7 @@ import { Calendar, ChevronDown, TriangleAlert } from "lucide-react";
 import {
   PERIOD_PRESETS, COMPARISON_MODES, PRESET_LABEL, COMPARISON_LABEL,
   resolvePeriod, resolveComparison, comparisonWarning, formatRange, monthCount,
-  isValidMonth, lastCompleteMonth,
+  isValidMonth, lastCompleteMonth, SNELKOPPELINGEN,
   type PeriodPreset, type ComparisonMode, type PeriodRange,
 } from "@/lib/period/period-range";
 
@@ -36,6 +36,55 @@ export function resolveSelection(
 ): PeriodSelection {
   const range = resolvePeriod(preset, custom);
   return { preset, custom, comparison, range, compareRange: resolveComparison(range, comparison) };
+}
+
+/**
+ * Drie, zes en twaalf maanden als zichtbare knoppen naast de kiezer (bouwplan fase 2).
+ *
+ * Waarom ze er staan. De periode wisselen was twee klikken en een paneel: openen, kiezen. Voor de
+ * drie vensters die je het vaakst naast elkaar legt is dat één klik te veel, en een bediening die
+ * achter een paneel zit nodigt niet uit om even te kijken wat er verandert.
+ *
+ * Geen tweede model: de knoppen zetten de bestaande presets (SNELKOPPELINGEN in period-range.ts),
+ * dus ze eindigen op dezelfde laatste volle maand met data en houden de gekozen vergelijking. Is
+ * er iets anders gekozen (dit jaar, vorig jaar, een eigen bereik), dan is geen van de drie
+ * ingedrukt; de kiezer ernaast toont wat er geldt.
+ *
+ * Tijdens het laden staan ze er al, uitgeschakeld en even breed: de rij verspringt dan niet als de
+ * stand binnenkomt (dezelfde reden als de gereserveerde tekst in de kiezer hieronder).
+ */
+export function PeriodeSnelkoppelingen({ preset, onKies, laden }: {
+  preset: PeriodPreset;
+  onKies: (preset: PeriodPreset) => void;
+  laden?: boolean;
+}) {
+  return (
+    <div role="group" aria-label="Periode, snelkoppelingen" className="flex gap-0.5 rounded-md border border-border bg-card p-0.5">
+      {SNELKOPPELINGEN.map((k) => {
+        const actief = !laden && preset === k.preset;
+        return (
+          <button
+            key={k.preset}
+            type="button"
+            aria-pressed={actief}
+            aria-label={PRESET_LABEL[k.preset]}
+            title={PRESET_LABEL[k.preset]}
+            disabled={laden}
+            onClick={() => onKies(k.preset)}
+            // min-h-7 plus de rand van de groep: even hoog als de kiezer ernaast, en op een telefoon
+            // een raakvlak van 44 px breed.
+            className={`min-h-7 min-w-11 rounded px-2 text-body transition-colors disabled:text-muted-foreground ${
+              actief
+                ? "bg-brand-blue/10 font-semibold text-brand-blue-ink"
+                : "text-brand-gray hover:bg-muted/70 disabled:hover:bg-transparent"
+            }`}
+          >
+            {k.kort}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 interface Props {

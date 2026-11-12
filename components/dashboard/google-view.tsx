@@ -5,7 +5,8 @@ import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangl
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import type { ForecastMetric } from "@/lib/forecast";
-import { Sectie } from "@/components/ui/sectie";
+import { Sectie, Deelkop } from "@/components/ui/sectie";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { HealthBadge } from "./health-badge";
 import { ChannelViewHeader } from "./channel-view-header";
 import { SearchScorecard } from "./search-scorecard";
@@ -212,59 +213,86 @@ export function GoogleView({
               1086 tegen 635 zodra Pacing eronder kwam: een gat van 400px in de kaart. Onder 1800px
               is de hero daarom één kolom: elke kaart op zijn natuurlijke hoogte, en dan valt er per
               definitie niets te overbruggen. */}
-          <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
-            <div className="flex flex-col gap-4">
-              <HealthBadge clientId={clientId} />
-              <div className="flex flex-1 flex-col">
-                <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
-              </div>
-            </div>
+          {/* ÉÉN KOP VOOR DE BLOKKEN MET EEN VAST VENSTER (bouwplan fase 2). Account Health, Pacing,
+              de maand- of beursweergave en het jaaroverzicht gaan over het kalenderjaar; de
+              wereldkaart over 180 dagen. De hero en de landencijfers stonden los boven de eerste
+              sectiekop, en tussen de beurs en het jaaroverzicht stond de grafiekenrij, die de
+              periodekiezer hoort te volgen. Wie de periode verzette zag de halve pagina stilstaan
+              zonder te kunnen zien waarom.
 
-            <div className="flex flex-col gap-4">
-              {/* De opvanger van de rechterkolom, voor het geval links de hoogste is (smalle
-                  schermen, waar Account Health gestapeld staat). De landenranglijst hangt in deze
-                  kaart: die balken horen bij de projectie en vullen hem met inhoud. De
-                  land x kanaal-matrix alleen bij meerdere kanalen -- met één kanaal is het een
-                  landentabel met één kolom, precies wat de kaart al toont. */}
-              <div className="flex flex-1 flex-col">
-                <GeoMapCard
-                  state={geo}
-                  verdieping={
-                    <>
-                      <GeoRanglijstInKaart state={geo} />
-                      {meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : null}
-                    </>
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* De landencijfers direct onder de hero: ze horen bij de wereldkaart erboven ("waar
-              komt het vandaan" / "wat leverde het per land op"), en stonden een scherm verderop. */}
-          <GeoRanglijstCard state={geo} zonderBalken />
-
-          {/* DE BEURS-SECTIE BOVEN DE GRAFIEKENRIJ, HET JAAROVERZICHT ERONDER. De beurs draagt de
-              vraag van het tabblad -- lopen we op schema -- en die stel je als eerste. De
-              grafiekkaarten eronder tonen het verloop en de verdeling, en het jaaroverzicht sluit
-              af met waar dat het jaar brengt; die twee horen bij elkaar en bij het detailwerk dat
-              daaronder doorloopt. Dezelfde volgorde op alle vier de tabbladen, zodat een tabwissel
-              niets verplaatst. */}
-
+              Nu staan de blokken die NIET meebewegen bij elkaar onder één kop die dat zegt, en
+              zegt elk blok in zijn kop welk venster het gebruikt (Vensterlabel). Wat een eigen
+              sectie was, is hier een deel met dezelfde titel, hetzelfde bijschrift en dezelfde
+              keuzeknop (Deelkop); er is niets weg. De indeling van de hero zelf is ongewijzigd. */}
           <Sectie
-            icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
-            titel={
-              (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
-              + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
-            }
-            bijschrift={beursAs
-              ? `Per week: hoeveel weken zijn we van ${edition!.eventName} en lopen we op schema?`
-              : "Per maand: waar staan we en wat is de trend?"}
-            actie={edition && <TijdasKeuze value={tijdas} onChange={onTijdasChange} />}
+            icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+            titel="Jaar, beurs en markten"
+            bijschrift="Vaste vensters: het kalenderjaar, de beurs en waar het verkeer vandaan komt. Deze blokken volgen de periodekiezer niet; elk zegt in zijn kop welk venster het gebruikt."
           >
+            <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+              <div className="flex flex-col gap-4">
+                <HealthBadge clientId={clientId} />
+                <div className="flex flex-1 flex-col">
+                  <PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {/* De opvanger van de rechterkolom, voor het geval links de hoogste is (smalle
+                    schermen, waar Account Health gestapeld staat). De landenranglijst hangt in deze
+                    kaart: die balken horen bij de projectie en vullen hem met inhoud. De
+                    land x kanaal-matrix alleen bij meerdere kanalen -- met één kanaal is het een
+                    landentabel met één kolom, precies wat de kaart al toont. */}
+                <div className="flex flex-1 flex-col">
+                  <GeoMapCard
+                    state={geo}
+                    verdieping={
+                      <>
+                        <GeoRanglijstInKaart state={geo} />
+                        {meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : null}
+                      </>
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* De landencijfers direct onder de hero: ze horen bij de wereldkaart erboven ("waar
+                komt het vandaan" / "wat leverde het per land op"), en stonden een scherm verderop. */}
+            <GeoRanglijstCard state={geo} zonderBalken />
+
+            {/* DE BEURS EERST, DAN HET JAAROVERZICHT, DAARNA PAS DE GRAFIEKENRIJ. De beurs draagt de
+                vraag van het tabblad -- lopen we op schema -- en die stel je als eerste; het
+                jaaroverzicht zegt waar dat het jaar brengt. Beide zijn jaarblokken en staan sinds
+                fase 2 direct onder elkaar; de grafiekkaarten volgen de gekozen periode en staan
+                eronder in hun eigen sectie. Dezelfde volgorde op alle vier de tabbladen, zodat een
+                tabwissel niets verplaatst. */}
+
+            <Deelkop
+              icoon={<Calendar className="w-4 h-4 text-brand-blue-ink" />}
+              titel={
+                (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
+                + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
+              }
+              bijschrift={beursAs
+                ? `Per week: hoeveel weken zijn we van ${edition!.eventName} en lopen we op schema?`
+                : "Per maand: waar staan we en wat is de trend?"}
+              actie={edition && <TijdasKeuze value={tijdas} onChange={onTijdasChange} />}
+            />
             {beursAs
               ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} />
               : <MonthlyOverview clientId={clientId} countryFilter={countryFilter} />}
+
+            {/* Het jaaroverzicht direct bij de andere jaarblokken. Het stond tot fase 2 onder de
+                grafiekenrij; die volgt nu de periode en heeft hieronder zijn eigen sectie. */}
+            <Deelkop
+              icoon={<Target className="w-4 h-4 text-brand-blue-ink" />}
+              titel={countryFilter ? `Jaaroverzicht 2026 — ${countryLabel(countryFilter)}` : "Jaaroverzicht 2026"}
+              bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+              venster={<Vensterlabel soort="jaar" />}
+            />
+            <MetricCards clientId={clientId} countryFilter={countryFilter} selected={jaaroverzichtMetric} onSelect={setJaaroverzichtMetric} />
+            <PerformanceChart clientId={clientId} countryFilter={countryFilter} metric={jaaroverzichtMetric} onMetricChange={setJaaroverzichtMetric} />
           </Sectie>
 
           {/* DRIE GRAFIEKKAARTEN OP EEN RIJ. Alle drie tonen een verdeling of een verloop, en dat
@@ -273,19 +301,16 @@ export function GoogleView({
               `flex-1`), dus als de donut ernaast hoger uitvalt, vullen ze dat met een grotere
               grafiek in plaats van met wit. Bij een tegelkaart of een tekstblok kan dat niet, en
               dat is het verschil tussen "opvullen" en "uitrekken". */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
-            <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
-            <CampaignTypeSplit clientId={clientId} />
-          </div>
-
           <Sectie
-            icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-            titel={countryFilter ? `Jaaroverzicht 2026 — ${countryLabel(countryFilter)}` : "Jaaroverzicht 2026"}
-            bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+            icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+            titel={countryFilter ? `Verloop en verdeling — ${countryLabel(countryFilter)}` : "Verloop en verdeling"}
+            bijschrift="CPA en conversies per maand binnen de gekozen periode, en waar de spend naartoe ging"
           >
-            <MetricCards clientId={clientId} countryFilter={countryFilter} selected={jaaroverzichtMetric} onSelect={setJaaroverzichtMetric} />
-            <PerformanceChart clientId={clientId} countryFilter={countryFilter} metric={jaaroverzichtMetric} onMetricChange={setJaaroverzichtMetric} />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+              <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
+              <CampaignTypeSplit clientId={clientId} />
+            </div>
           </Sectie>
 
           {/* Feedback punt 29+31: PmaxNetworkSplit was hier al gemarkeerd als PMax-only ("ze

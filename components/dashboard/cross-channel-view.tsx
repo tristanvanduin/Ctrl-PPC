@@ -1,17 +1,20 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { CalendarClock, Globe, Info, Layers, Loader2, Target, TrendingUp } from "lucide-react";
+import { CalendarClock, Info, Layers, Loader2, Target, TrendingUp } from "lucide-react";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { CampaignTypeSplit } from "./campaign-type-split";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
 import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
-import { kanaalMaandRijen } from "@/lib/cross-channel/kanaal-maandrijen";
+import { kanaalMaandRijen, rijenInPeriode } from "@/lib/cross-channel/kanaal-maandrijen";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
 import { maandLabel } from "./chart-chrome";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
-import { Sectie } from "@/components/ui/sectie";
+import { Sectie, Deelkop } from "@/components/ui/sectie";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { usePeriod } from "@/lib/period/period-context";
+import { formatRange } from "@/lib/period/period-range";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
@@ -94,14 +97,28 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
     [blended.perKanaal, blended.loading, blended.error],
   );
 
-  const months = rows ? [...new Set(rows.map((r) => r.month))] : [];
+  // ── DE GEKOZEN PERIODE (bouwplan fase 2) ─────────────────────────────────────────────────────
+  //
+  // De staven, de ring en de kanaaltabel volgen de periodekiezer. Ze hadden elk een eigen vast
+  // venster: de staven de laatste zes maanden, de ring ongeveer negentig dagen, de tabel alle
+  // geladen maanden (op de demo vierentwintig). Drie conversietotalen onder één band, geen van
+  // drieën gelijk aan die band en geen dat bewoog als je de periode verzette. De rijen staan al in
+  // het geheugen, dus de wissel kost geen verzoek; `rows` (alles) blijft de bron en bepaalt of de
+  // secties er staan, zodat ze niet verdwijnen als een periode leeg is.
+  const periode = usePeriod();
+  const periodeStart = periode.range.start;
+  const periodeEind = periode.range.end;
+  const rijenPeriode = useMemo(
+    () => (rows ? rijenInPeriode(rows, { start: periodeStart, end: periodeEind }) : null),
+    [rows, periodeStart, periodeEind],
+  );
 
-  // Grafiek-data: spend per kanaal per maand, gefocust op het recente advertentievenster
-  // (de laatste maanden richting de beurs) i.p.v. de hele historie. De maandtabel eronder toont
-  // het detail. Social (Meta/LinkedIn) draait doorgaans pas in de aanloop, dus dit venster laat
-  // de mix ook eerlijker zien.
-  const RECENT_MONTHS = 6;
-  const chartMonths = [...months].sort().slice(-RECENT_MONTHS);
+  // Nieuwste maand eerst, zoals de rijen binnenkomen: zo staat de maandtabel onderaan ook.
+  const months = rijenPeriode ? [...new Set(rijenPeriode.map((r) => r.month))] : [];
+
+  // Grafiek-data: spend per kanaal per maand, over de maanden van de gekozen periode waarin
+  // minstens één kanaal een rij heeft. De maandtabel eronder toont het detail.
+  const chartMonths = [...months].sort();
 
   // Lens 5: de optelsom-illusie.
   //
@@ -112,13 +129,12 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
   // Zonder anker — het werkelijke aantal orders of leads uit een primaire bron — is de som een
   // BOVENGRENS en zegt de lens dat expliciet. Dat is de eerlijke uitkomst en niet een tekort:
   // een verzonnen verdeling zou hier erger zijn dan geen verdeling.
-  // chartMonths wordt elke render opnieuw opgebouwd; als afhankelijkheid zou de memo dus nooit
-  // aanslaan. Het venster wordt daarom hierbinnen bepaald, uit rows.
+  // Over de gekozen periode, net als de tabel waar dit getal naast staat: hier stond een eigen
+  // venster van zes maanden, en dan claimde de zin een ander totaal dan de totaalrij ernaast.
   const betrouwbaarheid = useMemo(() => {
-    if (!rows || rows.length === 0) return null;
-    const venster = [...new Set(rows.map((r) => r.month))].sort().slice(-RECENT_MONTHS);
+    if (!rijenPeriode || rijenPeriode.length === 0) return null;
     const perKanaal = new Map<ChannelKey, number>();
-    for (const r of rows.filter((x) => venster.includes(x.month))) {
+    for (const r of rijenPeriode) {
       perKanaal.set(r.channel, (perKanaal.get(r.channel) ?? 0) + (r.conversions ?? 0));
     }
     if (perKanaal.size < 2) return null; // met één kanaal valt er niets op te tellen
@@ -126,8 +142,8 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
       [...perKanaal].map(([channel, conversions]) => ({ channel, conversions })),
       null // geen anker beschikbaar in deze weergave
     );
-  }, [rows]);
-  const chartSeries = [...new Set((rows ?? []).map((r) => CHANNEL_LABEL[r.channel] ?? r.channel))];
+  }, [rijenPeriode]);
+  const chartSeries = [...new Set((rijenPeriode ?? []).map((r) => CHANNEL_LABEL[r.channel] ?? r.channel))];
   // Een maand waarin een kanaal niet gemeten is, krijgt géén nul. Hier stond `row[s] = 0` voor elke
   // serie, en daardoor las februari als "Meta heeft nul euro uitgegeven" terwijl Meta toen simpelweg
   // niet liep — de tooltip zei er "€ 0" bij. Een ontbrekende meting als meetwaarde tonen is dezelfde
@@ -135,7 +151,7 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
   // de tooltip; wélke series later beginnen, zegt de grafiek er in een voetnoot bij.
   const chartData = chartMonths.map((m) => {
     const row: Record<string, number | string> = { maand: m.slice(0, 7) };
-    for (const r of (rows ?? []).filter((x) => x.month === m)) {
+    for (const r of (rijenPeriode ?? []).filter((x) => x.month === m)) {
       const label = CHANNEL_LABEL[r.channel] ?? r.channel;
       row[label] = (Number(row[label]) || 0) + (r.spend ?? 0);
     }
@@ -144,17 +160,26 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
 
   return (
     <div>
-      {/* "Markten" stond hier lange tijd als laatste sectie, onder de volle cross-channel-tabel --
-          op Google/Meta/LinkedIn's eigen Overzicht staat dezelfde kaart wél bovenaan, in de opener.
-          Voor een klant met >1 kanaal (waar "Alle kanalen" de standaardweergave is) betekende dat:
-          de kaart bestond en werkte, maar wie hem zocht moest eerst door de hele tabel scrollen --
-          precies het "ik mis de wereldkaart"-effect, zonder dat er iets ontbrak. Nu vooraan, zelfde
-          plek als bij de losse kanalen. */}
+      {/* ÉÉN KOP VOOR DE BLOKKEN MET EEN VAST VENSTER (bouwplan fase 2). Hier stonden vier secties
+          door elkaar: "Markten" (met Account Health en Pacing erin), "Prestaties richting de
+          beurs", dan de verdeling over de kanalen, dan het "Jaaroverzicht". Pacing, de beurs en
+          het jaaroverzicht gaan alle drie over het kalenderjaar en stonden op drie plekken, met
+          ertussen een blok dat de periodekiezer hoort te volgen. Wie de periode verzette zag de
+          helft van de pagina stilstaan zonder te kunnen zien waarom.
+
+          Nu staan de blokken die NIET meebewegen bij elkaar onder één kop die dat zegt, en de
+          blokken die de periode WEL volgen daaronder. Niets is weg: wat een sectie was, is hier
+          een deel met dezelfde titel en hetzelfde bijschrift (Deelkop), en elk blok zegt in zijn
+          kop welk venster het gebruikt (Vensterlabel). De wereldkaart blijft naast Account Health
+          en Pacing staan: die indeling is op hoogte uitgemeten (zie hieronder) en hoort bij de
+          bovenkant van de pagina. De kaart stond lange tijd als laatste sectie, onder de volle
+          cross-channel-tabel: hij bestond en werkte, maar wie hem zocht moest eerst door de hele
+          tabel scrollen -- het "ik mis de wereldkaart"-effect, zonder dat er iets ontbrak. */}
       <Sectie
         eerste
-        icoon={<Globe className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Markten"
-        bijschrift="Waar het verkeer en de conversies vandaan komen, over alle kanalen samen"
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Jaar, beurs en markten"
+        bijschrift="Vaste vensters: het kalenderjaar, de beurs en waar het verkeer vandaan komt, over alle kanalen samen. Deze blokken volgen de periodekiezer niet; elk zegt in zijn kop welk venster het gebruikt."
       >
         {/* DEZELFDE TWEE KAARTEN ALS DE KANAALTABBLADEN, en niet meer GeoBreakdown.
             GeoBreakdown is de oude, ongesplitste vorm: kaart links en ranglijst rechts in één
@@ -202,27 +227,58 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
 
         {/* Over de volle breedte: zes tegels naast elkaar vullen die breedte, in een halve kolom
             stonden ze in twee rijen van drie met een lege onderhelft. */}
-        <div className="mt-4">
-          <GeoRanglijstCard state={geo} zonderBalken />
-        </div>
-      </Sectie>
+        <GeoRanglijstCard state={geo} zonderBalken />
 
-      {/* DEZELFDE TWEE SECTIES ALS DE KANAALTABBLADEN, gevoed uit de blended historie.
-          "Waarom heeft alle kanalen deze sectie niet?" -- omdat FairWeeksOverview, MetricCards en
-          PerformanceChart hun data uit ClientDataProvider haalden, en die is Google-only. Alle
-          drie zijn nu gesplitst in een Google-ingang en een weergave die data + forecast als props
-          neemt; useBlendedClientData levert exact dezelfde twee vormen over Google, Meta,
-          LinkedIn en Microsoft samen, inclusief hetzelfde jaardoel-mechanisme (vorig jaar plus
-          groei zolang er niets is ingevoerd, zie lib/analysis/standaard-jaardoel.ts). */}
-      {blendedForecast && edition && (
-        <Sectie
-          icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Prestaties richting de beurs"
-          bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
-        >
-          <FairWeeksView data={blendedForecast.data} forecast={blendedForecast.forecast} edition={edition} />
-        </Sectie>
-      )}
+        {/* DEZELFDE TWEE DELEN ALS DE KANAALTABBLADEN, gevoed uit de blended historie.
+            "Waarom heeft alle kanalen deze sectie niet?" -- omdat FairWeeksOverview, MetricCards en
+            PerformanceChart hun data uit ClientDataProvider haalden, en die is Google-only. Alle
+            drie zijn nu gesplitst in een Google-ingang en een weergave die data + forecast als props
+            neemt; useBlendedClientData levert exact dezelfde twee vormen over Google, Meta,
+            LinkedIn en Microsoft samen, inclusief hetzelfde jaardoel-mechanisme (vorig jaar plus
+            groei zolang er niets is ingevoerd, zie lib/analysis/standaard-jaardoel.ts). */}
+        {blendedForecast && edition && (
+          <>
+            <Deelkop
+              icoon={<CalendarClock className="w-4 h-4 text-brand-blue-ink" />}
+              titel="Prestaties richting de beurs"
+              bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+            />
+            <FairWeeksView data={blendedForecast.data} forecast={blendedForecast.forecast} edition={edition} />
+          </>
+        )}
+
+        {blendedForecast && (
+          <>
+            <Deelkop
+              icoon={<Target className="w-4 h-4 text-brand-blue-ink" />}
+              titel="Jaaroverzicht"
+              bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend, over alle kanalen samen"
+              venster={<Vensterlabel soort="jaar" jaar={blendedForecast.data.currentYear} />}
+            />
+            {/* Het voorbehoud hoort hier en niet alleen bij de tabel verderop: elk kanaal claimt
+                zijn eigen conversies met zijn eigen attributievenster, dus de blended som is een
+                BOVENGRENS, en een prognose die daarop rekent erft dat. Maar als voetnoot en niet in
+                alarmkleur: dit is hoe blended rekenen werkt, niet iets wat vandaag is misgegaan en
+                wat je kunt verhelpen. */}
+            <p className="text-meta leading-snug text-muted-foreground">
+              De conversies hieronder zijn de som over de kanalen, elk met zijn eigen
+              attributievenster: een bovengrens, geen exacte telling.
+              {jaarUitgesloten && ` ${jaarUitgesloten}`}
+            </p>
+            <MetricCardsView
+              forecast={blendedForecast.forecast}
+              selected={jaaroverzichtMetric}
+              onSelect={setJaaroverzichtMetric}
+            />
+            <PerformanceChartView
+              clientData={blendedForecast.data}
+              forecast={blendedForecast.forecast}
+              metric={jaaroverzichtMetric}
+              onMetricChange={setJaaroverzichtMetric}
+            />
+          </>
+        )}
+      </Sectie>
 
       {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
           vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
@@ -232,7 +288,7 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
         <Sectie
           icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
           titel="Verdeling over de kanalen"
-          bijschrift="Spend per kanaal per maand, en de verdeling over de recentste maanden met data"
+          bijschrift={`Spend per kanaal per maand en de verdeling over de kanalen, binnen de gekozen periode (${formatRange(periode.range)})`}
         >
           {/* De staven en de ringen naast elkaar, want het zijn twee helften van dezelfde vraag:
               de staven tonen het VERLOOP per maand, de ringen de VERDELING nu -- en de ringen ook
@@ -248,42 +304,32 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
               De ring krijgt dezelfde rijen als de staven en de tabel (`kanaalRijen`) en kiest er
               zelf zijn venster uit: geen tweede lezing, en geen ring die een maand anders telt
               dan de tabel eronder. */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
-            <div className="lg:col-span-2">
-              <GroupedMonthlyBars title="Spend per kanaal per maand" months={chartMonths} series={chartSeries} data={chartData} groeit />
+          {/* Beide volgen de gekozen periode, uit dezelfde rijen: de staven per maand, de ring over
+              de hele periode. Heeft de periode geen enkele rij (een bereik van vóór de data), dan
+              zegt de kaart dat in plaats van te verdwijnen: een blok dat wegvalt als je de periode
+              verzet leest als een fout, niet als een antwoord. */}
+          {chartMonths.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card px-5 py-8 text-center shadow-sm">
+              <p className="mb-2"><Vensterlabel soort="periode" /></p>
+              <p className="text-body text-muted-foreground">
+                In {formatRange(periode.range)} heeft geen enkel kanaal cijfers. Kies een latere periode om de verdeling te zien.
+              </p>
             </div>
-            <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} kanaalRijen={rows} />
-          </div>
-        </Sectie>
-      )}
-
-      {blendedForecast && (
-        <Sectie
-          icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Jaaroverzicht"
-          bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend, over alle kanalen samen"
-        >
-          {/* Het voorbehoud hoort hier en niet alleen bij de tabel verderop: elk kanaal claimt
-              zijn eigen conversies met zijn eigen attributievenster, dus de blended som is een
-              BOVENGRENS, en een prognose die daarop rekent erft dat. Maar als voetnoot en niet in
-              alarmkleur: dit is hoe blended rekenen werkt, niet iets wat vandaag is misgegaan en
-              wat je kunt verhelpen. */}
-          <p className="text-meta leading-snug text-muted-foreground">
-            De conversies hieronder zijn de som over de kanalen, elk met zijn eigen
-            attributievenster: een bovengrens, geen exacte telling.
-            {jaarUitgesloten && ` ${jaarUitgesloten}`}
-          </p>
-          <MetricCardsView
-            forecast={blendedForecast.forecast}
-            selected={jaaroverzichtMetric}
-            onSelect={setJaaroverzichtMetric}
-          />
-          <PerformanceChartView
-            clientData={blendedForecast.data}
-            forecast={blendedForecast.forecast}
-            metric={jaaroverzichtMetric}
-            onMetricChange={setJaaroverzichtMetric}
-          />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+              <div className="lg:col-span-2">
+                <GroupedMonthlyBars
+                  title="Spend per kanaal per maand"
+                  venster={<Vensterlabel soort="periode" />}
+                  months={chartMonths}
+                  series={chartSeries}
+                  data={chartData}
+                  groeit
+                />
+              </div>
+              <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} kanaalRijen={rows} />
+            </div>
+          )}
         </Sectie>
       )}
 
@@ -299,7 +345,8 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
       <Sectie
         icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Cross-channel (blended)"
-        bijschrift="Wat elk kanaal opleverde, en de maanden erachter"
+        bijschrift={`Wat elk kanaal opleverde in de gekozen periode (${formatRange(periode.range)}), en de maanden erachter`}
+        actie={<Vensterlabel soort="periode" />}
       >
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
 
@@ -334,7 +381,18 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
               Nog geen cross-channel data. Zodra minstens twee kanalen (Google, Meta, LinkedIn of Microsoft) gesynct zijn, verschijnt hier de blended maandview.
             </div>
           )}
-          {rows && rows.length > 0 && (() => {
+          {/* De rijen zijn er, maar geen enkele valt in de gekozen periode (een bereik van vóór de
+              data). Neutraal en geen amber: er is niets mis, de periode is alleen leeg. */}
+          {rows && rows.length > 0 && rijenPeriode && rijenPeriode.length === 0 && (
+            <p className="py-8 text-center text-body text-muted-foreground">
+              In {formatRange(periode.range)} heeft geen enkel kanaal cijfers. Kies een latere periode om de kanalen te vergelijken.
+            </p>
+          )}
+          {rijenPeriode && rijenPeriode.length > 0 && (() => {
+            // De rijen van de gekozen periode. Hier stond `rows`: alle geladen maanden, op de demo
+            // vierentwintig, onder een band die over twaalf ging. Hetzelfde woord "Conversies",
+            // twee totalen.
+            const rows = rijenPeriode;
             // WAAROM DIT GEEN PLATTE LIJST MEER IS
             //
             // Hier stonden alle (maand × kanaal)-rijen onder elkaar: veertig regels ruwe data,
@@ -410,19 +468,16 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
                     ))}
                   </Body>
                   <TotaalRij>
-                    {/* De kanaaltotalen hierboven (`tot`) sommeren ALLE opgehaalde rijen, niet
-                        alleen het 6-maanden-venster van de grafiek erboven -- dat venster heet
-                        `chartMonths` en is voor recente demo-data (24 maanden historie) een stuk
-                        korter dan de werkelijke reeks. Het label gebruikte per ongeluk
-                        chartMonths.length en beweerde dus "Totaal (6 maanden)" bij een bedrag dat
-                        over de hele historie liep -- op deze klant ~4x te hoog voor wat het label
-                        zei. `months` (alle maanden in `rows`) is de tabel die er echt bij hoort;
-                        de maanddetails eronder tonen dezelfde volledige reeks.
+                    {/* De kanaaltotalen hierboven (`tot`) sommeren de rijen van de gekozen periode,
+                        dezelfde maanden als de staven, de ring en de maanddetails eronder
+                        (`months`). Dat was niet altijd zo: de tabel telde alle opgehaalde rijen en
+                        het label zei "Totaal (6 maanden)", het venster van de grafiek, bij een
+                        bedrag dat over de hele historie liep -- ~4x te hoog voor wat er stond.
 
-                        En met de periode erbij, niet alleen de lengte: "24 maanden" zei niet
-                        WELKE, en bij de demo zijn er daarvan zeventien alleen Google. Een CPA over
-                        sep '24 t/m aug '26 is een ander getal dan de CPA van dit jaar elders op de
-                        pagina, en dat moet je kunnen zien zonder de maanden open te klappen. */}
+                        Met de maanden erbij die er echt in zitten, niet alleen de lengte: begint
+                        een kanaal later dan de periode, dan is "12 maanden" niet WELKE, en een CPA
+                        over die maanden is een ander getal dan de CPA van het jaar elders op de
+                        pagina. Dat moet je kunnen zien zonder de maanden open te klappen. */}
                     <TotaalCel>
                       Totaal
                       {periodeTekst && (
@@ -501,7 +556,7 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
               Elk kanaal meet zijn eigen attributie, dus de som is geen exacte verdeling: dezelfde
               aankoop kan door twee kanalen geclaimd zijn.
               {betrouwbaarheid && (
-                <> Over de laatste {chartMonths.length} maanden claimen de kanalen samen{" "}
+                <> In de gekozen periode claimen de kanalen samen{" "}
                 <strong className="text-brand-gray">{fmt(betrouwbaarheid.blendedSum)} conversies</strong>;
                 dat is een bovengrens.</>
               )}{" "}
@@ -510,7 +565,7 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
             </div>
             {/* De weggevallen kolom, één keer uitgelegd in plaats van zes keer een streepje.
                 Zie de opmerking bij `heeftWaarde` hierboven. */}
-            {rows && rows.length > 0 && rows.every((r) => !((r.conversion_value ?? 0) > 0)) && (
+            {rijenPeriode && rijenPeriode.length > 0 && rijenPeriode.every((r) => !((r.conversion_value ?? 0) > 0)) && (
               <div className="rounded-lg border border-border bg-gray-50/70 px-4 py-3 text-meta leading-snug text-muted-foreground">
                 <p className="mb-1 flex items-center gap-1.5 font-semibold text-brand-gray">
                   <Info className="h-3.5 w-3.5 shrink-0" />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Briefcase, Calendar, CalendarClock, LayoutGrid, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
+import { Briefcase, Calendar, CalendarClock, LayoutGrid, PieChart, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
 import { ChannelBleedersTable } from "./channel-bleeders-table";
@@ -20,7 +20,8 @@ import { ChannelDataProvider } from "./channel-data-provider";
 import { GeoMapCard } from "./geo-map-card";
 import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
-import { Sectie } from "@/components/ui/sectie";
+import { Sectie, Deelkop } from "@/components/ui/sectie";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { isDemoClient } from "@/lib/demo/demo-mode";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/linkedin/campaign-types";
@@ -103,58 +104,82 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
           het gat dat deze lege donut achterliet. */}
       {/* Zelfde asymmetrische opzet als Google (zie google-view.tsx voor de volledige redenering):
           twee KOLOMMEN met elk één aangewezen opvanger, en pas vanaf 1800px twee kolommen. */}
-      <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
-        <div className="flex flex-col gap-4">
-          <ChannelHealthBadge clientId={clientId} channel="linkedin" />
-          {/* Pacing direct onder Account Health, net als op Google en Meta, en tegelijk de
-              opvanger van deze kolom. */}
+      {/* ÉÉN KOP VOOR DE BLOKKEN MET EEN VAST VENSTER (bouwplan fase 2). Account Health, het
+          jaaroverzicht en de beurs gaan over het kalenderjaar; de pacing over de lopende maand en
+          de wereldkaart over 180 dagen. Ze stonden verspreid, met ertussen blokken die de
+          periodekiezer horen te volgen: wie de periode verzette zag de halve pagina stilstaan
+          zonder te kunnen zien waarom. Nu staan de blokken die NIET meebewegen bij elkaar onder
+          één kop die dat zegt, en zegt elk blok in zijn kop welk venster het gebruikt
+          (Vensterlabel). Wat een eigen sectie was (de beurs, het jaaroverzicht) is hier een deel
+          met dezelfde titel en hetzelfde bijschrift (Deelkop); er is niets weg. Dezelfde opbouw
+          op alle tabbladen, zodat een tabwissel niets verplaatst. */}
+      <Sectie
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Jaar, beurs en markten"
+        bijschrift="Vaste vensters: het kalenderjaar, de beurs en waar het verkeer vandaan komt. Deze blokken volgen de periodekiezer niet; elk zegt in zijn kop welk venster het gebruikt."
+      >
+        <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+          <div className="flex flex-col gap-4">
+            <ChannelHealthBadge clientId={clientId} channel="linkedin" />
+            {/* Pacing direct onder Account Health, net als op Google en Meta, en tegelijk de
+                opvanger van deze kolom. */}
+            <div className="flex flex-1 flex-col">
+              <ChannelPacing edition={edition} />
+            </div>
+          </div>
           <div className="flex flex-1 flex-col">
-            <ChannelPacing edition={edition} />
+            <GeoMapCard state={geo} channel="linkedin" verdieping={<GeoRanglijstInKaart state={geo} />} />
           </div>
         </div>
-        <div className="flex flex-1 flex-col">
-          <GeoMapCard state={geo} channel="linkedin" verdieping={<GeoRanglijstInKaart state={geo} />} />
-        </div>
-      </div>
 
-      {/* Wat eerst als derde kaart in een hero-kolom stond. Raster van gelijke cellen i.p.v. twee
-          onafhankelijke kolommen -- zie meta-view.tsx voor de redenering. LinkedIn heeft hier maar
-          twee kaarten: alleen MEMBER_JOB_FUNCTION heeft demografiedata (nagemeten in
-          linkedin_demographic_daily), dus een tweede doelgroep-donut zou leeg zijn. */}
-      {/* Zelfde volgorde als Google en Meta: hero, landencijfers, dan de kaartenrij. */}
-      <GeoRanglijstCard state={geo} zonderBalken />
+        {/* Wat eerst als derde kaart in een hero-kolom stond. Raster van gelijke cellen i.p.v. twee
+            onafhankelijke kolommen -- zie meta-view.tsx voor de redenering. LinkedIn heeft hier maar
+            twee kaarten: alleen MEMBER_JOB_FUNCTION heeft demografiedata (nagemeten in
+            linkedin_demographic_daily), dus een tweede doelgroep-donut zou leeg zijn. */}
+        {/* Zelfde volgorde als Google en Meta: hero, landencijfers, dan de kaartenrij. */}
+        <GeoRanglijstCard state={geo} zonderBalken />
 
       {/* "Prestaties richting de beurs" -- de sectie die Google al had en deze kanalen niet.
           Alleen als er een event gekozen is; zonder event is "nog N weken tot" een lege zin.
           Zie channel-fair-weeks.tsx voor waarom hij hier ontbrak: niet de cijfers maar de ingang. */}
-      {edition && (
-        <Sectie
-          icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Prestaties richting de beurs"
-          bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
-        >
-          <ChannelFairWeeks edition={edition} />
-        </Sectie>
-      )}
+        {edition && (
+          <>
+            <Deelkop
+              icoon={<CalendarClock className="w-4 h-4 text-brand-blue-ink" />}
+              titel="Prestaties richting de beurs"
+              bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+            />
+            <ChannelFairWeeks edition={edition} />
+          </>
+        )}
+
+        {/* LinkedIn-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde
+            toelichting als bij Meta: computeForecast is al kanaalneutraal, dit levert alleen de
+            LinkedIn-databron en het client_targets-jaardoel. Zie channel-forecast-overview.tsx.
+            Stond tot fase 2 onder de ringenrij; nu direct bij de andere jaarblokken. */}
+        <Deelkop
+          icoon={<Target className="w-4 h-4 text-brand-blue-ink" />}
+          titel="Jaaroverzicht 2026"
+          bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+          venster={<Vensterlabel soort="jaar" />}
+        />
+        <ChannelForecastOverview />
+      </Sectie>
 
       {/* Twee in plaats van drie: LinkedIn levert alleen MEMBER_JOB_FUNCTION als doelgroepdata
           (leeftijd en gender komen er niet uit), dus er is geen tweede ringkaart om naast te
           zetten. Een lege derde kolom zou beloven dat die data er wel is. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
-        <ChannelMonthlyChart />
-      </div>
-
-      {/* LinkedIn-equivalent van Google's "Jaaroverzicht 2026" (23 augustus 2026). Zelfde
-          toelichting als bij Meta: computeForecast is al kanaalneutraal, dit levert alleen de
-          LinkedIn-databron en het client_targets-jaardoel. Zie channel-forecast-overview.tsx. */}
       <Sectie
-        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Jaaroverzicht 2026"
-        bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+        icoon={<PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Verdeling en verloop"
+        bijschrift="Wie we bereikten, en het maandverloop binnen de gekozen periode"
       >
-        <ChannelForecastOverview />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />
+          <ChannelMonthlyChart />
+        </div>
       </Sectie>
+
 
       {/* Wat er van de prestatie-view overblijft: de kerncijfers over 28 dagen en de maandtabel.
           Pacing staat nu in de hero en het maandverloop naast de landencijfers -- allebei
@@ -162,7 +187,7 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
       <Sectie
         icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Maandprestaties"
-        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
+        bijschrift="Kerncijfers over 28 dagen, en de maanden van de gekozen periode"
       >
         <ChannelPerformance clientId={clientId} channel="linkedin" geoClone={geoClone} />
       </Sectie>

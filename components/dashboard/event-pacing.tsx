@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { CalendarClock, Info } from "lucide-react";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Event-relatieve pacing: voor een beurs is "dag X van 365" zinloos. Wat telt is de opbouw tot NU
 // afgezet tegen HETZELFDE punt vóór de vorige editie (op gelijke afstand tot de beursdag,
@@ -57,10 +58,11 @@ export function EventPacing({ clientId, geoClone }: { clientId: string; geoClone
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+      <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2">
         <CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">Pacing richting de beurs</h3>
         <span className="text-meta text-muted-foreground">event-relatief · vs vorige editie</span>
+        <Vensterlabel soort="vast" venster="aanloop naar de beurs" />
         {data.daysToFair != null && (
           <span className="ml-auto text-meta font-medium text-brand-blue-ink">
             nog {data.daysToFair} {data.daysToFair === 1 ? "dag" : "dagen"} tot {data.fairLabel}

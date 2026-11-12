@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useLayoutEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { BarChart3, Settings, Target, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown, Search } from "lucide-react";
 import { SyncStatusBadge } from "./sync-status-badge";
@@ -22,9 +22,13 @@ import { ProposalQueue } from "../insights/proposal-queue";
 import { ChannelFilter } from "../insights/channel-filter";
 import { dbSelect } from "@/lib/data-access/client-read";
 import {
-  laadBeschikbareKanalen, kanalenUitBronnen, zichtbareTabs, geldigeKeuze, geenDataTekst, kanalenOpsomming,
+  laadBeschikbareKanalen, kanalenUitBronnen, zichtbareTabs, geenDataTekst, kanalenOpsomming,
+  KANAAL_PARAM, kanaalUitUrl, kanaalkeuzeUitUrl, kanaalParamRechtgezet,
   type Kanaal,
 } from "@/lib/kanalen/beschikbaar";
+import { GEO_PARAM, leesAdresbalk, schrijfAdresbalk, useUrlKeuze, type UrlKoppeling } from "@/lib/adresbalk";
+import { periodeUitParams, zetPeriodeParams } from "@/lib/period/periode-url";
+import type { PeriodeKeuze } from "@/lib/period/period-range";
 import { flattenMonths, heeftData } from "@/lib/period/apply-period";
 
 // laadBeschikbareKanalen() neemt structureel een client aan met .from(); de browser-singleton
@@ -63,8 +67,12 @@ import type { InsightChannel } from "@/lib/insights/channel-of";
 import { PeriodProvider, usePeriod, type PeriodDataStand } from "@/lib/period/period-context";
 import { bandDataStand } from "@/lib/period/band-stand";
 import { NIET_GOOGLE } from "@/lib/period/kanaal-maanden";
-import { PeriodSelector } from "./period-selector";
+import { PeriodSelector, PeriodeSnelkoppelingen } from "./period-selector";
 import { PeriodSummary } from "./period-summary";
+import { OverzichtBovenkant } from "./overzicht-bovenkant";
+import { WeergaveSchakelaar } from "./weergave-schakelaar";
+import { useWeergave } from "@/lib/use-weergave";
+import { WEERGAVE_PARAM } from "@/lib/weergave";
 import { SprintPlanning } from "../insights/sprint-planning";
 import { ClientFiles } from "./client-files";
 import { DgmView } from "./dgm-view";
@@ -140,12 +148,13 @@ function ChannelTabs({ channel, onChange, beschikbaar, ladenMetBalk = false }: {
   }
   const zichtbaar = CHANNELS.filter((c) => (toegestaan as string[]).includes(c.id));
   return (
-    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+    <div className="flex max-w-full gap-1 overflow-x-auto bg-gray-100 rounded-lg p-1 w-fit">
       {zichtbaar.map((c) => (
         <button
           key={c.id}
           onClick={() => onChange(c.id)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          aria-pressed={channel === c.id}
+          className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
             channel === c.id ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground hover:text-brand-gray"
           }`}
         >
@@ -174,12 +183,16 @@ const TAB_LABELS: Record<Tab, string> = {
   settings: "Instellingen",
 };
 
-function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab; onChange: (t: Tab) => void; sopErrorCount: number }) {
+// eenRegel (de nieuwe weergave): de twee rijen breken niet af maar schuiven opzij binnen hun vak
+// (het klantdashboard zet er een schuifbaar vak omheen). Op een telefoon waren het drie regels
+// knoppen boven het eerste cijfer; zo zijn het er altijd twee.
+function GroupedTabNav({ activeTab, onChange, sopErrorCount, eenRegel = false }: { activeTab: Tab; onChange: (t: Tab) => void; sopErrorCount: number; eenRegel?: boolean }) {
   const activeSection = CLIENT_SECTIONS.find((s) => s.tabs.includes(activeTab)) ?? CLIENT_SECTIONS[0];
+  const regel = eenRegel ? "w-max [&>button]:shrink-0 [&>button]:whitespace-nowrap" : "flex-wrap";
   return (
     <div className="space-y-2">
       {/* Top: de vier secties */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
+      <div className={`flex gap-1 bg-gray-100 rounded-lg p-1 ${eenRegel ? regel : "w-fit flex-wrap"}`}>
         {CLIENT_SECTIONS.map((s) => {
           const active = s.id === activeSection.id;
           const showBadge = s.tabs.includes("files") && sopErrorCount > 0;
@@ -194,7 +207,7 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
       </div>
       {/* Sub-navigatie binnen de sectie (alleen bij meer dan één) */}
       {activeSection.tabs.length > 1 && (
-        <div className="flex gap-1 flex-wrap pl-1">
+        <div className={`flex gap-1 pl-1 ${regel}`}>
           {activeSection.tabs.map((t) => {
             const active = activeTab === t;
             return (
@@ -220,25 +233,76 @@ function GroupedTabNav({ activeTab, onChange, sopErrorCount }: { activeTab: Tab;
 // zodat je met de hand niet voorbij het eind van de data kunt kiezen. klaar: dezelfde poort als de
 // KPI-band; tot de stand bekend is, is eindMaand de kalender, en dan toonde de kiezer een venster
 // dat even later versprong (review [8]).
-function DashboardPeriodPicker({ jaarlijkseEditie, klaar }: { jaarlijkseEditie: boolean; klaar: boolean }) {
+//
+// De snelkoppelingen 3, 6 en 12 maanden staan ernaast (bouwplan fase 2): de drie vensters die je
+// het vaakst wisselt, zonder eerst het paneel te openen. Ze zetten de bestaande presets via
+// dezelfde periode.set; er komt geen tweede periodemodel bij.
+//
+// snelVanafTablet (de nieuwe weergave): op een telefoon staan de snelkoppelingen niet los boven de
+// kiezer. Dezelfde drie vensters staan in het paneel van de kiezer; de losse rij kostte daar
+// veertig pixels boven het eerste cijfer. `contents` in de gewone weergave: dan doet het vak niet
+// mee in de opmaak en staat alles precies waar het stond.
+function DashboardPeriodPicker({ jaarlijkseEditie, klaar, snelVanafTablet = false }: { jaarlijkseEditie: boolean; klaar: boolean; snelVanafTablet?: boolean }) {
   const periode = usePeriod();
   return (
-    <PeriodSelector
-      jaarlijkseEditie={jaarlijkseEditie}
-      laden={!klaar}
-      maxMaand={periode.eindMaand}
-      value={{
-        preset: periode.preset, custom: periode.custom, comparison: periode.comparison,
-        range: periode.range, compareRange: periode.compareRange,
-      }}
-      onChange={(v) => periode.set(v.preset, v.custom, v.comparison)}
-    />
+    <>
+      <div className={snelVanafTablet ? "hidden sm:block" : "contents"}>
+      <PeriodeSnelkoppelingen
+        preset={periode.preset}
+        laden={!klaar}
+        onKies={(preset) => periode.set(preset, null, periode.comparison)}
+      />
+      </div>
+      <PeriodSelector
+        jaarlijkseEditie={jaarlijkseEditie}
+        laden={!klaar}
+        maxMaand={periode.eindMaand}
+        value={{
+          preset: periode.preset, custom: periode.custom, comparison: periode.comparison,
+          range: periode.range, compareRange: periode.compareRange,
+        }}
+        onChange={(v) => periode.set(v.preset, v.custom, v.comparison)}
+      />
+    </>
   );
 }
 
-export function ClientDashboard({ client }: { client: Client }) {
+export function ClientDashboard({ client, bewaardeWeergave = null }: {
+  client: Client;
+  /** De weergave zoals de server hem in de cookie las (lib/weergave.ts), zodat de eerste render al
+   *  de gekozen kop toont in plaats van eerst de vertrouwde en dan de nieuwe. */
+  bewaardeWeergave?: string | null;
+}) {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
-  const [channel, setChannel] = useState<Channel>("blended");
+  // DE KANAALKEUZE WOONT IN DE ADRESBALK (?kanaal=meta; bouwplan fase 2). Hier stond een useState:
+  // een herlaad sprong terug naar "Alle kanalen", Terug verliet de klant, en een link naar één
+  // kanaal bestond niet. De wissel zelf gaat via history.pushState en kost geen navigatie, geen
+  // serverwerk en geen verzoek; ?geo= en ?demo= blijven staan (lib/adresbalk.ts). `kanaalUitAdres`
+  // is het kanaal zoals het er staat; wat er getoond wordt (`channel`) volgt verderop, als bekend
+  // is welke kanalen deze klant heeft.
+  const searchParams = useSearchParams();
+  const kanaalRuw = searchParams.get(KANAAL_PARAM);
+  const [kanaalUitAdres, kiesKanaalInAdres] = useUrlKeuze<Kanaal>({
+    waarde: kanaalUitUrl(kanaalRuw),
+    leesNu: () => kanaalUitUrl(leesAdresbalk().get(KANAAL_PARAM)),
+    schrijf: (k) => schrijfAdresbalk((p) => { if (k) p.set(KANAAL_PARAM, k); else p.delete(KANAAL_PARAM); }, "push"),
+  });
+  const setChannel = useCallback((c: Channel) => kiesKanaalInAdres(c === "blended" ? null : c), [kiesKanaalInAdres]);
+  // De periode in de adresbalk (?periode=, ?vergelijk=): dezelfde keuze als de PeriodProvider al
+  // bewaart, geen tweede model. Bijstellen vervangt het adres (replace): Terug hoort naar het
+  // vorige kanaal te gaan, niet door vijf periodes terug te lopen.
+  const periodeAdres = useMemo((): UrlKoppeling<PeriodeKeuze> => ({
+    waarde: periodeUitParams(searchParams),
+    leesNu: () => periodeUitParams(leesAdresbalk()),
+    schrijf: (k) => schrijfAdresbalk((p) => zetPeriodeParams(p, k), "replace"),
+  }), [searchParams]);
+  // De schakelaar "Nieuwe weergave" (bouwplan fase 3): per gebruiker bewaard, standaard uit, en met
+  // ?weergave=nieuw voorop zodat de meting hem kan openen (lib/weergave.ts; de server geeft de
+  // bewaarde keuze mee uit de cookie, zodat de kop niet verspringt bij het laden). Uit: de pagina is wat
+  // hij was. Aan: de merkregel, de kanaalkaarten, de tegels en de hoofdgrafiek van
+  // OverzichtBovenkant; alles onder de bovenkant is in beide weergaven hetzelfde.
+  const [weergave, zetWeergave] = useWeergave(searchParams.get(WEERGAVE_PARAM), bewaardeWeergave);
+  const nieuweWeergave = weergave === "nieuw";
   // Alleen gebruikt voor het bronbijschrift verderop. isDemoMode() leest window.location, dus dit
   // hoort in een effect en niet in de eerste render -- anders rendert de server iets anders dan de
   // client en klapt de hydratie eruit.
@@ -298,17 +362,26 @@ export function ClientDashboard({ client }: { client: Client }) {
   useEffect(() => { if (kanalenNu) setKanalenBekend({ clientId: client.id, kanalen: kanalenNu }); }, [client.id, kanalenNu]);
   const kanalen = kanalenNu ?? (kanalenBekend?.clientId === client.id ? kanalenBekend.kanalen : null);
 
-  // De keuze bijstellen zodra bekend is wat er is. Zonder dit blijf je hangen op een kanaal dat
-  // deze klant niet heeft: van een Meta-klant doorklikken naar een Google-only klant liet een
-  // leeg scherm zien onder een tab die niet eens meer bestond.
+  // Wat er getoond wordt: het kanaal uit de adresbalk, bijgesteld zodra bekend is wat deze klant
+  // heeft (geldigeKeuze, via kanaalkeuzeUitUrl). Zonder dat bijstellen blijf je hangen op een
+  // kanaal dat deze klant niet heeft: ?kanaal=meta bij een klant met alleen Google liet een leeg
+  // scherm zien onder een tab die niet eens bestond. Afgeleid en geen eigen state: de adresbalk
+  // is de bron, en een tweede kopie kan ervan afwijken.
+  const channel: Channel = kanaalkeuzeUitUrl(kanaalUitAdres, kanalen);
+  // En het adres zelf rechtzetten als er iets staat wat niet kan (een onbekend kanaal, een kanaal
+  // dat deze klant niet heeft, of een kanaal bij een klant zonder kiezer): dan staat er geen adres
+  // boven dat iets anders beweert dan het scherm. Alleen weghalen, nooit toevoegen, en als
+  // vervanging (replace): Terug hoort niet naar het ongeldige adres te leiden.
   useEffect(() => {
     if (!kanalen) return;
-    setChannel((huidig) => geldigeKeuze(huidig, kanalen) as Channel);
-  }, [kanalen]);
+    const ruw = leesAdresbalk().get(KANAAL_PARAM);
+    if (ruw !== null && kanaalParamRechtgezet(ruw, kanalen) === null) {
+      schrijfAdresbalk((p) => p.delete(KANAAL_PARAM), "replace");
+    }
+  }, [kanalen, kanaalRuw]);
   // Beurs-scope; initieel en live gestuurd door ?geo= uit het menu (Fase 3), daarna ook
   // via de kiezer in de view aanpasbaar.
-  const searchParams = useSearchParams();
-  const geoParam = searchParams.get("geo");
+  const geoParam = searchParams.get(GEO_PARAM);
   const [geoClone, setGeoClone] = useState<string | null>(geoParam);
   useEffect(() => { setGeoClone(geoParam); }, [geoParam]);
   const [sopErrors, setSopErrors] = useState<SopError[]>([]);
@@ -363,7 +436,8 @@ export function ClientDashboard({ client }: { client: Client }) {
   // Had deze klant de vorige keer een kanaalbalk (meer dan één kanaal)? Alleen om tijdens het laden
   // de hoogte te reserveren; de waarheid komt uit `kanalen`.
   const [hadKanaalbalk, setHadKanaalbalk] = useState(false);
-  useEffect(() => {
+  // Layout-effect: vóór het eerste beeld, anders verschijnt de reservering zelf als een sprong.
+  useLayoutEffect(() => {
     try { setHadKanaalbalk(window.localStorage.getItem(`kanaalbalk:${client.id}`) === "1"); } catch { /* geen opslag: dan geen reservering */ }
   }, [client.id]);
   useEffect(() => {
@@ -372,19 +446,23 @@ export function ClientDashboard({ client }: { client: Client }) {
   }, [client.id, kanalen]);
   const bandKlaar = kanalen !== null && eigenStandBekend;
 
-  return (
-    <PeriodProvider scope={`client-${client.id}`} dataStand={dataStand}>
-    <BrandThemeProvider clientId={client.id} geoClone={geoClone}>
-    <div className="space-y-6">
-      {/* Merk-header: logo + merk-/beursnaam, in de huisstijl van de actieve klant/beurs. */}
-      <BrandHeaderBar geoClone={geoClone} fallbackName={client.name} edition={upcomingEdition} />
-      {/* De periodekiezer staat in de kop en niet per tabblad: hij geldt voor de hele
-          klantweergave, en per tabblad een eigen periode zou betekenen dat twee getallen
-          op hetzelfde scherm over verschillende maanden gaan. Onder de hero i.p.v. ernaast:
-          de hero loopt nu over de volle breedte, en de kiezer ertegenaan geklemd maakte hem smal. */}
-      <div className="flex justify-end -mt-3">
-        <DashboardPeriodPicker klaar={bandKlaar} jaarlijkseEditie={upcomingEdition?.cadence === "annual"} />
-      </div>
+  // ── De stukken van de kop die in BEIDE weergaven staan ──────────────────────────────────────────
+  // Benoemd en niet twee keer uitgeschreven: de nieuwe weergave zet ze in een andere volgorde en
+  // dichter op elkaar, maar het zijn dezelfde onderdelen met dezelfde bedrading.
+
+  // De periodekiezer staat in de kop en niet per tabblad: hij geldt voor de hele klantweergave, en
+  // per tabblad een eigen periode zou betekenen dat twee getallen op hetzelfde scherm over
+  // verschillende maanden gaan.
+  const periodeKiezer = (
+    <DashboardPeriodPicker klaar={bandKlaar} jaarlijkseEditie={upcomingEdition?.cadence === "annual"} snelVanafTablet={nieuweWeergave} />
+  );
+  // Op het Overzicht, en in de nieuwe weergave op elk tabblad: daar is de kop anders, dus daar hoort
+  // ook de weg terug te staan. Met de schakelaar uit staat hij op de andere tabbladen niet.
+  const schakelaar = (activeTab === "dashboard" || nieuweWeergave) && (
+    <WeergaveSchakelaar weergave={weergave} onKies={zetWeergave} compactOpTelefoon={nieuweWeergave} />
+  );
+  const bronrij = (
+    <>
       {/* Data source indicator + sync status.
 
         Het bijschrift noemt de kanalen die deze klant écht heeft en niet vast "Google Ads". Bij de
@@ -467,6 +545,10 @@ export function ClientDashboard({ client }: { client: Client }) {
         </div>
       )}
 
+    </>
+  );
+  const geenDataMelding = (
+    <>
       {/* Acht van de 71 klanten hebben nog geen enkel kanaal met data. Die zagen tot nu toe een
         volledig dashboard met overal nullen, en dat leest als "het gaat slecht" in plaats van
         "er is nog niets gekoppeld".
@@ -479,12 +561,16 @@ export function ClientDashboard({ client }: { client: Client }) {
         </div>
       )}
 
+    </>
+  );
+  const tabnav = (
+    <>
       {/* Tab navigation — de demo-accounts krijgen de nieuwe gegroepeerde IA (voorproefje).
         Eerst alleen demo-greentech; demo-grt/demo-gra/demo-grn (scripts/demo/seed-geoclone-
         clients.ts) volgden dezelfde "demo-"-naamconventie maar niet deze check, waardoor ze de
         oude platte tabbalk lieten zien -- inconsistent binnen dezelfde demo-omgeving. */}
       {client.id.startsWith("demo-") ? (
-        <GroupedTabNav activeTab={activeTab} onChange={setActiveTab} sopErrorCount={sopErrors.length} />
+        <GroupedTabNav activeTab={activeTab} onChange={setActiveTab} sopErrorCount={sopErrors.length} eenRegel={nieuweWeergave} />
       ) : (
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
         {([
@@ -521,6 +607,69 @@ export function ClientDashboard({ client }: { client: Client }) {
       </div>
       )}
 
+    </>
+  );
+  // De alarmbanner blijft boven de cijfers, op elk tabblad: hij leest geen providercontext, en
+  // onder de band zakte hij driehonderd pixels weg.
+  const codeRood = clientData.data && <CodeRoodBanner clientId={client.id} />;
+
+  return (
+    <PeriodProvider scope={`client-${client.id}`} dataStand={dataStand} adres={periodeAdres}>
+    <BrandThemeProvider clientId={client.id} geoClone={geoClone}>
+    <div className="space-y-6">
+      {nieuweWeergave ? (
+        // ── De nieuwe weergave (bouwplan fase 3) ──
+        // Eén blok met kleine tussenruimtes, zodat het eerste kerncijfer hoog staat: de merkregel met
+        // de periodekiezer ernaast (was: een hero van 94 px en een eigen rij voor de kiezer), de
+        // tabbladen, en dan de kaarten, de tegels en de grafiek. De bronrij (live of demo,
+        // conversielag, sync) staat eronder in plaats van erboven: de datastand staat al per kanaal
+        // op de kaarten, en de rij kostte vierenvijftig pixels boven het eerste cijfer. Hij is er
+        // nog, met dezelfde knop.
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <BrandHeaderBar compact geoClone={geoClone} fallbackName={client.name} edition={upcomingEdition} />
+            {/* Op een telefoon staat de schakelaar naast de naam en de kiezer op de regel eronder;
+                vanaf een tablet staat alles op één regel, met de schakelaar rechts. */}
+            <div className="order-2 sm:order-3">{schakelaar}</div>
+            <div className="order-3 flex flex-wrap items-center justify-end gap-2 max-sm:w-full sm:order-2">{periodeKiezer}</div>
+          </div>
+          {geenDataMelding}
+          {/* Een schuifbaar vak: de tabbalk mag breder zijn dan een telefoon zonder dat de pagina
+              zelf opzij schuift. */}
+          <div className="max-w-full overflow-x-auto">{tabnav}</div>
+          {codeRood}
+          {activeTab === "dashboard" && !clientData.error && (
+            <OverzichtBovenkant
+              clientId={client.id}
+              channel={channel}
+              kanalen={kanalen}
+              onKies={setChannel}
+              googleData={clientData.data}
+              route={blendedStand}
+              band={periodSummary}
+              bandKlaar={bandKlaar}
+              demo={demoModus}
+              reserveerKaarten={kanalen === null && hadKanaalbalk}
+            />
+          )}
+          {bronrij}
+        </div>
+      ) : (
+        // ── De vertrouwde weergave: precies zoals hij was, met alleen de schakelaar erbij ──
+        <>
+      {/* Merk-header: logo + merk-/beursnaam, in de huisstijl van de actieve klant/beurs. */}
+      <BrandHeaderBar geoClone={geoClone} fallbackName={client.name} edition={upcomingEdition} />
+      {/* Onder de hero i.p.v. ernaast: de hero loopt over de volle breedte, en de kiezer
+          ertegenaan geklemd maakte hem smal. */}
+      {/* flex-wrap: op een telefoon staan de snelkoppelingen op een eigen regel boven de kiezer in
+          plaats van hem uit beeld te duwen. */}
+      <div className="flex flex-wrap items-center justify-end gap-2 -mt-3">
+        {periodeKiezer}
+        {schakelaar}
+      </div>
+      {bronrij}
+      {geenDataMelding}
+      {tabnav}
       {/* De kanaaltabs en de KPI-band staan BUITEN de datapoort hieronder (fase 1, stap 4): ze
           hebben de Google-route alleen op het Google-tabblad en op Alle kanalen nodig, en de
           instellingenpoort van ClientDataProvider (tot 3 s) nooit. Zo wacht het eerste kerncijfer
@@ -531,14 +680,15 @@ export function ClientDashboard({ client }: { client: Client }) {
           De KPI-rij beweegt mee: op "blended" (de standaard, "Alle kanalen") telt hij alle kanalen
           op via useChannelPeriodData(); op een gekozen kanaal toont hij alleen dat kanaal. De losse
           kanalen gaan mee als bronnen, zodat de vergelijking per kanaal paart. */}
-      {/* De alarmbanner blijft boven de band, op elk tabblad: hij leest geen providercontext, en
-          onder de band zakte hij driehonderd pixels weg. */}
-      {clientData.data && <CodeRoodBanner clientId={client.id} />}
+      {codeRood}
       {activeTab === "dashboard" && !clientData.error && (
         <div className="space-y-6">
           <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} ladenMetBalk={kanalen === null && hadKanaalbalk} />
           <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} laden={!bandKlaar} />
         </div>
+      )}
+
+        </>
       )}
 
       {/* Laden: een vlak op de maten van de eerste kaarten, geen spinner. De spinner stond

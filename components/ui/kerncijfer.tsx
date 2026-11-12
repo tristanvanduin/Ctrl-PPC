@@ -22,6 +22,7 @@
 import type { ReactNode } from "react";
 import { TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Sparkline, type SparkBasis } from "./sparkline";
+import { useTellendeTekst } from "@/lib/beweging";
 
 export type CijferFormaat = "groot" | "compact";
 
@@ -39,12 +40,21 @@ export interface KerncijferDelta {
 }
 
 /**
+ * Hoe de verandering eruitziet. `regel` is de regel onder het getal, zoals overal. `pil` zet het
+ * percentage in een gekleurd vlakje met de vorige waarde ernaast: voor de kerncijfertegels bovenaan
+ * het Overzicht (bouwplan fase 3), waar de verandering het eerste is wat na een wissel moet opvallen.
+ * Dezelfde regels in beide vormen: dezelfde drempel voor "vlak", hetzelfde oordeel, dezelfde tekst
+ * voor schermlezers. Alleen de verpakking verschilt.
+ */
+export type DeltaVorm = "regel" | "pil";
+
+/**
  * De verandering onder het getal. Dit is wat er bewoog, en het stond in de kleinste letter van de
  * pagina (10 px) in een groen dat op die maat 3,2:1 haalde. Nu een maat groter (text-body, 12 px),
  * met icoon en teken, in groen-700 en rood-700, en met een woord voor wie geen kleur ziet.
  * Vanaf tien procent zonder decimaal: "+15%" leest, "+15,3%" telt.
  */
-function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was }: KerncijferDelta) {
+function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was, vorm = "regel" }: KerncijferDelta & { vorm?: DeltaVorm }) {
   if (pct === null) {
     return (
       <span className="text-body text-muted-foreground">
@@ -61,6 +71,23 @@ function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was }: Kerncijf
   const Icoon = vlak ? Minus : pct > 0 ? TrendingUp : TrendingDown;
   const decimalen = Math.abs(pct) >= 10 ? 0 : 1;
   const getal = `${pct > 0 ? "+" : ""}${pct.toFixed(decimalen).replace(".", ",")}%`;
+  if (vorm === "pil") {
+    // Tekst in de 700-tint op het 50-vlak van dezelfde kleur: ruim boven 4,5:1, ook in donkere
+    // modus (daar zijn beide tinten omgedraaid, zie .dark in app/globals.css). Een vlakke
+    // verandering krijgt het neutrale vlak: geen kleur waar geen oordeel is.
+    const vlakKleur = vlak ? "bg-muted text-muted-foreground" : goed ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700";
+    return (
+      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-body">
+        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-px font-semibold ${vlakKleur}`}>
+          <Icoon className="h-3 w-3 shrink-0" aria-hidden />
+          <span>{getal}</span>
+        </span>
+        <span className="sr-only">{vlak ? "vrijwel gelijk" : goed ? "gunstig" : "ongunstig"}</span>
+        {was && <span className="text-muted-foreground">was {was}</span>}
+        {waartegen && <span className="text-muted-foreground">{waartegen}</span>}
+      </span>
+    );
+  }
   return (
     <span className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-body font-medium ${kleur}`}>
       <Icoon className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -78,6 +105,7 @@ export function Kerncijfer({
   formaat = "groot",
   labelRegels = 1,
   delta,
+  deltaVorm = "regel",
   reeks,
   reeksBasis = "nul",
   reeksLabel,
@@ -95,6 +123,8 @@ export function Kerncijfer({
    */
   labelRegels?: number;
   delta?: KerncijferDelta;
+  /** De verandering als regel (standaard) of als pil; zie DeltaVorm. */
+  deltaVorm?: DeltaVorm;
   /** Het verloop achter dit cijfer, oud naar nieuw. `null` is een gat, geen nul. */
   reeks?: (number | null)[];
   reeksBasis?: SparkBasis;
@@ -113,6 +143,10 @@ export function Kerncijfer({
     ? "text-figure font-semibold leading-none tracking-tight"
     : "text-xl font-semibold leading-none tracking-tight";
   const kleur = toon === "waarschuwing" ? "text-red-600" : toon === "goed" ? "text-emerald-600" : "text-brand-gray";
+  // Bij een wissel van kanaal of periode telt het cijfer in hooguit 300 ms naar zijn nieuwe waarde,
+  // zodat te zien is wat er bewoog en in welke richting. Niet bij de eerste render en niet bij
+  // "minder beweging"; de eindstand is letterlijk `waarde` (lib/beweging.ts).
+  const getoond = useTellendeTekst(waarde);
 
   // Uitlijnen doet het LABEL, niet het getal.
   //
@@ -136,7 +170,7 @@ export function Kerncijfer({
       >
         {label}
       </p>
-      <p className={`mt-1.5 ${maat} ${kleur}`}>{waarde}</p>
+      <p className={`mt-1.5 ${maat} ${kleur}`}>{getoond}</p>
       {onderschrift && <p className="mt-1 text-micro text-muted-foreground">{onderschrift}</p>}
       {/* Het verloop onder het getal. Een totaal verzwijgt hoe het tot stand kwam: twaalf gelijke
           maanden en een half jaar niets gevolgd door een piek geven hetzelfde getal. */}
@@ -145,7 +179,7 @@ export function Kerncijfer({
           <Sparkline punten={reeks} basis={reeksBasis} breedte={72} hoogte={formaat === "groot" ? 18 : 14} titel={reeksLabel} />
         </div>
       )}
-      {delta && <div className="mt-2"><Delta {...delta} /></div>}
+      {delta && <div className="mt-2"><Delta {...delta} vorm={deltaVorm} /></div>}
       {children && <div className="mt-2">{children}</div>}
     </div>
   );

@@ -671,6 +671,25 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* De opbouw van de bovenkant van het Overzicht bij het eerste bezoek in een sessie (bouwplan
+ * fase 3): een blok komt van zes pixels lager en doorzichtig binnen. Eén duur (--duur-lang) en de
+ * aankomstcurve; de vertraging per blok zet de component (opbouwVertraging in lib/beweging.ts),
+ * zodat het laatste blok binnen 600 ms stilstaat. `backwards` en geen `both`: na afloop geldt de
+ * gewone opmaak weer, zodat een transform van de animatie nooit een hover of een focusring in de
+ * weg zit. Bij "minder beweging" staat de klasse er niet (useEersteOpbouw) en zet de regel
+ * onderaan dit bestand hem bovendien uit: met alleen een duur van 0,01 ms bleef een blok de hele
+ * vertraging onzichtbaar. */
+@keyframes opbouw-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* De waarden achter de komma zijn alleen een vangnet: de tokens staan in @theme, en een
+ * themavariabele die verder nergens gebruikt wordt hoeft niet in de uitvoer te belanden. Zonder
+ * vangnet is de hele regel dan ongeldig en komt het blok niet binnen maar staat het er ineens. */
+.opbouw {
+  animation: opbouw-in var(--duur-lang, 300ms) var(--ease-aankomst, cubic-bezier(0, 0, 0.2, 1)) backwards;
+}
+
 /* Herbruikbare teller-typografie: monospace, 'high-density' letter-spacing. Los van .terminal,
  * zodat <Counter isLive> overal in de app dezelfde cijfertypografie draagt, niet alleen op de
  * nieuwe schermen. */
@@ -885,6 +904,11 @@
   }
 
   .animate-pulse {
+    animation: none !important;
+  }
+
+  /* De opbouw heeft een vertraging per blok; zonder dit bleef een blok die tijd onzichtbaar. */
+  .opbouw {
     animation: none !important;
   }
 

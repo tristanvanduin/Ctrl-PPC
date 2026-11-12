@@ -12,7 +12,8 @@ import { ChannelPacing } from "./channel-pacing";
 import { ChannelMonthlyChart } from "./channel-monthly-chart";
 import { ChannelFairWeeks } from "./channel-fair-weeks";
 import { ChannelDataProvider } from "./channel-data-provider";
-import { Sectie } from "@/components/ui/sectie";
+import { Sectie, Deelkop } from "@/components/ui/sectie";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { isDemoClient } from "@/lib/demo/demo-mode";
 
 // Microsoft Ads (Bing)-tab: DATA-weergave, zelfde opbouw als Meta en LinkedIn via de gedeelde
@@ -67,42 +68,61 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
           naast elkaar pas vanaf 1800px, zelfde grens als Google/Meta/LinkedIn; daaronder staat
           Health gestapeld en zou hij Pacing ~300px uitrekken. Twee directe cellen en geen
           linkerkolom zoals bij Meta: zonder kaart rechts zou die de rechterhelft leeg laten. */}
-      <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
-        <ChannelHealthBadge clientId={clientId} channel="microsoft" />
-        <div className="flex flex-col">
-          <ChannelPacing edition={edition} />
+      {/* ÉÉN KOP VOOR DE BLOKKEN MET EEN VAST VENSTER (bouwplan fase 2). Account Health, het
+          jaaroverzicht en de beurs gaan over het kalenderjaar; de pacing over de lopende maand en
+          de wereldkaart over 180 dagen. Ze stonden verspreid, met ertussen blokken die de
+          periodekiezer horen te volgen: wie de periode verzette zag de halve pagina stilstaan
+          zonder te kunnen zien waarom. Nu staan de blokken die NIET meebewegen bij elkaar onder
+          één kop die dat zegt, en zegt elk blok in zijn kop welk venster het gebruikt
+          (Vensterlabel). Wat een eigen sectie was (de beurs, het jaaroverzicht) is hier een deel
+          met dezelfde titel en hetzelfde bijschrift (Deelkop); er is niets weg. Dezelfde opbouw
+          op alle tabbladen, zodat een tabwissel niets verplaatst. */}
+      <Sectie
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Jaar en beurs"
+        bijschrift="Vaste vensters: het kalenderjaar en de beurs. Deze blokken volgen de periodekiezer niet; elk zegt in zijn kop welk venster het gebruikt."
+      >
+        <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+          <ChannelHealthBadge clientId={clientId} channel="microsoft" />
+          <div className="flex flex-col">
+            <ChannelPacing edition={edition} />
+          </div>
         </div>
-      </div>
 
       {/* Dezelfde volgorde als google-view.tsx en meta-view.tsx: hero, beurs, maandverloop,
           jaaroverzicht, maandprestaties -- zodat een tabwissel niets verplaatst.
 
           "Prestaties richting de beurs" -- alleen als er een event gekozen is, zelfde regel als
           Meta en LinkedIn. */}
-      {edition && (
-        <Sectie
-          icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Prestaties richting de beurs"
-          bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
-        >
-          <ChannelFairWeeks edition={edition} />
-        </Sectie>
-      )}
+        {edition && (
+          <>
+            <Deelkop
+              icoon={<CalendarClock className="w-4 h-4 text-brand-blue-ink" />}
+              titel="Prestaties richting de beurs"
+              bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+            />
+            <ChannelFairWeeks edition={edition} />
+          </>
+        )}
 
-      <ChannelMonthlyChart />
 
-      <Sectie
-        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Jaaroverzicht"
-        bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
-      >
+        <Deelkop
+          icoon={<Target className="w-4 h-4 text-brand-blue-ink" />}
+          titel="Jaaroverzicht"
+          bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend"
+          venster={<Vensterlabel soort="jaar" />}
+        />
         <ChannelForecastOverview />
       </Sectie>
+
+      {/* Het maandverloop volgt de gekozen periode en staat daarom ná de jaarblokken, niet er
+          tussenin zoals tot fase 2. */}
+      <ChannelMonthlyChart />
 
       <Sectie
         icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Maandprestaties"
-        bijschrift="Kerncijfers over 28 dagen en het verloop per maand"
+        bijschrift="Kerncijfers over 28 dagen, en de maanden van de gekozen periode"
       >
         <ChannelPerformance clientId={clientId} channel="microsoft" geoClone={geoClone} />
       </Sectie>

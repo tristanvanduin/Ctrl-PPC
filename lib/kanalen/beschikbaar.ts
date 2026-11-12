@@ -129,6 +129,49 @@ export function geldigeKeuze(
   return "blended";
 }
 
+// ── De kanaalkeuze in de adresbalk (bouwplan fase 2) ────────────────────────────────────────────
+//
+// ?kanaal=meta is de bron van de kanaalkeuze: een herlaad komt terug op hetzelfde kanaal, Terug
+// werkt, en een link naar "Meta" is te delen. "Alle kanalen" is de standaard en staat er NIET in:
+// een schone link betekent dan altijd hetzelfde, en 62 van de 71 klanten (één kanaal, geen kiezer)
+// krijgen nooit een parameter te zien.
+
+/** De naam van de zoekparameter. */
+export const KANAAL_PARAM = "kanaal";
+
+/** Het kanaal uit ?kanaal=, of null als er niets of geen bestaand kanaal staat ("Alle kanalen"). */
+export function kanaalUitUrl(ruw: string | null | undefined): Kanaal | null {
+  return (ALLE_KANALEN as readonly string[]).includes(ruw ?? "") ? (ruw as Kanaal) : null;
+}
+
+/**
+ * Wat er getoond wordt, gegeven het kanaal uit de adresbalk en wat deze klant heeft.
+ *
+ * Zolang de kanalen nog onbekend zijn (null) geldt de adresbalk zoals hij is: een herlaad op
+ * ?kanaal=meta opent dan meteen op Meta in plaats van eerst op "Alle kanalen". Zodra ze bekend
+ * zijn beslist geldigeKeuze, precies zoals bij een klik: een kanaal dat deze klant niet heeft valt
+ * terug op "Alle kanalen", en een klant met één kanaal toont dat kanaal.
+ */
+export function kanaalkeuzeUitUrl(uitUrl: Kanaal | null, beschikbaar: readonly Kanaal[] | null): Kanaalkeuze {
+  const wens: Kanaalkeuze = uitUrl ?? "blended";
+  return beschikbaar === null ? wens : geldigeKeuze(wens, beschikbaar);
+}
+
+/**
+ * Wat er in ?kanaal= hoort te staan, gegeven wat er nu staat: dezelfde waarde als hij geldig is,
+ * anders null (de parameter hoort weg).
+ *
+ * Weg moet: een kanaal dat niet bestaat (?kanaal=tiktok), een kanaal dat deze klant niet heeft, en
+ * elk kanaal bij een klant zonder kiezer (één kanaal: er valt niets te kiezen, dus ook niets te
+ * onthouden). De pagina toont in al die gevallen al de terugval van geldigeKeuze; zonder
+ * rechtzetten stond er een adres boven dat iets anders beweerde dan het scherm.
+ */
+export function kanaalParamRechtgezet(ruw: string | null, beschikbaar: readonly Kanaal[]): Kanaal | null {
+  const uitUrl = kanaalUitUrl(ruw);
+  if (uitUrl === null || zichtbareTabs(beschikbaar).length === 0) return null;
+  return geldigeKeuze(uitUrl, beschikbaar) === uitUrl ? uitUrl : null;
+}
+
 /** Nette omschrijving voor een lege staat. */
 export function geenDataTekst(kanalen: readonly Kanaal[]): string | null {
   return kanalen.length === 0

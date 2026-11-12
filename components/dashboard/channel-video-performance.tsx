@@ -8,6 +8,7 @@ import { CollapsiblePanel } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { CONFIG, type ChannelKind } from "./channel-performance";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Meta/LinkedIn-equivalent van Google's "Waar het budget landt" (23 augustus 2026) -- alleen het
 // campagne-niveau videodeel (VideoPerformance), niet Google's placement-uitsluitingsadvies
@@ -135,7 +136,10 @@ export function ChannelVideoPerformance({ clientId, channel }: { clientId: strin
       icon={<PlayCircle className="w-4.5 h-4.5 text-brand-blue-ink" />}
       title="Video"
       subtitle="beoordeeld op bereik en kijkgedrag — niet op klikken of CPA"
-      meta={<span className="text-micro text-muted-foreground">{aggs.length} campagne{aggs.length === 1 ? "" : "s"}</span>}
+      meta={<>
+        <Vensterlabel soort="vast" venster="laatste 60 dagen" />
+        <span className="text-micro text-muted-foreground">{aggs.length} campagne{aggs.length === 1 ? "" : "s"}</span>
+      </>}
     >
       {channel === "meta" ? (
         <MetaVideoTabel rows={aggs as MetaVideoRow[]} names={names} grootsteBereik={grootsteBereik} />

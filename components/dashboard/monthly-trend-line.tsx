@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { LineChart, Line, XAxis, ResponsiveContainer, type DotItemDotProps } from "recharts";
 import { useGrafiekBeweging } from "@/lib/beweging";
 import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
-import { ALLE_FORECAST_METRICS, computeForecast } from "@/lib/forecast";
-import { METRIC_LABELS, formatPercent, formatterFor, geenWaardeLabel, isLowerBetter, zonderData } from "@/lib/forecast-format";
+import { computeForecast } from "@/lib/forecast";
+import { usePeriod } from "@/lib/period/period-context";
+import { slicePeriod } from "@/lib/period/apply-period";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { CHART_AXIS } from "@/lib/branding/chart-colors";
-import { Tip, AsY, Raster, asSchaalVenster, kortEuro } from "./chart-chrome";
-import { PeriodPopover } from "@/components/ui/period-popover";
+import { Tip, AsY, Raster, asSchaalVenster, kortEuro, maandLabel } from "./chart-chrome";
+import { MaandMetriekenPopover } from "./maand-metrieken-popover";
 
 // Compacte lijngrafiek voor de linkerkolom van de opener (17.43): "ik mis de lijn diagram nog" --
 // het kleine resterende hoogteverschil met de rechterkolom (kaart+grafiek+ranglijst) vult zich nu
@@ -24,6 +26,13 @@ import { PeriodPopover } from "@/components/ui/period-popover";
 // Zelfde rekenkern als MonthlyTrendBars/PerformanceChart (useForecast/computeForecast): geen
 // tweede forecast-implementatie, alleen een kortere, kalere weergave -- nu van forecast.cpa
 // i.p.v. forecast.conversions.
+//
+// VOLGT DE GEKOZEN PERIODE (bouwplan fase 2). Er stond "laatste 6 maanden" boven de laatste zes
+// punten van de PROGNOSE van het lopende jaar: juli t/m december, met de maanden die nog moeten
+// komen erbij. Dat was niet wat het label zei, en het bewoog niet als je de periode verzette. De
+// lijn loopt nu over de gemeten maanden van de gekozen periode, uit dezelfde maandreeks als de
+// band (slicePeriod): geen verzoek, en dezelfde CPA als de band over dezelfde maanden. De
+// prognose per maand staat in het jaaroverzicht en in het paneel achter een punt.
 export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string; countryFilter?: string | null }) {
   const { theme } = useBrandTheme();
   const beweging = useGrafiekBeweging();
@@ -32,15 +41,19 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
   const clientData = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
   const gedeeld = useForecast();
   const forecast = gedeeld ?? computeForecast(clientData);
-  const alleCpaPunten = forecast.cpa.points;
-  const points = alleCpaPunten.slice(-6);
-  // Zie monthly-trend-bars.tsx voor dezelfde redenering: de popover leest de andere metrics op
-  // via het volle, ongesnoeide array, dus moet de lokale 0..5-index eerst terug omgerekend.
-  const offset = alleCpaPunten.length - points.length;
+  const periode = usePeriod();
+  const periodeStart = periode.range.start;
+  const periodeEind = periode.range.end;
+  // De gemeten maanden van de periode; een maand zonder rij staat er niet in (geen punt, geen nul).
+  const maanden = useMemo(
+    () => slicePeriod(clientData, { start: periodeStart, end: periodeEind }).months,
+    [clientData, periodeStart, periodeEind],
+  );
 
-  const data = points.map((pt) => ({
-    label: pt.monthLabel,
-    waarde: pt.realized ?? pt.forecast ?? null,
+  // Zonder conversies bestaat er geen CPA: een gat in de lijn, geen nul.
+  const data = maanden.map((m) => ({
+    label: maandLabel(m.key),
+    waarde: m.conversions > 0 ? m.adSpend / m.conversions : null,
   }));
 
   const eur = (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
@@ -56,12 +69,19 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
     // en geen opvulling. Geen `h-full` op de kaart zelf: als rastercel rekt hij al vanzelf, en in
     // een flex-kolom zou hij dan de opvanger van die kolom leegroven (zie google-view.tsx).
     <div className="bg-card flex flex-col rounded-xl border border-border p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">
         <h3 className="text-meta font-semibold text-brand-blue-ink uppercase tracking-wide">
           CPA per maand
         </h3>
-        <span className="text-micro text-muted-foreground">laatste 6 maanden</span>
+        <Vensterlabel soort="periode" />
       </div>
+      {waarden.length === 0 ? (
+        // De periode heeft geen maand met conversies (of geen maand met data): dat zeggen, in
+        // plaats van een leeg assenkruis dat leest als "de CPA was nul".
+        <p className="flex min-h-[130px] flex-1 items-center justify-center text-center text-body text-muted-foreground">
+          Geen maand met conversies in deze periode, dus geen CPA om te tonen.
+        </p>
+      ) : (
       <div className="min-h-[130px] flex-1">
         <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
@@ -101,50 +121,11 @@ export function MonthlyTrendLine({ clientId, countryFilter }: { clientId: string
         </LineChart>
         </ResponsiveContainer>
       </div>
+      )}
 
-      {openIdx !== null && (() => {
-        const idx = offset + openIdx;
-        const label = points[openIdx]?.monthLabel ?? "";
-        return (
-          <PeriodPopover
-            title={label}
-            subtitle="Alle vier de metrics voor deze maand"
-            onClose={() => setOpenIdx(null)}
-          >
-            <div className="space-y-3">
-              {ALLE_FORECAST_METRICS.map((m) => {
-                const p = forecast[m].points[idx];
-                if (!p) return null;
-                // Zoals monthly-trend-bars.tsx: een maand zonder realisatie en zonder prognose
-                // stond hier als "Prognose", waarde 0 en een gekleurde ratio die niets meet.
-                const mGeenData = zonderData(p);
-                const mVal = p.realized ?? p.forecast ?? 0;
-                const mFormat = formatterFor(m);
-                const mInverted = isLowerBetter(m);
-                const mPositive = mInverted ? p.monthRatio <= 1 : p.monthRatio >= 1;
-                return (
-                  <div key={m} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
-                    <div>
-                      <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
-                      <p className="text-micro text-muted-foreground">
-                        {mGeenData ? geenWaardeLabel(p, m) : p.realized !== null ? "Gerealiseerd" : "Prognose"} · verwacht {mFormat(p.expected)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lead font-bold text-brand-gray">{mGeenData ? "—" : mFormat(mVal)}</p>
-                      {!mGeenData && (
-                        <p className={`text-micro font-semibold ${mPositive ? "text-green-600" : "text-red-500"}`}>
-                          {formatPercent(p.monthRatio, 0)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </PeriodPopover>
-        );
-      })()}
+      {openIdx !== null && maanden[openIdx] && (
+        <MaandMetriekenPopover maand={maanden[openIdx]} forecast={forecast} prognoseJaar={clientData.currentYear} onClose={() => setOpenIdx(null)} />
+      )}
     </div>
   );
 }

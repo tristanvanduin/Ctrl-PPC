@@ -9,7 +9,7 @@ import { alsBronReeks, type BronReeks } from "@/lib/period/apply-period";
 import { addMonths, type Month } from "@/lib/period/period-range";
 import { monthsAgo } from "@/lib/reporting-date";
 import { HISTORIE_JAREN } from "@/lib/api/google-vergelijking";
-import { WACHT_MS } from "@/lib/kanalen/beschikbaar";
+import { WACHT_MS, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import {
   HELE_HISTORIE_GELADEN_VANAF, NIET_GOOGLE, kanaalDagbron, kanaalStandUitDagen, kanaalStandUitMaanden, maandTotalenUitMaandreeks, samenvoegen,
   type KanaalStand, type NietGoogleKanaal,
@@ -62,6 +62,13 @@ export interface ChannelPeriodData {
    * route is dat HELE_HISTORIE_GELADEN_VANAF: die leest de hele tabel.
    */
   geladenVanaf: Record<NietGoogleKanaal, Month | null>;
+  /**
+   * Elk kanaal los als bron, ongeacht welk kanaal gekozen is; een kanaal ontbreekt zolang het nog
+   * laadt. Dit zijn DEZELFDE objecten als in `bronnen` op "Alle kanalen", zodat de kanaalkaarten en
+   * de hoofdgrafiek (bouwplan fase 3) per constructie op dezelfde maandcijfers staan als de band:
+   * de som over de kanalen is het totaal van de band, en geen tweede optelling ernaast.
+   */
+  perKanaal: Partial<Record<Kanaal, BronReeks>>;
   /**
    * Per niet-Google-kanaal of zijn stand bekend is: uit de route zodra die er is, in de terugvalweg
    * zodra zijn rijen en de selectie binnen zijn. De band mag geen cijfers of kalendervenster tonen
@@ -284,18 +291,30 @@ export function useChannelPeriodData({ clientId, channel, googleData, route }: C
   const linkedin = kanalen?.linkedin ?? null;
   const microsoft = kanalen?.microsoft ?? null;
 
+  // Google's laadgrens: /api/google-ads/client-data haalt vanaf 1 januari, HISTORIE_JAREN jaar vóór
+  // het jaar van het antwoord. Zonder die grens "begon" een account dat al sinds 2015 loopt in
+  // januari 2021, en zei de band over 2020 "de data begint in januari 2021" en "nieuw in deze
+  // periode", of op Alle kanalen "Google Ads (sinds januari 2021) ... liep het nog niet". De
+  // demoroute haalt de hele historie; daar is dit een ondergrens, en zegt de band over wat ervóór
+  // ligt alleen dat hij het niet heeft, niet dat het leeg was.
+  const googleGeladen = googleData ? `${googleData.currentYear - HISTORIE_JAREN}-01` : null;
+  // Elk kanaal één keer als bron (bouwplan fase 3): de band op "Alle kanalen", de kanaalkaarten en
+  // de hoofdgrafiek lezen dezelfde objecten. Google is een maandbron zonder dagen: daar is de
+  // eerste maand met data de start.
+  const perKanaal = useMemo((): Partial<Record<Kanaal, BronReeks>> => {
+    const uit: Partial<Record<Kanaal, BronReeks>> = {};
+    if (googleData) uit.google = alsBronReeks("google", googleData, null, googleGeladen);
+    if (meta) uit.meta = alsBronReeks("meta", meta.data, meta.vanaf, meta.geladenVanaf);
+    if (linkedin) uit.linkedin = alsBronReeks("linkedin", linkedin.data, linkedin.vanaf, linkedin.geladenVanaf);
+    if (microsoft) uit.microsoft = alsBronReeks("microsoft", microsoft.data, microsoft.vanaf, microsoft.geladenVanaf);
+    return uit;
+  }, [googleData, googleGeladen, meta, linkedin, microsoft]);
+
   const keuze = useMemo((): Pick<ChannelPeriodData, "data" | "bronnen"> => {
     // Eén kanaal: de data plus één bron met zijn eerste volle maand en laadgrens. "totaal" en geen
     // kanaalnaam: de band noemt bij één bron geen kanaal (ongepaardTekst in period-summary.tsx).
     const los = (s: GeladenKanaal | null): Pick<ChannelPeriodData, "data" | "bronnen"> =>
       (s ? { data: s.data, bronnen: [alsBronReeks("totaal", s.data, s.vanaf, s.geladenVanaf)] } : { data: null, bronnen: null });
-    // Google's laadgrens: /api/google-ads/client-data haalt vanaf 1 januari, HISTORIE_JAREN jaar vóór
-    // het jaar van het antwoord. Zonder die grens "begon" een account dat al sinds 2015 loopt in
-    // januari 2021, en zei de band over 2020 "de data begint in januari 2021" en "nieuw in deze
-    // periode", of op Alle kanalen "Google Ads (sinds januari 2021) ... liep het nog niet". De
-    // demoroute haalt de hele historie; daar is dit een ondergrens, en zegt de band over wat ervóór
-    // ligt alleen dat hij het niet heeft, niet dat het leeg was.
-    const googleGeladen = googleData ? `${googleData.currentYear - HISTORIE_JAREN}-01` : null;
     if (channel === "google") return { data: googleData, bronnen: googleData ? [alsBronReeks("totaal", googleData, null, googleGeladen)] : null };
     if (channel === "meta") return los(meta);
     if (channel === "linkedin") return los(linkedin);
@@ -304,18 +323,13 @@ export function useChannelPeriodData({ clientId, channel, googleData, route }: C
     // nul mee, en dat leest als "dit kanaal presteert niet" in plaats van "nog aan het laden".
     if (!googleData || !meta || !linkedin || !microsoft) return { data: null, bronnen: null };
     // De losse kanalen gaan mee, zodat de vergelijking per kanaal kan paren: een kanaal dat in de
-    // vergelijkingsperiode nog niet liep, telde in de optelling anders als groei. Google is een
-    // maandbron zonder dagen: daar is de eerste maand met data de start.
+    // vergelijkingsperiode nog niet liep, telde in de optelling anders als groei. Dezelfde objecten
+    // als `perKanaal` hierboven (alle vier staan er, want alle vier de bronnen zijn binnen).
     return {
       data: samenvoegen(clientId, [googleData, meta.data, linkedin.data, microsoft.data]),
-      bronnen: [
-        alsBronReeks("google", googleData, null, googleGeladen),
-        alsBronReeks("meta", meta.data, meta.vanaf, meta.geladenVanaf),
-        alsBronReeks("linkedin", linkedin.data, linkedin.vanaf, linkedin.geladenVanaf),
-        alsBronReeks("microsoft", microsoft.data, microsoft.vanaf, microsoft.geladenVanaf),
-      ],
+      bronnen: [perKanaal.google!, perKanaal.meta!, perKanaal.linkedin!, perKanaal.microsoft!],
     };
-  }, [channel, clientId, googleData, meta, linkedin, microsoft]);
+  }, [channel, clientId, googleData, googleGeladen, meta, linkedin, microsoft, perKanaal]);
 
   const mDag = meta?.laatsteDag ?? null;
   const lDag = linkedin?.laatsteDag ?? null;
@@ -328,5 +342,5 @@ export function useChannelPeriodData({ clientId, channel, googleData, route }: C
   const mKlaar = meta !== null, lKlaar = linkedin !== null, msKlaar = microsoft !== null;
   const klaar = useMemo(() => ({ meta: mKlaar, linkedin: lKlaar, microsoft: msKlaar }), [mKlaar, lKlaar, msKlaar]);
 
-  return { ...keuze, laatsteDag, geladenVanaf, klaar };
+  return { ...keuze, perKanaal, laatsteDag, geladenVanaf, klaar };
 }

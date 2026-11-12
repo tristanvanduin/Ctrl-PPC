@@ -2,6 +2,7 @@
 
 import { ResponsiveContainer, ComposedChart, Bar, Area, AreaChart, LabelList } from "recharts";
 import { useGrafiekBeweging } from "@/lib/beweging";
+import type { ReactNode } from "react";
 import { TrendingUp } from "lucide-react";
 import { useBrandTheme } from "../branding/brand-theme-provider";
 import { categoricalColor, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
@@ -33,11 +34,14 @@ export interface MonthlyTrendPoint {
   lijn: number;
 }
 
-export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
+export function MonthlyTrendChart({ title, data, lineLabel, height = 240, venster }: {
   title: string;
   data: MonthlyTrendPoint[];
   lineLabel: string;
   height?: number;
+  /** Het Vensterlabel van deze kaart (volgt periode, of een eigen venster); de aanroeper weet
+   *  welke maanden hij meegeeft, de grafiek niet. */
+  venster?: ReactNode;
 }) {
   const { theme } = useBrandTheme();
   const beweging = useGrafiekBeweging();
@@ -88,10 +92,11 @@ export function MonthlyTrendChart({ title, data, lineLabel, height = 240 }: {
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+      <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2">
         <TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{title}</h3>
         <span className="text-meta text-muted-foreground">spend en {lineLabel.toLowerCase()}, zelfde maanden</span>
+        {venster && <span className="ml-auto">{venster}</span>}
       </div>
 
       {/* De plot en de cijfers als één blok links, niet elk tegen een rand geduwd.
@@ -238,8 +243,10 @@ function SerieNaam({ x, y, width, index, naam, laatste }: LabelProps & { naam: s
 // Gegroepeerde maandbalken per serie (bijv. spend per kanaal): categorische vergelijking, dus het
 // gevalideerde categorische palet (kleurenblind-veilig, merk-onafhankelijk).
 
-export function GroupedMonthlyBars({ title, months, series, data, height = 260, groeit = false }: {
+export function GroupedMonthlyBars({ title, months, series, data, height = 260, groeit = false, venster }: {
   title: string;
+  /** Het Vensterlabel van deze kaart; zie MonthlyTrendChart hierboven. */
+  venster?: ReactNode;
   months: string[];
   series: string[];
   data: Record<string, number | string>[];
@@ -303,6 +310,7 @@ export function GroupedMonthlyBars({ title, months, series, data, height = 260, 
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{title}</h3>
+        {venster}
         {/* De legenda staat boven de plot: je leest hem vóór de grafiek, niet erna. */}
         <Legenda items={legenda} className="ml-auto" />
       </div>

@@ -177,12 +177,23 @@ console.log("MonthlyOverviewView gerenderd");
 // ── MonthlyTrendBars: dezelfde regel, maar zonder renderbare grafiek in node ─────────────────
 console.log("MonthlyTrendBars (bron)");
 {
+  // Bewust aangepast in fase 2. De staven en de CPA-lijn volgen de gekozen periode en lezen de
+  // gemeten maanden uit slicePeriod, niet meer de laatste zes punten van de jaarprognose. De regel
+  // "een maand zonder data krijgt geen staaf" hoefde daar eerst een eigen voorwaarde voor
+  // (zonderData(pt) ? null); nu staat zo'n maand niet eens in de reeks. Het paneel achter een
+  // staaf of punt is één gedeeld bestand geworden (maand-metrieken-popover.tsx) en houdt voor de
+  // maanden van het prognosejaar dezelfde regel.
   const b = bron("components/dashboard/monthly-trend-bars.tsx");
-  check("een maand zonder data krijgt geen staaf", /waarde:\s*zonderData\(pt\)\s*\?\s*null/.test(b));
+  check("de staven zijn de gemeten maanden van de gekozen periode (slicePeriod)",
+    /slicePeriod\(clientData, \{ start: periodeStart, end: periodeEind \}\)\.months/.test(b) && /usePeriod\(\)/.test(b) && !/\.slice\(-6\)/.test(b));
+  check("geen eigen kopie van het paneel meer", b.includes("<MaandMetriekenPopover") && !b.includes("PeriodPopover"));
+  const pop = bron("components/dashboard/maand-metrieken-popover.tsx");
   // Het label komt uit geenWaardeLabel: "Geen data", behalve bij kosten zonder conversies (geenNoemer,
   // lib/__geen_noemer_test.ts), die heet "Geen conversies".
-  check("de popover zegt \"Geen data\" en geen ratio", b.includes("mGeenData ? geenWaardeLabel(p, m)") && /!mGeenData && \(/.test(b)
-    && weergave.geenWaardeLabel({}, "cpa") === "Geen data");
+  check("de popover zegt \"Geen data\" en geen ratio", pop.includes("mGeenData ? geenWaardeLabel(p, m)") && /!mGeenData && \(/.test(pop)
+    && /zonderData\(p\)/.test(pop) && weergave.geenWaardeLabel({}, "cpa") === "Geen data");
+  check("een maand buiten het prognosejaar krijgt geen 'verwacht' en geen ratio",
+    /maand\.year === prognoseJaar/.test(pop) && /inPrognoseJaar \? forecast\[m\]\.points\[maand\.month - 1\] : undefined/.test(pop));
   const m = bron("components/dashboard/monthly-overview.tsx");
   check("monthly-overview.tsx leest de browserklok niet", !/new Date\(\)/.test(m) && !/getDate\(\)|getMonth\(\)|getFullYear\(\)/.test(m));
 }
@@ -212,9 +223,13 @@ console.log("ForecastTable, rapportexport en MonthlyTrendLine");
   check("maandtabel: zonder data een streep in plaats van een percentage", /geenData\s*\?\s*"—"\s*:\s*formatPercent\(ratio,\s*0\)/.test(t));
   check("maandtabel: zonder data geen groen of rood", /geenData\s*\?\s*"text-muted-foreground"/.test(t));
 
+  // Bewust aangepast in fase 2: de CPA-lijn deelt het paneel met de staven (zie hierboven), en
+  // zijn punten zijn de gemeten maanden van de gekozen periode.
   const l = bron("components/dashboard/monthly-trend-line.tsx");
-  check("CPA-lijn: de popover vraagt zonderData", /zonderData\(p\)/.test(l));
-  check("CPA-lijn: de popover zegt \"Geen data\" en geen ratio", l.includes("mGeenData ? geenWaardeLabel(p, m)") && /!mGeenData && \(/.test(l));
+  check("CPA-lijn: het gedeelde paneel, geen eigen kopie", l.includes("<MaandMetriekenPopover") && !l.includes("PeriodPopover"));
+  check("CPA-lijn: de gemeten maanden van de gekozen periode, en zonder conversies een gat in plaats van nul",
+    /slicePeriod\(clientData, \{ start: periodeStart, end: periodeEind \}\)\.months/.test(l)
+    && /m\.conversions > 0 \? m\.adSpend \/ m\.conversions : null/.test(l) && !/\.slice\(-6\)/.test(l));
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

@@ -2,6 +2,7 @@
 
 import { useKanaalData } from "./channel-data-provider";
 import { HealthBadgeView } from "./health-badge";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 /**
  * Account Health op het Meta-, LinkedIn- of Microsoft-tabblad. Zelfde weergave als Google's
@@ -28,5 +29,5 @@ export function ChannelHealthBadge(_props: { clientId: string; channel: "meta" |
   const { forecast } = useKanaalData();
   // Laden (null) en "leeg" (geen dagcijfers): geen kaart, zoals voorheen zonder score.
   if (!forecast || forecast === "leeg") return null;
-  return <HealthBadgeView health={forecast.health} />;
+  return <HealthBadgeView health={forecast.health} venster={<Vensterlabel soort="jaar" />} />;
 }

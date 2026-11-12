@@ -16,6 +16,8 @@ import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { opsomming } from "@/lib/util/tekst";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { BandLaadvlak } from "@/components/ui/laadvlak";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { nadrukIndex } from "@/lib/overzicht/bovenkant";
 
 function euro(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -165,6 +167,14 @@ interface Props {
   bronnen?: readonly BronReeks[] | null;
   /** Of `data` nog onderweg is. Dan staat er een vlak op de maat van de band in plaats van niets. */
   laden?: boolean;
+  /**
+   * `band` is de band zoals hij altijd was. `tegels` is dezelfde inhoud als vijf tegels (bouwplan
+   * fase 3, de nieuwe weergave): de verandering als pil met de vorige waarde erbij, één tegel met
+   * nadruk (de grootste verandering), en de periode met de vergelijking in de voetregel in plaats
+   * van in een kop erboven, zodat het eerste cijfer hoger op de pagina staat. Elke uitlegregel en
+   * elke waarschuwing van de band staat er ook: het is een andere vorm, geen andere inhoud.
+   */
+  vorm?: "band" | "tegels";
 }
 
 /**
@@ -182,11 +192,11 @@ function verhoudingDelta(
   return { pct: delta(huidig, vorig).pct, hogerIsBeter, was: opmaak(vorig) };
 }
 
-export function PeriodSummary({ data, compact, bronnen, laden = false }: Props) {
+export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "band" }: Props) {
   const periode = usePeriod();
   // Zonder data en nog ladend: de ruimte van de band alvast innemen. De band kwam als laatste
   // binnen en duwde dan alles eronder 200 px omlaag; dat was de grootste verspringing op de pagina.
-  if (!data) return laden ? <BandLaadvlak compact={compact} /> : null;
+  if (!data) return laden ? <BandLaadvlak compact={compact || vorm === "tegels"} /> : null;
 
   // Met de losse kanalen erbij: een kanaal dat in de vergelijkingsperiode nog niet liep, telt dan
   // niet als groei. De grote getallen blijven de hele periode; alleen de percentages zijn gepaard.
@@ -234,11 +244,11 @@ export function PeriodSummary({ data, compact, bronnen, laden = false }: Props) 
     });
 
   const kaarten = [
-    { label: "Conversies", waarde: aantal(current.totals.conversions), totaal: current.totals.conversions,
+    { label: "Conversies", waarde: aantal(current.totals.conversions), totaal: current.totals.conversions, opmaak: aantal,
       d: deltas?.conversions, hogerIsBeter: true, reeks: reeks((m) => m.conversions || 0) },
-    { label: "Omzet", waarde: euro(current.totals.revenue), totaal: current.totals.revenue,
+    { label: "Omzet", waarde: euro(current.totals.revenue), totaal: current.totals.revenue, opmaak: euro,
       d: deltas?.revenue, hogerIsBeter: true, reeks: reeks((m) => m.revenue || 0) },
-    { label: "Advertentiekosten", waarde: euro(current.totals.adSpend), totaal: current.totals.adSpend,
+    { label: "Advertentiekosten", waarde: euro(current.totals.adSpend), totaal: current.totals.adSpend, opmaak: euro,
       d: deltas?.adSpend, hogerIsBeter: false, reeks: reeks((m) => m.adSpend || 0) },
   ];
 
@@ -254,12 +264,139 @@ export function PeriodSummary({ data, compact, bronnen, laden = false }: Props) 
   const huidigeCpa = deltas ? verhouding(deltas.adSpend.huidig, deltas.conversions.huidig) : null;
   const vorigeCpa = deltas ? verhouding(deltas.adSpend.vorig, deltas.conversions.vorig) : null;
 
+  // De uitlegregels en waarschuwingen onder de cijfers: één blok, voor de band en voor de tegels.
+  const uitleg = (
+    <>
+      {/* Uitleg bij de cijfers, geen waarschuwing: dezelfde neutrale stijl, en hooguit één regel
+          per onderwerp. Amber blijft voor wat aandacht vraagt (de ontbrekende maanden hieronder). */}
+      {nietGepaard && <p className="mt-3 text-micro text-muted-foreground">{nietGepaard}</p>}
+      {standTekst && <p className={`${nietGepaard ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>{standTekst}</p>}
+
+      {/* Een geladen maand vóór de start: er is nog geen data, en er ontbreekt niets. Uitleg, geen
+          waarschuwing. De demo-Meta-tab zei hier in amber "Voor 7 maanden is geen data geladen (aug
+          2025 t/m feb 2026); die tellen hierboven niet mee", onder de eigen zin "de data begint
+          halverwege maart 2026", terwijl de band die maanden wel had opgehaald. */}
+      {voorStart.length > 0 && (
+        <p className={`${nietGepaard || standTekst ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>
+          {`${voorStart.length === 1 ? `Voor ${formatMonth(voorStart[0])} is er geen data` : `Voor ${voorStart.length} maanden is er geen data (${maandenTekst(voorStart)})`}: ${
+            start ? `de data begint pas in ${formatMonth(start)}.` : "er is nog geen enkele maand met data."}`}
+        </p>
+      )}
+
+      {/* Een maand zonder rij na de start van de data is een gemeten nul (gepauzeerd, of gestopt
+          terwijl de stand doorloopt): uitleg, geen waarschuwing. Hij stond in de amberregel als
+          "geen data geladen ... tellen hierboven niet mee", terwijl de zin erboven zei dat zo'n maand
+          als nul telt, en de cijfers dat ook doen (review [6]). */}
+      {gemetenNul.length > 0 && (
+        <p className={`${nietGepaard || standTekst || voorStart.length > 0 ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>
+          {gemetenNul.length === 1
+            ? `Voor ${formatMonth(gemetenNul[0])} is er geen data; na de start van de data is dat een maand zonder activiteit, en die telt hierboven als nul.`
+            : `Voor ${gemetenNul.length} maanden is er geen data (${maandenTekst(gemetenNul)}); na de start van de data zijn dat maanden zonder activiteit, en die tellen hierboven als nul.`}
+        </p>
+      )}
+
+      {nietOpgehaald.length > 0 && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-micro text-amber-800">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {nietOpgehaald.length === 1
+            ? `${nietOpgehaald[0]} kon niet geladen worden en telt hierboven niet mee.`
+            : `${opsomming(nietOpgehaald)} konden niet geladen worden en tellen hierboven niet mee.`}
+        </p>
+      )}
+
+      {nietGeladen.length > 0 && (
+        // Ontbrekende maanden melden in plaats van een kortere reeks stilzwijgend doorgeven:
+        // anders lees je een totaal over vier maanden als een totaal over zes.
+        <p className="mt-3 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-micro text-amber-800">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {nietGeladen.length === 1
+            ? `Voor ${formatMonth(nietGeladen[0])} is geen data geladen; dat totaal ontbreekt hierboven.`
+            : `Voor ${nietGeladen.length} maanden is geen data geladen (${maandenTekst(nietGeladen)}); die tellen hierboven niet mee.`}
+        </p>
+      )}
+    </>
+  );
+
+  if (vorm === "tegels") {
+    // De vijf cijfers als één lijst, zodat de nadruk over alle vijf gekozen wordt (nadrukIndex).
+    const tegels = [
+      ...kaarten.map((k) => ({
+        label: k.label, waarde: k.waarde, reeks: k.reeks, reeksBasis: "nul" as const,
+        delta: k.d ? {
+          pct: k.d.pct,
+          hogerIsBeter: k.hogerIsBeter,
+          leegTekst: k.d.vorig === 0 && k.totaal > 0 && !vorigeNietLeeg ? "nieuw in deze periode" : undefined,
+          // De bandkop "vergeleken met ..." staat hier in de voetregel; per tegel zegt "was" waartegen.
+          // Het GEPAARDE vorige totaal: precies het getal waar het percentage tegen gerekend is.
+          // Alleen als het grote getal erboven ook het gepaarde totaal is. Loopt een kanaal pas
+          // sinds kort, dan is het grote getal het hele periodetotaal en het percentage gerekend
+          // over de gepaarde maanden: "3.871 +23% was 1.902" klopt dan voor geen lezer. Dan alleen
+          // het percentage, zoals de band, en de uitlegregel eronder zegt waarover het gaat.
+          was: k.d.pct !== null && Math.abs(k.d.huidig - k.totaal) <= Math.max(1e-6, Math.abs(k.totaal) * 1e-9)
+            ? k.opmaak(k.d.vorig) : undefined,
+        } : undefined,
+      })),
+      { label: "ROAS", waarde: roas === null ? "—" : formatRoas(roas), reeksBasis: "bereik" as const,
+        reeks: reeksVerhouding((m) => (m.adSpend > 0 ? m.revenue / m.adSpend : null)),
+        delta: verhoudingDelta(vorigeRoas, huidigeRoas, true, (v) => formatRoas(v)) },
+      { label: "CPA", waarde: cpa === null ? "—" : euro(cpa), reeksBasis: "bereik" as const,
+        reeks: reeksVerhouding((m) => (m.conversions > 0 ? m.adSpend / m.conversions : null)),
+        delta: verhoudingDelta(vorigeCpa, huidigeCpa, false, (v) => euro(v)) },
+    ];
+    const nadruk = nadrukIndex(tegels.map((t) => t.delta?.pct));
+    return (
+      // Geen overflow-hidden: een bedrag van zeven cijfers is op een telefoon een paar pixels breder
+      // dan zijn kolom, en dan liever over de opvulling heen dan met een afgesneden laatste cijfer.
+      <section aria-label={`Kerncijfers over ${formatRange(periode.range)}`} className="rounded-xl border border-border bg-card shadow-sm">
+        {/* Hetzelfde raster als de band: twee, drie of vijf kolommen. De tegels hebben GEEN eigen
+            achtergrond: op een telefoon is een bedrag van zes cijfers breder dan zijn halve
+            kolom, en een buurtegel met een eigen vlak zou de laatste cijfers afdekken. De
+            scheidslijn tussen de tegels staat er daarom alleen waar ze naast elkaar passen. */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          {tegels.map((t, i) => (
+            // De nadruk is een streep boven de tegel en geen kleurvlak: het cijfer zelf blijft
+            // even groot en even zwart als de andere vier. Een los streepje binnen de opvulling en
+            // geen rand van de tegel: een rand loopt door tot in de ronde hoek van de kaart en
+            // steekt daar uit, en zo staan de cijfers met en zonder nadruk op dezelfde lijn.
+            <div key={t.label} data-nadruk={i === nadruk || undefined}
+              className="relative px-3 pb-3 pt-3 lg:border-l lg:border-l-border/60 lg:px-4 lg:first:border-l-0">
+              {i === nadruk && <span aria-hidden className="absolute inset-x-3 top-0 h-0.5 rounded-b-full bg-brand-gray lg:inset-x-4" />}
+              <Kerncijfer
+                label={t.label}
+                waarde={t.waarde}
+                reeks={t.reeks}
+                reeksBasis={t.reeksBasis}
+                reeksLabel={`${t.label} per maand binnen ${formatRange(periode.range)}`}
+                delta={t.delta}
+                deltaVorm="pil"
+              />
+            </div>
+          ))}
+        </div>
+        {/* De periode en de vergelijking voluit, met hetzelfde label als de andere blokken die de
+            periode volgen. In de band is dit de kop; hier de voetregel, onder de cijfers. */}
+        <div className="border-t border-border px-4 pb-2.5 pt-2">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
+            <span className="font-medium text-brand-gray">{formatRange(periode.range)}</span>
+            <Vensterlabel soort="periode" kaal />
+            {periode.compareRange && <span>vergeleken met {formatRange(periode.compareRange)}</span>}
+          </p>
+          {uitleg}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-border bg-card px-6 py-5 shadow-sm">
       {!compact && (
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-brand-blue-ink">
+          <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-wide text-brand-blue-ink">
             {formatRange(periode.range)}
+            {/* De band is het blok dat de periode per definitie volgt. Het label staat er kaal: de
+                maanden staan er al voluit naast, en hetzelfde woord als in de andere blokken laat
+                zien welke daarvan met deze band meebewegen. */}
+            <Vensterlabel soort="periode" kaal />
           </h3>
           {periode.compareRange && (
             <p className="text-micro text-muted-foreground">
@@ -329,53 +466,7 @@ export function PeriodSummary({ data, compact, bronnen, laden = false }: Props) 
         />
       </div>
 
-      {/* Uitleg bij de cijfers, geen waarschuwing: dezelfde neutrale stijl, en hooguit één regel
-          per onderwerp. Amber blijft voor wat aandacht vraagt (de ontbrekende maanden hieronder). */}
-      {nietGepaard && <p className="mt-3 text-micro text-muted-foreground">{nietGepaard}</p>}
-      {standTekst && <p className={`${nietGepaard ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>{standTekst}</p>}
-
-      {/* Een geladen maand vóór de start: er is nog geen data, en er ontbreekt niets. Uitleg, geen
-          waarschuwing. De demo-Meta-tab zei hier in amber "Voor 7 maanden is geen data geladen (aug
-          2025 t/m feb 2026); die tellen hierboven niet mee", onder de eigen zin "de data begint
-          halverwege maart 2026", terwijl de band die maanden wel had opgehaald. */}
-      {voorStart.length > 0 && (
-        <p className={`${nietGepaard || standTekst ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>
-          {`${voorStart.length === 1 ? `Voor ${formatMonth(voorStart[0])} is er geen data` : `Voor ${voorStart.length} maanden is er geen data (${maandenTekst(voorStart)})`}: ${
-            start ? `de data begint pas in ${formatMonth(start)}.` : "er is nog geen enkele maand met data."}`}
-        </p>
-      )}
-
-      {/* Een maand zonder rij na de start van de data is een gemeten nul (gepauzeerd, of gestopt
-          terwijl de stand doorloopt): uitleg, geen waarschuwing. Hij stond in de amberregel als
-          "geen data geladen ... tellen hierboven niet mee", terwijl de zin erboven zei dat zo'n maand
-          als nul telt, en de cijfers dat ook doen (review [6]). */}
-      {gemetenNul.length > 0 && (
-        <p className={`${nietGepaard || standTekst || voorStart.length > 0 ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>
-          {gemetenNul.length === 1
-            ? `Voor ${formatMonth(gemetenNul[0])} is er geen data; na de start van de data is dat een maand zonder activiteit, en die telt hierboven als nul.`
-            : `Voor ${gemetenNul.length} maanden is er geen data (${maandenTekst(gemetenNul)}); na de start van de data zijn dat maanden zonder activiteit, en die tellen hierboven als nul.`}
-        </p>
-      )}
-
-      {nietOpgehaald.length > 0 && (
-        <p className="mt-3 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-micro text-amber-800">
-          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {nietOpgehaald.length === 1
-            ? `${nietOpgehaald[0]} kon niet geladen worden en telt hierboven niet mee.`
-            : `${opsomming(nietOpgehaald)} konden niet geladen worden en tellen hierboven niet mee.`}
-        </p>
-      )}
-
-      {nietGeladen.length > 0 && (
-        // Ontbrekende maanden melden in plaats van een kortere reeks stilzwijgend doorgeven:
-        // anders lees je een totaal over vier maanden als een totaal over zes.
-        <p className="mt-3 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-micro text-amber-800">
-          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {nietGeladen.length === 1
-            ? `Voor ${formatMonth(nietGeladen[0])} is geen data geladen; dat totaal ontbreekt hierboven.`
-            : `Voor ${nietGeladen.length} maanden is geen data geladen (${maandenTekst(nietGeladen)}); die tellen hierboven niet mee.`}
-        </p>
-      )}
+      {uitleg}
     </div>
   );
 }

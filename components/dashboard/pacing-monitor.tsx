@@ -9,6 +9,7 @@ import { editieNaam, fairCountdown, type UpcomingEdition } from "@/lib/fair/fair
 import { today } from "@/lib/reporting-date";
 import { berekenLanding, seizoensduiding } from "@/lib/pacing/landing";
 import { jaardoelTekst, metToelichting } from "@/lib/analysis/standaard-jaardoel";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -216,9 +217,10 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
     // Nu rekken de blokken zelf mee en staat hun inhoud verticaal gecentreerd: dezelfde hoogte,
     // maar gevuld in plaats van afgetopt.
     <div className="@container flex h-full flex-col bg-card rounded-xl border border-border p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing</h3>
+        <Vensterlabel soort="jaar" jaar={data.currentYear} />
         <span className="text-micro text-muted-foreground ml-auto">
           <BeursAftelling edition={edition} vandaag={today()} />
           {totMaand > 0

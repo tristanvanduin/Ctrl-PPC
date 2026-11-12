@@ -10,6 +10,7 @@ import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import type { BlendedKanaalReeks } from "@/lib/api/blended-historical";
 import { uitgeslotenMetDag, type DataStandSamen } from "@/lib/sync/datastand";
 import { uitgeslotenZin } from "./period-summary";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Pacing over alle kanalen samen.
 //
@@ -228,6 +229,7 @@ export function BlendedPacing({ perKanaal, dataStand }: {
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing — alle kanalen</h3>
+        <Vensterlabel soort="jaar" jaar={Number(cijfers.totMaand.slice(0, 4))} />
         <span className="text-micro text-muted-foreground ml-auto">
           Jaar tot en met {formatMonth(cijfers.totMaand)} · {maanden} {maanden === 1 ? "maand" : "maanden"} · tegen dezelfde periode vorig jaar
         </span>

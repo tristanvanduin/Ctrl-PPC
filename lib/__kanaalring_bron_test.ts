@@ -10,7 +10,10 @@
 //
 // Wat hier vastligt, met het ECHTE component (react-dom/client op een nep-DOM):
 // - met `kanaalRijen` doet de kaart geen enkel verzoek en staat de ring er in de eerste render;
-// - hij kiest zelf zijn venster: een maand van vóór het venster telt niet mee in het totaal;
+// - hij volgt de gekozen periode (bewust aangepast in fase 2; hij koos eerst zelf een venster van
+//   ongeveer 90 dagen en stond stil als de periode verzet werd): een maand van vóór de periode
+//   telt niet mee in het totaal, de lopende maand ook niet, en een kortere periode geeft een
+//   kleiner totaal zonder verzoek;
 // - Microsoft staat in de ring;
 // - `kanaalRijen={null}` (de aanroeper laadt nog) is een laadvlak, geen lege ring en geen verzoek;
 // - zonder `kanaalRijen` en met Kanaal als enige tabblad leest hij de gedeelde historie
@@ -68,19 +71,27 @@ Object.assign(globalThis, {
   localStorage,
 });
 
-// ── De rijen: deze maand en de vorige in het venster, één maand van een jaar terug erbuiten ──
+// ── De rijen ─────────────────────────────────────────────────────────────────────────────────
+// De standaardperiode is de laatste twaalf VOLLE maanden: VORIGE (de laatste volle maand) en de
+// maand vijf terug liggen erin; de lopende maand en een maand van dertien terug niet. Onder
+// "laatste 3 maanden" valt ook de maand van vijf terug weg.
 const DEZE = today().slice(0, 7);
 const VORIGE = addMonths(DEZE, -1);
-const JAAR_TERUG = addMonths(DEZE, -12);
+const VIJF_TERUG = addMonths(DEZE, -5);
+const VOOR_PERIODE = addMonths(DEZE, -13);
 const rij = (maand: string, channel: KanaalMaandRij["channel"], spend: number, conversions: number): KanaalMaandRij =>
   ({ month: `${maand}-01`, channel, impressions: spend * 10, clicks: spend, spend, conversions, conversion_value: 0 });
 const RIJEN: KanaalMaandRij[] = [
-  rij(DEZE, "google_ads", 600, 30), rij(DEZE, "meta_ads", 250, 10), rij(DEZE, "microsoft_ads", 150, 5),
-  rij(VORIGE, "google_ads", 400, 20),
-  rij(JAAR_TERUG, "google_ads", 90000, 900),
+  rij(DEZE, "google_ads", 7000, 70),
+  rij(VORIGE, "google_ads", 600, 30), rij(VORIGE, "meta_ads", 250, 10), rij(VORIGE, "microsoft_ads", 150, 5),
+  rij(VIJF_TERUG, "google_ads", 430, 20),
+  rij(VOOR_PERIODE, "google_ads", 90000, 900),
 ];
 const eur = (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
-const IN_VENSTER = 600 + 250 + 150 + 400;
+const IN_VENSTER = 600 + 250 + 150 + 430;
+// Dit bedrag komt in de weergave over twaalf maanden nergens voor (het totaal is daar 1.430, Google
+// alleen 1.030): staat het er, dan heeft de ring de kortere periode overgenomen.
+const IN_DRIE_MAANDEN = 600 + 250 + 150;
 
 // ── Nep-fetch: telt per pad ──────────────────────────────────────────────────────────────────
 const verzoeken: Record<string, number> = {};
@@ -95,8 +106,8 @@ const ROUTE = {
   currentYearMonthly: [],
   dataStand: null,
   perKanaal: [
-    { kanaal: "google", vanaf: null, maanden: [{ month: DEZE, conversions: 30, revenue: 0, adSpend: 600, impressions: 6000, clicks: 600 }] },
-    { kanaal: "linkedin", vanaf: DEZE, maanden: [{ month: DEZE, conversions: 4, revenue: 0, adSpend: 200, impressions: 2000, clicks: 200 }] },
+    { kanaal: "google", vanaf: null, maanden: [{ month: VORIGE, conversions: 30, revenue: 0, adSpend: 600, impressions: 6000, clicks: 600 }] },
+    { kanaal: "linkedin", vanaf: VORIGE, maanden: [{ month: VORIGE, conversions: 4, revenue: 0, adSpend: 200, impressions: 2000, clicks: 200 }] },
   ],
   clientTargets: [],
 };
@@ -135,10 +146,33 @@ async function main() {
     check("de ring staat er meteen, met de kanalen bij naam", getoond("Spend per kanaal") && getoond("Google Ads") && getoond("Meta"), teksten.slice(0, 12).join(" | "));
     check("Microsoft staat in de ring", getoond("Microsoft Ads"), teksten.join(" | "));
     check("geen laadtekst", !getoond("wordt geladen") && !getoond("Bezig met laden"), teksten.join(" | "));
-    check("het totaal telt alleen de maanden in het venster", getoond(eur(IN_VENSTER)) && !getoond(eur(IN_VENSTER + 90000)), teksten.filter((t) => t.includes("€")).join(" | "));
+    check("het totaal telt alleen de maanden van de periode", getoond(eur(IN_VENSTER)) && !getoond(eur(IN_VENSTER + 90000)), teksten.filter((t) => t.includes("€")).join(" | "));
+    check("de lopende maand telt niet mee: de periode eindigt op de laatste volle maand", !getoond(eur(IN_VENSTER + 7000)), teksten.filter((t) => t.includes("€")).join(" | "));
+    check("de kop zegt dat de ring de periode volgt", teksten.some((t) => t.startsWith("volgt periode")), teksten.slice(0, 6).join(" | "));
     await rust(50);
     check("geen enkel verzoek", totaal() === 0, JSON.stringify(verzoeken));
     root.unmount();
+    await rust();
+  }
+
+  console.log("De ring volgt de gekozen periode, zonder verzoek");
+  {
+    // De echte PeriodProvider, met "laatste 3 maanden" als bewaarde keuze: die komt in een effect
+    // binnen, dus de ring staat eerst op twaalf maanden en schuift dan. Wachten op die toestand,
+    // niet op een tijd.
+    const { PeriodProvider } = await import("./period/period-context");
+    opslag.set("rm-periode-ring", JSON.stringify({ preset: "last_3m", custom: null, comparison: "none" }));
+    wisTeksten();
+    const root = maakRoot();
+    root.render(createElement(PeriodProvider, {
+      scope: "ring",
+      children: createElement(CampaignTypeSplit, { clientId: "klant-r", toon: ["kanaal"], kanaalRijen: RIJEN }),
+    }));
+    const geschoven = await tot(() => getoond(eur(IN_DRIE_MAANDEN)));
+    check("onder 'laatste 3 maanden' valt de maand van vijf terug weg", geschoven, teksten.filter((t) => t.includes("€")).join(" | "));
+    check("nog steeds geen enkel verzoek", totaal() === 0, JSON.stringify(verzoeken));
+    root.unmount();
+    opslag.delete("rm-periode-ring");
     await rust();
   }
 

@@ -10,6 +10,7 @@ import { useKanaalData } from "./channel-data-provider";
 import { eur, fmt } from "./channel-performance";
 import { BeursAftelling, PacingRing } from "./pacing-monitor";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Pacing voor Meta en LinkedIn, als eigen kaart in de hero -- naast Account Health, op dezelfde
 // plek waar Google's PacingMonitor staat.
@@ -79,6 +80,8 @@ export function ChannelPacing({ edition }: { edition?: UpcomingEdition | null })
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing</h3>
+        {/* Geen jaarblok: dit is de lopende maand tegen de vorige, op dezelfde dag. */}
+        <Vensterlabel soort="vast" venster="lopende maand" />
         <span className="text-micro text-muted-foreground ml-auto">
           <BeursAftelling edition={edition} vandaag={vandaag()} />
           Maand tot nu · dag {dagVanMaand} van {dagenInMaand} · vergeleken met vorige maand op dag {dagVanMaand}

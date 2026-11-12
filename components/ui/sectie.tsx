@@ -59,3 +59,42 @@ export function Sectie({
     </section>
   );
 }
+
+/**
+ * Een kop bínnen een sectie: een onderwerp dat bij zijn buren hoort, maar een eigen vraag stelt.
+ *
+ * Waarom dit bestaat (bouwplan fase 2). De blokken met een vast venster (pacing, het jaaroverzicht,
+ * de beurs) stonden verspreid over de pagina, elk onder een eigen sectiekop, met blokken ertussen
+ * die de periodekiezer wel volgen. Ze staan nu bij elkaar onder één sectiekop; wat eerder een
+ * sectie was, is daarbinnen een deel. De titel, het bijschrift en de keuzeknop blijven precies wat
+ * ze waren, alleen een maat kleiner (h3 onder de h2 van de sectie) en met minder lucht erboven dan
+ * een sectie: ze horen bij elkaar.
+ *
+ * `venster` is de plek voor het Vensterlabel van dit deel, als de kaarten eronder er zelf geen
+ * dragen.
+ */
+export function Deelkop({ icoon, titel, bijschrift, actie, venster }: {
+  icoon?: ReactNode;
+  titel: string;
+  bijschrift?: string;
+  actie?: ReactNode;
+  venster?: ReactNode;
+}) {
+  return (
+    // pt-4: binnen `space-y-4` van de sectie staat een deelkop zo op 32 px van het vorige blok,
+    // tussen de 16 px binnen een onderwerp en de 40 px tussen secties in.
+    <div className="flex flex-wrap items-center gap-3 gap-y-2 pt-4">
+      {icoon && (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10">{icoon}</div>
+      )}
+      <div className="min-w-0">
+        <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-title font-bold text-brand-blue-ink">
+          {titel}
+          {venster}
+        </h3>
+        {bijschrift && <p className="text-xs text-muted-foreground">{bijschrift}</p>}
+      </div>
+      {actie && <div className="ml-auto shrink-0">{actie}</div>}
+    </div>
+  );
+}

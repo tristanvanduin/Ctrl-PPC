@@ -89,7 +89,7 @@ async function main() {
   const { createElement } = await import("react");
   const { createRoot } = await import("react-dom/client");
   const { flushSync } = await import("react-dom");
-  const { PeriodSelector, resolveSelection } = await import("../../components/dashboard/period-selector");
+  const { PeriodSelector, PeriodeSnelkoppelingen, resolveSelection } = await import("../../components/dashboard/period-selector");
   const { lastCompleteMonth, PRESET_LABEL, COMPARISON_LABEL } = await import("./period-range");
   type Selectie = ReturnType<typeof resolveSelection>;
 
@@ -157,6 +157,38 @@ async function main() {
   check("maxMaand begrenst de eindmaand", alle(host, (k) => k.tagName === "INPUT")[1]?.attributes.max === "2026-07");
   root.unmount();
 
+  // ── De snelkoppelingen 3, 6 en 12 maanden naast de kiezer (bouwplan fase 2) ────────────────
+  // Zichtbare knoppen voor de drie vensters die je het vaakst wisselt. Ze zetten de bestaande
+  // presets; er is geen tweede periodemodel.
+  {
+    let gezet: string | null = null;
+    const snelHost = (doc.createElement as (t: string) => Knoop)("div");
+    const snelRoot = createRoot(snelHost as unknown as Element);
+    const toon = (extra: Record<string, unknown> = {}) => flushSync(() => snelRoot.render(createElement(PeriodeSnelkoppelingen, {
+      preset: "last_12m", onKies: (preset: string) => { gezet = preset; }, ...extra,
+    } as never)));
+    toon();
+    const knoppen = () => alle(snelHost, (k) => k.tagName === "BUTTON");
+    check("drie knoppen, zonder een paneel te openen", knoppen().map((k) => k.textContent).join() === "3 mnd,6 mnd,12 mnd", knoppen().map((k) => k.textContent).join());
+    check("elke knop heet voluit zoals de preset in het paneel",
+      knoppen().map((k) => k.attributes["aria-label"]).join() === [PRESET_LABEL.last_3m, PRESET_LABEL.last_6m, PRESET_LABEL.last_12m].join());
+    check("de actieve preset is ingedrukt, de andere niet",
+      knoppen().map((k) => k.attributes["aria-pressed"]).join() === "false,false,true", knoppen().map((k) => k.attributes["aria-pressed"]).join());
+    klik(knoppen()[0]);
+    check("een klik zet de bestaande preset", gezet === "last_3m", String(gezet));
+    klik(knoppen()[1]);
+    check("ook de tweede", gezet === "last_6m", String(gezet));
+    toon({ preset: "this_year" });
+    check("bij een andere keuze (dit jaar, een eigen bereik) is er geen ingedrukt", knoppen().every((k) => k.attributes["aria-pressed"] === "false"));
+    // Tijdens het laden staan ze er al (de rij verspringt dan niet), maar zijn ze niet te bedienen
+    // en beweert geen van de drie de actieve te zijn: de periode is dan nog niet bekend.
+    toon({ preset: "last_12m", laden: true });
+    check("tijdens het laden: aanwezig, uitgeschakeld, geen actieve",
+      knoppen().length === 3 && knoppen().every((k) => "disabled" in k.attributes || k.disabled === true)
+      && knoppen().every((k) => k.attributes["aria-pressed"] === "false"), JSON.stringify(knoppen().map((k) => k.attributes)));
+    snelRoot.unmount();
+  }
+
   // ── Bron: de kiezer en het klantdashboard ─────────────────────────────────────────────────
   const wortel = join(import.meta.dirname, "..", "..");
   const kiezer = readFileSync(join(wortel, "components/dashboard/period-selector.tsx"), "utf8");
@@ -167,6 +199,12 @@ async function main() {
   check("en de eindmaand van de presets als max", picker.includes("maxMaand={periode.eindMaand}"));
   check("gevuld uit de cadans van de editie", /<DashboardPeriodPicker[^>]*jaarlijkseEditie=\{upcomingEdition\?\.cadence === "annual"\}/.test(dash));
   check("de editie volgt de gekozen beurs", /useUpcomingEdition\(client\.id, geoClone\)/.test(dash));
+  // De snelkoppelingen staan naast de kiezer en gaan via dezelfde periode.set, met de gekozen
+  // vergelijking: geen tweede model en geen eigen state.
+  const snel = /function DashboardPeriodPicker[\s\S]*?<PeriodeSnelkoppelingen([\s\S]*?)\/>/.exec(dash)?.[1] ?? "";
+  check("het klantdashboard toont de snelkoppelingen naast de kiezer", snel.includes("preset={periode.preset}") && snel.includes("laden={!klaar}"), snel.slice(0, 160));
+  check("een klik zet de preset via periode.set en houdt de vergelijking", /onKies=\{\(preset\) => periode\.set\(preset, null, periode\.comparison\)\}/.test(snel), snel.slice(0, 200));
+  check("de knoppen komen uit SNELKOPPELINGEN (de bestaande presets)", /SNELKOPPELINGEN\.map\(/.test(kiezer));
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);
   process.exit(failed > 0 ? 1 : 0);

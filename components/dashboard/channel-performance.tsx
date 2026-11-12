@@ -12,6 +12,9 @@ import { today as vandaag } from "@/lib/reporting-date";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { useKanaalData } from "./channel-data-provider";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { usePeriod } from "@/lib/period/period-context";
+import type { PeriodRange } from "@/lib/period/period-range";
 
 // Volwaardige prestatie-view voor Meta, LinkedIn en Microsoft: dezelfde bouwstenen als Google
 // (KPI-kaarten, pacing, maandtabel, grafiek, campagnetabel), gevoed uit de dag-tabellen van
@@ -132,15 +135,24 @@ const emptyAgg = (): Agg => ({ impressions: 0, clicks: 0, spend: 0, conv: 0 });
 
 /**
  * De rijen van de maandtabel uit de maanden van de route: alleen VOLLE maanden (vóór `dezeMaand`),
- * de laatste zes, oplopend. De tellers komen één op één uit perKanaal[kanaal].maanden -- dezelfde
- * cijfers die "Alle kanalen" voor dit kanaal telt (lib/__kanaaltab_gelijk_alle_kanalen_test.ts).
+ * oplopend. De tellers komen één op één uit perKanaal[kanaal].maanden -- dezelfde cijfers die
+ * "Alle kanalen" voor dit kanaal telt (lib/__kanaaltab_gelijk_alle_kanalen_test.ts).
+ *
+ * Met `periode`: de volle maanden van de gekozen periode (bouwplan fase 2), zodat de totaalregel
+ * van de tabel het totaal van de band is. Zonder: de laatste zes, zoals het was; dat is het
+ * venster van de beurs-scope, waar de maanden uit campagnedagrijen komen en niet verder reiken.
  */
-export function volleMaandenUitTellers(maanden: readonly BlendedKanaalMaand[], dezeMaand: string): [string, Agg][] {
-  return maanden
+export function volleMaandenUitTellers(
+  maanden: readonly BlendedKanaalMaand[],
+  dezeMaand: string,
+  periode?: PeriodRange,
+): [string, Agg][] {
+  const rijen = maanden
     .filter((m) => m.month < dezeMaand)
+    .filter((m) => !periode || (m.month.slice(0, 7) >= periode.start && m.month.slice(0, 7) <= periode.end))
     .map((m): [string, Agg] => [m.month, { impressions: m.impressions ?? 0, clicks: m.clicks ?? 0, spend: m.adSpend, conv: m.conversions }])
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-6);
+    .sort(([a], [b]) => a.localeCompare(b));
+  return periode ? rijen : rijen.slice(-6);
 }
 
 // `edition` is hier weg: die diende alleen het pacing-blok ("nog N weken tot de beurs"),
@@ -148,6 +160,12 @@ export function volleMaandenUitTellers(maanden: readonly BlendedKanaalMaand[], d
 export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: string; channel: ChannelKind; geoClone?: string | null }) {
   const cfg = CONFIG[channel];
   const { rijen: account, maanden, convVan, convLabel, fout } = useKanaalData();
+  // De maandtabel volgt de gekozen periode (zonder beurs-scope); de kerncijfers erboven houden hun
+  // 28 dagen, want die komen uit dagrijen en de periode is op maandkorrel. Beide zeggen in hun kop
+  // welk venster ze gebruiken.
+  const periode = usePeriod();
+  const periodeStart = periode.range.start;
+  const periodeEind = periode.range.end;
   // Alleen met een gekozen beurs: de account-tabel draagt geen campagnenaam en kan dus niet per
   // beurs gesplitst worden, dan her-aggregeren we uit de campagne-dagdata (die wél namen draagt).
   // Zonder beurs werden deze twee lezingen gedaan en nooit gebruikt. null = (nog) niet gelezen.
@@ -210,9 +228,12 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
       }
       fullMonths = [...byMonth.entries()].filter(([m]) => m < curMonth).sort().slice(-6);
     } else {
-      fullMonths = volleMaandenUitTellers(maanden, curMonth);
+      fullMonths = volleMaandenUitTellers(maanden, curMonth, { start: periodeStart, end: periodeEind });
     }
-    if (source.length === 0 && fullMonths.length === 0) return null;
+    // Op ALLE volle maanden en niet op die van de periode: een lege periode is geen lege kaart.
+    // Anders verdween het hele blok, kerncijfers incluis, zodra je een periode koos van vóór de
+    // data van dit kanaal.
+    if (source.length === 0 && (geoClone ? fullMonths.length === 0 : volleMaandenUitTellers(maanden, curMonth).length === 0)) return null;
 
     // KPI-vensters: laatste 28 dagen vs de 28 ervoor.
     const win = (from: number, to: number): Agg => {
@@ -227,7 +248,7 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
     const prior = win(28, 56);
 
     return { empty: false as const, fullMonths, recent, prior };
-  }, [account, maanden, campaign, convVan, geoClone, matchedEntities]);
+  }, [account, maanden, campaign, convVan, geoClone, matchedEntities, periodeStart, periodeEind]);
 
   if (fout || error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{fout ?? error}</div>;
   if (account === null || maanden === null || (geoClone && campaign === null)) {
@@ -263,9 +284,10 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
       )}
       {/* KPI-kaarten — in een getitelde kaart, zodat de opbouw rijmt met het Google-beursoverzicht. */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2">
           <BarChart3 className="w-4.5 h-4.5 text-brand-blue-ink" />
           <h3 className="text-title font-semibold text-brand-gray">Kerncijfers (laatste 28 dagen)</h3>
+          <Vensterlabel soort="vast" venster="laatste 28 dagen" />
         </div>
         <div className="px-4 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {kpis.map((k) => (
@@ -298,10 +320,18 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
 
       {/* Maandtabel */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2">
           <Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />
           <h3 className="text-title font-semibold text-brand-gray">Per maand</h3>
+          {/* Zonder beurs-scope de gekozen periode; met beurs-scope de laatste zes volle maanden uit
+              de campagnedagrijen, de enige bron die per beurs te splitsen is. */}
+          {geoClone ? <Vensterlabel soort="vast" venster="laatste 6 maanden" /> : <Vensterlabel soort="periode" />}
         </div>
+        {fullMonths.length === 0 && (
+          <p className="px-5 py-8 text-center text-body text-muted-foreground">
+            {geoClone ? "Nog geen volle maand met cijfers voor deze beurs." : "Dit kanaal heeft geen volle maand met cijfers in de gekozen periode."}
+          </p>
+        )}
         {/* De gedeelde tabelcomponenten: zelfde ritme, sorteerbare opmaak, aandeelstrepen en een
             totaalregel als bij de dertien andere schermen. Handgeschreven <table> stond hier met
             een eigen kopstijl en zonder som.
@@ -309,7 +339,7 @@ export function ChannelPerformance({ clientId, channel, geoClone }: { clientId: 
             Aandeelstrepen alleen op wat optelt — spend, vertoningen, klikken, conversies. CTR en
             CPA zijn verhoudingen: daar bestaat geen geheel om een aandeel van te zijn, en bij CPA
             zou een lange streep "veel" zeggen waar het "duur" betekent. Zie data-table.tsx. */}
-        {(() => {
+        {fullMonths.length > 0 && (() => {
           const rijen = [...fullMonths].reverse();
           const som = rijen.reduce((t, [, a]) => ({
             spend: t.spend + a.spend, impressions: t.impressions + a.impressions,

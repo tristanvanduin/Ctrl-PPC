@@ -21,6 +21,7 @@ import { Raster, Tip, Legenda, type LegendaItem } from "./chart-chrome";
 import { METRIC_LABELS } from "@/lib/forecast-format";
 import { jaardoelTekst } from "@/lib/analysis/standaard-jaardoel";
 import { cpaTrendVanForecast } from "@/lib/analysis/trend";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 function formatYAxis(metric: ForecastMetric) {
   if (metric === "revenue") {
@@ -159,6 +160,7 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
           <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
             Performance {new Date().getFullYear()}
           </h3>
+          <Vensterlabel soort="jaar" jaar={clientData.currentYear} />
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => setViewMode("weekly")}

@@ -11,6 +11,7 @@ import { today } from "@/lib/reporting-date";
 import type { ClientHistoricalData } from "@/lib/types";
 import { PeriodPopover } from "@/components/ui/period-popover";
 import { actieveJaardagen } from "./pacing-monitor";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 const ALLE_METRICS: ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"];
 
@@ -307,8 +308,10 @@ export function MonthlyOverviewView({ data, forecast, vandaag }: {
           plus de metric-knoppen de pagina breder i.p.v. zelf om te breken. */}
       <div className="px-5 pt-5 pb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
+          <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">
             Maandprestaties
+            {/* De maanden van het lopende jaar tegen de jaarprognose: een jaarblok. */}
+            <Vensterlabel soort="jaar" jaar={data.currentYear} />
           </h3>
           <p className="text-meta text-muted-foreground mt-0.5">
             Vorige, huidige en volgende maand · ratio geeft aan of je boven of onder verwachting zit

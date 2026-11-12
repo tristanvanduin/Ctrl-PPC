@@ -13,8 +13,10 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 import { maandLabel } from "./chart-chrome";
 import { addDays, today } from "@/lib/reporting-date";
 import { maandStart } from "@/lib/analysis/db-veilig";
-import { kanaalMaandRijen, type KanaalMaandRij } from "@/lib/cross-channel/kanaal-maandrijen";
+import { kanaalMaandRijen, rijenInPeriode, type KanaalMaandRij } from "@/lib/cross-channel/kanaal-maandrijen";
 import { useBlendedClientData } from "@/lib/use-blended-client-data";
+import { usePeriod } from "@/lib/period/period-context";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // De opener-donut (masterplan 17.32): spend per campagnetype (Search/Performance Max/Shopping/
 // Display). Bewust NIET Performance Max' eigen netwerkringen (pmax-network-split.tsx) -- die
@@ -168,7 +170,13 @@ export function vensterVanaf(vandaag: string): string {
  * @param kanaalRijen De maandrijen per kanaal voor de uitsplitsing "kanaal", als de aanroeper ze
  *   al heeft ("Alle kanalen" voedt er ook zijn staven en zijn tabel mee): null zolang hij nog
  *   laadt. Weggelaten (de Google-weergave) leest de kaart ze zelf uit dezelfde gedeelde historie,
- *   en pas als iemand het tabblad Kanaal kiest. Het venster kiest de kaart altijd zelf.
+ *   en pas als iemand het tabblad Kanaal kiest.
+ *
+ * HET VENSTER (bouwplan fase 2). De uitsplitsing per kanaal volgt de gekozen periode: de
+ * maandrijen per kanaal staan al in het geheugen, dus een periodewissel kost geen verzoek.
+ * Campagnetype en campagne lezen ads_campaign_monthly met een databasefilter op de laatste
+ * ongeveer negentig dagen; die de periode laten volgen kost bij elke wissel een verzoek. Ze houden
+ * daarom hun eigen venster, en het label in de kop zegt welke maanden dat zijn.
  */
 export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u.key), kanaalRijen }: {
   clientId: string;
@@ -188,12 +196,13 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
   // eronder. Nogmaals klikken op hetzelfde type heft de selectie op.
   const [selected, setSelected] = useState<string | null>(null);
   const toggleSelected = (key: string) => setSelected((cur) => (cur === key ? null : key));
+  const periode = usePeriod();
 
   // Drie maanden: genoeg om een net gestarte campagne niet als "geen data" te tonen, kort
   // genoeg om een verschoven mix (bv. een gestopt PMax-experiment) nog te laten zien --
   // zelfde overweging als PmaxNetworkSplit's eigen venster, alleen op maandrijen i.p.v. dagrijen.
-  // Eén keer bepaald, voor alle drie de tabbladen: het databasefilter van type en campagne en het
-  // filter op de kanaalrijen hieronder gebruiken dezelfde maand.
+  // Het venster van campagnetype en campagne (het databasefilter); de kanaalrijen hieronder volgen
+  // de gekozen periode.
   const vanaf = vensterVanaf(today());
 
   // KANAAL komt uit een ANDERE bron dan campagnetype en campagne: ads_campaign_monthly kent per
@@ -208,14 +217,18 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
   // cache (hij staat uit zolang niemand het tabblad Kanaal kiest). En geen effect met state: de
   // rijen zijn er al, dus een effect zou eerst een laadvlak tonen en dan pas de ring.
   const zelfLezen = kanaalRijen === undefined && uitsplitsing === "kanaal";
+  // Als losse maanden en niet als object: usePeriod geeft bij elke render van de provider een
+  // nieuw bereik, en de memo hieronder hoort alleen te herrekenen als de maanden veranderen.
+  const periodeStart = periode.range.start;
+  const periodeEind = periode.range.end;
   const eigenHistorie = useBlendedClientData(clientId, zelfLezen);
   const kanaalDeel = useMemo(() => {
     const bron = kanaalRijen !== undefined
       ? kanaalRijen
       : eigenHistorie.perKanaal ? kanaalMaandRijen(eigenHistorie.perKanaal) : eigenHistorie.loading ? null : [];
     if (bron === null) return null;
-    // De rijen dragen het maandbegin, net als de month-kolom waar het databasefilter op staat.
-    const inVenster = bron.filter((r) => r.month >= vanaf);
+    // De maanden van de gekozen periode: dezelfde als de band, de staven en de kanaaltabel.
+    const inVenster = rijenInPeriode(bron, { start: periodeStart, end: periodeEind });
     return {
       maanden: maandenTekst(inVenster.map((r) => r.month)),
       rows: inVenster.map((r): NetworkRow => ({
@@ -227,7 +240,7 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
         clicks: r.clicks,
       })),
     };
-  }, [kanaalRijen, eigenHistorie.perKanaal, eigenHistorie.loading, vanaf]);
+  }, [kanaalRijen, eigenHistorie.perKanaal, eigenHistorie.loading, periodeStart, periodeEind]);
 
   const sleutel = `${clientId}|${uitsplitsing}|${vanaf}`;
   useEffect(() => {
@@ -290,16 +303,22 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
   if (rows === null && opStart) {
     return <Laadvlak vorm="grafiek" hoogte={200} titel={keuzes[0]?.titel ?? UITSPLITSINGEN[0].titel} />;
   }
-  if (leeg && opStart) return null;
+  // De kanaalring volgt de periode, en dan is "leeg" een gevolg van de keuze van de gebruiker (een
+  // periode van vóór de data): de kaart blijft staan en zegt dat, in plaats van te verdwijnen
+  // zodra je de periode verzet.
+  if (leeg && opStart && uitsplitsing !== "kanaal") return null;
 
   const kop = (
     <div className="border-b border-border px-5 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <PieChart className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{actief.titel}</h3>
-        {/* De maanden die er echt in zitten; "laatste 90 dagen" alleen zolang dat nog niet bekend is
-            of er niets is (dan is het de vraag, niet de uitkomst). */}
-        <span className="text-meta text-muted-foreground">{maanden ?? "laatste 90 dagen"}</span>
+        {/* Het venster, in het gedeelde label. Per kanaal: de gekozen periode. Campagnetype en
+            campagne: de maanden die er echt in zitten; "laatste 90 dagen" alleen zolang dat nog
+            niet bekend is of er niets is (dan is het de vraag, niet de uitkomst). */}
+        {uitsplitsing === "kanaal"
+          ? <Vensterlabel soort="periode" />
+          : <Vensterlabel soort="vast" venster={maanden ?? "laatste 90 dagen"} />}
       </div>
       {/* De uitsplitsingskiezer. Radiogroup en geen tabs-rol: er is één paneel eronder dat van
           inhoud wisselt, niet drie panelen waarvan er één zichtbaar is. Bij één keuze helemaal
@@ -337,7 +356,9 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
         <p className="px-5 py-8 text-center text-meta text-muted-foreground">
           {rows === null
             ? "Bezig met laden…"
-            : `Voor deze klant staat er in de laatste 90 dagen geen verdeling per ${actief.label.toLowerCase()} in het systeem.`}
+            : uitsplitsing === "kanaal"
+              ? "In de gekozen periode is er geen spend om over de kanalen te verdelen."
+              : `Voor deze klant staat er in de laatste 90 dagen geen verdeling per ${actief.label.toLowerCase()} in het systeem.`}
         </p>
       </div>
     );

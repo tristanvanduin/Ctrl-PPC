@@ -10,6 +10,7 @@ import { METRIC_LABELS, formatDeltaPercent, formatPercent, formatterFor, geenWaa
 import { toFairWeeks, currentWeekIndex, editieNaam, fairCountdown, type FairWeek, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
 import { PeriodPopover } from "@/components/ui/period-popover";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 const ALLE_METRICS: ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"];
 
@@ -253,9 +254,12 @@ export function FairWeeksView({
           nu naar een eigen regel i.p.v. de pagina breder te maken. */}
       <div className="px-5 pt-5 pb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide flex flex-wrap items-center gap-2">
             <CalendarClock className="w-4 h-4" />
             Weken tot {edition.eventName}
+            {/* De weken rond de beurs, uit de maanden en de prognose van het lopende jaar: een
+                jaarblok op de beurs-as, los van de gekozen periode. */}
+            <Vensterlabel soort="jaar" jaar={data.currentYear} toevoeging="weken rond de beurs" />
           </h3>
           <p className="text-meta text-muted-foreground mt-0.5">
             {aftelling == null

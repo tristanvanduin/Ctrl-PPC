@@ -10,6 +10,7 @@ import { KANAAL_NAAM, KANAAL_KLEUR, type Kanaal } from "@/lib/kanalen/beschikbaa
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { KanaalHealthRadar, type RadarReeks } from "./kanaal-health-radar";
 import type { RadarFactor } from "@/lib/health-radar";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 /**
  * Account Health per kanaal, naast elkaar en op volgorde — de opener van "Alle kanalen".
@@ -70,7 +71,7 @@ const COMPACT_VANAF = 4;
  * boven de verkeerde balk — een fout die eruitziet als data.
  */
 const COMPACT_RASTER =
-  "grid grid-cols-[minmax(5rem,9rem)_2rem_repeat(5,minmax(3rem,1fr))_1rem] items-center gap-x-3";
+  "grid min-w-[29rem] grid-cols-[minmax(5rem,9rem)_2rem_repeat(5,minmax(3rem,1fr))_1rem] items-center gap-x-3";
 
 /** Wat de kaart per kanaal weet: een score, nog onderweg, of niets om te beoordelen. */
 export interface KanaalScores {
@@ -214,9 +215,11 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
 
   return (
     <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <Activity className="w-4 h-4 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Account Health per kanaal</h3>
+        {/* Een jaarblok: elke score komt uit de jaarprognose van zijn kanaal, niet uit de gekozen periode. */}
+        <Vensterlabel soort="jaar" />
         <span className="text-micro text-muted-foreground ml-auto">elk kanaal tegen zijn eigen maatstaf</span>
       </div>
 
@@ -238,7 +241,9 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
             </p>
           </div>
         )}
-        <div className={`flex min-w-0 flex-1 flex-col ${compact ? "gap-1.5" : "gap-4"}`}>
+        {/* Compact heeft acht kolommen en dus een ondergrens (min-w in COMPACT_RASTER); op een
+            telefoon schuift de lijst binnen zijn kaart in plaats van de hele pagina opzij te duwen. */}
+        <div className={`flex min-w-0 flex-1 flex-col ${compact ? "gap-1.5 overflow-x-auto" : "gap-4"}`}>
           {/* De factornamen één keer, niet bij elk kanaal opnieuw. Dat is de hele winst van de
               compacte vorm: de namen zijn voor elk kanaal identiek, dus vanaf vier kanalen is het
               herhaalde label puur hoogte. */}
@@ -292,8 +297,10 @@ function KanaalZonderScore({ kanaal, tekst, compact }: { kanaal: Kanaal; tekst: 
   );
 }
 
-/** De kleur van een cijfer: dezelfde drempels als op een losse health-kaart. */
-function kleurVanScore(health: HealthScore): string {
+/** De kleur van een cijfer: dezelfde drempels als op een losse health-kaart. Geëxporteerd voor de
+ *  health-ring op de kanaalkaarten (kanaalkaarten.tsx): dezelfde score hoort daar dezelfde kleur
+ *  te krijgen, en een tweede set drempels ernaast loopt vroeg of laat uiteen. */
+export function kleurVanScore(health: HealthScore): string {
   if (health.grade === "?") return "#9ca3af";
   return health.total >= 70 ? "#22c55e" : health.total >= 50 ? "#f59e0b" : "#ef4444";
 }

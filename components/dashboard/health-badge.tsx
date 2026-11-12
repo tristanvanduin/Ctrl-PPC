@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Info, Activity } from "lucide-react";
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
 import { computeHealthScore, type HealthScore } from "@/lib/health-score";
 import { magRadarTonen } from "@/lib/health-radar";
 import { HealthRadar } from "./health-radar";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 export function HealthBadge({ clientId }: { clientId: string }) {
   const data = useClientHistoricalData(clientId);
@@ -20,7 +21,9 @@ export function HealthBadge({ clientId }: { clientId: string }) {
     dataState?.adGroupBleeders,
   ), [forecast, dataState]);
 
-  return <HealthBadgeView health={health} />;
+  // De score komt uit de jaarprognose (tempo tegen het jaardoel, efficiëntie tegen het doel), dus
+  // dit is een jaarblok: de periodekiezer verandert hem niet, en dat staat in de kop.
+  return <HealthBadgeView health={health} venster={<Vensterlabel soort="jaar" jaar={data.currentYear} />} />;
 }
 
 /**
@@ -36,8 +39,12 @@ export function HealthBadgeView({
   health,
   titel = "Account Health",
   Icoon = Activity,
+  venster,
 }: {
   health: HealthScore;
+  /** Het Vensterlabel naast de titel. De aanroeper weet over welk venster de score gaat (het
+   *  kalenderjaar op het Overzicht); de scorecards op Campagnes geven er geen mee. */
+  venster?: ReactNode;
   /** Sectie 5.4 (Campaign Type Intelligence) hergebruikt deze view voor de Search-scorecard --
    *  zelfde opbouw, andere titel/icoon, geen tweede kopie van vier lagen presentatielogica. */
   titel?: string;
@@ -114,9 +121,10 @@ export function HealthBadgeView({
             Onder de drie beoordeelde assen valt de radar terug op de staafjes: twee punten en drie
             gaten is geen vorm maar ruis die eruitziet als een meting. */}
         <div className="shrink-0">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
             <Icoon className="w-4 h-4 text-brand-blue-ink" />
             <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">{titel}</h3>
+            {venster}
           </div>
           {magRadarTonen(health.factors) ? (
             <HealthRadar factoren={health.factors} kleur={radarKleur} />

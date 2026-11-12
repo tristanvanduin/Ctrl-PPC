@@ -13,6 +13,7 @@ import {
 } from "@/lib/video/video-performance";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // YouTube/Demand Gen-prestaties met de maten die bij video horen: CPM (wat kost bereik), CPV (wat
 // kost een view), view rate en kijkdiepte. Verschijnt alléén als er echt videocampagnes draaien —
@@ -123,7 +124,10 @@ export function VideoPerformance({ clientId }: { clientId: string }) {
       icon={<PlayCircle className="w-4.5 h-4.5 text-brand-blue-ink" />}
       title="Video (YouTube)"
       subtitle="beoordeeld op bereik en kijkgedrag — niet op klikken of CPA"
-      meta={<span className="text-micro text-muted-foreground">{aggs.length} campagne{aggs.length === 1 ? "" : "s"}</span>}
+      meta={<>
+        <Vensterlabel soort="vast" venster="laatste 180 dagen" />
+        <span className="text-micro text-muted-foreground">{aggs.length} campagne{aggs.length === 1 ? "" : "s"}</span>
+      </>}
     >
       {(() => {
         const totaal = aggs.reduce(
