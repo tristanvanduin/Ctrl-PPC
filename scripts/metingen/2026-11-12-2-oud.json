@@ -1,0 +1,2581 @@
+{
+ "datum": "2026-11-12T00:41:33.387Z",
+ "fase": "2-oud",
+ "url": "http://localhost:3190/client/demo-greentech?demo=1",
+ "runs": [
+  {
+   "naam": "1440x900 cpu x1",
+   "breedte": 1440,
+   "throttle": 1,
+   "laden": {
+    "domMs": 610,
+    "eersteKerncijferMs": 3038,
+    "netwerkStilMs": null,
+    "lcpMs": 2796,
+    "cls": 0.17,
+    "langeTaken": 6,
+    "blokkeerMs": 439,
+    "api": {
+     "verzoeken": 14,
+     "kb": 85
+    },
+    "perPad": {
+     "/api/google-ads/client-data": {
+      "n": 1,
+      "kb": 50.5,
+      "maxMs": 785,
+      "somMs": 785
+     },
+     "/api/blended/client-data": {
+      "n": 1,
+      "kb": 23.1,
+      "maxMs": 1413,
+      "somMs": 1413
+     },
+     "data/ads_campaign_monthly": {
+      "n": 1,
+      "kb": 5.2,
+      "maxMs": 628,
+      "somMs": 628
+     },
+     "/api/geo": {
+      "n": 2,
+      "kb": 3.7,
+      "maxMs": 72,
+      "somMs": 117
+     },
+     "data/client_settings": {
+      "n": 1,
+      "kb": 1.4,
+      "maxMs": 378,
+      "somMs": 378
+     },
+     "/api/chat": {
+      "n": 1,
+      "kb": 0.7,
+      "maxMs": 1045,
+      "somMs": 1045
+     },
+     "/api/me": {
+      "n": 1,
+      "kb": 0.1,
+      "maxMs": 138,
+      "somMs": 138
+     },
+     "data/accounts": {
+      "n": 1,
+      "kb": 0.1,
+      "maxMs": 933,
+      "somMs": 933
+     },
+     "data/ads_account_monthly": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 544,
+      "somMs": 544
+     },
+     "data/meta_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 702,
+      "somMs": 702
+     },
+     "/api/branding/scope": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 731,
+      "somMs": 731
+     },
+     "data/linkedin_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 812,
+      "somMs": 812
+     },
+     "data/microsoft_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 894,
+      "somMs": 894
+     }
+    },
+    "paginaHoogte": 5495,
+    "eersteKerncijfer": {
+     "tekst": "3.384",
+     "y": 538
+    },
+    "blokken": 19
+   },
+   "wissels": [
+    {
+     "label": "kanaal: Alle kanalen -> Meta",
+     "fout": null,
+     "api": {
+      "verzoeken": 5,
+      "kb": 3
+     },
+     "perPad": {
+      "/api/geo": {
+       "n": 2,
+       "kb": 3,
+       "maxMs": 119,
+       "somMs": 237
+      },
+      "data/meta_campaigns": {
+       "n": 1,
+       "kb": 0.4,
+       "maxMs": 230,
+       "somMs": 230
+      },
+      "data/meta_breakdown_daily": {
+       "n": 1,
+       "kb": 0,
+       "maxMs": 232,
+       "somMs": 232
+      },
+      "data/meta_campaign_daily": {
+       "n": 1,
+       "kb": 0,
+       "maxMs": 230,
+       "somMs": 230
+      }
+     },
+     "eersteVeranderingMs": 109,
+     "netwerkStilMs": 459,
+     "blokken": 35,
+     "blokkenVeranderd": 32,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "18. To-do's",
+      "19. Notities",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&kanaal=meta",
+     "beeldjes": 79,
+     "beeldjesBoven25ms": 3,
+     "langeTaken": 2,
+     "blokkeerMs": 44,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: Meta -> Alle kanalen",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 174,
+     "netwerkStilMs": null,
+     "blokken": 35,
+     "blokkenVeranderd": 32,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "19. To-do's",
+      "20. Notities",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1",
+     "beeldjes": 80,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 136,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: Alle kanalen -> Meta (tweede keer)",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 94,
+     "netwerkStilMs": null,
+     "blokken": 35,
+     "blokkenVeranderd": 32,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "18. To-do's",
+      "19. Notities",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&kanaal=meta",
+     "beeldjes": 86,
+     "beeldjesBoven25ms": 2,
+     "langeTaken": 1,
+     "blokkeerMs": 15,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: Meta -> Alle kanalen (tweede keer)",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 163,
+     "netwerkStilMs": null,
+     "blokken": 35,
+     "blokkenVeranderd": 32,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "19. To-do's",
+      "20. Notities",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1",
+     "beeldjes": 81,
+     "beeldjesBoven25ms": 3,
+     "langeTaken": 1,
+     "blokkeerMs": 105,
+     "cls": 0
+    },
+    {
+     "label": "periode: -> Laatste 3 maanden",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 65,
+     "netwerkStilMs": null,
+     "blokken": 20,
+     "blokkenVeranderd": 5,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m",
+     "beeldjes": 86,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 43,
+     "cls": 0
+    },
+    {
+     "label": "periode: -> Laatste 12 maanden",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 53,
+     "netwerkStilMs": null,
+     "blokken": 20,
+     "blokkenVeranderd": 5,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m",
+     "beeldjes": 84,
+     "beeldjesBoven25ms": 2,
+     "langeTaken": 1,
+     "blokkeerMs": 70,
+     "cls": 0
+    },
+    {
+     "label": "periode (snelkoppeling): -> 6 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 99,
+     "netwerkStilMs": null,
+     "blokken": 20,
+     "blokkenVeranderd": 5,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "4. februari 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_6m",
+     "beeldjes": 85,
+     "beeldjesBoven25ms": 2,
+     "langeTaken": 1,
+     "blokkeerMs": 55,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: -> Google Ads",
+     "fout": null,
+     "api": {
+      "verzoeken": 4,
+      "kb": 6
+     },
+     "perPad": {
+      "/api/geo": {
+       "n": 2,
+       "kb": 3.4,
+       "maxMs": 56,
+       "somMs": 112
+      },
+      "/api/geo/channels": {
+       "n": 1,
+       "kb": 1.4,
+       "maxMs": 8,
+       "somMs": 8
+      },
+      "data/ads_campaign_monthly": {
+       "n": 1,
+       "kb": 1,
+       "maxMs": 161,
+       "somMs": 161
+      }
+     },
+     "eersteVeranderingMs": 166,
+     "netwerkStilMs": 400,
+     "blokken": 37,
+     "blokkenVeranderd": 34,
+     "veranderd": [
+      "4. februari 2026 t/m juli 2026volgt periode",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "18. To-do's",
+      "19. Notities",
+      "5. Google Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Performance 2026",
+      "16. CPA per maand",
+      "17. Conversies per maand",
+      "18. Spend per campagnetype"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_6m&kanaal=google",
+     "beeldjes": 77,
+     "beeldjesBoven25ms": 3,
+     "langeTaken": 1,
+     "blokkeerMs": 140,
+     "cls": 0
+    },
+    {
+     "label": "periode op Google Ads: -> 3 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 78,
+     "netwerkStilMs": null,
+     "blokken": 23,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. februari 2026 t/m juli 2026volgt periode",
+      "16. CPA per maand",
+      "17. Conversies per maand",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=google",
+     "beeldjes": 87,
+     "beeldjesBoven25ms": 2,
+     "langeTaken": 1,
+     "blokkeerMs": 21,
+     "cls": 0
+    },
+    {
+     "label": "periode op Google Ads: -> 12 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 100,
+     "netwerkStilMs": null,
+     "blokken": 23,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "16. CPA per maand",
+      "17. Conversies per maand",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=google",
+     "beeldjes": 86,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 46,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: -> Meta",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 92,
+     "netwerkStilMs": null,
+     "blokken": 29,
+     "blokkenVeranderd": 26,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Google Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Performance 2026",
+      "16. CPA per maand",
+      "17. Conversies per maand",
+      "18. Spend per campagnetype",
+      "19. Video (YouTube)",
+      "20. Waar je video's draaien",
+      "21. To-do's",
+      "22. Notities",
+      "5. Meta Ads",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "19. To-do's",
+      "20. Notities"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=meta",
+     "beeldjes": 86,
+     "beeldjesBoven25ms": 2,
+     "langeTaken": 1,
+     "blokkeerMs": 11,
+     "cls": 0
+    },
+    {
+     "label": "periode op Meta: -> 3 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 83,
+     "netwerkStilMs": null,
+     "blokken": 21,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "16. Maandverloop",
+      "18. Per maand",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=meta",
+     "beeldjes": 87,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 40,
+     "cls": 0
+    },
+    {
+     "label": "periode op Meta: -> 12 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 74,
+     "netwerkStilMs": null,
+     "blokken": 21,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "16. Maandverloop",
+      "18. Per maand",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=meta",
+     "beeldjes": 88,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 20,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: -> LinkedIn",
+     "fout": null,
+     "api": {
+      "verzoeken": 5,
+      "kb": 3
+     },
+     "perPad": {
+      "/api/geo": {
+       "n": 2,
+       "kb": 2.2,
+       "maxMs": 51,
+       "somMs": 101
+      },
+      "data/linkedin_campaigns": {
+       "n": 1,
+       "kb": 0.5,
+       "maxMs": 214,
+       "somMs": 214
+      },
+      "data/linkedin_demographic_daily": {
+       "n": 1,
+       "kb": 0,
+       "maxMs": 165,
+       "somMs": 165
+      },
+      "data/linkedin_campaign_daily": {
+       "n": 1,
+       "kb": 0,
+       "maxMs": 198,
+       "somMs": 198
+      }
+     },
+     "eersteVeranderingMs": 75,
+     "netwerkStilMs": 356,
+     "blokken": 21,
+     "blokkenVeranderd": 16,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "5. LinkedIn Ads"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=linkedin",
+     "beeldjes": 86,
+     "beeldjesBoven25ms": 3,
+     "langeTaken": 0,
+     "blokkeerMs": 0,
+     "cls": 0
+    },
+    {
+     "label": "periode op LinkedIn: -> 3 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 58,
+     "netwerkStilMs": null,
+     "blokken": 21,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "16. Maandverloop",
+      "18. Per maand",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=linkedin",
+     "beeldjes": 88,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 14,
+     "cls": 0
+    },
+    {
+     "label": "periode op LinkedIn: -> 12 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 67,
+     "netwerkStilMs": null,
+     "blokken": 21,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "16. Maandverloop",
+      "18. Per maand",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=linkedin",
+     "beeldjes": 88,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 19,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: -> Microsoft",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 72,
+     "netwerkStilMs": null,
+     "blokken": 32,
+     "blokkenVeranderd": 29,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. LinkedIn Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "19. To-do's",
+      "20. Notities",
+      "5. Microsoft Ads (Bing)",
+      "8. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "9. Conversies",
+      "10. Omzet",
+      "11. ROAS",
+      "12. CPA",
+      "13. Prognose per maandjaarblok · 2026",
+      "14. Maandverloop",
+      "15. Kerncijfers (laatste 28 dagen)",
+      "16. Per maand",
+      "17. To-do's",
+      "18. Notities"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=microsoft",
+     "beeldjes": 85,
+     "beeldjesBoven25ms": 3,
+     "langeTaken": 0,
+     "blokkeerMs": 0,
+     "cls": 0
+    },
+    {
+     "label": "periode op Microsoft: -> 3 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 88,
+     "netwerkStilMs": null,
+     "blokken": 19,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "14. Maandverloop",
+      "16. Per maand",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=microsoft",
+     "beeldjes": 86,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 43,
+     "cls": 0
+    },
+    {
+     "label": "periode op Microsoft: -> 12 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 104,
+     "netwerkStilMs": null,
+     "blokken": 19,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "14. Maandverloop",
+      "16. Per maand",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=microsoft",
+     "beeldjes": 84,
+     "beeldjesBoven25ms": 2,
+     "langeTaken": 1,
+     "blokkeerMs": 65,
+     "cls": 0
+    }
+   ],
+   "eerlijk": {
+    "conversietotalen": [
+     "4.198",
+     "352",
+     "37.547",
+     "3.384",
+     "657"
+    ],
+    "permanenteAnimaties": [],
+    "datastand": "t/m 25 augustus 2026"
+   },
+   "vensters": {
+    "blokken": 19,
+    "perSoort": {
+     "geen": 3,
+     "periode": 6,
+     "jaar": 8,
+     "vast": 2
+    },
+    "zonderVenster": [
+     "demo-greentech #1",
+     "Demodata — Google Ads, Meta, LinkedIn #1",
+     "Conversielag: 3 dagen #1"
+    ],
+    "conversietotalen": [
+     {
+      "totaal": "4.198",
+      "blok": "PACING — ALLE KANALEN #1",
+      "venster": "jaarblok · 2026"
+     },
+     {
+      "totaal": "352",
+      "blok": "Waar komt het vandaan #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "37.547",
+      "blok": "Conversies per land #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "657",
+      "blok": "Conversies per land #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "3.384",
+      "blok": "KANAAL SPEND aandeel KLIKKEN CONVERSIES aandeel #1",
+      "venster": "volgt periode · aug 2025–jul 2026"
+     }
+    ],
+    "conversietotalenZonderVenster": []
+   },
+   "basisBlokken": [
+    "1. demo-greentech",
+    "2. Demodata — Google Ads, Meta, LinkedIn en Microsoft",
+    "3. Conversielag: 3 dagen",
+    "4. augustus 2025 t/m juli 2026volgt periode",
+    "5. Account Health per kanaal",
+    "6. Pacing — alle kanalen",
+    "7. Waar komt het vandaan",
+    "8. Conversies per land",
+    "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+    "10. Conversies",
+    "11. Omzet",
+    "12. ROAS",
+    "13. CPA",
+    "14. Performance 2026",
+    "15. Spend per kanaal per maand",
+    "16. Spend per kanaal",
+    "17. KANAAL SPEND",
+    "18. To-do's",
+    "19. Notities"
+   ],
+   "venstersPerKanaal": {
+    "Alle kanalen": {
+     "blokken": 19,
+     "perSoort": {
+      "geen": 3,
+      "periode": 6,
+      "jaar": 8,
+      "vast": 2
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1"
+     ],
+     "conversietotalen": [
+      {
+       "totaal": "4.198",
+       "blok": "PACING — ALLE KANALEN #1",
+       "venster": "jaarblok · 2026"
+      },
+      {
+       "totaal": "352",
+       "blok": "Waar komt het vandaan #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "37.547",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "657",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "3.384",
+       "blok": "KANAAL SPEND aandeel KLIKKEN CONVERSIES aandeel #1",
+       "venster": "volgt periode · aug 2025–jul 2026"
+      }
+     ],
+     "conversietotalenZonderVenster": []
+    },
+    "Google Ads": {
+     "blokken": 22,
+     "perSoort": {
+      "geen": 4,
+      "periode": 3,
+      "jaar": 10,
+      "vast": 5
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1",
+      "Google Ads #1"
+     ],
+     "conversietotalen": [
+      {
+       "totaal": "751",
+       "blok": "PACING #1",
+       "venster": "jaarblok · 2026"
+      },
+      {
+       "totaal": "230",
+       "blok": "Waar komt het vandaan #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "13.615",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "391",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "126",
+       "blok": "Spend per campagnetype #1",
+       "venster": "vast venster · aug '26"
+      }
+     ],
+     "conversietotalenZonderVenster": []
+    },
+    "Meta": {
+     "blokken": 20,
+     "perSoort": {
+      "geen": 4,
+      "periode": 3,
+      "jaar": 9,
+      "vast": 4
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1",
+      "Meta Ads #1"
+     ],
+     "conversietotalen": [
+      {
+       "totaal": "103",
+       "blok": "Waar komt het vandaan #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "21.624",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "225",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      }
+     ],
+     "conversietotalenZonderVenster": []
+    },
+    "LinkedIn": {
+     "blokken": 20,
+     "perSoort": {
+      "geen": 4,
+      "periode": 3,
+      "jaar": 9,
+      "vast": 4
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1",
+      "LinkedIn Ads #1"
+     ],
+     "conversietotalen": [
+      {
+       "totaal": "2.308",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      }
+     ],
+     "conversietotalenZonderVenster": []
+    },
+    "Microsoft": {
+     "blokken": 18,
+     "perSoort": {
+      "geen": 4,
+      "periode": 3,
+      "jaar": 9,
+      "vast": 2
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1",
+      "Microsoft Ads (Bing) #1"
+     ],
+     "conversietotalen": [],
+     "conversietotalenZonderVenster": []
+    }
+   },
+   "herlaad": {
+    "voor": {
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=meta",
+     "ingedrukt": [
+      "Laatste 3 maanden",
+      "Meta"
+     ],
+     "periode": "mei 2026 t/m juli 2026tegen mei 2025 t/m juli 2025"
+    },
+    "na": {
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=meta",
+     "ingedrukt": [
+      "Laatste 3 maanden",
+      "Meta"
+     ],
+     "periode": "mei 2026 t/m juli 2026tegen mei 2025 t/m juli 2025"
+    },
+    "zelfdeToestand": true
+   }
+  },
+  {
+   "naam": "1440x900 cpu x4",
+   "breedte": 1440,
+   "throttle": 4,
+   "laden": {
+    "domMs": 103,
+    "eersteKerncijferMs": 3737,
+    "netwerkStilMs": null,
+    "lcpMs": 2764,
+    "cls": 0.17,
+    "langeTaken": 13,
+    "blokkeerMs": 1802,
+    "api": {
+     "verzoeken": 14,
+     "kb": 85
+    },
+    "perPad": {
+     "/api/google-ads/client-data": {
+      "n": 1,
+      "kb": 50.5,
+      "maxMs": 174,
+      "somMs": 174
+     },
+     "/api/blended/client-data": {
+      "n": 1,
+      "kb": 23.1,
+      "maxMs": 762,
+      "somMs": 762
+     },
+     "data/ads_campaign_monthly": {
+      "n": 1,
+      "kb": 5.2,
+      "maxMs": 139,
+      "somMs": 139
+     },
+     "/api/geo": {
+      "n": 2,
+      "kb": 3.7,
+      "maxMs": 107,
+      "somMs": 188
+     },
+     "data/client_settings": {
+      "n": 1,
+      "kb": 1.4,
+      "maxMs": 172,
+      "somMs": 172
+     },
+     "/api/chat": {
+      "n": 1,
+      "kb": 0.7,
+      "maxMs": 275,
+      "somMs": 275
+     },
+     "/api/me": {
+      "n": 1,
+      "kb": 0.1,
+      "maxMs": 35,
+      "somMs": 35
+     },
+     "data/accounts": {
+      "n": 1,
+      "kb": 0.1,
+      "maxMs": 531,
+      "somMs": 531
+     },
+     "data/ads_account_monthly": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 290,
+      "somMs": 290
+     },
+     "/api/branding/scope": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 306,
+      "somMs": 306
+     },
+     "data/meta_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 403,
+      "somMs": 403
+     },
+     "data/linkedin_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 421,
+      "somMs": 421
+     },
+     "data/microsoft_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 533,
+      "somMs": 533
+     }
+    },
+    "paginaHoogte": 5495,
+    "eersteKerncijfer": {
+     "tekst": "3.384",
+     "y": 538
+    },
+    "blokken": 19
+   },
+   "wissels": [
+    {
+     "label": "kanaal: Alle kanalen -> Meta",
+     "fout": null,
+     "api": {
+      "verzoeken": 5,
+      "kb": 3
+     },
+     "perPad": {
+      "/api/geo": {
+       "n": 2,
+       "kb": 3,
+       "maxMs": 596,
+       "somMs": 1189
+      },
+      "data/meta_campaigns": {
+       "n": 1,
+       "kb": 0.4,
+       "maxMs": 600,
+       "somMs": 600
+      },
+      "data/meta_campaign_daily": {
+       "n": 1,
+       "kb": 0,
+       "maxMs": 598,
+       "somMs": 598
+      },
+      "data/meta_breakdown_daily": {
+       "n": 1,
+       "kb": 0,
+       "maxMs": 601,
+       "somMs": 601
+      }
+     },
+     "eersteVeranderingMs": 343,
+     "netwerkStilMs": 1009,
+     "blokken": 35,
+     "blokkenVeranderd": 32,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "18. To-do's",
+      "19. Notities",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&kanaal=meta",
+     "beeldjes": 17,
+     "beeldjesBoven25ms": 5,
+     "langeTaken": 5,
+     "blokkeerMs": 941,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: Meta -> Alle kanalen",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 673,
+     "netwerkStilMs": null,
+     "blokken": 35,
+     "blokkenVeranderd": 32,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "19. To-do's",
+      "20. Notities",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1",
+     "beeldjes": 22,
+     "beeldjesBoven25ms": 11,
+     "langeTaken": 1,
+     "blokkeerMs": 695,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: Alle kanalen -> Meta (tweede keer)",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 272,
+     "netwerkStilMs": null,
+     "blokken": 35,
+     "blokkenVeranderd": 32,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "18. To-do's",
+      "19. Notities",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&kanaal=meta",
+     "beeldjes": 53,
+     "beeldjesBoven25ms": 4,
+     "langeTaken": 2,
+     "blokkeerMs": 458,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: Meta -> Alle kanalen (tweede keer)",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 761,
+     "netwerkStilMs": null,
+     "blokken": 35,
+     "blokkenVeranderd": 32,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "19. To-do's",
+      "20. Notities",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1",
+     "beeldjes": 19,
+     "beeldjesBoven25ms": 10,
+     "langeTaken": 1,
+     "blokkeerMs": 827,
+     "cls": 0
+    },
+    {
+     "label": "periode: -> Laatste 3 maanden",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 101,
+     "netwerkStilMs": null,
+     "blokken": 20,
+     "blokkenVeranderd": 5,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m",
+     "beeldjes": 39,
+     "beeldjesBoven25ms": 11,
+     "langeTaken": 2,
+     "blokkeerMs": 552,
+     "cls": 0
+    },
+    {
+     "label": "periode: -> Laatste 12 maanden",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 111,
+     "netwerkStilMs": null,
+     "blokken": 20,
+     "blokkenVeranderd": 5,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m",
+     "beeldjes": 41,
+     "beeldjesBoven25ms": 12,
+     "langeTaken": 1,
+     "blokkeerMs": 464,
+     "cls": 0
+    },
+    {
+     "label": "periode (snelkoppeling): -> 6 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 466,
+     "netwerkStilMs": null,
+     "blokken": 20,
+     "blokkenVeranderd": 5,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "4. februari 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_6m",
+     "beeldjes": 30,
+     "beeldjesBoven25ms": 11,
+     "langeTaken": 2,
+     "blokkeerMs": 751,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: -> Google Ads",
+     "fout": null,
+     "api": {
+      "verzoeken": 4,
+      "kb": 6
+     },
+     "perPad": {
+      "/api/geo": {
+       "n": 2,
+       "kb": 3.4,
+       "maxMs": 197,
+       "somMs": 392
+      },
+      "/api/geo/channels": {
+       "n": 1,
+       "kb": 1.4,
+       "maxMs": 95,
+       "somMs": 95
+      },
+      "data/ads_campaign_monthly": {
+       "n": 1,
+       "kb": 1,
+       "maxMs": 202,
+       "somMs": 202
+      }
+     },
+     "eersteVeranderingMs": 725,
+     "netwerkStilMs": 1567,
+     "blokken": 37,
+     "blokkenVeranderd": 34,
+     "veranderd": [
+      "4. februari 2026 t/m juli 2026volgt periode",
+      "5. Account Health per kanaal",
+      "6. Pacing — alle kanalen",
+      "7. Waar komt het vandaan",
+      "8. Conversies per land",
+      "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "10. Conversies",
+      "11. Omzet",
+      "12. ROAS",
+      "13. CPA",
+      "14. Performance 2026",
+      "15. Spend per kanaal per maand",
+      "16. Spend per kanaal",
+      "17. KANAAL SPEND",
+      "18. To-do's",
+      "19. Notities",
+      "5. Google Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Performance 2026",
+      "16. CPA per maand",
+      "17. Conversies per maand",
+      "18. Spend per campagnetype"
+     ],
+     "volgtPeriode": {
+      "blokken": 6,
+      "veranderd": 4,
+      "stil": [
+       "TO-DO'S #1",
+       "NOTITIES #1"
+      ]
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_6m&kanaal=google",
+     "beeldjes": 11,
+     "beeldjesBoven25ms": 6,
+     "langeTaken": 4,
+     "blokkeerMs": 1072,
+     "cls": 0
+    },
+    {
+     "label": "periode op Google Ads: -> 3 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 261,
+     "netwerkStilMs": null,
+     "blokken": 23,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. februari 2026 t/m juli 2026volgt periode",
+      "16. CPA per maand",
+      "17. Conversies per maand",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=google",
+     "beeldjes": 69,
+     "beeldjesBoven25ms": 1,
+     "langeTaken": 1,
+     "blokkeerMs": 300,
+     "cls": 0
+    },
+    {
+     "label": "periode op Google Ads: -> 12 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 210,
+     "netwerkStilMs": null,
+     "blokken": 23,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "16. CPA per maand",
+      "17. Conversies per maand",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=google",
+     "beeldjes": 53,
+     "beeldjesBoven25ms": 6,
+     "langeTaken": 2,
+     "blokkeerMs": 399,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: -> Meta",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 363,
+     "netwerkStilMs": null,
+     "blokken": 29,
+     "blokkenVeranderd": 26,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Google Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Performance 2026",
+      "16. CPA per maand",
+      "17. Conversies per maand",
+      "18. Spend per campagnetype",
+      "19. Video (YouTube)",
+      "20. Waar je video's draaien",
+      "21. To-do's",
+      "22. Notities",
+      "5. Meta Ads",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "19. To-do's",
+      "20. Notities"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=meta",
+     "beeldjes": 59,
+     "beeldjesBoven25ms": 3,
+     "langeTaken": 2,
+     "blokkeerMs": 404,
+     "cls": 0
+    },
+    {
+     "label": "periode op Meta: -> 3 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 263,
+     "netwerkStilMs": null,
+     "blokken": 21,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "16. Maandverloop",
+      "18. Per maand",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=meta",
+     "beeldjes": 69,
+     "beeldjesBoven25ms": 3,
+     "langeTaken": 1,
+     "blokkeerMs": 274,
+     "cls": 0
+    },
+    {
+     "label": "periode op Meta: -> 12 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 217,
+     "netwerkStilMs": null,
+     "blokken": 21,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "16. Maandverloop",
+      "18. Per maand",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=meta",
+     "beeldjes": 60,
+     "beeldjesBoven25ms": 5,
+     "langeTaken": 1,
+     "blokkeerMs": 379,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: -> LinkedIn",
+     "fout": null,
+     "api": {
+      "verzoeken": 5,
+      "kb": 3
+     },
+     "perPad": {
+      "/api/geo": {
+       "n": 2,
+       "kb": 2.2,
+       "maxMs": 397,
+       "somMs": 790
+      },
+      "data/linkedin_campaigns": {
+       "n": 1,
+       "kb": 0.5,
+       "maxMs": 401,
+       "somMs": 401
+      },
+      "data/linkedin_demographic_daily": {
+       "n": 1,
+       "kb": 0,
+       "maxMs": 401,
+       "somMs": 401
+      },
+      "data/linkedin_campaign_daily": {
+       "n": 1,
+       "kb": 0,
+       "maxMs": 405,
+       "somMs": 405
+      }
+     },
+     "eersteVeranderingMs": 234,
+     "netwerkStilMs": 667,
+     "blokken": 21,
+     "blokkenVeranderd": 16,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. Meta Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "5. LinkedIn Ads"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=linkedin",
+     "beeldjes": 46,
+     "beeldjesBoven25ms": 5,
+     "langeTaken": 4,
+     "blokkeerMs": 490,
+     "cls": 0
+    },
+    {
+     "label": "periode op LinkedIn: -> 3 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 189,
+     "netwerkStilMs": null,
+     "blokken": 21,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "16. Maandverloop",
+      "18. Per maand",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=linkedin",
+     "beeldjes": 63,
+     "beeldjesBoven25ms": 2,
+     "langeTaken": 1,
+     "blokkeerMs": 388,
+     "cls": 0
+    },
+    {
+     "label": "periode op LinkedIn: -> 12 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 211,
+     "netwerkStilMs": null,
+     "blokken": 21,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "16. Maandverloop",
+      "18. Per maand",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=linkedin",
+     "beeldjes": 60,
+     "beeldjesBoven25ms": 7,
+     "langeTaken": 1,
+     "blokkeerMs": 361,
+     "cls": 0
+    },
+    {
+     "label": "kanaal: -> Microsoft",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 225,
+     "netwerkStilMs": null,
+     "blokken": 32,
+     "blokkenVeranderd": 29,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "5. LinkedIn Ads",
+      "6. Account Health",
+      "7. Pacing",
+      "8. Waar komt het vandaan",
+      "9. Conversies per land",
+      "10. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "11. Conversies",
+      "12. Omzet",
+      "13. ROAS",
+      "14. CPA",
+      "15. Prognose per maandjaarblok · 2026",
+      "16. Maandverloop",
+      "17. Kerncijfers (laatste 28 dagen)",
+      "18. Per maand",
+      "19. To-do's",
+      "20. Notities",
+      "5. Microsoft Ads (Bing)",
+      "8. Weken tot GreenTech North Americajaarblok · 2026 ·",
+      "9. Conversies",
+      "10. Omzet",
+      "11. ROAS",
+      "12. CPA",
+      "13. Prognose per maandjaarblok · 2026",
+      "14. Maandverloop",
+      "15. Kerncijfers (laatste 28 dagen)",
+      "16. Per maand",
+      "17. To-do's",
+      "18. Notities"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=microsoft",
+     "beeldjes": 65,
+     "beeldjesBoven25ms": 4,
+     "langeTaken": 2,
+     "blokkeerMs": 297,
+     "cls": 0
+    },
+    {
+     "label": "periode op Microsoft: -> 3 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 291,
+     "netwerkStilMs": null,
+     "blokken": 19,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. augustus 2025 t/m juli 2026volgt periode",
+      "14. Maandverloop",
+      "16. Per maand",
+      "4. mei 2026 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=microsoft",
+     "beeldjes": 53,
+     "beeldjesBoven25ms": 6,
+     "langeTaken": 2,
+     "blokkeerMs": 435,
+     "cls": 0
+    },
+    {
+     "label": "periode op Microsoft: -> 12 mnd",
+     "fout": null,
+     "api": {
+      "verzoeken": 0,
+      "kb": 0
+     },
+     "perPad": {},
+     "eersteVeranderingMs": 262,
+     "netwerkStilMs": null,
+     "blokken": 19,
+     "blokkenVeranderd": 4,
+     "veranderd": [
+      "4. mei 2026 t/m juli 2026volgt periode",
+      "14. Maandverloop",
+      "16. Per maand",
+      "4. augustus 2025 t/m juli 2026volgt periode"
+     ],
+     "volgtPeriode": {
+      "blokken": 3,
+      "veranderd": 3,
+      "stil": []
+     },
+     "url": "/client/demo-greentech?demo=1&periode=last_12m&kanaal=microsoft",
+     "beeldjes": 32,
+     "beeldjesBoven25ms": 10,
+     "langeTaken": 2,
+     "blokkeerMs": 540,
+     "cls": 0
+    }
+   ],
+   "eerlijk": {
+    "conversietotalen": [
+     "4.198",
+     "352",
+     "37.547",
+     "3.384",
+     "657"
+    ],
+    "permanenteAnimaties": [],
+    "datastand": "t/m 25 augustus 2026"
+   },
+   "vensters": {
+    "blokken": 19,
+    "perSoort": {
+     "geen": 3,
+     "periode": 6,
+     "jaar": 8,
+     "vast": 2
+    },
+    "zonderVenster": [
+     "demo-greentech #1",
+     "Demodata — Google Ads, Meta, LinkedIn #1",
+     "Conversielag: 3 dagen #1"
+    ],
+    "conversietotalen": [
+     {
+      "totaal": "4.198",
+      "blok": "PACING — ALLE KANALEN #1",
+      "venster": "jaarblok · 2026"
+     },
+     {
+      "totaal": "352",
+      "blok": "Waar komt het vandaan #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "37.547",
+      "blok": "Conversies per land #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "657",
+      "blok": "Conversies per land #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "3.384",
+      "blok": "KANAAL SPEND aandeel KLIKKEN CONVERSIES aandeel #1",
+      "venster": "volgt periode · aug 2025–jul 2026"
+     }
+    ],
+    "conversietotalenZonderVenster": []
+   },
+   "basisBlokken": [
+    "1. demo-greentech",
+    "2. Demodata — Google Ads, Meta, LinkedIn en Microsoft",
+    "3. Conversielag: 3 dagen",
+    "4. augustus 2025 t/m juli 2026volgt periode",
+    "5. Account Health per kanaal",
+    "6. Pacing — alle kanalen",
+    "7. Waar komt het vandaan",
+    "8. Conversies per land",
+    "9. Weken tot GreenTech North Americajaarblok · 2026 ·",
+    "10. Conversies",
+    "11. Omzet",
+    "12. ROAS",
+    "13. CPA",
+    "14. Performance 2026",
+    "15. Spend per kanaal per maand",
+    "16. Spend per kanaal",
+    "17. KANAAL SPEND",
+    "18. To-do's",
+    "19. Notities"
+   ],
+   "venstersPerKanaal": {
+    "Alle kanalen": {
+     "blokken": 19,
+     "perSoort": {
+      "geen": 3,
+      "periode": 6,
+      "jaar": 8,
+      "vast": 2
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1"
+     ],
+     "conversietotalen": [
+      {
+       "totaal": "4.198",
+       "blok": "PACING — ALLE KANALEN #1",
+       "venster": "jaarblok · 2026"
+      },
+      {
+       "totaal": "352",
+       "blok": "Waar komt het vandaan #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "37.547",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "657",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "3.384",
+       "blok": "KANAAL SPEND aandeel KLIKKEN CONVERSIES aandeel #1",
+       "venster": "volgt periode · aug 2025–jul 2026"
+      }
+     ],
+     "conversietotalenZonderVenster": []
+    },
+    "Google Ads": {
+     "blokken": 22,
+     "perSoort": {
+      "geen": 4,
+      "periode": 3,
+      "jaar": 10,
+      "vast": 5
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1",
+      "Google Ads #1"
+     ],
+     "conversietotalen": [
+      {
+       "totaal": "751",
+       "blok": "PACING #1",
+       "venster": "jaarblok · 2026"
+      },
+      {
+       "totaal": "230",
+       "blok": "Waar komt het vandaan #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "13.615",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "391",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "126",
+       "blok": "Spend per campagnetype #1",
+       "venster": "vast venster · aug '26"
+      }
+     ],
+     "conversietotalenZonderVenster": []
+    },
+    "Meta": {
+     "blokken": 20,
+     "perSoort": {
+      "geen": 4,
+      "periode": 3,
+      "jaar": 9,
+      "vast": 4
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1",
+      "Meta Ads #1"
+     ],
+     "conversietotalen": [
+      {
+       "totaal": "103",
+       "blok": "Waar komt het vandaan #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "21.624",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      },
+      {
+       "totaal": "225",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      }
+     ],
+     "conversietotalenZonderVenster": []
+    },
+    "LinkedIn": {
+     "blokken": 20,
+     "perSoort": {
+      "geen": 4,
+      "periode": 3,
+      "jaar": 9,
+      "vast": 4
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1",
+      "LinkedIn Ads #1"
+     ],
+     "conversietotalen": [
+      {
+       "totaal": "2.308",
+       "blok": "Conversies per land #1",
+       "venster": "vast venster · laatste 180 dagen"
+      }
+     ],
+     "conversietotalenZonderVenster": []
+    },
+    "Microsoft": {
+     "blokken": 18,
+     "perSoort": {
+      "geen": 4,
+      "periode": 3,
+      "jaar": 9,
+      "vast": 2
+     },
+     "zonderVenster": [
+      "demo-greentech #1",
+      "Demodata — Google Ads, Meta, LinkedIn #1",
+      "Conversielag: 3 dagen #1",
+      "Microsoft Ads (Bing) #1"
+     ],
+     "conversietotalen": [],
+     "conversietotalenZonderVenster": []
+    }
+   },
+   "herlaad": {
+    "voor": {
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=meta",
+     "ingedrukt": [
+      "Laatste 3 maanden",
+      "Meta"
+     ],
+     "periode": "mei 2026 t/m juli 2026tegen mei 2025 t/m juli 2025"
+    },
+    "na": {
+     "url": "/client/demo-greentech?demo=1&periode=last_3m&kanaal=meta",
+     "ingedrukt": [
+      "Laatste 3 maanden",
+      "Meta"
+     ],
+     "periode": "mei 2026 t/m juli 2026tegen mei 2025 t/m juli 2025"
+    },
+    "zelfdeToestand": true
+   }
+  },
+  {
+   "naam": "390x844 cpu x1",
+   "breedte": 390,
+   "throttle": 1,
+   "laden": {
+    "domMs": 129,
+    "eersteKerncijferMs": 1722,
+    "netwerkStilMs": null,
+    "lcpMs": 1124,
+    "cls": 0.133,
+    "langeTaken": 5,
+    "blokkeerMs": 170,
+    "api": {
+     "verzoeken": 14,
+     "kb": 85
+    },
+    "perPad": {
+     "/api/google-ads/client-data": {
+      "n": 1,
+      "kb": 50.5,
+      "maxMs": 471,
+      "somMs": 471
+     },
+     "/api/blended/client-data": {
+      "n": 1,
+      "kb": 23.1,
+      "maxMs": 898,
+      "somMs": 898
+     },
+     "data/ads_campaign_monthly": {
+      "n": 1,
+      "kb": 5.2,
+      "maxMs": 181,
+      "somMs": 181
+     },
+     "/api/geo": {
+      "n": 2,
+      "kb": 3.7,
+      "maxMs": 9,
+      "somMs": 14
+     },
+     "data/client_settings": {
+      "n": 1,
+      "kb": 1.4,
+      "maxMs": 149,
+      "somMs": 149
+     },
+     "/api/chat": {
+      "n": 1,
+      "kb": 0.7,
+      "maxMs": 565,
+      "somMs": 565
+     },
+     "/api/me": {
+      "n": 1,
+      "kb": 0.1,
+      "maxMs": 128,
+      "somMs": 128
+     },
+     "data/accounts": {
+      "n": 1,
+      "kb": 0.1,
+      "maxMs": 682,
+      "somMs": 682
+     },
+     "data/ads_account_monthly": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 439,
+      "somMs": 439
+     },
+     "/api/branding/scope": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 443,
+      "somMs": 443
+     },
+     "data/meta_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 457,
+      "somMs": 457
+     },
+     "data/microsoft_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 594,
+      "somMs": 594
+     },
+     "data/linkedin_account_daily": {
+      "n": 1,
+      "kb": 0,
+      "maxMs": 601,
+      "somMs": 601
+     }
+    },
+    "paginaHoogte": 9038,
+    "eersteKerncijfer": {
+     "tekst": "3.384",
+     "y": 833
+    },
+    "blokken": 19
+   },
+   "wissels": [],
+   "eerlijk": {
+    "conversietotalen": [
+     "4.198",
+     "352",
+     "37.547",
+     "3.384",
+     "657"
+    ],
+    "permanenteAnimaties": [],
+    "datastand": "t/m 25 augustus 2026"
+   },
+   "vensters": {
+    "blokken": 19,
+    "perSoort": {
+     "geen": 3,
+     "periode": 6,
+     "jaar": 8,
+     "vast": 2
+    },
+    "zonderVenster": [
+     "demo-greentech #1",
+     "Demodata — Google Ads, Meta, LinkedIn #1",
+     "Conversielag: 3 dagen #1"
+    ],
+    "conversietotalen": [
+     {
+      "totaal": "4.198",
+      "blok": "PACING — ALLE KANALEN #1",
+      "venster": "jaarblok · 2026"
+     },
+     {
+      "totaal": "352",
+      "blok": "Waar komt het vandaan #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "37.547",
+      "blok": "Conversies per land #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "657",
+      "blok": "Conversies per land #1",
+      "venster": "vast venster · laatste 180 dagen"
+     },
+     {
+      "totaal": "3.384",
+      "blok": "KANAAL SPEND aandeel KLIKKEN CONVERSIES aandeel #1",
+      "venster": "volgt periode · aug 2025–jul 2026"
+     }
+    ],
+    "conversietotalenZonderVenster": []
+   }
+  }
+ ]
+}

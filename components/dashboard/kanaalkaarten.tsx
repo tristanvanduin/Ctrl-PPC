@@ -119,7 +119,9 @@ function Kaart({ kaart, actief, onKlik, vertraging, opbouw, periode }: {
       title={`${actief ? `${naam} is gekozen. Klik nog eens voor alle kanalen.` : `Filter de pagina op ${naam}.`} Cijfers over ${periode}.`}
       onClick={onKlik}
       style={{ ...(actief ? { borderColor: kleur } : {}), ...(opbouw ? { animationDelay: `${vertraging}ms` } : {}) }}
-      className={`group flex w-60 shrink-0 snap-start flex-col gap-1 rounded-xl border bg-card px-3 py-2 text-left shadow-sm transition-[border-color,box-shadow,translate] hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink sm:w-auto sm:shrink ${
+      // `relative`: de sr-only beschrijving is absoluut gepositioneerd. Zonder anker hier viel hij
+      // buiten de veegstrook en maakte hij de pagina op een telefoon 390 px te breed.
+      className={`group relative flex w-60 shrink-0 snap-start flex-col gap-1 rounded-xl border bg-card px-3 py-2 text-left shadow-sm transition-[border-color,box-shadow,translate] hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink sm:w-auto sm:shrink ${
         actief ? "ring-2 ring-brand-blue/15" : "border-border"
       } ${opbouw ? "opbouw" : ""}`}
     >
