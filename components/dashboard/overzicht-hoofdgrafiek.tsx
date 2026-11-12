@@ -242,7 +242,7 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
           </div>
           {/* Wat de staven samen zijn, per kanaal, met de prijs per conversie. Alleen op een breed
               scherm: op een telefoon staan dezelfde totalen op de kanaalkaarten erboven. */}
-          <div className="hidden w-64 shrink-0 self-center text-meta lg:block">
+          <div className={`hidden shrink-0 self-center text-meta lg:block ${kosten ? "w-72" : "w-64"}`}>
           {/* De kolomkoppen boven de cijfers, niet een zin eronder: zo staat bij elk getal wat het is. */}
           <div className={`mb-1 grid ${kolommen} gap-x-2 text-micro uppercase tracking-wider text-muted-foreground`} aria-hidden>
             <span>{formatRangeKort(periode.range)}</span>
@@ -254,7 +254,8 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
               <div key={r.kanaal} className={`grid ${kolommen} items-baseline gap-x-2`}>
                 <dt className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
                   <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: KANAAL_KLEUR[r.kanaal] }} aria-hidden />
-                  <span className="truncate">{KANAAL_NAAM[r.kanaal]}</span>
+                  {/* In de stand Kosten is de naamkolom smal; de volledige naam staat dan in de uitleg. */}
+                  <span className="truncate" title={KANAAL_NAAM[r.kanaal]}>{KANAAL_NAAM[r.kanaal]}</span>
                 </dt>
                 <dd className="text-right font-semibold tabular-nums text-brand-gray"><span className="sr-only">{kosten ? "kosten" : "conversies"}: </span>{kosten ? volledigEuro(Math.round(r.adSpend)) : volledigGetal(Math.round(r.conversions))}</dd>
                 <dd className="text-right tabular-nums text-muted-foreground" title="Kosten per conversie"><span className="sr-only">CPA: </span>{euroOfStreep(r.cpa === null ? null : Math.round(r.cpa))}</dd>

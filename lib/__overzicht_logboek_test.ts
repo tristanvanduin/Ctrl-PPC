@@ -280,7 +280,9 @@ async function main() {
     const codeBron = half.bronnen.find((b) => b.bron === "code-rood"), syncBron = half.bronnen.find((b) => b.bron === "sync");
     check("een ontbrekende tabel maakt de bron 'niet te lezen', met de reden", codeBron?.ok === false && (codeBron.fout ?? "").includes("code_rood_meldingen"), JSON.stringify(codeBron));
     check("... en de rest van het logboek staat er nog", half.items.some((i) => i.id === "analyse:j1") && half.items.some((i) => i.id === "sync:google:g0"));
-    check("één runtabel die faalt maakt de syncs niet onleesbaar, maar de reden staat erbij", syncBron?.ok === true && (syncBron.fout ?? "").includes("permission denied"), JSON.stringify(syncBron));
+    check("één runtabel die faalt maakt de syncs niet onleesbaar, maar de bron zegt dat hij een gat heeft, en van welk kanaal",
+      syncBron?.ok === true && syncBron.deels === true && (syncBron.kanalenStuk ?? []).join() === "linkedin" && (syncBron.fout ?? "").includes("linkedin_sync_runs"), JSON.stringify(syncBron));
+    check("... en de melding van de database zelf gaat niet mee naar de browser", !JSON.stringify(half).includes("permission denied") && !JSON.stringify(half).includes("Could not find the table"), JSON.stringify(half.bronnen));
 
     const leeg = await leesLogboek(new FakeSupabase() as unknown as SupabaseClient, "niemand", { nu: NU });
     check("een klant zonder gebeurtenissen: leeg, en elke bron zegt nul", leeg.items.length === 0 && leeg.bronnen.every((b) => b.ok && b.aantal === 0));

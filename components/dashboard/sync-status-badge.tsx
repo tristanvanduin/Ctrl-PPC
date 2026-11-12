@@ -235,7 +235,7 @@ export function SyncStatusBadge({ clientId, onSyncComplete, kanalen = null, eerl
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className={`flex items-center gap-1.5 text-xs ${config.color} ${config.bg} border ${config.border} rounded-lg px-3 py-1.5`}>
+      <div data-venster="stand" className={`flex items-center gap-1.5 text-xs ${config.color} ${config.bg} border ${config.border} rounded-lg px-3 py-1.5`}>
         {config.icon}
         <span className="font-medium">{config.label}</span>
         {status.hoursSinceSync != null && (

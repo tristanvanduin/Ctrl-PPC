@@ -13,7 +13,7 @@
 // KPI-band; de health is HET OBJECT dat de ranking en het tabblad van het kanaal tonen
 // (kanaalScores in kanaal-health-ranking.tsx). Deze component rekent zelf niets.
 
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { KANAAL_NAAM, KANAAL_KLEUR, type Kanaal, type Kanaalkeuze } from "@/lib/kanalen/beschikbaar";
 import { volgendeKanaalkeuze, type KaartCijfers } from "@/lib/overzicht/bovenkant";
 import type { HealthScore } from "@/lib/health-score";
@@ -136,7 +136,24 @@ function Kaart({ kaart, actief, onKlik, vertraging, opbouw, periode }: {
         <span className="flex min-w-0 flex-col leading-tight">
           <span className="flex items-center gap-1 text-title font-semibold text-brand-gray">
             <span className="truncate">{naam}</span>
-            {actief && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: kleur }} aria-hidden />}
+            {/* De zichtbare weg terug, IN de gekozen kaart. De kaart is het filter en dezelfde kaart
+                haalt het er weer af; dat stond alleen in de uitleg (title) en in de tekst voor een
+                schermlezer, en op een aanraakscherm bestaat geen van beide. Een losse regel onder de
+                rij loste dat op maar kostte hoogte: bij elke filterklik, en bij het laden van een
+                adres met ?kanaal=, schoven de tegels en alles eronder omlaag. Hier neemt het de
+                plek van het vinkje in: de kaart wordt er niet hoger van, en de hele kaart is het
+                tikvlak. De naam kort in als het niet past; hij staat ook op het kleurvlakje ernaast
+                en in de uitleg. */}
+            {actief && (
+              <span data-kanaalfilter={kanaal} aria-hidden
+                // leading-none en een icoon van tien pixels: veertien pixels hoog, lager dan de
+                // regel van de naam, zodat de kaart precies even hoog blijft. De tekst in de gewone
+                // tekstkleur (de kanaalkleur haalt op deze maat het contrast niet); de rand draagt de kleur.
+                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-micro font-medium leading-none text-brand-gray"
+                style={{ borderColor: kleur }}>
+                <X className="h-2.5 w-2.5" />alle kanalen
+              </span>
+            )}
           </span>
           {/* De koppel- en datastand: tot welke dag dit kanaal data heeft, en rood als de sync stilstaat. */}
           <span data-kaartstand className={`text-meta ${stand?.alarm ? "font-medium text-red-700" : "text-muted-foreground"}`}>

@@ -22,17 +22,18 @@
 //   het budgetadvies                                            boven de tabel, niet achter een klik
 //   het voorbehoud "som over de kanalen: een bovengrens"        de voetregel
 //
-// De oude voetnoot "er staat voor deze kanalen geen jaardoel in het systeem" staat er niet meer
-// los: hij werd op dezelfde pagina tegengesproken door het jaaroverzicht, dat wel een (geschat)
-// jaardoel toonde. In de plaats staat waar het jaardoel vandaan komt.
+// De oude voetnoot "er staat voor deze kanalen geen jaardoel in het systeem" staat er niet meer,
+// ook niet in de lade: hij werd op dezelfde pagina tegengesproken door het jaaroverzicht, dat wel
+// een (geschat) jaardoel toonde. In de plaats staat waar het jaardoel vandaan komt, en de voetregel
+// van de pacing zegt hier alleen waartegen vergeleken is (useBlendedPacing, naastJaardoel).
 
 import { useState } from "react";
-import { Zap } from "lucide-react";
+import { AlertTriangle, Check, Zap } from "lucide-react";
 import type { ClientHistoricalData } from "@/lib/types";
 import { MONTH_LABELS, computeForecast, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatterFor } from "@/lib/forecast-format";
 import { formatMonth, formatRange } from "@/lib/period/period-range";
-import { doelHerkomstZin, gemiddeldPerMaand, pacingJaarRijen, verschilTekst, type PacingJaarRij } from "@/lib/overzicht/pacing-jaar";
+import { doelHerkomstZin, gemiddeldPerMaand, pacingJaarRijen, verschilTekst, zichtbareMetriek, type PacingJaarRij } from "@/lib/overzicht/pacing-jaar";
 import type { BlendedKanaalReeks } from "@/lib/api/blended-historical";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { Lade } from "@/components/ui/disclosure";
@@ -48,7 +49,7 @@ const formaat = (rij: PacingJaarRij): ((v: number) => string) =>
   rij.sleutel === "adSpend" ? formatCurrency : formatterFor(rij.sleutel);
 const ofStreep = (v: number | null, f: (v: number) => string) => (v === null ? "—" : f(v));
 
-export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStand = null, metric, onMetricChange, uitgesloten = null, kanaalNaam, titelToevoeging }: {
+export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStand = null, metric, onMetricChange, uitgesloten = null, kanaalNaam, titelToevoeging, grafiekBegin }: {
   /** De blended historie en de prognose erop: dezelfde twee als het jaaroverzicht altijd las. */
   data: ClientHistoricalData;
   forecast: ClientForecast;
@@ -69,8 +70,14 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
   kanaalNaam?: string;
   /** Achter het jaar in de kop, voor het landfilter van Google: "Duitsland". */
   titelToevoeging?: string;
+  /** Waar de grafiek in de lade op begint; zonder deze per maand (zie PerformanceChartView). */
+  grafiekBegin?: "weekly" | "monthly";
 }) {
-  const pacing = useBlendedPacing(kanaalNaam === undefined ? perKanaal : null, dataStand);
+  const pacing = useBlendedPacing(kanaalNaam === undefined ? perKanaal : null, dataStand, { naastJaardoel: true });
+  // De metriek van de grafiek, geklemd op een metriek die deze klant heeft: een kanaal met alleen
+  // een omzetdoel heeft geen rij Conversies, en dan opende de grafiek op een reeks waar geen knop
+  // bij hoort.
+  const getoondeMetriek = zichtbareMetriek(forecast, metric);
   const c = pacing?.cijfers ?? null;
   const rijen = pacingJaarRijen(forecast, c ? { convRatio: c.convRatio, spendRatio: c.spendRatio } : null);
   const laatste = rijen[0]?.laatsteMaand ?? -1;
@@ -98,8 +105,15 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
 
         {/* Zes kolommen passen niet op een telefoon: de tabel schuift dan binnen zijn eigen vak in
             plaats van de pagina breder te maken. */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[40rem] border-collapse text-body">
+        {/* Een schuifvak zonder iets erin dat focus kan krijgen is met het toetsenbord niet opzij te
+            schuiven: daarom zelf focusbaar, met een naam en een zichtbare focusrand. */}
+        <div
+          className="overflow-x-auto rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink"
+          tabIndex={0}
+          role="region"
+          aria-label={`Tabel pacing en jaaroverzicht ${data.currentYear}; schuift opzij op een smal scherm`}
+        >
+          <table className="w-full min-w-[42rem] border-collapse text-body">
             <thead>
               <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-muted-foreground">
                 <th scope="col" className="py-1.5 pr-3 font-semibold">Metriek</th>
@@ -130,10 +144,14 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
                     {/* relative: het sr-only woord blijft dan in zijn cel als de tabel opzij schuift. */}
                     <td className={`relative px-3 py-2 text-right font-semibold tabular-nums ${kleur}`}>
                       {rij.vsDoelPct === null ? "—" : (
-                        <>
+                        // Een icoon naast de kleur: bij CPA is lager beter, dus "+12%" is daar
+                        // ongunstig en bij Conversies gunstig. Wie rood en groen niet onderscheidt,
+                        // kon dat oordeel uit het teken alleen niet afleiden.
+                        <span className="inline-flex items-center justify-end gap-1" data-oordeel={rij.gunstig ? "gunstig" : "ongunstig"}>
+                          {rij.gunstig ? <Check className="h-3.5 w-3.5 shrink-0" aria-hidden /> : <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />}
                           {formatDeltaPercent(rij.vsDoelPct)}
                           <span className="sr-only"> {rij.gunstig ? "gunstig" : "ongunstig"}</span>
-                        </>
+                        </span>
                       )}
                     </td>
                     <td className="py-2 pl-3">
@@ -159,7 +177,7 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
       </div>
 
       <Lade id={ladeId} label="Verloop en prognose" labelOpen="Verberg verloop en prognose">
-        <PerformanceChartView clientData={data} forecast={forecast} metric={metric} onMetricChange={onMetricChange} inLade />
+        <PerformanceChartView clientData={data} forecast={forecast} metric={getoondeMetriek} onMetricChange={onMetricChange} inLade beginWeergave={grafiekBegin} />
         {c && pacing && (
           <div className="border-t border-border px-5 py-4">
             <h4 className="text-meta font-semibold uppercase tracking-wider text-muted-foreground">
@@ -203,8 +221,11 @@ function Voortgang({ rij }: { rij: PacingJaarRij }) {
   const verwacht = rij.verwachtPct === null ? null : Math.min(Math.max(rij.verwachtPct, 0), 100);
   const tekst = `${Math.round(pct)}% van het doel${rij.verwachtPct !== null ? `, verwacht ${Math.round(rij.verwachtPct)}%` : ""}`;
   return (
-    <div className="flex min-w-[9rem] items-center gap-2" title={tekst}>
-      <div className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100" aria-hidden>
+    // De balk heeft een eigen ondergrens: naast de tekst ("100% · verwacht 100%") bleef er in een
+    // tabel op zijn minimumbreedte dertig pixels over, en daarin is de streep "verwacht" niet af
+    // te lezen.
+    <div className="flex min-w-[12rem] items-center gap-2" title={tekst}>
+      <div className="relative h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-gray-100" aria-hidden>
         <div className={`h-full rounded-full ${rij.gunstig === false ? "bg-red-400" : "bg-green-500"}`} style={{ width: `${Math.min(pct, 100)}%` }} />
         {verwacht !== null && <div className="absolute bottom-0 top-0 w-px bg-brand-blue/50" style={{ left: `${verwacht}%` }} />}
       </div>
@@ -237,6 +258,9 @@ export function PacingJaaroverzichtGoogle({ clientId, countryFilter, titelToevoe
       onMetricChange={setMetric}
       kanaalNaam={KANAAL_NAAM.google}
       titelToevoeging={titelToevoeging}
+      // De weken van Google zijn echte weekcijfers, en de grafiek opende hier altijd per week. Per
+      // maand is de beginstand voor "Alle kanalen", waar de weken verdeelde maandtotalen zijn.
+      grafiekBegin="weekly"
     />
   );
 }

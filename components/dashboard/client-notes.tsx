@@ -1,5 +1,6 @@
 "use client";
 
+import { STAND_VAN_NU } from "@/components/ui/vensterlabel";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { StickyNote, ListChecks, Plus, Pencil, Trash2, Save } from "lucide-react";
 import { supabase, type ClientNote } from "@/lib/supabase";
@@ -289,7 +290,7 @@ export function ClientNotes({ clientId }: { clientId: string }) {
   return (
     <div ref={wortel} className="grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* Sectie 1: to-do's -- eigen kaart, eigen toevoegknop. */}
-      <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+      <div {...STAND_VAN_NU} className="bg-card rounded-xl border border-border p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <ListChecks className="w-4 h-4 text-brand-blue-ink" />
@@ -337,7 +338,7 @@ export function ClientNotes({ clientId }: { clientId: string }) {
       </div>
 
       {/* Sectie 2: vrije notities -- eigen kaart, eigen toevoegknop. */}
-      <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+      <div {...STAND_VAN_NU} className="bg-card rounded-xl border border-border p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <StickyNote className="w-4 h-4 text-brand-blue-ink" />

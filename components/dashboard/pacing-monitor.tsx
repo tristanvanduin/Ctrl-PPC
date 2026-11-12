@@ -10,6 +10,7 @@ import { today } from "@/lib/reporting-date";
 import { berekenLanding, seizoensduiding } from "@/lib/pacing/landing";
 import { jaardoelTekst, metToelichting } from "@/lib/analysis/standaard-jaardoel";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { RINGCEL } from "./channel-pacing";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -136,7 +137,7 @@ export function BeursAftelling({ edition, vandaag }: { edition?: UpcomingEdition
   );
 }
 
-export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: string; countryFilter?: string | null; edition?: UpcomingEdition | null }) {
+export function PacingMonitor({ clientId, countryFilter, edition, stapelSmal = false }: { stapelSmal?: boolean; clientId: string; countryFilter?: string | null; edition?: UpcomingEdition | null }) {
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
   const forecast = useMemo(() => computeForecast(data), [data]);
@@ -257,7 +258,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         convLanding.volgensPrognose !== null ? "@7xl:grid-cols-6" : "@7xl:grid-cols-5"
       }`}>
         {/* Conversions pacing */}
-        <div className="flex min-w-0 flex-col items-center justify-center gap-3 text-center @lg:flex-row @lg:text-left">
+        <div className={stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd}>
           <div className="relative">
             <PacingRing pct={convPacingPct} color={convColor} />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -274,7 +275,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         </div>
 
         {/* Spend pacing */}
-        <div className="flex min-w-0 flex-col items-center justify-center gap-3 text-center @lg:flex-row @lg:text-left">
+        <div className={stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd}>
           <div className="relative">
             <PacingRing pct={spendPacingPct} color={spendColor} />
             <div className="absolute inset-0 flex items-center justify-center">

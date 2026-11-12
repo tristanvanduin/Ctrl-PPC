@@ -166,6 +166,8 @@ export function TopBar() {
         {!nieuweChrome && (
         <button
           onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+          // data-chrome-oud: vóór React al verborgen voor wie de nieuwe weergave koos (lib/weergave-init.ts).
+          data-chrome-oud
           className="hidden items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-meta text-muted-foreground transition-colors hover:bg-gray-100 sm:flex"
         >
           <Search className="h-3.5 w-3.5" />
@@ -244,7 +246,7 @@ export function TopBar() {
             is de minst functionele van de balk (staat nergens anders, maar kost ook niemand een
             handeling als hij er even niet is), dus die gaat als eerste. */}
         {!nieuweChrome && (
-        <span className="hidden text-sm text-muted-foreground md:inline">
+        <span data-chrome-oud className="hidden text-sm text-muted-foreground md:inline">
           {mounted
             ? new Date().toLocaleDateString("nl-NL", {
                 weekday: "long",

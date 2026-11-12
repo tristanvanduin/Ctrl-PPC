@@ -33,6 +33,14 @@ export const WEERGAVE_PARAM = "weergave";
  *  scherm, geen klant. */
 export const WEERGAVE_SLEUTEL = "overzicht-weergave";
 
+/**
+ * De weergave voor wie niets koos. Standaard UIT: niemand krijgt de nieuwe weergave zonder hem zelf
+ * aan te zetten. Dit is de ENE plek waar de standaard staat: kiesWeergave hieronder en het script
+ * in de <head> (lib/weergave-init.ts) lezen hem allebei. Stonden het er twee, dan gaf de bovenbalk
+ * na het omzetten van de ene weer een sprong voor iedereen zonder bewaarde keuze.
+ */
+export const STANDAARD_WEERGAVE: Weergave = "oud";
+
 /** De weergave uit ?weergave= (of uit de opslag), of null als er niets of iets onbekends staat. */
 export function weergaveUitUrl(ruw: string | null | undefined): Weergave | null {
   return ruw === "nieuw" || ruw === "oud" ? ruw : null;
@@ -40,14 +48,41 @@ export function weergaveUitUrl(ruw: string | null | undefined): Weergave | null 
 
 /**
  * Welke weergave er getoond wordt: de adresbalk gaat voor, dan de bewaarde keuze, en zonder beide
- * de oude. Standaard UIT: niemand krijgt de nieuwe weergave zonder hem zelf aan te zetten.
+ * de standaard (STANDAARD_WEERGAVE).
  * Een onbekende bewaarde waarde (een oudere versie, een handmatige bewerking) telt als geen keuze.
  */
 export function kiesWeergave(inp: { url: string | null | undefined; bewaard: string | null | undefined }): Weergave {
-  return weergaveUitUrl(inp.url) ?? weergaveUitUrl(inp.bewaard) ?? "oud";
+  return weergaveUitUrl(inp.url) ?? weergaveUitUrl(inp.bewaard) ?? STANDAARD_WEERGAVE;
 }
 
 /** De cookie-regel die de keuze een jaar bewaart, voor document.cookie. */
 export function weergaveCookie(w: Weergave): string {
   return `${WEERGAVE_SLEUTEL}=${w}; path=/; max-age=31536000; samesite=lax`;
+}
+
+// ── De chrome rond een klantpagina, vóór de eerste verf ─────────────────────────────────────────
+//
+// De bovenbalk staat in de layout boven het klantdashboard en kent de keuze pas na het monteren
+// (lib/use-weergave.ts, useNieuweChrome): de server stuurde de knop "Zoeken" dus altijd mee, en
+// voor wie de nieuwe weergave koos verdween hij daarna, waarbij alles rechts in de balk versprong.
+// De cookie in de layout lezen zou dat oplossen, maar maakt ELKE pagina onder die layout dynamisch
+// (Vandaag, Portfolio, Beheer), ook voor wie de schakelaar nooit aanraakt.
+//
+// Daarom dezelfde opzet als het thema: een regel script in de <head> (lib/weergave-init.ts) die
+// vóór de eerste verf een kenmerk op <html> zet, en één regel CSS die verbergt wat in de nieuwe chrome niet hoort
+// (app/globals.css, [data-chrome-oud]). React haalt de knop daarna alsnog uit de boom; dat verspringt
+// niet meer, want hij stond er al niet. De hook houdt het kenmerk bij als de keuze of de pagina
+// wisselt.
+
+/** Waar een klantpagina mee begint: alleen daar volgt de chrome de schakelaar. */
+export const KLANTPAD = "/client/";
+/** Het kenmerk op <html> dat zegt dat de chrome de nieuwe weergave volgt. */
+export const CHROME_ATTRIBUUT = "data-chrome";
+
+/**
+ * Volgt de chrome rond deze pagina de nieuwe weergave? Alleen op een klantpagina, en dan volgens
+ * dezelfde voorrang als het Overzicht zelf (kiesWeergave).
+ */
+export function chromeIsNieuw(inp: { pad: string | null | undefined; url: string | null | undefined; bewaard: string | null | undefined }): boolean {
+  return !!inp.pad && inp.pad.startsWith(KLANTPAD) && kiesWeergave(inp) === "nieuw";
 }

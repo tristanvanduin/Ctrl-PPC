@@ -25,9 +25,18 @@ export function WeergaveSchakelaar({ weergave, onKies, compactOpTelefoon = false
       aria-checked={aan}
       title={aan ? "Terug naar de vertrouwde weergave van het Overzicht" : "Probeer de nieuwe bovenkant van het Overzicht: kanaalkaarten, tegels en de hoofdgrafiek"}
       onClick={() => onKies(aan ? "oud" : "nieuw")}
-      className="inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-meta text-muted-foreground transition-colors hover:text-brand-gray focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink"
+      // In de merkregel van de nieuwe weergave staat op een telefoon alleen het schuifje. Dan is
+      // dat schuifje het hele tikvlak: 44 bij 44 px in plaats van 28 bij 16, en vanaf sm weer de
+      // compacte maat met het label ernaast. In de vertrouwde weergave is de knop wat hij was.
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 text-meta text-muted-foreground transition-colors hover:text-brand-gray focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink ${compactOpTelefoon ? "min-h-11 min-w-11 justify-center sm:min-h-7 sm:min-w-0" : "min-h-7"}`}
     >
-      <span aria-hidden className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${aan ? "bg-brand-blue" : "bg-muted-foreground/40"}`}>
+      {/* Het spoor: zonder label ernaast (compact) moet het schuifje zelf te zien zijn, dus dan
+          de donkere merkkleur (aan) of een grijs met een rand (uit) in plaats van een tint van 40%. */}
+      <span aria-hidden className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
+        compactOpTelefoon
+          ? (aan ? "bg-brand-blue-ink" : "bg-muted-foreground/70 ring-1 ring-muted-foreground")
+          : (aan ? "bg-brand-blue" : "bg-muted-foreground/40")
+      }`}>
         <span className={`absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${aan ? "translate-x-3" : "translate-x-0"}`} />
       </span>
       <span className={compactOpTelefoon ? "sr-only sm:not-sr-only" : undefined}>Nieuwe weergave</span>

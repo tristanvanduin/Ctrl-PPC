@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { THEMA_INIT_SCRIPT } from "@/components/ui/thema-schakelaar";
+import { WEERGAVE_INIT_SCRIPT } from "@/lib/weergave-init";
 import { BRAND_NAME } from "@/lib/branding/brand";
 import "./globals.css";
 import { CANONIEK_DOMEIN } from "@/lib/domein";
@@ -47,6 +48,10 @@ export default function RootLayout({
             fractie later om. Die witte flits op een donker scherm is precies het moment waarop een
             product er goedkoop uitziet. */}
         <script dangerouslySetInnerHTML={{ __html: THEMA_INIT_SCRIPT }} />
+        {/* Dezelfde reden, voor de bovenbalk op een klantpagina: wie de nieuwe weergave koos, zag
+            de knop "Zoeken" eerst verschijnen en dan verdwijnen, waarbij de balk versprong. Het
+            script zet alleen een kenmerk op <html>; buiten een klantpagina doet het niets. */}
+        <script dangerouslySetInnerHTML={{ __html: WEERGAVE_INIT_SCRIPT }} />
       </head>
       <body className="min-h-screen">
         <TooltipProvider>{children}</TooltipProvider>

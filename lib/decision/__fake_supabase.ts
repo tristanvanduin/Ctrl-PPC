@@ -48,10 +48,26 @@ class FakeQueryBuilder {
 
   constructor(private store: FakeSupabase, private table: string) {}
 
-  select(_cols?: string): this { return this; }
+  // `{ count: "exact", head: true }`: de telling van de rijen die de filters matchen (vóór een
+  // limiet), en met `head` zonder de rijen zelf, zoals PostgREST.
+  private telling = false;
+  private alleenKop = false;
+  select(_cols?: string, opts?: { count?: string; head?: boolean }): this {
+    if (opts?.count) this.telling = true;
+    if (opts?.head) this.alleenKop = true;
+    return this;
+  }
   eq(col: string, val: unknown): this { this.filters.push((r) => matchesEq(r, col, val)); return this; }
   neq(col: string, val: unknown): this { this.filters.push((r) => !matchesEq(r, col, val)); return this; }
   is(col: string, val: unknown): this { this.filters.push((r) => (r[col] ?? null) === val); return this; }
+  /** `.not(kolom, "is", null)` en `.not(kolom, "eq", waarde)`: het omgekeerde van het filter. Een
+   *  andere operator gooit, zodat een test niet stil op een filter leunt dat hier niets doet. */
+  not(col: string, op: string, val: unknown): this {
+    if (op === "is") this.filters.push((r) => (r[col] ?? null) !== val);
+    else if (op === "eq") this.filters.push((r) => !matchesEq(r, col, val));
+    else throw new Error(`FakeSupabase.not: operator "${op}" is niet nagebouwd`);
+    return this;
+  }
   lte(col: string, val: unknown): this { this.filters.push((r) => matchesLte(r, col, val)); return this; }
   gte(col: string, val: unknown): this { this.filters.push((r) => matchesGte(r, col, val)); return this; }
   in(col: string, vals: unknown[]): this { this.filters.push((r) => matchesIn(r, col, vals)); return this; }
@@ -87,7 +103,7 @@ class FakeQueryBuilder {
   }
 
   // Maakt het object thenable/awaitable, zoals de echte PostgrestFilterBuilder.
-  then<T>(resolve: (value: { data: unknown; error: { message: string } | null }) => T): Promise<T> {
+  then<T>(resolve: (value: { data: unknown; error: { message: string } | null; count?: number | null }) => T): Promise<T> {
     const fout = this.store.fouten[this.table];
     if (fout) return Promise.resolve(resolve({ data: null, error: { message: fout } }));
     if (this.pendingInsert) {
@@ -107,6 +123,12 @@ class FakeQueryBuilder {
       return Promise.resolve(resolve({ data: null, error: null }));
     }
     let rows = this.matching();
+    if (this.telling) {
+      const count = rows.length;
+      if (this.alleenKop) return Promise.resolve(resolve({ data: null, error: null, count }));
+      if (this.limitN != null) rows = rows.slice(0, this.limitN);
+      return Promise.resolve(resolve({ data: rows, error: null, count }));
+    }
     if (this.orderCol) {
       const col = this.orderCol;
       rows = [...rows].sort((a, b) => {

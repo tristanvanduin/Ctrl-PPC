@@ -60,7 +60,7 @@ import { ChannelBudgetScenario } from "./channel-budget-scenario";
 import { EventForecaster } from "./event-forecaster";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreativeDeepDive } from "./creative-deep-dive";
-import { isDemoClient } from "@/lib/demo/demo-mode";
+import { isDemoClient, isDemoClientId } from "@/lib/demo/demo-mode";
 import { GodViewDemo } from "@/components/terminal/god-view-demo";
 import { ChannelGapCard } from "./channel-gap-card";
 import type { InsightChannel } from "@/lib/insights/channel-of";
@@ -97,6 +97,9 @@ import { GeoCloneScope } from "./geo-clone-scope";
 import { TrackingAlert } from "./tracking-alert";
 import { CodeRoodBanner } from "./code-rood-banner";
 import { ClientNotes } from "./client-notes";
+import { STAND_VAN_NU } from "@/components/ui/vensterlabel";
+import { kanaalbalkCookieRegel, reserveerKaartenrij, type BalkGeheugen } from "@/lib/overzicht/kaartenrij";
+import { SectieKopBijeen } from "@/components/ui/sectie";
 import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
@@ -269,11 +272,14 @@ function DashboardPeriodPicker({ jaarlijkseEditie, klaar, snelVanafTablet = fals
   );
 }
 
-export function ClientDashboard({ client, bewaardeWeergave = null }: {
+export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVanServer = null }: {
   client: Client;
   /** De weergave zoals de server hem in de cookie las (lib/weergave.ts), zodat de eerste render al
    *  de gekozen kop toont in plaats van eerst de vertrouwde en dan de nieuwe. */
   bewaardeWeergave?: string | null;
+  /** Of deze klant de vorige keer een kanaalbalk had, zoals de server het in de cookie las
+   *  (lib/overzicht/kaartenrij.ts): dan staat de vrijgehouden rij al in de eerste HTML. */
+  kanaalbalkVanServer?: BalkGeheugen;
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   // DE KANAALKEUZE WOONT IN DE ADRESBALK (?kanaal=meta; bouwplan fase 2). Hier stond een useState:
@@ -438,15 +444,32 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
       : periodSummary.klaar[channel];
   // Had deze klant de vorige keer een kanaalbalk (meer dan één kanaal)? Alleen om tijdens het laden
   // de hoogte te reserveren; de waarheid komt uit `kanalen`.
-  const [hadKanaalbalk, setHadKanaalbalk] = useState(false);
+  // Drie standen en geen twee: "er was een balk", "er was er geen", en "over deze klant is niets
+  // bekend" (lib/overzicht/kaartenrij.ts). In de nieuwe weergave komt de beginwaarde van de server
+  // (een cookie onder het pad van deze klant), zodat de eerste HTML al klopt. De vertrouwde
+  // weergave leest en schrijft die cookie niet: daar begint het op "niets bekend" en komt het
+  // antwoord uit localStorage, vóór het eerste beeld, zoals het was.
+  const vanServer = nieuweWeergave ? kanaalbalkVanServer : null;
+  const [balkGeheugen, setBalkGeheugen] = useState<BalkGeheugen>(vanServer);
+  const hadKanaalbalk = balkGeheugen === "1";
   // Layout-effect: vóór het eerste beeld, anders verschijnt de reservering zelf als een sprong.
   useLayoutEffect(() => {
-    try { setHadKanaalbalk(window.localStorage.getItem(`kanaalbalk:${client.id}`) === "1"); } catch { /* geen opslag: dan geen reservering */ }
-  }, [client.id]);
+    try {
+      const v = window.localStorage.getItem(`kanaalbalk:${client.id}`);
+      setBalkGeheugen(v === "1" || v === "0" ? v : vanServer);
+    } catch { /* geen opslag: dan wat de server wist */ }
+  }, [client.id, vanServer]);
   useEffect(() => {
     if (kanalen === null) return;
-    try { window.localStorage.setItem(`kanaalbalk:${client.id}`, zichtbareTabs(kanalen).length > 0 ? "1" : "0"); } catch { /* idem */ }
-  }, [client.id, kanalen]);
+    const metBalk = zichtbareTabs(kanalen).length > 0;
+    try { window.localStorage.setItem(`kanaalbalk:${client.id}`, metBalk ? "1" : "0"); } catch { /* idem */ }
+    // En in de cookie, voor de server bij de volgende paginalaad. Alleen in de nieuwe weergave.
+    if (!nieuweWeergave) return;
+    try {
+      const regel = kanaalbalkCookieRegel(metBalk, window.location.pathname);
+      if (regel) document.cookie = regel;
+    } catch { /* geen cookies: dan weet alleen de browser het */ }
+  }, [client.id, kanalen, nieuweWeergave]);
   const bandKlaar = kanalen !== null && eigenStandBekend;
 
   // De datastand in woorden, voor de bronrij van de nieuwe weergave (bouwplan fase 4): tot welke
@@ -519,12 +542,12 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
               KANAALNAAM onwaar, nu het woord "live". Zelfde les, dus dezelfde behandeling. */}
           {kanalenOpsomming(kanalen ?? []) !== null && (
             demoModus ? (
-              <div className="flex items-center gap-2 text-xs text-brand-blue-ink bg-brand-blue/10 border border-brand-blue/20 rounded-lg px-3 py-1.5">
+              <div {...STAND_VAN_NU} className="flex items-center gap-2 text-xs text-brand-blue-ink bg-brand-blue/10 border border-brand-blue/20 rounded-lg px-3 py-1.5">
                 <FlaskConical className="w-3.5 h-3.5" />
                 Demodata — {kanalenOpsomming(kanalen ?? [])}, geen live koppeling
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+              <div {...STAND_VAN_NU} className="flex items-center gap-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
                 <Wifi className="w-3.5 h-3.5" />
                 Live data uit {kanalenOpsomming(kanalen ?? [])}
               </div>
@@ -534,7 +557,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
               staat er elke dag, verandert zelden, en er is niets aan te doen. In alarmkleur zegt
               hij elke sessie opnieuw "let op" over iets waar niet op te letten valt; naast de
               live-badge is hij precies wat hij is: een stukje context bij de cijfers. */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 border border-border rounded-lg px-3 py-1.5">
+          <div {...STAND_VAN_NU} className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 border border-border rounded-lg px-3 py-1.5">
             <Clock className="w-3.5 h-3.5" />
             Conversielag: {lagDays} {lagDays === 1 ? "dag" : "dagen"}
           </div>
@@ -561,6 +584,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
               rood als de data stilstaat. Het woord en een icoon, niet alleen de kleur. */}
           {nieuweWeergave && standTekst && (
             <div
+              {...STAND_VAN_NU}
               data-datastand={standTekst.alarm ? "alarm" : "ok"}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${standTekst.alarm ? "border-red-200 bg-red-50 font-semibold text-red-700" : "border-border bg-muted/60 text-muted-foreground"}`}
             >
@@ -687,7 +711,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
               band={periodSummary}
               bandKlaar={bandKlaar}
               demo={demoModus}
-              reserveerKaarten={kanalen === null && hadKanaalbalk}
+              reserveerKaarten={reserveerKaartenrij({ kanalenBekend: kanalen !== null, geheugen: balkGeheugen, nieuw: true, meerdereVerwacht: isDemoClientId(client.id) })}
             />
           )}
           {bronrij}
@@ -754,12 +778,15 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
           <GeoCloneScope value={geoClone} onChange={setGeoClone} />
 
           {activeTab === "dashboard" && (
+            // De koppen van de nieuwe weergave houden icoon en titel bij elkaar (components/ui/sectie.tsx);
+            // met de schakelaar uit, en op elk ander tabblad, blijft de kop wat hij was.
+            <SectieKopBijeen.Provider value={nieuweWeergave}>
             <div className="space-y-6">
               {/* De kanaaltabs en de KPI-band staan hierboven, buiten de datapoort. */}
               {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
               {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
               {channel === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
-              {channel === "blended" && <CrossChannelView clientId={client.id} kanalen={kanalen ?? []} edition={upcomingEdition} nieuw={nieuweWeergave} />}
+              {channel === "blended" && <CrossChannelView clientId={client.id} kanalen={kanalen ?? []} edition={upcomingEdition} nieuw={nieuweWeergave} googleData={nieuweWeergave ? clientData.data : null} />}
               {channel === "google" && (
                 <GoogleView
                   clientId={client.id}
@@ -775,6 +802,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
                 />
               )}
             </div>
+            </SectieKopBijeen.Provider>
           )}
 
           {activeTab === "campaigns" && (

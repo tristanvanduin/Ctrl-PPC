@@ -24,7 +24,7 @@ const UsStatesMap = dynamic(() => import("./us-states-map"), {
 // de klik-op-VS-hint, zodat de kaart de volle kolombreedte krijgt. Krijgt state van
 // useGeoBreakdown() mee als prop in plaats van hem zelf aan te roepen -- zelfde hook-instantie als
 // GeoRanglijstCard ernaast, anders lopen metric-keuze en VS-drilldown uit elkaar.
-export function GeoMapCard({ state, channel = "google", verdieping, naast, voet, vensterToevoeging }: {
+export function GeoMapCard({ state, channel = "google", verdieping, naast, voet, vensterToevoeging, vensterUitleg }: {
   state: GeoBreakdownState;
   channel?: "google" | "meta" | "linkedin" | "blended";
   verdieping?: ReactNode;
@@ -39,6 +39,10 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
   voet?: ReactNode;
   /** Een voorbehoud bij het venster, voor het label in de kop: "zonder Microsoft". */
   vensterToevoeging?: string;
+  /** Hetzelfde voorbehoud voluit: waar het wel en niet geldt. Staat in de uitleg van het label.
+   *  Voor wie geen muis heeft staat dezelfde zin boven de tabel in de lade (GeoTabelLade), en bij
+   *  een klant met één land open in de kaart: hier een eigen regel kostte op elk scherm hoogte. */
+  vensterUitleg?: string;
 }) {
   const { metricKey, setMetricKey, metric, focus, setFocus, countries, laden, canDrillUs, geoWord, values, ranked, eenLandOfMinder } = state;
 
@@ -50,7 +54,7 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
   // vaakst.
   // Het voorbehoud bij het venster gaat mee: deze stand heeft geen eigen kop met een vensterlabel, en
   // zonder stond "zonder Microsoft" bij een klant met één land nergens meer.
-  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} voorbehoud={vensterToevoeging} />;
+  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} voorbehoud={vensterToevoeging} voorbehoudUitleg={vensterUitleg} />;
 
   // De kolom ernaast alleen als de ranglijst iets toont: zonder rijen voor de gekozen metriek stond
   // er rechts een leeg omrand vak naast "Geen data voor deze metric".
@@ -70,7 +74,7 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
         <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
         {/* De landrijen komen uit een eigen lezing over 180 dagen (lib/geo/use-geo-breakdown.ts); de
             periode laten volgen kost een verzoek per wissel. Tot die tijd staat het venster erbij. */}
-        <Vensterlabel soort="vast" venster="laatste 180 dagen" toevoeging={vensterToevoeging} />
+        <Vensterlabel soort="vast" venster="laatste 180 dagen" toevoeging={vensterToevoeging} toevoegingUitleg={vensterUitleg} />
         {/* Het aantal landen als bijschrift, nu de tegel "aantal landen" er in deze vorm niet meer is. */}
         {naast !== undefined && ranked.length > 0 && (
           <span className="text-meta text-muted-foreground">{ranked.length} {focus === "US" ? "staten" : ranked.length === 1 ? "land" : "landen"}</span>
@@ -108,7 +112,13 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
       <div className={metNaast ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px]" : "contents"}>
       <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-3">
         {ranked.length === 0 ? (
-          <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
+          <>
+            <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
+            {/* Zonder rijen is er geen lade onder de kaart (GeoTabelLade rendert dan niets), en stond
+                het voorbehoud voluit alleen in de uitleg van het vensterlabel: niet te lezen zonder
+                muis. Juist hier hoort het: "geen data" kan ook betekenen dat de bron een kanaal mist. */}
+            {vensterUitleg && <p className="px-2 pb-2 text-center text-micro leading-snug text-muted-foreground" data-venster-uitleg>{vensterUitleg}</p>}
+          </>
         ) : (
           // De kaart-SVG is `w-full h-auto` op een viewBox van 760x380, dus zijn hoogte groeit
           // LINEAIR mee met de kolombreedte -- als enige kaart op het scherm. Alle andere kaarten

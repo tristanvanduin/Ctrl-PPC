@@ -48,6 +48,7 @@ export function CollapsiblePanel({
   meta,
   defaultOpen = true,
   naadloos = false,
+  standVanNu = false,
   children,
 }: {
   /** Stabiele sleutel voor het onthouden van open/dicht. Verander hem niet zonder reden. */
@@ -59,6 +60,9 @@ export function CollapsiblePanel({
   meta?: React.ReactNode;
   defaultOpen?: boolean;
   children: React.ReactNode;
+  /** Dit paneel gaat over geen enkel venster (de koppeling, de uitleg van een tabblad): zie
+   *  STAND_VAN_NU in components/ui/vensterlabel.tsx. */
+  standVanNu?: boolean;
   /**
    * Zonder eigen kaartrand, voor een paneel dat ín een andere kaart staat.
    *
@@ -87,12 +91,16 @@ export function CollapsiblePanel({
   const paneelId = `paneel-${id}`;
 
   return (
-    <div className={naadloos ? "border-t border-border" : "bg-card rounded-xl border border-border shadow-sm overflow-hidden"}>
+    // data-paneel: de meting (scripts/meet-overzicht.mjs) ziet zo dat een dicht paneel geen cijfers
+    // toont, en telt het dan niet als een blok dat bij een periodewissel had moeten veranderen.
+    <div data-paneel={open ? "open" : "dicht"} data-venster={standVanNu ? "stand" : undefined} className={naadloos ? "border-t border-border" : "bg-card rounded-xl border border-border shadow-sm overflow-hidden"}>
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        aria-controls={paneelId}
+        // Alleen een verwijzing als het paneel er staat: dicht wordt het niet gerenderd, en een
+        // aria-controls naar een id dat niet bestaat is een dood spoor (dezelfde regel als Lade).
+        aria-controls={open ? paneelId : undefined}
         className="w-full px-5 py-3 flex items-center gap-2 text-left hover:bg-gray-50/70 transition-colors"
       >
         {icon}
@@ -183,18 +191,21 @@ export function MeerKnop({
   uitgeklapt,
   onToggle,
   eenheid = "regels",
+  ruim = false,
 }: {
   verborgen: number;
   uitgeklapt: boolean;
   onToggle: () => void;
   eenheid?: string;
+  /** Een tikvlak van minstens 44 px, voor een knop die op een telefoon bovenaan de pagina staat. */
+  ruim?: boolean;
 }) {
   if (verborgen === 0) return null;
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="w-full px-5 py-2.5 text-meta font-medium text-brand-blue-ink hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors"
+      className={`${ruim ? "min-h-11 " : ""}w-full px-5 py-2.5 text-meta font-medium text-brand-blue-ink hover:bg-gray-50 border-t border-border flex items-center justify-center gap-1.5 transition-colors`}
     >
       <ChevronDown className={`w-3.5 h-3.5 transition-transform ${uitgeklapt ? "rotate-180" : ""}`} />
       {uitgeklapt ? "Toon minder" : `Toon ${verborgen} ${eenheid} meer`}
@@ -221,6 +232,7 @@ export function Lade({
   labelOpen,
   defaultOpen = false,
   rand = true,
+  heelBlok = false,
   children,
 }: {
   /** Stabiele sleutel voor het onthouden van open of dicht. */
@@ -232,6 +244,13 @@ export function Lade({
   defaultOpen?: boolean;
   /** De scheidingslijn boven de knop, voor een lade in de voet van een kaart. */
   rand?: boolean;
+  /**
+   * Deze lade IS de inhoud van zijn kaart: dicht staat er alleen een kop en deze knop. De meting
+   * leest dat af (data-heel-blok) en telt zo'n dichte kaart niet als een blok dat bij een
+   * periodewissel had moeten veranderen. Niet zetten bij een lade onder een kaart die zelf cijfers
+   * toont ("Verloop en prognose"): die kaart hoort wel te bewegen.
+   */
+  heelBlok?: boolean;
   /** De inhoud, of een functie die hem maakt: die wordt pas aangeroepen als de lade open is, zodat
    *  rekenwerk in de aanroeper (totalen, een lange tabel) dicht niets kost. */
   children: React.ReactNode | (() => React.ReactNode);
@@ -245,6 +264,7 @@ export function Lade({
         onClick={toggle}
         aria-expanded={open}
         aria-controls={open ? inhoudId : undefined}
+        data-heel-blok={heelBlok ? (open ? "open" : "dicht") : undefined}
         className={`flex min-h-11 w-full items-center justify-center gap-1.5 px-5 py-2.5 text-meta font-medium text-brand-blue-ink transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-blue ${rand ? "border-t border-border" : ""}`}
       >
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />

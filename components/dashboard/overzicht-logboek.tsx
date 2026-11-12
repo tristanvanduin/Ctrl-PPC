@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { KANAAL_KLEUR, KANAAL_NAAM, type Kanaal, type Kanaalkeuze } from "@/lib/kanalen/beschikbaar";
 import {
-  SOORT_LABEL, legeStaat, tijdLabel, voorKanaal,
+  SOORT_LABEL, bronnenMetLeesfout, legeStaat, tijdLabel, voorKanaal,
   type Logboek, type LogboekItem, type LogboekSoort, type LogboekToon,
 } from "@/lib/overzicht/logboek";
 import { isNieuwSinds } from "@/lib/overzicht/bezoek";
@@ -61,7 +61,12 @@ const TOON_CHIP: Record<LogboekToon, string> = {
   voorstel: "bg-brand-blue/10 text-brand-blue-ink",
 };
 
-const kaart = "relative flex min-h-[19rem] flex-col rounded-xl border border-border bg-card px-1.5 pb-2 pt-3 shadow-sm";
+// `lg:min-h`: de minimumhoogte is er om naast de grafiek te passen, en dat is pas vanaf lg. Onder lg
+// staat het logboek over de volle breedte BOVEN de grafiek; een leeg logboek hield daar op een
+// telefoon driehonderd pixels vast voor één zin.
+// `@container`: de regels schikken zich naar de breedte van DEZE kaart, niet naar het venster. De
+// kaart is juist op een breed scherm smal (vier van de twaalf kolommen naast de grafiek).
+const kaart = "@container relative flex flex-col rounded-xl border border-border bg-card px-1.5 pb-2 pt-3 shadow-sm lg:min-h-[19rem]";
 
 function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel }: {
   item: LogboekItem;
@@ -82,16 +87,20 @@ function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel }: {
         aria-expanded={open}
         aria-controls={paneel}
         onClick={onWissel}
-        className="grid min-h-[52px] w-full grid-cols-[26px_minmax(0,1fr)_auto_16px] items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-blue-ink"
+        // In een smalle kaart (naast de grafiek, of op een telefoon) staat de chip ONDER de titel
+        // en heeft de titel de hele regel; pas in een brede kaart (@md, 28rem) staat hij ernaast.
+        // Hier stond de chip altijd naast de titel, niet te krimpen: in een kolom van 224 px bleef
+        // er voor de titel een handvol tekens over, op één regel afgekapt.
+        className="grid min-h-[52px] w-full grid-cols-[26px_minmax(0,1fr)_16px] items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-blue-ink @md:grid-cols-[26px_minmax(0,1fr)_auto_16px]"
       >
         <span
           aria-hidden
-          className={`flex h-6 w-6 items-center justify-center rounded-md text-meta font-bold ${kleur ? "" : "bg-muted text-muted-foreground"}`}
+          className={`col-start-1 row-start-1 flex h-6 w-6 items-center justify-center rounded-md text-meta font-bold ${kleur ? "" : "bg-muted text-muted-foreground"}`}
           style={kleur ? { backgroundColor: `${kleur}1f`, color: kleur } : undefined}
         >
           {item.kanaal ? KANAAL_GLYPH[item.kanaal] : SOORT_ICOON[item.soort]}
         </span>
-        <span className="min-w-0">
+        <span className="col-start-2 row-start-1 min-w-0">
           <span className="flex flex-wrap items-center gap-x-1.5 text-meta text-muted-foreground">
             {nieuw && (
               // Een stip EN het woord: kleur alleen zegt een schermlezer en een kleurenblinde niets.
@@ -102,13 +111,15 @@ function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel }: {
             <span>{SOORT_LABEL[item.soort]}{item.kanaal ? ` · ${KANAAL_NAAM[item.kanaal]}` : ""} · {tijdLabel(item.tijd, nu)}</span>
             {item.voorbeeld && <span className="rounded border border-border px-1 text-micro font-medium uppercase tracking-wide">voorbeeld</span>}
           </span>
-          {/* Op een telefoon twee regels, daarboven één: de titel is de inhoud van de regel. */}
-          <span className="line-clamp-2 text-xs leading-snug text-brand-gray sm:line-clamp-1" title={item.titel}>{item.titel}</span>
+          {/* Twee regels zolang de kaart smal is, één in een brede kaart: de titel is de inhoud van
+              de regel. De volledige titel staat ook in het uitgeklapte paneel, niet alleen in een
+              tooltip die een toetsenbord en een aanraakscherm niet kennen. */}
+          <span className="line-clamp-2 text-xs leading-snug text-brand-gray @md:line-clamp-1" title={item.titel}>{item.titel}</span>
         </span>
-        {item.chip ? (
-          <span className={`whitespace-nowrap rounded-full px-1.5 py-px text-meta font-semibold ${TOON_CHIP[item.toon]}`}>{item.chip}</span>
-        ) : <span />}
-        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+        {item.chip && (
+          <span className={`col-start-2 row-start-2 max-w-full justify-self-start truncate rounded-full px-1.5 py-px text-meta font-semibold @md:col-start-3 @md:row-start-1 @md:max-w-[10rem] ${TOON_CHIP[item.toon]}`} title={item.chip}>{item.chip}</span>
+        )}
+        <ChevronDown className={`col-start-3 row-start-1 h-3.5 w-3.5 text-muted-foreground transition-transform @md:col-start-4 ${open ? "rotate-180" : ""}`} aria-hidden />
       </button>
       {/* 0fr -> 1fr: het paneel schuift open zonder dat de hoogte gemeten hoeft te worden. Dicht is
           het ook echt weg voor toetsenbord en schermlezer (hidden), niet alleen nul pixels hoog. */}
@@ -118,16 +129,19 @@ function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel }: {
       >
         <div id={paneel} className="overflow-hidden" hidden={!open}>
           <div className="flex flex-col gap-2 pb-2.5 pl-10 pr-2">
+            {/* De titel voluit, als eerste alinea: in de regel erboven kan hij afgekapt zijn. */}
+            <p className="text-xs font-medium leading-relaxed text-brand-gray" data-logboek-titel>{item.titel}</p>
             {item.detail.map((alinea, i) => (
               <p key={i} className="text-xs leading-relaxed text-brand-gray">{alinea}</p>
             ))}
             {(item.beoordeelbaar || bekijkKanaal) && (
-              <div className="flex flex-wrap gap-1.5">
+              // Op een aanraakscherm 44 px hoog met 8 px ertussen; vanaf sm de compacte maat.
+              <div className="flex flex-wrap gap-2 sm:gap-1.5">
                 {item.beoordeelbaar && (
                   <button
                     type="button"
                     onClick={onBeoordeel}
-                    className="inline-flex h-7 items-center gap-1 rounded-full bg-brand-gray px-3 text-xs font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink"
+                    className="inline-flex min-h-11 items-center gap-1 rounded-full bg-brand-gray px-3 sm:min-h-7 text-xs font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink"
                   >
                     Beoordeel <ArrowRight className="h-3 w-3" aria-hidden />
                     <span className="sr-only">in Bevindingen</span>
@@ -137,7 +151,7 @@ function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel }: {
                   <button
                     type="button"
                     onClick={bekijkKanaal}
-                    className="inline-flex h-7 items-center rounded-full bg-muted px-3 text-xs text-brand-gray hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink"
+                    className="inline-flex min-h-11 items-center rounded-full bg-muted px-3 sm:min-h-7 text-xs text-brand-gray hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink"
                   >
                     Bekijk {KANAAL_NAAM[item.kanaal]}
                   </button>
@@ -149,6 +163,18 @@ function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel }: {
       </div>
     </li>
   );
+}
+
+/**
+ * Wat een schermlezer hoort als het aantal nieuwe regels verandert: hetzelfde als de regel onder
+ * de kop, ZONDER het tijdstip. Dat tijdstip loopt mee met de klok ("31 min geleden", "32 min
+ * geleden"); in een live-gebied werd het tot een uur lang elke minuut opnieuw voorgelezen.
+ */
+export function nieuwAankondiging(inp: { bekend: boolean; eerste: boolean; ijkpunt: string | null; nieuw: number; nieuwElders: number }): string | null {
+  if (!inp.bekend) return null;
+  if (inp.eerste || !inp.ijkpunt) return "eerste bezoek: vanaf nu zie je hier wat er nieuw is";
+  const elders = inp.nieuwElders > 0 ? `, en ${inp.nieuwElders} bij andere kanalen` : "";
+  return `${inp.nieuw > 0 ? `${inp.nieuw} nieuw` : "niets nieuws"} sinds je vorige bezoek${elders}`;
 }
 
 /** De regel onder de kop: hoeveel er nieuw is sinds het vorige bezoek. */
@@ -187,6 +213,8 @@ export function LogboekKaart({ logboek, laadt, fout, channel, kanalen, ijkpunt, 
   const nieuw = items.filter((i) => isNieuwSinds(i.tijd, ijkpunt)).length;
   const nieuwElders = alle.filter((i) => isNieuwSinds(i.tijd, ijkpunt)).length - nieuw;
   const sub = logboek ? nieuwTekst({ bekend: bezoekBekend, eerste: eersteBezoek, ijkpunt, nieuw, nieuwElders, nu }) : null;
+  const aankondiging = logboek ? nieuwAankondiging({ bekend: bezoekBekend, eerste: eersteBezoek, ijkpunt, nieuw, nieuwElders }) : null;
+  const leesfouten = logboek ? bronnenMetLeesfout(logboek.bronnen, channel) : [];
   const metVoorbeelden = items.some((i) => i.voorbeeld);
 
   const kop = (
@@ -195,7 +223,10 @@ export function LogboekKaart({ logboek, laadt, fout, channel, kanalen, ijkpunt, 
       <h3 id="logboek-kop" className="text-title font-semibold text-brand-gray">Wat er gebeurde</h3>
       <Vensterlabel soort="vast" venster={`laatste ${logboek?.dagen ?? 30} dagen`} />
       {/* Altijd aanwezig, ook leeg: de regel eronder verspringt dan niet als het ijkpunt bekend wordt. */}
-      <p className="min-h-4 w-full text-meta text-muted-foreground" data-logboek-nieuw={nieuw} aria-live="polite">{sub}</p>
+      <p className="min-h-4 w-full text-meta text-muted-foreground" data-logboek-nieuw={nieuw}>{sub}</p>
+      {/* De aankondiging voor een schermlezer staat apart, zonder het tijdstip: de zichtbare regel
+          hierboven verandert elke minuut mee met de klok en is daarom zelf geen live-gebied. */}
+      <span className="sr-only" role="status" data-logboek-aankondiging>{aankondiging}</span>
     </div>
   );
 
@@ -258,18 +289,23 @@ export function LogboekKaart({ logboek, laadt, fout, channel, kanalen, ijkpunt, 
       {/* Buiten het schuifvak: vier regels vullen het vak al, en een knop onder de vouw daarvan
           ziet alleen wie in het vak schuift. Hier staat altijd in beeld dat er meer is. */}
       {items.length > 0 && (
-        <MeerKnop verborgen={lijst.verborgen} uitgeklapt={lijst.uitgeklapt} onToggle={lijst.toggle} eenheid="regels" />
+        <MeerKnop verborgen={lijst.verborgen} uitgeklapt={lijst.uitgeklapt} onToggle={lijst.toggle} eenheid="regels" ruim />
       )}
       <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/60 px-2 pt-2 text-meta text-muted-foreground">
-        <button type="button" onClick={onBeoordeel} className="inline-flex items-center gap-1 font-medium text-brand-blue-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink">
+        <button type="button" onClick={onBeoordeel} className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-blue-ink hover:underline sm:min-h-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink">
           Naar Bevindingen <ArrowRight className="h-3 w-3" aria-hidden />
         </button>
-        {logboek.wachtOpOordeel > 0 && (
+        {logboek.wachtOpOordeel !== null && logboek.wachtOpOordeel > 0 && (
           <span>· {logboek.wachtOpOordeel} {logboek.wachtOpOordeel === 1 ? "voorstel wacht" : "voorstellen wachten"} op je oordeel</span>
         )}
         {fout && <span className="text-red-700">· verversen mislukte: {fout}</span>}
-        {logboek.bronnen.some((b) => !b.ok) && items.length > 0 && (
-          <span title={logboek.bronnen.filter((b) => !b.ok).map((b) => `${b.bron}: ${b.fout ?? "niet te lezen"}`).join("\n")}>· niet elke bron was te lezen</span>
+        {/* Ook een bron waarvan een DEEL niet te lezen was (één runtabel van de vier): die is `ok`,
+            maar "niets gebeurd" geldt er niet voor. Welke bron het is staat er in woorden bij; de
+            reden per tabel in de uitleg. */}
+        {leesfouten.length > 0 && items.length > 0 && (
+          <span data-logboek-leesfout title={leesfouten.map((b) => `${b.naam}: ${b.reden}`).join("\n")}>
+            · niet elke bron was te lezen ({leesfouten.map((b) => b.naam).join(", ")})
+          </span>
         )}
         {metVoorbeelden && <span className="w-full">Regels met &lsquo;voorbeeld&rsquo; zijn verzonnen voor de demo; de rest is echt.</span>}
       </div>

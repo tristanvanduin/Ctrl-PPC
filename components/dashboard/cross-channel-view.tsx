@@ -30,6 +30,10 @@ import { PacingJaaroverzicht } from "./pacing-jaaroverzicht";
 import { uitgeslotenZin } from "./period-summary";
 import { uitgeslotenMetDag } from "@/lib/sync/datastand";
 import type { Kanaal } from "@/lib/kanalen/beschikbaar";
+import type { ClientHistoricalData } from "@/lib/types";
+import { alsBronReeks } from "@/lib/period/apply-period";
+import { grafiekMaanden } from "@/lib/overzicht/bovenkant";
+import { bronVerschilZin, kostenBronVerschil } from "@/lib/overzicht/bron-verschil";
 
 // Cross-channel (blended) tab. Eén bron: de pacing, de beurs-sectie, het jaaroverzicht én de
 // grafiek, de ringen en de kanaaltabel lezen de blended historie (useBlendedClientData: Google uit
@@ -46,6 +50,15 @@ const CHANNEL_LABEL: Record<string, string> = {
   microsoft_ads: "Microsoft",
 };
 
+/**
+ * Waar Microsoft Ads op dit tabblad wel en niet meetelt. Eén zin voor beide weergaven: in de
+ * vertrouwde staat hij boven de sectie, in de nieuwe bij het voorbehoud "zonder Microsoft" van de
+ * wereldkaart, het enige blok dat Microsoft nog niet meetelt.
+ */
+export const MICROSOFT_UITLEG =
+  "Microsoft Ads telt mee in de kerncijfers bovenaan, de ranking, de pacing, de beurs-sectie, het jaaroverzicht, "
+  + "de verdeling over de kanalen en de cross-channel-tabel. In de markten nog niet; de eigen Microsoft-cijfers staan op het tabblad Microsoft.";
+
 // Bedragen dragen hun valutateken. Zonder dat staat er "489.160" naast "266.532" en moet je uit
 // de kolomkop afleiden wat geld is en wat een aantal — precies het soort werk dat een tabel je
 // hoort te besparen.
@@ -59,7 +72,7 @@ function fmt(n: number | null): string {
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(n);
 }
 
-export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = false, alleenTabel = false }: {
+export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = false, alleenTabel = false, googleData = null }: {
   clientId: string;
   kanalen?: Kanaal[];
   edition?: UpcomingEdition | null;
@@ -73,6 +86,12 @@ export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = fals
    * dezelfde ophaalronde, dus geen verzoek erbij; de landcijfers worden in deze stand niet gelezen.
    */
   alleenTabel?: boolean;
+  /**
+   * De Google-data zoals de tegels en de hoofdgrafiek bovenaan ze lezen (de Google-route), in de
+   * nieuwe weergave. Alleen om te kunnen ZEGGEN wanneer die afwijkt van wat de ring en de
+   * kanaaltabel hier tonen (lib/overzicht/bron-verschil.ts); er wordt niets mee geteld.
+   */
+  googleData?: ClientHistoricalData | null;
 }) {
   const [maandenOpen, toggleMaanden] = useRememberedOpen("cross-maanden", false);
   // Eén hook-aanroep voor beide geo-kaarten: de kaart en de cijfers eronder delen dezelfde
@@ -123,6 +142,14 @@ export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = fals
     () => (rows ? rijenInPeriode(rows, { start: periodeStart, end: periodeEind }) : null),
     [rows, periodeStart, periodeEind],
   );
+
+  // Lopen de maandkosten in de hoofdgrafiek en in de kanaaltabel uiteen? Dezelfde maanden, twee
+  // lezingen van Google (zie bron-verschil.ts). Leeg als ze gelijk lopen; dan staat er niets.
+  const bronVerschil = useMemo(() => {
+    if (!nieuw || !googleData || !rijenPeriode) return [];
+    const grafiek = grafiekMaanden({ google: alsBronReeks("google", googleData) }, ["google"], { start: periodeStart, end: periodeEind });
+    return kostenBronVerschil(grafiek, rijenPeriode);
+  }, [nieuw, googleData, rijenPeriode, periodeStart, periodeEind]);
 
   // Nieuwste maand eerst, zoals de rijen binnenkomen: zo staat de maandtabel onderaan ook.
   const months = rijenPeriode ? [...new Set(rijenPeriode.map((r) => r.month))] : [];
@@ -480,18 +507,27 @@ export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = fals
             />
           )}
 
-          {/* De kanaaltabel: de data achter de ring en de hoofdgrafiek, en het tekstalternatief van
-              beide. Dicht staat er de kop met het venster en de knop; de tabel van de maanden per
-              kanaal (tot veertig regels) wordt pas gerenderd als je hem opent. */}
+          {/* De kanaaltabel: de data achter de ring, en het tekstalternatief ervan. Dicht staat er de
+              kop met het venster en de knop; de tabel van de maanden per kanaal (tot veertig
+              regels) wordt pas gerenderd als je hem opent.
+              NIET "de cijfers achter de grafiek": de hoofdgrafiek staat op de reeksen van de tegels
+              bovenaan, en daarin komt Google live uit de Google-route; de ring en deze tabel lezen
+              de gesynchroniseerde database. Lopen die twee uiteen, dan staat dat hier open, met
+              beide bedragen, en niet pas achter de knop. */}
           {kanalen.length > 1 && (
             <section aria-label="Kanaaltotalen als tabel" className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
               <div className="flex flex-wrap items-center gap-2 px-5 py-3">
                 <Layers className="h-4 w-4 text-brand-blue-ink" aria-hidden />
                 <h3 className="text-title font-semibold text-brand-gray">Kanaaltotalen en maanden per kanaal</h3>
                 <Vensterlabel soort="periode" />
-                <span className="ml-auto text-micro text-muted-foreground">de cijfers achter de ring en de grafiek · staat ook open op Campagnes</span>
+                <span className="ml-auto text-micro text-muted-foreground">de cijfers achter de ring · staat ook open op Campagnes</span>
               </div>
-              <Lade id="cross-kanaaltabel" label="Toon als tabel" labelOpen="Verberg de tabel">
+              {bronVerschil.length > 0 && (
+                <p className="mx-5 mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-meta leading-snug text-amber-900" data-bronverschil={bronVerschil.map((v) => v.kanaal).join(",")}>
+                  {bronVerschil.map((v) => bronVerschilZin(v)).join(" ")}
+                </p>
+              )}
+              <Lade id="cross-kanaaltabel" label="Toon als tabel" labelOpen="Verberg de tabel" heelBlok>
                 {tabelMetVoorbehoud}
               </Lade>
             </section>
@@ -501,8 +537,12 @@ export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = fals
             state={geo}
             channel="blended"
             naast={<GeoRanglijstInKaart state={geo} naast />}
-            voet={<GeoTabelLade state={geo} />}
+            voet={<GeoTabelLade state={geo} toelichting={kanalen.includes("microsoft") ? MICROSOFT_UITLEG : undefined} />}
             vensterToevoeging={kanalen.includes("microsoft") ? "zonder Microsoft" : undefined}
+            // De volledige zin, zoals hij in de vertrouwde weergave boven de sectie staat: waar
+            // Microsoft WEL meetelt, waar niet, en waar de eigen cijfers staan. Alleen "zonder
+            // Microsoft" liet de vraag open of de andere blokken het dan wel meetellen.
+            vensterUitleg={kanalen.includes("microsoft") ? MICROSOFT_UITLEG : undefined}
           />
         </Sectie>
       </div>
@@ -549,11 +589,7 @@ export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = fals
             onder een kop die "alle kanalen" belooft. Gedempt en niet amber: er valt vandaag niets
             aan te doen (de kleurregel van 82cde2d). */}
         {kanalen.includes("microsoft") && (
-          <p className="mb-3 text-meta leading-snug text-muted-foreground">
-            Microsoft Ads telt mee in de kerncijfers bovenaan, de ranking, de pacing, de
-            beurs-sectie, het jaaroverzicht, de verdeling over de kanalen en de cross-channel-tabel.
-            In de markten nog niet; de eigen Microsoft-cijfers staan op het tabblad Microsoft.
-          </p>
+          <p className="mb-3 text-meta leading-snug text-muted-foreground">{MICROSOFT_UITLEG}</p>
         )}
         {/* Dezelfde asymmetrische hero als de kanaaltabbladen: links de gezondheid, rechts de
             wereldkaart, en de linkerkolom vangt het hoogteverschil op. Zie google-view.tsx voor

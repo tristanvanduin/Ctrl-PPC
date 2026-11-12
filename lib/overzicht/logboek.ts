@@ -69,18 +69,30 @@ export type LogboekBronNaam = "code-rood" | "sync" | "analyses" | "voorstellen" 
 /** Wat één bron opleverde, ook als dat niets was: de lege staat vertelt het na. */
 export interface LogboekBron {
   bron: LogboekBronNaam;
+  /** Minstens één tabel van deze bron antwoordde. Niet: alles is gelezen; zie `deels`. */
   ok: boolean;
   /** Hoeveel regels deze bron aan het logboek gaf. */
   aantal: number;
-  /** De reden als de bron niet te lezen was. */
+  /**
+   * Een deel van deze bron was niet te lezen, de rest wel: één van de vier runtabellen, of één van
+   * de twee lezingen van de meldingen. De bron blijft `ok` (wat er staat is waar), maar "niets
+   * gebeurd" mag er niet meer over gezegd worden zonder dit erbij.
+   */
+  deels?: boolean;
+  /** Bij de syncs: de kanalen waarvan de runtabel niet te lezen was. */
+  kanalenStuk?: Kanaal[];
+  /** Waarom (een deel van) de bron niet te lezen was: een vaste, korte reden per tabel. De melding
+   *  van de database zelf gaat niet naar de browser; die staat in het serverlog. */
   fout?: string;
 }
 
 export interface Logboek {
   items: LogboekItem[];
   bronnen: LogboekBron[];
-  /** Alle voorstellen die op een oordeel wachten, ook die buiten het venster. */
-  wachtOpOordeel: number;
+  /** Alle voorstellen die op een oordeel wachten, ook die buiten het venster. Een telling in de
+   *  database, geen lengte van een afgekapte lijst. null: de bron was niet te lezen, en dan is
+   *  "0 wachten" een bewering die niemand kan doen. */
+  wachtOpOordeel: number | null;
   /** Wanneer de server dit las, ISO. */
   opgehaaldOp: string;
   dagen: number;
@@ -328,6 +340,10 @@ const JOB_NAAM: Record<string, string> = {
   monthly_sop: "Maandanalyse", biweekly_sop: "Tweewekelijkse analyse", weekly_sop: "Weekanalyse",
   second_opinion: "Second opinion", report_generation: "Rapport",
 };
+/** De jobtypen die een regel opleveren, voor het filter in de query zelf. De lezer kapt af op een
+ *  vast aantal rijen; zonder dit filter vulden veertig pdf-jobs die plekken en viel een afgeronde
+ *  analyse stil uit het logboek. Afgeleid van JOB_NAAM, dus de twee lopen niet uiteen. */
+export const JOB_TYPEN: readonly string[] = Object.keys(JOB_NAAM);
 
 export function jobItems(rijen: readonly JobRij[], vanaf: string): LogboekItem[] {
   return rijen.flatMap((r): LogboekItem[] => {
@@ -485,12 +501,20 @@ const BRON_VAN_SOORT: Record<LogboekSoort, LogboekBronNaam> = {
  * naam genoemd: "niets gebeurd" en "niet kunnen kijken" zijn verschillende dingen.
  */
 export function legeStaat(logboek: Pick<Logboek, "items" | "bronnen" | "dagen" | "wachtOpOordeel">, keuze: Kanaalkeuze = "blended"): string {
-  const stuk = logboek.bronnen.filter((b) => !b.ok);
+  // De runtabel van het GEKOZEN kanaal was niet te lezen: dan zijn de syncs voor deze keuze niet
+  // te lezen, ook al antwoordden de andere drie tabellen. "Voor Microsoft Ads: geen sync gedraaid"
+  // was daar een bewering over een tabel waar niemand in gekeken had.
+  const kanaalStuk = (b: LogboekBron) => keuze !== "blended" && (b.kanalenStuk ?? []).includes(keuze);
+  const stuk = logboek.bronnen.filter((b) => !b.ok || kanaalStuk(b));
+  // Deels gelezen, en dat deel raakt deze keuze: op Alle kanalen elke bron met een gat, op een
+  // kanaal alleen een bron zonder kanaalverdeling (de meldingen). Een runtabel van een ANDER kanaal
+  // die faalde, zegt niets over dit kanaal.
+  const deels = logboek.bronnen.filter((b) => b.ok && b.deels && !kanaalStuk(b) && (keuze === "blended" || !b.kanalenStuk));
   // Leeg is een bron die BIJ DEZE KANAALKEUZE geen regel heeft. De telling op de bron zelf
   // (`aantal`) gaat over alle kanalen: met Meta gekozen en alleen een Google-sync zou de zin over
   // de sync zwijgen, terwijl er voor Meta geen was.
   const gevuld = new Set(voorKanaal(logboek.items, keuze).map((i) => BRON_VAN_SOORT[i.soort]));
-  const leeg = logboek.bronnen.filter((b) => b.ok && !gevuld.has(b.bron));
+  const leeg = logboek.bronnen.filter((b) => b.ok && !kanaalStuk(b) && !gevuld.has(b.bron));
   const n = logboek.wachtOpOordeel;
   const waar = keuze === "blended" ? "" : ` voor ${KANAAL_NAAM[keuze]}`;
   const zinnen: string[] = [];
@@ -500,15 +524,31 @@ export function legeStaat(logboek: Pick<Logboek, "items" | "bronnen" | "dagen" |
       : `In de laatste ${logboek.dagen} dagen is er${waar} niets vastgelegd.`);
   }
   if (stuk.length > 0) zinnen.push(`Niet te lezen: ${opsomming(stuk.map((b) => BRON_ZIN[b.bron].naam))}; daar kan dus wel iets gebeurd zijn.`);
+  if (deels.length > 0) {
+    zinnen.push(`Niet volledig te lezen: ${opsomming(deels.map((b) =>
+      `${BRON_ZIN[b.bron].naam}${b.kanalenStuk?.length ? ` (${opsomming(b.kanalenStuk.map((k) => KANAAL_NAAM[k]))})` : ""}`))}; daar kan dus meer gebeurd zijn dan hier staat.`);
+  }
   // "Ouder" alleen op Alle kanalen: daar is een voorstel dat wacht en niet in de lijst staat ook
   // echt van voor het venster. Op een kanaal kan het van gisteren zijn en bij een ander kanaal
-  // horen; de telling gaat over alle kanalen, en dat staat er dan bij.
-  if (n > 0) {
+  // horen; de telling gaat over alle kanalen, en dat staat er dan bij. Zonder telling (de bron was
+  // niet te lezen) geen zin: die bron staat hierboven al bij "niet te lezen".
+  if (n !== null && n > 0) {
     zinnen.push(keuze === "blended"
       ? `Er ${n === 1 ? "wacht" : "wachten"} nog ${n} ${n === 1 ? "ouder voorstel" : "oudere voorstellen"} op een oordeel in Bevindingen.`
       : `Over alle kanalen ${n === 1 ? "wacht" : "wachten"} er ${n} ${n === 1 ? "voorstel" : "voorstellen"} op een oordeel in Bevindingen.`);
   }
   return zinnen.join(" ");
+}
+
+/**
+ * De bronnen waar bij deze kanaalkeuze iets niet van gelezen is, geheel of deels, met de naam
+ * zoals het scherm hem noemt. Voor de regel "niet elke bron was te lezen" onder een logboek dat
+ * wel regels heeft: die keek alleen naar `ok`, en een bron waarvan één tabel faalde is `ok`.
+ */
+export function bronnenMetLeesfout(bronnen: readonly LogboekBron[], keuze: Kanaalkeuze = "blended"): { naam: string; reden: string }[] {
+  return bronnen
+    .filter((b) => !b.ok || (b.deels && (keuze === "blended" || !b.kanalenStuk || b.kanalenStuk.includes(keuze))))
+    .map((b) => ({ naam: BRON_ZIN[b.bron].naam, reden: b.fout ?? "niet te lezen" }));
 }
 
 // ── De demo: voorbeelden die meelopen met de klok ───────────────────────────────────────────────

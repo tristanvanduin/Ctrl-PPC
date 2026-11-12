@@ -38,7 +38,7 @@ import { GEOCLONE_DEMO_IDS } from "./geoclone-clients";
 const SLEUTEL = "ctrl-ppc-demo";
 
 /** Is dit een demo-klant-id: GreenTech zelf of een van de geo-klonen (GRT/GRA/GRN). */
-function isDemoClientId(id: string): boolean {
+export function isDemoClientId(id: string): boolean {
   const bare = id.replace(/^gads-/, "");
   return bare === "demo-greentech" || GEOCLONE_DEMO_IDS.includes(bare);
 }

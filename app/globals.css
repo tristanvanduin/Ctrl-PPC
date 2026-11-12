@@ -920,3 +920,13 @@
     display: none;
   }
 }
+
+/* De chrome rond een klantpagina in de nieuwe weergave (lib/weergave-init.ts, WEERGAVE_INIT_SCRIPT).
+   Het script in de <head> zet data-chrome="nieuw" op <html> vóór de eerste verf; wat in die chrome
+   niet hoort (de knop "Zoeken", de datum van vandaag) draagt data-chrome-oud en is dan al weg
+   voordat React het uit de boom haalt. Zonder dit stond de knop er bij elke paginalaad even en
+   versprong de bovenbalk als hij verdween. Met de schakelaar uit staat het kenmerk er niet en
+   doet deze regel niets. */
+html[data-chrome="nieuw"] [data-chrome-oud] {
+  display: none !important;
+}

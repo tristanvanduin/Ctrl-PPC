@@ -1,7 +1,7 @@
 "use client";
 
 import { ListOrdered } from "lucide-react";
-import { useRememberedOpen, RegioToggle, Lade } from "@/components/ui/disclosure";
+import { useRememberedOpen, RegioToggle, Lade, MeerKnop, useTruncatedList } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { GeoRanglijst } from "./geo-ranglijst";
 import { int, eur, pct, nf, type GeoBreakdownState } from "@/lib/geo/use-geo-breakdown";
@@ -24,22 +24,35 @@ import { Vensterlabel } from "@/components/ui/vensterlabel";
  * De cijfers en de uitklaptabel blijven eronder in GeoRanglijstCard (met `zonderBalken`), zodat er
  * niets dubbel staat.
  */
+/** Hoeveel regio's de ranglijst naast de kaart toont voor "toon meer" (de nieuwe weergave). */
+export const GEO_NAAST_ZICHTBAAR = 6;
+
 export function GeoRanglijstInKaart({ state, naast = false }: {
   state: GeoBreakdownState;
-  /** Naast de projectie in plaats van eronder (de nieuwe weergave): dan zonder de lijn erboven. */
+  /**
+   * Naast de projectie in plaats van eronder (de nieuwe weergave): dan zonder de lijn erboven, en
+   * kort beginnend. De eerste zes regio's zijn het verhaal; een klant met twintig landen had hier
+   * een kolom van achthonderd pixels, op een telefoon onder de kaart. De rest staat achter "toon
+   * meer", en alle landen met alle cijfers in "Toon als tabel" eronder. In de vertrouwde weergave
+   * (zonder `naast`) staat de hele lijst er, zoals altijd.
+   */
   naast?: boolean;
 }) {
   const { metric, focus, setFocus, laden, canDrillUs, labelOf, ranked, eenLandOfMinder } = state;
+  const lijst = useTruncatedList(ranked, naast ? GEO_NAAST_ZICHTBAAR : Number.MAX_SAFE_INTEGER);
   if (laden || eenLandOfMinder || ranked.length === 0) return null;
   return (
-    <div className={naast ? "px-4 py-3" : "border-t border-border px-4 py-3"}>
-      <GeoRanglijst
-        regels={ranked.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
-        metriekLabel={metric.label}
-        klikbaar={(code) => canDrillUs && code === "US" && focus == null}
-        onKlik={() => setFocus("US")}
-      />
-    </div>
+    <>
+      <div className={naast ? "px-4 py-3" : "border-t border-border px-4 py-3"}>
+        <GeoRanglijst
+          regels={lijst.zichtbaar.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
+          metriekLabel={metric.label}
+          klikbaar={(code) => canDrillUs && code === "US" && focus == null}
+          onKlik={() => setFocus("US")}
+        />
+      </div>
+      <MeerKnop verborgen={lijst.verborgen} uitgeklapt={lijst.uitgeklapt} onToggle={lijst.toggle} eenheid={focus === "US" ? "staten" : "landen"} ruim />
+    </>
   );
 }
 
@@ -94,12 +107,18 @@ function GeoTabel({ state }: { state: GeoBreakdownState }) {
  * tegels waren een eigen kaart van 180 px met een eigen conversietotaal naast dat van de band.
  * Dicht staat er alleen de knop; de rijen worden pas gerenderd als je hem opent.
  */
-export function GeoTabelLade({ state }: { state: GeoBreakdownState }) {
+export function GeoTabelLade({ state, toelichting }: {
+  state: GeoBreakdownState;
+  /** Een voorbehoud bij deze cijfers, voluit, boven de tabel: de zin die in de uitleg van het
+   *  vensterlabel staat, voor wie geen muis heeft om die uitleg te zien. */
+  toelichting?: string;
+}) {
   const { laden, eenLandOfMinder, ranked, focus } = state;
   if (laden || eenLandOfMinder || ranked.length === 0) return null;
   return (
     // Zeven kolommen: op een telefoon schuift de tabel binnen de kaart (Tabel heeft een eigen schuifvak).
     <Lade id="geo-tabel-nieuw" label={`Toon als tabel (${ranked.length} ${focus === "US" ? "staten" : "landen"}, met totalen)`} labelOpen="Verberg de tabel">
+      {toelichting && <p className="border-b border-border px-5 py-2 text-meta leading-snug text-muted-foreground" data-venster-uitleg>{toelichting}</p>}
       <GeoTabel state={state} />
     </Lade>
   );

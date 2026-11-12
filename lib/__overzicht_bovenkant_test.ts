@@ -121,7 +121,7 @@ console.log("De schakelaar: standaard uit, de adresbalk gaat voor");
   check("een onbekende cookie telt niet", server(null, "1") === "oud");
   check("de cookie draagt dezelfde naam als de opslag en geldt voor de hele site", weergaveCookie("nieuw") === `${WEERGAVE_SLEUTEL}=nieuw; path=/; max-age=31536000; samesite=lax`);
   const pagina = zonderCommentaar(lees("app/(app)/client/[clientId]/page.tsx"));
-  check("de serverpagina leest de cookie en geeft hem door", /\(await cookies\(\)\)\.get\(WEERGAVE_SLEUTEL\)\?\.value \?\? null/.test(pagina) && /bewaardeWeergave=\{bewaardeWeergave\}/.test(pagina));
+  check("de serverpagina leest de cookie en geeft hem door", /koekjes\.get\(WEERGAVE_SLEUTEL\)\?\.value \?\? null/.test(pagina) && /bewaardeWeergave=\{bewaardeWeergave\}/.test(pagina));
   const hook = zonderCommentaar(lees("lib/use-weergave.ts"));
   check("localStorage is de bron, de cookie de kopie", /window\.localStorage\.setItem\(WEERGAVE_SLEUTEL, w\)/.test(hook) && /schrijfCookie\(w\)/.test(hook));
   check("de schakelaar haalt ?weergave= uit het adres, als vervanging", /schrijfAdresbalk\(\(p\) => p\.delete\(WEERGAVE_PARAM\), "replace"\)/.test(hook));

@@ -115,7 +115,7 @@ export function BudgetAdvies({ forecast, className = "" }: { forecast: ClientFor
   );
 }
 
-export function PerformanceChartView({ clientData, forecast, metric: metricProp, onMetricChange, inLade = false }: {
+export function PerformanceChartView({ clientData, forecast, metric: metricProp, onMetricChange, inLade = false, beginWeergave }: {
   clientData: ClientHistoricalData;
   forecast: ClientForecast;
   metric?: ForecastMetric;
@@ -127,12 +127,18 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
    * zijn op "Alle kanalen" maandtotalen die gelijk over de weken verdeeld zijn.
    */
   inLade?: boolean;
+  /**
+   * Waar de keuze "Per week / Per maand" op begint. Los van `inLade`: op het Google-tabblad staat
+   * de grafiek ook in de lade, maar zijn de weken echte weekcijfers en opende hij altijd per week.
+   * Zonder deze: per maand in de lade, per week daarbuiten.
+   */
+  beginWeergave?: "weekly" | "monthly";
 }) {
   const [internalMetric, setInternalMetric] = useState<ForecastMetric>("conversions");
   const metric = metricProp ?? internalMetric;
   const setMetric = onMetricChange ?? setInternalMetric;
   const beweging = useGrafiekBeweging();
-  const [viewMode, setViewMode] = useState<ViewMode>(inLade ? "monthly" : "weekly");
+  const [viewMode, setViewMode] = useState<ViewMode>(beginWeergave ?? (inLade ? "monthly" : "weekly"));
   const [showYoY, setShowYoY] = useState(false);
   const { theme } = useBrandTheme();
 

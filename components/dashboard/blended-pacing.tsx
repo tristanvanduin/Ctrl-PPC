@@ -113,6 +113,15 @@ export function blendedPacingVoetregel(
   c: BlendedPacingCijfers,
   partieel: DataStandSamen["partieel"] | null | undefined,
   uitgesloten: readonly { bron: string; dataTot: string | null }[] = [],
+  opties: {
+    /**
+     * De regel staat in een blok dat zelf een jaardoel toont ("Pacing & jaaroverzicht" in de nieuwe
+     * weergave). Dan zonder de zin "er staat voor deze kanalen geen jaardoel in het systeem": die
+     * stond daar onder een tabel met de kolommen jaardoel, prognose en "vs doel". Wat overblijft is
+     * waar de zin eigenlijk voor diende: zeggen waartegen vergeleken is.
+     */
+    naastJaardoel?: boolean;
+  } = {},
 ): string {
   const zinnen: string[] = [];
   // Een partiële eerste maand noemen: "sinds juli 2025" alleen zou de vraag oproepen waarom juli
@@ -132,9 +141,10 @@ export function blendedPacingVoetregel(
       "Het tempo telt alle kanalen van dit jaar.",
     );
   } else if (c.buiten.length === 0 && c.deels.length === 0) {
-    zinnen.push(
-      "Tegen vorig jaar en niet tegen een doel: er staat voor deze kanalen geen jaardoel in het systeem, " +
-      "en een verzonnen doel zou een percentage opleveren dat preciezer oogt dan het is.",
+    zinnen.push(opties.naastJaardoel
+      ? `Het verschil met vorig jaar is gelijk-voor-gelijk: ${opsomming(c.vergeleken.map(naamVan))}.`
+      : "Tegen vorig jaar en niet tegen een doel: er staat voor deze kanalen geen jaardoel in het systeem, " +
+        "en een verzonnen doel zou een percentage opleveren dat preciezer oogt dan het is.",
     );
   } else {
     zinnen.push(`Het verschil is gelijk-voor-gelijk: ${opsomming(c.vergeleken.map(naamVan))}.`);
@@ -193,7 +203,11 @@ export type PacingDataStand = (Pick<DataStandSamen, "laatsteVolleMaand" | "parti
  * (pacing-jaaroverzicht.tsx): hetzelfde venster, dezelfde paren en dezelfde zin over wat er buiten
  * de vergelijking viel.
  */
-export function useBlendedPacing(perKanaal: readonly BlendedKanaalReeks[] | null, dataStand: PacingDataStand): { cijfers: BlendedPacingCijfers; voetregel: string } | null {
+export function useBlendedPacing(
+  perKanaal: readonly BlendedKanaalReeks[] | null,
+  dataStand: PacingDataStand,
+  opties: { naastJaardoel?: boolean } = {},
+): { cijfers: BlendedPacingCijfers; voetregel: string } | null {
   const totMaand = dataStand?.laatsteVolleMaand ?? null;
   const cijfers = useMemo(
     () => (perKanaal && perKanaal.length > 0 && totMaand ? blendedPacingCijfers(perKanaal, totMaand) : null),
@@ -203,7 +217,8 @@ export function useBlendedPacing(perKanaal: readonly BlendedKanaalReeks[] | null
   // Alleen een bron die binnen het venster ophoudt: wie pas in de partiële maand erna stopt, is
   // t/m totMaand volledig en raakt dit verschil niet.
   const voetregel = blendedPacingVoetregel(cijfers, dataStand?.partieel,
-    uitgeslotenMetDag(dataStand).filter((b) => !!b.dataTot && b.dataTot.slice(0, 7) <= cijfers.totMaand));
+    uitgeslotenMetDag(dataStand).filter((b) => !!b.dataTot && b.dataTot.slice(0, 7) <= cijfers.totMaand),
+    { naastJaardoel: opties.naastJaardoel });
   return { cijfers, voetregel };
 }
 

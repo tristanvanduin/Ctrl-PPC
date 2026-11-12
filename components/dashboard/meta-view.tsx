@@ -50,6 +50,20 @@ import { ObjectiveInsights, type ObjectiveGroupLike } from "./objective-insights
 
 const SECTIONS = ["Campagnes", "Ad sets", "Advertenties & creatives", "Breakdowns (leeftijd, plaatsing, device)"];
 
+/**
+ * De koppelstatus van Meta zoals de kopkaart hem toont: laden, gekoppeld, of een waarschuwing met
+ * een label. Eén regel voor de kopkaart (vertrouwde weergave) en voor de kop van het paneel "Over
+ * dit tabblad" (nieuwe weergave), zodat die twee nooit iets anders zeggen.
+ */
+export function koppelStatusMeta(
+  koppeling: { status: string | null } | "fout" | null,
+  probleemLabel: string | null,
+): { kind: "loading" } | { kind: "connected" } | { kind: "warning"; label: string } {
+  if (koppeling === null) return { kind: "loading" };
+  if (koppeling === "fout") return { kind: "warning", label: "Status onbekend" };
+  return probleemLabel ? { kind: "warning", label: probleemLabel } : { kind: "connected" };
+}
+
 export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true, nieuw = false }: {
   clientId: string;
   geoClone?: string | null;
@@ -95,12 +109,27 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true, 
   const waarschuwing = probleem ? (
     <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{probleem.tekst}</div>
   ) : undefined;
+  const status = koppelStatusMeta(koppeling, probleem?.label ?? null);
+  // De nieuwe weergave zet de kopkaart achter "Over dit tabblad". Twee dingen mogen daar niet mee
+  // verdwijnen. Eén: een statusaanroep die MISLUKT ("Status onbekend") is geen benoemd probleem,
+  // maar wel een koppeling waarvan niemand weet of hij werkt; die krijgt bovenaan een eigen regel.
+  // Twee: de statuspil zelf ("Gekoppeld") staat in de kop van het dichte paneel.
+  const waarschuwingNieuw = waarschuwing ?? (koppeling === "fout" ? (
+    <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800" data-koppeling="onbekend">
+      De koppelstatus van Meta kon niet worden gelezen, dus of de cijfers hieronder nog worden bijgewerkt is onbekend. Controleer de Meta-koppeling onder Instellingen.
+    </div>
+  ) : undefined);
+  const koppelstatus = status.kind === "loading" ? undefined : (
+    <span className={`text-meta ${status.kind === "connected" ? "text-emerald-700" : "font-medium text-amber-700"}`} data-koppelstatus={status.kind}>
+      {status.kind === "connected" ? "Gekoppeld" : status.label}
+    </span>
+  );
   const kop = (
       <ChannelViewHeader
         icon={<Megaphone className="w-5 h-5 text-brand-blue-ink" />}
         title="Meta Ads"
         geoClone={geoClone}
-        status={koppeling === null ? { kind: "loading" } : koppeling === "fout" ? { kind: "warning", label: "Status onbekend" } : probleem ? { kind: "warning", label: probleem.label } : { kind: "connected" }}
+        status={status}
         blurb={
           geoClone
             ? <>Cijfers hieronder zijn <strong>her-geaggregeerd per beurs</strong> ({geoClone}) uit de campagnes waarvan de naam bij deze beurs hoort. Ratio&apos;s (CPA, CTR) komen uit de venstertotalen, niet uit dag-gemiddelden.</>
@@ -128,7 +157,8 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true, 
           geoClone={geoClone}
           edition={edition}
           kop={kop}
-          waarschuwing={waarschuwing}
+          waarschuwing={waarschuwingNieuw}
+          koppelstatus={koppelstatus}
           geo={geo}
           verdeling={
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

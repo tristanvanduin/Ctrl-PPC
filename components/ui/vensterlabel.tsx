@@ -17,10 +17,24 @@
 // Eén component en geen losse tekstjes per kaart: dezelfde woorden, dezelfde plek, en de meting
 // (scripts/meet-overzicht.mjs) vindt de blokken aan `data-venster`. "Volgt periode" is licht
 // gekleurd, de andere twee neutraal: zo zie je in één blik welke blokken meebewegen.
+//
+// EN EEN VIERDE SOORT ZONDER LABEL: de stand van nu (STAND_VAN_NU). De bronrij (live of demo, de
+// conversielag, de datastand), de to-do's, de notities en "Over dit tabblad" gaan over geen enkel
+// venster: ze zeggen hoe het er op dit moment voor staat. Een zichtbaar label "stand van nu" bij
+// een chip die "Conversielag: 3 dagen" zegt, is ruis. Maar de meting moet ze kunnen onderscheiden
+// van een blok dat zijn venster vergat te noemen, en vooral van een blok dat de periode hoort te
+// volgen: zonder dit kenmerk leende de meting voor deze blokken het label van een buurblok, en
+// telde ze als "volgt periode, maar beweegt niet".
 
 import { usePeriod } from "@/lib/period/period-context";
 import { formatRange, formatRangeKort } from "@/lib/period/period-range";
 import { today } from "@/lib/reporting-date";
+
+/**
+ * Voor op de buitenste tag van een blok dat de stand van nu toont en geen venster heeft:
+ * `<div {...STAND_VAN_NU} className="...">`. Onzichtbaar; alleen de meting leest het.
+ */
+export const STAND_VAN_NU = { "data-venster": "stand" } as const;
 
 type Props = (
   /** `kaal`: alleen "volgt periode", zonder de maanden; voor een kop die de periode zelf al voluit
@@ -33,12 +47,15 @@ type Props = (
 ) & {
   /** Een voorbehoud dat bij dit venster hoort, kort: "zonder Microsoft", "alleen Google". */
   toevoeging?: string;
+  /** Het voorbehoud voluit, voor de uitleg bij het label (title): wat het wel en niet raakt.
+   *  Zonder deze staat de korte toevoeging in de uitleg. */
+  toevoegingUitleg?: string;
   className?: string;
 };
 
 export function Vensterlabel(props: Props) {
   const periode = usePeriod();
-  const { soort, toevoeging, className = "" } = props;
+  const { soort, toevoeging, toevoegingUitleg, className = "" } = props;
   const jaar = soort === "jaar" ? props.jaar ?? Number(today().slice(0, 4)) : null;
   const tekst = soort === "periode" ? (props.kaal ? "volgt periode" : `volgt periode · ${formatRangeKort(periode.range)}`)
     : soort === "jaar" ? `jaarblok · ${jaar}`
@@ -52,7 +69,7 @@ export function Vensterlabel(props: Props) {
   return (
     <span
       data-venster={soort}
-      title={toevoeging ? `${uitleg} ${toevoeging}.` : uitleg}
+      title={toevoegingUitleg ? `${uitleg} ${toevoegingUitleg}` : toevoeging ? `${uitleg} ${toevoeging}.` : uitleg}
       // `truncate` en geen `shrink-0`: in een kop die omloopt (flex-wrap) schuift het label naar
       // een eigen regel; in een kop die dat niet kan (de knop van een uitklappaneel) wordt het
       // ingekort in plaats van de titel ernaast woord voor woord te laten afbreken. De volledige

@@ -170,8 +170,15 @@ async function main() {
     toon();
     const knoppen = () => alle(snelHost, (k) => k.tagName === "BUTTON");
     check("drie knoppen, zonder een paneel te openen", knoppen().map((k) => k.textContent).join() === "3 mnd,6 mnd,12 mnd", knoppen().map((k) => k.textContent).join());
-    check("elke knop heet voluit zoals de preset in het paneel",
-      knoppen().map((k) => k.attributes["aria-label"]).join() === [PRESET_LABEL.last_3m, PRESET_LABEL.last_6m, PRESET_LABEL.last_12m].join());
+    // De naam begint met wat er op de knop staat en zegt daarna de preset voluit. Alleen de volle
+    // naam ("Laatste 3 maanden") bevatte de zichtbare tekst ("3 mnd") niet: wie met zijn stem
+    // bedient en zegt wat hij ziet, vond de knop dan niet.
+    check("elke knop heet naar zijn zichtbare tekst, en daarna voluit zoals de preset in het paneel",
+      knoppen().map((k) => k.attributes["aria-label"]).join("|")
+        === [["3 mnd", PRESET_LABEL.last_3m], ["6 mnd", PRESET_LABEL.last_6m], ["12 mnd", PRESET_LABEL.last_12m]].map(([kort, vol]) => `${kort}, ${vol.toLowerCase()}`).join("|"),
+      knoppen().map((k) => k.attributes["aria-label"]).join("|"));
+    check("... en de uitleg bij de knop is de preset zoals hij in het paneel heet",
+      knoppen().map((k) => k.attributes.title).join() === [PRESET_LABEL.last_3m, PRESET_LABEL.last_6m, PRESET_LABEL.last_12m].join());
     check("de actieve preset is ingedrukt, de andere niet",
       knoppen().map((k) => k.attributes["aria-pressed"]).join() === "false,false,true", knoppen().map((k) => k.attributes["aria-pressed"]).join());
     klik(knoppen()[0]);

@@ -200,7 +200,7 @@ export function GoogleView({
           <div className="grid grid-cols-1 items-start gap-4 min-[1800px]:grid-cols-2">
             <HealthBadge clientId={clientId} />
             {/* In een eigen div met automatische hoogte: de pacingkaart is `h-full`. */}
-            <div><PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} /></div>
+            <div><PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} stapelSmal /></div>
           </div>
 
           <Deelkop
@@ -265,6 +265,8 @@ export function GoogleView({
             title="Waar het budget landt"
             subtitle="video en placements"
             icon={<LayoutGrid className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
+            // Het venster van VideoPerformance en VideoPlacements, die er open zelf ook mee openen.
+            meta={<Vensterlabel soort="vast" venster="laatste 180 dagen" />}
             defaultOpen={false}
           >
             <LadeInhoud>
@@ -277,6 +279,7 @@ export function GoogleView({
             title="Over dit tabblad"
             subtitle="de koppeling, wat dit kanaal levert en waar de analyses staan"
             icon={<Info className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
+            standVanNu
             defaultOpen={false}
           >
             <LadeInhoud>{kop}</LadeInhoud>

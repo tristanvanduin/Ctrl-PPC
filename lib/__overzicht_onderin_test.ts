@@ -36,6 +36,7 @@ import { formatCurrency, formatNumber } from "./forecast-format";
 import type { ClientHistoricalData, MonthlyRecord } from "./types";
 import { doelHerkomstZin, gemiddeldPerMaand, pacingJaarRijen, verschilTekst } from "./overzicht/pacing-jaar";
 import { PeriodProvider } from "./period/period-context";
+import { chromeIsNieuw } from "./weergave";
 import { Lade } from "../components/ui/disclosure";
 import { PacingJaaroverzicht } from "../components/dashboard/pacing-jaaroverzicht";
 import { FairWeeksView } from "../components/dashboard/fair-weeks-overview";
@@ -166,8 +167,8 @@ console.log("De kaart, gerenderd");
   check("het doel loopt achter: het budgetadvies staat in de kaart, vóór de knop van de lade",
     forecastAchter.budgetRecommendation.behindTarget && achter.indexOf("Budget aanbeveling") >= 0 && achter.indexOf("Budget aanbeveling") < achter.indexOf("aria-expanded"));
   check("een oordeel is niet alleen kleur: 'gunstig' of 'ongunstig' voor schermlezers", /sr-only"> ?(on)?gunstig/.test(html));
-  check("het sr-only woord zit in een cel met relative (de tabel schuift opzij op een telefoon)", /<td class="relative [^"]*">[^<]*<span class="sr-only">/.test(html));
-  check("de tabel heeft een eigen schuifvak", /<div class="overflow-x-auto"><table/.test(html));
+  check("het sr-only woord zit in een cel met relative (de tabel schuift opzij op een telefoon)", /<td class="relative [^"]*"><span[^>]*data-oordeel="(on)?gunstig"[^>]*>[\s\S]{0,400}?<span class="sr-only">/.test(html));
+  check("de tabel heeft een eigen schuifvak", /<div class="overflow-x-auto[^"]*"[^>]*><table/.test(html));
 }
 
 console.log("De lade");
@@ -431,9 +432,10 @@ console.log("De bedrading: de schakelaar bereikt elk tabblad");
   // De bovenbalk en de bureaubanner volgen de schakelaar alleen op een klantpagina.
   const balk = lees("components", "layout", "top-bar.tsx");
   check("de bovenbalk: zonder de knop Zoeken en de datum in de nieuwe weergave, het palet blijft gemount",
-    /\{!nieuweChrome && \(\s*<button[\s\S]{0,400}Zoeken/.test(balk) && /\{!nieuweChrome && \(\s*<span className="hidden text-sm text-muted-foreground md:inline">/.test(balk) && /\n\s*<CommandPalette \/>/.test(balk));
-  const hook = lees("lib", "use-weergave.ts");
-  check("alleen op een klantpagina: elders blijft de chrome wat hij was", /return weergave === "nieuw" && !!pad && pad\.startsWith\("\/client\/"\);/.test(hook));
+    /\{!nieuweChrome && \(\s*<button[\s\S]{0,700}Zoeken/.test(balk) && /\{!nieuweChrome && \(\s*<span data-chrome-oud className="hidden text-sm text-muted-foreground md:inline">/.test(balk) && /\n\s*<CommandPalette \/>/.test(balk));
+  check("alleen op een klantpagina: elders blijft de chrome wat hij was",
+    chromeIsNieuw({ pad: "/client/demo-greentech", url: "nieuw", bewaard: null }) && !chromeIsNieuw({ pad: "/portfolio", url: "nieuw", bewaard: "nieuw" })
+      && !chromeIsNieuw({ pad: "/client/demo-greentech", url: null, bewaard: null }) && !chromeIsNieuw({ pad: null, url: "nieuw", bewaard: null }));
 }
 
 console.warn = waarschuw;

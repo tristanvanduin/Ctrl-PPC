@@ -12,7 +12,10 @@
 // NIETS IS WEG, en dat is na te lopen (de nummers zijn die van de elementtabel):
 //   63  de kopkaart van het tabblad (koppeling, uitleg,     onderaan achter "Over dit tabblad";
 //       wat dit kanaal levert, waar de analyses staan)      een waarschuwing over de koppeling
-//                                                           blijft open bovenaan staan
+//                                                           blijft open bovenaan staan, ook als
+//                                                           de status zelf niet te lezen was; de
+//                                                           statuspil staat dicht in de kop van
+//                                                           het paneel
 //   64  Account Health van het kanaal                       blijft, open
 //   65  pacing tegen vorige maand                           blijft, open, naast Health
 //   71  de vier jaarkaarten en "Prognose per maand"         Pacing & jaaroverzicht met de lade
@@ -57,7 +60,7 @@ export function LadeInhoud({ children }: { children: ReactNode }) {
   return <div className="space-y-4 bg-muted/20 p-3 sm:p-4">{children}</div>;
 }
 
-export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop, waarschuwing, geo, verdeling, verdelingBijschrift, video = false }: {
+export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop, waarschuwing, koppelstatus, geo, verdeling, verdelingBijschrift, video = false }: {
   clientId: string;
   kanaal: NietGoogleKanaal;
   geoClone?: string | null;
@@ -66,6 +69,9 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
   kop: ReactNode;
   /** Een probleem met de koppeling: dat staat open bovenaan, niet achter een klik. */
   waarschuwing?: ReactNode;
+  /** De koppelstatus in een paar woorden ("Gekoppeld", "Status onbekend"), voor de kop van het
+   *  dichte paneel "Over dit tabblad". Alleen voor een kanaal dat zijn status kent. */
+  koppelstatus?: ReactNode;
   /** De landcijfers van dit kanaal; null voor een kanaal zonder geodata (Microsoft). */
   geo: GeoBreakdownState | null;
   /** De verdelingsringen van dit kanaal (BreakdownDonuts), als het ze heeft. */
@@ -90,7 +96,7 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
         <div className="grid grid-cols-1 items-start gap-4 min-[1800px]:grid-cols-2">
           <ChannelHealthBadge clientId={clientId} channel={kanaal} />
           {/* In een eigen div met automatische hoogte: de pacingkaart is `h-full`. */}
-          <div><ChannelPacing edition={edition} /></div>
+          <div><ChannelPacing edition={edition} stapelSmal /></div>
         </div>
 
         {edition && (
@@ -151,6 +157,15 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
           title="Maandprestaties"
           subtitle="kerncijfers over 28 dagen, en de maanden van de gekozen periode als tabel"
           icon={<Calendar className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
+          // Twee vensters in één blok: de kerncijfers hebben een eigen venster, de maandtabel
+          // volgt de periode (een beurs: zes maanden). Het label noemt het venster van de cijfers
+          // bovenaan en zegt erbij wat de tabel doet; open draagt elk deel zijn eigen label.
+          meta={<Vensterlabel
+            soort="vast"
+            venster="laatste 28 dagen"
+            toevoeging={geoClone ? "tabel: 6 maanden" : "tabel: periode"}
+            toevoegingUitleg={geoClone ? "De maandtabel in dit blok gaat over de laatste zes maanden." : "De maandtabel in dit blok volgt de gekozen periode."}
+          />}
           defaultOpen={false}
         >
           <LadeInhoud><ChannelPerformance clientId={clientId} channel={kanaal} geoClone={geoClone} /></LadeInhoud>
@@ -161,6 +176,8 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
             title="Waar het budget landt"
             subtitle="video"
             icon={<LayoutGrid className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
+            // Het venster van ChannelVideoPerformance, die er open zelf ook mee opent.
+            meta={<Vensterlabel soort="vast" venster="laatste 60 dagen" />}
             defaultOpen={false}
           >
             <LadeInhoud><ChannelVideoPerformance clientId={clientId} channel={kanaal} /></LadeInhoud>
@@ -172,6 +189,10 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
             title="Over dit tabblad"
             subtitle="de koppeling, wat dit kanaal levert en waar de analyses staan"
             icon={<Info className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
+            // De koppelstatus blijft dicht zichtbaar (de `meta` van het paneel): "Gekoppeld" of
+            // "Status onbekend" hoort niet achter een klik, ook als er geen benoemd probleem is.
+            meta={koppelstatus}
+            standVanNu
             defaultOpen={false}
           >
             <LadeInhoud>{kop}</LadeInhoud>

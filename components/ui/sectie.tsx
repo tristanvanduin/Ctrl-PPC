@@ -15,7 +15,21 @@
 // De verhouding hier is ongeveer 2,5 : 1 — veertig pixels tussen secties, zestien binnen een
 // sectie. Genoeg om als scheiding te lezen, niet zoveel dat de pagina uit elkaar valt.
 
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+
+/**
+ * Staan het icoon en de titel van een kop als één blok bij elkaar (de nieuwe weergave van het
+ * Overzicht), of als losse items in de omloop, zoals het was?
+ *
+ * WAAROM EEN CONTEXT EN GEEN PROP. Sectie en Deelkop staan op tien schermen (Overzicht, Campagnes,
+ * Second Opinion, ...). De kop bijeen houden verandert de omloop: de titel krimpt en loopt om naast
+ * de actie, waar voorheen de actie naar een eigen regel brak. Dat is een reparatie voor een
+ * telefoon (het icoon stond alleen op een regel, met de titel eronder), maar het is wel een andere
+ * opmaak, en de vertrouwde weergave hoort te blijven wat hij was. De nieuwe weergave zet deze
+ * context aan rond haar eigen Overzicht; overal elders, en met de schakelaar uit, rendert de kop
+ * precies de oude opmaak.
+ */
+export const SectieKopBijeen = createContext(false);
 
 export function Sectie({
   icoon,
@@ -40,14 +54,15 @@ export function Sectie({
           titel/bijschrift-kolom (min-w-0) tot 0 breed uitgeknepen worden in plaats van dat de
           actie naar een eigen regel brak -- op een telefoonbreed scherm duwde dat de hele pagina
           breder. */}
+      {/* In de nieuwe weergave (SectieKopBijeen) zijn het icoon en de titel samen ÉÉN item van die
+          omloop: alleen de actie mag naar een eigen regel. Als twee losse items brak op een telefoon
+          niet de actie af maar de titel: een bijschrift van twee regels is breder dan wat er naast
+          het icoon overblijft, dus stond het icoon alleen op een regel met de titel eronder. */}
       <div className="mb-4 flex flex-wrap items-center gap-3 gap-y-2">
-        {icoon && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10">{icoon}</div>
-        )}
-        <div className="min-w-0">
+        <Kop icoon={icoon} maat="h-9 w-9">
           <h2 className="text-base font-bold text-brand-blue-ink">{titel}</h2>
           {bijschrift && <p className="text-xs text-muted-foreground">{bijschrift}</p>}
-        </div>
+        </Kop>
         {actie && <div className="ml-auto shrink-0">{actie}</div>}
       </div>
       {/* Binnen een sectie staan de kaarten dichter op elkaar dan de secties onderling — én ze
@@ -57,6 +72,28 @@ export function Sectie({
           erft ook door naar kaarten die dieper in een kind zitten. */}
       <div className="space-y-4 sectie-kaarten">{children}</div>
     </section>
+  );
+}
+
+/**
+ * Het icoon met de titel ernaast.
+ *
+ * Zonder SectieKopBijeen: twee losse items in de omloop van de kop, zoals het was. Met: één blok
+ * dat niet uit elkaar valt. `flex-[1_1_12rem]`: het blok vult de regel en mag krimpen (de tekst
+ * loopt dan om, naast het icoon), maar vraagt minstens twaalf rem. Past de actie daar niet meer
+ * naast, dan breekt de actie naar een eigen regel; de titel wordt nooit tot nul uitgeknepen.
+ */
+function Kop({ icoon, maat, children }: { icoon?: ReactNode; maat: string; children: ReactNode }) {
+  const bijeen = useContext(SectieKopBijeen);
+  const vlak = icoon && (
+    <div className={`flex ${maat} shrink-0 items-center justify-center rounded-lg bg-brand-blue/10`}>{icoon}</div>
+  );
+  if (!bijeen) return <>{vlak}<div className="min-w-0">{children}</div></>;
+  return (
+    <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-3">
+      {vlak}
+      <div className="min-w-0">{children}</div>
+    </div>
   );
 }
 
@@ -84,16 +121,13 @@ export function Deelkop({ icoon, titel, bijschrift, actie, venster }: {
     // pt-4: binnen `space-y-4` van de sectie staat een deelkop zo op 32 px van het vorige blok,
     // tussen de 16 px binnen een onderwerp en de 40 px tussen secties in.
     <div className="flex flex-wrap items-center gap-3 gap-y-2 pt-4">
-      {icoon && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10">{icoon}</div>
-      )}
-      <div className="min-w-0">
+      <Kop icoon={icoon} maat="h-8 w-8">
         <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-title font-bold text-brand-blue-ink">
           {titel}
           {venster}
         </h3>
         {bijschrift && <p className="text-xs text-muted-foreground">{bijschrift}</p>}
-      </div>
+      </Kop>
       {actie && <div className="ml-auto shrink-0">{actie}</div>}
     </div>
   );

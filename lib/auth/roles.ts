@@ -262,8 +262,16 @@ export function capabilityForApi(pathname: string, method: string): Capability {
   return isRead ? "client:read" : "settings:write";
 }
 
-// Het beurs-id uit een verzoek, voor de scope-check. De app gebruikt client_id in de
-// querystring (27 routes) en clientId in bodies; /client/<id> is het paginapad.
+/**
+ * Het beurs-id uit een verzoek. De app gebruikt client_id in de querystring (27 routes) en clientId
+ * in bodies; /client/<id> is het paginapad.
+ *
+ * @deprecated Niet voor een toegangscheck. Dit geeft EEN id terug terwijl een verzoek er meer kan
+ * noemen (?client_id=a&clientId=b): wie hierop toetst, toetst mogelijk een ander id dan de route
+ * daarna leest. De poortwachter en de routes gebruiken clientIdsUitVerzoek hieronder. Deze functie
+ * heeft buiten de tests geen aanroepers meer en blijft alleen staan omdat de test van het logboek
+ * ermee laat zien wat de oude lezing miste.
+ */
 export function clientIdFromPath(pathname: string, searchParams: URLSearchParams): string | null {
   const q = searchParams.get("client_id") ?? searchParams.get("clientId");
   if (q) return q;

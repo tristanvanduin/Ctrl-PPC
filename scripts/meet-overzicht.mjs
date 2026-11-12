@@ -25,7 +25,28 @@
 //   - de adresbalk (fase 2): na een kanaal- en een periodewissel de pagina herladen en kijken of
 //     hetzelfde kanaal en dezelfde periode terugkomen.
 //
-// Vaste meetnormen en drempels staan in het bouwplan; dit script oordeelt niet, het meet.
+// Vaste meetnormen en drempels staan in het bouwplan; dit script oordeelt niet, het meet. Het
+// oordeel (per norm gehaald of niet) geeft scripts/oordeel-overzicht.mjs over het bestand dat hier
+// uitkomt.
+//
+// WAT ER OP 12 NOVEMBER AAN DE VENSTERTELLING IS RECHTGEZET, en waarom dat geen flatteren is.
+// De telling "volgt periode: N van M veranderd" kwam uit op 50 tot 54 procent, en bijna de helft
+// van de stille blokken droeg dat label helemaal niet:
+//   - De bronrij (Demodata, Conversielag, Datastand), To-do's en Notities hebben geen venster en
+//     staan in geen sectie. De telling zocht voor een blok zonder eigen label het laatste label
+//     ERVOOR in de sectie, en viel zonder sectie terug op de hele pagina: zo leenden ze het label
+//     van de kanaalkaarten. Een blok krijgt nu alleen een label uit zijn EIGEN sectie; staat het
+//     in geen sectie, dan heeft het geen label. De blokken die de stand van nu tonen zeggen dat
+//     zelf (data-venster="stand", zie components/ui/vensterlabel.tsx) en tellen als eigen soort.
+//   - Een dichtgeklapt blok draagt in zijn kop het venster van wat erin zit, maar toont dicht geen
+//     cijfer dat kan veranderen. Die blokken (data-paneel="dicht", data-heel-blok="dicht") staan
+//     apart in de uitkomst van een wissel (`dicht`) en tellen daar niet mee in de noemer.
+//     DAT ALLEEN WAS EEN VERSOEPELING: het bouwplan zegt "de blokken die 'volgt periode' dragen",
+//     niet "de open blokken", en een label op een dicht blok was zo door niets gemeten. Daarom
+//     opent de meting ze aan het eind één keer, per tabblad, wisselt dan twee keer van periode en
+//     legt vast of elk geopend blok verandert (`dichteVolgers`). Het oordeel toetst dat als een
+//     eigen norm (A1b), naast A1 over de open blokken.
+// Een blok dat "volgt periode" draagt, open staat en stil blijft, telt nog precies zoals het telde.
 
 import { chromium } from "playwright-core";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -92,13 +113,23 @@ const SNAPSHOT = () => {
  * Het label van een blok is het Vensterlabel in de kaart zelf, of anders het laatste label in een
  * kop boven de kaart binnen dezelfde sectie (de sectiekop of een Deelkop: zo dragen de vier
  * jaartegels en de kanaaltabel hun venster). Zonder label: `soort` null, en dan telt elk
- * conversietotaal in dat blok als ongelabeld.
+ * conversietotaal in dat blok als ongelabeld. Een blok buiten elke sectie leent GEEN label van de
+ * rest van de pagina (zie de kop van dit bestand).
+ *
+ * `soort` "stand": het blok zegt zelf dat het de stand van nu toont en geen venster heeft
+ * (data-venster="stand" op de kaart). `dicht`: het blok is een dichtgeklapt paneel of een kaart
+ * waarvan de hele inhoud achter een dichte lade zit.
  *
  * De tekst zonder het label: bij een periodewissel verandert de tekst van het label zelf
  * ("volgt periode · jun–aug 2026"). Telde die mee, dan "veranderde" elk gelabeld blok vanzelf en
  * mat de meting het label in plaats van de cijfers.
+ *
+ * `doe` (alleen voor de meting van de dichte blokken, zie meetDichteVolgers): `{ open: [sleutels] }`
+ * klikt de genoemde dichte blokken open, `{ sluit: [sleutels] }` klikt ze weer dicht. In dezelfde
+ * functie en niet in een tweede, zodat "welk blok is dit" op één plek wordt bepaald. Zonder `doe`
+ * raakt deze functie de pagina niet aan.
  */
-const VENSTERS = () => {
+const VENSTERS = (doe) => {
   const schoon = (t) => t.replace(/\s+/g, " ").trim();
   const main = document.querySelector("main") ?? document.body;
   const isKaart = (el) => /rounded-(xl|lg|2xl)/.test(String(el.className)) && /border|shadow|bg-card/.test(String(el.className));
@@ -107,27 +138,37 @@ const VENSTERS = () => {
   const gezien = {};
   for (const el of main.querySelectorAll("*")) {
     if (!isKaart(el) || inKaart(el) || el.getClientRects().length === 0) continue;
-    let label = el.querySelector("[data-venster]");
-    if (!label) {
-      const sectie = el.closest("section") ?? main;
-      for (const l of sectie.querySelectorAll("[data-venster]")) {
+    // Een echt Vensterlabel, niet het kenmerk "stand" van een genest blok.
+    const LABEL = '[data-venster]:not([data-venster="stand"])';
+    const stand = el.getAttribute("data-venster") === "stand";
+    let label = stand ? null : el.querySelector(LABEL);
+    if (!label && !stand) {
+      const sectie = el.closest("section");
+      for (const l of sectie?.querySelectorAll(LABEL) ?? []) {
         if (inKaart(l) || isKaart(l)) continue; // het label van een andere kaart
         if (l.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) label = l; // de laatste vóór deze kaart
       }
     }
     let tekst = el.innerText;
-    for (const l of el.querySelectorAll("[data-venster]")) tekst = tekst.split(l.innerText).join(" ");
+    for (const l of el.querySelectorAll(LABEL)) tekst = tekst.split(l.innerText).join(" ");
     tekst = schoon(tekst).slice(0, 6000);
     let kop = el.querySelector("h1, h2, h3, h4")?.innerText ?? tekst.split(" ").slice(0, 6).join(" ");
-    for (const l of el.querySelectorAll("[data-venster]")) kop = kop.split(l.innerText).join(" ");
+    for (const l of el.querySelectorAll(LABEL)) kop = kop.split(l.innerText).join(" ");
     kop = schoon(kop).slice(0, 50);
+    const dicht = el.getAttribute("data-paneel") === "dicht" || el.querySelector('[data-heel-blok="dicht"]') !== null;
     // Dezelfde kop kan vaker voorkomen (vier tegels "Conversies"); het volgnummer houdt ze uit elkaar.
     gezien[kop] = (gezien[kop] ?? 0) + 1;
+    const knopVoor = (stand) => (el.getAttribute("data-paneel") === stand
+      ? el.querySelector(`:scope > button[aria-expanded="${stand === "open"}"]`)
+      : el.querySelector(`[data-heel-blok="${stand}"]`));
+    if (doe?.open?.includes(`${kop} #${gezien[kop]}`) && dicht) knopVoor("dicht")?.click();
+    if (doe?.sluit?.includes(`${kop} #${gezien[kop]}`) && !dicht) knopVoor("open")?.click();
     const totalen = [];
     for (const m of tekst.matchAll(/(\d{1,3}(?:\.\d{3})+|\d{3,})\s+conversies\b/gi)) totalen.push(m[1]);
     for (const m of tekst.matchAll(/\bConversies\s+(?:[^\d\s]{0,12}\s)?(\d{1,3}(?:\.\d{3})+|\d{3,})/g)) totalen.push(m[1]);
     uit.push({
-      sleutel: `${kop} #${gezien[kop]}`, soort: label?.getAttribute("data-venster") ?? null, label: label ? schoon(label.innerText) : null, tekst,
+      sleutel: `${kop} #${gezien[kop]}`, soort: stand ? "stand" : label?.getAttribute("data-venster") ?? null,
+      label: stand ? "stand van nu" : label ? schoon(label.innerText) : null, tekst, dicht,
       conversietotalen: [...new Set(totalen)].filter((v) => !/^20\d\d$/.test(v) && Number(v.replace(/\./g, "")) >= 50),
     });
   }
@@ -266,7 +307,9 @@ async function run(breedte, hoogte, throttle) {
       // Fase 2: van de blokken die vóór de wissel "volgt periode" droegen, hoeveel hebben daarna
       // een andere tekst (het label zelf niet meegeteld)? Bij een periodewissel is het doel 90%.
       const naPerSleutel = new Map(naVensters.map((b) => [b.sleutel, b]));
-      const volgers = voorVensters.filter((b) => b.soort === "periode");
+      // Een dicht blok toont geen cijfer dat kan veranderen: apart genoemd, niet in de noemer.
+      const volgers = voorVensters.filter((b) => b.soort === "periode" && !b.dicht);
+      const dichteVolgers = voorVensters.filter((b) => b.soort === "periode" && b.dicht).map((b) => b.sleutel);
       const stil = volgers.filter((b) => naPerSleutel.get(b.sleutel)?.tekst === b.tekst).map((b) => b.sleutel);
       res.wissels.push({
         label, fout,
@@ -274,7 +317,7 @@ async function run(breedte, hoogte, throttle) {
         eersteVeranderingMs: eerste === null ? null : Math.round(eerste),
         netwerkStilMs: r < 0 ? null : Date.now() - t - RUST_MS - 1600,
         blokken: sleutels.length, blokkenVeranderd: veranderd.length, veranderd: veranderd.slice(0, 30),
-        volgtPeriode: { blokken: volgers.length, veranderd: volgers.length - stil.length, stil },
+        volgtPeriode: { blokken: volgers.length, veranderd: volgers.length - stil.length, stil, dicht: dichteVolgers },
         url: await p.evaluate(() => location.pathname + location.search),
         beeldjes: frames.length, beeldjesBoven25ms: frames.filter((x) => x > 25).length,
         langeTaken: mm.langN, blokkeerMs: Math.round(mm.lang), cls: Math.round(mm.cls * 1000) / 1000,
@@ -303,10 +346,15 @@ async function run(breedte, hoogte, throttle) {
     const snel = (kort) => p.locator('[role="group"][aria-label^="Periode"] button', { hasText: new RegExp(`^${kort}$`) }).first().click({ timeout: 5000 });
     await wissel("periode (snelkoppeling): -> 6 mnd", () => snel("6 mnd"));
     // Elke kanaalweergave heeft eigen blokken; het aandeel "volgt periode" dat echt beweegt, telt
-    // per weergave. Kanalen die deze klant niet heeft, geven een FOUT-regel en geen crash.
+    // per weergave. Een kanaal dat deze klant niet heeft (geen tab, geen kaart) wordt overgeslagen
+    // en bij naam genoemd; het is geen wissel met een fout. Dat onderscheid telt: het oordeel
+    // keurt een meting met een mislukte wissel af (scripts/overzicht-normen.mjs), en een klant
+    // zonder LinkedIn is geen mislukte meting.
     res.venstersPerKanaal = { "Alle kanalen": res.vensters };
+    res.kanalenOvergeslagen = [];
     for (const kanaal of ["Google Ads", "Meta", "LinkedIn", "Microsoft"]) {
       // De tab heet "Microsoft", de kanaalkaart "Microsoft Ads" (KANAAL_NAAM): beide tellen.
+      if ((await p.getByRole("button", { name: new RegExp(`^${kanaal}( Ads)?$`) }).count()) === 0) { res.kanalenOvergeslagen.push(kanaal); continue; }
       await wissel(`kanaal: -> ${kanaal}`, () => p.getByRole("button", { name: new RegExp(`^${kanaal}( Ads)?$`) }).first().click({ timeout: 3000 }));
       if (res.wissels.at(-1).fout) continue;
       res.venstersPerKanaal[kanaal] = vensterStand(await p.evaluate(VENSTERS));
@@ -336,6 +384,47 @@ async function run(breedte, hoogte, throttle) {
           && JSON.stringify(voorHerlaad.ingedrukt) === JSON.stringify(naHerlaad.ingedrukt),
       };
     } catch (e) { res.herlaad = { fout: String(e.message).slice(0, 160) }; }
+
+    // ── De dichte blokken met "volgt periode": eenmaal open, bewegen ze dan ook? ──
+    // Als laatste, zodat het openen niets verandert aan wat hierboven gemeten is (de stand van een
+    // paneel wordt per gebruiker onthouden). Per tabblad via de adresbalk: in de nieuwe weergave
+    // is een klik op de gekozen kanaalkaart juist de weg TERUG, en na de herlaad hierboven staat
+    // er al een kanaal gekozen.
+    // Twee periodewissels na het openen, en de tekst na de eerste tegen die na de tweede: zo hangt
+    // de uitkomst niet af van de periode die toevallig al gekozen was.
+    res.dichteVolgers = {};
+    const tabbladen = [["Alle kanalen", ""], ["Google Ads", "google"], ["Meta", "meta"], ["LinkedIn", "linkedin"], ["Microsoft", "microsoft"]];
+    for (const [tab, kanaal] of tabbladen) {
+      try {
+        await p.goto(`${URL_KLANT}${kanaal ? `&kanaal=${kanaal}` : ""}`, { waitUntil: "domcontentloaded" });
+        await p.waitForFunction(() => !document.querySelector('main button[aria-haspopup="dialog"]')?.disabled, null, { timeout: 30000 });
+        await rust(20000);
+        // Een kanaal dat deze klant niet heeft, valt terug op alle kanalen: dan is er niets te meten.
+        const opKanaal = await p.evaluate(() => new URLSearchParams(location.search).get("kanaal") ?? "");
+        if (opKanaal !== kanaal) { res.dichteVolgers[tab] = { fout: "tabblad niet beschikbaar" }; continue; }
+        const dicht = (await p.evaluate(VENSTERS)).filter((b) => b.soort === "periode" && b.dicht).map((b) => b.sleutel);
+        if (dicht.length === 0) { res.dichteVolgers[tab] = { blokken: 0, geopend: 0, veranderd: 0, stil: [], nietGeopend: [] }; continue; }
+        await p.evaluate(VENSTERS, { open: dicht });
+        await rust(15000);
+        await snel("3 mnd"); await rust(15000); await p.waitForTimeout(1600);
+        const eerst = new Map((await p.evaluate(VENSTERS)).map((b) => [b.sleutel, b]));
+        await snel("12 mnd"); await rust(15000); await p.waitForTimeout(1600);
+        const daarna = new Map((await p.evaluate(VENSTERS)).map((b) => [b.sleutel, b]));
+        // Niet te openen (geen knop gevonden, of het blok heet open anders) is niet "veranderd":
+        // het telt mee in de noemer en staat bij naam in de uitkomst.
+        const nietGeopend = dicht.filter((k) => !eerst.has(k) || eerst.get(k).dicht);
+        const geopend = dicht.filter((k) => !nietGeopend.includes(k));
+        const stil = geopend.filter((k) => daarna.get(k)?.tekst === eerst.get(k).tekst);
+        res.dichteVolgers[tab] = {
+          blokken: dicht.length, geopend: geopend.length, veranderd: geopend.length - stil.length, stil, nietGeopend,
+          // Het venster dat het blok open noemt: een blok dat dicht "volgt periode" heet en open een
+          // ander label draagt, zegt dicht iets anders dan het is.
+          openSoort: Object.fromEntries(geopend.map((k) => [k, eerst.get(k).soort])),
+        };
+        await p.evaluate(VENSTERS, { sluit: geopend });
+        await p.waitForTimeout(300);
+      } catch (e) { res.dichteVolgers[tab] = { fout: String(e.message).slice(0, 160) }; }
+    }
   }
   await ctx.close();
   return res;
@@ -361,12 +450,16 @@ for (const r of uit.runs) {
     // Alleen bij een periodewissel zegt dit iets: een kanaalwissel vervangt de blokken zelf.
     if (w.label.startsWith("periode") && w.volgtPeriode?.blokken > 0) {
       const v = w.volgtPeriode;
-      console.log(`   volgt periode: ${v.veranderd}/${v.blokken} veranderd (${Math.round((v.veranderd / v.blokken) * 100)}%)${v.stil.length ? ` · stil: ${v.stil.join("; ")}` : ""} · ${w.url}`);
+      console.log(`   volgt periode: ${v.veranderd}/${v.blokken} veranderd (${Math.round((v.veranderd / v.blokken) * 100)}%)${v.stil.length ? ` · stil: ${v.stil.join("; ")}` : ""}${v.dicht?.length ? ` · dicht, apart gemeten: ${v.dicht.join("; ")}` : ""} · ${w.url}`);
     }
   }
   for (const [kanaal, v] of Object.entries(r.venstersPerKanaal ?? (r.vensters ? { "Alle kanalen": r.vensters } : {}))) {
     console.log(`vensters ${kanaal}: ${v.blokken} blokken ${JSON.stringify(v.perSoort)} · zonder venster: ${v.zonderVenster.length ? v.zonderVenster.join("; ") : "geen"} · conversietotalen zonder venster: ${v.conversietotalenZonderVenster.length ? JSON.stringify(v.conversietotalenZonderVenster) : "0"}`);
   }
+  for (const [tab, d] of Object.entries(r.dichteVolgers ?? {})) {
+    console.log(`dichte blokken met "volgt periode" op ${tab}: ${d.fout ? `[FOUT ${d.fout}]` : d.blokken === 0 ? "geen" : `${d.veranderd}/${d.blokken} veranderd na openen${d.stil.length ? ` · stil: ${d.stil.join("; ")}` : ""}${d.nietGeopend.length ? ` · niet te openen: ${d.nietGeopend.join("; ")}` : ""}`}`);
+  }
+  if (r.kanalenOvergeslagen?.length) console.log(`kanalen die deze klant niet heeft, overgeslagen: ${r.kanalenOvergeslagen.join(", ")}`);
   if (r.herlaad) console.log(`herlaad: ${r.herlaad.fout ? `[FOUT ${r.herlaad.fout}]` : `${r.herlaad.zelfdeToestand ? "zelfde toestand" : "ANDERS"} · ${r.herlaad.na.url} · ${JSON.stringify(r.herlaad.na.ingedrukt)} · ${r.herlaad.na.periode}`}`);
   if (r.eerlijk) console.log(`eerlijk: conversietotalen ${JSON.stringify(r.eerlijk.conversietotalen)} · permanente animaties ${r.eerlijk.permanenteAnimaties.length} ${JSON.stringify(r.eerlijk.permanenteAnimaties.slice(0, 3))} · datastand "${r.eerlijk.datastand}"`);
 }

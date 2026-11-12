@@ -5,7 +5,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { leesAdresbalk, schrijfAdresbalk } from "@/lib/adresbalk";
-import { kiesWeergave, weergaveCookie, weergaveUitUrl, WEERGAVE_PARAM, WEERGAVE_SLEUTEL, type Weergave } from "@/lib/weergave";
+import {
+  CHROME_ATTRIBUUT, chromeIsNieuw, kiesWeergave, weergaveCookie, weergaveUitUrl, WEERGAVE_PARAM, WEERGAVE_SLEUTEL, type Weergave,
+} from "@/lib/weergave";
 
 function leesBewaard(): string | null {
   try { return window.localStorage.getItem(WEERGAVE_SLEUTEL); } catch { return null; }
@@ -83,8 +85,12 @@ export function useWeergave(urlWaarde: string | null, vanServer: string | null =
  */
 export function useNieuweChrome(pad: string | null): boolean {
   const [weergave, setWeergave] = useState<Weergave>("oud");
+  // Is de keuze al gelezen? Tot dan is "oud" een beginwaarde en geen keuze, en blijft het kenmerk
+  // op <html> wat het script in de <head> ervan maakte.
+  const [gelezen, setGelezen] = useState(false);
   useEffect(() => {
     setWeergave(kiesWeergave({ url: leesAdresbalk().get(WEERGAVE_PARAM), bewaard: weergaveUitUrl(leesBewaard()) ?? leesCookie() }));
+    setGelezen(true);
     const opKeuze = (e: Event) => {
       const keuze = weergaveUitUrl((e as CustomEvent<unknown>).detail as string | null);
       if (keuze) setWeergave(keuze);
@@ -92,5 +98,17 @@ export function useNieuweChrome(pad: string | null): boolean {
     window.addEventListener(WEERGAVE_GEBEURTENIS, opKeuze);
     return () => window.removeEventListener(WEERGAVE_GEBEURTENIS, opKeuze);
   }, [pad]);
-  return weergave === "nieuw" && !!pad && pad.startsWith("/client/");
+  const nieuw = chromeIsNieuw({ pad, url: weergave, bewaard: null });
+  // Het kenmerk op <html> dat het script in de <head> vóór de eerste verf zette (lib/weergave-init.ts)
+  // bijhouden: na een wissel van de schakelaar of van pagina klopt het anders niet meer, en dan
+  // verborg de CSS de knop "Zoeken" op Portfolio. Pas nadat de keuze gelezen is: de eerste render
+  // staat op "oud", en het kenmerk dan weghalen liet de knop één beeld lang terugkomen.
+  useEffect(() => {
+    if (!gelezen) return;
+    try {
+      if (nieuw) document.documentElement.setAttribute(CHROME_ATTRIBUUT, "nieuw");
+      else document.documentElement.removeAttribute(CHROME_ATTRIBUUT);
+    } catch { /* geen document: niets bij te houden */ }
+  }, [nieuw, gelezen]);
+  return nieuw;
 }

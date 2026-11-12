@@ -53,6 +53,11 @@ export function resolveSelection(
  * Tijdens het laden staan ze er al, uitgeschakeld en even breed: de rij verspringt dan niet als de
  * stand binnenkomt (dezelfde reden als de gereserveerde tekst in de kiezer hieronder).
  */
+/** De toegankelijke naam van een snelkoppeling: de zichtbare tekst, en dan voluit. */
+export function snelkoppelingNaam(k: { kort: string; preset: PeriodPreset }): string {
+  return `${k.kort}, ${PRESET_LABEL[k.preset].toLowerCase()}`;
+}
+
 export function PeriodeSnelkoppelingen({ preset, onKies, laden }: {
   preset: PeriodPreset;
   onKies: (preset: PeriodPreset) => void;
@@ -67,7 +72,10 @@ export function PeriodeSnelkoppelingen({ preset, onKies, laden }: {
             key={k.preset}
             type="button"
             aria-pressed={actief}
-            aria-label={PRESET_LABEL[k.preset]}
+            // De naam begint met wat er op de knop staat ("3 mnd") en zegt het daarna voluit. Alleen
+            // de volle naam ("Laatste 3 maanden") bevatte de zichtbare tekst niet: wie met zijn
+            // stem bedient en "3 mnd" zegt, vond de knop dan niet.
+            aria-label={snelkoppelingNaam(k)}
             title={PRESET_LABEL[k.preset]}
             disabled={laden}
             onClick={() => onKies(k.preset)}

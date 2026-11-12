@@ -63,6 +63,17 @@ export interface PacingJaarRij {
  * dan het doel" in rood zou een oordeel zijn over een getal dat niemand gekozen heeft. De kosten
  * staan er om de CPA en de ROAS te kunnen plaatsen, in grijs.
  */
+/**
+ * De metriek die de grafiek in de lade toont: de gekozen metriek, of de eerste actieve als de
+ * gekozen metriek voor deze klant niet actief is. Dezelfde klem als het jaaroverzicht van een
+ * kanaal altijd had (ChannelForecastOverview): een kanaal met alleen een omzet- of ROAS-doel heeft
+ * geen knop "Conversies", en opende toch op de conversiereeks.
+ */
+export function zichtbareMetriek(forecast: ClientForecast, gekozen: ForecastMetric): ForecastMetric {
+  const actief = actieveMetrics(forecast);
+  return actief.includes(gekozen) ? gekozen : actief[0] ?? gekozen;
+}
+
 export function pacingJaarRijen(forecast: ClientForecast, vorigJaar: VorigJaar | null): PacingJaarRij[] {
   const rijen: PacingJaarRij[] = actieveMetrics(forecast).map((metric) => {
     const c = jaarKaartCijfers(forecast, metric);
