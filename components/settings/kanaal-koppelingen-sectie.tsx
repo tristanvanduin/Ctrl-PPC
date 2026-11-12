@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, XCircle, AlertTriangle, Info, Loader2, RefreshCw, Link2, Unlink, DownloadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAllClients, type Client } from "@/lib/clients";
+import { vergeetBronnen } from "@/lib/data-access/bron-cache";
 
 type Kanaal = "meta" | "linkedin" | "microsoft";
 
@@ -237,6 +238,10 @@ function KanaalKaart({ clientId, stand, bureau, onGewijzigd }: { clientId: strin
       }
       const rijen = Object.entries(data.rows_upserted ?? {}).filter(([, v]) => typeof v === "number").map(([k, v]) => `${k}: ${v}`).join(", ");
       setMelding({ soort: "ok", tekst: `Backfill klaar${rijen ? ` (${rijen})` : ""}.` });
+      // De backfill schreef nieuwe rijen: de blokken van het dashboard die hun lezing vijf minuten
+      // bewaren (wereldkaart, uitsplitsingen, videokaart, matrix, campagnetypes) lezen daarna
+      // opnieuw. Dit is naast de syncbadge de enige plek waar de browser een sync start.
+      vergeetBronnen(`${clientId}|`);
       onGewijzigd();
     } catch (e) {
       setMelding({ soort: "fout", tekst: e instanceof Error ? e.message : "Backfill mislukt" });

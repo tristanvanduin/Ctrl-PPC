@@ -536,6 +536,31 @@ export function dagkanaalDataTot(laatsteRij: string | null | undefined, routeDat
   return laatsteGeldigeDag(rij ? addDays(rij, -1) : null, route);
 }
 
+/** Wat <kanaal>_connections over een dagkanaal zegt: wanneer de sync voor het laatst slaagde, en
+ *  of de koppeling er (nog) is. */
+export interface DagKoppeling {
+  laatsteGeslaagdeSync: string | null;
+  gekoppeld: boolean;
+}
+
+function dagKoppelingUitRijen(connRijen: { last_sync_at: unknown; status?: unknown }[]): DagKoppeling {
+  return {
+    laatsteGeslaagdeSync: connRijen[0]?.last_sync_at ? String(connRijen[0].last_sync_at) : null,
+    gekoppeld: connRijen.length > 0 && connRijen[0].status !== "disabled",
+  };
+}
+
+/**
+ * Alleen de koppeling van een dagkanaal, zonder de datums. Voor de blended route, die alle dagrijen
+ * van het kanaal zelf al leest en de nieuwste dag daaruit haalt (lib/api/blended-historical.ts):
+ * dagstandVoorKlant zou dezelfde tabel een tweede keer lezen. Zelfde lezing en zelfde uitleg van de
+ * rij als in dagstandVoorKlant; gooit bij een fout, net als die.
+ */
+export async function dagKoppelingVoorKlant(supabase: SupabaseClient, clientId: string, kanaal: Dagkanaal): Promise<DagKoppeling> {
+  const conn = await supabase.from(`${kanaal}_connections`).select("last_sync_at, status").eq("client_id", clientId).limit(1);
+  return dagKoppelingUitRijen(eis(conn, `${kanaal}_connections (dagstand)`) as { last_sync_at: unknown; status?: unknown }[]);
+}
+
 /** @param nu vandaag als "YYYY-MM-DD" (standaard today()); de blended route geeft zijn eigen peildag mee. */
 export async function dagstandVoorKlant(supabase: SupabaseClient, clientId: string, kanaal: Dagkanaal, nu?: string): Promise<Dagstand> {
   // Nieuwste eerst en afgekapt op 400 rijen (ruim een jaar dagdata); het maximum wordt daarna in
@@ -548,9 +573,8 @@ export async function dagstandVoorKlant(supabase: SupabaseClient, clientId: stri
   const rijen = eis(dagen, `${kanaal}_account_daily (dagstand)`) as { date: unknown }[];
   const connRijen = eis(conn, `${kanaal}_connections (dagstand)`) as { last_sync_at: unknown; status?: unknown }[];
   const laatsteDag = rijen.map((r) => String(r.date ?? "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop() ?? null;
-  const sync = connRijen[0]?.last_sync_at ? String(connRijen[0].last_sync_at) : null;
-  const gekoppeld = connRijen.length > 0 && connRijen[0].status !== "disabled";
-  return beoordeelDagstand({ kanaal, laatsteDag, laatsteGeslaagdeSync: sync, nu, gekoppeld });
+  const { laatsteGeslaagdeSync, gekoppeld } = dagKoppelingUitRijen(connRijen);
+  return beoordeelDagstand({ kanaal, laatsteDag, laatsteGeslaagdeSync, nu, gekoppeld });
 }
 
 /**

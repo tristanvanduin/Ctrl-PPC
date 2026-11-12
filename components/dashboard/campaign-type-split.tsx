@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PieChart, X } from "lucide-react";
 import { dbSelect } from "@/lib/data-access/client-read";
+import { maakBronCache } from "@/lib/data-access/bron-cache";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { KANAAL_KLEUR, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { DonutChart, type DonutSlice } from "./donut-chart";
@@ -74,6 +75,28 @@ interface CampaignMonthlyRow {
   conversions_value: number | null;
   impressions: number | null;
   clicks: number | null;
+}
+
+// De ruwe maandrijen per (klant, venster), vijf minuten bewaard. Dit blok las bij ELKE mount
+// opnieuw (elk bezoek aan het Google-tabblad), en bij een wissel tussen de tabbladen Campagnetype
+// en Campagne nog een keer exact dezelfde query: alleen de afbeelding naar type of naam verschilt.
+// Nu één lezing; de afbeelding gebeurt in de component, op dezelfde rijen. De rijen veranderen
+// alleen door een sync; die vergeet ze via vergeetBronnen (de sleutel begint met de klant).
+const CAMPAGNEMAANDEN_TTL = 5 * 60 * 1000;
+const campagneMaandenCache = maakBronCache<CampaignMonthlyRow[]>(CAMPAGNEMAANDEN_TTL);
+const campagneMaandenSleutel = (clientId: string, vanaf: string) => `${clientId}|campagnemaanden|${vanaf}`;
+
+function leesCampagneMaanden(clientId: string, vanaf: string): Promise<CampaignMonthlyRow[]> {
+  return campagneMaandenCache.lees(campagneMaandenSleutel(clientId, vanaf), async () => {
+    const { data, error } = await dbSelect<CampaignMonthlyRow>("ads_campaign_monthly", {
+      select: "month, campaign_type, campaign_name, cost, conversions, conversions_value, impressions, clicks",
+      clientId, filters: [{ op: "gte", column: "month", value: vanaf }],
+    });
+    // Gooien: een mislukte lezing hoort niet vijf minuten als "geen campagnes" in de cache te
+    // staan. De component toont dan de lege staat, zoals voorheen, en de volgende mount leest opnieuw.
+    if (error) throw new Error(error.message);
+    return data;
+  });
 }
 
 // De kanaalrijen dragen de kanaalsleutel als google_ads/meta_ads/linkedin_ads/microsoft_ads
@@ -188,7 +211,13 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
   // Wat er uit ads_campaign_monthly gelezen is, met de (klant, uitsplitsing) waar het bij hoort.
   // Zonder die sleutel stonden na een wissel van tabblad één render lang de rijen van het vorige
   // tabblad onder de kop van het nieuwe.
-  const [gelezen, setGelezen] = useState<{ sleutel: string; rows: NetworkRow[]; maanden: string | null } | null>(null);
+  // De RUWE rijen, met de (klant, venster) waar ze bij horen; de beginstaat uit de cache, zodat een
+  // tweede bezoek geen laadvlak toont en geen verzoek doet.
+  const [gelezen, setGelezen] = useState<{ sleutel: string; rijen: CampaignMonthlyRow[] } | null>(() => {
+    const begin = vensterVanaf(today());
+    const bewaard = campagneMaandenCache.kijk(campagneMaandenSleutel(clientId, begin));
+    return bewaard ? { sleutel: campagneMaandenSleutel(clientId, begin), rijen: bewaard } : null;
+  });
   const [uitsplitsing, setUitsplitsing] = useState<Uitsplitsing>(start);
   const [tabelOpen, toggleTabel] = useRememberedOpen("campagnetype-tabel", false);
   // Klik op een ring-segment of een legendaregel selecteert dat campagnetype -- gedeeld tussen
@@ -242,37 +271,39 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
     };
   }, [kanaalRijen, eigenHistorie.perKanaal, eigenHistorie.loading, periodeStart, periodeEind]);
 
-  const sleutel = `${clientId}|${uitsplitsing}|${vanaf}`;
+  const sleutel = campagneMaandenSleutel(clientId, vanaf);
+  // Niet opnieuw lezen bij een wissel tussen Campagnetype en Campagne: het zijn dezelfde rijen.
+  // Alleen OF er gelezen moet worden (niet op het tabblad Kanaal) hangt van de uitsplitsing af.
+  const leestCampagnes = uitsplitsing !== "kanaal";
   useEffect(() => {
-    if (uitsplitsing === "kanaal") return; // geen lezing: zie kanaalDeel hierboven
+    if (!leestCampagnes) return; // geen lezing: zie kanaalDeel hierboven
     let cancelled = false;
-
-    dbSelect<CampaignMonthlyRow>("ads_campaign_monthly", {
-      select: "month, campaign_type, campaign_name, cost, conversions, conversions_value, impressions, clicks",
-      clientId, filters: [{ op: "gte", column: "month", value: vanaf }],
-    }).then(({ data }) => {
-      if (cancelled) return;
-      setGelezen({
-        sleutel,
-        maanden: maandenTekst(data.map((r) => r.month)),
-        rows: data.map((r) => ({
-          networkType: uitsplitsing === "campagne"
-            ? (r.campaign_name ?? "Onbekende campagne")
-            : (r.campaign_type ?? "ONBEKEND"),
-          cost: Number(r.cost ?? 0),
-          conversions: Number(r.conversions ?? 0),
-          conversionsValue: Number(r.conversions_value ?? 0),
-          impressions: Number(r.impressions ?? 0),
-          clicks: Number(r.clicks ?? 0),
-        })),
-      });
-    }, () => { if (!cancelled) setGelezen({ sleutel, maanden: null, rows: [] }); });
-
+    // Een mislukte lezing is een lege staat, zoals voorheen; hij staat alleen niet in de cache.
+    leesCampagneMaanden(clientId, vanaf).catch((): CampaignMonthlyRow[] => []).then((rijen) => {
+      if (!cancelled) setGelezen({ sleutel, rijen });
+    });
     return () => { cancelled = true; };
-  }, [clientId, uitsplitsing, vanaf, sleutel]);
+  }, [clientId, leestCampagnes, vanaf, sleutel]);
 
-  // null = nog onderweg, voor het tabblad dat nu open staat.
-  const campagneDeel = gelezen?.sleutel === sleutel ? gelezen : null;
+  // null = nog onderweg, voor het tabblad dat nu open staat. De afbeelding naar campagnetype of
+  // campagnenaam gebeurt hier, op de gelezen rijen: een wissel tussen die twee kost geen verzoek.
+  const ruweRijen = gelezen?.sleutel === sleutel ? gelezen.rijen : null;
+  const campagneDeel = useMemo(() => {
+    if (ruweRijen === null || uitsplitsing === "kanaal") return null;
+    return {
+      maanden: maandenTekst(ruweRijen.map((r) => r.month)),
+      rows: ruweRijen.map((r): NetworkRow => ({
+        networkType: uitsplitsing === "campagne"
+          ? (r.campaign_name ?? "Onbekende campagne")
+          : (r.campaign_type ?? "ONBEKEND"),
+        cost: Number(r.cost ?? 0),
+        conversions: Number(r.conversions ?? 0),
+        conversionsValue: Number(r.conversions_value ?? 0),
+        impressions: Number(r.impressions ?? 0),
+        clicks: Number(r.clicks ?? 0),
+      })),
+    };
+  }, [ruweRijen, uitsplitsing]);
   const rows: NetworkRow[] | null = (uitsplitsing === "kanaal" ? kanaalDeel : campagneDeel)?.rows ?? null;
   const maanden: string | null = (uitsplitsing === "kanaal" ? kanaalDeel : campagneDeel)?.maanden ?? null;
 

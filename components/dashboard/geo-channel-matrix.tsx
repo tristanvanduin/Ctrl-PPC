@@ -6,6 +6,7 @@ import { Loader2, Grid3x3 } from "lucide-react";
 import { divergingColor, inkOn } from "@/lib/branding/chart-colors";
 import { stateLabel } from "@/lib/geo/us-fips";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
+import { maakBronCache } from "@/lib/data-access/bron-cache";
 import {
   matrixTotals, cellIndex, findMixDeviations, strongestPerCountry, isUnsplit, cpa, roas,
   CHANNEL_LABEL, type ChannelCell, type ChannelKey,
@@ -40,19 +41,43 @@ const METRICS: Record<MetricKey, { label: string; get: (c: ChannelCell) => numbe
   roas: { label: "ROAS", get: roas, fmt: (v) => (v == null ? "—" : `${num(v, 2)}×`), higherIsBetter: true },
 };
 
+// De cellen per klant, vijf minuten bewaard. Dit blok haalde bij ELKE mount opnieuw op (een kale
+// fetch met state per mount): elk bezoek aan het Google-tabblad kostte dit verzoek opnieuw, ook
+// direct terug vanaf een ander kanaal. De rijen veranderen alleen door een sync; die vergeet ze
+// via vergeetBronnen (lib/data-access/bron-cache.ts), de sleutel begint met de klant.
+const MATRIX_TTL = 5 * 60 * 1000;
+const matrixCache = maakBronCache<ChannelCell[]>(MATRIX_TTL);
+const matrixSleutel = (clientId: string) => `${clientId}|geo-matrix`;
+
+function leesMatrix(clientId: string): Promise<ChannelCell[]> {
+  // Demo wordt server-side bepaald door de klant-id (zie app/api/geo/channels/route.ts), geen
+  // vlag hier nodig.
+  return matrixCache.lees(matrixSleutel(clientId), () =>
+    fetch(`/api/geo/channels?clientId=${encodeURIComponent(clientId)}`)
+      .then((r) => {
+        // Gooien: een storing hoort niet vijf minuten als "geen cellen" in de cache te staan. De
+        // lege matrix maakt de component er hieronder van, zoals voorheen.
+        if (!r.ok) throw new Error(`/api/geo/channels gaf HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => (Array.isArray(d?.cells) ? (d.cells as ChannelCell[]) : [])));
+}
+
 export function GeoChannelMatrix({ clientId }: { clientId: string }) {
-  const [cells, setCells] = useState<ChannelCell[] | null>(null);
+  // De beginstaat uit de cache: een tweede bezoek toont de matrix meteen, zonder verzoek.
+  const [gelezen, setGelezen] = useState<{ clientId: string; cells: ChannelCell[] } | null>(() => {
+    const bewaard = matrixCache.kijk(matrixSleutel(clientId));
+    return bewaard ? { clientId, cells: bewaard } : null;
+  });
+  const cells = gelezen?.clientId === clientId ? gelezen.cells : null;
   const [metricKey, setMetricKey] = useState<MetricKey>("cpa");
   const [hover, setHover] = useState<{ country: string; channel: ChannelKey } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    // Demo wordt server-side bepaald door de klant-id (zie app/api/geo/channels/route.ts), geen
-    // vlag hier nodig.
-    fetch(`/api/geo/channels?clientId=${encodeURIComponent(clientId)}`)
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setCells(d.cells ?? []); })
-      .catch(() => { if (!cancelled) setCells([]); });
+    leesMatrix(clientId)
+      .then((c) => { if (!cancelled) setGelezen({ clientId, cells: c }); })
+      .catch(() => { if (!cancelled) setGelezen({ clientId, cells: [] }); });
     return () => { cancelled = true; };
   }, [clientId]);
 

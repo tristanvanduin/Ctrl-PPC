@@ -15,7 +15,7 @@
 // Fase 4 zet het logboek "Wat er gebeurde" naast de grafiek (overzicht-logboek.tsx). Dat is het
 // enige blok hier dat zelf iets ophaalt: één verzoek bij het laden, niets bij een wissel.
 
-import { useEffect, useMemo, useState, type AnimationEvent } from "react";
+import { memo, useEffect, useMemo, useState, type AnimationEvent } from "react";
 import type { ClientHistoricalData } from "@/lib/types";
 import type { BlendedClientDataState } from "@/lib/use-blended-client-data";
 import type { ChannelPeriodData } from "@/lib/use-channel-period-data";
@@ -70,7 +70,7 @@ function useGoogleHealth(clientId: string, googleData: ClientHistoricalData | nu
   return { health, laadt: aan && (!googleData || !klaar) };
 }
 
-export function OverzichtBovenkant({ clientId, channel, kanalen, onKies, onBeoordeel, googleData, route, band, bandKlaar, demo, reserveerKaarten = false }: {
+function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel, googleData, route, band, bandKlaar, demo, reserveerKaarten = false }: {
   clientId: string;
   /** Wat er getoond wordt: een kanaal, of "blended" voor alle kanalen. */
   channel: Kanaalkeuze;
@@ -142,6 +142,9 @@ export function OverzichtBovenkant({ clientId, channel, kanalen, onKies, onBeoor
 
   // De grafiek toont wat de tegels tellen: alle kanalen, of het ene gekozen kanaal.
   const gekozen = channel === "blended" ? null : channel;
+  // Eén lijst per (gekozen, lijst): `gekozen ? [gekozen] : lijst` maakte bij een gekozen kanaal elke
+  // render een nieuwe, en dan krijgt de grafiek elke render een andere prop.
+  const grafiekKanalen = useMemo(() => (gekozen ? [gekozen] : lijst), [gekozen, lijst]);
   const maanden = useMemo(() => {
     const getoond = gekozen ? [gekozen] : lijst;
     if (!bandKlaar || getoond.length === 0 || getoond.some((k) => !band.perKanaal[k])) return null;
@@ -179,7 +182,7 @@ export function OverzichtBovenkant({ clientId, channel, kanalen, onKies, onBeoor
           ronde van de blended route (na een sync). */}
       <div className={`grid items-start gap-2 lg:grid-cols-12 ${speel ? "opbouw" : ""}`} style={stap(voor + 1)} onAnimationEnd={opEinde}>
         <div className="order-2 min-w-0 lg:order-1 lg:col-span-8">
-          <OverzichtHoofdgrafiek maanden={maanden} kanalen={gekozen ? [gekozen] : lijst} gekozen={gekozen} laden={grafiekLaadt} />
+          <OverzichtHoofdgrafiek maanden={maanden} kanalen={grafiekKanalen} gekozen={gekozen} laden={grafiekLaadt} />
         </div>
         <div className="order-1 min-w-0 lg:order-2 lg:col-span-4">
           <OverzichtLogboek clientId={clientId} channel={channel} kanalen={lijst} onKies={onKies} onBeoordeel={onBeoordeel} herlees={route.perKanaalTab} />
@@ -188,3 +191,9 @@ export function OverzichtBovenkant({ clientId, channel, kanalen, onKies, onBeoor
     </div>
   );
 }
+
+// In memo: een wissel van kanaal of periode rendert ClientDashboard twee keer (de dringende render
+// van de klik, daarna die van Next op het gewijzigde adres). De tweede keer zijn de props dezelfde:
+// de band is één object zolang zijn delen dat zijn (useChannelPeriodData), en onKies en onBeoordeel
+// zijn vaste functies. Zonder memo rekende de hoofdgrafiek elke wissel twee keer.
+export const OverzichtBovenkant = memo(OverzichtBovenkantRuw);

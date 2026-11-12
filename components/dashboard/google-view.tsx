@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Calendar, Target, Globe, Info, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge, SearchIcon } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
@@ -101,7 +101,7 @@ interface GoogleViewProps {
 }
 
 /** De Overzicht-tab voor Google Ads. */
-export function GoogleView({
+function GoogleViewRuw({
   clientId, geoClone, edition, meerdereKanalen, detectedCountries,
   countryFilter, onCountryFilterChange, tijdas, onTijdasChange, nieuw = false,
 }: GoogleViewProps) {
@@ -648,3 +648,10 @@ export function GoogleForecast({ clientId }: { clientId: string }) {
     </>
   );
 }
+
+// In memo: een kanaal- of periodewissel rendert ClientDashboard twee keer (de dringende render van
+// de klik, daarna die van Next op het gewijzigde adres), en de tweede keer is er aan dit tabblad
+// niets veranderd. Zonder memo bouwde elke wissel het hele tabblad twee keer op. De props zijn
+// primitieven, setters en gememoiseerde objecten; komt er een inline functie of een nieuw object
+// als prop bij, dan werkt dit stil niet meer.
+export const GoogleView = memo(GoogleViewRuw);

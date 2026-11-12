@@ -16,6 +16,8 @@ import { alleRijen, eis, DataLaagFout } from "@/lib/analysis/db-veilig";
 import { eersteDagUitRijen, eersteVolleMaand, startLaatsteLoopUitRijen } from "@/lib/period/kanaal-maanden";
 import { forecastRijenUitDagen, kanaalEmmersUitRijen, type KanaalEmmers } from "@/lib/analysis/channel-forecast-data";
 import {
+  beoordeelDagstand,
+  dagKoppelingVoorKlant,
   datastandVoorKlant,
   dagstandVoorKlant,
   dataTotVanDagbron,
@@ -25,6 +27,9 @@ import {
   volleMaand,
   type DataStandSamen,
   type Dagkanaal,
+  type DagKoppeling,
+  type Dagstand,
+  type Datastand,
 } from "@/lib/sync/datastand";
 
 /**
@@ -199,6 +204,16 @@ interface KanaalMaandRij {
 }
 
 /**
+ * De melding bij "geen blended data" (geen accounts-rij, of geen enkele rij voor deze klant). Eén
+ * plek, omdat twee wegen haar geven: de route als 404, en het zaad van de klantpagina
+ * (lib/overzicht/zaad-server.ts), dat dezelfde uitkomst meestuurt zodat de browser de route er
+ * niet nog eens om hoeft te vragen.
+ */
+export function geenBlendedDataFout(clientId: string): string {
+  return `Geen blended data voor "${clientId}"`;
+}
+
+/**
  * Haalt de blended jaren-/maandhistorie op voor "Alle kanalen". Null als de klant geen account
  * heeft of op geen enkel kanaal data draagt. Een databasefout gooit DataLaagFout (de route maakt
  * er een 500 van die de bron noemt) in plaats van als "geen data" te lezen.
@@ -210,17 +225,26 @@ export async function fetchBlendedHistoricalData(
   clientId: string,
   nu: string = today(),
 ): Promise<BlendedHistoricalData | null> {
-  const klant = await klantVanId(supabase, clientId);
-  if (!klant) return null;
-
-  const [googleRes, settingsRes, dagRes, targetsRes] = await Promise.all([
-    supabase.from("fact_core")
-      .select("period_start, impressions, clicks, cost, conversions, conv_value")
-      .eq("account_id", klant.id)
-      .eq("channel", "google")
-      .eq("level", "account")
-      .eq("grain", "month")
-      .order("period_start"),
+  // EEN RONDE NAAR DE DATABASE IN PLAATS VAN DRIE. Hier stonden er drie na elkaar: eerst de klant
+  // (accounts), dan de rijen, dan de stand per kanaal. De route is de poort voor het eerste
+  // kerncijfer (de band wacht erop), dus elke ronde is wachttijd op het scherm. Alleen fact_core
+  // heeft het account-id nodig; al het andere filtert op client_id en vertrekt nu meteen, ook de
+  // lezingen voor de stand (standLezingen hieronder). Bestaat de klant niet, dan is er voor niets
+  // gelezen; dat is de uitzondering, en het antwoord blijft null.
+  const klantLezing = klantVanId(supabase, clientId);
+  const stand = startStandLezingen(supabase, clientId, nu);
+  const rijenLezing = Promise.all([
+    klantLezing.then(async (k): Promise<{ data: FactCoreMaandRij[] | null; error: { message: string } | null }> => {
+      if (!k) return { data: [], error: null };
+      const { data, error } = await supabase.from("fact_core")
+        .select("period_start, impressions, clicks, cost, conversions, conv_value")
+        .eq("account_id", k.id)
+        .eq("channel", "google")
+        .eq("level", "account")
+        .eq("grain", "month")
+        .order("period_start");
+      return { data: data as FactCoreMaandRij[] | null, error };
+    }),
     supabase.from("client_settings").select("channel_conversion_config").eq("client_id", clientId).maybeSingle(),
     Promise.all(DAGKANALEN.map(({ channel }) => alleRijen<Record<string, unknown>>(
       // De select-lijst komt uit een functie, dus de clienttypes kunnen de rijvorm niet afleiden;
@@ -238,6 +262,12 @@ export async function fetchBlendedHistoricalData(
     // tab hem niet zelf hoeft te doen; dezelfde select als channel-data-provider had.
     supabase.from("client_targets").select("channel, metric, target_value, valid_from, valid_to").eq("client_id", clientId),
   ]);
+  // Een fout in de rijen van een klant die niet bestaat, is geen fout van dit verzoek: zonder deze
+  // regel werd het een onafgehandelde afwijzing, want bij "geen klant" wacht niemand meer op de rijen.
+  rijenLezing.catch(() => undefined);
+  const klant = await klantLezing;
+  if (!klant) return null;
+  const [googleRes, settingsRes, dagRes, targetsRes] = await rijenLezing;
 
   // Zonder de opgeslagen selectie zou hier stil de standaard gelden, en dan telt het Jaaroverzicht
   // andere conversies dan de KPI-band: precies het verschil dat deze bron moet wegnemen.
@@ -245,7 +275,7 @@ export async function fetchBlendedHistoricalData(
   const opgeslagen = (settingsRes.data as { channel_conversion_config?: unknown } | null)?.channel_conversion_config ?? null;
   const convConfig: ChannelConversionConfig = resolveChannelConversionConfig(opgeslagen as Partial<ChannelConversionConfig> | null);
 
-  const googleRijen = eis(googleRes, "fact_core google (blended)") as FactCoreMaandRij[];
+  const googleRijen = eis(googleRes, "fact_core google (blended)");
   const clientTargets = eis(targetsRes, "client_targets (blended)") as ClientTargetRij[];
   const rows: KanaalMaandRij[] = googleRijen.map((r) => ({
     kanaal: "google",
@@ -257,6 +287,9 @@ export async function fetchBlendedHistoricalData(
     conversionsValue: Number(r.conv_value ?? 0),
   }));
   const laatsteDagUitRijen: Partial<Record<Dagkanaal, string>> = {};
+  // De kanalen waarvan de rijen op het plafond van alleRijen zijn afgekapt: daar is de nieuwste rij
+  // hierboven niet zeker de nieuwste in de tabel, en leest de stand zijn datums zelf (zoals voorheen).
+  const afgekapteKanalen = new Set<Dagkanaal>();
   const vanafPerKanaal: Partial<Record<Dagkanaal, string | null>> = {};
   const eersteDagPerKanaal: Partial<Record<Dagkanaal, string | null>> = {};
   const emmersPerKanaal: Partial<Record<Dagkanaal, KanaalEmmers>> = {};
@@ -267,6 +300,7 @@ export async function fetchBlendedHistoricalData(
     if (afgekapt) {
       // Liever een totaal dat te laag is mét een spoor dan een stil afgekapt totaal.
       console.warn(`[blended-historical] ${KANAAL_DAGBRON[channel].table} voor ${clientId} afgekapt op ${rijen.length} rijen`);
+      afgekapteKanalen.add(kanaal);
     }
     for (const m of kanaalMaandenUitDagen(rijen, channel, convConfig)) {
       rows.push({
@@ -358,7 +392,7 @@ export async function fetchBlendedHistoricalData(
   }
   historicalYears.sort((a, b) => a.year - b.year);
 
-  const dataStand = await blendedDataStand(supabase, clientId, nu, perKanaal, laatsteDagUitRijen);
+  const dataStand = await blendedDataStand(supabase, clientId, nu, perKanaal, laatsteDagUitRijen, stand, afgekapteKanalen);
   const vol = dataStand?.laatsteVolleMaand ?? null;
   const realizedThroughMonth = vol === null || Number(vol.slice(0, 4)) < currentYear ? 0 : Number(vol.slice(5, 7));
 
@@ -430,12 +464,77 @@ export async function fetchBlendedHistoricalData(
  *
  * De lezers krijgen `nu` mee, zodat de syncbeoordeling dezelfde peildag heeft als volleMaand.
  */
+/** Een lezing die al onderweg is, met zijn fout erbij in plaats van als afwijzing. */
+type Vooraf<T> = Promise<{ ok: true; waarde: T } | { ok: false }>;
+function vooraf<T>(lezing: PromiseLike<T>): Vooraf<T> {
+  return Promise.resolve(lezing).then(
+    (waarde) => ({ ok: true as const, waarde }),
+    () => ({ ok: false as const }),
+  );
+}
+
+interface StandLezingen {
+  google: Vooraf<Datastand>;
+  koppeling: Record<Dagkanaal, Vooraf<DagKoppeling>>;
+}
+
+/**
+ * De lezingen voor de stand per kanaal, gestart NAAST de rijen in plaats van erna. Niets hiervan
+ * hangt af van de rijen zelf; alleen de vraag "heeft dit kanaal data" filtert achteraf wat er
+ * gebruikt wordt (blendedDataStand). Voor een kanaal zonder data is er dan een kleine lezing voor
+ * niets gedaan; daar staat tegenover dat de route een hele ronde korter is.
+ *
+ * Per dagkanaal alleen nog de koppeling (<kanaal>_connections). dagstandVoorKlant las daarnaast de
+ * nieuwste 400 datums uit <kanaal>_account_daily, terwijl fetchBlendedHistoricalData ALLE rijen
+ * van dezelfde tabel al heeft: het maximum daarover is hetzelfde. Drie lezingen minder.
+ *
+ * Elke lezing draagt zijn eigen fout mee (vooraf): een kapotte bron wordt de terugval van dat ene
+ * kanaal, zoals voorheen, en geen onafgehandelde afwijzing als de functie eerder terugkeert.
+ */
+function startStandLezingen(supabase: SupabaseClient, clientId: string, nu: string): StandLezingen {
+  return {
+    google: vooraf(datastandVoorKlant(supabase, clientId, nu)),
+    koppeling: {
+      meta: vooraf(dagKoppelingVoorKlant(supabase, clientId, "meta")),
+      linkedin: vooraf(dagKoppelingVoorKlant(supabase, clientId, "linkedin")),
+      microsoft: vooraf(dagKoppelingVoorKlant(supabase, clientId, "microsoft")),
+    },
+  };
+}
+
+/**
+ * De dagstand van een kanaal uit wat er al gelezen is: de nieuwste rij uit de rijen van de route
+ * en de koppeling uit startStandLezingen. Dezelfde beoordeling als dagstandVoorKlant
+ * (beoordeelDagstand), zonder de tweede lezing van de datums. Gooit als de koppeling niet te lezen
+ * was, net als dagstandVoorKlant: de aanroeper valt dan terug op de eigen rijen van het kanaal.
+ *
+ * Is het kanaal afgekapt (meer rijen dan het plafond van alleRijen, oplopend gelezen), dan is de
+ * nieuwste rij hier niet zeker de nieuwste in de tabel; dan de bestaande lezer, die de nieuwste
+ * 400 datums zelf ophaalt.
+ */
+async function dagstandUitLezingen(
+  supabase: SupabaseClient,
+  clientId: string,
+  kanaal: Dagkanaal,
+  nu: string,
+  laatsteDag: string | null,
+  koppeling: Vooraf<DagKoppeling>,
+  afgekapt: boolean,
+): Promise<Dagstand> {
+  if (afgekapt) return dagstandVoorKlant(supabase, clientId, kanaal, nu);
+  const k = await koppeling;
+  if (!k.ok) throw new DataLaagFout(`${kanaal}_connections (dagstand)`, "lezing mislukt");
+  return beoordeelDagstand({ kanaal, laatsteDag, laatsteGeslaagdeSync: k.waarde.laatsteGeslaagdeSync, nu, gekoppeld: k.waarde.gekoppeld });
+}
+
 async function blendedDataStand(
   supabase: SupabaseClient,
   clientId: string,
   nu: string,
   perKanaal: BlendedKanaalReeks[],
   laatsteDagUitRijen: Partial<Record<Dagkanaal, string>>,
+  lezingen: StandLezingen,
+  afgekapteKanalen: ReadonlySet<Dagkanaal>,
 ): Promise<DataStandSamen | null> {
   const metData = new Set(perKanaal.map((k) => k.kanaal));
   const googleMaanden = perKanaal.find((k) => k.kanaal === "google")?.maanden ?? [];
@@ -443,7 +542,7 @@ async function blendedDataStand(
 
   const bronnen = await Promise.all([
     ...(metData.has("google")
-      ? [datastandVoorKlant(supabase, clientId, nu).then(
+      ? [lezingen.google.then((l) => { if (!l.ok) throw new Error("datastand"); return l.waarde; }).then(
           (s) => ({
             bron: "google",
             dataTot: dataTotVanMaandbron(s.laatsteMaand ?? laatsteGoogleMaand, s.laatsteGeslaagdeSync),
@@ -453,7 +552,7 @@ async function blendedDataStand(
         )]
       : []),
     ...DAGKANALEN.filter(({ kanaal }) => metData.has(kanaal)).map(({ kanaal }) =>
-      dagstandVoorKlant(supabase, clientId, kanaal, nu).then(
+      dagstandUitLezingen(supabase, clientId, kanaal, nu, laatsteDagUitRijen[kanaal] ?? null, lezingen.koppeling[kanaal], afgekapteKanalen.has(kanaal)).then(
         (s) => ({
           bron: kanaal,
           dataTot: dataTotVanDagbron(s) ?? laatsteDagUitRijen[kanaal] ?? null,

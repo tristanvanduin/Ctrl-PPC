@@ -163,11 +163,18 @@ console.log("stap 4: band, kanalen en de vergeet-ingang");
     /useBlendedClientData\(client\.id\)/.test(code) && !/blendedAan/.test(code));
   check("de band krijgt de route mee", /useChannelPeriodData\(\{[^}]*route: blendedStand[^}]*\}\)/.test(code));
   // De kanalenlijst: niet alleen de route. Het proefje loopt als race ernaast (geen wachten op een
-  // routefout of een time-out), en Google komt uit het Google-antwoord.
+  // routefout of een time-out), tenzij de server het antwoord van de route met de pagina meestuurt:
+  // die beslissing zit in proefjeNodig (getoetst in lib/kanalen/__beschikbaar_test.ts). Google komt
+  // uit het Google-antwoord.
   // Het effect met precies deze deps; de (?!useEffect) houdt de greep binnen dat ene effect.
-  const proefje = /useEffect\(\(\) => \{((?:(?!useEffect\()[\s\S])*?)\}, \[client\.id, routeKlaar, proefje\]\);/.exec(code)?.[1] ?? "";
-  check("het kanalenproefje vertrekt naast de route, niet na een fout of een time-out",
-    proefje.includes("laadBeschikbareKanalen(dbSelectAlsSupabase, client.id)") && !/error|WACHT_MS|setTimeout/.test(proefje), proefje.slice(0, 160));
+  const proefje = /useEffect\(\(\) => \{((?:(?!useEffect\()[\s\S])*?)\}, \[client\.id, startProefje\]\);/.exec(code)?.[1] ?? "";
+  check("het kanalenproefje vertrekt zodra proefjeNodig het zegt, zonder eigen wachten",
+    proefje.includes("if (!startProefje) return;") && proefje.includes("laadBeschikbareKanalen(dbSelectAlsSupabase, client.id)") && !/setTimeout/.test(proefje), proefje.slice(0, 160));
+  check("proefjeNodig krijgt de routefout, de stilte en het zaad mee",
+    /proefjeNodig\(\{\s*routeKlaar, routeFout, routeStil: routeStilVoor === client\.id, proefjeBekend: proefje\?\.clientId === client\.id, zaadVerwacht,\s*\}\)/.test(code)
+    && /setTimeout\(\(\) => setRouteStilVoor\(client\.id\), PROEFJE_WACHT_MS\)/.test(code));
+  check("zonder belofte van de server is er geen zaad verwacht: dan geldt de race, zoals het was",
+    /const zaadVerwacht = blendedVanServer != null && zaadZonderAntwoord !== blendedVanServer;/.test(code));
   // De regel zelf (route vóór proefje, null zolang onbekend) is getoetst in lib/kanalen/__beschikbaar_test.ts.
   check("de kanalenlijst loopt via kanalenUitBronnen", /kanalenUitBronnen\(\{\s*googleLaadt: clientData\.loading,/.test(code));
   check("Google in de kanalenlijst komt uit het Google-antwoord", /google: googleData \? flattenMonths\(googleData\)\.some\(heeftData\) : null,/.test(code));

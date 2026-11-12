@@ -181,7 +181,9 @@ const ICOON = /^(Calendar|CalendarClock|Target|Globe|LayoutGrid|TrendingUp|Spark
 /** De bron van één geëxporteerde functie: van zijn kop tot de eerstvolgende functie op kolom 0. */
 function functieBron(bestand: string, naam: string): string {
   const s = lees(`components/dashboard/${bestand}`);
-  const a = s.indexOf(`export function ${naam}(`);
+  // De tabbladen staan in memo (`export const X = memo(XRuw)`); de functie zelf heet dan XRuw.
+  const direct = s.indexOf(`export function ${naam}(`);
+  const a = direct >= 0 ? direct : s.indexOf(`\nfunction ${naam}Ruw(`);
   if (a < 0) return "";
   const rest = s.slice(a + 10);
   const b = rest.search(/\n(export )?(function|const|interface|type) /);

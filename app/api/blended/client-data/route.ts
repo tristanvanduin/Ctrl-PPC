@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { fetchBlendedHistoricalData } from "@/lib/api/blended-historical";
+import { fetchBlendedHistoricalData, geenBlendedDataFout } from "@/lib/api/blended-historical";
 import { dataFoutNaarResponse } from "@/lib/analysis/db-veilig";
 
 /**
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   try {
     const data = await fetchBlendedHistoricalData(supabase, clientId);
     if (!data) {
-      return Response.json({ error: `Geen blended data voor "${clientId}"` }, { status: 404 });
+      return Response.json({ error: geenBlendedDataFout(clientId) }, { status: 404 });
     }
     return Response.json(data);
   } catch (e) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Megaphone, Calendar, CalendarClock, LayoutGrid, PieChart, Sparkles, Target, Users, AlertTriangle } from "lucide-react";
 import { ChannelPerformance } from "./channel-performance";
 import { ChannelCampaignTable } from "./channel-campaign-table";
@@ -64,7 +64,7 @@ export function koppelStatusMeta(
   return probleemLabel ? { kind: "warning", label: probleemLabel } : { kind: "connected" };
 }
 
-export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true, nieuw = false }: {
+function MetaViewRuw({ clientId, geoClone, edition, meerdereKanalen = true, nieuw = false }: {
   clientId: string;
   geoClone?: string | null;
   edition?: UpcomingEdition | null;
@@ -443,3 +443,10 @@ export function MetaCampagnes({ clientId, geoClone }: { clientId: string; geoClo
     </div>
   );
 }
+
+// In memo: een kanaal- of periodewissel rendert ClientDashboard twee keer (de dringende render van
+// de klik, daarna die van Next op het gewijzigde adres), en de tweede keer is er aan dit tabblad
+// niets veranderd. Zonder memo bouwde elke wissel het hele tabblad twee keer op. De props zijn
+// primitieven, setters en gememoiseerde objecten; komt er een inline functie of een nieuw object
+// als prop bij, dan werkt dit stil niet meer.
+export const MetaView = memo(MetaViewRuw);

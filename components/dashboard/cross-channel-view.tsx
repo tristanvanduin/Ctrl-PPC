@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import { CalendarClock, Info, Layers, Loader2, Target, TrendingUp } from "lucide-react";
 import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { CampaignTypeSplit } from "./campaign-type-split";
@@ -72,7 +72,7 @@ function fmt(n: number | null): string {
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(n);
 }
 
-export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = false, alleenTabel = false, googleData = null }: {
+function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, alleenTabel = false, googleData = null }: {
   clientId: string;
   kanalen?: Kanaal[];
   edition?: UpcomingEdition | null;
@@ -753,3 +753,10 @@ export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = fals
     </div>
   );
 }
+
+// In memo: een kanaal- of periodewissel rendert ClientDashboard twee keer (de dringende render van
+// de klik, daarna die van Next op het gewijzigde adres), en de tweede keer is er aan dit tabblad
+// niets veranderd. Zonder memo bouwde elke wissel het hele tabblad twee keer op. De props zijn
+// primitieven, setters en gememoiseerde objecten; komt er een inline functie of een nieuw object
+// als prop bij, dan werkt dit stil niet meer.
+export const CrossChannelView = memo(CrossChannelViewRuw);

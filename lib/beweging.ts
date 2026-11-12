@@ -167,10 +167,22 @@ export function tussenTekst(van: string, naar: string, t: number): string {
   const b = ontleedGetal(naar);
   if (!a || !b || a.voor !== b.voor || a.na !== b.na) return naar;
   const waarde = a.getal + (b.getal - a.getal) * Math.max(0, t);
-  return `${b.voor}${new Intl.NumberFormat("nl-NL", {
-    minimumFractionDigits: b.decimalen, maximumFractionDigits: b.decimalen,
-    useGrouping: b.groepen ?? a.groepen ?? true,
-  }).format(waarde)}${b.na}`;
+  return `${b.voor}${telOpmaak(b.decimalen, b.groepen ?? a.groepen ?? true).format(waarde)}${b.na}`;
+}
+
+// De opmaak per (decimalen, groepen), één keer gemaakt. tussenTekst loopt per kerncijfer per
+// beeldje (useTellendeTekst hieronder), en maakte elke keer een nieuwe Intl.NumberFormat: bij vijf
+// tegels en vier kaarten enkele honderden per wissel, in precies de 300 ms waarin de pagina ook
+// het nieuwe tabblad opbouwt. Dezelfde opties, dus dezelfde tekst.
+const telOpmaken = new Map<string, Intl.NumberFormat>();
+function telOpmaak(decimalen: number, groepen: boolean): Intl.NumberFormat {
+  const sleutel = `${decimalen}|${groepen}`;
+  let opmaak = telOpmaken.get(sleutel);
+  if (!opmaak) {
+    opmaak = new Intl.NumberFormat("nl-NL", { minimumFractionDigits: decimalen, maximumFractionDigits: decimalen, useGrouping: groepen });
+    telOpmaken.set(sleutel, opmaak);
+  }
+  return opmaak;
 }
 
 // Snel weg en rustig aankomen: het oog volgt de eerste sprong en leest het cijfer als het stilvalt.

@@ -38,22 +38,48 @@ type GeoNiveau = "country" | "region";
 // hook opnieuw, en elke mount haalde beide niveaus opnieuw op: twee verzoeken bij elke wissel van
 // tabblad, ook terug naar een tabblad waar je net was. De rijen veranderen alleen door een sync
 // (het venster is 180 dagen, per maand); die vergeet ze via vergeetBronnen in bron-cache.ts.
+//
+// Eén verzoek per kanaal, met beide niveaus in het antwoord (level=beide). Hier stonden er twee
+// (land en staat elk een eigen verzoek naar /api/geo); de server doet er dezelfde twee lezingen
+// voor als voorheen, alleen in één antwoord. Bewust NIET alle kanalen in één antwoord bij "Alle
+// kanalen": dat zou het eerste laden verzwaren (acht lezingen in plaats van twee, ook voor een
+// klant met alleen Google) om een latere kanaalwissel te versnellen, en dat is niet gemeten op een
+// echte klant.
 const GEO_TTL = 5 * 60 * 1000;
-const geoCache = maakBronCache<GeoAgg[]>(GEO_TTL);
-const geoSleutel = (clientId: string, channel: Channel, level: GeoNiveau) => `${clientId}|${channel}|${level}`;
+type GeoPaar = Record<GeoNiveau, GeoAgg[]>;
+const geoCache = maakBronCache<GeoPaar>(GEO_TTL);
+const geoSleutel = (clientId: string, channel: Channel) => `${clientId}|${channel}|geo`;
+const GEEN_GEO: GeoPaar = { country: [], region: [] };
 
-function leesGeo(clientId: string, channel: Channel, level: GeoNiveau): Promise<GeoAgg[]> {
+/**
+ * Eén niveau mislukte op de server, het andere niet. De fout draagt wat er wel is: de kaart toont
+ * dat (land en staat faalden altijd al los van elkaar), maar het staat niet in de cache, zodat de
+ * volgende mount het opnieuw probeert.
+ */
+class GeoDeelsMislukt extends Error {
+  constructor(readonly deel: GeoPaar) { super("/api/geo gaf niet beide niveaus"); }
+}
+
+function leesGeo(clientId: string, channel: Channel): Promise<GeoPaar> {
   // /api/geo bepaalt demo vs. echt zelf aan de hand van clientId (lib/geo/geo-source.ts), dus
   // hier is geen aparte demo-vlag meer nodig.
-  return geoCache.lees(geoSleutel(clientId, channel, level), () =>
-    fetch(`/api/geo?clientId=${encodeURIComponent(clientId)}&channel=${channel}&level=${level}`)
+  return geoCache.lees(geoSleutel(clientId, channel), () =>
+    fetch(`/api/geo?clientId=${encodeURIComponent(clientId)}&channel=${channel}&level=beide`)
       .then((r) => {
         // Gooien, niet "geen rijen" teruggeven: een storing hoort niet vijf minuten lang als een
         // lege kaart in de cache te staan. De lege kaart maakt de hook er hieronder van.
         if (!r.ok) throw new Error(`/api/geo gaf HTTP ${r.status}`);
         return r.json();
       })
-      .then((d) => (Array.isArray(d?.rows) ? (d.rows as GeoAgg[]) : [])));
+      .then((d: { niveaus?: Partial<Record<GeoNiveau, unknown>> }) => {
+        const land = d?.niveaus?.country, staat = d?.niveaus?.region;
+        const paar: GeoPaar = {
+          country: Array.isArray(land) ? (land as GeoAgg[]) : [],
+          region: Array.isArray(staat) ? (staat as GeoAgg[]) : [],
+        };
+        if (!Array.isArray(land) || !Array.isArray(staat)) throw new GeoDeelsMislukt(paar);
+        return paar;
+      }));
 }
 
 export function useGeoBreakdown({ clientId, channel = "google", enabled = true }: {
@@ -70,32 +96,27 @@ export function useGeoBreakdown({ clientId, channel = "google", enabled = true }
 
   // De beginstaat uit de cache: een tweede bezoek binnen de cachetijd toont de kaart meteen, zonder
   // laadvlak en zonder verzoek.
-  const [countries, setCountries] = useState<GeoAgg[]>(() => (enabled ? geoCache.kijk(geoSleutel(clientId, channel, "country")) : undefined) ?? []);
-  const [states, setStates] = useState<GeoAgg[]>(() => (enabled ? geoCache.kijk(geoSleutel(clientId, channel, "region")) : undefined) ?? []);
-  const [laden, setLaden] = useState(() => !enabled
-    || geoCache.kijk(geoSleutel(clientId, channel, "country")) === undefined
-    || geoCache.kijk(geoSleutel(clientId, channel, "region")) === undefined);
+  const [countries, setCountries] = useState<GeoAgg[]>(() => (enabled ? geoCache.kijk(geoSleutel(clientId, channel))?.country : undefined) ?? []);
+  const [states, setStates] = useState<GeoAgg[]>(() => (enabled ? geoCache.kijk(geoSleutel(clientId, channel))?.region : undefined) ?? []);
+  const [laden, setLaden] = useState(() => !enabled || geoCache.kijk(geoSleutel(clientId, channel)) === undefined);
 
   useEffect(() => {
     if (!enabled) return;
-    const bewaardLand = geoCache.kijk(geoSleutel(clientId, channel, "country"));
-    const bewaardStaat = geoCache.kijk(geoSleutel(clientId, channel, "region"));
-    if (bewaardLand !== undefined && bewaardStaat !== undefined) {
-      setCountries(bewaardLand);
-      setStates(bewaardStaat);
+    const bewaard = geoCache.kijk(geoSleutel(clientId, channel));
+    if (bewaard !== undefined) {
+      setCountries(bewaard.country);
+      setStates(bewaard.region);
       setLaden(false);
       return;
     }
     let cancelled = false;
     setLaden(true);
-    // Een mislukte lezing toont een lege kaart, zoals altijd; hij staat alleen niet in de cache,
-    // dus de volgende mount probeert het opnieuw.
-    const haal = (level: GeoNiveau) => leesGeo(clientId, channel, level).catch(() => [] as GeoAgg[]);
-
-    Promise.all([haal("country"), haal("region")]).then(([land, staat]) => {
+    // Een mislukte lezing toont een lege kaart, zoals altijd (of het ene niveau dat wel lukte); ze
+    // staat alleen niet in de cache, dus de volgende mount probeert het opnieuw.
+    leesGeo(clientId, channel).catch((e): GeoPaar => (e instanceof GeoDeelsMislukt ? e.deel : GEEN_GEO)).then((paar) => {
       if (cancelled) return;
-      setCountries(land);
-      setStates(staat);
+      setCountries(paar.country);
+      setStates(paar.region);
       setLaden(false);
     });
     return () => { cancelled = true; };

@@ -8,6 +8,7 @@ import { supabase } from "./supabase";
 import type { GoogleAdsConversionAction } from "./api/google-ads";
 import { dbUpsert } from "./data-access/client-write";
 import { dbSelectOne } from "./data-access/client-read";
+import { maakZaadbak, type Zaad } from "./overzicht/zaadbak";
 
 // --- Conversion actions ---
 
@@ -245,6 +246,31 @@ const onderweg = new Map<string, Promise<ClientSettingsRijUitkomst>>();
 // in lib/use-blended-client-data.ts).
 const rijGeneratie = new Map<string, number>();
 
+// De rij die de server met de klantpagina meestuurde (lib/overzicht/zaadbak.ts), in een omhulsel
+// omdat "geen rij" (null) een geldig antwoord is.
+const rijZaadbak = maakZaadbak<{ rij: ClientSettingsRow | null }>();
+
+/**
+ * Leg de rij van de server klaar voor de eerste lezer van deze klant; zie zaaiBlendedClientData
+ * (lib/use-blended-client-data.ts) voor wanneer en waarom. Doet niets als de rij er al is of al
+ * gelezen wordt.
+ */
+export function zaaiClientSettingsRij(clientId: string, belofte: Promise<Zaad<{ rij: ClientSettingsRow | null }> | null> | null | undefined): void {
+  const c = rijCache.get(clientId);
+  if ((c && Date.now() - c.timestamp < RIJ_TTL_MS) || onderweg.has(clientId)) return;
+  rijZaadbak.zaai(clientId, belofte);
+}
+
+/**
+ * De rij uit de cache als die er vers in staat, zonder verzoek; undefined als er niets (vers) is.
+ * Voor de beginstaat van een component: ChannelDataProvider begon bij elke mount zonder selectie
+ * en bouwde het hele kanaaltabblad daardoor twee keer op, terwijl de rij er al lag.
+ */
+export function kijkClientSettingsRij(clientId: string): ClientSettingsRow | null | undefined {
+  const c = rijCache.get(clientId);
+  return c && Date.now() - c.timestamp < RIJ_TTL_MS ? c.rij : undefined;
+}
+
 /**
  * De ruwe client_settings-rij van deze klant: uit de cache, of één gedeeld verzoek voor iedereen
  * die er tegelijk om vraagt. Null als er geen rij is (een nieuwe klant); dat wordt ook gecachet,
@@ -260,7 +286,14 @@ export function loadClientSettingsRij(clientId: string): Promise<ClientSettingsR
   const lopend = onderweg.get(clientId);
   if (lopend) return lopend;
   const gen = rijGeneratie.get(clientId) ?? 0;
-  const verzoek: Promise<ClientSettingsRijUitkomst> = dbSelectOne<ClientSettingsRow>("client_settings", { select: "*", clientId })
+  const vanRoute = () => dbSelectOne<ClientSettingsRow>("client_settings", { select: "*", clientId });
+  // Stuurde de server de rij al mee met de pagina, dan die; anders (of als het zaad niets
+  // bruikbaars draagt) de gewone lezing. Wat erna komt (cache, generatie) is voor beide gelijk.
+  const zaad = rijZaadbak.neem(clientId);
+  const lezing: Promise<ClientSettingsRijUitkomst> = zaad
+    ? zaad.then((z) => (z ? { data: z.rij, error: null } : vanRoute()))
+    : vanRoute();
+  const verzoek: Promise<ClientSettingsRijUitkomst> = lezing
     .then((uitkomst) => {
       if (!uitkomst.error && (rijGeneratie.get(clientId) ?? 0) === gen) {
         rijCache.set(clientId, { rij: uitkomst.data, timestamp: Date.now() });
@@ -282,6 +315,7 @@ export function loadClientSettingsRij(clientId: string): Promise<ClientSettingsR
 export function vergeetClientSettingsRij(clientId: string): void {
   rijCache.delete(clientId);
   onderweg.delete(clientId);
+  rijZaadbak.vergeet(clientId);
   rijGeneratie.set(clientId, (rijGeneratie.get(clientId) ?? 0) + 1);
 }
 

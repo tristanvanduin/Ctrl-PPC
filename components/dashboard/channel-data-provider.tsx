@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { loadClientSettingsRij } from "@/lib/client-settings";
+import { kijkClientSettingsRij, loadClientSettingsRij } from "@/lib/client-settings";
 import { useBlendedClientData, type KanaalTab } from "@/lib/use-blended-client-data";
 import type { BlendedKanaalMaand } from "@/lib/api/blended-historical";
 import {
@@ -81,7 +81,18 @@ export function ChannelDataProvider({ clientId, channel, children }: {
   // De selectie hoort bij één klant. Staat hier nog die van een andere klant (of nog niets), dan
   // wachten de rijen: anders telde de pacing één render met de verkeerde of de standaardselectie
   // en sprong hij daarna. De rij is bij het laden al gelezen (de band), dus dit is een microtaak.
-  const [selectie, setSelectie] = useState<{ clientId: string; config: ChannelConversionConfig } | null>(null);
+  //
+  // De beginstaat uit de cache van de rij (kijkClientSettingsRij): hier stond `null`, bij elke
+  // mount. Het hele kanaaltabblad renderde en commitde dan eerst in zijn laadstaat, en na het
+  // effect hieronder (de rij kwam uit de cache terug) nog een keer met de echte kaarten: elke
+  // wissel naar Meta, LinkedIn of Microsoft bouwde het tabblad twee keer op, ook bij het tweede
+  // bezoek. Dezelfde rij en dezelfde selectie, alleen een render eerder; bij een lege cache (een
+  // koude start) verandert er niets.
+  const [selectie, setSelectie] = useState<{ clientId: string; config: ChannelConversionConfig } | null>(() => {
+    const rij = kijkClientSettingsRij(clientId);
+    if (rij === undefined) return null;
+    return { clientId, config: resolveChannelConversionConfig((rij?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null) };
+  });
   const selectieKlaar = selectie?.clientId === clientId;
   const convConfig = useMemo(
     () => (selectie?.clientId === clientId ? selectie.config : resolveChannelConversionConfig(null)),

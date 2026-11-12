@@ -7,6 +7,7 @@
 
 import {
   zichtbareTabs, geldigeKeuze, geenDataTekst, laadBeschikbareKanalen, kanalenOpsomming, kanalenUitBronnen,
+  proefjeNodig, PROEFJE_WACHT_MS, WACHT_MS,
   ALLE_KANALEN, type Kanaal,
 } from "./beschikbaar";
 
@@ -145,6 +146,23 @@ async function main(): Promise<void> {
   // kanalenUitBronnen zegt wat er op elk moment bekend is; null = nog niet.
   const uit = (inp: Parameters<typeof kanalenUitBronnen>[0]) => { const k = kanalenUitBronnen(inp); return k === null ? "null" : k.join(","); };
   const basis = { googleLaadt: false, google: true as boolean | null, route: null as string[] | null, proefje: null as string[] | null };
+
+  // ── Wanneer het proefje vertrekt ─────────────────────────────────────────────────────────────
+  // De regel is de race: bij de mount, naast de route. De uitzondering is een antwoord dat de
+  // server met de pagina meestuurt: dan alleen nog bij een routefout of een route die stil blijft.
+  const p = { routeKlaar: false, routeFout: false, routeStil: false, proefjeBekend: false, zaadVerwacht: false };
+  check("zonder zaad, bij de mount: het proefje vertrekt naast de route (de race)", proefjeNodig(p) === true);
+  check("zonder zaad, de route antwoordde al (de cache): geen proefje", proefjeNodig({ ...p, routeKlaar: true }) === false);
+  check("zonder zaad, het proefje is er al: niet nog een keer", proefjeNodig({ ...p, proefjeBekend: true }) === false);
+  const z = { ...p, zaadVerwacht: true };
+  check("met zaad, bij de mount: geen proefje", proefjeNodig(z) === false);
+  check("met zaad, de route antwoordde: geen proefje", proefjeNodig({ ...z, routeKlaar: true }) === false);
+  check("met zaad, de route antwoordde, ook al was hij eerst stil: geen proefje", proefjeNodig({ ...z, routeKlaar: true, routeStil: true }) === false);
+  check("met zaad, een routefout ('geen data' uit het zaad zelf): het proefje vertrekt meteen", proefjeNodig({ ...z, routeFout: true }) === true);
+  check("met zaad, de route blijft stil: het proefje vertrekt", proefjeNodig({ ...z, routeStil: true }) === true);
+  check("met zaad, het proefje is er al: niet nog een keer", proefjeNodig({ ...z, routeFout: true, proefjeBekend: true }) === false);
+  check("het zaad bleek leeg (de aanroeper zet zaadVerwacht uit): de race geldt weer", proefjeNodig({ ...z, zaadVerwacht: false }) === true);
+  check("de stilte is korter dan de wachttijd waarna een kanaal als afwezig geldt", PROEFJE_WACHT_MS > 0 && PROEFJE_WACHT_MS < WACHT_MS);
 
   check("niets binnen: onbekend, niet 'geen kanalen'", uit({ ...basis, googleLaadt: true, google: null }) === "null");
   check("alleen Google binnen: de dagkanalen zijn nog onbekend", uit(basis) === "null");

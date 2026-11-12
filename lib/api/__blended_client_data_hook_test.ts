@@ -383,6 +383,112 @@ async function main() {
     check("zonder gemounte lezer: vergeten vraagt niets op", verzoeken.c9 === 2, String(verzoeken.c9));
   }
 
+  // ── Het zaad: het antwoord dat de server met de pagina meestuurde ───────────────────────────
+  // De klantpagina start de lezing op de server en geeft de belofte mee (lib/overzicht/zaad-server.ts);
+  // de eerste ophaalronde gebruikt dat antwoord en vraagt de route niet. Tot hier vertrok dat
+  // verzoek pas na het laden en hydrateren van het script, en wachtte het eerste kerncijfer erop.
+  console.log("Het zaad van de server: de eerste ronde zonder verzoek, met dezelfde uitkomst");
+  {
+    const zaai = (hookModule as { zaaiBlendedClientData?: (clientId: string, belofte: Promise<unknown> | null) => void }).zaaiBlendedClientData;
+    check("zaaiBlendedClientData bestaat", typeof zaai === "function");
+    const vers = (waarde: unknown) => Promise.resolve({ waarde });
+
+    // De vergelijking: dezelfde klantgegevens via de route (z-route) en via het zaad (z-zaad).
+    const viaRoute = mount({ naam: "zroute", clientId: "z-route" });
+    await tot(() => verzoeken["z-route"] === 1);
+    await beantwoordAlles();
+    await tot(() => staten.zroute?.loading === false);
+
+    zaai?.("z-zaad", vers(JSON.parse(JSON.stringify(ANTWOORD))));
+    const viaZaad = mount({ naam: "zband", clientId: "z-zaad" }, { naam: "ztab", clientId: "z-zaad" });
+    // Alleen de instellingen worden nog gevraagd (in deze test niet gezaaid); de route niet.
+    await tot(() => wachtend.some((w) => w.klant === "instellingen:z-zaad"));
+    await beantwoordAlles();
+    await tot(() => staten.zband?.loading === false && staten.ztab?.loading === false);
+    check("geen verzoek aan de route", verzoeken["z-zaad"] === undefined, String(verzoeken["z-zaad"]));
+    check("beide lezers hebben de data, zonder fout", staten.zband?.data != null && staten.ztab?.data != null && staten.zband.error === null);
+    check("dezelfde datastand en dezelfde prognose als via de route",
+      staten.zband?.dataStand?.laatsteVolleMaand === staten.zroute?.dataStand?.laatsteVolleMaand
+      && JSON.stringify(staten.zband?.forecast) === JSON.stringify(staten.zroute?.forecast).split("z-route").join("z-zaad")
+      && JSON.stringify(staten.zband?.perKanaal) === JSON.stringify(staten.zroute?.perKanaal));
+    check("de twee lezers delen het antwoord (hetzelfde object)", staten.zband?.forecast != null && staten.zband?.forecast === staten.ztab?.forecast);
+    viaRoute.unmount(); viaZaad.unmount();
+    await rust();
+
+    console.log("Het zaad is eenmalig: na vergeten vraagt de volgende ronde de route");
+    vergeet?.("z-zaad");
+    const na = mount({ naam: "zna", clientId: "z-zaad" });
+    await tot(() => verzoeken["z-zaad"] === 1);
+    check("na vergeetBlendedClientData: de route, niet opnieuw het zaad", verzoeken["z-zaad"] === 1, String(verzoeken["z-zaad"]));
+    await beantwoordAlles();
+    await tot(() => staten.zna?.loading === false);
+    na.unmount();
+    await rust();
+
+    console.log("Een zaad zonder antwoord (geen toegang, een fout op de server): de route, met haar eigen fout");
+    zaai?.("z-leeg", Promise.resolve(null));
+    const leeg = mount({ naam: "zleeg", clientId: "z-leeg" });
+    await tot(() => verzoeken["z-leeg"] === 1);
+    check("null van de server: de route wordt gevraagd", verzoeken["z-leeg"] === 1, String(verzoeken["z-leeg"]));
+    await beantwoordAlles();
+    await tot(() => staten.zleeg?.loading === false);
+    check("en de lezer krijgt de data van de route", staten.zleeg?.data != null && staten.zleeg.error === null);
+    leeg.unmount();
+
+    zaai?.("fout-zaad", Promise.reject(new Error("de stroom brak af")));
+    const stuk = mount({ naam: "zstuk", clientId: "fout-zaad" });
+    await tot(() => verzoeken["fout-zaad"] === 1);
+    await beantwoordAlles();
+    await tot(() => staten.zstuk?.loading === false);
+    check("een afgewezen zaad wordt de foutmelding van de ROUTE, niet een eigen fout",
+      verzoeken["fout-zaad"] === 1 && staten.zstuk?.error === 'Geen blended data voor "fout-zaad"', JSON.stringify([verzoeken["fout-zaad"], staten.zstuk?.error]));
+    stuk.unmount();
+
+    // "Geen data" is een antwoord dat het zaad zelf draagt (het lichaam van de 404 van de route):
+    // dezelfde foutstaat, zonder de route er nog eens om te vragen. Eerder was dat een tweede ronde.
+    zaai?.("z-geen", vers({ error: 'Geen blended data voor "z-geen"' }));
+    const geen = mount({ naam: "zgeen", clientId: "z-geen" });
+    await tot(() => wachtend.some((w) => w.klant === "instellingen:z-geen"));
+    await beantwoordAlles();
+    await tot(() => staten.zgeen?.loading === false);
+    check("'geen data' uit het zaad: de foutstaat van de route, zonder verzoek aan de route",
+      verzoeken["z-geen"] === undefined && staten.zgeen?.error === 'Geen blended data voor "z-geen"' && staten.zgeen.data === null,
+      JSON.stringify([verzoeken["z-geen"], staten.zgeen?.error]));
+    geen.unmount();
+
+    // Een zaad dat is blijven liggen. Het pad waar dit misging: de pagina staat lang open, er komt
+    // een nieuw zaad binnen terwijl de gemounte hook niet opnieuw ophaalt, en een lezer van minuten
+    // later kreeg het als vers. De leeftijd wordt nu getoetst op het moment van nemen: 61 seconden
+    // na het zaaien doet de lezer zijn gewone verzoek, ook al was de belofte allang opgelost.
+    zaai?.("z-oud", vers(JSON.parse(JSON.stringify({ ...ANTWOORD, realizedThroughMonth: 3 }))));
+    await rust();
+    const echteNow = Date.now;
+    try {
+      Date.now = () => echteNow() + 61_000;
+      const oud = mount({ naam: "zoud", clientId: "z-oud" });
+      await tot(() => verzoeken["z-oud"] === 1);
+      check("zaaien, 61 seconden later lezen: het gewone verzoek", verzoeken["z-oud"] === 1, String(verzoeken["z-oud"]));
+      await beantwoordAlles();
+      await tot(() => staten.zoud?.loading === false);
+      check("en de lezer krijgt het antwoord van de route, niet het oude zaad", staten.zoud?.dataStand?.laatsteVolleMaand === "2026-07", JSON.stringify(staten.zoud?.dataStand));
+      oud.unmount();
+    } finally {
+      Date.now = echteNow;
+    }
+    // Het antwoord is op de verschoven klok bewaard; vergeten houdt de rest van de test zuiver.
+    vergeet?.("z-oud");
+
+    // Staat het antwoord er al (de cache), dan wordt er niet gezaaid: een later zaad vervangt niets.
+    const belofte = vers(JSON.parse(JSON.stringify({ ...ANTWOORD, realizedThroughMonth: 3 })));
+    zaai?.("z-zaad", belofte);
+    const terug = mount({ naam: "zterug", clientId: "z-zaad" });
+    await rust();
+    check("een klant met een vers antwoord in de cache: het zaad wordt genegeerd, geen verzoek",
+      verzoeken["z-zaad"] === 1 && staten.zterug?.loading === false && staten.zterug?.dataStand?.laatsteVolleMaand === "2026-07");
+    terug.unmount();
+    await rust();
+  }
+
   console.log(`\n${passed} geslaagd, ${failed} mislukt`);
   process.exit(failed > 0 ? 1 : 0);
 }

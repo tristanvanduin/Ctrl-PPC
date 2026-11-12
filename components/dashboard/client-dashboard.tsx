@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useLayoutEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useLayoutEffect, useDeferredValue } from "react";
 import { useSearchParams } from "next/navigation";
 import { Database, BarChart3, Settings, Target, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown, Search } from "lucide-react";
 import { SyncStatusBadge } from "./sync-status-badge";
 import { PaginaLaadvlak } from "@/components/ui/laadvlak";
-import { getClientSettings } from "@/lib/client-settings";
+import { getClientSettings, zaaiClientSettingsRij, type ClientSettingsRow } from "@/lib/client-settings";
+import type { Zaad } from "@/lib/overzicht/zaadbak";
 import { SecondOpinionView } from "./second-opinion-view";
 import { AnalysisOverview } from "./analysis-overview";
 import { useUpcomingEdition } from "@/lib/fair/use-upcoming-edition";
@@ -22,7 +23,7 @@ import { ProposalQueue } from "../insights/proposal-queue";
 import { ChannelFilter } from "../insights/channel-filter";
 import { dbSelect } from "@/lib/data-access/client-read";
 import {
-  laadBeschikbareKanalen, kanalenUitBronnen, zichtbareTabs, geenDataTekst, kanalenOpsomming,
+  laadBeschikbareKanalen, kanalenUitBronnen, proefjeNodig, PROEFJE_WACHT_MS, zichtbareTabs, geenDataTekst, kanalenOpsomming,
   KANAAL_PARAM, kanaalUitUrl, kanaalkeuzeUitUrl, kanaalParamRechtgezet,
   type Kanaal,
 } from "@/lib/kanalen/beschikbaar";
@@ -105,7 +106,7 @@ import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
 import { useClientData } from "@/lib/use-client-data";
 import { useChannelPeriodData } from "@/lib/use-channel-period-data";
-import { useBlendedClientData, vergeetBlendedClientData } from "@/lib/use-blended-client-data";
+import { useBlendedClientData, vergeetBlendedClientData, zaaiBlendedClientData, type BlendedAntwoord } from "@/lib/use-blended-client-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import { Sectie } from "@/components/ui/sectie";
@@ -121,6 +122,10 @@ type Tab = "dashboard" | "campaigns" | "forecast" | "insights" | "outcomes" | "g
 
 
 type Channel = "google" | "meta" | "linkedin" | "microsoft" | "blended";
+
+// Eén vaste lege lijst: `kanalen ?? []` maakte bij elke render een nieuwe, en dan ziet de memo om
+// CrossChannelView elke keer een andere prop.
+const GEEN_KANALEN: Kanaal[] = [];
 
 const CHANNELS: { id: Channel; label: string; icon: React.ReactNode }[] = [
   { id: "blended", label: "Alle kanalen", icon: <Layers className="w-3.5 h-3.5" /> },
@@ -272,7 +277,7 @@ function DashboardPeriodPicker({ jaarlijkseEditie, klaar, snelVanafTablet = fals
   );
 }
 
-export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVanServer = null }: {
+export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVanServer = null, blendedVanServer = null, instellingenVanServer = null }: {
   client: Client;
   /** De weergave zoals de server hem in de cookie las (lib/weergave.ts), zodat de eerste render al
    *  de gekozen kop toont in plaats van eerst de vertrouwde en dan de nieuwe. */
@@ -280,7 +285,21 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   /** Of deze klant de vorige keer een kanaalbalk had, zoals de server het in de cookie las
    *  (lib/overzicht/kaartenrij.ts): dan staat de vrijgehouden rij al in de eerste HTML. */
   kanaalbalkVanServer?: BalkGeheugen;
+  /** Het antwoord van de blended route en de client_settings-rij, door de server al gelezen terwijl
+   *  hij de pagina stuurde (lib/overzicht/zaad-server.ts). Beloften, niet afgewacht: ze komen in
+   *  dezelfde respons na. Null (een navigatie binnen de app: de server las niets) of een belofte
+   *  met null (geen toegang, een fout): dan vraagt de browser het zelf, zoals het was. Het blended
+   *  antwoord kan ook "geen data" zijn ({ error }): de uitkomst van de 404 van de route. */
+  blendedVanServer?: Promise<Zaad<BlendedAntwoord> | null> | null;
+  instellingenVanServer?: Promise<Zaad<{ rij: ClientSettingsRow | null }> | null> | null;
 }) {
+  // Het zaad klaarleggen VOOR de hooks hieronder hun eerste verzoek doen (dat gebeurt in een
+  // effect, dus na deze render). Tijdens het renderen en niet in een effect: de effecten van de
+  // kinderen lopen vóór die van deze component, en dan was het eerste verzoek al weg. Het mag
+  // hier, want het is herhaalbaar: dezelfde belofte twee keer zaaien doet niets, op de server
+  // doet het helemaal niets (zaadbak.ts), en er verandert geen staat door.
+  zaaiBlendedClientData(client.id, blendedVanServer);
+  zaaiClientSettingsRij(client.id, instellingenVanServer);
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   // DE KANAALKEUZE WOONT IN DE ADRESBALK (?kanaal=meta; bouwplan fase 2). Hier stond een useState:
   // een herlaad sprong terug naar "Alle kanalen", Terug verliet de klant, en een link naar één
@@ -337,20 +356,45 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   //   antwoordt bepaalt de dagkanalen. Zo hangt de kanalenlijst van een klant met alleen Google
   //   (62 van de 71) niet aan de duur van de blended route, en is een routefout (404 bij een klant
   //   zonder fact_core-rijen) geen tweede ronde: het antwoord van het proefje ligt er dan al.
-  //   Hier stond het proefje als eerste schakel van een waterval (proefje -> route -> band).
+  //   EEN UITZONDERING: stuurt de server het antwoord van de route met de pagina mee
+  //   (lib/overzicht/zaad-server.ts), dan valt er niets te racen. Het antwoord is er dan vóór het
+  //   proefje kon terugkomen, en de vier verzoeken waren bij elke paginalaad voor niets. Het
+  //   proefje vertrekt in dat geval alleen nog als het zaad niets bruikbaars bleek te dragen, de
+  //   route een fout geeft (ook "geen data" uit het zaad zelf) of PROEFJE_WACHT_MS stil blijft:
+  //   proefjeNodig in lib/kanalen/beschikbaar.ts.
   // De route gaat voor zodra hij er is: hij is ook de bron van de cijfers in de band.
   const [proefje, setProefje] = useState<{ clientId: string; kanalen: Kanaal[] } | null>(null);
   const routeKlaar = !blendedStand.loading && blendedStand.error === null && blendedStand.perKanaal !== null;
+  const routeFout = blendedStand.error !== null;
+  // Welke belofte van de server niets bruikbaars droeg (geen toegang, een fout daar, de stroom
+  // brak af). Tot dat blijkt geldt het zaad als verwacht. Vastgehouden als de belofte zelf: een
+  // volgende paginalaad brengt een nieuwe mee, en die begint weer als verwacht.
+  const [zaadZonderAntwoord, setZaadZonderAntwoord] = useState<unknown>(null);
   useEffect(() => {
-    // Kent de route de kanalen al (de cache, bij een terugkeer naar deze klant), dan valt er niets
-    // te racen; een proefje dat nog onderweg is als de route antwoordt, wordt niet meer gelezen.
-    if (routeKlaar || proefje?.clientId === client.id) return;
+    if (!blendedVanServer) return;
+    let levend = true;
+    Promise.resolve(blendedVanServer).then((z) => !z, () => true).then((leeg) => { if (levend && leeg) setZaadZonderAntwoord(blendedVanServer); });
+    return () => { levend = false; };
+  }, [blendedVanServer]);
+  const zaadVerwacht = blendedVanServer != null && zaadZonderAntwoord !== blendedVanServer;
+  // Voor welke klant de route te lang stil bleef. Per klant: na een klantwissel begint de klok opnieuw.
+  const [routeStilVoor, setRouteStilVoor] = useState<string | null>(null);
+  useEffect(() => {
+    if (routeKlaar || routeFout) return;
+    const klok = setTimeout(() => setRouteStilVoor(client.id), PROEFJE_WACHT_MS);
+    return () => clearTimeout(klok);
+  }, [client.id, routeKlaar, routeFout]);
+  const startProefje = proefjeNodig({
+    routeKlaar, routeFout, routeStil: routeStilVoor === client.id, proefjeBekend: proefje?.clientId === client.id, zaadVerwacht,
+  });
+  useEffect(() => {
+    if (!startProefje) return;
     let levend = true;
     laadBeschikbareKanalen(dbSelectAlsSupabase, client.id)
       .then((k) => { if (levend) setProefje({ clientId: client.id, kanalen: k }); })
       .catch(() => { if (levend) setProefje({ clientId: client.id, kanalen: [] }); });
     return () => { levend = false; };
-  }, [client.id, routeKlaar, proefje]);
+  }, [client.id, startProefje]);
   // null = nog niet bekend. Dat onderscheid telt: "nog niet weten" mag er niet uitzien als
   // "geen kanalen", anders flitst de lege staat op bij elke navigatie.
   const googleData = clientData.data;
@@ -377,6 +421,22 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // scherm zien onder een tab die niet eens bestond. Afgeleid en geen eigen state: de adresbalk
   // is de bron, en een tweede kopie kan ervan afwijken.
   const channel: Channel = kanaalkeuzeUitUrl(kanaalUitAdres, kanalen);
+  // Het kanaal voor het deel ONDER de bovenkant (het hele kanaaltabblad), een render later dan de
+  // klik. Een kanaalwissel brak in één synchrone render het oude tabblad af en bouwde het nieuwe
+  // op, samen met de kaarten, de tegels en de grafiek: gemeten één lange taak per wissel (76 tot
+  // 141 ms, bij een vier keer tragere processor 443 tot 1076 ms), en de gekozen kaart lichtte pas
+  // op als dat allemaal klaar was. Nu krijgen de kaarten, de tegels en de grafiek het kanaal
+  // meteen, en volgt het tabblad in een render die React mag onderbreken. Zolang het achterloopt
+  // staat het gedimd en met aria-busy (zie verderop): boven staan dan al de cijfers van het
+  // nieuwe kanaal en eronder nog het oude tabblad, en dat mag niet als één geheel lezen. De
+  // cijfers zelf veranderen niet, alleen het moment waarop het tabblad wisselt.
+  // ALLEEN IN DE NIEUWE WEERGAVE. Met de schakelaar uit wisselt het tabblad in dezelfde render als
+  // de tabs en de band, zoals het altijd deed: de oude weergave mag alleen sneller worden, niet
+  // anders, en een moment met de band van het ene kanaal boven het tabblad van het andere is anders.
+  const naarBeoordelen = useCallback(() => setActiveTab("outcomes"), []);
+  const kanaalUitgesteld = useDeferredValue(channel);
+  const kanaalOnder: Channel = nieuweWeergave ? kanaalUitgesteld : channel;
+  const onderLooptAchter = kanaalOnder !== channel;
   // En het adres zelf rechtzetten als er iets staat wat niet kan (een onbekend kanaal, een kanaal
   // dat deze klant niet heeft, of een kanaal bij een klant zonder kiezer): dan staat er geen adres
   // boven dat iets anders beweert dan het scherm. Alleen weghalen, nooit toevoegen, en als
@@ -705,7 +765,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
               channel={channel}
               kanalen={kanalen}
               onKies={setChannel}
-              onBeoordeel={() => setActiveTab("outcomes")}
+              onBeoordeel={naarBeoordelen}
               googleData={clientData.data}
               route={blendedStand}
               band={periodSummary}
@@ -781,13 +841,19 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
             // De koppen van de nieuwe weergave houden icoon en titel bij elkaar (components/ui/sectie.tsx);
             // met de schakelaar uit, en op elk ander tabblad, blijft de kop wat hij was.
             <SectieKopBijeen.Provider value={nieuweWeergave}>
-            <div className="space-y-6">
+            <div
+              className={`space-y-6 transition-opacity ${onderLooptAchter ? "opacity-60" : ""}`}
+              aria-busy={onderLooptAchter || undefined}
+              data-tabblad-kanaal={kanaalOnder}
+            >
               {/* De kanaaltabs en de KPI-band staan hierboven, buiten de datapoort. */}
-              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
-              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
-              {channel === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
-              {channel === "blended" && <CrossChannelView clientId={client.id} kanalen={kanalen ?? []} edition={upcomingEdition} nieuw={nieuweWeergave} googleData={nieuweWeergave ? clientData.data : null} />}
-              {channel === "google" && (
+              {/* Op kanaalOnder en niet op channel: het tabblad volgt de klik een render later
+                  (zie useDeferredValue hierboven). De tabbladen staan in memo. */}
+              {kanaalOnder === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
+              {kanaalOnder === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
+              {kanaalOnder === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
+              {kanaalOnder === "blended" && <CrossChannelView clientId={client.id} kanalen={kanalen ?? GEEN_KANALEN} edition={upcomingEdition} nieuw={nieuweWeergave} googleData={nieuweWeergave ? clientData.data : null} />}
+              {kanaalOnder === "google" && (
                 <GoogleView
                   clientId={client.id}
                   geoClone={geoClone}

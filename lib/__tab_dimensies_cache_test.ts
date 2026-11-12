@@ -14,8 +14,9 @@
 // - twee BreakdownDonuts naast elkaar doen ÉÉN lezing van meta_breakdown_daily, en beide tonen
 //   hun eigen groep uit dezelfde rijen;
 // - een tweede mount binnen de cachetijd doet geen verzoek en toont meteen de kaart;
-// - useGeoBreakdown: twee verzoeken (land en staat) bij de eerste mount, nul bij de tweede, en de
-//   allereerste render heeft de landen al;
+// - useGeoBreakdown: één verzoek (land en staat samen, voor dit ene kanaal) bij de eerste mount,
+//   nul bij de tweede, en de allereerste render heeft de landen al; een niveau dat op de server
+//   mislukt neemt het andere niet mee en komt niet in de cache;
 // - ChannelVideoPerformance: één lezing van de dagrijen en één van de namen, daarna geen;
 // - een mislukte lezing toont niets en staat niet in de cache: de volgende mount probeert opnieuw;
 // - na vergeetBronnen (wat de syncbadge aanroept) leest elk blok opnieuw.
@@ -80,6 +81,8 @@ type Vraag = { clientId?: string; select?: string; filters?: { column: string; v
 const verzoeken: Record<string, number> = {};
 const geteld = (sleutel: string) => verzoeken[sleutel] ?? 0;
 let wachtend: { sleutel: string; los: () => void }[] = [];
+/** Klanten waarvoor /api/geo de staten niet kon lezen (null voor dat ene niveau). */
+const halfKapot = new Set<string>();
 /** Bronnen die een fout teruggeven: "tabel:klant" of "geo:klant". */
 const kapot = new Set<string>();
 
@@ -103,22 +106,41 @@ const GEO: Record<string, unknown[]> = {
   region: [{ code: "CA", impressions: 400, clicks: 15, cost: 45, conversions: 1, conversionsValue: 100 }],
 };
 
+// De land x kanaal-matrix (/api/geo/channels) en de maandrijen per campagne (ads_campaign_monthly).
+const MATRIX = [
+  { country: "NL", channel: "search", impressions: 1000, clicks: 50, cost: 100, conversions: 5, conversionsValue: 500 },
+  { country: "DE", channel: "search", impressions: 800, clicks: 30, cost: 90, conversions: 2, conversionsValue: 200 },
+];
+const CAMPAGNEMAANDEN = [
+  { month: "2026-10-01", campaign_type: "SEARCH", campaign_name: "Merk NL", cost: 300, conversions: 6, conversions_value: 600, impressions: 3000, clicks: 90 },
+  { month: "2026-10-01", campaign_type: "PERFORMANCE_MAX", campaign_name: "Shopping breed", cost: 700, conversions: 14, conversions_value: 2100, impressions: 9000, clicks: 210 },
+];
+
 const json = (lichaam: unknown, status = 200) => new Response(JSON.stringify(lichaam), { status, headers: { "content-type": "application/json" } });
 globalThis.fetch = ((url: string) => {
   const u = String(url);
   let sleutel: string;
   let antwoord: () => Response;
-  if (u.startsWith("/api/geo")) {
+  if (u.startsWith("/api/geo/channels")) {
+    const klant = new URLSearchParams(u.split("?")[1] ?? "").get("clientId") ?? "";
+    sleutel = `matrix:${klant}`;
+    antwoord = () => (kapot.has(sleutel) ? json({ error: "kapot" }, 500) : json({ cells: MATRIX }));
+  } else if (u.startsWith("/api/geo")) {
     const p = new URLSearchParams(u.split("?")[1] ?? "");
     const klant = p.get("clientId") ?? ""; const level = p.get("level") ?? "";
     sleutel = `geo:${p.get("channel")}:${level}:${klant}`;
-    antwoord = () => (kapot.has(`geo:${klant}`) ? json({ error: "kapot" }, 500) : json({ rows: GEO[level] ?? [] }));
+    // level=beide: één antwoord met de landen en de staten van dit ene kanaal. Een niveau dat op
+    // de server mislukte komt als null (`halfKapot`).
+    antwoord = () => (kapot.has(`geo:${klant}`) ? json({ error: "kapot" }, 500)
+      : level === "beide" ? json({ niveaus: { country: GEO.country, region: halfKapot.has(klant) ? null : GEO.region } })
+        : json({ rows: GEO[level] ?? [] }));
   } else if (u.startsWith("/api/data/")) {
     const tabel = decodeURIComponent(u.slice("/api/data/".length).split("?")[0]);
     const vraag = JSON.parse(decodeURIComponent(u.split("?q=")[1] ?? "{}")) as Vraag;
     const klant = vraag.clientId ?? "";
     sleutel = `${tabel}:${klant}`;
-    const rijen = tabel === "meta_breakdown_daily" ? BREAKDOWN : tabel === "meta_campaign_daily" ? VIDEO_DAGEN : tabel === "meta_campaigns" ? NAMEN : [];
+    const rijen = tabel === "meta_breakdown_daily" ? BREAKDOWN : tabel === "meta_campaign_daily" ? VIDEO_DAGEN : tabel === "meta_campaigns" ? NAMEN
+      : tabel === "ads_campaign_monthly" ? CAMPAGNEMAANDEN : [];
     antwoord = () => (kapot.has(sleutel) ? json({ error: "kapot" }, 500) : json({ data: rijen }));
     if (tabel === "meta_breakdown_daily" || tabel === "meta_campaign_daily") {
       check(`${tabel}: de lezing vraagt de laatste 60 dagen`, vraag.filters?.length === 1 && vraag.filters[0].column === "date", JSON.stringify(vraag.filters));
@@ -237,24 +259,28 @@ async function main() {
   // ── useGeoBreakdown ────────────────────────────────────────────────────────────────────────
   type GeoStaat = ReturnType<typeof useGeoBreakdown>;
   const geo: Record<string, GeoStaat[]> = {};
-  function GeoLezer({ naam, clientId, enabled }: { naam: string; clientId: string; enabled?: boolean }) {
-    (geo[naam] ??= []).push(useGeoBreakdown({ clientId, channel: "meta", enabled }));
+  type GeoKanaal = NonNullable<Parameters<typeof useGeoBreakdown>[0]["channel"]>;
+  function GeoLezer({ naam, clientId, enabled, kanaal = "meta" }: { naam: string; clientId: string; enabled?: boolean; kanaal?: GeoKanaal }) {
+    (geo[naam] ??= []).push(useGeoBreakdown({ clientId, channel: kanaal, enabled }));
     return null;
   }
-  const geoMount = (...lezers: { naam: string; clientId: string; enabled?: boolean }[]) => {
+  const geoMount = (...lezers: { naam: string; clientId: string; enabled?: boolean; kanaal?: GeoKanaal }[]) => {
     const root = maakRoot();
     root.render(createElement("div", null, ...lezers.map((l) => createElement(GeoLezer, { key: l.naam, ...l }))));
     return root;
   };
   const laatste = (naam: string) => geo[naam][geo[naam].length - 1];
-  const geoVerzoeken = (klant: string) => geteld(`geo:meta:country:${klant}`) + geteld(`geo:meta:region:${klant}`);
+  // Elk verzoek naar /api/geo voor deze klant, welk kanaal of niveau ook: zo telt een terugval op
+  // de oude losse verzoeken (land en staat apart) gewoon mee.
+  const geoVerzoeken = (klant: string) => Object.keys(verzoeken).filter((k) => k.startsWith("geo:") && k.endsWith(`:${klant}`)).reduce((s, k) => s + verzoeken[k], 0);
 
-  console.log("useGeoBreakdown: eerste mount twee verzoeken (land en staat)");
+  console.log("useGeoBreakdown: eerste mount één verzoek voor land en staat samen");
   {
     const root = geoMount({ naam: "kaart", clientId: "klant-1" }, { naam: "lijst", clientId: "klant-1" });
     await rust();
-    check("twee lezers, één verzoek per niveau", geteld("geo:meta:country:klant-1") === 1 && geteld("geo:meta:region:klant-1") === 1,
-      `${geteld("geo:meta:country:klant-1")} land, ${geteld("geo:meta:region:klant-1")} staat`);
+    // Hier stonden er twee (land en staat elk een eigen verzoek), bij elke eerste wissel van kanaal.
+    check("twee lezers, samen één verzoek met beide niveaus", geteld("geo:meta:beide:klant-1") === 1 && geoVerzoeken("klant-1") === 1,
+      `${geteld("geo:meta:beide:klant-1")} gebundeld, ${geoVerzoeken("klant-1")} in totaal`);
     check("beide laden", laatste("kaart").laden && laatste("lijst").laden);
     await beantwoordAlles();
     check("beide hebben de landen en de staten", laatste("kaart").countries.length === 2 && laatste("lijst").states.length === 1 && !laatste("kaart").laden && !laatste("lijst").laden);
@@ -264,7 +290,7 @@ async function main() {
     console.log("useGeoBreakdown: een tweede mount binnen de cachetijd doet geen verzoek");
     const terug = geoMount({ naam: "terug", clientId: "klant-1" });
     await rust();
-    check("geen verzoek", geoVerzoeken("klant-1") === 2 && wachtend.length === 0, `${geoVerzoeken("klant-1")} verzoeken, ${wachtend.length} onderweg`);
+    check("geen verzoek", geoVerzoeken("klant-1") === 1 && wachtend.length === 0, `${geoVerzoeken("klant-1")} verzoeken, ${wachtend.length} onderweg`);
     check("de ALLEREERSTE render heeft de landen al, zonder laadstaat", geo.terug[0].laden === false && geo.terug[0].countries.length === 2 && geo.terug[0].states.length === 1,
       JSON.stringify({ laden: geo.terug[0].laden, landen: geo.terug[0].countries.length }));
     await ontkoppel(terug);
@@ -276,7 +302,7 @@ async function main() {
     await ontkoppel(uit);
     const ander = geoMount({ naam: "ander", clientId: "klant-2" });
     await rust();
-    check("een andere klant: eigen verzoeken, en eerst een laadstaat", geoVerzoeken("klant-2") === 2 && geo.ander[0].laden === true && geo.ander[0].countries.length === 0);
+    check("een andere klant: een eigen verzoek, en eerst een laadstaat", geoVerzoeken("klant-2") === 1 && geo.ander[0].laden === true && geo.ander[0].countries.length === 0);
     await beantwoordAlles();
     await ontkoppel(ander);
 
@@ -286,7 +312,7 @@ async function main() {
       Date.now = () => echteNow() + 5 * 60 * 1000 + 1;
       const laat = geoMount({ naam: "laat", clientId: "klant-1" });
       await rust();
-      check("na vijf minuten: opnieuw twee verzoeken", geoVerzoeken("klant-1") === 4, String(geoVerzoeken("klant-1")));
+      check("na vijf minuten: opnieuw een verzoek", geoVerzoeken("klant-1") === 2, String(geoVerzoeken("klant-1")));
       await beantwoordAlles();
       await ontkoppel(laat);
     } finally {
@@ -296,7 +322,7 @@ async function main() {
     vergeetBronnen("klant-1|");
     const naSync = geoMount({ naam: "naSync", clientId: "klant-1" });
     await rust();
-    check("na vergeetBronnen: opnieuw twee verzoeken", geoVerzoeken("klant-1") === 6, String(geoVerzoeken("klant-1")));
+    check("na vergeetBronnen: opnieuw een verzoek", geoVerzoeken("klant-1") === 3, String(geoVerzoeken("klant-1")));
     await beantwoordAlles();
     await ontkoppel(naSync);
 
@@ -310,10 +336,46 @@ async function main() {
     kapot.delete("geo:klant-fout");
     const hersteld = geoMount({ naam: "hersteld", clientId: "klant-fout" });
     await rust();
-    check("de volgende mount vraagt opnieuw", geoVerzoeken("klant-fout") === 4, String(geoVerzoeken("klant-fout")));
+    check("de volgende mount vraagt opnieuw", geoVerzoeken("klant-fout") === 2, String(geoVerzoeken("klant-fout")));
     await beantwoordAlles();
     check("en krijgt de landen", laatste("hersteld").countries.length === 2);
     await ontkoppel(hersteld);
+  }
+
+  // ── Elk kanaal leest alleen zichzelf; een half antwoord toont wat er is en blijft uit de cache ──
+  console.log("useGeoBreakdown: Alle kanalen leest alleen zichzelf, en een niveau dat mislukt neemt het andere niet mee");
+  {
+    const alle = geoMount({ naam: "alle", clientId: "klant-alle", kanaal: "blended" });
+    await rust();
+    check("Alle kanalen: één verzoek, voor blended alleen (niet alle kanalen in één antwoord)",
+      geteld("geo:blended:beide:klant-alle") === 1 && geoVerzoeken("klant-alle") === 1, String(geoVerzoeken("klant-alle")));
+    await beantwoordAlles();
+    check("Alle kanalen heeft zijn landen en staten", laatste("alle").countries.length === 2 && laatste("alle").states.length === 1 && !laatste("alle").laden);
+    await ontkoppel(alle);
+    const meta = geoMount({ naam: "na-alle-meta", clientId: "klant-alle", kanaal: "meta" });
+    await rust();
+    check("een kanaal daarna leest zelf: één eigen verzoek", geteld("geo:meta:beide:klant-alle") === 1 && geoVerzoeken("klant-alle") === 2, String(geoVerzoeken("klant-alle")));
+    await beantwoordAlles();
+    await ontkoppel(meta);
+
+    // De staten mislukken op de server (null), de landen niet: voorheen twee losse verzoeken die
+    // los van elkaar faalden. De kaart toont de landen, en de volgende mount probeert het opnieuw.
+    halfKapot.add("klant-half");
+    const half = geoMount({ naam: "half", clientId: "klant-half" });
+    await rust();
+    await beantwoordAlles();
+    check("de landen staan er, de staten zijn leeg, en er wordt niet meer geladen",
+      laatste("half").countries.length === 2 && laatste("half").states.length === 0 && laatste("half").laden === false,
+      JSON.stringify({ landen: laatste("half").countries.length, staten: laatste("half").states.length }));
+    check("zonder staten geen VS-verdieping", laatste("half").canDrillUs === false);
+    await ontkoppel(half);
+    halfKapot.delete("klant-half");
+    const heel = geoMount({ naam: "heel", clientId: "klant-half" });
+    await rust();
+    check("het halve antwoord staat niet in de cache: de volgende mount vraagt opnieuw", geoVerzoeken("klant-half") === 2 && geo.heel[0].laden === true, String(geoVerzoeken("klant-half")));
+    await beantwoordAlles();
+    check("en krijgt nu ook de staten", laatste("heel").states.length === 1 && laatste("heel").canDrillUs === true);
+    await ontkoppel(heel);
   }
 
   // ── ChannelVideoPerformance ────────────────────────────────────────────────────────────────
@@ -369,6 +431,100 @@ async function main() {
     await ontkoppel(naSync);
   }
 
+  // ── GeoChannelMatrix en CampaignTypeSplit: de twee blokken van het Google-tabblad zonder cache ─
+  // Allebei lazen bij ELKE mount opnieuw (een kale fetch, state per mount): elk bezoek aan het
+  // Google-tabblad kostte twee verzoeken, ook direct terug vanaf een ander kanaal. En de ring las
+  // bij een wissel tussen Campagnetype en Campagne nog een keer exact dezelfde query.
+  const { GeoChannelMatrix } = await import("../components/dashboard/geo-channel-matrix");
+  const { CampaignTypeSplit } = await import("../components/dashboard/campaign-type-split");
+  const matrix = (clientId: string) => { const root = maakRoot(); root.render(createElement(GeoChannelMatrix, { clientId })); return root; };
+  const ring = (clientId: string, toon: ("type" | "campagne")[]) => {
+    const root = maakRoot();
+    root.render(createElement(CampaignTypeSplit, { clientId, toon }));
+    return root;
+  };
+
+  console.log("GeoChannelMatrix: één lezing per klant, een tweede bezoek doet geen verzoek");
+  {
+    const eerste = matrix("klant-1");
+    await rust();
+    check("het eerste bezoek: één verzoek", geteld("matrix:klant-1") === 1 && onderweg("matrix:klant-1") === 1, String(geteld("matrix:klant-1")));
+    await beantwoordAlles();
+    await ontkoppel(eerste);
+    wisTeksten();
+    const terug = matrix("klant-1");
+    await rust();
+    check("het tweede bezoek: geen verzoek", geteld("matrix:klant-1") === 1 && wachtend.length === 0, `${geteld("matrix:klant-1")} verzoeken, ${wachtend.length} onderweg`);
+    check("en geen laadtekst: de matrix staat er meteen", !getoond("laden") && !getoond("Laden"), teksten.slice(0, 8).join(" | "));
+    await ontkoppel(terug);
+    vergeetBronnen("klant-1|");
+    const naSync = matrix("klant-1");
+    await rust();
+    check("na vergeetBronnen (de sync): opnieuw lezen", geteld("matrix:klant-1") === 2, String(geteld("matrix:klant-1")));
+    await beantwoordAlles();
+    await ontkoppel(naSync);
+
+    kapot.add("matrix:klant-fout");
+    const fout = matrix("klant-fout");
+    await rust();
+    await beantwoordAlles();
+    await ontkoppel(fout);
+    kapot.delete("matrix:klant-fout");
+    const hersteld = matrix("klant-fout");
+    await rust();
+    check("een storing staat niet in de cache: de volgende mount leest opnieuw", geteld("matrix:klant-fout") === 2, String(geteld("matrix:klant-fout")));
+    await beantwoordAlles();
+    await ontkoppel(hersteld);
+  }
+
+  console.log("CampaignTypeSplit: één lezing per klant, ook voor Campagnetype en Campagne samen");
+  {
+    const S = "ads_campaign_monthly:klant-1";
+    wisTeksten();
+    const perType = ring("klant-1", ["type"]);
+    await rust();
+    check("het eerste bezoek: één verzoek", geteld(S) === 1 && onderweg(S) === 1, String(geteld(S)));
+    await beantwoordAlles();
+    check("de ring toont de campagnetypes", getoond("Performance Max") || getoond("PERFORMANCE_MAX") || getoond("Search") || getoond("Zoeken"), teksten.slice(-14).join(" | "));
+    const totaalType = teksten.filter((t) => t.includes("€")).join(" | ");
+    await ontkoppel(perType);
+
+    // Dezelfde rijen, nu per campagne (het andere tabblad van de kaart): geen nieuwe lezing.
+    wisTeksten();
+    const perCampagne = ring("klant-1", ["campagne"]);
+    await rust();
+    check("per campagne, na per type: geen verzoek", geteld(S) === 1 && wachtend.length === 0, `${geteld(S)} verzoeken, ${wachtend.length} onderweg`);
+    check("de ring toont de campagnes bij naam, uit dezelfde rijen", getoond("Merk NL") && getoond("Shopping breed"), teksten.slice(-14).join(" | "));
+    await ontkoppel(perCampagne);
+
+    wisTeksten();
+    const terug = ring("klant-1", ["type"]);
+    await rust();
+    check("een tweede bezoek: geen verzoek, en dezelfde bedragen", geteld(S) === 1 && teksten.filter((t) => t.includes("€")).join(" | ") === totaalType,
+      `${geteld(S)} | ${teksten.filter((t) => t.includes("€")).join(" | ")} tegen ${totaalType}`);
+    await ontkoppel(terug);
+
+    vergeetBronnen("klant-1|");
+    const naSync = ring("klant-1", ["type"]);
+    await rust();
+    check("na vergeetBronnen (de sync): opnieuw lezen", geteld(S) === 2, String(geteld(S)));
+    await beantwoordAlles();
+    await ontkoppel(naSync);
+
+    kapot.add("ads_campaign_monthly:klant-fout");
+    const fout = ring("klant-fout", ["type"]);
+    await rust();
+    await beantwoordAlles();
+    await ontkoppel(fout);
+    kapot.delete("ads_campaign_monthly:klant-fout");
+    wisTeksten();
+    const hersteld = ring("klant-fout", ["type"]);
+    await rust();
+    check("een mislukte lezing staat niet in de cache", geteld("ads_campaign_monthly:klant-fout") === 2, String(geteld("ads_campaign_monthly:klant-fout")));
+    await beantwoordAlles();
+    await ontkoppel(hersteld);
+  }
+
   // ── De bedrading: de sync vergeet de dimensies, en niemand houdt een eigen cache bij ────────
   console.log("De bedrading");
   {
@@ -377,7 +533,13 @@ async function main() {
     const badge = bron("components/dashboard/sync-status-badge.tsx");
     check("de syncbadge vergeet de dimensies van de klant, vóór hij de pagina laat herladen",
       /vergeetBronnen\(`\$\{clientId\}\|`\);\s*onSyncComplete\?\.\(\);/.test(badge));
-    for (const pad of ["lib/geo/use-geo-breakdown.ts", "components/dashboard/breakdown-donuts.tsx", "components/dashboard/channel-video-performance.tsx"]) {
+    // De tweede (en laatste) plek waar de browser een sync start: de backfill bij de koppelingen.
+    // Zonder dit toonden de blokken na een backfill nog tot vijf minuten de rijen van ervoor.
+    const koppelingen = bron("components/settings/kanaal-koppelingen-sectie.tsx");
+    check("de backfill bij de koppelingen vergeet de dimensies van de klant ook",
+      /Backfill klaar[\s\S]{0,120}vergeetBronnen\(`\$\{clientId\}\|`\);\s*onGewijzigd\(\);/.test(koppelingen));
+    for (const pad of ["lib/geo/use-geo-breakdown.ts", "components/dashboard/breakdown-donuts.tsx", "components/dashboard/channel-video-performance.tsx",
+      "components/dashboard/geo-channel-matrix.tsx", "components/dashboard/campaign-type-split.tsx"]) {
       const tekst = bron(pad);
       check(`${pad} leest via maakBronCache, zonder eigen Map`, /maakBronCache</.test(tekst) && !/new Map<string, \{[^}]*timestamp/.test(tekst));
     }

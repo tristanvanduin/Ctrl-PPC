@@ -310,7 +310,7 @@ console.log("Hoofdgrafiek: de som per maand is de band over dezelfde periode");
   // De hook geeft de kaarten en de grafiek dezelfde reeksen als de band op "Alle kanalen".
   const hook = zonderCommentaar(lees("lib/use-channel-period-data.ts"));
   check("de band op Alle kanalen paart op dezelfde objecten als perKanaal", /bronnen: \[perKanaal\.google!, perKanaal\.meta!, perKanaal\.linkedin!, perKanaal\.microsoft!\]/.test(hook));
-  check("en de hook geeft perKanaal terug", /return \{ \.\.\.keuze, perKanaal, laatsteDag, geladenVanaf, klaar \};/.test(hook));
+  check("en de hook geeft perKanaal terug", /return useMemo\(\(\) => \(\{ \.\.\.keuze, perKanaal, laatsteDag, geladenVanaf, klaar \}\), \[keuze, perKanaal, laatsteDag, geladenVanaf, klaar\]\);/.test(hook));
   const grafiek = zonderCommentaar(lees("components/dashboard/overzicht-hoofdgrafiek.tsx"));
   check("de grafiek stapelt de kanalen en zet de CPA op een eigen as", /stackId="kanalen"/.test(grafiek) && /<AsY id="cpa" rechts /.test(grafiek) && /yAxisId="cpa"/.test(grafiek));
   check("hij gebruikt de gedeelde chrome en de vaste kanaalkleuren", /Raster, AsX, AsY, Tip, Legenda/.test(grafiek) && /fill=\{KANAAL_KLEUR\[k\]\}/.test(grafiek) && /CHART_LINE_SECONDARY/.test(grafiek));

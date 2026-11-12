@@ -19,14 +19,19 @@ import { BandLaadvlak } from "@/components/ui/laadvlak";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { nadrukIndex } from "@/lib/overzicht/bovenkant";
 
+// Eén keer gemaakt en niet per aanroep: de band rendert bij elke wissel van kanaal of periode, en
+// maakte dan per getal een nieuwe Intl.NumberFormat. Dezelfde opties, dus dezelfde tekst.
+const EURO_OPMAAK = new Intl.NumberFormat("nl-NL", {
+  style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0,
+});
+const AANTAL_OPMAAK = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 });
+
 function euro(v: number): string {
-  return new Intl.NumberFormat("nl-NL", {
-    style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0,
-  }).format(v);
+  return EURO_OPMAAK.format(v);
 }
 
 function aantal(v: number): string {
-  return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(v);
+  return AANTAL_OPMAAK.format(v);
 }
 
 /** "mrt 2026 t/m apr 2026" voor aaneengesloten maanden, anders de maanden zelf: twee losse pauzes

@@ -192,6 +192,49 @@ export function geenDataTekst(kanalen: readonly Kanaal[]): string | null {
 export const WACHT_MS = 6000;
 
 /**
+ * Hoe lang de blended route stil mag blijven voordat het kanalenproefje (laadBeschikbareKanalen)
+ * alsnog vertrekt, in het geval dat het niet bij de mount vertrok omdat de server het antwoord van
+ * de route met de pagina meestuurde (zie proefjeNodig).
+ *
+ * Twee seconden: het meegestuurde antwoord is er gewoonlijk vóór het script klaar is. Is het er
+ * dan nog niet, dan is er iets mis en hoort de tweede weg erbij. Korter dan WACHT_MS, omdat dit
+ * geen opgeven is: een klant met alleen Google hoeft dan geen zes seconden op zijn kanalenlijst te
+ * wachten.
+ */
+export const PROEFJE_WACHT_MS = 2000;
+
+/**
+ * Moet het kanalenproefje (vier verzoeken met limit 1) vertrekken?
+ *
+ * DE REGEL IS DE RACE: het proefje vertrekt bij de mount, naast de blended route, en wie het eerst
+ * antwoordt bepaalt de dagkanalen. Zo hangt de kanalenlijst niet aan de duur van de route, en is
+ * een routefout geen tweede ronde.
+ *
+ * DE UITZONDERING: de server stuurt het antwoord van de route met de pagina mee (`zaadVerwacht`,
+ * lib/overzicht/zaad-server.ts). Dan is er niets te racen: het antwoord is er eerder dan het
+ * proefje kon terugkomen, en de vier verzoeken waren bij elke paginalaad voor niets. Het proefje
+ * vertrekt dan alleen nog als vangnet: de route gaf een fout (ook "geen data", dat het zaad zelf
+ * draagt, dus zonder extra ronde), of hij blijft PROEFJE_WACHT_MS stil. Blijkt het zaad niets
+ * bruikbaars te dragen, dan zet de aanroeper `zaadVerwacht` uit en geldt de race weer.
+ */
+export function proefjeNodig(inp: {
+  /** De route heeft geantwoord met kanalen (ook uit de cache). */
+  routeKlaar: boolean;
+  /** De route gaf een fout. */
+  routeFout: boolean;
+  /** De route is PROEFJE_WACHT_MS na de mount nog niet terug. */
+  routeStil: boolean;
+  /** Het proefje voor deze klant is al binnen. */
+  proefjeBekend: boolean;
+  /** De server stuurt het antwoord van de route mee, en het is (nog) niet onbruikbaar gebleken. */
+  zaadVerwacht: boolean;
+}): boolean {
+  if (inp.routeKlaar || inp.proefjeBekend) return false;
+  if (!inp.zaadVerwacht) return true;
+  return inp.routeFout || inp.routeStil;
+}
+
+/**
  * Zoekt per kanaal of er ook maar één rij bestaat.
  *
  * Drie kleine queries naast elkaar, met `limit 1` en één kolom: het antwoord is ja of nee, dus er

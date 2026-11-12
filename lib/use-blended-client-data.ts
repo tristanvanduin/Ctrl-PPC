@@ -13,8 +13,9 @@ import { buildChannelForecastUitEmmers, tabStandUitRoute } from "./analysis/chan
 import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore } from "./health-score";
 import { CONVERSIE_KANAAL, NIET_GOOGLE, type NietGoogleKanaal } from "./period/kanaal-maanden";
 import { today as vandaag } from "./reporting-date";
+import { maakZaadbak, type Zaad } from "./overzicht/zaadbak";
 
-interface BlendedApiResponse {
+export interface BlendedApiResponse {
   currentYear: number;
   realizedThroughMonth: number;
   targetCurrentYear: { conversions: number; revenue: number; adSpend: number };
@@ -91,6 +92,25 @@ const CACHE_TTL = 5 * 60 * 1000;
 // verzoek in plaats van een eigen te starten.
 const onderweg = new Map<string, Promise<Opgehaald>>();
 
+// Het antwoord dat de server met de pagina meestuurde (lib/overzicht/zaadbak.ts): de eerste
+// ophaalronde van een klant gebruikt dat in plaats van de route op te vragen. Alles NA het antwoord
+// (samenvoegen, prognoses, cache, generatie) is dezelfde code als voor een antwoord van de route.
+// Het zaad kan ook "geen data" dragen ({ error }, het lichaam van de 404 van de route): dat is een
+// antwoord, en geeft in haal() dezelfde foutstaat als de route, zonder haar te vragen.
+export type BlendedAntwoord = BlendedApiResponse | { error: string };
+const zaadbak = maakZaadbak<BlendedAntwoord>();
+
+/**
+ * Leg het antwoord van de server klaar voor de eerste ophaalronde van deze klant. Aan te roepen
+ * tijdens het renderen van de klantpagina (client-dashboard.tsx), vóór het effect van de hook: de
+ * bak doet niets op de server, niets met een belofte die hij al kende, en niets als er voor deze
+ * klant al een antwoord of een verzoek is.
+ */
+export function zaaiBlendedClientData(clientId: string, belofte: Promise<Zaad<BlendedAntwoord> | null> | null | undefined): void {
+  if (uitCache(clientId) || onderweg.has(clientId)) return;
+  zaadbak.zaai(clientId, belofte);
+}
+
 // Per klant een teller die vergeetBlendedClientData ophoogt. Een verzoek dat vóór het vergeten
 // vertrok, brengt nog de oude selectie mee en mag die dan niet meer in de cache zetten.
 const generatie = new Map<string, number>();
@@ -112,6 +132,8 @@ const BLENDED_VERGETEN = "blended-client-data-vergeten";
 export function vergeetBlendedClientData(clientId: string): void {
   cache.delete(clientId);
   onderweg.delete(clientId);
+  // Ook het zaad van de server: dat is van vóór het opslaan of de sync.
+  zaadbak.vergeet(clientId);
   generatie.set(clientId, (generatie.get(clientId) ?? 0) + 1);
   // Bewaakt: buiten de browser (en in de hook-test met een nep-window) is er geen dispatchEvent.
   if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
@@ -177,8 +199,16 @@ function haal(clientId: string): Promise<Opgehaald> {
   // loadClientSettings in ClientDataProvider (de demo: 1.938 of 2.600 conversies als doel). Mislukt
   // het lezen, dan de cache of de standaard, zoals getClientSettings dat altijd doet.
   const instellingen = loadClientSettings(clientId).catch(() => null);
-  const verzoek: Promise<Opgehaald> = fetch(`/api/blended/client-data?clientId=${encodeURIComponent(clientId)}`)
-    .then((res) => res.json())
+  const vanRoute = (): Promise<BlendedApiResponse & { error?: string }> =>
+    fetch(`/api/blended/client-data?clientId=${encodeURIComponent(clientId)}`).then((res) => res.json());
+  // Stuurde de server het antwoord al mee, dan dat; anders (of als het zaad niets bruikbaars
+  // draagt: geen toegang, een fout op de server) de route, met haar eigen foutmelding. Een zaad dat
+  // te lang is blijven liggen geeft de bak niet meer uit (lib/overzicht/zaadbak.ts).
+  const zaad = zaadbak.neem(clientId);
+  const antwoord: Promise<BlendedApiResponse & { error?: string }> = zaad
+    ? zaad.then((a) => (a as (BlendedApiResponse & { error?: string }) | undefined) ?? vanRoute())
+    : vanRoute();
+  const verzoek: Promise<Opgehaald> = antwoord
     .then(async (apiData: BlendedApiResponse & { error?: string }) => {
       if (apiData.error) throw new Error(apiData.error);
       await instellingen;

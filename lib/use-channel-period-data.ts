@@ -342,5 +342,8 @@ export function useChannelPeriodData({ clientId, channel, googleData, route }: C
   const mKlaar = meta !== null, lKlaar = linkedin !== null, msKlaar = microsoft !== null;
   const klaar = useMemo(() => ({ meta: mKlaar, linkedin: lKlaar, microsoft: msKlaar }), [mKlaar, lKlaar, msKlaar]);
 
-  return { ...keuze, perKanaal, laatsteDag, geladenVanaf, klaar };
+  // Eén object zolang de delen dezelfde zijn: hier stond een nieuw object bij elke render, ook al
+  // waren alle velden zelf gememoiseerd, en dan kan geen afnemer (de bovenkant in memo) een render
+  // overslaan.
+  return useMemo(() => ({ ...keuze, perKanaal, laatsteDag, geladenVanaf, klaar }), [keuze, perKanaal, laatsteDag, geladenVanaf, klaar]);
 }

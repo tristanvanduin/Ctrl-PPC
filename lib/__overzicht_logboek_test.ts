@@ -551,7 +551,9 @@ async function main() {
       return [dashboard.slice(begin, midden), dashboard.slice(midden, dashboard.indexOf("{clientData.loading && <PaginaLaadvlak", midden))];
     })();
     check("de nieuwe bovenkant staat alleen in de tak van de nieuwe weergave", nieuw.includes("<OverzichtBovenkant") && !oud.includes("<OverzichtBovenkant"));
-    check("'Beoordeel' opent het tabblad Bevindingen", /onBeoordeel=\{\(\) => setActiveTab\("outcomes"\)\}/.test(nieuw));
+    // Een vaste functie (useCallback) en geen inline: de bovenkant staat in memo.
+    check("'Beoordeel' opent het tabblad Bevindingen", /onBeoordeel=\{naarBeoordelen\}/.test(nieuw)
+      && /const naarBeoordelen = useCallback\(\(\) => setActiveTab\("outcomes"\), \[\]\);/.test(dashboard));
     check("de datastand in de bronrij alleen in de nieuwe weergave", /\{nieuweWeergave && standTekst && \(/.test(dashboard) && /data-datastand=/.test(dashboard));
     check("de eerlijke tijd op de badge alleen in de nieuwe weergave", /eerlijkeTijd=\{nieuweWeergave\}/.test(dashboard));
     const badge = zonderCommentaar(lees("components/dashboard/sync-status-badge.tsx"));
