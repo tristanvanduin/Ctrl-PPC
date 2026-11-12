@@ -24,7 +24,9 @@
 
 import { useEffect, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, X } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useAccess } from "@/lib/auth/use-access";
+import { useNieuweChrome } from "@/lib/use-weergave";
 
 interface Account {
   id: string;
@@ -48,6 +50,10 @@ export function SopDekkingBanner() {
   const [open, setOpen] = useState(false);
   const [bezig, setBezig] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // De nieuwe weergave van het Overzicht (bouwplan fase 5, element 28): deze beheermelding gaat over
+  // het bureau, niet over de klant op het scherm, en staat daar niet meer boven klantdata. Hij is
+  // niet weg: op Vandaag, Beheer en elke andere pagina staat hij er zoals altijd.
+  const opKlantpaginaNieuw = useNieuweChrome(usePathname());
 
   async function herlaad() {
     try {
@@ -66,7 +72,7 @@ export function SopDekkingBanner() {
     herlaad();
   }, [toegangLaadt, ingelogd]);
 
-  if (!oordeel || oordeel.toestand !== "overschreden" || dismissed) return null;
+  if (!oordeel || oordeel.toestand !== "overschreden" || dismissed || opKlantpaginaNieuw) return null;
 
   const aanAccounts = accounts.filter((a) => a.sops_enabled);
 

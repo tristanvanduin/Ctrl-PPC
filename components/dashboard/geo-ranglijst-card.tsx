@@ -1,7 +1,7 @@
 "use client";
 
 import { ListOrdered } from "lucide-react";
-import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
+import { useRememberedOpen, RegioToggle, Lade } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { GeoRanglijst } from "./geo-ranglijst";
 import { int, eur, pct, nf, type GeoBreakdownState } from "@/lib/geo/use-geo-breakdown";
@@ -24,11 +24,15 @@ import { Vensterlabel } from "@/components/ui/vensterlabel";
  * De cijfers en de uitklaptabel blijven eronder in GeoRanglijstCard (met `zonderBalken`), zodat er
  * niets dubbel staat.
  */
-export function GeoRanglijstInKaart({ state }: { state: GeoBreakdownState }) {
+export function GeoRanglijstInKaart({ state, naast = false }: {
+  state: GeoBreakdownState;
+  /** Naast de projectie in plaats van eronder (de nieuwe weergave): dan zonder de lijn erboven. */
+  naast?: boolean;
+}) {
   const { metric, focus, setFocus, laden, canDrillUs, labelOf, ranked, eenLandOfMinder } = state;
   if (laden || eenLandOfMinder || ranked.length === 0) return null;
   return (
-    <div className="border-t border-border px-4 py-3">
+    <div className={naast ? "px-4 py-3" : "border-t border-border px-4 py-3"}>
       <GeoRanglijst
         regels={ranked.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
         metriekLabel={metric.label}
@@ -36,6 +40,68 @@ export function GeoRanglijstInKaart({ state }: { state: GeoBreakdownState }) {
         onKlik={() => setFocus("US")}
       />
     </div>
+  );
+}
+
+/**
+ * De tabel per land (of per staat), met de totaalrij. Eén definitie voor de kaart "per land"
+ * hieronder en voor "Toon als tabel" in de voet van de wereldkaart in de nieuwe weergave
+ * (GeoTabelLade): dezelfde kolommen en dezelfde totalen op beide plekken.
+ */
+function GeoTabel({ state }: { state: GeoBreakdownState }) {
+  const { focus, labelOf, ranked, totaal } = state;
+  return (
+    <Tabel>
+      <Kop>
+        <KolomKop>{focus === "US" ? "Staat" : "Land"}</KolomKop>
+        <KolomKop getal>Vertoningen</KolomKop>
+        <KolomKop getal>Klikken</KolomKop>
+        <KolomKop getal>CTR</KolomKop>
+        <KolomKop getal>Conversies</KolomKop>
+        <KolomKop getal>Conv.ratio</KolomKop>
+        <KolomKop getal>CPA</KolomKop>
+      </Kop>
+      <Body>
+        {ranked.map(({ c }) => (
+          <Rij key={c.code}>
+            <NaamCel>{labelOf(c.code)}</NaamCel>
+            <GetalCel>{int(c.impressions)}</GetalCel>
+            <GetalCel>{int(c.clicks)}</GetalCel>
+            <GetalCel zacht>{pct(c.impressions > 0 ? c.clicks / c.impressions : null)}</GetalCel>
+            <GetalCel>{c.conversions == null ? "—" : nf(1).format(c.conversions)}</GetalCel>
+            <GetalCel zacht>{pct(c.clicks > 0 ? c.conversions / c.clicks : null)}</GetalCel>
+            <GetalCel zacht>{eur(c.conversions > 0 ? c.cost / c.conversions : null)}</GetalCel>
+          </Rij>
+        ))}
+      </Body>
+      <TotaalRij>
+        <TotaalCel>Totaal ({ranked.length})</TotaalCel>
+        <TotaalCel getal>{int(totaal.impressions)}</TotaalCel>
+        <TotaalCel getal>{int(totaal.clicks)}</TotaalCel>
+        <TotaalCel getal>{pct(totaal.impressions > 0 ? totaal.clicks / totaal.impressions : null)}</TotaalCel>
+        <TotaalCel getal>{nf(1).format(totaal.conversions)}</TotaalCel>
+        <TotaalCel getal>{pct(totaal.clicks > 0 ? totaal.conversions / totaal.clicks : null)}</TotaalCel>
+        <TotaalCel getal>{eur(totaal.conversions > 0 ? totaal.cost / totaal.conversions : null)}</TotaalCel>
+      </TotaalRij>
+    </Tabel>
+  );
+}
+
+/**
+ * "Toon als tabel" in de voet van de wereldkaart (bouwplan fase 5). De tabel is het tekstalternatief
+ * van de projectie en draagt in zijn totaalrij wat de zes losse tegels "per land" toonden
+ * (vertoningen, klikken, conversies, CTR, CPA; het aantal landen staat in de kop van de kaart). Die
+ * tegels waren een eigen kaart van 180 px met een eigen conversietotaal naast dat van de band.
+ * Dicht staat er alleen de knop; de rijen worden pas gerenderd als je hem opent.
+ */
+export function GeoTabelLade({ state }: { state: GeoBreakdownState }) {
+  const { laden, eenLandOfMinder, ranked, focus } = state;
+  if (laden || eenLandOfMinder || ranked.length === 0) return null;
+  return (
+    // Zeven kolommen: op een telefoon schuift de tabel binnen de kaart (Tabel heeft een eigen schuifvak).
+    <Lade id="geo-tabel-nieuw" label={`Toon als tabel (${ranked.length} ${focus === "US" ? "staten" : "landen"}, met totalen)`} labelOpen="Verberg de tabel">
+      <GeoTabel state={state} />
+    </Lade>
   );
 }
 
@@ -85,39 +151,7 @@ export function GeoRanglijstCard({ state, zonderBalken = false }: { state: GeoBr
         label={`de tabel per ${geoWord} (${ranked.length})`}
       />
       <div id="geo-tabel-hero" hidden={!tabelOpen} className="border-t border-border">
-        <Tabel>
-          <Kop>
-            <KolomKop>{focus === "US" ? "Staat" : "Land"}</KolomKop>
-            <KolomKop getal>Vertoningen</KolomKop>
-            <KolomKop getal>Klikken</KolomKop>
-            <KolomKop getal>CTR</KolomKop>
-            <KolomKop getal>Conversies</KolomKop>
-            <KolomKop getal>Conv.ratio</KolomKop>
-            <KolomKop getal>CPA</KolomKop>
-          </Kop>
-          <Body>
-            {ranked.map(({ c }) => (
-              <Rij key={c.code}>
-                <NaamCel>{labelOf(c.code)}</NaamCel>
-                <GetalCel>{int(c.impressions)}</GetalCel>
-                <GetalCel>{int(c.clicks)}</GetalCel>
-                <GetalCel zacht>{pct(c.impressions > 0 ? c.clicks / c.impressions : null)}</GetalCel>
-                <GetalCel>{c.conversions == null ? "—" : nf(1).format(c.conversions)}</GetalCel>
-                <GetalCel zacht>{pct(c.clicks > 0 ? c.conversions / c.clicks : null)}</GetalCel>
-                <GetalCel zacht>{eur(c.conversions > 0 ? c.cost / c.conversions : null)}</GetalCel>
-              </Rij>
-            ))}
-          </Body>
-          <TotaalRij>
-            <TotaalCel>Totaal ({ranked.length})</TotaalCel>
-            <TotaalCel getal>{int(totaal.impressions)}</TotaalCel>
-            <TotaalCel getal>{int(totaal.clicks)}</TotaalCel>
-            <TotaalCel getal>{pct(totaal.impressions > 0 ? totaal.clicks / totaal.impressions : null)}</TotaalCel>
-            <TotaalCel getal>{nf(1).format(totaal.conversions)}</TotaalCel>
-            <TotaalCel getal>{pct(totaal.clicks > 0 ? totaal.conversions / totaal.clicks : null)}</TotaalCel>
-            <TotaalCel getal>{eur(totaal.conversions > 0 ? totaal.cost / totaal.conversions : null)}</TotaalCel>
-          </TotaalRij>
-        </Tabel>
+        <GeoTabel state={state} />
       </div>
     </div>
   );

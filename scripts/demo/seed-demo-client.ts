@@ -51,6 +51,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { MetaObjective } from "../../lib/meta/campaign-types";
 import type { LinkedInObjective } from "../../lib/linkedin/campaign-types";
 import { splitInt } from "../../lib/demo/split";
+import { today } from "../../lib/reporting-date";
 import { microsoftDemoRows, MS_CAMPAIGNS, MS_ADGROUPS } from "../../lib/demo/microsoft-demo";
 
 export const DEMO_CLIENT = "demo-greentech";
@@ -61,7 +62,22 @@ const addDays = (base: string, days: number) => { const d = new Date(base); d.se
 
 // Ankerdatum: "vandaag" voor de gegenereerde reeksen. Bewust vast, zodat de scenario's
 // stabiel blijven; ruim binnen de 70-dagen-vensters van de signaal-routes.
-const TODAY = new Date().toISOString().slice(0, 10);
+//
+// ALLES HIERONDER HANGT AAN DEZE ENE DATUM (maandIdx 0 = de maand van TODAY, dag 0 = TODAY): de
+// seed is klokrelatief. Wie hem vandaag draait, krijgt een demo die tot vandaag loopt; hij stopte
+// op 25 augustus 2026 omdat hij toen voor het laatst gedraaid is, niet omdat die datum ergens
+// vaststaat. scripts/demo/herseed-demo.mjs draait hem opnieuw (bouwplan fase 4).
+//
+// Twee dingen die daarbij telden:
+// - De dag is de AMSTERDAMSE dag (today()), niet de UTC-dag: een herseed om 00:30 legde het venster
+//   anders een dag te vroeg, en begin van de maand een hele maand.
+// - DEMO_VANDAAG=JJJJ-MM-DD zet een vaste klok, voor een test of om een seed te reproduceren.
+const VASTE_DAG = process.env.DEMO_VANDAAG;
+if (VASTE_DAG !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(VASTE_DAG)) {
+  console.error(`DEMO_VANDAAG moet JJJJ-MM-DD zijn, niet "${VASTE_DAG}".`);
+  process.exit(1);
+}
+const TODAY = VASTE_DAG ?? today();
 const monthsBack = (n: number) => { const d = new Date(TODAY); d.setDate(1); d.setMonth(d.getMonth() - n); return iso(d); };
 
 // ── Google: maanddata per campagne met event-cycli ─────────────────────────

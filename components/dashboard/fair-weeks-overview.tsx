@@ -199,10 +199,19 @@ export function FairWeeksView({
   data,
   forecast,
   edition,
+  compact = false,
 }: {
   data: ClientHistoricalData;
   forecast: ClientForecast;
   edition: UpcomingEdition;
+  /**
+   * De nieuwe weergave (bouwplan fase 5): de drie weekkaarten (vorige, deze, volgende week) worden
+   * één regel "deze week". De drie kaarten herhaalden wat de strook eronder al toont (waarde en
+   * ratio per week) en wat een klik op een kolom opent (alle vier de metrics met de verwachting).
+   * De regel is een knop naar datzelfde venster; de vorige en de volgende week zijn de kolommen
+   * links en rechts van de gemarkeerde. Scheelt 170 px, op een telefoon ruim 450.
+   */
+  compact?: boolean;
 }) {
   const [metric, setMetric] = useState<ForecastMetric>("conversions");
   const [openWeekStart, setOpenWeekStart] = useState<string | null>(null);
@@ -305,6 +314,42 @@ export function FairWeeksView({
         </div>
       )}
 
+      {compact ? (huidige && (() => {
+        const geenData = zonderData(huidige);
+        const waarde = huidige.realized ?? huidige.forecast ?? 0;
+        const ratio = huidige.expected > 0 ? waarde / huidige.expected : null;
+        const gunstig = ratio === null ? null : inverted ? ratio <= 1 : ratio >= 1;
+        // Kosten zonder conversies (geenNoemer): geen getal, wel een oordeel, zoals de weekkaart die
+        // deze regel vervangt. Voor een metriek waar lager beter is (CPA) is dat ongunstig.
+        const oordeelZonderGetal = huidige.geenNoemer ? !inverted : null;
+        return (
+          <div className="px-5 pb-2">
+            <button
+              type="button"
+              onClick={() => setOpenWeekStart(huidige.weekStart)}
+              // De knop opent het venster met alle metrics van deze week; dat hoort een schermlezer te weten.
+              aria-haspopup="dialog"
+              className="flex min-h-11 w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg bg-brand-blue/5 px-3 py-2 text-left text-body transition-colors hover:bg-brand-blue/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
+            >
+              <span className="font-semibold text-brand-blue-ink">Deze week {huidige.label}</span>
+              {/* Zonder waarde staat de reden op de plek van "gerealiseerd" en een streepje op de plek
+                  van het getal: dezelfde woorden en hetzelfde oordeel als de weekkaart. */}
+              <span className={`text-micro ${oordeelZonderGetal === null ? "text-muted-foreground" : oordeelZonderGetal ? "font-semibold text-green-700" : "font-semibold text-red-700"}`}>
+                {geenData ? geenWaardeLabel(huidige, metric).toLowerCase() : huidige.realized !== null ? "gerealiseerd" : "prognose"}
+                {oordeelZonderGetal !== null && <span className="sr-only"> ({oordeelZonderGetal ? "gunstig" : "ongunstig"})</span>}
+              </span>
+              <span className="text-lead font-bold tabular-nums text-brand-gray">{geenData ? "—" : format(waarde)}</span>
+              {heeftVerwachting && !geenData && (
+                <span className="tabular-nums text-muted-foreground">
+                  verwacht {format(huidige.expected)}
+                  {ratio !== null && <> · <span className={`font-semibold ${gunstig ? "text-green-700" : "text-red-700"}`}>{formatPercent(ratio, 0)}</span></>}
+                </span>
+              )}
+              <span className="ml-auto text-meta text-brand-blue-ink">alle metrics</span>
+            </button>
+          </div>
+        );
+      })()) : (
       <div className="px-5 pb-2">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
           {vorige && <WeekCard week={vorige} metric={metric} format={format} variant="previous" inverted={inverted} heeftVerwachting={heeftVerwachting} onOpen={() => setOpenWeekStart(vorige.weekStart)} />}
@@ -312,6 +357,7 @@ export function FairWeeksView({
           {volgende && <WeekCard week={volgende} metric={metric} format={format} variant="next" inverted={inverted} heeftVerwachting={heeftVerwachting} onOpen={() => setOpenWeekStart(volgende.weekStart)} />}
         </div>
       </div>
+      )}
 
       <div className="mt-2 border-t border-border">
         <div className="px-5 py-3">

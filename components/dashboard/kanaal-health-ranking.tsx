@@ -11,6 +11,7 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 import { KanaalHealthRadar, type RadarReeks } from "./kanaal-health-radar";
 import type { RadarFactor } from "@/lib/health-radar";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { Lade } from "@/components/ui/disclosure";
 
 /**
  * Account Health per kanaal, naast elkaar en op volgorde — de opener van "Alle kanalen".
@@ -121,7 +122,18 @@ export function kanaalScores(
   return { rijen, laden, nietBeoordeeld };
 }
 
-export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; kanalen: Kanaal[] }) {
+export function KanaalHealthRanking({ clientId, kanalen, onderbouwingAchterKlik = false }: {
+  clientId: string;
+  kanalen: Kanaal[];
+  /**
+   * De nieuwe weergave (bouwplan fase 5): de rangschikking staat bovenaan, één regel per kanaal met
+   * de score, de zwakste factor en het signaal; de radar, de vijf factoren per kanaal en de
+   * toelichting staan achter de knop "Toon onderbouwing". Niets is weg: het is dezelfde radar en
+   * dezelfde factorregels, alleen dicht tot je ze vraagt. De kaart was 640 tot 700 px hoog en is
+   * dicht ongeveer 60 px plus 44 per kanaal.
+   */
+  onderbouwingAchterKlik?: boolean;
+}) {
   // Google uit de provider die de pagina toch al vult. useClientDataState en niet
   // useClientHistoricalData: die laatste gooit buiten een provider, en dan nam één ontbrekende
   // Google-bron de scores van de andere kanalen mee.
@@ -213,8 +225,7 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
       : route.error ? "niet beoordeeld: de kanaalcijfers konden niet geladen worden"
       : "niet beoordeeld: geen dagcijfers om een prognose op te bouwen";
 
-  return (
-    <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
+  const kop = (
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Activity className="w-4 h-4 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Account Health per kanaal</h3>
@@ -222,7 +233,9 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
         <Vensterlabel soort="jaar" />
         <span className="text-micro text-muted-foreground ml-auto">elk kanaal tegen zijn eigen maatstaf</span>
       </div>
-
+  );
+  const onderbouwing = (
+    <>
       {/* Geen `flex-1` en geen `h-full` op deze kaart: hij houdt zijn eigen hoogte. Drie
           kanaalregels over 830px uitspreiden gaf gaten van 200px tussen de kanalen. De
           landencijfers eronder vangen het hoogteverschil met de wereldkaart op -- zie
@@ -271,7 +284,9 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
           ))}
         </div>
       </div>
-
+    </>
+  );
+  const toelichting = (
       <p className="mt-4 border-t border-border pt-3 text-meta leading-snug text-muted-foreground">
         De radar is het gemiddelde per as over de kanalen die die as meten. Een as die voor een
         kanaal niet beoordeeld is, telt daar niet mee: Hygiëne (verspilling op zoektermen en ad
@@ -281,6 +296,46 @@ export function KanaalHealthRanking({ clientId, kanalen }: { clientId: string; k
         staat is één samengesteld cijfer over de spend van alle kanalen samen: dat zou tegen één
         doel moeten meten, en een doel dat voor het ene kanaal gezet is zegt niets over het andere.
       </p>
+  );
+
+  if (onderbouwingAchterKlik) {
+    return (
+      <div className="@container overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="px-5 pt-5">
+          {kop}
+          {/* De rangschikking: de sterkste bovenaan, kanalen zonder score onderaan met de reden.
+              Een lijst en geen losse blokken: een schermlezer zegt dan hoeveel kanalen er staan. */}
+          <ul className="flex flex-col gap-1.5 pb-4">
+            {rijen.map(({ kanaal, health }) => (
+              <li key={kanaal} className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
+                <KanaalKop kanaal={kanaal} health={health} />
+              </li>
+            ))}
+            {laden.map((kanaal) => (
+              <li key={kanaal}><KanaalZonderScore kanaal={kanaal} tekst="score wordt berekend" compact /></li>
+            ))}
+            {nietBeoordeeld.map((kanaal) => (
+              <li key={kanaal}><KanaalZonderScore kanaal={kanaal} tekst={waaromGeenScore(kanaal)} compact /></li>
+            ))}
+          </ul>
+        </div>
+        <Lade id="health-onderbouwing" label="Toon onderbouwing: radar en factoren" labelOpen="Verberg onderbouwing">
+          <div className="px-5 py-4">
+            {onderbouwing}
+            {toelichting}
+          </div>
+        </Lade>
+      </div>
+    );
+  }
+
+  return (
+    <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
+      {kop}
+
+      {onderbouwing}
+
+      {toelichting}
     </div>
   );
 }
@@ -309,16 +364,54 @@ function balkKleur(score: number): string {
   return score >= 16 ? "bg-green-400" : score >= 10 ? "bg-amber-400" : "bg-red-400";
 }
 
+/** De zwakste BEOORDEELDE factor. Een niet-beoordeelde factor heeft score 0 en zou anders altijd
+ *  als "de zwakste" bovendrijven -- terwijl "niet gemeten" iets anders is dan "slecht". */
+function zwaksteFactor(health: HealthScore): HealthFactor | null {
+  const beoordeeld = health.factors.filter((f) => f.assessed);
+  return beoordeeld.length > 0 ? beoordeeld.reduce((laagste, f) => (f.score < laagste.score ? f : laagste)) : null;
+}
+
+/** Het signaal van een kanaal: de kritieke afwijking als die er is, anders de eerste. */
+const signaalVan = (health: HealthScore) => health.anomalies.find((a) => a.severity === "critical") ?? health.anomalies[0];
+
+/**
+ * De kopregel van een kanaal: stip, naam, cijfer, de zwakste factor en het signaal. Eén component
+ * voor de uitgeschreven regel (met de factoren eronder) en voor de rangschikking van de nieuwe
+ * weergave (alleen deze regel): dezelfde woorden op beide plekken.
+ */
+function KanaalKop({ kanaal, health }: { kanaal: Kanaal; health: HealthScore }) {
+  const kleur = kleurVanScore(health);
+  const zwakste = zwaksteFactor(health);
+  const kritiek = signaalVan(health);
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: KANAAL_KLEUR[kanaal] }} aria-hidden />
+      <span className="text-title font-semibold text-brand-gray">{KANAAL_NAAM[kanaal]}</span>
+      <span className="text-lead font-bold tabular-nums" style={{ color: kleur }}>
+        {health.grade === "?" ? "—" : health.total}
+      </span>
+      {health.grade === "?" ? (
+        <span className="text-meta text-muted-foreground">
+          te weinig beoordeeld ({health.assessedCount}/5)
+        </span>
+      ) : zwakste ? (
+        <span className="text-meta text-muted-foreground">
+          zwakste: <span className="font-medium text-brand-gray">{zwakste.name}</span> {zwakste.score}/{zwakste.maxScore}
+        </span>
+      ) : null}
+      {kritiek && (
+        <span className="ml-auto flex items-center gap-1 text-meta text-muted-foreground">
+          <AlertTriangle className={`w-3 h-3 shrink-0 ${kritiek.severity === "critical" ? "text-red-500" : "text-amber-500"}`} />
+          <span className="min-w-0 truncate">{kritiek.title}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 function KanaalRegel({ kanaal, health, compact }: { kanaal: Kanaal; health: HealthScore; compact: boolean }) {
   const kleur = kleurVanScore(health);
-
-  // De zwakste BEOORDEELDE factor. Een niet-beoordeelde factor heeft score 0 en zou anders altijd
-  // als "de zwakste" bovendrijven -- terwijl "niet gemeten" iets anders is dan "slecht".
-  const beoordeeld = health.factors.filter((f) => f.assessed);
-  const zwakste = beoordeeld.length > 0
-    ? beoordeeld.reduce((laagste, f) => (f.score < laagste.score ? f : laagste))
-    : null;
-  const kritiek = health.anomalies.find((a) => a.severity === "critical") ?? health.anomalies[0];
+  const kritiek = signaalVan(health);
 
   if (compact) {
     // Dezelfde vijf kolommen, dezelfde volgorde, alleen zonder de herhaalde labels en zonder de
@@ -372,28 +465,7 @@ function KanaalRegel({ kanaal, health, compact }: { kanaal: Kanaal; health: Heal
           hoogte per kanaal, drie keer onder elkaar. Dat las als een tabel die geen tabel is. Nu
           per kanaal een blokje met een kopregel en een vaste factorrij eronder: dezelfde vijf
           kolommen op dezelfde plek bij elk kanaal, dus je kunt verticaal vergelijken. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: KANAAL_KLEUR[kanaal] }} aria-hidden />
-        <span className="text-title font-semibold text-brand-gray">{KANAAL_NAAM[kanaal]}</span>
-        <span className="text-lead font-bold tabular-nums" style={{ color: kleur }}>
-          {health.grade === "?" ? "—" : health.total}
-        </span>
-        {health.grade === "?" ? (
-          <span className="text-meta text-muted-foreground">
-            te weinig beoordeeld ({health.assessedCount}/5)
-          </span>
-        ) : zwakste ? (
-          <span className="text-meta text-muted-foreground">
-            zwakste: <span className="font-medium text-brand-gray">{zwakste.name}</span> {zwakste.score}/{zwakste.maxScore}
-          </span>
-        ) : null}
-        {kritiek && (
-          <span className="ml-auto flex items-center gap-1 text-meta text-muted-foreground">
-            <AlertTriangle className={`w-3 h-3 shrink-0 ${kritiek.severity === "critical" ? "text-red-500" : "text-amber-500"}`} />
-            <span className="min-w-0 truncate">{kritiek.title}</span>
-          </span>
-        )}
-      </div>
+      <KanaalKop kanaal={kanaal} health={health} />
 
       {/* De vijf factoren, altijd alle vijf en altijd in dezelfde volgorde: dat is wat een
           rangschikking bruikbaar maakt. Twee kanalen met een andere score kunnen op dezelfde as

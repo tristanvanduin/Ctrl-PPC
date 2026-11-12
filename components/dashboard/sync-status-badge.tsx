@@ -5,6 +5,8 @@ import { RefreshCw, CheckCircle2, AlertTriangle, XCircle, Clock, Loader2 } from 
 import { supabase } from "@/lib/supabase";
 import { dbSelectOne } from "@/lib/data-access/client-read";
 import { vergeetBronnen } from "@/lib/data-access/bron-cache";
+import { geledenLabel } from "@/lib/overzicht/logboek";
+import { useMinuutklok } from "@/lib/overzicht/use-minuutklok";
 
 type FreshnessStatus = "fresh" | "stale" | "missing" | "partial" | "unknown";
 
@@ -70,9 +72,18 @@ interface Props {
   onSyncComplete?: () => void;
   /** De kanalen met data (lib/kanalen/beschikbaar.ts); null = nog onbekend. */
   kanalen?: readonly string[] | null;
+  /**
+   * De leeftijd van de laatste run met een echte maat (nieuwe weergave, bouwplan fase 4). De badge
+   * zei "zojuist" over alles van het laatste uur: een run van vijftig minuten oud is niet zojuist.
+   * Aan: "zojuist" alleen binnen vijf minuten, daarna minuten, uren, dagen (geledenLabel). Uit: de
+   * tekst zoals hij in de vertrouwde weergave altijd was.
+   */
+  eerlijkeTijd?: boolean;
 }
 
-export function SyncStatusBadge({ clientId, onSyncComplete, kanalen = null }: Props) {
+export function SyncStatusBadge({ clientId, onSyncComplete, kanalen = null, eerlijkeTijd = false }: Props) {
+  // De tijd op de badge loopt mee: zonder nieuwe render bleef "zojuist" een uur staan.
+  useMinuutklok(eerlijkeTijd);
   const [status, setStatus] = useState<SyncStatus>({
     freshnessStatus: "unknown",
     lastSyncAt: null,
@@ -228,7 +239,7 @@ export function SyncStatusBadge({ clientId, onSyncComplete, kanalen = null }: Pr
         {config.icon}
         <span className="font-medium">{config.label}</span>
         {status.hoursSinceSync != null && (
-          <span className="opacity-70">· laatste run {formatTimeAgo(status.hoursSinceSync)}</span>
+          <span className="opacity-70">· laatste run {(eerlijkeTijd ? geledenLabel(status.lastSyncAt) : null) ?? formatTimeAgo(status.hoursSinceSync)}</span>
         )}
         {status.datasetsAvailable != null && status.datasetsTotal != null && (
           <span className="opacity-70">

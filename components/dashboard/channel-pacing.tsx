@@ -89,7 +89,7 @@ export function ChannelPacing({ edition }: { edition?: UpcomingEdition | null })
       </div>
 
       <div className="grid flex-1 grid-cols-2 items-stretch gap-4 @6xl:grid-cols-3 @7xl:grid-cols-6">
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex min-w-0 flex-col items-center justify-center gap-3 text-center @lg:flex-row @lg:text-left">
           <div className="relative">
             <PacingRing pct={pctVan(spendRatio)} color={spendKleur} />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -105,7 +105,7 @@ export function ChannelPacing({ edition }: { edition?: UpcomingEdition | null })
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex min-w-0 flex-col items-center justify-center gap-3 text-center @lg:flex-row @lg:text-left">
           <div className="relative">
             <PacingRing pct={pctVan(convRatio)} color={convKleur} />
             <div className="absolute inset-0 flex items-center justify-center">

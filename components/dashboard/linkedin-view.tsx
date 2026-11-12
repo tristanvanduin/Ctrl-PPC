@@ -23,6 +23,7 @@ import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie, Deelkop } from "@/components/ui/sectie";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { isDemoClient } from "@/lib/demo/demo-mode";
+import { KanaalOverzichtNieuw } from "./kanaal-overzicht-nieuw";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/linkedin/campaign-types";
 import { buildLinkedInObjectiveBreakdown } from "@/lib/linkedin/objective-breakdown";
@@ -45,17 +46,22 @@ const SECTIONS = [
   "Lead-forms",
 ];
 
-export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
+export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = true, nieuw = false }: {
+  clientId: string;
+  geoClone?: string | null;
+  edition?: UpcomingEdition | null;
+  meerdereKanalen?: boolean;
+  /** De schakelaar "Nieuwe weergave" staat aan: de herschikte, ingekorte opbouw (bouwplan fase 5,
+   *  kanaal-overzicht-nieuw.tsx). Uit rendert dit tabblad precies wat het altijd renderde. */
+  nieuw?: boolean;
+}) {
   const demo = isDemoClient(clientId);
   // Eén hook-aanroep voor de opener: GeoMapCard en GeoRanglijstCard delen dezelfde metric-keuze
   // en VS-drilldown-state (zelfde patroon als Google 17.36 en Meta 17.38).
   const geo = useGeoBreakdown({ clientId, channel: "linkedin" });
-  return (
-    // Eén provider om alle kaarten heen: pacing, maandverloop, de beurs-sectie en het
-    // jaaroverzicht lezen allemaal dezelfde dagrijen en dezelfde forecast. Zie
-    // channel-data-provider.tsx voor wat er zonder gebeurde.
-    <ChannelDataProvider clientId={clientId} channel="linkedin">
-    <div className="space-y-6">
+  // De kopkaart, één keer gemaakt: de vertrouwde weergave zet hem bovenaan, de nieuwe achter "Over
+  // dit tabblad" (en in de beursmodus ook bovenaan).
+  const kop = (
       <ChannelViewHeader
         icon={<Briefcase className="w-5 h-5 text-brand-blue-ink" />}
         title="LinkedIn Ads"
@@ -77,6 +83,31 @@ export function LinkedInView({ clientId, geoClone, edition, meerdereKanalen = tr
             : <>De LinkedIn-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong>.</>
         }
       />
+  );
+  if (nieuw) {
+    return (
+      <ChannelDataProvider clientId={clientId} channel="linkedin">
+        <KanaalOverzichtNieuw
+          clientId={clientId}
+          kanaal="linkedin"
+          geoClone={geoClone}
+          edition={edition}
+          kop={kop}
+          geo={geo}
+          verdeling={<BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />}
+          verdelingBijschrift="Wie we bereikten"
+          video
+        />
+      </ChannelDataProvider>
+    );
+  }
+  return (
+    // Eén provider om alle kaarten heen: pacing, maandverloop, de beurs-sectie en het
+    // jaaroverzicht lezen allemaal dezelfde dagrijen en dezelfde forecast. Zie
+    // channel-data-provider.tsx voor wat er zonder gebeurde.
+    <ChannelDataProvider clientId={clientId} channel="linkedin">
+    <div className="space-y-6">
+      {kop}
 
       {/* DE OPENER (23 augustus 2026, teruggezet naar 50/50): Account Health naast de wereldkaart,
           zelfde indeling als Google en Meta (zie google-view.tsx).

@@ -45,7 +45,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import {
-  isPublicPath, isCronPath, capabilityForApi, can, canAccessClient, clientIdFromPath,
+  isPublicPath, isCronPath, capabilityForApi, can, canAccessClient, clientIdsUitVerzoek,
 } from "@/lib/auth/roles";
 import { bepaalScope } from "@/lib/auth/scope";
 
@@ -118,8 +118,10 @@ export async function middleware(request: NextRequest) {
   // wel in de database en in de routes doorgevoerd, maar niet in de poortwachter ervoor.
   const { role, scope } = await bepaalScope(supabase as never, user.id);
 
-  const clientId = clientIdFromPath(pathname, request.nextUrl.searchParams);
-  if (clientId && !canAccessClient(scope, clientId)) {
+  // Elk id dat het verzoek noemt, niet alleen het eerste: een route die clientId leest terwijl
+  // hier alleen client_id was getoetst, gaf de gegevens van een klant buiten de scope terug.
+  const clientIds = clientIdsUitVerzoek(pathname, request.nextUrl.searchParams);
+  if (clientIds.some((id) => !canAccessClient(scope, id))) {
     if (isApi) return NextResponse.json({ error: "Onvoldoende rechten" }, { status: 403 });
     const url = request.nextUrl.clone();
     // '/' is sinds Fase 5 de publieke marketingpagina, niet meer de ingelogde cockpit -- een

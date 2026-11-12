@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useLayoutEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, Settings, Target, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown, Search } from "lucide-react";
+import { Database, BarChart3, Settings, Target, AlertTriangle, Wifi, FlaskConical, Clock, LayoutGrid, Lightbulb, TrendingUp, FolderOpen, Users, Kanban, ClipboardCheck, FileText, Megaphone, Briefcase, Layers, Crown, Search } from "lucide-react";
 import { SyncStatusBadge } from "./sync-status-badge";
 import { PaginaLaadvlak } from "@/components/ui/laadvlak";
 import { getClientSettings } from "@/lib/client-settings";
@@ -73,6 +73,8 @@ import { OverzichtBovenkant } from "./overzicht-bovenkant";
 import { WeergaveSchakelaar } from "./weergave-schakelaar";
 import { useWeergave } from "@/lib/use-weergave";
 import { WEERGAVE_PARAM } from "@/lib/weergave";
+import { kaartStand } from "@/lib/overzicht/bovenkant";
+import { today } from "@/lib/reporting-date";
 import { SprintPlanning } from "../insights/sprint-planning";
 import { ClientFiles } from "./client-files";
 import { DgmView } from "./dgm-view";
@@ -300,7 +302,8 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
   // ?weergave=nieuw voorop zodat de meting hem kan openen (lib/weergave.ts; de server geeft de
   // bewaarde keuze mee uit de cookie, zodat de kop niet verspringt bij het laden). Uit: de pagina is wat
   // hij was. Aan: de merkregel, de kanaalkaarten, de tegels en de hoofdgrafiek van
-  // OverzichtBovenkant; alles onder de bovenkant is in beide weergaven hetzelfde.
+  // OverzichtBovenkant, en onder de bovenkant de herschikte opbouw van fase 5 op elk tabblad (de
+  // prop `nieuw` van CrossChannelView, GoogleView, MetaView, LinkedInView en MicrosoftView).
   const [weergave, zetWeergave] = useWeergave(searchParams.get(WEERGAVE_PARAM), bewaardeWeergave);
   const nieuweWeergave = weergave === "nieuw";
   // Alleen gebruikt voor het bronbijschrift verderop. isDemoMode() leest window.location, dus dit
@@ -446,6 +449,21 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
   }, [client.id, kanalen]);
   const bandKlaar = kanalen !== null && eigenStandBekend;
 
+  // De datastand in woorden, voor de bronrij van de nieuwe weergave (bouwplan fase 4): tot welke
+  // dag de cijfers op dit scherm lopen, voor het gekozen kanaal of voor alle kanalen samen. Dezelfde
+  // regel als op de kanaalkaarten (kaartStand): "stil sinds" in rood als de data meer dan twee
+  // weken achterloopt, behalve als de sync van elk betrokken kanaal gewoon draait. De demo had hier
+  // niets staan (de syncbadge is er in de demo niet), terwijl juist daar de data op een vaste dag
+  // ophoudt.
+  const standTekst = useMemo(() => {
+    const betrokken = channel === "blended" ? (kanalen ?? []) : [channel];
+    const bronnen = blendedStand.dataStand?.bronnen ?? [];
+    return kaartStand({
+      dataTot: dataStand?.dataTot, vandaag: today(), demo: demoModus, bekend: bandKlaar,
+      achterMaarSyncDraait: betrokken.length > 0 && betrokken.every((k) => bronnen.find((b) => b.bron === k)?.syncDraait === true),
+    });
+  }, [channel, kanalen, blendedStand.dataStand, dataStand?.dataTot, demoModus, bandKlaar]);
+
   // ── De stukken van de kop die in BEIDE weergaven staan ──────────────────────────────────────────
   // Benoemd en niet twee keer uitgeschreven: de nieuwe weergave zet ze in een andere volgorde en
   // dichter op elkaar, maar het zijn dezelfde onderdelen met dezelfde bedrading.
@@ -484,6 +502,9 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
           <span className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-transparent select-none">Conversielag: 3 dagen</span>
           {!demoModus && (
             <span className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-transparent select-none">Cijfers actueel · laatste run 3u geleden</span>
+          )}
+          {nieuweWeergave && (
+            <span className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-transparent select-none">Data t/m 31 dec 2026</span>
           )}
         </div>
       )}
@@ -535,11 +556,27 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
               leest live bij Google en haar datastand is "t/m gisteren" (liveDataStand), geen van
               beide verandert door een sync naar de database. Haar cache verloopt gewoon na vijf
               minuten. (De demo, die Google wel uit de database leest, heeft deze knop niet.) */}
+          {/* De datastand, in de rij waar de bron staat (nieuwe weergave, fase 4): "live" zegt waar
+              de cijfers vandaan komen, dit zegt tot welke dag ze lopen. Neutraal zolang dat klopt,
+              rood als de data stilstaat. Het woord en een icoon, niet alleen de kleur. */}
+          {nieuweWeergave && standTekst && (
+            <div
+              data-datastand={standTekst.alarm ? "alarm" : "ok"}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${standTekst.alarm ? "border-red-200 bg-red-50 font-semibold text-red-700" : "border-border bg-muted/60 text-muted-foreground"}`}
+            >
+              {standTekst.alarm ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> : <Database className="h-3.5 w-3.5" aria-hidden />}
+              <span>
+                <span className="sr-only">Datastand{channel === "blended" ? " van alle kanalen samen" : ""}: </span>
+                {standTekst.tekst.charAt(0).toUpperCase() + standTekst.tekst.slice(1)}
+              </span>
+            </div>
+          )}
           {!demoModus && (
             <SyncStatusBadge
               clientId={client.id}
               kanalen={kanalen}
               onSyncComplete={() => vergeetBlendedClientData(client.id)}
+              eerlijkeTijd={nieuweWeergave}
             />
           )}
         </div>
@@ -644,6 +681,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
               channel={channel}
               kanalen={kanalen}
               onKies={setChannel}
+              onBeoordeel={() => setActiveTab("outcomes")}
               googleData={clientData.data}
               route={blendedStand}
               band={periodSummary}
@@ -718,10 +756,10 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
           {activeTab === "dashboard" && (
             <div className="space-y-6">
               {/* De kanaaltabs en de KPI-band staan hierboven, buiten de datapoort. */}
-              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
-              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
-              {channel === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} />}
-              {channel === "blended" && <CrossChannelView clientId={client.id} kanalen={kanalen ?? []} edition={upcomingEdition} />}
+              {channel === "meta" && <MetaView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
+              {channel === "linkedin" && <LinkedInView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
+              {channel === "microsoft" && <MicrosoftView clientId={client.id} geoClone={geoClone} edition={upcomingEdition} meerdereKanalen={(kanalen?.length ?? 0) > 1} nieuw={nieuweWeergave} />}
+              {channel === "blended" && <CrossChannelView clientId={client.id} kanalen={kanalen ?? []} edition={upcomingEdition} nieuw={nieuweWeergave} />}
               {channel === "google" && (
                 <GoogleView
                   clientId={client.id}
@@ -733,6 +771,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
                   onCountryFilterChange={setCountryFilter}
                   tijdas={tijdas}
                   onTijdasChange={setTijdas}
+                  nieuw={nieuweWeergave}
                 />
               )}
             </div>
@@ -754,6 +793,9 @@ export function ClientDashboard({ client, bewaardeWeergave = null }: {
               {channel === "microsoft" && <MicrosoftCampagnes clientId={client.id} geoClone={geoClone} />}
               {/* Alle kanalen op de Campagnes-tab: welke campagnes draaien per kanaal (niet de
                   blended maandgrafiek — die hoort bij Prognose/Overzicht). */}
+              {/* De nieuwe weergave (fase 5, element 57): de kanaaltotalen staan hier open, boven de
+                  campagnes. Op het Overzicht zitten ze dan achter "Toon als tabel". */}
+              {channel === "blended" && nieuweWeergave && <CrossChannelView clientId={client.id} kanalen={kanalen ?? []} alleenTabel />}
               {channel === "blended" && <CampaignsPerChannel clientId={client.id} geoClone={geoClone} />}
             </div>
           )}

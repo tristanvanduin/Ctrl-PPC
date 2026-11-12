@@ -71,18 +71,15 @@ export function PerformanceChart({ clientId, countryFilter, metric, onMetricChan
   );
 }
 
-export function PerformanceChartView({ clientData, forecast, metric: metricProp, onMetricChange }: {
-  clientData: ClientHistoricalData;
-  forecast: ClientForecast;
-  metric?: ForecastMetric;
-  onMetricChange?: (metric: ForecastMetric) => void;
-}) {
-  const [internalMetric, setInternalMetric] = useState<ForecastMetric>("conversions");
-  const metric = metricProp ?? internalMetric;
-  const setMetric = onMetricChange ?? setInternalMetric;
-  const beweging = useGrafiekBeweging();
-  const [viewMode, setViewMode] = useState<ViewMode>("weekly");
-  const [showYoY, setShowYoY] = useState(false);
+/**
+ * Het budgetadvies: alleen als het conversiedoel achterloopt (anders niets).
+ *
+ * Een eigen component omdat het op twee plekken staat. In de grafiek, zoals altijd; en in de nieuwe
+ * weergave als statusregel in de kaart "Pacing & jaaroverzicht", waar de grafiek in een lade zit
+ * (bouwplan fase 5): een signaal dat om actie vraagt hoort niet achter een klik. Dezelfde zin op
+ * beide plekken, uit dezelfde regels.
+ */
+export function BudgetAdvies({ forecast, className = "" }: { forecast: ClientForecast; className?: string }) {
   // Het budgetadvies rekent op het conversiedoel. Of dat een schatting is, zegt de herkomst (die op
   // "Alle kanalen" uit de optelling komt); hier stond altijd "het geschatte jaardoel ... er is nog
   // geen doel ingevoerd", ook naast een doel uit Instellingen.
@@ -93,6 +90,50 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
   // de conversiemeting klopt", en deze banner zei op dezelfde pagina "Verhoog maandelijks budget
   // met 825% naar € 101.767/maand". Dat getal rekent met een CPA waar die maand in de teller zit.
   const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
+  if (!forecast.budgetRecommendation.behindTarget) return null;
+  return (
+        <div className={`px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg ${className}`}>
+          <p className="text-sm text-amber-800 font-medium">
+            {zonderConversies.length > 0 ? (
+              <>
+                {/* Met de herkomst van het doel, net als de tak hieronder: zonder zei deze tak "om het
+                    geschatte jaardoel te halen" zonder "vorig jaar +10%; er is nog geen doel ingevoerd". */}
+                Budget aanbeveling: hoeveel budget nodig is om {conversieDoel.naam}{conversieDoel.toelichting ? ` (${conversieDoel.toelichting})` : ""} te halen,
+                is pas te berekenen als de conversiemeting klopt: in {zonderConversies.join(", ")} waren er kosten zonder één conversie.
+              </>
+            ) : (
+              <>
+                Budget aanbeveling: {forecast.budgetRecommendation.spendIncreasePct > 0
+                  ? `Verhoog maandelijks budget met ${Math.round(forecast.budgetRecommendation.spendIncreasePct)}% `
+                  : ""}
+                naar {new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(forecast.budgetRecommendation.requiredMonthlySpend)}/maand
+                om {conversieDoel.naam} te halen{conversieDoel.toelichting ? ` (${conversieDoel.toelichting})` : ""}.
+              </>
+            )}
+          </p>
+        </div>
+  );
+}
+
+export function PerformanceChartView({ clientData, forecast, metric: metricProp, onMetricChange, inLade = false }: {
+  clientData: ClientHistoricalData;
+  forecast: ClientForecast;
+  metric?: ForecastMetric;
+  onMetricChange?: (metric: ForecastMetric) => void;
+  /**
+   * De grafiek staat in de lade "Verloop en prognose" van de kaart Pacing & jaaroverzicht (de
+   * nieuwe weergave). Dan zonder eigen kaartrand (anders een kaart in een kaart), zonder het
+   * budgetadvies (dat staat al in de kaart zelf, buiten de lade) en standaard per maand: de weken
+   * zijn op "Alle kanalen" maandtotalen die gelijk over de weken verdeeld zijn.
+   */
+  inLade?: boolean;
+}) {
+  const [internalMetric, setInternalMetric] = useState<ForecastMetric>("conversions");
+  const metric = metricProp ?? internalMetric;
+  const setMetric = onMetricChange ?? setInternalMetric;
+  const beweging = useGrafiekBeweging();
+  const [viewMode, setViewMode] = useState<ViewMode>(inLade ? "monthly" : "weekly");
+  const [showYoY, setShowYoY] = useState(false);
   const { theme } = useBrandTheme();
 
   const result = forecast[metric];
@@ -151,7 +192,7 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
   ];
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+    <div className={inLade ? "p-5" : "bg-card rounded-xl border border-border p-5 shadow-sm"}>
       {/* flex-wrap: op smalle schermen (telefoon) paste deze rij -- titel + weergavekiezer +
           "Vorig jaar" + vier metric-knoppen -- niet naast elkaar en duwde de hele pagina breder in
           plaats van zelf om te breken. Genoeg knoppen op één rij om nooit in te krimpen. */}
@@ -209,29 +250,8 @@ export function PerformanceChartView({ clientData, forecast, metric: metricProp,
         </div>
       </div>
 
-      {/* Budget recommendation banner */}
-      {forecast.budgetRecommendation.behindTarget && metric === "conversions" && (
-        <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-800 font-medium">
-            {zonderConversies.length > 0 ? (
-              <>
-                {/* Met de herkomst van het doel, net als de tak hieronder: zonder zei deze tak "om het
-                    geschatte jaardoel te halen" zonder "vorig jaar +10%; er is nog geen doel ingevoerd". */}
-                Budget aanbeveling: hoeveel budget nodig is om {conversieDoel.naam}{conversieDoel.toelichting ? ` (${conversieDoel.toelichting})` : ""} te halen,
-                is pas te berekenen als de conversiemeting klopt: in {zonderConversies.join(", ")} waren er kosten zonder één conversie.
-              </>
-            ) : (
-              <>
-                Budget aanbeveling: {forecast.budgetRecommendation.spendIncreasePct > 0
-                  ? `Verhoog maandelijks budget met ${Math.round(forecast.budgetRecommendation.spendIncreasePct)}% `
-                  : ""}
-                naar {new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(forecast.budgetRecommendation.requiredMonthlySpend)}/maand
-                om {conversieDoel.naam} te halen{conversieDoel.toelichting ? ` (${conversieDoel.toelichting})` : ""}.
-              </>
-            )}
-          </p>
-        </div>
-      )}
+      {/* Het budgetadvies, alleen bij de conversies; in de lade staat het al in de kaart erboven. */}
+      {!inLade && metric === "conversions" && <BudgetAdvies forecast={forecast} className="mb-4" />}
 
       {/* De legenda boven de plot; recharts zette hem onderaan als rij blokjes. Hier is hij ook
           verplicht: het palet haalt de kleurenblind-checks maar niet overal 3:1 tegen wit, en dan

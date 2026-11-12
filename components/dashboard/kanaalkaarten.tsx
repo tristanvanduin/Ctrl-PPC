@@ -43,7 +43,7 @@ const euro = (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", 
 
 // Het teken op het kleurvlakje. Geen merklogo's: een letter in de kanaalkleur is genoeg om de
 // kaart terug te vinden, en de naam staat ernaast.
-const GLYPH: Record<Kanaal, string> = { google: "G", meta: "M", linkedin: "in", microsoft: "Ms" };
+export const KANAAL_GLYPH: Record<Kanaal, string> = { google: "G", meta: "M", linkedin: "in", microsoft: "Ms" };
 
 const OMTREK = 2 * Math.PI * 12.5;
 
@@ -131,7 +131,7 @@ function Kaart({ kaart, actief, onKlik, vertraging, opbouw, periode }: {
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-body font-bold"
           style={{ color: kleur, background: `color-mix(in srgb, ${kleur} 14%, transparent)` }}
         >
-          {GLYPH[kanaal]}
+          {KANAAL_GLYPH[kanaal]}
         </span>
         <span className="flex min-w-0 flex-col leading-tight">
           <span className="flex items-center gap-1 text-title font-semibold text-brand-gray">

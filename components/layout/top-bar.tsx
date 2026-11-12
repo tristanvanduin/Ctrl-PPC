@@ -8,6 +8,7 @@ import { ThemaSchakelaar } from "@/components/ui/thema-schakelaar";
 import { CommandPalette } from "./command-palette";
 import { UserMenu } from "./user-menu";
 import { useSidebarMobile } from "./sidebar-mobile-context";
+import { useNieuweChrome } from "@/lib/use-weergave";
 
 interface Notification {
   clientName: string;
@@ -23,6 +24,12 @@ export function TopBar() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
   const { toggle: toggleSidebar } = useSidebarMobile();
+  // De nieuwe weergave van het Overzicht (bouwplan fase 5, elementen 8 en 11 van de elementtabel):
+  // op een klantpagina zonder de knop "Zoeken" en zonder de datum van vandaag. Zoeken blijft
+  // bereikbaar via het zoekveld in de zijbalk en via de sneltoets (het palet blijft gemount); de
+  // datum zei niets over de data en werd met de datastand verward. Met de schakelaar uit, en op
+  // elke andere pagina, is de balk wat hij was.
+  const nieuweChrome = useNieuweChrome(pathname);
 
   useEffect(() => {
     setMounted(true);
@@ -156,6 +163,7 @@ export function TopBar() {
 
         {/* Cmd+K/Ctrl+K quick-search (Fase 5). De knop is de ontdekbare ingang; de sneltoets werkt
             overal, ook zonder deze knop ooit aangeklikt te hebben (zie command-palette.tsx). */}
+        {!nieuweChrome && (
         <button
           onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
           className="hidden items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-meta text-muted-foreground transition-colors hover:bg-gray-100 sm:flex"
@@ -164,6 +172,7 @@ export function TopBar() {
           Zoeken
           <kbd className="ml-1 rounded border border-border bg-gray-50 px-1 text-micro">⌘K</kbd>
         </button>
+        )}
         <CommandPalette />
 
         {/* De thema-keuze staat in de bovenbalk en niet weggestopt in de instellingen: het is een
@@ -234,6 +243,7 @@ export function TopBar() {
             zelf al over zijn eigen breedte heen (zie sectie 13.2, docs/MASTERPLAN.md). De datum
             is de minst functionele van de balk (staat nergens anders, maar kost ook niemand een
             handeling als hij er even niet is), dus die gaat als eerste. */}
+        {!nieuweChrome && (
         <span className="hidden text-sm text-muted-foreground md:inline">
           {mounted
             ? new Date().toLocaleDateString("nl-NL", {
@@ -245,6 +255,7 @@ export function TopBar() {
             : ""
           }
         </span>
+        )}
 
         <UserMenu />
       </div>

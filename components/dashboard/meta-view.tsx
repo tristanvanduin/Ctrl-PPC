@@ -23,6 +23,7 @@ import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { Sectie, Deelkop } from "@/components/ui/sectie";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { isDemoClient } from "@/lib/demo/demo-mode";
+import { KanaalOverzichtNieuw } from "./kanaal-overzicht-nieuw";
 import { dbSelect } from "@/lib/data-access/client-read";
 import { OBJECTIVE_EVAL_CRITERIA } from "@/lib/meta/campaign-types";
 import { buildMetaObjectiveBreakdown, type MetaObjectiveDailyRow } from "@/lib/meta/objective-breakdown";
@@ -49,7 +50,15 @@ import { ObjectiveInsights, type ObjectiveGroupLike } from "./objective-insights
 
 const SECTIONS = ["Campagnes", "Ad sets", "Advertenties & creatives", "Breakdowns (leeftijd, plaatsing, device)"];
 
-export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
+export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true, nieuw = false }: {
+  clientId: string;
+  geoClone?: string | null;
+  edition?: UpcomingEdition | null;
+  meerdereKanalen?: boolean;
+  /** De schakelaar "Nieuwe weergave" staat aan: de herschikte, ingekorte opbouw (bouwplan fase 5,
+   *  kanaal-overzicht-nieuw.tsx). Uit rendert dit tabblad precies wat het altijd renderde. */
+  nieuw?: boolean;
+}) {
   // Eén hook-aanroep voor de opener: GeoMapCard en GeoRanglijstCard delen dezelfde metric-keuze
   // en VS-drilldown-state (zelfde reden als Google's opener, 17.36).
   const geo = useGeoBreakdown({ clientId, channel: "meta" });
@@ -80,12 +89,13 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
       ? { label: "Bijwerken mislukt", tekst: "De laatste keer bijwerken vanuit Meta is mislukt; de cijfers hieronder kunnen achterlopen. Controleer de Meta-koppeling onder Instellingen." }
     : null;
 
-  return (
-    // Eén provider om alle kaarten heen: pacing, maandverloop, de beurs-sectie en het
-    // jaaroverzicht lezen allemaal dezelfde dagrijen en dezelfde forecast. Zie
-    // channel-data-provider.tsx voor wat er zonder gebeurde.
-    <ChannelDataProvider clientId={clientId} channel="meta">
-    <div className="space-y-6">
+  // De waarschuwing over de koppeling en de kopkaart, één keer gemaakt. De vertrouwde weergave zet
+  // de kaart bovenaan met de waarschuwing erin; de nieuwe zet de kaart achter "Over dit tabblad" en
+  // houdt de waarschuwing open bovenaan: een koppeling die niet werkt hoort niet achter een klik.
+  const waarschuwing = probleem ? (
+    <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{probleem.tekst}</div>
+  ) : undefined;
+  const kop = (
       <ChannelViewHeader
         icon={<Megaphone className="w-5 h-5 text-brand-blue-ink" />}
         title="Meta Ads"
@@ -106,10 +116,39 @@ export function MetaView({ clientId, geoClone, edition, meerdereKanalen = true }
             ? <>De Meta-analyses (maand-SOP, creative vision, briefing, signalen) draai je via het tabblad <strong>Analyses</strong> → Meta.</>
             : <>De Meta-analyses (maand-SOP, creative vision, briefing, signalen) draai je via het tabblad <strong>Analyses</strong>.</>
         }
-        warning={probleem ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{probleem.tekst}</div>
-        ) : undefined}
+        warning={waarschuwing}
       />
+  );
+  if (nieuw) {
+    return (
+      <ChannelDataProvider clientId={clientId} channel="meta">
+        <KanaalOverzichtNieuw
+          clientId={clientId}
+          kanaal="meta"
+          geoClone={geoClone}
+          edition={edition}
+          kop={kop}
+          waarschuwing={waarschuwing}
+          geo={geo}
+          verdeling={
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
+              <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
+            </div>
+          }
+          verdelingBijschrift="Waar het budget heen ging en wie we bereikten"
+          video
+        />
+      </ChannelDataProvider>
+    );
+  }
+  return (
+    // Eén provider om alle kaarten heen: pacing, maandverloop, de beurs-sectie en het
+    // jaaroverzicht lezen allemaal dezelfde dagrijen en dezelfde forecast. Zie
+    // channel-data-provider.tsx voor wat er zonder gebeurde.
+    <ChannelDataProvider clientId={clientId} channel="meta">
+    <div className="space-y-6">
+      {kop}
 
       {/* DE OPENER (23 augustus 2026, teruggezet naar 50/50): Account Health naast de wereldkaart,
           zelfde indeling als Google's hero (zie google-view.tsx).

@@ -15,6 +15,7 @@ import { ChannelDataProvider } from "./channel-data-provider";
 import { Sectie, Deelkop } from "@/components/ui/sectie";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { isDemoClient } from "@/lib/demo/demo-mode";
+import { KanaalOverzichtNieuw } from "./kanaal-overzicht-nieuw";
 
 // Microsoft Ads (Bing)-tab: DATA-weergave, zelfde opbouw als Meta en LinkedIn via de gedeelde
 // ChannelKind-bouwstenen (channel-performance.tsx's CONFIG kent "microsoft"). De analyses draaien
@@ -36,14 +37,19 @@ const SECTIONS = [
   "Netwerk & device, impressieaandeel, profieldimensies",
 ];
 
-export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = true }: { clientId: string; geoClone?: string | null; edition?: UpcomingEdition | null; meerdereKanalen?: boolean }) {
+export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = true, nieuw = false }: {
+  clientId: string;
+  geoClone?: string | null;
+  edition?: UpcomingEdition | null;
+  meerdereKanalen?: boolean;
+  /** De schakelaar "Nieuwe weergave" staat aan: de herschikte, ingekorte opbouw (bouwplan fase 5,
+   *  kanaal-overzicht-nieuw.tsx). Uit rendert dit tabblad precies wat het altijd renderde. */
+  nieuw?: boolean;
+}) {
   const demo = isDemoClient(clientId);
-  return (
-    // Eén provider om alle kaarten heen, zoals Meta en LinkedIn sinds "een fetch per
-    // kanaaltabblad": pacing, maandverloop, de beurs-sectie en het jaaroverzicht lezen dezelfde
-    // dagrijen en dezelfde forecast. Zie channel-data-provider.tsx.
-    <ChannelDataProvider clientId={clientId} channel="microsoft">
-    <div className="space-y-6">
+  // De kopkaart, één keer gemaakt: de vertrouwde weergave zet hem bovenaan, de nieuwe achter "Over
+  // dit tabblad" (en in de beursmodus ook bovenaan).
+  const kop = (
       <ChannelViewHeader
         icon={<Search className="w-5 h-5 text-brand-blue-ink" />}
         title="Microsoft Ads (Bing)"
@@ -63,6 +69,22 @@ export function MicrosoftView({ clientId, geoClone, edition, meerdereKanalen = t
             : <>De Microsoft-analyses (maand-SOP, weekly, bi-weekly) draai je via het tabblad <strong>Analyses</strong>.</>
         }
       />
+  );
+  if (nieuw) {
+    // Geen wereldkaart, geen ringen en geen video: Microsoft levert die data niet (zie hierboven).
+    return (
+      <ChannelDataProvider clientId={clientId} channel="microsoft">
+        <KanaalOverzichtNieuw clientId={clientId} kanaal="microsoft" geoClone={geoClone} edition={edition} kop={kop} geo={null} />
+      </ChannelDataProvider>
+    );
+  }
+  return (
+    // Eén provider om alle kaarten heen, zoals Meta en LinkedIn sinds "een fetch per
+    // kanaaltabblad": pacing, maandverloop, de beurs-sectie en het jaaroverzicht lezen dezelfde
+    // dagrijen en dezelfde forecast. Zie channel-data-provider.tsx.
+    <ChannelDataProvider clientId={clientId} channel="microsoft">
+    <div className="space-y-6">
+      {kop}
 
       {/* Geen geo-kaart naast Account Health (Microsoft levert geen geodata): health en pacing
           naast elkaar pas vanaf 1800px, zelfde grens als Google/Meta/LinkedIn; daaronder staat

@@ -11,6 +11,9 @@
 // kanaal- of periodewissel is dus puur rekenwerk in de browser: geen verzoek, zoals fase 1 heeft
 // vastgelegd. Net als de band staat het BUITEN de datapoort van ClientDataProvider: het eerste
 // cijfer wacht op de routes, niet op de instellingen.
+//
+// Fase 4 zet het logboek "Wat er gebeurde" naast de grafiek (overzicht-logboek.tsx). Dat is het
+// enige blok hier dat zelf iets ophaalt: één verzoek bij het laden, niets bij een wissel.
 
 import { useEffect, useMemo, useState, type AnimationEvent } from "react";
 import type { ClientHistoricalData } from "@/lib/types";
@@ -31,6 +34,7 @@ import { kanaalScores } from "./kanaal-health-ranking";
 import { Kanaalkaarten, KAARTENRIJ_HOOGTE, type KaartHealth, type Kanaalkaart } from "./kanaalkaarten";
 import { PeriodSummary } from "./period-summary";
 import { OverzichtHoofdgrafiek } from "./overzicht-hoofdgrafiek";
+import { OverzichtLogboek } from "./overzicht-logboek";
 
 /**
  * De health van Google voor de kaart: dezelfde score als in de ranking "Account Health per kanaal".
@@ -66,7 +70,7 @@ function useGoogleHealth(clientId: string, googleData: ClientHistoricalData | nu
   return { health, laadt: aan && (!googleData || !klaar) };
 }
 
-export function OverzichtBovenkant({ clientId, channel, kanalen, onKies, googleData, route, band, bandKlaar, demo, reserveerKaarten = false }: {
+export function OverzichtBovenkant({ clientId, channel, kanalen, onKies, onBeoordeel, googleData, route, band, bandKlaar, demo, reserveerKaarten = false }: {
   clientId: string;
   /** Wat er getoond wordt: een kanaal, of "blended" voor alle kanalen. */
   channel: Kanaalkeuze;
@@ -74,6 +78,8 @@ export function OverzichtBovenkant({ clientId, channel, kanalen, onKies, googleD
   kanalen: readonly Kanaal[] | null;
   /** Zet het kanaal (in de adresbalk, via het klantdashboard). */
   onKies: (keuze: Kanaalkeuze) => void;
+  /** Naar het tabblad Bevindingen: daar wordt beslist, het logboek wijst er alleen naar. */
+  onBeoordeel: () => void;
   googleData: ClientHistoricalData | null;
   /** De blended route: de health per dagkanaal, en de stand van de bronnen. */
   route: Pick<BlendedClientDataState, "perKanaalTab" | "dataStand" | "loading" | "error">;
@@ -165,8 +171,19 @@ export function OverzichtBovenkant({ clientId, channel, kanalen, onKies, googleD
       <div className={speel ? "opbouw" : undefined} style={stap(voor)}>
         <PeriodSummary data={bandKlaar ? band.data : null} bronnen={band.bronnen} laden={!bandKlaar} vorm="tegels" />
       </div>
-      <div className={speel ? "opbouw" : undefined} style={stap(voor + 1)} onAnimationEnd={opEinde}>
-        <OverzichtHoofdgrafiek maanden={maanden} kanalen={gekozen ? [gekozen] : lijst} gekozen={gekozen} laden={grafiekLaadt} />
+      {/* De grafiek en het logboek naast elkaar (8 en 4 van de 12 kolommen); op een telefoon onder
+          elkaar met het logboek EERST: wat er gebeurde lees je voor je het verloop bekijkt.
+          `items-start`: de twee kaarten rekken elkaar niet op, en het logboek heeft een eigen
+          schuifvak, dus een regel die openklapt verschuift niets onder dit blok. Het logboek doet
+          één verzoek bij het laden en geen bij een wissel van kanaal of periode; `herlees` is de
+          ronde van de blended route (na een sync). */}
+      <div className={`grid items-start gap-2 lg:grid-cols-12 ${speel ? "opbouw" : ""}`} style={stap(voor + 1)} onAnimationEnd={opEinde}>
+        <div className="order-2 min-w-0 lg:order-1 lg:col-span-8">
+          <OverzichtHoofdgrafiek maanden={maanden} kanalen={gekozen ? [gekozen] : lijst} gekozen={gekozen} laden={grafiekLaadt} />
+        </div>
+        <div className="order-1 min-w-0 lg:order-2 lg:col-span-4">
+          <OverzichtLogboek clientId={clientId} channel={channel} kanalen={lijst} onKies={onKies} onBeoordeel={onBeoordeel} herlees={route.perKanaalTab} />
+        </div>
       </div>
     </div>
   );

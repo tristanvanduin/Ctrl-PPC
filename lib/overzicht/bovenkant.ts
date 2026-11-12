@@ -168,6 +168,14 @@ export interface GrafiekMaand {
   cpa: number | null;
   /** Geen enkel getoond kanaal deed deze maand iets: de grafiek tekent dan niets, en zegt dat. */
   leeg: boolean;
+  /**
+   * De getoonde kanalen die deze maand nog niet liepen: de maand ligt vóór hun eerste maand met
+   * data. Hun nullen in `perKanaal` zijn dan geen meting. Een PAUZE hoort hier niet bij: een kanaal
+   * dat eerder liep en deze maand niets deed, heeft echt nul uitgegeven. De grafiek laat een kanaal
+   * dat nog niet liep weg uit de stapel en de tooltip en noemt het in een voetregel, zoals de
+   * stavenkaart "Spend per kanaal per maand" deed.
+   */
+  voorStart: Kanaal[];
 }
 
 /**
@@ -186,10 +194,22 @@ export function grafiekMaanden(
   periode: PeriodRange,
 ): GrafiekMaand[] {
   const lijst = ALLE_KANALEN.filter((k) => getoond.includes(k));
+  // De eerste maand met data per kanaal ("YYYY-MM" sorteert als tekst). Een kanaal zonder enige
+  // data heeft geen start en dus ook geen "nog niet": daar valt niets over te zeggen.
+  const eersteMaand = new Map<Kanaal, Month>();
+  for (const kanaal of lijst) {
+    let eerste: Month | null = null;
+    for (const [maand, t] of perKanaal[kanaal]?.maanden ?? []) {
+      if (heeftData(t) && (eerste === null || maand < eerste)) eerste = maand;
+    }
+    if (eerste !== null) eersteMaand.set(kanaal, eerste);
+  }
   return monthsIn(periode).map((maand) => {
-    const rij: GrafiekMaand = { maand, perKanaal: {}, conversions: 0, adSpend: 0, revenue: 0, cpa: null, leeg: true };
+    const rij: GrafiekMaand = { maand, perKanaal: {}, conversions: 0, adSpend: 0, revenue: 0, cpa: null, leeg: true, voorStart: [] };
     for (const kanaal of lijst) {
       const m = perKanaal[kanaal]?.maanden.get(maand);
+      const start = eersteMaand.get(kanaal);
+      if (start !== undefined && maand < start) rij.voorStart.push(kanaal);
       const t: Totalen = { conversions: m?.conversions || 0, revenue: m?.revenue || 0, adSpend: m?.adSpend || 0 };
       rij.perKanaal[kanaal] = t;
       rij.conversions += t.conversions;

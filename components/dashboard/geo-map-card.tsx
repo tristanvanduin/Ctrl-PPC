@@ -24,10 +24,21 @@ const UsStatesMap = dynamic(() => import("./us-states-map"), {
 // de klik-op-VS-hint, zodat de kaart de volle kolombreedte krijgt. Krijgt state van
 // useGeoBreakdown() mee als prop in plaats van hem zelf aan te roepen -- zelfde hook-instantie als
 // GeoRanglijstCard ernaast, anders lopen metric-keuze en VS-drilldown uit elkaar.
-export function GeoMapCard({ state, channel = "google", verdieping }: {
+export function GeoMapCard({ state, channel = "google", verdieping, naast, voet, vensterToevoeging }: {
   state: GeoBreakdownState;
   channel?: "google" | "meta" | "linkedin" | "blended";
   verdieping?: ReactNode;
+  /**
+   * De nieuwe weergave (bouwplan fase 5): de ranglijst NAAST de projectie in plaats van eronder.
+   * Onder de projectie maakte hij de kaart 850 px hoog, met balken van duizend pixels breed; ernaast
+   * is het dezelfde inhoud op de hoogte van de projectie. Onder `lg` staat hij er weer onder: naast
+   * elkaar is op een telefoon geen indeling maar gedrang.
+   */
+  naast?: ReactNode;
+  /** Onderaan de kaart, over de volle breedte: de lade "Toon als tabel". */
+  voet?: ReactNode;
+  /** Een voorbehoud bij het venster, voor het label in de kop: "zonder Microsoft". */
+  vensterToevoeging?: string;
 }) {
   const { metricKey, setMetricKey, metric, focus, setFocus, countries, laden, canDrillUs, geoWord, values, ranked, eenLandOfMinder } = state;
 
@@ -37,7 +48,13 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
   // nieuwe 2x2-opener (17.36-17.43), was waar "ik mis de geo-kaart in al mijn overzichten" op
   // sloeg: voor een single-country klant (de norm, niet de uitzondering) verdween hij hier het
   // vaakst.
-  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} />;
+  // Het voorbehoud bij het venster gaat mee: deze stand heeft geen eigen kop met een vensterlabel, en
+  // zonder stond "zonder Microsoft" bij een klant met één land nergens meer.
+  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} voorbehoud={vensterToevoeging} />;
+
+  // De kolom ernaast alleen als de ranglijst iets toont: zonder rijen voor de gekozen metriek stond
+  // er rechts een leeg omrand vak naast "Geen data voor deze metric".
+  const metNaast = naast !== undefined && ranked.length > 0;
 
   return (
     // `flex h-full flex-col` met het kaartvlak als `flex-1`: deze kaart deelt een rasterrij met
@@ -53,7 +70,11 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
         <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
         {/* De landrijen komen uit een eigen lezing over 180 dagen (lib/geo/use-geo-breakdown.ts); de
             periode laten volgen kost een verzoek per wissel. Tot die tijd staat het venster erbij. */}
-        <Vensterlabel soort="vast" venster="laatste 180 dagen" />
+        <Vensterlabel soort="vast" venster="laatste 180 dagen" toevoeging={vensterToevoeging} />
+        {/* Het aantal landen als bijschrift, nu de tegel "aantal landen" er in deze vorm niet meer is. */}
+        {naast !== undefined && ranked.length > 0 && (
+          <span className="text-meta text-muted-foreground">{ranked.length} {focus === "US" ? "staten" : ranked.length === 1 ? "land" : "landen"}</span>
+        )}
         {focus === "US" && (
           <button
             onClick={() => setFocus(null)}
@@ -84,7 +105,8 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
         </label>
       </div>
 
-      <div className="flex flex-1 flex-col justify-center px-3 py-3">
+      <div className={metNaast ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px]" : "contents"}>
+      <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-3">
         {ranked.length === 0 ? (
           <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
         ) : (
@@ -118,8 +140,11 @@ export function GeoMapCard({ state, channel = "google", verdieping }: {
           </p>
         )}
       </div>
+      {metNaast && <div className="min-w-0 border-t border-border lg:border-l lg:border-t-0">{naast}</div>}
+      </div>
 
       {verdieping}
+      {voet}
     </div>
   );
 }

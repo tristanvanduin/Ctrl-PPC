@@ -8,7 +8,7 @@ import { blendedReliability } from "@/lib/cross-channel/measurement-reliability"
 import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
 import { kanaalMaandRijen, rijenInPeriode } from "@/lib/cross-channel/kanaal-maandrijen";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
-import { RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
+import { Lade, RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
 import { maandLabel } from "./chart-chrome";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Sectie, Deelkop } from "@/components/ui/sectie";
@@ -16,7 +16,7 @@ import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { usePeriod } from "@/lib/period/period-context";
 import { formatRange } from "@/lib/period/period-range";
 import { GeoMapCard } from "./geo-map-card";
-import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
+import { GeoRanglijstCard, GeoRanglijstInKaart, GeoTabelLade } from "./geo-ranglijst-card";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { KanaalHealthRanking } from "./kanaal-health-ranking";
 import { useBlendedClientData } from "@/lib/use-blended-client-data";
@@ -26,6 +26,7 @@ import { MetricCardsView } from "./metric-cards";
 import { PerformanceChartView } from "./performance-chart";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { BlendedPacing } from "./blended-pacing";
+import { PacingJaaroverzicht } from "./pacing-jaaroverzicht";
 import { uitgeslotenZin } from "./period-summary";
 import { uitgeslotenMetDag } from "@/lib/sync/datastand";
 import type { Kanaal } from "@/lib/kanalen/beschikbaar";
@@ -58,15 +59,25 @@ function fmt(n: number | null): string {
   return new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(n);
 }
 
-export function CrossChannelView({ clientId, kanalen = [], edition }: {
+export function CrossChannelView({ clientId, kanalen = [], edition, nieuw = false, alleenTabel = false }: {
   clientId: string;
   kanalen?: Kanaal[];
   edition?: UpcomingEdition | null;
+  /** De schakelaar "Nieuwe weergave" staat aan: de herschikte, ingekorte opbouw (bouwplan fase 5).
+   *  Uit rendert dit tabblad precies wat het altijd renderde. */
+  nieuw?: boolean;
+  /**
+   * Alleen de kanaaltabel met zijn voorbehouden, als eigen sectie: voor Campagnes > Alle kanalen in
+   * de nieuwe weergave (element 57 van de elementtabel). Op het Overzicht staat dezelfde tabel dan
+   * achter "Toon als tabel"; hier staat hij open, boven de campagnes per kanaal. Dezelfde rijen uit
+   * dezelfde ophaalronde, dus geen verzoek erbij; de landcijfers worden in deze stand niet gelezen.
+   */
+  alleenTabel?: boolean;
 }) {
   const [maandenOpen, toggleMaanden] = useRememberedOpen("cross-maanden", false);
   // Eén hook-aanroep voor beide geo-kaarten: de kaart en de cijfers eronder delen dezelfde
   // metric-keuze en dezelfde VS-drilldown. Twee aanroepen zouden twee losse states geven.
-  const geo = useGeoBreakdown({ clientId, channel: "blended" });
+  const geo = useGeoBreakdown({ clientId, channel: "blended", enabled: !alleenTabel });
   // De blended historie voedt zowel de beurs-sectie als het jaaroverzicht. Eén hook, één forecast:
   // twee aanroepen zouden dezelfde route twee keer bevragen en twee keer dezelfde som uitrekenen.
   //
@@ -158,214 +169,12 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
     return row;
   });
 
-  return (
-    <div>
-      {/* ÉÉN KOP VOOR DE BLOKKEN MET EEN VAST VENSTER (bouwplan fase 2). Hier stonden vier secties
-          door elkaar: "Markten" (met Account Health en Pacing erin), "Prestaties richting de
-          beurs", dan de verdeling over de kanalen, dan het "Jaaroverzicht". Pacing, de beurs en
-          het jaaroverzicht gaan alle drie over het kalenderjaar en stonden op drie plekken, met
-          ertussen een blok dat de periodekiezer hoort te volgen. Wie de periode verzette zag de
-          helft van de pagina stilstaan zonder te kunnen zien waarom.
-
-          Nu staan de blokken die NIET meebewegen bij elkaar onder één kop die dat zegt, en de
-          blokken die de periode WEL volgen daaronder. Niets is weg: wat een sectie was, is hier
-          een deel met dezelfde titel en hetzelfde bijschrift (Deelkop), en elk blok zegt in zijn
-          kop welk venster het gebruikt (Vensterlabel). De wereldkaart blijft naast Account Health
-          en Pacing staan: die indeling is op hoogte uitgemeten (zie hieronder) en hoort bij de
-          bovenkant van de pagina. De kaart stond lange tijd als laatste sectie, onder de volle
-          cross-channel-tabel: hij bestond en werkte, maar wie hem zocht moest eerst door de hele
-          tabel scrollen -- het "ik mis de wereldkaart"-effect, zonder dat er iets ontbrak. */}
-      <Sectie
-        eerste
-        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Jaar, beurs en markten"
-        bijschrift="Vaste vensters: het kalenderjaar, de beurs en waar het verkeer vandaan komt, over alle kanalen samen. Deze blokken volgen de periodekiezer niet; elk zegt in zijn kop welk venster het gebruikt."
-      >
-        {/* DEZELFDE TWEE KAARTEN ALS DE KANAALTABBLADEN, en niet meer GeoBreakdown.
-            GeoBreakdown is de oude, ongesplitste vorm: kaart links en ranglijst rechts in één
-            kaart, met een `max-w-6xl` (1152px) die op een scherm van 1920px gecentreerd in een
-            kaart van 1584px stond -- 216px wit aan weerszijden en een projectie van 760px in het
-            midden. Dat viel niet op zolang alle tabbladen zo waren; nu de kanaaltabbladen de
-            gesplitste vorm hebben (projectie plus balken in de kaart, cijfers in een eigen kaart
-            eronder) las het als "er is iets met de kaart gebeurd". Zelfde componenten, zelfde
-            volgorde, zelfde breedtegedrag. */}
-        {/* Microsoft telt op dit tabblad niet overal mee, en dat moet er staan. De pacing, de
-            beurs-sectie en het jaaroverzicht lezen sinds 1 november 2026 de dagtabellen (via
-            /api/blended/client-data), net als de kerncijfers bovenaan: daar telt Microsoft mee. De
-            ranking (fase 1, stap 5), de verdeling over de kanalen en de cross-channel-tabel (stap 6)
-            ook: die lezen het tab-object en de tellers per kanaal uit dezelfde route. Alleen de
-            markten lezen nog een bron zonder Microsoft. Zonder deze regel ontbrak Microsoft stil
-            onder een kop die "alle kanalen" belooft. Gedempt en niet amber: er valt vandaag niets
-            aan te doen (de kleurregel van 82cde2d). */}
-        {kanalen.includes("microsoft") && (
-          <p className="mb-3 text-meta leading-snug text-muted-foreground">
-            Microsoft Ads telt mee in de kerncijfers bovenaan, de ranking, de pacing, de
-            beurs-sectie, het jaaroverzicht, de verdeling over de kanalen en de cross-channel-tabel.
-            In de markten nog niet; de eigen Microsoft-cijfers staan op het tabblad Microsoft.
-          </p>
-        )}
-        {/* Dezelfde asymmetrische hero als de kanaaltabbladen: links de gezondheid, rechts de
-            wereldkaart, en de linkerkolom vangt het hoogteverschil op. Zie google-view.tsx voor
-            de volledige redenering achter de 1800px-grens. */}
-        <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
-          <div className="flex flex-col gap-4">
-            <KanaalHealthRanking clientId={clientId} kanalen={kanalen} />
-            {/* De opvanger van deze kolom. Pacing hoort hier ook inhoudelijk: de rangschikking
-                zegt hoe gezond elk kanaal is, pacing zegt of het geheel op tempo ligt. Gevoed uit
-                dezelfde historie als het jaaroverzicht (per kanaal, met de datastand), niet uit
-                blended_account_monthly: anders konden de twee blokken over hetzelfde jaar
-                verschillende getallen tonen (andere conversieselectie, wees-rollups, geen
-                Microsoft). */}
-            <div className="flex flex-1 flex-col">
-              <BlendedPacing perKanaal={blended.perKanaal} dataStand={blended.dataStand} />
-            </div>
-          </div>
-          <div className="flex flex-1 flex-col">
-            <GeoMapCard state={geo} channel="blended" verdieping={<GeoRanglijstInKaart state={geo} />} />
-          </div>
-        </div>
-
-        {/* Over de volle breedte: zes tegels naast elkaar vullen die breedte, in een halve kolom
-            stonden ze in twee rijen van drie met een lege onderhelft. */}
-        <GeoRanglijstCard state={geo} zonderBalken />
-
-        {/* DEZELFDE TWEE DELEN ALS DE KANAALTABBLADEN, gevoed uit de blended historie.
-            "Waarom heeft alle kanalen deze sectie niet?" -- omdat FairWeeksOverview, MetricCards en
-            PerformanceChart hun data uit ClientDataProvider haalden, en die is Google-only. Alle
-            drie zijn nu gesplitst in een Google-ingang en een weergave die data + forecast als props
-            neemt; useBlendedClientData levert exact dezelfde twee vormen over Google, Meta,
-            LinkedIn en Microsoft samen, inclusief hetzelfde jaardoel-mechanisme (vorig jaar plus
-            groei zolang er niets is ingevoerd, zie lib/analysis/standaard-jaardoel.ts). */}
-        {blendedForecast && edition && (
-          <>
-            <Deelkop
-              icoon={<CalendarClock className="w-4 h-4 text-brand-blue-ink" />}
-              titel="Prestaties richting de beurs"
-              bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
-            />
-            <FairWeeksView data={blendedForecast.data} forecast={blendedForecast.forecast} edition={edition} />
-          </>
-        )}
-
-        {blendedForecast && (
-          <>
-            <Deelkop
-              icoon={<Target className="w-4 h-4 text-brand-blue-ink" />}
-              titel="Jaaroverzicht"
-              bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend, over alle kanalen samen"
-              venster={<Vensterlabel soort="jaar" jaar={blendedForecast.data.currentYear} />}
-            />
-            {/* Het voorbehoud hoort hier en niet alleen bij de tabel verderop: elk kanaal claimt
-                zijn eigen conversies met zijn eigen attributievenster, dus de blended som is een
-                BOVENGRENS, en een prognose die daarop rekent erft dat. Maar als voetnoot en niet in
-                alarmkleur: dit is hoe blended rekenen werkt, niet iets wat vandaag is misgegaan en
-                wat je kunt verhelpen. */}
-            <p className="text-meta leading-snug text-muted-foreground">
-              De conversies hieronder zijn de som over de kanalen, elk met zijn eigen
-              attributievenster: een bovengrens, geen exacte telling.
-              {jaarUitgesloten && ` ${jaarUitgesloten}`}
-            </p>
-            <MetricCardsView
-              forecast={blendedForecast.forecast}
-              selected={jaaroverzichtMetric}
-              onSelect={setJaaroverzichtMetric}
-            />
-            <PerformanceChartView
-              clientData={blendedForecast.data}
-              forecast={blendedForecast.forecast}
-              metric={jaaroverzichtMetric}
-              onMetricChange={setJaaroverzichtMetric}
-            />
-          </>
-        )}
-      </Sectie>
-
-      {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
-          vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
-          binnen zichzelf, terwijl het twee antwoorden op twee vragen zijn — "hoe verhouden de
-          kanalen zich over de maanden" en "wat leverde elk kanaal op". */}
-      {rows && rows.length > 0 && (
-        <Sectie
-          icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Verdeling over de kanalen"
-          bijschrift={`Spend per kanaal per maand en de verdeling over de kanalen, binnen de gekozen periode (${formatRange(periode.range)})`}
-        >
-          {/* De staven en de ringen naast elkaar, want het zijn twee helften van dezelfde vraag:
-              de staven tonen het VERLOOP per maand, de ringen de VERDELING nu -- en de ringen ook
-              voor conversies, wat de staven niet doen. "Waarom heeft alle kanalen geen donuts?"
-              was terecht: de kaart bestond al (dezelfde die op Google onder "Spend per kanaal"
-              staat) en las hier alleen niemand.
-
-              Alleen de kanaal-uitsplitsing: campagnetype en campagnenaam komen uit
-              ads_campaign_monthly, en die tabel kent enkel Google-campagnes. Twee tabbladen die
-              een Google-verdeling tonen onder een kop die alle kanalen belooft, is precies de
-              soort halve waarheid die dit tabblad moet vermijden.
-
-              De ring krijgt dezelfde rijen als de staven en de tabel (`kanaalRijen`) en kiest er
-              zelf zijn venster uit: geen tweede lezing, en geen ring die een maand anders telt
-              dan de tabel eronder. */}
-          {/* Beide volgen de gekozen periode, uit dezelfde rijen: de staven per maand, de ring over
-              de hele periode. Heeft de periode geen enkele rij (een bereik van vóór de data), dan
-              zegt de kaart dat in plaats van te verdwijnen: een blok dat wegvalt als je de periode
-              verzet leest als een fout, niet als een antwoord. */}
-          {chartMonths.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card px-5 py-8 text-center shadow-sm">
-              <p className="mb-2"><Vensterlabel soort="periode" /></p>
-              <p className="text-body text-muted-foreground">
-                In {formatRange(periode.range)} heeft geen enkel kanaal cijfers. Kies een latere periode om de verdeling te zien.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
-              <div className="lg:col-span-2">
-                <GroupedMonthlyBars
-                  title="Spend per kanaal per maand"
-                  venster={<Vensterlabel soort="periode" />}
-                  months={chartMonths}
-                  series={chartSeries}
-                  data={chartData}
-                  groeit
-                />
-              </div>
-              <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} kanaalRijen={rows} />
-            </div>
-          )}
-        </Sectie>
-      )}
-
-      {/* Data-weergave; de cross-channel-signaalanalyse draait via Analyses → Cross-channel.
-
-          Alleen bij meer dan één kanaal, dezelfde voorwaarde als de hook hierboven: de rijen komen
-          daaruit, en zolang hij uit staat is er niets te tonen en ook niets te laden. Dat is het
-          geval bij een klant zonder data (de melding bovenaan het dashboard zegt dat al) en heel
-          even bij het openen, als de kanalen nog niet bekend zijn. Zonder deze voorwaarde zou
-          daar dan een halve tel "nog geen cross-channel data" staan voor een klant die vier
-          kanalen heeft. De secties hierboven verschijnen op dezelfde manier pas met hun data. */}
-      {kanalen.length > 1 && (
-      <Sectie
-        icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel="Cross-channel (blended)"
-        bijschrift={`Wat elk kanaal opleverde in de gekozen periode (${formatRange(periode.range)}), en de maanden erachter`}
-        actie={<Vensterlabel soort="periode" />}
-      >
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-
-        {/* ── DE TABEL SMALLER, MET DE WAARSCHUWINGEN ERNAAST ──────────────────
-            Hier stonden twee volle-breedte banners bóven een tabel van zes kolommen, en die tabel
-            liep zelf ook over de volle kaartbreedte. Drie brede blokken onder elkaar, met veel
-            witruimte rechts in alle drie.
-
-            Nu staat de tabel in acht van de twaalf kolommen en staan de twee mededelingen ernaast.
-            Geen opvulling: het zijn de twee voorbehouden die je bij déZE cijfers moet kennen, en
-            naast de cijfers gelezen worden ze eerder gelezen dan erboven, waar je ze overslaat op
-            weg naar de tabel.
-
-            Bewust NIET de kanaalverdeling ernaast gezet, hoe verleidelijk ook: die staat al in de
-            grafiek erboven én in de eerste kolom van deze tabel. Een derde kopie is geen bento
-            maar herhaling.
-
-            Onder lg valt alles terug op één kolom en staat de tabel weer voluit -- op een smal
-            scherm is naast elkaar geen indeling maar gedrang. */}
+  // De kanaaltabel met de twee voorbehouden ernaast. Eén stuk voor beide weergaven: in de
+  // vertrouwde staat het open in de sectie "Cross-channel (blended)", in de nieuwe achter "Toon als
+  // tabel". Dezelfde rijen, dezelfde totalen, dezelfde tekst. Een functie en geen waarde: de
+  // totalen en de veertig maandregels worden pas uitgerekend waar hij wordt aangeroepen, en in de
+  // nieuwe weergave is dat pas als de lade open is.
+  const tabelMetVoorbehoud = () => (
         <div className="grid gap-4 px-5 py-4 lg:grid-cols-12">
           <div className="min-w-0 lg:col-span-8">
           {rows === null && !error && (
@@ -578,6 +387,330 @@ export function CrossChannelView({ clientId, kanalen = [], edition }: {
             )}
           </aside>
         </div>
+  );
+
+  if (alleenTabel) {
+    // Dezelfde voorwaarde als op het Overzicht: zonder twee kanalen valt er niets te vergelijken.
+    if (kanalen.length <= 1) return null;
+    return (
+      <Sectie
+        eerste
+        icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Kanaaltotalen"
+        bijschrift={`Wat elk kanaal opleverde in de gekozen periode (${formatRange(periode.range)}), en de maanden erachter`}
+        actie={<Vensterlabel soort="periode" />}
+      >
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          {tabelMetVoorbehoud()}
+        </div>
+      </Sectie>
+    );
+  }
+
+  // De verdeling over de kanalen: de ring van de gekozen periode, of de zin dat de periode leeg is.
+  const legePeriode = (
+            <div className="rounded-xl border border-border bg-card px-5 py-8 text-center shadow-sm">
+              <p className="mb-2"><Vensterlabel soort="periode" /></p>
+              <p className="text-body text-muted-foreground">
+                In {formatRange(periode.range)} heeft geen enkel kanaal cijfers. Kies een latere periode om de verdeling te zien.
+              </p>
+            </div>
+  );
+
+  // ── DE NIEUWE WEERGAVE (bouwplan fase 5) ─────────────────────────────────────────────────────
+  //
+  // Dezelfde blokken, herschikt en ingekort; achter de schakelaar "Nieuwe weergave". Wat hier niet
+  // meer open staat, staat achter een knop of op een andere plek, en nergens is een cijfer weg:
+  //
+  //   Account Health          de rangschikking open; radar, factoren en toelichting achter
+  //                           "Toon onderbouwing"
+  //   Pacing + Jaaroverzicht  één kaart (pacing-jaaroverzicht.tsx) met de lade "Verloop en
+  //                           prognose"; het budgetadvies in de kaart zelf
+  //   Beurs                   de strook en het weekvenster blijven; de drie weekkaarten zijn één
+  //                           regel "deze week"
+  //   Spend per kanaal        de schakelaar Kosten in de hoofdgrafiek bovenaan
+  //   Ring per kanaal         blijft, volgt de periode
+  //   Kanaaltabel en maanden  achter "Toon als tabel", met de voorbehouden erbij
+  //   Wereldkaart             de ranglijst naast de projectie, de tabel per land achter "Toon als
+  //                           tabel"; de zes tegels "per land" staan in de totaalrij van die tabel
+  //   De Microsoft-regel      het voorbehoud in het vensterlabel van de wereldkaart, het enige
+  //                           blok dat Microsoft nog niet meetelt
+  //
+  // Alles leest dezelfde hook-aanroepen als hierboven: de herschikking kost geen verzoek, en een
+  // wissel van kanaal of periode ook niet.
+  if (nieuw) {
+    const metBeurs = Boolean(blendedForecast && edition);
+    return (
+      <div>
+        {blendedForecast && edition && (
+          <Sectie
+            eerste
+            icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
+            titel="Prestaties richting de beurs"
+            bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+          >
+            <FairWeeksView data={blendedForecast.data} forecast={blendedForecast.forecast} edition={edition} compact />
+          </Sectie>
+        )}
+
+        <Sectie
+          eerste={!metBeurs}
+          icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Gezondheid, pacing en markten"
+          bijschrift="Elk blok zegt in zijn kop welk venster het gebruikt: het kalenderjaar, de gekozen periode of een eigen venster."
+        >
+          {/* `items-start`: de twee kaarten rekken elkaar niet op. Klapt de onderbouwing van Health
+              open, dan groeit alleen die kaart. */}
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+            <KanaalHealthRanking clientId={clientId} kanalen={kanalen} onderbouwingAchterKlik />
+            {rows && rows.length > 0 && (
+              chartMonths.length === 0 ? legePeriode : <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} kanaalRijen={rows} />
+            )}
+          </div>
+
+          {blendedForecast && (
+            <PacingJaaroverzicht
+              data={blendedForecast.data}
+              forecast={blendedForecast.forecast}
+              perKanaal={blended.perKanaal}
+              dataStand={blended.dataStand}
+              metric={jaaroverzichtMetric}
+              onMetricChange={setJaaroverzichtMetric}
+              uitgesloten={jaarUitgesloten}
+            />
+          )}
+
+          {/* De kanaaltabel: de data achter de ring en de hoofdgrafiek, en het tekstalternatief van
+              beide. Dicht staat er de kop met het venster en de knop; de tabel van de maanden per
+              kanaal (tot veertig regels) wordt pas gerenderd als je hem opent. */}
+          {kanalen.length > 1 && (
+            <section aria-label="Kanaaltotalen als tabel" className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+              <div className="flex flex-wrap items-center gap-2 px-5 py-3">
+                <Layers className="h-4 w-4 text-brand-blue-ink" aria-hidden />
+                <h3 className="text-title font-semibold text-brand-gray">Kanaaltotalen en maanden per kanaal</h3>
+                <Vensterlabel soort="periode" />
+                <span className="ml-auto text-micro text-muted-foreground">de cijfers achter de ring en de grafiek · staat ook open op Campagnes</span>
+              </div>
+              <Lade id="cross-kanaaltabel" label="Toon als tabel" labelOpen="Verberg de tabel">
+                {tabelMetVoorbehoud}
+              </Lade>
+            </section>
+          )}
+
+          <GeoMapCard
+            state={geo}
+            channel="blended"
+            naast={<GeoRanglijstInKaart state={geo} naast />}
+            voet={<GeoTabelLade state={geo} />}
+            vensterToevoeging={kanalen.includes("microsoft") ? "zonder Microsoft" : undefined}
+          />
+        </Sectie>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* ÉÉN KOP VOOR DE BLOKKEN MET EEN VAST VENSTER (bouwplan fase 2). Hier stonden vier secties
+          door elkaar: "Markten" (met Account Health en Pacing erin), "Prestaties richting de
+          beurs", dan de verdeling over de kanalen, dan het "Jaaroverzicht". Pacing, de beurs en
+          het jaaroverzicht gaan alle drie over het kalenderjaar en stonden op drie plekken, met
+          ertussen een blok dat de periodekiezer hoort te volgen. Wie de periode verzette zag de
+          helft van de pagina stilstaan zonder te kunnen zien waarom.
+
+          Nu staan de blokken die NIET meebewegen bij elkaar onder één kop die dat zegt, en de
+          blokken die de periode WEL volgen daaronder. Niets is weg: wat een sectie was, is hier
+          een deel met dezelfde titel en hetzelfde bijschrift (Deelkop), en elk blok zegt in zijn
+          kop welk venster het gebruikt (Vensterlabel). De wereldkaart blijft naast Account Health
+          en Pacing staan: die indeling is op hoogte uitgemeten (zie hieronder) en hoort bij de
+          bovenkant van de pagina. De kaart stond lange tijd als laatste sectie, onder de volle
+          cross-channel-tabel: hij bestond en werkte, maar wie hem zocht moest eerst door de hele
+          tabel scrollen -- het "ik mis de wereldkaart"-effect, zonder dat er iets ontbrak. */}
+      <Sectie
+        eerste
+        icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Jaar, beurs en markten"
+        bijschrift="Vaste vensters: het kalenderjaar, de beurs en waar het verkeer vandaan komt, over alle kanalen samen. Deze blokken volgen de periodekiezer niet; elk zegt in zijn kop welk venster het gebruikt."
+      >
+        {/* DEZELFDE TWEE KAARTEN ALS DE KANAALTABBLADEN, en niet meer GeoBreakdown.
+            GeoBreakdown is de oude, ongesplitste vorm: kaart links en ranglijst rechts in één
+            kaart, met een `max-w-6xl` (1152px) die op een scherm van 1920px gecentreerd in een
+            kaart van 1584px stond -- 216px wit aan weerszijden en een projectie van 760px in het
+            midden. Dat viel niet op zolang alle tabbladen zo waren; nu de kanaaltabbladen de
+            gesplitste vorm hebben (projectie plus balken in de kaart, cijfers in een eigen kaart
+            eronder) las het als "er is iets met de kaart gebeurd". Zelfde componenten, zelfde
+            volgorde, zelfde breedtegedrag. */}
+        {/* Microsoft telt op dit tabblad niet overal mee, en dat moet er staan. De pacing, de
+            beurs-sectie en het jaaroverzicht lezen sinds 1 november 2026 de dagtabellen (via
+            /api/blended/client-data), net als de kerncijfers bovenaan: daar telt Microsoft mee. De
+            ranking (fase 1, stap 5), de verdeling over de kanalen en de cross-channel-tabel (stap 6)
+            ook: die lezen het tab-object en de tellers per kanaal uit dezelfde route. Alleen de
+            markten lezen nog een bron zonder Microsoft. Zonder deze regel ontbrak Microsoft stil
+            onder een kop die "alle kanalen" belooft. Gedempt en niet amber: er valt vandaag niets
+            aan te doen (de kleurregel van 82cde2d). */}
+        {kanalen.includes("microsoft") && (
+          <p className="mb-3 text-meta leading-snug text-muted-foreground">
+            Microsoft Ads telt mee in de kerncijfers bovenaan, de ranking, de pacing, de
+            beurs-sectie, het jaaroverzicht, de verdeling over de kanalen en de cross-channel-tabel.
+            In de markten nog niet; de eigen Microsoft-cijfers staan op het tabblad Microsoft.
+          </p>
+        )}
+        {/* Dezelfde asymmetrische hero als de kanaaltabbladen: links de gezondheid, rechts de
+            wereldkaart, en de linkerkolom vangt het hoogteverschil op. Zie google-view.tsx voor
+            de volledige redenering achter de 1800px-grens. */}
+        <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-2 min-[1800px]:items-stretch">
+          <div className="flex flex-col gap-4">
+            <KanaalHealthRanking clientId={clientId} kanalen={kanalen} />
+            {/* De opvanger van deze kolom. Pacing hoort hier ook inhoudelijk: de rangschikking
+                zegt hoe gezond elk kanaal is, pacing zegt of het geheel op tempo ligt. Gevoed uit
+                dezelfde historie als het jaaroverzicht (per kanaal, met de datastand), niet uit
+                blended_account_monthly: anders konden de twee blokken over hetzelfde jaar
+                verschillende getallen tonen (andere conversieselectie, wees-rollups, geen
+                Microsoft). */}
+            <div className="flex flex-1 flex-col">
+              <BlendedPacing perKanaal={blended.perKanaal} dataStand={blended.dataStand} />
+            </div>
+          </div>
+          <div className="flex flex-1 flex-col">
+            <GeoMapCard state={geo} channel="blended" verdieping={<GeoRanglijstInKaart state={geo} />} />
+          </div>
+        </div>
+
+        {/* Over de volle breedte: zes tegels naast elkaar vullen die breedte, in een halve kolom
+            stonden ze in twee rijen van drie met een lege onderhelft. */}
+        <GeoRanglijstCard state={geo} zonderBalken />
+
+        {/* DEZELFDE TWEE DELEN ALS DE KANAALTABBLADEN, gevoed uit de blended historie.
+            "Waarom heeft alle kanalen deze sectie niet?" -- omdat FairWeeksOverview, MetricCards en
+            PerformanceChart hun data uit ClientDataProvider haalden, en die is Google-only. Alle
+            drie zijn nu gesplitst in een Google-ingang en een weergave die data + forecast als props
+            neemt; useBlendedClientData levert exact dezelfde twee vormen over Google, Meta,
+            LinkedIn en Microsoft samen, inclusief hetzelfde jaardoel-mechanisme (vorig jaar plus
+            groei zolang er niets is ingevoerd, zie lib/analysis/standaard-jaardoel.ts). */}
+        {blendedForecast && edition && (
+          <>
+            <Deelkop
+              icoon={<CalendarClock className="w-4 h-4 text-brand-blue-ink" />}
+              titel="Prestaties richting de beurs"
+              bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
+            />
+            <FairWeeksView data={blendedForecast.data} forecast={blendedForecast.forecast} edition={edition} />
+          </>
+        )}
+
+        {blendedForecast && (
+          <>
+            <Deelkop
+              icoon={<Target className="w-4 h-4 text-brand-blue-ink" />}
+              titel="Jaaroverzicht"
+              bijschrift="Jaardoelen vs bijgestelde prognose op basis van weektrend, over alle kanalen samen"
+              venster={<Vensterlabel soort="jaar" jaar={blendedForecast.data.currentYear} />}
+            />
+            {/* Het voorbehoud hoort hier en niet alleen bij de tabel verderop: elk kanaal claimt
+                zijn eigen conversies met zijn eigen attributievenster, dus de blended som is een
+                BOVENGRENS, en een prognose die daarop rekent erft dat. Maar als voetnoot en niet in
+                alarmkleur: dit is hoe blended rekenen werkt, niet iets wat vandaag is misgegaan en
+                wat je kunt verhelpen. */}
+            <p className="text-meta leading-snug text-muted-foreground">
+              De conversies hieronder zijn de som over de kanalen, elk met zijn eigen
+              attributievenster: een bovengrens, geen exacte telling.
+              {jaarUitgesloten && ` ${jaarUitgesloten}`}
+            </p>
+            <MetricCardsView
+              forecast={blendedForecast.forecast}
+              selected={jaaroverzichtMetric}
+              onSelect={setJaaroverzichtMetric}
+            />
+            <PerformanceChartView
+              clientData={blendedForecast.data}
+              forecast={blendedForecast.forecast}
+              metric={jaaroverzichtMetric}
+              onMetricChange={setJaaroverzichtMetric}
+            />
+          </>
+        )}
+      </Sectie>
+
+      {/* Dezelfde sectie-indeling als de Google-weergave. Deze tak van de pagina stond nog op een
+          vlakke `space-y-6`: de grafiek en de tabel eronder hadden evenveel lucht tussen zich als
+          binnen zichzelf, terwijl het twee antwoorden op twee vragen zijn — "hoe verhouden de
+          kanalen zich over de maanden" en "wat leverde elk kanaal op". */}
+      {rows && rows.length > 0 && (
+        <Sectie
+          icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Verdeling over de kanalen"
+          bijschrift={`Spend per kanaal per maand en de verdeling over de kanalen, binnen de gekozen periode (${formatRange(periode.range)})`}
+        >
+          {/* De staven en de ringen naast elkaar, want het zijn twee helften van dezelfde vraag:
+              de staven tonen het VERLOOP per maand, de ringen de VERDELING nu -- en de ringen ook
+              voor conversies, wat de staven niet doen. "Waarom heeft alle kanalen geen donuts?"
+              was terecht: de kaart bestond al (dezelfde die op Google onder "Spend per kanaal"
+              staat) en las hier alleen niemand.
+
+              Alleen de kanaal-uitsplitsing: campagnetype en campagnenaam komen uit
+              ads_campaign_monthly, en die tabel kent enkel Google-campagnes. Twee tabbladen die
+              een Google-verdeling tonen onder een kop die alle kanalen belooft, is precies de
+              soort halve waarheid die dit tabblad moet vermijden.
+
+              De ring krijgt dezelfde rijen als de staven en de tabel (`kanaalRijen`) en kiest er
+              zelf zijn venster uit: geen tweede lezing, en geen ring die een maand anders telt
+              dan de tabel eronder. */}
+          {/* Beide volgen de gekozen periode, uit dezelfde rijen: de staven per maand, de ring over
+              de hele periode. Heeft de periode geen enkele rij (een bereik van vóór de data), dan
+              zegt de kaart dat in plaats van te verdwijnen: een blok dat wegvalt als je de periode
+              verzet leest als een fout, niet als een antwoord. */}
+          {chartMonths.length === 0 ? legePeriode : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+              <div className="lg:col-span-2">
+                <GroupedMonthlyBars
+                  title="Spend per kanaal per maand"
+                  venster={<Vensterlabel soort="periode" />}
+                  months={chartMonths}
+                  series={chartSeries}
+                  data={chartData}
+                  groeit
+                />
+              </div>
+              <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} kanaalRijen={rows} />
+            </div>
+          )}
+        </Sectie>
+      )}
+
+      {/* Data-weergave; de cross-channel-signaalanalyse draait via Analyses → Cross-channel.
+
+          Alleen bij meer dan één kanaal, dezelfde voorwaarde als de hook hierboven: de rijen komen
+          daaruit, en zolang hij uit staat is er niets te tonen en ook niets te laden. Dat is het
+          geval bij een klant zonder data (de melding bovenaan het dashboard zegt dat al) en heel
+          even bij het openen, als de kanalen nog niet bekend zijn. Zonder deze voorwaarde zou
+          daar dan een halve tel "nog geen cross-channel data" staan voor een klant die vier
+          kanalen heeft. De secties hierboven verschijnen op dezelfde manier pas met hun data. */}
+      {kanalen.length > 1 && (
+      <Sectie
+        icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel="Cross-channel (blended)"
+        bijschrift={`Wat elk kanaal opleverde in de gekozen periode (${formatRange(periode.range)}), en de maanden erachter`}
+        actie={<Vensterlabel soort="periode" />}
+      >
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+
+        {/* ── DE TABEL SMALLER, MET DE WAARSCHUWINGEN ERNAAST ──────────────────
+            Hier stonden twee volle-breedte banners bóven een tabel van zes kolommen, en die tabel
+            liep zelf ook over de volle kaartbreedte. Drie brede blokken onder elkaar, met veel
+            witruimte rechts in alle drie.
+
+            Nu staat de tabel in acht van de twaalf kolommen en staan de twee mededelingen ernaast.
+            Geen opvulling: het zijn de twee voorbehouden die je bij déZE cijfers moet kennen, en
+            naast de cijfers gelezen worden ze eerder gelezen dan erboven, waar je ze overslaat op
+            weg naar de tabel.
+
+            Bewust NIET de kanaalverdeling ernaast gezet, hoe verleidelijk ook: die staat al in de
+            grafiek erboven én in de eerste kolom van deze tabel. Een derde kopie is geen bento
+            maar herhaling.
+
+            Onder lg valt alles terug op één kolom en staat de tabel weer voluit -- op een smal
+            scherm is naast elkaar geen indeling maar gedrang. */}
+        {tabelMetVoorbehoud()}
       </div>
       </Sectie>
       )}

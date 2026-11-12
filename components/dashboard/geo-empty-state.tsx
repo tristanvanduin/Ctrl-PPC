@@ -4,6 +4,7 @@ import { Globe2 } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import { CHANNEL_LABEL, int, nf, type Channel } from "@/lib/geo/use-geo-breakdown";
 import { type GeoAgg } from "@/lib/demo/geo-demo";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Vervangt de stille `return null` die GeoBreakdown/GeoMapCard/GeoRanglijstCard tot 20 augustus
 // 2026 gaven bij "één (of geen) land: geen geo-verhaal". De aanname klopt (een wereldkaart met
@@ -17,13 +18,20 @@ import { type GeoAgg } from "@/lib/demo/geo-demo";
 // Eén gedeelde component i.p.v. de melding drie keer kopiëren (GeoBreakdown en GeoMapCard delen
 // hem; GeoRanglijstCard laat een enkel land wél stil vallen -- een ranglijst van één rij heeft
 // niets om te ranken en zou naast deze kaart pure herhaling zijn).
-export function GeoEnkelLandKaart({ channel, land }: { channel: Channel; land: GeoAgg | null }) {
+export function GeoEnkelLandKaart({ channel, land, voorbehoud }: {
+  channel: Channel;
+  land: GeoAgg | null;
+  /** Een voorbehoud bij deze cijfers ("zonder Microsoft"), uit de wereldkaart van de nieuwe weergave.
+   *  Dan staat het venster met het voorbehoud in de kop; zonder is de kaart wat hij was. */
+  voorbehoud?: string;
+}) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <Globe2 className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">Waar komt het vandaan</h3>
         <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
+        {voorbehoud && <Vensterlabel soort="vast" venster="laatste 180 dagen" toevoeging={voorbehoud} />}
       </div>
       {land ? (
         <div className="px-5 py-5 flex items-center justify-between flex-wrap gap-4">

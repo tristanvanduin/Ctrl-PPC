@@ -201,3 +201,56 @@ export function MeerKnop({
     </button>
   );
 }
+
+/**
+ * Een lade: een knop die een deel van een kaart opent, met de stand per gebruiker onthouden.
+ *
+ * Waarom naast RegioToggle. Die schrijft zelf "Toon …" en "Verberg …" om zijn label en laat de
+ * inhoud aan de aanroeper, die hem met `hidden` in de boom houdt. De lades van het Overzicht in de
+ * nieuwe weergave (bouwplan fase 5) hebben een eigen naam ("Verloop en prognose", "Toon als
+ * tabel", "Toon onderbouwing") en inhoud die rekenwerk kost: een grafiek, een tabel van veertig
+ * regels. Die wordt hier pas gerenderd als de lade open is; dicht staat er alleen de knop.
+ *
+ * Een echte knop met aria-expanded, dus bedienbaar met Tab, Enter en de spatiebalk. De knop wijst
+ * met aria-controls alleen naar de inhoud als die er staat: een verwijzing naar een id dat niet
+ * bestaat is voor een schermlezer een dood spoor.
+ */
+export function Lade({
+  id,
+  label,
+  labelOpen,
+  defaultOpen = false,
+  rand = true,
+  children,
+}: {
+  /** Stabiele sleutel voor het onthouden van open of dicht. */
+  id: string;
+  /** De tekst op de knop als de lade dicht is. */
+  label: string;
+  /** De tekst als hij open is; zonder deze blijft het label staan en zegt de pijl de stand. */
+  labelOpen?: string;
+  defaultOpen?: boolean;
+  /** De scheidingslijn boven de knop, voor een lade in de voet van een kaart. */
+  rand?: boolean;
+  /** De inhoud, of een functie die hem maakt: die wordt pas aangeroepen als de lade open is, zodat
+   *  rekenwerk in de aanroeper (totalen, een lange tabel) dicht niets kost. */
+  children: React.ReactNode | (() => React.ReactNode);
+}) {
+  const [open, toggle] = useRememberedOpen(id, defaultOpen);
+  const inhoudId = `lade-${id}`;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={open ? inhoudId : undefined}
+        className={`flex min-h-11 w-full items-center justify-center gap-1.5 px-5 py-2.5 text-meta font-medium text-brand-blue-ink transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-blue ${rand ? "border-t border-border" : ""}`}
+      >
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+        {open ? labelOpen ?? label : label}
+      </button>
+      {open && <div id={inhoudId} className="border-t border-border">{typeof children === "function" ? children() : children}</div>}
+    </>
+  );
+}

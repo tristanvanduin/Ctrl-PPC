@@ -133,6 +133,10 @@ const GELABELD: Record<string, string> = {
   PacingMonitor: "pacing-monitor.tsx",
   ChannelPacing: "channel-pacing.tsx",
   BlendedPacing: "blended-pacing.tsx",
+  PacingJaaroverzicht: "pacing-jaaroverzicht.tsx", // de nieuwe weergave: pacing en jaaroverzicht in één kaart
+  PacingJaaroverzichtGoogle: "pacing-jaaroverzicht.tsx", // dezelfde kaart op het Google-tabblad
+  PacingJaaroverzichtKanaal: "pacing-jaaroverzicht.tsx", // en op Meta, LinkedIn en Microsoft
+  KanaalOverzichtNieuw: "kanaal-overzicht-nieuw.tsx", // de nieuwe opbouw van een kanaaltabblad; zijn blokken staan hieronder als eigen weergave
   GeoMapCard: "geo-map-card.tsx",
   GeoRanglijstCard: "geo-ranglijst-card.tsx",
   MonthlyOverview: "monthly-overview.tsx",
@@ -166,6 +170,11 @@ const ZONDER: Record<string, string> = {
   Tabel: "kanaaltabel", Kop: "kanaaltabel", KolomKop: "kanaaltabel", Body: "kanaaltabel", Rij: "kanaaltabel",
   NaamCel: "kanaaltabel", GetalCel: "kanaaltabel", AandeelCel: "kanaaltabel", TotaalRij: "kanaaltabel", TotaalCel: "kanaaltabel",
   RegioToggle: "kanaaltabel",
+  // De nieuwe weergave (fase 5): een lade is een knop in de voet van een kaart die zijn label al draagt.
+  Lade: "de knop 'Toon als tabel' onder de kop met het label van de kanaaltabel",
+  GeoTabelLade: "staat ín de wereldkaart, onder diens label",
+  CollapsiblePanel: "een uitklapblok ('Detail op aanvraag'); wat erin staat draagt zijn eigen label",
+  LadeInhoud: "het vlak binnen een uitklapblok",
 };
 const ICOON = /^(Calendar|CalendarClock|Target|Globe|LayoutGrid|TrendingUp|Sparkles|AlertTriangle|Users|Gauge|SearchIcon|Search|Megaphone|Briefcase|PieChart|Info|Layers|Loader2)$/;
 
@@ -181,6 +190,8 @@ function functieBron(bestand: string, naam: string): string {
 const WEERGAVEN: [string, string][] = [
   ["google-view.tsx", "GoogleView"], ["meta-view.tsx", "MetaView"], ["linkedin-view.tsx", "LinkedInView"],
   ["microsoft-view.tsx", "MicrosoftView"], ["cross-channel-view.tsx", "CrossChannelView"],
+  // De kanaaltabbladen in de nieuwe weergave (fase 5): dezelfde eis, elk blok een benoemd venster.
+  ["kanaal-overzicht-nieuw.tsx", "KanaalOverzichtNieuw"],
 ];
 {
   for (const [bestand, naam] of WEERGAVEN) {
@@ -250,7 +261,9 @@ console.log("Bron: de jaarblokken staan bij elkaar onder één kop");
       ["<ChannelMonthlyChart", "<ChannelPerformance"]],
     ["cross-channel-view.tsx", "CrossChannelView", "Jaar, beurs en markten",
       ["<KanaalHealthRanking", "<BlendedPacing", "<GeoMapCard", "<GeoRanglijstCard", "<FairWeeksView", "titel=\"Jaaroverzicht\"", "<MetricCardsView", "<PerformanceChartView"],
-      ["<GroupedMonthlyBars", "<CampaignTypeSplit", "<Tabel"]],
+      // De kanaaltabel is één stuk voor beide weergaven (tabelMetVoorbehoud); in de vertrouwde
+      // weergave staat de aanroep onder de sectie met de vaste vensters.
+      ["<GroupedMonthlyBars", "<CampaignTypeSplit", "{tabelMetVoorbehoud()}"]],
   ];
   for (const [bestand, naam, titel, volgorde, volgers] of eisen) {
     const bron = functieBron(bestand, naam);

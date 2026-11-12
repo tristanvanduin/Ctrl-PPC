@@ -18,7 +18,7 @@
 // verhouding, en vanaf nul werd elke beweging een rechte streep.
 
 import { ResponsiveContainer, ComposedChart, Bar, Line } from "recharts";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LineChart } from "lucide-react";
 import { useGrafiekBeweging } from "@/lib/beweging";
 import { KANAAL_NAAM, KANAAL_KLEUR, ALLE_KANALEN, type Kanaal } from "@/lib/kanalen/beschikbaar";
@@ -40,7 +40,22 @@ const HOOGTE = "h-[180px] sm:h-[220px]";
 
 const euroOfStreep = (v: number | null) => (v === null ? "—" : volledigEuro(v));
 
-export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false }: {
+/**
+ * Wat de staven tonen: de conversies of de kosten per kanaal (bouwplan fase 5).
+ *
+ * De kosten per kanaal per maand stonden in een eigen kaart onderaan ("Spend per kanaal per maand",
+ * gegroepeerde staven, 667 px, op een telefoon leeg). Het is dezelfde as, dezelfde maanden en
+ * dezelfde kanaalkleuren als deze grafiek, dus hier een schakelaar in plaats van een tweede kaart.
+ * De CPA-lijn blijft in beide standen staan: het is de verhouding tussen precies deze twee.
+ */
+export type HoofdgrafiekMaat = "conversions" | "adSpend";
+type Maat = HoofdgrafiekMaat;
+const MATEN: { id: Maat; label: string }[] = [
+  { id: "conversions", label: "Conversies" },
+  { id: "adSpend", label: "Kosten" },
+];
+
+export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false, beginMaat = "conversions" }: {
   /** De maanden van de gekozen periode (grafiekMaanden); null zolang de reeksen laden. */
   maanden: GrafiekMaand[] | null;
   /** De kanalen die getoond worden: alle kanalen van de klant, of het ene gekozen kanaal. */
@@ -48,8 +63,14 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
   /** Het gekozen kanaal, voor de kop; null op "Alle kanalen". */
   gekozen: Kanaal | null;
   laden?: boolean;
+  /** Waar de schakelaar Conversies of Kosten op begint. De pagina laat hem op Conversies; de test
+   *  rendert er beide standen mee, zonder te hoeven klikken. */
+  beginMaat?: HoofdgrafiekMaat;
 }) {
   const periode = usePeriod();
+  const [maat, setMaat] = useState<Maat>(beginMaat);
+  const kosten = maat === "adSpend";
+  const titel = kosten ? "Kosten per maand" : "Conversies per maand";
   const basisBeweging = useGrafiekBeweging();
   // Pas bewegen als de grafiek er al een keer stond. Dit component rendert eerst zijn laadvlak,
   // dus zonder deze rem groeiden de staven in zodra de reeksen binnenkwamen: beweging bij een
@@ -63,9 +84,36 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <LineChart className="h-4 w-4 text-brand-blue-ink" aria-hidden />
       <h3 className="text-title font-semibold text-brand-gray">
-        Conversies per maand{gekozen ? ` · ${KANAAL_NAAM[gekozen]}` : ""}
+        {titel}{gekozen ? ` · ${KANAAL_NAAM[gekozen]}` : ""}
       </h3>
       <Vensterlabel soort="periode" />
+      {/* Een keuze uit twee, als radiogroep: Tab brengt je bij de gekozen knop, de pijltjes wisselen
+          (en kiezen meteen), zoals bij elke groep keuzerondjes. Geen aria-pressed: dat is voor een
+          knop die aan of uit staat, en de kanaalkaarten hierboven gebruiken het al voor het filter. */}
+      <div role="radiogroup" aria-label="Wat de staven tonen" className="flex gap-0.5 rounded-lg bg-gray-100 p-0.5">
+        {MATEN.map((m, i) => (
+          <button
+            key={m.id}
+            type="button"
+            role="radio"
+            aria-checked={maat === m.id}
+            tabIndex={maat === m.id ? 0 : -1}
+            onClick={() => setMaat(m.id)}
+            onKeyDown={(e) => {
+              const stap = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+              if (stap === 0) return;
+              e.preventDefault();
+              setMaat(MATEN[(i + stap + MATEN.length) % MATEN.length].id);
+              // De focus gaat mee naar de knop die nu gekozen is.
+              const buur = stap === 1 ? e.currentTarget.nextElementSibling ?? e.currentTarget.parentElement?.firstElementChild : e.currentTarget.previousElementSibling ?? e.currentTarget.parentElement?.lastElementChild;
+              if (buur instanceof HTMLElement) buur.focus();
+            }}
+            className={`min-h-11 rounded-md px-2.5 py-1 text-meta font-medium sm:min-h-7 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${maat === m.id ? "bg-card text-brand-blue-ink shadow-sm" : "text-muted-foreground hover:text-brand-gray"}`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
       <Legenda
         className="ml-auto"
         items={[...lijst.map((k) => ({ label: KANAAL_NAAM[k], kleur: KANAAL_KLEUR[k] })), { label: "CPA (rechteras)", kleur: CHART_LINE_SECONDARY }]}
@@ -89,11 +137,13 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
 
   const rijen = maanden.map((m) => ({
     maand: m.maand,
-    ...Object.fromEntries(lijst.map((k) => [k, m.perKanaal[k]?.conversions ?? 0])),
+    // Een kanaal dat deze maand nog niet liep, krijgt geen sleutel: zonder sleutel tekent recharts
+    // niets en zwijgt de tooltip. Een nul zou lezen als "niets uitgegeven", en dat is een meting.
+    ...Object.fromEntries(lijst.filter((k) => !m.voorStart.includes(k)).map((k) => [k, m.perKanaal[k]?.[maat] ?? 0])),
     [CPA]: m.cpa,
   }));
   const perMaand = new Map(maanden.map((m) => [m.maand, m]));
-  const hoogste = Math.max(0, ...maanden.map((m) => m.conversions));
+  const hoogste = Math.max(0, ...maanden.map((m) => m[maat]));
   const cpas = maanden.map((m) => m.cpa).filter((v): v is number => v !== null);
   const schaal = asSchaal(hoogste);
   const schaalCpa = cpas.length > 0 ? asSchaalVenster(Math.min(...cpas), Math.max(...cpas)) : null;
@@ -107,8 +157,9 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
     const m = perMaand.get(maand);
     if (!m) return [];
     return [
-      ...(lijst.length > 1 ? [{ naam: "Totaal", waarde: volledigGetal(m.conversions), sterk: true }] : []),
-      { naam: "Kosten", waarde: volledigEuro(m.adSpend) },
+      ...(lijst.length > 1 ? [{ naam: "Totaal", waarde: kosten ? volledigEuro(m.adSpend) : volledigGetal(m.conversions), sterk: true }] : []),
+      // De andere maat erbij, zodat de tooltip in beide standen beide getallen draagt.
+      kosten ? { naam: "Conversies", waarde: volledigGetal(m.conversions) } : { naam: "Kosten", waarde: volledigEuro(m.adSpend) },
       { naam: CPA, waarde: euroOfStreep(m.cpa), kleur: CHART_LINE_SECONDARY },
     ];
   };
@@ -121,9 +172,20 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
     return { kanaal: k, ...t, cpa: t.conversions > 0 ? t.adSpend / t.conversions : null };
   });
   const totaalCpa = totaal.conversions > 0 ? totaal.adSpend / totaal.conversions : null;
+  // De kolom met het getal: een aantal conversies past in 4rem, een bedrag van zes of zeven cijfers
+  // ("€ 1.250.000") niet. In de stand Kosten is de kolom daarom breder; de kanaalnaam kort in.
+  const kolommen = kosten ? "grid-cols-[minmax(0,1fr)_5.75rem_4.5rem]" : "grid-cols-[minmax(0,1fr)_4rem_4.5rem]";
+
+  // Welke kanalen pas in de loop van de periode beginnen, en vanaf wanneer. Een ontbrekende staaf
+  // en een staaf van nul zien er hetzelfde uit, dus de grafiek moet het zeggen: anders leest een
+  // maand waarin Meta nog niet liep als "Meta gaf niets uit". Dezelfde regel als de stavenkaart
+  // "Spend per kanaal per maand" die deze schakelaar vervangt.
+  const laatstarters = lijst
+    .filter((k) => maanden.some((m) => m.voorStart.includes(k)))
+    .map((k) => ({ kanaal: k, start: maanden.find((m) => !m.voorStart.includes(k))?.maand ?? null }));
 
   return (
-    <section aria-label={`Conversies per maand, ${formatRange(periode.range)}`} className={kaart}>
+    <section aria-label={`${titel}, ${formatRange(periode.range)}`} className={kaart}>
       {kop}
       {leeg ? (
         <p className={`mt-2 flex ${HOOGTE} items-center justify-center rounded-lg bg-muted/30 text-meta text-muted-foreground`}>
@@ -141,10 +203,10 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
                 <Raster />
                 <AsX dataKey="maand" formatter={maandLabel} />
                 {/* De linkeras zonder eigen naam: het raster hangt aan de standaard-as van recharts. */}
-                <AsY formatter={kortGetal} width={44} {...schaal} />
+                <AsY formatter={kosten ? kortEuro : kortGetal} width={kosten ? 52 : 44} {...schaal} />
                 {schaalCpa && <AsY id="cpa" rechts kleur={CHART_LINE_SECONDARY} formatter={kortEuro} width={52} domain={schaalCpa.domain} ticks={schaalCpa.ticks} />}
                 <Tip
-                  formatter={(v) => volledigGetal(v)}
+                  formatter={(v) => (kosten ? volledigEuro(v) : volledigGetal(v))}
                   verberg={[CPA]}
                   voet={voet}
                 />
@@ -182,26 +244,26 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
               scherm: op een telefoon staan dezelfde totalen op de kanaalkaarten erboven. */}
           <div className="hidden w-64 shrink-0 self-center text-meta lg:block">
           {/* De kolomkoppen boven de cijfers, niet een zin eronder: zo staat bij elk getal wat het is. */}
-          <div className="mb-1 grid grid-cols-[minmax(0,1fr)_4rem_4.5rem] gap-x-2 text-micro uppercase tracking-wider text-muted-foreground" aria-hidden>
+          <div className={`mb-1 grid ${kolommen} gap-x-2 text-micro uppercase tracking-wider text-muted-foreground`} aria-hidden>
             <span>{formatRangeKort(periode.range)}</span>
-            <span className="text-right">conv.</span>
+            <span className="text-right">{kosten ? "kosten" : "conv."}</span>
             <span className="text-right">CPA</span>
           </div>
           <dl className="grid gap-y-1.5">
             {perKanaal.map((r) => (
-              <div key={r.kanaal} className="grid grid-cols-[minmax(0,1fr)_4rem_4.5rem] items-baseline gap-x-2">
+              <div key={r.kanaal} className={`grid ${kolommen} items-baseline gap-x-2`}>
                 <dt className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
                   <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: KANAAL_KLEUR[r.kanaal] }} aria-hidden />
                   <span className="truncate">{KANAAL_NAAM[r.kanaal]}</span>
                 </dt>
-                <dd className="text-right font-semibold tabular-nums text-brand-gray"><span className="sr-only">conversies: </span>{volledigGetal(Math.round(r.conversions))}</dd>
+                <dd className="text-right font-semibold tabular-nums text-brand-gray"><span className="sr-only">{kosten ? "kosten" : "conversies"}: </span>{kosten ? volledigEuro(Math.round(r.adSpend)) : volledigGetal(Math.round(r.conversions))}</dd>
                 <dd className="text-right tabular-nums text-muted-foreground" title="Kosten per conversie"><span className="sr-only">CPA: </span>{euroOfStreep(r.cpa === null ? null : Math.round(r.cpa))}</dd>
               </div>
             ))}
             {perKanaal.length > 1 && (
-              <div className="grid grid-cols-[minmax(0,1fr)_4rem_4.5rem] items-baseline gap-x-2 border-t border-border pt-1.5">
+              <div className={`grid ${kolommen} items-baseline gap-x-2 border-t border-border pt-1.5`}>
                 <dt className="text-brand-gray">Totaal</dt>
-                <dd className="text-right font-semibold tabular-nums text-brand-gray">{volledigGetal(Math.round(totaal.conversions))}</dd>
+                <dd className="text-right font-semibold tabular-nums text-brand-gray">{kosten ? volledigEuro(Math.round(totaal.adSpend)) : volledigGetal(Math.round(totaal.conversions))}</dd>
                 <dd className="text-right tabular-nums text-muted-foreground" title="Kosten per conversie">{euroOfStreep(totaalCpa === null ? null : Math.round(totaalCpa))}</dd>
               </div>
             )}
@@ -209,12 +271,25 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
           </div>
         </div>
       )}
+      {/* De voetregel: wat je bij deze staven moet weten en niet kunt zien. Het voorbehoud van de
+          optelling stond naast de kanaaltabel onderaan ("waarom blended indicatief is"); die tabel
+          zit in de nieuwe weergave achter een knop, en het voorbehoud hoort bij het getal. */}
+      {!leeg && (laatstarters.length > 0 || lijst.length > 1) && (
+        <p className="mt-2 text-micro leading-snug text-muted-foreground">
+          {laatstarters.map((l) => (
+            <span key={l.kanaal}>
+              {KANAAL_NAAM[l.kanaal]} {l.start ? `begint in ${maandLabel(l.start)}` : "liep in deze periode nog niet"}: de maanden daarvoor zijn niet gemeten, geen nul.{" "}
+            </span>
+          ))}
+          {lijst.length > 1 && <>De conversies zijn de som over de kanalen, elk met zijn eigen attributievenster: een bovengrens, geen exacte telling.</>}
+        </p>
+      )}
       {/* Dezelfde cijfers als tabel, voor wie de grafiek niet ziet: per maand de kanalen, het
           totaal en de CPA. */}
       {/* In een div: sr-only op de tabel zelf houdt hem niet op 1 px (een tabel negeert width),
           en dan maakte hij de pagina op een telefoon 320 px te breed. */}
       <div className="sr-only"><table>
-        <caption>Conversies per maand per kanaal, met het totaal en de CPA, over {formatRange(periode.range)}</caption>
+        <caption>{titel} per kanaal, met het totaal en de CPA, over {formatRange(periode.range)}</caption>
         <thead>
           <tr>
             <th scope="col">Maand</th>
@@ -227,8 +302,8 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
           {maanden.map((m) => (
             <tr key={m.maand}>
               <th scope="row">{maandLabel(m.maand)}</th>
-              {lijst.map((k) => <td key={k}>{volledigGetal(m.perKanaal[k]?.conversions ?? 0)}</td>)}
-              <td>{volledigGetal(m.conversions)}</td>
+              {lijst.map((k) => <td key={k}>{m.voorStart.includes(k) ? "liep nog niet" : kosten ? volledigEuro(m.perKanaal[k]?.adSpend ?? 0) : volledigGetal(m.perKanaal[k]?.conversions ?? 0)}</td>)}
+              <td>{kosten ? volledigEuro(m.adSpend) : volledigGetal(m.conversions)}</td>
               <td>{m.cpa === null ? "geen conversies" : volledigEuro(m.cpa)}</td>
             </tr>
           ))}

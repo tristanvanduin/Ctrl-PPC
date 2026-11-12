@@ -270,3 +270,21 @@ export function clientIdFromPath(pathname: string, searchParams: URLSearchParams
   const m = /^\/client\/([^/]+)/.exec(pathname);
   return m ? decodeURIComponent(m[1]) : null;
 }
+
+/**
+ * ALLE beurs-id's die een verzoek noemt: elke client_id en elke clientId uit de querystring, en
+ * het id uit het paginapad. Zonder dubbelen, in die volgorde.
+ *
+ * Waarom dit naast clientIdFromPath bestaat. Die geeft er één terug, en client_id gaat voor. Een
+ * route die zelf clientId leest, kreeg zo een ander id dan de poortwachter had getoetst:
+ * ?client_id=<eigen klant>&clientId=<andere klant> kwam door de scope-check op de eigen klant en
+ * leverde daarna de gegevens van de andere. De poortwachter toetst daarom elk id dat een route
+ * zou kunnen lezen, niet alleen het eerste; één id buiten de scope weigert het verzoek. Een
+ * herhaalde parameter (?clientId=a&clientId=b) telt om dezelfde reden volledig mee.
+ */
+export function clientIdsUitVerzoek(pathname: string, searchParams: URLSearchParams): string[] {
+  const uit = [...searchParams.getAll("client_id"), ...searchParams.getAll("clientId")].filter(Boolean);
+  const m = /^\/client\/([^/]+)/.exec(pathname);
+  if (m) uit.push(decodeURIComponent(m[1]));
+  return [...new Set(uit)];
+}

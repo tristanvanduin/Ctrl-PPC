@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Target, Globe, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge, SearchIcon } from "lucide-react";
+import { Calendar, Target, Globe, Info, LayoutGrid, TrendingUp, Sparkles, AlertTriangle, Users, Gauge, SearchIcon } from "lucide-react";
 import { countryLabel } from "@/lib/countries";
 import type { UpcomingEdition } from "@/lib/fair/fair-weeks";
 import type { ForecastMetric } from "@/lib/forecast";
@@ -22,7 +22,10 @@ import { MetricCards } from "./metric-cards";
 import { PerformanceChart } from "./performance-chart";
 import { GeoChannelMatrix } from "./geo-channel-matrix";
 import { GeoMapCard } from "./geo-map-card";
-import { GeoRanglijstCard, GeoRanglijstInKaart } from "./geo-ranglijst-card";
+import { GeoRanglijstCard, GeoRanglijstInKaart, GeoTabelLade } from "./geo-ranglijst-card";
+import { CollapsiblePanel } from "@/components/ui/disclosure";
+import { LadeInhoud } from "./kanaal-overzicht-nieuw";
+import { PacingJaaroverzichtGoogle } from "./pacing-jaaroverzicht";
 import { useGeoBreakdown } from "@/lib/geo/use-geo-breakdown";
 import { VideoPerformance } from "./video-performance";
 import { PmaxNetworkSplit } from "./pmax-network-split";
@@ -92,12 +95,15 @@ interface GoogleViewProps {
   onCountryFilterChange: (value: string | null) => void;
   tijdas: "beurs" | "maand";
   onTijdasChange: (value: "beurs" | "maand") => void;
+  /** De schakelaar "Nieuwe weergave" staat aan: de herschikte, ingekorte opbouw (bouwplan fase 5).
+   *  Uit rendert dit tabblad precies wat het altijd renderde. */
+  nieuw?: boolean;
 }
 
 /** De Overzicht-tab voor Google Ads. */
 export function GoogleView({
   clientId, geoClone, edition, meerdereKanalen, detectedCountries,
-  countryFilter, onCountryFilterChange, tijdas, onTijdasChange,
+  countryFilter, onCountryFilterChange, tijdas, onTijdasChange, nieuw = false,
 }: GoogleViewProps) {
   const beursAs = edition !== null && tijdas === "beurs";
   // Eén hook-aanroep: GeoMapCard en GeoRanglijstCard staan in de nieuwe 2x2-indeling niet meer
@@ -111,12 +117,9 @@ export function GoogleView({
   // delen -- geen nieuwe grafiek nodig, alleen een gedeelde staat.
   const [jaaroverzichtMetric, setJaaroverzichtMetric] = useState<ForecastMetric>("conversions");
 
-  return (
-    <>
-      {/* Zelfde kaart als Meta/LinkedIn (ChannelViewHeader, gebouwd "zodat ze dezelfde opbouw als
-          de Google-weergave hebben" -- maar Google zelf gebruikte hem nooit. Toegevoegd 22 augustus
-          2026 (feedback: "alle kanalen moeten een zelfde layout hebben... de structuur en layout
-          moet exact hetzelfde voelen") zodat alle drie kanalen met dezelfde kop-kaart openen. */}
+  // De kopkaart en het landfilter, één keer gemaakt: beide weergaven tonen dezelfde twee, de nieuwe
+  // zet de kopkaart alleen achter "Over dit tabblad".
+  const kop = (
       <ChannelViewHeader
         icon={<SearchIcon className="w-5 h-5 text-brand-blue-ink" />}
         title="Google Ads"
@@ -134,21 +137,8 @@ export function GoogleView({
             : <>De Google-analyses (maand-SOP, signalen) draai je via het tabblad <strong>Analyses</strong>.</>
         }
       />
-
-      {geoClone && <HealthBadge clientId={clientId} />}
-
-      {geoClone ? (
-        // Beurs gekozen: her-geaggregeerd beursoverzicht (uit campagnedata) i.p.v. de
-        // account-brede kaarten, die niet per beurs te splitsen zijn.
-        <>
-          {/* Event-relatieve pacing: opbouw tot nu vs dezelfde afstand tot de vorige editie. */}
-          <EventPacing clientId={clientId} geoClone={geoClone} />
-          <GeoCloneOverview clientId={clientId} geoClone={geoClone} />
-        </>
-      ) : (
-        <>
-          {/* Country filter for dashboard (only if multi-country) */}
-          {detectedCountries && detectedCountries.length > 1 && (
+  );
+  const landfilter = detectedCountries && detectedCountries.length > 1 && (
             <div className="flex items-center gap-1.5 flex-wrap">
               <Globe className="w-3.5 h-3.5 text-muted-foreground" />
               <button
@@ -171,7 +161,153 @@ export function GoogleView({
                 </button>
               ))}
             </div>
-          )}
+          );
+
+  // ── DE NIEUWE WEERGAVE (bouwplan fase 5) ─────────────────────────────────────────────────────
+  //
+  // Dezelfde blokken, herschikt en ingekort, zoals op "Alle kanalen" (cross-channel-view.tsx) en de
+  // andere kanaaltabbladen (kanaal-overzicht-nieuw.tsx). Per element van de elementtabel:
+  //
+  //   63  de kopkaart van het tabblad          onderaan achter "Over dit tabblad"
+  //   56  het landfilter                       blijft, bovenaan
+  //   64  Account Health                       blijft, open
+  //   46  PacingMonitor (de ringen)            blijft, open, naast Health
+  //   66  maand- of beursweergave met keuze    blijft, met dezelfde keuzeknop
+  //   71  vier jaarkaarten en de grafiek       Pacing & jaaroverzicht met de lade "Verloop en prognose"
+  //   53  de zes landentegels                  de totaalrij van "Toon als tabel" in de wereldkaart
+  //   51  de ranglijst onder de projectie      naast de projectie
+  //   54  de tabel per land                    "Toon als tabel" in de voet van de wereldkaart
+  //   55  land x kanaal                        blijft in de voet van de wereldkaart, achter zijn knop
+  //   68  de ring per campagnetype             blijft, open
+  //   67  CPA-lijn en conversiestaven          achter een klik: de hoofdgrafiek bovenaan toont ze
+  //                                            samen; los blijven ze er voor het landfilter
+  //   70  waar het budget landt                achter een klik
+  //
+  // De beursmodus (een gekozen beurs: EventPacing en GeoCloneOverview, element 73) is in beide
+  // weergaven dezelfde: daar valt niets in te korten zonder de beurscijfers te raken.
+  if (nieuw && !geoClone) {
+    return (
+      <>
+        {landfilter}
+        <Sectie
+          eerste
+          icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Gezondheid, pacing en markten"
+          bijschrift="Elk blok zegt in zijn kop welk venster het gebruikt: het kalenderjaar, de lopende maand of een eigen venster."
+        >
+          {/* `items-start`: de twee kaarten rekken elkaar niet op. De grens van 1800 px is die van de
+              vertrouwde weergave (zie de toelichting bij de hero hieronder). */}
+          <div className="grid grid-cols-1 items-start gap-4 min-[1800px]:grid-cols-2">
+            <HealthBadge clientId={clientId} />
+            {/* In een eigen div met automatische hoogte: de pacingkaart is `h-full`. */}
+            <div><PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} /></div>
+          </div>
+
+          <Deelkop
+            icoon={<Calendar className="w-4 h-4 text-brand-blue-ink" />}
+            titel={
+              (beursAs ? "Prestaties richting de beurs" : "Maandprestaties")
+              + (countryFilter ? ` — ${countryLabel(countryFilter)}` : "")
+            }
+            bijschrift={beursAs
+              ? `Per week: hoeveel weken zijn we van ${edition!.eventName} en lopen we op schema?`
+              : "Per maand: waar staan we en wat is de trend?"}
+            actie={edition && <TijdasKeuze value={tijdas} onChange={onTijdasChange} />}
+          />
+          {beursAs
+            ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} />
+            : <MonthlyOverview clientId={clientId} countryFilter={countryFilter} />}
+
+          <PacingJaaroverzichtGoogle clientId={clientId} countryFilter={countryFilter} titelToevoeging={countryFilter ? countryLabel(countryFilter) : undefined} />
+
+          <GeoMapCard
+            state={geo}
+            naast={<GeoRanglijstInKaart state={geo} naast />}
+            voet={
+              <>
+                <GeoTabelLade state={geo} />
+                {meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : null}
+              </>
+            }
+          />
+        </Sectie>
+
+        <Sectie
+          icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Verdeling"
+          bijschrift="Waar de spend naartoe ging, binnen de gekozen periode"
+        >
+          <CampaignTypeSplit clientId={clientId} />
+        </Sectie>
+
+        <Sectie
+          icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
+          titel="Detail op aanvraag"
+          bijschrift="De cijfers achter de grafiek en de tegels bovenaan. Dicht tot je erom vraagt; de pagina onthoudt wat je open liet."
+        >
+          <CollapsiblePanel
+            id="google-nieuw-verloop"
+            title={countryFilter ? `CPA en conversies per maand — ${countryLabel(countryFilter)}` : "CPA en conversies per maand"}
+            subtitle="als twee eigen grafieken; de grafiek bovenaan toont ze samen"
+            icon={<TrendingUp className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
+            meta={<Vensterlabel soort="periode" />}
+            defaultOpen={false}
+          >
+            <LadeInhoud>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <MonthlyTrendLine clientId={clientId} countryFilter={countryFilter} />
+                <MonthlyTrendBars clientId={clientId} countryFilter={countryFilter} groeit />
+              </div>
+            </LadeInhoud>
+          </CollapsiblePanel>
+          <CollapsiblePanel
+            id="google-nieuw-video"
+            title="Waar het budget landt"
+            subtitle="video en placements"
+            icon={<LayoutGrid className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
+            defaultOpen={false}
+          >
+            <LadeInhoud>
+              <VideoPerformance clientId={clientId} />
+              <VideoPlacements clientId={clientId} />
+            </LadeInhoud>
+          </CollapsiblePanel>
+          <CollapsiblePanel
+            id="kanaal-nieuw-over"
+            title="Over dit tabblad"
+            subtitle="de koppeling, wat dit kanaal levert en waar de analyses staan"
+            icon={<Info className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
+            defaultOpen={false}
+          >
+            <LadeInhoud>{kop}</LadeInhoud>
+          </CollapsiblePanel>
+        </Sectie>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {/* Zelfde kaart als Meta/LinkedIn (ChannelViewHeader, gebouwd "zodat ze dezelfde opbouw als
+          de Google-weergave hebben" -- maar Google zelf gebruikte hem nooit. Toegevoegd 22 augustus
+          2026 (feedback: "alle kanalen moeten een zelfde layout hebben... de structuur en layout
+          moet exact hetzelfde voelen") zodat alle drie kanalen met dezelfde kop-kaart openen. */}
+      {kop}
+
+      {geoClone && <HealthBadge clientId={clientId} />}
+
+      {geoClone ? (
+        // Beurs gekozen: her-geaggregeerd beursoverzicht (uit campagnedata) i.p.v. de
+        // account-brede kaarten, die niet per beurs te splitsen zijn.
+        <>
+          {/* Event-relatieve pacing: opbouw tot nu vs dezelfde afstand tot de vorige editie. */}
+          <EventPacing clientId={clientId} geoClone={geoClone} />
+          <GeoCloneOverview clientId={clientId} geoClone={geoClone} />
+        </>
+      ) : (
+        <>
+          {/* Country filter for dashboard (only if multi-country) */}
+          {landfilter}
 
           {/* DE OPENER (23 augustus 2026, teruggezet): 50/50, Account Health naast de wereldkaart --
               expliciete correctie op de eerdere 5/7-donut/kaart-indeling van vandaag, die de kaart

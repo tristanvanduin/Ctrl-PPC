@@ -7,7 +7,7 @@
 
 import {
   ROLES, CAPABILITIES, ROLE_CAPABILITIES, ALL_CLIENTS,
-  can, capabilitiesOf, canAccessClient, capabilityForApi, clientIdFromPath,
+  can, capabilitiesOf, canAccessClient, capabilityForApi, clientIdFromPath, clientIdsUitVerzoek,
   isCronPath, isPublicPath, isRole, normalizeRole, scopeFor,
   type Capability, type Role,
 } from "./roles";
@@ -101,6 +101,20 @@ assert(clientIdFromPath("/clients", qs("")) === null, "/clients is geen /client/
 // De querystring wint van het pad: zo kan een handler niet met een ander id verder werken
 // dan waar de middleware op heeft gecontroleerd.
 assert(clientIdFromPath("/client/aquatech", qs("client_id=greentech")) === "greentech", "de querystring wint");
+
+// De poortwachter toetst ELK id dat het verzoek noemt. Met alleen het eerste kwam
+// ?client_id=<eigen>&clientId=<ander> door de scope-check op de eigen klant, terwijl een route die
+// clientId leest de ander teruggaf.
+const eigenKlant = ["greentech"] as const;
+const doorDePoort = (pad: string, query: string) => clientIdsUitVerzoek(pad, qs(query)).every((id) => canAccessClient(eigenKlant, id));
+assert(clientIdsUitVerzoek("/api/x", qs("client_id=greentech&clientId=aquatech")).join() === "greentech,aquatech", "beide parameternamen tellen");
+assert(!doorDePoort("/api/x", "client_id=greentech&clientId=aquatech"), "eigen klant in client_id, andere in clientId: geweigerd");
+assert(!doorDePoort("/api/x", "clientId=greentech&client_id=aquatech"), "omgekeerd ook geweigerd");
+assert(!doorDePoort("/api/x", "clientId=greentech&clientId=aquatech"), "een herhaalde parameter met een ander id: geweigerd");
+assert(!doorDePoort("/client/aquatech", "client_id=greentech"), "een ander id in het pad dan in de querystring: geweigerd");
+assert(doorDePoort("/client/greentech", "client_id=greentech&clientId=greentech"), "drie keer dezelfde klant is één klant");
+assert(clientIdsUitVerzoek("/client/greentech", qs("client_id=greentech&clientId=greentech")).length === 1, "zonder dubbelen");
+assert(clientIdsUitVerzoek("/portfolio", qs("")).length === 0 && doorDePoort("/portfolio", ""), "geen id: niets te toetsen");
 
 // ── Rechten per API-pad ────────────────────────────────────────────────────
 

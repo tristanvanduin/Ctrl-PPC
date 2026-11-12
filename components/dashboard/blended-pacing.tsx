@@ -184,23 +184,39 @@ export function blendedPacingVoetregel(
   return zinnen.join(" ");
 }
 
-export function BlendedPacing({ perKanaal, dataStand }: {
-  perKanaal: readonly BlendedKanaalReeks[] | null;
-  dataStand: (Pick<DataStandSamen, "laatsteVolleMaand" | "partieel"> & Partial<Pick<DataStandSamen, "uitgesloten" | "bronnen">>) | null;
-}) {
+/** De stand van de route zoals de pacing hem nodig heeft. */
+export type PacingDataStand = (Pick<DataStandSamen, "laatsteVolleMaand" | "partieel"> & Partial<Pick<DataStandSamen, "uitgesloten" | "bronnen">>) | null;
+
+/**
+ * De pacing uit de blended route: de cijfers en de voetregel erbij, of null als er niets te tonen
+ * valt. Eén hook voor dit blok en voor "Pacing & jaaroverzicht" in de nieuwe weergave
+ * (pacing-jaaroverzicht.tsx): hetzelfde venster, dezelfde paren en dezelfde zin over wat er buiten
+ * de vergelijking viel.
+ */
+export function useBlendedPacing(perKanaal: readonly BlendedKanaalReeks[] | null, dataStand: PacingDataStand): { cijfers: BlendedPacingCijfers; voetregel: string } | null {
   const totMaand = dataStand?.laatsteVolleMaand ?? null;
   const cijfers = useMemo(
     () => (perKanaal && perKanaal.length > 0 && totMaand ? blendedPacingCijfers(perKanaal, totMaand) : null),
     [perKanaal, totMaand],
   );
-
   if (!cijfers) return null;
-
-  const { maanden, spend, conv, gepaard, spendRatio, convRatio, vergeleken } = cijfers;
   // Alleen een bron die binnen het venster ophoudt: wie pas in de partiële maand erna stopt, is
   // t/m totMaand volledig en raakt dit verschil niet.
   const voetregel = blendedPacingVoetregel(cijfers, dataStand?.partieel,
     uitgeslotenMetDag(dataStand).filter((b) => !!b.dataTot && b.dataTot.slice(0, 7) <= cijfers.totMaand));
+  return { cijfers, voetregel };
+}
+
+export function BlendedPacing({ perKanaal, dataStand }: {
+  perKanaal: readonly BlendedKanaalReeks[] | null;
+  dataStand: PacingDataStand;
+}) {
+  const pacing = useBlendedPacing(perKanaal, dataStand);
+
+  if (!pacing) return null;
+
+  const { cijfers, voetregel } = pacing;
+  const { maanden, spend, conv, gepaard, spendRatio, convRatio, vergeleken } = cijfers;
 
   const eur = (v: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
   const num = (v: number, d = 0) => new Intl.NumberFormat("nl-NL", { maximumFractionDigits: d }).format(v);

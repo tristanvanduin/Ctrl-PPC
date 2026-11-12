@@ -257,7 +257,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         convLanding.volgensPrognose !== null ? "@7xl:grid-cols-6" : "@7xl:grid-cols-5"
       }`}>
         {/* Conversions pacing */}
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex min-w-0 flex-col items-center justify-center gap-3 text-center @lg:flex-row @lg:text-left">
           <div className="relative">
             <PacingRing pct={convPacingPct} color={convColor} />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -274,7 +274,7 @@ export function PacingMonitor({ clientId, countryFilter, edition }: { clientId: 
         </div>
 
         {/* Spend pacing */}
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex min-w-0 flex-col items-center justify-center gap-3 text-center @lg:flex-row @lg:text-left">
           <div className="relative">
             <PacingRing pct={spendPacingPct} color={spendColor} />
             <div className="absolute inset-0 flex items-center justify-center">
