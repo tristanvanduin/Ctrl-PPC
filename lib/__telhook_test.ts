@@ -212,7 +212,9 @@ async function main() {
     check("Kerncijfer telt met de gedeelde hook", /import \{ useTellendeTekst \} from "@\/lib\/beweging"/.test(tegel) && /const getoond = useTellendeTekst\(waarde\)/.test(tegel));
     check("en toont wat de hook geeft", /<p className=\{`mt-1\.5 \$\{maat\} \$\{kleur\}`\}>\{getoond\}<\/p>/.test(tegel));
     const beweging = readFileSync(join(wortel, "lib/beweging.ts"), "utf8");
-    check("de duur is het token, geen los getal", /\(nu - begin\) \/ DUUR\.lang/.test(beweging));
+    // De duur is een parameter met het token als standaard (de trechter telt in DUUR.middel).
+    check("de duur is het token, geen los getal",
+      /duur: number = DUUR\.lang/.test(beweging) && /\(nu - begin\) \/ duur/.test(beweging));
     check("de voorkeur voor minder beweging wordt gelezen", /!minderNu\.current/.test(beweging) && /useMinderBeweging\(\)/.test(beweging));
   }
 

@@ -113,11 +113,21 @@ console.log("Uit de kolom zelf");
   check("null geeft een lege lijst", eventPeriodesUitRaiEvents(null).length === 0);
   check("een kolom zonder events ook", eventPeriodesUitRaiEvents({}).length === 0);
   check("events dat geen lijst is ook", eventPeriodesUitRaiEvents({ events: "kapot" }).length === 0);
-  // De demo-klant, zoals de mock hem draagt: alleen date, dus allemaal eendaagse periodes.
+  // De demo-klant, zoals de mock hem draagt: de beurzen met alleen date (eendaagse periodes), en de
+  // voorbeelden Black Friday en Moederdag-actie met een begin en een eind.
   const cs = demoRows().client_settings.find((r) => r.client_id === DEMO_GREENTECH_ID)!;
   const demo = eventPeriodesUitRaiEvents(cs.rai_events);
-  check("de demo heeft vijf edities", demo.length === 5, String(demo.length));
-  check("allemaal één dag", demo.every((e) => e.start === e.eind && !e.heeftPeriode));
+  check("de demo heeft negen edities", demo.length === 9, String(demo.length));
+  const beurzen = demo.filter((e) => e.eventId.startsWith("demo-gr"));
+  check("de beurzen zijn één dag", beurzen.length === 5 && beurzen.every((e) => e.start === e.eind && !e.heeftPeriode));
+  const bf26 = demo.find((e) => e.eventId === "demo-bf" && e.label === "2026");
+  check("Black Friday 2026 is 20 t/m 30 november en vergelijkt met 21 november t/m 1 december 2025",
+    bf26?.start === "2026-11-20" && bf26?.eind === "2026-11-30" && bf26?.heeftPeriode === true
+      && bf26?.vorige?.start === "2025-11-21" && bf26?.vorige?.eind === "2025-12-01", JSON.stringify(bf26));
+  const md26 = demo.find((e) => e.eventId === "demo-moederdag" && e.label === "2026");
+  check("Moederdag-actie 2026 is heel mei en vergelijkt met mei 2025",
+    md26?.start === "2026-05-01" && md26?.eind === "2026-05-31" && md26?.vorige?.start === "2025-05-01", JSON.stringify(md26));
+  check("de eerste editie van een voorbeeld heeft geen vorige", demo.find((e) => e.eventId === "demo-bf" && e.label === "2025")?.vorige === null);
   const gra26 = demo.find((e) => e.eventId === "demo-gra" && e.label === "2026");
   check("GreenTech Americas 2026 vergelijkt met 2025", gra26?.vorige?.start === "2025-09-16", JSON.stringify(gra26?.vorige));
   check("GreenTech North America heeft geen vorige editie", demo.find((e) => e.eventId === "demo-grn")?.vorige === null);

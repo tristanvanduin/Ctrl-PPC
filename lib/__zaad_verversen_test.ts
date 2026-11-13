@@ -173,7 +173,8 @@ async function main() {
     // De kerncijfers: van "Conversies" tot en met de CPA.
     const kern = () => {
       const t = container.textContent;
-      const i = t.search(/Conversies/);
+      // De tegel "Conversies" met zijn getal, niet de statusregel erboven ("Conversies +3% tegen ...").
+      const i = t.search(/Conversies\s*\d/);
       if (i < 0) return null;
       const j = t.indexOf("CPA", i);
       return t.slice(i, j < 0 ? i + 160 : j + 8);

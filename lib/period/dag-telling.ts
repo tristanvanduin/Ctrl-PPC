@@ -52,6 +52,7 @@ import type { ClientHistoricalData } from "@/lib/types";
 import type { ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
 import { maandagVanWeek } from "@/lib/api/google-weekvensters";
 import { KANAAL_NAAM } from "@/lib/kanalen/beschikbaar";
+import { KANAAL_DAGBRON } from "@/lib/analysis/channel-report-blend";
 import { addDays, today } from "@/lib/reporting-date";
 import {
   alsBronReeks, bronStart, delta, gepaardeTotalen, heeftData, slicePeriod,
@@ -75,14 +76,30 @@ export type Fijnheid = "dag" | "week" | "maand";
 /** Een rij uit ads_account_weekly: week_start is de maandag van de week. */
 export interface GoogleWeekRij {
   week_start: string;
+  impressions?: number | null;
+  clicks?: number | null;
   cost?: number | null;
   conversions?: number | null;
   conversions_value?: number | null;
 }
 
+/** Vertoningen en klikken: de eerste twee stappen van de trechter (lib/overzicht/trechter.ts). */
+export interface Tellers {
+  impressions: number;
+  clicks: number;
+}
+
 export interface DagTelInvoer {
-  /** Google: de maandreeks van de hooks (ClientHistoricalData) en, voor dagperiodes, de weekrijen. */
-  google?: { maanden?: ClientHistoricalData | null; weken?: readonly GoogleWeekRij[] | null } | null;
+  /**
+   * Google: de maandreeks van de hooks (ClientHistoricalData) en, voor dagperiodes, de weekrijen.
+   * `maandTellers` zijn de vertoningen en klikken per maand ("YYYY-MM") uit de blended route: de
+   * maandreeks van de hooks kent ze niet. Zonder telt Google over hele maanden zonder tellers.
+   */
+  google?: {
+    maanden?: ClientHistoricalData | null;
+    weken?: readonly GoogleWeekRij[] | null;
+    maandTellers?: ReadonlyMap<Month, Tellers> | null;
+  } | null;
   /** Dagrijen per kanaal, gelezen met kanaalDagbron (lib/period/kanaal-maanden.ts). ALLE rijen van
    *  het kanaal, niet alleen die van de periode: de start van het kanaal komt eruit. */
   dagkanalen?: Partial<Record<NietGoogleKanaal, readonly Record<string, unknown>[] | null>>;
@@ -105,6 +122,11 @@ export interface KanaalTelling {
    *  zonder uitgaven niet te onderscheiden, en die telt als nul, zoals in de maandoptelling. */
   ontbrekend: string[];
   totalen: Totalen;
+  /**
+   * Vertoningen en klikken over dezelfde eenheden als `totalen`, of null als de bron ze niet kent
+   * (Google over hele maanden zonder `maandTellers`, of weekrijen zonder die kolommen).
+   */
+  tellers: Tellers | null;
   /**
    * De eerste dag waarop het kanaal iets deed, uit ALLE rijen (niet alleen die van de periode); null
    * als het nergens iets deed. Per fijnheid zo precies als de rijen zijn: een dagkanaal de dag zelf
@@ -170,6 +192,7 @@ export function telGoogle(
     return {
       kanaal: "google", gevraagd: p, geteld, fijnheid: "maand", wijktAf,
       eenheden: monthsIn(maanden), ontbrekend: s.missing, totalen: s.totals,
+      tellers: google.maandTellers ? maandTellersOver(google.maandTellers, monthsIn(maanden)) : null,
       bronStart: start ? `${start}-01` : null, dataTot,
       uitleg: delen.length ? delen.join(" ") : null,
     };
@@ -180,6 +203,17 @@ export function telGoogle(
 
 function minDag(a: Dag, b: Dag): Dag {
   return a < b ? a : b;
+}
+
+/** De tellers over een rij maanden; een maand zonder tellers telt als nul, zoals in slicePeriod. */
+function maandTellersOver(perMaand: ReadonlyMap<Month, Tellers>, maanden: readonly Month[]): Tellers {
+  const t: Tellers = { impressions: 0, clicks: 0 };
+  for (const m of maanden) {
+    const x = perMaand.get(m);
+    t.impressions += n(x?.impressions);
+    t.clicks += n(x?.clicks);
+  }
+  return t;
 }
 
 /**
@@ -211,11 +245,16 @@ export function telGoogleWeken(p: DagPeriode, weken: readonly GoogleWeekRij[]): 
   // Een week die na gisteren begint, heeft nog geen hele dag: die telt niet, ook als er een rij is.
   const raakt = schoon.filter((w) => w.week_start <= p.eind && w.week_start <= gisteren && addDays(w.week_start, 6) >= p.start);
   const totalen = nul();
+  const tellers: Tellers = { impressions: 0, clicks: 0 };
   for (const w of raakt) {
     totalen.conversions += n(w.conversions);
     totalen.revenue += n(w.conversions_value);
     totalen.adSpend += n(w.cost);
+    tellers.impressions += n(w.impressions);
+    tellers.clicks += n(w.clicks);
   }
+  // Zonder de kolommen in de rijen (een oudere lezer) zijn de tellers onbekend, geen nul.
+  const metTellers = raakt.some((w) => typeof w.impressions === "number" || typeof w.clicks === "number");
 
   // Een week die nog moet beginnen ontbreekt niet: hij bestaat nog niet.
   const verwacht: Dag[] = [];
@@ -253,7 +292,7 @@ export function telGoogleWeken(p: DagPeriode, weken: readonly GoogleWeekRij[]): 
   }
   return {
     kanaal: "google", gevraagd: p, geteld, fijnheid: "week", wijktAf,
-    eenheden, ontbrekend, totalen,
+    eenheden, ontbrekend, totalen, tellers: raakt.length === 0 || metTellers ? tellers : null,
     bronStart: eersteActief?.week_start ?? null,
     dataTot: laatsteRij ? minDag(addDays(laatsteRij.week_start, 6), gisteren) : null,
     uitleg: delen.length ? delen.join(" ") : null,
@@ -288,6 +327,14 @@ export function telDagkanaal(
   const laatsteRij = laatsteDagUitRijen(rijen);
 
   const binnen = rijen.filter((r) => dagIn(String(r.date ?? "").slice(0, 10), p));
+  // De vertoningen en klikken uit dezelfde rijen, met de klikkolom van het kanaal (Meta: link_clicks),
+  // zoals monthlyFromDaily ze per maand optelt.
+  const klikveld = KANAAL_DAGBRON[CONVERSIE_KANAAL[kanaal]].clicksField;
+  const tellers: Tellers = { impressions: 0, clicks: 0 };
+  for (const r of binnen) {
+    tellers.impressions += n(Number(r.impressions ?? 0));
+    tellers.clicks += n(Number(r[klikveld] ?? 0));
+  }
   const stand = kanaalStandUitDagen("", [...binnen], kanaal, convConfig);
   const s = slicePeriod(stand.data, omhullendeMaanden(p));
 
@@ -305,7 +352,7 @@ export function telDagkanaal(
   }
   return {
     kanaal, gevraagd: p, geteld, fijnheid: "dag", wijktAf,
-    eenheden: [], ontbrekend: [], totalen: s.totals,
+    eenheden: [], ontbrekend: [], totalen: s.totals, tellers,
     bronStart: bron, dataTot: laatsteRij, uitleg,
   };
 }

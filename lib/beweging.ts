@@ -189,8 +189,9 @@ function telOpmaak(decimalen: number, groepen: boolean): Intl.NumberFormat {
 const uitlopen = (t: number): number => 1 - (1 - t) ** 3;
 
 /**
- * De tekst die een kerncijfer NU toont: bij een nieuwe waarde telt hij er in hooguit DUUR.lang
- * (300 ms) naartoe, vanaf wat er op dat moment stond.
+ * De tekst die een kerncijfer NU toont: bij een nieuwe waarde telt hij er in hooguit `duur`
+ * (standaard DUUR.lang, 300 ms) naartoe, vanaf wat er op dat moment stond. De trechter telt in
+ * DUUR.middel (200 ms), gelijk met zijn balken.
  *
  * - Eerste render: de waarde zelf, geen telling.
  * - Minder beweging (of geen requestAnimationFrame): de nieuwe waarde direct.
@@ -200,7 +201,7 @@ const uitlopen = (t: number): number => 1 - (1 - t) ** 3;
  * Anders staat de nieuwe waarde er één beeldje, springt hij terug naar de oude, en telt hij dan
  * pas: beweging die niets aanwijst.
  */
-export function useTellendeTekst(doel: string): string {
+export function useTellendeTekst(doel: string, duur: number = DUUR.lang): string {
   const minder = useMinderBeweging();
   // Wat er loopt: van welke tekst, naar welke, en hoe ver. null = er loopt niets.
   const [telling, setTelling] = useState<{ naar: string; tekst: string } | null>(null);
@@ -222,7 +223,7 @@ export function useTellendeTekst(doel: string): string {
     let begin: number | null = null;
     let raf = requestAnimationFrame(function stap(nu: number) {
       if (begin === null) begin = nu;
-      const t = Math.min(1, (nu - begin) / DUUR.lang);
+      const t = Math.min(1, (nu - begin) / duur);
       const tekst = tussenTekst(van, doel, uitlopen(t));
       getoond.current = tekst;
       if (t >= 1) { setTelling(null); return; }
@@ -230,6 +231,7 @@ export function useTellendeTekst(doel: string): string {
       raf = requestAnimationFrame(stap);
     });
     return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- de duur telt bij het begin van een telling, zoals de voorkeur
   }, [doel]);
 
   // Een telling hoort bij het doel waarvoor hij begon. Is het doel alweer anders (deze render),

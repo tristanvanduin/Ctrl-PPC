@@ -26,8 +26,9 @@ import type { ClientHistoricalData } from "@/lib/types";
 import { NIET_GOOGLE, type NietGoogleKanaal } from "./kanaal-maanden";
 import {
   telDagPeriode, telDagVergelijking,
-  type DagTelInvoer, type DagTelling, type DagVergelijkingTelling, type GoogleWeekRij,
+  type DagTelInvoer, type DagTelling, type DagVergelijkingTelling, type GoogleWeekRij, type Tellers,
 } from "./dag-telling";
+import type { Month } from "./period-range";
 import type { DagStaat } from "./dag-keuze";
 
 /** Wat er voor een klant opgehaald is. Een bron die niet te laden was, staat in `fouten`. */
@@ -43,7 +44,7 @@ const bronnen = new Map<string, Promise<DagBronnen>>();
 
 async function laadWeken(clientId: string): Promise<GoogleWeekRij[]> {
   const { data, error } = await dbSelect<GoogleWeekRij>("ads_account_weekly", {
-    select: "week_start,cost,conversions,conversions_value", clientId,
+    select: "week_start,impressions,clicks,cost,conversions,conversions_value", clientId,
     order: { column: "week_start", ascending: false }, limit: 1000,
   });
   if (error) throw new Error(error.message);
@@ -91,7 +92,7 @@ export interface DagCijfers {
  * gekozen). Null zolang er niets te tellen valt: geen dagstaat, de maandweg (dan rekent de band),
  * of de rijen laden nog.
  */
-export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData }: {
+export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData, googleTellers = null }: {
   clientId: string;
   /** De keuze per dag van de provider (usePeriod().dag). */
   staat: DagStaat | null;
@@ -101,6 +102,8 @@ export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData }:
   gekozen: Kanaal | null;
   /** De maandreeks van Google, zoals de band hem heeft. */
   googleData: ClientHistoricalData | null;
+  /** De vertoningen en klikken van Google per maand (de blended route), voor de trechter. */
+  googleTellers?: ReadonlyMap<Month, Tellers> | null;
 }): { alle: DagCijfers | null; getoond: DagCijfers | null; laden: boolean } {
   const nodig = !!staat && !staat.maandPad && kanalen.length > 0;
   const kanaalSleutel = kanalen.join(",");
@@ -125,7 +128,7 @@ export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData }:
       const dagkanalen: DagTelInvoer["dagkanalen"] = {};
       for (const k of NIET_GOOGLE) if (welke.includes(k) && b.dagkanalen[k]) dagkanalen[k] = b.dagkanalen[k];
       const invoer: DagTelInvoer = {
-        google: welke.includes("google") ? { maanden: googleData, weken: b.weken } : null,
+        google: welke.includes("google") ? { maanden: googleData, weken: b.weken, maandTellers: googleTellers } : null,
         dagkanalen,
         convConfig: b.convConfig,
       };
@@ -136,6 +139,6 @@ export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData }:
     };
     const alle = tel(kanalen);
     return { alle, getoond: gekozen && kanalen.includes(gekozen) ? tel([gekozen]) : alle };
-  }, [nodig, staat, b, googleNodig, googleData, kanalen, gekozen]);
+  }, [nodig, staat, b, googleNodig, googleData, googleTellers, kanalen, gekozen]);
   return { ...uit, laden: nodig && uit.alle === null };
 }

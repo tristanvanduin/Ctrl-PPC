@@ -990,6 +990,30 @@ const clientSettings: Row[] = [{
       { id: "demo-grt", name: "GreenTech Amsterdam", abbrev: "GRT", cadence: "annual", editions: [{ date: "2026-06-11", label: "2026" }, { date: "2027-06-10", label: "2027" }] },
       { id: "demo-gra", name: "GreenTech Americas", abbrev: "GRA", cadence: "annual", editions: [{ date: "2025-09-16", label: "2025" }, { date: "2026-09-15", label: "2026" }] },
       { id: "demo-grn", name: "GreenTech North America", abbrev: "GRN", cadence: "custom", editions: [{ date: "2026-11-04", label: "2026" }] },
+      // VOORBEELDEN, geen echte acties van deze fictieve klant: momenten met een begin en een eind
+      // (start/end, lib/events/event-periodes.ts), zodat de periodekiezer van de nieuwe weergave een
+      // event als periode laat kiezen en tegen de vorige editie zet. Ze staan alleen hier in de code,
+      // niet in de database.
+      //
+      // Welke cijfers erbij horen, eerlijk (de mock is klokrelatief en wordt bij elke aanroep opnieuw
+      // opgebouwd, dus "nu" is altijd vandaag): Google heeft maandcijfers over twee jaar en weekcijfers
+      // over de laatste 26 weken, Meta en LinkedIn dagcijfers over twee jaar (730 dagen), Microsoft
+      // dagcijfers over 400 dagen (op 13 november 2026: sinds oktober 2025). Daarom:
+      // - Moederdag-actie loopt over hele maanden (mei). 2026 tegen 2025 laat voor Google, Meta en
+      //   LinkedIn een vergelijking zien; alleen Microsoft liep in mei 2025 nog niet en valt buiten het
+      //   percentage, met de reden erbij.
+      // - Black Friday 2025 heeft cijfers van alle vier de kanalen, maar geen eerdere editie in de lijst.
+      //   Google telt een dagperiode per week, en die weken liggen buiten de 26 weken met weekrijen:
+      //   dat meldt het scherm. Black Friday 2026 ligt (op 13 november 2026) nog voor ons: die laat zien
+      //   hoe het scherm zegt dat er nog geen data is, en vult zich vanzelf zodra de dagen voorbij zijn.
+      { id: "demo-bf", name: "Black Friday", abbrev: "BF", cadence: "annual", editions: [
+        { date: "2025-11-28", label: "2025", start: "2025-11-21", end: "2025-12-01" },
+        { date: "2026-11-27", label: "2026", start: "2026-11-20", end: "2026-11-30" },
+      ] },
+      { id: "demo-moederdag", name: "Moederdag-actie", abbrev: "MD", cadence: "annual", editions: [
+        { date: "2025-05-11", label: "2025", start: "2025-05-01", end: "2025-05-31" },
+        { date: "2026-05-10", label: "2026", start: "2026-05-01", end: "2026-05-31" },
+      ] },
     ],
   },
   kpi_targets: { conversionsAbsolute: 700, revenueAbsolute: 90000, roasTarget: 4, cpaTarget: 60 },

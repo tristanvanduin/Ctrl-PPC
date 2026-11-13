@@ -76,6 +76,7 @@ import { GeenBeursfilter } from "./geen-beursfilter";
 import { overzichtBeursmelding } from "@/lib/overzicht/beursfilter";
 import { kiezerOpTab } from "@/lib/period/kiezer-per-tab";
 import { OverzichtBovenkant } from "./overzicht-bovenkant";
+import { OverzichtWatNu } from "./overzicht-wat-nu";
 import { WeergaveSchakelaar } from "./weergave-schakelaar";
 import { useWeergave } from "@/lib/use-weergave";
 import { WEERGAVE_PARAM } from "@/lib/weergave";
@@ -943,6 +944,11 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
                   onTijdasChange={setTijdas}
                   nieuw={nieuweWeergave}
                 />
+              )}
+              {/* Het einde van de trechter in de nieuwe weergave: de open voorstellen en to-do's, met
+                  de weg naar Bevindingen. Met de schakelaar uit staat hier niets. */}
+              {nieuweWeergave && (
+                <OverzichtWatNu clientId={client.id} channel={channel} onBeoordeel={naarBeoordelen} herlees={blendedStand.perKanaalTab} />
               )}
             </div>
             </SectieKopBijeen.Provider>

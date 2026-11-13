@@ -186,7 +186,10 @@ export function EventSettings({ clientId }: { clientId: string }) {
                   return (
                     <div key={idx} className="rounded-md border border-border/60 p-3">
                       <div className="flex items-start gap-2">
-                        <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-3 gap-y-2">
+                        {/* Twee gelijke kolommen vanaf een tablet: Begin en Eind staan onder Datum en Label
+                            en zijn even breed (een smalle datumkolom naast een brede maakte Eind
+                            breder dan Begin). Op een telefoon alles onder elkaar. */}
+                        <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                           <div className="min-w-0">
                             <label className="block min-w-0">
                               <span className="text-meta font-medium text-brand-gray">Datum (ankerpunt)</span>

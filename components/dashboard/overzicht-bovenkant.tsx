@@ -29,7 +29,14 @@ import type { ChannelPeriodData } from "@/lib/use-channel-period-data";
 import { ALLE_KANALEN, zichtbareTabs, type Kanaal, type Kanaalkeuze } from "@/lib/kanalen/beschikbaar";
 import { usePeriod } from "@/lib/period/period-context";
 import { bandDataStand } from "@/lib/period/band-stand";
-import { grafiekMaanden, kaartCijfers, kaartCijfersUitDagen, kaartDagRegel, kaartStand } from "@/lib/overzicht/bovenkant";
+import { grafiekMaanden, kaartCijfers, kaartCijfersUitDagen, kaartDagRegel, kaartStand, kanaalTotalen } from "@/lib/overzicht/bovenkant";
+import {
+  bijdragePerKanaal, kanaalParenUitDagen, kanaalParenUitMaanden, statusRegel, tellersOver, tellersPerMaand, trechter,
+  type KanaalStand, type Tellers,
+} from "@/lib/overzicht/trechter";
+import { comparePeriods } from "@/lib/period/apply-period";
+import { formatRange, monthsIn, type Month } from "@/lib/period/period-range";
+import { formatDagPeriode } from "@/lib/period/dag-periode";
 import { useDagTelling } from "@/lib/period/use-dag-telling";
 import { opbouwVertraging, useEersteOpbouw } from "@/lib/beweging";
 import { heeftGecachteInstellingen, loadClientSettings } from "@/lib/client-settings";
@@ -46,6 +53,7 @@ import { DagKerncijfers } from "./dag-kerncijfers";
 import { BandUitZaad, type BandZaad } from "./band-uit-zaad";
 import { OverzichtHoofdgrafiek } from "./overzicht-hoofdgrafiek";
 import { OverzichtLogboek } from "./overzicht-logboek";
+import { BijdragePerKanaal, KanaalTrechter, StatusRegel, type TrechterVenster } from "./overzicht-trechter";
 
 /**
  * De health van Google voor de kaart: dezelfde score als in de ranking "Account Health per kanaal".
@@ -105,7 +113,7 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
    */
   googleStaat?: GoogleHealthInvoer | null;
   /** De blended route: de health per dagkanaal, en de stand van de bronnen. */
-  route: Pick<BlendedClientDataState, "perKanaalTab" | "dataStand" | "loading" | "error">;
+  route: Pick<BlendedClientDataState, "perKanaal" | "perKanaalTab" | "dataStand" | "loading" | "error">;
   /** De maandreeksen van de band (useChannelPeriodData), voor het gekozen kanaal en per kanaal. */
   band: ChannelPeriodData;
   /** De stand van het gekozen kanaal is bekend: pas dan cijfers en een periode (zie bandKlaar). */
@@ -148,7 +156,17 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
   const gekozen = channel === "blended" ? null : channel;
   // Een periode per dag die maanden niet kunnen: de tegels en de kaarten uit de telling per dag.
   const dagPad = !!periode.dag && !periode.dag.maandPad;
-  const dagTelling = useDagTelling({ clientId, staat: dagPad ? periode.dag : null, kanalen: lijst, gekozen, googleData });
+  // De vertoningen en klikken per kanaal per maand, uit de blended route: de eerste twee stappen van
+  // de trechter. De band kent ze niet (lib/overzicht/trechter.ts).
+  const tellersPerKanaal = useMemo(() => {
+    const uit: Partial<Record<Kanaal, Map<Month, Tellers> | null>> = {};
+    for (const r of route.perKanaal ?? []) uit[r.kanaal] = tellersPerMaand(r.maanden);
+    return uit;
+  }, [route.perKanaal]);
+  const dagTelling = useDagTelling({
+    clientId, staat: dagPad ? periode.dag : null, kanalen: lijst, gekozen, googleData,
+    googleTellers: tellersPerKanaal.google ?? null,
+  });
   const cijfers = useMemo(() => {
     if (!bandKlaar) return null;
     if (!dagPad) return kaartCijfers(band.perKanaal, lijst, periode.range);
@@ -193,6 +211,90 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
     };
   }), [lijst, scores, google.laadt, route.error, route.dataStand, googleStand, googleData, band.laatsteDag, band.klaar, cijfers, vandaag, demo, dagPad, dagTelling.alle]);
 
+  // ── De trechter: hoe gaat het, en waar zit het (lib/overzicht/trechter.ts) ──
+  // Het venster zoals de tegels het noemen: per dag de dagen, anders de maanden.
+  const vergelijkDag = dagPad && periode.dag && periode.dag.keuze.vergelijk !== "none" ? periode.dag.vergelijking.periode : null;
+  const overDag = dagPad && periode.dag ? formatDagPeriode(periode.dag.periode) : null;
+  const tegenDag = vergelijkDag ? formatDagPeriode(vergelijkDag) : null;
+  const venster = useMemo((): TrechterVenster => overDag !== null
+    ? { over: overDag, tegen: tegenDag }
+    : { over: formatRange(periode.range), tegen: periode.compareRange ? formatRange(periode.compareRange) : null },
+  [overDag, tegenDag, periode.range, periode.compareRange]);
+  // De statusregel uit DEZELFDE cijfers als de tegels eronder: comparePeriods op de band, of de
+  // telling per dag van wat getoond wordt.
+  const status = useMemo((): string | null => {
+    if (!bandKlaar) return null;
+    if (dagPad) {
+      const g = dagTelling.getoond;
+      const t = g ? (g.vergelijking?.huidig ?? g.alleen) : null;
+      if (!g || !t) return null;
+      return statusRegel({ totalen: t.totaal, deltas: g.vergelijking?.deltas ?? null, tegen: g.vergelijking ? formatDagPeriode(g.vergelijking.vergelijking) : null });
+    }
+    if (!band.data) return null;
+    const { current, deltas } = comparePeriods(band.data, periode.range, periode.compareRange, band.bronnen ?? undefined);
+    return statusRegel({ totalen: current.totals, deltas: deltas ?? null, tegen: periode.compareRange ? formatRange(periode.compareRange) : null });
+  }, [bandKlaar, dagPad, dagTelling.getoond, band.data, band.bronnen, periode.range, periode.compareRange]);
+  // Per kanaal wat in de vergelijking zit: per maand gepaardeTotalen op de bronnen van de band, per
+  // dag de telling. Null zolang er niets te paren valt of de cijfers laden.
+  const paren = useMemo(() => {
+    if (!bandKlaar) return null;
+    if (dagPad) {
+      const v = dagTelling.alle?.vergelijking ?? null;
+      return v ? kanaalParenUitDagen(v, lijst) : null;
+    }
+    if (lijst.some((k) => !band.perKanaal[k])) return null;
+    return kanaalParenUitMaanden({ perKanaal: band.perKanaal, tellers: tellersPerKanaal, kanalen: lijst, periode: periode.range, vergelijking: periode.compareRange });
+  }, [bandKlaar, dagPad, dagTelling.alle, lijst, band.perKanaal, tellersPerKanaal, periode.range, periode.compareRange]);
+  // Op Alle kanalen met meer dan één kanaal: de bijdrage per kanaal. Op een gekozen kanaal, of bij een
+  // klant met één kanaal, de trechter van dat kanaal: een bijdrage van één kanaal is altijd 100%.
+  const trechterKanaal: Kanaal | null = gekozen ?? (lijst.length === 1 ? lijst[0] : null);
+  const bijdrage = useMemo(
+    () => (trechterKanaal || !cijfers ? null : bijdragePerKanaal(cijfers, paren)),
+    [trechterKanaal, cijfers, paren],
+  );
+  const trechterStand = useMemo((): KanaalStand | null => {
+    if (!trechterKanaal || !bandKlaar) return null;
+    if (dagPad) {
+      const alle = dagTelling.alle;
+      const t = alle ? (alle.vergelijking?.huidig ?? alle.alleen)?.perKanaal.find((x) => x.kanaal === trechterKanaal) : null;
+      return t ? { totalen: t.totalen, tellers: t.tellers } : null;
+    }
+    const bron = band.perKanaal[trechterKanaal];
+    // Wacht op de route zolang die nog laadt: anders stond er eerst "niet bekend" bij de klikken.
+    if (!bron || (route.perKanaal === null && route.loading)) return null;
+    return { totalen: kanaalTotalen(bron, periode.range), tellers: tellersOver(tellersPerKanaal[trechterKanaal], monthsIn(periode.range)) };
+  }, [trechterKanaal, bandKlaar, dagPad, dagTelling.alle, band.perKanaal, route.perKanaal, route.loading, tellersPerKanaal, periode.range]);
+  const trechterVergelijk = trechterKanaal ? paren?.find((p) => p.kanaal === trechterKanaal) ?? null : null;
+  // Het venster van de trechter op een dagperiode: wat het kanaal WERKELIJK telde. Google telt een
+  // dagperiode per hele week of maand, en een kanaal dat later begon of nog niet bij is telt korter;
+  // dan noemt de regel de getelde dagen en de gevraagde erbij (KanaalTelling.wijktAf en geteld).
+  const trechterVenster = useMemo((): TrechterVenster => {
+    const alle = dagTelling.alle;
+    if (!dagPad || !trechterKanaal || !alle) return venster;
+    const nu = (alle.vergelijking?.huidig ?? alle.alleen)?.perKanaal.find((x) => x.kanaal === trechterKanaal) ?? null;
+    const toen = alle.vergelijking?.vorig.perKanaal.find((x) => x.kanaal === trechterKanaal) ?? null;
+    const getelde = (t: typeof nu, standaard: string): string => {
+      if (!t || !t.wijktAf) return standaard;
+      return t.geteld
+        ? `${formatDagPeriode(t.geteld)} (gevraagd: ${formatDagPeriode(t.gevraagd)})`
+        : `${formatDagPeriode(t.gevraagd)}, waarin niets te tellen viel`;
+    };
+    return { over: getelde(nu, venster.over), tegen: venster.tegen === null ? null : getelde(toen, venster.tegen) };
+  }, [dagPad, trechterKanaal, dagTelling.alle, venster]);
+  // Op Alle kanalen op een dagperiode: telde niet elk kanaal precies deze dagen, dan zegt de regel dat.
+  const bijdrageVenster = useMemo((): TrechterVenster => {
+    const alle = dagTelling.alle;
+    const t = alle ? (alle.vergelijking?.huidig ?? alle.alleen) : null;
+    const gemengd = !!t?.gemengd || !!alle?.vergelijking?.vorig.gemengd;
+    return dagPad && gemengd
+      ? { ...venster, noot: "niet elk kanaal telde precies deze dagen; de uitleg onder de kerncijfers zegt per kanaal welke" }
+      : venster;
+  }, [dagPad, dagTelling.alle, venster]);
+  const trechterUitkomst = useMemo(
+    () => (trechterStand ? trechter(trechterStand, trechterVergelijk?.paar ?? null) : null),
+    [trechterStand, trechterVergelijk],
+  );
+
   // Eén lijst per (gekozen, lijst): `gekozen ? [gekozen] : lijst` maakte bij een gekozen kanaal elke
   // render een nieuwe, en dan krijgt de grafiek elke render een andere prop.
   const grafiekKanalen = useMemo(() => (gekozen ? [gekozen] : lijst), [gekozen, lijst]);
@@ -222,13 +324,22 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
       ) : reserveerKaarten ? (
         <div className={`${KAARTENRIJ_HOOGTE} rounded-xl bg-muted/40`} aria-hidden />
       ) : null}
-      <div className={speel ? "opbouw" : undefined} style={stap(voor)}>
+      {/* 1 HOE GAAT HET: de statusregel, dan de kerncijfers. 2 WAAR ZIT HET: de bijdrage per kanaal of
+          de trechter van het kanaal. Daarna 3 WAAROM: de grafiek en het logboek, en onder deze bovenkant
+          gezondheid en pacing. 4 WAT NU staat onderaan de pagina (overzicht-wat-nu.tsx). */}
+      <div className={`space-y-2 ${speel ? "opbouw" : ""}`} style={stap(voor)}>
+        {lijst.length > 0 && <StatusRegel tekst={status} />}
         {dagPad ? (
           <DagKerncijfers cijfers={bandKlaar ? dagTelling.getoond : null} laden={!bandKlaar || dagTelling.laden} />
         ) : (
           <PeriodSummary data={bandKlaar ? band.data : null} bronnen={band.bronnen} laden={!bandKlaar} vorm="tegels"
             zolangLaden={bandZaad && <BandUitZaad zaad={bandZaad} vorm="tegels" />} />
         )}
+        {trechterKanaal ? (
+          <KanaalTrechter kanaal={trechterKanaal} trechter={trechterUitkomst} uitleg={trechterVergelijk?.uitleg ?? null} venster={trechterVenster} />
+        ) : lijst.length > 1 ? (
+          <BijdragePerKanaal rijen={bijdrage} venster={bijdrageVenster} />
+        ) : null}
       </div>
       {/* De grafiek en het logboek naast elkaar (8 en 4 van de 12 kolommen); op een telefoon onder
           elkaar met het logboek EERST: wat er gebeurde lees je voor je het verloop bekijkt.
