@@ -1,7 +1,7 @@
 -- 108: claim_generation_job alleen nog voor service_role.
 --
--- NOG NIET GEDRAAID. Wacht op akkoord van de eigenaar; deze migratie wijzigt rechten in de live
--- database. Terugweg: `grant execute on function claim_generation_job(text[]) to anon,
+-- GEDRAAID op 13 november 2026, met akkoord van de eigenaar. Gecontroleerd: alleen postgres en
+-- service_role hebben nog EXECUTE, en scripts/check-rpc-rechten.mjs is groen. Terugweg: `grant execute on function claim_generation_job(text[]) to anon,
 -- authenticated;` -- seconden werk, geen dataverlies.
 --
 -- ── WAAROM ───────────────────────────────────────────────────────────────────

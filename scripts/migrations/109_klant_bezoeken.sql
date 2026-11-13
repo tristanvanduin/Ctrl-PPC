@@ -1,6 +1,7 @@
 -- 109: klant_bezoeken, het ijkpunt "sinds je vorige bezoek" per gebruiker en per klant.
 --
--- STATUS: KLAARGEZET, NIET TOEGEPAST EN NERGENS OP AANGESLOTEN (bouwplan fase 4, 12 november 2026).
+-- STATUS: TOEGEPAST op 13 november 2026 (akkoord eigenaar; RLS aan, drie policies, nul rijen), maar
+-- nog NERGENS OP AANGESLOTEN (bouwplan fase 4, 12 november 2026).
 -- Geen route, hook of cron leest of schrijft deze tabel. Het ijkpunt woont nu in localStorage
 -- (lib/overzicht/bezoek.ts, sleutel `vorig-bezoek:<client_id>`): per browser, en dus kwijt op een
 -- ander apparaat of na het wissen van de browsergegevens. Deze tabel maakt er later een ijkpunt
