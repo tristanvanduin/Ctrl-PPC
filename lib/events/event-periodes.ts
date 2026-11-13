@@ -23,9 +23,9 @@
 //   maakt een dag niet uit, voor een vergelijking per dag wel). Een event zonder id of naam ook,
 //   zoals businessEventsUitRaiEvents.
 //
-// Let op: event-settings.tsx bewaart start en end bij het opslaan (hij spreidt de editie), maar
-// gooit een editie zonder `date` weg. Een editie met alleen start/end overleeft dus het opslaan via
-// die pagina niet, totdat stap 3 daar een veld voor maakt.
+// Invullen kan sinds stap 2 in event-settings.tsx (begin en eind per editie; de regels in
+// lib/events/editie-invoer.ts). Dat formulier is strenger dan deze lezer: het eist een `date` naast
+// start/end en dat de periode die `date` bevat. Deze lezer blijft ruim voor wat er al staat.
 //
 // Gelezen zoals lib/fair (geldigeEdities): een datum mag een tijd dragen ("2026-01-05T00:00:00Z");
 // alleen de eerste tien tekens tellen, zoals bij week_start in de weekrijen. Het terugvallabel bij
