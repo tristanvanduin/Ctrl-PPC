@@ -1,10 +1,11 @@
 -- 110: meta_period_reach, vertoningen en bereik van Meta over een HEEL venster in een lezing.
 --
--- STATUS: NIET GEDRAAID. Geschreven op 13 november 2026 bij de doorlichting (sectie 1, Meta-
--- frequentie). De code werkt zonder deze tabel: de signaalroute leest hem, en als hij ontbreekt of
+-- STATUS: GEDRAAID op 13 november 2026, met akkoord van de eigenaar (RLS aan, een policy, nul
+-- rijen). Geschreven dezelfde dag bij de doorlichting (sectie 1, Meta-frequentie). De tabel blijft
+-- leeg tot er een echte Meta-koppeling synct. De code werkt zonder deze tabel: de signaalroute leest hem, en als hij ontbreekt of
 -- leeg is meldt de detector "frequentie niet te beoordelen" in plaats van stil "niets gevonden".
--- TOT DEZE MIGRATIE GEDRAAID IS, GAAN FATIGUE EN SATURATIE IN DE APP DUS NOOIT AF: ze melden
--- alleen "niet te beoordelen". Ook in de demo-app (lib/demo/demo-rows.ts kent de tabel niet); de
+-- ZOLANG DE TABEL LEEG IS, GAAN FATIGUE EN SATURATIE IN DE APP NIET AF: ze melden
+-- "niet te beoordelen". Ook in de demo-app (lib/demo/demo-rows.ts kent de tabel niet); de
 -- --check van scripts/demo/seed-demo-client.ts zegt dat er bij S1 en S2 bij.
 -- De dagelijkse Meta-run (lib/sync/kanaal-runs.ts) roept syncMetaPeriodReach aan. Die kijkt eerst
 -- of de tabel er is; zonder tabel vraagt hij niets aan Meta, zet "overgeslagen: tabel ontbreekt"

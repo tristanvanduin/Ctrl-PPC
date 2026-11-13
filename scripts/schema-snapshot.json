@@ -1236,6 +1236,13 @@
 "avg_cpv",
 "video_view_rate"
 ],
+"klant_bezoeken": [
+"user_id",
+"client_id",
+"vorig_bezoek_op",
+"laatst_gezien_op",
+"updated_at"
+],
 "linkedin_account_daily": [
 "client_id",
 "date",
@@ -2085,6 +2092,18 @@
 "cpa",
 "roas",
 "conversions"
+],
+"meta_period_reach": [
+"client_id",
+"level",
+"entity_id",
+"period_start",
+"period_end",
+"impressions",
+"reach",
+"frequency",
+"created_at",
+"updated_at"
 ],
 "meta_sync_runs": [
 "id",

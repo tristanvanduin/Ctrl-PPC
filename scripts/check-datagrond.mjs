@@ -38,7 +38,9 @@ if (process.argv.includes("--vernieuw")) {
   for (const r of rows.sort((a, b) => a.table_name.localeCompare(b.table_name))) {
     snap[r.table_name] = r.kolommen;
   }
-  writeFileSync(SNAPSHOT_PAD, JSON.stringify(snap, null, 0));
+  // Een waarde per regel: dan is een nieuwe tabel of kolom in de diff een paar regels, geen
+  // herschreven bestand van 2.500 regels.
+  writeFileSync(SNAPSHOT_PAD, JSON.stringify(snap, null, "") + "\n");
   console.log(`Snapshot ververst: ${Object.keys(snap).length} tabellen/views.`);
   process.exit(0);
 }
@@ -53,12 +55,7 @@ const SCHEMA = JSON.parse(readFileSync(SNAPSHOT_PAD, "utf8"));
 // gewoon als fout. Staat de tabel eenmaal in de snapshot (na --vernieuw), dan doet de regel niets
 // meer en hoort hij weg. Een tabel hoort hier ALLEEN als de code getest is zonder de tabel.
 const KLAARGEZET = {
-  meta_period_reach: {
-    migratie: "scripts/migrations/110_meta_period_reach.sql",
-    reden: "Meta-periodebereik voor de frequentiedetector. lib/meta/sync.ts kijkt eerst of de tabel " +
-      "bestaat en slaat de lezing anders over (getest in lib/meta/__meta_sync_test.ts); de detector " +
-      "zegt dan 'niet te beoordelen'.",
-  },
+  // Leeg. meta_period_reach (migratie 110) stond hier tot hij op 13 november 2026 gedraaid werd.
 };
 const klaargezet = [];
 
